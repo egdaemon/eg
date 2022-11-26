@@ -43,14 +43,9 @@ func Parallel(operations ...op) Task {
 	})
 }
 
-func When(o Task, conditions ...bool) Task {
+func When(b bool, o Task) Task {
 	return fnTask(func() error {
-		result := true
-		for _, c := range conditions {
-			result = result && c
-		}
-
-		if !result {
+		if !b {
 			return nil
 		}
 

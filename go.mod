@@ -32,5 +32,6 @@ require (
 require (
 	github.com/go-logr/logr v1.2.3 // indirect
 	github.com/stretchr/testify v1.8.1 // indirect
+	github.com/tetratelabs/wazero v1.0.0-pre.3
 	golang.org/x/sys v0.2.0 // indirect
 )

@@ -1,4 +1,3 @@
-// Package bwc is the user client which focuses on human friendly behaviors not system administration, and not on backwards compatibility.
 package main
 
 import (
@@ -15,6 +14,7 @@ import (
 	"github.com/james-lawrence/eg/cmd/cmdopts"
 	"github.com/james-lawrence/eg/internal/contextx"
 	"github.com/james-lawrence/eg/internal/debugx"
+	"github.com/james-lawrence/eg/internal/osx"
 	"github.com/willabides/kongplete"
 )
 
@@ -22,6 +22,7 @@ func main() {
 	var shellcli struct {
 		cmdopts.Global
 		Version            cmdopts.Version              `cmd:"" help:"display versioning information"`
+		Interp             runner                       `cmd:"" help:"execute the interpreter on the given directory"`
 		InstallCompletions kongplete.InstallCompletions `cmd:"" help:"install shell completions"`
 	}
 
@@ -44,7 +45,9 @@ func main() {
 		&shellcli,
 		kong.Name("eg"),
 		kong.Description("cli for eg"),
-		kong.Vars{},
+		kong.Vars{
+			"vars_cwd": osx.Getwd("."),
+		},
 		kong.UsageOnError(),
 		kong.Bind(&shellcli.Global),
 		kong.TypeMapper(reflect.TypeOf(&net.IP{}), kong.MapperFunc(cmdopts.ParseIP)),
@@ -68,6 +71,7 @@ func main() {
 	}
 
 	shellcli.Cleanup.Wait()
+
 	if err != nil {
 		os.Exit(1)
 	}

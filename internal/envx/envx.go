@@ -2,7 +2,10 @@
 package envx
 
 import (
+	"encoding/base64"
+	"encoding/hex"
 	"log"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -11,45 +14,96 @@ import (
 	"github.com/pkg/errors"
 )
 
+// Int retrieve a integer flag from the environment, checks each key in order
+// first to parse successfully is returned.
+func Int(fallback int, keys ...string) int {
+	return envval(fallback, func(s string) (int, error) {
+		decoded, err := strconv.ParseInt(s, 10, 64)
+		return int(decoded), errors.Wrapf(err, "integer '%s' is invalid", s)
+	}, keys...)
+}
+
+func Float64(fallback float64, keys ...string) float64 {
+	return envval(fallback, func(s string) (float64, error) {
+		decoded, err := strconv.ParseFloat(s, 64)
+		return float64(decoded), errors.Wrapf(err, "float64 '%s' is invalid", s)
+	}, keys...)
+}
+
 // Boolean retrieve a boolean flag from the environment, checks each key in order
 // first to parse successfully is returned.
 func Boolean(fallback bool, keys ...string) bool {
-	for _, k := range keys {
-		if b, err := strconv.ParseBool(os.Getenv(k)); err == nil {
-			return b
-		}
-	}
-
-	return fallback
+	return envval(fallback, func(s string) (bool, error) {
+		decoded, err := strconv.ParseBool(s)
+		return decoded, errors.Wrapf(err, "boolean '%s' is invalid", s)
+	}, keys...)
 }
 
 // String retrieve a string value from the environment, checks each key in order
 // first string found is returned.
 func String(fallback string, keys ...string) string {
-	for _, k := range keys {
-		s := strings.TrimSpace(os.Getenv(k))
-		if s != "" {
-			return s
-		}
-	}
-
-	return fallback
+	return envval(fallback, func(s string) (string, error) {
+		// we'll never receive an empty string because envval skips empty strings.
+		return s, nil
+	}, keys...)
 }
 
 // Duration retrieves a time.Duration from the environment, checks each key in order
 // first successful parse to a duration is returned.
 func Duration(fallback time.Duration, keys ...string) time.Duration {
+	return envval(fallback, func(s string) (time.Duration, error) {
+		decoded, err := time.ParseDuration(s)
+		return decoded, errors.Wrapf(err, "time.Duration '%s' is invalid", s)
+	}, keys...)
+}
+
+// Hex read value as a hex encoded string.
+func Hex(fallback []byte, keys ...string) []byte {
+	return envval(fallback, func(s string) ([]byte, error) {
+		decoded, err := hex.DecodeString(s)
+		return decoded, errors.Wrapf(err, "invalid hex encoded data '%s'", s)
+	}, keys...)
+}
+
+// Base64 read value as a base64 encoded string
+func Base64(fallback []byte, keys ...string) []byte {
+	enc := base64.RawStdEncoding.WithPadding('=')
+	return envval(fallback, func(s string) ([]byte, error) {
+		decoded, err := enc.DecodeString(s)
+		return decoded, errors.Wrapf(err, "invalid base64 encoded data '%s'", s)
+	}, keys...)
+}
+
+func URL(fallback string, keys ...string) *url.URL {
+	var (
+		err    error
+		parsed *url.URL
+	)
+
+	if parsed, err = url.Parse(fallback); err != nil {
+		panic(errors.Wrap(err, "must provide a valid fallback url"))
+	}
+
+	return envval(parsed, func(s string) (*url.URL, error) {
+		decoded, err := url.Parse(s)
+		return decoded, errors.WithStack(err)
+	}, keys...)
+}
+
+func envval[T any](fallback T, parse func(string) (T, error), keys ...string) T {
 	for _, k := range keys {
 		s := strings.TrimSpace(os.Getenv(k))
 		if s == "" {
 			continue
 		}
 
-		if d, err := time.ParseDuration(s); err == nil {
-			return d
-		} else {
-			log.Println(errors.Wrapf(err, "unable to parse time.Duration from %s", s))
+		decoded, err := parse(s)
+		if err != nil {
+			log.Printf("%s stored an invalid value %v\n", k, err)
+			continue
 		}
+
+		return decoded
 	}
 
 	return fallback

@@ -1,0 +1,13 @@
+FROM ubuntu:jammy
+
+# put apt in non-interactive mode
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt update
+
+# general utilities
+RUN apt install -y --no-install-recommends curl gnupg2 software-properties-common lsb-release build-essential iproute2 git
+RUN apt install -y --no-install-recommends libpq5 postgresql-14 postgresql-client-14 postgresql-contrib-14 postgresql-client-common
+RUN apt install -y --no-install-recommends ssh
+
+RUN systemctl enable postgresql ssh

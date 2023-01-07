@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"os"
+	"time"
 
 	"github.com/james-lawrence/eg/runtime/wasi/env"
 	"github.com/james-lawrence/eg/runtime/wasi/langx"
@@ -36,8 +37,13 @@ func Op4(yak.Op) error {
 	return nil
 }
 
-func DaemonTests() error {
+func PrintDir(yak.Op) error {
+	return shell.Run(context.Background(), "echo hello world")
+}
+
+func DaemonTests(ctx context.Context) error {
 	return yak.Perform(
+		ctx,
 		yak.Parallel(
 			Op1,
 			Op2,
@@ -51,27 +57,18 @@ func DaemonTests() error {
 }
 
 func main() {
-	if err := yak.Perform(yak.Module(DaemonTests)); err != nil {
+	ctx, done := context.WithTimeout(context.Background(), time.Hour)
+	defer done()
+
+	if err := shell.Run(ctx, "echo hello world"); err != nil {
 		panic(err)
 	}
 
-	if i, err := os.Stat("/bin/bash"); err == nil {
-		log.Println("found bin directory", i.Name())
-	} else {
-		log.Println("unable to locate /bin/bash", err)
-	}
-
-	if i, err := os.Stat("/usr/bin/bash"); err == nil {
-		log.Println("found bash", i.Name())
-	} else {
-		log.Println("unable to locate /usr/bin/bash", err)
-	}
-
-	if err := shell.Run(context.Background(), "echo hello world"); err != nil {
+	if err := shell.Run(ctx, "ls -lha"); err != nil {
 		panic(err)
 	}
 
 	yak.Container("ubuntu.22.04").
-		Definition(langx.Must(os.Open("Containerfile"))).
+		Definition(langx.Must(os.Open(".test/Containerfile"))).
 		Perform(yak.Module(DaemonTests))
 }

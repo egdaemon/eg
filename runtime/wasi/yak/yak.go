@@ -2,27 +2,36 @@ package yak
 
 import (
 	"bytes"
+	"context"
 	"io"
 	"log"
 )
 
 // represents a sequence of operations to perform.
 type Task interface {
-	Do() error
+	Do(ctx context.Context) error
 }
 
-type Op interface{}
+type Op interface {
+	// Context() context.Context TODO
+}
 type op func(Op) error
 
-func Module(o func() error) Task {
-	return fnTask(func() error {
-		return o()
+type fnTask func(ctx context.Context) error
+
+func (t fnTask) Do(ctx context.Context) error {
+	return t(ctx)
+}
+
+func Module(o func(ctx context.Context) error) Task {
+	return fnTask(func(ctx context.Context) error {
+		return o(ctx)
 	})
 }
 
-func Perform(tasks ...Task) error {
+func Perform(ctx context.Context, tasks ...Task) error {
 	for _, t := range tasks {
-		if err := t.Do(); err != nil {
+		if err := t.Do(ctx); err != nil {
 			return err
 		}
 	}
@@ -31,9 +40,9 @@ func Perform(tasks ...Task) error {
 }
 
 func Deferred(tasks ...Task) Task {
-	return fnTask(func() error {
+	return fnTask(func(ctx context.Context) error {
 		for _, task := range tasks {
-			if err := task.Do(); err != nil {
+			if err := task.Do(ctx); err != nil {
 				return err
 			}
 		}
@@ -41,14 +50,8 @@ func Deferred(tasks ...Task) Task {
 	})
 }
 
-type fnTask func() error
-
-func (t fnTask) Do() error {
-	return t()
-}
-
 func Sequential(operations ...op) Task {
-	return fnTask(func() error {
+	return fnTask(func(ctx context.Context) error {
 		for _, op := range operations {
 			if err := op(nil); err != nil {
 				return err
@@ -59,7 +62,7 @@ func Sequential(operations ...op) Task {
 }
 
 func Parallel(operations ...op) Task {
-	return fnTask(func() error {
+	return fnTask(func(ctx context.Context) error {
 		for _, op := range operations {
 			if err := op(nil); err != nil {
 				return err
@@ -70,12 +73,12 @@ func Parallel(operations ...op) Task {
 }
 
 func When(b bool, o Task) Task {
-	return fnTask(func() error {
+	return fnTask(func(ctx context.Context) error {
 		if !b {
 			return nil
 		}
 
-		return o.Do()
+		return o.Do(ctx)
 	})
 }
 
@@ -116,5 +119,5 @@ func (t ContainerRunner) Perform(tasks ...Task) error {
 		log.Printf("building container %s\n%s\n", t.name, b.String())
 	}
 
-	return Perform(tasks...)
+	return Perform(context.Background(), tasks...)
 }

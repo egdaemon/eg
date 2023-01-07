@@ -4,10 +4,11 @@ comma := ,
 space :=
 space +=
 
-goimports := golang.org/x/tools/cmd/goimports@v0.1.12
-golangci_lint := github.com/golangci/golangci-lint/cmd/golangci-lint@v1.49.0
+gofumpt := mvdan.cc/gofumpt@v0.4.0
+gosimports := github.com/rinchsan/gosimports/cmd/gosimports@v0.3.4
+golangci_lint := github.com/golangci/golangci-lint/cmd/golangci-lint@v1.50.1
 # sync this with netlify.toml!
-hugo          := github.com/gohugoio/hugo@v0.102.3
+hugo          := github.com/gohugoio/hugo@v0.105.0
 
 # Make 3.81 doesn't support '**' globbing: Set explicitly instead of recursion.
 all_sources   := $(wildcard *.go */*.go */*/*.go */*/*/*.go */*/*/*.go */*/*/*/*.go)
@@ -50,11 +51,13 @@ test.examples:
 build.examples.as:
 	@cd ./imports/assemblyscript/example/testdata && npm install && npm run build
 
-# Use -fstage1 to avoid bugs in the new compiler
-# https://github.com/ziglang/zig/wiki/Self-Hosted-Compiler-Upgrade-Guide#is-it-time-to-upgrade
+%.wasm: %.zig
+	@(cd $(@D); zig build -Drelease-small=true)
+	@mv $(@D)/zig-out/*/$(@F) $(@D)
+
 .PHONY: build.examples.zig
-build.examples.zig:
-	@cd examples/allocation/zig/testdata/ && zig build -fstage1 -Drelease-small=true && mv zig-out/lib/greet.wasm .
+build.examples.zig: examples/allocation/zig/testdata/greet.wasm imports/wasi_snapshot_preview1/example/testdata/zig/cat.wasm imports/wasi_snapshot_preview1/testdata/zig/wasi.wasm
+	@cd internal/testing/dwarftestdata/testdata/zig; zig build; mv zig-out/*/main.wasm ./ # Need DWARF custom sections.
 
 tinygo_sources := examples/basic/testdata/add.go examples/allocation/tinygo/testdata/greet.go examples/cli/testdata/cli.go imports/wasi_snapshot_preview1/example/testdata/tinygo/cat.go
 .PHONY: build.examples.tinygo
@@ -62,9 +65,11 @@ build.examples.tinygo: $(tinygo_sources)
 	@for f in $^; do \
 	    tinygo build -o $$(echo $$f | sed -e 's/\.go/\.wasm/') -scheduler=none --no-debug --target=wasi $$f; \
 	done
+	# Need DWARF sections.
+	tinygo build -o internal/testing/dwarftestdata/testdata/tinygo/main.wasm -scheduler=none --target=wasi internal/testing/dwarftestdata/testdata/tinygo/main.go
 
 # We use zig to build C as it is easy to install and embeds a copy of zig-cc.
-c_sources := imports/wasi_snapshot_preview1/example/testdata/zig-cc/cat.c
+c_sources := imports/wasi_snapshot_preview1/example/testdata/zig-cc/cat.c imports/wasi_snapshot_preview1/testdata/zig-cc/wasi.c
 .PHONY: build.examples.zig-cc
 build.examples.zig-cc: $(c_sources)
 	@for f in $^; do \
@@ -99,9 +104,16 @@ build.examples.emscripten: $(emscripten_sources)
 
 %/greet.wasm : cargo_target := wasm32-unknown-unknown
 %/cat.wasm : cargo_target := wasm32-wasi
+%/wasi.wasm : cargo_target := wasm32-wasi
 
 .PHONY: build.examples.rust
-build.examples.rust: examples/allocation/rust/testdata/greet.wasm imports/wasi_snapshot_preview1/example/testdata/cargo-wasi/cat.wasm
+build.examples.rust: examples/allocation/rust/testdata/greet.wasm imports/wasi_snapshot_preview1/example/testdata/cargo-wasi/cat.wasm imports/wasi_snapshot_preview1/testdata/cargo-wasi/wasi.wasm internal/testing/dwarftestdata/testdata/rust/main.wasm.xz
+
+# Normally, we build release because it is smaller. Testing dwarf requires the debug build.
+internal/testing/dwarftestdata/testdata/rust/main.wasm.xz:
+	cd $(@D) && cargo wasi build
+	mv $(@D)/target/wasm32-wasi/debug/main.wasm $(@D)
+	cd $(@D) && xz -k -f ./main.wasm # Rust's DWARF section is huge, so compress it.
 
 # Builds rust using cargo normally, or cargo-wasi.
 %.wasm: %.rs
@@ -114,8 +126,8 @@ spectest_v1_testdata_dir := $(spectest_v1_dir)/testdata
 spec_version_v1 := wg-1.0
 spectest_v2_dir := $(spectest_base_dir)/v2
 spectest_v2_testdata_dir := $(spectest_v2_dir)/testdata
-# Latest draft state as of Oct 3, 2022.
-spec_version_v2 := 8a352708cffeb71206ca49a0f743bdc57269fb1a
+# Latest draft state as of Nov 9, 2022.
+spec_version_v2 := f9b461a312426a60f2f81dcb19b39b66b90a5447
 
 .PHONY: build.spectest
 build.spectest:
@@ -195,15 +207,13 @@ lint: $(golangci_lint_path)
 
 .PHONY: format
 format:
-	@find . -type f -name '*.go' | xargs gofmt -s -w
-	@for f in `find . -name '*.go'`; do \
-	    awk '/^import \($$/,/^\)$$/{if($$0=="")next}{print}' $$f > /tmp/fmt; \
-	    mv /tmp/fmt $$f; \
-	done
-	@go run $(goimports) -w -local github.com/tetratelabs/wazero `find . -name '*.go'`
+	@go run $(gofumpt) -l -w .
+	@go run $(gosimports) -local github.com/tetratelabs/ -w $(shell find . -name '*.go' -type f)
 
 .PHONY: check
 check:
+	@GOARCH=amd64 GOOS=dragonfly go build ./... # Check if the internal/platform can be built on compiler-unsupported platforms
+	@GOARCH=386 GOOS=linux go build ./... # Check if the internal/platform can be built on compiler-unsupported platforms
 	@$(MAKE) lint golangci_lint_goarch=arm64
 	@$(MAKE) lint golangci_lint_goarch=amd64
 	@$(MAKE) format
@@ -222,3 +232,9 @@ site: ## Serve website content
 clean: ## Ensure a clean build
 	@rm -rf dist build coverage.txt
 	@go clean -testcache
+
+fuzz_timeout_seconds ?= 10
+.PHONY: fuzz
+fuzz:
+	@cd internal/integration_test/fuzz && cargo fuzz run basic -- -max_total_time=$(fuzz_timeout_seconds)
+	@cd internal/integration_test/fuzz && cargo fuzz run validation -- -max_total_time=$(fuzz_timeout_seconds)

@@ -15,65 +15,9 @@ Import wazero and extend your Go application with code written in any language!
 
 ## Example
 
-The best way to learn wazero is by trying one of our [examples](examples). The
+The best way to learn wazero is by trying one of our [examples](examples/README.md). The
 most [basic example](examples/basic) extends a Go application with an addition
 function defined in WebAssembly.
-
-## Deeper dive
-
-The former example is a pure function. While a good start, you probably are
-wondering how to do something more realistic, like read a file. WebAssembly
-Modules (Wasm) are sandboxed similar to containers. They can't read anything
-on your machine unless you explicitly allow it.
-
-The WebAssembly Core Specification is a standard, governed by W3C process, but
-it has no scope to specify how system resources like files are accessed.
-Instead, WebAssembly defines "host functions" and the signatures they can use.
-In wazero, "host functions" are written in Go, and let you do anything
-including access files. The main constraint is that WebAssembly only allows
-numeric types. wazero includes [imports](imports) for common languages and
-compiler toolchains.
-
-For example, you can grant WebAssembly code access to your console by exporting
-a function written in Go. The below function can be imported into standard
-WebAssembly as the module "env" and the function name "log_i32".
-```go
-_, err := r.NewHostModuleBuilder("env").
-	ExportFunction("log_i32", func(v uint32) {
-		fmt.Println("log_i32 >>", v)
-	}).
-	Instantiate(ctx, r)
-if err != nil {
-	log.Panicln(err)
-}
-```
-
-The WebAssembly community has [subgroups][4] which maintain work that may not
-result in a Web Standard. One such group is the WebAssembly System Interface
-([WASI][5]), which defines functions similar to Go's [x/sys/unix][6].
-
-The [wasi_snapshot_preview1][13] tag of WASI is widely implemented, so wazero
-bundles an implementation. That way, you don't have to write these functions.
-
-For example, here's how you can allow WebAssembly modules to read
-"/work/home/a.txt" as "/a.txt" or "./a.txt" as well the system clock:
-```go
-_, err := wasi_snapshot_preview1.Instantiate(ctx, r)
-if err != nil {
-	log.Panicln(err)
-}
-
-config := wazero.NewModuleConfig().
-	WithFS(os.DirFS("/work/home")). // instead of no file system
-	WithSysWalltime().WithSysNanotime() // instead of fake time
-
-module, err := r.InstantiateModule(ctx, compiled, config)
-...
-```
-
-While we hope this deeper dive was useful, we also provide [examples](examples)
-to elaborate each point. Please try these before raising usage questions as
-they may answer them for you!
 
 ## Runtime
 
@@ -124,7 +68,8 @@ go get github.com/tetratelabs/wazero@latest
 ```
 
 wazero will tag a new pre-release at least once a month until 1.0. 1.0 is
-scheduled for Feb 2023, following the release of Go 1.20.
+scheduled for Feb 2023, following the release of Go 1.20. wazero 1.0 will build
+with Go 1.18 and above per the below policy.
 
 Meanwhile, please practice the current APIs to ensure they work for you, and
 give us a [star][15] if you are enjoying it so far!
@@ -134,12 +79,15 @@ give us a [star][15] if you are enjoying it so far!
 wazero has no dependencies except Go, so the only source of conflict in your
 project's use of wazero is the Go version.
 
-To simplify our support policy, we adopt Go's [Release Policy][10] (two versions).
+wazero follows the same version policy as Go's [Release Policy][10]: two
+versions. wazero will ensure these versions work and bugs are valid if there's
+an issue with a current Go version.
 
-This means wazero will remain compilable and tested on the version prior to the
-latest release of Go.
-
-For example, once Go 1.29 is released, wazero may use a Go 1.28 feature.
+Additionally, wazero intentionally delays usage of language or standard library
+features one additional version. For example, when Go 1.29 is released, wazero
+can use language features or standard libraries added in 1.27. This is a
+convenience for embedders who have a slower version policy than Go. However,
+only supported Go versions may be used to raise support issues.
 
 ### Platform
 

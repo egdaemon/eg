@@ -95,7 +95,7 @@ func (m *CallContext) CloseWithExitCode(ctx context.Context, exitCode uint32) er
 	if !closed {
 		return nil
 	}
-	m.ns.deleteModule(m.Name())
+	_ = m.ns.deleteModule(m.Name())
 	if m.CodeCloser == nil {
 		return err
 	}
@@ -115,7 +115,7 @@ func (m *CallContext) close(ctx context.Context, exitCode uint32) (c bool, err e
 	}
 	c = true
 	if sysCtx := m.Sys; sysCtx != nil { // nil if from HostModuleBuilder
-		err = sysCtx.FS(ctx).Close(ctx)
+		err = sysCtx.FS().Close(ctx)
 	}
 	return
 }
@@ -127,11 +127,27 @@ func (m *CallContext) Memory() api.Memory {
 
 // ExportedMemory implements the same method as documented on api.Module.
 func (m *CallContext) ExportedMemory(name string) api.Memory {
-	exp, err := m.module.getExport(name, ExternTypeMemory)
+	_, err := m.module.getExport(name, ExternTypeMemory)
 	if err != nil {
 		return nil
 	}
-	return exp.Memory
+	// We Assume that we have at most one memory.
+	return m.memory
+}
+
+// ExportedMemoryDefinitions implements the same method as documented on
+// api.Module.
+func (m *CallContext) ExportedMemoryDefinitions() map[string]api.MemoryDefinition {
+	// Special case as we currently only support one memory.
+	if mem := m.module.Memory; mem != nil {
+		// Now, find out if it is exported
+		for name, exp := range m.module.Exports {
+			if exp.Type == ExternTypeMemory {
+				return map[string]api.MemoryDefinition{name: mem.definition}
+			}
+		}
+	}
+	return map[string]api.MemoryDefinition{}
 }
 
 // ExportedFunction implements the same method as documented on api.Module.
@@ -141,17 +157,39 @@ func (m *CallContext) ExportedFunction(name string) api.Function {
 		return nil
 	}
 
-	fi := exp.Function
-	ce, err := exp.Function.Module.Engine.NewCallEngine(m, fi)
+	return m.function(&m.module.Functions[exp.Index])
+}
+
+// ExportedFunctionDefinitions implements the same method as documented on
+// api.Module.
+func (m *CallContext) ExportedFunctionDefinitions() map[string]api.FunctionDefinition {
+	result := map[string]api.FunctionDefinition{}
+	for name, exp := range m.module.Exports {
+		if exp.Type == ExternTypeFunc {
+			result[name] = m.module.Functions[exp.Index].Definition
+		}
+	}
+	return result
+}
+
+// Module is exposed for emscripten.
+func (m *CallContext) Module() *ModuleInstance {
+	return m.module
+}
+
+func (m *CallContext) Function(funcIdx Index) api.Function {
+	if uint32(len(m.module.Functions)) < funcIdx {
+		return nil
+	}
+	return m.function(&m.module.Functions[funcIdx])
+}
+
+func (m *CallContext) function(f *FunctionInstance) api.Function {
+	ce, err := f.Module.Engine.NewCallEngine(m, f)
 	if err != nil {
 		return nil
 	}
-
-	if exp.Function.Module == m.module {
-		return &function{fi: fi, ce: ce}
-	} else {
-		return &importedFn{importingModule: m, importedFn: fi, ce: ce}
-	}
+	return &function{fi: f, ce: ce}
 }
 
 // function implements api.Function. This couples FunctionInstance with CallEngine so that
@@ -171,27 +209,6 @@ func (f *function) Call(ctx context.Context, params ...uint64) (ret []uint64, er
 	return f.ce.Call(ctx, f.fi.Module.CallCtx, params)
 }
 
-// importedFn implements api.Function and ensures the call context of an imported function is the importing module.
-type importedFn struct {
-	ce              CallEngine
-	importingModule *CallContext
-	importedFn      *FunctionInstance
-}
-
-// Definition implements the same method as documented on api.Function.
-func (f *importedFn) Definition() api.FunctionDefinition {
-	return f.importedFn.Definition
-}
-
-// Call implements the same method as documented on api.Function.
-func (f *importedFn) Call(ctx context.Context, params ...uint64) (ret []uint64, err error) {
-	if f.importedFn.IsHostFunction {
-		return nil, fmt.Errorf("directly calling host function is not supported")
-	}
-	mod := f.importingModule
-	return f.ce.Call(ctx, mod, params)
-}
-
 // GlobalVal is an internal hack to get the lower 64 bits of a global.
 func (m *CallContext) GlobalVal(idx Index) uint64 {
 	return m.module.Globals[idx].Val
@@ -203,19 +220,20 @@ func (m *CallContext) ExportedGlobal(name string) api.Global {
 	if err != nil {
 		return nil
 	}
-	if exp.Global.Type.Mutable {
-		return &mutableGlobal{exp.Global}
+	g := m.module.Globals[exp.Index]
+	if g.Type.Mutable {
+		return &mutableGlobal{g}
 	}
-	valType := exp.Global.Type.ValType
+	valType := g.Type.ValType
 	switch valType {
 	case ValueTypeI32:
-		return globalI32(exp.Global.Val)
+		return globalI32(g.Val)
 	case ValueTypeI64:
-		return globalI64(exp.Global.Val)
+		return globalI64(g.Val)
 	case ValueTypeF32:
-		return globalF32(exp.Global.Val)
+		return globalF32(g.Val)
 	case ValueTypeF64:
-		return globalF64(exp.Global.Val)
+		return globalF64(g.Val)
 	default:
 		panic(fmt.Errorf("BUG: unknown value type %X", valType))
 	}

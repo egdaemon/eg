@@ -1,7 +1,6 @@
 package sys
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -15,10 +14,8 @@ import (
 // Context holds module-scoped system resources currently only supported by
 // built-in host functions.
 type Context struct {
-	args, environ         []string
+	args, environ         [][]byte
 	argsSize, environSize uint32
-	stdin                 io.Reader
-	stdout, stderr        io.Writer
 
 	// Note: Using function pointers here keeps them stable for tests.
 
@@ -35,7 +32,7 @@ type Context struct {
 //
 // Note: The count will never be more than math.MaxUint32.
 // See wazero.ModuleConfig WithArgs
-func (c *Context) Args() []string {
+func (c *Context) Args() [][]byte {
 	return c.args
 }
 
@@ -52,7 +49,7 @@ func (c *Context) ArgsSize() uint32 {
 //
 // Note: The count will never be more than math.MaxUint32.
 // See wazero.ModuleConfig WithEnv
-func (c *Context) Environ() []string {
+func (c *Context) Environ() [][]byte {
 	return c.environ
 }
 
@@ -65,27 +62,9 @@ func (c *Context) EnvironSize() uint32 {
 	return c.environSize
 }
 
-// Stdin is like exec.Cmd Stdin and defaults to a reader of os.DevNull.
-// See wazero.ModuleConfig WithStdin
-func (c *Context) Stdin() io.Reader {
-	return c.stdin
-}
-
-// Stdout is like exec.Cmd Stdout and defaults to io.Discard.
-// See wazero.ModuleConfig WithStdout
-func (c *Context) Stdout() io.Writer {
-	return c.stdout
-}
-
-// Stderr is like exec.Cmd Stderr and defaults to io.Discard.
-// See wazero.ModuleConfig WithStderr
-func (c *Context) Stderr() io.Writer {
-	return c.stderr
-}
-
 // Walltime implements sys.Walltime.
-func (c *Context) Walltime(ctx context.Context) (sec int64, nsec int32) {
-	return (*(c.walltime))(ctx)
+func (c *Context) Walltime() (sec int64, nsec int32) {
+	return (*(c.walltime))()
 }
 
 // WalltimeResolution returns resolution of Walltime.
@@ -94,8 +73,8 @@ func (c *Context) WalltimeResolution() sys.ClockResolution {
 }
 
 // Nanotime implements sys.Nanotime.
-func (c *Context) Nanotime(ctx context.Context) int64 {
-	return (*(c.nanotime))(ctx)
+func (c *Context) Nanotime() int64 {
+	return (*(c.nanotime))()
 }
 
 // NanotimeResolution returns resolution of Nanotime.
@@ -104,16 +83,12 @@ func (c *Context) NanotimeResolution() sys.ClockResolution {
 }
 
 // Nanosleep implements sys.Nanosleep.
-func (c *Context) Nanosleep(ctx context.Context, ns int64) {
-	(*(c.nanosleep))(ctx, ns)
+func (c *Context) Nanosleep(ns int64) {
+	(*(c.nanosleep))(ns)
 }
 
-// FS returns a possibly nil file system context.
-func (c *Context) FS(ctx context.Context) *FSContext {
-	// Override Context when it is passed via context
-	if fsValue := ctx.Value(FSKey{}); fsValue != nil {
-		return fsValue.(*FSContext)
-	}
+// FS returns the possibly empty (EmptyFS) file system context.
+func (c *Context) FS() *FSContext {
 	return c.fsc
 }
 
@@ -141,14 +116,16 @@ func DefaultContext(fs fs.FS) *Context {
 	}
 }
 
-var _ = DefaultContext(nil) // Force panic on bug.
-var ns sys.Nanosleep = platform.FakeNanosleep
+var (
+	_                = DefaultContext(nil) // Force panic on bug.
+	ns sys.Nanosleep = platform.FakeNanosleep
+)
 
 // NewContext is a factory function which helps avoid needing to know defaults or exporting all fields.
 // Note: max is exposed for testing. max is only used for env/args validation.
 func NewContext(
 	max uint32,
-	args, environ []string,
+	args, environ [][]byte,
 	stdin io.Reader,
 	stdout, stderr io.Writer,
 	randSource io.Reader,
@@ -167,24 +144,6 @@ func NewContext(
 
 	if sysCtx.environSize, err = nullTerminatedByteCount(max, environ); err != nil {
 		return nil, fmt.Errorf("environ invalid: %w", err)
-	}
-
-	if stdin == nil {
-		sysCtx.stdin = eofReader{}
-	} else {
-		sysCtx.stdin = stdin
-	}
-
-	if stdout == nil {
-		sysCtx.stdout = io.Discard
-	} else {
-		sysCtx.stdout = stdout
-	}
-
-	if stderr == nil {
-		sysCtx.stderr = io.Discard
-	} else {
-		sysCtx.stderr = stderr
 	}
 
 	if randSource == nil {
@@ -222,9 +181,9 @@ func NewContext(
 	}
 
 	if fs != nil {
-		sysCtx.fsc = NewFSContext(fs)
+		sysCtx.fsc, err = NewFSContext(stdin, stdout, stderr, fs)
 	} else {
-		sysCtx.fsc = NewFSContext(EmptyFS)
+		sysCtx.fsc, err = NewFSContext(stdin, stdout, stderr, EmptyFS)
 	}
 
 	return
@@ -237,7 +196,7 @@ func clockResolutionInvalid(resolution sys.ClockResolution) bool {
 
 // nullTerminatedByteCount ensures the count or Nul-terminated length of the elements doesn't exceed max, and that no
 // element includes the nul character.
-func nullTerminatedByteCount(max uint32, elements []string) (uint32, error) {
+func nullTerminatedByteCount(max uint32, elements [][]byte) (uint32, error) {
 	count := uint32(len(elements))
 	if count > max {
 		return 0, errors.New("exceeds maximum count")

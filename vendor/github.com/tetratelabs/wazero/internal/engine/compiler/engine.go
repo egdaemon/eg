@@ -6,10 +6,13 @@ import (
 	"fmt"
 	"reflect"
 	"runtime"
+	"sort"
 	"sync"
 	"unsafe"
 
 	"github.com/tetratelabs/wazero/api"
+	"github.com/tetratelabs/wazero/experimental"
+	"github.com/tetratelabs/wazero/internal/asm"
 	"github.com/tetratelabs/wazero/internal/compilationcache"
 	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/internal/version"
@@ -19,6 +22,9 @@ import (
 	"github.com/tetratelabs/wazero/internal/wazeroir"
 )
 
+// NOTE: The offset of many of the struct fields defined here are referenced from
+// assembly using the constants below such as moduleEngineFunctionsOffset.
+// If changing a struct, update the constant and associated tests as needed.
 type (
 	// engine is a Compiler implementation of wasm.Engine
 	engine struct {
@@ -33,6 +39,8 @@ type (
 
 	// moduleEngine implements wasm.ModuleEngine
 	moduleEngine struct {
+		// See note at top of file before modifying this struct.
+
 		// name is the name the module was instantiated with used for error handling.
 		name string
 
@@ -40,14 +48,14 @@ type (
 		// The index is module instance-scoped. We intentionally avoid using map
 		// as the underlying memory region is accessed by assembly directly by using
 		// codesElement0Address.
-		functions []*function
-
-		importedFunctionCount uint32
+		functions []function
 	}
 
 	// callEngine holds context per moduleEngine.Call, and shared across all the
 	// function calls originating from the same moduleEngine.Call execution.
 	callEngine struct {
+		// See note at top of file before modifying this struct.
+
 		// These contexts are read and written by compiled code.
 		// Note: structs are embedded to reduce the costs to access fields inside them. Also, this eases field offset
 		// calculation.
@@ -118,11 +126,29 @@ type (
 
 		// initialFn is the initial function for this call engine.
 		initialFn *function
+
+		// ctx is the context.Context passed to all the host function calls.
+		// This is modified when there's a function listener call, otherwise it's always the context.Context
+		// passed to the Call API.
+		ctx context.Context
+		// contextStack is a stack of contexts which is pushed and popped by function listeners.
+		// This is used and modified when there are function listeners.
+		contextStack *contextStack
+	}
+
+	// contextStack is a stack of context.Context.
+	contextStack struct {
+		// See note at top of file before modifying this struct.
+
+		self context.Context
+		prev *contextStack
 	}
 
 	// moduleContext holds the per-function call specific module information.
 	// This is subject to be manipulated from compiled native code whenever we make function calls.
 	moduleContext struct {
+		// See note at top of file before modifying this struct.
+
 		// fn holds the currently executed *function.
 		fn *function
 
@@ -162,6 +188,8 @@ type (
 
 	// stackContext stores the data to access engine.stack.
 	stackContext struct {
+		// See note at top of file before modifying this struct.
+
 		// stackPointer on .stack field which is accessed by stack[stackBasePointer+stackBasePointerInBytes*8].
 		//
 		// Note: stackPointer is not used in assembly since the native code knows exact position of
@@ -189,6 +217,8 @@ type (
 
 	// exitContext will be manipulated whenever compiled native code returns into the Go function.
 	exitContext struct {
+		// See note at top of file before modifying this struct.
+
 		// Where we store the status code of Compiler execution.
 		statusCode nativeCallStatusCode
 
@@ -206,6 +236,8 @@ type (
 	// native program (where the stack is the system stack though), and we retrieve the struct
 	// with unsafe pointer casts.
 	callFrame struct {
+		// See note at top of file before modifying this struct.
+
 		// returnAddress is the return address to which the engine jumps when the callee function returns.
 		returnAddress uintptr
 		// returnStackBasePointerInBytes is the stack base pointer to set on stackContext.stackBasePointerInBytes
@@ -218,6 +250,8 @@ type (
 
 	// Function corresponds to function instance in Wasm, and is created from `code`.
 	function struct {
+		// See note at top of file before modifying this struct.
+
 		// codeInitialAddress is the pre-calculated pointer pointing to the initial byte of .codeSegment slice.
 		// That mean codeInitialAddress always equals uintptr(unsafe.Pointer(&.codeSegment[0]))
 		// and we cache the value (uintptr(unsafe.Pointer(&.codeSegment[0]))) to this field,
@@ -236,6 +270,8 @@ type (
 	// code corresponds to a function in a module (not instantiated one). This holds the machine code
 	// compiled by wazero compiler.
 	code struct {
+		// See note at top of file before modifying this struct.
+
 		// codeSegment is holding the compiled native code as a byte slice.
 		codeSegment []byte
 		// See the doc for codeStaticData type.
@@ -246,19 +282,25 @@ type (
 		indexInModule wasm.Index
 		// sourceModule is the module from which this function is compiled. For logging purpose.
 		sourceModule *wasm.Module
+		// listener holds a listener to notify when this function is called.
+		listener experimental.FunctionListener
+
+		sourceOffsetMap *sourceOffsetMap
+	}
+
+	// sourceOffsetMap holds the information to retrieve the original offset in the Wasm binary from the
+	// offset in the native binary.
+	sourceOffsetMap struct {
+		// See note at top of file before modifying this struct.
+
+		// irOperationOffsetsInNativeBinary is index-correlated with irOperationSourceOffsetsInWasmBinary,
+		// and maps each index (corresponding to each IR Operation) to the offset in the compiled native code.
+		irOperationOffsetsInNativeBinary []uint64
+		// irOperationSourceOffsetsInWasmBinary is index-correlated with irOperationOffsetsInNativeBinary.
+		// See wazeroir.CompilationResult irOperationOffsetsInNativeBinary.
+		irOperationSourceOffsetsInWasmBinary []uint64
 	}
 )
-
-// createFunction creates a new function which uses the native code compiled.
-func (c *code) createFunction(f *wasm.FunctionInstance) *function {
-	return &function{
-		codeInitialAddress:    uintptr(unsafe.Pointer(&c.codeSegment[0])),
-		stackPointerCeil:      c.stackPointerCeil,
-		moduleInstanceAddress: uintptr(unsafe.Pointer(f.Module)),
-		source:                f,
-		parent:                c,
-	}
-}
 
 // Native code reads/writes Go's structs with the following constants.
 // See TestVerifyOffsetValue for how to derive these values.
@@ -294,22 +336,23 @@ const (
 	functionCodeInitialAddressOffset    = 0
 	functionSourceOffset                = 16
 	functionModuleInstanceAddressOffset = 24
+	functionSize                        = 40
 
 	// Offsets for wasm.ModuleInstance.
 	moduleInstanceGlobalsOffset          = 48
 	moduleInstanceMemoryOffset           = 72
 	moduleInstanceTablesOffset           = 80
-	moduleInstanceEngineOffset           = 136
-	moduleInstanceTypeIDsOffset          = 152
-	moduleInstanceDataInstancesOffset    = 176
-	moduleInstanceElementInstancesOffset = 200
+	moduleInstanceEngineOffset           = 112
+	moduleInstanceTypeIDsOffset          = 128
+	moduleInstanceDataInstancesOffset    = 152
+	moduleInstanceElementInstancesOffset = 176
 
 	// Offsets for wasm.TableInstance.
 	tableInstanceTableOffset    = 0
 	tableInstanceTableLenOffset = 8
 
 	// Offsets for wasm.FunctionInstance.
-	functionInstanceTypeIDOffset = 88
+	functionInstanceTypeIDOffset = 40
 
 	// Offsets for wasm.MemoryInstance.
 	memoryInstanceBufferOffset    = 0
@@ -441,54 +484,62 @@ func (e *engine) DeleteCompiledModule(module *wasm.Module) {
 }
 
 // CompileModule implements the same method as documented on wasm.Engine.
-func (e *engine) CompileModule(ctx context.Context, module *wasm.Module) error {
+func (e *engine) CompileModule(ctx context.Context, module *wasm.Module, listeners []experimental.FunctionListener) error {
 	if _, ok, err := e.getCodes(module); ok { // cache hit!
 		return nil
 	} else if err != nil {
 		return err
 	}
 
-	funcs := make([]*code, 0, len(module.FunctionSection))
-
 	irs, err := wazeroir.CompileFunctions(ctx, e.enabledFeatures, callFrameDataSizeInUint64, module)
 	if err != nil {
 		return err
 	}
-	for funcIndex, ir := range irs {
+
+	importedFuncs := module.ImportFuncCount()
+	funcs := make([]*code, len(module.FunctionSection))
+	ln := len(listeners)
+	cmp := newCompiler()
+	for i, ir := range irs {
+		var lsn experimental.FunctionListener
+		if i < ln {
+			lsn = listeners[i]
+		}
+		cmp.Init(ir, lsn != nil)
+		funcIndex := wasm.Index(i)
 		var compiled *code
 		if ir.GoFunc != nil {
-			if compiled, err = compileGoDefinedHostFunction(ir); err != nil {
-				def := module.FunctionDefinitionSection[uint32(funcIndex)+module.ImportFuncCount()]
+			if compiled, err = compileGoDefinedHostFunction(cmp); err != nil {
+				def := module.FunctionDefinitionSection[funcIndex+importedFuncs]
 				return fmt.Errorf("error compiling host go func[%s]: %w", def.DebugName(), err)
 			}
-		} else if compiled, err = compileWasmFunction(e.enabledFeatures, ir); err != nil {
-			def := module.FunctionDefinitionSection[uint32(funcIndex)+module.ImportFuncCount()]
+		} else if compiled, err = compileWasmFunction(cmp, ir); err != nil {
+			def := module.FunctionDefinitionSection[funcIndex+importedFuncs]
 			return fmt.Errorf("error compiling wasm func[%s]: %w", def.DebugName(), err)
 		}
 
 		// As this uses mmap, we need to munmap on the compiled machine code when it's GCed.
 		e.setFinalizer(compiled, releaseCode)
 
-		compiled.indexInModule = wasm.Index(funcIndex)
+		compiled.listener = lsn
+		compiled.indexInModule = funcIndex
 		compiled.sourceModule = module
-
-		funcs = append(funcs, compiled)
+		funcs[funcIndex] = compiled
 	}
 	return e.addCodes(module, funcs)
 }
 
 // NewModuleEngine implements the same method as documented on wasm.Engine.
-func (e *engine) NewModuleEngine(name string, module *wasm.Module, importedFunctions, moduleFunctions []*wasm.FunctionInstance, tables []*wasm.TableInstance, tableInits []wasm.TableInitEntry) (wasm.ModuleEngine, error) {
-	imported := uint32(len(importedFunctions))
+func (e *engine) NewModuleEngine(name string, module *wasm.Module, functions []wasm.FunctionInstance) (wasm.ModuleEngine, error) {
 	me := &moduleEngine{
-		name:                  name,
-		functions:             make([]*function, 0, imported+uint32(len(moduleFunctions))),
-		importedFunctionCount: imported,
+		name:      name,
+		functions: make([]function, len(functions)),
 	}
 
-	for _, f := range importedFunctions {
+	imported := int(module.ImportFuncCount())
+	for i, f := range functions[:imported] {
 		cf := f.Module.Engine.(*moduleEngine).functions[f.Idx]
-		me.functions = append(me.functions, cf)
+		me.functions[i] = cf
 	}
 
 	codes, ok, err := e.getCodes(module)
@@ -499,21 +550,14 @@ func (e *engine) NewModuleEngine(name string, module *wasm.Module, importedFunct
 	}
 
 	for i, c := range codes {
-		f := moduleFunctions[i]
-		function := c.createFunction(f)
-		me.functions = append(me.functions, function)
-	}
-
-	for _, init := range tableInits {
-		references := tables[init.TableIndex].References
-		if int(init.Offset)+(len(init.FunctionIndexes)) > len(references) {
-			return me, wasm.ErrElementOffsetOutOfBounds
-		}
-
-		for i, funcIdx := range init.FunctionIndexes {
-			if funcIdx != nil {
-				references[init.Offset+uint32(i)] = uintptr(unsafe.Pointer(me.functions[*funcIdx]))
-			}
+		offset := imported + i
+		f := &functions[offset]
+		me.functions[offset] = function{
+			codeInitialAddress:    uintptr(unsafe.Pointer(&c.codeSegment[0])),
+			stackPointerCeil:      c.stackPointerCeil,
+			moduleInstanceAddress: uintptr(unsafe.Pointer(f.Module)),
+			source:                f,
+			parent:                c,
 		}
 	}
 	return me, nil
@@ -524,12 +568,17 @@ func (e *moduleEngine) Name() string {
 	return e.name
 }
 
+// FunctionInstanceReference implements the same method as documented on wasm.ModuleEngine.
+func (e *moduleEngine) FunctionInstanceReference(funcIndex wasm.Index) wasm.Reference {
+	return uintptr(unsafe.Pointer(&e.functions[funcIndex]))
+}
+
 // CreateFuncElementInstance implements the same method as documented on wasm.ModuleEngine.
 func (e *moduleEngine) CreateFuncElementInstance(indexes []*wasm.Index) *wasm.ElementInstance {
 	refs := make([]wasm.Reference, len(indexes))
 	for i, index := range indexes {
 		if index != nil {
-			refs[i] = uintptr(unsafe.Pointer(e.functions[*index]))
+			refs[i] = uintptr(unsafe.Pointer(&e.functions[*index]))
 		}
 	}
 	return &wasm.ElementInstance{
@@ -538,36 +587,50 @@ func (e *moduleEngine) CreateFuncElementInstance(indexes []*wasm.Index) *wasm.El
 	}
 }
 
-// InitializeFuncrefGlobals implements the same method as documented on wasm.InitializeFuncrefGlobals.
-func (e *moduleEngine) InitializeFuncrefGlobals(globals []*wasm.GlobalInstance) {
-	for _, g := range globals {
-		if g.Type.ValType == wasm.ValueTypeFuncref {
-			if int64(g.Val) == wasm.GlobalInstanceNullFuncRefValue {
-				g.Val = 0 // Null funcref is expressed as zero.
-			} else {
-				// Lowers the stored function index into the interpreter specific function's opaque pointer.
-				g.Val = uint64(uintptr(unsafe.Pointer(e.functions[g.Val])))
-			}
-		}
-	}
-}
-
-func (e *moduleEngine) NewCallEngine(callCtx *wasm.CallContext, f *wasm.FunctionInstance) (ce wasm.CallEngine, err error) {
+func (e *moduleEngine) NewCallEngine(_ *wasm.CallContext, f *wasm.FunctionInstance) (ce wasm.CallEngine, err error) {
 	// Note: The input parameters are pre-validated, so a compiled function is only absent on close. Updates to
 	// code on close aren't locked, neither is this read.
-	compiled := e.functions[f.Idx]
-	if compiled == nil { // Lazy check the cause as it could be because the module was already closed.
-		if err = callCtx.FailIfClosed(); err == nil {
-			panic(fmt.Errorf("BUG: %s.func[%d] was nil before close", e.name, f.Idx))
-		}
-		return
-	}
+	compiled := &e.functions[f.Idx]
 
 	initStackSize := initialStackSize
 	if initialStackSize < compiled.stackPointerCeil {
 		initStackSize = compiled.stackPointerCeil * 2
 	}
 	return e.newCallEngine(initStackSize, compiled), nil
+}
+
+// LookupFunction implements the same method as documented on wasm.ModuleEngine.
+func (e *moduleEngine) LookupFunction(t *wasm.TableInstance, typeId wasm.FunctionTypeID, tableOffset wasm.Index) (idx wasm.Index, err error) {
+	if tableOffset >= uint32(len(t.References)) || t.Type != wasm.RefTypeFuncref {
+		err = wasmruntime.ErrRuntimeInvalidTableAccess
+		return
+	}
+	rawPtr := t.References[tableOffset]
+	if rawPtr == 0 {
+		err = wasmruntime.ErrRuntimeInvalidTableAccess
+		return
+	}
+
+	tf := functionFromUintptr(rawPtr)
+	if tf.source.TypeID != typeId {
+		err = wasmruntime.ErrRuntimeIndirectCallTypeMismatch
+		return
+	}
+	idx = tf.source.Idx
+
+	return
+}
+
+// functionFromUintptr resurrects the original *function from the given uintptr
+// which comes from either funcref table or OpcodeRefFunc instruction.
+func functionFromUintptr(ptr uintptr) *function {
+	// Wraps ptrs as the double pointer in order to avoid the unsafe access as detected by race detector.
+	//
+	// For example, if we have (*function)(unsafe.Pointer(ptr)) instead, then the race detector's "checkptr"
+	// subroutine wanrs as "checkptr: pointer arithmetic result points to invalid allocation"
+	// https://github.com/golang/go/blob/1ce7fcf139417d618c2730010ede2afb41664211/src/runtime/checkptr.go#L69
+	var wrapped *uintptr = &ptr
+	return *(**function)(unsafe.Pointer(wrapped))
 }
 
 // Call implements the same method as documented on wasm.ModuleEngine.
@@ -595,7 +658,13 @@ func (ce *callEngine) Call(ctx context.Context, callCtx *wasm.CallContext, param
 	ce.initializeStack(tp, params)
 	ce.execWasmFunction(ctx, callCtx)
 
-	results = ce.stack[:tp.ResultNumInUint64]
+	// This returns a safe copy of the results, instead of a slice view. If we
+	// returned a re-slice, the caller could accidentally or purposefully
+	// corrupt the stack of subsequent calls
+	if resultCount := tp.ResultNumInUint64; resultCount > 0 {
+		results = make([]uint64, resultCount)
+		copy(results, ce.stack[:resultCount])
+	}
 	return
 }
 
@@ -659,15 +728,28 @@ func (ce *callEngine) deferredOnCall(recovered interface{}) (err error) {
 		// Unwinds call frames from the values stack, starting from the
 		// current function `ce.fn`, and the current stack base pointer `ce.stackBasePointerInBytes`.
 		fn := ce.fn
+		pc := uint64(ce.returnAddress)
 		stackBasePointer := int(ce.stackBasePointerInBytes >> 3)
 		for {
-			def := fn.source.Definition
-			builder.AddFrame(def.DebugName(), def.ParamTypes(), def.ResultTypes())
+			source := fn.source
+			def := source.Definition
 
-			callFrameOffset := callFrameOffset(fn.source.Type)
+			// sourceInfo holds the source code information corresponding to the frame.
+			// It is not empty only when the DWARF is enabled.
+			var sources []string
+			if p := fn.parent; p.codeSegment != nil {
+				if p.sourceOffsetMap != nil {
+					offset := fn.getSourceOffsetInWasmBinary(pc)
+					sources = p.sourceModule.DWARFLines.Line(offset)
+				}
+			}
+			builder.AddFrame(def.DebugName(), def.ParamTypes(), def.ResultTypes(), sources)
+
+			callFrameOffset := callFrameOffset(source.Type)
 			if stackBasePointer != 0 {
 				frame := *(*callFrame)(unsafe.Pointer(&ce.stack[stackBasePointer+callFrameOffset]))
 				fn = frame.function
+				pc = uint64(frame.returnAddress)
 				stackBasePointer = int(frame.returnStackBasePointerInBytes >> 3)
 			} else { // base == 0 means that this was the last call frame stacked.
 				break
@@ -680,6 +762,36 @@ func (ce *callEngine) deferredOnCall(recovered interface{}) (err error) {
 	ce.stackBasePointerInBytes, ce.stackPointer, ce.moduleInstanceAddress = 0, 0, 0
 	ce.moduleContext.fn = ce.initialFn
 	return
+}
+
+// getSourceOffsetInWasmBinary returns the corresponding offset in the original Wasm binary's code section
+// for the given pc (which is an absolute address in the memory).
+// If needPreviousInstr equals true, this returns the previous instruction's offset for the given pc.
+func (f *function) getSourceOffsetInWasmBinary(pc uint64) uint64 {
+	srcMap := f.parent.sourceOffsetMap
+	if srcMap == nil {
+		return 0
+	}
+	n := len(srcMap.irOperationOffsetsInNativeBinary) + 1
+
+	// Calculate the offset in the compiled native binary.
+	pcOffsetInNativeBinary := pc - uint64(f.codeInitialAddress)
+
+	// Then, do the binary search on the list of offsets in the native binary for all the IR operations.
+	// This returns the index of the *next* IR operation of the one corresponding to the origin of this pc.
+	// See sort.Search.
+	index := sort.Search(n, func(i int) bool {
+		if i == n-1 {
+			return true
+		}
+		return srcMap.irOperationOffsetsInNativeBinary[i] >= pcOffsetInNativeBinary
+	})
+
+	if index == n || index == 0 { // This case, somehow pc is not found in the source offset map.
+		return 0
+	} else {
+		return srcMap.irOperationSourceOffsetsInWasmBinary[index-1]
+	}
 }
 
 func NewEngine(ctx context.Context, enabledFeatures api.CoreFeatures) wasm.Engine {
@@ -764,6 +876,8 @@ const (
 	builtinFunctionIndexMemoryGrow wasm.Index = iota
 	builtinFunctionIndexGrowStack
 	builtinFunctionIndexTableGrow
+	builtinFunctionIndexFunctionListenerBefore
+	builtinFunctionIndexFunctionListenerAfter
 	// builtinFunctionIndexBreakPoint is internal (only for wazero developers). Disabled by default.
 	builtinFunctionIndexBreakPoint
 )
@@ -771,6 +885,7 @@ const (
 func (ce *callEngine) execWasmFunction(ctx context.Context, callCtx *wasm.CallContext) {
 	codeAddr := ce.initialFn.codeInitialAddress
 	modAddr := ce.initialFn.moduleInstanceAddress
+	ce.ctx = ctx
 
 entry:
 	{
@@ -783,28 +898,39 @@ entry:
 		case nativeCallStatusCodeCallGoHostFunction:
 			calleeHostFunction := ce.moduleContext.fn
 			base := int(ce.stackBasePointerInBytes >> 3)
-			params := ce.stack[base : base+len(calleeHostFunction.source.Type.Params)]
+
+			// In the compiler engine, ce.stack has enough capacity for the
+			// max of param or result length, so we don't need to grow when
+			// there are more results than parameters.
+			stackLen := calleeHostFunction.source.Type.ParamNumInUint64
+			if resultLen := calleeHostFunction.source.Type.ResultNumInUint64; resultLen > stackLen {
+				stackLen = resultLen
+			}
+			stack := ce.stack[base : base+stackLen]
+
 			fn := calleeHostFunction.source.GoFunc
-			var results []uint64
 			switch fn := fn.(type) {
 			case api.GoModuleFunction:
-				results = fn.Call(ctx, callCtx.WithMemory(ce.memoryInstance), params)
+				fn.Call(ce.ctx, callCtx.WithMemory(ce.memoryInstance), stack)
 			case api.GoFunction:
-				results = fn.Call(ctx, params)
+				fn.Call(ce.ctx, stack)
 			}
 
-			copy(ce.stack[base:], results)
 			codeAddr, modAddr = ce.returnAddress, ce.moduleInstanceAddress
 			goto entry
 		case nativeCallStatusCodeCallBuiltInFunction:
 			caller := ce.moduleContext.fn
 			switch ce.exitContext.builtinFunctionCallIndex {
 			case builtinFunctionIndexMemoryGrow:
-				ce.builtinFunctionMemoryGrow(ctx, caller.source.Module.Memory)
+				ce.builtinFunctionMemoryGrow(caller.source.Module.Memory)
 			case builtinFunctionIndexGrowStack:
 				ce.builtinFunctionGrowStack(caller.stackPointerCeil)
 			case builtinFunctionIndexTableGrow:
-				ce.builtinFunctionTableGrow(ctx, caller.source.Module.Tables)
+				ce.builtinFunctionTableGrow(caller.source.Module.Tables)
+			case builtinFunctionIndexFunctionListenerBefore:
+				ce.builtinFunctionFunctionListenerBefore(ce.ctx, callCtx.WithMemory(ce.memoryInstance), caller)
+			case builtinFunctionIndexFunctionListenerAfter:
+				ce.builtinFunctionFunctionListenerAfter(ce.ctx, callCtx.WithMemory(ce.memoryInstance), caller)
 			}
 			if false {
 				if ce.exitContext.builtinFunctionCallIndex == builtinFunctionIndexBreakPoint {
@@ -845,10 +971,10 @@ func (ce *callEngine) builtinFunctionGrowStack(stackPointerCeil uint64) {
 	ce.stackContext.stackLenInBytes = newLen << 3
 }
 
-func (ce *callEngine) builtinFunctionMemoryGrow(ctx context.Context, mem *wasm.MemoryInstance) {
+func (ce *callEngine) builtinFunctionMemoryGrow(mem *wasm.MemoryInstance) {
 	newPages := ce.popValue()
 
-	if res, ok := mem.Grow(ctx, uint32(newPages)); !ok {
+	if res, ok := mem.Grow(uint32(newPages)); !ok {
 		ce.pushValue(uint64(0xffffffff)) // = -1 in signed 32-bit integer.
 	} else {
 		ce.pushValue(uint64(res))
@@ -860,26 +986,36 @@ func (ce *callEngine) builtinFunctionMemoryGrow(ctx context.Context, mem *wasm.M
 	ce.moduleContext.memoryElement0Address = bufSliceHeader.Data
 }
 
-func (ce *callEngine) builtinFunctionTableGrow(ctx context.Context, tables []*wasm.TableInstance) {
+func (ce *callEngine) builtinFunctionTableGrow(tables []*wasm.TableInstance) {
 	tableIndex := uint32(ce.popValue())
 	table := tables[tableIndex] // verified not to be out of range by the func validation at compilation phase.
 	num := ce.popValue()
 	ref := ce.popValue()
-	res := table.Grow(ctx, uint32(num), uintptr(ref))
+	res := table.Grow(uint32(num), uintptr(ref))
 	ce.pushValue(uint64(res))
 }
 
-func compileGoDefinedHostFunction(ir *wazeroir.CompilationResult) (*code, error) {
-	compiler, err := newCompiler(ir)
-	if err != nil {
+func (ce *callEngine) builtinFunctionFunctionListenerBefore(ctx context.Context, mod api.Module, fn *function) {
+	base := int(ce.stackBasePointerInBytes >> 3)
+	listerCtx := fn.parent.listener.Before(ctx, mod, fn.source.Definition, ce.stack[base:base+fn.source.Type.ParamNumInUint64])
+	prevStackTop := ce.contextStack
+	ce.contextStack = &contextStack{self: ctx, prev: prevStackTop}
+	ce.ctx = listerCtx
+}
+
+func (ce *callEngine) builtinFunctionFunctionListenerAfter(ctx context.Context, mod api.Module, fn *function) {
+	base := int(ce.stackBasePointerInBytes >> 3)
+	fn.parent.listener.After(ctx, mod, fn.source.Definition, nil, ce.stack[base:base+fn.source.Type.ResultNumInUint64])
+	ce.ctx = ce.contextStack.self
+	ce.contextStack = ce.contextStack.prev
+}
+
+func compileGoDefinedHostFunction(cmp compiler) (*code, error) {
+	if err := cmp.compileGoDefinedHostFunction(); err != nil {
 		return nil, err
 	}
 
-	if err = compiler.compileGoDefinedHostFunction(); err != nil {
-		return nil, err
-	}
-
-	c, _, err := compiler.compile()
+	c, _, err := cmp.compile()
 	if err != nil {
 		return nil, err
 	}
@@ -887,309 +1023,317 @@ func compileGoDefinedHostFunction(ir *wazeroir.CompilationResult) (*code, error)
 	return &code{codeSegment: c}, nil
 }
 
-func compileWasmFunction(_ api.CoreFeatures, ir *wazeroir.CompilationResult) (*code, error) {
-	compiler, err := newCompiler(ir)
-	if err != nil {
-		return nil, fmt.Errorf("failed to initialize assembly builder: %w", err)
-	}
-
-	if err := compiler.compilePreamble(); err != nil {
+func compileWasmFunction(cmp compiler, ir *wazeroir.CompilationResult) (*code, error) {
+	if err := cmp.compilePreamble(); err != nil {
 		return nil, fmt.Errorf("failed to emit preamble: %w", err)
 	}
 
+	needSourceOffsets := len(ir.IROperationSourceOffsetsInWasmBinary) > 0
+	var irOpBegins []asm.Node
+	if needSourceOffsets {
+		irOpBegins = make([]asm.Node, len(ir.Operations))
+	}
+
 	var skip bool
-	for _, op := range ir.Operations {
+	for i, op := range ir.Operations {
+		if needSourceOffsets {
+			// If this compilation requires source offsets for DWARF based back trace,
+			// we emit a NOP node at the beginning of each IR operation to get the
+			// binary offset of the beginning of the corresponding compiled native code.
+			irOpBegins[i] = cmp.compileNOP()
+		}
+
 		// Compiler determines whether skip the entire label.
 		// For example, if the label doesn't have any caller,
 		// we don't need to generate native code at all as we never reach the region.
 		if op.Kind() == wazeroir.OperationKindLabel {
-			skip = compiler.compileLabel(op.(*wazeroir.OperationLabel))
+			skip = cmp.compileLabel(op.(*wazeroir.OperationLabel))
 		}
 		if skip {
 			continue
 		}
 
 		if false {
-			fmt.Printf("compiling op=%s: %s\n", op.Kind(), compiler)
+			fmt.Printf("compiling op=%s: %s\n", op.Kind(), cmp)
 		}
 		var err error
 		switch o := op.(type) {
 		case *wazeroir.OperationLabel:
 			// Label op is already handled ^^.
 		case *wazeroir.OperationUnreachable:
-			err = compiler.compileUnreachable()
+			err = cmp.compileUnreachable()
 		case *wazeroir.OperationBr:
-			err = compiler.compileBr(o)
+			err = cmp.compileBr(o)
 		case *wazeroir.OperationBrIf:
-			err = compiler.compileBrIf(o)
+			err = cmp.compileBrIf(o)
 		case *wazeroir.OperationBrTable:
-			err = compiler.compileBrTable(o)
+			err = cmp.compileBrTable(o)
 		case *wazeroir.OperationCall:
-			err = compiler.compileCall(o)
+			err = cmp.compileCall(o)
 		case *wazeroir.OperationCallIndirect:
-			err = compiler.compileCallIndirect(o)
+			err = cmp.compileCallIndirect(o)
 		case *wazeroir.OperationDrop:
-			err = compiler.compileDrop(o)
+			err = cmp.compileDrop(o)
 		case *wazeroir.OperationSelect:
-			err = compiler.compileSelect(o)
+			err = cmp.compileSelect(o)
 		case *wazeroir.OperationPick:
-			err = compiler.compilePick(o)
+			err = cmp.compilePick(o)
 		case *wazeroir.OperationSet:
-			err = compiler.compileSet(o)
+			err = cmp.compileSet(o)
 		case *wazeroir.OperationGlobalGet:
-			err = compiler.compileGlobalGet(o)
+			err = cmp.compileGlobalGet(o)
 		case *wazeroir.OperationGlobalSet:
-			err = compiler.compileGlobalSet(o)
+			err = cmp.compileGlobalSet(o)
 		case *wazeroir.OperationLoad:
-			err = compiler.compileLoad(o)
+			err = cmp.compileLoad(o)
 		case *wazeroir.OperationLoad8:
-			err = compiler.compileLoad8(o)
+			err = cmp.compileLoad8(o)
 		case *wazeroir.OperationLoad16:
-			err = compiler.compileLoad16(o)
+			err = cmp.compileLoad16(o)
 		case *wazeroir.OperationLoad32:
-			err = compiler.compileLoad32(o)
+			err = cmp.compileLoad32(o)
 		case *wazeroir.OperationStore:
-			err = compiler.compileStore(o)
+			err = cmp.compileStore(o)
 		case *wazeroir.OperationStore8:
-			err = compiler.compileStore8(o)
+			err = cmp.compileStore8(o)
 		case *wazeroir.OperationStore16:
-			err = compiler.compileStore16(o)
+			err = cmp.compileStore16(o)
 		case *wazeroir.OperationStore32:
-			err = compiler.compileStore32(o)
+			err = cmp.compileStore32(o)
 		case *wazeroir.OperationMemorySize:
-			err = compiler.compileMemorySize()
+			err = cmp.compileMemorySize()
 		case *wazeroir.OperationMemoryGrow:
-			err = compiler.compileMemoryGrow()
+			err = cmp.compileMemoryGrow()
 		case *wazeroir.OperationConstI32:
-			err = compiler.compileConstI32(o)
+			err = cmp.compileConstI32(o)
 		case *wazeroir.OperationConstI64:
-			err = compiler.compileConstI64(o)
+			err = cmp.compileConstI64(o)
 		case *wazeroir.OperationConstF32:
-			err = compiler.compileConstF32(o)
+			err = cmp.compileConstF32(o)
 		case *wazeroir.OperationConstF64:
-			err = compiler.compileConstF64(o)
+			err = cmp.compileConstF64(o)
 		case *wazeroir.OperationEq:
-			err = compiler.compileEq(o)
+			err = cmp.compileEq(o)
 		case *wazeroir.OperationNe:
-			err = compiler.compileNe(o)
+			err = cmp.compileNe(o)
 		case *wazeroir.OperationEqz:
-			err = compiler.compileEqz(o)
+			err = cmp.compileEqz(o)
 		case *wazeroir.OperationLt:
-			err = compiler.compileLt(o)
+			err = cmp.compileLt(o)
 		case *wazeroir.OperationGt:
-			err = compiler.compileGt(o)
+			err = cmp.compileGt(o)
 		case *wazeroir.OperationLe:
-			err = compiler.compileLe(o)
+			err = cmp.compileLe(o)
 		case *wazeroir.OperationGe:
-			err = compiler.compileGe(o)
+			err = cmp.compileGe(o)
 		case *wazeroir.OperationAdd:
-			err = compiler.compileAdd(o)
+			err = cmp.compileAdd(o)
 		case *wazeroir.OperationSub:
-			err = compiler.compileSub(o)
+			err = cmp.compileSub(o)
 		case *wazeroir.OperationMul:
-			err = compiler.compileMul(o)
+			err = cmp.compileMul(o)
 		case *wazeroir.OperationClz:
-			err = compiler.compileClz(o)
+			err = cmp.compileClz(o)
 		case *wazeroir.OperationCtz:
-			err = compiler.compileCtz(o)
+			err = cmp.compileCtz(o)
 		case *wazeroir.OperationPopcnt:
-			err = compiler.compilePopcnt(o)
+			err = cmp.compilePopcnt(o)
 		case *wazeroir.OperationDiv:
-			err = compiler.compileDiv(o)
+			err = cmp.compileDiv(o)
 		case *wazeroir.OperationRem:
-			err = compiler.compileRem(o)
+			err = cmp.compileRem(o)
 		case *wazeroir.OperationAnd:
-			err = compiler.compileAnd(o)
+			err = cmp.compileAnd(o)
 		case *wazeroir.OperationOr:
-			err = compiler.compileOr(o)
+			err = cmp.compileOr(o)
 		case *wazeroir.OperationXor:
-			err = compiler.compileXor(o)
+			err = cmp.compileXor(o)
 		case *wazeroir.OperationShl:
-			err = compiler.compileShl(o)
+			err = cmp.compileShl(o)
 		case *wazeroir.OperationShr:
-			err = compiler.compileShr(o)
+			err = cmp.compileShr(o)
 		case *wazeroir.OperationRotl:
-			err = compiler.compileRotl(o)
+			err = cmp.compileRotl(o)
 		case *wazeroir.OperationRotr:
-			err = compiler.compileRotr(o)
+			err = cmp.compileRotr(o)
 		case *wazeroir.OperationAbs:
-			err = compiler.compileAbs(o)
+			err = cmp.compileAbs(o)
 		case *wazeroir.OperationNeg:
-			err = compiler.compileNeg(o)
+			err = cmp.compileNeg(o)
 		case *wazeroir.OperationCeil:
-			err = compiler.compileCeil(o)
+			err = cmp.compileCeil(o)
 		case *wazeroir.OperationFloor:
-			err = compiler.compileFloor(o)
+			err = cmp.compileFloor(o)
 		case *wazeroir.OperationTrunc:
-			err = compiler.compileTrunc(o)
+			err = cmp.compileTrunc(o)
 		case *wazeroir.OperationNearest:
-			err = compiler.compileNearest(o)
+			err = cmp.compileNearest(o)
 		case *wazeroir.OperationSqrt:
-			err = compiler.compileSqrt(o)
+			err = cmp.compileSqrt(o)
 		case *wazeroir.OperationMin:
-			err = compiler.compileMin(o)
+			err = cmp.compileMin(o)
 		case *wazeroir.OperationMax:
-			err = compiler.compileMax(o)
+			err = cmp.compileMax(o)
 		case *wazeroir.OperationCopysign:
-			err = compiler.compileCopysign(o)
+			err = cmp.compileCopysign(o)
 		case *wazeroir.OperationI32WrapFromI64:
-			err = compiler.compileI32WrapFromI64()
+			err = cmp.compileI32WrapFromI64()
 		case *wazeroir.OperationITruncFromF:
-			err = compiler.compileITruncFromF(o)
+			err = cmp.compileITruncFromF(o)
 		case *wazeroir.OperationFConvertFromI:
-			err = compiler.compileFConvertFromI(o)
+			err = cmp.compileFConvertFromI(o)
 		case *wazeroir.OperationF32DemoteFromF64:
-			err = compiler.compileF32DemoteFromF64()
+			err = cmp.compileF32DemoteFromF64()
 		case *wazeroir.OperationF64PromoteFromF32:
-			err = compiler.compileF64PromoteFromF32()
+			err = cmp.compileF64PromoteFromF32()
 		case *wazeroir.OperationI32ReinterpretFromF32:
-			err = compiler.compileI32ReinterpretFromF32()
+			err = cmp.compileI32ReinterpretFromF32()
 		case *wazeroir.OperationI64ReinterpretFromF64:
-			err = compiler.compileI64ReinterpretFromF64()
+			err = cmp.compileI64ReinterpretFromF64()
 		case *wazeroir.OperationF32ReinterpretFromI32:
-			err = compiler.compileF32ReinterpretFromI32()
+			err = cmp.compileF32ReinterpretFromI32()
 		case *wazeroir.OperationF64ReinterpretFromI64:
-			err = compiler.compileF64ReinterpretFromI64()
+			err = cmp.compileF64ReinterpretFromI64()
 		case *wazeroir.OperationExtend:
-			err = compiler.compileExtend(o)
+			err = cmp.compileExtend(o)
 		case *wazeroir.OperationSignExtend32From8:
-			err = compiler.compileSignExtend32From8()
+			err = cmp.compileSignExtend32From8()
 		case *wazeroir.OperationSignExtend32From16:
-			err = compiler.compileSignExtend32From16()
+			err = cmp.compileSignExtend32From16()
 		case *wazeroir.OperationSignExtend64From8:
-			err = compiler.compileSignExtend64From8()
+			err = cmp.compileSignExtend64From8()
 		case *wazeroir.OperationSignExtend64From16:
-			err = compiler.compileSignExtend64From16()
+			err = cmp.compileSignExtend64From16()
 		case *wazeroir.OperationSignExtend64From32:
-			err = compiler.compileSignExtend64From32()
+			err = cmp.compileSignExtend64From32()
 		case *wazeroir.OperationDataDrop:
-			err = compiler.compileDataDrop(o)
+			err = cmp.compileDataDrop(o)
 		case *wazeroir.OperationMemoryInit:
-			err = compiler.compileMemoryInit(o)
+			err = cmp.compileMemoryInit(o)
 		case *wazeroir.OperationMemoryCopy:
-			err = compiler.compileMemoryCopy()
+			err = cmp.compileMemoryCopy()
 		case *wazeroir.OperationMemoryFill:
-			err = compiler.compileMemoryFill()
+			err = cmp.compileMemoryFill()
 		case *wazeroir.OperationTableInit:
-			err = compiler.compileTableInit(o)
+			err = cmp.compileTableInit(o)
 		case *wazeroir.OperationTableCopy:
-			err = compiler.compileTableCopy(o)
+			err = cmp.compileTableCopy(o)
 		case *wazeroir.OperationElemDrop:
-			err = compiler.compileElemDrop(o)
+			err = cmp.compileElemDrop(o)
 		case *wazeroir.OperationRefFunc:
-			err = compiler.compileRefFunc(o)
+			err = cmp.compileRefFunc(o)
 		case *wazeroir.OperationTableGet:
-			err = compiler.compileTableGet(o)
+			err = cmp.compileTableGet(o)
 		case *wazeroir.OperationTableSet:
-			err = compiler.compileTableSet(o)
+			err = cmp.compileTableSet(o)
 		case *wazeroir.OperationTableGrow:
-			err = compiler.compileTableGrow(o)
+			err = cmp.compileTableGrow(o)
 		case *wazeroir.OperationTableSize:
-			err = compiler.compileTableSize(o)
+			err = cmp.compileTableSize(o)
 		case *wazeroir.OperationTableFill:
-			err = compiler.compileTableFill(o)
+			err = cmp.compileTableFill(o)
 		case *wazeroir.OperationV128Const:
-			err = compiler.compileV128Const(o)
+			err = cmp.compileV128Const(o)
 		case *wazeroir.OperationV128Add:
-			err = compiler.compileV128Add(o)
+			err = cmp.compileV128Add(o)
 		case *wazeroir.OperationV128Sub:
-			err = compiler.compileV128Sub(o)
+			err = cmp.compileV128Sub(o)
 		case *wazeroir.OperationV128Load:
-			err = compiler.compileV128Load(o)
+			err = cmp.compileV128Load(o)
 		case *wazeroir.OperationV128LoadLane:
-			err = compiler.compileV128LoadLane(o)
+			err = cmp.compileV128LoadLane(o)
 		case *wazeroir.OperationV128Store:
-			err = compiler.compileV128Store(o)
+			err = cmp.compileV128Store(o)
 		case *wazeroir.OperationV128StoreLane:
-			err = compiler.compileV128StoreLane(o)
+			err = cmp.compileV128StoreLane(o)
 		case *wazeroir.OperationV128ExtractLane:
-			err = compiler.compileV128ExtractLane(o)
+			err = cmp.compileV128ExtractLane(o)
 		case *wazeroir.OperationV128ReplaceLane:
-			err = compiler.compileV128ReplaceLane(o)
+			err = cmp.compileV128ReplaceLane(o)
 		case *wazeroir.OperationV128Splat:
-			err = compiler.compileV128Splat(o)
+			err = cmp.compileV128Splat(o)
 		case *wazeroir.OperationV128Shuffle:
-			err = compiler.compileV128Shuffle(o)
+			err = cmp.compileV128Shuffle(o)
 		case *wazeroir.OperationV128Swizzle:
-			err = compiler.compileV128Swizzle(o)
+			err = cmp.compileV128Swizzle(o)
 		case *wazeroir.OperationV128AnyTrue:
-			err = compiler.compileV128AnyTrue(o)
+			err = cmp.compileV128AnyTrue(o)
 		case *wazeroir.OperationV128AllTrue:
-			err = compiler.compileV128AllTrue(o)
+			err = cmp.compileV128AllTrue(o)
 		case *wazeroir.OperationV128BitMask:
-			err = compiler.compileV128BitMask(o)
+			err = cmp.compileV128BitMask(o)
 		case *wazeroir.OperationV128And:
-			err = compiler.compileV128And(o)
+			err = cmp.compileV128And(o)
 		case *wazeroir.OperationV128Not:
-			err = compiler.compileV128Not(o)
+			err = cmp.compileV128Not(o)
 		case *wazeroir.OperationV128Or:
-			err = compiler.compileV128Or(o)
+			err = cmp.compileV128Or(o)
 		case *wazeroir.OperationV128Xor:
-			err = compiler.compileV128Xor(o)
+			err = cmp.compileV128Xor(o)
 		case *wazeroir.OperationV128Bitselect:
-			err = compiler.compileV128Bitselect(o)
+			err = cmp.compileV128Bitselect(o)
 		case *wazeroir.OperationV128AndNot:
-			err = compiler.compileV128AndNot(o)
+			err = cmp.compileV128AndNot(o)
 		case *wazeroir.OperationV128Shr:
-			err = compiler.compileV128Shr(o)
+			err = cmp.compileV128Shr(o)
 		case *wazeroir.OperationV128Shl:
-			err = compiler.compileV128Shl(o)
+			err = cmp.compileV128Shl(o)
 		case *wazeroir.OperationV128Cmp:
-			err = compiler.compileV128Cmp(o)
+			err = cmp.compileV128Cmp(o)
 		case *wazeroir.OperationV128AddSat:
-			err = compiler.compileV128AddSat(o)
+			err = cmp.compileV128AddSat(o)
 		case *wazeroir.OperationV128SubSat:
-			err = compiler.compileV128SubSat(o)
+			err = cmp.compileV128SubSat(o)
 		case *wazeroir.OperationV128Mul:
-			err = compiler.compileV128Mul(o)
+			err = cmp.compileV128Mul(o)
 		case *wazeroir.OperationV128Div:
-			err = compiler.compileV128Div(o)
+			err = cmp.compileV128Div(o)
 		case *wazeroir.OperationV128Neg:
-			err = compiler.compileV128Neg(o)
+			err = cmp.compileV128Neg(o)
 		case *wazeroir.OperationV128Sqrt:
-			err = compiler.compileV128Sqrt(o)
+			err = cmp.compileV128Sqrt(o)
 		case *wazeroir.OperationV128Abs:
-			err = compiler.compileV128Abs(o)
+			err = cmp.compileV128Abs(o)
 		case *wazeroir.OperationV128Popcnt:
-			err = compiler.compileV128Popcnt(o)
+			err = cmp.compileV128Popcnt(o)
 		case *wazeroir.OperationV128Min:
-			err = compiler.compileV128Min(o)
+			err = cmp.compileV128Min(o)
 		case *wazeroir.OperationV128Max:
-			err = compiler.compileV128Max(o)
+			err = cmp.compileV128Max(o)
 		case *wazeroir.OperationV128AvgrU:
-			err = compiler.compileV128AvgrU(o)
+			err = cmp.compileV128AvgrU(o)
 		case *wazeroir.OperationV128Pmin:
-			err = compiler.compileV128Pmin(o)
+			err = cmp.compileV128Pmin(o)
 		case *wazeroir.OperationV128Pmax:
-			err = compiler.compileV128Pmax(o)
+			err = cmp.compileV128Pmax(o)
 		case *wazeroir.OperationV128Ceil:
-			err = compiler.compileV128Ceil(o)
+			err = cmp.compileV128Ceil(o)
 		case *wazeroir.OperationV128Floor:
-			err = compiler.compileV128Floor(o)
+			err = cmp.compileV128Floor(o)
 		case *wazeroir.OperationV128Trunc:
-			err = compiler.compileV128Trunc(o)
+			err = cmp.compileV128Trunc(o)
 		case *wazeroir.OperationV128Nearest:
-			err = compiler.compileV128Nearest(o)
+			err = cmp.compileV128Nearest(o)
 		case *wazeroir.OperationV128Extend:
-			err = compiler.compileV128Extend(o)
+			err = cmp.compileV128Extend(o)
 		case *wazeroir.OperationV128ExtMul:
-			err = compiler.compileV128ExtMul(o)
+			err = cmp.compileV128ExtMul(o)
 		case *wazeroir.OperationV128Q15mulrSatS:
-			err = compiler.compileV128Q15mulrSatS(o)
+			err = cmp.compileV128Q15mulrSatS(o)
 		case *wazeroir.OperationV128ExtAddPairwise:
-			err = compiler.compileV128ExtAddPairwise(o)
+			err = cmp.compileV128ExtAddPairwise(o)
 		case *wazeroir.OperationV128FloatPromote:
-			err = compiler.compileV128FloatPromote(o)
+			err = cmp.compileV128FloatPromote(o)
 		case *wazeroir.OperationV128FloatDemote:
-			err = compiler.compileV128FloatDemote(o)
+			err = cmp.compileV128FloatDemote(o)
 		case *wazeroir.OperationV128FConvertFromI:
-			err = compiler.compileV128FConvertFromI(o)
+			err = cmp.compileV128FConvertFromI(o)
 		case *wazeroir.OperationV128Dot:
-			err = compiler.compileV128Dot(o)
+			err = cmp.compileV128Dot(o)
 		case *wazeroir.OperationV128Narrow:
-			err = compiler.compileV128Narrow(o)
+			err = cmp.compileV128Narrow(o)
 		case *wazeroir.OperationV128ITruncSatFromF:
-			err = compiler.compileV128ITruncSatFromF(o)
+			err = cmp.compileV128ITruncSatFromF(o)
 		default:
 			err = errors.New("unsupported")
 		}
@@ -1198,10 +1342,21 @@ func compileWasmFunction(_ api.CoreFeatures, ir *wazeroir.CompilationResult) (*c
 		}
 	}
 
-	c, stackPointerCeil, err := compiler.compile()
+	c, stackPointerCeil, err := cmp.compile()
 	if err != nil {
 		return nil, fmt.Errorf("failed to compile: %w", err)
 	}
 
-	return &code{codeSegment: c, stackPointerCeil: stackPointerCeil}, nil
+	ret := &code{codeSegment: c, stackPointerCeil: stackPointerCeil}
+	if needSourceOffsets {
+		offsetInNativeBin := make([]uint64, len(irOpBegins))
+		for i, nop := range irOpBegins {
+			offsetInNativeBin[i] = nop.OffsetInBinary()
+		}
+		ret.sourceOffsetMap = &sourceOffsetMap{
+			irOperationSourceOffsetsInWasmBinary: ir.IROperationSourceOffsetsInWasmBinary,
+			irOperationOffsetsInNativeBinary:     offsetInNativeBin,
+		}
+	}
+	return ret, nil
 }

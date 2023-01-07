@@ -138,6 +138,7 @@ func NewRuntimeWithConfig(ctx context.Context, rConfig RuntimeConfig) Runtime {
 		memoryLimitPages:      config.memoryLimitPages,
 		memoryCapacityFromMax: config.memoryCapacityFromMax,
 		isInterpreter:         config.isInterpreter,
+		dwarfDisabled:         config.dwarfDisabled,
 	}
 }
 
@@ -149,6 +150,7 @@ type runtime struct {
 	memoryLimitPages      uint32
 	memoryCapacityFromMax bool
 	isInterpreter         bool
+	dwarfDisabled         bool
 	compiledModules       []*compiledModule
 }
 
@@ -172,7 +174,8 @@ func (r *runtime) CompileModule(ctx context.Context, binary []byte) (CompiledMod
 		return nil, errors.New("invalid binary")
 	}
 
-	internal, err := binaryformat.DecodeModule(binary, r.enabledFeatures, r.memoryLimitPages, r.memoryCapacityFromMax)
+	internal, err := binaryformat.DecodeModule(binary, r.enabledFeatures,
+		r.memoryLimitPages, r.memoryCapacityFromMax, !r.dwarfDisabled, false)
 	if err != nil {
 		return nil, err
 	} else if err = internal.Validate(r.enabledFeatures); err != nil {
@@ -189,11 +192,12 @@ func (r *runtime) CompileModule(ctx context.Context, binary []byte) (CompiledMod
 
 	c := &compiledModule{module: internal, compiledEngine: r.store.Engine}
 
-	if c.listeners, err = buildListeners(ctx, r, internal); err != nil {
+	listeners, err := buildListeners(ctx, internal)
+	if err != nil {
 		return nil, err
 	}
 
-	if err = r.store.Engine.CompileModule(ctx, internal); err != nil {
+	if err = r.store.Engine.CompileModule(ctx, internal, listeners); err != nil {
 		return nil, err
 	}
 
@@ -201,14 +205,11 @@ func (r *runtime) CompileModule(ctx context.Context, binary []byte) (CompiledMod
 	return c, nil
 }
 
-func buildListeners(ctx context.Context, r *runtime, internal *wasm.Module) ([]experimentalapi.FunctionListener, error) {
+func buildListeners(ctx context.Context, internal *wasm.Module) ([]experimentalapi.FunctionListener, error) {
 	// Test to see if internal code are using an experimental feature.
 	fnlf := ctx.Value(experimentalapi.FunctionListenerFactoryKey{})
 	if fnlf == nil {
 		return nil, nil
-	}
-	if !r.isInterpreter {
-		return nil, errors.New("context includes a FunctionListenerFactoryKey, which is only supported in the interpreter")
 	}
 	factory := fnlf.(experimentalapi.FunctionListenerFactory)
 	importCount := internal.ImportFuncCount()

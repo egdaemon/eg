@@ -4,15 +4,11 @@ import (
 	"context"
 
 	"github.com/tetratelabs/wazero/api"
+	. "github.com/tetratelabs/wazero/internal/wasi_snapshot_preview1"
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
-const (
-	functionArgsGet      = "args_get"
-	functionArgsSizesGet = "args_sizes_get"
-)
-
-// argsGet is the WASI function named functionArgsGet that reads command-line
+// argsGet is the WASI function named ArgsGetName that reads command-line
 // argument data.
 //
 // # Parameters
@@ -44,25 +40,15 @@ const (
 // See argsSizesGet
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#args_get
 // See https://en.wikipedia.org/wiki/Null-terminated_string
-var argsGet = &wasm.HostFunc{
-	ExportNames: []string{functionArgsGet},
-	Name:        functionArgsGet,
-	ParamTypes:  []api.ValueType{i32, i32},
-	ParamNames:  []string{"argv", "argv_buf"},
-	ResultTypes: []api.ValueType{i32},
-	Code: &wasm.Code{
-		IsHostFunction: true,
-		GoFunc:         api.GoModuleFunc(argsGetFn),
-	},
-}
+var argsGet = newHostFunc(ArgsGetName, argsGetFn, []api.ValueType{i32, i32}, "argv", "argv_buf")
 
-func argsGetFn(ctx context.Context, mod api.Module, params []uint64) []uint64 {
+func argsGetFn(_ context.Context, mod api.Module, params []uint64) Errno {
 	sysCtx := mod.(*wasm.CallContext).Sys
 	argv, argvBuf := uint32(params[0]), uint32(params[1])
-	return writeOffsetsAndNullTerminatedValues(ctx, mod.Memory(), sysCtx.Args(), argv, argvBuf)
+	return writeOffsetsAndNullTerminatedValues(mod.Memory(), sysCtx.Args(), argv, argvBuf, sysCtx.ArgsSize())
 }
 
-// argsSizesGet is the WASI function named functionArgsSizesGet that reads
+// argsSizesGet is the WASI function named ArgsSizesGetName that reads
 // command-line argument sizes.
 //
 // # Parameters
@@ -91,28 +77,20 @@ func argsGetFn(ctx context.Context, mod api.Module, params []uint64) []uint64 {
 // See argsGet
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#args_sizes_get
 // See https://en.wikipedia.org/wiki/Null-terminated_string
-var argsSizesGet = &wasm.HostFunc{
-	ExportNames: []string{functionArgsSizesGet},
-	Name:        functionArgsSizesGet,
-	ParamTypes:  []api.ValueType{i32, i32},
-	ParamNames:  []string{"result.argc", "result.argv_len"},
-	ResultTypes: []api.ValueType{i32},
-	Code: &wasm.Code{
-		IsHostFunction: true,
-		GoFunc:         api.GoModuleFunc(argsSizesGetFn),
-	},
-}
+var argsSizesGet = newHostFunc(ArgsSizesGetName, argsSizesGetFn, []api.ValueType{i32, i32}, "result.argc", "result.argv_len")
 
-func argsSizesGetFn(ctx context.Context, mod api.Module, params []uint64) []uint64 {
+func argsSizesGetFn(_ context.Context, mod api.Module, params []uint64) Errno {
 	sysCtx := mod.(*wasm.CallContext).Sys
 	mem := mod.Memory()
 	resultArgc, resultArgvLen := uint32(params[0]), uint32(params[1])
 
-	if !mem.WriteUint32Le(ctx, resultArgc, uint32(len(sysCtx.Args()))) {
-		return errnoFault
+	// argc and argv_len offsets are not necessarily sequential, so we have to
+	// write them independently.
+	if !mem.WriteUint32Le(resultArgc, uint32(len(sysCtx.Args()))) {
+		return ErrnoFault
 	}
-	if !mem.WriteUint32Le(ctx, resultArgvLen, sysCtx.ArgsSize()) {
-		return errnoFault
+	if !mem.WriteUint32Le(resultArgvLen, sysCtx.ArgsSize()) {
+		return ErrnoFault
 	}
-	return errnoSuccess
+	return ErrnoSuccess
 }

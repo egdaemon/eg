@@ -27,19 +27,20 @@ const maximumValuesOnStack = 1 << 27
 // Returns an error if the instruction sequence is not valid,
 // or potentially it can exceed the maximum number of values on the stack.
 func (m *Module) validateFunction(enabledFeatures api.CoreFeatures, idx Index, functions []Index,
-	globals []*GlobalType, memory *Memory, tables []*Table, declaredFunctionIndexes map[Index]struct{}) error {
+	globals []*GlobalType, memory *Memory, tables []*Table, declaredFunctionIndexes map[Index]struct{},
+) error {
 	return m.validateFunctionWithMaxStackValues(enabledFeatures, idx, functions, globals, memory, tables, maximumValuesOnStack, declaredFunctionIndexes)
 }
 
 func readMemArg(pc uint64, body []byte) (align, offset uint32, read uint64, err error) {
-	align, num, err := leb128.DecodeUint32(bytes.NewReader(body[pc:]))
+	align, num, err := leb128.LoadUint32(body[pc:])
 	if err != nil {
 		err = fmt.Errorf("read memory align: %v", err)
 		return
 	}
 	read += num
 
-	offset, num, err = leb128.DecodeUint32(bytes.NewReader(body[pc+num:]))
+	offset, num, err = leb128.LoadUint32(body[pc+num:])
 	if err != nil {
 		err = fmt.Errorf("read memory offset: %v", err)
 		return
@@ -276,7 +277,7 @@ func (m *Module) validateFunctionWithMaxStackValues(
 				return fmt.Errorf("memory must exist for %s", InstructionName(op))
 			}
 			pc++
-			val, num, err := leb128.DecodeUint32(bytes.NewReader(body[pc:]))
+			val, num, err := leb128.LoadUint32(body[pc:])
 			if err != nil {
 				return fmt.Errorf("read immediate: %v", err)
 			}
@@ -297,14 +298,14 @@ func (m *Module) validateFunctionWithMaxStackValues(
 			pc++
 			switch Opcode(op) {
 			case OpcodeI32Const:
-				_, num, err := leb128.DecodeInt32(bytes.NewReader(body[pc:]))
+				_, num, err := leb128.LoadInt32(body[pc:])
 				if err != nil {
 					return fmt.Errorf("read i32 immediate: %s", err)
 				}
 				pc += num - 1
 				valueTypeStack.push(ValueTypeI32)
 			case OpcodeI64Const:
-				_, num, err := leb128.DecodeInt64(bytes.NewReader(body[pc:]))
+				_, num, err := leb128.LoadInt64(body[pc:])
 				if err != nil {
 					return fmt.Errorf("read i64 immediate: %v", err)
 				}
@@ -319,7 +320,7 @@ func (m *Module) validateFunctionWithMaxStackValues(
 			}
 		} else if OpcodeLocalGet <= op && op <= OpcodeGlobalSet {
 			pc++
-			index, num, err := leb128.DecodeUint32(bytes.NewReader(body[pc:]))
+			index, num, err := leb128.LoadUint32(body[pc:])
 			if err != nil {
 				return fmt.Errorf("read immediate: %v", err)
 			}
@@ -384,7 +385,7 @@ func (m *Module) validateFunctionWithMaxStackValues(
 			}
 		} else if op == OpcodeBr {
 			pc++
-			index, num, err := leb128.DecodeUint32(bytes.NewReader(body[pc:]))
+			index, num, err := leb128.LoadUint32(body[pc:])
 			if err != nil {
 				return fmt.Errorf("read immediate: %v", err)
 			} else if int(index) >= len(controlBlockStack) {
@@ -406,7 +407,7 @@ func (m *Module) validateFunctionWithMaxStackValues(
 			valueTypeStack.unreachable()
 		} else if op == OpcodeBrIf {
 			pc++
-			index, num, err := leb128.DecodeUint32(bytes.NewReader(body[pc:]))
+			index, num, err := leb128.LoadUint32(body[pc:])
 			if err != nil {
 				return fmt.Errorf("read immediate: %v", err)
 			} else if int(index) >= len(controlBlockStack) {
@@ -526,7 +527,7 @@ func (m *Module) validateFunctionWithMaxStackValues(
 			valueTypeStack.unreachable()
 		} else if op == OpcodeCall {
 			pc++
-			index, num, err := leb128.DecodeUint32(bytes.NewReader(body[pc:]))
+			index, num, err := leb128.LoadUint32(body[pc:])
 			if err != nil {
 				return fmt.Errorf("read immediate: %v", err)
 			}
@@ -545,7 +546,7 @@ func (m *Module) validateFunctionWithMaxStackValues(
 			}
 		} else if op == OpcodeCallIndirect {
 			pc++
-			typeIndex, num, err := leb128.DecodeUint32(bytes.NewReader(body[pc:]))
+			typeIndex, num, err := leb128.LoadUint32(body[pc:])
 			if err != nil {
 				return fmt.Errorf("read immediate: %v", err)
 			}
@@ -555,7 +556,7 @@ func (m *Module) validateFunctionWithMaxStackValues(
 				return fmt.Errorf("invalid type index at %s: %d", OpcodeCallIndirectName, typeIndex)
 			}
 
-			tableIndex, num, err := leb128.DecodeUint32(bytes.NewReader(body[pc:]))
+			tableIndex, num, err := leb128.LoadUint32(body[pc:])
 			if err != nil {
 				return fmt.Errorf("read table index: %v", err)
 			}
@@ -827,7 +828,7 @@ func (m *Module) validateFunctionWithMaxStackValues(
 				valueTypeStack.push(ValueTypeI32)
 			case OpcodeRefFunc:
 				pc++
-				index, num, err := leb128.DecodeUint32(bytes.NewReader(body[pc:]))
+				index, num, err := leb128.LoadUint32(body[pc:])
 				if err != nil {
 					return fmt.Errorf("failed to read function index for ref.func: %v", err)
 				}
@@ -842,7 +843,7 @@ func (m *Module) validateFunctionWithMaxStackValues(
 				return fmt.Errorf("%s is invalid as %v", InstructionName(op), err)
 			}
 			pc++
-			tableIndex, num, err := leb128.DecodeUint32(bytes.NewReader(body[pc:]))
+			tableIndex, num, err := leb128.LoadUint32(body[pc:])
 			if err != nil {
 				return fmt.Errorf("read immediate: %v", err)
 			}
@@ -867,9 +868,19 @@ func (m *Module) validateFunctionWithMaxStackValues(
 			pc += num - 1
 		} else if op == OpcodeMiscPrefix {
 			pc++
-			// Miscellaneous instructions come with two bytes which starts with OpcodeMiscPrefix,
-			// and the second byte determines the actual instruction.
-			miscOpcode := body[pc]
+			// A misc opcode is encoded as an unsigned variable 32-bit integer.
+			miscOp32, num, err := leb128.LoadUint32(body[pc:])
+			if err != nil {
+				return fmt.Errorf("failed to read misc opcode: %v", err)
+			}
+			pc += num - 1
+			miscOpcode := byte(miscOp32)
+			// If the misc opcode is beyond byte range, it is highly likely this is an invalid binary, or
+			// it is due to the new opcode from a new proposal. In the latter case, we have to
+			// change the alias type of OpcodeMisc (which is currently byte) to uint32.
+			if uint32(byte(miscOp32)) != miscOp32 {
+				return fmt.Errorf("invalid misc opcode: %#x", miscOp32)
+			}
 			if miscOpcode >= OpcodeMiscI32TruncSatF32S && miscOpcode <= OpcodeMiscI64TruncSatF64U {
 				if err := enabledFeatures.RequireEnabled(api.CoreFeatureNonTrappingFloatToIntConversion); err != nil {
 					return fmt.Errorf("%s invalid as %v", miscInstructionNames[miscOpcode], err)
@@ -903,7 +914,7 @@ func (m *Module) validateFunctionWithMaxStackValues(
 
 					// We need to read the index to the data section.
 					pc++
-					index, num, err := leb128.DecodeUint32(bytes.NewReader(body[pc:]))
+					index, num, err := leb128.LoadUint32(body[pc:])
 					if err != nil {
 						return fmt.Errorf("failed to read data segment index for %s: %v", MiscInstructionName(miscOpcode), err)
 					}
@@ -924,7 +935,7 @@ func (m *Module) validateFunctionWithMaxStackValues(
 
 						// We need to read the index to the data section.
 						pc++
-						index, num, err := leb128.DecodeUint32(bytes.NewReader(body[pc:]))
+						index, num, err := leb128.LoadUint32(body[pc:])
 						if err != nil {
 							return fmt.Errorf("failed to read data segment index for %s: %v", MiscInstructionName(miscOpcode), err)
 						}
@@ -935,7 +946,7 @@ func (m *Module) validateFunctionWithMaxStackValues(
 					}
 
 					pc++
-					val, num, err := leb128.DecodeUint32(bytes.NewReader(body[pc:]))
+					val, num, err := leb128.LoadUint32(body[pc:])
 					if err != nil {
 						return fmt.Errorf("failed to read memory index for %s: %v", MiscInstructionName(miscOpcode), err)
 					}
@@ -945,7 +956,7 @@ func (m *Module) validateFunctionWithMaxStackValues(
 					if miscOpcode == OpcodeMiscMemoryCopy {
 						pc++
 						// memory.copy needs two memory index which are reserved as zero.
-						val, num, err := leb128.DecodeUint32(bytes.NewReader(body[pc:]))
+						val, num, err := leb128.LoadUint32(body[pc:])
 						if err != nil {
 							return fmt.Errorf("failed to read memory index for %s: %v", MiscInstructionName(miscOpcode), err)
 						}
@@ -957,7 +968,7 @@ func (m *Module) validateFunctionWithMaxStackValues(
 				case OpcodeMiscTableInit:
 					params = []ValueType{ValueTypeI32, ValueTypeI32, ValueTypeI32}
 					pc++
-					elementIndex, num, err := leb128.DecodeUint32(bytes.NewReader(body[pc:]))
+					elementIndex, num, err := leb128.LoadUint32(body[pc:])
 					if err != nil {
 						return fmt.Errorf("failed to read element segment index for %s: %v", MiscInstructionName(miscOpcode), err)
 					}
@@ -966,7 +977,7 @@ func (m *Module) validateFunctionWithMaxStackValues(
 					}
 					pc += num
 
-					tableIndex, num, err := leb128.DecodeUint32(bytes.NewReader(body[pc:]))
+					tableIndex, num, err := leb128.LoadUint32(body[pc:])
 					if err != nil {
 						return fmt.Errorf("failed to read source table index for %s: %v", MiscInstructionName(miscOpcode), err)
 					}
@@ -988,7 +999,7 @@ func (m *Module) validateFunctionWithMaxStackValues(
 					pc += num - 1
 				case OpcodeMiscElemDrop:
 					pc++
-					elementIndex, num, err := leb128.DecodeUint32(bytes.NewReader(body[pc:]))
+					elementIndex, num, err := leb128.LoadUint32(body[pc:])
 					if err != nil {
 						return fmt.Errorf("failed to read element segment index for %s: %v", MiscInstructionName(miscOpcode), err)
 					} else if int(elementIndex) >= len(m.ElementSection) {
@@ -999,7 +1010,7 @@ func (m *Module) validateFunctionWithMaxStackValues(
 					params = []ValueType{ValueTypeI32, ValueTypeI32, ValueTypeI32}
 					pc++
 
-					dstTableIndex, num, err := leb128.DecodeUint32(bytes.NewReader(body[pc:]))
+					dstTableIndex, num, err := leb128.LoadUint32(body[pc:])
 					if err != nil {
 						return fmt.Errorf("failed to read destination table index for %s: %v", MiscInstructionName(miscOpcode), err)
 					}
@@ -1013,7 +1024,7 @@ func (m *Module) validateFunctionWithMaxStackValues(
 					}
 					pc += num
 
-					srcTableIndex, num, err := leb128.DecodeUint32(bytes.NewReader(body[pc:]))
+					srcTableIndex, num, err := leb128.LoadUint32(body[pc:])
 					if err != nil {
 						return fmt.Errorf("failed to read source table index for %s: %v", MiscInstructionName(miscOpcode), err)
 					}
@@ -1044,7 +1055,7 @@ func (m *Module) validateFunctionWithMaxStackValues(
 				}
 
 				pc++
-				tableIndex, num, err := leb128.DecodeUint32(bytes.NewReader(body[pc:]))
+				tableIndex, num, err := leb128.LoadUint32(body[pc:])
 				if err != nil {
 					return fmt.Errorf("failed to read table index for %s: %v", MiscInstructionName(miscOpcode), err)
 				}
@@ -1440,6 +1451,9 @@ func (m *Module) validateFunctionWithMaxStackValues(
 			valueTypeStack.pushStackLimit(len(bt.Params))
 			pc += num
 		} else if op == OpcodeElse {
+			if len(controlBlockStack) == 0 {
+				return fmt.Errorf("redundant Else instruction at %#x", pc)
+			}
 			bl := controlBlockStack[len(controlBlockStack)-1]
 			bl.elseAt = pc
 			// Check the type soundness of the instructions *before* entering this else Op.
@@ -1453,6 +1467,9 @@ func (m *Module) validateFunctionWithMaxStackValues(
 				valueTypeStack.push(p)
 			}
 		} else if op == OpcodeEnd {
+			if len(controlBlockStack) == 0 {
+				return fmt.Errorf("redundant End instruction at %#x", pc)
+			}
 			bl := controlBlockStack[len(controlBlockStack)-1]
 			bl.endAt = pc
 			controlBlockStack = controlBlockStack[:len(controlBlockStack)-1]
@@ -1856,21 +1873,21 @@ func DecodeBlockType(types []*FunctionType, r *bytes.Reader, enabledFeatures api
 	var ret *FunctionType
 	switch raw {
 	case -64: // 0x40 in original byte = nil
-		ret = &FunctionType{}
+		ret = blockType_v_v
 	case -1: // 0x7f in original byte = i32
-		ret = &FunctionType{Results: []ValueType{ValueTypeI32}, ResultNumInUint64: 1}
+		ret = blockType_v_i32
 	case -2: // 0x7e in original byte = i64
-		ret = &FunctionType{Results: []ValueType{ValueTypeI64}, ResultNumInUint64: 1}
+		ret = blockType_v_i64
 	case -3: // 0x7d in original byte = f32
-		ret = &FunctionType{Results: []ValueType{ValueTypeF32}, ResultNumInUint64: 1}
+		ret = blockType_v_f32
 	case -4: // 0x7c in original byte = f64
-		ret = &FunctionType{Results: []ValueType{ValueTypeF64}, ResultNumInUint64: 1}
+		ret = blockType_v_f64
 	case -5: // 0x7b in original byte = v128
-		ret = &FunctionType{Results: []ValueType{ValueTypeV128}, ResultNumInUint64: 2}
+		ret = blockType_v_v128
 	case -16: // 0x70 in original byte = funcref
-		ret = &FunctionType{Results: []ValueType{ValueTypeFuncref}, ResultNumInUint64: 1}
+		ret = blockType_v_funcref
 	case -17: // 0x6f in original byte = externref
-		ret = &FunctionType{Results: []ValueType{ValueTypeExternref}, ResultNumInUint64: 1}
+		ret = blockType_v_externref
 	default:
 		if err = enabledFeatures.RequireEnabled(api.CoreFeatureMultiValue); err != nil {
 			return nil, num, fmt.Errorf("block with function type return invalid as %v", err)
@@ -1882,3 +1899,15 @@ func DecodeBlockType(types []*FunctionType, r *bytes.Reader, enabledFeatures api
 	}
 	return ret, num, err
 }
+
+// These block types are defined as globals in order to avoid allocations in DecodeBlockType.
+var (
+	blockType_v_v         = &FunctionType{}
+	blockType_v_i32       = &FunctionType{Results: []ValueType{ValueTypeI32}, ResultNumInUint64: 1}
+	blockType_v_i64       = &FunctionType{Results: []ValueType{ValueTypeI64}, ResultNumInUint64: 1}
+	blockType_v_f32       = &FunctionType{Results: []ValueType{ValueTypeF32}, ResultNumInUint64: 1}
+	blockType_v_f64       = &FunctionType{Results: []ValueType{ValueTypeF64}, ResultNumInUint64: 1}
+	blockType_v_v128      = &FunctionType{Results: []ValueType{ValueTypeV128}, ResultNumInUint64: 2}
+	blockType_v_funcref   = &FunctionType{Results: []ValueType{ValueTypeFuncref}, ResultNumInUint64: 1}
+	blockType_v_externref = &FunctionType{Results: []ValueType{ValueTypeExternref}, ResultNumInUint64: 1}
+)

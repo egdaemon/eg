@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/tetratelabs/wazero/api"
-	"github.com/tetratelabs/wazero/experimental"
 	"github.com/tetratelabs/wazero/internal/engine/compiler"
 	"github.com/tetratelabs/wazero/internal/engine/interpreter"
 	"github.com/tetratelabs/wazero/internal/platform"
@@ -67,6 +66,41 @@ type RuntimeConfig interface {
 	//
 	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#grow-mem
 	WithMemoryCapacityFromMax(memoryCapacityFromMax bool) RuntimeConfig
+
+	// WithDebugInfoEnabled toggles DWARF based stack traces in the face of
+	// runtime errors. Defaults to true.
+	//
+	// Those who wish to disable this, can like so:
+	//
+	//	r := wazero.NewRuntimeWithConfig(wazero.NewRuntimeConfig().WithDebugInfoEnabled(false)
+	//
+	// When disabled, a stack trace message looks like:
+	//
+	//	wasm stack trace:
+	//		.runtime._panic(i32)
+	//		.myFunc()
+	//		.main.main()
+	//		.runtime.run()
+	//		._start()
+	//
+	// When enabled, the stack trace includes source code information:
+	//
+	//	wasm stack trace:
+	//		.runtime._panic(i32)
+	//		  0x16e2: /opt/homebrew/Cellar/tinygo/0.26.0/src/runtime/runtime_tinygowasm.go:73:6
+	//		.myFunc()
+	//		  0x190b: /Users/XXXXX/wazero/internal/testing/dwarftestdata/testdata/main.go:19:7
+	//		.main.main()
+	//		  0x18ed: /Users/XXXXX/wazero/internal/testing/dwarftestdata/testdata/main.go:4:3
+	//		.runtime.run()
+	//		  0x18cc: /opt/homebrew/Cellar/tinygo/0.26.0/src/runtime/scheduler_none.go:26:10
+	//		._start()
+	//		  0x18b6: /opt/homebrew/Cellar/tinygo/0.26.0/src/runtime/runtime_wasm_wasi.go:22:5
+	//
+	// Note: This only takes into effect when the original Wasm binary has the
+	// DWARF "custom sections" that are often stripped, depending on
+	// optimization flags passed to the compiler.
+	WithDebugInfoEnabled(bool) RuntimeConfig
 }
 
 // NewRuntimeConfig returns a RuntimeConfig using the compiler if it is supported in this environment,
@@ -80,6 +114,7 @@ type runtimeConfig struct {
 	memoryLimitPages      uint32
 	memoryCapacityFromMax bool
 	isInterpreter         bool
+	dwarfDisabled         bool // negative as defaults to enabled
 	newEngine             func(context.Context, api.CoreFeatures) wasm.Engine
 }
 
@@ -88,6 +123,7 @@ var engineLessConfig = &runtimeConfig{
 	enabledFeatures:       api.CoreFeaturesV2,
 	memoryLimitPages:      wasm.MemoryLimitPages,
 	memoryCapacityFromMax: false,
+	dwarfDisabled:         false,
 }
 
 // NewRuntimeConfigCompiler compiles WebAssembly modules into
@@ -149,6 +185,13 @@ func (c *runtimeConfig) WithMemoryCapacityFromMax(memoryCapacityFromMax bool) Ru
 	return ret
 }
 
+// WithDebugInfoEnabled implements RuntimeConfig.WithDebugInfoEnabled
+func (c *runtimeConfig) WithDebugInfoEnabled(dwarfEnabled bool) RuntimeConfig {
+	ret := c.clone()
+	ret.dwarfDisabled = !dwarfEnabled
+	return ret
+}
+
 // CompiledModule is a WebAssembly module ready to be instantiated (Runtime.InstantiateModule) as an api.Module.
 //
 // In WebAssembly terminology, this is a decoded, validated, and possibly also compiled module. wazero avoids using
@@ -201,8 +244,6 @@ type compiledModule struct {
 	module *wasm.Module
 	// compiledEngine holds an engine on which `module` is compiled.
 	compiledEngine wasm.Engine
-	// listeners are present if the code was compiled with a listener
-	listeners []experimental.FunctionListener
 	// closeWithModule prevents leaking compiled code when a module is compiled implicitly.
 	closeWithModule bool
 }
@@ -259,7 +300,6 @@ func (c *compiledModule) ExportedMemories() map[string]api.MemoryDefinition {
 //
 // Note: ModuleConfig is immutable. Each WithXXX function returns a new instance including the corresponding change.
 type ModuleConfig interface {
-
 	// WithArgs assigns command-line arguments visible to an imported function that reads an arg vector (argv). Defaults to
 	// none. Runtime.InstantiateModule errs if any arg is empty.
 	//
@@ -466,9 +506,9 @@ type moduleConfig struct {
 	nanotime           *sys.Nanotime
 	nanotimeResolution sys.ClockResolution
 	nanosleep          *sys.Nanosleep
-	args               []string
+	args               [][]byte
 	// environ is pair-indexed to retain order similar to os.Environ.
-	environ []string
+	environ [][]byte
 	// environKeys allow overwriting of existing values.
 	environKeys map[string]int
 	// fs is the file system to open files with
@@ -496,8 +536,19 @@ func (c *moduleConfig) clone() *moduleConfig {
 // WithArgs implements ModuleConfig.WithArgs
 func (c *moduleConfig) WithArgs(args ...string) ModuleConfig {
 	ret := c.clone()
-	ret.args = args
+	ret.args = toByteSlices(args)
 	return ret
+}
+
+func toByteSlices(strings []string) (result [][]byte) {
+	if len(strings) == 0 {
+		return
+	}
+	result = make([][]byte, len(strings))
+	for i, a := range strings {
+		result[i] = []byte(a)
+	}
+	return
 }
 
 // WithEnv implements ModuleConfig.WithEnv
@@ -505,10 +556,10 @@ func (c *moduleConfig) WithEnv(key, value string) ModuleConfig {
 	ret := c.clone()
 	// Check to see if this key already exists and update it.
 	if i, ok := ret.environKeys[key]; ok {
-		ret.environ[i+1] = value // environ is pair-indexed, so the value is 1 after the key.
+		ret.environ[i+1] = []byte(value) // environ is pair-indexed, so the value is 1 after the key.
 	} else {
 		ret.environKeys[key] = len(ret.environ)
-		ret.environ = append(ret.environ, key, value)
+		ret.environ = append(ret.environ, []byte(key), []byte(value))
 	}
 	return ret
 }
@@ -606,21 +657,29 @@ func (c *moduleConfig) WithRandSource(source io.Reader) ModuleConfig {
 
 // toSysContext creates a baseline wasm.Context configured by ModuleConfig.
 func (c *moduleConfig) toSysContext() (sysCtx *internalsys.Context, err error) {
-	var environ []string // Intentionally doesn't pre-allocate to reduce logic to default to nil.
+	var environ [][]byte // Intentionally doesn't pre-allocate to reduce logic to default to nil.
 	// Same validation as syscall.Setenv for Linux
 	for i := 0; i < len(c.environ); i += 2 {
 		key, value := c.environ[i], c.environ[i+1]
-		if len(key) == 0 {
+		keyLen := len(key)
+		if keyLen == 0 {
 			err = errors.New("environ invalid: empty key")
 			return
 		}
-		for j := 0; j < len(key); j++ {
-			if key[j] == '=' { // NUL enforced in NewContext
+		valueLen := len(value)
+		result := make([]byte, keyLen+valueLen+1)
+		j := 0
+		for ; j < keyLen; j++ {
+			if k := key[j]; k == '=' { // NUL enforced in NewContext
 				err = errors.New("environ invalid: key contains '=' character")
 				return
+			} else {
+				result[j] = k
 			}
 		}
-		environ = append(environ, key+"="+value)
+		result[j] = '='
+		copy(result[j+1:], value)
+		environ = append(environ, result)
 	}
 
 	return internalsys.NewContext(

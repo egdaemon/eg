@@ -18,17 +18,22 @@ package wasi_snapshot_preview1
 
 import (
 	"context"
+	"encoding/binary"
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
+	. "github.com/tetratelabs/wazero/internal/wasi_snapshot_preview1"
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
 // ModuleName is the module name WASI functions are exported into.
 //
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md
-const ModuleName = "wasi_snapshot_preview1"
+const ModuleName = InternalModuleName
+
 const i32, i64 = wasm.ValueTypeI32, wasm.ValueTypeI64
+
+var le = binary.LittleEndian
 
 // MustInstantiate calls Instantiate or panics on error.
 //
@@ -41,7 +46,7 @@ func MustInstantiate(ctx context.Context, r wazero.Runtime) {
 }
 
 // Instantiate instantiates the ModuleName module into the runtime default
-// namespace..
+// namespace.
 //
 // # Notes
 //
@@ -54,7 +59,6 @@ func Instantiate(ctx context.Context, r wazero.Runtime) (api.Closer, error) {
 
 // Builder configures the ModuleName module for later use via Compile or Instantiate.
 type Builder interface {
-
 	// Compile compiles the ModuleName module that can instantiated in any
 	// namespace (wazero.Namespace).
 	//
@@ -89,6 +93,46 @@ func (b *builder) Compile(ctx context.Context) (wazero.CompiledModule, error) {
 // Instantiate implements Builder.Instantiate
 func (b *builder) Instantiate(ctx context.Context, ns wazero.Namespace) (api.Closer, error) {
 	return b.hostModuleBuilder().Instantiate(ctx, ns)
+}
+
+// FunctionExporter exports functions into a wazero.HostModuleBuilder.
+type FunctionExporter interface {
+	ExportFunctions(wazero.HostModuleBuilder)
+}
+
+// NewFunctionExporter returns a new FunctionExporter. This is used for the
+// following two use cases:
+//   - Overriding a builtin function with an alternate implementation.
+//   - Exporting functions to the module "wasi_unstable" for legacy code.
+//
+// # Example of overriding default behavior
+//
+//	// Export the default WASI functions.
+//	wasiBuilder := r.NewHostModuleBuilder(ModuleName)
+//	wasi_snapshot_preview1.NewFunctionExporter().ExportFunctions(wasiBuilder)
+//
+//	// Subsequent calls to NewFunctionBuilder override built-in exports.
+//	wasiBuilder.NewFunctionBuilder().
+//		WithFunc(func(ctx context.Context, mod api.Module, exitCode uint32) {
+//		// your custom logic
+//		}).Export("proc_exit")
+//
+// # Example of using the old module name for WASI
+//
+//	// Instantiate the current WASI functions under the wasi_unstable
+//	// instead of wasi_snapshot_preview1.
+//	wasiBuilder := r.NewHostModuleBuilder("wasi_unstable")
+//	wasi_snapshot_preview1.NewFunctionExporter().ExportFunctions(wasiBuilder)
+//	_, err := wasiBuilder.Instantiate(testCtx, r)
+func NewFunctionExporter() FunctionExporter {
+	return &functionExporter{}
+}
+
+type functionExporter struct{}
+
+// ExportFunctions implements FunctionExporter.ExportFunctions
+func (functionExporter) ExportFunctions(builder wazero.HostModuleBuilder) {
+	exportFunctions(builder)
 }
 
 // ## Translation notes
@@ -174,48 +218,82 @@ func exportFunctions(builder wazero.HostModuleBuilder) {
 	exporter.ExportHostFunc(sockShutdown)
 }
 
-// Declare constants to avoid slice allocation per call.
-var (
-	errnoBadf        = []uint64{uint64(ErrnoBadf)}
-	errnoExist       = []uint64{uint64(ErrnoExist)}
-	errnoInval       = []uint64{uint64(ErrnoInval)}
-	errnoIo          = []uint64{uint64(ErrnoIo)}
-	errnoNoent       = []uint64{uint64(ErrnoNoent)}
-	errnoFault       = []uint64{uint64(ErrnoFault)}
-	errnoNametoolong = []uint64{uint64(ErrnoNametoolong)}
-	errnoSuccess     = []uint64{uint64(ErrnoSuccess)}
-)
-
-func writeOffsetsAndNullTerminatedValues(ctx context.Context, mem api.Memory, values []string, offsets, bytes uint32) []uint64 {
-	for _, value := range values {
-		// Write current offset and advance it.
-		if !mem.WriteUint32Le(ctx, offsets, bytes) {
-			return errnoFault
-		}
-		offsets += 4 // size of uint32
-
-		// Write the next value to memory with a NUL terminator
-		if !mem.Write(ctx, bytes, []byte(value)) {
-			return errnoFault
-		}
-		bytes += uint32(len(value))
-		if !mem.WriteByte(ctx, bytes, 0) {
-			return errnoFault
-		}
-		bytes++
+// writeOffsetsAndNullTerminatedValues is used to write NUL-terminated values
+// for args or environ, given a pre-defined bytesLen (which includes NUL
+// terminators).
+func writeOffsetsAndNullTerminatedValues(mem api.Memory, values [][]byte, offsets, bytes, bytesLen uint32) Errno {
+	// The caller may not place bytes directly after offsets, so we have to
+	// read them independently.
+	valuesLen := len(values)
+	offsetsLen := uint32(valuesLen * 4) // uint32Le
+	offsetsBuf, ok := mem.Read(offsets, offsetsLen)
+	if !ok {
+		return ErrnoFault
+	}
+	bytesBuf, ok := mem.Read(bytes, bytesLen)
+	if !ok {
+		return ErrnoFault
 	}
 
-	return errnoSuccess
+	// Loop through the values, first writing the location of its data to
+	// offsetsBuf[oI], then its NUL-terminated data at bytesBuf[bI]
+	var oI, bI uint32
+	for _, value := range values {
+		// Go can't guarantee inlining as there's not //go:inline directive.
+		// This inlines uint32 little-endian encoding instead.
+		bytesOffset := bytes + bI
+		offsetsBuf[oI] = byte(bytesOffset)
+		offsetsBuf[oI+1] = byte(bytesOffset >> 8)
+		offsetsBuf[oI+2] = byte(bytesOffset >> 16)
+		offsetsBuf[oI+3] = byte(bytesOffset >> 24)
+		oI += 4 // size of uint32 we just wrote
+
+		// Write the next value to memory with a NUL terminator
+		copy(bytesBuf[bI:], value)
+		bI += uint32(len(value))
+		bytesBuf[bI] = 0 // NUL terminator
+		bI++
+	}
+
+	return ErrnoSuccess
+}
+
+func newHostFunc(
+	name string,
+	goFunc wasiFunc,
+	paramTypes []api.ValueType,
+	paramNames ...string,
+) *wasm.HostFunc {
+	return &wasm.HostFunc{
+		ExportNames: []string{name},
+		Name:        name,
+		ParamTypes:  paramTypes,
+		ParamNames:  paramNames,
+		ResultTypes: []api.ValueType{i32},
+		ResultNames: []string{"errno"},
+		Code:        &wasm.Code{IsHostFunction: true, GoFunc: goFunc},
+	}
+}
+
+// wasiFunc special cases that all WASI functions return a single Errno
+// result. The returned value will be written back to the stack at index zero.
+type wasiFunc func(ctx context.Context, mod api.Module, params []uint64) Errno
+
+// Call implements the same method as documented on api.GoModuleFunction.
+func (f wasiFunc) Call(ctx context.Context, mod api.Module, stack []uint64) {
+	// Write the result back onto the stack
+	stack[0] = uint64(f(ctx, mod, stack))
 }
 
 // stubFunction stubs for GrainLang per #271.
-func stubFunction(name string, paramTypes []wasm.ValueType, paramNames []string) *wasm.HostFunc {
+func stubFunction(name string, paramTypes []wasm.ValueType, paramNames ...string) *wasm.HostFunc {
 	return &wasm.HostFunc{
 		Name:        name,
 		ExportNames: []string{name},
 		ParamTypes:  paramTypes,
 		ParamNames:  paramNames,
-		ResultTypes: []wasm.ValueType{i32},
+		ResultTypes: []api.ValueType{i32},
+		ResultNames: []string{"errno"},
 		Code: &wasm.Code{
 			IsHostFunction: true,
 			Body:           []byte{wasm.OpcodeI32Const, byte(ErrnoNosys), wasm.OpcodeEnd},

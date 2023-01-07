@@ -4,15 +4,11 @@ import (
 	"context"
 
 	"github.com/tetratelabs/wazero/api"
+	. "github.com/tetratelabs/wazero/internal/wasi_snapshot_preview1"
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
-const (
-	functionEnvironGet      = "environ_get"
-	functionEnvironSizesGet = "environ_sizes_get"
-)
-
-// environGet is the WASI function named functionEnvironGet that reads
+// environGet is the WASI function named EnvironGetName that reads
 // environment variables.
 //
 // # Parameters
@@ -44,25 +40,16 @@ const (
 // See environSizesGet
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#environ_get
 // See https://en.wikipedia.org/wiki/Null-terminated_string
-var environGet = &wasm.HostFunc{
-	ExportNames: []string{functionEnvironGet},
-	Name:        functionEnvironGet,
-	ParamTypes:  []api.ValueType{i32, i32},
-	ParamNames:  []string{"environ", "environ_buf"},
-	ResultTypes: []api.ValueType{i32},
-	Code: &wasm.Code{
-		IsHostFunction: true,
-		GoFunc:         api.GoModuleFunc(environGetFn),
-	},
-}
+var environGet = newHostFunc(EnvironGetName, environGetFn, []api.ValueType{i32, i32}, "environ", "environ_buf")
 
-func environGetFn(ctx context.Context, mod api.Module, params []uint64) []uint64 {
+func environGetFn(_ context.Context, mod api.Module, params []uint64) Errno {
 	sysCtx := mod.(*wasm.CallContext).Sys
 	environ, environBuf := uint32(params[0]), uint32(params[1])
-	return writeOffsetsAndNullTerminatedValues(ctx, mod.Memory(), sysCtx.Environ(), environ, environBuf)
+
+	return writeOffsetsAndNullTerminatedValues(mod.Memory(), sysCtx.Environ(), environ, environBuf, sysCtx.EnvironSize())
 }
 
-// environSizesGet is the WASI function named functionEnvironSizesGet that
+// environSizesGet is the WASI function named EnvironSizesGetName that
 // reads environment variable sizes.
 //
 // # Parameters
@@ -93,28 +80,20 @@ func environGetFn(ctx context.Context, mod api.Module, params []uint64) []uint64
 // See environGet
 // https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#environ_sizes_get
 // and https://en.wikipedia.org/wiki/Null-terminated_string
-var environSizesGet = &wasm.HostFunc{
-	ExportNames: []string{functionEnvironSizesGet},
-	Name:        functionEnvironSizesGet,
-	ParamTypes:  []api.ValueType{i32, i32},
-	ParamNames:  []string{"result.environc", "result.environv_len"},
-	ResultTypes: []api.ValueType{i32},
-	Code: &wasm.Code{
-		IsHostFunction: true,
-		GoFunc:         api.GoModuleFunc(environSizesGetFn),
-	},
-}
+var environSizesGet = newHostFunc(EnvironSizesGetName, environSizesGetFn, []api.ValueType{i32, i32}, "result.environc", "result.environv_len")
 
-func environSizesGetFn(ctx context.Context, mod api.Module, params []uint64) []uint64 {
+func environSizesGetFn(_ context.Context, mod api.Module, params []uint64) Errno {
 	sysCtx := mod.(*wasm.CallContext).Sys
 	mem := mod.Memory()
 	resultEnvironc, resultEnvironvLen := uint32(params[0]), uint32(params[1])
 
-	if !mem.WriteUint32Le(ctx, resultEnvironc, uint32(len(sysCtx.Environ()))) {
-		return errnoFault
+	// environc and environv_len offsets are not necessarily sequential, so we
+	// have to write them independently.
+	if !mem.WriteUint32Le(resultEnvironc, uint32(len(sysCtx.Environ()))) {
+		return ErrnoFault
 	}
-	if !mem.WriteUint32Le(ctx, resultEnvironvLen, sysCtx.EnvironSize()) {
-		return errnoFault
+	if !mem.WriteUint32Le(resultEnvironvLen, sysCtx.EnvironSize()) {
+		return ErrnoFault
 	}
-	return errnoSuccess
+	return ErrnoSuccess
 }

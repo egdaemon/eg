@@ -1,35 +1,12 @@
 package wasm
 
 import (
-	"errors"
 	"fmt"
 	"sort"
 
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/internal/wasmdebug"
 )
-
-type ProxyFuncExporter interface {
-	ExportProxyFunc(*ProxyFunc)
-}
-
-// ProxyFunc is a function defined both in wasm and go. This is used to
-// optimize the Go signature or obviate calls based on what can be done
-// mechanically in wasm.
-type ProxyFunc struct {
-	// Proxy must be a wasm func
-	Proxy *HostFunc
-	// Proxied should be a go func.
-	Proxied *HostFunc
-
-	// CallBodyPos is the position in Code.Body of the caller to replace the
-	// real funcIdx of the proxied.
-	CallBodyPos int
-}
-
-func (p *ProxyFunc) Name() string {
-	return p.Proxied.Name
-}
 
 type HostFuncExporter interface {
 	ExportHostFunc(*HostFunc)
@@ -38,20 +15,23 @@ type HostFuncExporter interface {
 // HostFunc is a function with an inlined type, used for NewHostModule.
 // Any corresponding FunctionType will be reused or added to the Module.
 type HostFunc struct {
-	// ExportNames is equivalent to  the same method on api.FunctionDefinition.
+	// ExportNames is equivalent to the same method on api.FunctionDefinition.
 	ExportNames []string
 
-	// Name is equivalent to  the same method on api.FunctionDefinition.
+	// Name is equivalent to the same method on api.FunctionDefinition.
 	Name string
 
-	// ParamTypes is equivalent to  the same method on api.FunctionDefinition.
+	// ParamTypes is equivalent to the same method on api.FunctionDefinition.
 	ParamTypes []ValueType
 
-	// ParamNames is equivalent to  the same method on api.FunctionDefinition.
+	// ParamNames is equivalent to the same method on api.FunctionDefinition.
 	ParamNames []string
 
-	// ResultTypes is equivalent to  the same method on api.FunctionDefinition.
+	// ResultTypes is equivalent to the same method on api.FunctionDefinition.
 	ResultTypes []ValueType
+
+	// ResultNames is equivalent to the same method on api.FunctionDefinition.
+	ResultNames []string
 
 	// Code is the equivalent function in the SectionIDCode.
 	Code *Code
@@ -98,11 +78,17 @@ func (f *HostFunc) WithWasm(body []byte) *HostFunc {
 	return &ret
 }
 
+type HostFuncNames struct {
+	Name        string
+	ParamNames  []string
+	ResultNames []string
+}
+
 // NewHostModule is defined internally for use in WASI tests and to keep the code size in the root directory small.
 func NewHostModule(
 	moduleName string,
 	nameToGoFunc map[string]interface{},
-	funcToNames map[string][]string,
+	funcToNames map[string]*HostFuncNames,
 	enabledFeatures api.CoreFeatures,
 ) (m *Module, err error) {
 	if moduleName != "" {
@@ -118,24 +104,16 @@ func NewHostModule(
 		}
 	}
 
-	// Assigns the ModuleID by calculating sha256 on inputs as host modules do not have `wasm` to hash.
+	m.IsHostModule = true
 	m.AssignModuleID([]byte(fmt.Sprintf("%s:%v:%v", moduleName, nameToGoFunc, enabledFeatures)))
 	m.BuildFunctionDefinitions()
 	return
 }
 
-// maxProxiedFuncIdx is the maximum index where leb128 encoding matches the bit
-// of an unsigned literal byte. Using this simplifies host function index
-// substitution.
-//
-// Note: this is 127, not 255 because when the MSB is set, leb128 encoding
-// doesn't match the literal byte.
-const maxProxiedFuncIdx = 127
-
 func addFuncs(
 	m *Module,
 	nameToGoFunc map[string]interface{},
-	funcToNames map[string][]string,
+	funcToNames map[string]*HostFuncNames,
 	enabledFeatures api.CoreFeatures,
 ) (err error) {
 	if m.NameSection == nil {
@@ -157,29 +135,6 @@ func addFuncs(
 		if hf, ok := v.(*HostFunc); ok {
 			nameToFunc[hf.Name] = hf
 			funcNames = append(funcNames, hf.Name)
-		} else if pf, ok := v.(*ProxyFunc); ok {
-			// First, add the proxied function which also gives us the real
-			// position in the function index namespace, We will need this
-			// later. We've kept code simpler by limiting the max index to
-			// what is encodable in a single byte. This is ok as we don't have
-			// any current use cases for hundreds of proxy functions.
-			proxiedIdx := len(funcNames)
-			if proxiedIdx > maxProxiedFuncIdx {
-				return errors.New("TODO: proxied funcidx larger than one byte")
-			}
-			nameToFunc[pf.Proxied.Name] = pf.Proxied
-			funcNames = append(funcNames, pf.Proxied.Name)
-
-			// Now that we have the real index of the proxied function,
-			// substitute that for the zero placeholder in the proxy's code
-			// body. This placeholder is at index CallBodyPos in the slice.
-			proxyBody := make([]byte, len(pf.Proxy.Code.Body))
-			copy(proxyBody, pf.Proxy.Code.Body)
-			proxyBody[pf.CallBodyPos] = byte(proxiedIdx)
-			proxy := pf.Proxy.WithWasm(proxyBody)
-
-			nameToFunc[proxy.Name] = proxy
-			funcNames = append(funcNames, proxy.Name)
 		} else { // reflection
 			params, results, code, ftErr := parseGoReflectFunc(v)
 			if ftErr != nil {
@@ -192,14 +147,25 @@ func addFuncs(
 				ResultTypes: results,
 				Code:        code,
 			}
-			if names := funcToNames[k]; names != nil {
-				namesLen := len(names)
-				if namesLen > 1 && namesLen-1 != len(params) {
-					return fmt.Errorf("func[%s.%s] has %d params, but %d param names", moduleName, k, namesLen-1, len(params))
-				}
-				hf.Name = names[0]
-				hf.ParamNames = names[1:]
+
+			// Assign names to the function, if they exist.
+			ns := funcToNames[k]
+			if name := ns.Name; name != "" {
+				hf.Name = ns.Name
 			}
+			if paramNames := ns.ParamNames; paramNames != nil {
+				if paramNamesLen := len(paramNames); paramNamesLen != len(params) {
+					return fmt.Errorf("func[%s.%s] has %d params, but %d params names", moduleName, k, paramNamesLen, len(params))
+				}
+				hf.ParamNames = paramNames
+			}
+			if resultNames := ns.ResultNames; resultNames != nil {
+				if resultNamesLen := len(resultNames); resultNamesLen != len(results) {
+					return fmt.Errorf("func[%s.%s] has %d results, but %d results names", moduleName, k, resultNamesLen, len(results))
+				}
+				hf.ResultNames = resultNames
+			}
+
 			nameToFunc[k] = hf
 			funcNames = append(funcNames, k)
 		}
@@ -225,12 +191,20 @@ func addFuncs(
 			m.ExportSection = append(m.ExportSection, &Export{Type: ExternTypeFunc, Name: export, Index: idx})
 		}
 		m.NameSection.FunctionNames = append(m.NameSection.FunctionNames, &NameAssoc{Index: idx, Name: hf.Name})
+
 		if len(hf.ParamNames) > 0 {
 			localNames := &NameMapAssoc{Index: idx}
 			for i, n := range hf.ParamNames {
 				localNames.NameMap = append(localNames.NameMap, &NameAssoc{Index: Index(i), Name: n})
 			}
 			m.NameSection.LocalNames = append(m.NameSection.LocalNames, localNames)
+		}
+		if len(hf.ResultNames) > 0 {
+			resultNames := &NameMapAssoc{Index: idx}
+			for i, n := range hf.ResultNames {
+				resultNames.NameMap = append(resultNames.NameMap, &NameAssoc{Index: Index(i), Name: n})
+			}
+			m.NameSection.ResultNames = append(m.NameSection.ResultNames, resultNames)
 		}
 		idx++
 	}

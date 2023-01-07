@@ -1,15 +1,12 @@
 package wasm
 
 import (
-	"bytes"
 	"context"
 	"encoding/binary"
-	"errors"
 	"fmt"
 	"sync"
 
 	"github.com/tetratelabs/wazero/api"
-	experimentalapi "github.com/tetratelabs/wazero/experimental"
 	"github.com/tetratelabs/wazero/internal/ieee754"
 	"github.com/tetratelabs/wazero/internal/leb128"
 	internalsys "github.com/tetratelabs/wazero/internal/sys"
@@ -57,13 +54,12 @@ type (
 	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#syntax-moduleinst
 	ModuleInstance struct {
 		Name      string
-		Exports   map[string]*ExportInstance
-		Functions []*FunctionInstance
+		Exports   map[string]ExportInstance
+		Functions []FunctionInstance
 		Globals   []*GlobalInstance
 		// Memory is set when Module.MemorySection had a memory, regardless of whether it was exported.
 		Memory *MemoryInstance
 		Tables []*TableInstance
-		Types  []*FunctionType
 
 		// CallCtx holds default function call context from this function instance.
 		CallCtx *CallContext
@@ -97,11 +93,8 @@ type (
 	//
 	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#syntax-exportinst
 	ExportInstance struct {
-		Type     ExternType
-		Function *FunctionInstance
-		Global   *GlobalInstance
-		Memory   *MemoryInstance
-		Table    *TableInstance
+		Type  ExternType
+		Index Index
 	}
 
 	// FunctionInstance represents a function instance in a Store.
@@ -113,12 +106,6 @@ type (
 
 		// Type is the signature of this function.
 		Type *FunctionType
-
-		// LocalTypes holds types of locals, set when Kind == FunctionKindWasm
-		LocalTypes []ValueType
-
-		// Body is the function body in WebAssembly Binary Format, set when Kind == FunctionKindWasm
-		Body []byte
 
 		// GoFunc is non-nil when IsHostFunction and defined in go, either
 		// api.GoFunction or api.GoModuleFunction.
@@ -140,9 +127,6 @@ type (
 
 		// Definition is known at compile time.
 		Definition api.FunctionDefinition
-
-		// Listener holds a listener to notify when this function is called.
-		Listener experimentalapi.FunctionListener
 	}
 
 	// GlobalInstance represents a global instance in a store.
@@ -166,12 +150,7 @@ type (
 const maximumFunctionTypes = 1 << 27
 
 // addSections adds section elements to the ModuleInstance
-func (m *ModuleInstance) addSections(module *Module, importedFunctions, functions []*FunctionInstance,
-	importedGlobals, globals []*GlobalInstance, tables []*TableInstance, memory, importedMemory *MemoryInstance,
-	types []*FunctionType) {
-
-	m.Types = types
-	m.Functions = append(importedFunctions, functions...)
+func (m *ModuleInstance) addSections(module *Module, importedGlobals, globals []*GlobalInstance, tables []*TableInstance, memory, importedMemory *MemoryInstance) {
 	m.Globals = append(importedGlobals, globals...)
 	m.Tables = tables
 
@@ -182,13 +161,6 @@ func (m *ModuleInstance) addSections(module *Module, importedFunctions, function
 	}
 
 	m.BuildExports(module.ExportSection)
-	m.buildDataInstances(module.DataSection)
-}
-
-func (m *ModuleInstance) buildDataInstances(segments []*DataSegment) {
-	for _, d := range segments {
-		m.DataInstances = append(m.DataInstances, d.Init)
-	}
 }
 
 func (m *ModuleInstance) buildElementInstances(elements []*ElementSegment) {
@@ -202,24 +174,41 @@ func (m *ModuleInstance) buildElementInstances(elements []*ElementSegment) {
 	}
 }
 
-func (m *ModuleInstance) BuildExports(exports []*Export) {
-	m.Exports = make(map[string]*ExportInstance, len(exports))
-	for _, exp := range exports {
-		index := exp.Index
-		var ei *ExportInstance
-		switch exp.Type {
-		case ExternTypeFunc:
-			ei = &ExportInstance{Type: exp.Type, Function: m.Functions[index]}
-		case ExternTypeGlobal:
-			ei = &ExportInstance{Type: exp.Type, Global: m.Globals[index]}
-		case ExternTypeMemory:
-			ei = &ExportInstance{Type: exp.Type, Memory: m.Memory}
-		case ExternTypeTable:
-			ei = &ExportInstance{Type: exp.Type, Table: m.Tables[index]}
+func (m *ModuleInstance) applyTableInits(tables []*TableInstance, tableInits []tableInitEntry) {
+	for _, init := range tableInits {
+		table := tables[init.tableIndex]
+		references := table.References
+		if int(init.offset)+len(init.functionIndexes) > len(references) ||
+			int(init.offset)+init.nullExternRefCount > len(references) {
+			// ErrElementOffsetOutOfBounds is the error raised when the active element offset exceeds the table length.
+			// Before CoreFeatureReferenceTypes, this was checked statically before instantiation, after the proposal,
+			// this must be raised as runtime error (as in assert_trap in spectest), not even an instantiation error.
+			// https://github.com/WebAssembly/spec/blob/d39195773112a22b245ffbe864bab6d1182ccb06/test/core/linking.wast#L264-L274
+			//
+			// In wazero, we ignore it since in any way, the instantiated module and engines are fine and can be used
+			// for function invocations.
+			return
 		}
 
+		if table.Type == RefTypeExternref {
+			for i := 0; i < init.nullExternRefCount; i++ {
+				references[init.offset+uint32(i)] = Reference(0)
+			}
+		} else {
+			for i, fnIndex := range init.functionIndexes {
+				if fnIndex != nil {
+					references[init.offset+uint32(i)] = m.Engine.FunctionInstanceReference(*fnIndex)
+				}
+			}
+		}
+	}
+}
+
+func (m *ModuleInstance) BuildExports(exports []*Export) {
+	m.Exports = make(map[string]ExportInstance, len(exports))
+	for _, exp := range exports {
 		// We already validated the duplicates during module validation phase.
-		m.Exports[exp.Name] = ei
+		m.Exports[exp.Name] = ExportInstance{Type: exp.Type, Index: exp.Index}
 	}
 }
 
@@ -238,11 +227,13 @@ func (m *ModuleInstance) validateData(data []*DataSegment) (err error) {
 	return
 }
 
-// applyData uses the given data segments and mutate the memory according to the initial contents on it.
-// This is called after all the validation phase passes and out of bounds memory access error here is
-// not a validation error, but rather a runtime error.
+// applyData uses the given data segments and mutate the memory according to the initial contents on it
+// and populate the `DataInstances`. This is called after all the validation phase passes and out of
+// bounds memory access error here is not a validation error, but rather a runtime error.
 func (m *ModuleInstance) applyData(data []*DataSegment) error {
+	m.DataInstances = make([][]byte, len(data))
 	for i, d := range data {
+		m.DataInstances[i] = d.Init
 		if !d.IsPassive() {
 			offset := executeConstExpression(m.Globals, d.OffsetExpression).(int32)
 			if offset < 0 || int(offset)+len(d.Init) > len(m.Memory.Buffer) {
@@ -255,24 +246,29 @@ func (m *ModuleInstance) applyData(data []*DataSegment) error {
 }
 
 // GetExport returns an export of the given name and type or errs if not exported or the wrong type.
-func (m *ModuleInstance) getExport(name string, et ExternType) (*ExportInstance, error) {
+func (m *ModuleInstance) getExport(name string, et ExternType) (ExportInstance, error) {
 	exp, ok := m.Exports[name]
 	if !ok {
-		return nil, fmt.Errorf("%q is not exported in module %q", name, m.Name)
+		return ExportInstance{}, fmt.Errorf("%q is not exported in module %q", name, m.Name)
 	}
 	if exp.Type != et {
-		return nil, fmt.Errorf("export %q in module %q is a %s, not a %s", name, m.Name, ExternTypeName(exp.Type), ExternTypeName(et))
+		return ExportInstance{}, fmt.Errorf("export %q in module %q is a %s, not a %s", name, m.Name, ExternTypeName(exp.Type), ExternTypeName(et))
 	}
 	return exp, nil
 }
 
 func NewStore(enabledFeatures api.CoreFeatures, engine Engine) (*Store, *Namespace) {
 	ns := newNamespace()
+
+	typeIDs := make(map[string]FunctionTypeID, len(preAllocatedTypeIDs))
+	for k, v := range preAllocatedTypeIDs {
+		typeIDs[k] = v
+	}
 	return &Store{
 		EnabledFeatures:  enabledFeatures,
 		Engine:           engine,
 		namespaces:       []*Namespace{ns},
-		typeIDs:          map[string]FunctionTypeID{},
+		typeIDs:          typeIDs,
 		functionMaxTypes: maximumFunctionTypes,
 	}, ns
 }
@@ -300,7 +296,6 @@ func (s *Store) Instantiate(
 	module *Module,
 	name string,
 	sys *internalsys.Context,
-	listeners []experimentalapi.FunctionListener,
 ) (*CallContext, error) {
 	// Collect any imported modules to avoid locking the namespace too long.
 	importedModuleNames := map[string]struct{}{}
@@ -320,13 +315,16 @@ func (s *Store) Instantiate(
 	}
 
 	// Instantiate the module and add it to the namespace so that other modules can import it.
-	if callCtx, err := s.instantiate(ctx, ns, module, name, sys, listeners, importedModules); err != nil {
-		ns.deleteModule(name)
+	if callCtx, err := s.instantiate(ctx, ns, module, name, sys, importedModules); err != nil {
+		_ = ns.deleteModule(name)
 		return nil, err
 	} else {
 		// Now that the instantiation is complete without error, add it.
 		// This makes the module visible for import, and ensures it is closed when the namespace is.
-		ns.addModule(callCtx.module)
+		if err := ns.setModule(callCtx.module); err != nil {
+			callCtx.Close(ctx)
+			return nil, err
+		}
 		return callCtx, nil
 	}
 }
@@ -337,7 +335,6 @@ func (s *Store) instantiate(
 	module *Module,
 	name string,
 	sysCtx *internalsys.Context,
-	listeners []experimentalapi.FunctionListener,
 	modules map[string]*ModuleInstance,
 ) (*CallContext, error) {
 	typeIDs, err := s.getFunctionTypeIDs(module.TypeSection)
@@ -356,13 +353,20 @@ func (s *Store) instantiate(
 	if err != nil {
 		return nil, err
 	}
-	globals, memory := module.buildGlobals(importedGlobals), module.buildMemory()
 
 	m := &ModuleInstance{Name: name, TypeIDs: typeIDs}
-	functions := m.BuildFunctions(module, listeners)
+	functions := m.BuildFunctions(module, importedFunctions)
+
+	// Plus, we are ready to compile functions.
+	m.Engine, err = s.Engine.NewModuleEngine(name, module, functions)
+	if err != nil {
+		return nil, err
+	}
+
+	globals, memory := module.buildGlobals(importedGlobals, m.Engine.FunctionInstanceReference), module.buildMemory()
 
 	// Now we have all instances from imports and local ones, so ready to create a new ModuleInstance.
-	m.addSections(module, importedFunctions, functions, importedGlobals, globals, tables, importedMemory, memory, module.TypeSection)
+	m.addSections(module, importedGlobals, globals, tables, importedMemory, memory)
 
 	// As of reference types proposal, data segment validation must happen after instantiation,
 	// and the side effect must persist even if there's out of bounds error after instantiation.
@@ -373,23 +377,15 @@ func (s *Store) instantiate(
 		}
 	}
 
-	// Plus, we are ready to compile functions.
-	m.Engine, err = s.Engine.NewModuleEngine(name, module, importedFunctions, functions, tables, tableInit)
-	if err != nil && !errors.Is(err, ErrElementOffsetOutOfBounds) {
-		// ErrElementOffsetOutOfBounds is not an instantiation error, but rather runtime error, so we ignore it as
-		// in anyway the instantiated module and engines are fine and can be used for function invocations.
-		// See comments on ErrElementOffsetOutOfBounds.
-		return nil, fmt.Errorf("compilation failed: %w", err)
-	}
-
 	// After engine creation, we can create the funcref element instances and initialize funcref type globals.
 	m.buildElementInstances(module.ElementSection)
-	m.Engine.InitializeFuncrefGlobals(globals)
 
 	// Now all the validation passes, we are safe to mutate memory instances (possibly imported ones).
 	if err = m.applyData(module.DataSection); err != nil {
 		return nil, err
 	}
+
+	m.applyTableInits(tables, tableInit)
 
 	// Compile the default context for calls to this module.
 	callCtx := NewCallContext(ns, m, sysCtx)
@@ -398,7 +394,7 @@ func (s *Store) instantiate(
 	// Execute the start function.
 	if module.StartSection != nil {
 		funcIdx := *module.StartSection
-		f := m.Functions[funcIdx]
+		f := &m.Functions[funcIdx]
 
 		ce, err := f.Module.Engine.NewCallEngine(callCtx, f)
 		if err != nil {
@@ -431,7 +427,7 @@ func resolveImports(module *Module, modules map[string]*ModuleInstance) (
 			return
 		}
 
-		var imported *ExportInstance
+		var imported ExportInstance
 		imported, err = m.getExport(i.Name, i.Type)
 		if err != nil {
 			return
@@ -446,7 +442,7 @@ func resolveImports(module *Module, modules map[string]*ModuleInstance) (
 				return
 			}
 			expectedType := module.TypeSection[i.DescFunc]
-			importedFunction := imported.Function
+			importedFunction := &m.Functions[imported.Index]
 
 			d := importedFunction.Definition
 			if !expectedType.EqualsSignature(d.ParamTypes(), d.ResultTypes()) {
@@ -458,7 +454,7 @@ func resolveImports(module *Module, modules map[string]*ModuleInstance) (
 			importedFunctions = append(importedFunctions, importedFunction)
 		case ExternTypeTable:
 			expected := i.DescTable
-			importedTable := imported.Table
+			importedTable := m.Tables[imported.Index]
 			if expected.Type != importedTable.Type {
 				err = errorInvalidImport(i, idx, fmt.Errorf("table type mismatch: %s != %s",
 					RefTypeName(expected.Type), RefTypeName(importedTable.Type)))
@@ -482,7 +478,7 @@ func resolveImports(module *Module, modules map[string]*ModuleInstance) (
 			importedTables = append(importedTables, importedTable)
 		case ExternTypeMemory:
 			expected := i.DescMem
-			importedMemory = imported.Memory
+			importedMemory = m.Memory
 
 			if expected.Min > memoryBytesNumToPages(uint64(len(importedMemory.Buffer))) {
 				err = errorMinSizeMismatch(i, idx, expected.Min, importedMemory.Min)
@@ -495,7 +491,7 @@ func resolveImports(module *Module, modules map[string]*ModuleInstance) (
 			}
 		case ExternTypeGlobal:
 			expected := i.DescGlobal
-			importedGlobal := imported.Global
+			importedGlobal := m.Globals[imported.Index]
 
 			if expected.Mutable != importedGlobal.Type.Mutable {
 				err = errorInvalidImport(i, idx, fmt.Errorf("mutability mismatch: %t != %t",
@@ -533,20 +529,19 @@ func errorInvalidImport(i *Import, idx int, err error) error {
 // Global initialization constant expression can only reference the imported globals.
 // See the note on https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#constant-expressions%E2%91%A0
 func executeConstExpression(importedGlobals []*GlobalInstance, expr *ConstantExpression) (v interface{}) {
-	r := bytes.NewReader(expr.Data)
 	switch expr.Opcode {
 	case OpcodeI32Const:
 		// Treat constants as signed as their interpretation is not yet known per /RATIONALE.md
-		v, _, _ = leb128.DecodeInt32(r)
+		v, _, _ = leb128.LoadInt32(expr.Data)
 	case OpcodeI64Const:
 		// Treat constants as signed as their interpretation is not yet known per /RATIONALE.md
-		v, _, _ = leb128.DecodeInt64(r)
+		v, _, _ = leb128.LoadInt64(expr.Data)
 	case OpcodeF32Const:
-		v, _ = ieee754.DecodeFloat32(r)
+		v, _ = ieee754.DecodeFloat32(expr.Data)
 	case OpcodeF64Const:
-		v, _ = ieee754.DecodeFloat64(r)
+		v, _ = ieee754.DecodeFloat64(expr.Data)
 	case OpcodeGlobalGet:
-		id, _, _ := leb128.DecodeUint32(r)
+		id, _, _ := leb128.LoadUint32(expr.Data)
 		g := importedGlobals[id]
 		switch g.Type.ValType {
 		case ValueTypeI32:
@@ -559,34 +554,26 @@ func executeConstExpression(importedGlobals []*GlobalInstance, expr *ConstantExp
 			v = api.DecodeF64(g.Val)
 		case ValueTypeV128:
 			v = [2]uint64{g.Val, g.ValHi}
+		case ValueTypeFuncref, ValueTypeExternref:
+			v = int64(g.Val)
 		}
 	case OpcodeRefNull:
 		switch expr.Data[0] {
-		case ValueTypeExternref:
-			v = int64(0) // Extern reference types are opaque 64bit pointer at runtime.
-		case ValueTypeFuncref:
-			// For funcref types, the pointer value will be set by Engines, so
-			// here we set the "invalid function index" (-1) to indicate that this should be null reference.
-			v = GlobalInstanceNullFuncRefValue
+		case ValueTypeExternref, ValueTypeFuncref:
+			v = int64(0) // Reference types are opaque 64bit pointer at runtime.
 		}
 	case OpcodeRefFunc:
 		// For ref.func const expression, we temporarily store the index as value,
 		// and if this is the const expr for global, the value will be further downed to
 		// opaque pointer of the engine-specific compiled function.
-		v, _, _ = leb128.DecodeUint32(r)
+		v, _, _ = leb128.LoadUint32(expr.Data)
 	case OpcodeVecV128Const:
 		v = [2]uint64{binary.LittleEndian.Uint64(expr.Data[0:8]), binary.LittleEndian.Uint64(expr.Data[8:16])}
 	}
 	return
 }
 
-// GlobalInstanceNullFuncRefValue is the temporary value for ValueTypeFuncref globals which are initialized via ref.null.
-const GlobalInstanceNullFuncRefValue int64 = -1
-
 func (s *Store) getFunctionTypeIDs(ts []*FunctionType) ([]FunctionTypeID, error) {
-	// We take write-lock here as the following might end up mutating typeIDs map.
-	s.mux.Lock()
-	defer s.mux.Unlock()
 	ret := make([]FunctionTypeID, len(ts))
 	for i, t := range ts {
 		inst, err := s.getFunctionTypeID(t)
@@ -598,15 +585,62 @@ func (s *Store) getFunctionTypeIDs(ts []*FunctionType) ([]FunctionTypeID, error)
 	return ret, nil
 }
 
+// preAllocatedTypeIDs maps several "well-known" FunctionType strings to the pre allocated FunctionID.
+// This is used by emscripten integration, but it is harmless to have this all the time as it's only
+// used during Store creation.
+var preAllocatedTypeIDs = map[string]FunctionTypeID{
+	"i32i32i32i32_v":   PreAllocatedTypeID_i32i32i32i32_v,
+	"i32i32i32_v":      PreAllocatedTypeID_i32i32i32_v,
+	"i32i32_v":         PreAllocatedTypeID_i32i32_v,
+	"i32_v":            PreAllocatedTypeID_i32_v,
+	"v_v":              PreAllocatedTypeID_v_v,
+	"i32i32i32i32_i32": PreAllocatedTypeID_i32i32i32i32_i32,
+	"i32i32i32_i32":    PreAllocatedTypeID_i32i32i32_i32,
+	"i32i32_i32":       PreAllocatedTypeID_i32i32_i32,
+	"i32_i32":          PreAllocatedTypeID_i32_i32,
+	"v_i32":            PreAllocatedTypeID_v_i32,
+}
+
+const (
+	// PreAllocatedTypeID_i32i32i32i32_v is FunctionTypeID for i32i32i32i32_v.
+	PreAllocatedTypeID_i32i32i32i32_v FunctionTypeID = iota
+	// PreAllocatedTypeID_i32i32i32_v is FunctionTypeID for i32i32i32_v
+	PreAllocatedTypeID_i32i32i32_v
+	// PreAllocatedTypeID_i32i32_v is FunctionTypeID for i32i32_v
+	PreAllocatedTypeID_i32i32_v
+	// PreAllocatedTypeID_i32_v is FunctionTypeID for i32_v
+	PreAllocatedTypeID_i32_v
+	// PreAllocatedTypeID_v_v is FunctionTypeID for v_v
+	PreAllocatedTypeID_v_v
+	// PreAllocatedTypeID_i32i32i32i32_i32 is FunctionTypeID for i32i32i32i32_i32
+	PreAllocatedTypeID_i32i32i32i32_i32
+	// PreAllocatedTypeID_i32i32i32_i32 is FunctionTypeID for i32i32i32_i32
+	PreAllocatedTypeID_i32i32i32_i32
+	// PreAllocatedTypeID_i32i32_i32 is FunctionTypeID for i32i32_i32
+	PreAllocatedTypeID_i32i32_i32
+	// PreAllocatedTypeID_i32_i32 is FunctionTypeID for i32_i32
+	PreAllocatedTypeID_i32_i32
+	// PreAllocatedTypeID_v_i32 is FunctionTypeID for v_i32
+	PreAllocatedTypeID_v_i32
+)
+
 func (s *Store) getFunctionTypeID(t *FunctionType) (FunctionTypeID, error) {
-	key := t.String()
+	s.mux.RLock()
+	key := t.key()
 	id, ok := s.typeIDs[key]
+	s.mux.RUnlock()
 	if !ok {
-		l := uint32(len(s.typeIDs))
-		if l >= s.functionMaxTypes {
+		s.mux.Lock()
+		defer s.mux.Unlock()
+		// Check again in case another goroutine has already added the type.
+		if id, ok = s.typeIDs[key]; ok {
+			return id, nil
+		}
+		l := len(s.typeIDs)
+		if uint32(l) >= s.functionMaxTypes {
 			return 0, fmt.Errorf("too many function types in a store")
 		}
-		id = FunctionTypeID(len(s.typeIDs))
+		id = FunctionTypeID(l)
 		s.typeIDs[key] = id
 	}
 	return id, nil

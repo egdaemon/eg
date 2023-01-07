@@ -5,13 +5,14 @@ import (
 	"crypto/sha256"
 	"errors"
 	"fmt"
+	"io"
 	"sort"
 	"strings"
 
 	"github.com/tetratelabs/wazero/api"
-	"github.com/tetratelabs/wazero/experimental"
 	"github.com/tetratelabs/wazero/internal/ieee754"
 	"github.com/tetratelabs/wazero/internal/leb128"
+	"github.com/tetratelabs/wazero/internal/wasmdebug"
 )
 
 // DecodeModule parses the WebAssembly Binary Format (%.wasm) into a Module. This function returns when the input is
@@ -154,6 +155,11 @@ type Module struct {
 	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#custom-section%E2%91%A0
 	NameSection *NameSection
 
+	// CustomSections are set when the SectionIDCustom other than "name" were successfully decoded from the binary format.
+	//
+	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#custom-section%E2%91%A0
+	CustomSections []*CustomSection
+
 	// validatedActiveElementSegments are built on Validate when
 	// SectionIDElement is non-empty and all inputs are valid.
 	//
@@ -174,11 +180,19 @@ type Module struct {
 	// ID is the sha256 value of the source wasm and is used for caching.
 	ID ModuleID
 
+	// IsHostModule true if this is the host module, false otherwise.
+	IsHostModule bool
+
 	// FunctionDefinitionSection is a wazero-specific section built on Validate.
 	FunctionDefinitionSection []*FunctionDefinition
 
 	// MemoryDefinitionSection is a wazero-specific section built on Validate.
 	MemoryDefinitionSection []*MemoryDefinition
+
+	// DWARFLines is used to emit DWARF based stack trace. This is created from the multiple custom sections
+	// as described in https://yurydelendik.github.io/webassembly-dwarf/, though it is not specified in the Wasm
+	// specification: https://github.com/WebAssembly/debugging/issues/1
+	DWARFLines *wasmdebug.DWARFLines
 }
 
 // ModuleID represents sha256 hash value uniquely assigned to Module.
@@ -372,7 +386,7 @@ func (m *Module) declaredFunctionIndexes() (ret map[Index]struct{}, err error) {
 	for i, g := range m.GlobalSection {
 		if g.Init.Opcode == OpcodeRefFunc {
 			var index uint32
-			index, _, err = leb128.DecodeUint32(bytes.NewReader(g.Init.Data))
+			index, _, err = leb128.LoadUint32(g.Init.Data)
 			if err != nil {
 				err = fmt.Errorf("%s[%d] failed to initialize: %w", SectionIDName(SectionIDGlobal), i, err)
 				return
@@ -480,36 +494,35 @@ func (m *Module) validateExports(enabledFeatures api.CoreFeatures, functions []I
 
 func validateConstExpression(globals []*GlobalType, numFuncs uint32, expr *ConstantExpression, expectedType ValueType) (err error) {
 	var actualType ValueType
-	r := bytes.NewReader(expr.Data)
 	switch expr.Opcode {
 	case OpcodeI32Const:
 		// Treat constants as signed as their interpretation is not yet known per /RATIONALE.md
-		_, _, err = leb128.DecodeInt32(r)
+		_, _, err = leb128.LoadInt32(expr.Data)
 		if err != nil {
 			return fmt.Errorf("read i32: %w", err)
 		}
 		actualType = ValueTypeI32
 	case OpcodeI64Const:
 		// Treat constants as signed as their interpretation is not yet known per /RATIONALE.md
-		_, _, err = leb128.DecodeInt64(r)
+		_, _, err = leb128.LoadInt64(expr.Data)
 		if err != nil {
 			return fmt.Errorf("read i64: %w", err)
 		}
 		actualType = ValueTypeI64
 	case OpcodeF32Const:
-		_, err = ieee754.DecodeFloat32(r)
+		_, err = ieee754.DecodeFloat32(expr.Data)
 		if err != nil {
 			return fmt.Errorf("read f32: %w", err)
 		}
 		actualType = ValueTypeF32
 	case OpcodeF64Const:
-		_, err = ieee754.DecodeFloat64(r)
+		_, err = ieee754.DecodeFloat64(expr.Data)
 		if err != nil {
 			return fmt.Errorf("read f64: %w", err)
 		}
 		actualType = ValueTypeF64
 	case OpcodeGlobalGet:
-		id, _, err := leb128.DecodeUint32(r)
+		id, _, err := leb128.LoadUint32(expr.Data)
 		if err != nil {
 			return fmt.Errorf("read index of global: %w", err)
 		}
@@ -518,15 +531,16 @@ func validateConstExpression(globals []*GlobalType, numFuncs uint32, expr *Const
 		}
 		actualType = globals[id].ValType
 	case OpcodeRefNull:
-		reftype, err := r.ReadByte()
-		if err != nil {
-			return fmt.Errorf("read reference type for ref.null: %w", err)
-		} else if reftype != RefTypeFuncref && reftype != RefTypeExternref {
+		if len(expr.Data) == 0 {
+			return fmt.Errorf("read reference type for ref.null: %w", io.ErrShortBuffer)
+		}
+		reftype := expr.Data[0]
+		if reftype != RefTypeFuncref && reftype != RefTypeExternref {
 			return fmt.Errorf("invalid type for ref.null: 0x%x", reftype)
 		}
 		actualType = reftype
 	case OpcodeRefFunc:
-		index, _, err := leb128.DecodeUint32(r)
+		index, _, err := leb128.LoadUint32(expr.Data)
 		if err != nil {
 			return fmt.Errorf("read i32: %w", err)
 		} else if index >= numFuncs {
@@ -557,12 +571,17 @@ func (m *Module) validateDataCountSection() (err error) {
 	return
 }
 
-func (m *Module) buildGlobals(importedGlobals []*GlobalInstance) (globals []*GlobalInstance) {
-	for _, gs := range m.GlobalSection {
+func (m *Module) buildGlobals(importedGlobals []*GlobalInstance, funcRefResolver func(funcIndex Index) Reference) (globals []*GlobalInstance) {
+	globals = make([]*GlobalInstance, len(m.GlobalSection))
+	for i, gs := range m.GlobalSection {
 		g := &GlobalInstance{Type: gs.Type}
 		switch v := executeConstExpression(importedGlobals, gs.Init).(type) {
 		case uint32:
-			g.Val = uint64(v)
+			if gs.Type.ValType == ValueTypeFuncref {
+				g.Val = uint64(funcRefResolver(v))
+			} else {
+				g.Val = uint64(v)
+			}
 		case int32:
 			g.Val = uint64(uint32(v))
 		case int64:
@@ -576,7 +595,7 @@ func (m *Module) buildGlobals(importedGlobals []*GlobalInstance) (globals []*Glo
 		default:
 			panic(fmt.Errorf("BUG: invalid conversion %d", v))
 		}
-		globals = append(globals, g)
+		globals[i] = g
 	}
 	return
 }
@@ -588,28 +607,29 @@ func (m *Module) buildGlobals(importedGlobals []*GlobalInstance) (globals []*Glo
 //   - This relies on data generated by Module.BuildFunctionDefinitions.
 //   - This is exported for tests that don't call Instantiate, notably only
 //     enginetest.go.
-func (m *ModuleInstance) BuildFunctions(mod *Module, listeners []experimental.FunctionListener) (fns []*FunctionInstance) {
-	fns = make([]*FunctionInstance, 0, len(mod.FunctionDefinitionSection))
-	for i := range mod.FunctionSection {
-		code := mod.CodeSection[i]
-		fns = append(fns, &FunctionInstance{
-			IsHostFunction: code.IsHostFunction,
-			LocalTypes:     code.LocalTypes,
-			Body:           code.Body,
-			GoFunc:         code.GoFunc,
-			TypeID:         m.TypeIDs[mod.FunctionSection[i]],
-		})
-	}
-
+func (m *ModuleInstance) BuildFunctions(mod *Module, importedFunctions []*FunctionInstance) (fns []FunctionInstance) {
 	importCount := mod.ImportFuncCount()
-	for i, f := range fns {
-		d := mod.FunctionDefinitionSection[uint32(i)+importCount]
-		f.Module = m
-		f.Idx = d.index
-		f.Type = d.funcType
-		f.Definition = d
-		if listeners != nil {
-			f.Listener = listeners[i]
+	fns = make([]FunctionInstance, importCount+uint32(len(mod.FunctionSection)))
+	m.Functions = fns
+
+	for i, imp := range importedFunctions {
+		fns[i] = *imp
+	}
+	for i, section := range mod.FunctionSection {
+		offset := uint32(i) + importCount
+		code := mod.CodeSection[i]
+		d := mod.FunctionDefinitionSection[offset]
+		// This object is only referenced from a slice. Instead of creating a heap object
+		// here and storing a pointer, we store the struct directly in the slice. This
+		// reduces the number of heap objects which improves GC performance.
+		fns[offset] = FunctionInstance{
+			IsHostFunction: code.IsHostFunction,
+			GoFunc:         code.GoFunc,
+			TypeID:         m.TypeIDs[section],
+			Module:         m,
+			Idx:            d.index,
+			Type:           d.funcType,
+			Definition:     d,
 		}
 	}
 	return
@@ -637,6 +657,7 @@ func (m *Module) buildMemory() (mem *MemoryInstance) {
 	memSec := m.MemorySection
 	if memSec != nil {
 		mem = NewMemoryInstance(memSec)
+		mem.definition = m.MemoryDefinitionSection[0]
 	}
 	return
 }
@@ -708,9 +729,10 @@ func (f *FunctionType) key() string {
 		ret += ValueTypeName(b)
 	}
 	if len(f.Params) == 0 {
-		ret += "v"
+		ret += "v_"
+	} else {
+		ret += "_"
 	}
-	ret += "_"
 	for _, b := range f.Results {
 		ret += ValueTypeName(b)
 	}
@@ -829,6 +851,10 @@ type Code struct {
 	// Note: This has no serialization format, so is not encodable.
 	// See https://www.w3.org/TR/2019/REC-wasm-core-1-20191205/#host-functions%E2%91%A2
 	GoFunc interface{}
+
+	// BodyOffsetInCodeSection is the offset of the beginning of the body in the code section.
+	// This is used for DWARF based stack trace where a program counter represents an offset in code section.
+	BodyOffsetInCodeSection uint64
 }
 
 type DataSegment struct {
@@ -878,6 +904,15 @@ type NameSection struct {
 	// Note: LocalNames are only used for debugging. At runtime, locals are called based on raw numeric index.
 	// Note: This can be nil for any reason including configuration.
 	LocalNames IndirectNameMap
+
+	// ResultNames is a wazero-specific mechanism to store result names.
+	ResultNames IndirectNameMap
+}
+
+// CustomSection contains the name and raw data of a custom section.
+type CustomSection struct {
+	Name string
+	Data []byte
 }
 
 // NameMap associates an index with any associated names.

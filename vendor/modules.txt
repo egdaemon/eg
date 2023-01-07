@@ -26,10 +26,10 @@ github.com/hashicorp/go-multierror
 # github.com/logrusorgru/aurora v2.0.3+incompatible
 ## explicit
 github.com/logrusorgru/aurora
-# github.com/mattn/go-isatty v0.0.16
+# github.com/mattn/go-isatty v0.0.17
 ## explicit; go 1.15
 github.com/mattn/go-isatty
-# github.com/onsi/ginkgo/v2 v2.5.1
+# github.com/onsi/ginkgo/v2 v2.6.1
 ## explicit; go 1.18
 github.com/onsi/ginkgo/v2
 github.com/onsi/ginkgo/v2/config
@@ -41,7 +41,7 @@ github.com/onsi/ginkgo/v2/internal/parallel_support
 github.com/onsi/ginkgo/v2/internal/testingtproxy
 github.com/onsi/ginkgo/v2/reporters
 github.com/onsi/ginkgo/v2/types
-# github.com/onsi/gomega v1.24.1
+# github.com/onsi/gomega v1.24.2
 ## explicit; go 1.18
 github.com/onsi/gomega
 github.com/onsi/gomega/format
@@ -66,8 +66,8 @@ github.com/posener/complete/cmd/install
 github.com/riywo/loginshell
 # github.com/stretchr/testify v1.8.1
 ## explicit; go 1.13
-# github.com/tetratelabs/wazero v1.0.0-pre.3
-## explicit; go 1.18
+# github.com/tetratelabs/wazero v1.0.0-pre.7
+## explicit; go 1.17
 github.com/tetratelabs/wazero
 github.com/tetratelabs/wazero/api
 github.com/tetratelabs/wazero/experimental
@@ -83,6 +83,7 @@ github.com/tetratelabs/wazero/internal/leb128
 github.com/tetratelabs/wazero/internal/moremath
 github.com/tetratelabs/wazero/internal/platform
 github.com/tetratelabs/wazero/internal/sys
+github.com/tetratelabs/wazero/internal/syscallfs
 github.com/tetratelabs/wazero/internal/u32
 github.com/tetratelabs/wazero/internal/u64
 github.com/tetratelabs/wazero/internal/version
@@ -97,7 +98,7 @@ github.com/tetratelabs/wazero/sys
 ## explicit; go 1.17
 github.com/willabides/kongplete
 github.com/willabides/kongplete/internal/positionalpredictor
-# golang.org/x/crypto v0.3.0
+# golang.org/x/crypto v0.5.0
 ## explicit; go 1.17
 golang.org/x/crypto/blowfish
 golang.org/x/crypto/chacha20
@@ -108,16 +109,16 @@ golang.org/x/crypto/internal/alias
 golang.org/x/crypto/internal/poly1305
 golang.org/x/crypto/ssh
 golang.org/x/crypto/ssh/internal/bcrypt_pbkdf
-# golang.org/x/net v0.2.0
+# golang.org/x/net v0.5.0
 ## explicit; go 1.17
 golang.org/x/net/html
 golang.org/x/net/html/atom
 golang.org/x/net/html/charset
-# golang.org/x/sys v0.2.0
+# golang.org/x/sys v0.4.0
 ## explicit; go 1.17
 golang.org/x/sys/cpu
 golang.org/x/sys/unix
-# golang.org/x/text v0.4.0
+# golang.org/x/text v0.6.0
 ## explicit; go 1.17
 golang.org/x/text/encoding
 golang.org/x/text/encoding/charmap
@@ -136,7 +137,7 @@ golang.org/x/text/internal/utf8internal
 golang.org/x/text/language
 golang.org/x/text/runes
 golang.org/x/text/transform
-# golang.org/x/time v0.2.0
+# golang.org/x/time v0.3.0
 ## explicit
 golang.org/x/time/rate
 # google.golang.org/protobuf v1.28.1

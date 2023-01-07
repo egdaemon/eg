@@ -5,12 +5,11 @@ import (
 	"io"
 
 	"github.com/tetratelabs/wazero/api"
+	. "github.com/tetratelabs/wazero/internal/wasi_snapshot_preview1"
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
-const functionRandomGet = "random_get"
-
-// randomGet is the WASI function named functionRandomGet which writes random
+// randomGet is the WASI function named RandomGetName which writes random
 // data to a buffer.
 //
 // # Parameters
@@ -34,32 +33,22 @@ const functionRandomGet = "random_get"
 //	    buf --^
 //
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-random_getbuf-pointeru8-bufLen-size---errno
-var randomGet = &wasm.HostFunc{
-	ExportNames: []string{functionRandomGet},
-	Name:        functionRandomGet,
-	ParamTypes:  []api.ValueType{i32, i32},
-	ParamNames:  []string{"buf", "buf_len"},
-	ResultTypes: []api.ValueType{i32},
-	Code: &wasm.Code{
-		IsHostFunction: true,
-		GoFunc:         api.GoModuleFunc(randomGetFn),
-	},
-}
+var randomGet = newHostFunc(RandomGetName, randomGetFn, []api.ValueType{i32, i32}, "buf", "buf_len")
 
-func randomGetFn(ctx context.Context, mod api.Module, params []uint64) []uint64 {
+func randomGetFn(_ context.Context, mod api.Module, params []uint64) Errno {
 	sysCtx := mod.(*wasm.CallContext).Sys
 	randSource := sysCtx.RandSource()
 	buf, bufLen := uint32(params[0]), uint32(params[1])
 
-	randomBytes, ok := mod.Memory().Read(ctx, buf, bufLen)
+	randomBytes, ok := mod.Memory().Read(buf, bufLen)
 	if !ok { // out-of-range
-		return errnoFault
+		return ErrnoFault
 	}
 
 	// We can ignore the returned n as it only != byteCount on error
 	if _, err := io.ReadAtLeast(randSource, randomBytes, int(bufLen)); err != nil {
-		return errnoIo
+		return ErrnoIo
 	}
 
-	return errnoSuccess
+	return ErrnoSuccess
 }

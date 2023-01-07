@@ -1,14 +1,25 @@
 package leb128
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
+	"io"
 )
 
 const (
 	maxVarintLen32 = 5
+	maxVarintLen33 = maxVarintLen32
 	maxVarintLen64 = 10
+
+	int33Mask  int64 = 1 << 7
+	int33Mask2       = ^int33Mask
+	int33Mask3       = 1 << 6
+	int33Mask4       = 8589934591 // 2^33-1
+	int33Mask5       = 1 << 32
+	int33Mask6       = int33Mask4 + 1 // 2^33
+
+	int64Mask3 = 1 << 6
+	int64Mask4 = ^0
 )
 
 var (
@@ -16,18 +27,6 @@ var (
 	errOverflow33 = errors.New("overflows a 33-bit integer")
 	errOverflow64 = errors.New("overflows a 64-bit integer")
 )
-
-// encodeCache reduces allocations by returning a constant slice of size one for values that can encode in a single byte
-var encodeCache = [0x80][1]byte{
-	{0x00}, {0x01}, {0x02}, {0x03}, {0x04}, {0x05}, {0x06}, {0x07}, {0x08}, {0x09}, {0x0a}, {0x0b}, {0x0c}, {0x0d}, {0x0e}, {0x0f},
-	{0x10}, {0x11}, {0x12}, {0x13}, {0x14}, {0x15}, {0x16}, {0x17}, {0x18}, {0x19}, {0x1a}, {0x1b}, {0x1c}, {0x1d}, {0x1e}, {0x1f},
-	{0x20}, {0x21}, {0x22}, {0x23}, {0x24}, {0x25}, {0x26}, {0x27}, {0x28}, {0x29}, {0x2a}, {0x2b}, {0x2c}, {0x2d}, {0x2e}, {0x2f},
-	{0x30}, {0x31}, {0x32}, {0x33}, {0x34}, {0x35}, {0x36}, {0x37}, {0x38}, {0x39}, {0x3a}, {0x3b}, {0x3c}, {0x3d}, {0x3e}, {0x3f},
-	{0x40}, {0x41}, {0x42}, {0x43}, {0x44}, {0x45}, {0x46}, {0x47}, {0x48}, {0x49}, {0x4a}, {0x4b}, {0x4c}, {0x4d}, {0x4e}, {0x4f},
-	{0x50}, {0x51}, {0x52}, {0x53}, {0x54}, {0x55}, {0x56}, {0x57}, {0x58}, {0x59}, {0x5a}, {0x5b}, {0x5c}, {0x5d}, {0x5e}, {0x5f},
-	{0x60}, {0x61}, {0x62}, {0x63}, {0x64}, {0x65}, {0x66}, {0x67}, {0x68}, {0x69}, {0x6a}, {0x6b}, {0x6c}, {0x6d}, {0x6e}, {0x6f},
-	{0x70}, {0x71}, {0x72}, {0x73}, {0x74}, {0x75}, {0x76}, {0x77}, {0x78}, {0x79}, {0x7a}, {0x7b}, {0x7c}, {0x7d}, {0x7e}, {0x7f},
-}
 
 // EncodeInt32 encodes the signed value into a buffer in LEB128 format
 //
@@ -74,10 +73,6 @@ func EncodeUint32(value uint32) []byte {
 //
 // See https://en.wikipedia.org/wiki/LEB128#Encode_unsigned_integer
 func EncodeUint64(value uint64) (buf []byte) {
-	if value < 0x80 {
-		return encodeCache[value][:]
-	}
-
 	// This is effectively a do/while loop where we take 7 bits of the value and encode them until it is zero.
 	for {
 		// Take 7 remaining low-order bits from the value into b.
@@ -98,12 +93,27 @@ func EncodeUint64(value uint64) (buf []byte) {
 	}
 }
 
-func DecodeUint32(r *bytes.Reader) (ret uint32, bytesRead uint64, err error) {
+type nextByte func(i int) (byte, error)
+
+func DecodeUint32(r io.ByteReader) (ret uint32, bytesRead uint64, err error) {
+	return decodeUint32(func(_ int) (byte, error) { return r.ReadByte() })
+}
+
+func LoadUint32(buf []byte) (ret uint32, bytesRead uint64, err error) {
+	return decodeUint32(func(i int) (byte, error) {
+		if i >= len(buf) {
+			return 0, io.EOF
+		}
+		return buf[i], nil
+	})
+}
+
+func decodeUint32(next nextByte) (ret uint32, bytesRead uint64, err error) {
 	// Derived from https://github.com/golang/go/blob/aafad20b617ee63d58fcd4f6e0d98fe27760678c/src/encoding/binary/varint.go
 	// with the modification on the overflow handling tailored for 32-bits.
 	var s uint32
 	for i := 0; i < maxVarintLen32; i++ {
-		b, err := r.ReadByte()
+		b, err := next(i)
 		if err != nil {
 			return 0, 0, err
 		}
@@ -120,14 +130,19 @@ func DecodeUint32(r *bytes.Reader) (ret uint32, bytesRead uint64, err error) {
 	return 0, 0, errOverflow32
 }
 
-func DecodeUint64(r *bytes.Reader) (ret uint64, bytesRead uint64, err error) {
+func LoadUint64(buf []byte) (ret uint64, bytesRead uint64, err error) {
+	bufLen := len(buf)
+	if bufLen == 0 {
+		return 0, 0, io.EOF
+	}
+
 	// Derived from https://github.com/golang/go/blob/aafad20b617ee63d58fcd4f6e0d98fe27760678c/src/encoding/binary/varint.go
 	var s uint64
 	for i := 0; i < maxVarintLen64; i++ {
-		b, err := r.ReadByte()
-		if err != nil {
-			return 0, 0, err
+		if i >= bufLen {
+			return 0, 0, io.EOF
 		}
+		b := buf[i]
 		if b < 0x80 {
 			// Unused bits (non first bit) must all be zero.
 			if i == maxVarintLen64-1 && b > 1 {
@@ -141,11 +156,24 @@ func DecodeUint64(r *bytes.Reader) (ret uint64, bytesRead uint64, err error) {
 	return 0, 0, errOverflow64
 }
 
-func DecodeInt32(r *bytes.Reader) (ret int32, bytesRead uint64, err error) {
+func DecodeInt32(r io.ByteReader) (ret int32, bytesRead uint64, err error) {
+	return decodeInt32(func(_ int) (byte, error) { return r.ReadByte() })
+}
+
+func LoadInt32(buf []byte) (ret int32, bytesRead uint64, err error) {
+	return decodeInt32(func(i int) (byte, error) {
+		if i >= len(buf) {
+			return 0, io.EOF
+		}
+		return buf[i], nil
+	})
+}
+
+func decodeInt32(next nextByte) (ret int32, bytesRead uint64, err error) {
 	var shift int
 	var b byte
 	for {
-		b, err = r.ReadByte()
+		b, err = next(int(bytesRead))
 		if err != nil {
 			return 0, 0, fmt.Errorf("readByte failed: %w", err)
 		}
@@ -158,11 +186,11 @@ func DecodeInt32(r *bytes.Reader) (ret int32, bytesRead uint64, err error) {
 			}
 			// Over flow checks.
 			// fixme: can be optimized.
-			if bytesRead > 5 {
+			if bytesRead > maxVarintLen32 {
 				return 0, 0, errOverflow32
-			} else if unused := b & 0b00110000; bytesRead == 5 && ret < 0 && unused != 0b00110000 {
+			} else if unused := b & 0b00110000; bytesRead == maxVarintLen32 && ret < 0 && unused != 0b00110000 {
 				return 0, 0, errOverflow32
-			} else if bytesRead == 5 && ret >= 0 && unused != 0x00 {
+			} else if bytesRead == maxVarintLen32 && ret >= 0 && unused != 0x00 {
 				return 0, 0, errOverflow32
 			}
 			return
@@ -174,15 +202,7 @@ func DecodeInt32(r *bytes.Reader) (ret int32, bytesRead uint64, err error) {
 // still needs to fit the 32-bit range of allowed indices. Hence, this is 33, not 32-bit!
 //
 // See https://webassembly.github.io/spec/core/binary/instructions.html#control-instructions
-func DecodeInt33AsInt64(r *bytes.Reader) (ret int64, bytesRead uint64, err error) {
-	const (
-		int33Mask  int64 = 1 << 7
-		int33Mask2       = ^int33Mask
-		int33Mask3       = 1 << 6
-		int33Mask4       = 8589934591 // 2^33-1
-		int33Mask5       = 1 << 32
-		int33Mask6       = int33Mask4 + 1 // 2^33
-	)
+func DecodeInt33AsInt64(r io.ByteReader) (ret int64, bytesRead uint64, err error) {
 	var shift int
 	var b int64
 	var rb byte
@@ -212,25 +232,34 @@ func DecodeInt33AsInt64(r *bytes.Reader) (ret int64, bytesRead uint64, err error
 	}
 	// Over flow checks.
 	// fixme: can be optimized.
-	if bytesRead > 5 {
+	if bytesRead > maxVarintLen33 {
 		return 0, 0, errOverflow33
-	} else if unused := b & 0b00100000; bytesRead == 5 && ret < 0 && unused != 0b00100000 {
+	} else if unused := b & 0b00100000; bytesRead == maxVarintLen33 && ret < 0 && unused != 0b00100000 {
 		return 0, 0, errOverflow33
-	} else if bytesRead == 5 && ret >= 0 && unused != 0x00 {
+	} else if bytesRead == maxVarintLen33 && ret >= 0 && unused != 0x00 {
 		return 0, 0, errOverflow33
 	}
 	return ret, bytesRead, nil
 }
 
-func DecodeInt64(r *bytes.Reader) (ret int64, bytesRead uint64, err error) {
-	const (
-		int64Mask3 = 1 << 6
-		int64Mask4 = ^0
-	)
+func DecodeInt64(r io.ByteReader) (ret int64, bytesRead uint64, err error) {
+	return decodeInt64(func(_ int) (byte, error) { return r.ReadByte() })
+}
+
+func LoadInt64(buf []byte) (ret int64, bytesRead uint64, err error) {
+	return decodeInt64(func(i int) (byte, error) {
+		if i >= len(buf) {
+			return 0, io.EOF
+		}
+		return buf[i], nil
+	})
+}
+
+func decodeInt64(next nextByte) (ret int64, bytesRead uint64, err error) {
 	var shift int
 	var b byte
 	for {
-		b, err = r.ReadByte()
+		b, err = next(int(bytesRead))
 		if err != nil {
 			return 0, 0, fmt.Errorf("readByte failed: %w", err)
 		}
@@ -243,11 +272,11 @@ func DecodeInt64(r *bytes.Reader) (ret int64, bytesRead uint64, err error) {
 			}
 			// Over flow checks.
 			// fixme: can be optimized.
-			if bytesRead > 10 {
+			if bytesRead > maxVarintLen64 {
 				return 0, 0, errOverflow64
-			} else if unused := b & 0b00111110; bytesRead == 10 && ret < 0 && unused != 0b00111110 {
+			} else if unused := b & 0b00111110; bytesRead == maxVarintLen64 && ret < 0 && unused != 0b00111110 {
 				return 0, 0, errOverflow64
-			} else if bytesRead == 10 && ret >= 0 && unused != 0x00 {
+			} else if bytesRead == maxVarintLen64 && ret >= 0 && unused != 0x00 {
 				return 0, 0, errOverflow64
 			}
 			return

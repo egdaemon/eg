@@ -5,7 +5,6 @@ import (
 	"io/fs"
 	"log"
 	"os"
-	"path/filepath"
 	"strings"
 
 	"github.com/james-lawrence/eg/internal/osx"
@@ -41,17 +40,18 @@ func (t runner) perform(ctx context.Context) (err error) {
 		wazero.NewRuntimeConfig(),
 	)
 
-	workspace := filepath.Join(osx.Getwd(""), ".data")
 	mcfg := wazero.NewModuleConfig().WithEnv(
 		"CI", os.Getenv("CI"),
 	).WithEnv(
 		"EG_CI", os.Getenv("EG_CI"),
+	).WithEnv(
+		"SHELL", os.Getenv("SHELL"),
 	).WithStderr(
 		os.Stderr,
 	).WithStdout(
 		os.Stdout,
 	).WithFS(
-		os.DirFS(workspace),
+		os.DirFS("/"),
 	).WithSysNanotime().WithSysWalltime()
 
 	ns1 := runtime.NewNamespace(ctx)

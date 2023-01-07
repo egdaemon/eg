@@ -5,9 +5,12 @@ import (
 	"io/fs"
 	"log"
 	"os"
+	"path/filepath"
+	"strings"
 
 	"github.com/james-lawrence/eg/internal/osx"
 	"github.com/tetratelabs/wazero"
+	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
 )
 
@@ -38,6 +41,7 @@ func (t runner) perform(ctx context.Context) (err error) {
 		wazero.NewRuntimeConfig(),
 	)
 
+	workspace := filepath.Join(osx.Getwd(""), ".data")
 	mcfg := wazero.NewModuleConfig().WithEnv(
 		"CI", os.Getenv("CI"),
 	).WithEnv(
@@ -46,6 +50,8 @@ func (t runner) perform(ctx context.Context) (err error) {
 		os.Stderr,
 	).WithStdout(
 		os.Stdout,
+	).WithFS(
+		os.DirFS(workspace),
 	).WithSysNanotime().WithSysWalltime()
 
 	ns1 := runtime.NewNamespace(ctx)
@@ -90,7 +96,7 @@ func (t runner) perform(ctx context.Context) (err error) {
 		}
 		defer c.Close(ctx)
 
-		// debugmodule(path, c)
+		debugmodule(path, c)
 
 		m, err := ns1.InstantiateModule(
 			ctx,
@@ -111,26 +117,26 @@ func (t runner) perform(ctx context.Context) (err error) {
 	return nil
 }
 
-// func debugmodule(name string, m wazero.CompiledModule) {
-// 	log.Println("module debug", name, m.Name())
-// 	for _, imp := range m.ExportedFunctions() {
-// 		paramtypestr := typeliststr(imp.ParamTypes()...)
-// 		resulttypestr := typeliststr(imp.ResultTypes()...)
-// 		log.Println("exported", imp.Name(), "(", paramtypestr, ")", resulttypestr)
-// 	}
+func debugmodule(name string, m wazero.CompiledModule) {
+	log.Println("module debug", name, m.Name())
+	for _, imp := range m.ExportedFunctions() {
+		paramtypestr := typeliststr(imp.ParamTypes()...)
+		resulttypestr := typeliststr(imp.ResultTypes()...)
+		log.Println("exported", imp.Name(), "(", paramtypestr, ")", resulttypestr)
+	}
 
-// 	for _, imp := range m.ImportedFunctions() {
-// 		paramtypestr := typeliststr(imp.ParamTypes()...)
-// 		resulttypestr := typeliststr(imp.ResultTypes()...)
-// 		log.Println("imported", imp.Name(), "(", paramtypestr, ")", resulttypestr)
-// 	}
-// }
+	for _, imp := range m.ImportedFunctions() {
+		paramtypestr := typeliststr(imp.ParamTypes()...)
+		resulttypestr := typeliststr(imp.ResultTypes()...)
+		log.Println("imported", imp.Name(), "(", paramtypestr, ")", resulttypestr)
+	}
+}
 
-// func typeliststr(types ...api.ValueType) string {
-// 	typesstr := []string(nil)
-// 	for _, t := range types {
-// 		typesstr = append(typesstr, api.ValueTypeName(t))
-// 	}
+func typeliststr(types ...api.ValueType) string {
+	typesstr := []string(nil)
+	for _, t := range types {
+		typesstr = append(typesstr, api.ValueTypeName(t))
+	}
 
-// 	return strings.Join(typesstr, ", ")
-// }
+	return strings.Join(typesstr, ", ")
+}

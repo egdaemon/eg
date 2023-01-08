@@ -3,12 +3,12 @@ package shell
 import (
 	"context"
 
-	"github.com/james-lawrence/eg/runtime/wasi/internal/host"
+	"github.com/james-lawrence/eg/runtime/wasi/internal/ffiexec"
 	"github.com/pkg/errors"
 )
 
 func Run(ctx context.Context, command string) (err error) {
-	switch code := host.Command("/bin/bash", []string{"-c", command}); code {
+	switch code := ffiexec.Command("/bin/bash", []string{"-c", command}); code {
 	case 0:
 		return nil
 	default:

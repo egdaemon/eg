@@ -2,12 +2,17 @@ package interp
 
 import (
 	"context"
+	"errors"
 	"io/fs"
 	"log"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
+	"syscall"
 
+	"github.com/james-lawrence/eg/internal/envx"
+	"github.com/james-lawrence/eg/interp/runtime/wasi/exechost"
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
@@ -22,11 +27,18 @@ func OptionModuleDir(s string) Option {
 	}
 }
 
+func OptionBuildDir(s string) Option {
+	return func(r *runner) {
+		r.builddir = s
+	}
+}
+
 func Run(ctx context.Context, dir string, options ...Option) error {
 	var (
 		r = runner{
 			root:      dir,
 			moduledir: ".eg",
+			builddir:  filepath.Join(".cache", "build"),
 		}
 	)
 
@@ -40,6 +52,19 @@ func Run(ctx context.Context, dir string, options ...Option) error {
 type runner struct {
 	root      string
 	moduledir string
+	builddir  string
+}
+
+func (t runner) Open(name string) (fs.File, error) {
+	path := filepath.Join(t.root, filepath.Clean(name))
+
+	if f, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0600); err == nil {
+		return f, nil
+	} else if errors.Is(err, syscall.EISDIR) {
+		return os.OpenFile(path, os.O_RDONLY, 0600)
+	} else {
+		return nil, err
+	}
 }
 
 func (t runner) perform(ctx context.Context) (err error) {
@@ -49,16 +74,31 @@ func (t runner) perform(ctx context.Context) (err error) {
 		wazero.NewRuntimeConfig(),
 	)
 
+	moduledir := filepath.Join(t.root, t.moduledir)
+	cachedir := filepath.Join(t.root, t.moduledir, ".cache")
+	tmpdir, err := os.MkdirTemp(moduledir, "eg.tmp.*")
+	if err != nil {
+		return err
+	}
+	defer os.RemoveAll(tmpdir)
+
 	mcfg := wazero.NewModuleConfig().WithEnv(
 		"CI", os.Getenv("CI"),
 	).WithEnv(
 		"EG_CI", os.Getenv("EG_CI"),
+	).WithEnv(
+		"EG_CACHE_DIRECTORY", envx.String(cachedir, "EG_CACHE_DIRECTORY", "CACHE_DIRECTORY"),
+	).WithEnv(
+		"EG_RUNTIME_DIRECTORY", tmpdir,
+	).WithEnv(
+		"RUNTIME_DIRECTORY", tmpdir,
 	).WithStderr(
 		os.Stderr,
 	).WithStdout(
 		os.Stdout,
 	).WithFS(
-		os.DirFS(t.root),
+		// t,
+		os.DirFS("."),
 	).WithSysNanotime().WithSysWalltime()
 
 	ns1 := runtime.NewNamespace(ctx)
@@ -69,61 +109,22 @@ func (t runner) perform(ctx context.Context) (err error) {
 	}
 	defer wasienv.Close(ctx)
 
-	hostenv, err := runtime.NewHostModuleBuilder("env").NewFunctionBuilder().WithFunc(func(
-		ctx context.Context,
-		m api.Module,
-		nameoffset uint32, namelen uint32,
-		argsoffset uint32, argslen uint32, argssize uint32,
-	) uint32 {
-		var (
-			ok   bool
-			data []byte
-		)
-
-		if data, ok = m.Memory().Read(nameoffset, namelen); !ok {
-			return 127
-		}
-		name := string(data)
-
-		args := make([]string, 0, argslen)
-		for offset, i := argsoffset, uint32(0); i < argslen*argssize; offset, i = offset+8, i+argssize {
-			var (
-				moffset uint32
-				mlen    uint32
-			)
-
-			if moffset, ok = m.Memory().ReadUint32Le(argsoffset + i*4); !ok {
-				return 127
-			}
-			if mlen, ok = m.Memory().ReadUint32Le(argsoffset + (i+1)*4); !ok {
-				return 127
-			}
-
-			if data, ok = m.Memory().Read(moffset, mlen); !ok {
-				return 127
-			}
-			args = append(args, string(data))
-		}
-
-		cmd := exec.CommandContext(ctx, name, args...)
+	hostenv, err := runtime.NewHostModuleBuilder("env").
+		NewFunctionBuilder().WithFunc(exechost.Exec(func(cmd *exec.Cmd) *exec.Cmd {
 		cmd.Dir = t.root
 		cmd.Env = os.Environ()
 		cmd.Stderr = os.Stderr
 		cmd.Stdout = os.Stdout
-		if err = cmd.Run(); err != nil {
-			log.Println("failed to execute shell command", err)
-			return 128
-		}
-
-		return 0
-	}).Export("github.com/james-lawrence/eg/runtime/wasi/runtime/host.Command").Instantiate(ctx, ns1)
+		return cmd
+	})).Export("github.com/james-lawrence/eg/runtime/wasi/runtime/ffiexec.Command").
+		Instantiate(ctx, ns1)
 	if err != nil {
 		return err
 	}
 	defer hostenv.Close(ctx)
 	debugmodule2("env", hostenv)
 
-	err = fs.WalkDir(os.DirFS(t.root), t.moduledir, func(path string, d fs.DirEntry, err error) error {
+	err = fs.WalkDir(os.DirFS(t.root), t.builddir, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}

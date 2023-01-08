@@ -66,7 +66,7 @@ github.com/posener/complete/cmd/install
 github.com/riywo/loginshell
 # github.com/stretchr/testify v1.8.1
 ## explicit; go 1.13
-# github.com/tetratelabs/wazero v1.0.0-pre.7
+# github.com/tetratelabs/wazero v1.0.0-pre.7.0.20230107140259-f213133896d9
 ## explicit; go 1.17
 github.com/tetratelabs/wazero
 github.com/tetratelabs/wazero/api

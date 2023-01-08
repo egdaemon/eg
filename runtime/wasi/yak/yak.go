@@ -1,10 +1,12 @@
 package yak
 
 import (
-	"bytes"
 	"context"
-	"io"
+	"errors"
 	"log"
+
+	"github.com/james-lawrence/eg/internal/envx"
+	"github.com/james-lawrence/eg/runtime/wasi/internal/ffiexec"
 )
 
 // represents a sequence of operations to perform.
@@ -89,35 +91,39 @@ type Runner interface {
 // Run the tasks with the specified container.
 func Container(name string) ContainerRunner {
 	return ContainerRunner{
-		name: name,
+		tmpdir: envx.String("", "EG_RUNTIME_DIRECTORY"),
+		name:   name,
 	}
 }
 
 type ContainerRunner struct {
 	name       string
-	definition io.Reader
+	tmpdir     string
+	definition string
 }
 
-func (t ContainerRunner) Definition(src io.Reader) ContainerRunner {
-	t.definition = src
+func (t ContainerRunner) DefinitionFile(s string) ContainerRunner {
+	t.definition = s
 	return t
 }
 
-func (t ContainerRunner) Perform(tasks ...Task) error {
+func (t ContainerRunner) Perform(ctx context.Context, tasks ...Task) (err error) {
 	var (
-		b bytes.Buffer
+		setup []Task
 	)
 
 	// lookup container from registry
 	// if not found fallback to the definition
 	// if no definition then we have an error
-	if t.definition != nil {
-		if _, err := io.Copy(&b, t.definition); err != nil {
-			return err
-		}
+	if t.definition != "" {
 
-		log.Printf("building container %s\n%s\n", t.name, b.String())
+		// sudo podman build -t localhost/derp:latest -f ./zderp/custom/Containerfile -f ./zderp/egci/Containerfile ./zderp/egci/
+		// sudo podman run --detach --name derpy --volume ./egci/.filesystem:/opt localhost/derp:latest /usr/sbin/init
+		log.Printf("building container %s\n", t.definition)
+		if code := ffiexec.Command("podman", []string{"build", "-f", t.definition, ".egci"}); code != 0 {
+			return errors.New("unable to build the container")
+		}
 	}
 
-	return Perform(context.Background(), tasks...)
+	return Perform(ctx, Deferred(setup...), Deferred(tasks...))
 }

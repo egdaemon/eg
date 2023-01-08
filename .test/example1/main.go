@@ -3,11 +3,9 @@ package main
 import (
 	"context"
 	"log"
-	"os"
 	"time"
 
 	"github.com/james-lawrence/eg/runtime/wasi/env"
-	"github.com/james-lawrence/eg/runtime/wasi/langx"
 	"github.com/james-lawrence/eg/runtime/wasi/shell"
 	"github.com/james-lawrence/eg/runtime/wasi/yak"
 )
@@ -64,11 +62,14 @@ func main() {
 		panic(err)
 	}
 
-	if err := shell.Run(ctx, "ls -lha"); err != nil {
+	if err := shell.Run(ctx, "ls -lha .test"); err != nil {
 		panic(err)
 	}
 
-	yak.Container("ubuntu.22.04").
-		Definition(langx.Must(os.Open(".test/Containerfile"))).
-		Perform(yak.Module(DaemonTests))
+	err := yak.Container("ubuntu.22.04").
+		DefinitionFile(".test/Containerfile").
+		Perform(ctx, yak.Module(DaemonTests))
+	if err != nil {
+		panic(err)
+	}
 }

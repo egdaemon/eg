@@ -1,6 +1,9 @@
 package main
 
 import (
+	"crypto/md5"
+	"encoding/hex"
+	"io"
 	"io/fs"
 	"log"
 	"os"
@@ -18,12 +21,29 @@ type runner struct {
 }
 
 func (t runner) Run(ctx *cmdopts.Global) (err error) {
+	content := md5.New()
 	err = fs.WalkDir(os.DirFS(t.Dir), t.ModuleDir, func(path string, d fs.DirEntry, err error) error {
+		var (
+			c *os.File
+		)
+
+		// TODO: identify code to compile and checksum
 		if err != nil {
 			return err
 		}
 
-		// TODO: identify code to compile
+		if d.IsDir() {
+			return nil
+		}
+
+		if c, err = os.Open(path); err != nil {
+			return err
+		}
+
+		if _, err = io.Copy(content, c); err != nil {
+			return err
+		}
+
 		log.Println("visiting", path)
 		return nil
 	})
@@ -32,10 +52,12 @@ func (t runner) Run(ctx *cmdopts.Global) (err error) {
 		return err
 	}
 
-	moduledir := filepath.Join(t.ModuleDir, t.BuildCache, "build")
-	if err = compile.Run(ctx.Context, filepath.Join(t.Dir, t.ModuleDir, "example1/main.go"), filepath.Join(t.Dir, moduledir, "eg1.example.wasm")); err != nil {
+	log.Println("checksum", hex.EncodeToString(content.Sum(nil)))
+
+	builddir := filepath.Join(t.ModuleDir, t.BuildCache, "build")
+	if err = compile.Run(ctx.Context, filepath.Join(t.Dir, t.ModuleDir, "example1/main.go"), filepath.Join(t.Dir, builddir, "eg1.example.wasm")); err != nil {
 		return err
 	}
 
-	return interp.Run(ctx.Context, t.Dir, interp.OptionModuleDir(moduledir))
+	return interp.Run(ctx.Context, t.Dir, interp.OptionModuleDir(t.ModuleDir), interp.OptionBuildDir(builddir))
 }

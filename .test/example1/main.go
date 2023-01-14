@@ -34,9 +34,9 @@ func Op4(context.Context, yak.Op) error {
 	return nil
 }
 
-func DaemonTests(context.Context, yak.Op) error {
+func DaemonTests(ctx context.Context, _ yak.Op) error {
 	return yak.Perform(
-		context.TODO(),
+		ctx,
 		yak.Parallel(
 			Op1,
 			Op2,

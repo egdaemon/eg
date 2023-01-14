@@ -3,9 +3,6 @@ package transpile
 import (
 	"bytes"
 	"context"
-	"crypto/md5"
-	"encoding/hex"
-	"hash"
 	"io"
 	"io/fs"
 	"log"
@@ -14,25 +11,20 @@ import (
 	"strings"
 
 	"github.com/james-lawrence/eg/internal/errorsx"
+	"github.com/james-lawrence/eg/workspaces"
 )
 
 type Context struct {
-	CacheID   hash.Hash
-	Workspace fs.FS
-	root      string
-	cachedir  string // the directory we rewrite content into and is ignored for checksumming purposes
+	Workspace workspaces.Context
 }
 
 type Transpiler interface {
-	Run(ctx context.Context, tctx Context) (cacheid string, roots []string, err error)
+	Run(ctx context.Context, tctx Context) (roots []string, err error)
 }
 
-func New(workspace fs.FS, root string, cachedir string) Context {
+func New(ws workspaces.Context) Context {
 	return Context{
-		CacheID:   md5.New(),
-		Workspace: workspace,
-		root:      root,
-		cachedir:  cachedir,
+		Workspace: ws,
 	}
 }
 
@@ -46,7 +38,7 @@ const Skip = errorsx.String("skipping content")
 type golang struct{}
 
 // TODO: need to have this actually rewrite all the source to another directory.
-func (t golang) Run(ctx context.Context, tctx Context) (_ string, roots []string, err error) {
+func (t golang) Run(ctx context.Context, tctx Context) (roots []string, err error) {
 	ignore := func(path string, d fs.DirEntry) error {
 		if !strings.HasSuffix(path, ".go") {
 			return errorsx.String("ignoring non-golang file")
@@ -80,22 +72,21 @@ func (t golang) Run(ctx context.Context, tctx Context) (_ string, roots []string
 	}
 
 	if err = visit(ctx, tctx, ignore, rewrite); err != nil {
-		return "", []string(nil), err
+		return []string(nil), err
 	}
 
-	return hex.EncodeToString(tctx.CacheID.Sum(nil)), roots, nil
+	return roots, nil
 }
 
 func transpiledpath(tctx Context, current string) (path string, err error) {
-	if path, err = filepath.Rel(tctx.root, current); err != nil {
+	if path, err = filepath.Rel(tctx.Workspace.ModuleDir, current); err != nil {
 		return "", err
 	}
-
-	return filepath.Join(tctx.root, tctx.cachedir, "transpile", path), nil
+	return filepath.Join(tctx.Workspace.TransDir, path), nil
 }
 
 func visit(ctx context.Context, tctx Context, ignore func(string, fs.DirEntry) error, rewrite func(string, fs.DirEntry, []byte) error) error {
-	return fs.WalkDir(tctx.Workspace, tctx.root, func(path string, d fs.DirEntry, err error) error {
+	return fs.WalkDir(os.DirFS(filepath.Join(tctx.Workspace.Root)), tctx.Workspace.ModuleDir, func(path string, d fs.DirEntry, err error) error {
 		var (
 			c   *os.File
 			buf bytes.Buffer
@@ -111,10 +102,13 @@ func visit(ctx context.Context, tctx Context, ignore func(string, fs.DirEntry) e
 		default:
 		}
 
-		// in case it isn't already in the ignorable set
-		if strings.HasSuffix(tctx.cachedir, d.Name()) {
-			log.Println("skipping cache directory", path)
-			return fs.SkipDir
+		if cause := tctx.Workspace.Ignore.Ignore(path, d); cause != nil {
+			log.Println("skipping", path, cause)
+			if d.IsDir() {
+				return fs.SkipDir
+			}
+
+			return nil
 		}
 
 		if d.IsDir() {
@@ -130,7 +124,7 @@ func visit(ctx context.Context, tctx Context, ignore func(string, fs.DirEntry) e
 			return err
 		}
 
-		if _, err = io.Copy(io.MultiWriter(tctx.CacheID, &buf), c); err != nil {
+		if _, err = io.Copy(&buf, c); err != nil {
 			return err
 		}
 

@@ -6,42 +6,37 @@ import (
 	"time"
 
 	"github.com/james-lawrence/eg/runtime/wasi/env"
-	"github.com/james-lawrence/eg/runtime/wasi/shell"
 	"github.com/james-lawrence/eg/runtime/wasi/yak"
 )
 
-func Op1(yak.Op) error {
+func Op1(context.Context, yak.Op) error {
 	log.Println("op1 initiated")
 	defer log.Println("op1 completed")
 
 	return nil
 }
 
-func Op2(yak.Op) error {
+func Op2(context.Context, yak.Op) error {
 	log.Println("op2 initiated")
 	defer log.Println("op2 completed")
 
 	return nil
 }
 
-func Op3(yak.Op) error {
+func Op3(context.Context, yak.Op) error {
 	log.Println("op3 initiated")
 	defer log.Println("op3 completed")
 
 	return nil
 }
 
-func Op4(yak.Op) error {
+func Op4(context.Context, yak.Op) error {
 	return nil
 }
 
-func PrintDir(yak.Op) error {
-	return shell.Run(context.Background(), "echo hello world")
-}
-
-func DaemonTests(ctx context.Context) error {
+func DaemonTests(context.Context, yak.Op) error {
 	return yak.Perform(
-		ctx,
+		context.TODO(),
 		yak.Parallel(
 			Op1,
 			Op2,
@@ -54,22 +49,16 @@ func DaemonTests(ctx context.Context) error {
 	)
 }
 
+// main defines the setup for the CI process. here is where you define all
+// of the environments and tasks you wish to run.
 func main() {
 	ctx, done := context.WithTimeout(context.Background(), time.Hour)
 	defer done()
 
-	if err := shell.Run(ctx, "echo hello world"); err != nil {
-		panic(err)
-	}
+	c1 := yak.Container("ubuntu.22.04").
+		BuildFromFile(".test/Containerfile")
 
-	if err := shell.Run(ctx, "ls -lha .test"); err != nil {
-		panic(err)
-	}
-
-	err := yak.Container("ubuntu.22.04").
-		DefinitionFile(".test/Containerfile").
-		Perform(ctx, yak.Module(DaemonTests))
-	if err != nil {
+	if err := c1.Module(ctx, yak.Ref(DaemonTests), yak.Ref(Op4)); err != nil {
 		panic(err)
 	}
 }

@@ -22,6 +22,7 @@ require (
 	github.com/kr/text v0.2.0 // indirect
 	github.com/posener/complete v1.2.3 // indirect
 	github.com/riywo/loginshell v0.0.0-20200815045211-7d26008be1ab // indirect
+	golang.org/x/mod v0.7.0 // indirect
 	golang.org/x/net v0.5.0 // indirect
 	golang.org/x/text v0.6.0 // indirect
 	google.golang.org/protobuf v1.28.1 // indirect
@@ -34,4 +35,5 @@ require (
 	github.com/stretchr/testify v1.8.1 // indirect
 	github.com/tetratelabs/wazero v1.0.0-pre.7.0.20230107140259-f213133896d9
 	golang.org/x/sys v0.4.0 // indirect
+	golang.org/x/tools v0.5.0
 )

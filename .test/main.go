@@ -6,42 +6,45 @@ import (
 	"time"
 
 	"github.com/james-lawrence/eg/runtime/wasi/env"
-	"github.com/james-lawrence/eg/runtime/wasi/yak"
+	derpyak "github.com/james-lawrence/eg/runtime/wasi/yak"
 )
 
-func Op1(context.Context, yak.Op) error {
+func Op1(context.Context, derpyak.Op) error {
 	log.Println("op1 initiated")
 	defer log.Println("op1 completed")
 
 	return nil
 }
 
-func Op2(context.Context, yak.Op) error {
+func Op2(context.Context, derpyak.Op) error {
 	log.Println("op2 initiated")
 	defer log.Println("op2 completed")
 
 	return nil
 }
 
-func Op3(context.Context, yak.Op) error {
+func Op3(context.Context, derpyak.Op) error {
 	log.Println("op3 initiated")
 	defer log.Println("op3 completed")
 
 	return nil
 }
 
-func Op4(context.Context, yak.Op) error {
+func Op4(context.Context, derpyak.Op) error {
+	log.Println("op4 initiated")
+	defer log.Println("op4 completed")
+
 	return nil
 }
 
-func DaemonTests(ctx context.Context, _ yak.Op) error {
-	return yak.Perform(
+func DaemonTests(ctx context.Context, _ derpyak.Op) error {
+	return derpyak.Perform(
 		ctx,
-		yak.Parallel(
+		derpyak.Parallel(
 			Op1,
 			Op2,
 		),
-		yak.When(env.Boolean(false, "EG_CI", "CI"), yak.Sequential(
+		derpyak.When(env.Boolean(false, "EG_CI", "CI"), derpyak.Sequential(
 			Op1,
 			Op2,
 			Op3,
@@ -55,10 +58,10 @@ func main() {
 	ctx, done := context.WithTimeout(context.Background(), time.Hour)
 	defer done()
 
-	c1 := yak.Container("ubuntu.22.04").
+	c1 := derpyak.Container("ubuntu.22.04").
 		BuildFromFile(".test/Containerfile")
 
-	if err := c1.Module(ctx, yak.Ref(DaemonTests), yak.Ref(Op4)); err != nil {
+	if err := derpyak.Module(ctx, c1, derpyak.Ref(DaemonTests), derpyak.Ref(Op4)); err != nil {
 		panic(err)
 	}
 }

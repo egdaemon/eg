@@ -48,7 +48,7 @@ func (t runner) Run(ctx *cmdopts.Global) (err error) {
 
 		if _, err = os.Stat(path); err == nil {
 			// nothing to do.
-			return nil
+			continue
 		}
 
 		if err = compile.Run(ctx.Context, root, path); err != nil {

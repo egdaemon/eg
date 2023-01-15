@@ -122,7 +122,8 @@ func (t runner) perform(ctx context.Context) (err error) {
 		return err
 	}
 	defer hostenv.Close(ctx)
-	debugmodule2("env", hostenv)
+
+	// debugmodule2("env", hostenv)
 
 	err = fs.WalkDir(os.DirFS(t.root), t.builddir, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
@@ -139,8 +140,8 @@ func (t runner) perform(ctx context.Context) (err error) {
 			return nil
 		}
 
-		log.Println("compiling initiated", path)
-		defer log.Println("compiling completed", path)
+		log.Println("interp initiated", path)
+		defer log.Println("interp completed", path)
 		wasi, err := os.ReadFile(path)
 		if err != nil {
 			return err
@@ -152,7 +153,7 @@ func (t runner) perform(ctx context.Context) (err error) {
 		}
 		defer c.Close(ctx)
 
-		debugmodule1(path, c)
+		// debugmodule1(path, c)
 
 		m, err := ns1.InstantiateModule(
 			ctx,

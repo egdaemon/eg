@@ -16,6 +16,7 @@ type task interface {
 	Do(ctx context.Context) error
 }
 
+// A reference to an operation.
 type Reference interface {
 	ID() string
 }
@@ -42,11 +43,28 @@ func (t runtimeref) ID() string {
 
 // Ref meta programming marking a task for delayed execution when rewriting the program at compilation time.
 // if executed directly will use the memory location of the function.
-// invocations of this method are often replaced during build time with a custom
-// implementation by the runtime
+// Important: this method acts as an instrumentation point by the runtime.
 func Ref(o op) Reference {
 	addr := *(*uintptr)(unsafe.Pointer(&o))
 	return runtimeref{ptr: addr, do: o}
+}
+
+type transpiledref struct {
+	name string
+	do   op
+}
+
+func (t transpiledref) ID() string {
+	return t.name
+}
+
+// Deprecated: this is intended for internal use only. do not use.
+// its use may prevent future builds from executing.
+func UnsafeTranspiledRef(name string, o op) Reference {
+	return transpiledref{
+		name: name,
+		do:   o,
+	}
 }
 
 func Perform(ctx context.Context, tasks ...task) error {
@@ -92,7 +110,7 @@ func When(b bool, o task) task {
 }
 
 type Runner interface {
-	Module(ctx context.Context, references ...Reference) (err error)
+	CompileWith(ctx context.Context) (err error)
 }
 
 // Run the tasks with the specified container.
@@ -114,11 +132,8 @@ func (t ContainerRunner) BuildFromFile(s string) ContainerRunner {
 	return t
 }
 
-func (t ContainerRunner) Module(ctx context.Context, references ...Reference) (err error) {
-	var (
-		setup []task
-	)
-
+// CompileWith builds the container and
+func (t ContainerRunner) CompileWith(ctx context.Context) (err error) {
 	// lookup container from registry
 	// if not found fallback to the definition
 	// if no definition then we have an error
@@ -131,11 +146,17 @@ func (t ContainerRunner) Module(ctx context.Context, references ...Reference) (e
 		}
 	}
 
-	for _, r := range references {
-		log.Println("reference", r.ID())
-	}
+	// TODO: upload the container to registry.
 
-	return Perform(ctx, deferred(setup...))
+	return nil
+}
+
+// Module executes a set of references within the provided environment.
+// Important: this method acts as an Instrumentation point by the runtime.
+func Module(ctx context.Context, r Runner, references ...Reference) error {
+	// generate a module main file based on the references.
+	log.Println("generating a module with", len(references), "references")
+	return nil
 }
 
 func deferred(tasks ...task) task {

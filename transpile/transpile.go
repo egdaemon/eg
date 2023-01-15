@@ -1,17 +1,19 @@
 package transpile
 
 import (
-	"bytes"
 	"context"
-	"io"
-	"io/fs"
-	"log"
+	"go/ast"
+	"go/printer"
+	"go/types"
 	"os"
 	"path/filepath"
-	"strings"
 
+	"github.com/james-lawrence/eg/astbuild"
+	"github.com/james-lawrence/eg/astcodec"
 	"github.com/james-lawrence/eg/internal/errorsx"
 	"github.com/james-lawrence/eg/workspaces"
+	"github.com/pkg/errors"
+	"golang.org/x/tools/go/packages"
 )
 
 type Context struct {
@@ -37,97 +39,73 @@ const Skip = errorsx.String("skipping content")
 
 type golang struct{}
 
-// TODO: need to have this actually rewrite all the source to another directory.
 func (t golang) Run(ctx context.Context, tctx Context) (roots []string, err error) {
-	ignore := func(path string, d fs.DirEntry) error {
-		if !strings.HasSuffix(path, ".go") {
-			return errorsx.String("ignoring non-golang file")
-		}
+	var (
+		dst      string
+		pkg      *packages.Package
+		yakident = "yak"
+	)
 
-		return nil
+	pkgc := astcodec.DefaultPkgLoad(
+		astcodec.LoadDir(filepath.Join(tctx.Workspace.Root, tctx.Workspace.ModuleDir)),
+		astcodec.AutoFileSet,
+	)
+
+	if pkg, err = astcodec.Load(pkgc, "eg/ci"); err != nil {
+		return roots, errors.Wrap(err, "unable to load package eg/ci")
 	}
 
-	rewrite := func(from string, d fs.DirEntry, contents []byte) (err error) {
+	if imp := astcodec.FindImport(pkg, astcodec.FindImportsByPath("github.com/james-lawrence/eg/runtime/wasi/yak")); imp != nil {
+		yakident = imp.Name.String()
+	}
+	refexpr := astbuild.SelExpr(yakident, "Ref")
+
+	for _, c := range pkg.Syntax {
+		ast.Walk(astcodec.NewCallExprReplacement(func(ce *ast.CallExpr) *ast.CallExpr {
+			args := []ast.Expr{
+				astbuild.StringLiteral(types.ExprString(ce.Args[0])),
+			}
+			args = append(args, ce.Args...)
+			return astbuild.CallExpr(astbuild.SelExpr(yakident, "UnsafeTranspiledRef"), args...)
+		}, func(ce *ast.CallExpr) bool {
+			return astcodec.TypePattern(refexpr)(ce.Fun)
+		}), c)
+	}
+
+	for _, c := range pkg.Syntax {
 		var (
-			dst string
+			iodst *os.File
 		)
 
-		if dst, err = transpiledpath(tctx, from); err != nil {
-			return err
+		ftoken := pkg.Fset.File(c.Pos())
+		if dst, err = transpiledpath(tctx, filepath.Join(tctx.Workspace.Root, tctx.Workspace.ModuleDir), ftoken.Name()); err != nil {
+			return roots, err
 		}
 
 		if err = os.MkdirAll(filepath.Dir(dst), 0700); err != nil {
-			return err
+			return roots, err
 		}
 
-		if err = os.WriteFile(dst, contents, 0600); err != nil {
-			return err
+		if iodst, err = os.OpenFile(dst, os.O_CREATE|os.O_TRUNC|os.O_RDWR, 0600); err != nil {
+			return roots, err
+		}
+		defer iodst.Close()
+
+		if err = printer.Fprint(iodst, pkg.Fset, c); err != nil {
+			return roots, err
 		}
 
-		if bytes.Contains(contents, []byte("func main()")) {
+		if mainfn := astcodec.FindFunctionDecl(pkg, astcodec.FindFunctionsByName("main")); mainfn != nil {
 			roots = append(roots, dst)
 		}
-
-		return nil
-	}
-
-	if err = visit(ctx, tctx, ignore, rewrite); err != nil {
-		return []string(nil), err
 	}
 
 	return roots, nil
 }
 
-func transpiledpath(tctx Context, current string) (path string, err error) {
-	if path, err = filepath.Rel(tctx.Workspace.ModuleDir, current); err != nil {
+func transpiledpath(tctx Context, mdir string, current string) (path string, err error) {
+	if path, err = filepath.Rel(mdir, current); err != nil {
 		return "", err
 	}
 	return filepath.Join(tctx.Workspace.TransDir, path), nil
-}
-
-func visit(ctx context.Context, tctx Context, ignore func(string, fs.DirEntry) error, rewrite func(string, fs.DirEntry, []byte) error) error {
-	return fs.WalkDir(os.DirFS(filepath.Join(tctx.Workspace.Root)), tctx.Workspace.ModuleDir, func(path string, d fs.DirEntry, err error) error {
-		var (
-			c   *os.File
-			buf bytes.Buffer
-		)
-
-		if err != nil {
-			return err
-		}
-
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		default:
-		}
-
-		if cause := tctx.Workspace.Ignore.Ignore(path, d); cause != nil {
-			log.Println("skipping", path, cause)
-			if d.IsDir() {
-				return fs.SkipDir
-			}
-
-			return nil
-		}
-
-		if d.IsDir() {
-			return nil
-		}
-
-		if cause := ignore(path, d); cause != nil {
-			log.Println("skipping", path, cause)
-			return nil
-		}
-
-		if c, err = os.Open(path); err != nil {
-			return err
-		}
-
-		if _, err = io.Copy(&buf, c); err != nil {
-			return err
-		}
-
-		return rewrite(path, d, buf.Bytes())
-	})
 }

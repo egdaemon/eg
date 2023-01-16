@@ -8,14 +8,13 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strings"
 	"syscall"
 
 	"github.com/james-lawrence/eg/internal/envx"
 	"github.com/james-lawrence/eg/interp/runtime/wasi/ffiegmodule"
 	"github.com/james-lawrence/eg/interp/runtime/wasi/ffiexec"
+	"github.com/james-lawrence/eg/interp/wasidebug"
 	"github.com/tetratelabs/wazero"
-	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
 )
 
@@ -90,6 +89,8 @@ func (t runner) perform(ctx context.Context) (err error) {
 	).WithEnv(
 		"EG_CACHE_DIRECTORY", envx.String(cachedir, "EG_CACHE_DIRECTORY", "CACHE_DIRECTORY"),
 	).WithEnv(
+		"EG_ROOT_DIRECTORY", t.root,
+	).WithEnv(
 		"EG_RUNTIME_DIRECTORY", tmpdir,
 	).WithEnv(
 		"RUNTIME_DIRECTORY", tmpdir,
@@ -127,7 +128,7 @@ func (t runner) perform(ctx context.Context) (err error) {
 	}
 	defer hostenv.Close(ctx)
 
-	// debugmodule2("env", hostenv)
+	// wasidebug.Host(hostenv)
 
 	err = fs.WalkDir(os.DirFS(t.root), t.builddir, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
@@ -158,6 +159,7 @@ func (t runner) perform(ctx context.Context) (err error) {
 		defer c.Close(ctx)
 
 		// debugmodule1(path, c)
+		wasidebug.Module(c)
 
 		m, err := ns1.InstantiateModule(
 			ctx,
@@ -176,48 +178,4 @@ func (t runner) perform(ctx context.Context) (err error) {
 	}
 
 	return nil
-}
-
-type debuggable1 interface {
-	Name() string
-	ExportedFunctions() map[string]api.FunctionDefinition
-	ImportedFunctions() []api.FunctionDefinition
-}
-
-type debuggable2 interface {
-	Name() string
-	ExportedFunctionDefinitions() map[string]api.FunctionDefinition
-}
-
-func debugmodule1(name string, m debuggable1) {
-	log.Println("module debug", name, m.Name())
-	for _, imp := range m.ExportedFunctions() {
-		paramtypestr := typeliststr(imp.ParamTypes()...)
-		resulttypestr := typeliststr(imp.ResultTypes()...)
-		log.Println("exported", imp.Name(), "(", paramtypestr, ")", resulttypestr)
-	}
-
-	for _, imp := range m.ImportedFunctions() {
-		paramtypestr := typeliststr(imp.ParamTypes()...)
-		resulttypestr := typeliststr(imp.ResultTypes()...)
-		log.Println("imported", imp.Name(), "(", paramtypestr, ")", resulttypestr)
-	}
-}
-
-func debugmodule2(name string, m debuggable2) {
-	log.Println("module debug", name, m.Name())
-	for _, imp := range m.ExportedFunctionDefinitions() {
-		paramtypestr := typeliststr(imp.ParamTypes()...)
-		resulttypestr := typeliststr(imp.ResultTypes()...)
-		log.Println("exported", imp.Name(), "(", paramtypestr, ")", resulttypestr)
-	}
-}
-
-func typeliststr(types ...api.ValueType) string {
-	typesstr := []string(nil)
-	for _, t := range types {
-		typesstr = append(typesstr, api.ValueTypeName(t))
-	}
-
-	return strings.Join(typesstr, ", ")
 }

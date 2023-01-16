@@ -96,12 +96,13 @@ func (t golang) Run(ctx context.Context) (roots []string, err error) {
 		}), c)
 
 		ast.Walk(astcodec.NewCallExprReplacement(func(ce *ast.CallExpr) *ast.CallExpr {
-			log.Println("replacing moduleref", types.ExprString(ce))
 			if len(ce.Args) < 3 {
 				log.Println("unable to transpile module call")
 				return ce
 			}
 
+			ctxarg := ce.Args[0]
+			rarg := ce.Args[1]
 			statements := make([]jen.Code, 0, len(ce.Args[2:]))
 			for _, op := range ce.Args[2:] {
 				statements = append(statements, jen.Id(types.ExprString(op)))
@@ -123,17 +124,17 @@ func (t golang) Run(ctx context.Context) (roots []string, err error) {
 					jen.Panic(jen.Id("err")),
 				),
 			)
-			generatedmodules = append(generatedmodules, &module{
-				fname:    filepath.Join(gendir, fmt.Sprintf("module.%d.%d.go", pos.Line, pos.Column)),
+
+			genwasm := filepath.Join(t.Context.Workspace.BuildDir, gendir, fmt.Sprintf("module.%d.%d.wasm", pos.Line, pos.Column))
+			m := &module{
+				fname:    filepath.Join(t.Workspace.GenModDir, gendir, fmt.Sprintf("module.%d.%d.go", pos.Line, pos.Column)),
 				original: buf,
 				main:     bytes.NewBufferString(fmt.Sprintf("%#v", main)),
 				pos:      pkg.Fset.PositionFor(ce.Pos(), true),
-			})
+			}
+			generatedmodules = append(generatedmodules, m)
 
-			// log.Println("derp fn", types.ExprString(astbuild.CallExpr(ast.NewIdent("derp"), ops...)))
-
-			// TODO: replace yak.Module with a call that points to a cached file.
-			return ce
+			return astbuild.CallExpr(astbuild.SelExpr(yakident, "UnsafeModule"), ctxarg, rarg, astbuild.StringLiteral(genwasm))
 		}, func(ce *ast.CallExpr) bool {
 			return astcodec.TypePattern(refmodule)(ce.Fun)
 		}), c)
@@ -182,7 +183,7 @@ func (t golang) Run(ctx context.Context) (roots []string, err error) {
 			return roots, err
 		}
 
-		if gendir, err = workspaces.PathGenMod(t.Context.Workspace, filepath.Join(t.Context.Workspace.Root, t.Context.Workspace.ModuleDir), workspaces.ReplaceExt(ftoken.Name(), ".wasm.d")); err != nil {
+		if gendir, err = filepath.Rel(filepath.Join(t.Context.Workspace.Root, t.Context.Workspace.ModuleDir), workspaces.ReplaceExt(ftoken.Name(), ".wasm.d")); err != nil {
 			return roots, err
 		}
 

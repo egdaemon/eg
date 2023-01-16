@@ -4,7 +4,6 @@ import (
 	"log"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/james-lawrence/eg/cmd/cmdopts"
 	"github.com/james-lawrence/eg/compile"
@@ -27,7 +26,7 @@ func (t runner) Run(ctx *cmdopts.Global) (err error) {
 		return err
 	}
 
-	roots, err := transpile.Autodetect().Run(ctx.Context, transpile.New(ws))
+	roots, err := transpile.Autodetect(transpile.New(ws)).Run(ctx.Context)
 	if err != nil {
 		return err
 	}
@@ -42,8 +41,8 @@ func (t runner) Run(ctx *cmdopts.Global) (err error) {
 		if path, err = filepath.Rel(ws.TransDir, root); err != nil {
 			return err
 		}
-
-		path = strings.TrimSuffix(path, filepath.Ext(path)) + ".wasm"
+		path = workspaces.TrimRoot(path, filepath.Base(ws.GenModDir))
+		path = workspaces.ReplaceExt(path, ".wasm")
 		path = filepath.Join(ws.BuildDir, path)
 
 		if _, err = os.Stat(path); err == nil {

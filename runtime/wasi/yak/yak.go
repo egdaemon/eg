@@ -2,13 +2,13 @@ package yak
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"log"
 	"unsafe"
 
 	"github.com/james-lawrence/eg/internal/envx"
 	"github.com/james-lawrence/eg/runtime/wasi/internal/ffiexec"
+	"github.com/pkg/errors"
 )
 
 // represents a sequence of operations to perform.
@@ -153,19 +153,12 @@ func (t ContainerRunner) CompileWith(ctx context.Context) (err error) {
 
 // Module executes a set of references within the provided environment.
 // Important: this method acts as an Instrumentation point by the runtime.
-func Module(ctx context.Context, r Runner, references ...Reference) error {
+func Module(ctx context.Context, r Runner, references ...op) error {
 	// generate a module main file based on the references.
 	log.Println("generating a module with", len(references), "references")
-	return nil
-}
 
-func deferred(tasks ...task) task {
-	return fnTask(func(ctx context.Context) error {
-		for _, task := range tasks {
-			if err := task.Do(ctx); err != nil {
-				return err
-			}
-		}
-		return nil
-	})
+	return r.CompileWith(ctx)
+	// if code := ffiegmodule.Build(names...); code != 0 {
+	// 	return errors.Errorf("unable to generate module: %d", code)
+	// }
 }

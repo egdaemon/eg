@@ -61,7 +61,7 @@ func main() {
 	c1 := derpyak.Container("ubuntu.22.04").
 		BuildFromFile(".test/Containerfile")
 
-	if err := derpyak.Module(ctx, c1, derpyak.Ref(DaemonTests), derpyak.Ref(Op4)); err != nil {
+	if err := derpyak.Module(ctx, c1, DaemonTests, Op4); err != nil {
 		panic(err)
 	}
 }

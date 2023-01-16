@@ -1,4 +1,4 @@
-package exechost
+package ffiexec
 
 import (
 	"context"

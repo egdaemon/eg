@@ -7,6 +7,7 @@ import (
 	"go/types"
 	"log"
 
+	"golang.org/x/tools/go/ast/astutil"
 	"golang.org/x/tools/go/packages"
 )
 
@@ -253,4 +254,51 @@ func NewCallExprReplacement(mut func(*ast.CallExpr) *ast.CallExpr, pattern func(
 		mut:     mut,
 		pattern: pattern,
 	}
+}
+
+func ReplaceFunction(root ast.Node, with *ast.FuncDecl, pattern func(ast.Decl) bool) ast.Node {
+	return astutil.Apply(root, func(c *astutil.Cursor) bool {
+		switch n := c.Node().(type) {
+		case *ast.File:
+			return true
+		case *ast.FuncDecl:
+			return pattern(n)
+		case ast.Decl:
+			return false
+		default:
+			return false
+		}
+	}, func(c *astutil.Cursor) bool {
+		if _, ok := c.Node().(*ast.FuncDecl); !ok {
+			return true
+		}
+		c.InsertAfter(with)
+		c.Delete()
+		return true
+	})
+}
+
+func RemoveFunction(root ast.Node, pattern func(ast.Decl) bool) ast.Node {
+	return astutil.Apply(root, func(c *astutil.Cursor) bool {
+		switch n := c.Node().(type) {
+		case *ast.File:
+			return true
+		case *ast.FuncDecl:
+			return pattern(n)
+		case ast.Decl:
+			return false
+		default:
+			return false
+		}
+	}, func(c *astutil.Cursor) bool {
+		if _, ok := c.Node().(*ast.FuncDecl); !ok {
+			return true
+		}
+		c.Delete()
+		return true
+	})
+}
+
+func Ident(expr ast.Expr) string {
+	return types.ExprString(expr)
 }

@@ -11,6 +11,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/james-lawrence/eg/internal/errorsx"
 )
@@ -38,6 +39,7 @@ type Context struct {
 	CacheDir  string // cache directory. relative to the module directory.
 	BuildDir  string // directory for built wasm modules; relative to the cache directory.
 	TransDir  string // root directory for the transpiled code; relative to the cache directory.
+	GenModDir string // root directory for generated modules; relative to the cache directory.
 	Ignore    ignorable
 }
 
@@ -63,6 +65,7 @@ func New(ctx context.Context, root string, mdir string) (zero Context, err error
 		CacheDir:  cdir,
 		BuildDir:  filepath.Join(cdir, ".eg", "build", cid),
 		TransDir:  filepath.Join(cdir, ".eg", "trans", cid),
+		GenModDir: filepath.Join(cdir, ".eg", "trans", cid, ".genmod"),
 		Ignore:    ignore,
 	}, nil
 }
@@ -105,4 +108,33 @@ func cacheid(ctx context.Context, root string, mdir string, cacheid hash.Hash, i
 
 		return nil
 	})
+}
+
+func PathTranspiled(tctx Context, mdir string, current string) (path string, err error) {
+	if path, err = filepath.Rel(mdir, current); err != nil {
+		return "", err
+	}
+	return filepath.Join(tctx.TransDir, path), nil
+}
+
+func PathGenMod(tctx Context, mdir string, current string) (path string, err error) {
+	if path, err = filepath.Rel(mdir, current); err != nil {
+		return "", err
+	}
+	return filepath.Join(tctx.GenModDir, path), nil
+}
+
+func PathBuild(tctx Context, mdir string, current string) (path string, err error) {
+	if path, err = filepath.Rel(mdir, current); err != nil {
+		return "", err
+	}
+	return filepath.Join(tctx.BuildDir, path), nil
+}
+
+func ReplaceExt(path string, ext string) string {
+	return strings.TrimSuffix(path, filepath.Ext(path)) + ext
+}
+
+func TrimRoot(path string, root string) string {
+	return strings.TrimPrefix(path, root)
 }

@@ -12,7 +12,8 @@ import (
 	"syscall"
 
 	"github.com/james-lawrence/eg/internal/envx"
-	"github.com/james-lawrence/eg/interp/runtime/wasi/exechost"
+	"github.com/james-lawrence/eg/interp/runtime/wasi/ffiegmodule"
+	"github.com/james-lawrence/eg/interp/runtime/wasi/ffiexec"
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
@@ -110,7 +111,10 @@ func (t runner) perform(ctx context.Context) (err error) {
 	defer wasienv.Close(ctx)
 
 	hostenv, err := runtime.NewHostModuleBuilder("env").
-		NewFunctionBuilder().WithFunc(exechost.Exec(func(cmd *exec.Cmd) *exec.Cmd {
+		NewFunctionBuilder().WithFunc(ffiegmodule.Build(func(refs ...string) error {
+		return nil
+	})).Export("github.com/james-lawrence/eg/runtime/wasi/runtime/ffiegmodule.Build").
+		NewFunctionBuilder().WithFunc(ffiexec.Exec(func(cmd *exec.Cmd) *exec.Cmd {
 		cmd.Dir = t.root
 		cmd.Env = os.Environ()
 		cmd.Stderr = os.Stderr

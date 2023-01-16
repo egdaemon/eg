@@ -110,6 +110,13 @@ func cacheid(ctx context.Context, root string, mdir string, cacheid hash.Hash, i
 	})
 }
 
+func PathRel(tctx Context, mdir string, current string) (path string, err error) {
+	if path, err = filepath.Rel(mdir, current); err != nil {
+		return "", err
+	}
+	return filepath.Join(tctx.TransDir, path), nil
+}
+
 func PathTranspiled(tctx Context, mdir string, current string) (path string, err error) {
 	if path, err = filepath.Rel(mdir, current); err != nil {
 		return "", err

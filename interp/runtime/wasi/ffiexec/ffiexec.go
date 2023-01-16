@@ -28,6 +28,9 @@ func Exec(op func(*exec.Cmd) *exec.Cmd) func(
 			return 127
 		}
 
+		log.Println("initiated", cmd.String())
+		defer log.Println("completed", cmd.String())
+
 		if err = op(cmd).Run(); err != nil {
 			log.Println("failed to execute shell command", err)
 			return 128

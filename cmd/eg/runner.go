@@ -57,3 +57,20 @@ func (t runner) Run(ctx *cmdopts.Global) (err error) {
 
 	return interp.Run(ctx.Context, t.Dir, interp.OptionModuleDir(t.ModuleDir), interp.OptionBuildDir(ws.BuildDir))
 }
+
+type module struct {
+	Dir       string `name:"directory" help:"root directory of the repository" default:"${vars_cwd}"`
+	ModuleDir string `name:"moduledir" help:"must be a subdirectory in the provided directory" default:".eg"`
+}
+
+func (t module) Run(ctx *cmdopts.Global) (err error) {
+	var (
+		ws workspaces.Context
+	)
+
+	if ws, err = workspaces.New(ctx.Context, t.Dir, t.ModuleDir); err != nil {
+		return err
+	}
+
+	return interp.Run(ctx.Context, t.Dir, interp.OptionModuleDir(t.ModuleDir), interp.OptionBuildDir(ws.BuildDir))
+}

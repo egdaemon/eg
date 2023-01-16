@@ -7,6 +7,7 @@ import (
 	"unsafe"
 
 	"github.com/james-lawrence/eg/internal/envx"
+	"github.com/james-lawrence/eg/internal/md5x"
 	"github.com/james-lawrence/eg/runtime/wasi/internal/ffiexec"
 	"github.com/pkg/errors"
 )
@@ -111,6 +112,7 @@ func When(b bool, o task) task {
 
 type Runner interface {
 	CompileWith(ctx context.Context) (err error)
+	RunWith(ctx context.Context, mpath string) (err error)
 }
 
 // Run the tasks with the specified container.
@@ -134,19 +136,32 @@ func (t ContainerRunner) BuildFromFile(s string) ContainerRunner {
 
 // CompileWith builds the container and
 func (t ContainerRunner) CompileWith(ctx context.Context) (err error) {
-	// lookup container from registry
-	// if not found fallback to the definition
-	// if no definition then we have an error
-	if t.definition != "" {
-		// sudo podman build -t localhost/derp:latest -f ./zderp/custom/Containerfile -f ./zderp/egci/Containerfile ./zderp/egci/
-		// sudo podman run --detach --name derpy --volume ./egci/.filesystem:/opt localhost/derp:latest /usr/sbin/init
-		log.Printf("building container %s\n", t.definition)
-		if code := ffiexec.Command("podman", []string{"build", "-f", t.definition, ".egci"}); code != 0 {
-			return errors.New("unable to build the container")
-		}
+	log.Printf("building container %s\n", t.definition)
+	if code := ffiexec.Command("podman", []string{"build", "--timestamp", "0", "-t", t.name, "-f", t.definition, ".egci"}); code != 0 {
+		return errors.New("unable to build the container")
 	}
 
-	// TODO: upload the container to registry.
+	return nil
+}
+
+func (t ContainerRunner) RunWith(ctx context.Context, mpath string) (err error) {
+	// TODO: implement a custom host method. this is currently a security risk
+	if code := ffiexec.Command("podman", []string{
+		"run",
+		"--name",
+		fmt.Sprintf("%s.%s", t.name, md5x.DigestString(mpath)),
+		"--detach",
+		"--volume",
+		fmt.Sprintf("%s:/opt/egmodule.wasm:O", mpath),
+		"--volume",
+		fmt.Sprintf("%s:/opt/eg:O", envx.String("", "EG_ROOT_DIRECTORY")),
+		"--volume",
+		fmt.Sprintf("%s:/opt/egbin:ro", "/home/james.lawrence/go/bin/eg"),
+		t.name,
+		"/usr/sbin/init",
+	}); code != 0 {
+		return errors.New("unable to build the container")
+	}
 
 	return nil
 }
@@ -156,9 +171,11 @@ func (t ContainerRunner) CompileWith(ctx context.Context) (err error) {
 func Module(ctx context.Context, r Runner, references ...op) error {
 	// generate a module main file based on the references.
 	log.Println("generating a module with", len(references), "references")
-
 	return r.CompileWith(ctx)
-	// if code := ffiegmodule.Build(names...); code != 0 {
-	// 	return errors.Errorf("unable to generate module: %d", code)
-	// }
+}
+
+// Deprecated: this is intended for internal use only. do not use.
+// used to replace the module invocations at runtime.
+func UnsafeModule(ctx context.Context, r Runner, modulepath string) error {
+	return r.RunWith(ctx, modulepath)
 }

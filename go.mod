@@ -33,8 +33,9 @@ require (
 require (
 	github.com/dave/jennifer v1.6.0
 	github.com/go-logr/logr v1.2.3 // indirect
+	github.com/gofrs/uuid v4.3.1+incompatible
 	github.com/stretchr/testify v1.8.1 // indirect
-	github.com/tetratelabs/wazero v1.0.0-pre.7.0.20230107140259-f213133896d9
+	github.com/tetratelabs/wazero v1.0.0-pre.7
 	golang.org/x/sys v0.4.0 // indirect
 	golang.org/x/tools v0.5.0
 )

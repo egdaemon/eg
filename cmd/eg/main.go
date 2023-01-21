@@ -23,6 +23,7 @@ func main() {
 		cmdopts.Global
 		Version            cmdopts.Version              `cmd:"" help:"display versioning information"`
 		Interp             runner                       `cmd:"" help:"execute the interpreter on the given directory"`
+		Module             module                       `cmd:"" help:"executes a compiled module directly" hidden:"true"`
 		InstallCompletions kongplete.InstallCompletions `cmd:"" help:"install shell completions"`
 	}
 

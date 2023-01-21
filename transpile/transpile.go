@@ -28,8 +28,13 @@ type Context struct {
 	Workspace workspaces.Context
 }
 
+type Compiled struct {
+	Path      string
+	Generated bool
+}
+
 type Transpiler interface {
-	Run(ctx context.Context) (roots []string, err error)
+	Run(ctx context.Context) (roots []Compiled, err error)
 }
 
 func New(ws workspaces.Context) Context {
@@ -47,7 +52,7 @@ type golang struct {
 	Context
 }
 
-func (t golang) Run(ctx context.Context) (roots []string, err error) {
+func (t golang) Run(ctx context.Context) (roots []Compiled, err error) {
 	type module struct {
 		fname    string
 		original *bytes.Buffer
@@ -196,7 +201,7 @@ func (t golang) Run(ctx context.Context) (roots []string, err error) {
 		}
 
 		if mainfn := astcodec.FindFunctionDecl(pkg, astcodec.FindFunctionsByName("main")); mainfn != nil {
-			roots = append(roots, dst)
+			roots = append(roots, Compiled{Path: dst})
 		}
 	}
 
@@ -221,7 +226,7 @@ func (t golang) Run(ctx context.Context) (roots []string, err error) {
 			return roots, err
 		}
 
-		roots = append(roots, m.fname)
+		roots = append(roots, Compiled{Path: m.fname, Generated: true})
 	}
 
 	return roots, nil

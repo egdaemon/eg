@@ -33,44 +33,50 @@ func (t runner) Run(ctx *cmdopts.Global) (err error) {
 
 	log.Println("cacheid", ws.CachedID, "roots", roots)
 
+	modules := make([]transpile.Compiled, 0, len(roots))
+
 	for _, root := range roots {
 		var (
 			path string
 		)
 
-		if path, err = filepath.Rel(ws.TransDir, root); err != nil {
+		if path, err = filepath.Rel(ws.TransDir, root.Path); err != nil {
 			return err
 		}
-		path = workspaces.TrimRoot(path, filepath.Base(ws.GenModDir))
-		path = workspaces.ReplaceExt(path, ".wasm")
+		tmp := workspaces.TrimRoot(path, filepath.Base(ws.GenModDir))
+		path = workspaces.ReplaceExt(tmp, ".wasm")
 		path = filepath.Join(ws.BuildDir, path)
+		modules = append(modules, transpile.Compiled{Path: path, Generated: root.Generated})
 
 		if _, err = os.Stat(path); err == nil {
 			// nothing to do.
 			continue
 		}
 
-		if err = compile.Run(ctx.Context, root, path); err != nil {
+		if err = compile.Run(ctx.Context, root.Path, path); err != nil {
 			return err
 		}
 	}
 
-	return interp.Run(ctx.Context, t.Dir, interp.OptionModuleDir(t.ModuleDir), interp.OptionBuildDir(ws.BuildDir))
+	for _, m := range modules {
+		if m.Generated {
+			continue
+		}
+
+		if err = interp.Run(ctx.Context, t.Dir, m.Path, interp.OptionModuleDir(t.ModuleDir)); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 type module struct {
 	Dir       string `name:"directory" help:"root directory of the repository" default:"${vars_cwd}"`
 	ModuleDir string `name:"moduledir" help:"must be a subdirectory in the provided directory" default:".eg"`
+	Module    string `arg:"" help:"name of the module to run"`
 }
 
 func (t module) Run(ctx *cmdopts.Global) (err error) {
-	var (
-		ws workspaces.Context
-	)
-
-	if ws, err = workspaces.New(ctx.Context, t.Dir, t.ModuleDir); err != nil {
-		return err
-	}
-
-	return interp.Run(ctx.Context, t.Dir, interp.OptionModuleDir(t.ModuleDir), interp.OptionBuildDir(ws.BuildDir))
+	return interp.Run(ctx.Context, t.Dir, t.Module, interp.OptionModuleDir(t.ModuleDir))
 }

@@ -61,7 +61,16 @@ func main() {
 	c1 := derpyak.Container("ubuntu.22.04").
 		BuildFromFile(".test/Containerfile")
 
-	if err := derpyak.Module(ctx, c1, DaemonTests, Op4); err != nil {
+	err := derpyak.Perform(
+		ctx,
+		derpyak.Parallel(
+			derpyak.Module(ctx, c1, DaemonTests),
+
+			derpyak.Module(ctx, c1, Op4),
+		),
+	)
+	if err != nil {
 		panic(err)
 	}
+
 }

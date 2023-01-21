@@ -6,6 +6,7 @@ import (
 	"log"
 	"unsafe"
 
+	"github.com/gofrs/uuid"
 	"github.com/james-lawrence/eg/internal/envx"
 	"github.com/james-lawrence/eg/internal/md5x"
 	"github.com/james-lawrence/eg/runtime/wasi/internal/ffiexec"
@@ -146,21 +147,43 @@ func (t ContainerRunner) CompileWith(ctx context.Context) (err error) {
 
 func (t ContainerRunner) RunWith(ctx context.Context, mpath string) (err error) {
 	// TODO: implement a custom host method. this is currently a security risk
+	cname := fmt.Sprintf("%s.%s.%s", t.name, md5x.DigestString(mpath), uuid.Must(uuid.NewV4()))
+	log.Println("running", cname)
+
+	if code := ffiexec.Command("podman", []string{
+		"stop", cname,
+	}); code != 0 {
+		return errors.New("unable to build the container")
+	}
+
+	if code := ffiexec.Command("podman", []string{
+		"rm", cname,
+	}); code != 0 {
+		return errors.New("unable to build the container")
+	}
+
 	if code := ffiexec.Command("podman", []string{
 		"run",
-		"--name",
-		fmt.Sprintf("%s.%s", t.name, md5x.DigestString(mpath)),
+		"--name", cname,
 		"--detach",
-		"--volume",
-		fmt.Sprintf("%s:/opt/egmodule.wasm:O", mpath),
-		"--volume",
-		fmt.Sprintf("%s:/opt/eg:O", envx.String("", "EG_ROOT_DIRECTORY")),
-		"--volume",
-		fmt.Sprintf("%s:/opt/egbin:ro", "/home/james.lawrence/go/bin/eg"),
+		"--volume", fmt.Sprintf("%s:/opt/egmodule.wasm:ro", mpath),
+		"--volume", fmt.Sprintf("%s:/opt/egbin:ro", "/home/james.lawrence/go/bin/eg"),
+		"--volume", fmt.Sprintf("%s:/opt/eg:O", envx.String("", "EG_ROOT_DIRECTORY")),
 		t.name,
 		"/usr/sbin/init",
 	}); code != 0 {
-		return errors.New("unable to build the container")
+		return errors.New("unable to start the container")
+	}
+
+	if code := ffiexec.Command("podman", []string{
+		"exec", cname,
+		"/opt/egbin",
+		"module",
+		"--directory=/opt/eg",
+		"--moduledir=.test",
+		"/opt/egmodule.wasm",
+	}); code != 0 {
+		return errors.New("unable to run the module within the container")
 	}
 
 	return nil
@@ -168,14 +191,19 @@ func (t ContainerRunner) RunWith(ctx context.Context, mpath string) (err error) 
 
 // Module executes a set of references within the provided environment.
 // Important: this method acts as an Instrumentation point by the runtime.
-func Module(ctx context.Context, r Runner, references ...op) error {
-	// generate a module main file based on the references.
-	log.Println("generating a module with", len(references), "references")
-	return r.CompileWith(ctx)
+func Module(ctx context.Context, r Runner, references ...op) op {
+	return func(ctx context.Context, o Op) error {
+		return r.CompileWith(ctx)
+	}
 }
 
 // Deprecated: this is intended for internal use only. do not use.
 // used to replace the module invocations at runtime.
-func UnsafeModule(ctx context.Context, r Runner, modulepath string) error {
-	return r.RunWith(ctx, modulepath)
+func UnsafeModule(ctx context.Context, r Runner, modulepath string) op {
+	return func(ctx context.Context, o Op) error {
+		if err := r.CompileWith(ctx); err != nil {
+			return err
+		}
+		return r.RunWith(ctx, modulepath)
+	}
 }

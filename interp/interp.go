@@ -8,12 +8,12 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sync"
 	"syscall"
 
 	"github.com/james-lawrence/eg/internal/envx"
 	"github.com/james-lawrence/eg/interp/runtime/wasi/ffiegmodule"
 	"github.com/james-lawrence/eg/interp/runtime/wasi/ffiexec"
-	"github.com/james-lawrence/eg/interp/wasidebug"
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
 )
@@ -27,18 +27,13 @@ func OptionModuleDir(s string) Option {
 	}
 }
 
-func OptionBuildDir(s string) Option {
-	return func(r *runner) {
-		r.builddir = s
-	}
-}
-
-func Run(ctx context.Context, dir string, options ...Option) error {
+func Run(ctx context.Context, dir string, module string, options ...Option) error {
 	var (
 		r = runner{
 			root:      dir,
 			moduledir: ".eg",
-			builddir:  filepath.Join(".cache", "build"),
+			// builddir:  filepath.Join(".cache", "build"),
+			initonce: &sync.Once{},
 		}
 	)
 
@@ -46,13 +41,13 @@ func Run(ctx context.Context, dir string, options ...Option) error {
 		opt(&r)
 	}
 
-	return r.perform(ctx)
+	return r.perform(ctx, module)
 }
 
 type runner struct {
 	root      string
 	moduledir string
-	builddir  string
+	initonce  *sync.Once
 }
 
 func (t runner) Open(name string) (fs.File, error) {
@@ -67,7 +62,7 @@ func (t runner) Open(name string) (fs.File, error) {
 	}
 }
 
-func (t runner) perform(ctx context.Context) (err error) {
+func (t runner) perform(ctx context.Context, path string) (err error) {
 	// Create a new WebAssembly Runtime.
 	runtime := wazero.NewRuntimeWithConfig(
 		ctx,
@@ -83,7 +78,7 @@ func (t runner) perform(ctx context.Context) (err error) {
 	defer os.RemoveAll(tmpdir)
 
 	mcfg := wazero.NewModuleConfig().WithEnv(
-		"CI", os.Getenv("CI"),
+		"CI", envx.String("", "EG_CI", "CI"),
 	).WithEnv(
 		"EG_CI", os.Getenv("EG_CI"),
 	).WithEnv(
@@ -99,7 +94,6 @@ func (t runner) perform(ctx context.Context) (err error) {
 	).WithStdout(
 		os.Stdout,
 	).WithFS(
-		// t,
 		os.DirFS("."),
 	).WithSysNanotime().WithSysWalltime()
 
@@ -129,53 +123,30 @@ func (t runner) perform(ctx context.Context) (err error) {
 	defer hostenv.Close(ctx)
 
 	// wasidebug.Host(hostenv)
-
-	err = fs.WalkDir(os.DirFS(t.root), t.builddir, func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		default:
-		}
-
-		if d.IsDir() {
-			return nil
-		}
-
-		log.Println("interp initiated", path)
-		defer log.Println("interp completed", path)
-		wasi, err := os.ReadFile(path)
-		if err != nil {
-			return err
-		}
-
-		c, err := runtime.CompileModule(ctx, wasi)
-		if err != nil {
-			return err
-		}
-		defer c.Close(ctx)
-
-		// debugmodule1(path, c)
-		wasidebug.Module(c)
-
-		m, err := ns1.InstantiateModule(
-			ctx,
-			c,
-			mcfg.WithName(path),
-		)
-		if err != nil {
-			return err
-		}
-		defer m.Close(ctx)
-
-		return nil
-	})
+	log.Println("interp initiated", path)
+	defer log.Println("interp completed", path)
+	wasi, err := os.ReadFile(path)
 	if err != nil {
 		return err
 	}
+
+	c, err := runtime.CompileModule(ctx, wasi)
+	if err != nil {
+		return err
+	}
+	defer c.Close(ctx)
+
+	// wasidebug.Module(c)
+
+	m, err := ns1.InstantiateModule(
+		ctx,
+		c,
+		mcfg.WithName(path),
+	)
+	if err != nil {
+		return err
+	}
+	defer m.Close(ctx)
 
 	return nil
 }

@@ -4,12 +4,11 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"sync"
 	"unsafe"
 
-	"github.com/gofrs/uuid"
-	"github.com/james-lawrence/eg/internal/envx"
-	"github.com/james-lawrence/eg/internal/md5x"
-	"github.com/james-lawrence/eg/runtime/wasi/internal/ffiexec"
+	"github.com/james-lawrence/eg/internal/errorsx"
+	"github.com/james-lawrence/eg/runtime/wasi/internal/ffiegcontainer"
 	"github.com/pkg/errors"
 )
 
@@ -91,13 +90,30 @@ func Sequential(operations ...op) task {
 }
 
 func Parallel(operations ...op) task {
-	return fnTask(func(ctx context.Context) error {
-		for _, op := range operations {
-			if err := op(ctx, Ref(op)); err != nil {
-				return err
+	return fnTask(func(ctx context.Context) (err error) {
+		errs := make(chan error, len(operations))
+		defer close(errs)
+
+		for _, o := range operations {
+			go func(iop op) {
+				select {
+				case <-ctx.Done():
+					errs <- ctx.Err()
+				case errs <- iop(ctx, Ref(iop)):
+				}
+			}(o)
+		}
+
+		for i := 0; i < len(operations); i++ {
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case cause := <-errs:
+				err = errorsx.Compact(err, cause)
 			}
 		}
-		return nil
+
+		return err
 	})
 }
 
@@ -119,15 +135,15 @@ type Runner interface {
 // Run the tasks with the specified container.
 func Container(name string) ContainerRunner {
 	return ContainerRunner{
-		tmpdir: envx.String("", "EG_RUNTIME_DIRECTORY"),
-		name:   name,
+		name:  name,
+		built: &sync.Once{},
 	}
 }
 
 type ContainerRunner struct {
 	name       string
-	tmpdir     string
 	definition string
+	built      *sync.Once
 }
 
 func (t ContainerRunner) BuildFromFile(s string) ContainerRunner {
@@ -137,59 +153,26 @@ func (t ContainerRunner) BuildFromFile(s string) ContainerRunner {
 
 // CompileWith builds the container and
 func (t ContainerRunner) CompileWith(ctx context.Context) (err error) {
-	log.Printf("building container %s\n", t.definition)
-	if code := ffiexec.Command("podman", []string{"build", "--timestamp", "0", "-t", t.name, "-f", t.definition, ".egci"}); code != 0 {
-		return errors.New("unable to build the container")
-	}
+	t.built.Do(func() {
+		log.Printf("building container %s\n", t.definition)
+		if code := ffiegcontainer.Build(t.name, t.definition); code != 0 {
+			err = errors.Errorf("unable to build the container: %d", code)
+			return
+		}
+	})
 
-	return nil
+	return err
 }
 
 func (t ContainerRunner) RunWith(ctx context.Context, mpath string) (err error) {
-	// TODO: implement a custom host method. this is currently a security risk
-	cname := fmt.Sprintf("%s.%s.%s", t.name, md5x.DigestString(mpath), uuid.Must(uuid.NewV4()))
-	log.Println("running", cname)
-
-	if code := ffiexec.Command("podman", []string{
-		"stop", cname,
-	}); code != 0 {
-		return errors.New("unable to build the container")
-	}
-
-	if code := ffiexec.Command("podman", []string{
-		"rm", cname,
-	}); code != 0 {
-		return errors.New("unable to build the container")
-	}
-
-	if code := ffiexec.Command("podman", []string{
-		"run",
-		"--name", cname,
-		"--detach",
-		"--volume", fmt.Sprintf("%s:/opt/egmodule.wasm:ro", mpath),
-		"--volume", fmt.Sprintf("%s:/opt/egbin:ro", "/home/james.lawrence/go/bin/eg"),
-		"--volume", fmt.Sprintf("%s:/opt/eg:O", envx.String("", "EG_ROOT_DIRECTORY")),
-		t.name,
-		"/usr/sbin/init",
-	}); code != 0 {
-		return errors.New("unable to start the container")
-	}
-
-	if code := ffiexec.Command("podman", []string{
-		"exec", cname,
-		"/opt/egbin",
-		"module",
-		"--directory=/opt/eg",
-		"--moduledir=.test",
-		"/opt/egmodule.wasm",
-	}); code != 0 {
-		return errors.New("unable to run the module within the container")
+	if code := ffiegcontainer.Run(t.name, mpath); code != 0 {
+		return errors.Errorf("unable to build the container: %d", code)
 	}
 
 	return nil
 }
 
-// Module executes a set of references within the provided environment.
+// Module executes a set of operations within the provided environment.
 // Important: this method acts as an Instrumentation point by the runtime.
 func Module(ctx context.Context, r Runner, references ...op) op {
 	return func(ctx context.Context, o Op) error {
@@ -200,10 +183,13 @@ func Module(ctx context.Context, r Runner, references ...op) op {
 // Deprecated: this is intended for internal use only. do not use.
 // used to replace the module invocations at runtime.
 func UnsafeModule(ctx context.Context, r Runner, modulepath string) op {
-	return func(ctx context.Context, o Op) error {
-		if err := r.CompileWith(ctx); err != nil {
+	if err := r.CompileWith(ctx); err != nil {
+		return func(context.Context, Op) error {
 			return err
 		}
+	}
+
+	return func(ctx context.Context, o Op) error {
 		return r.RunWith(ctx, modulepath)
 	}
 }

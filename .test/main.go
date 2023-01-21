@@ -33,7 +33,7 @@ func Op3(context.Context, derpyak.Op) error {
 func Op4(context.Context, derpyak.Op) error {
 	log.Println("op4 initiated")
 	defer log.Println("op4 completed")
-
+	time.Sleep(10 * time.Second)
 	return nil
 }
 
@@ -65,7 +65,8 @@ func main() {
 		ctx,
 		derpyak.Parallel(
 			derpyak.Module(ctx, c1, DaemonTests),
-
+			derpyak.Module(ctx, c1, Op4),
+			derpyak.Module(ctx, c1, Op4),
 			derpyak.Module(ctx, c1, Op4),
 		),
 	)

@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/gofrs/uuid"
 	"github.com/james-lawrence/eg/cmd/cmdopts"
 	"github.com/james-lawrence/eg/compile"
 	"github.com/james-lawrence/eg/interp"
@@ -43,8 +44,9 @@ func (t runner) Run(ctx *cmdopts.Global) (err error) {
 		if path, err = filepath.Rel(ws.TransDir, root.Path); err != nil {
 			return err
 		}
-		tmp := workspaces.TrimRoot(path, filepath.Base(ws.GenModDir))
-		path = workspaces.ReplaceExt(tmp, ".wasm")
+
+		path = workspaces.TrimRoot(path, filepath.Base(ws.GenModDir))
+		path = workspaces.ReplaceExt(path, ".wasm")
 		path = filepath.Join(ws.BuildDir, path)
 		modules = append(modules, transpile.Compiled{Path: path, Generated: root.Generated})
 
@@ -63,7 +65,7 @@ func (t runner) Run(ctx *cmdopts.Global) (err error) {
 			continue
 		}
 
-		if err = interp.Run(ctx.Context, t.Dir, m.Path, interp.OptionModuleDir(t.ModuleDir)); err != nil {
+		if err = interp.Run(ctx.Context, uuid.Must(uuid.NewV4()).String(), t.Dir, m.Path, interp.OptionModuleDir(t.ModuleDir)); err != nil {
 			return err
 		}
 	}
@@ -78,5 +80,5 @@ type module struct {
 }
 
 func (t module) Run(ctx *cmdopts.Global) (err error) {
-	return interp.Run(ctx.Context, t.Dir, t.Module, interp.OptionModuleDir(t.ModuleDir))
+	return interp.Run(ctx.Context, uuid.Must(uuid.NewV4()).String(), t.Dir, t.Module, interp.OptionModuleDir(t.ModuleDir))
 }

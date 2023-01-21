@@ -3,6 +3,7 @@ package interp
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io/fs"
 	"log"
 	"os"
@@ -12,7 +13,8 @@ import (
 	"syscall"
 
 	"github.com/james-lawrence/eg/internal/envx"
-	"github.com/james-lawrence/eg/interp/runtime/wasi/ffiegmodule"
+	"github.com/james-lawrence/eg/internal/md5x"
+	"github.com/james-lawrence/eg/interp/runtime/wasi/ffiegcontainer"
 	"github.com/james-lawrence/eg/interp/runtime/wasi/ffiexec"
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
@@ -27,13 +29,12 @@ func OptionModuleDir(s string) Option {
 	}
 }
 
-func Run(ctx context.Context, dir string, module string, options ...Option) error {
+func Run(ctx context.Context, runid, dir string, module string, options ...Option) error {
 	var (
 		r = runner{
 			root:      dir,
 			moduledir: ".eg",
-			// builddir:  filepath.Join(".cache", "build"),
-			initonce: &sync.Once{},
+			initonce:  &sync.Once{},
 		}
 	)
 
@@ -41,7 +42,7 @@ func Run(ctx context.Context, dir string, module string, options ...Option) erro
 		opt(&r)
 	}
 
-	return r.perform(ctx, module)
+	return r.perform(ctx, runid, module)
 }
 
 type runner struct {
@@ -62,7 +63,7 @@ func (t runner) Open(name string) (fs.File, error) {
 	}
 }
 
-func (t runner) perform(ctx context.Context, path string) (err error) {
+func (t runner) perform(ctx context.Context, runid, path string) (err error) {
 	// Create a new WebAssembly Runtime.
 	runtime := wazero.NewRuntimeWithConfig(
 		ctx,
@@ -77,14 +78,27 @@ func (t runner) perform(ctx context.Context, path string) (err error) {
 	}
 	defer os.RemoveAll(tmpdir)
 
+	cmdenv := append(
+		os.Environ(),
+		fmt.Sprintf("CI=%s", envx.String("", "EG_CI", "CI")),
+		fmt.Sprintf("EG_CI=%s", envx.String("", "EG_CI", "CI")),
+		fmt.Sprintf("EG_RUNID=%s", runid),
+		fmt.Sprintf("EG_ROOT_DIRECTORY=%s", t.root),
+		fmt.Sprintf("EG_CACHE_DIRECTORY=%s", envx.String(cachedir, "EG_CACHE_DIRECTORY", "CACHE_DIRECTORY")),
+		fmt.Sprintf("EG_RUNTIME_DIRECTORY=%s", tmpdir),
+		fmt.Sprintf("RUNTIME_DIRECTORY=%s", tmpdir),
+	)
+
 	mcfg := wazero.NewModuleConfig().WithEnv(
 		"CI", envx.String("", "EG_CI", "CI"),
 	).WithEnv(
-		"EG_CI", os.Getenv("EG_CI"),
+		"EG_CI", envx.String("", "EG_CI", "CI"),
 	).WithEnv(
-		"EG_CACHE_DIRECTORY", envx.String(cachedir, "EG_CACHE_DIRECTORY", "CACHE_DIRECTORY"),
+		"EG_RUNID", runid,
 	).WithEnv(
 		"EG_ROOT_DIRECTORY", t.root,
+	).WithEnv(
+		"EG_CACHE_DIRECTORY", envx.String(cachedir, "EG_CACHE_DIRECTORY", "CACHE_DIRECTORY"),
 	).WithEnv(
 		"EG_RUNTIME_DIRECTORY", tmpdir,
 	).WithEnv(
@@ -106,12 +120,28 @@ func (t runner) perform(ctx context.Context, path string) (err error) {
 	defer wasienv.Close(ctx)
 
 	hostenv, err := runtime.NewHostModuleBuilder("env").
-		NewFunctionBuilder().WithFunc(ffiegmodule.Build(func(refs ...string) error {
-		return nil
-	})).Export("github.com/james-lawrence/eg/runtime/wasi/runtime/ffiegmodule.Build").
+		NewFunctionBuilder().WithFunc(ffiegcontainer.Build(func(ctx context.Context, name, definition string) (cmd *exec.Cmd, err error) {
+		cmd, err = ffiegcontainer.PodmanBuild(ctx, name, moduledir, definition)
+		cmd.Dir = t.root
+		cmd.Env = cmdenv
+		cmd.Stderr = os.Stderr
+		cmd.Stdout = os.Stdout
+		return cmd, err
+	})).Export("github.com/james-lawrence/eg/runtime/wasi/runtime/ffiegcontainer.Build").
+		NewFunctionBuilder().WithFunc(ffiegcontainer.Run(func(ctx context.Context, name, modulepath string) (err error) {
+		cmdctx := func(cmd *exec.Cmd) *exec.Cmd {
+			cmd.Dir = t.root
+			cmd.Env = cmdenv
+			cmd.Stderr = os.Stderr
+			cmd.Stdout = os.Stdout
+			return cmd
+		}
+		cname := fmt.Sprintf("%s.%s", name, md5x.DigestString(modulepath+runid))
+		return ffiegcontainer.PodmanRun(ctx, cmdctx, name, cname, t.root, t.moduledir, modulepath, "/home/james.lawrence/go/bin/eg")
+	})).Export("github.com/james-lawrence/eg/runtime/wasi/runtime/ffiegcontainer.Run").
 		NewFunctionBuilder().WithFunc(ffiexec.Exec(func(cmd *exec.Cmd) *exec.Cmd {
 		cmd.Dir = t.root
-		cmd.Env = os.Environ()
+		cmd.Env = cmdenv
 		cmd.Stderr = os.Stderr
 		cmd.Stdout = os.Stdout
 		return cmd

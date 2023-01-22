@@ -57,8 +57,8 @@ func ParseFormHandler(original http.Handler) http.Handler {
 	})
 }
 
-// RouteInvokedHandler wraps a http.Handler and emits route invocations.
-func RouteInvokedHandler(original http.Handler) http.Handler {
+// RouteInvoked wraps a http.Handler and emits route invocations.
+func RouteInvoked(original http.Handler) http.Handler {
 	return http.HandlerFunc(func(resp http.ResponseWriter, req *http.Request) {
 		p := req.Host + req.URL.Path
 		started := time.Now()
@@ -83,8 +83,8 @@ func RouteRateLimited(l *rate.Limiter) func(http.Handler) http.Handler {
 	}
 }
 
-// DumpRequestHandler dumps the request to STDERR.
-func DumpRequestHandler(original http.Handler) http.Handler {
+// Debug dumps the request to STDERR.
+func Debug(original http.Handler) http.Handler {
 	return http.HandlerFunc(func(resp http.ResponseWriter, req *http.Request) {
 		raw, err := httputil.DumpRequest(req, true)
 		if err != nil {

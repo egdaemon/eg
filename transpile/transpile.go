@@ -61,9 +61,8 @@ func (t golang) Run(ctx context.Context) (roots []Compiled, err error) {
 	}
 
 	var (
-		dst      string
-		pkg      *packages.Package
-		yakident = "yak"
+		dst string
+		pkg *packages.Package
 	)
 
 	pkgc := astcodec.DefaultPkgLoad(
@@ -75,15 +74,20 @@ func (t golang) Run(ctx context.Context) (roots []Compiled, err error) {
 		return roots, errors.Wrap(err, "unable to load package eg/ci")
 	}
 
-	if imp := astcodec.FindImport(pkg, astcodec.FindImportsByPath("github.com/james-lawrence/eg/runtime/wasi/yak")); imp != nil {
-		yakident = imp.Name.String()
-	}
-	refexpr := astbuild.SelExpr(yakident, "Ref")
-	refmodule := astbuild.SelExpr(yakident, "Module")
-
 	generatedmodules := make([]*module, 0, 128)
 
 	transform := func(ftoken *token.File, gendir string, c *ast.File) error {
+		var (
+			yakident = "yak"
+		)
+
+		if imp := astcodec.FindImport(c, astcodec.FindImportsByPath("github.com/james-lawrence/eg/runtime/wasi/yak")); imp != nil && imp.Name != nil {
+			yakident = imp.Name.String()
+		}
+
+		refexpr := astbuild.SelExpr(yakident, "Ref")
+		refmodule := astbuild.SelExpr(yakident, "Module")
+
 		// make a clone of the buffer
 		buf := bytes.NewBuffer(nil)
 		if err = printer.Fprint(buf, pkg.Fset, c); err != nil {

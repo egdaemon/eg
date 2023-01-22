@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"math/rand"
 	"sync"
 	"unsafe"
 
@@ -42,10 +43,10 @@ func (t runtimeref) ID() string {
 	return fmt.Sprintf("%x", t.ptr)
 }
 
-// Ref meta programming marking a task for delayed execution when rewriting the program at compilation time.
+// ref meta programming marking a task for delayed execution when rewriting the program at compilation time.
 // if executed directly will use the memory location of the function.
 // Important: this method acts as an instrumentation point by the runtime.
-func Ref(o op) Reference {
+func ref(o op) Reference {
 	addr := *(*uintptr)(unsafe.Pointer(&o))
 	return runtimeref{ptr: addr, do: o}
 }
@@ -81,7 +82,7 @@ func Perform(ctx context.Context, tasks ...task) error {
 func Sequential(operations ...op) task {
 	return fnTask(func(ctx context.Context) error {
 		for _, op := range operations {
-			if err := op(ctx, Ref(op)); err != nil {
+			if err := op(ctx, ref(op)); err != nil {
 				return err
 			}
 		}
@@ -89,17 +90,30 @@ func Sequential(operations ...op) task {
 	})
 }
 
+// Run operations in parallel.
+// WARNING: currently due to limitations within wasi runtimes
+// threading isn't supported. this makes parallelism impossible
+// natively within the runtime; however some operations like executing
+// modules can be done in parallel since they are manage on the host
+// and not inside the runtime. in the future when wasi environments
+// gain threading this will automatically begin running operations
+// in parallel natively. to prevent issues in the future we shuffle
+// operations to ensure callers are not implicitly relying on order.
 func Parallel(operations ...op) task {
 	return fnTask(func(ctx context.Context) (err error) {
 		errs := make(chan error, len(operations))
 		defer close(errs)
+
+		rand.Shuffle(len(operations), func(i, j int) {
+			operations[i], operations[j] = operations[j], operations[i]
+		})
 
 		for _, o := range operations {
 			go func(iop op) {
 				select {
 				case <-ctx.Done():
 					errs <- ctx.Err()
-				case errs <- iop(ctx, Ref(iop)):
+				case errs <- iop(ctx, ref(iop)):
 				}
 			}(o)
 		}

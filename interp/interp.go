@@ -2,6 +2,7 @@ package interp
 
 import (
 	"context"
+	"crypto/rand"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -82,7 +83,7 @@ func (t runner) perform(ctx context.Context, runid, path string) (err error) {
 		os.Environ(),
 		fmt.Sprintf("CI=%s", envx.String("", "EG_CI", "CI")),
 		fmt.Sprintf("EG_CI=%s", envx.String("", "EG_CI", "CI")),
-		fmt.Sprintf("EG_RUNID=%s", runid),
+		fmt.Sprintf("EG_RUN_ID=%s", runid),
 		fmt.Sprintf("EG_ROOT_DIRECTORY=%s", t.root),
 		fmt.Sprintf("EG_CACHE_DIRECTORY=%s", envx.String(cachedir, "EG_CACHE_DIRECTORY", "CACHE_DIRECTORY")),
 		fmt.Sprintf("EG_RUNTIME_DIRECTORY=%s", tmpdir),
@@ -94,7 +95,7 @@ func (t runner) perform(ctx context.Context, runid, path string) (err error) {
 	).WithEnv(
 		"EG_CI", envx.String("", "EG_CI", "CI"),
 	).WithEnv(
-		"EG_RUNID", runid,
+		"EG_RUN_ID", runid,
 	).WithEnv(
 		"EG_ROOT_DIRECTORY", t.root,
 	).WithEnv(
@@ -109,7 +110,7 @@ func (t runner) perform(ctx context.Context, runid, path string) (err error) {
 		os.Stdout,
 	).WithFS(
 		os.DirFS("."),
-	).WithSysNanotime().WithSysWalltime()
+	).WithSysNanotime().WithSysWalltime().WithRandSource(rand.Reader)
 
 	ns1 := runtime.NewNamespace(ctx)
 

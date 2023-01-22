@@ -1,0 +1,10 @@
+syntax = "proto3";
+
+package ci;
+
+message RegisterRequest {
+  string id = 1 [ json_name = "id" ];
+  repeated string labels = 2 [ json_name = "labels" ];
+}
+
+message RegisterResponse {}

@@ -2,41 +2,17 @@ package sshx
 
 import (
 	"bytes"
-	"crypto/rsa"
-	"crypto/sha256"
+	"crypto/ed25519"
+	"crypto/rand"
 	"crypto/x509"
-	"encoding/hex"
 	"encoding/pem"
+	"fmt"
+	"io"
+	"os"
 	"strings"
 
 	"golang.org/x/crypto/ssh"
 )
-
-func FingerprintSHA256(d []byte) string {
-	digest := sha256.Sum256(d)
-	return hex.EncodeToString(digest[:])
-}
-
-// PublicKey returns a public key from the pem encoded private key.
-func PublicKey(pemkey []byte) (pub []byte, err error) {
-	var (
-		pkey   *rsa.PrivateKey
-		pubkey ssh.PublicKey
-	)
-
-	blk, _ := pem.Decode(pemkey) // assumes a single valid pem encoded key.
-
-	if pkey, err = x509.ParsePKCS1PrivateKey(blk.Bytes); err != nil {
-		return pub, err
-	}
-
-	// log.Println("PUBKEY", spew.Sdump(pkey.N), spew.Sdump(pkey.PublicKey))
-	if pubkey, err = ssh.NewPublicKey(&pkey.PublicKey); err != nil {
-		return pub, err
-	}
-
-	return ssh.MarshalAuthorizedKey(pubkey), nil
-}
 
 // IsNoKeyFound check if ssh key is not found.
 func IsNoKeyFound(err error) bool {
@@ -51,4 +27,100 @@ func Comment(encoded []byte, comment string) []byte {
 
 	comment = " " + comment + "\r\n"
 	return append(bytes.TrimSpace(encoded), []byte(comment)...)
+}
+
+type option func(*KeyGen)
+
+func OptionKeyGenRand(src io.Reader) option {
+	return func(kg *KeyGen) {
+		kg.src = src
+	}
+}
+
+func NewKeyGen(options ...option) *KeyGen {
+	kg := KeyGen{
+		src: rand.Reader,
+	}
+
+	for _, opt := range options {
+		opt(&kg)
+	}
+
+	return &kg
+}
+
+type KeyGen struct {
+	src io.Reader
+}
+
+func (t KeyGen) Generate() (epriv, epub []byte, err error) {
+	var (
+		priv   ed25519.PrivateKey
+		pub    ed25519.PublicKey
+		pubkey ssh.PublicKey
+		mpriv  []byte
+	)
+
+	if pub, priv, err = ed25519.GenerateKey(rand.Reader); err != nil {
+		return nil, nil, err
+	}
+
+	if pubkey, err = ssh.NewPublicKey(pub); err != nil {
+		return nil, nil, err
+	}
+
+	if mpriv, err = x509.MarshalPKCS8PrivateKey(priv); err != nil {
+		return nil, nil, err
+	}
+
+	pemKey := &pem.Block{
+		Type:  "PRIVATE KEY",
+		Bytes: mpriv,
+	}
+
+	return pem.EncodeToMemory(pemKey), ssh.MarshalAuthorizedKey(pubkey), nil
+}
+
+type keygen interface {
+	Generate() (epriv, epub []byte, err error)
+}
+
+func loadcached(path string) (s ssh.Signer, err error) {
+	var (
+		privencoded []byte
+	)
+
+	if privencoded, err = os.ReadFile(path); err != nil {
+		return nil, err
+	}
+
+	return ssh.ParsePrivateKey(privencoded)
+}
+
+func AutoCached(kg keygen, path string) (s ssh.Signer, err error) {
+	var (
+		privencoded, pubencoded []byte
+	)
+
+	if s, err = loadcached(path); err == nil {
+		return s, nil
+	}
+
+	if privencoded, pubencoded, err = kg.Generate(); err != nil {
+		return nil, err
+	}
+
+	if s, err = ssh.ParsePrivateKey(privencoded); err != nil {
+		return nil, err
+	}
+
+	if err = os.WriteFile(path, privencoded, 0600); err != nil {
+		return nil, err
+	}
+
+	if err = os.WriteFile(fmt.Sprintf("%s.pub", path), pubencoded, 0600); err != nil {
+		return nil, err
+	}
+
+	return s, err
 }

@@ -5,6 +5,8 @@ import (
 	"log"
 	"net"
 	"os"
+	"os/user"
+	"path/filepath"
 	"reflect"
 	"sync"
 	"syscall"
@@ -14,7 +16,10 @@ import (
 	"github.com/james-lawrence/eg/cmd/cmdopts"
 	"github.com/james-lawrence/eg/internal/contextx"
 	"github.com/james-lawrence/eg/internal/debugx"
+	"github.com/james-lawrence/eg/internal/envx"
+	"github.com/james-lawrence/eg/internal/fsx"
 	"github.com/james-lawrence/eg/internal/osx"
+	"github.com/james-lawrence/eg/internal/userx"
 	"github.com/willabides/kongplete"
 )
 
@@ -24,12 +29,18 @@ func main() {
 		Version            cmdopts.Version              `cmd:"" help:"display versioning information"`
 		Interp             runner                       `cmd:"" help:"execute the interpreter on the given directory"`
 		Module             module                       `cmd:"" help:"executes a compiled module directly" hidden:"true"`
+		Daemon             daemon                       `cmd:"" help:"run in daemon mode letting the control plane push jobs to the local machine" hidden:"true"`
 		InstallCompletions kongplete.InstallCompletions `cmd:"" help:"install shell completions"`
 	}
 
 	var (
-		err error
-		ctx *kong.Context
+		err          error
+		ctx          *kong.Context
+		autorootuser = user.User{
+			Gid:     "0",
+			Uid:     "0",
+			HomeDir: "/root",
+		}
 	)
 
 	shellcli.Cleanup = &sync.WaitGroup{}
@@ -42,12 +53,17 @@ func main() {
 		log.Println("waiting for systems to shutdown")
 	}, os.Kill, os.Interrupt)
 
+	user := userx.CurrentUserOrDefault(autorootuser)
+
 	parser := kong.Must(
 		&shellcli,
 		kong.Name("eg"),
 		kong.Description("cli for eg"),
 		kong.Vars{
-			"vars_cwd": osx.Getwd("."),
+			"vars_cwd":             osx.Getwd("."),
+			"vars_cache_directory": envx.String(os.TempDir(), "CACHE_DIRECTORY", "XDG_CACHE_HOME"),
+			"vars_account_id":      envx.String("", "EG_ACCOUNT"),
+			"vars_ssh_key_path":    fsx.LocateFirstInDir(filepath.Join(user.HomeDir, ".ssh"), "id_ed25519", "id"),
 		},
 		kong.UsageOnError(),
 		kong.Bind(&shellcli.Global),

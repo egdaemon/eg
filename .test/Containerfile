@@ -10,4 +10,7 @@ RUN apt install -y --no-install-recommends curl gnupg2 software-properties-commo
 RUN apt install -y --no-install-recommends libpq5 postgresql-14 postgresql-client-14 postgresql-contrib-14 postgresql-client-common
 RUN apt install -y --no-install-recommends ssh
 
+RUN apt install -y --no-install-recommends podman uidmap dbus-user-session
+RUN usermod --add-subuids 100000-200000 --add-subgids 100000-200000 root
+
 RUN systemctl enable postgresql ssh

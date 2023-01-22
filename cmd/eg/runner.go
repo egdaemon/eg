@@ -32,7 +32,7 @@ func (t runner) Run(ctx *cmdopts.Global) (err error) {
 		return err
 	}
 
-	log.Println("cacheid", ws.CachedID, "roots", roots)
+	log.Println("cacheid", ws.CachedID)
 
 	modules := make([]transpile.Compiled, 0, len(roots))
 

@@ -139,31 +139,34 @@ func SearchDecls(pkg *packages.Package, filters ...func(ast.Decl) bool) (fn []as
 	return fn
 }
 
-func SearchImports(pkg *packages.Package, filters ...func(*ast.ImportSpec) bool) (fn []*ast.ImportSpec) {
+func SearchPackageImports(pkg *packages.Package, filters ...func(*ast.ImportSpec) bool) (fn []*ast.ImportSpec) {
 	for _, gf := range pkg.Syntax {
-		for _, d := range gf.Decls {
-			x := &findimports{}
-			ast.Walk(x, d)
-
-			for _, s := range x.found {
-				for _, f := range filters {
-					if !f(s) {
-						continue
-					}
-				}
-
-				fn = append(fn, s)
-			}
-
-			return fn
-		}
+		fn = append(fn, SearchImports(gf, filters...)...)
 	}
 
 	return fn
 }
 
-func FindImport(pkg *packages.Package, filters ...func(*ast.ImportSpec) bool) *ast.ImportSpec {
-	found := SearchImports(pkg, filters...)
+func SearchImports(root ast.Node, filters ...func(*ast.ImportSpec) bool) (fn []*ast.ImportSpec) {
+	x := &findimports{}
+
+	ast.Walk(x, root)
+
+	for _, s := range x.found {
+		for _, f := range filters {
+			if !f(s) {
+				continue
+			}
+		}
+
+		fn = append(fn, s)
+	}
+
+	return fn
+}
+
+func FindImport(root ast.Node, filters ...func(*ast.ImportSpec) bool) *ast.ImportSpec {
+	found := SearchImports(root, filters...)
 	for _, i := range found {
 		for _, f := range filters {
 			if f(i) {

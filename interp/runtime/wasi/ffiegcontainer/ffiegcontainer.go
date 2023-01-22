@@ -131,7 +131,7 @@ func PodmanRun(ctx context.Context, cmdctx func(*exec.Cmd) *exec.Cmd, image, cna
 		"--volume", fmt.Sprintf("%s:/opt/eg:O", rootdir),
 		"--env", "CI",
 		"--env", "EG_CI",
-		"--env", "EG_RUNID",
+		"--env", "EG_RUN_ID",
 		image,
 		"/usr/sbin/init",
 	)

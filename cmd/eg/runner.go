@@ -3,12 +3,14 @@ package main
 import (
 	"log"
 	"os"
+	"os/exec"
 	"path/filepath"
 
 	"github.com/gofrs/uuid"
 	"github.com/james-lawrence/eg/cmd/cmdopts"
 	"github.com/james-lawrence/eg/compile"
 	"github.com/james-lawrence/eg/interp"
+	"github.com/james-lawrence/eg/interp/runtime/wasi/ffiegcontainer"
 	"github.com/james-lawrence/eg/transpile"
 	"github.com/james-lawrence/eg/workspaces"
 )
@@ -56,6 +58,17 @@ func (t runner) Run(ctx *cmdopts.Global) (err error) {
 		}
 
 		if err = compile.Run(ctx.Context, root.Path, path); err != nil {
+			return err
+		}
+	}
+
+	{
+		var cmd *exec.Cmd
+		if cmd, err = ffiegcontainer.PodmanBuild(ctx.Context, "ubuntu:jammy", t.Dir, ""); err != nil {
+			return err
+		}
+
+		if err = cmd.Run(); err != nil {
 			return err
 		}
 	}

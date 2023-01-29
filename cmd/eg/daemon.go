@@ -47,7 +47,9 @@ func (t daemon) Run(ctx *cmdopts.Global) (err error) {
 		},
 	}
 
-	// TODO: if err = daemons.Register(ctx, config); err != nil { return err }
+	if err = daemons.Register(ctx, t.AccountID, signer.PublicKey()); err != nil {
+		return err
+	}
 
 	if httpl, err = daemons.HTTP(ctx); err != nil {
 		return err

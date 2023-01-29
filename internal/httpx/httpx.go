@@ -214,6 +214,18 @@ func ErrorCode(resp *http.Response) error {
 	return Error{Code: resp.StatusCode, cause: errors.New(resp.Status)}
 }
 
+func AsError(r *http.Response, err error) (*http.Response, error) {
+	if err != nil {
+		return r, err
+	}
+
+	if r.StatusCode >= 400 {
+		return r, &Error{Code: r.StatusCode, cause: errors.New(r.Status)}
+	}
+
+	return r, nil
+}
+
 // Error ...
 type Error struct {
 	Code  int

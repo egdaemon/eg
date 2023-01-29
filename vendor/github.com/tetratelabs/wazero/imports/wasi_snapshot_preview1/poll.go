@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/tetratelabs/wazero/api"
-	internalsys "github.com/tetratelabs/wazero/internal/sys"
 	. "github.com/tetratelabs/wazero/internal/wasi_snapshot_preview1"
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
@@ -133,11 +132,9 @@ func processFDEvent(mod api.Module, eventType byte, inBuf []byte) Errno {
 	// Choose the best error, which falls back to unsupported, until we support
 	// files.
 	errno := ErrnoNotsup
-	if eventType == EventTypeFdRead {
-		if _, ok := fsc.LookupFile(fd); !ok {
-			errno = ErrnoBadf
-		}
-	} else if eventType == EventTypeFdWrite && internalsys.WriterForFile(fsc, fd) == nil {
+	if eventType == EventTypeFdRead && fsc.FdReader(fd) == nil {
+		errno = ErrnoBadf
+	} else if eventType == EventTypeFdWrite && fsc.FdWriter(fd) == nil {
 		errno = ErrnoBadf
 	}
 

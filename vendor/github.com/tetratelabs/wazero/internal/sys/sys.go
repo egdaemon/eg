@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/tetratelabs/wazero/internal/platform"
-	"github.com/tetratelabs/wazero/internal/syscallfs"
 	"github.com/tetratelabs/wazero/sys"
 )
 
@@ -182,9 +181,9 @@ func NewContext(
 	}
 
 	if fs != nil {
-		sysCtx.fsc, err = NewFSContext(stdin, stdout, stderr, syscallfs.Adapt(fs))
+		sysCtx.fsc, err = NewFSContext(stdin, stdout, stderr, fs)
 	} else {
-		sysCtx.fsc, err = NewFSContext(stdin, stdout, stderr, syscallfs.EmptyFS)
+		sysCtx.fsc, err = NewFSContext(stdin, stdout, stderr, EmptyFS)
 	}
 
 	return

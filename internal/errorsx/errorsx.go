@@ -129,3 +129,25 @@ func (t userfriendly) Unwrap() error {
 func (t userfriendly) Cause() error {
 	return t.error
 }
+
+// Mark an error as temporary
+func NewTemporary(err error) error {
+	return Temporary{
+		error: err,
+	}
+}
+
+type Temporary struct {
+	error
+}
+
+func (t Temporary) Temporary() bool {
+	return true
+}
+
+func (t Temporary) Unwrap() error {
+	return t.error
+}
+func (t Temporary) Cause() error {
+	return t.error
+}

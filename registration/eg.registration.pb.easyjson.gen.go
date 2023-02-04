@@ -17,66 +17,7 @@ var (
 	_ easyjson.Marshaler
 )
 
-func easyjsonDabade4DecodeGithubComJamesLawrenceEgRegistration(in *jlexer.Lexer, out *RegisterResponse) {
-	isTopLevel := in.IsStart()
-	if in.IsNull() {
-		if isTopLevel {
-			in.Consumed()
-		}
-		in.Skip()
-		return
-	}
-	in.Delim('{')
-	for !in.IsDelim('}') {
-		key := in.UnsafeFieldName(false)
-		in.WantColon()
-		if in.IsNull() {
-			in.Skip()
-			in.WantComma()
-			continue
-		}
-		switch key {
-		default:
-			in.SkipRecursive()
-		}
-		in.WantComma()
-	}
-	in.Delim('}')
-	if isTopLevel {
-		in.Consumed()
-	}
-}
-func easyjsonDabade4EncodeGithubComJamesLawrenceEgRegistration(out *jwriter.Writer, in RegisterResponse) {
-	out.RawByte('{')
-	first := true
-	_ = first
-	out.RawByte('}')
-}
-
-// MarshalJSON supports json.Marshaler interface
-func (v RegisterResponse) MarshalJSON() ([]byte, error) {
-	w := jwriter.Writer{}
-	easyjsonDabade4EncodeGithubComJamesLawrenceEgRegistration(&w, v)
-	return w.Buffer.BuildBytes(), w.Error
-}
-
-// MarshalEasyJSON supports easyjson.Marshaler interface
-func (v RegisterResponse) MarshalEasyJSON(w *jwriter.Writer) {
-	easyjsonDabade4EncodeGithubComJamesLawrenceEgRegistration(w, v)
-}
-
-// UnmarshalJSON supports json.Unmarshaler interface
-func (v *RegisterResponse) UnmarshalJSON(data []byte) error {
-	r := jlexer.Lexer{Data: data}
-	easyjsonDabade4DecodeGithubComJamesLawrenceEgRegistration(&r, v)
-	return r.Error()
-}
-
-// UnmarshalEasyJSON supports easyjson.Unmarshaler interface
-func (v *RegisterResponse) UnmarshalEasyJSON(l *jlexer.Lexer) {
-	easyjsonDabade4DecodeGithubComJamesLawrenceEgRegistration(l, v)
-}
-func easyjsonDabade4DecodeGithubComJamesLawrenceEgRegistration1(in *jlexer.Lexer, out *RegisterRequest) {
+func easyjsonDabade4DecodeGithubComJamesLawrenceEgRegistration(in *jlexer.Lexer, out *RegistrationResponse) {
 	isTopLevel := in.IsStart()
 	if in.IsNull() {
 		if isTopLevel {
@@ -130,7 +71,7 @@ func easyjsonDabade4DecodeGithubComJamesLawrenceEgRegistration1(in *jlexer.Lexer
 		in.Consumed()
 	}
 }
-func easyjsonDabade4EncodeGithubComJamesLawrenceEgRegistration1(out *jwriter.Writer, in RegisterRequest) {
+func easyjsonDabade4EncodeGithubComJamesLawrenceEgRegistration(out *jwriter.Writer, in RegistrationResponse) {
 	out.RawByte('{')
 	first := true
 	_ = first
@@ -163,25 +104,151 @@ func easyjsonDabade4EncodeGithubComJamesLawrenceEgRegistration1(out *jwriter.Wri
 }
 
 // MarshalJSON supports json.Marshaler interface
-func (v RegisterRequest) MarshalJSON() ([]byte, error) {
+func (v RegistrationResponse) MarshalJSON() ([]byte, error) {
+	w := jwriter.Writer{}
+	easyjsonDabade4EncodeGithubComJamesLawrenceEgRegistration(&w, v)
+	return w.Buffer.BuildBytes(), w.Error
+}
+
+// MarshalEasyJSON supports easyjson.Marshaler interface
+func (v RegistrationResponse) MarshalEasyJSON(w *jwriter.Writer) {
+	easyjsonDabade4EncodeGithubComJamesLawrenceEgRegistration(w, v)
+}
+
+// UnmarshalJSON supports json.Unmarshaler interface
+func (v *RegistrationResponse) UnmarshalJSON(data []byte) error {
+	r := jlexer.Lexer{Data: data}
+	easyjsonDabade4DecodeGithubComJamesLawrenceEgRegistration(&r, v)
+	return r.Error()
+}
+
+// UnmarshalEasyJSON supports easyjson.Unmarshaler interface
+func (v *RegistrationResponse) UnmarshalEasyJSON(l *jlexer.Lexer) {
+	easyjsonDabade4DecodeGithubComJamesLawrenceEgRegistration(l, v)
+}
+func easyjsonDabade4DecodeGithubComJamesLawrenceEgRegistration1(in *jlexer.Lexer, out *RegistrationRequest) {
+	isTopLevel := in.IsStart()
+	if in.IsNull() {
+		if isTopLevel {
+			in.Consumed()
+		}
+		in.Skip()
+		return
+	}
+	in.Delim('{')
+	for !in.IsDelim('}') {
+		key := in.UnsafeFieldName(false)
+		in.WantColon()
+		if in.IsNull() {
+			in.Skip()
+			in.WantComma()
+			continue
+		}
+		switch key {
+		case "id":
+			out.Id = string(in.String())
+		case "labels":
+			if in.IsNull() {
+				in.Skip()
+				out.Labels = nil
+			} else {
+				in.Delim('[')
+				if out.Labels == nil {
+					if !in.IsDelim(']') {
+						out.Labels = make([]string, 0, 4)
+					} else {
+						out.Labels = []string{}
+					}
+				} else {
+					out.Labels = (out.Labels)[:0]
+				}
+				for !in.IsDelim(']') {
+					var v4 string
+					v4 = string(in.String())
+					out.Labels = append(out.Labels, v4)
+					in.WantComma()
+				}
+				in.Delim(']')
+			}
+		case "publickey":
+			if in.IsNull() {
+				in.Skip()
+				out.Publickey = nil
+			} else {
+				out.Publickey = in.Bytes()
+			}
+		default:
+			in.SkipRecursive()
+		}
+		in.WantComma()
+	}
+	in.Delim('}')
+	if isTopLevel {
+		in.Consumed()
+	}
+}
+func easyjsonDabade4EncodeGithubComJamesLawrenceEgRegistration1(out *jwriter.Writer, in RegistrationRequest) {
+	out.RawByte('{')
+	first := true
+	_ = first
+	if in.Id != "" {
+		const prefix string = ",\"id\":"
+		first = false
+		out.RawString(prefix[1:])
+		out.String(string(in.Id))
+	}
+	if len(in.Labels) != 0 {
+		const prefix string = ",\"labels\":"
+		if first {
+			first = false
+			out.RawString(prefix[1:])
+		} else {
+			out.RawString(prefix)
+		}
+		{
+			out.RawByte('[')
+			for v6, v7 := range in.Labels {
+				if v6 > 0 {
+					out.RawByte(',')
+				}
+				out.String(string(v7))
+			}
+			out.RawByte(']')
+		}
+	}
+	if len(in.Publickey) != 0 {
+		const prefix string = ",\"publickey\":"
+		if first {
+			first = false
+			out.RawString(prefix[1:])
+		} else {
+			out.RawString(prefix)
+		}
+		out.Base64Bytes(in.Publickey)
+	}
+	out.RawByte('}')
+}
+
+// MarshalJSON supports json.Marshaler interface
+func (v RegistrationRequest) MarshalJSON() ([]byte, error) {
 	w := jwriter.Writer{}
 	easyjsonDabade4EncodeGithubComJamesLawrenceEgRegistration1(&w, v)
 	return w.Buffer.BuildBytes(), w.Error
 }
 
 // MarshalEasyJSON supports easyjson.Marshaler interface
-func (v RegisterRequest) MarshalEasyJSON(w *jwriter.Writer) {
+func (v RegistrationRequest) MarshalEasyJSON(w *jwriter.Writer) {
 	easyjsonDabade4EncodeGithubComJamesLawrenceEgRegistration1(w, v)
 }
 
 // UnmarshalJSON supports json.Unmarshaler interface
-func (v *RegisterRequest) UnmarshalJSON(data []byte) error {
+func (v *RegistrationRequest) UnmarshalJSON(data []byte) error {
 	r := jlexer.Lexer{Data: data}
 	easyjsonDabade4DecodeGithubComJamesLawrenceEgRegistration1(&r, v)
 	return r.Error()
 }
 
 // UnmarshalEasyJSON supports easyjson.Unmarshaler interface
-func (v *RegisterRequest) UnmarshalEasyJSON(l *jlexer.Lexer) {
+func (v *RegistrationRequest) UnmarshalEasyJSON(l *jlexer.Lexer) {
 	easyjsonDabade4DecodeGithubComJamesLawrenceEgRegistration1(l, v)
 }

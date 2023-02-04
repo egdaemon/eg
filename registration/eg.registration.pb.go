@@ -20,17 +20,18 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-type RegisterRequest struct {
+type RegistrationRequest struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	Id     string   `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	Labels []string `protobuf:"bytes,2,rep,name=labels,proto3" json:"labels,omitempty"`
+	Id        string   `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Labels    []string `protobuf:"bytes,2,rep,name=labels,proto3" json:"labels,omitempty"`
+	Publickey []byte   `protobuf:"bytes,3,opt,name=publickey,json=pkey,proto3" json:"publickey,omitempty"`
 }
 
-func (x *RegisterRequest) Reset() {
-	*x = RegisterRequest{}
+func (x *RegistrationRequest) Reset() {
+	*x = RegistrationRequest{}
 	if protoimpl.UnsafeEnabled {
 		mi := &file_eg_registration_proto_msgTypes[0]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -38,13 +39,13 @@ func (x *RegisterRequest) Reset() {
 	}
 }
 
-func (x *RegisterRequest) String() string {
+func (x *RegistrationRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*RegisterRequest) ProtoMessage() {}
+func (*RegistrationRequest) ProtoMessage() {}
 
-func (x *RegisterRequest) ProtoReflect() protoreflect.Message {
+func (x *RegistrationRequest) ProtoReflect() protoreflect.Message {
 	mi := &file_eg_registration_proto_msgTypes[0]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -56,33 +57,43 @@ func (x *RegisterRequest) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use RegisterRequest.ProtoReflect.Descriptor instead.
-func (*RegisterRequest) Descriptor() ([]byte, []int) {
+// Deprecated: Use RegistrationRequest.ProtoReflect.Descriptor instead.
+func (*RegistrationRequest) Descriptor() ([]byte, []int) {
 	return file_eg_registration_proto_rawDescGZIP(), []int{0}
 }
 
-func (x *RegisterRequest) GetId() string {
+func (x *RegistrationRequest) GetId() string {
 	if x != nil {
 		return x.Id
 	}
 	return ""
 }
 
-func (x *RegisterRequest) GetLabels() []string {
+func (x *RegistrationRequest) GetLabels() []string {
 	if x != nil {
 		return x.Labels
 	}
 	return nil
 }
 
-type RegisterResponse struct {
+func (x *RegistrationRequest) GetPublickey() []byte {
+	if x != nil {
+		return x.Publickey
+	}
+	return nil
+}
+
+type RegistrationResponse struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
+
+	Id     string   `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Labels []string `protobuf:"bytes,2,rep,name=labels,proto3" json:"labels,omitempty"`
 }
 
-func (x *RegisterResponse) Reset() {
-	*x = RegisterResponse{}
+func (x *RegistrationResponse) Reset() {
+	*x = RegistrationResponse{}
 	if protoimpl.UnsafeEnabled {
 		mi := &file_eg_registration_proto_msgTypes[1]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -90,13 +101,13 @@ func (x *RegisterResponse) Reset() {
 	}
 }
 
-func (x *RegisterResponse) String() string {
+func (x *RegistrationResponse) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*RegisterResponse) ProtoMessage() {}
+func (*RegistrationResponse) ProtoMessage() {}
 
-func (x *RegisterResponse) ProtoReflect() protoreflect.Message {
+func (x *RegistrationResponse) ProtoReflect() protoreflect.Message {
 	mi := &file_eg_registration_proto_msgTypes[1]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -108,22 +119,40 @@ func (x *RegisterResponse) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use RegisterResponse.ProtoReflect.Descriptor instead.
-func (*RegisterResponse) Descriptor() ([]byte, []int) {
+// Deprecated: Use RegistrationResponse.ProtoReflect.Descriptor instead.
+func (*RegistrationResponse) Descriptor() ([]byte, []int) {
 	return file_eg_registration_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *RegistrationResponse) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *RegistrationResponse) GetLabels() []string {
+	if x != nil {
+		return x.Labels
+	}
+	return nil
 }
 
 var File_eg_registration_proto protoreflect.FileDescriptor
 
 var file_eg_registration_proto_rawDesc = []byte{
 	0x0a, 0x15, 0x65, 0x67, 0x2e, 0x72, 0x65, 0x67, 0x69, 0x73, 0x74, 0x72, 0x61, 0x74, 0x69, 0x6f,
-	0x6e, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x12, 0x02, 0x63, 0x69, 0x22, 0x39, 0x0a, 0x0f, 0x52,
-	0x65, 0x67, 0x69, 0x73, 0x74, 0x65, 0x72, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x12, 0x0e,
-	0x0a, 0x02, 0x69, 0x64, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x02, 0x69, 0x64, 0x12, 0x16,
-	0x0a, 0x06, 0x6c, 0x61, 0x62, 0x65, 0x6c, 0x73, 0x18, 0x02, 0x20, 0x03, 0x28, 0x09, 0x52, 0x06,
-	0x6c, 0x61, 0x62, 0x65, 0x6c, 0x73, 0x22, 0x12, 0x0a, 0x10, 0x52, 0x65, 0x67, 0x69, 0x73, 0x74,
-	0x65, 0x72, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74,
-	0x6f, 0x33,
+	0x6e, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x12, 0x02, 0x63, 0x69, 0x22, 0x56, 0x0a, 0x13, 0x52,
+	0x65, 0x67, 0x69, 0x73, 0x74, 0x72, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x52, 0x65, 0x71, 0x75, 0x65,
+	0x73, 0x74, 0x12, 0x0e, 0x0a, 0x02, 0x69, 0x64, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x02,
+	0x69, 0x64, 0x12, 0x16, 0x0a, 0x06, 0x6c, 0x61, 0x62, 0x65, 0x6c, 0x73, 0x18, 0x02, 0x20, 0x03,
+	0x28, 0x09, 0x52, 0x06, 0x6c, 0x61, 0x62, 0x65, 0x6c, 0x73, 0x12, 0x17, 0x0a, 0x09, 0x70, 0x75,
+	0x62, 0x6c, 0x69, 0x63, 0x6b, 0x65, 0x79, 0x18, 0x03, 0x20, 0x01, 0x28, 0x0c, 0x52, 0x04, 0x70,
+	0x6b, 0x65, 0x79, 0x22, 0x3e, 0x0a, 0x14, 0x52, 0x65, 0x67, 0x69, 0x73, 0x74, 0x72, 0x61, 0x74,
+	0x69, 0x6f, 0x6e, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x12, 0x0e, 0x0a, 0x02, 0x69,
+	0x64, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x02, 0x69, 0x64, 0x12, 0x16, 0x0a, 0x06, 0x6c,
+	0x61, 0x62, 0x65, 0x6c, 0x73, 0x18, 0x02, 0x20, 0x03, 0x28, 0x09, 0x52, 0x06, 0x6c, 0x61, 0x62,
+	0x65, 0x6c, 0x73, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
 }
 
 var (
@@ -140,8 +169,8 @@ func file_eg_registration_proto_rawDescGZIP() []byte {
 
 var file_eg_registration_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
 var file_eg_registration_proto_goTypes = []interface{}{
-	(*RegisterRequest)(nil),  // 0: ci.RegisterRequest
-	(*RegisterResponse)(nil), // 1: ci.RegisterResponse
+	(*RegistrationRequest)(nil),  // 0: ci.RegistrationRequest
+	(*RegistrationResponse)(nil), // 1: ci.RegistrationResponse
 }
 var file_eg_registration_proto_depIdxs = []int32{
 	0, // [0:0] is the sub-list for method output_type
@@ -158,7 +187,7 @@ func file_eg_registration_proto_init() {
 	}
 	if !protoimpl.UnsafeEnabled {
 		file_eg_registration_proto_msgTypes[0].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*RegisterRequest); i {
+			switch v := v.(*RegistrationRequest); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -170,7 +199,7 @@ func file_eg_registration_proto_init() {
 			}
 		}
 		file_eg_registration_proto_msgTypes[1].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*RegisterResponse); i {
+			switch v := v.(*RegistrationResponse); i {
 			case 0:
 				return &v.state
 			case 1:

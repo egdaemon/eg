@@ -4,6 +4,9 @@ github.com/alecthomas/kong
 # github.com/dave/jennifer v1.6.0
 ## explicit; go 1.19
 github.com/dave/jennifer/jen
+# github.com/davecgh/go-spew v1.1.1
+## explicit
+github.com/davecgh/go-spew/spew
 # github.com/go-logr/logr v1.2.3
 ## explicit; go 1.16
 github.com/go-logr/logr
@@ -11,6 +14,9 @@ github.com/go-logr/logr/funcr
 # github.com/gofrs/uuid v4.3.1+incompatible
 ## explicit
 github.com/gofrs/uuid
+# github.com/golang-jwt/jwt/v4 v4.4.3
+## explicit; go 1.16
+github.com/golang-jwt/jwt/v4
 # github.com/google/go-cmp v0.5.9
 ## explicit; go 1.13
 github.com/google/go-cmp/cmp

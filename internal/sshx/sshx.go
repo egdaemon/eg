@@ -11,6 +11,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/james-lawrence/eg/internal/cryptox"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -35,6 +36,14 @@ func OptionKeyGenRand(src io.Reader) option {
 	return func(kg *KeyGen) {
 		kg.src = src
 	}
+}
+
+func NewKeyGenSeeded(seed string) *KeyGen {
+	return NewKeyGen(OptionKeyGenRand(cryptox.NewPRNGSHA512([]byte(seed))))
+}
+
+func UnsafeNewKeyGen() *KeyGen {
+	return NewKeyGen(OptionKeyGenRand(cryptox.NewPRNGSHA512([]byte("unsafe"))))
 }
 
 func NewKeyGen(options ...option) *KeyGen {

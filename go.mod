@@ -1,9 +1,10 @@
 module github.com/james-lawrence/eg
 
-go 1.19
+go 1.20
 
 require (
 	github.com/alecthomas/kong v0.7.1
+	github.com/davecgh/go-spew v1.1.1
 	github.com/gorilla/websocket v1.5.0
 	github.com/logrusorgru/aurora v2.0.3+incompatible
 	github.com/mattn/go-isatty v0.0.17
@@ -35,6 +36,7 @@ require (
 	github.com/dave/jennifer v1.6.0
 	github.com/go-logr/logr v1.2.3 // indirect
 	github.com/gofrs/uuid v4.3.1+incompatible
+	github.com/golang-jwt/jwt/v4 v4.4.3
 	github.com/gorilla/mux v1.8.0
 	github.com/justinas/alice v1.2.0
 	github.com/mailru/easyjson v0.7.7

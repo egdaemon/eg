@@ -47,7 +47,7 @@ func (t daemon) Run(ctx *cmdopts.Global) (err error) {
 		},
 	}
 
-	if err = daemons.Register(ctx, t.AccountID, signer.PublicKey()); err != nil {
+	if err = daemons.Register(ctx, t.AccountID, signer); err != nil {
 		return err
 	}
 

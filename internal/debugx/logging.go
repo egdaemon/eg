@@ -1,3 +1,4 @@
+//go:build debug.enabled
 // +build debug.enabled
 
 package debugx

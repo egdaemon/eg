@@ -36,30 +36,15 @@ func easyjsonDabade4DecodeGithubComJamesLawrenceEgRegistration(in *jlexer.Lexer,
 			continue
 		}
 		switch key {
-		case "id":
-			out.Id = string(in.String())
-		case "labels":
+		case "registration":
 			if in.IsNull() {
 				in.Skip()
-				out.Labels = nil
+				out.Registration = nil
 			} else {
-				in.Delim('[')
-				if out.Labels == nil {
-					if !in.IsDelim(']') {
-						out.Labels = make([]string, 0, 4)
-					} else {
-						out.Labels = []string{}
-					}
-				} else {
-					out.Labels = (out.Labels)[:0]
+				if out.Registration == nil {
+					out.Registration = new(Registration)
 				}
-				for !in.IsDelim(']') {
-					var v1 string
-					v1 = string(in.String())
-					out.Labels = append(out.Labels, v1)
-					in.WantComma()
-				}
-				in.Delim(']')
+				(*out.Registration).UnmarshalEasyJSON(in)
 			}
 		default:
 			in.SkipRecursive()
@@ -75,30 +60,11 @@ func easyjsonDabade4EncodeGithubComJamesLawrenceEgRegistration(out *jwriter.Writ
 	out.RawByte('{')
 	first := true
 	_ = first
-	if in.Id != "" {
-		const prefix string = ",\"id\":"
+	if in.Registration != nil {
+		const prefix string = ",\"registration\":"
 		first = false
 		out.RawString(prefix[1:])
-		out.String(string(in.Id))
-	}
-	if len(in.Labels) != 0 {
-		const prefix string = ",\"labels\":"
-		if first {
-			first = false
-			out.RawString(prefix[1:])
-		} else {
-			out.RawString(prefix)
-		}
-		{
-			out.RawByte('[')
-			for v2, v3 := range in.Labels {
-				if v2 > 0 {
-					out.RawByte(',')
-				}
-				out.String(string(v3))
-			}
-			out.RawByte(']')
-		}
+		(*in.Registration).MarshalEasyJSON(out)
 	}
 	out.RawByte('}')
 }
@@ -145,37 +111,15 @@ func easyjsonDabade4DecodeGithubComJamesLawrenceEgRegistration1(in *jlexer.Lexer
 			continue
 		}
 		switch key {
-		case "id":
-			out.Id = string(in.String())
-		case "labels":
+		case "registration":
 			if in.IsNull() {
 				in.Skip()
-				out.Labels = nil
+				out.Registration = nil
 			} else {
-				in.Delim('[')
-				if out.Labels == nil {
-					if !in.IsDelim(']') {
-						out.Labels = make([]string, 0, 4)
-					} else {
-						out.Labels = []string{}
-					}
-				} else {
-					out.Labels = (out.Labels)[:0]
+				if out.Registration == nil {
+					out.Registration = new(Registration)
 				}
-				for !in.IsDelim(']') {
-					var v4 string
-					v4 = string(in.String())
-					out.Labels = append(out.Labels, v4)
-					in.WantComma()
-				}
-				in.Delim(']')
-			}
-		case "publickey":
-			if in.IsNull() {
-				in.Skip()
-				out.Publickey = nil
-			} else {
-				out.Publickey = in.Bytes()
+				(*out.Registration).UnmarshalEasyJSON(in)
 			}
 		default:
 			in.SkipRecursive()
@@ -191,40 +135,11 @@ func easyjsonDabade4EncodeGithubComJamesLawrenceEgRegistration1(out *jwriter.Wri
 	out.RawByte('{')
 	first := true
 	_ = first
-	if in.Id != "" {
-		const prefix string = ",\"id\":"
+	if in.Registration != nil {
+		const prefix string = ",\"registration\":"
 		first = false
 		out.RawString(prefix[1:])
-		out.String(string(in.Id))
-	}
-	if len(in.Labels) != 0 {
-		const prefix string = ",\"labels\":"
-		if first {
-			first = false
-			out.RawString(prefix[1:])
-		} else {
-			out.RawString(prefix)
-		}
-		{
-			out.RawByte('[')
-			for v6, v7 := range in.Labels {
-				if v6 > 0 {
-					out.RawByte(',')
-				}
-				out.String(string(v7))
-			}
-			out.RawByte(']')
-		}
-	}
-	if len(in.Publickey) != 0 {
-		const prefix string = ",\"publickey\":"
-		if first {
-			first = false
-			out.RawString(prefix[1:])
-		} else {
-			out.RawString(prefix)
-		}
-		out.Base64Bytes(in.Publickey)
+		(*in.Registration).MarshalEasyJSON(out)
 	}
 	out.RawByte('}')
 }
@@ -251,4 +166,154 @@ func (v *RegistrationRequest) UnmarshalJSON(data []byte) error {
 // UnmarshalEasyJSON supports easyjson.Unmarshaler interface
 func (v *RegistrationRequest) UnmarshalEasyJSON(l *jlexer.Lexer) {
 	easyjsonDabade4DecodeGithubComJamesLawrenceEgRegistration1(l, v)
+}
+func easyjsonDabade4DecodeGithubComJamesLawrenceEgRegistration2(in *jlexer.Lexer, out *Registration) {
+	isTopLevel := in.IsStart()
+	if in.IsNull() {
+		if isTopLevel {
+			in.Consumed()
+		}
+		in.Skip()
+		return
+	}
+	in.Delim('{')
+	for !in.IsDelim('}') {
+		key := in.UnsafeFieldName(false)
+		in.WantColon()
+		if in.IsNull() {
+			in.Skip()
+			in.WantComma()
+			continue
+		}
+		switch key {
+		case "id":
+			out.Id = string(in.String())
+		case "labels":
+			if in.IsNull() {
+				in.Skip()
+				out.Labels = nil
+			} else {
+				in.Delim('[')
+				if out.Labels == nil {
+					if !in.IsDelim(']') {
+						out.Labels = make([]string, 0, 4)
+					} else {
+						out.Labels = []string{}
+					}
+				} else {
+					out.Labels = (out.Labels)[:0]
+				}
+				for !in.IsDelim(']') {
+					var v1 string
+					v1 = string(in.String())
+					out.Labels = append(out.Labels, v1)
+					in.WantComma()
+				}
+				in.Delim(']')
+			}
+		case "publickey":
+			if in.IsNull() {
+				in.Skip()
+				out.Publickey = nil
+			} else {
+				out.Publickey = in.Bytes()
+			}
+		case "authzed_at":
+			out.AuthzedAt = string(in.String())
+		case "expires_at":
+			out.ExpiresAt = string(in.String())
+		default:
+			in.SkipRecursive()
+		}
+		in.WantComma()
+	}
+	in.Delim('}')
+	if isTopLevel {
+		in.Consumed()
+	}
+}
+func easyjsonDabade4EncodeGithubComJamesLawrenceEgRegistration2(out *jwriter.Writer, in Registration) {
+	out.RawByte('{')
+	first := true
+	_ = first
+	if in.Id != "" {
+		const prefix string = ",\"id\":"
+		first = false
+		out.RawString(prefix[1:])
+		out.String(string(in.Id))
+	}
+	if len(in.Labels) != 0 {
+		const prefix string = ",\"labels\":"
+		if first {
+			first = false
+			out.RawString(prefix[1:])
+		} else {
+			out.RawString(prefix)
+		}
+		{
+			out.RawByte('[')
+			for v3, v4 := range in.Labels {
+				if v3 > 0 {
+					out.RawByte(',')
+				}
+				out.String(string(v4))
+			}
+			out.RawByte(']')
+		}
+	}
+	if len(in.Publickey) != 0 {
+		const prefix string = ",\"publickey\":"
+		if first {
+			first = false
+			out.RawString(prefix[1:])
+		} else {
+			out.RawString(prefix)
+		}
+		out.Base64Bytes(in.Publickey)
+	}
+	if in.AuthzedAt != "" {
+		const prefix string = ",\"authzed_at\":"
+		if first {
+			first = false
+			out.RawString(prefix[1:])
+		} else {
+			out.RawString(prefix)
+		}
+		out.String(string(in.AuthzedAt))
+	}
+	if in.ExpiresAt != "" {
+		const prefix string = ",\"expires_at\":"
+		if first {
+			first = false
+			out.RawString(prefix[1:])
+		} else {
+			out.RawString(prefix)
+		}
+		out.String(string(in.ExpiresAt))
+	}
+	out.RawByte('}')
+}
+
+// MarshalJSON supports json.Marshaler interface
+func (v Registration) MarshalJSON() ([]byte, error) {
+	w := jwriter.Writer{}
+	easyjsonDabade4EncodeGithubComJamesLawrenceEgRegistration2(&w, v)
+	return w.Buffer.BuildBytes(), w.Error
+}
+
+// MarshalEasyJSON supports easyjson.Marshaler interface
+func (v Registration) MarshalEasyJSON(w *jwriter.Writer) {
+	easyjsonDabade4EncodeGithubComJamesLawrenceEgRegistration2(w, v)
+}
+
+// UnmarshalJSON supports json.Unmarshaler interface
+func (v *Registration) UnmarshalJSON(data []byte) error {
+	r := jlexer.Lexer{Data: data}
+	easyjsonDabade4DecodeGithubComJamesLawrenceEgRegistration2(&r, v)
+	return r.Error()
+}
+
+// UnmarshalEasyJSON supports easyjson.Unmarshaler interface
+func (v *Registration) UnmarshalEasyJSON(l *jlexer.Lexer) {
+	easyjsonDabade4DecodeGithubComJamesLawrenceEgRegistration2(l, v)
 }

@@ -9,7 +9,6 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/james-lawrence/eg/cmd/cmdopts"
-	"github.com/james-lawrence/eg/internal/errorsx"
 	"github.com/james-lawrence/eg/internal/jwtx"
 	"github.com/james-lawrence/eg/notary"
 	"github.com/james-lawrence/eg/registration"
@@ -50,25 +49,35 @@ func Register(global *cmdopts.Global, aid string, s ssh.Signer) (err error) {
 	r := rate.NewLimiter(rate.Every(5*time.Second), 1)
 
 	for err := r.Wait(global.Context); err == nil; err = r.Wait(global.Context) {
+		var (
+			authzedts time.Time
+		)
+
 		regreq := &registration.RegistrationRequest{
-			Id:        fingerprint,
-			Labels:    []string{"linux"},
-			Publickey: ssh.MarshalAuthorizedKey(s.PublicKey()),
+			Registration: &registration.Registration{
+				Id:        fingerprint,
+				Labels:    []string{"linux"},
+				Publickey: ssh.MarshalAuthorizedKey(s.PublicKey()),
+			},
 		}
 
 		reg, err := rc.Registration(global.Context, regreq)
-
-		if err == nil {
-			log.Println("registration accepted", spew.Sdump(reg))
-			return nil
-		}
-
-		switch err.(type) {
-		case errorsx.Temporary:
-			log.Println("waiting for registration to be authorized")
-		default:
+		if err != nil {
 			log.Println("registration failed", err)
+			continue
 		}
+
+		if authzedts, err = time.Parse(time.RFC3339Nano, reg.Registration.AuthzedAt); err != nil {
+			log.Println("unable to parse authzed timestamp", err)
+			continue
+		}
+
+		if authzedts.After(time.Now()) {
+			continue
+		}
+
+		log.Println("registration accepted", spew.Sdump(reg))
+		return nil
 	}
 
 	return nil

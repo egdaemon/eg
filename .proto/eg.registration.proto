@@ -1,14 +1,19 @@
 syntax = "proto3";
 
-package ci;
+package eg;
 
-message RegistrationRequest {
+message Registration {
   string id = 1 [ json_name = "id" ];
   repeated string labels = 2 [ json_name = "labels" ];
   bytes publickey = 3 [ json_name = "pkey" ];
+  string authzed_at = 4 [ json_name = " authzed_at" ];
+  string expires_at = 5 [ json_name = " expires_at" ];
+}
+
+message RegistrationRequest {
+  Registration registration = 1 [ json_name = "registration" ];
 }
 
 message RegistrationResponse {
-  string id = 1 [ json_name = "id" ];
-  repeated string labels = 2 [ json_name = "labels" ];
+  Registration registration = 1 [ json_name = "registration" ];
 }

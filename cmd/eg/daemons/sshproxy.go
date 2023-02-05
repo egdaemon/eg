@@ -18,7 +18,6 @@ func SSHProxy(global *cmdopts.Global, config *ssh.ClientConfig, signer ssh.Signe
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to listen for ssh connections")
 	}
-	defer conn.Close()
 
 	if proxyl, err = conn.Listen("tcp", "127.0.0.1:0"); err != nil {
 		return nil, errors.Wrap(err, "unable to listen for ssh connections")
@@ -31,6 +30,7 @@ func SSHProxy(global *cmdopts.Global, config *ssh.ClientConfig, signer ssh.Signe
 
 	global.Cleanup.Add(1)
 	go func() {
+		defer conn.Close()
 		defer global.Cleanup.Done()
 		defer global.Shutdown()
 

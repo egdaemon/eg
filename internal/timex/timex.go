@@ -5,6 +5,16 @@ import (
 	"time"
 )
 
+// Inf - positive infinity no time can be larger.
+// see https://stackoverflow.com/questions/25065055/what-is-the-maximum-time-time-in-go/32620397
+func Inf() time.Time {
+	return time.Unix(math.MaxInt64-62135596800, 999999999)
+}
+
+func NegInf() time.Time {
+	return time.Unix(math.MinInt64, math.MinInt64)
+}
+
 // Every executes the provided function every duration.
 func Every(d time.Duration, do func()) {
 	for range time.Tick(d) {
@@ -67,4 +77,64 @@ type Clock struct{}
 
 func (t Clock) Now() time.Time {
 	return time.Now()
+}
+
+// RFC3339NanoMax truncate to the maximum value for RFC3339.
+func RFC3339NanoMax(t time.Time) time.Time {
+	ts := RFC3339Inf()
+	if t.Before(ts) {
+		return t
+	}
+
+	return ts
+}
+
+// RFC3339NanoMin truncate to the minimum value for RFC3339.
+func RFC3339NanoMin(t time.Time) time.Time {
+	ts := RFC3339NegInf()
+	if t.After(ts) && !t.Equal(NegInf()) {
+		return t
+	}
+
+	return ts
+}
+
+// RFC3339NanoEncode truncate time to RFC3339NanoEncode
+func RFC3339NanoEncode(t time.Time) time.Time {
+	return RFC3339NanoMax(RFC3339NanoMin(t))
+}
+
+// RFC3339Nano truncate time to RFC3339Nano
+func RFC3339NanoDecode(t time.Time) time.Time {
+	return RFC3339NanoMaxDecode(RFC3339NanoMinDecode(t))
+}
+
+// RFC3339NanoMinDecode convert minimum value for RFC3339 to time.Time.
+func RFC3339NanoMinDecode(t time.Time) time.Time {
+	ts := RFC3339NegInf()
+	if t.After(ts) && !t.Equal(ts) {
+		return t
+	}
+
+	return NegInf()
+}
+
+// RFC3339NanoMaxDecode truncate to the maximum value for RFC3339.
+func RFC3339NanoMaxDecode(t time.Time) time.Time {
+	ts := RFC3339Inf()
+	if t.Before(ts) || !t.Equal(ts) {
+		return t
+	}
+
+	return Inf()
+}
+
+// RFC3339NegInf neg infinity representation
+func RFC3339NegInf() time.Time {
+	return time.Date(0000, 01, 1, 1, 1, 1, 0, time.UTC)
+}
+
+// RFC3339Inf  infinity representation
+func RFC3339Inf() time.Time {
+	return time.Date(9999, time.December, 31, 23, 59, 59, 999000000, time.UTC)
 }

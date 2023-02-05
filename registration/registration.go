@@ -4,13 +4,11 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net/http"
 
 	"github.com/james-lawrence/eg"
 	"github.com/james-lawrence/eg/internal/envx"
-	"github.com/james-lawrence/eg/internal/errorsx"
 	"github.com/james-lawrence/eg/internal/httpx"
 )
 
@@ -50,10 +48,10 @@ func (t RegistrationClient) Registration(ctx context.Context, req *RegistrationR
 	}
 	defer httpresp.Body.Close()
 
-	// accepted status means we've received the request but its not yet authorized.
-	if httpx.CheckStatusCode(httpresp.StatusCode, http.StatusAccepted) {
-		return nil, errorsx.NewTemporary(errors.New("registration not yet authorized"))
-	}
+	// // accepted status means we've received the request but its not yet authorized.
+	// if httpx.CheckStatusCode(httpresp.StatusCode, http.StatusAccepted) {
+	// 	return nil, errorsx.NewTemporary(errors.New("registration not yet authorized"))
+	// }
 
 	if err = json.NewDecoder(httpresp.Body).Decode(&resp); err != nil {
 		return nil, err

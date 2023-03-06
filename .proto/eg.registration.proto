@@ -10,10 +10,24 @@ message Registration {
   string expires_at = 5 [ json_name = " expires_at" ];
 }
 
+message RegistrationSearchRequest {}
+
+message RegistrationSearchResponse {
+  repeated Registration items = 1 [ json_name = "items" ];
+}
+
 message RegistrationRequest {
   Registration registration = 1 [ json_name = "registration" ];
 }
 
 message RegistrationResponse {
+  Registration registration = 1 [ json_name = "registration" ];
+}
+
+message RegistrationGrantRequest {
+  Registration registration = 1 [ json_name = "registration" ];
+}
+
+message RegistrationGrantResponse {
   Registration registration = 1 [ json_name = "registration" ];
 }

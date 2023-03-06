@@ -17,6 +17,11 @@ require (
 )
 
 require (
+	github.com/golang/protobuf v1.5.2 // indirect
+	google.golang.org/appengine v1.6.7 // indirect
+)
+
+require (
 	github.com/google/go-cmp v0.5.9 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/hashicorp/go-multierror v1.1.1 // indirect
@@ -24,9 +29,9 @@ require (
 	github.com/kr/text v0.2.0 // indirect
 	github.com/posener/complete v1.2.3 // indirect
 	github.com/riywo/loginshell v0.0.0-20200815045211-7d26008be1ab // indirect
-	golang.org/x/mod v0.7.0 // indirect
-	golang.org/x/net v0.5.0 // indirect
-	golang.org/x/text v0.6.0 // indirect
+	golang.org/x/mod v0.8.0 // indirect
+	golang.org/x/net v0.8.0 // indirect
+	golang.org/x/text v0.8.0 // indirect
 	google.golang.org/protobuf v1.28.1
 	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
@@ -42,6 +47,7 @@ require (
 	github.com/mailru/easyjson v0.7.7
 	github.com/stretchr/testify v1.8.1 // indirect
 	github.com/tetratelabs/wazero v1.0.0-pre.7
-	golang.org/x/sys v0.4.0 // indirect
-	golang.org/x/tools v0.5.0
+	golang.org/x/oauth2 v0.6.0
+	golang.org/x/sys v0.6.0 // indirect
+	golang.org/x/tools v0.6.0
 )

@@ -226,6 +226,14 @@ func AsError(r *http.Response, err error) (*http.Response, error) {
 	return r, nil
 }
 
+func AutoClose(r *http.Response) error {
+	if r == nil {
+		return nil
+	}
+
+	return r.Body.Close()
+}
+
 // Error ...
 type Error struct {
 	Code  int

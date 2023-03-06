@@ -57,7 +57,6 @@ func (t daemon) Run(ctx *cmdopts.Global) (err error) {
 	defer httpl.Close()
 
 	if sshproxy, err = daemons.SSHProxy(ctx, config, signer, httpl); err != nil {
-		log.Println("DERP", err)
 		return err
 	}
 	defer sshproxy.Close()

@@ -4,7 +4,6 @@ import (
 	"crypto/rand"
 	"fmt"
 	"io"
-	"log"
 	"os"
 
 	"github.com/golang-jwt/jwt/v4"
@@ -169,7 +168,6 @@ func (t jwtsigner) Sign(signingString string, key interface{}) (string, error) {
 	)
 
 	if s, ok = key.(ssh.Signer); !ok {
-		log.Printf("DERP %T\n", key)
 		return "", jwt.ErrInvalidKeyType
 	}
 

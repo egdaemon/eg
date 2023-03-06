@@ -36,6 +36,7 @@ func Register(global *cmdopts.Global, aid string, s ssh.Signer) (err error) {
 					jwtx.ClaimsOptionIssuer(aid),
 				),
 			).SignedString(s)
+
 			if err != nil {
 				return "", err
 			}
@@ -73,6 +74,7 @@ func Register(global *cmdopts.Global, aid string, s ssh.Signer) (err error) {
 		}
 
 		if authzedts.After(time.Now()) {
+			log.Println("derp")
 			continue
 		}
 

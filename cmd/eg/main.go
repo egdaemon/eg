@@ -30,6 +30,7 @@ func main() {
 		Interp             runner                       `cmd:"" help:"execute the interpreter on the given directory"`
 		Module             module                       `cmd:"" help:"executes a compiled module directly" hidden:"true"`
 		Daemon             daemon                       `cmd:"" help:"run in daemon mode letting the control plane push jobs to the local machine" hidden:"true"`
+		AgentManagement    actlcmd                      `cmd:"" name:"actl" help:"agent management commands"`
 		InstallCompletions kongplete.InstallCompletions `cmd:"" help:"install shell completions"`
 	}
 

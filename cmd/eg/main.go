@@ -20,6 +20,7 @@ import (
 	"github.com/james-lawrence/eg/internal/envx"
 	"github.com/james-lawrence/eg/internal/fsx"
 	"github.com/james-lawrence/eg/internal/osx"
+	"github.com/james-lawrence/eg/internal/stringsx"
 	"github.com/james-lawrence/eg/internal/userx"
 	"github.com/willabides/kongplete"
 )
@@ -67,6 +68,8 @@ func main() {
 			"vars_cache_directory": envx.String(os.TempDir(), "CACHE_DIRECTORY", "XDG_CACHE_HOME"),
 			"vars_account_id":      envx.String("", "EG_ACCOUNT"),
 			"vars_ssh_key_path":    fsx.LocateFirstInDir(filepath.Join(user.HomeDir, ".ssh"), "id_ed25519", "id"),
+			"vars_user_name":       stringsx.DefaultIfBlank(user.Name, user.Username),
+			"vars_user_username":   user.Username,
 		},
 		kong.UsageOnError(),
 		kong.Bind(&shellcli.Global),

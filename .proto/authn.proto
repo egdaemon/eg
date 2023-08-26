@@ -1,0 +1,30 @@
+syntax = "proto3";
+
+package authn;
+
+message Identity {
+  string id = 1 [ json_name = "id" ];
+  string display = 2 [ json_name = "display" ];
+  string email = 4 [ json_name = "email" ];
+  string uid = 7 [ json_name = "uid" ];
+  string uidraw = 8 [ json_name = "uidraw" ];
+}
+
+message Profile {
+  string id = 1 [ json_name = "id" ];
+  string account_id = 2 [ json_name = "account_id" ];
+  string display = 3 [ json_name = "display" ];
+  string email = 4 [ json_name = "email" ];
+}
+
+message Authn {
+  string token = 1 [ json_name = "token" ];
+  Profile profile = 2 [ json_name = "profile" ];
+}
+
+message Authed {
+  string signup_token = 1 [ json_name = "signup_token" ];
+  string redirect = 2 [ json_name = "redirect" ];
+  Identity identity = 3 [ json_name = "identity" ];
+  repeated Authn profiles = 4 [ json_name = "profiles" ];
+}

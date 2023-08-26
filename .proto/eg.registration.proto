@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package eg;
+package eg.actl;
 
 message Registration {
   string id = 1 [ json_name = "id" ];

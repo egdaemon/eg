@@ -14,6 +14,7 @@ import (
 	"github.com/alecthomas/kong"
 	"github.com/james-lawrence/eg/cmd/cmderrors"
 	"github.com/james-lawrence/eg/cmd/cmdopts"
+	"github.com/james-lawrence/eg/cmd/eg/accountcmds"
 	"github.com/james-lawrence/eg/internal/contextx"
 	"github.com/james-lawrence/eg/internal/debugx"
 	"github.com/james-lawrence/eg/internal/envx"
@@ -31,6 +32,7 @@ func main() {
 		Module             module                       `cmd:"" help:"executes a compiled module directly" hidden:"true"`
 		Daemon             daemon                       `cmd:"" help:"run in daemon mode letting the control plane push jobs to the local machine" hidden:"true"`
 		AgentManagement    actlcmd                      `cmd:"" name:"actl" help:"agent management commands"`
+		Register           accountcmds.Register         `cmd:"" name:"register" help:"register with an account with eg"`
 		InstallCompletions kongplete.InstallCompletions `cmd:"" help:"install shell completions"`
 	}
 

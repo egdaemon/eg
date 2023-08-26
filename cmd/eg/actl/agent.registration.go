@@ -47,8 +47,8 @@ func (t AuthorizeAgent) Run(gctx *cmdopts.Global) (err error) {
 		ClientID:     ssh.FingerprintSHA256(signer.PublicKey()),
 		ClientSecret: password.String(),
 		Endpoint: oauth2.Endpoint{
-			AuthURL:   fmt.Sprintf("%s/oauth2/ssh/auth", envx.String("https://localhost:3001", eg.EnvEGAPIHost)),
-			TokenURL:  fmt.Sprintf("%s/oauth2/ssh/token", envx.String("https://localhost:3001", eg.EnvEGAPIHost)),
+			AuthURL:   fmt.Sprintf("%s/oauth2/ssh/auth", envx.String(eg.EnvEGAPIHostDefault, eg.EnvEGAPIHost)),
+			TokenURL:  fmt.Sprintf("%s/oauth2/ssh/token", envx.String(eg.EnvEGAPIHostDefault, eg.EnvEGAPIHost)),
 			AuthStyle: oauth2.AuthStyleInHeader,
 		},
 	}
@@ -63,12 +63,14 @@ func (t AuthorizeAgent) Run(gctx *cmdopts.Global) (err error) {
 	}
 
 	httpc := cfg.Client(ctx, token)
-	resp, err := httpc.Post(fmt.Sprintf("%s/authn/ssh", envx.String("https://localhost:3001", eg.EnvEGAPIHost)), "application/json", nil)
+	resp, err := httpc.Post(fmt.Sprintf("%s/authn/ssh", envx.String(eg.EnvEGAPIHostDefault, eg.EnvEGAPIHost)), "application/json", nil)
 	if err != nil {
 		return err
 	}
+
 	if decoded, err := httputil.DumpResponse(resp, true); err == nil {
 		log.Println("DERP", string(decoded))
 	}
+
 	return nil
 }

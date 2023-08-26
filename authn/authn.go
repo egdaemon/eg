@@ -2,9 +2,12 @@ package authn
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 
 	"github.com/james-lawrence/eg"
 	"github.com/james-lawrence/eg/internal/envx"
+	"github.com/james-lawrence/eg/internal/userx"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/oauth2"
 )
@@ -19,4 +22,24 @@ func OAuth2SSHConfig(signer ssh.Signer, otp string) oauth2.Config {
 			AuthStyle: oauth2.AuthStyleInHeader,
 		},
 	}
+}
+
+func WriteSessionToken(token string) (err error) {
+	basedir := userx.DefaultCacheDirectory()
+	path := filepath.Join(basedir, "session.token")
+	if err = os.MkdirAll(basedir, 0700); err != nil {
+		return err
+	}
+
+	if err = os.WriteFile(path, []byte(token), 0600); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func ReadSessionToken() (_ string, err error) {
+	path := filepath.Join(userx.DefaultCacheDirectory(), "session.token")
+	raw, err := os.ReadFile(path)
+	return string(raw), err
 }

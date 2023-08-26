@@ -74,7 +74,7 @@ func Register(global *cmdopts.Global, aid string, s ssh.Signer) (err error) {
 		}
 
 		if authzedts.After(time.Now()) {
-			log.Println("waiting for registration to be accepted. run `eg actl authorize` to accept")
+			log.Printf("waiting for registration to be accepted. run `eg actl authorize --id='%s'` to accept\n", reg.Registration.Id)
 			continue
 		}
 

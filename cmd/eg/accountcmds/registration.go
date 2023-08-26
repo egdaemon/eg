@@ -46,7 +46,7 @@ func (t Register) Run(gctx *cmdopts.Global) (err error) {
 	ctransport := &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 	}
-	chttp := &http.Client{Transport: ctransport, Timeout: 10 * time.Second}
+	chttp := httpx.DebugClient(&http.Client{Transport: ctransport, Timeout: 10 * time.Second})
 
 	ctx := context.WithValue(gctx.Context, oauth2.HTTPClient, chttp)
 	cfg := authn.OAuth2SSHConfig(signer, password.String())
@@ -84,38 +84,19 @@ func (t Register) Run(gctx *cmdopts.Global) (err error) {
 	if err != nil {
 		return err
 	}
-	resp2, err := httpx.AsError(authzc.Do(req))
+	resp3, err := httpx.AsError(authzc.Do(req))
 	if err != nil {
 		return err
 	}
-	defer httpx.AutoClose(resp2)
+	defer httpx.AutoClose(resp3)
 
-	if err = json.NewDecoder(resp2.Body).Decode(&authed); err != nil {
+	if err = json.NewDecoder(resp3.Body).Decode(&authed); err != nil {
 		return err
-	}
-
-	signup := func() error {
-		req, err = http.NewRequestWithContext(ctx, http.MethodPost, fmt.Sprintf("%s/authn/signup", envx.String(eg.EnvEGAPIHostDefault, eg.EnvEGAPIHost)), nil)
-		if err != nil {
-			return err
-		}
-		req.Header.Add("Authorization", authed.SignupToken)
-		resp3, err := httpx.AsError(chttp.Do(req))
-		if err != nil {
-			return err
-		}
-		defer httpx.AutoClose(resp3)
-
-		if err = json.NewDecoder(resp3.Body).Decode(&authed); err != nil {
-			return err
-		}
-
-		return nil
 	}
 
 	switch len(authed.Profiles) {
 	case 0:
-		return signup()
+		return signup(ctx, authed.SignupToken)
 	default:
 		return errorsx.Notification(errors.New("you've already registered an account; multiple account support will be implemented in the future"))
 	}

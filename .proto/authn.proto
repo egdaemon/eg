@@ -10,6 +10,11 @@ message Identity {
   string uidraw = 8 [ json_name = "uidraw" ];
 }
 
+message Account {
+  string id = 1 [ json_name = "id" ];
+  string display = 2 [ json_name = "display" ];
+}
+
 message Profile {
   string id = 1 [ json_name = "id" ];
   string account_id = 2 [ json_name = "account_id" ];
@@ -27,4 +32,11 @@ message Authed {
   string redirect = 2 [ json_name = "redirect" ];
   Identity identity = 3 [ json_name = "identity" ];
   repeated Authn profiles = 4 [ json_name = "profiles" ];
+}
+
+message Current {
+  string token = 1 [ json_name = "token" ];
+  Profile profile = 2 [ json_name = "profile" ];
+  Account account = 3 [ json_name = "account" ];
+  string redirect = 4 [ json_name = "redirect" ];
 }

@@ -2,17 +2,14 @@ package actl
 
 import (
 	"context"
-	"crypto/rand"
 	"crypto/tls"
-	"encoding/base64"
-	"log"
 	"net/http"
 	"time"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/gofrs/uuid"
 	"github.com/james-lawrence/eg/authn"
 	"github.com/james-lawrence/eg/cmd/cmdopts"
+	"github.com/james-lawrence/eg/internal/httpx"
 	"github.com/james-lawrence/eg/internal/sshx"
 	"github.com/james-lawrence/eg/registration"
 	"golang.org/x/crypto/ssh"
@@ -21,13 +18,13 @@ import (
 
 type AuthorizeAgent struct {
 	SSHKeyPath string `name:"sshkeypath" help:"path to ssh key to use" default:"${vars_ssh_key_path}"`
+	ID         string `name:"id" help:"grant authorization to compute" required:""`
 }
 
 func (t AuthorizeAgent) Run(gctx *cmdopts.Global) (err error) {
 	var (
+		at     string
 		signer ssh.Signer
-		sig    *ssh.Signature
-		sresp  *registration.RegistrationSearchResponse
 	)
 
 	if signer, err = sshx.AutoCached(sshx.NewKeyGen(), t.SSHKeyPath); err != nil {
@@ -40,33 +37,20 @@ func (t AuthorizeAgent) Run(gctx *cmdopts.Global) (err error) {
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 	}
 	chttp := &http.Client{Transport: ctransport, Timeout: 10 * time.Second}
+	chttp = httpx.DebugClient(chttp)
 
 	ctx := context.WithValue(gctx.Context, oauth2.HTTPClient, chttp)
 	cfg := authn.OAuth2SSHConfig(signer, otp.String())
 
-	if sig, err = signer.Sign(rand.Reader, otp.Bytes()); err != nil {
+	if at, err = authn.ReadSessionToken(); err != nil {
 		return err
 	}
 
-	token, err := cfg.PasswordCredentialsToken(ctx, cfg.ClientID, base64.RawURLEncoding.EncodeToString(ssh.Marshal(sig)))
-	if err != nil {
-		return err
-	}
-
-	httpc := cfg.Client(ctx, token)
-	// resp, err := httpc.Post(fmt.Sprintf("%s/authn/ssh", envx.String(eg.EnvEGAPIHostDefault, eg.EnvEGAPIHost)), "application/json", nil)
-	// if err != nil {
-	// 	return err
-	// }
-	// if decoded, err := httputil.DumpResponse(resp, true); err == nil {
-	// 	log.Println("DERP", string(decoded))
-	// }
-
+	httpc := cfg.Client(ctx, &oauth2.Token{AccessToken: at})
 	rc := registration.NewRegistrationClient(httpc)
-	if sresp, err = rc.Search(ctx, &registration.RegistrationSearchRequest{}); err != nil {
+	if _, err = rc.Grant(ctx, &registration.RegistrationGrantRequest{Registration: &registration.Registration{Id: t.ID}}); err != nil {
 		return err
 	}
 
-	log.Println("Search Response", spew.Sdump(sresp))
 	return nil
 }

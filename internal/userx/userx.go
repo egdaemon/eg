@@ -5,6 +5,8 @@ import (
 	"os"
 	"os/user"
 	"path/filepath"
+
+	"github.com/james-lawrence/eg/internal/envx"
 )
 
 const (
@@ -59,12 +61,13 @@ func DefaultDirLocation(rel string) string {
 // DefaultCacheDirectory cache directory for storing data.
 func DefaultCacheDirectory() string {
 	user := CurrentUserOrDefault(fallbackUser())
+	if user.Uid == fallbackUser().Uid {
+		return filepath.Join("/", "var", "cache", DefaultDir)
+	}
 
-	cachedir := os.Getenv("CACHE_DIRECTORY")
-	env := filepath.Join(os.Getenv("XDG_CACHE_HOME"), DefaultDir)
-	home := filepath.Join(user.HomeDir, ".cache", DefaultDir)
-	system := filepath.Join("/", "var", "cache", DefaultDir)
-	return DefaultDirectory("", env, cachedir, home, system)
+	root := envx.String(filepath.Join(user.HomeDir, ".cache"), "CACHE_DIRECTORY", "XDG_CACHE_HOME")
+
+	return filepath.Join(root, DefaultDir)
 }
 
 // DefaultDirectory finds the first directory root that exists and then returns

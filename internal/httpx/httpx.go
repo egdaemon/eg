@@ -177,7 +177,9 @@ func WriteEmptyJSONArray(resp http.ResponseWriter, code int) {
 	const emptyJSON = "[]"
 	resp.Header().Set("Content-Type", "application/json")
 	resp.WriteHeader(code)
-	resp.Write([]byte(emptyJSON))
+	if _, err := resp.Write([]byte(emptyJSON)); err != nil {
+		log.Println("unable to write response", err)
+	}
 }
 
 // WriteEmptyJSON emits empty json with the provided status code.
@@ -185,7 +187,9 @@ func WriteEmptyJSON(resp http.ResponseWriter, code int) {
 	const emptyJSON = "{}"
 	resp.Header().Set("Content-Type", "application/json")
 	resp.WriteHeader(code)
-	resp.Write([]byte(emptyJSON))
+	if _, err := resp.Write([]byte(emptyJSON)); err != nil {
+		log.Println("unable to write response", err)
+	}
 }
 
 // RedirectHTTPRequest generates a url to redirect to from the provided

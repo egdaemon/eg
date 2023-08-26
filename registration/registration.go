@@ -16,7 +16,7 @@ import (
 func NewRegistrationClient(c *http.Client) *RegistrationClient {
 	return &RegistrationClient{
 		c:    c,
-		host: envx.String("https://localhost:3001", eg.EnvEGAPIHost),
+		host: envx.String(eg.EnvEGAPIHostDefault, eg.EnvEGAPIHost),
 	}
 }
 

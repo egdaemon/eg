@@ -13,7 +13,7 @@ import (
 type contextKey int
 
 const (
-	contextKeyBufferPool = iota
+	contextKeyBufferPool contextKey = iota
 )
 
 type bufferTracking struct {

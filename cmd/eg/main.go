@@ -34,6 +34,7 @@ func main() {
 		Daemon             daemon                       `cmd:"" help:"run in daemon mode letting the control plane push jobs to the local machine" hidden:"true"`
 		AgentManagement    actlcmd                      `cmd:"" name:"actl" help:"agent management commands"`
 		Register           accountcmds.Register         `cmd:"" name:"register" help:"register with an account with eg"`
+		Login              accountcmds.Login            `cmd:"" name:"login" help:"login to a profile"`
 		InstallCompletions kongplete.InstallCompletions `cmd:"" help:"install shell completions"`
 	}
 

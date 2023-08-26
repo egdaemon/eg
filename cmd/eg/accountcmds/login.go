@@ -23,13 +23,12 @@ import (
 	"golang.org/x/oauth2"
 )
 
-type Register struct {
+type Login struct {
 	SSHKeyPath string `name:"sshkeypath" help:"path to ssh key to use" default:"${vars_ssh_key_path}"`
-	Name       string `name:"name" help:"name of the account to create" default:"${vars_user_name}"`
-	Email      string `email:"email" help:"business contact email" required:""`
+	ID         string `name:"id" help:"profile id to login as" required:""`
 }
 
-func (t Register) Run(gctx *cmdopts.Global) (err error) {
+func (t Login) Run(gctx *cmdopts.Global) (err error) {
 	var (
 		signer ssh.Signer
 		sig    *ssh.Signature
@@ -54,8 +53,6 @@ func (t Register) Run(gctx *cmdopts.Global) (err error) {
 	authzuri := cfg.AuthCodeURL(
 		encoded,
 		oauth2.AccessTypeOffline,
-		oauth2.SetAuthURLParam("email", t.Email),
-		oauth2.SetAuthURLParam("description", t.Name),
 	)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, authzuri, nil)
 	if err != nil {
@@ -97,6 +94,8 @@ func (t Register) Run(gctx *cmdopts.Global) (err error) {
 	switch len(authed.Profiles) {
 	case 0:
 		return signup(ctx, authed.SignupToken)
+	case 1:
+		return login(ctx, authed.Profiles[0])
 	default:
 		return errorsx.Notification(errors.New("you've already registered an account; multiple account support will be implemented in the future"))
 	}

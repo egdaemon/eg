@@ -10,6 +10,14 @@ import (
 	"github.com/tetratelabs/wazero/api"
 )
 
+func mayberun(c *exec.Cmd) error {
+	if c == nil {
+		return nil
+	}
+
+	return c.Run()
+}
+
 func Exec(op func(*exec.Cmd) *exec.Cmd) func(
 	ctx context.Context,
 	m api.Module,
@@ -31,7 +39,7 @@ func Exec(op func(*exec.Cmd) *exec.Cmd) func(
 		log.Println("initiated", cmd.String())
 		defer log.Println("completed", cmd.String())
 
-		if err = op(cmd).Run(); err != nil {
+		if err = mayberun(op(cmd)); err != nil {
 			log.Println("failed to execute shell command", err)
 			return 128
 		}

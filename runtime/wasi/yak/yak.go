@@ -13,11 +13,6 @@ import (
 	"github.com/pkg/errors"
 )
 
-// represents a sequence of operations to perform.
-type task interface {
-	Do(ctx context.Context) error
-}
-
 // A reference to an operation.
 type Reference interface {
 	ID() string
@@ -27,12 +22,6 @@ type Op interface {
 	ID() string
 }
 type op func(context.Context, Op) error
-
-type fnTask func(ctx context.Context) error
-
-func (t fnTask) Do(ctx context.Context) error {
-	return t(ctx)
-}
 
 type runtimeref struct {
 	ptr uintptr
@@ -69,9 +58,9 @@ func UnsafeTranspiledRef(name string, o op) Reference {
 	}
 }
 
-func Perform(ctx context.Context, tasks ...task) error {
+func Perform(ctx context.Context, tasks ...op) error {
 	for _, t := range tasks {
-		if err := t.Do(ctx); err != nil {
+		if err := t(ctx, ref(t)); err != nil {
 			return err
 		}
 	}
@@ -79,15 +68,15 @@ func Perform(ctx context.Context, tasks ...task) error {
 	return nil
 }
 
-func Sequential(operations ...op) task {
-	return fnTask(func(ctx context.Context) error {
+func Sequential(operations ...op) op {
+	return func(ctx context.Context, o Op) error {
 		for _, op := range operations {
 			if err := op(ctx, ref(op)); err != nil {
 				return err
 			}
 		}
 		return nil
-	})
+	}
 }
 
 // Run operations in parallel.
@@ -99,8 +88,8 @@ func Sequential(operations ...op) task {
 // gain threading this will automatically begin running operations
 // in parallel natively. to prevent issues in the future we shuffle
 // operations to ensure callers are not implicitly relying on order.
-func Parallel(operations ...op) task {
-	return fnTask(func(ctx context.Context) (err error) {
+func Parallel(operations ...op) op {
+	return func(ctx context.Context, o Op) (err error) {
 		errs := make(chan error, len(operations))
 		defer close(errs)
 
@@ -128,17 +117,17 @@ func Parallel(operations ...op) task {
 		}
 
 		return err
-	})
+	}
 }
 
-func When(b bool, o task) task {
-	return fnTask(func(ctx context.Context) error {
+func When(b bool, o op) op {
+	return func(ctx context.Context, i Op) error {
 		if !b {
 			return nil
 		}
 
-		return o.Do(ctx)
-	})
+		return o(ctx, ref(o))
+	}
 }
 
 type Runner interface {

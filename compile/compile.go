@@ -16,8 +16,8 @@ func Run(ctx context.Context, module string, output string) (err error) {
 		return err
 	}
 
-	cmd := exec.CommandContext(ctx, "tinygo", "build", "-target", "wasi", "-wasm-abi", "generic", "-o", output, module)
-	cmd.Env = os.Environ()
+	cmd := exec.CommandContext(ctx, "tinygo", "build", "-target", "wasi", "-o", output, module)
+	cmd.Env = append(os.Environ(), "GOOS=wasip1")
 	cmd.Stderr = os.Stderr
 	cmd.Stdout = os.Stdout
 

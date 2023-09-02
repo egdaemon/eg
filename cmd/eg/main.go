@@ -95,8 +95,4 @@ func main() {
 	}
 
 	shellcli.Cleanup.Wait()
-
-	if err != nil {
-		os.Exit(1)
-	}
 }

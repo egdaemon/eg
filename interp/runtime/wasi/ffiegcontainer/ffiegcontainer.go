@@ -11,6 +11,14 @@ import (
 	"github.com/tetratelabs/wazero/api"
 )
 
+func mayberun(c *exec.Cmd) error {
+	if c == nil {
+		return nil
+	}
+
+	return c.Run()
+}
+
 func Build(builder func(ctx context.Context, name, definition string) (*exec.Cmd, error)) func(
 	ctx context.Context,
 	m api.Module,
@@ -45,7 +53,7 @@ func Build(builder func(ctx context.Context, name, definition string) (*exec.Cmd
 			return 2
 		}
 
-		if err = cmd.Run(); err != nil {
+		if err = mayberun(cmd); err != nil {
 			log.Println("generating eg container failed", err)
 			return 3
 		}
@@ -103,19 +111,19 @@ func PodmanRun(ctx context.Context, cmdctx func(*exec.Cmd) *exec.Cmd, image, cna
 	log.Println("running", image, cname)
 
 	defer func() {
-		cctx, done := context.WithTimeout(context.Background(), 10*time.Second)
+		cctx, done := context.WithTimeout(ctx, 10*time.Second)
 		defer done()
 
 		// don't care about this error; if the container doesn't exist its fine; if something
 		// actually prevented it from stopped then our startup command will fail.
-		if err = cmdctx(exec.CommandContext(cctx, "podman", "stop", cname)).Run(); err != nil {
+		if err = mayberun(cmdctx(exec.CommandContext(cctx, "podman", "stop", cname))); err != nil {
 			log.Println(err)
 			return
 		}
 
 		// don't care about this error; if the container doesn't exist its fine; if something
 		// actually prevented it from being rm then our startup command will fail.
-		if err = cmdctx(exec.CommandContext(cctx, "podman", "rm", cname)).Run(); err != nil {
+		if err = mayberun(cmdctx(exec.CommandContext(cctx, "podman", "rm", cname))); err != nil {
 			log.Println(err)
 			return
 		}
@@ -136,7 +144,7 @@ func PodmanRun(ctx context.Context, cmdctx func(*exec.Cmd) *exec.Cmd, image, cna
 		"/usr/sbin/init",
 	)
 
-	if err = cmdctx(cmd).Run(); err != nil {
+	if err = mayberun(cmdctx(cmd)); err != nil {
 		return err
 	}
 
@@ -150,7 +158,7 @@ func PodmanRun(ctx context.Context, cmdctx func(*exec.Cmd) *exec.Cmd, image, cna
 		"/opt/egmodule.wasm",
 	)
 
-	if err = cmdctx(cmd).Run(); err != nil {
+	if err = mayberun(cmdctx(cmd)); err != nil {
 		return err
 	}
 

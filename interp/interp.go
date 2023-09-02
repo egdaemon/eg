@@ -30,6 +30,8 @@ func OptionModuleDir(s string) Option {
 	}
 }
 
+type runtimefn func(r runner, moduledir string, cmdenv []string, host wazero.HostModuleBuilder) wazero.HostModuleBuilder
+
 func Run(ctx context.Context, runid, dir string, module string, options ...Option) error {
 	var (
 		r = runner{
@@ -43,7 +45,36 @@ func Run(ctx context.Context, runid, dir string, module string, options ...Optio
 		opt(&r)
 	}
 
-	return r.perform(ctx, runid, module)
+	runtimeenv := func(r runner, moduledir string, cmdenv []string, host wazero.HostModuleBuilder) wazero.HostModuleBuilder {
+		return host.NewFunctionBuilder().WithFunc(ffiegcontainer.Build(func(ctx context.Context, name, definition string) (cmd *exec.Cmd, err error) {
+			cmd, err = ffiegcontainer.PodmanBuild(ctx, name, moduledir, definition)
+			cmd.Dir = r.root
+			cmd.Env = cmdenv
+			cmd.Stderr = os.Stderr
+			cmd.Stdout = os.Stdout
+			return cmd, err
+		})).Export("github.com/james-lawrence/eg/runtime/wasi/runtime/ffiegcontainer.Build").
+			NewFunctionBuilder().WithFunc(ffiegcontainer.Run(func(ctx context.Context, name, modulepath string) (err error) {
+			cmdctx := func(cmd *exec.Cmd) *exec.Cmd {
+				cmd.Dir = r.root
+				cmd.Env = cmdenv
+				cmd.Stderr = os.Stderr
+				cmd.Stdout = os.Stdout
+				return cmd
+			}
+			cname := fmt.Sprintf("%s.%s", name, md5x.DigestString(modulepath+runid))
+			return ffiegcontainer.PodmanRun(ctx, cmdctx, name, cname, r.root, r.moduledir, modulepath, "/home/james.lawrence/go/bin/eg")
+		})).Export("github.com/james-lawrence/eg/runtime/wasi/runtime/ffiegcontainer.Run").
+			NewFunctionBuilder().WithFunc(ffiexec.Exec(func(cmd *exec.Cmd) *exec.Cmd {
+			cmd.Dir = r.root
+			cmd.Env = cmdenv
+			cmd.Stderr = os.Stderr
+			cmd.Stdout = os.Stdout
+			return cmd
+		})).Export("github.com/james-lawrence/eg/runtime/wasi/runtime/ffiexec.Command")
+	}
+
+	return r.perform(ctx, runid, module, runtimeenv)
 }
 
 type runner struct {
@@ -64,7 +95,7 @@ func (t runner) Open(name string) (fs.File, error) {
 	}
 }
 
-func (t runner) perform(ctx context.Context, runid, path string) (err error) {
+func (t runner) perform(ctx context.Context, runid, path string, rtb runtimefn) (err error) {
 	// Create a new WebAssembly Runtime.
 	runtime := wazero.NewRuntimeWithConfig(
 		ctx,
@@ -120,33 +151,7 @@ func (t runner) perform(ctx context.Context, runid, path string) (err error) {
 	}
 	defer wasienv.Close(ctx)
 
-	hostenv, err := runtime.NewHostModuleBuilder("env").
-		NewFunctionBuilder().WithFunc(ffiegcontainer.Build(func(ctx context.Context, name, definition string) (cmd *exec.Cmd, err error) {
-		cmd, err = ffiegcontainer.PodmanBuild(ctx, name, moduledir, definition)
-		cmd.Dir = t.root
-		cmd.Env = cmdenv
-		cmd.Stderr = os.Stderr
-		cmd.Stdout = os.Stdout
-		return cmd, err
-	})).Export("github.com/james-lawrence/eg/runtime/wasi/runtime/ffiegcontainer.Build").
-		NewFunctionBuilder().WithFunc(ffiegcontainer.Run(func(ctx context.Context, name, modulepath string) (err error) {
-		cmdctx := func(cmd *exec.Cmd) *exec.Cmd {
-			cmd.Dir = t.root
-			cmd.Env = cmdenv
-			cmd.Stderr = os.Stderr
-			cmd.Stdout = os.Stdout
-			return cmd
-		}
-		cname := fmt.Sprintf("%s.%s", name, md5x.DigestString(modulepath+runid))
-		return ffiegcontainer.PodmanRun(ctx, cmdctx, name, cname, t.root, t.moduledir, modulepath, "/home/james.lawrence/go/bin/eg")
-	})).Export("github.com/james-lawrence/eg/runtime/wasi/runtime/ffiegcontainer.Run").
-		NewFunctionBuilder().WithFunc(ffiexec.Exec(func(cmd *exec.Cmd) *exec.Cmd {
-		cmd.Dir = t.root
-		cmd.Env = cmdenv
-		cmd.Stderr = os.Stderr
-		cmd.Stdout = os.Stdout
-		return cmd
-	})).Export("github.com/james-lawrence/eg/runtime/wasi/runtime/ffiexec.Command").
+	hostenv, err := rtb(t, moduledir, cmdenv, runtime.NewHostModuleBuilder("env")).
 		Instantiate(ctx, ns1)
 	if err != nil {
 		return err

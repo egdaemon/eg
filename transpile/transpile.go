@@ -3,6 +3,7 @@ package transpile
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"go/ast"
 	"go/parser"
@@ -18,9 +19,9 @@ import (
 	"github.com/dave/jennifer/jen"
 	"github.com/james-lawrence/eg/astbuild"
 	"github.com/james-lawrence/eg/astcodec"
+	"github.com/james-lawrence/eg/internal/errorsx"
 	"github.com/james-lawrence/eg/workspaces"
 
-	"github.com/pkg/errors"
 	"golang.org/x/tools/go/packages"
 )
 
@@ -71,7 +72,7 @@ func (t golang) Run(ctx context.Context) (roots []Compiled, err error) {
 	)
 
 	if pkg, err = astcodec.Load(pkgc, "eg/ci"); err != nil {
-		return roots, errors.Wrap(err, "unable to load package eg/ci")
+		return roots, errorsx.Wrap(err, "unable to load package eg/ci")
 	}
 
 	generatedmodules := make([]*module, 0, 128)
@@ -94,17 +95,12 @@ func (t golang) Run(ctx context.Context) (roots []Compiled, err error) {
 			return err
 		}
 
-		ast.Walk(astcodec.NewCallExprReplacement(func(ce *ast.CallExpr) *ast.CallExpr {
-			args := []ast.Expr{
-				astbuild.StringLiteral(types.ExprString(ce.Args[0])),
-			}
-			args = append(args, ce.Args...)
-			return astbuild.CallExpr(astbuild.SelExpr(yakident, "UnsafeTranspiledRef"), args...)
-		}, func(ce *ast.CallExpr) bool {
-			return astcodec.TypePattern(refexpr)(ce.Fun)
-		}), c)
+		moduleExpr := func(ce *ast.CallExpr) bool {
+			return astcodec.TypePattern(refmodule)(ce.Fun)
+		}
 
-		ast.Walk(astcodec.NewCallExprReplacement(func(ce *ast.CallExpr) *ast.CallExpr {
+		generr := error(nil)
+		genmod := astcodec.NewCallExprReplacement(func(ce *ast.CallExpr) *ast.CallExpr {
 			if len(ce.Args) < 3 {
 				log.Println("unable to transpile module call")
 				return ce
@@ -134,21 +130,32 @@ func (t golang) Run(ctx context.Context) (roots []Compiled, err error) {
 				),
 			)
 
+			mainbuf := bytes.NewBuffer(nil)
+			if cause := main.Render(mainbuf); cause != nil {
+				generr = errors.Join(generr, cause)
+			}
+
 			genwasm := filepath.Join(t.Context.Workspace.BuildDir, gendir, fmt.Sprintf("module.%d.%d.wasm", pos.Line, pos.Column))
 			m := &module{
 				fname:    filepath.Join(t.Workspace.GenModDir, gendir, fmt.Sprintf("module.%d.%d.go", pos.Line, pos.Column)),
 				original: buf,
-				main:     bytes.NewBufferString(fmt.Sprintf("%#v", main)),
-				pos:      pkg.Fset.PositionFor(ce.Pos(), true),
+				main:     mainbuf,
+				pos:      pos,
 			}
 			generatedmodules = append(generatedmodules, m)
 
 			return astbuild.CallExpr(astbuild.SelExpr(yakident, "UnsafeModule"), ctxarg, rarg, astbuild.StringLiteral(genwasm))
-		}, func(ce *ast.CallExpr) bool {
-			return astcodec.TypePattern(refmodule)(ce.Fun)
-		}), c)
+		}, moduleExpr)
 
-		return nil
+		v := astcodec.Multivisit(
+			// astcodec.Filter(grapher(pkg.Fset), moduleExpr),
+			replaceRef(yakident, refexpr),
+			genmod,
+		)
+
+		ast.Walk(v, c)
+
+		return generr
 	}
 
 	rewrite := func(ftoken *token.File, dst string, c ast.Node) error {
@@ -158,7 +165,7 @@ func (t golang) Run(ctx context.Context) (roots []Compiled, err error) {
 			buf       = bytes.NewBuffer(nil)
 		)
 
-		if err = (&printer.Config{Mode: printer.RawFormat}).Fprint(buf, pkg.Fset, c); err != nil {
+		if err = (&printer.Config{Mode: printer.TabIndent}).Fprint(buf, pkg.Fset, c); err != nil {
 			return err
 		}
 

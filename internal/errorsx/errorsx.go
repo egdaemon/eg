@@ -33,6 +33,10 @@ func Wrap(err error, m string) error {
 	return errors.Wrap(err, m)
 }
 
+func Wrapf(err error, format string, args ...interface{}) error {
+	return errors.Wrapf(err, format, args...)
+}
+
 func Ignore(err error, ignore ...error) error {
 	for _, i := range ignore {
 		if errors.Is(err, i) {
@@ -156,4 +160,46 @@ func (t Temporary) Unwrap() error {
 }
 func (t Temporary) Cause() error {
 	return t.error
+}
+
+type Unrecoverable struct {
+	cause error
+}
+
+func (t Unrecoverable) Unrecoverable() {}
+
+func (t Unrecoverable) Unwrap() error {
+	return t.cause
+}
+
+func (t Unrecoverable) Error() string {
+	return t.cause.Error()
+}
+
+func (t Unrecoverable) Is(target error) bool {
+	type unrecoverable interface {
+		Unrecoverable()
+	}
+
+	_, ok := target.(unrecoverable)
+	return ok
+}
+
+func (t Unrecoverable) As(target any) bool {
+	type unrecoverable interface {
+		Unrecoverable()
+	}
+
+	if x, ok := target.(*unrecoverable); ok {
+		*x = t
+		return ok
+	}
+
+	return false
+}
+
+func NewUnrecoverable(err error) error {
+	return Unrecoverable{
+		cause: err,
+	}
 }

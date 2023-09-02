@@ -2,17 +2,21 @@ package interp
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"os"
 	"os/exec"
 	"sync"
 
+	"github.com/awalterschulze/gographviz"
 	"github.com/james-lawrence/eg/internal/md5x"
 	"github.com/james-lawrence/eg/interp/runtime/wasi/ffiegcontainer"
 	"github.com/james-lawrence/eg/interp/runtime/wasi/ffiexec"
+	"github.com/james-lawrence/eg/interp/runtime/wasi/ffigraph"
 	"github.com/tetratelabs/wazero"
 )
 
-func Analyse(ctx context.Context, runid, dir string, module string, options ...Option) error {
+func Analyse(ctx context.Context, runid, dir string, module string, options ...Option) (err error) {
 	var (
 		r = runner{
 			root:      dir,
@@ -25,16 +29,28 @@ func Analyse(ctx context.Context, runid, dir string, module string, options ...O
 		opt(&r)
 	}
 
+	gg := gographviz.NewGraph()
+	gg.Directed = true
+	// gg.Name = strings.ReplaceAll(runid, "-", "")
+
 	runtimeenv := func(r runner, moduledir string, cmdenv []string, host wazero.HostModuleBuilder) wazero.HostModuleBuilder {
-		return host.NewFunctionBuilder().WithFunc(ffiegcontainer.Build(func(ctx context.Context, name, definition string) (cmd *exec.Cmd, err error) {
-			// cmd, err = ffiegcontainer.PodmanBuild(ctx, name, moduledir, definition)
-			// cmd.Dir = r.root
-			// cmd.Env = cmdenv
-			// cmd.Stderr = os.Stderr
-			// cmd.Stdout = os.Stdout
-			// return cmd, err
-			return nil, nil
-		})).Export("github.com/james-lawrence/eg/runtime/wasi/runtime/ffiegcontainer.Build").
+		g := ffigraph.NewViz(gg)
+		return host.NewFunctionBuilder().
+			WithFunc(ffigraph.Analysing(true)).Export("github.com/james-lawrence/eg/runtime/wasi/runtime/graph.Analysing").
+			NewFunctionBuilder().
+			WithFunc(g.Pusher()).Export("github.com/james-lawrence/eg/runtime/wasi/runtime/graph.Push").
+			NewFunctionBuilder().
+			WithFunc(g.Popper()).Export("github.com/james-lawrence/eg/runtime/wasi/runtime/graph.Pop").
+			NewFunctionBuilder().
+			WithFunc(ffiegcontainer.Build(func(ctx context.Context, name, definition string) (cmd *exec.Cmd, err error) {
+				// cmd, err = ffiegcontainer.PodmanBuild(ctx, name, moduledir, definition)
+				// cmd.Dir = r.root
+				// cmd.Env = cmdenv
+				// cmd.Stderr = os.Stderr
+				// cmd.Stdout = os.Stdout
+				// return cmd, err
+				return nil, nil
+			})).Export("github.com/james-lawrence/eg/runtime/wasi/runtime/ffiegcontainer.Build").
 			NewFunctionBuilder().WithFunc(ffiegcontainer.Run(func(ctx context.Context, name, modulepath string) (err error) {
 			cmdctx := func(cmd *exec.Cmd) *exec.Cmd {
 				return nil
@@ -57,5 +73,14 @@ func Analyse(ctx context.Context, runid, dir string, module string, options ...O
 		})).Export("github.com/james-lawrence/eg/runtime/wasi/runtime/ffiexec.Command")
 	}
 
-	return r.perform(ctx, runid, module, runtimeenv)
+	if err = r.perform(ctx, runid, module, runtimeenv); err != nil {
+		return err
+	}
+
+	if err = os.WriteFile(runid+".dot", []byte(gg.String()), 0600); err != nil {
+		return err
+	}
+
+	// return nil
+	return errors.New("done")
 }

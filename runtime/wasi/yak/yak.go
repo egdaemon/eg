@@ -10,6 +10,7 @@ import (
 
 	"github.com/james-lawrence/eg/internal/errorsx"
 	"github.com/james-lawrence/eg/runtime/wasi/internal/ffiegcontainer"
+	"github.com/james-lawrence/eg/runtime/wasi/internal/ffigraph"
 	"github.com/pkg/errors"
 )
 
@@ -29,7 +30,17 @@ type runtimeref struct {
 }
 
 func (t runtimeref) ID() string {
-	return fmt.Sprintf("%x", t.ptr)
+	return fmt.Sprintf("ref%x", t.ptr)
+}
+
+type namedop string
+
+func (t namedop) ID() string {
+	return string(t)
+}
+
+func prefixedop(p string, o Op) namedop {
+	return namedop(fmt.Sprintf("%s%s", p, o.ID()))
 }
 
 // ref meta programming marking a task for delayed execution when rewriting the program at compilation time.
@@ -59,23 +70,31 @@ func UnsafeTranspiledRef(name string, o op) Reference {
 }
 
 func Perform(ctx context.Context, tasks ...op) error {
-	for _, t := range tasks {
-		if err := t(ctx, ref(t)); err != nil {
-			return err
+	return ffigraph.WrapErr(namedop("perform"), func() error {
+		for _, t := range tasks {
+			if err := t(ctx, ref(t)); err != nil {
+				return err
+			}
 		}
-	}
 
-	return nil
+		return nil
+	})
 }
 
 func Sequential(operations ...op) op {
 	return func(ctx context.Context, o Op) error {
-		for _, op := range operations {
-			if err := op(ctx, ref(op)); err != nil {
-				return err
+		return ffigraph.WrapErr(prefixedop("seq", o), func() error {
+			for _, op := range operations {
+				r := ref(op)
+				err := ffigraph.WrapErr(r, func() error {
+					return op(ctx, r)
+				})
+				if err != nil {
+					return err
+				}
 			}
-		}
-		return nil
+			return nil
+		})
 	}
 }
 
@@ -90,33 +109,36 @@ func Sequential(operations ...op) op {
 // operations to ensure callers are not implicitly relying on order.
 func Parallel(operations ...op) op {
 	return func(ctx context.Context, o Op) (err error) {
-		errs := make(chan error, len(operations))
-		defer close(errs)
+		return ffigraph.WrapErr(prefixedop("par", o), func() error {
+			errs := make(chan error, len(operations))
+			defer close(errs)
 
-		rand.Shuffle(len(operations), func(i, j int) {
-			operations[i], operations[j] = operations[j], operations[i]
-		})
+			rand.Shuffle(len(operations), func(i, j int) {
+				operations[i], operations[j] = operations[j], operations[i]
+			})
 
-		for _, o := range operations {
-			go func(iop op) {
+			for _, o := range operations {
+				go func(iop op) {
+					r := ref(iop)
+					select {
+					case <-ctx.Done():
+						errs <- ctx.Err()
+					case errs <- ffigraph.WrapErr(r, func() error { return iop(ctx, r) }):
+					}
+				}(o)
+			}
+
+			for i := 0; i < len(operations); i++ {
 				select {
 				case <-ctx.Done():
-					errs <- ctx.Err()
-				case errs <- iop(ctx, ref(iop)):
+					return ctx.Err()
+				case cause := <-errs:
+					err = errorsx.Compact(err, cause)
 				}
-			}(o)
-		}
-
-		for i := 0; i < len(operations); i++ {
-			select {
-			case <-ctx.Done():
-				return ctx.Err()
-			case cause := <-errs:
-				err = errorsx.Compact(err, cause)
 			}
-		}
 
-		return err
+			return err
+		})
 	}
 }
 
@@ -157,6 +179,10 @@ func (t ContainerRunner) BuildFromFile(s string) ContainerRunner {
 // CompileWith builds the container and
 func (t ContainerRunner) CompileWith(ctx context.Context) (err error) {
 	t.built.Do(func() {
+		if ffigraph.Analysing() {
+			return
+		}
+
 		log.Printf("building container %s\n", t.definition)
 		if code := ffiegcontainer.Build(t.name, t.definition); code != 0 {
 			err = errors.Errorf("unable to build the container: %d", code)

@@ -72,17 +72,17 @@ func main() {
 		yak.Parallel(
 			yak.Module(ctx, c1, Op1),
 			yak.Module(ctx, c1, Op2),
-			yak.Module(
-				ctx,
-				c1,
-				yak.Parallel(
-					yak.Sequential(Op1, Op2),
-					yak.Sequential(Op3, Op4),
-				),
-			),
-			yak.Module(ctx, c1, DaemonTests),
-			yak.Module(ctx, c1, Op3),
-			yak.Module(ctx, c1, Op4),
+			// yak.Module(
+			// 	ctx,
+			// 	c1,
+			// 	yak.Parallel(
+			// 		yak.Sequential(Op1, Op2),
+			// 		yak.Sequential(Op3, Op4),
+			// 	),
+			// ),
+			// yak.Module(ctx, c1, DaemonTests),
+			// yak.Module(ctx, c1, Op3),
+			// yak.Module(ctx, c1, Op4),
 		),
 	)
 	if err != nil {

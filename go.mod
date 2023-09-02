@@ -1,6 +1,6 @@
 module github.com/james-lawrence/eg
 
-go 1.20
+go 1.21
 
 require (
 	github.com/alecthomas/kong v0.7.1

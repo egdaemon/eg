@@ -191,6 +191,21 @@ func FindFunctionDecl(pkg *packages.Package, filters ...func(ast.Decl) bool) *as
 	return nil
 }
 
+type multivisit []ast.Visitor
+
+func (t multivisit) Visit(node ast.Node) (w ast.Visitor) {
+	updates := make([]ast.Visitor, 0, len(t))
+	for _, v := range t {
+		updates = append(updates, v.Visit(node))
+	}
+
+	return multivisit(updates)
+}
+
+func Multivisit(set ...ast.Visitor) ast.Visitor {
+	return multivisit(set)
+}
+
 type findimports struct {
 	found []*ast.ImportSpec
 }
@@ -212,9 +227,13 @@ func (t *findimports) Visit(node ast.Node) (w ast.Visitor) {
 	return nil
 }
 
-type PrintNodes struct{}
+func Printer() ast.Visitor {
+	return nodePrinter{}
+}
 
-func (t PrintNodes) Visit(node ast.Node) (w ast.Visitor) {
+type nodePrinter struct{}
+
+func (t nodePrinter) Visit(node ast.Node) (w ast.Visitor) {
 	if node == nil {
 		return t
 	}
@@ -226,6 +245,40 @@ func (t PrintNodes) Visit(node ast.Node) (w ast.Visitor) {
 		log.Printf("%T\n", x)
 	}
 	return t
+}
+
+type filter struct {
+	delegate ast.Visitor
+	pattern  func(ast.Node) bool
+}
+
+func (t filter) Visit(node ast.Node) (w ast.Visitor) {
+	if node == nil {
+		return t
+	}
+
+	if !t.pattern(node) {
+		return t
+	}
+
+	return filter{
+		delegate: t.delegate.Visit(node),
+		pattern:  t.pattern,
+	}
+}
+
+func Filter[T ast.Node](v ast.Visitor, m func(T) bool) ast.Visitor {
+	return filter{
+		delegate: v,
+		pattern: func(n ast.Node) bool {
+			switch x := n.(type) {
+			case T:
+				return m(x)
+			default:
+				return false
+			}
+		},
+	}
 }
 
 type replacecallexpr struct {

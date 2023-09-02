@@ -3,16 +3,15 @@ package main
 import (
 	"log"
 	"os"
-	"os/exec"
 	"path/filepath"
 
 	"github.com/gofrs/uuid"
 	"github.com/james-lawrence/eg/cmd/cmdopts"
 	"github.com/james-lawrence/eg/compile"
 	"github.com/james-lawrence/eg/interp"
-	"github.com/james-lawrence/eg/interp/runtime/wasi/ffiegcontainer"
 	"github.com/james-lawrence/eg/transpile"
 	"github.com/james-lawrence/eg/workspaces"
+	"github.com/pkg/errors"
 )
 
 type runner struct {
@@ -62,14 +61,24 @@ func (t runner) Run(ctx *cmdopts.Global) (err error) {
 		}
 	}
 
-	{
-		var cmd *exec.Cmd
-		if cmd, err = ffiegcontainer.PodmanBuild(ctx.Context, "ubuntu:jammy", t.Dir, ""); err != nil {
-			return err
+	log.Println("roots", roots)
+	// TODO: run the modules inside a container for safety
+	// {
+	// 	cmd := exec.CommandContext(ctx.Context, "podman", "build", "--timestamp", "0", "-t", "ubuntu:jammy", t.Dir)
+	// 	log.Println("RUNNING", cmd.String())
+	// 	if err = cmd.Run(); err != nil {
+	// 		log.Println("DERP 1", err)
+	// 		return err
+	// 	}
+	// }
+
+	for _, m := range modules {
+		if m.Generated {
+			continue
 		}
 
-		if err = cmd.Run(); err != nil {
-			return err
+		if err = interp.Analyse(ctx.Context, uuid.Must(uuid.NewV4()).String(), t.Dir, m.Path, interp.OptionModuleDir(t.ModuleDir)); err != nil {
+			return errors.Wrapf(err, "failed to analyse module %s", m.Path)
 		}
 	}
 
@@ -79,7 +88,7 @@ func (t runner) Run(ctx *cmdopts.Global) (err error) {
 		}
 
 		if err = interp.Run(ctx.Context, uuid.Must(uuid.NewV4()).String(), t.Dir, m.Path, interp.OptionModuleDir(t.ModuleDir)); err != nil {
-			return err
+			return errors.Wrapf(err, "failed to run module %s", m.Path)
 		}
 	}
 

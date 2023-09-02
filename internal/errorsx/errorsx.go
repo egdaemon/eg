@@ -1,10 +1,11 @@
 package errorsx
 
 import (
-	"errors"
 	"fmt"
 	"log"
 	"time"
+
+	"github.com/pkg/errors"
 )
 
 // Compact returns the first error in the set, if any.
@@ -26,6 +27,10 @@ func MaybeLog(err error) {
 	if cause := log.Output(2, fmt.Sprintln(err)); cause != nil {
 		panic(cause)
 	}
+}
+
+func Wrap(err error, m string) error {
+	return errors.Wrap(err, m)
 }
 
 func Ignore(err error, ignore ...error) error {

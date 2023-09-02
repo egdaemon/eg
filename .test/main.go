@@ -38,9 +38,6 @@ func Op4(context.Context, yak.Op) error {
 }
 
 func DaemonTests(ctx context.Context, _ yak.Op) error {
-	// c1 := yak.Container("ubuntu.22.04").
-	// 	BuildFromFile(".test/Containerfile")
-
 	return yak.Perform(
 		ctx,
 		yak.Parallel(
@@ -54,6 +51,11 @@ func DaemonTests(ctx context.Context, _ yak.Op) error {
 			Op3,
 		)),
 	)
+}
+
+func ExampleContainer() yak.Runner {
+	return yak.Container("ubuntu.22.04").
+		BuildFromFile(".test/Containerfile")
 }
 
 // main defines the setup for the CI process. here is where you define all
@@ -70,13 +72,20 @@ func main() {
 		yak.Parallel(
 			yak.Module(ctx, c1, Op1),
 			yak.Module(ctx, c1, Op2),
+			yak.Module(
+				ctx,
+				c1,
+				yak.Parallel(
+					yak.Sequential(Op1, Op2),
+					yak.Sequential(Op3, Op4),
+				),
+			),
 			yak.Module(ctx, c1, DaemonTests),
 			yak.Module(ctx, c1, Op3),
 			yak.Module(ctx, c1, Op4),
 		),
 	)
 	if err != nil {
-		panic(err)
+		log.Fatalln(err)
 	}
-
 }

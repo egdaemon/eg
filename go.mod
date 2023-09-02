@@ -38,6 +38,7 @@ require (
 )
 
 require (
+	github.com/awalterschulze/gographviz v2.0.3+incompatible
 	github.com/dave/jennifer v1.6.0
 	github.com/go-logr/logr v1.2.3 // indirect
 	github.com/gofrs/uuid v4.3.1+incompatible

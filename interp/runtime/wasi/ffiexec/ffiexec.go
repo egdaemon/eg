@@ -21,16 +21,21 @@ func mayberun(c *exec.Cmd) error {
 func Exec(op func(*exec.Cmd) *exec.Cmd) func(
 	ctx context.Context,
 	m api.Module,
+	deadline int64,
 	nameoffset uint32, namelen uint32,
 	argsoffset uint32, argslen uint32, argssize uint32,
 ) uint32 {
 	return func(
 		ctx context.Context,
 		m api.Module,
+		deadline int64,
 		nameoffset uint32, namelen uint32,
 		argsoffset uint32, argslen uint32, argssize uint32,
 	) uint32 {
-		cmd, err := Command(ctx, m, nameoffset, namelen, argsoffset, argslen, argssize)
+		ictx, done := ffi.ReadMicroDeadline(ctx, deadline)
+		defer done()
+
+		cmd, err := Command(ictx, m, nameoffset, namelen, argsoffset, argslen, argssize)
 		if err != nil {
 			log.Println("unable to build command", err)
 			return 127
@@ -56,20 +61,15 @@ func Command(
 ) (_ *exec.Cmd, err error) {
 	var (
 		name string
+		args []string
 	)
 
 	if name, err = ffi.ReadString(m.Memory(), nameoffset, namelen); err != nil {
-		log.Println("unable to read name argument", err)
 		return nil, errors.Wrap(err, "unable to read command name argument")
 	}
 
-	args := make([]string, 0, argslen)
-	for offset, i := argsoffset, uint32(0); i < argslen*2; offset, i = offset+8, i+2 {
-		data, err := ffi.ReadArrayElement(m.Memory(), argsoffset+i*4, (i+1)*4)
-		if err != nil {
-			return nil, errors.Wrap(err, "unable to read args elemen")
-		}
-		args = append(args, string(data))
+	if args, err = ffi.ReadStringArray(m.Memory(), argsoffset, argslen, argssize); err != nil {
+		return nil, errors.Wrap(err, "unable to read command arguments")
 	}
 
 	return exec.CommandContext(ctx, name, args...), nil

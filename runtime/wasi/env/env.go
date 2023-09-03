@@ -1,6 +1,8 @@
 package env
 
-import "github.com/james-lawrence/eg/internal/envx"
+import (
+	"github.com/james-lawrence/eg/internal/envx"
+)
 
 func Boolean(fallback bool, keys ...string) bool {
 	return envx.Boolean(fallback, keys...)

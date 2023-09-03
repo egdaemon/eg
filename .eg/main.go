@@ -4,8 +4,10 @@ import (
 	"context"
 	"log"
 	"os"
+	"path/filepath"
 	"time"
 
+	"github.com/james-lawrence/eg/internal/envx"
 	"github.com/james-lawrence/eg/runtime/wasi/shell"
 	"github.com/james-lawrence/eg/runtime/wasi/yak"
 )
@@ -16,11 +18,23 @@ func BuildContainer(r yak.ContainerRunner) yak.OpFn {
 	}
 }
 
-func PrepareContainerMounts(ctx context.Context, _ yak.Op) error {
+func PrepareDebian(ctx context.Context, _ yak.Op) error {
 	return shell.Run(
 		ctx,
-		shell.New("echo hello world 1").Timeout(10*time.Second),
-		shell.New("echo hello world 2").Timeout(10*time.Second),
+		shell.New("rm -rf .dist/deb/debian && mkdir -p .dist/deb/debian"),
+		shell.New("rsync --recursive .dist/deb/.skel/ .dist/deb/debian"),
+		shell.New("cat .dist/deb/.templates/changelog.tmpl | VERSION=\"0.0.1\" DISTRO=\"jammy\" DEBEMAIL=\"jljatone@gmail.com\" CHANGELOG_DATE=\"$(date +\"%a, %d %b %Y %T %z\")\" envsubst | tee .dist/deb/debian/changelog"),
+		shell.New("cat .dist/deb/debian/changelog"),
+		shell.New("cat .dist/deb/.templates/control.tmpl | envsubst | tee .dist/deb/debian/control"),
+		shell.New("cat .dist/deb/.templates/rules.tmpl | envsubst | tee .dist/deb/debian/rules"),
+	)
+}
+
+func BuildDebian(ctx context.Context, _ yak.Op) error {
+	return shell.Run(
+		ctx,
+		shell.New("ls -lha").Directory(".dist/deb"),
+		shell.New("cd .dist/deb && debuild -S"),
 	)
 }
 
@@ -31,7 +45,17 @@ func Debug(ctx context.Context, _ yak.Op) error {
 
 	return shell.Run(
 		ctx,
-		shell.New("podman --version").Timeout(10*time.Second),
+		shell.New("podman --version"),
+	)
+}
+
+func DebugGPG(ctx context.Context, _ yak.Op) error {
+	return shell.Run(
+		ctx,
+		shell.New("ls -lha /root/.gnupg/")
+		shell.New("gpg --list-keys"),
+		shell.New("ls -lha /tmp"),
+		shell.New("env && gpgconf --list-dirs agent-socket").Environ("GPG_AGENT_INFO", "/root/.gnupg/socket"),
 	)
 }
 
@@ -39,9 +63,9 @@ func DebianBuild(ctx context.Context, o yak.Op) error {
 	return yak.Sequential(
 		yak.Parallel(
 			Debug,
-			// BuildDebContainer,
-			// PrepareContainerMounts,
+			PrepareDebian,
 		),
+		BuildDebian,
 	)(ctx, o)
 }
 
@@ -53,6 +77,17 @@ func main() {
 
 	// c1 := yak.Container("eg.ubuntu.22.04").PullFrom("quay.io/podman/stable")
 
+	// -v $(HOME)/.gnupg:/opt/bw/.dist/cache/.gnupg
+
+	c1 := yak.Container("eg.ubuntu.22.04").
+		OptionPrivileged().
+		OptionVolumeWithPermissions(
+			filepath.Join("/", "home", "james.lawrence", ".gnupg"), filepath.Join("/", "root", ".gnupg"), "rw",
+		).
+		OptionVolumeWithPermissions(
+			envx.String("", "GPG_AGENT_INFO"), "/root/.gnupg/socket", "rw",
+		)
+
 	err := yak.Perform(
 		ctx,
 		yak.Parallel(
@@ -62,7 +97,7 @@ func main() {
 				BuildFromFile(".dist/deb/Containerfile")),
 		),
 		yak.Parallel(
-			yak.Module(ctx, yak.Container("eg.ubuntu.22.04").OptionPrivileged(), DebianBuild),
+			yak.Module(ctx, c1, DebugGPG, DebianBuild),
 		),
 	)
 	if err != nil {

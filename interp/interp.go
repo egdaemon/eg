@@ -143,6 +143,8 @@ func (t runner) perform(ctx context.Context, runid, path string, rtb runtimefn) 
 	)
 
 	mcfg := wazero.NewModuleConfig().WithEnv(
+		"GPG_AGENT_INFO", envx.String("/root/.gnupg/socket", "GPG_AGENT_INFO"),
+	).WithEnv(
 		"CI", envx.String("", "EG_CI", "CI"),
 	).WithEnv(
 		"EG_CI", envx.String("", "EG_CI", "CI"),
@@ -156,6 +158,8 @@ func (t runner) perform(ctx context.Context, runid, path string, rtb runtimefn) 
 		"EG_RUNTIME_DIRECTORY", tmpdir,
 	).WithEnv(
 		"RUNTIME_DIRECTORY", tmpdir,
+	).WithStdin(
+		os.Stdin,
 	).WithStderr(
 		os.Stderr,
 	).WithStdout(

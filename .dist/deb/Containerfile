@@ -6,7 +6,7 @@ COPY .dist/.build.filesystem /
 RUN apt-get update
 RUN apt-get -y --no-install-recommends install dput devscripts dh-make dput software-properties-common golang-1.20 git uidmap dbus-user-session
 RUN apt-get update
-RUN apt-get -y --no-install-recommends install podman podman-remote
+RUN apt-get -y --no-install-recommends install podman podman-remote rsync vim build-essential
 RUN podman --version
 RUN podman-remote --version
 RUN usermod --add-subuids 100000-200000 --add-subgids 100000-200000 root

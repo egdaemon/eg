@@ -2,7 +2,6 @@ package ffigraph
 
 import (
 	"context"
-	"fmt"
 	"log"
 
 	"github.com/awalterschulze/gographviz"
@@ -77,10 +76,6 @@ type graphviz struct {
 	current string
 }
 
-func (t *graphviz) nid(s string) string {
-	return fmt.Sprintf("n%s", s)
-}
-
 func (t *graphviz) Pusher() traceevent {
 	return func(ctx context.Context, m api.Module, idoffset, idlen uint32) uint32 {
 		var (
@@ -92,13 +87,6 @@ func (t *graphviz) Pusher() traceevent {
 			return 1
 		}
 
-		// id = t.nid(id)
-
-		if id == t.current { // TODO find the cause.
-			log.Println("DERP", id, t.current)
-		}
-
-		log.Println("pushing", id)
 		if err = t.g.AddNode(t.current, id, nil); err != nil {
 			log.Println("unable to trace graph node", err)
 			return 1
@@ -121,17 +109,13 @@ func (t *graphviz) Pusher() traceevent {
 func (t *graphviz) Popper() traceevent {
 	return func(ctx context.Context, m api.Module, idoffset, idlen uint32) uint32 {
 		var (
-			id  string
 			err error
 		)
-		if id, err = ffi.ReadString(m.Memory(), idoffset, idlen); err != nil {
+		if _, err = ffi.ReadString(m.Memory(), idoffset, idlen); err != nil {
 			log.Println("unable to read id argument", err)
 			return 1
 		}
 
-		// id = t.nid(id)
-
-		log.Println("popping", id, len(t.stack), t.stack)
 		t.stack = t.stack[:len(t.stack)-1]
 		if len(t.stack) == 0 {
 			return 0

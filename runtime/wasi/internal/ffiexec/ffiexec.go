@@ -1,4 +1,4 @@
 package ffiexec
 
-//go:wasmimport env github.com/james-lawrence/eg/runtime/wasi/runtime/ffiexec.Command
-func Command(command string, args []string) int
+//export github.com/james-lawrence/eg/runtime/wasi/runtime/ffiexec.Command
+func Command(deadline int64, command string, args []string) uint32

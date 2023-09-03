@@ -3,15 +3,15 @@ package yak
 import (
 	"context"
 	"fmt"
-	"log"
 	"math/rand"
 	"sync"
 	"unsafe"
 
 	"github.com/james-lawrence/eg/internal/errorsx"
+	"github.com/james-lawrence/eg/internal/stringsx"
+	"github.com/james-lawrence/eg/interp/runtime/wasi/ffiguest"
 	"github.com/james-lawrence/eg/runtime/wasi/internal/ffiegcontainer"
 	"github.com/james-lawrence/eg/runtime/wasi/internal/ffigraph"
-	"github.com/pkg/errors"
 )
 
 // A reference to an operation.
@@ -22,11 +22,11 @@ type Reference interface {
 type Op interface {
 	ID() string
 }
-type op func(context.Context, Op) error
+type OpFn func(context.Context, Op) error
 
 type runtimeref struct {
 	ptr uintptr
-	do  op
+	do  OpFn
 }
 
 func (t runtimeref) ID() string {
@@ -46,14 +46,14 @@ func prefixedop(p string, o Op) namedop {
 // ref meta programming marking a task for delayed execution when rewriting the program at compilation time.
 // if executed directly will use the memory location of the function.
 // Important: this method acts as an instrumentation point by the runtime.
-func ref(o op) Reference {
+func ref(o OpFn) Reference {
 	addr := *(*uintptr)(unsafe.Pointer(&o))
 	return runtimeref{ptr: addr, do: o}
 }
 
 type transpiledref struct {
 	name string
-	do   op
+	do   OpFn
 }
 
 func (t transpiledref) ID() string {
@@ -62,14 +62,14 @@ func (t transpiledref) ID() string {
 
 // Deprecated: this is intended for internal use only. do not use.
 // its use may prevent future builds from executing.
-func UnsafeTranspiledRef(name string, o op) Reference {
+func UnsafeTranspiledRef(name string, o OpFn) Reference {
 	return transpiledref{
 		name: name,
 		do:   o,
 	}
 }
 
-func Perform(ctx context.Context, tasks ...op) error {
+func Perform(ctx context.Context, tasks ...OpFn) error {
 	return ffigraph.WrapErr(namedop("perform"), func() error {
 		for _, t := range tasks {
 			if err := t(ctx, ref(t)); err != nil {
@@ -81,7 +81,7 @@ func Perform(ctx context.Context, tasks ...op) error {
 	})
 }
 
-func Sequential(operations ...op) op {
+func Sequential(operations ...OpFn) OpFn {
 	return func(ctx context.Context, o Op) error {
 		return ffigraph.WrapErr(prefixedop("seq", o), func() error {
 			for _, op := range operations {
@@ -107,7 +107,7 @@ func Sequential(operations ...op) op {
 // gain threading this will automatically begin running operations
 // in parallel natively. to prevent issues in the future we shuffle
 // operations to ensure callers are not implicitly relying on order.
-func Parallel(operations ...op) op {
+func Parallel(operations ...OpFn) OpFn {
 	return func(ctx context.Context, o Op) (err error) {
 		return ffigraph.WrapErr(prefixedop("par", o), func() error {
 			errs := make(chan error, len(operations))
@@ -118,7 +118,7 @@ func Parallel(operations ...op) op {
 			})
 
 			for _, o := range operations {
-				go func(iop op) {
+				go func(iop OpFn) {
 					r := ref(iop)
 					select {
 					case <-ctx.Done():
@@ -142,7 +142,7 @@ func Parallel(operations ...op) op {
 	}
 }
 
-func When(b bool, o op) op {
+func When(b bool, o OpFn) OpFn {
 	return func(ctx context.Context, i Op) error {
 		if !b {
 			return nil
@@ -165,9 +165,25 @@ func Container(name string) ContainerRunner {
 	}
 }
 
+type coption []string
+
+func (t coption) volume(host, guest, opts string) coption {
+	return []string{"--volume", fmt.Sprintf("%s:%s:%s", host, guest, opts)}
+}
+
+func (t coption) privileged() coption {
+	return []string{"--privileged"}
+}
+
+func (t coption) user(user string) coption {
+	return []string{"--user", user}
+}
+
 type ContainerRunner struct {
 	name       string
 	definition string
+	pull       string
+	options    []coption
 	built      *sync.Once
 }
 
@@ -176,17 +192,29 @@ func (t ContainerRunner) BuildFromFile(s string) ContainerRunner {
 	return t
 }
 
+func (t ContainerRunner) PullFrom(s string) ContainerRunner {
+	t.pull = s
+	return t
+}
+
 // CompileWith builds the container and
 func (t ContainerRunner) CompileWith(ctx context.Context) (err error) {
+	if ffigraph.Analysing() {
+		return nil
+	}
+
+	var opts []string
+	for _, o := range t.options {
+		opts = append(opts, o...)
+	}
+
 	t.built.Do(func() {
-		if ffigraph.Analysing() {
-			return
+		if t.pull != "" {
+			err = ffiguest.Error(ffiegcontainer.Pull(t.pull, opts), fmt.Errorf("unable to pull the container: %s", t.name))
 		}
 
-		log.Printf("building container %s\n", t.definition)
-		if code := ffiegcontainer.Build(t.name, t.definition); code != 0 {
-			err = errors.Errorf("unable to build the container: %d", code)
-			return
+		if t.definition != "" {
+			err = ffiguest.Error(ffiegcontainer.Build(t.name, t.definition, opts), fmt.Errorf("unable to build the container: %s", t.name))
 		}
 	})
 
@@ -194,16 +222,40 @@ func (t ContainerRunner) CompileWith(ctx context.Context) (err error) {
 }
 
 func (t ContainerRunner) RunWith(ctx context.Context, mpath string) (err error) {
-	if code := ffiegcontainer.Run(t.name, mpath); code != 0 {
-		return errors.Errorf("unable to build the container: %d", code)
+	var opts []string
+	for _, o := range t.options {
+		opts = append(opts, o...)
 	}
 
-	return nil
+	return ffiguest.Error(ffiegcontainer.Module(t.name, mpath, opts), fmt.Errorf("unable to run the container: %s", t.name))
+}
+
+func (t ContainerRunner) OptionPrivileged() ContainerRunner {
+	t.options = append(t.options, (coption{}).privileged())
+	return t
+}
+
+func (t ContainerRunner) OptionUser(username string) ContainerRunner {
+	t.options = append(t.options, (coption{}).user(username))
+	return t
+}
+
+// Mount a directory into the container at the provided host, guest paths as read only.
+func (t ContainerRunner) OptionVolume(host, guest string) ContainerRunner {
+	t.options = append(t.options, (coption{}).volume(host, guest, "ro"))
+	return t
+}
+
+// Mount a directory into the container at the provided the host, guest paths and the mount permissions.
+// the mount permissions default to read only when an empty string
+func (t ContainerRunner) OptionVolumeWithPermissions(host, guest, perms string) ContainerRunner {
+	t.options = append(t.options, (coption{}).volume(host, guest, stringsx.DefaultIfBlank(perms, "ro")))
+	return t
 }
 
 // Module executes a set of operations within the provided environment.
 // Important: this method acts as an Instrumentation point by the runtime.
-func Module(ctx context.Context, r Runner, references ...op) op {
+func Module(ctx context.Context, r Runner, references ...OpFn) OpFn {
 	return func(ctx context.Context, o Op) error {
 		return r.CompileWith(ctx)
 	}
@@ -211,7 +263,7 @@ func Module(ctx context.Context, r Runner, references ...op) op {
 
 // Deprecated: this is intended for internal use only. do not use.
 // used to replace the module invocations at runtime.
-func UnsafeModule(ctx context.Context, r Runner, modulepath string) op {
+func UnsafeModule(ctx context.Context, r Runner, modulepath string) OpFn {
 	if err := r.CompileWith(ctx); err != nil {
 		return func(context.Context, Op) error {
 			return err

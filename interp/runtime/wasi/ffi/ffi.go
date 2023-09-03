@@ -25,13 +25,28 @@ func ReadString(m api.Memory, offset uint32, len uint32) (string, error) {
 	return string(data), nil
 }
 
+func ReadStringArray(m api.Memory, offset uint32, length uint32, argssize uint32) (args []string, err error) {
+	args = make([]string, 0, length)
+	for offset, i := offset, uint32(0); i < length*2; offset, i = offset+8, i+2 {
+		var (
+			data []byte
+		)
+
+		if data, err = ReadArrayElement(m, offset, 4); err != nil {
+			return nil, err
+		}
+
+		args = append(args, string(data))
+	}
+
+	return args, nil
+}
+
 func ReadArrayElement(m api.Memory, offset, len uint32) (data []byte, err error) {
 	var (
 		ok            bool
 		eoffset, elen uint32
 	)
-
-	// log.Println("reading array element", offset, len)
 
 	if eoffset, ok = m.ReadUint32Le(offset); !ok {
 		return nil, errors.New("unable to read element offset")

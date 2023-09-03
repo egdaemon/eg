@@ -18,7 +18,6 @@ import (
 	"github.com/james-lawrence/eg/interp/runtime/wasi/ffiegcontainer"
 	"github.com/james-lawrence/eg/interp/runtime/wasi/ffiexec"
 	"github.com/james-lawrence/eg/interp/runtime/wasi/ffigraph"
-	"github.com/james-lawrence/eg/interp/wasidebug"
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
 )
@@ -52,15 +51,23 @@ func Run(ctx context.Context, runid, dir string, module string, options ...Optio
 		return host.NewFunctionBuilder().WithFunc(ffigraph.Analysing(false)).Export("github.com/james-lawrence/eg/runtime/wasi/runtime/graph.Analysing").
 			NewFunctionBuilder().WithFunc(g.Pusher()).Export("github.com/james-lawrence/eg/runtime/wasi/runtime/graph.Push").
 			NewFunctionBuilder().WithFunc(g.Popper()).Export("github.com/james-lawrence/eg/runtime/wasi/runtime/graph.Pop").
-			NewFunctionBuilder().WithFunc(ffiegcontainer.Build(func(ctx context.Context, name, definition string) (cmd *exec.Cmd, err error) {
-			cmd, err = ffiegcontainer.PodmanBuild(ctx, name, moduledir, definition)
+			NewFunctionBuilder().WithFunc(ffiegcontainer.Pull(func(ctx context.Context, name string, options ...string) (cmd *exec.Cmd, err error) {
+			cmd, err = ffiegcontainer.PodmanPull(ctx, name, options...)
+			cmd.Dir = r.root
+			cmd.Env = cmdenv
+			cmd.Stderr = os.Stderr
+			cmd.Stdout = os.Stdout
+			return cmd, err
+		})).Export("github.com/james-lawrence/eg/runtime/wasi/runtime/ffiegcontainer.Pull").
+			NewFunctionBuilder().WithFunc(ffiegcontainer.Build(func(ctx context.Context, name, definition string, options ...string) (cmd *exec.Cmd, err error) {
+			cmd, err = ffiegcontainer.PodmanBuild(ctx, name, ".", definition, options...)
 			cmd.Dir = r.root
 			cmd.Env = cmdenv
 			cmd.Stderr = os.Stderr
 			cmd.Stdout = os.Stdout
 			return cmd, err
 		})).Export("github.com/james-lawrence/eg/runtime/wasi/runtime/ffiegcontainer.Build").
-			NewFunctionBuilder().WithFunc(ffiegcontainer.Run(func(ctx context.Context, name, modulepath string) (err error) {
+			NewFunctionBuilder().WithFunc(ffiegcontainer.Module(func(ctx context.Context, name, modulepath string, options ...string) (err error) {
 			cmdctx := func(cmd *exec.Cmd) *exec.Cmd {
 				cmd.Dir = r.root
 				cmd.Env = cmdenv
@@ -69,8 +76,16 @@ func Run(ctx context.Context, runid, dir string, module string, options ...Optio
 				return cmd
 			}
 			cname := fmt.Sprintf("%s.%s", name, md5x.DigestString(modulepath+runid))
-			return ffiegcontainer.PodmanRun(ctx, cmdctx, name, cname, r.root, r.moduledir, modulepath, "/home/james.lawrence/go/bin/eg")
-		})).Export("github.com/james-lawrence/eg/runtime/wasi/runtime/ffiegcontainer.Run").
+
+			options = append(
+				options,
+				"--volume", fmt.Sprintf("%s:/opt/egbin:ro", os.Args[0]),
+				"--volume", fmt.Sprintf("%s:/opt/egmodule.wasm:ro", modulepath),
+				"--volume", fmt.Sprintf("%s:/opt/eg:O", r.root),
+			)
+
+			return ffiegcontainer.PodmanModule(ctx, cmdctx, name, cname, r.moduledir, options...)
+		})).Export("github.com/james-lawrence/eg/runtime/wasi/runtime/ffiegcontainer.Module").
 			NewFunctionBuilder().WithFunc(ffiexec.Exec(func(cmd *exec.Cmd) *exec.Cmd {
 			cmd.Dir = r.root
 			cmd.Env = cmdenv
@@ -164,7 +179,7 @@ func (t runner) perform(ctx context.Context, runid, path string, rtb runtimefn) 
 	}
 	defer hostenv.Close(ctx)
 
-	wasidebug.Host(hostenv)
+	// wasidebug.Host(hostenv)
 	log.Println("interp initiated", path)
 	defer log.Println("interp completed", path)
 	wasi, err := os.ReadFile(path)

@@ -32,32 +32,32 @@ type grapher struct{}
 
 func (t grapher) Pusher() traceevent {
 	return func(ctx context.Context, m api.Module, idoffset, idlen uint32) uint32 {
-		var (
-			id  string
-			err error
-		)
-		if id, err = ffi.ReadString(m.Memory(), idoffset, idlen); err != nil {
-			log.Println("unable to read id argument", err)
-			return 1
-		}
+		// var (
+		// 	id  string
+		// 	err error
+		// )
+		// if id, err = ffi.ReadString(m.Memory(), idoffset, idlen); err != nil {
+		// 	log.Println("unable to read id argument", err)
+		// 	return 1
+		// }
 
-		log.Println("pushing", id)
+		// log.Println("pushing", id)
 		return 0
 	}
 }
 
 func (t grapher) Popper() traceevent {
 	return func(ctx context.Context, m api.Module, idoffset, idlen uint32) uint32 {
-		var (
-			id  string
-			err error
-		)
-		if id, err = ffi.ReadString(m.Memory(), idoffset, idlen); err != nil {
-			log.Println("unable to read id argument", err)
-			return 1
-		}
+		// var (
+		// 	id  string
+		// 	err error
+		// )
+		// if id, err = ffi.ReadString(m.Memory(), idoffset, idlen); err != nil {
+		// 	log.Println("unable to read id argument", err)
+		// 	return 1
+		// }
 
-		log.Println("popping", id)
+		// log.Println("popping", id)
 		return 0
 	}
 }

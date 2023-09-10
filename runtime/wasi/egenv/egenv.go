@@ -20,3 +20,7 @@ func CacheDirectory() string {
 func CachePath(paths ...string) string {
 	return filepath.Join(CacheDirectory(), filepath.Join(paths...))
 }
+
+func RuntimeDirectory() string {
+	return os.Getenv("EG_RUNTIME_DIRECTORY")
+}

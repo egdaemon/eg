@@ -11,7 +11,7 @@
 //	defer r.Close(ctx) // This closes everything this Runtime created.
 //
 //	wasi_snapshot_preview1.MustInstantiate(ctx, r)
-//	mod, _ := r.InstantiateModuleFromBinary(ctx, wasm)
+//	mod, _ := r.Instantiate(ctx, wasm)
 //
 // See https://github.com/WebAssembly/WASI
 package wasi_snapshot_preview1
@@ -22,14 +22,15 @@ import (
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
-	. "github.com/tetratelabs/wazero/internal/wasi_snapshot_preview1"
+	"github.com/tetratelabs/wazero/experimental/sys"
+	"github.com/tetratelabs/wazero/internal/wasip1"
 	"github.com/tetratelabs/wazero/internal/wasm"
 )
 
 // ModuleName is the module name WASI functions are exported into.
 //
 // See https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md
-const ModuleName = InternalModuleName
+const ModuleName = wasip1.InternalModuleName
 
 const i32, i64 = wasm.ValueTypeI32, wasm.ValueTypeI64
 
@@ -45,30 +46,32 @@ func MustInstantiate(ctx context.Context, r wazero.Runtime) {
 	}
 }
 
-// Instantiate instantiates the ModuleName module into the runtime default
-// namespace.
+// Instantiate instantiates the ModuleName module into the runtime.
 //
 // # Notes
 //
-//   - Failure cases are documented on wazero.Namespace InstantiateModule.
+//   - Failure cases are documented on wazero.Runtime InstantiateModule.
 //   - Closing the wazero.Runtime has the same effect as closing the result.
-//   - To instantiate into another wazero.Namespace, use NewBuilder instead.
 func Instantiate(ctx context.Context, r wazero.Runtime) (api.Closer, error) {
-	return NewBuilder(r).Instantiate(ctx, r)
+	return NewBuilder(r).Instantiate(ctx)
 }
 
 // Builder configures the ModuleName module for later use via Compile or Instantiate.
+//
+// # Notes
+//
+//   - This is an interface for decoupling, not third-party implementations.
+//     All implementations are in wazero.
 type Builder interface {
-	// Compile compiles the ModuleName module that can instantiated in any
-	// namespace (wazero.Namespace).
+	// Compile compiles the ModuleName module. Call this before Instantiate.
 	//
 	// Note: This has the same effect as the same function on wazero.HostModuleBuilder.
 	Compile(context.Context) (wazero.CompiledModule, error)
 
-	// Instantiate instantiates the ModuleName module into the given namespace.
+	// Instantiate instantiates the ModuleName module and returns a function to close it.
 	//
 	// Note: This has the same effect as the same function on wazero.HostModuleBuilder.
-	Instantiate(context.Context, wazero.Namespace) (api.Closer, error)
+	Instantiate(context.Context) (api.Closer, error)
 }
 
 // NewBuilder returns a new Builder.
@@ -91,11 +94,16 @@ func (b *builder) Compile(ctx context.Context) (wazero.CompiledModule, error) {
 }
 
 // Instantiate implements Builder.Instantiate
-func (b *builder) Instantiate(ctx context.Context, ns wazero.Namespace) (api.Closer, error) {
-	return b.hostModuleBuilder().Instantiate(ctx, ns)
+func (b *builder) Instantiate(ctx context.Context) (api.Closer, error) {
+	return b.hostModuleBuilder().Instantiate(ctx)
 }
 
 // FunctionExporter exports functions into a wazero.HostModuleBuilder.
+//
+// # Notes
+//
+//   - This is an interface for decoupling, not third-party implementations.
+//     All implementations are in wazero.
 type FunctionExporter interface {
 	ExportFunctions(wazero.HostModuleBuilder)
 }
@@ -221,18 +229,18 @@ func exportFunctions(builder wazero.HostModuleBuilder) {
 // writeOffsetsAndNullTerminatedValues is used to write NUL-terminated values
 // for args or environ, given a pre-defined bytesLen (which includes NUL
 // terminators).
-func writeOffsetsAndNullTerminatedValues(mem api.Memory, values [][]byte, offsets, bytes, bytesLen uint32) Errno {
+func writeOffsetsAndNullTerminatedValues(mem api.Memory, values [][]byte, offsets, bytes, bytesLen uint32) sys.Errno {
 	// The caller may not place bytes directly after offsets, so we have to
 	// read them independently.
 	valuesLen := len(values)
 	offsetsLen := uint32(valuesLen * 4) // uint32Le
 	offsetsBuf, ok := mem.Read(offsets, offsetsLen)
 	if !ok {
-		return ErrnoFault
+		return sys.EFAULT
 	}
 	bytesBuf, ok := mem.Read(bytes, bytesLen)
 	if !ok {
-		return ErrnoFault
+		return sys.EFAULT
 	}
 
 	// Loop through the values, first writing the location of its data to
@@ -255,7 +263,7 @@ func writeOffsetsAndNullTerminatedValues(mem api.Memory, values [][]byte, offset
 		bI++
 	}
 
-	return ErrnoSuccess
+	return 0
 }
 
 func newHostFunc(
@@ -265,38 +273,42 @@ func newHostFunc(
 	paramNames ...string,
 ) *wasm.HostFunc {
 	return &wasm.HostFunc{
-		ExportNames: []string{name},
+		ExportName:  name,
 		Name:        name,
 		ParamTypes:  paramTypes,
 		ParamNames:  paramNames,
 		ResultTypes: []api.ValueType{i32},
 		ResultNames: []string{"errno"},
-		Code:        &wasm.Code{IsHostFunction: true, GoFunc: goFunc},
+		Code:        wasm.Code{GoFunc: goFunc},
 	}
 }
 
 // wasiFunc special cases that all WASI functions return a single Errno
 // result. The returned value will be written back to the stack at index zero.
-type wasiFunc func(ctx context.Context, mod api.Module, params []uint64) Errno
+type wasiFunc func(ctx context.Context, mod api.Module, params []uint64) sys.Errno
 
 // Call implements the same method as documented on api.GoModuleFunction.
 func (f wasiFunc) Call(ctx context.Context, mod api.Module, stack []uint64) {
 	// Write the result back onto the stack
-	stack[0] = uint64(f(ctx, mod, stack))
+	errno := f(ctx, mod, stack)
+	if errno != 0 {
+		stack[0] = uint64(wasip1.ToErrno(errno))
+	} else { // special case ass ErrnoSuccess is zero
+		stack[0] = 0
+	}
 }
 
 // stubFunction stubs for GrainLang per #271.
 func stubFunction(name string, paramTypes []wasm.ValueType, paramNames ...string) *wasm.HostFunc {
 	return &wasm.HostFunc{
+		ExportName:  name,
 		Name:        name,
-		ExportNames: []string{name},
 		ParamTypes:  paramTypes,
 		ParamNames:  paramNames,
 		ResultTypes: []api.ValueType{i32},
 		ResultNames: []string{"errno"},
-		Code: &wasm.Code{
-			IsHostFunction: true,
-			Body:           []byte{wasm.OpcodeI32Const, byte(ErrnoNosys), wasm.OpcodeEnd},
+		Code: wasm.Code{
+			GoFunc: api.GoModuleFunc(func(_ context.Context, _ api.Module, stack []uint64) { stack[0] = uint64(wasip1.ErrnoNosys) }),
 		},
 	}
 }

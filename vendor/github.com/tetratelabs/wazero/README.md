@@ -60,19 +60,21 @@ wazero into their Go applications.
 
 ### wazero
 
-wazero is an early project, so APIs are subject to change until version 1.0.
-To use wazero meanwhile, you need to use the latest pre-release like this:
+wazero's [1.0 release][15] happened in March 2023, and is [in use][16] by many
+projects and production sites.
 
+We offer an API stability promise with semantic versioning. In other words, we
+promise to not break any exported function signature without incrementing the
+major version. This does not mean no innovation: New features and behaviors
+happen with a minor version increment, e.g. 1.0.11 to 1.2.0. We also fix bugs
+or change internal details with a patch version, e.g. 1.0.0 to 1.0.1.
+
+You can get the latest version of wazero like this.
 ```bash
 go get github.com/tetratelabs/wazero@latest
 ```
 
-wazero will tag a new pre-release at least once a month until 1.0. 1.0 is
-scheduled for Feb 2023, following the release of Go 1.20. wazero 1.0 will build
-with Go 1.18 and above per the below policy.
-
-Meanwhile, please practice the current APIs to ensure they work for you, and
-give us a [star][15] if you are enjoying it so far!
+Please give us a [star][17] if you end up using wazero!
 
 ### Go
 
@@ -96,14 +98,14 @@ systems are ones we test, but that doesn't necessarily mean other operating
 system versions won't work.
 
 We currently test Linux (Ubuntu and scratch), MacOS and Windows as packaged by
-[GitHub Actions][11], as well FreeBSD via Vagrant/VirtualBox.
+[GitHub Actions][11], as well compilation of 32-bit Linux and 64-bit FreeBSD.
 
 * Interpreter
   * Linux is tested on amd64 (native) as well arm64 and riscv64 via emulation.
-  * FreeBSD, MacOS and Windows are only tested on amd64.
+  * MacOS and Windows are only tested on amd64.
 * Compiler
   * Linux is tested on amd64 (native) as well arm64 via emulation.
-  * FreeBSD, MacOS and Windows are only tested on amd64.
+  * MacOS and Windows are only tested on amd64.
 
 wazero has no dependencies and doesn't require CGO. This means it can also be
 embedded in an application that doesn't use an operating system. This is a main
@@ -128,4 +130,6 @@ wazero is a registered trademark of Tetrate.io, Inc. in the United States and/or
 [12]: https://docs.docker.com/develop/develop-images/baseimages/#create-a-simple-parent-image-using-scratch
 [13]: https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md
 [14]: https://github.com/WebAssembly/spec/tree/d39195773112a22b245ffbe864bab6d1182ccb06/test/core
-[15]: https://github.com/tetratelabs/wazero/stargazers
+[15]: https://tetrate.io/blog/introducing-wazero-from-tetrate/
+[16]: https://wazero.io/community/users/
+[17]: https://github.com/tetratelabs/wazero/stargazers

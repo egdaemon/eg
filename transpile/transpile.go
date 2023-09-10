@@ -88,6 +88,7 @@ func (t golang) Run(ctx context.Context) (roots []Compiled, err error) {
 
 		refexpr := astbuild.SelExpr(yakident, "Ref")
 		refmodule := astbuild.SelExpr(yakident, "Module")
+		refexec := astbuild.SelExpr(yakident, "Exec")
 
 		// make a clone of the buffer
 		buf := bytes.NewBuffer(nil)
@@ -97,6 +98,10 @@ func (t golang) Run(ctx context.Context) (roots []Compiled, err error) {
 
 		moduleExpr := func(ce *ast.CallExpr) bool {
 			return astcodec.TypePattern(refmodule)(ce.Fun)
+		}
+
+		execExpr := func(ce *ast.CallExpr) bool {
+			return astcodec.TypePattern(refexec)(ce.Fun)
 		}
 
 		generr := error(nil)
@@ -144,13 +149,30 @@ func (t golang) Run(ctx context.Context) (roots []Compiled, err error) {
 			}
 			generatedmodules = append(generatedmodules, m)
 
-			return astbuild.CallExpr(astbuild.SelExpr(yakident, "UnsafeModule"), ctxarg, rarg, astbuild.StringLiteral(genwasm))
+			return astbuild.CallExpr(astbuild.SelExpr(yakident, "UnsafeRunner"), ctxarg, astbuild.CallExpr(astbuild.SelExpr(types.ExprString(rarg), "ToModuleRunner")), astbuild.StringLiteral(genwasm))
 		}, moduleExpr)
+
+		genexec := astcodec.NewCallExprReplacement(func(ce *ast.CallExpr) *ast.CallExpr {
+			if len(ce.Args) < 2 {
+				log.Println("unable to transpile exec call", len(ce.Args))
+				return ce
+			}
+
+			ctxarg := ce.Args[0]
+			rarg := ce.Args[1]
+
+			pos := pkg.Fset.PositionFor(ce.Pos(), true)
+			pos.Filename = strings.TrimPrefix(pos.Filename, t.Workspace.Root+"/")
+			genwasm := filepath.Join(t.Context.Workspace.BuildDir, gendir, fmt.Sprintf("module.%d.%d.wasm", pos.Line, pos.Column))
+
+			return astbuild.CallExpr(astbuild.SelExpr(yakident, "UnsafeRunner"), ctxarg, rarg, astbuild.StringLiteral(genwasm))
+		}, execExpr)
 
 		v := astcodec.Multivisit(
 			// astcodec.Filter(grapher(pkg.Fset), moduleExpr),
 			replaceRef(yakident, refexpr),
 			genmod,
+			genexec,
 		)
 
 		ast.Walk(v, c)

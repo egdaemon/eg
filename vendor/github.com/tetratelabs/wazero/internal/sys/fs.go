@@ -1,449 +1,474 @@
 package sys
 
 import (
-	"context"
-	"errors"
-	"fmt"
 	"io"
 	"io/fs"
-	"os"
-	"path"
-	"syscall"
-	"time"
+	"net"
 
-	"github.com/tetratelabs/wazero/internal/platform"
-	"github.com/tetratelabs/wazero/internal/syscallfs"
+	"github.com/tetratelabs/wazero/experimental/sys"
+	"github.com/tetratelabs/wazero/internal/descriptor"
+	"github.com/tetratelabs/wazero/internal/fsapi"
+	socketapi "github.com/tetratelabs/wazero/internal/sock"
+	"github.com/tetratelabs/wazero/internal/sysfs"
 )
 
 const (
-	FdStdin uint32 = iota
+	FdStdin int32 = iota
 	FdStdout
 	FdStderr
-	// FdRoot is the file descriptor of the root ("/") filesystem.
+	// FdPreopen is the file descriptor of the first pre-opened directory.
 	//
 	// # Why file descriptor 3?
 	//
-	// While not specified, the most common WASI implementation, wasi-libc, expects
-	// POSIX style file descriptor allocation, where the lowest available number is
-	// used to open the next file. Since 1 and 2 are taken by stdout and stderr,
-	// `root` is assigned 3.
+	// While not specified, the most common WASI implementation, wasi-libc,
+	// expects POSIX style file descriptor allocation, where the lowest
+	// available number is used to open the next file. Since 1 and 2 are taken
+	// by stdout and stderr, the next is 3.
 	//   - https://github.com/WebAssembly/WASI/issues/122
 	//   - https://pubs.opengroup.org/onlinepubs/9699919799/functions/V2_chap02.html#tag_15_14
 	//   - https://github.com/WebAssembly/wasi-libc/blob/wasi-sdk-16/libc-bottom-half/sources/preopens.c#L215
-	FdRoot
+	FdPreopen
 )
 
-const (
-	modeDevice     = uint32(fs.ModeDevice | 0o640)
-	modeCharDevice = uint32(fs.ModeCharDevice | 0o640)
-)
-
-// EmptyFS is exported to special-case an empty file system.
-var EmptyFS = &emptyFS{}
-
-type emptyFS struct{}
-
-// compile-time check to ensure emptyFS implements fs.FS
-var _ fs.FS = &emptyFS{}
-
-// Open implements the same method as documented on fs.FS.
-func (f *emptyFS) Open(name string) (fs.File, error) {
-	if !fs.ValidPath(name) {
-		return nil, &fs.PathError{Op: "open", Path: name, Err: fs.ErrInvalid}
-	}
-	return nil, &fs.PathError{Op: "open", Path: name, Err: fs.ErrNotExist}
-}
-
-// An emptyRootDir is a fake "/" directory.
-type emptyRootDir struct{}
-
-var _ fs.ReadDirFile = emptyRootDir{}
-
-func (emptyRootDir) Stat() (fs.FileInfo, error) { return emptyRootDir{}, nil }
-func (emptyRootDir) Read([]byte) (int, error) {
-	return 0, &fs.PathError{Op: "read", Path: "/", Err: errors.New("is a directory")}
-}
-func (emptyRootDir) Close() error                       { return nil }
-func (emptyRootDir) ReadDir(int) ([]fs.DirEntry, error) { return nil, nil }
-
-var _ fs.FileInfo = emptyRootDir{}
-
-func (emptyRootDir) Name() string       { return "/" }
-func (emptyRootDir) Size() int64        { return 0 }
-func (emptyRootDir) Mode() fs.FileMode  { return fs.ModeDir | 0o555 }
-func (emptyRootDir) ModTime() time.Time { return time.Unix(0, 0) }
-func (emptyRootDir) IsDir() bool        { return true }
-func (emptyRootDir) Sys() interface{}   { return nil }
-
-type stdioFileWriter struct {
-	w io.Writer
-	s fs.FileInfo
-}
-
-// Stat implements fs.File
-func (w *stdioFileWriter) Stat() (fs.FileInfo, error) { return w.s, nil }
-
-// Read implements fs.File
-func (w *stdioFileWriter) Read([]byte) (n int, err error) {
-	return // emulate os.Stdout which returns zero
-}
-
-// Write implements io.Writer
-func (w *stdioFileWriter) Write(p []byte) (n int, err error) {
-	return w.w.Write(p)
-}
-
-// Close implements fs.File
-func (w *stdioFileWriter) Close() error {
-	// Don't actually close the underlying file, as we didn't open it!
-	return nil
-}
-
-type stdioFileReader struct {
-	r io.Reader
-	s fs.FileInfo
-}
-
-// Stat implements fs.File
-func (r *stdioFileReader) Stat() (fs.FileInfo, error) { return r.s, nil }
-
-// Read implements fs.File
-func (r *stdioFileReader) Read(p []byte) (n int, err error) {
-	return r.r.Read(p)
-}
-
-// Close implements fs.File
-func (r *stdioFileReader) Close() error {
-	// Don't actually close the underlying file, as we didn't open it!
-	return nil
-}
-
-var (
-	noopStdinStat  = stdioFileInfo{FdStdin, modeDevice}
-	noopStdoutStat = stdioFileInfo{FdStdout, modeDevice}
-	noopStderrStat = stdioFileInfo{FdStderr, modeDevice}
-)
-
-// stdioFileInfo implements fs.FileInfo where index zero is the FD and one is the mode.
-type stdioFileInfo [2]uint32
-
-func (s stdioFileInfo) Name() string {
-	switch s[0] {
-	case FdStdin:
-		return "stdin"
-	case FdStdout:
-		return "stdout"
-	case FdStderr:
-		return "stderr"
-	default:
-		panic(fmt.Errorf("BUG: incorrect FD %d", s[0]))
-	}
-}
-
-func (stdioFileInfo) Size() int64         { return 0 }
-func (s stdioFileInfo) Mode() fs.FileMode { return fs.FileMode(s[1]) }
-func (stdioFileInfo) ModTime() time.Time  { return time.Unix(0, 0) }
-func (stdioFileInfo) IsDir() bool         { return false }
-func (stdioFileInfo) Sys() interface{}    { return nil }
+const modeDevice = fs.ModeDevice | 0o640
 
 // FileEntry maps a path to an open file in a file system.
 type FileEntry struct {
-	// Name is the basename of the file, at the time it was opened. When the
-	// file is root "/" (fd = FdRoot), this is "/".
+	// Name is the name of the directory up to its pre-open, or the pre-open
+	// name itself when IsPreopen.
 	//
-	// Note: This must match fs.FileInfo.
+	// # Notes
+	//
+	//   - This can drift on rename.
+	//   - This relates to the guest path, which is not the real file path
+	//     except if the entire host filesystem was made available.
 	Name string
 
-	// File is always non-nil, even when root "/" (fd = FdRoot).
-	File fs.File
+	// IsPreopen is a directory that is lazily opened.
+	IsPreopen bool
 
-	// ReadDir is present when this File is a fs.ReadDirFile and `ReadDir`
-	// was called.
-	ReadDir *ReadDir
+	// FS is the filesystem associated with the pre-open.
+	FS sys.FS
+
+	// File is always non-nil.
+	File fsapi.File
+
+	// direntCache is nil until DirentCache was called.
+	direntCache *DirentCache
 }
 
-// ReadDir is the status of a prior fs.ReadDirFile call.
-type ReadDir struct {
-	// CountRead is the total count of files read including Entries.
-	CountRead uint64
+// DirentCache gets or creates a DirentCache for this file or returns an error.
+//
+// # Errors
+//
+// A zero sys.Errno is success. The below are expected otherwise:
+//   - sys.ENOSYS: the implementation does not support this function.
+//   - sys.EBADF: the dir was closed or not readable.
+//   - sys.ENOTDIR: the file was not a directory.
+//
+// # Notes
+//
+//   - See /RATIONALE.md for design notes.
+func (f *FileEntry) DirentCache() (*DirentCache, sys.Errno) {
+	if dir := f.direntCache; dir != nil {
+		return dir, 0
+	}
 
-	// Entries is the contents of the last fs.ReadDirFile call. Notably,
-	// directory listing are not rewindable, so we keep entries around in case
-	// the caller mis-estimated their buffer and needs a few still cached.
-	Entries []fs.DirEntry
+	// Require the file to be a directory vs a late error on the same.
+	if isDir, errno := f.File.IsDir(); errno != 0 {
+		return nil, errno
+	} else if !isDir {
+		return nil, sys.ENOTDIR
+	}
+
+	// Generate the dotEntries only once.
+	if dotEntries, errno := synthesizeDotEntries(f); errno != 0 {
+		return nil, errno
+	} else {
+		f.direntCache = &DirentCache{f: f.File, dotEntries: dotEntries}
+	}
+
+	return f.direntCache, 0
+}
+
+// DirentCache is a caching abstraction of sys.File Readdir.
+//
+// This is special-cased for "wasi_snapshot_preview1.fd_readdir", and may be
+// unneeded, or require changes, to support preview1 or preview2.
+//   - The position of the dirents are serialized as `d_next`. For reasons
+//     described below, any may need to be re-read. This accepts any positions
+//     in the cache, rather than track the position of the last dirent.
+//   - dot entries ("." and "..") must be returned. See /RATIONALE.md for why.
+//   - An sys.Dirent Name is variable length, it could exceed memory size and
+//     need to be re-read.
+//   - Multiple dirents may be returned. It is more efficient to read from the
+//     underlying file in bulk vs one-at-a-time.
+//
+// The last results returned by Read are cached, but entries before that
+// position are not. This support re-reading entries that couldn't fit into
+// memory without accidentally caching all entries in a large directory. This
+// approach is sometimes called a sliding window.
+type DirentCache struct {
+	// f is the underlying file
+	f sys.File
+
+	// dotEntries are the "." and ".." entries added when the directory is
+	// initialized.
+	dotEntries []sys.Dirent
+
+	// dirents are the potentially unread directory entries.
+	//
+	// Internal detail: nil is different from zero length. Zero length is an
+	// exhausted directory (eof). nil means the re-read.
+	dirents []sys.Dirent
+
+	// countRead is the total count of dirents read since last rewind.
+	countRead uint64
+
+	// eof is true when the underlying file is at EOF. This avoids re-reading
+	// the directory when it is exhausted. Entires in an exhausted directory
+	// are not visible until it is rewound via calling Read with `pos==0`.
+	eof bool
+}
+
+// synthesizeDotEntries generates a slice of the two elements "." and "..".
+func synthesizeDotEntries(f *FileEntry) ([]sys.Dirent, sys.Errno) {
+	dotIno, errno := f.File.Ino()
+	if errno != 0 {
+		return nil, errno
+	}
+	result := [2]sys.Dirent{}
+	result[0] = sys.Dirent{Name: ".", Ino: dotIno, Type: fs.ModeDir}
+	// See /RATIONALE.md for why we don't attempt to get an inode for ".." and
+	// why in wasi-libc this won't fan-out either.
+	result[1] = sys.Dirent{Name: "..", Ino: 0, Type: fs.ModeDir}
+	return result[:], 0
+}
+
+// exhaustedDirents avoids allocating empty slices.
+var exhaustedDirents = [0]sys.Dirent{}
+
+// Read is similar to and returns the same errors as `Readdir` on sys.File.
+// The main difference is this caches entries returned, resulting in multiple
+// valid positions to read from.
+//
+// When zero, `pos` means rewind to the beginning of this directory. This
+// implies a rewind (Seek to zero on the underlying sys.File), unless the
+// initial entries are still cached.
+//
+// When non-zero, `pos` is the zero based index of all dirents returned since
+// last rewind. Only entries beginning at `pos` are cached for subsequent
+// calls. A non-zero `pos` before the cache returns sys.ENOENT for reasons
+// described on DirentCache documentation.
+//
+// Up to `n` entries are cached and returned. When `n` exceeds the cache, the
+// difference are read from the underlying sys.File via `Readdir`. EOF is
+// when `len(dirents)` returned are less than `n`.
+func (d *DirentCache) Read(pos uint64, n uint32) (dirents []sys.Dirent, errno sys.Errno) {
+	switch {
+	case pos > d.countRead: // farther than read or negative coerced to uint64.
+		return nil, sys.ENOENT
+	case pos == 0 && d.dirents != nil:
+		// Rewind if we have already read entries. This allows us to see new
+		// entries added after the directory was opened.
+		if _, errno = d.f.Seek(0, io.SeekStart); errno != 0 {
+			return
+		}
+		d.dirents = nil // dump cache
+		d.countRead = 0
+	}
+
+	if n == 0 {
+		return // special case no entries.
+	}
+
+	if d.dirents == nil {
+		// Always populate dot entries, which makes min len(dirents) == 2.
+		d.dirents = d.dotEntries
+		d.countRead = 2
+		d.eof = false
+
+		if countToRead := int(n - 2); countToRead <= 0 {
+			return
+		} else if dirents, errno = d.f.Readdir(countToRead); errno != 0 {
+			return
+		} else if countRead := len(dirents); countRead > 0 {
+			d.eof = countRead < countToRead
+			d.dirents = append(d.dotEntries, dirents...)
+			d.countRead += uint64(countRead)
+		}
+
+		return d.cachedDirents(n), 0
+	}
+
+	// Reset our cache to the first entry being read.
+	cacheStart := d.countRead - uint64(len(d.dirents))
+	if pos < cacheStart {
+		// We don't currently allow reads before our cache because Seek(0) is
+		// the only portable way. Doing otherwise requires skipping, which we
+		// won't do unless wasi-testsuite starts requiring it. Implementing
+		// this would allow re-reading a large directory, so care would be
+		// needed to not buffer the entire directory in memory while skipping.
+		errno = sys.ENOENT
+		return
+	} else if posInCache := pos - cacheStart; posInCache != 0 {
+		if uint64(len(d.dirents)) == posInCache {
+			// Avoid allocation re-slicing to zero length.
+			d.dirents = exhaustedDirents[:]
+		} else {
+			d.dirents = d.dirents[posInCache:]
+		}
+	}
+
+	// See if we need more entries.
+	if countToRead := int(n) - len(d.dirents); countToRead > 0 && !d.eof {
+		// Try to read more, which could fail.
+		if dirents, errno = d.f.Readdir(countToRead); errno != 0 {
+			return
+		}
+
+		// Append the next read entries if we weren't at EOF.
+		if countRead := len(dirents); countRead > 0 {
+			d.eof = countRead < countToRead
+			d.dirents = append(d.dirents, dirents...)
+			d.countRead += uint64(countRead)
+		}
+	}
+
+	return d.cachedDirents(n), 0
+}
+
+// cachedDirents returns up to `n` dirents from the cache.
+func (d *DirentCache) cachedDirents(n uint32) []sys.Dirent {
+	direntCount := uint32(len(d.dirents))
+	switch {
+	case direntCount == 0:
+		return nil
+	case direntCount > n:
+		return d.dirents[:n]
+	}
+	return d.dirents
 }
 
 type FSContext struct {
-	// fs is the root ("/") mount.
-	fs fs.FS
+	// rootFS is the root ("/") mount.
+	rootFS sys.FS
 
-	// openedFiles is a map of file descriptor numbers (>=FdRoot) to open files
+	// openedFiles is a map of file descriptor numbers (>=FdPreopen) to open files
 	// (or directories) and defaults to empty.
 	// TODO: This is unguarded, so not goroutine-safe!
 	openedFiles FileTable
 }
 
-var errNotDir = errors.New("not a directory")
+// FileTable is a specialization of the descriptor.Table type used to map file
+// descriptors to file entries.
+type FileTable = descriptor.Table[int32, *FileEntry]
 
-// NewFSContext creates a FSContext, using the `root` parameter for any paths
-// beginning at "/". If the input is EmptyFS, there is no root filesystem.
-// Otherwise, `root` is assigned file descriptor FdRoot and the returned
-// context can open files in that file system. Any error on opening "." is
-// returned.
-func NewFSContext(stdin io.Reader, stdout, stderr io.Writer, root fs.FS) (fsc *FSContext, err error) {
-	fsc = &FSContext{fs: root}
-	fsc.openedFiles.Insert(stdinReader(stdin))
-	fsc.openedFiles.Insert(stdioWriter(stdout, noopStdoutStat))
-	fsc.openedFiles.Insert(stdioWriter(stderr, noopStderrStat))
-
-	if root == EmptyFS {
-		return fsc, nil
-	}
-
-	// Open the root directory by using "." as "/" is not relevant in fs.FS.
-	// This not only validates the file system, but also allows us to test if
-	// this is a real file or not. ex. `file.(*os.File)`.
-	//
-	// Note: We don't use fs.ReadDirFS as this isn't implemented by os.DirFS.
-	var rootDir fs.File
-	if sfs, ok := root.(syscallfs.FS); ok {
-		rootDir, err = sfs.OpenFile(".", os.O_RDONLY, 0)
+// RootFS returns a possibly unimplemented root filesystem. Any files that
+// should be added to the table should be inserted via InsertFile.
+//
+// TODO: This is only used by GOOS=js and tests: Remove when we remove GOOS=js
+// (after Go 1.22 is released).
+func (c *FSContext) RootFS() sys.FS {
+	if rootFS := c.rootFS; rootFS == nil {
+		return sys.UnimplementedFS{}
 	} else {
-		rootDir, err = root.Open(".")
+		return rootFS
 	}
-	if err != nil {
-		// This could fail because someone made a special-purpose file system,
-		// which only passes certain filenames and not ".".
-		rootDir = emptyRootDir{}
-		err = nil
-	}
-
-	// Verify the directory existed and was a directory at the time the context
-	// was created.
-	var stat fs.FileInfo
-	if stat, err = rootDir.Stat(); err != nil {
-		return // err if we couldn't determine if the root was a directory.
-	} else if !stat.IsDir() {
-		err = &fs.PathError{Op: "ReadDir", Path: stat.Name(), Err: errNotDir}
-		return
-	}
-
-	fsc.openedFiles.Insert(&FileEntry{Name: "/", File: rootDir})
-	return fsc, nil
 }
 
-func stdinReader(r io.Reader) *FileEntry {
-	if r == nil {
-		r = eofReader{}
-	}
-	s := stdioStat(r, noopStdinStat)
-	return &FileEntry{Name: noopStdinStat.Name(), File: &stdioFileReader{r: r, s: s}}
-}
-
-func stdioWriter(w io.Writer, defaultStat stdioFileInfo) *FileEntry {
-	if w == nil {
-		w = io.Discard
-	}
-	s := stdioStat(w, defaultStat)
-	return &FileEntry{Name: defaultStat.Name(), File: &stdioFileWriter{w: w, s: s}}
-}
-
-func stdioStat(f interface{}, defaultStat stdioFileInfo) fs.FileInfo {
-	if f, ok := f.(*os.File); ok && platform.IsTerminal(f.Fd()) {
-		return stdioFileInfo{defaultStat[0], modeCharDevice}
-	}
-	return defaultStat
-}
-
-// OpenedFile returns a file and true if it was opened or nil and false, if syscall.EBADF.
-func (c *FSContext) OpenedFile(fd uint32) (*FileEntry, bool) {
+// LookupFile returns a file if it is in the table.
+func (c *FSContext) LookupFile(fd int32) (*FileEntry, bool) {
 	return c.openedFiles.Lookup(fd)
 }
 
-func (c *FSContext) StatFile(fd uint32) (fs.FileInfo, error) {
-	f, ok := c.openedFiles.Lookup(fd)
-	if !ok {
-		return nil, syscall.EBADF
-	}
-	return f.File.Stat()
-}
-
-// fileModeStat is a fake fs.FileInfo which only returns its mode.
-// This is used for character devices.
-type fileModeStat fs.FileMode
-
-var _ fs.FileInfo = fileModeStat(0)
-
-func (s fileModeStat) Size() int64        { return 0 }
-func (s fileModeStat) Mode() fs.FileMode  { return fs.FileMode(s) }
-func (s fileModeStat) ModTime() time.Time { return time.Unix(0, 0) }
-func (s fileModeStat) Sys() interface{}   { return nil }
-func (s fileModeStat) Name() string       { return "" }
-func (s fileModeStat) IsDir() bool        { return false }
-
-// Mkdir is like syscall.Mkdir and returns the file descriptor of the new
-// directory or an error.
-func (c *FSContext) Mkdir(name string, perm fs.FileMode) (newFD uint32, err error) {
-	name = c.cleanPath(name)
-	if wfs, ok := c.fs.(syscallfs.FS); ok {
-		if err = wfs.Mkdir(name, perm); err != nil {
-			return
-		}
-		// TODO: Determine how to handle when a directory already
-		// exists or is a file.
-		return c.OpenFile(name, os.O_RDONLY, perm)
-	}
-	err = syscall.ENOSYS
-	return
-}
-
-// OpenFile is like syscall.Open and returns the file descriptor of the new file or an error.
-func (c *FSContext) OpenFile(name string, flags int, perm fs.FileMode) (newFD uint32, err error) {
-	var f fs.File
-	if wfs, ok := c.fs.(syscallfs.FS); ok {
-		name = c.cleanPath(name)
-		f, err = wfs.OpenFile(name, flags, perm)
+// OpenFile opens the file into the table and returns its file descriptor.
+// The result must be closed by CloseFile or Close.
+func (c *FSContext) OpenFile(fs sys.FS, path string, flag sys.Oflag, perm fs.FileMode) (int32, sys.Errno) {
+	if f, errno := fs.OpenFile(path, flag, perm); errno != 0 {
+		return 0, errno
 	} else {
-		// While os.Open says it is read-only, in reality the files returned
-		// are often writable. Fail only on the flags which won't work.
-		switch {
-		case flags&os.O_APPEND != 0:
-			fallthrough
-		case flags&os.O_CREATE != 0:
-			fallthrough
-		case flags&os.O_TRUNC != 0:
-			return 0, syscall.ENOSYS
-		default:
-			// only time fs.FS is used
-			f, err = c.fs.Open(c.cleanPath(name))
+		fe := &FileEntry{FS: fs, File: fsapi.Adapt(f)}
+		if path == "/" || path == "." {
+			fe.Name = ""
+		} else {
+			fe.Name = path
+		}
+		if newFD, ok := c.openedFiles.Insert(fe); !ok {
+			return 0, sys.EBADF
+		} else {
+			return newFD, 0
 		}
 	}
-
-	if err != nil {
-		return 0, err
-	}
-
-	newFD = c.openedFiles.Insert(&FileEntry{Name: path.Base(name), File: f})
-	return newFD, nil
 }
 
-// Rmdir is like syscall.Rmdir.
-func (c *FSContext) Rmdir(name string) (err error) {
-	if wfs, ok := c.fs.(syscallfs.FS); ok {
-		name = c.cleanPath(name)
-		return wfs.Rmdir(name)
+// Renumber assigns the file pointed by the descriptor `from` to `to`.
+func (c *FSContext) Renumber(from, to int32) sys.Errno {
+	fromFile, ok := c.openedFiles.Lookup(from)
+	if !ok || to < 0 {
+		return sys.EBADF
+	} else if fromFile.IsPreopen {
+		return sys.ENOTSUP
 	}
-	err = syscall.ENOSYS
-	return
+
+	// If toFile is already open, we close it to prevent windows lock issues.
+	//
+	// The doc is unclear and other implementations do nothing for already-opened To FDs.
+	// https://github.com/WebAssembly/WASI/blob/snapshot-01/phases/snapshot/docs.md#-fd_renumberfd-fd-to-fd---errno
+	// https://github.com/bytecodealliance/wasmtime/blob/main/crates/wasi-common/src/snapshots/preview_1.rs#L531-L546
+	if toFile, ok := c.openedFiles.Lookup(to); ok {
+		if toFile.IsPreopen {
+			return sys.ENOTSUP
+		}
+		_ = toFile.File.Close()
+	}
+
+	c.openedFiles.Delete(from)
+	if !c.openedFiles.InsertAt(fromFile, to) {
+		return sys.EBADF
+	}
+	return 0
 }
 
-func (c *FSContext) StatPath(name string) (fs.FileInfo, error) {
-	fd, err := c.OpenFile(name, os.O_RDONLY, 0)
-	if err != nil {
-		return nil, err
+// SockAccept accepts a sock.TCPConn into the file table and returns its file
+// descriptor.
+func (c *FSContext) SockAccept(sockFD int32, nonblock bool) (int32, sys.Errno) {
+	var sock socketapi.TCPSock
+	if e, ok := c.LookupFile(sockFD); !ok || !e.IsPreopen {
+		return 0, sys.EBADF // Not a preopen
+	} else if sock, ok = e.File.(socketapi.TCPSock); !ok {
+		return 0, sys.EBADF // Not a sock
 	}
-	defer c.CloseFile(fd)
-	return c.StatFile(fd)
-}
 
-// Rename is like syscall.Rename.
-func (c *FSContext) Rename(from, to string) (err error) {
-	if wfs, ok := c.fs.(syscallfs.FS); ok {
-		from = c.cleanPath(from)
-		to = c.cleanPath(to)
-		return wfs.Rename(from, to)
+	conn, errno := sock.Accept()
+	if errno != 0 {
+		return 0, errno
 	}
-	err = syscall.ENOSYS
-	return
-}
 
-// Unlink is like syscall.Unlink.
-func (c *FSContext) Unlink(name string) (err error) {
-	if wfs, ok := c.fs.(syscallfs.FS); ok {
-		name = c.cleanPath(name)
-		return wfs.Unlink(name)
-	}
-	err = syscall.ENOSYS
-	return
-}
+	fe := &FileEntry{File: fsapi.Adapt(conn)}
 
-// Utimes is like syscall.Utimes.
-func (c *FSContext) Utimes(name string, atimeNsec, mtimeNsec int64) (err error) {
-	if wfs, ok := c.fs.(syscallfs.FS); ok {
-		name = c.cleanPath(name)
-		return wfs.Utimes(name, atimeNsec, mtimeNsec)
+	if nonblock {
+		if errno = fe.File.SetNonblock(true); errno != 0 {
+			_ = conn.Close()
+			return 0, errno
+		}
 	}
-	err = syscall.ENOSYS
-	return
-}
 
-func (c *FSContext) cleanPath(name string) string {
-	if len(name) == 0 {
-		return name
-	}
-	// fs.ValidFile cannot be rooted (start with '/')
-	cleaned := name
-	if name[0] == '/' {
-		cleaned = name[1:]
-	}
-	cleaned = path.Clean(cleaned) // e.g. "sub/." -> "sub"
-	return cleaned
-}
-
-// FdWriter returns a valid writer for the given file descriptor or nil if syscall.EBADF.
-func (c *FSContext) FdWriter(fd uint32) io.Writer {
-	// Check to see if the file descriptor is available
-	if f, ok := c.openedFiles.Lookup(fd); !ok {
-		return nil
-	} else if writer, ok := f.File.(io.Writer); !ok {
-		// Go's syscall.Write also returns EBADF if the FD is present, but not writeable
-		return nil
+	if newFD, ok := c.openedFiles.Insert(fe); !ok {
+		return 0, sys.EBADF
 	} else {
-		return writer
+		return newFD, 0
 	}
 }
 
-// FdReader returns a valid reader for the given file descriptor or nil if syscall.EBADF.
-func (c *FSContext) FdReader(fd uint32) io.Reader {
-	switch fd {
-	case FdStdout, FdStderr:
-		return nil // writer, not a readable file.
-	case FdRoot:
-		return nil // directory, not a readable file.
-	}
-
-	if f, ok := c.openedFiles.Lookup(fd); !ok {
-		return nil // TODO: could be a directory not a file.
-	} else {
-		return f.File
-	}
-}
-
-// CloseFile returns true if a file was opened and closed without error, or false if syscall.EBADF.
-func (c *FSContext) CloseFile(fd uint32) bool {
+// CloseFile returns any error closing the existing file.
+func (c *FSContext) CloseFile(fd int32) (errno sys.Errno) {
 	f, ok := c.openedFiles.Lookup(fd)
 	if !ok {
-		return false
+		return sys.EBADF
+	}
+	if errno = f.File.Close(); errno != 0 {
+		return errno
 	}
 	c.openedFiles.Delete(fd)
-
-	if err := f.File.Close(); err != nil {
-		return false
-	}
-	return true
+	return errno
 }
 
-// Close implements api.Closer
-func (c *FSContext) Close(context.Context) (err error) {
+// Close implements io.Closer
+func (c *FSContext) Close() (err error) {
 	// Close any files opened in this context
-	c.openedFiles.Range(func(fd uint32, entry *FileEntry) bool {
-		if e := entry.File.Close(); e != nil {
-			err = e // This means err returned == the last non-nil error.
+	c.openedFiles.Range(func(fd int32, entry *FileEntry) bool {
+		if errno := entry.File.Close(); errno != 0 {
+			err = errno // This means err returned == the last non-nil error.
 		}
 		return true
 	})
-	// A closed FSContext cannot be reused so clear the state instead of
-	// using Reset.
+	// A closed FSContext cannot be reused so clear the state.
 	c.openedFiles = FileTable{}
 	return
+}
+
+// InitFSContext initializes a FSContext with stdio streams and optional
+// pre-opened filesystems and TCP listeners.
+func (c *Context) InitFSContext(
+	stdin io.Reader,
+	stdout, stderr io.Writer,
+	fs []sys.FS, guestPaths []string,
+	tcpListeners []*net.TCPListener,
+) (err error) {
+	inFile, err := stdinFileEntry(stdin)
+	if err != nil {
+		return err
+	}
+	c.fsc.openedFiles.Insert(inFile)
+	outWriter, err := stdioWriterFileEntry("stdout", stdout)
+	if err != nil {
+		return err
+	}
+	c.fsc.openedFiles.Insert(outWriter)
+	errWriter, err := stdioWriterFileEntry("stderr", stderr)
+	if err != nil {
+		return err
+	}
+	c.fsc.openedFiles.Insert(errWriter)
+
+	for i, fs := range fs {
+		guestPath := guestPaths[i]
+
+		if StripPrefixesAndTrailingSlash(guestPath) == "" {
+			// Default to bind to '/' when guestPath is effectively empty.
+			guestPath = "/"
+			c.fsc.rootFS = fs
+		}
+		c.fsc.openedFiles.Insert(&FileEntry{
+			FS:        fs,
+			Name:      guestPath,
+			IsPreopen: true,
+			File:      &lazyDir{fs: fs},
+		})
+	}
+
+	for _, tl := range tcpListeners {
+		c.fsc.openedFiles.Insert(&FileEntry{IsPreopen: true, File: fsapi.Adapt(sysfs.NewTCPListenerFile(tl))})
+	}
+	return nil
+}
+
+// StripPrefixesAndTrailingSlash skips any leading "./" or "/" such that the
+// result index begins with another string. A result of "." coerces to the
+// empty string "" because the current directory is handled by the guest.
+//
+// Results are the offset/len pair which is an optimization to avoid re-slicing
+// overhead, as this function is called for every path operation.
+//
+// Note: Relative paths should be handled by the guest, as that's what knows
+// what the current directory is. However, paths that escape the current
+// directory e.g. "../.." have been found in `tinygo test` and this
+// implementation takes care to avoid it.
+func StripPrefixesAndTrailingSlash(path string) string {
+	// strip trailing slashes
+	pathLen := len(path)
+	for ; pathLen > 0 && path[pathLen-1] == '/'; pathLen-- {
+	}
+
+	pathI := 0
+loop:
+	for pathI < pathLen {
+		switch path[pathI] {
+		case '/':
+			pathI++
+		case '.':
+			nextI := pathI + 1
+			if nextI < pathLen && path[nextI] == '/' {
+				pathI = nextI + 1
+			} else if nextI == pathLen {
+				pathI = nextI
+			} else {
+				break loop
+			}
+		default:
+			break loop
+		}
+	}
+	return path[pathI:pathLen]
 }

@@ -4,11 +4,11 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
+	"strings"
 	"sync"
 	"unsafe"
 
 	"github.com/james-lawrence/eg/internal/errorsx"
-	"github.com/james-lawrence/eg/internal/stringsx"
 	"github.com/james-lawrence/eg/interp/runtime/wasi/ffiguest"
 	"github.com/james-lawrence/eg/runtime/wasi/internal/ffiegcontainer"
 	"github.com/james-lawrence/eg/runtime/wasi/internal/ffigraph"
@@ -179,10 +179,23 @@ func (t coption) user(user string) coption {
 	return []string{"--user", user}
 }
 
+func (t coption) workdir(dir string) coption {
+	return []string{"-w", dir}
+}
+
+func (t coption) envvar(k, v string) coption {
+	if v == "" {
+		return []string{"-e", k}
+	}
+
+	return []string{"-e", fmt.Sprintf("%s=%s", k, v)}
+}
+
 type ContainerRunner struct {
 	name       string
 	definition string
 	pull       string
+	cmd        []string
 	options    []coption
 	built      *sync.Once
 }
@@ -194,6 +207,11 @@ func (t ContainerRunner) BuildFromFile(s string) ContainerRunner {
 
 func (t ContainerRunner) PullFrom(s string) ContainerRunner {
 	t.pull = s
+	return t
+}
+
+func (t ContainerRunner) Command(s string) ContainerRunner {
+	t.cmd = strings.Split(s, " ")
 	return t
 }
 
@@ -227,7 +245,11 @@ func (t ContainerRunner) RunWith(ctx context.Context, mpath string) (err error) 
 		opts = append(opts, o...)
 	}
 
-	return ffiguest.Error(ffiegcontainer.Module(t.name, mpath, opts), fmt.Errorf("unable to run the container: %s", t.name))
+	return ffiguest.Error(ffiegcontainer.Run(t.name, mpath, t.cmd, opts), fmt.Errorf("unable to run the container: %s", t.name))
+}
+
+func (t ContainerRunner) ToModuleRunner() ContainerModuleRunner {
+	return ContainerModuleRunner{ContainerRunner: t}
 }
 
 func (t ContainerRunner) OptionPrivileged() ContainerRunner {
@@ -240,17 +262,51 @@ func (t ContainerRunner) OptionUser(username string) ContainerRunner {
 	return t
 }
 
-// Mount a directory into the container at the provided host, guest paths as read only.
+func (t ContainerRunner) OptionWorkingDirectory(dir string) ContainerRunner {
+	t.options = append(t.options, (coption{}).workdir(dir))
+	return t
+}
+
+func (t ContainerRunner) OptionEnvVar(k string) ContainerRunner {
+	t.options = append(t.options, (coption{}).envvar(k, ""))
+	return t
+}
+
+func (t ContainerRunner) OptionEnv(k, v string) ContainerRunner {
+	t.options = append(t.options, (coption{}).envvar(k, v))
+	return t
+}
+
+// Mount a directory into the container at the provided host, guest paths as immutable.
+// this allows the container to active as if its writing but not to have any of the changes persisted
 func (t ContainerRunner) OptionVolume(host, guest string) ContainerRunner {
+	t.options = append(t.options, (coption{}).volume(host, guest, "O"))
+	return t
+}
+
+// Mount a directory into the container at the provided host, guest paths as read only.
+func (t ContainerRunner) OptionVolumeReadOnly(host, guest string) ContainerRunner {
 	t.options = append(t.options, (coption{}).volume(host, guest, "ro"))
 	return t
 }
 
-// Mount a directory into the container at the provided the host, guest paths and the mount permissions.
-// the mount permissions default to read only when an empty string
-func (t ContainerRunner) OptionVolumeWithPermissions(host, guest, perms string) ContainerRunner {
-	t.options = append(t.options, (coption{}).volume(host, guest, stringsx.DefaultIfBlank(perms, "ro")))
+// Mount a directory into the container at the provided the host, guest paths as mutable
+func (t ContainerRunner) OptionVolumeWritable(host, guest string) ContainerRunner {
+	t.options = append(t.options, (coption{}).volume(host, guest, "rw"))
 	return t
+}
+
+type ContainerModuleRunner struct {
+	ContainerRunner
+}
+
+func (t ContainerModuleRunner) RunWith(ctx context.Context, mpath string) (err error) {
+	var opts []string
+	for _, o := range t.options {
+		opts = append(opts, o...)
+	}
+
+	return ffiguest.Error(ffiegcontainer.Module(t.name, mpath, opts), fmt.Errorf("unable to run the module: %s", t.name))
 }
 
 // Module executes a set of operations within the provided environment.
@@ -261,9 +317,31 @@ func Module(ctx context.Context, r Runner, references ...OpFn) OpFn {
 	}
 }
 
+// Exec executes command with the given runner
+// Important: this method acts as an Instrumentation point by the runtime.
+func Exec(ctx context.Context, r Runner) OpFn {
+	return func(ctx context.Context, o Op) error {
+		return r.CompileWith(ctx)
+	}
+}
+
+// Deprecated: this is intended for internal use only. do not use.
+// used to replace invocations at runtime.
+func UnsafeRunner(ctx context.Context, r Runner, modulepath string) OpFn {
+	if err := r.CompileWith(ctx); err != nil {
+		return func(context.Context, Op) error {
+			return err
+		}
+	}
+
+	return func(ctx context.Context, o Op) error {
+		return r.RunWith(ctx, modulepath)
+	}
+}
+
 // Deprecated: this is intended for internal use only. do not use.
 // used to replace the module invocations at runtime.
-func UnsafeModule(ctx context.Context, r Runner, modulepath string) OpFn {
+func UnsafeExec(ctx context.Context, r Runner, modulepath string) OpFn {
 	if err := r.CompileWith(ctx); err != nil {
 		return func(context.Context, Op) error {
 			return err

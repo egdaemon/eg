@@ -7,7 +7,7 @@ require (
 	github.com/davecgh/go-spew v1.1.1
 	github.com/gorilla/websocket v1.5.0
 	github.com/logrusorgru/aurora v2.0.3+incompatible
-	github.com/mattn/go-isatty v0.0.17
+	github.com/mattn/go-isatty v0.0.19
 	github.com/onsi/ginkgo/v2 v2.6.1
 	github.com/onsi/gomega v1.24.2
 	github.com/pkg/errors v0.9.1
@@ -47,8 +47,8 @@ require (
 	github.com/justinas/alice v1.2.0
 	github.com/mailru/easyjson v0.7.7
 	github.com/stretchr/testify v1.8.1 // indirect
-	github.com/tetratelabs/wazero v1.0.0-pre.7
+	github.com/tetratelabs/wazero v1.5.0
 	golang.org/x/oauth2 v0.6.0
-	golang.org/x/sys v0.6.0 // indirect
+	golang.org/x/sys v0.12.0 // indirect
 	golang.org/x/tools v0.6.0
 )

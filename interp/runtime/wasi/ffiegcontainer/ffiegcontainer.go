@@ -15,6 +15,7 @@ func mayberun(c *exec.Cmd) error {
 		return nil
 	}
 
+	log.Println("running", c.String())
 	return c.Run()
 }
 
@@ -112,50 +113,58 @@ func Build(builder func(ctx context.Context, name, definition string, options ..
 	}
 }
 
-// func Run(runner func(ctx context.Context, name, modulepath string, options ...string) (err error)) func(
-// 	ctx context.Context,
-// 	m api.Module,
-// 	nameoffset uint32, namelen uint32,
-// 	definitionoffset uint32, definitionlen uint32,
-// 	argsoffset uint32, argslen uint32, argssize uint32,
-// ) uint32 {
-// 	return func(
-// 		ctx context.Context,
-// 		m api.Module,
-// 		nameoffset uint32, namelen uint32,
-// 		modulepathoffset uint32, modulepathlen uint32,
-// 		argsoffset uint32, argslen uint32, argssize uint32,
-// 	) uint32 {
-// 		var (
-// 			err        error
-// 			name       string
-// 			modulepath string
-// 			options    []string
-// 		)
+func Run(runner func(ctx context.Context, name, modulepath string, cmd []string, options ...string) (err error)) func(
+	ctx context.Context,
+	m api.Module,
+	nameoffset uint32, namelen uint32,
+	modulepathoffset uint32, modulepathlen uint32,
+	cmdoffset uint32, cmdlen uint32, cmdsize uint32,
+	argsoffset uint32, argslen uint32, argssize uint32,
+) uint32 {
+	return func(
+		ctx context.Context,
+		m api.Module,
+		nameoffset uint32, namelen uint32,
+		modulepathoffset uint32, modulepathlen uint32,
+		cmdoffset uint32, cmdlen uint32, cmdsize uint32,
+		argsoffset uint32, argslen uint32, argssize uint32,
+	) uint32 {
+		var (
+			err        error
+			name       string
+			modulepath string
+			cmd        []string
+			options    []string
+		)
 
-// 		if name, err = ffi.ReadString(m.Memory(), nameoffset, namelen); err != nil {
-// 			log.Println("unable to decode container name", err)
-// 			return 1
-// 		}
+		if name, err = ffi.ReadString(m.Memory(), nameoffset, namelen); err != nil {
+			log.Println("unable to decode container name", err)
+			return 1
+		}
 
-// 		if modulepath, err = ffi.ReadString(m.Memory(), modulepathoffset, modulepathlen); err != nil {
-// 			log.Println("unable to decode modulepath", err)
-// 			return 1
-// 		}
+		if modulepath, err = ffi.ReadString(m.Memory(), modulepathoffset, modulepathlen); err != nil {
+			log.Println("unable to decode modulepath", err)
+			return 1
+		}
 
-// 		if options, err = ffi.ReadStringArray(m.Memory(), argsoffset, argslen, argssize); err != nil {
-// 			log.Println("unable to decode options", err)
-// 			return 1
-// 		}
+		if cmd, err = ffi.ReadStringArray(m.Memory(), cmdoffset, cmdlen, cmdsize); err != nil {
+			log.Println("unable to decode command", err)
+			return 1
+		}
 
-// 		if err = runner(ctx, name, modulepath, options...); err != nil {
-// 			log.Println("generating eg container failed", err)
-// 			return 2
-// 		}
+		if options, err = ffi.ReadStringArray(m.Memory(), argsoffset, argslen, argssize); err != nil {
+			log.Println("unable to decode options", err)
+			return 1
+		}
 
-// 		return 0
-// 	}
-// }
+		if err = runner(ctx, name, modulepath, cmd, options...); err != nil {
+			log.Println("generating eg container failed", err)
+			return 2
+		}
+
+		return 0
+	}
+}
 
 // internal function for running modules
 func Module(runner func(ctx context.Context, name, modulepath string, options ...string) (err error)) func(
@@ -222,7 +231,7 @@ func PodmanBuild(ctx context.Context, name string, dir string, definition string
 	return exec.CommandContext(ctx, "podman", args...), nil
 }
 
-func PodmanRun(ctx context.Context, cmdctx func(*exec.Cmd) *exec.Cmd, image, cname string, options ...string) (err error) {
+func PodmanRun(ctx context.Context, cmdctx func(*exec.Cmd) *exec.Cmd, image, cname string, command []string, options ...string) (err error) {
 	var (
 		cmd *exec.Cmd
 	)
@@ -249,9 +258,11 @@ func PodmanRun(ctx context.Context, cmdctx func(*exec.Cmd) *exec.Cmd, image, cna
 	}()
 
 	cmd = exec.CommandContext(
-		ctx, "podman", "run", "--name", cname, image,
+		ctx, "podman", "run", "-it", "--name", cname,
 	)
 	cmd.Args = append(cmd.Args, options...)
+	cmd.Args = append(cmd.Args, image)
+	cmd.Args = append(cmd.Args, command...)
 
 	if err = mayberun(cmdctx(cmd)); err != nil {
 		return err
@@ -312,7 +323,7 @@ func PodmanModule(ctx context.Context, cmdctx func(*exec.Cmd) *exec.Cmd, image, 
 
 	cmd = exec.CommandContext(
 		ctx,
-		"podman", "exec", cname,
+		"podman", "exec", "-it", cname,
 		"/opt/egbin",
 		"module",
 		"--directory=/opt/eg",

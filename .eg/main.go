@@ -2,12 +2,14 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"os"
 	"path/filepath"
 	"time"
 
-	"github.com/james-lawrence/eg/internal/envx"
+	"github.com/james-lawrence/eg/runtime/wasi/egenv"
+	"github.com/james-lawrence/eg/runtime/wasi/langx"
 	"github.com/james-lawrence/eg/runtime/wasi/shell"
 	"github.com/james-lawrence/eg/runtime/wasi/yak"
 )
@@ -21,9 +23,10 @@ func BuildContainer(r yak.ContainerRunner) yak.OpFn {
 func PrepareDebian(ctx context.Context, _ yak.Op) error {
 	return shell.Run(
 		ctx,
-		shell.New("rm -rf .dist/deb/debian && mkdir -p .dist/deb/debian"),
+		shell.New("git show -s --format=%ct HEAD"),
+		shell.New("rm -rf .dist/deb/debian/* && mkdir -p .dist/deb/debian"),
 		shell.New("rsync --recursive .dist/deb/.skel/ .dist/deb/debian"),
-		shell.New("cat .dist/deb/.templates/changelog.tmpl | VERSION=\"0.0.1\" DISTRO=\"jammy\" DEBEMAIL=\"jljatone@gmail.com\" CHANGELOG_DATE=\"$(date +\"%a, %d %b %Y %T %z\")\" envsubst | tee .dist/deb/debian/changelog"),
+		shell.New("cat .dist/deb/.templates/changelog.tmpl | envsubst | tee .dist/deb/debian/changelog"),
 		shell.New("cat .dist/deb/debian/changelog"),
 		shell.New("cat .dist/deb/.templates/control.tmpl | envsubst | tee .dist/deb/debian/control"),
 		shell.New("cat .dist/deb/.templates/rules.tmpl | envsubst | tee .dist/deb/debian/rules"),
@@ -33,40 +36,9 @@ func PrepareDebian(ctx context.Context, _ yak.Op) error {
 func BuildDebian(ctx context.Context, _ yak.Op) error {
 	return shell.Run(
 		ctx,
-		shell.New("ls -lha").Directory(".dist/deb"),
-		shell.New("cd .dist/deb && debuild -S"),
+		shell.New("cd .dist/deb && debuild -S -k1472F4128AD327A04323220509F9FEB7D4D09CF4"),
+		shell.New("cd .dist && dput -f -c deb/dput.config eg eg_${VERSION}_source.changes"),
 	)
-}
-
-func Debug(ctx context.Context, _ yak.Op) error {
-	for _, en := range os.Environ() {
-		log.Println(en)
-	}
-
-	return shell.Run(
-		ctx,
-		shell.New("podman --version"),
-	)
-}
-
-func DebugGPG(ctx context.Context, _ yak.Op) error {
-	return shell.Run(
-		ctx,
-		shell.New("ls -lha /root/.gnupg/")
-		shell.New("gpg --list-keys"),
-		shell.New("ls -lha /tmp"),
-		shell.New("env && gpgconf --list-dirs agent-socket").Environ("GPG_AGENT_INFO", "/root/.gnupg/socket"),
-	)
-}
-
-func DebianBuild(ctx context.Context, o yak.Op) error {
-	return yak.Sequential(
-		yak.Parallel(
-			Debug,
-			PrepareDebian,
-		),
-		BuildDebian,
-	)(ctx, o)
 }
 
 // main defines the setup for the CI process. here is where you define all
@@ -75,17 +47,28 @@ func main() {
 	ctx, done := context.WithTimeout(context.Background(), time.Hour)
 	defer done()
 
-	// c1 := yak.Container("eg.ubuntu.22.04").PullFrom("quay.io/podman/stable")
+	var (
+		debcache = egenv.CachePath(".dist")
+	)
 
-	// -v $(HOME)/.gnupg:/opt/bw/.dist/cache/.gnupg
+	if err := os.MkdirAll(debcache, 0700); err != nil {
+		log.Fatalln(err)
+	}
 
 	c1 := yak.Container("eg.ubuntu.22.04").
-		OptionPrivileged().
-		OptionVolumeWithPermissions(
-			filepath.Join("/", "home", "james.lawrence", ".gnupg"), filepath.Join("/", "root", ".gnupg"), "rw",
+		OptionEnv("VERSION", fmt.Sprintf("0.0.%d", time.Now().Unix())).
+		OptionEnv("DEBEMAIL", "jljatone@gmail.com").
+		OptionEnv("DEBFULLNAME", "James Lawrence").
+		OptionEnv("DISTRO", "jammy").
+		OptionEnv("CHANGELOG_DATE", time.Now().Format(time.RFC1123Z)).
+		OptionVolume(
+			filepath.Join(langx.Must(os.UserHomeDir()), ".gnupg"), filepath.Join("/", "root", ".gnupg"),
 		).
-		OptionVolumeWithPermissions(
-			envx.String("", "GPG_AGENT_INFO"), "/root/.gnupg/socket", "rw",
+		OptionVolumeWritable(
+			".eg/.cache/.dist", "/opt/eg/.dist",
+		).
+		OptionVolume(
+			".dist/deb", "/opt/eg/.dist/deb",
 		)
 
 	err := yak.Perform(
@@ -96,10 +79,9 @@ func main() {
 			BuildContainer(yak.Container("eg.debian.build").
 				BuildFromFile(".dist/deb/Containerfile")),
 		),
-		yak.Parallel(
-			yak.Module(ctx, c1, DebugGPG, DebianBuild),
-		),
+		yak.Module(ctx, c1, PrepareDebian, BuildDebian),
 	)
+
 	if err != nil {
 		log.Fatalln(err)
 	}

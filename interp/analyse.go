@@ -58,7 +58,7 @@ func Analyse(ctx context.Context, runid, dir string, module string, options ...O
 				// return cmd, err
 				return nil, nil
 			})).Export("github.com/james-lawrence/eg/runtime/wasi/runtime/ffiegcontainer.Build").
-			NewFunctionBuilder().WithFunc(ffiegcontainer.Module(func(ctx context.Context, name, modulepath string, options ...string) (err error) {
+			NewFunctionBuilder().WithFunc(ffiegcontainer.Run(func(ctx context.Context, name, modulepath string, cmd []string, options ...string) (err error) {
 			cmdctx := func(cmd *exec.Cmd) *exec.Cmd {
 				return nil
 				// cmd.Dir = r.root
@@ -68,6 +68,25 @@ func Analyse(ctx context.Context, runid, dir string, module string, options ...O
 				// return cmd
 			}
 			cname := fmt.Sprintf("%s.%s", name, md5x.DigestString(modulepath+runid))
+
+			options = append(
+				options,
+				"-w", r.moduledir,
+				"--volume", fmt.Sprintf("%s:/opt/eg:O", r.root),
+			)
+
+			return ffiegcontainer.PodmanRun(ctx, cmdctx, name, cname, cmd, options...)
+		})).Export("github.com/james-lawrence/eg/runtime/wasi/runtime/ffiegcontainer.Run").
+			NewFunctionBuilder().WithFunc(ffiegcontainer.Module(func(ctx context.Context, name, modulepath string, options ...string) (err error) {
+			cmdctx := func(cmd *exec.Cmd) *exec.Cmd {
+				return nil
+				// cmd.Dir = r.root
+				// cmd.Env = cmdenv
+				// cmd.Stderr = os.Stderr
+				// cmd.Stdout = os.Stdout
+				// return cmd
+			}
+			cname := fmt.Sprintf("%s.%s", name, md5x.DigestString(runid))
 			return ffiegcontainer.PodmanModule(ctx, cmdctx, name, cname, r.moduledir, options...)
 		})).Export("github.com/james-lawrence/eg/runtime/wasi/runtime/ffiegcontainer.Module").
 			NewFunctionBuilder().WithFunc(ffiexec.Exec(func(cmd *exec.Cmd) *exec.Cmd {

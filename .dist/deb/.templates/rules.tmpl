@@ -18,7 +18,7 @@ DH_VERBOSE = 1
 override_dh_auto_build:
 	echo "DH AUTO BUILD OVERRIDE"
 	echo "$(CURDIR)"
-	mkdir $(CURDIR)/bin
+	mkdir $(CURDIR)/bin (CURDIR)/.gocache
 	ls -lha $(CURDIR)
 	GOBIN=$(CURDIR)/bin /usr/lib/go-1.20/bin/go env
 	ls -lha $(CURDIR)/src

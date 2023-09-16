@@ -4,8 +4,10 @@ ARG DEBIAN_FRONTEND=noninteractive
 COPY .dist/.build.filesystem /
 
 RUN apt-get update
-RUN apt-get -y --no-install-recommends install dput devscripts dh-make dput software-properties-common golang-1.20 git uidmap dbus-user-session
+RUN apt-get -y --no-install-recommends install dput devscripts dh-make dput software-properties-common git uidmap dbus-user-session
+RUN add-apt-repository ppa:longsleep/golang-backports
 RUN apt-get update
+RUN apt-get -y --no-install-recommends install golang-1.21
 RUN apt-get -y --no-install-recommends install podman podman-remote rsync vim build-essential
 RUN podman --version
 RUN podman-remote --version

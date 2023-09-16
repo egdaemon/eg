@@ -17,11 +17,13 @@ type Command struct {
 	timeout   time.Duration
 }
 
+// directory to run the command in. must be a relative path.
 func (t Command) Directory(d string) Command {
 	t.directory = d
 	return t
 }
 
+// maximum duration for a command to run.
 func (t Command) Timeout(d time.Duration) Command {
 	t.timeout = d
 	return t

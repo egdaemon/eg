@@ -27,17 +27,18 @@ func PrepareDebian(ctx context.Context, _ yak.Op) error {
 		shell.New("rm -rf .dist/deb/debian/* && mkdir -p .dist/deb/debian"),
 		shell.New("rsync --recursive .dist/deb/.skel/ .dist/deb/debian"),
 		shell.New("cat .dist/deb/.templates/changelog.tmpl | envsubst | tee .dist/deb/debian/changelog"),
-		shell.New("cat .dist/deb/debian/changelog"),
 		shell.New("cat .dist/deb/.templates/control.tmpl | envsubst | tee .dist/deb/debian/control"),
 		shell.New("cat .dist/deb/.templates/rules.tmpl | envsubst | tee .dist/deb/debian/rules"),
+		shell.New("git clone --depth 1 file://${PWD} ${PWD}/.dist/deb/src"),
 	)
 }
 
 func BuildDebian(ctx context.Context, _ yak.Op) error {
 	return shell.Run(
 		ctx,
-		shell.New("cd .dist/deb && debuild -S -k1472F4128AD327A04323220509F9FEB7D4D09CF4"),
-		shell.New("cd .dist && dput -f -c deb/dput.config eg eg_${VERSION}_source.changes"),
+		shell.New("/usr/lib/go-1.21/bin/go build -mod=vendor ./cmd/...").Environ("GOPROXY", "off").Directory(".dist/deb/src"),
+		shell.New("pwd && debuild -S -k1472F4128AD327A04323220509F9FEB7D4D09CF4").Directory(".dist/deb"),
+		shell.New("dput -f -c deb/dput.config eg eg_${VERSION}_source.changes").Directory(".dist"),
 	)
 }
 

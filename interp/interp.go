@@ -112,7 +112,7 @@ func Run(ctx context.Context, runid, dir string, module string, options ...Optio
 			return ffiegcontainer.PodmanRun(ctx, cmdctx, name, cname, cmd, options...)
 		})).Export("github.com/james-lawrence/eg/runtime/wasi/runtime/ffiegcontainer.Run").
 			NewFunctionBuilder().WithFunc(ffiexec.Exec(func(cmd *exec.Cmd) *exec.Cmd {
-			cmd.Dir = r.root
+			cmd.Dir = filepath.Join(r.root, cmd.Dir)
 			cmd.Env = cmdenv
 			cmd.Stdin = stdin
 			cmd.Stdout = stdout

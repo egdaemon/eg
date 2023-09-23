@@ -29,6 +29,7 @@ func main() {
 	var shellcli struct {
 		cmdopts.Global
 		Version            cmdopts.Version              `cmd:"" help:"display versioning information"`
+		Monitor            monitor                      `cmd:"" help:"execute the interpreter and monitor the progress"`
 		Interp             runner                       `cmd:"" help:"execute the interpreter on the given directory"`
 		Module             module                       `cmd:"" help:"executes a compiled module directly" hidden:"true"`
 		Daemon             daemon                       `cmd:"" help:"run in daemon mode letting the control plane push jobs to the local machine" hidden:"true"`

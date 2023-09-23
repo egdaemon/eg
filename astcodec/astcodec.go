@@ -1,6 +1,7 @@
 package astcodec
 
 import (
+	"errors"
 	"fmt"
 	"go/ast"
 	"go/token"
@@ -25,7 +26,7 @@ func AutoFileSet(c *packages.Config) {
 
 func DefaultPkgLoad(options ...LoadOpt) *packages.Config {
 	cfg := &packages.Config{
-		Mode: packages.NeedName | packages.NeedImports | packages.NeedTypes | packages.NeedSyntax | packages.NeedFiles | packages.NeedDeps,
+		Mode: packages.NeedName | packages.NeedImports | packages.NeedTypes | packages.NeedSyntax | packages.NeedFiles | packages.NeedDeps | packages.NeedModule,
 	}
 
 	for _, opt := range options {
@@ -35,14 +36,18 @@ func DefaultPkgLoad(options ...LoadOpt) *packages.Config {
 	return cfg
 }
 
-func Load(cfg *packages.Config, name string) (pkg *packages.Package, err error) {
+func Load(cfg *packages.Config) (pkg *packages.Package, err error) {
 	var set []*packages.Package
 
-	if set, err = packages.Load(cfg, name); err != nil {
+	if set, err = packages.Load(cfg); err != nil {
 		return nil, err
 	}
 
-	return set[0], nil
+	for _, pkg = range set {
+		return pkg, nil
+	}
+
+	return nil, errors.New("no package found")
 }
 
 func FindFunctions(d ast.Decl) bool {

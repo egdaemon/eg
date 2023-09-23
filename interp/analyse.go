@@ -14,7 +14,7 @@ import (
 	"github.com/tetratelabs/wazero"
 )
 
-func Analyse(ctx context.Context, runid, dir string, module string, options ...Option) (err error) {
+func Analyse(ctx context.Context, gg *gographviz.Graph, runid, dir string, module string, options ...Option) (err error) {
 	var (
 		r = runner{
 			root:      dir,
@@ -26,9 +26,6 @@ func Analyse(ctx context.Context, runid, dir string, module string, options ...O
 	for _, opt := range options {
 		opt(&r)
 	}
-
-	gg := gographviz.NewGraph()
-	gg.Directed = true
 
 	runtimeenv := func(r runner, moduledir string, cmdenv []string, host wazero.HostModuleBuilder) wazero.HostModuleBuilder {
 		g := ffigraph.NewViz(gg)

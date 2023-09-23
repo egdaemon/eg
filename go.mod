@@ -4,7 +4,10 @@ go 1.21
 
 require (
 	github.com/alecthomas/kong v0.7.1
+	github.com/charmbracelet/bubbletea v0.24.2
+	github.com/charmbracelet/lipgloss v0.8.0
 	github.com/davecgh/go-spew v1.1.1
+	github.com/dominikbraun/graph v0.23.0
 	github.com/gorilla/websocket v1.5.0
 	github.com/logrusorgru/aurora v2.0.3+incompatible
 	github.com/mattn/go-isatty v0.0.19
@@ -18,10 +21,7 @@ require (
 
 require (
 	github.com/aymanbagabas/go-osc52/v2 v2.0.1 // indirect
-	github.com/charmbracelet/bubbletea v0.24.2 // indirect
-	github.com/charmbracelet/lipgloss v0.8.0 // indirect
 	github.com/containerd/console v1.0.4-0.20230313162750-1ae8d489ac81 // indirect
-	github.com/dominikbraun/graph v0.23.0 // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/lucasb-eyer/go-colorful v1.2.0 // indirect
 	github.com/mattn/go-localereader v0.0.1 // indirect

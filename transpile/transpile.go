@@ -71,8 +71,8 @@ func (t golang) Run(ctx context.Context) (roots []Compiled, err error) {
 		astcodec.AutoFileSet,
 	)
 
-	if pkg, err = astcodec.Load(pkgc, "eg/ci"); err != nil {
-		return roots, errorsx.Wrap(err, "unable to load package eg/ci")
+	if pkg, err = astcodec.Load(pkgc); err != nil {
+		return roots, errorsx.Wrap(err, "unable to load package")
 	}
 
 	generatedmodules := make([]*module, 0, 128)

@@ -1,0 +1,76 @@
+syntax = "proto3";
+
+package eg.interp.events;
+
+message RunMetadata { bytes id = 1; }
+
+message LogHeader {
+  int32 Major = 1;
+  int32 Minor = 2;
+  int32 Patch = 3;
+  int64 sts = 4;
+  int64 ets = 5;
+}
+
+// heartbeat event
+message Heartbeat {}
+
+message Task {
+  enum State {
+    Pending = 0;
+    Initiated = 1;
+    Completed = 2;
+    Error = 1000;
+  }
+  string id = 1;
+  string description = 2;
+  State state = 3;
+  int64 deadline = 4; // unix timestamp.
+}
+
+// Represents every message recorded when executing a job
+message Message {
+  string id = 1;
+  int64 ts = 2; // unix timestamp.
+
+  oneof Event {
+    LogHeader preamble = 100;
+    Heartbeat heartbeat = 101;
+    Task task = 102;
+  }
+}
+
+message RunUploadChunk {
+  message Metadata {
+    uint64 bytes = 1;
+    bytes checksum = 2;
+  }
+
+  bytes data = 1;
+  bytes checksum = 2;
+  oneof initialChunkMetadata {
+    bool none = 3;
+    Metadata metadata = 4;
+  }
+}
+
+message RunUploadResponse {}
+
+message RunLogRequest { RunMetadata run = 1; }
+message RunLogResponse { bytes content = 1; }
+
+message RunInitiateRequest {}
+message RunInitiateResult {}
+
+message RunCancelRequest {}
+message RunCancelResponse {}
+
+message RunWatchRequest { RunMetadata run = 1; }
+
+service Run {
+  rpc Upload(stream RunUploadChunk) returns (RunUploadResponse) {}
+  rpc Initiate(RunInitiateRequest) returns (RunInitiateResult) {}
+  rpc Watch(RunWatchRequest) returns (stream Message) {}
+  rpc Cancel(RunCancelRequest) returns (RunCancelResponse) {}
+  rpc Logs(RunLogRequest) returns (stream RunLogResponse) {}
+}

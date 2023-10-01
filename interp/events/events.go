@@ -2,15 +2,26 @@ package events
 
 import (
 	"context"
+	"io"
+	"os"
+	"path/filepath"
+	sync "sync"
 	"time"
 
 	"github.com/gofrs/uuid"
+	"github.com/james-lawrence/eg/internal/errorsx"
+	"github.com/james-lawrence/eg/internal/iox"
+	"github.com/james-lawrence/eg/internal/protobuflog"
+)
+
+const (
+	format = "2006.01.02.15.04.05.log"
 )
 
 func NewMessage(evt isMessage_Event) *Message {
 	return &Message{
 		Id:    uuid.Must(uuid.NewV7()).String(),
-		Ts:    time.Now().Unix(),
+		Ts:    time.Now().UnixMicro(),
 		Event: evt,
 	}
 }
@@ -21,8 +32,8 @@ func NewPreambleV0(start time.Time, end time.Time) *Message {
 			Major: 0,
 			Minor: 0,
 			Patch: 0,
-			Sts:   start.Unix(),
-			Ets:   end.Unix(),
+			Sts:   start.UnixMicro(),
+			Ets:   end.UnixMicro(),
 		},
 	})
 }
@@ -75,14 +86,94 @@ func NewLog(dir string) *Log {
 	return &Log{
 		dir:      dir,
 		duration: 30 * time.Second,
+		l:        &sync.Mutex{},
 	}
+}
+
+func NewLogEnsureDir(dir string) (_ *Log, err error) {
+	if err = os.MkdirAll(dir, 0755); err != nil {
+		return nil, err
+	}
+
+	return NewLog(dir), nil
+}
+
+func NewLogDirFromRun(root string, md *RunMetadata) string {
+	return filepath.Join(root, uuid.FromBytesOrNil(md.Id).String(), "logs")
 }
 
 type Log struct {
 	dir      string
 	duration time.Duration
+	l        *sync.Mutex
 }
 
 func (t *Log) Write(ctx context.Context, events ...*Message) error {
-	return nil
+	var (
+		fh      *os.File
+		current string
+		encoder *protobuflog.Encoder[*Message]
+	)
+	t.l.Lock()
+	defer t.l.Unlock()
+
+	replacefh := func(old io.Closer, path string) (_ *os.File, err error) {
+		errorsx.MaybeLog(errorsx.Wrap(iox.MaybeClose(old), "unable to close log file"))
+		return os.OpenFile(path, os.O_CREATE|os.O_RDWR|os.O_APPEND, 0600)
+	}
+
+	for _, e := range events {
+		var (
+			err error
+		)
+
+		logname := filepath.Join(t.dir, time.UnixMicro(e.Ts).Truncate(t.duration).Format(format))
+		if logname != current {
+			if fh, err = replacefh(fh, logname); err != nil {
+				return err
+			}
+			current = logname
+			encoder = protobuflog.NewEncoder[*Message](fh)
+		}
+
+		if err = encoder.Encode(e); err != nil {
+			return err
+		}
+	}
+
+	return iox.MaybeClose(fh)
+}
+
+func NewReader(dir string) *Reader {
+	return &Reader{
+		dir:      dir,
+		duration: 30 * time.Second,
+		current:  time.Now(),
+	}
+}
+
+type Reader struct {
+	dir      string
+	duration time.Duration
+	current  time.Time
+}
+
+func (t *Reader) Read(ctx context.Context, buf *[]*Message) (err error) {
+	var (
+		fh      *os.File
+		decoder *protobuflog.Decoder[*Message]
+	)
+
+	replacefh := func(old *os.File, path string) (_ *os.File, err error) {
+		errorsx.MaybeLog(errorsx.Wrap(iox.MaybeClose(old), "unable to close log file"))
+		return os.Open(path)
+	}
+
+	logname := filepath.Join(t.dir, t.current.Truncate(t.duration).Format(format))
+	if fh, err = replacefh(fh, logname); err != nil {
+		return err
+	}
+	decoder = protobuflog.NewDecoder[*Message](fh)
+
+	return decoder.Decode(buf)
 }

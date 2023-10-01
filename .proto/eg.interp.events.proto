@@ -54,7 +54,7 @@ message RunUploadChunk {
   }
 }
 
-message RunUploadResponse {}
+message RunUploadResponse { RunMetadata run = 1; }
 
 message RunLogRequest { RunMetadata run = 1; }
 message RunLogResponse { bytes content = 1; }
@@ -67,10 +67,22 @@ message RunCancelResponse {}
 
 message RunWatchRequest { RunMetadata run = 1; }
 
-service Run {
+service Agent {
   rpc Upload(stream RunUploadChunk) returns (RunUploadResponse) {}
   rpc Initiate(RunInitiateRequest) returns (RunInitiateResult) {}
-  rpc Watch(RunWatchRequest) returns (stream Message) {}
   rpc Cancel(RunCancelRequest) returns (RunCancelResponse) {}
   rpc Logs(RunLogRequest) returns (stream RunLogResponse) {}
+  rpc Watch(RunWatchRequest) returns (stream Message) {}
+}
+
+message DispatchRequest { repeated Message messages = 1; }
+
+message DispatchResponse {}
+
+service Events {
+  rpc Dispatch(DispatchRequest) returns (DispatchResponse) {}
+}
+
+service Runner {
+  rpc Dispatch(DispatchRequest) returns (DispatchResponse) {}
 }

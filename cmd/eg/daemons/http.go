@@ -11,10 +11,7 @@ import (
 	"github.com/justinas/alice"
 )
 
-func HTTP(global *cmdopts.Global) (httpl net.Listener, err error) {
-	if httpl, err = net.Listen("tcp", "127.0.1.1:8093"); err != nil {
-		return nil, err
-	}
+func HTTP(global *cmdopts.Global, httpl net.Listener) (err error) {
 
 	httpmux := mux.NewRouter()
 	httpmux.NotFoundHandler = alice.New(httpx.RouteInvoked).ThenFunc(httpx.NotFound)
@@ -28,5 +25,5 @@ func HTTP(global *cmdopts.Global) (httpl net.Listener, err error) {
 		}
 	}()
 
-	return httpl, err
+	return nil
 }

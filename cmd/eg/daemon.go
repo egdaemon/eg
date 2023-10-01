@@ -25,8 +25,13 @@ func (t daemon) Run(ctx *cmdopts.Global) (err error) {
 	var (
 		signer   ssh.Signer
 		httpl    net.Listener
+		grpcl    net.Listener
 		sshproxy net.Listener
 	)
+
+	if httpl, err = net.Listen("tcp", "127.0.1.1:8093"); err != nil {
+		return err
+	}
 
 	if signer, err = sshx.AutoCached(sshx.NewKeyGen(sshx.OptionKeyGenRand(cryptox.NewPRNGSHA512([]byte(t.Seed)))), t.SSHKeyPath); err != nil {
 		return err
@@ -51,10 +56,18 @@ func (t daemon) Run(ctx *cmdopts.Global) (err error) {
 		return err
 	}
 
-	if httpl, err = daemons.HTTP(ctx); err != nil {
+	if err = daemons.HTTP(ctx, httpl); err != nil {
 		return err
 	}
 	defer httpl.Close()
+
+	if grpcl, err = daemons.DefaultAgentListener(); err != nil {
+		return err
+	}
+
+	if err = daemons.Agent(ctx, grpcl); err != nil {
+		return err
+	}
 
 	if sshproxy, err = daemons.SSHProxy(ctx, config, signer, httpl); err != nil {
 		return err

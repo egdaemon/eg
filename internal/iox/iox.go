@@ -78,3 +78,11 @@ func Copy(from, to string) error {
 
 	return out.Close()
 }
+
+func MaybeClose(c io.Closer) error {
+	if c == nil || c == (*os.File)(nil) {
+		return nil
+	}
+
+	return c.Close()
+}

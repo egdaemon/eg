@@ -11,7 +11,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/dominikbraun/graph"
-	"github.com/james-lawrence/eg/internal/graphx"
+	"google.golang.org/grpc"
 )
 
 type Node struct {
@@ -33,12 +33,12 @@ type EventTask struct {
 	State State
 }
 
-func NewGraph(g graph.Graph[string, *Node]) Graph {
-	return Graph{g: g}
+func NewGraph(cc grpc.ClientConnInterface) Graph {
+	return Graph{cc: cc}
 }
 
 type Graph struct {
-	g graph.Graph[string, *Node]
+	cc grpc.ClientConnInterface
 }
 
 func (t Graph) Init() tea.Cmd {
@@ -54,8 +54,8 @@ func (t Graph) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return t, tea.Quit
 		}
 	case EventTask:
-		n, _ := t.g.Vertex(m.ID)
-		n.State = m.State
+		// n, _ := t.g.Vertex(m.ID)
+		// n.State = m.State
 	default:
 		log.Printf("received %T", m)
 	}
@@ -75,15 +75,15 @@ func (t Graph) View() string {
 		Foreground(lipgloss.Color("#FFF7DB"))
 	nodeStyle := lipgloss.NewStyle()
 	doc := strings.Builder{}
-	err := graphx.DFS(t.g, "perform", func(id string, ancestors []string) bool {
-		n, _ := t.g.Vertex(id)
-		nodes = append(nodes, dfsnode{n: n, path: fmt.Sprintf("%s.%s", strings.Join(ancestors, "."), n.ID), depth: len(ancestors)})
+	// err := graphx.DFS(t.g, "perform", func(id string, ancestors []string) bool {
+	// 	n, _ := t.g.Vertex(id)
+	// 	nodes = append(nodes, dfsnode{n: n, path: fmt.Sprintf("%s.%s", strings.Join(ancestors, "."), n.ID), depth: len(ancestors)})
 
-		return false
-	})
-	if err != nil {
-		return Error().SetString(err.Error()).String()
-	}
+	// 	return false
+	// })
+	// if err != nil {
+	// 	return Error().SetString(err.Error()).String()
+	// }
 
 	sort.Slice(nodes, func(i, j int) bool {
 		return nodes[i].path < nodes[j].path

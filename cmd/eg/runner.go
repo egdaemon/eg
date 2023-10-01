@@ -1,24 +1,22 @@
 package main
 
 import (
-	"io"
 	"log"
-	"math/rand"
 	"os"
 	"path/filepath"
-	"time"
 
 	"github.com/awalterschulze/gographviz"
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/dominikbraun/graph"
 	"github.com/gofrs/uuid"
 	"github.com/james-lawrence/eg/cmd/cmdopts"
+	"github.com/james-lawrence/eg/cmd/eg/daemons"
 	"github.com/james-lawrence/eg/cmd/ux"
 	"github.com/james-lawrence/eg/compile"
 	"github.com/james-lawrence/eg/interp"
 	"github.com/james-lawrence/eg/transpile"
 	"github.com/james-lawrence/eg/workspaces"
 	"github.com/pkg/errors"
+	"google.golang.org/grpc"
 )
 
 type runner struct {
@@ -121,53 +119,19 @@ type monitor struct {
 }
 
 func (t monitor) Run(ctx *cmdopts.Global) (err error) {
-	const (
-		path = "derp.dot"
-	)
-
 	var (
-		fh   *os.File
-		rawg []byte
-		gg   *gographviz.Graph
+		cc *grpc.ClientConn
 	)
 
-	if fh, err = os.Open(path); err != nil {
-		log.Fatalln(err)
-	}
-	defer fh.Close()
-
-	if rawg, err = io.ReadAll(fh); err != nil {
-		log.Fatalln(err)
-	}
-
-	if gg, err = gographviz.Read(rawg); err != nil {
-		log.Fatalln(err)
-	}
-
-	g, err := ux.TranslateGraphiz(gg)
-	if err != nil {
+	if cc, err = daemons.DefaultAgentClient(ctx.Context); err != nil {
 		return err
 	}
 
 	p := tea.NewProgram(
-		ux.NewGraph(g),
+		ux.NewGraph(cc),
 		tea.WithoutSignalHandler(),
 		tea.WithContext(ctx.Context),
 	)
-	go func() {
-		for {
-			time.Sleep(time.Second)
-
-			nodes, _ := graph.TopologicalSort(g)
-			if len(nodes) == 0 {
-				continue
-			}
-
-			choice := rand.Intn(len(nodes))
-			n, _ := g.Vertex(nodes[choice])
-			p.Send(ux.EventTask{ID: n.ID, State: (n.State + 1) % (ux.StateError + 1)})
-		}
-	}()
 
 	go func() {
 		<-ctx.Context.Done()
@@ -178,9 +142,5 @@ func (t monitor) Run(ctx *cmdopts.Global) (err error) {
 		return err
 	}
 
-	// err = draw.DOT(g, langx.Must(os.OpenFile("derp2.dot", os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0600)))
-	// if err != nil {
-	// 	log.Fatalln(err)
-	// }
 	return nil
 }

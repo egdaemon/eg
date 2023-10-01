@@ -34,7 +34,7 @@ func OptionModuleDir(s string) Option {
 
 type runtimefn func(r runner, moduledir string, cmdenv []string, host wazero.HostModuleBuilder) wazero.HostModuleBuilder
 
-func Run(ctx context.Context, runid, dir string, module string, options ...Option) error {
+func Run(ctx context.Context, runid string, g ffigraph.Eventer, dir string, module string, options ...Option) error {
 	var (
 		r = runner{
 			root:      dir,

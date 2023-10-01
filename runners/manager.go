@@ -29,7 +29,7 @@ type Manager struct {
 	done context.CancelFunc
 }
 
-func (t Manager) NewRun(ctx context.Context, id string) (*Runner, error) {
+func (t Manager) NewRun(ctx context.Context, id string) (*Agent, error) {
 	return NewRunner(t.ctx, t.dir, id)
 }
 

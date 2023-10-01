@@ -6,7 +6,6 @@ import (
 	"os/exec"
 	"sync"
 
-	"github.com/awalterschulze/gographviz"
 	"github.com/james-lawrence/eg/internal/md5x"
 	"github.com/james-lawrence/eg/interp/runtime/wasi/ffiegcontainer"
 	"github.com/james-lawrence/eg/interp/runtime/wasi/ffiexec"
@@ -14,7 +13,7 @@ import (
 	"github.com/tetratelabs/wazero"
 )
 
-func Analyse(ctx context.Context, gg *gographviz.Graph, runid, dir string, module string, options ...Option) (err error) {
+func Analyse(ctx context.Context, g ffigraph.Eventer, runid, dir string, module string, options ...Option) (err error) {
 	var (
 		r = runner{
 			root:      dir,
@@ -28,7 +27,6 @@ func Analyse(ctx context.Context, gg *gographviz.Graph, runid, dir string, modul
 	}
 
 	runtimeenv := func(r runner, moduledir string, cmdenv []string, host wazero.HostModuleBuilder) wazero.HostModuleBuilder {
-		g := ffigraph.NewViz(gg)
 		return host.NewFunctionBuilder().
 			WithFunc(ffigraph.Analysing(true)).Export("github.com/james-lawrence/eg/runtime/wasi/runtime/graph.Analysing").
 			NewFunctionBuilder().

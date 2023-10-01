@@ -26,11 +26,15 @@ func New() grapher {
 	return grapher{}
 }
 
-type traceevent func(ctx context.Context, m api.Module, idoffset uint32, idlen uint32) uint32
+type TraceEvent func(ctx context.Context, m api.Module, idoffset uint32, idlen uint32) uint32
 
+type Eventer interface {
+	Pusher() TraceEvent
+	Popper() TraceEvent
+}
 type grapher struct{}
 
-func (t grapher) Pusher() traceevent {
+func (t grapher) Pusher() TraceEvent {
 	return func(ctx context.Context, m api.Module, idoffset, idlen uint32) uint32 {
 		// var (
 		// 	id  string
@@ -46,7 +50,7 @@ func (t grapher) Pusher() traceevent {
 	}
 }
 
-func (t grapher) Popper() traceevent {
+func (t grapher) Popper() TraceEvent {
 	return func(ctx context.Context, m api.Module, idoffset, idlen uint32) uint32 {
 		// var (
 		// 	id  string
@@ -58,6 +62,81 @@ func (t grapher) Popper() traceevent {
 		// }
 
 		// log.Println("popping", id)
+		return 0
+	}
+}
+
+func NewListener(g chan *EventInfo) *listener {
+	return &listener{
+		c:       g,
+		stack:   []string{},
+		current: "",
+	}
+}
+
+type State uint
+
+const (
+	Pushed State = iota
+	Popped
+)
+
+type EventInfo struct {
+	ID    string
+	State State
+}
+
+type listener struct {
+	c       chan *EventInfo
+	stack   []string
+	current string
+}
+
+func (t *listener) Pusher() TraceEvent {
+	return func(ctx context.Context, m api.Module, idoffset, idlen uint32) uint32 {
+		var (
+			id  string
+			err error
+		)
+		if id, err = ffi.ReadString(m.Memory(), idoffset, idlen); err != nil {
+			log.Println("unable to read id argument", err)
+			return 1
+		}
+
+		if t.current != "" {
+			select {
+			case <-ctx.Done():
+				log.Println("unable to push event to listener", ctx.Err())
+				return 1
+			case t.c <- &EventInfo{ID: id, State: Pushed}:
+			}
+		}
+
+		t.current = id
+		t.stack = append(t.stack, id)
+
+		return 0
+	}
+}
+
+func (t *listener) Popper() TraceEvent {
+	return func(ctx context.Context, m api.Module, idoffset, idlen uint32) uint32 {
+		var (
+			err error
+			id  string
+		)
+		if id, err = ffi.ReadString(m.Memory(), idoffset, idlen); err != nil {
+			log.Println("unable to read id argument", err)
+			return 1
+		}
+
+		select {
+		case <-ctx.Done():
+			log.Println("unable to push event to listener", ctx.Err())
+			return 1
+		case t.c <- &EventInfo{ID: id, State: Popped}:
+		}
+
 		return 0
 	}
 }
@@ -76,7 +155,7 @@ type graphviz struct {
 	current string
 }
 
-func (t *graphviz) Pusher() traceevent {
+func (t *graphviz) Pusher() TraceEvent {
 	return func(ctx context.Context, m api.Module, idoffset, idlen uint32) uint32 {
 		var (
 			id  string
@@ -106,7 +185,7 @@ func (t *graphviz) Pusher() traceevent {
 	}
 }
 
-func (t *graphviz) Popper() traceevent {
+func (t *graphviz) Popper() TraceEvent {
 	return func(ctx context.Context, m api.Module, idoffset, idlen uint32) uint32 {
 		var (
 			err error

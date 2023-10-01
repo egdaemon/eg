@@ -22,7 +22,7 @@ func main() {
 		generated []*events.Message
 		ts        = time.Now().Truncate(time.Hour)
 		ctx, done = context.WithCancel(context.Background())
-		ragent    *runners.Runner
+		ragent    *runners.Agent
 	)
 
 	dir := langx.Must(filepath.Abs(runners.DefaultManagerDirectory()))

@@ -1,18 +1,24 @@
 package main
 
 import (
+	"context"
+	"fmt"
 	"log"
 	"os"
 	"path/filepath"
 
-	"github.com/awalterschulze/gographviz"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/davecgh/go-spew/spew"
 	"github.com/gofrs/uuid"
 	"github.com/james-lawrence/eg/cmd/cmdopts"
 	"github.com/james-lawrence/eg/cmd/eg/daemons"
 	"github.com/james-lawrence/eg/cmd/ux"
 	"github.com/james-lawrence/eg/compile"
 	"github.com/james-lawrence/eg/interp"
+	"github.com/james-lawrence/eg/interp/events"
+	"github.com/james-lawrence/eg/interp/runtime/wasi/ffigraph"
+	"github.com/james-lawrence/eg/runners"
+	"github.com/james-lawrence/eg/runtime/wasi/langx"
 	"github.com/james-lawrence/eg/transpile"
 	"github.com/james-lawrence/eg/workspaces"
 	"github.com/pkg/errors"
@@ -26,8 +32,52 @@ type runner struct {
 
 func (t runner) Run(ctx *cmdopts.Global) (err error) {
 	var (
-		ws workspaces.Context
+		ws     workspaces.Context
+		uid    = uuid.Must(uuid.NewV7())
+		ragent *runners.Agent
+		ebuf   = make(chan *ffigraph.EventInfo)
 	)
+
+	m := runners.NewManager(
+		ctx.Context,
+		langx.Must(filepath.Abs(runners.DefaultManagerDirectory())),
+	)
+
+	if ragent, err = m.NewRun(ctx.Context, uid.String()); err != nil {
+		return err
+	}
+
+	cc, err := ragent.Dial(ctx.Context)
+	if err != nil {
+		return err
+	}
+	go func() {
+		makeevt := func(e *ffigraph.EventInfo) *events.Message {
+			switch e.State {
+			case ffigraph.Popped:
+				return events.NewTaskCompleted(e.ID, "completed")
+			case ffigraph.Pushed:
+				return events.NewTaskInitiated(e.ID, "initiated")
+			default:
+				return events.NewTaskErrored(e.ID, fmt.Sprintf("unknown %d", e.State))
+			}
+		}
+
+		c := events.NewEventsClient(cc)
+		for {
+			select {
+			case <-ctx.Context.Done():
+				return
+			case evt := <-ebuf:
+				if _, err := c.Dispatch(context.Background(), &events.DispatchRequest{Messages: []*events.Message{
+					makeevt(evt),
+				}}); err != nil {
+					log.Println("unable to dispatch event", spew.Sdump(evt))
+					continue
+				}
+			}
+		}
+	}()
 
 	if ws, err = workspaces.New(ctx.Context, t.Dir, t.ModuleDir); err != nil {
 		return err
@@ -77,15 +127,12 @@ func (t runner) Run(ctx *cmdopts.Global) (err error) {
 	// 	}
 	// }
 
-	gg := gographviz.NewGraph()
-	gg.Directed = true
-
 	for _, m := range modules {
 		if m.Generated {
 			continue
 		}
 
-		if err = interp.Analyse(ctx.Context, gg, uuid.Must(uuid.NewV4()).String(), t.Dir, m.Path, interp.OptionModuleDir(t.ModuleDir)); err != nil {
+		if err = interp.Analyse(ctx.Context, ffigraph.NewListener(ebuf), uid.String(), t.Dir, m.Path, interp.OptionModuleDir(t.ModuleDir)); err != nil {
 			return errors.Wrapf(err, "failed to analyse module %s", m.Path)
 		}
 	}
@@ -95,7 +142,7 @@ func (t runner) Run(ctx *cmdopts.Global) (err error) {
 			continue
 		}
 
-		if err = interp.Run(ctx.Context, uuid.Must(uuid.NewV4()).String(), t.Dir, m.Path, interp.OptionModuleDir(t.ModuleDir)); err != nil {
+		if err = interp.Run(ctx.Context, uid.String(), ffigraph.NewListener(ebuf), t.Dir, m.Path, interp.OptionModuleDir(t.ModuleDir)); err != nil {
 			return errors.Wrapf(err, "failed to run module %s", m.Path)
 		}
 	}
@@ -110,7 +157,7 @@ type module struct {
 }
 
 func (t module) Run(ctx *cmdopts.Global) (err error) {
-	return interp.Run(ctx.Context, uuid.Must(uuid.NewV4()).String(), t.Dir, t.Module, interp.OptionModuleDir(t.ModuleDir))
+	return interp.Run(ctx.Context, uuid.Must(uuid.NewV4()).String(), ffigraph.New(), t.Dir, t.Module, interp.OptionModuleDir(t.ModuleDir))
 }
 
 type monitor struct {

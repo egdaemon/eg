@@ -14,7 +14,7 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 )
 
-func NewRunner(ctx context.Context, root, id string) (_ *Runner, err error) {
+func NewRunner(ctx context.Context, root, id string) (_ *Agent, err error) {
 	var (
 		control net.Listener
 		workdir = filepath.Join(root, id)
@@ -43,7 +43,7 @@ func NewRunner(ctx context.Context, root, id string) (_ *Runner, err error) {
 		return nil, errors.WithStack(err)
 	}
 
-	r := &Runner{
+	r := &Agent{
 		id:      id,
 		workdir: workdir,
 		control: control,
@@ -55,7 +55,7 @@ func NewRunner(ctx context.Context, root, id string) (_ *Runner, err error) {
 	return r, nil
 }
 
-type Runner struct {
+type Agent struct {
 	id      string
 	workdir string
 	control net.Listener
@@ -63,11 +63,11 @@ type Runner struct {
 	evtlog  *events.Log
 }
 
-func (t Runner) Dial(ctx context.Context) (conn *grpc.ClientConn, err error) {
+func (t Agent) Dial(ctx context.Context) (conn *grpc.ClientConn, err error) {
 	return grpc.DialContext(ctx, fmt.Sprintf("unix://%s", filepath.Join(t.workdir, "control.socket")), grpc.WithInsecure())
 }
 
-func (t Runner) Background() {
+func (t Agent) Background() {
 	log.Println("RUNNER INITIATED", t.id)
 	defer log.Println("RUNNER COMPLETED", t.id)
 	defer os.RemoveAll(t.workdir)

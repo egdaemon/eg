@@ -113,12 +113,10 @@ func (t Graph) View() string {
 			nodeStyle.Copy().
 				MarginLeft(n.depth*2),
 		)
-		// log.Println("DERP", n.n.State)
-		_, _ = fmt.Fprint(&title, nodeStyle.Copy().Padding(0, 1).Foreground(lipgloss.Color("#00FF00")).SetString("\u25CF"))
+		_, _ = fmt.Fprint(&title, nodeStyle.Copy().Padding(0, 1).Foreground(nodeStateTerminalColor(n.n.State)).SetString("\u25CF"))
 		_, _ = fmt.Fprint(&title, textstyle.Copy().SetString(fmt.Sprintf("- %v - ", nodeStateTerminalColor(n.n.State))))
 		_, _ = fmt.Fprint(&title, textstyle.Copy().SetString(n.n.ID))
 		_, _ = fmt.Fprint(&title, "\n")
-		// log.Println("DERP", n.n.ID, n.n.State, nodeStateTerminalColor(n.n.State))
 		doc.WriteString(lipgloss.JoinHorizontal(lipgloss.Bottom, title.String()))
 	}
 
@@ -132,8 +130,7 @@ func nodeStateTerminalColor(s State) lipgloss.TerminalColor {
 	case StateRunning:
 		return lipgloss.Color("#DBAB79")
 	case StateSuccessful:
-		// return lipgloss.Color("#A8CC8C")
-		return lipgloss.Color("#00FF00")
+		return lipgloss.Color("#A8CC8C")
 	default:
 		return lipgloss.Color("#B9BFCA")
 	}

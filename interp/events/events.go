@@ -3,6 +3,8 @@ package events
 import (
 	"context"
 	"io"
+	"io/fs"
+	"log"
 	"os"
 	"path/filepath"
 	sync "sync"
@@ -58,17 +60,19 @@ func NewTaskPending(id, desc string) *Message {
 	})
 }
 
-func NewTaskInitiated(id, desc string) *Message {
+func NewTaskInitiated(pid, id, desc string) *Message {
 	return NewTask(&Task{
 		Id:          id,
+		Pid:         pid,
 		Description: desc,
 		State:       Task_Initiated,
 	})
 }
 
-func NewTaskCompleted(id, desc string) *Message {
+func NewTaskCompleted(pid, id, desc string) *Message {
 	return NewTask(&Task{
 		Id:          id,
+		Pid:         pid,
 		Description: desc,
 		State:       Task_Completed,
 	})
@@ -80,6 +84,10 @@ func NewTaskErrored(id, desc string) *Message {
 		Description: desc,
 		State:       Task_Error,
 	})
+}
+
+func NewDispatch(m ...*Message) *DispatchRequest {
+	return &DispatchRequest{Messages: m}
 }
 
 func NewLog(dir string) *Log {
@@ -99,7 +107,11 @@ func NewLogEnsureDir(dir string) (_ *Log, err error) {
 }
 
 func NewLogDirFromRun(root string, md *RunMetadata) string {
-	return filepath.Join(root, uuid.FromBytesOrNil(md.Id).String(), "logs")
+	return NewLogDirFromRunID(root, uuid.FromBytesOrNil(md.Id).String())
+}
+
+func NewLogDirFromRunID(root string, id string) string {
+	return filepath.Join(root, id, "events")
 }
 
 type Log struct {
@@ -144,24 +156,59 @@ func (t *Log) Write(ctx context.Context, events ...*Message) error {
 	return iox.MaybeClose(fh)
 }
 
+func detectFirstLogTimestamp(dir string) time.Time {
+	var (
+		ts = time.Now()
+	)
+	err := filepath.Walk(dir, func(path string, info fs.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+
+		if path == dir {
+			return nil
+		}
+
+		if info.IsDir() {
+			return filepath.SkipDir
+		}
+
+		if ts, err = time.Parse(format, info.Name()); err != nil {
+			return err
+		}
+
+		return filepath.SkipAll
+	})
+
+	if err != nil {
+		log.Println("unable to detect first log", err)
+		return time.Now()
+	}
+
+	return ts
+}
+
 func NewReader(dir string) *Reader {
 	return &Reader{
-		dir:      dir,
-		duration: 30 * time.Second,
-		current:  time.Now(),
+		dir:       dir,
+		duration:  30 * time.Second,
+		current:   detectFirstLogTimestamp(dir),
+		batchSize: 100,
 	}
 }
 
 type Reader struct {
-	dir      string
-	duration time.Duration
-	current  time.Time
+	dir       string
+	duration  time.Duration
+	current   time.Time
+	batchSize int
 }
 
-func (t *Reader) Read(ctx context.Context, buf *[]*Message) (err error) {
+func (t *Reader) Read(ctx context.Context, dst *[]*Message) (err error) {
 	var (
 		fh      *os.File
 		decoder *protobuflog.Decoder[*Message]
+		buf     = make([]*Message, 0, t.batchSize)
 	)
 
 	replacefh := func(old *os.File, path string) (_ *os.File, err error) {
@@ -170,10 +217,23 @@ func (t *Reader) Read(ctx context.Context, buf *[]*Message) (err error) {
 	}
 
 	logname := filepath.Join(t.dir, t.current.Truncate(t.duration).Format(format))
-	if fh, err = replacefh(fh, logname); err != nil {
+
+	if fh, err = replacefh(fh, logname); os.IsNotExist(err) {
+		return io.EOF
+	} else if err != nil {
 		return err
 	}
 	decoder = protobuflog.NewDecoder[*Message](fh)
 
-	return decoder.Decode(buf)
+	if err = decoder.Decode(&buf); err != nil {
+		return err
+	}
+
+	*dst = append(*dst, buf...)
+
+	if len(buf) < cap(buf) && time.Since(t.current) > t.duration {
+		t.current = t.current.Add(t.duration)
+	}
+
+	return nil
 }

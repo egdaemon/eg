@@ -70,7 +70,7 @@ func UnsafeTranspiledRef(name string, o OpFn) Reference {
 }
 
 func Perform(ctx context.Context, tasks ...OpFn) error {
-	return ffigraph.WrapErr(namedop("perform"), func() error {
+	return ffigraph.WrapErr(nil, namedop("perform"), func() error {
 		for _, t := range tasks {
 			if err := t(ctx, ref(t)); err != nil {
 				return err
@@ -83,10 +83,11 @@ func Perform(ctx context.Context, tasks ...OpFn) error {
 
 func Sequential(operations ...OpFn) OpFn {
 	return func(ctx context.Context, o Op) error {
-		return ffigraph.WrapErr(prefixedop("seq", o), func() error {
+		parent := prefixedop("seq", o)
+		return ffigraph.WrapErr(nil, parent, func() error {
 			for _, op := range operations {
 				r := ref(op)
-				err := ffigraph.WrapErr(r, func() error {
+				err := ffigraph.WrapErr(parent, r, func() error {
 					return op(ctx, r)
 				})
 				if err != nil {
@@ -109,7 +110,8 @@ func Sequential(operations ...OpFn) OpFn {
 // operations to ensure callers are not implicitly relying on order.
 func Parallel(operations ...OpFn) OpFn {
 	return func(ctx context.Context, o Op) (err error) {
-		return ffigraph.WrapErr(prefixedop("par", o), func() error {
+		parent := prefixedop("par", o)
+		return ffigraph.WrapErr(nil, parent, func() error {
 			errs := make(chan error, len(operations))
 			defer close(errs)
 
@@ -123,7 +125,7 @@ func Parallel(operations ...OpFn) OpFn {
 					select {
 					case <-ctx.Done():
 						errs <- ctx.Err()
-					case errs <- ffigraph.WrapErr(r, func() error { return iop(ctx, r) }):
+					case errs <- ffigraph.WrapErr(parent, r, func() error { return iop(ctx, r) }):
 					}
 				}(o)
 			}

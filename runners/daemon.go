@@ -39,7 +39,7 @@ func NewRunner(ctx context.Context, root, id string) (_ *Agent, err error) {
 		control.Close()
 	}()
 
-	if evtlog, err = events.NewLogEnsureDir(filepath.Join(workdir, "events")); err != nil {
+	if evtlog, err = events.NewLogEnsureDir(events.NewLogDirFromRunID(root, id)); err != nil {
 		return nil, errors.WithStack(err)
 	}
 

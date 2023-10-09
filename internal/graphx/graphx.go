@@ -27,6 +27,7 @@ func dfs[K comparable, T any](g graph.Graph[K, T], ancestors []K, m map[K]map[K]
 	if stop := visit(n, ancestors); stop {
 		return stop
 	}
+
 	na := make([]K, 0, len(ancestors))
 	na = append(na, ancestors...)
 	na = append(na, n)

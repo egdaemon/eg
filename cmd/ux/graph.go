@@ -2,7 +2,6 @@ package ux
 
 import (
 	"fmt"
-	"log"
 	"sort"
 	"strings"
 
@@ -11,7 +10,9 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/dominikbraun/graph"
-	"google.golang.org/grpc"
+	"github.com/james-lawrence/eg/internal/graphx"
+	"github.com/james-lawrence/eg/internal/stringsx"
+	"github.com/james-lawrence/eg/interp/events"
 )
 
 type Node struct {
@@ -33,16 +34,19 @@ type EventTask struct {
 	State State
 }
 
-func NewGraph(cc grpc.ClientConnInterface) Graph {
-	return Graph{cc: cc}
+func NewGraph() Graph {
+	return Graph{
+		g: graph.New(func(v *Node) string {
+			return v.ID
+		}, graph.Directed(), graph.PreventCycles(), graph.Tree()),
+	}
 }
 
 type Graph struct {
-	cc grpc.ClientConnInterface
+	g graph.Graph[string, *Node]
 }
 
 func (t Graph) Init() tea.Cmd {
-	// Just return `nil`, which means "no I/O right now, please."
 	return nil
 }
 
@@ -53,11 +57,25 @@ func (t Graph) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.String() == "ctrl+c" {
 			return t, tea.Quit
 		}
-	case EventTask:
-		// n, _ := t.g.Vertex(m.ID)
-		// n.State = m.State
+	case *events.Message:
+		switch mt := m.Event.(type) {
+		case *events.Message_Task:
+			n := &Node{
+				ID:    mt.Task.Id,
+				State: State(mt.Task.State),
+			}
+
+			if err := t.g.AddVertex(n); err != nil {
+				n, _ := t.g.Vertex(mt.Task.Id)
+				n.State = State(mt.Task.State)
+			} else if mt.Task.Id == "perform" {
+			} else {
+				ppid := stringsx.DefaultIfBlank(mt.Task.Pid, "perform")
+				_ = t.g.AddEdge(ppid, mt.Task.Id)
+			}
+		}
 	default:
-		log.Printf("received %T", m)
+		// log.Printf("received %T", m)
 	}
 
 	return t, nil
@@ -75,15 +93,15 @@ func (t Graph) View() string {
 		Foreground(lipgloss.Color("#FFF7DB"))
 	nodeStyle := lipgloss.NewStyle()
 	doc := strings.Builder{}
-	// err := graphx.DFS(t.g, "perform", func(id string, ancestors []string) bool {
-	// 	n, _ := t.g.Vertex(id)
-	// 	nodes = append(nodes, dfsnode{n: n, path: fmt.Sprintf("%s.%s", strings.Join(ancestors, "."), n.ID), depth: len(ancestors)})
+	err := graphx.DFS(t.g, "perform", func(id string, ancestors []string) bool {
+		n, _ := t.g.Vertex(id)
+		nodes = append(nodes, dfsnode{n: n, path: fmt.Sprintf("%s.%s", strings.Join(ancestors, "."), n.ID), depth: len(ancestors)})
+		return false
+	})
 
-	// 	return false
-	// })
-	// if err != nil {
-	// 	return Error().SetString(err.Error()).String()
-	// }
+	if err != nil {
+		return Error().SetString(err.Error()).String()
+	}
 
 	sort.Slice(nodes, func(i, j int) bool {
 		return nodes[i].path < nodes[j].path
@@ -95,7 +113,8 @@ func (t Graph) View() string {
 			nodeStyle.Copy().
 				MarginLeft(n.depth*2),
 		)
-		_, _ = fmt.Fprint(&title, nodeStyle.Copy().Padding(0, 1).Foreground(nodeStateTerminalColor(n.n.State)).SetString("\u25CF"))
+		// log.Println("DERP", n.n.State)
+		_, _ = fmt.Fprint(&title, nodeStyle.Copy().Padding(0, 1).Foreground(lipgloss.Color("#00FF00")).SetString("\u25CF"))
 		_, _ = fmt.Fprint(&title, textstyle.Copy().SetString(fmt.Sprintf("- %v - ", nodeStateTerminalColor(n.n.State))))
 		_, _ = fmt.Fprint(&title, textstyle.Copy().SetString(n.n.ID))
 		_, _ = fmt.Fprint(&title, "\n")
@@ -113,7 +132,8 @@ func nodeStateTerminalColor(s State) lipgloss.TerminalColor {
 	case StateRunning:
 		return lipgloss.Color("#DBAB79")
 	case StateSuccessful:
-		return lipgloss.Color("#A8CC8C")
+		// return lipgloss.Color("#A8CC8C")
+		return lipgloss.Color("#00FF00")
 	default:
 		return lipgloss.Color("#B9BFCA")
 	}

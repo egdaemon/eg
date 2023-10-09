@@ -23,9 +23,10 @@ message Task {
     Error = 1000;
   }
   string id = 1;
-  string description = 2;
-  State state = 3;
-  int64 deadline = 4; // unix timestamp.
+  string pid = 2;
+  string description = 3;
+  State state = 4;
+  int64 deadline = 5; // unix timestamp.
 }
 
 // Represents every message recorded when executing a job

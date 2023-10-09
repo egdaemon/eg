@@ -7,19 +7,15 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/gofrs/uuid"
-	"github.com/james-lawrence/eg/internal/envx"
 	"github.com/james-lawrence/eg/internal/md5x"
 	"github.com/pkg/errors"
 	"google.golang.org/grpc"
 )
 
-func NewServiceAgent() *AgentService {
-	root := filepath.Join(envx.String(os.TempDir(), "CACHE_DIRECTORY"), "pending-runs")
-	if err := os.MkdirAll(root, 0700); err != nil {
-		panic(err)
-	}
+func NewServiceAgent(root string) *AgentService {
 	return &AgentService{
 		dir: root,
 	}
@@ -118,7 +114,17 @@ func (t *AgentService) Watch(rw *RunWatchRequest, s Agent_WatchServer) (err erro
 			buf = make([]*Message, 0, 5)
 		)
 
-		if err = r.Read(s.Context(), &buf); err != nil {
+		select {
+		case <-s.Context().Done():
+			return s.Context().Err()
+		default:
+		}
+
+		if cause := r.Read(s.Context(), &buf); cause == io.EOF {
+			time.Sleep(time.Second)
+			continue
+		} else if cause != nil {
+			err = cause
 			continue
 		}
 

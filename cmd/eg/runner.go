@@ -1,9 +1,10 @@
 package main
 
 import (
-	"context"
 	"fmt"
+	"io"
 	"log"
+	"net"
 	"os"
 	"path/filepath"
 
@@ -51,13 +52,14 @@ func (t runner) Run(ctx *cmdopts.Global) (err error) {
 	if err != nil {
 		return err
 	}
+
 	go func() {
 		makeevt := func(e *ffigraph.EventInfo) *events.Message {
 			switch e.State {
 			case ffigraph.Popped:
-				return events.NewTaskCompleted(e.ID, "completed")
+				return events.NewTaskCompleted(e.Parent, e.ID, "completed")
 			case ffigraph.Pushed:
-				return events.NewTaskInitiated(e.ID, "initiated")
+				return events.NewTaskInitiated(e.Parent, e.ID, "initiated")
 			default:
 				return events.NewTaskErrored(e.ID, fmt.Sprintf("unknown %d", e.State))
 			}
@@ -69,9 +71,7 @@ func (t runner) Run(ctx *cmdopts.Global) (err error) {
 			case <-ctx.Context.Done():
 				return
 			case evt := <-ebuf:
-				if _, err := c.Dispatch(context.Background(), &events.DispatchRequest{Messages: []*events.Message{
-					makeevt(evt),
-				}}); err != nil {
+				if _, err := c.Dispatch(ctx.Context, events.NewDispatch(makeevt(evt))); err != nil {
 					log.Println("unable to dispatch event", spew.Sdump(evt))
 					continue
 				}
@@ -163,22 +163,60 @@ func (t module) Run(ctx *cmdopts.Global) (err error) {
 type monitor struct {
 	Dir       string `name:"directory" help:"root directory of the repository" default:"${vars_cwd}"`
 	ModuleDir string `name:"moduledir" help:"must be a subdirectory in the provided directory" default:".eg"`
+	RunID     string `name:"runid"`
 }
 
 func (t monitor) Run(ctx *cmdopts.Global) (err error) {
 	var (
-		cc *grpc.ClientConn
+		cc    *grpc.ClientConn
+		grpcl net.Listener
 	)
+
+	if grpcl, err = daemons.DefaultAgentListener(); err != nil {
+		return err
+	}
+	defer grpcl.Close()
+
+	if err = daemons.Agent(ctx, grpcl); err != nil {
+		return err
+	}
 
 	if cc, err = daemons.DefaultAgentClient(ctx.Context); err != nil {
 		return err
 	}
 
+	w, err := events.NewAgentClient(cc).Watch(ctx.Context, &events.RunWatchRequest{Run: &events.RunMetadata{Id: uuid.FromStringOrNil(t.RunID).Bytes()}})
+	if err != nil {
+		return err
+	}
+
 	p := tea.NewProgram(
-		ux.NewGraph(cc),
+		ux.NewGraph(),
 		tea.WithoutSignalHandler(),
 		tea.WithContext(ctx.Context),
 	)
+
+	go func() {
+		for {
+			select {
+			case <-ctx.Context.Done():
+				return
+			default:
+			}
+
+			m, err := w.Recv()
+			if err == io.EOF {
+				log.Println("EOF received")
+				return
+			}
+			if err != nil {
+				log.Println("unable to receive message", err)
+				continue
+			}
+
+			p.Send(m)
+		}
+	}()
 
 	go func() {
 		<-ctx.Context.Done()

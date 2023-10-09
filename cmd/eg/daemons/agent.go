@@ -11,6 +11,8 @@ import (
 	"github.com/james-lawrence/eg/cmd/cmdopts"
 	"github.com/james-lawrence/eg/internal/envx"
 	"github.com/james-lawrence/eg/interp/events"
+	"github.com/james-lawrence/eg/runners"
+	"github.com/james-lawrence/eg/runtime/wasi/langx"
 	"github.com/pkg/errors"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -36,8 +38,8 @@ func DefaultAgentListener() (n net.Listener, err error) {
 
 func DefaultAgentClient(ctx context.Context) (cc *grpc.ClientConn, err error) {
 	daemonpath := DefaultAgentSocketPath()
-	if info, err := os.Stat(daemonpath); os.IsNotExist(err) {
-		return nil, fmt.Errorf("agent not running at %s", info.Name())
+	if _, err := os.Stat(daemonpath); os.IsNotExist(err) {
+		return nil, fmt.Errorf("agent not running at %s", daemonpath)
 	}
 
 	return grpc.DialContext(ctx, fmt.Sprintf("unix://%s", daemonpath), grpc.WithInsecure(), grpc.WithBlock())
@@ -49,7 +51,9 @@ func Agent(global *cmdopts.Global, grpcl net.Listener) (err error) {
 		grpc.Creds(insecure.NewCredentials()), // this is a local socket
 	)
 
-	events.NewServiceAgent().Bind(srv)
+	events.NewServiceAgent(
+		langx.Must(filepath.Abs(runners.DefaultManagerDirectory())),
+	).Bind(srv)
 
 	global.Cleanup.Add(1)
 	go func() {

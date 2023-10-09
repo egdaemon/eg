@@ -3,6 +3,7 @@ package runners
 import (
 	"context"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 
@@ -16,6 +17,7 @@ func DefaultManagerDirectory() string {
 
 func NewManager(ctx context.Context, dir string) *Manager {
 	ctx, done := context.WithCancel(ctx)
+	log.Println("DERP", dir)
 	return &Manager{
 		ctx:  ctx,
 		done: done,

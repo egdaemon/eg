@@ -3,7 +3,6 @@ package interp
 import (
 	"context"
 	"crypto/rand"
-	"errors"
 	"fmt"
 	"io/fs"
 	"log"
@@ -19,6 +18,8 @@ import (
 	"github.com/james-lawrence/eg/interp/runtime/wasi/ffiegcontainer"
 	"github.com/james-lawrence/eg/interp/runtime/wasi/ffiexec"
 	"github.com/james-lawrence/eg/interp/runtime/wasi/ffigraph"
+	"github.com/james-lawrence/eg/runners"
+	"github.com/pkg/errors"
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
 )
@@ -37,9 +38,10 @@ type runtimefn func(r runner, moduledir string, cmdenv []string, host wazero.Hos
 func Run(ctx context.Context, runid string, g ffigraph.Eventer, dir string, module string, options ...Option) error {
 	var (
 		r = runner{
-			root:      dir,
-			moduledir: ".eg",
-			initonce:  &sync.Once{},
+			root:       dir,
+			moduledir:  ".eg",
+			runtimedir: runners.DefaultRunnerDirectory(runid),
+			initonce:   &sync.Once{},
 		}
 	)
 
@@ -51,7 +53,6 @@ func Run(ctx context.Context, runid string, g ffigraph.Eventer, dir string, modu
 	stdout := os.Stdout
 
 	runtimeenv := func(r runner, moduledir string, cmdenv []string, host wazero.HostModuleBuilder) wazero.HostModuleBuilder {
-		g := ffigraph.New()
 		return host.NewFunctionBuilder().WithFunc(ffigraph.Analysing(false)).Export("github.com/james-lawrence/eg/runtime/wasi/runtime/graph.Analysing").
 			NewFunctionBuilder().WithFunc(g.Pusher()).Export("github.com/james-lawrence/eg/runtime/wasi/runtime/graph.Push").
 			NewFunctionBuilder().WithFunc(g.Popper()).Export("github.com/james-lawrence/eg/runtime/wasi/runtime/graph.Pop").
@@ -89,6 +90,7 @@ func Run(ctx context.Context, runid string, g ffigraph.Eventer, dir string, modu
 				"--volume", fmt.Sprintf("%s:/opt/egbin:ro", os.Args[0]),
 				"--volume", fmt.Sprintf("%s:/opt/egmodule.wasm:ro", modulepath),
 				"--volume", fmt.Sprintf("%s:/opt/eg:O", r.root),
+				"--volume", fmt.Sprintf("%s:/opt/egruntime", r.runtimedir),
 			)
 
 			return ffiegcontainer.PodmanModule(ctx, cmdctx, name, cname, r.moduledir, options...)
@@ -125,9 +127,10 @@ func Run(ctx context.Context, runid string, g ffigraph.Eventer, dir string, modu
 }
 
 type runner struct {
-	root      string
-	moduledir string
-	initonce  *sync.Once
+	root       string
+	runtimedir string
+	moduledir  string
+	initonce   *sync.Once
 }
 
 func (t runner) Open(name string) (fs.File, error) {
@@ -152,6 +155,7 @@ func (t runner) perform(ctx context.Context, runid, path string, rtb runtimefn) 
 	moduledir := filepath.Join(t.root, t.moduledir)
 	hostcachedir := filepath.Join(t.root, t.moduledir, ".cache")
 	guestcachedir := filepath.Join("/", "cache")
+	guestruntimedir := runners.DefaultRunnerRuntimeDir()
 	tmpdir, err := os.MkdirTemp(moduledir, "eg.tmp.*")
 	if err != nil {
 		return err
@@ -165,9 +169,12 @@ func (t runner) perform(ctx context.Context, runid, path string, rtb runtimefn) 
 		fmt.Sprintf("EG_RUN_ID=%s", runid),
 		fmt.Sprintf("EG_ROOT_DIRECTORY=%s", t.root),
 		fmt.Sprintf("EG_CACHE_DIRECTORY=%s", envx.String(guestcachedir, "EG_CACHE_DIRECTORY", "CACHE_DIRECTORY")),
-		fmt.Sprintf("EG_RUNTIME_DIRECTORY=%s", tmpdir),
-		fmt.Sprintf("RUNTIME_DIRECTORY=%s", tmpdir),
+		fmt.Sprintf("EG_RUNTIME_DIRECTORY=%s", guestruntimedir),
+		fmt.Sprintf("RUNTIME_DIRECTORY=%s", guestruntimedir),
 	)
+
+	log.Println("cache dir", hostcachedir, "->", guestcachedir)
+	log.Println("runtime dir", t.runtimedir, "->", guestruntimedir)
 
 	mcfg := wazero.NewModuleConfig().WithEnv(
 		"CI", envx.String("", "EG_CI", "CI"),
@@ -182,7 +189,7 @@ func (t runner) perform(ctx context.Context, runid, path string, rtb runtimefn) 
 	).WithEnv(
 		"EG_RUNTIME_DIRECTORY", tmpdir,
 	).WithEnv(
-		"RUNTIME_DIRECTORY", tmpdir,
+		"RUNTIME_DIRECTORY", guestruntimedir,
 	).WithEnv(
 		"HOME", osx.UserHomeDir("/root"),
 	).WithStdin(
@@ -194,7 +201,8 @@ func (t runner) perform(ctx context.Context, runid, path string, rtb runtimefn) 
 	).WithFSConfig(
 		wazero.NewFSConfig().
 			WithDirMount(hostcachedir, guestcachedir).
-			WithDirMount(tmpdir, "/tmp"),
+			WithDirMount(tmpdir, "/tmp").
+			WithDirMount(t.runtimedir, guestruntimedir),
 	).WithSysNanotime().WithSysWalltime().WithRandSource(rand.Reader)
 
 	wasienv, err := wasi_snapshot_preview1.NewBuilder(runtime).Instantiate(ctx)

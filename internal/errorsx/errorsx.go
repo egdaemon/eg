@@ -29,6 +29,14 @@ func MaybeLog(err error) {
 	}
 }
 
+func Must(err error) {
+	if err == nil {
+		return
+	}
+
+	panic(err)
+}
+
 func Wrap(err error, m string) error {
 	return errors.Wrap(err, m)
 }

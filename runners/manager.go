@@ -3,7 +3,6 @@ package runners
 import (
 	"context"
 	"fmt"
-	"log"
 	"os"
 	"path/filepath"
 
@@ -15,9 +14,12 @@ func DefaultManagerDirectory() string {
 	return filepath.Join(envx.String(os.TempDir(), "STATE_DIRECTORY", "XDG_STATE_HOME"), "daemons")
 }
 
+func DefaultRunnerDirectory(uid string) string {
+	return filepath.Join(DefaultManagerDirectory(), uid)
+}
+
 func NewManager(ctx context.Context, dir string) *Manager {
 	ctx, done := context.WithCancel(ctx)
-	log.Println("DERP", dir)
 	return &Manager{
 		ctx:  ctx,
 		done: done,

@@ -92,8 +92,8 @@ func main() {
 
 	if err = ctx.Run(); err != nil {
 		log.Println(cmderrors.Sprint(err))
-		shellcli.Shutdown()
 	}
 
+	shellcli.Shutdown()
 	shellcli.Cleanup.Wait()
 }

@@ -10,15 +10,17 @@ import (
 	"github.com/james-lawrence/eg/interp/runtime/wasi/ffiegcontainer"
 	"github.com/james-lawrence/eg/interp/runtime/wasi/ffiexec"
 	"github.com/james-lawrence/eg/interp/runtime/wasi/ffigraph"
+	"github.com/james-lawrence/eg/runners"
 	"github.com/tetratelabs/wazero"
 )
 
 func Analyse(ctx context.Context, g ffigraph.Eventer, runid, dir string, module string, options ...Option) (err error) {
 	var (
 		r = runner{
-			root:      dir,
-			moduledir: ".eg",
-			initonce:  &sync.Once{},
+			root:       dir,
+			moduledir:  ".eg",
+			runtimedir: runners.DefaultRunnerDirectory(runid),
+			initonce:   &sync.Once{},
 		}
 	)
 
@@ -82,6 +84,10 @@ func Analyse(ctx context.Context, g ffigraph.Eventer, runid, dir string, module 
 				// return cmd
 			}
 			cname := fmt.Sprintf("%s.%s", name, md5x.DigestString(runid))
+			options = append(
+				options,
+				"--volume", fmt.Sprintf("%s:%s:O", r.runtimedir, runners.DefaultRunnerRuntimeDir()),
+			)
 			return ffiegcontainer.PodmanModule(ctx, cmdctx, name, cname, r.moduledir, options...)
 		})).Export("github.com/james-lawrence/eg/runtime/wasi/runtime/ffiegcontainer.Module").
 			NewFunctionBuilder().WithFunc(ffiexec.Exec(func(cmd *exec.Cmd) *exec.Cmd {

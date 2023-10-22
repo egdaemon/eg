@@ -14,6 +14,14 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 )
 
+func DefaultRunnerRuntimeDir() string {
+	return filepath.Join("/", "opt", "egruntime")
+}
+
+func DefaultRunnerSocketPath() string {
+	return filepath.Join(DefaultRunnerRuntimeDir(), "control.socket")
+}
+
 func NewRunner(ctx context.Context, root, id string) (_ *Agent, err error) {
 	var (
 		control net.Listener
@@ -48,9 +56,13 @@ func NewRunner(ctx context.Context, root, id string) (_ *Agent, err error) {
 		workdir: workdir,
 		control: control,
 		evtlog:  evtlog,
+		srv: grpc.NewServer(
+			grpc.Creds(insecure.NewCredentials()), // this is a local socket
+		),
+		blocked: make(chan struct{}),
 		log:     log.New(logdst, id, log.Flags()),
 	}
-	go r.Background()
+	go r.background()
 
 	return r, nil
 }
@@ -59,7 +71,9 @@ type Agent struct {
 	id      string
 	workdir string
 	control net.Listener
+	srv     *grpc.Server
 	log     *log.Logger
+	blocked chan struct{}
 	evtlog  *events.Log
 }
 
@@ -67,18 +81,28 @@ func (t Agent) Dial(ctx context.Context) (conn *grpc.ClientConn, err error) {
 	return grpc.DialContext(ctx, fmt.Sprintf("unix://%s", filepath.Join(t.workdir, "control.socket")), grpc.WithInsecure())
 }
 
-func (t Agent) Background() {
+func (t Agent) Close() error {
+	log.Println("graceful shutdown initiated")
+	t.srv.GracefulStop()
+	<-t.blocked
+	return nil
+}
+
+func (t Agent) background() {
 	log.Println("RUNNER INITIATED", t.id)
+	log.Println("working directory", t.workdir)
+	log.Println("control socket", t.control.Addr().String())
+	defer close(t.blocked)
 	defer log.Println("RUNNER COMPLETED", t.id)
 	defer os.RemoveAll(t.workdir)
 
-	srv := grpc.NewServer(
-		grpc.Creds(insecure.NewCredentials()), // this is a local socket
-	)
+	events.NewServiceDispatch(t.evtlog).Bind(t.srv)
+	// enable event logging.
+	// events.NewServiceAgent(
+	// 	langx.Must(filepath.Abs(DefaultManagerDirectory())),
+	// ).Bind(srv)
 
-	events.NewServiceDispatch(t.evtlog).Bind(srv)
-
-	if err := srv.Serve(t.control); err != nil {
+	if err := t.srv.Serve(t.control); err != nil {
 		t.log.Println("runner shutdown", err)
 		return
 	}

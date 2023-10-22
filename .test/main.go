@@ -6,13 +6,18 @@ import (
 	"time"
 
 	"github.com/james-lawrence/eg/runtime/wasi/env"
+	"github.com/james-lawrence/eg/runtime/wasi/shell"
 	"github.com/james-lawrence/eg/runtime/wasi/yak"
 )
 
-func Op1(context.Context, yak.Op) error {
+func Op1(ctx context.Context, op yak.Op) error {
 	log.Println("op1 initiated")
 	defer log.Println("op1 completed")
-
+	return shell.Run(
+		ctx,
+		shell.New("env"),
+		shell.New("ls -lha /opt/egruntime"),
+	)
 	return nil
 }
 
@@ -75,7 +80,7 @@ func main() {
 		),
 		yak.Parallel(
 			yak.Module(ctx, c1, Op1),
-			yak.Module(ctx, c1, Op2),
+			// yak.Module(ctx, c1, Op2),
 			// yak.Module(
 			// 	ctx,
 			// 	c1,

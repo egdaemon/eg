@@ -14,12 +14,6 @@ import (
 	"github.com/james-lawrence/eg/runtime/wasi/yak"
 )
 
-func BuildContainer(r yak.ContainerRunner) yak.OpFn {
-	return func(ctx context.Context, _ yak.Op) error {
-		return r.CompileWith(ctx)
-	}
-}
-
 func PrepareDebian(ctx context.Context, _ yak.Op) error {
 	return shell.Run(
 		ctx,
@@ -75,9 +69,9 @@ func main() {
 	err := yak.Perform(
 		ctx,
 		yak.Parallel(
-			BuildContainer(yak.Container("eg.ubuntu.22.04").
+			yak.Build(yak.Container("eg.ubuntu.22.04").
 				BuildFromFile(".dist/Containerfile")),
-			BuildContainer(yak.Container("eg.debian.build").
+			yak.Build(yak.Container("eg.debian.build").
 				BuildFromFile(".dist/deb/Containerfile")),
 		),
 		yak.Module(ctx, c1, PrepareDebian, BuildDebian),

@@ -311,6 +311,12 @@ func (t ContainerModuleRunner) RunWith(ctx context.Context, mpath string) (err e
 	return ffiguest.Error(ffiegcontainer.Module(t.name, mpath, opts), fmt.Errorf("unable to run the module: %s", t.name))
 }
 
+func Build(r Runner) OpFn {
+	return func(ctx context.Context, o Op) error {
+		return r.CompileWith(ctx)
+	}
+}
+
 // Module executes a set of operations within the provided environment.
 // Important: this method acts as an Instrumentation point by the runtime.
 func Module(ctx context.Context, r Runner, references ...OpFn) OpFn {

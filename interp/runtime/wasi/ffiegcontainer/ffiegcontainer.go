@@ -324,6 +324,7 @@ func PodmanModule(ctx context.Context, cmdctx func(*exec.Cmd) *exec.Cmd, image, 
 	cmd = exec.CommandContext(
 		ctx,
 		"podman", "exec", "-it", cname,
+		// "/usr/bin/eg",
 		"/opt/egbin",
 		"module",
 		"--directory=/opt/eg",

@@ -19,6 +19,7 @@ import (
 	"github.com/james-lawrence/eg/interp/runtime/wasi/ffiexec"
 	"github.com/james-lawrence/eg/interp/runtime/wasi/ffigraph"
 	"github.com/james-lawrence/eg/runners"
+	"github.com/james-lawrence/eg/runtime/wasi/langx"
 	"github.com/pkg/errors"
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
@@ -87,7 +88,7 @@ func Run(ctx context.Context, runid string, g ffigraph.Eventer, dir string, modu
 
 			options = append(
 				options,
-				"--volume", fmt.Sprintf("%s:/opt/egbin:ro", os.Args[0]),
+				"--volume", fmt.Sprintf("%s:/opt/egbin:ro", langx.Must(exec.LookPath(os.Args[0]))),
 				"--volume", fmt.Sprintf("%s:/opt/egmodule.wasm:ro", modulepath),
 				"--volume", fmt.Sprintf("%s:/opt/eg:O", r.root),
 				"--volume", fmt.Sprintf("%s:/opt/egruntime", r.runtimedir),

@@ -6,6 +6,7 @@ import (
 	"os/exec"
 	"time"
 
+	"github.com/james-lawrence/eg/internal/envx"
 	"github.com/james-lawrence/eg/interp/runtime/wasi/ffi"
 	"github.com/tetratelabs/wazero/api"
 )
@@ -324,8 +325,7 @@ func PodmanModule(ctx context.Context, cmdctx func(*exec.Cmd) *exec.Cmd, image, 
 	cmd = exec.CommandContext(
 		ctx,
 		"podman", "exec", "-it", cname,
-		// "/usr/bin/eg",
-		"/opt/egbin",
+		envx.String("eg", "EG_BIN"),
 		"module",
 		"--directory=/opt/eg",
 		"--moduledir", moduledir,

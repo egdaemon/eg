@@ -8,6 +8,8 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/james-lawrence/eg/internal/envx"
+	"github.com/james-lawrence/eg/interp/c8s"
 	"github.com/james-lawrence/eg/interp/events"
 	"github.com/pkg/errors"
 	"google.golang.org/grpc"
@@ -97,6 +99,26 @@ func (t Agent) background() {
 	defer os.RemoveAll(t.workdir)
 
 	events.NewServiceDispatch(t.evtlog).Bind(t.srv)
+	c8s.NewServiceProxy(
+		t.workdir,
+		c8s.ServiceProxyOptionEnviron(
+			append(
+				os.Environ(),
+				fmt.Sprintf("CI=%s", envx.String("", "EG_CI", "CI")),
+				fmt.Sprintf("EG_CI=%s", envx.String("", "EG_CI", "CI")),
+				fmt.Sprintf("EG_RUN_ID=%s", t.id),
+				fmt.Sprintf("EG_ROOT_DIRECTORY=%s", t.workdir),
+				fmt.Sprintf("EG_CACHE_DIRECTORY=%s", envx.String("derp0", "EG_CACHE_DIRECTORY", "CACHE_DIRECTORY")),
+				fmt.Sprintf("EG_RUNTIME_DIRECTORY=%s", "derp1"),
+				fmt.Sprintf("RUNTIME_DIRECTORY=%s", "derp2"),
+
+				// fmt.Sprintf("EG_CACHE_DIRECTORY=%s", envx.String(guestcachedir, "EG_CACHE_DIRECTORY", "CACHE_DIRECTORY")),
+				// fmt.Sprintf("EG_RUNTIME_DIRECTORY=%s", guestruntimedir),
+				// fmt.Sprintf("RUNTIME_DIRECTORY=%s", guestruntimedir),
+			)...,
+		),
+	).Bind(t.srv)
+	// TODO: container endpoint.
 	// enable event logging.
 	// events.NewServiceAgent(
 	// 	langx.Must(filepath.Abs(DefaultManagerDirectory())),

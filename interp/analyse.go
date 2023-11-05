@@ -7,6 +7,7 @@ import (
 	"sync"
 
 	"github.com/james-lawrence/eg/internal/md5x"
+	"github.com/james-lawrence/eg/interp/c8s"
 	"github.com/james-lawrence/eg/interp/runtime/wasi/ffiegcontainer"
 	"github.com/james-lawrence/eg/interp/runtime/wasi/ffiexec"
 	"github.com/james-lawrence/eg/interp/runtime/wasi/ffigraph"
@@ -36,24 +37,24 @@ func Analyse(ctx context.Context, g ffigraph.Eventer, runid, dir string, module 
 			NewFunctionBuilder().
 			WithFunc(g.Popper()).Export("github.com/james-lawrence/eg/runtime/wasi/runtime/graph.Pop").
 			NewFunctionBuilder().
-			WithFunc(ffiegcontainer.Pull(func(ctx context.Context, name string, options ...string) (cmd *exec.Cmd, err error) {
+			WithFunc(ffiegcontainer.Pull(func(ctx context.Context, name, wdir string, options ...string) (err error) {
 				// cmd, err = ffiegcontainer.PodmanBuild(ctx, name, moduledir, definition)
 				// cmd.Dir = r.root
 				// cmd.Env = cmdenv
 				// cmd.Stderr = os.Stderr
 				// cmd.Stdout = os.Stdout
 				// return cmd, err
-				return nil, nil
+				return nil
 			})).Export("github.com/james-lawrence/eg/runtime/wasi/runtime/ffiegcontainer.Pull").
 			NewFunctionBuilder().
-			WithFunc(ffiegcontainer.Build(func(ctx context.Context, name, definition string, options ...string) (cmd *exec.Cmd, err error) {
+			WithFunc(ffiegcontainer.Build(func(ctx context.Context, name, wdir, definition string, options ...string) (err error) {
 				// cmd, err = ffiegcontainer.PodmanBuild(ctx, name, moduledir, definition)
 				// cmd.Dir = r.root
 				// cmd.Env = cmdenv
 				// cmd.Stderr = os.Stderr
 				// cmd.Stdout = os.Stdout
 				// return cmd, err
-				return nil, nil
+				return nil
 			})).Export("github.com/james-lawrence/eg/runtime/wasi/runtime/ffiegcontainer.Build").
 			NewFunctionBuilder().WithFunc(ffiegcontainer.Run(func(ctx context.Context, name, modulepath string, cmd []string, options ...string) (err error) {
 			cmdctx := func(cmd *exec.Cmd) *exec.Cmd {
@@ -72,7 +73,7 @@ func Analyse(ctx context.Context, g ffigraph.Eventer, runid, dir string, module 
 				"--volume", fmt.Sprintf("%s:/opt/eg:O", r.root),
 			)
 
-			return ffiegcontainer.PodmanRun(ctx, cmdctx, name, cname, cmd, options...)
+			return c8s.PodmanRun(ctx, cmdctx, name, cname, cmd, options...)
 		})).Export("github.com/james-lawrence/eg/runtime/wasi/runtime/ffiegcontainer.Run").
 			NewFunctionBuilder().WithFunc(ffiegcontainer.Module(func(ctx context.Context, name, modulepath string, options ...string) (err error) {
 			cmdctx := func(cmd *exec.Cmd) *exec.Cmd {
@@ -88,7 +89,7 @@ func Analyse(ctx context.Context, g ffigraph.Eventer, runid, dir string, module 
 				options,
 				"--volume", fmt.Sprintf("%s:%s:O", r.runtimedir, runners.DefaultRunnerRuntimeDir()),
 			)
-			return ffiegcontainer.PodmanModule(ctx, cmdctx, name, cname, r.moduledir, options...)
+			return c8s.PodmanModule(ctx, cmdctx, name, cname, r.moduledir, options...)
 		})).Export("github.com/james-lawrence/eg/runtime/wasi/runtime/ffiegcontainer.Module").
 			NewFunctionBuilder().WithFunc(ffiexec.Exec(func(cmd *exec.Cmd) *exec.Cmd {
 			return nil

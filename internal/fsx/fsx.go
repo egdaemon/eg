@@ -1,6 +1,8 @@
 package fsx
 
 import (
+	"io/fs"
+	"log"
 	"os"
 	"path/filepath"
 )
@@ -15,4 +17,22 @@ func LocateFirstInDir(dir string, names ...string) (result string) {
 	}
 
 	return result
+}
+
+func PrintFS(d fs.FS) {
+	log.Println("--------- FS WALK INITIATED ---------")
+	defer log.Println("--------- FS WALK COMPLETED ---------")
+
+	err := fs.WalkDir(d, ".", func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+
+		log.Println(path)
+
+		return nil
+	})
+	if err != nil {
+		log.Println("fs walk failed", err)
+	}
 }

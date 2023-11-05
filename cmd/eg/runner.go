@@ -56,6 +56,7 @@ func preparerootcontainer(cpath string) (err error) {
 type runner struct {
 	Dir       string `name:"directory" help:"root directory of the repository" default:"${vars_cwd}"`
 	ModuleDir string `name:"moduledir" help:"must be a subdirectory in the provided directory" default:".eg"`
+	Name      string `arg:"" name:"module" help:"name of the module to run, i.e. the folder name within moduledir" default:""`
 }
 
 func (t runner) Run(ctx *cmdopts.Global) (err error) {
@@ -123,7 +124,7 @@ func (t runner) Run(ctx *cmdopts.Global) (err error) {
 		}
 	}()
 
-	if ws, err = workspaces.New(ctx.Context, t.Dir, t.ModuleDir); err != nil {
+	if ws, err = workspaces.New(ctx.Context, t.Dir, t.ModuleDir, t.Name); err != nil {
 		return err
 	}
 

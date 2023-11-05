@@ -67,7 +67,7 @@ func (t golang) Run(ctx context.Context) (roots []Compiled, err error) {
 	)
 
 	pkgc := astcodec.DefaultPkgLoad(
-		astcodec.LoadDir(filepath.Join(t.Context.Workspace.Root, t.Context.Workspace.ModuleDir)),
+		astcodec.LoadDir(filepath.Join(t.Context.Workspace.Root, t.Context.Workspace.ModuleDir, t.Context.Workspace.Module)),
 		astcodec.AutoFileSet,
 	)
 

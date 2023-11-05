@@ -34,6 +34,7 @@ func (t ignoredir) Ignore(path string, d fs.DirEntry) error {
 }
 
 type Context struct {
+	Module    string // name of the module
 	CachedID  string // unique id generated from the content of the module.
 	Root      string // workspace root directory.
 	ModuleDir string // eg module directory; relative to the root
@@ -49,7 +50,7 @@ func (t Context) FS() fs.FS {
 	return os.DirFS(t.Root)
 }
 
-func New(ctx context.Context, root string, mdir string) (zero Context, err error) {
+func New(ctx context.Context, root string, mdir string, name string) (zero Context, err error) {
 	cidmd5 := md5.New()
 	cdir := filepath.Join(mdir, ".cache")
 	ignore := ignoredir{path: cdir, reason: "cache directory"}
@@ -61,6 +62,7 @@ func New(ctx context.Context, root string, mdir string) (zero Context, err error
 	cid := hex.EncodeToString(cidmd5.Sum(nil))
 
 	return ensuredirs(Context{
+		Module:    name,
 		CachedID:  cid,
 		Root:      root,
 		ModuleDir: mdir,

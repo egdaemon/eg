@@ -26,7 +26,7 @@ import (
 type Register struct {
 	SSHKeyPath string `name:"sshkeypath" help:"path to ssh key to use" default:"${vars_ssh_key_path}"`
 	Name       string `name:"name" help:"name of the account to create" default:"${vars_user_name}"`
-	Email      string `email:"email" help:"business contact email" required:""`
+	Email      string `name:"email" help:"business contact email" required:""`
 }
 
 func (t Register) Run(gctx *cmdopts.Global) (err error) {

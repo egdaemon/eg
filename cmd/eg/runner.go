@@ -252,7 +252,7 @@ func (t module) Run(ctx *cmdopts.Global) (err error) {
 		}
 	}()
 
-	return interp.Run(ctx.Context, uid, ffigraph.NewListener(ebuf), t.Dir, t.Module, interp.OptionModuleDir(t.ModuleDir), interp.OptionRuntimeDir("/opt/egruntime"))
+	return interp.Run(ctx.Context, uid, ffigraph.NewListener(ebuf), t.Dir, t.Module, interp.OptionModuleDir(t.ModuleDir))
 }
 
 type monitor struct {

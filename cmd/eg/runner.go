@@ -8,6 +8,7 @@ import (
 	"log"
 	"net"
 	"os"
+	"os/exec"
 	"path/filepath"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -19,11 +20,13 @@ import (
 	"github.com/james-lawrence/eg/compile"
 	"github.com/james-lawrence/eg/internal/envx"
 	"github.com/james-lawrence/eg/interp"
+	"github.com/james-lawrence/eg/interp/c8s"
 	"github.com/james-lawrence/eg/interp/events"
 	"github.com/james-lawrence/eg/interp/runtime/wasi/ffigraph"
+	"github.com/james-lawrence/eg/runners"
+	"github.com/james-lawrence/eg/runtime/wasi/langx"
 	"github.com/james-lawrence/eg/transpile"
 	"github.com/james-lawrence/eg/workspaces"
-	"github.com/pkg/errors"
 	"google.golang.org/grpc"
 )
 
@@ -154,7 +157,7 @@ func (t runner) Run(ctx *cmdopts.Global) (err error) {
 
 		path = workspaces.TrimRoot(path, filepath.Base(ws.GenModDir))
 		path = workspaces.ReplaceExt(path, ".wasm")
-		path = filepath.Join(ws.BuildDir, path)
+		path = filepath.Join(ws.Root, ws.BuildDir, path)
 
 		if !root.Generated {
 			modules = append(modules, transpile.Compiled{Path: path, Generated: root.Generated})
@@ -171,40 +174,34 @@ func (t runner) Run(ctx *cmdopts.Global) (err error) {
 	}
 
 	log.Println("modules", modules)
-	// TODO: enable root container to use.
-	// {
-	// 	cmd := exec.CommandContext(ctx.Context, "podman", "build", "--timestamp", "0", "-t", "eg", "-f", rootc, t.Dir)
-	// 	cmd.Stderr = os.Stderr
-	// 	cmd.Stdin = os.Stdin
-	// 	cmd.Stdout = os.Stdout
+	{
+		cmd := exec.CommandContext(ctx.Context, "podman", "build", "--timestamp", "0", "-t", "eg", "-f", rootc, t.Dir)
+		cmd.Stderr = os.Stderr
+		cmd.Stdin = os.Stdin
+		cmd.Stdout = os.Stdout
 
-	// 	if err = cmd.Run(); err != nil {
-	// 		return err
-	// 	}
-	// }
+		if err = cmd.Run(); err != nil {
+			return err
+		}
+	}
+
+	runner := c8s.NewProxyClient(cc)
 
 	for _, m := range modules {
-		if err = interp.Run(ctx.Context, uid.String(), ffigraph.NewListener(ebuf), t.Dir, m.Path, interp.OptionModuleDir(t.ModuleDir)); err != nil {
-			return errors.Wrapf(err, "failed to run module %s", m.Path)
+		options := []string{
+			"--privileged",
+			"--volume", fmt.Sprintf("%s:/opt/egbin:ro", langx.Must(exec.LookPath(os.Args[0]))), // deprecated
+			"--volume", fmt.Sprintf("%s:/opt/egmodule.wasm:ro", m.Path),
+			"--volume", fmt.Sprintf("%s:/opt/eg:O", ws.Root),
+			"--volume", fmt.Sprintf("%s:/opt/egruntime", runners.DefaultRunnerDirectory(uid.String())),
 		}
-
-		// cmdctx := func(cmd *exec.Cmd) *exec.Cmd {
-		// 	cmd.Dir = t.Dir
-		// 	cmd.Stderr = os.Stderr
-		// 	cmd.Stdin = os.Stdin
-		// 	cmd.Stdout = os.Stdout
-		// 	return cmd
-		// }
-
-		// options := []string{
-		// 	"--privileged",
-		// 	"--volume", fmt.Sprintf("%s:/opt/egbin:ro", langx.Must(exec.LookPath(os.Args[0]))), // deprecated
-		// 	"--volume", fmt.Sprintf("%s:/opt/egmodule.wasm:ro", m.Path),
-		// 	"--volume", fmt.Sprintf("%s:/opt/eg:O", ws.Root),
-		// 	"--volume", fmt.Sprintf("%s:/opt/egruntime", runners.DefaultRunnerDirectory(uid.String())),
-		// }
-
-		// return ffiegcontainer.PodmanModule(ctx.Context, cmdctx, "eg", fmt.Sprintf("eg-%s", uid.String()), ws.ModuleDir, options...)
+		_, err = runner.Module(ctx.Context, &c8s.ModuleRequest{
+			Image:   "eg",
+			Name:    fmt.Sprintf("eg-%s", uid.String()),
+			Mdir:    ws.ModuleDir,
+			Options: options,
+		})
+		return err
 	}
 
 	return nil
@@ -252,7 +249,17 @@ func (t module) Run(ctx *cmdopts.Global) (err error) {
 		}
 	}()
 
-	return interp.Run(ctx.Context, uid, ffigraph.NewListener(ebuf), t.Dir, t.Module, interp.OptionModuleDir(t.ModuleDir))
+	log.Println("DERP REMOTE")
+	return interp.Remote(
+		ctx.Context,
+		uid,
+		ffigraph.NewListener(ebuf),
+		cc,
+		t.Dir,
+		t.Module,
+		interp.OptionModuleDir(t.ModuleDir),
+		interp.OptionRuntimeDir("/opt/egruntime"),
+	)
 }
 
 type monitor struct {

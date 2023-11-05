@@ -61,23 +61,20 @@ func BuildContainer(r yak.Runner) yak.OpFn {
 // main defines the setup for the CI process. here is where you define all
 // of the environments and tasks you wish to run.
 func main() {
-	// ctx, done := context.WithTimeout(context.Background(), time.Hour)
-	// defer done()
+	ctx, done := context.WithTimeout(context.Background(), time.Hour)
+	defer done()
 
 	log.Println("main module")
-	// c1 := yak.Container("ubuntu.22.04").
-	// 	BuildFromFile(".test/Containerfile")
 
-	// err := yak.Perform(
-	// 	ctx,
-	// 	yak.Parallel(
-	// 		yak.Build(c1),
-	// 	),
-	// 	yak.Parallel(
-	// 		yak.Module(ctx, c1, Op1),
-	// 	),
-	// )
-	// if err != nil {
-	// 	log.Fatalln(err)
-	// }
+	c1 := yak.Container("ubuntu.22.04").
+		BuildFromFile(".test/Containerfile")
+
+	err := yak.Perform(
+		ctx,
+		yak.Build(c1),
+		yak.Module(ctx, c1, Op1),
+	)
+	if err != nil {
+		log.Fatalln(err)
+	}
 }

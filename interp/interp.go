@@ -15,14 +15,15 @@ import (
 	"github.com/james-lawrence/eg/internal/envx"
 	"github.com/james-lawrence/eg/internal/md5x"
 	"github.com/james-lawrence/eg/internal/osx"
+	"github.com/james-lawrence/eg/interp/c8s"
 	"github.com/james-lawrence/eg/interp/runtime/wasi/ffiegcontainer"
 	"github.com/james-lawrence/eg/interp/runtime/wasi/ffiexec"
 	"github.com/james-lawrence/eg/interp/runtime/wasi/ffigraph"
 	"github.com/james-lawrence/eg/runners"
-	"github.com/james-lawrence/eg/runtime/wasi/langx"
 	"github.com/pkg/errors"
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
+	"google.golang.org/grpc"
 )
 
 type Option func(*runner)
@@ -43,7 +44,106 @@ func OptionRuntimeDir(s string) Option {
 
 type runtimefn func(r runner, moduledir string, cmdenv []string, host wazero.HostModuleBuilder) wazero.HostModuleBuilder
 
-func Run(ctx context.Context, runid string, g ffigraph.Eventer, dir string, module string, options ...Option) error {
+// func Run(ctx context.Context, runid string, g ffigraph.Eventer, dir string, module string, options ...Option) error {
+// 	var (
+// 		r = runner{
+// 			root:       dir,
+// 			moduledir:  ".eg",
+// 			runtimedir: runners.DefaultRunnerDirectory(runid),
+// 			initonce:   &sync.Once{},
+// 		}
+// 	)
+
+// 	for _, opt := range options {
+// 		opt(&r)
+// 	}
+
+// 	stdin := os.Stdin
+// 	stdout := os.Stdout
+
+// 	runtimeenv := func(r runner, moduledir string, cmdenv []string, host wazero.HostModuleBuilder) wazero.HostModuleBuilder {
+// 		return host.NewFunctionBuilder().WithFunc(ffigraph.Analysing(false)).Export("github.com/james-lawrence/eg/runtime/wasi/runtime/graph.Analysing").
+// 			NewFunctionBuilder().WithFunc(g.Pusher()).Export("github.com/james-lawrence/eg/runtime/wasi/runtime/graph.Push").
+// 			NewFunctionBuilder().WithFunc(g.Popper()).Export("github.com/james-lawrence/eg/runtime/wasi/runtime/graph.Pop").
+// 			NewFunctionBuilder().WithFunc(ffiegcontainer.Pull(func(ctx context.Context, name, wdir string, options ...string) (err error) {
+// 			cmd, err := c8s.PodmanPull(ctx, name, options...)
+// 			if err != nil {
+// 				return err
+// 			}
+// 			cmd.Dir = r.root
+// 			cmd.Env = cmdenv
+// 			cmd.Stdin = stdin
+// 			cmd.Stdout = stdout
+// 			cmd.Stderr = os.Stderr
+// 			return mayberun(cmd)
+// 		})).Export("github.com/james-lawrence/eg/runtime/wasi/runtime/ffiegcontainer.Pull").
+// 			NewFunctionBuilder().WithFunc(ffiegcontainer.Build(func(ctx context.Context, name, wdir, definition string, options ...string) (err error) {
+// 			cmd, err := c8s.PodmanBuild(ctx, name, wdir, definition, options...)
+// 			if err != nil {
+// 				return err
+// 			}
+// 			cmd.Dir = r.root
+// 			cmd.Env = cmdenv
+// 			cmd.Stdin = stdin
+// 			cmd.Stdout = stdout
+// 			cmd.Stderr = os.Stderr
+// 			return mayberun(cmd)
+// 		})).Export("github.com/james-lawrence/eg/runtime/wasi/runtime/ffiegcontainer.Build").
+// 			NewFunctionBuilder().WithFunc(ffiegcontainer.Module(func(ctx context.Context, name, modulepath string, options ...string) (err error) {
+// 			cmdctx := func(cmd *exec.Cmd) *exec.Cmd {
+// 				cmd.Dir = r.root
+// 				cmd.Env = cmdenv
+// 				cmd.Stdin = stdin
+// 				cmd.Stdout = stdout
+// 				cmd.Stderr = os.Stderr
+// 				return cmd
+// 			}
+// 			cname := fmt.Sprintf("%s.%s", name, md5x.DigestString(modulepath+runid))
+
+// 			options = append(
+// 				options,
+// 				"--volume", fmt.Sprintf("%s:/opt/egbin:ro", langx.Must(exec.LookPath(os.Args[0]))),
+// 				"--volume", fmt.Sprintf("%s:/opt/egmodule.wasm:ro", modulepath),
+// 				"--volume", fmt.Sprintf("%s:/opt/eg:O", r.root),
+// 				"--volume", fmt.Sprintf("%s:/opt/egruntime", r.runtimedir),
+// 			)
+
+// 			return c8s.PodmanModule(ctx, cmdctx, name, cname, r.moduledir, options...)
+// 		})).Export("github.com/james-lawrence/eg/runtime/wasi/runtime/ffiegcontainer.Module").
+// 			NewFunctionBuilder().WithFunc(ffiegcontainer.Run(func(ctx context.Context, name, modulepath string, cmd []string, options ...string) (err error) {
+// 			cmdctx := func(cmd *exec.Cmd) *exec.Cmd {
+// 				cmd.Dir = r.root
+// 				cmd.Env = cmdenv
+// 				cmd.Stdin = stdin
+// 				cmd.Stdout = stdout
+// 				cmd.Stderr = os.Stderr
+// 				return cmd
+// 			}
+// 			cname := fmt.Sprintf("%s.%s", name, md5x.DigestString(modulepath+runid))
+
+// 			options = append(
+// 				options,
+// 				"--volume", fmt.Sprintf("%s:/opt/eg:O", r.root),
+// 			)
+
+// 			return c8s.PodmanRun(ctx, cmdctx, name, cname, cmd, options...)
+// 		})).Export("github.com/james-lawrence/eg/runtime/wasi/runtime/ffiegcontainer.Run").
+// 			NewFunctionBuilder().WithFunc(ffiexec.Exec(func(cmd *exec.Cmd) *exec.Cmd {
+// 			cmd.Dir = filepath.Join(r.root, cmd.Dir)
+// 			cmd.Env = cmdenv
+// 			cmd.Stdin = stdin
+// 			cmd.Stdout = stdout
+// 			cmd.Stderr = os.Stderr
+// 			return cmd
+// 		})).Export("github.com/james-lawrence/eg/runtime/wasi/runtime/ffiexec.Command")
+// 	}
+
+// 	return r.perform(ctx, runid, module, runtimeenv)
+// }
+
+// Remote uses the api to implement particular actions like building and running containers.
+// may not be necessary.
+func Remote(ctx context.Context, runid string, g ffigraph.Eventer, svc grpc.ClientConnInterface, dir string, module string, options ...Option) error {
 	var (
 		r = runner{
 			root:       dir,
@@ -57,6 +157,7 @@ func Run(ctx context.Context, runid string, g ffigraph.Eventer, dir string, modu
 		opt(&r)
 	}
 
+	containers := c8s.NewProxyClient(svc)
 	stdin := os.Stdin
 	stdout := os.Stdout
 
@@ -64,62 +165,63 @@ func Run(ctx context.Context, runid string, g ffigraph.Eventer, dir string, modu
 		return host.NewFunctionBuilder().WithFunc(ffigraph.Analysing(false)).Export("github.com/james-lawrence/eg/runtime/wasi/runtime/graph.Analysing").
 			NewFunctionBuilder().WithFunc(g.Pusher()).Export("github.com/james-lawrence/eg/runtime/wasi/runtime/graph.Push").
 			NewFunctionBuilder().WithFunc(g.Popper()).Export("github.com/james-lawrence/eg/runtime/wasi/runtime/graph.Pop").
-			NewFunctionBuilder().WithFunc(ffiegcontainer.Pull(func(ctx context.Context, name string, options ...string) (cmd *exec.Cmd, err error) {
-			cmd, err = ffiegcontainer.PodmanPull(ctx, name, options...)
-			cmd.Dir = r.root
-			cmd.Env = cmdenv
-			cmd.Stdin = stdin
-			cmd.Stdout = stdout
-			cmd.Stderr = os.Stderr
-			return cmd, err
+			NewFunctionBuilder().WithFunc(ffiegcontainer.Pull(func(ctx context.Context, name, wdir string, options ...string) (err error) {
+			log.Println("REMOTE PULL", name, wdir)
+			_, err = containers.Pull(ctx, &c8s.PullRequest{
+				Name:    name,
+				Dir:     wdir,
+				Options: options,
+			})
+			if err != nil {
+				return err
+			}
+			return nil
 		})).Export("github.com/james-lawrence/eg/runtime/wasi/runtime/ffiegcontainer.Pull").
-			NewFunctionBuilder().WithFunc(ffiegcontainer.Build(func(ctx context.Context, name, definition string, options ...string) (cmd *exec.Cmd, err error) {
-			cmd, err = ffiegcontainer.PodmanBuild(ctx, name, ".", definition, options...)
-			cmd.Dir = r.root
-			cmd.Env = cmdenv
-			cmd.Stdin = stdin
-			cmd.Stdout = stdout
-			cmd.Stderr = os.Stderr
-			return cmd, err
+			NewFunctionBuilder().WithFunc(ffiegcontainer.Build(func(ctx context.Context, name, wdir string, definition string, options ...string) (err error) {
+			log.Println("REMOTE BUILD", name, wdir)
+			_, err = containers.Build(ctx, &c8s.BuildRequest{
+				Name:      name,
+				Directory: wdir,
+				Options:   options,
+			})
+			if err != nil {
+				return err
+			}
+			return nil
 		})).Export("github.com/james-lawrence/eg/runtime/wasi/runtime/ffiegcontainer.Build").
 			NewFunctionBuilder().WithFunc(ffiegcontainer.Module(func(ctx context.Context, name, modulepath string, options ...string) (err error) {
-			cmdctx := func(cmd *exec.Cmd) *exec.Cmd {
-				cmd.Dir = r.root
-				cmd.Env = cmdenv
-				cmd.Stdin = stdin
-				cmd.Stdout = stdout
-				cmd.Stderr = os.Stderr
-				return cmd
-			}
 			cname := fmt.Sprintf("%s.%s", name, md5x.DigestString(modulepath+runid))
 
+			log.Println("REMOTE MODULE", modulepath, r.runtimedir)
 			options = append(
 				options,
-				"--volume", fmt.Sprintf("%s:/opt/egbin:ro", langx.Must(exec.LookPath(os.Args[0]))),
 				"--volume", fmt.Sprintf("%s:/opt/egmodule.wasm:ro", modulepath),
-				"--volume", fmt.Sprintf("%s:/opt/eg:O", r.root),
 				"--volume", fmt.Sprintf("%s:/opt/egruntime", r.runtimedir),
 			)
 
-			return ffiegcontainer.PodmanModule(ctx, cmdctx, name, cname, r.moduledir, options...)
+			_, err = containers.Module(ctx, &c8s.ModuleRequest{
+				Image:   name,
+				Name:    cname,
+				Options: options,
+			})
+			if err != nil {
+				return err
+			}
+			return nil
 		})).Export("github.com/james-lawrence/eg/runtime/wasi/runtime/ffiegcontainer.Module").
 			NewFunctionBuilder().WithFunc(ffiegcontainer.Run(func(ctx context.Context, name, modulepath string, cmd []string, options ...string) (err error) {
-			cmdctx := func(cmd *exec.Cmd) *exec.Cmd {
-				cmd.Dir = r.root
-				cmd.Env = cmdenv
-				cmd.Stdin = stdin
-				cmd.Stdout = stdout
-				cmd.Stderr = os.Stderr
-				return cmd
-			}
 			cname := fmt.Sprintf("%s.%s", name, md5x.DigestString(modulepath+runid))
 
-			options = append(
-				options,
-				"--volume", fmt.Sprintf("%s:/opt/eg:O", r.root),
-			)
-
-			return ffiegcontainer.PodmanRun(ctx, cmdctx, name, cname, cmd, options...)
+			_, err = containers.Run(ctx, &c8s.RunRequest{
+				Image:   name,
+				Name:    cname,
+				Command: cmd,
+				Options: options,
+			})
+			if err != nil {
+				return err
+			}
+			return nil
 		})).Export("github.com/james-lawrence/eg/runtime/wasi/runtime/ffiegcontainer.Run").
 			NewFunctionBuilder().WithFunc(ffiexec.Exec(func(cmd *exec.Cmd) *exec.Cmd {
 			cmd.Dir = filepath.Join(r.root, cmd.Dir)
@@ -249,4 +351,13 @@ func (t runner) perform(ctx context.Context, runid, path string, rtb runtimefn) 
 	defer m.Close(ctx)
 
 	return nil
+}
+
+func mayberun(c *exec.Cmd) error {
+	if c == nil {
+		return nil
+	}
+
+	log.Println("running", c.String())
+	return c.Run()
 }

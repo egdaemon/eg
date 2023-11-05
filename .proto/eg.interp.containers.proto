@@ -2,17 +2,40 @@ syntax = "proto3";
 
 package eg.interp.containers;
 
-message PullRequest {}
+message PullRequest {
+  string name = 1;
+  string dir = 2;
+  repeated string options = 3;
+}
 message PullResponse {}
 
-message BuildRequest {}
+message BuildRequest {
+  string name = 1;
+  string directory = 2;
+  string definition = 3;
+  repeated string options = 4;
+}
 message BuildResponse {}
 
-message RunRequest {}
+message RunRequest {
+  string image = 1;
+  string name = 2;
+  repeated string command = 3;
+  repeated string options = 4;
+}
 message RunResponse {}
 
-service Containers {
+message ModuleRequest {
+  string image = 1;
+  string name = 2;
+  string mdir = 3;
+  repeated string options = 4;
+}
+message ModuleResponse {}
+
+service Proxy {
   rpc Pull(PullRequest) returns (PullResponse) {}
   rpc Build(BuildRequest) returns (BuildResponse) {}
   rpc Run(RunRequest) returns (RunResponse) {}
+  rpc Module(ModuleRequest) returns (ModuleResponse) {}
 }

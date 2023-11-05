@@ -1,8 +1,10 @@
 package main
 
 import (
+	"embed"
 	"fmt"
 	"io"
+	"io/fs"
 	"log"
 	"net"
 	"os"
@@ -24,6 +26,32 @@ import (
 	"github.com/pkg/errors"
 	"google.golang.org/grpc"
 )
+
+//go:embed DefaultContainerfile
+var embedded embed.FS
+
+func preparerootcontainer(cpath string) (err error) {
+	var (
+		c   fs.File
+		dst *os.File
+	)
+
+	log.Println("default container path", cpath)
+	if c, err = embedded.Open("DefaultContainerfile"); err != nil {
+		return err
+	}
+	defer c.Close()
+
+	if dst, err = os.OpenFile(cpath, os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0600); err != nil {
+		return err
+	}
+
+	if _, err = io.Copy(dst, c); err != nil {
+		return err
+	}
+
+	return nil
+}
 
 type runner struct {
 	Dir       string `name:"directory" help:"root directory of the repository" default:"${vars_cwd}"`
@@ -99,6 +127,12 @@ func (t runner) Run(ctx *cmdopts.Global) (err error) {
 		return err
 	}
 
+	rootc := filepath.Join(ws.RunnerDir, "Containerfile")
+
+	if err = preparerootcontainer(rootc); err != nil {
+		return err
+	}
+
 	roots, err := transpile.Autodetect(transpile.New(ws)).Run(ctx.Context)
 	if err != nil {
 		return err
@@ -120,7 +154,10 @@ func (t runner) Run(ctx *cmdopts.Global) (err error) {
 		path = workspaces.TrimRoot(path, filepath.Base(ws.GenModDir))
 		path = workspaces.ReplaceExt(path, ".wasm")
 		path = filepath.Join(ws.BuildDir, path)
-		modules = append(modules, transpile.Compiled{Path: path, Generated: root.Generated})
+
+		if !root.Generated {
+			modules = append(modules, transpile.Compiled{Path: path, Generated: root.Generated})
+		}
 
 		if _, err = os.Stat(path); err == nil {
 			// nothing to do.
@@ -132,35 +169,41 @@ func (t runner) Run(ctx *cmdopts.Global) (err error) {
 		}
 	}
 
-	log.Println("roots", roots)
-	// TODO: run the modules inside a container for safety
+	log.Println("modules", modules)
+	// TODO: enable root container to use.
 	// {
-	// 	cmd := exec.CommandContext(ctx.Context, "podman", "build", "--timestamp", "0", "-t", "ubuntu:jammy", t.Dir)
-	// 	log.Println("RUNNING", cmd.String())
+	// 	cmd := exec.CommandContext(ctx.Context, "podman", "build", "--timestamp", "0", "-t", "eg", "-f", rootc, t.Dir)
+	// 	cmd.Stderr = os.Stderr
+	// 	cmd.Stdin = os.Stdin
+	// 	cmd.Stdout = os.Stdout
+
 	// 	if err = cmd.Run(); err != nil {
-	// 		log.Println("DERP 1", err)
 	// 		return err
 	// 	}
 	// }
 
 	for _, m := range modules {
-		if m.Generated {
-			continue
-		}
-
-		if err = interp.Analyse(ctx.Context, ffigraph.NewListener(ebuf), uid.String(), t.Dir, m.Path, interp.OptionModuleDir(t.ModuleDir)); err != nil {
-			return errors.Wrapf(err, "failed to analyse module %s", m.Path)
-		}
-	}
-
-	for _, m := range modules {
-		if m.Generated {
-			continue
-		}
-
 		if err = interp.Run(ctx.Context, uid.String(), ffigraph.NewListener(ebuf), t.Dir, m.Path, interp.OptionModuleDir(t.ModuleDir)); err != nil {
 			return errors.Wrapf(err, "failed to run module %s", m.Path)
 		}
+
+		// cmdctx := func(cmd *exec.Cmd) *exec.Cmd {
+		// 	cmd.Dir = t.Dir
+		// 	cmd.Stderr = os.Stderr
+		// 	cmd.Stdin = os.Stdin
+		// 	cmd.Stdout = os.Stdout
+		// 	return cmd
+		// }
+
+		// options := []string{
+		// 	"--privileged",
+		// 	"--volume", fmt.Sprintf("%s:/opt/egbin:ro", langx.Must(exec.LookPath(os.Args[0]))), // deprecated
+		// 	"--volume", fmt.Sprintf("%s:/opt/egmodule.wasm:ro", m.Path),
+		// 	"--volume", fmt.Sprintf("%s:/opt/eg:O", ws.Root),
+		// 	"--volume", fmt.Sprintf("%s:/opt/egruntime", runners.DefaultRunnerDirectory(uid.String())),
+		// }
+
+		// return ffiegcontainer.PodmanModule(ctx.Context, cmdctx, "eg", fmt.Sprintf("eg-%s", uid.String()), ws.ModuleDir, options...)
 	}
 
 	return nil
@@ -208,7 +251,7 @@ func (t module) Run(ctx *cmdopts.Global) (err error) {
 		}
 	}()
 
-	return interp.Run(ctx.Context, uid, ffigraph.NewListener(ebuf), t.Dir, t.Module, interp.OptionModuleDir(t.ModuleDir))
+	return interp.Run(ctx.Context, uid, ffigraph.NewListener(ebuf), t.Dir, t.Module, interp.OptionModuleDir(t.ModuleDir), interp.OptionRuntimeDir("/opt/egruntime"))
 }
 
 type monitor struct {

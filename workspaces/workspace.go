@@ -14,6 +14,7 @@ import (
 	"strings"
 
 	"github.com/james-lawrence/eg/internal/errorsx"
+	"github.com/pkg/errors"
 )
 
 type ignorable interface {
@@ -37,6 +38,7 @@ type Context struct {
 	Root      string // workspace root directory.
 	ModuleDir string // eg module directory; relative to the root
 	CacheDir  string // cache directory. relative to the module directory.
+	RunnerDir string // cache directory for the runner.
 	BuildDir  string // directory for built wasm modules; relative to the cache directory.
 	TransDir  string // root directory for the transpiled code; relative to the cache directory.
 	GenModDir string // root directory for generated modules; relative to the cache directory.
@@ -58,16 +60,31 @@ func New(ctx context.Context, root string, mdir string) (zero Context, err error
 
 	cid := hex.EncodeToString(cidmd5.Sum(nil))
 
-	return Context{
+	return ensuredirs(Context{
 		CachedID:  cid,
 		Root:      root,
 		ModuleDir: mdir,
 		CacheDir:  cdir,
+		RunnerDir: filepath.Join(cdir, ".eg"),
 		BuildDir:  filepath.Join(cdir, ".eg", "build", cid),
 		TransDir:  filepath.Join(cdir, ".eg", "trans", cid),
 		GenModDir: filepath.Join(cdir, ".eg", "trans", cid, ".genmod"),
 		Ignore:    ignore,
-	}, nil
+	})
+}
+
+func ensuredirs(c Context) (_ Context, err error) {
+	mkdirs := func(paths ...string) error {
+		for _, p := range paths {
+			if err = os.MkdirAll(p, 0700); err != nil {
+				return errors.Wrapf(err, "unable to create directory: %s", p)
+			}
+		}
+
+		return nil
+	}
+
+	return c, mkdirs(c.GenModDir, c.BuildDir)
 }
 
 func cacheid(ctx context.Context, root string, mdir string, cacheid hash.Hash, ignore ignorable) error {

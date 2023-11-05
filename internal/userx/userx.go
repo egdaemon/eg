@@ -13,7 +13,7 @@ const (
 	DefaultDir = "eg"
 )
 
-func fallbackUser() user.User {
+func Root() user.User {
 	return user.User{
 		Gid:     "0",
 		Uid:     "0",
@@ -22,7 +22,6 @@ func fallbackUser() user.User {
 }
 
 // CurrentUserOrDefault returns the current user or the default configured user.
-// (usually root)
 func CurrentUserOrDefault(d user.User) (result *user.User) {
 	var (
 		err error
@@ -39,7 +38,7 @@ func CurrentUserOrDefault(d user.User) (result *user.User) {
 
 // DefaultUserDirLocation returns the user directory location.
 func DefaultUserDirLocation(name string) string {
-	user := CurrentUserOrDefault(fallbackUser())
+	user := CurrentUserOrDefault(Root())
 
 	envconfig := filepath.Join(os.Getenv("XDG_CONFIG_HOME"), DefaultDir)
 	home := filepath.Join(user.HomeDir, ".config", DefaultDir)
@@ -49,7 +48,7 @@ func DefaultUserDirLocation(name string) string {
 
 // DefaultDirLocation looks for a directory one of the default directory locations.
 func DefaultDirLocation(rel string) string {
-	user := CurrentUserOrDefault(fallbackUser())
+	user := CurrentUserOrDefault(Root())
 
 	env := filepath.Join(os.Getenv("XDG_CONFIG_HOME"), DefaultDir)
 	home := filepath.Join(user.HomeDir, ".config", DefaultDir)
@@ -60,8 +59,8 @@ func DefaultDirLocation(rel string) string {
 
 // DefaultCacheDirectory cache directory for storing data.
 func DefaultCacheDirectory() string {
-	user := CurrentUserOrDefault(fallbackUser())
-	if user.Uid == fallbackUser().Uid {
+	user := CurrentUserOrDefault(Root())
+	if user.Uid == Root().Uid {
 		return filepath.Join("/", "var", "cache", DefaultDir)
 	}
 

@@ -34,6 +34,13 @@ func OptionModuleDir(s string) Option {
 	}
 }
 
+// OptionRuntimeDir
+func OptionRuntimeDir(s string) Option {
+	return func(r *runner) {
+		r.runtimedir = s
+	}
+}
+
 type runtimefn func(r runner, moduledir string, cmdenv []string, host wazero.HostModuleBuilder) wazero.HostModuleBuilder
 
 func Run(ctx context.Context, runid string, g ffigraph.Eventer, dir string, module string, options ...Option) error {

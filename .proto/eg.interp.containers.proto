@@ -1,0 +1,18 @@
+syntax = "proto3";
+
+package eg.interp.containers;
+
+message PullRequest {}
+message PullResponse {}
+
+message BuildRequest {}
+message BuildResponse {}
+
+message RunRequest {}
+message RunResponse {}
+
+service Containers {
+  rpc Pull(PullRequest) returns (PullResponse) {}
+  rpc Build(BuildRequest) returns (BuildResponse) {}
+  rpc Run(RunRequest) returns (RunResponse) {}
+}

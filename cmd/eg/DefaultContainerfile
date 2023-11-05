@@ -1,0 +1,18 @@
+FROM ubuntu:jammy
+
+# put apt in non-interactive mode
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt update
+
+# general utilities
+RUN apt install -y --no-install-recommends curl gnupg2 software-properties-common lsb-release build-essential iproute2 git apt-file
+RUN add-apt-repository ppa:jljatone/eg
+
+RUN apt install -y --no-install-recommends eg
+RUN apt install -y --no-install-recommends ssh
+RUN apt install -y --no-install-recommends podman uidmap dbus-user-session
+
+RUN usermod --add-subuids 100000-200000 --add-subgids 100000-200000 root
+
+RUN systemctl enable ssh

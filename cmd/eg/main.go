@@ -5,7 +5,6 @@ import (
 	"log"
 	"net"
 	"os"
-	"os/user"
 	"path/filepath"
 	"reflect"
 	"sync"
@@ -40,13 +39,8 @@ func main() {
 	}
 
 	var (
-		err          error
-		ctx          *kong.Context
-		autorootuser = user.User{
-			Gid:     "0",
-			Uid:     "0",
-			HomeDir: "/root",
-		}
+		err error
+		ctx *kong.Context
 	)
 
 	shellcli.Cleanup = &sync.WaitGroup{}
@@ -59,7 +53,7 @@ func main() {
 		log.Println("waiting for systems to shutdown")
 	}, os.Kill, os.Interrupt)
 
-	user := userx.CurrentUserOrDefault(autorootuser)
+	user := userx.CurrentUserOrDefault(userx.Root())
 
 	parser := kong.Must(
 		&shellcli,

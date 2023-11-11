@@ -3,16 +3,14 @@ package runners
 import (
 	"context"
 	"fmt"
-	"os"
 	"path/filepath"
 
-	"github.com/james-lawrence/eg/internal/envx"
 	"github.com/james-lawrence/eg/workspaces"
 	"google.golang.org/grpc"
 )
 
 func DefaultManagerDirectory() string {
-	return filepath.Join(envx.String(os.TempDir(), "STATE_DIRECTORY", "XDG_STATE_HOME"), "daemons")
+	return filepath.Join(workspaces.DefaultStateDirectory(), "daemons")
 }
 
 func DefaultRunnerDirectory(uid string) string {

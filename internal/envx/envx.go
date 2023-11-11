@@ -14,6 +14,14 @@ import (
 	"github.com/pkg/errors"
 )
 
+func Print(environ []string) {
+	log.Println("--------- PRINT ENVIRON INITIATED ---------")
+	defer log.Println("--------- PRINT ENVIRON COMPLETED ---------")
+	for _, s := range environ {
+		log.Println(s)
+	}
+}
+
 // Int retrieve a integer flag from the environment, checks each key in order
 // first to parse successfully is returned.
 func Int(fallback int, keys ...string) int {

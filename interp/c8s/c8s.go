@@ -3,10 +3,12 @@ package c8s
 import (
 	context "context"
 	"log"
+	"os"
 	"os/exec"
 	"time"
 
 	"github.com/james-lawrence/eg/internal/envx"
+	"github.com/james-lawrence/eg/runtime/wasi/langx"
 )
 
 func mayberun(c *exec.Cmd) error {
@@ -14,8 +16,7 @@ func mayberun(c *exec.Cmd) error {
 		return nil
 	}
 
-	log.Println("directory", c.Dir)
-	log.Println("running", c.String())
+	log.Println("---------------", langx.Must(os.Getwd()), "running", c.Dir, "->", c.String(), "---------------")
 	return c.Run()
 }
 
@@ -30,7 +31,7 @@ func PodmanPull(ctx context.Context, name string, options ...string) (cmd *exec.
 
 func PodmanBuild(ctx context.Context, name string, dir string, definition string, options ...string) (cmd *exec.Cmd, err error) {
 	args := []string{
-		"build", "--timestamp", "0", "-t", name, "-f", definition,
+		"build", "--stdin", "--timestamp", "0", "-t", name, "-f", definition,
 	}
 	args = append(args, options...)
 	args = append(args, dir)
@@ -65,7 +66,7 @@ func PodmanRun(ctx context.Context, cmdctx func(*exec.Cmd) *exec.Cmd, image, cna
 	}()
 
 	cmd = exec.CommandContext(
-		ctx, "podman", "run", "-it", "--name", cname,
+		ctx, "podman", "run", "-i", "--name", cname,
 	)
 	cmd.Args = append(cmd.Args, options...)
 	cmd.Args = append(cmd.Args, image)
@@ -102,23 +103,40 @@ func PodmanModule(ctx context.Context, cmdctx func(*exec.Cmd) *exec.Cmd, image, 
 		}
 	}()
 
-	cmd = exec.CommandContext(
+	cmd = cmdctx(exec.CommandContext(
 		ctx,
 		"podman",
 		PodmanModuleRunCmd(image, cname, moduledir, options...)...,
-	)
+	))
 
-	if err = mayberun(cmdctx(cmd)); err != nil {
+	// stdinbuff := bytes.NewBuffer(nil)
+	// errbuff := bytes.NewBuffer(nil)
+	// cmd.Stdin = bytes.NewReader(nil)
+	// cmd.Stdout = stdinbuff
+	// cmd.Stderr = errbuff
+
+	if err = mayberun(cmd); err != nil {
 		return err
 	}
 
-	cmd = exec.CommandContext(
+	// if _, err = io.Copy(os.Stdin, stdinbuff); err != nil {
+	// 	return err
+	// }
+
+	// if _, err = io.Copy(os.Stderr, errbuff); err != nil {
+	// 	return err
+	// }
+
+	cmd = cmdctx(exec.CommandContext(
 		ctx,
 		"podman",
 		PodmanModuleExecCmd(cname, moduledir)...,
-	)
+	))
+	cmd.Stdin = os.Stdin
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
 
-	if err = mayberun(cmdctx(cmd)); err != nil {
+	if err = mayberun(cmd); err != nil {
 		return err
 	}
 
@@ -148,7 +166,7 @@ func PodmanModuleRunCmd(image, cname, moduledir string, options ...string) []str
 func PodmanModuleExecCmd(cname, moduledir string) []string {
 	return []string{
 		"exec",
-		"-it",
+		"-i",
 		cname,
 		envx.String("eg", "EG_BIN"),
 		"module",

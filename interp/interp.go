@@ -95,8 +95,6 @@ func Remote(ctx context.Context, runid string, g ffigraph.Eventer, svc grpc.Clie
 		})).Export("github.com/james-lawrence/eg/runtime/wasi/runtime/ffiegcontainer.Build").
 			NewFunctionBuilder().WithFunc(ffiegcontainer.Module(func(ctx context.Context, name, modulepath string, options ...string) (err error) {
 			cname := fmt.Sprintf("%s.%s", name, md5x.DigestString(modulepath+runid))
-
-			log.Println("REMOTE MODULE", modulepath, r.runtimedir)
 			options = append(
 				options,
 				"--volume", fmt.Sprintf("%s:/opt/egmodule.wasm:ro", modulepath),
@@ -114,7 +112,6 @@ func Remote(ctx context.Context, runid string, g ffigraph.Eventer, svc grpc.Clie
 		})).Export("github.com/james-lawrence/eg/runtime/wasi/runtime/ffiegcontainer.Module").
 			NewFunctionBuilder().WithFunc(ffiegcontainer.Run(func(ctx context.Context, name, modulepath string, cmd []string, options ...string) (err error) {
 			cname := fmt.Sprintf("%s.%s", name, md5x.DigestString(modulepath+runid))
-
 			_, err = containers.Run(ctx, &c8s.RunRequest{
 				Image:   name,
 				Name:    cname,
@@ -177,6 +174,7 @@ func (t runner) perform(ctx context.Context, runid, path string, rtb runtimefn) 
 
 	cmdenv := append(
 		os.Environ(),
+		// fmt.Sprintf("TERM=%s", envx.String("", "TERM")),
 		fmt.Sprintf("CI=%s", envx.String("", "EG_CI", "CI")),
 		fmt.Sprintf("EG_CI=%s", envx.String("", "EG_CI", "CI")),
 		fmt.Sprintf("EG_RUN_ID=%s", runid),
@@ -205,12 +203,14 @@ func (t runner) perform(ctx context.Context, runid, path string, rtb runtimefn) 
 		"RUNTIME_DIRECTORY", guestruntimedir,
 	).WithEnv(
 		"HOME", osx.UserHomeDir("/root"),
-	// ).WithStdin(
-	// 	os.Stdin,
-	// ).WithStderr(
-	// 	os.Stderr,
-	// ).WithStdout(
-	// 	os.Stdout,
+	).WithEnv(
+		"TERM", envx.String("", "TERM"),
+	).WithStdin(
+		os.Stdin,
+	).WithStderr(
+		os.Stderr,
+	).WithStdout(
+		os.Stdout,
 	).WithFSConfig(
 		wazero.NewFSConfig().
 			WithDirMount(hostcachedir, guestcachedir).

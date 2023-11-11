@@ -12,6 +12,7 @@ import (
 	"github.com/james-lawrence/eg/internal/envx"
 	"github.com/james-lawrence/eg/interp/c8s"
 	"github.com/james-lawrence/eg/interp/events"
+	"github.com/james-lawrence/eg/runtime/wasi/langx"
 	"github.com/james-lawrence/eg/workspaces"
 	"github.com/pkg/errors"
 	"google.golang.org/grpc"
@@ -106,6 +107,7 @@ func (t Agent) background() {
 	events.NewServiceDispatch(t.evtlog).Bind(t.srv)
 	c8s.NewServiceProxy(
 		t.ws,
+		t.workdir,
 		c8s.ServiceProxyOptionEnviron(
 			append(
 				os.Environ(),
@@ -114,6 +116,9 @@ func (t Agent) background() {
 				fmt.Sprintf("EG_RUN_ID=%s", t.id),
 				fmt.Sprintf("EG_ROOT_DIRECTORY=%s", t.workdir),
 			)...,
+		),
+		c8s.ServiceProxyOptionVolumes(
+			"--volume", fmt.Sprintf("%s:/root:O", langx.Must(os.UserHomeDir())),
 		),
 	).Bind(t.srv)
 

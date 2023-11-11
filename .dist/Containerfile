@@ -4,13 +4,15 @@ FROM ubuntu:jammy
 COPY .dist/.build.filesystem /
 
 RUN apt-get update
-RUN apt-get -y --no-install-recommends install dput devscripts dh-make dput software-properties-common git uidmap dbus-user-session fuse-overlayfs
-RUN add-apt-repository ppa:longsleep/golang-backports
-RUN add-apt-repository ppa:jljatone/eg
+RUN apt-get -y install software-properties-common build-essential apt-file
+RUN add-apt-repository -n ppa:longsleep/golang-backports
+RUN add-apt-repository -n ppa:jljatone/eg
 RUN apt-get update
-RUN apt-get -y --no-install-recommends install golang-1.21 podman podman-remote rsync vim build-essential apt-file eg
+RUN apt-get -y install dput devscripts dh-make dput git uidmap dbus-user-session fuse-overlayfs
+RUN apt-get -y install golang-1.21 podman rsync vim eg
+RUN apt-get -y install pinentry-tty
+RUN which pinentry-tty
 RUN podman --version
-RUN podman-remote --version
 RUN usermod --add-subuids 100000-200000 --add-subgids 100000-200000 root
 
 CMD /usr/sbin/init

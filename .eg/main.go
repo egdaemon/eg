@@ -29,7 +29,7 @@ func BuildDebian(ctx context.Context, _ yak.Op) error {
 	return shell.Run(
 		ctx,
 		shell.New("/usr/lib/go-1.21/bin/go build -mod=vendor ./cmd/...").Environ("GOPROXY", "off").Directory(".dist/deb/src"),
-		shell.New("pwd && debuild -S -k1472F4128AD327A04323220509F9FEB7D4D09CF4").Directory(".dist/deb"),
+		shell.New("debuild -S -k1472F4128AD327A04323220509F9FEB7D4D09CF4").Directory(".dist/deb"),
 		shell.New("dput -f -c deb/dput.config eg eg_${VERSION}_source.changes").Directory(".dist"),
 	)
 }
@@ -54,9 +54,6 @@ func main() {
 		OptionEnv("DEBFULLNAME", "James Lawrence").
 		OptionEnv("DISTRO", "jammy").
 		OptionEnv("CHANGELOG_DATE", time.Now().Format(time.RFC1123Z)).
-		// OptionVolume(
-		// 	filepath.Join(langx.Must(os.UserHomeDir()), ".gnupg"), filepath.Join("/", "root", ".gnupg"),
-		// ).
 		OptionVolumeWritable(
 			".eg/.cache/.dist", "/opt/eg/.dist",
 		).
@@ -66,12 +63,12 @@ func main() {
 
 	err := yak.Perform(
 		ctx,
-		// yak.Parallel(
-		yak.Build(yak.Container("eg.ubuntu.22.04").
-			BuildFromFile(".dist/Containerfile")),
-		yak.Build(yak.Container("eg.debian.build").
-			BuildFromFile(".dist/deb/Containerfile")),
-		// ),
+		yak.Parallel(
+			yak.Build(yak.Container("eg.ubuntu.22.04").
+				BuildFromFile(".dist/Containerfile")),
+			yak.Build(yak.Container("eg.debian.build").
+				BuildFromFile(".dist/deb/Containerfile")),
+		),
 		yak.Module(ctx, c1, PrepareDebian, BuildDebian),
 	)
 

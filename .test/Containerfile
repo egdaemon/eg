@@ -4,13 +4,17 @@ FROM ubuntu:jammy
 ENV DEBIAN_FRONTEND=noninteractive
 
 RUN apt update
+RUN apt-get -y install software-properties-common build-essential uidmap dbus-user-session apt-file
+RUN add-apt-repository -n ppa:longsleep/golang-backports
+RUN add-apt-repository -n ppa:jljatone/eg
+RUN apt update
 
 # general utilities
-RUN apt install -y --no-install-recommends curl gnupg2 software-properties-common lsb-release build-essential iproute2 git
+RUN apt install -y --no-install-recommends curl gnupg2 lsb-release iproute2 git
 RUN apt install -y --no-install-recommends libpq5 postgresql-14 postgresql-client-14 postgresql-contrib-14 postgresql-client-common
 RUN apt install -y --no-install-recommends ssh
 
-RUN apt install -y --no-install-recommends podman uidmap dbus-user-session
+RUN apt install -y --no-install-recommends podman eg
 RUN usermod --add-subuids 100000-200000 --add-subgids 100000-200000 root
 
 RUN systemctl enable postgresql ssh

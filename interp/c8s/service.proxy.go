@@ -7,6 +7,8 @@ import (
 	"os"
 	"os/exec"
 
+	"github.com/james-lawrence/eg/internal/envx"
+	"github.com/james-lawrence/eg/runtime/wasi/langx"
 	"github.com/james-lawrence/eg/workspaces"
 	grpc "google.golang.org/grpc"
 )
@@ -19,9 +21,16 @@ func ServiceProxyOptionEnviron(environ ...string) ServiceProxyOption {
 	}
 }
 
-func NewServiceProxy(ws workspaces.Context, options ...ServiceProxyOption) *ProxyService {
+func ServiceProxyOptionVolumes(v ...string) ServiceProxyOption {
+	return func(ps *ProxyService) {
+		ps.volumes = v
+	}
+}
+
+func NewServiceProxy(ws workspaces.Context, runtimedir string, options ...ServiceProxyOption) *ProxyService {
 	svc := &ProxyService{
-		ws: ws,
+		ws:         ws,
+		runtimedir: runtimedir,
 	}
 
 	for _, opt := range options {
@@ -33,8 +42,10 @@ func NewServiceProxy(ws workspaces.Context, options ...ServiceProxyOption) *Prox
 
 type ProxyService struct {
 	UnimplementedProxyServer
-	ws  workspaces.Context
-	env []string
+	ws         workspaces.Context
+	runtimedir string
+	env        []string
+	volumes    []string
 }
 
 func (t *ProxyService) Bind(host grpc.ServiceRegistrar) {
@@ -52,8 +63,8 @@ func (t *ProxyService) prepcmd(cmd *exec.Cmd) *exec.Cmd {
 
 // Build implements ProxyServer.
 func (t *ProxyService) Build(ctx context.Context, req *BuildRequest) (_ *BuildResponse, err error) {
-	// log.Println("PROXY CONTAINER BUILD INITIATED")
-	// defer log.Println("PROXY CONTAINER BUILD COMPLETED")
+	log.Println("PROXY CONTAINER BUILD INITIATED", langx.Must(os.Getwd()), os.Stdin, os.Stdout, os.Stderr)
+	defer log.Println("PROXY CONTAINER BUILD COMPLETED", langx.Must(os.Getwd()), os.Stdin, os.Stdout, os.Stderr)
 
 	var (
 		cmd *exec.Cmd
@@ -85,7 +96,7 @@ func (t *ProxyService) Pull(ctx context.Context, req *PullRequest) (resp *PullRe
 		return nil, err
 	}
 
-	if err = mayberun(cmd); err != nil {
+	if err = mayberun(t.prepcmd(cmd)); err != nil {
 		return nil, err
 	}
 
@@ -94,11 +105,15 @@ func (t *ProxyService) Pull(ctx context.Context, req *PullRequest) (resp *PullRe
 
 // Run implements ProxyServer.
 func (t *ProxyService) Run(ctx context.Context, req *RunRequest) (_ *RunResponse, err error) {
-	// log.Println("PROXY CONTAINER RUN INITIATED")
-	// defer log.Println("PROXY CONTAINER RUN COMPLETED")
+	log.Println("PROXY CONTAINER RUN INITIATED", langx.Must(os.Getwd()))
+	defer log.Println("PROXY CONTAINER RUN COMPLETED", langx.Must(os.Getwd()))
 
 	options := append(
 		req.Options,
+		t.volumes...,
+	)
+	options = append(
+		options,
 		"--volume", fmt.Sprintf("%s:/opt/eg:O", t.ws.Root),
 	)
 
@@ -111,15 +126,18 @@ func (t *ProxyService) Run(ctx context.Context, req *RunRequest) (_ *RunResponse
 
 // Module implements ProxyServer.
 func (t *ProxyService) Module(ctx context.Context, req *ModuleRequest) (_ *ModuleResponse, err error) {
-	// log.Println("PROXY CONTAINER MODULE INITIATED")
-	// defer log.Println("PROXY CONTAINER MODULE COMPLETED")
+	log.Println("PROXY CONTAINER MODULE INITIATED", langx.Must(os.Getwd()), envx.String("eg", "EG_BIN"))
+	defer log.Println("PROXY CONTAINER MODULE COMPLETED", langx.Must(os.Getwd()), envx.String("eg", "EG_BIN"))
 
-	// log.Println("DERP", spew.Sdump(t.ws))
-	// options := append(
-	// 	req.Options,
-	// 	"--volume", fmt.Sprintf("%s:/opt/egruntime", t.ws.RunnerDir),
-	// )
-	if err = PodmanModule(ctx, t.prepcmd, req.Image, req.Name, req.Mdir, req.Options...); err != nil {
+	options := append(
+		req.Options,
+		"--volume", fmt.Sprintf("%s:/opt/egbin:ro", langx.Must(exec.LookPath(os.Args[0]))),
+		"--volume", fmt.Sprintf("%s:/opt/egruntime", t.runtimedir),
+		"--volume", fmt.Sprintf("%s:/opt/eg:O", t.ws.Root),
+	)
+	options = append(options, t.volumes...)
+
+	if err = PodmanModule(ctx, t.prepcmd, req.Image, req.Name, req.Mdir, options...); err != nil {
 		return nil, err
 	}
 

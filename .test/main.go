@@ -66,8 +66,7 @@ func main() {
 
 	log.Println("main module")
 
-	c1 := yak.Container("ubuntu.22.04").
-		BuildFromFile(".test/Containerfile")
+	c1 := yak.Container("ubuntu.22.04").BuildFromFile(".test/Containerfile")
 
 	err := yak.Perform(
 		ctx,

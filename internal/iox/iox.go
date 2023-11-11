@@ -86,3 +86,14 @@ func MaybeClose(c io.Closer) error {
 
 	return c.Close()
 }
+
+type zreader struct{}
+
+func (z *zreader) Read(p []byte) (n int, err error) {
+	// Return zero bytes read and no error
+	return 0, nil
+}
+
+func Zero() io.Reader {
+	return &zreader{}
+}

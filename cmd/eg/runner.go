@@ -23,7 +23,6 @@ import (
 	"github.com/james-lawrence/eg/interp/c8s"
 	"github.com/james-lawrence/eg/interp/events"
 	"github.com/james-lawrence/eg/interp/runtime/wasi/ffigraph"
-	"github.com/james-lawrence/eg/runners"
 	"github.com/james-lawrence/eg/runtime/wasi/langx"
 	"github.com/james-lawrence/eg/transpile"
 	"github.com/james-lawrence/eg/workspaces"
@@ -194,7 +193,6 @@ func (t runner) Run(ctx *cmdopts.Global) (err error) {
 			"--volume", fmt.Sprintf("%s:/opt/egbin:ro", langx.Must(exec.LookPath(os.Args[0]))), // deprecated
 			"--volume", fmt.Sprintf("%s:/opt/egmodule.wasm:ro", m.Path),
 			"--volume", fmt.Sprintf("%s:/opt/eg:O", ws.Root),
-			"--volume", fmt.Sprintf("%s:/opt/egruntime", runners.DefaultRunnerDirectory(uid.String())),
 		}
 		_, err = runner.Module(ctx.Context, &c8s.ModuleRequest{
 			Image:   "eg",
@@ -216,7 +214,7 @@ type module struct {
 
 func (t module) Run(ctx *cmdopts.Global) (err error) {
 	var (
-		uid  = envx.String(uuid.Must(uuid.NewV7()).String(), "EG_RUN_ID")
+		uid  = envx.String(uuid.Nil.String(), "EG_RUN_ID")
 		ebuf = make(chan *ffigraph.EventInfo)
 		cc   grpc.ClientConnInterface
 	)
@@ -244,14 +242,16 @@ func (t module) Run(ctx *cmdopts.Global) (err error) {
 				return
 			case evt := <-ebuf:
 				if _, err := c.Dispatch(ctx.Context, events.NewDispatch(makeevt(evt))); err != nil {
-					log.Println("unable to dispatch event", spew.Sdump(evt))
+					log.Println("unable to dispatch event", err, spew.Sdump(evt))
 					continue
 				}
 			}
 		}
 	}()
 
-	log.Println("DERP REMOTE")
+	// envx.Print(os.Environ())
+	// fsx.PrintFS(os.DirFS("/opt/egruntime"))
+
 	return interp.Remote(
 		ctx.Context,
 		uid,

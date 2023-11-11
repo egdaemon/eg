@@ -13,9 +13,14 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/james-lawrence/eg/internal/envx"
 	"github.com/james-lawrence/eg/internal/errorsx"
 	"github.com/pkg/errors"
 )
+
+func DefaultStateDirectory() string {
+	return envx.String(os.TempDir(), "STATE_DIRECTORY", "XDG_STATE_HOME", "EG_STATE_DIRECTORY")
+}
 
 type ignorable interface {
 	Ignore(string, fs.DirEntry) error // returns an error describing the reason the provided file should be ignored

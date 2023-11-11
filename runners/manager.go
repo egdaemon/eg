@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 
 	"github.com/james-lawrence/eg/internal/envx"
+	"github.com/james-lawrence/eg/workspaces"
 	"google.golang.org/grpc"
 )
 
@@ -33,8 +34,8 @@ type Manager struct {
 	done context.CancelFunc
 }
 
-func (t Manager) NewRun(ctx context.Context, id string) (*Agent, error) {
-	return NewRunner(t.ctx, t.dir, id)
+func (t Manager) NewRun(ctx context.Context, ws workspaces.Context, id string) (*Agent, error) {
+	return NewRunner(t.ctx, t.dir, ws, id)
 }
 
 func (t Manager) Dial(ctx context.Context, id string) (conn *grpc.ClientConn, err error) {

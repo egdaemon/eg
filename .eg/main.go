@@ -5,11 +5,9 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"path/filepath"
 	"time"
 
 	"github.com/james-lawrence/eg/runtime/wasi/egenv"
-	"github.com/james-lawrence/eg/runtime/wasi/langx"
 	"github.com/james-lawrence/eg/runtime/wasi/shell"
 	"github.com/james-lawrence/eg/runtime/wasi/yak"
 )
@@ -56,9 +54,9 @@ func main() {
 		OptionEnv("DEBFULLNAME", "James Lawrence").
 		OptionEnv("DISTRO", "jammy").
 		OptionEnv("CHANGELOG_DATE", time.Now().Format(time.RFC1123Z)).
-		OptionVolume(
-			filepath.Join(langx.Must(os.UserHomeDir()), ".gnupg"), filepath.Join("/", "root", ".gnupg"),
-		).
+		// OptionVolume(
+		// 	filepath.Join(langx.Must(os.UserHomeDir()), ".gnupg"), filepath.Join("/", "root", ".gnupg"),
+		// ).
 		OptionVolumeWritable(
 			".eg/.cache/.dist", "/opt/eg/.dist",
 		).
@@ -68,12 +66,12 @@ func main() {
 
 	err := yak.Perform(
 		ctx,
-		yak.Parallel(
-			yak.Build(yak.Container("eg.ubuntu.22.04").
-				BuildFromFile(".dist/Containerfile")),
-			yak.Build(yak.Container("eg.debian.build").
-				BuildFromFile(".dist/deb/Containerfile")),
-		),
+		// yak.Parallel(
+		yak.Build(yak.Container("eg.ubuntu.22.04").
+			BuildFromFile(".dist/Containerfile")),
+		yak.Build(yak.Container("eg.debian.build").
+			BuildFromFile(".dist/deb/Containerfile")),
+		// ),
 		yak.Module(ctx, c1, PrepareDebian, BuildDebian),
 	)
 

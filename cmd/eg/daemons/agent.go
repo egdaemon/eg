@@ -14,6 +14,7 @@ import (
 	"github.com/james-lawrence/eg/interp/events"
 	"github.com/james-lawrence/eg/runners"
 	"github.com/james-lawrence/eg/runtime/wasi/langx"
+	"github.com/james-lawrence/eg/workspaces"
 	"github.com/pkg/errors"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -61,7 +62,7 @@ func DefaultRunnerClient(ctx context.Context) (cc *grpc.ClientConn, err error) {
 	return grpc.DialContext(ctx, fmt.Sprintf("unix://%s", daemonpath), grpc.WithInsecure(), grpc.WithBlock())
 }
 
-func AutoRunnerClient(global *cmdopts.Global, uid string) (cc *grpc.ClientConn, err error) {
+func AutoRunnerClient(global *cmdopts.Global, ws workspaces.Context, uid string) (cc *grpc.ClientConn, err error) {
 	var (
 		ragent *runners.Agent
 	)
@@ -76,7 +77,7 @@ func AutoRunnerClient(global *cmdopts.Global, uid string) (cc *grpc.ClientConn, 
 		langx.Must(filepath.Abs(runners.DefaultManagerDirectory())),
 	)
 
-	if ragent, err = m.NewRun(global.Context, uid); err != nil {
+	if ragent, err = m.NewRun(global.Context, ws, uid); err != nil {
 		return nil, err
 	}
 

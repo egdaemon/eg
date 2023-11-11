@@ -14,6 +14,7 @@ func mayberun(c *exec.Cmd) error {
 		return nil
 	}
 
+	log.Println("directory", c.Dir)
 	log.Println("running", c.String())
 	return c.Run()
 }
@@ -132,6 +133,7 @@ func PodmanModuleRunCmd(image, cname, moduledir string, options ...string) []str
 		"--env", "CI",
 		"--env", "EG_CI",
 		"--env", "EG_RUN_ID",
+		"--env", "EG_BIN",
 	},
 		options...,
 	)

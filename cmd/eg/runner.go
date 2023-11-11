@@ -70,7 +70,11 @@ func (t runner) Run(ctx *cmdopts.Global) (err error) {
 		cc   grpc.ClientConnInterface
 	)
 
-	if cc, err = daemons.AutoRunnerClient(ctx, uid.String()); err != nil {
+	if ws, err = workspaces.New(ctx.Context, t.Dir, t.ModuleDir, t.Name); err != nil {
+		return err
+	}
+
+	if cc, err = daemons.AutoRunnerClient(ctx, ws, uid.String()); err != nil {
 		return err
 	}
 
@@ -126,10 +130,6 @@ func (t runner) Run(ctx *cmdopts.Global) (err error) {
 			}
 		}
 	}()
-
-	if ws, err = workspaces.New(ctx.Context, t.Dir, t.ModuleDir, t.Name); err != nil {
-		return err
-	}
 
 	rootc := filepath.Join(ws.RunnerDir, "Containerfile")
 
@@ -190,6 +190,7 @@ func (t runner) Run(ctx *cmdopts.Global) (err error) {
 	for _, m := range modules {
 		options := []string{
 			"--privileged",
+			"--env", "EG_BIN",
 			"--volume", fmt.Sprintf("%s:/opt/egbin:ro", langx.Must(exec.LookPath(os.Args[0]))), // deprecated
 			"--volume", fmt.Sprintf("%s:/opt/egmodule.wasm:ro", m.Path),
 			"--volume", fmt.Sprintf("%s:/opt/eg:O", ws.Root),
@@ -220,7 +221,8 @@ func (t module) Run(ctx *cmdopts.Global) (err error) {
 		cc   grpc.ClientConnInterface
 	)
 
-	if cc, err = daemons.AutoRunnerClient(ctx, uid); err != nil {
+	// TODO: fill out workspaces...
+	if cc, err = daemons.AutoRunnerClient(ctx, workspaces.Context{}, uid); err != nil {
 		return err
 	}
 	go func() {

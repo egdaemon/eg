@@ -11,6 +11,7 @@ import (
 	"github.com/james-lawrence/eg/interp/events"
 	"github.com/james-lawrence/eg/runners"
 	"github.com/james-lawrence/eg/runtime/wasi/langx"
+	"github.com/james-lawrence/eg/workspaces"
 )
 
 func main() {
@@ -36,7 +37,7 @@ func main() {
 	defer time.Sleep(30 * time.Second)
 	defer done()
 
-	if ragent, err = m.NewRun(ctx, id.String()); err != nil {
+	if ragent, err = m.NewRun(ctx, workspaces.Context{}, id.String()); err != nil {
 		log.Fatalln(err)
 	}
 

@@ -8,9 +8,11 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/james-lawrence/eg/internal/envx"
 	"github.com/james-lawrence/eg/interp/c8s"
 	"github.com/james-lawrence/eg/interp/events"
+	"github.com/james-lawrence/eg/workspaces"
 	"github.com/pkg/errors"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -24,7 +26,7 @@ func DefaultRunnerSocketPath() string {
 	return filepath.Join(DefaultRunnerRuntimeDir(), "control.socket")
 }
 
-func NewRunner(ctx context.Context, root, id string) (_ *Agent, err error) {
+func NewRunner(ctx context.Context, root string, ws workspaces.Context, id string) (_ *Agent, err error) {
 	var (
 		control net.Listener
 		workdir = filepath.Join(root, id)
@@ -55,6 +57,7 @@ func NewRunner(ctx context.Context, root, id string) (_ *Agent, err error) {
 
 	r := &Agent{
 		id:      id,
+		ws:      ws,
 		workdir: workdir,
 		control: control,
 		evtlog:  evtlog,
@@ -72,6 +75,7 @@ func NewRunner(ctx context.Context, root, id string) (_ *Agent, err error) {
 type Agent struct {
 	id      string
 	workdir string
+	ws      workspaces.Context
 	control net.Listener
 	srv     *grpc.Server
 	log     *log.Logger
@@ -93,6 +97,7 @@ func (t Agent) Close() error {
 func (t Agent) background() {
 	log.Println("RUNNER INITIATED", t.id)
 	log.Println("working directory", t.workdir)
+	log.Println("workspace", spew.Sdump(t.ws))
 	log.Println("control socket", t.control.Addr().String())
 	defer close(t.blocked)
 	defer log.Println("RUNNER COMPLETED", t.id)
@@ -100,7 +105,7 @@ func (t Agent) background() {
 
 	events.NewServiceDispatch(t.evtlog).Bind(t.srv)
 	c8s.NewServiceProxy(
-		t.workdir,
+		t.ws,
 		c8s.ServiceProxyOptionEnviron(
 			append(
 				os.Environ(),
@@ -108,16 +113,10 @@ func (t Agent) background() {
 				fmt.Sprintf("EG_CI=%s", envx.String("", "EG_CI", "CI")),
 				fmt.Sprintf("EG_RUN_ID=%s", t.id),
 				fmt.Sprintf("EG_ROOT_DIRECTORY=%s", t.workdir),
-				fmt.Sprintf("EG_CACHE_DIRECTORY=%s", envx.String("derp0", "EG_CACHE_DIRECTORY", "CACHE_DIRECTORY")),
-				fmt.Sprintf("EG_RUNTIME_DIRECTORY=%s", "derp1"),
-				fmt.Sprintf("RUNTIME_DIRECTORY=%s", "derp2"),
-
-				// fmt.Sprintf("EG_CACHE_DIRECTORY=%s", envx.String(guestcachedir, "EG_CACHE_DIRECTORY", "CACHE_DIRECTORY")),
-				// fmt.Sprintf("EG_RUNTIME_DIRECTORY=%s", guestruntimedir),
-				// fmt.Sprintf("RUNTIME_DIRECTORY=%s", guestruntimedir),
 			)...,
 		),
 	).Bind(t.srv)
+
 	// TODO: container endpoint.
 	// enable event logging.
 	// events.NewServiceAgent(

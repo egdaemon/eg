@@ -59,12 +59,12 @@ func New(cmd string) Command {
 	}
 }
 
-// Zero creates a Command with no specified command to run.
+// Runtime creates a Command with no specified command to run.
 // this lets it be used as a template:
 //
-// tmp := shell.Zero().Environ("FOO", "BAR")
+// tmp := shell.Runtime().Environ("FOO", "BAR")
 // shell.Run(tmp.New("ls -lha"), tmp.New("echo hello world"))
-func Zero() Command {
+func Runtime() Command {
 	return Command{
 		timeout: 5 * time.Minute,
 	}

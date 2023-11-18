@@ -150,7 +150,7 @@ func PodmanModuleRunCmd(image, cname, moduledir string, options ...string) []str
 func PodmanModuleExecCmd(cname, moduledir string) []string {
 	return []string{
 		"exec",
-		"-it",
+		envx.String("-i", "EG_EXEC_OPTIONS"),
 		cname,
 		envx.String("eg", "EG_BIN"),
 		"module",

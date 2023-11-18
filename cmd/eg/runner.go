@@ -23,6 +23,7 @@ import (
 	"github.com/james-lawrence/eg/interp/c8s"
 	"github.com/james-lawrence/eg/interp/events"
 	"github.com/james-lawrence/eg/interp/runtime/wasi/ffigraph"
+	"github.com/james-lawrence/eg/runners"
 	"github.com/james-lawrence/eg/runtime/wasi/langx"
 	"github.com/james-lawrence/eg/transpile"
 	"github.com/james-lawrence/eg/workspaces"
@@ -60,21 +61,27 @@ type runner struct {
 	ModuleDir  string `name:"moduledir" help:"must be a subdirectory in the provided directory" default:".eg"`
 	Name       string `arg:"" name:"module" help:"name of the module to run, i.e. the folder name within moduledir" default:""`
 	Privileged bool   `name:"privileged" help:"run the initial container in privileged mode"`
+	MountHome  bool   `name:"home" help:"mount home directory"`
 }
 
 func (t runner) Run(ctx *cmdopts.Global) (err error) {
 	var (
-		ws   workspaces.Context
-		uid  = uuid.Must(uuid.NewV7())
-		ebuf = make(chan *ffigraph.EventInfo)
-		cc   grpc.ClientConnInterface
+		ws        workspaces.Context
+		uid       = uuid.Must(uuid.NewV7())
+		ebuf      = make(chan *ffigraph.EventInfo)
+		cc        grpc.ClientConnInterface
+		mounthome runners.AgentOption = runners.AgentOptionNoop
 	)
 
 	if ws, err = workspaces.New(ctx.Context, t.Dir, t.ModuleDir, t.Name); err != nil {
 		return err
 	}
 
-	if cc, err = daemons.AutoRunnerClient(ctx, ws, uid.String()); err != nil {
+	if t.MountHome {
+		mounthome = runners.AgentOptionAutoMountHome(langx.Must(os.UserHomeDir()))
+	}
+
+	if cc, err = daemons.AutoRunnerClient(ctx, ws, uid.String(), mounthome); err != nil {
 		return err
 	}
 

@@ -7,12 +7,12 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/james-lawrence/eg/internal/envx"
 	"github.com/james-lawrence/eg/interp/c8s"
 	"github.com/james-lawrence/eg/interp/events"
-	"github.com/james-lawrence/eg/runtime/wasi/langx"
 	"github.com/james-lawrence/eg/workspaces"
 	"github.com/pkg/errors"
 	"google.golang.org/grpc"
@@ -27,7 +27,30 @@ func DefaultRunnerSocketPath() string {
 	return filepath.Join(DefaultRunnerRuntimeDir(), "control.socket")
 }
 
-func NewRunner(ctx context.Context, root string, ws workspaces.Context, id string) (_ *Agent, err error) {
+type AgentOption func(*Agent)
+
+func AgentOptionNoop(*Agent) {}
+
+func AgentOptionAutoMountHome(home string) AgentOption {
+	if strings.TrimSpace(home) == "" {
+		return AgentOptionNoop
+	}
+
+	return AgentOptionMounts(fmt.Sprintf("%s:/root:O", home))
+}
+
+func AgentOptionMounts(desc ...string) AgentOption {
+	vs := []string{}
+	for _, v := range desc {
+		vs = append(vs, "--volume", v)
+	}
+
+	return func(a *Agent) {
+		a.volumes = append(a.volumes, vs...)
+	}
+}
+
+func NewRunner(ctx context.Context, root string, ws workspaces.Context, id string, options ...AgentOption) (_ *Agent, err error) {
 	var (
 		control net.Listener
 		workdir = filepath.Join(root, id)
@@ -68,6 +91,11 @@ func NewRunner(ctx context.Context, root string, ws workspaces.Context, id strin
 		blocked: make(chan struct{}),
 		log:     log.New(logdst, id, log.Flags()),
 	}
+
+	for _, opt := range options {
+		opt(r)
+	}
+
 	go r.background()
 
 	return r, nil
@@ -76,6 +104,7 @@ func NewRunner(ctx context.Context, root string, ws workspaces.Context, id strin
 type Agent struct {
 	id      string
 	workdir string
+	volumes []string
 	ws      workspaces.Context
 	control net.Listener
 	srv     *grpc.Server
@@ -118,15 +147,9 @@ func (t Agent) background() {
 			)...,
 		),
 		c8s.ServiceProxyOptionVolumes(
-			"--volume", fmt.Sprintf("%s:/root:O", langx.Must(os.UserHomeDir())),
+			t.volumes...,
 		),
 	).Bind(t.srv)
-
-	// TODO: container endpoint.
-	// enable event logging.
-	// events.NewServiceAgent(
-	// 	langx.Must(filepath.Abs(DefaultManagerDirectory())),
-	// ).Bind(srv)
 
 	if err := t.srv.Serve(t.control); err != nil {
 		t.log.Println("runner shutdown", err)

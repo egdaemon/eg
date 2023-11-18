@@ -33,6 +33,21 @@ func (t Command) Environ(k, v string) Command {
 	return t
 }
 
+// New clone the current command configuration and replace the command
+// that will be executed.
+func (t Command) New(cmd string) Command {
+	var (
+		environ []string
+	)
+
+	copy(environ, t.environ)
+	d := t
+	d.cmd = cmd
+	d.environ = environ
+
+	return d
+}
+
 // New create a new command with reasonable defaults.
 // defaults:
 //
@@ -40,6 +55,17 @@ func (t Command) Environ(k, v string) Command {
 func New(cmd string) Command {
 	return Command{
 		cmd:     cmd,
+		timeout: 5 * time.Minute,
+	}
+}
+
+// Zero creates a Command with no specified command to run.
+// this lets it be used as a template:
+//
+// tmp := shell.Zero().Environ("FOO", "BAR")
+// shell.Run(tmp.New("ls -lha"), tmp.New("echo hello world"))
+func Zero() Command {
+	return Command{
 		timeout: 5 * time.Minute,
 	}
 }

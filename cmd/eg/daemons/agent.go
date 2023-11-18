@@ -62,7 +62,7 @@ func DefaultRunnerClient(ctx context.Context) (cc *grpc.ClientConn, err error) {
 	return grpc.DialContext(ctx, fmt.Sprintf("unix://%s", daemonpath), grpc.WithInsecure(), grpc.WithBlock())
 }
 
-func AutoRunnerClient(global *cmdopts.Global, ws workspaces.Context, uid string) (cc *grpc.ClientConn, err error) {
+func AutoRunnerClient(global *cmdopts.Global, ws workspaces.Context, uid string, options ...runners.AgentOption) (cc *grpc.ClientConn, err error) {
 	var (
 		ragent *runners.Agent
 	)
@@ -77,7 +77,7 @@ func AutoRunnerClient(global *cmdopts.Global, ws workspaces.Context, uid string)
 		langx.Must(filepath.Abs(runners.DefaultManagerDirectory())),
 	)
 
-	if ragent, err = m.NewRun(global.Context, ws, uid); err != nil {
+	if ragent, err = m.NewRun(global.Context, ws, uid, options...); err != nil {
 		return nil, err
 	}
 

@@ -32,8 +32,8 @@ type Manager struct {
 	done context.CancelFunc
 }
 
-func (t Manager) NewRun(ctx context.Context, ws workspaces.Context, id string) (*Agent, error) {
-	return NewRunner(t.ctx, t.dir, ws, id)
+func (t Manager) NewRun(ctx context.Context, ws workspaces.Context, id string, options ...AgentOption) (*Agent, error) {
+	return NewRunner(t.ctx, t.dir, ws, id, options...)
 }
 
 func (t Manager) Dial(ctx context.Context, id string) (conn *grpc.ClientConn, err error) {

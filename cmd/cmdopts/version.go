@@ -7,9 +7,14 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/james-lawrence/eg/internal/stringsx"
 	"github.com/logrusorgru/aurora"
 	"github.com/mattn/go-isatty"
 	"github.com/pkg/errors"
+)
+
+var (
+	Treeish = ""
 )
 
 type Version struct{}
@@ -40,7 +45,7 @@ func (t Version) Run(ctx *Global) (err error) {
 			}
 		}
 
-		if _, err = fmt.Println(info.Main.Path, ts.Format("2006-01-02"), id); err != nil {
+		if _, err = fmt.Println(info.Main.Path, ts.Format("2006-01-02"), stringsx.DefaultIfBlank(id, Treeish)); err != nil {
 			return err
 		}
 

@@ -22,7 +22,7 @@ override_dh_auto_build:
 	ls -lha $(CURDIR)
 	GOCACHE="$(CURDIR)/.gocache" GOBIN="$(CURDIR)/bin" /usr/lib/go-1.21/bin/go env
 	ls -lha $(CURDIR)/src
-	cd src; GOWORK="off" GOPROXY="direct" GOCACHE="$(CURDIR)/.gocache" GOBIN="$(CURDIR)/bin" /usr/lib/go-1.21/bin/go build -mod=vendor -o "$(CURDIR)/bin" -buildvcs=false ./cmd/...; cd ..
+	cd src; GOWORK="off" GOPROXY="direct" GOCACHE="$(CURDIR)/.gocache" GOBIN="$(CURDIR)/bin" /usr/lib/go-1.21/bin/go build -mod=vendor -ldflags="-X 'github.com/james-lawrence/eg/cmd/cmdopts.Treeish=${VERSION}'" -o "$(CURDIR)/bin" -buildvcs=false ./cmd/...; cd ..
 	ls -lha $(CURDIR)/bin
 
 override_dh_auto_test:

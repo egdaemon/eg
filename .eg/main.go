@@ -53,7 +53,7 @@ func main() {
 	}
 
 	c1 := yak.Container(c1name).
-		OptionEnv("VCS_REVISION", eggit.Commitish(".", "HEAD")).
+		OptionEnv("VCS_REVISION", eggit.Commitish(ctx, "HEAD")).
 		OptionEnv("VERSION", fmt.Sprintf("0.0.%d", time.Now().Unix())).
 		OptionEnv("DEBEMAIL", "jljatone@gmail.com").
 		OptionEnv("DEBFULLNAME", "James Lawrence").

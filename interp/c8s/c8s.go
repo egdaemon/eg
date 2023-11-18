@@ -109,32 +109,18 @@ func PodmanModule(ctx context.Context, cmdctx func(*exec.Cmd) *exec.Cmd, image, 
 		PodmanModuleRunCmd(image, cname, moduledir, options...)...,
 	))
 
-	// stdinbuff := bytes.NewBuffer(nil)
-	// errbuff := bytes.NewBuffer(nil)
-	// cmd.Stdin = bytes.NewReader(nil)
-	// cmd.Stdout = stdinbuff
-	// cmd.Stderr = errbuff
-
 	if err = mayberun(cmd); err != nil {
 		return err
 	}
-
-	// if _, err = io.Copy(os.Stdin, stdinbuff); err != nil {
-	// 	return err
-	// }
-
-	// if _, err = io.Copy(os.Stderr, errbuff); err != nil {
-	// 	return err
-	// }
 
 	cmd = cmdctx(exec.CommandContext(
 		ctx,
 		"podman",
 		PodmanModuleExecCmd(cname, moduledir)...,
 	))
-	cmd.Stdin = os.Stdin
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
+	// cmd.Stdin = os.Stdin
+	// cmd.Stdout = os.Stdout
+	// cmd.Stderr = os.Stderr
 
 	if err = mayberun(cmd); err != nil {
 		return err
@@ -166,7 +152,7 @@ func PodmanModuleRunCmd(image, cname, moduledir string, options ...string) []str
 func PodmanModuleExecCmd(cname, moduledir string) []string {
 	return []string{
 		"exec",
-		"-i",
+		"-it",
 		cname,
 		envx.String("eg", "EG_BIN"),
 		"module",

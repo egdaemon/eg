@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/james-lawrence/eg/internal/envx"
+	"github.com/james-lawrence/eg/internal/errorsx"
 	"github.com/james-lawrence/eg/runtime/wasi/langx"
 )
 
@@ -110,7 +111,7 @@ func PodmanModule(ctx context.Context, cmdctx func(*exec.Cmd) *exec.Cmd, image, 
 	))
 
 	if err = mayberun(cmd); err != nil {
-		return err
+		return errorsx.Wrap(err, "unable to run container")
 	}
 
 	cmd = cmdctx(exec.CommandContext(
@@ -118,12 +119,9 @@ func PodmanModule(ctx context.Context, cmdctx func(*exec.Cmd) *exec.Cmd, image, 
 		"podman",
 		PodmanModuleExecCmd(cname, moduledir)...,
 	))
-	// cmd.Stdin = os.Stdin
-	// cmd.Stdout = os.Stdout
-	// cmd.Stderr = os.Stderr
 
 	if err = mayberun(cmd); err != nil {
-		return err
+		return errorsx.Wrap(err, "unable to exec module")
 	}
 
 	return nil

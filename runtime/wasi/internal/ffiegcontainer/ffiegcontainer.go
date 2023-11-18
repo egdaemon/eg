@@ -1,13 +1,69 @@
 package ffiegcontainer
 
-//export github.com/james-lawrence/eg/runtime/wasi/runtime/ffiegcontainer.Pull
-func Pull(name string, args []string) uint32
+import (
+	"context"
+	"fmt"
 
-//export github.com/james-lawrence/eg/runtime/wasi/runtime/ffiegcontainer.Build
-func Build(name, definition string, args []string) uint32
+	"github.com/james-lawrence/eg/interp/runtime/wasi/ffiguest"
+)
 
-//export github.com/james-lawrence/eg/runtime/wasi/runtime/ffiegcontainer.Run
-func Run(name, modulepath string, cmd []string, args []string) uint32
+func Pull(ctx context.Context, name string, args []string) error {
+	nameptr, namelen := ffiguest.String(name)
+	argsptr, argslen, argssize := ffiguest.StringArray(args...)
+	return ffiguest.Error(
+		pull(
+			ffiguest.ContextDeadline(ctx),
+			nameptr, namelen,
+			argsptr, argslen, argssize,
+		),
+		fmt.Errorf("pull failed"),
+	)
+}
 
-//export github.com/james-lawrence/eg/runtime/wasi/runtime/ffiegcontainer.Module
-func Module(name, modulepath string, args []string) uint32
+func Build(ctx context.Context, name, definition string, args []string) error {
+	nameptr, namelen := ffiguest.String(name)
+	defptr, deflen := ffiguest.String(definition)
+	argsptr, argslen, argssize := ffiguest.StringArray(args...)
+	return ffiguest.Error(
+		build(
+			ffiguest.ContextDeadline(ctx),
+			nameptr, namelen,
+			defptr, deflen,
+			argsptr, argslen, argssize,
+		),
+		fmt.Errorf("build failed"),
+	)
+}
+
+func Run(ctx context.Context, name, modulepath string, cmd []string, args []string) error {
+	nameptr, namelen := ffiguest.String(name)
+	mpathptr, mpathlen := ffiguest.String(modulepath)
+	cmdptr, cmdlen, cmdsize := ffiguest.StringArray(cmd...)
+	argsptr, argslen, argssize := ffiguest.StringArray(args...)
+	return ffiguest.Error(
+		run(
+			ffiguest.ContextDeadline(ctx),
+			nameptr, namelen,
+			mpathptr, mpathlen,
+			cmdptr, cmdlen, cmdsize,
+			argsptr, argslen, argssize,
+		),
+		fmt.Errorf("run failed"),
+	)
+}
+
+func Module(ctx context.Context, name, modulepath string, args []string) error {
+	nameptr, namelen := ffiguest.String(name)
+	mpathptr, mpathlen := ffiguest.String(modulepath)
+	argsptr, argslen, argssize := ffiguest.StringArray(args...)
+
+	return ffiguest.Error(
+		module(
+			ffiguest.ContextDeadline(ctx),
+			nameptr, namelen,
+			mpathptr, mpathlen,
+			argsptr, argslen, argssize,
+		),
+		fmt.Errorf("module failed"),
+	)
+}

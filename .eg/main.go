@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/james-lawrence/eg/runtime/wasi/egenv"
+	"github.com/james-lawrence/eg/runtime/wasi/eggit"
 	"github.com/james-lawrence/eg/runtime/wasi/shell"
 	"github.com/james-lawrence/eg/runtime/wasi/yak"
 )
@@ -52,6 +53,7 @@ func main() {
 	}
 
 	c1 := yak.Container(c1name).
+		OptionEnv("VCS_REVISION", eggit.Commitish(".", "HEAD")).
 		OptionEnv("VERSION", fmt.Sprintf("0.0.%d", time.Now().Unix())).
 		OptionEnv("DEBEMAIL", "jljatone@gmail.com").
 		OptionEnv("DEBFULLNAME", "James Lawrence").

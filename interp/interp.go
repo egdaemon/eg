@@ -18,6 +18,7 @@ import (
 	"github.com/james-lawrence/eg/interp/c8s"
 	"github.com/james-lawrence/eg/interp/runtime/wasi/ffiegcontainer"
 	"github.com/james-lawrence/eg/interp/runtime/wasi/ffiexec"
+	"github.com/james-lawrence/eg/interp/runtime/wasi/ffigit"
 	"github.com/james-lawrence/eg/interp/runtime/wasi/ffigraph"
 	"github.com/james-lawrence/eg/runners"
 	"github.com/pkg/errors"
@@ -126,7 +127,9 @@ func Remote(ctx context.Context, runid string, g ffigraph.Eventer, svc grpc.Clie
 			cmd.Stdout = os.Stdout
 			cmd.Stderr = os.Stderr
 			return cmd
-		})).Export("github.com/james-lawrence/eg/runtime/wasi/runtime/ffiexec.Command")
+		})).Export("github.com/james-lawrence/eg/runtime/wasi/runtime/ffiexec.Command").NewFunctionBuilder().WithFunc(
+			ffigit.Commitish(r.root),
+		).Export("github.com/james-lawrence/eg/runtime/wasi/runtime/ffigit.Commitish")
 	}
 
 	return r.perform(ctx, runid, module, runtimeenv)

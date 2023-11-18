@@ -10,6 +10,7 @@ import (
 	"github.com/james-lawrence/eg/interp/c8s"
 	"github.com/james-lawrence/eg/interp/runtime/wasi/ffiegcontainer"
 	"github.com/james-lawrence/eg/interp/runtime/wasi/ffiexec"
+	"github.com/james-lawrence/eg/interp/runtime/wasi/ffigit"
 	"github.com/james-lawrence/eg/interp/runtime/wasi/ffigraph"
 	"github.com/james-lawrence/eg/runners"
 	"github.com/tetratelabs/wazero"
@@ -98,7 +99,9 @@ func Analyse(ctx context.Context, g ffigraph.Eventer, runid, dir string, module 
 			// cmd.Stderr = os.Stderr
 			// cmd.Stdout = os.Stdout
 			// return cmd
-		})).Export("github.com/james-lawrence/eg/runtime/wasi/runtime/ffiexec.Command")
+		})).Export("github.com/james-lawrence/eg/runtime/wasi/runtime/ffiexec.Command").NewFunctionBuilder().WithFunc(
+			ffigit.Commitish(dir),
+		).Export("github.com/james-lawrence/eg/runtime/wasi/runtime/ffigit.Commitish")
 	}
 
 	if err = r.perform(ctx, runid, module, runtimeenv); err != nil {

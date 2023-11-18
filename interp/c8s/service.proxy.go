@@ -138,6 +138,7 @@ func (t *ProxyService) Module(ctx context.Context, req *ModuleRequest) (_ *Modul
 	options = append(options, t.volumes...)
 
 	if err = PodmanModule(ctx, t.prepcmd, req.Image, req.Name, req.Mdir, options...); err != nil {
+		log.Println(err)
 		return nil, err
 	}
 

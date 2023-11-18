@@ -56,9 +56,10 @@ func preparerootcontainer(cpath string) (err error) {
 }
 
 type runner struct {
-	Dir       string `name:"directory" help:"root directory of the repository" default:"${vars_cwd}"`
-	ModuleDir string `name:"moduledir" help:"must be a subdirectory in the provided directory" default:".eg"`
-	Name      string `arg:"" name:"module" help:"name of the module to run, i.e. the folder name within moduledir" default:""`
+	Dir        string `name:"directory" help:"root directory of the repository" default:"${vars_cwd}"`
+	ModuleDir  string `name:"moduledir" help:"must be a subdirectory in the provided directory" default:".eg"`
+	Name       string `arg:"" name:"module" help:"name of the module to run, i.e. the folder name within moduledir" default:""`
+	Privileged bool   `name:"privileged" help:"run the initial container in privileged mode"`
 }
 
 func (t runner) Run(ctx *cmdopts.Global) (err error) {
@@ -187,20 +188,25 @@ func (t runner) Run(ctx *cmdopts.Global) (err error) {
 	runner := c8s.NewProxyClient(cc)
 
 	for _, m := range modules {
-		options := []string{
-			"--privileged",
+		options := []string{}
+		if t.Privileged {
+			options = append(options, "--privileged")
+		}
+		options = append(options,
 			"--env", "EG_BIN",
 			"--volume", fmt.Sprintf("%s:/opt/egbin:ro", langx.Must(exec.LookPath(os.Args[0]))), // deprecated
 			"--volume", fmt.Sprintf("%s:/opt/egmodule.wasm:ro", m.Path),
 			"--volume", fmt.Sprintf("%s:/opt/eg:O", ws.Root),
-		}
+		)
 		_, err = runner.Module(ctx.Context, &c8s.ModuleRequest{
 			Image:   "eg",
 			Name:    fmt.Sprintf("eg-%s", uid.String()),
 			Mdir:    ws.ModuleDir,
 			Options: options,
 		})
-		return err
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil

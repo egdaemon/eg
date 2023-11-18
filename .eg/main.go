@@ -37,6 +37,9 @@ func BuildDebian(ctx context.Context, _ yak.Op) error {
 // main defines the setup for the CI process. here is where you define all
 // of the environments and tasks you wish to run.
 func main() {
+	const (
+		c1name = "eg.ubuntu.22.04"
+	)
 	ctx, done := context.WithTimeout(context.Background(), time.Hour)
 	defer done()
 
@@ -48,7 +51,7 @@ func main() {
 		log.Fatalln(err)
 	}
 
-	c1 := yak.Container("eg.ubuntu.22.04").
+	c1 := yak.Container(c1name).
 		OptionEnv("VERSION", fmt.Sprintf("0.0.%d", time.Now().Unix())).
 		OptionEnv("DEBEMAIL", "jljatone@gmail.com").
 		OptionEnv("DEBFULLNAME", "James Lawrence").
@@ -64,7 +67,7 @@ func main() {
 	err := yak.Perform(
 		ctx,
 		yak.Parallel(
-			yak.Build(yak.Container("eg.ubuntu.22.04").
+			yak.Build(yak.Container(c1name).
 				BuildFromFile(".dist/Containerfile")),
 			yak.Build(yak.Container("eg.debian.build").
 				BuildFromFile(".dist/deb/Containerfile")),

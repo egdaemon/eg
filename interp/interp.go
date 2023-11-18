@@ -78,10 +78,6 @@ func Remote(ctx context.Context, runid string, g ffigraph.Eventer, svc grpc.Clie
 			return nil
 		})).Export("github.com/james-lawrence/eg/runtime/wasi/runtime/ffiegcontainer.Pull").
 			NewFunctionBuilder().WithFunc(ffiegcontainer.Build(func(ctx context.Context, name, wdir string, definition string, options ...string) (err error) {
-			log.Println("REMOTE BUILD", name, wdir, r.root)
-			log.Println("definition", definition)
-			log.Println("options", options)
-
 			_, err = containers.Build(ctx, &c8s.BuildRequest{
 				Name:       name,
 				Directory:  wdir,

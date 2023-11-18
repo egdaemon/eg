@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/james-lawrence/eg/interp/runtime/wasi/ffiguest"
 	"github.com/james-lawrence/eg/runtime/wasi/internal/ffiexec"
 	"github.com/james-lawrence/eg/runtime/wasi/internal/ffigraph"
 )
@@ -65,5 +64,5 @@ func run(ctx context.Context, c Command) (err error) {
 
 	cmd := append([]string{"-c"}, c.environ...)
 	cmd = append(cmd, c.cmd)
-	return ffiguest.Error(ffiexec.Command(ffiguest.ContextDeadline(cctx), c.directory, "/bin/bash", cmd), fmt.Errorf("unable to execute command"))
+	return ffiexec.Command(cctx, c.directory, "bash", cmd)
 }

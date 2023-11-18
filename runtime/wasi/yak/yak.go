@@ -9,7 +9,6 @@ import (
 	"unsafe"
 
 	"github.com/james-lawrence/eg/internal/errorsx"
-	"github.com/james-lawrence/eg/interp/runtime/wasi/ffiguest"
 	"github.com/james-lawrence/eg/runtime/wasi/internal/ffiegcontainer"
 	"github.com/james-lawrence/eg/runtime/wasi/internal/ffigraph"
 )
@@ -230,11 +229,11 @@ func (t ContainerRunner) CompileWith(ctx context.Context) (err error) {
 
 	t.built.Do(func() {
 		if t.pull != "" {
-			err = ffiguest.Error(ffiegcontainer.Pull(t.pull, opts), fmt.Errorf("unable to pull the container: %s", t.name))
+			err = errorsx.Wrapf(ffiegcontainer.Pull(ctx, t.pull, opts), "unable to pull the container: %s", t.name)
 		}
 
 		if t.definition != "" {
-			err = ffiguest.Error(ffiegcontainer.Build(t.name, t.definition, opts), fmt.Errorf("unable to build the container: %s", t.name))
+			err = errorsx.Wrapf(ffiegcontainer.Build(ctx, t.name, t.definition, opts), "unable to build the container: %s", t.name)
 		}
 	})
 
@@ -247,7 +246,7 @@ func (t ContainerRunner) RunWith(ctx context.Context, mpath string) (err error) 
 		opts = append(opts, o...)
 	}
 
-	return ffiguest.Error(ffiegcontainer.Run(t.name, mpath, t.cmd, opts), fmt.Errorf("unable to run the container: %s", t.name))
+	return errorsx.Wrapf(ffiegcontainer.Run(ctx, t.name, mpath, t.cmd, opts), "unable to run the container: %s", t.name)
 }
 
 func (t ContainerRunner) ToModuleRunner() ContainerModuleRunner {
@@ -308,7 +307,7 @@ func (t ContainerModuleRunner) RunWith(ctx context.Context, mpath string) (err e
 		opts = append(opts, o...)
 	}
 
-	return ffiguest.Error(ffiegcontainer.Module(t.name, mpath, opts), fmt.Errorf("unable to run the module: %s", t.name))
+	return errorsx.Wrapf(ffiegcontainer.Module(ctx, t.name, mpath, opts), "unable to run the module: %s", t.name)
 }
 
 func Build(r Runner) OpFn {

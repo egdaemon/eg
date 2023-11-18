@@ -1,4 +1,23 @@
 package ffiexec
 
-//export github.com/james-lawrence/eg/runtime/wasi/runtime/ffiexec.Command
-func Command(deadline int64, dir string, command string, args []string) uint32
+import (
+	"context"
+	"fmt"
+
+	"github.com/james-lawrence/eg/interp/runtime/wasi/ffiguest"
+)
+
+func Command(ctx context.Context, dir string, cmd string, args []string) error {
+	dirptr, dirlen := ffiguest.String(dir)
+	cmdptr, cmdlen := ffiguest.String(cmd)
+	argsptr, argslen, argssize := ffiguest.StringArray(args...)
+	return ffiguest.Error(
+		command(
+			ffiguest.ContextDeadline(ctx),
+			dirptr, dirlen,
+			cmdptr, cmdlen,
+			argsptr, argslen, argssize,
+		),
+		fmt.Errorf("unable to execute command"),
+	)
+}

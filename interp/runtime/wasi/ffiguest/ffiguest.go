@@ -27,6 +27,10 @@ func String(s string) (unsafe.Pointer, uint32) {
 	return unsafe.Pointer(unsafe.StringData(s)), uint32(len(s))
 }
 
+func StringArray(a ...string) (unsafe.Pointer, uint32, uint32) {
+	return unsafe.Pointer(unsafe.SliceData(a)), uint32(len(a)), uint32(unsafe.Sizeof(&a))
+}
+
 func ContextDeadline(ctx context.Context) int64 {
 	if ts, ok := ctx.Deadline(); ok {
 		return ts.UnixMicro()

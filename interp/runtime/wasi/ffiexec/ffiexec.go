@@ -46,6 +46,7 @@ func Exec(op func(*exec.Cmd) *exec.Cmd) func(
 		}
 
 		log.Println("initiated", cmd.String())
+		log.Println("environ", cmd.Env)
 		defer log.Println("completed", cmd.String())
 
 		if err = mayberun(op(cmd)); err != nil {

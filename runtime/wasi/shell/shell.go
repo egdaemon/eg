@@ -3,8 +3,10 @@ package shell
 import (
 	"context"
 	"fmt"
+	"math"
 	"time"
 
+	"github.com/james-lawrence/eg/internal/errorsx"
 	"github.com/james-lawrence/eg/runtime/wasi/internal/ffiexec"
 	"github.com/james-lawrence/eg/runtime/wasi/internal/ffigraph"
 )
@@ -14,6 +16,13 @@ type Command struct {
 	directory string
 	environ   []string
 	timeout   time.Duration
+	attempts  int16
+}
+
+// number of attempts to make before giving up.
+func (t Command) Attempts(a int16) Command {
+	t.attempts = a
+	return t
 }
 
 // directory to run the command in. must be a relative path.
@@ -60,10 +69,16 @@ func New(cmd string) Command {
 }
 
 // Runtime creates a Command with no specified command to run.
-// this lets it be used as a template:
+// and can be used as a template:
 //
 // tmp := shell.Runtime().Environ("FOO", "BAR")
-// shell.Run(tmp.New("ls -lha"), tmp.New("echo hello world"))
+//
+// shell.Run(
+//
+//	tmp.New("ls -lha"),
+//	tmp.New("echo hello world"),
+//
+// )
 func Runtime() Command {
 	return Command{
 		timeout: 5 * time.Minute,
@@ -72,12 +87,35 @@ func Runtime() Command {
 
 func Run(ctx context.Context, cmds ...Command) (err error) {
 	for _, cmd := range cmds {
-		if err = run(ctx, cmd); err != nil {
+		if err = retry(ctx, cmd, func() error { return run(ctx, cmd) }); err != nil {
 			return err
 		}
 	}
 
 	return nil
+}
+
+func retry(ctx context.Context, c Command, do func() error) (err error) {
+	retries := c.attempts
+	switch retries {
+	case 1:
+		return do()
+	case 0:
+		return do()
+	case -1:
+		retries = math.MaxInt16
+	}
+
+	for i := int16(0); i < retries; i++ {
+		if cause := do(); cause == nil {
+			return nil
+		} else {
+			err = errorsx.Compact(err, cause)
+		}
+
+	}
+
+	return err
 }
 
 func run(ctx context.Context, c Command) (err error) {

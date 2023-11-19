@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 )
 
 func Run(ctx context.Context, dir, module string, output string) (err error) {
@@ -16,7 +17,7 @@ func Run(ctx context.Context, dir, module string, output string) (err error) {
 		return err
 	}
 
-	cmd := exec.CommandContext(ctx, "go", "build", "-trimpath", "-o", output, module)
+	cmd := exec.CommandContext(ctx, "go", "build", "-trimpath", "-o", output, strings.TrimPrefix(dir, module))
 	cmd.Env = append(os.Environ(), "GOOS=wasip1", "GOARCH=wasm")
 	cmd.Dir = dir
 	cmd.Stdin = os.Stdin

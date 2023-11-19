@@ -97,9 +97,11 @@ func Remote(ctx context.Context, runid string, g ffigraph.Eventer, svc grpc.Clie
 				"--volume", fmt.Sprintf("%s:/opt/egmodule.wasm:ro", modulepath),
 			)
 
+			log.Println("DERP", name, modulepath, r.moduledir, r.root, r.runtimedir)
 			_, err = containers.Module(ctx, &c8s.ModuleRequest{
 				Image:   name,
 				Name:    cname,
+				Mdir:    ".eg",
 				Options: options,
 			})
 			if err != nil {

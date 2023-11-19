@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"path/filepath"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/james-lawrence/eg/internal/envx"
@@ -115,7 +116,7 @@ func (t *ProxyService) Run(ctx context.Context, req *RunRequest) (_ *RunResponse
 	)
 	options = append(
 		options,
-		"--volume", fmt.Sprintf("%s:/opt/eg:O", t.ws.Root),
+		"--volume", fmt.Sprintf("%s:/opt/eg:O", filepath.Dir(t.ws.Root)),
 	)
 
 	if err = PodmanRun(ctx, t.prepcmd, req.Image, req.Name, req.Command, options...); err != nil {
@@ -136,7 +137,7 @@ func (t *ProxyService) Module(ctx context.Context, req *ModuleRequest) (_ *Modul
 		req.Options,
 		"--volume", fmt.Sprintf("%s:/opt/egbin:ro", langx.Must(exec.LookPath(os.Args[0]))),
 		"--volume", fmt.Sprintf("%s:/opt/egruntime", t.runtimedir),
-		"--volume", fmt.Sprintf("%s:/opt/eg:O", t.ws.Root),
+		// "--volume", fmt.Sprintf("%s:/opt/eg:O", filepath.Dir(t.ws.Root)),
 	)
 	options = append(options, t.volumes...)
 

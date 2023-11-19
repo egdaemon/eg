@@ -45,6 +45,7 @@ func Exec(op func(*exec.Cmd) *exec.Cmd) func(
 			return 127
 		}
 
+		log.Println("DERP", cmd.Env)
 		cmd = op(cmd)
 
 		log.Println("initiated", cmd.String())

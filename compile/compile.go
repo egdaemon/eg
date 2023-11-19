@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 )
 
-func Run(ctx context.Context, module string, output string) (err error) {
+func Run(ctx context.Context, dir, module string, output string) (err error) {
 	log.Println("compiling initiated", module, "->", output)
 	defer log.Println("compiling completed", module, "->", output)
 
@@ -18,6 +18,7 @@ func Run(ctx context.Context, module string, output string) (err error) {
 
 	cmd := exec.CommandContext(ctx, "go", "build", "-trimpath", "-o", output, module)
 	cmd.Env = append(os.Environ(), "GOOS=wasip1", "GOARCH=wasm")
+	cmd.Dir = dir
 	cmd.Stdin = os.Stdin
 	cmd.Stderr = os.Stderr
 	cmd.Stdout = os.Stdout

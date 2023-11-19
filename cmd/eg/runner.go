@@ -175,7 +175,7 @@ func (t runner) Run(ctx *cmdopts.Global) (err error) {
 			continue
 		}
 
-		if err = compile.Run(ctx.Context, root.Path, path); err != nil {
+		if err = compile.Run(ctx.Context, filepath.Join(ws.Root, ws.ModuleDir), root.Path, path); err != nil {
 			return err
 		}
 	}

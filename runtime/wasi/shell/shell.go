@@ -46,7 +46,7 @@ func (t Command) Environ(k, v string) Command {
 // that will be executed.
 func (t Command) New(cmd string) Command {
 	var (
-		environ []string
+		environ = make([]string, len(t.environ))
 	)
 
 	copy(environ, t.environ)

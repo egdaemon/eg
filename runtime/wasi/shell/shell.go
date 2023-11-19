@@ -113,6 +113,11 @@ func retry(ctx context.Context, c Command, do func() error) (err error) {
 			err = errorsx.Compact(err, cause)
 		}
 
+		select {
+		case <-time.After(200 * time.Millisecond):
+		case <-ctx.Done():
+			return ctx.Err()
+		}
 	}
 
 	return err

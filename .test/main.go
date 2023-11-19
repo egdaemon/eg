@@ -6,13 +6,17 @@ import (
 	"time"
 
 	"github.com/james-lawrence/eg/runtime/wasi/env"
+	"github.com/james-lawrence/eg/runtime/wasi/shell"
 	"github.com/james-lawrence/eg/runtime/wasi/yak"
 )
 
 func Op1(ctx context.Context, op yak.Op) error {
 	log.Println("op1 initiated")
 	defer log.Println("op1 completed")
-	return nil
+	return shell.Run(
+		ctx,
+		shell.New("env").Environ("USER", "root"),
+	)
 }
 
 func Op2(context.Context, yak.Op) error {

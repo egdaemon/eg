@@ -94,11 +94,6 @@ func Analyse(ctx context.Context, g ffigraph.Eventer, runid, dir string, module 
 		})).Export("github.com/james-lawrence/eg/runtime/wasi/runtime/ffiegcontainer.Module").
 			NewFunctionBuilder().WithFunc(ffiexec.Exec(func(cmd *exec.Cmd) *exec.Cmd {
 			return nil
-			// cmd.Dir = r.root
-			// cmd.Env = cmdenv
-			// cmd.Stderr = os.Stderr
-			// cmd.Stdout = os.Stdout
-			// return cmd
 		})).Export("github.com/james-lawrence/eg/runtime/wasi/runtime/ffiexec.Command").NewFunctionBuilder().WithFunc(
 			ffigit.Commitish(dir),
 		).Export("github.com/james-lawrence/eg/runtime/wasi/runtime/ffigit.Commitish")

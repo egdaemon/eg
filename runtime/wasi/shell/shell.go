@@ -3,6 +3,7 @@ package shell
 import (
 	"context"
 	"fmt"
+	"log"
 	"math"
 	"time"
 
@@ -131,7 +132,7 @@ func run(ctx context.Context, c Command) (err error) {
 	cctx, done := context.WithTimeout(ctx, c.timeout)
 	defer done()
 
-	cmd := append([]string{"-c"}, c.environ...)
-	cmd = append(cmd, c.cmd)
-	return ffiexec.Command(cctx, c.directory, "bash", cmd)
+	cmd := append([]string{"-c"}, c.cmd)
+	log.Println("DERP", cmd)
+	return ffiexec.Command(cctx, c.directory, c.environ, "bash", cmd)
 }

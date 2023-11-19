@@ -45,11 +45,10 @@ func Exec(op func(*exec.Cmd) *exec.Cmd) func(
 			return 127
 		}
 
-		log.Println("DERP", cmd.Env)
 		cmd = op(cmd)
 
 		log.Println("initiated", cmd.String())
-		log.Println("environ", cmd.Env)
+		// log.Println("environ", cmd.Env)
 		defer log.Println("completed", cmd.String())
 
 		if err = mayberun(cmd); err != nil {

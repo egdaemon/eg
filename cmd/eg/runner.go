@@ -203,7 +203,7 @@ func (t runner) Run(ctx *cmdopts.Global) (err error) {
 			"--env", "EG_BIN",
 			"--volume", fmt.Sprintf("%s:/opt/egbin:ro", langx.Must(exec.LookPath(os.Args[0]))), // deprecated
 			"--volume", fmt.Sprintf("%s:/opt/egmodule.wasm:ro", m.Path),
-			"--volume", fmt.Sprintf("%s:/opt/eg:O", filepath.Dir(ws.Root)),
+			"--volume", fmt.Sprintf("%s:/opt/eg:O", ws.Root),
 		)
 		_, err = runner.Module(ctx.Context, &c8s.ModuleRequest{
 			Image:   "eg",

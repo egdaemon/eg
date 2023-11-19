@@ -169,7 +169,7 @@ func (t runner) perform(ctx context.Context, runid, path string, rtb runtimefn) 
 	guestruntimedir := runners.DefaultRunnerRuntimeDir()
 	tmpdir, err := os.MkdirTemp(moduledir, "eg.tmp.*")
 	if err != nil {
-		return err
+		return errors.Wrap(err, "unable to create tmp directory")
 	}
 	defer os.RemoveAll(tmpdir)
 

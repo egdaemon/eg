@@ -45,11 +45,13 @@ func Exec(op func(*exec.Cmd) *exec.Cmd) func(
 			return 127
 		}
 
+		cmd = op(cmd)
+
 		log.Println("initiated", cmd.String())
 		log.Println("environ", cmd.Env)
 		defer log.Println("completed", cmd.String())
 
-		if err = mayberun(op(cmd)); err != nil {
+		if err = mayberun(cmd); err != nil {
 			log.Println("failed to execute shell command", err)
 			return 128
 		}

@@ -7,7 +7,6 @@ import (
 	"os"
 	"os/exec"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/james-lawrence/eg/internal/envx"
 	"github.com/james-lawrence/eg/runtime/wasi/langx"
 	"github.com/james-lawrence/eg/workspaces"
@@ -129,8 +128,6 @@ func (t *ProxyService) Run(ctx context.Context, req *RunRequest) (_ *RunResponse
 func (t *ProxyService) Module(ctx context.Context, req *ModuleRequest) (_ *ModuleResponse, err error) {
 	log.Println("PROXY CONTAINER MODULE INITIATED", langx.Must(os.Getwd()), envx.String("eg", "EG_BIN"))
 	defer log.Println("PROXY CONTAINER MODULE COMPLETED", langx.Must(os.Getwd()), envx.String("eg", "EG_BIN"))
-
-	log.Println("WORKSPACE", spew.Sdump(t.ws))
 
 	options := append(
 		req.Options,

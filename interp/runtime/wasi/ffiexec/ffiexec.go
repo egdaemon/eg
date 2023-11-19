@@ -23,6 +23,7 @@ func Exec(op func(*exec.Cmd) *exec.Cmd) func(
 	m api.Module,
 	deadline int64,
 	diroffset uint32, dirlen uint32,
+	envoffset uint32, envlen uint32, envsize uint32,
 	nameoffset uint32, namelen uint32,
 	argsoffset uint32, argslen uint32, argssize uint32,
 ) uint32 {
@@ -31,13 +32,14 @@ func Exec(op func(*exec.Cmd) *exec.Cmd) func(
 		m api.Module,
 		deadline int64,
 		diroffset uint32, dirlen uint32,
+		envoffset uint32, envlen uint32, envsize uint32,
 		nameoffset uint32, namelen uint32,
 		argsoffset uint32, argslen uint32, argssize uint32,
 	) uint32 {
 		ictx, done := ffi.ReadMicroDeadline(ctx, deadline)
 		defer done()
 
-		cmd, err := Command(ictx, m, diroffset, dirlen, nameoffset, namelen, argsoffset, argslen, argssize)
+		cmd, err := Command(ictx, m, diroffset, dirlen, envoffset, envlen, envsize, nameoffset, namelen, argsoffset, argslen, argssize)
 		if err != nil {
 			log.Println("unable to build command", err)
 			return 127
@@ -59,13 +61,15 @@ func Command(
 	ctx context.Context,
 	m api.Module,
 	diroffset uint32, dirlen uint32,
+	envoffset uint32, envlen uint32, envsize uint32,
 	nameoffset uint32, namelen uint32,
 	argsoffset uint32, argslen uint32, argssize uint32,
 ) (_ *exec.Cmd, err error) {
 	var (
-		dir  string
-		name string
-		args []string
+		dir     string
+		name    string
+		args    []string
+		environ []string
 	)
 
 	if dir, err = ffi.ReadString(m.Memory(), diroffset, dirlen); err != nil {
@@ -80,8 +84,13 @@ func Command(
 		return nil, errors.Wrap(err, "unable to read command arguments")
 	}
 
+	if environ, err = ffi.ReadStringArray(m.Memory(), envoffset, envlen, envsize); err != nil {
+		return nil, errors.Wrap(err, "unable to read command environment")
+	}
+
 	cmd := exec.CommandContext(ctx, name, args...)
 	cmd.Dir = dir
+	cmd.Env = environ
 
 	return cmd, nil
 }

@@ -38,7 +38,7 @@ func (t Command) Timeout(d time.Duration) Command {
 }
 
 func (t Command) Environ(k, v string) Command {
-	t.environ = append(t.environ, fmt.Sprintf("%s=\"%s\"", k, v))
+	t.environ = append(t.environ, fmt.Sprintf("%s=%s", k, v))
 	return t
 }
 

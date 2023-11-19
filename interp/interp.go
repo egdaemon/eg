@@ -101,7 +101,7 @@ func Remote(ctx context.Context, runid string, g ffigraph.Eventer, svc grpc.Clie
 			_, err = containers.Module(ctx, &c8s.ModuleRequest{
 				Image:   name,
 				Name:    cname,
-				Mdir:    ".eg",
+				Mdir:    r.moduledir,
 				Options: options,
 			})
 			if err != nil {

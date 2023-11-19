@@ -162,7 +162,7 @@ func (t runner) perform(ctx context.Context, runid, path string, rtb runtimefn) 
 	)
 
 	moduledir := filepath.Join(t.root, t.moduledir)
-	hostcachedir := filepath.Join(t.root, t.moduledir, ".cache")
+	hostcachedir := filepath.Join(moduledir, ".cache")
 	guestcachedir := filepath.Join("/", "cache")
 	guestruntimedir := runners.DefaultRunnerRuntimeDir()
 	tmpdir, err := os.MkdirTemp(moduledir, "eg.tmp.*")
@@ -183,6 +183,7 @@ func (t runner) perform(ctx context.Context, runid, path string, rtb runtimefn) 
 		fmt.Sprintf("RUNTIME_DIRECTORY=%s", guestruntimedir),
 	)
 
+	log.Println("module dir", moduledir)
 	log.Println("cache dir", hostcachedir, "->", guestcachedir)
 	log.Println("runtime dir", t.runtimedir, "->", guestruntimedir)
 

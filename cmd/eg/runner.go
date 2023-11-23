@@ -81,7 +81,6 @@ func (t runner) Run(ctx *cmdopts.Global) (err error) {
 		mounthome = runners.AgentOptionAutoMountHome(langx.Must(os.UserHomeDir()))
 	}
 
-	log.Println("DERP DERP", spew.Sdump(ws))
 	if cc, err = daemons.AutoRunnerClient(ctx, ws, uid.String(), mounthome); err != nil {
 		return err
 	}

@@ -94,10 +94,9 @@ func Remote(ctx context.Context, runid string, g ffigraph.Eventer, svc grpc.Clie
 			cname := fmt.Sprintf("%s.%s", name, md5x.DigestString(modulepath+runid))
 			options = append(
 				options,
-				"--volume", fmt.Sprintf("%s:/opt/egmodule.wasm:ro", modulepath),
+				"--volume", fmt.Sprintf("%s:/opt/egmodule.wasm:ro", filepath.Join(r.moduledir, modulepath)),
 			)
 
-			log.Println("DERP", name, modulepath, r.moduledir, r.root, r.runtimedir)
 			_, err = containers.Module(ctx, &c8s.ModuleRequest{
 				Image:   name,
 				Name:    cname,

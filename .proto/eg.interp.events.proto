@@ -70,7 +70,6 @@ message RunWatchRequest { RunMetadata run = 1; }
 
 service Agent {
   rpc Upload(stream RunUploadChunk) returns (RunUploadResponse) {}
-  rpc Initiate(RunInitiateRequest) returns (RunInitiateResult) {}
   rpc Cancel(RunCancelRequest) returns (RunCancelResponse) {}
   rpc Logs(RunLogRequest) returns (stream RunLogResponse) {}
   rpc Watch(RunWatchRequest) returns (stream Message) {}

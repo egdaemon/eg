@@ -17,7 +17,6 @@ import (
 	"github.com/james-lawrence/eg/internal/contextx"
 	"github.com/james-lawrence/eg/internal/debugx"
 	"github.com/james-lawrence/eg/internal/envx"
-	"github.com/james-lawrence/eg/internal/fsx"
 	"github.com/james-lawrence/eg/internal/osx"
 	"github.com/james-lawrence/eg/internal/stringsx"
 	"github.com/james-lawrence/eg/internal/userx"
@@ -31,7 +30,7 @@ func main() {
 		Monitor            monitor                      `cmd:"" help:"execute the interpreter and monitor the progress"`
 		Interp             runner                       `cmd:"" help:"execute the interpreter on the given directory"`
 		Module             module                       `cmd:"" help:"executes a compiled module directly" hidden:"true"`
-		Daemon             daemon                       `cmd:"" help:"run in daemon mode letting the control plane push jobs to the local machine" hidden:"true"`
+		Daemon             daemon                       `cmd:"" help:"run in daemon mode letting the control plane push jobs to machines" hidden:"true"`
 		AgentManagement    actlcmd                      `cmd:"" name:"actl" help:"agent management commands"`
 		Register           accountcmds.Register         `cmd:"" name:"register" help:"register with an account with eg"`
 		Login              accountcmds.Login            `cmd:"" name:"login" help:"login to a profile"`
@@ -63,9 +62,10 @@ func main() {
 			"vars_cwd":             osx.Getwd("."),
 			"vars_cache_directory": envx.String(os.TempDir(), "CACHE_DIRECTORY", "XDG_CACHE_HOME"),
 			"vars_account_id":      envx.String("", "EG_ACCOUNT"),
-			"vars_ssh_key_path":    fsx.LocateFirstInDir(filepath.Join(user.HomeDir, ".ssh"), "id_ed25519", "id"),
-			"vars_user_name":       stringsx.DefaultIfBlank(user.Name, user.Username),
-			"vars_user_username":   user.Username,
+			// "vars_ssh_key_path":    // fsx.LocateFirstInDir(filepath.Join(user.HomeDir, ".ssh"), "id_ed25519", "id"),
+			"vars_ssh_key_path":  filepath.Join(user.HomeDir, ".ssh", "eg"),
+			"vars_user_name":     stringsx.DefaultIfBlank(user.Name, user.Username),
+			"vars_user_username": user.Username,
 		},
 		kong.UsageOnError(),
 		kong.Bind(&shellcli.Global),

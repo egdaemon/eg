@@ -19,14 +19,13 @@ func SSHProxy(global *cmdopts.Global, config *ssh.ClientConfig, signer ssh.Signe
 		return nil, errors.Wrap(err, "unable to listen for ssh connections")
 	}
 
-	if proxyl, err = conn.Listen("tcp", "127.0.0.1:0"); err != nil {
+	// if proxyl, err = conn.Listen("tcp", "127.0.0.1:0"); err != nil {
+	// 	return nil, errors.Wrap(err, "unable to listen for ssh connections")
+	// }
+
+	if proxyl, err = conn.Listen("unix", "derp.socket"); err != nil {
 		return nil, errors.Wrap(err, "unable to listen for ssh connections")
 	}
-
-	// proxyl, err := conn.Listen("unix", "derp.socket")
-	// if err != nil {
-	// 	log.Fatal("unable to listen to unix connection: ", err)
-	// }
 
 	global.Cleanup.Add(1)
 	go func() {
@@ -35,6 +34,7 @@ func SSHProxy(global *cmdopts.Global, config *ssh.ClientConfig, signer ssh.Signe
 		defer global.Shutdown()
 
 		d := net.Dialer{}
+
 		for {
 			proxied, err := proxyl.Accept()
 			if err != nil {

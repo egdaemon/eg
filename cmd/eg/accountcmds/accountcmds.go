@@ -13,6 +13,7 @@ import (
 	"github.com/james-lawrence/eg/authn"
 	"github.com/james-lawrence/eg/internal/envx"
 	"github.com/james-lawrence/eg/internal/httpx"
+	"github.com/james-lawrence/eg/internal/stringsx"
 )
 
 func signup(ctx context.Context, signupToken string) (err error) {
@@ -72,7 +73,7 @@ func login(ctx context.Context, authed *authn.Authn) (err error) {
 		return err
 	}
 
-	log.Println("logged in as", session.Profile.Display, "-", session.Profile.Email)
-	log.Println("account", session.Account.Display)
+	log.Println("logged in as", session.Profile.Display, "-", session.Profile.Id)
+	log.Println("account", stringsx.DefaultIfBlank(session.Account.Display, session.Profile.AccountId))
 	return authn.WriteSessionToken(session.Token)
 }

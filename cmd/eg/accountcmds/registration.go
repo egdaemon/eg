@@ -46,7 +46,7 @@ func (t Register) Run(gctx *cmdopts.Global) (err error) {
 	ctransport := &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 	}
-	chttp := httpx.DebugClient(&http.Client{Transport: ctransport, Timeout: 10 * time.Second})
+	chttp := &http.Client{Transport: ctransport, Timeout: 10 * time.Second}
 
 	ctx := context.WithValue(gctx.Context, oauth2.HTTPClient, chttp)
 	cfg := authn.OAuth2SSHConfig(signer, password.String())
@@ -97,6 +97,8 @@ func (t Register) Run(gctx *cmdopts.Global) (err error) {
 	switch len(authed.Profiles) {
 	case 0:
 		return signup(ctx, authed.SignupToken)
+	case 1:
+		return login(ctx, authed.Profiles[0])
 	default:
 		return errorsx.Notification(errors.New("you've already registered an account; multiple account support will be implemented in the future"))
 	}

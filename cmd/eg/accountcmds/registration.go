@@ -55,8 +55,6 @@ func (t Register) Run(gctx *cmdopts.Global, tlscfg *cmdopts.TLSConfig) (err erro
 	authzuri := cfg.AuthCodeURL(
 		encoded,
 		oauth2.AccessTypeOffline,
-		oauth2.SetAuthURLParam("email", t.Email),
-		oauth2.SetAuthURLParam("description", t.Name),
 	)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, authzuri, nil)
 	if err != nil {

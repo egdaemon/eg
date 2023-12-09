@@ -506,6 +506,27 @@ func easyjsonDabade4DecodeGithubComJamesLawrenceEgRegistration6(in *jlexer.Lexer
 		switch key {
 		case "id":
 			out.Id = string(in.String())
+		case "description":
+			out.Description = string(in.String())
+		case "publickey":
+			if in.IsNull() {
+				in.Skip()
+				out.Publickey = nil
+			} else {
+				out.Publickey = in.Bytes()
+			}
+		case "authzed_at":
+			out.AuthzedAt = string(in.String())
+		case "expires_at":
+			out.ExpiresAt = string(in.String())
+		case "os":
+			out.Os = string(in.String())
+		case "arch":
+			out.Arch = string(in.String())
+		case "cores":
+			out.Cores = uint64(in.Uint64())
+		case "memory":
+			out.Memory = uint64(in.Uint64())
 		case "labels":
 			if in.IsNull() {
 				in.Skip()
@@ -522,24 +543,13 @@ func easyjsonDabade4DecodeGithubComJamesLawrenceEgRegistration6(in *jlexer.Lexer
 					out.Labels = (out.Labels)[:0]
 				}
 				for !in.IsDelim(']') {
-					var v4 string
-					v4 = string(in.String())
-					out.Labels = append(out.Labels, v4)
+					var v5 string
+					v5 = string(in.String())
+					out.Labels = append(out.Labels, v5)
 					in.WantComma()
 				}
 				in.Delim(']')
 			}
-		case "publickey":
-			if in.IsNull() {
-				in.Skip()
-				out.Publickey = nil
-			} else {
-				out.Publickey = in.Bytes()
-			}
-		case "authzed_at":
-			out.AuthzedAt = string(in.String())
-		case "expires_at":
-			out.ExpiresAt = string(in.String())
 		default:
 			in.SkipRecursive()
 		}
@@ -560,24 +570,15 @@ func easyjsonDabade4EncodeGithubComJamesLawrenceEgRegistration6(out *jwriter.Wri
 		out.RawString(prefix[1:])
 		out.String(string(in.Id))
 	}
-	if len(in.Labels) != 0 {
-		const prefix string = ",\"labels\":"
+	if in.Description != "" {
+		const prefix string = ",\"description\":"
 		if first {
 			first = false
 			out.RawString(prefix[1:])
 		} else {
 			out.RawString(prefix)
 		}
-		{
-			out.RawByte('[')
-			for v6, v7 := range in.Labels {
-				if v6 > 0 {
-					out.RawByte(',')
-				}
-				out.String(string(v7))
-			}
-			out.RawByte(']')
-		}
+		out.String(string(in.Description))
 	}
 	if len(in.Publickey) != 0 {
 		const prefix string = ",\"publickey\":"
@@ -608,6 +609,65 @@ func easyjsonDabade4EncodeGithubComJamesLawrenceEgRegistration6(out *jwriter.Wri
 			out.RawString(prefix)
 		}
 		out.String(string(in.ExpiresAt))
+	}
+	if in.Os != "" {
+		const prefix string = ",\"os\":"
+		if first {
+			first = false
+			out.RawString(prefix[1:])
+		} else {
+			out.RawString(prefix)
+		}
+		out.String(string(in.Os))
+	}
+	if in.Arch != "" {
+		const prefix string = ",\"arch\":"
+		if first {
+			first = false
+			out.RawString(prefix[1:])
+		} else {
+			out.RawString(prefix)
+		}
+		out.String(string(in.Arch))
+	}
+	if in.Cores != 0 {
+		const prefix string = ",\"cores\":"
+		if first {
+			first = false
+			out.RawString(prefix[1:])
+		} else {
+			out.RawString(prefix)
+		}
+		out.Uint64(uint64(in.Cores))
+	}
+	if in.Memory != 0 {
+		const prefix string = ",\"memory\":"
+		if first {
+			first = false
+			out.RawString(prefix[1:])
+		} else {
+			out.RawString(prefix)
+		}
+		out.Uint64(uint64(in.Memory))
+	}
+	if len(in.Labels) != 0 {
+		const prefix string = ",\"labels\":"
+		if first {
+			first = false
+			out.RawString(prefix[1:])
+		} else {
+			out.RawString(prefix)
+		}
+		{
+			out.RawByte('[')
+			for v8, v9 := range in.Labels {
+				if v8 > 0 {
+					out.RawByte(',')
+				}
+				out.String(string(v9))
+			}
+			out.RawByte(']')
+		}
 	}
 	out.RawByte('}')
 }

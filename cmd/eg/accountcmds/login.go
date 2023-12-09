@@ -3,14 +3,16 @@ package accountcmds
 import (
 	"context"
 	"crypto/rand"
-	"crypto/tls"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"net/http"
+	"os"
 	"time"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/gofrs/uuid"
 	"github.com/james-lawrence/eg"
 	"github.com/james-lawrence/eg/authn"
@@ -19,16 +21,16 @@ import (
 	"github.com/james-lawrence/eg/internal/errorsx"
 	"github.com/james-lawrence/eg/internal/httpx"
 	"github.com/james-lawrence/eg/internal/sshx"
+	"github.com/james-lawrence/eg/internal/stringsx"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/oauth2"
 )
 
 type Login struct {
 	SSHKeyPath string `name:"sshkeypath" help:"path to ssh key to use" default:"${vars_ssh_key_path}"`
-	ID         string `name:"id" help:"profile id to login as" required:""`
 }
 
-func (t Login) Run(gctx *cmdopts.Global) (err error) {
+func (t Login) Run(gctx *cmdopts.Global, tlscfg *cmdopts.TLSConfig) (err error) {
 	var (
 		signer ssh.Signer
 		sig    *ssh.Signature
@@ -43,7 +45,7 @@ func (t Login) Run(gctx *cmdopts.Global) (err error) {
 	encoded := base64.RawURLEncoding.EncodeToString(signer.PublicKey().Marshal())
 
 	ctransport := &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		TLSClientConfig: tlscfg.Config(),
 	}
 	chttp := httpx.DebugClient(&http.Client{Transport: ctransport, Timeout: 10 * time.Second})
 
@@ -91,11 +93,17 @@ func (t Login) Run(gctx *cmdopts.Global) (err error) {
 		return err
 	}
 
+	log.Println("authed", spew.Sdump(&authed))
+
 	switch len(authed.Profiles) {
 	case 0:
-		return signup(ctx, authed.SignupToken)
+		return errorsx.Notification(fmt.Errorf(
+			"the ssh key (%s) is not associated with any profiles, unable to login. associate the key with a profile or use the `%s register --help` command to setup a new account",
+			t.SSHKeyPath,
+			stringsx.First(os.Args...),
+		))
 	case 1:
-		return login(ctx, authed.Profiles[0])
+		return login(ctx, chttp, authed.Profiles[0])
 	default:
 		return errorsx.Notification(errors.New("you've already registered an account; multiple account support will be implemented in the future"))
 	}

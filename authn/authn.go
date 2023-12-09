@@ -2,6 +2,7 @@ package authn
 
 import (
 	"fmt"
+	"net/http"
 	"os"
 	"path/filepath"
 
@@ -42,4 +43,8 @@ func ReadSessionToken() (_ string, err error) {
 	path := filepath.Join(userx.DefaultCacheDirectory(), "session.token")
 	raw, err := os.ReadFile(path)
 	return string(raw), err
+}
+
+func BearerAuthorization(req *http.Request, token string) {
+	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", token))
 }

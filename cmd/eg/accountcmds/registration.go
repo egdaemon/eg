@@ -3,14 +3,15 @@ package accountcmds
 import (
 	"context"
 	"crypto/rand"
-	"crypto/tls"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"net/http"
 	"time"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/gofrs/uuid"
 	"github.com/james-lawrence/eg"
 	"github.com/james-lawrence/eg/authn"
@@ -29,7 +30,7 @@ type Register struct {
 	Email      string `name:"email" help:"business contact email" required:""`
 }
 
-func (t Register) Run(gctx *cmdopts.Global) (err error) {
+func (t Register) Run(gctx *cmdopts.Global, tlscfg *cmdopts.TLSConfig) (err error) {
 	var (
 		signer ssh.Signer
 		sig    *ssh.Signature
@@ -44,7 +45,7 @@ func (t Register) Run(gctx *cmdopts.Global) (err error) {
 	encoded := base64.RawURLEncoding.EncodeToString(signer.PublicKey().Marshal())
 
 	ctransport := &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		TLSClientConfig: tlscfg.Config(),
 	}
 	chttp := &http.Client{Transport: ctransport, Timeout: 10 * time.Second}
 
@@ -94,11 +95,13 @@ func (t Register) Run(gctx *cmdopts.Global) (err error) {
 		return err
 	}
 
+	log.Println("authed", spew.Sdump(&authed))
+
 	switch len(authed.Profiles) {
 	case 0:
-		return signup(ctx, authed.SignupToken)
+		return signup(ctx, chttp, &authed)
 	case 1:
-		return login(ctx, authed.Profiles[0])
+		return login(ctx, chttp, authed.Profiles[0])
 	default:
 		return errorsx.Notification(errors.New("you've already registered an account; multiple account support will be implemented in the future"))
 	}

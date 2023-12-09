@@ -2,6 +2,7 @@ package cmdopts
 
 import (
 	"context"
+	"crypto/tls"
 	"sync"
 )
 
@@ -10,4 +11,14 @@ type Global struct {
 	Context   context.Context    `kong:"-"`
 	Shutdown  context.CancelFunc `kong:"-"`
 	Cleanup   *sync.WaitGroup    `kong:"-"`
+}
+
+type TLSConfig struct {
+	Insecure bool `help:"allow unsigned (and therefor insecure) tls certificates to be used" name:"insecure" default:"false"`
+}
+
+func (t TLSConfig) Config() *tls.Config {
+	return &tls.Config{
+		InsecureSkipVerify: t.Insecure,
+	}
 }

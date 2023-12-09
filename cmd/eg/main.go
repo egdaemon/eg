@@ -26,6 +26,7 @@ import (
 func main() {
 	var shellcli struct {
 		cmdopts.Global
+		cmdopts.TLSConfig
 		Version            cmdopts.Version              `cmd:"" help:"display versioning information"`
 		Monitor            monitor                      `cmd:"" help:"execute the interpreter and monitor the progress"`
 		Interp             runner                       `cmd:"" help:"execute the interpreter on the given directory"`
@@ -68,7 +69,10 @@ func main() {
 			"vars_user_username": user.Username,
 		},
 		kong.UsageOnError(),
-		kong.Bind(&shellcli.Global),
+		kong.Bind(
+			&shellcli.Global,
+			&shellcli.TLSConfig,
+		),
 		kong.TypeMapper(reflect.TypeOf(&net.IP{}), kong.MapperFunc(cmdopts.ParseIP)),
 		kong.TypeMapper(reflect.TypeOf(&net.TCPAddr{}), kong.MapperFunc(cmdopts.ParseTCPAddr)),
 		kong.TypeMapper(reflect.TypeOf([]*net.TCPAddr(nil)), kong.MapperFunc(cmdopts.ParseTCPAddrArray)),

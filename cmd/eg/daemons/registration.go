@@ -2,14 +2,17 @@ package daemons
 
 import (
 	"crypto/tls"
+	"fmt"
 	"log"
 	"net/http"
+	"runtime"
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/james-lawrence/eg/cmd/cmdopts"
 	"github.com/james-lawrence/eg/internal/jwtx"
+	"github.com/james-lawrence/eg/internal/systemx"
 	"github.com/james-lawrence/eg/notary"
 	"github.com/james-lawrence/eg/registration"
 	"golang.org/x/crypto/ssh"
@@ -56,9 +59,14 @@ func Register(global *cmdopts.Global, aid string, s ssh.Signer) (err error) {
 
 		regreq := &registration.RegistrationRequest{
 			Registration: &registration.Registration{
-				Id:        fingerprint,
-				Labels:    []string{"linux"},
-				Publickey: ssh.MarshalAuthorizedKey(s.PublicKey()),
+				Id:          fingerprint,
+				Description: fmt.Sprintf("%s - %s", systemx.HostnameOrDefault("unknown.eg.lan"), fingerprint),
+				Os:          runtime.GOOS,
+				Arch:        runtime.GOARCH,
+				Cores:       uint64(runtime.NumCPU()),
+				Memory:      0, // TODO
+				Publickey:   ssh.MarshalAuthorizedKey(s.PublicKey()),
+				Labels:      []string{},
 			},
 		}
 

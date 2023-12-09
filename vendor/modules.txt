@@ -1,3 +1,5 @@
+# bitbucket.org/jatone/genieql v0.0.0-20210607112644-30a724ef85f5
+## explicit
 # dario.cat/mergo v1.0.0
 ## explicit; go 1.13
 dario.cat/mergo

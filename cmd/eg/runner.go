@@ -6,7 +6,9 @@ import (
 	"io"
 	"io/fs"
 	"log"
+	"mime/multipart"
 	"net"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -19,6 +21,11 @@ import (
 	"github.com/james-lawrence/eg/cmd/ux"
 	"github.com/james-lawrence/eg/compile"
 	"github.com/james-lawrence/eg/internal/envx"
+	"github.com/james-lawrence/eg/internal/errorsx"
+	"github.com/james-lawrence/eg/internal/httpx"
+	"github.com/james-lawrence/eg/internal/iox"
+	"github.com/james-lawrence/eg/internal/slicesx"
+	"github.com/james-lawrence/eg/internal/tarx"
 	"github.com/james-lawrence/eg/interp"
 	"github.com/james-lawrence/eg/interp/c8s"
 	"github.com/james-lawrence/eg/interp/events"
@@ -27,6 +34,7 @@ import (
 	"github.com/james-lawrence/eg/runtime/wasi/langx"
 	"github.com/james-lawrence/eg/transpile"
 	"github.com/james-lawrence/eg/workspaces"
+	"github.com/pkg/errors"
 	"google.golang.org/grpc"
 )
 
@@ -275,6 +283,179 @@ func (t module) Run(ctx *cmdopts.Global) (err error) {
 		interp.OptionModuleDir(t.ModuleDir),
 		interp.OptionRuntimeDir("/opt/egruntime"),
 	)
+}
+
+type upload struct {
+	Dir         string   `name:"directory" help:"root directory of the repository" default:"${vars_cwd}"`
+	ModuleDir   string   `name:"moduledir" help:"must be a subdirectory in the provided directory" default:".eg"`
+	Name        string   `arg:"" name:"module" help:"name of the module to run, i.e. the folder name within moduledir" default:""`
+	Environment []string `name:"env" short:"e" help:"define environment variables and their values to be included"`
+	Dirty       bool     `name:"dirty" help:"include all environment variables"`
+	Endpoint    string   `name:"endpoint" help:"specify the endpoint to upload to" hidden:"true"`
+	OS          string   `name:"os" help:"operating system the job requires" hidden:"true" default:"linux"`
+	Arch        string   `name:"arch" help:"instruction set the job requires" hidden:"true" default:"${vars_arch}"`
+	Cores       string   `name:"cores" help:"minimum number of cores the required" default:"${vars_cores_minimum_default}"`
+	Memory      string   `name:"memory" help:"minimum amount of ram required" default:"${vars_memory_minimum_default}"`
+	Labels      []string `name:"labels" help:"custom labels required"`
+}
+
+func (t upload) Run(ctx *cmdopts.Global) (err error) {
+	var (
+		ws                   workspaces.Context
+		tmpdir               string
+		archiveio, environio *os.File
+	)
+
+	if ws, err = workspaces.New(ctx.Context, t.Dir, t.ModuleDir, t.Name); err != nil {
+		return err
+	}
+
+	roots, err := transpile.Autodetect(transpile.New(ws)).Run(ctx.Context)
+	if err != nil {
+		return err
+	}
+
+	log.Println("cacheid", ws.CachedID)
+
+	modules := make([]transpile.Compiled, 0, len(roots))
+
+	for _, root := range roots {
+		var (
+			path string
+		)
+
+		if path, err = filepath.Rel(ws.TransDir, root.Path); err != nil {
+			return err
+		}
+
+		path = workspaces.TrimRoot(path, filepath.Base(ws.GenModDir))
+		path = workspaces.ReplaceExt(path, ".wasm")
+		path = filepath.Join(ws.Root, ws.BuildDir, path)
+
+		modules = append(modules, transpile.Compiled{Path: path, Generated: root.Generated})
+
+		if _, err = os.Stat(path); err == nil {
+			// nothing to do.
+			continue
+		}
+
+		if err = compile.Run(ctx.Context, ws.ModuleDir, root.Path, path); err != nil {
+			return err
+		}
+	}
+
+	entry, found := slicesx.Find(func(c transpile.Compiled) bool {
+		return !c.Generated
+	}, modules...)
+
+	if !found {
+		return errors.New("unable to locate entry point")
+	}
+
+	if tmpdir, err = os.MkdirTemp("", "eg.upload.*"); err != nil {
+		return errorsx.Wrap(err, "unable to  create temporary directory")
+	}
+
+	defer func() {
+		os.RemoveAll(tmpdir)
+	}()
+
+	if environio, err = os.Create(filepath.Join(tmpdir, "environ.env")); err != nil {
+		return errorsx.Wrap(err, "unable to open the kernel archive")
+	}
+	defer environio.Close()
+
+	if t.Dirty {
+		for _, e := range os.Environ() {
+			if _, err = fmt.Fprintf(environio, "%s\n", e); err != nil {
+				return errorsx.Wrap(err, "unable to write environment variable")
+			}
+		}
+	}
+
+	for _, e := range t.Environment {
+		if _, err = fmt.Fprintf(environio, "%s\n", e); err != nil {
+			return errorsx.Wrap(err, "unable to write environment variable")
+		}
+	}
+
+	if err = iox.Rewind(environio); err != nil {
+		return errorsx.Wrap(err, "unable to rewind environment variables buffer")
+	}
+
+	if archiveio, err = os.CreateTemp(tmpdir, "kernel.*.tar.gz"); err != nil {
+		return errorsx.Wrap(err, "unable to open the kernel archive")
+	}
+	defer archiveio.Close()
+
+	if err = tarx.Pack(archiveio, filepath.Join(ws.Root, ws.BuildDir)); err != nil {
+		return errorsx.Wrap(err, "unable to pack the kernel archive")
+	}
+
+	if err = iox.Rewind(archiveio); err != nil {
+		return errorsx.Wrap(err, "unable to rewind kernel archive")
+	}
+
+	// TODO: determine the destination based on the requirements
+	// i.e. cores, memory, labels, disk, videomem, etc.
+	// not sure if the client should do this or the node we upload to.
+	// if its the node we upload to it'll cost more due to having to
+	// push the archive to another node that matches the requirements.
+	// in theory we could use redirects to handle that but it'd still take a performance hit.
+	mimetype, buf, err := httpx.Multipart(func(w *multipart.Writer) error {
+		part, lerr := w.CreatePart(httpx.NewMultipartHeader("application/gzip", "kernel", "kernel.tar.gz"))
+		if lerr != nil {
+			return errorsx.Wrap(lerr, "unable to create kernel part")
+		}
+
+		if _, lerr = io.Copy(part, archiveio); lerr != nil {
+			return errorsx.Wrap(lerr, "unable to copy kernel")
+		}
+
+		part, lerr = w.CreatePart(httpx.NewMultipartHeader("text/plain", "environ", "variables.env"))
+		if lerr != nil {
+			return errorsx.Wrap(lerr, "unable to create environ part")
+		}
+
+		if _, lerr = io.Copy(part, environio); lerr != nil {
+			return errorsx.Wrap(lerr, "unable to copy kernel")
+		}
+
+		if err = w.WriteField("entrypoint", filepath.Base(entry.Path)); err != nil {
+			return errorsx.Wrap(lerr, "unable to copy entry point")
+		}
+
+		if err = w.WriteField("cores", t.Cores); err != nil {
+			return errorsx.Wrap(lerr, "unable to set minimum cores")
+		}
+
+		if err = w.WriteField("memory", t.Memory); err != nil {
+			return errorsx.Wrap(lerr, "unable to set minimum memory")
+		}
+
+		return nil
+	})
+	if err != nil {
+		return errorsx.Wrap(err, "unable to generate multipart upload")
+	}
+
+	req, err := http.NewRequestWithContext(ctx.Context, http.MethodPost, t.Endpoint, buf)
+	if err != nil {
+		return errorsx.Wrap(err, "unable to create kernel upload request")
+	}
+
+	req.Header.Set("Content-Type", mimetype)
+
+	resp, err := httpx.AsError(http.DefaultClient.Do(req)) //nolint:golint,bodyclose
+	defer httpx.TryClose(resp)
+
+	if err != nil {
+		return errorsx.Wrap(err, "unable to upload kernel for processing")
+	}
+
+	// TODO: monitoring the job once its uploaded and we have a run id.
+
+	return nil
 }
 
 type monitor struct {

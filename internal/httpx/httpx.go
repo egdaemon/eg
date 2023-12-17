@@ -8,15 +8,20 @@ import (
 	"io"
 	"log"
 	"mime"
+	"mime/multipart"
 	"net"
 	"net/http"
 	"net/http/httputil"
+	"net/textproto"
 	"net/url"
 	"os"
 	"strings"
 	"time"
 
 	"github.com/james-lawrence/eg/internal/debugx"
+	"github.com/james-lawrence/eg/internal/envx"
+	"github.com/james-lawrence/eg/internal/errorsx"
+	"github.com/james-lawrence/eg/internal/iox"
 	"github.com/james-lawrence/eg/internal/stringsx"
 	"github.com/pkg/errors"
 	"golang.org/x/time/rate"
@@ -183,13 +188,15 @@ func WriteEmptyJSONArray(resp http.ResponseWriter, code int) {
 }
 
 // WriteEmptyJSON emits empty json with the provided status code.
-func WriteEmptyJSON(resp http.ResponseWriter, code int) {
+func WriteEmptyJSON(resp http.ResponseWriter, code int) error {
 	const emptyJSON = "{}"
 	resp.Header().Set("Content-Type", "application/json")
 	resp.WriteHeader(code)
 	if _, err := resp.Write([]byte(emptyJSON)); err != nil {
-		log.Println("unable to write response", err)
+		return errorsx.Wrap(err, "unable to write response")
 	}
+
+	return nil
 }
 
 // RedirectHTTPRequest generates a url to redirect to from the provided
@@ -278,4 +285,51 @@ func NotFound(resp http.ResponseWriter, req *http.Request) {
 	raw, _ := httputil.DumpRequest(req, false)
 	log.Println("requested endpoint not found", string(raw))
 	resp.WriteHeader(http.StatusNotFound)
+}
+
+func Multipart(do func(*multipart.Writer) error) (_ string, _ *os.File, err error) {
+	buffer, err := os.CreateTemp(envx.String("", "CACHE_DIRECTORY"), "multipart.upload.bin.")
+	if err != nil {
+		return "", nil, errors.Wrap(err, "unable to create tmpfile buffer")
+	}
+
+	mw := multipart.NewWriter(buffer)
+
+	if err = do(mw); err != nil {
+		return "", nil, err
+	}
+
+	// Close the form
+	if err = mw.Close(); err != nil {
+		return "", nil, errors.Wrap(err, "unable to close writer request")
+	}
+
+	if err = iox.Rewind(buffer); err != nil {
+		return "", nil, errors.Wrap(err, "rewind buffer")
+	}
+
+	return mw.FormDataContentType(), buffer, nil
+}
+
+func escapeQuotes(s string) string {
+	quoteEscaper := strings.NewReplacer("\\", "\\\\", `"`, "\\\"")
+	return quoteEscaper.Replace(s)
+}
+
+func NewMultipartHeader(mimetype string, fieldname string, filename string) textproto.MIMEHeader {
+	h := make(textproto.MIMEHeader)
+	h.Set("Content-Disposition",
+		fmt.Sprintf(`form-data; name="%s"; filename="%s"`,
+			escapeQuotes(fieldname), escapeQuotes(filename)))
+	h.Set("Content-Type", mimetype)
+	return h
+}
+
+// TryClose attempts to close the response body if it exists.
+func TryClose(r *http.Response) error {
+	if r == nil {
+		return nil
+	}
+
+	return r.Body.Close()
 }

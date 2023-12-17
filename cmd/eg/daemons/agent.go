@@ -26,8 +26,8 @@ func DefaultAgentSocketPath() string {
 
 func DefaultAgentListener() (n net.Listener, err error) {
 	daemonpath := DefaultAgentSocketPath()
-	if info, err := os.Stat(daemonpath); !os.IsNotExist(err) {
-		return nil, fmt.Errorf("agent already running at %s", info.Name())
+	if _, err := os.Stat(daemonpath); !os.IsNotExist(err) {
+		return nil, fmt.Errorf("agent already running at %s", daemonpath)
 	}
 
 	log.Println("spawning host agent", daemonpath)

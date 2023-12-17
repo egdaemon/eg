@@ -7,6 +7,8 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"runtime"
+	"strconv"
 	"sync"
 	"syscall"
 
@@ -14,6 +16,7 @@ import (
 	"github.com/james-lawrence/eg/cmd/cmderrors"
 	"github.com/james-lawrence/eg/cmd/cmdopts"
 	"github.com/james-lawrence/eg/cmd/eg/accountcmds"
+	"github.com/james-lawrence/eg/internal/bytesx"
 	"github.com/james-lawrence/eg/internal/contextx"
 	"github.com/james-lawrence/eg/internal/debugx"
 	"github.com/james-lawrence/eg/internal/envx"
@@ -30,6 +33,7 @@ func main() {
 		Version            cmdopts.Version              `cmd:"" help:"display versioning information"`
 		Monitor            monitor                      `cmd:"" help:"execute the interpreter and monitor the progress"`
 		Interp             runner                       `cmd:"" help:"execute the interpreter on the given directory"`
+		Upload             upload                       `cmd:"" help:"compiles and uploads the process to the cluster"`
 		Module             module                       `cmd:"" help:"executes a compiled module directly" hidden:"true"`
 		Daemon             daemon                       `cmd:"" help:"run in daemon mode letting the control plane push jobs to machines" hidden:"true"`
 		AgentManagement    actlcmd                      `cmd:"" name:"actl" help:"agent management commands"`
@@ -64,9 +68,14 @@ func main() {
 			"vars_cache_directory": envx.String(os.TempDir(), "CACHE_DIRECTORY", "XDG_CACHE_HOME"),
 			"vars_account_id":      envx.String("", "EG_ACCOUNT"),
 			// "vars_ssh_key_path":    // fsx.LocateFirstInDir(filepath.Join(user.HomeDir, ".ssh"), "id_ed25519", "id"),
-			"vars_ssh_key_path":  filepath.Join(user.HomeDir, ".ssh", "eg"),
-			"vars_user_name":     stringsx.DefaultIfBlank(user.Name, user.Username),
-			"vars_user_username": user.Username,
+			"vars_ssh_key_path":           filepath.Join(user.HomeDir, ".ssh", "eg"),
+			"vars_user_name":              stringsx.DefaultIfBlank(user.Name, user.Username),
+			"vars_user_username":          user.Username,
+			"vars_os":                     runtime.GOOS,
+			"vars_arch":                   runtime.GOARCH,
+			"vars_cores_minimum_default":  strconv.Itoa(1),
+			"vars_memory_minimum_default": strconv.Itoa(bytesx.GiB),
+			"vars_disk_minimum_default":   strconv.Itoa(8 * bytesx.GiB),
 		},
 		kong.UsageOnError(),
 		kong.Bind(

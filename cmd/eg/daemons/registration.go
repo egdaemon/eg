@@ -15,6 +15,7 @@ import (
 	"github.com/james-lawrence/eg/internal/systemx"
 	"github.com/james-lawrence/eg/notary"
 	"github.com/james-lawrence/eg/registration"
+	"github.com/pbnjay/memory"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/time/rate"
 )
@@ -64,7 +65,7 @@ func Register(global *cmdopts.Global, aid string, s ssh.Signer) (err error) {
 				Os:          runtime.GOOS,
 				Arch:        runtime.GOARCH,
 				Cores:       uint64(runtime.NumCPU()),
-				Memory:      0, // TODO
+				Memory:      memory.TotalMemory(),
 				Publickey:   ssh.MarshalAuthorizedKey(s.PublicKey()),
 				Labels:      []string{},
 			},

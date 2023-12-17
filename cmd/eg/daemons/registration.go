@@ -20,10 +20,10 @@ import (
 	"golang.org/x/time/rate"
 )
 
-func Register(global *cmdopts.Global, aid string, s ssh.Signer) (err error) {
+func Register(global *cmdopts.Global, aid, machineid string, s ssh.Signer) (err error) {
 	fingerprint := ssh.FingerprintSHA256(s.PublicKey())
-	log.Println("registering daemon with control plane initiated", aid, fingerprint)
-	defer log.Println("registering daemon with control plane completed", aid, fingerprint)
+	log.Println("registering daemon with control plane initiated", aid, machineid, fingerprint)
+	defer log.Println("registering daemon with control plane completed", aid, machineid, fingerprint)
 
 	ctransport := &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
@@ -35,7 +35,7 @@ func Register(global *cmdopts.Global, aid string, s ssh.Signer) (err error) {
 			signed, err = jwt.NewWithClaims(
 				notary.NewJWTSigner(),
 				jwtx.NewJWTClaims(
-					fingerprint,
+					machineid,
 					jwtx.ClaimsOptionAuthnExpiration(),
 					jwtx.ClaimsOptionIssuer(aid),
 				),
@@ -60,7 +60,6 @@ func Register(global *cmdopts.Global, aid string, s ssh.Signer) (err error) {
 
 		regreq := &registration.RegistrationRequest{
 			Registration: &registration.Registration{
-				Id:          fingerprint,
 				Description: fmt.Sprintf("%s - %s", systemx.HostnameOrDefault("unknown.eg.lan"), fingerprint),
 				Os:          runtime.GOOS,
 				Arch:        runtime.GOARCH,

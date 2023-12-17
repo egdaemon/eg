@@ -9,10 +9,12 @@ import (
 	"reflect"
 	"runtime"
 	"strconv"
+	"strings"
 	"sync"
 	"syscall"
 
 	"github.com/alecthomas/kong"
+	"github.com/gofrs/uuid"
 	"github.com/james-lawrence/eg/cmd/cmderrors"
 	"github.com/james-lawrence/eg/cmd/cmdopts"
 	"github.com/james-lawrence/eg/cmd/eg/accountcmds"
@@ -20,11 +22,39 @@ import (
 	"github.com/james-lawrence/eg/internal/contextx"
 	"github.com/james-lawrence/eg/internal/debugx"
 	"github.com/james-lawrence/eg/internal/envx"
+	"github.com/james-lawrence/eg/internal/errorsx"
 	"github.com/james-lawrence/eg/internal/osx"
 	"github.com/james-lawrence/eg/internal/stringsx"
 	"github.com/james-lawrence/eg/internal/userx"
 	"github.com/willabides/kongplete"
 )
+
+func machineID() string {
+	var (
+		err error
+		raw []byte
+	)
+
+	// by default use the machine-id.
+	if raw, err = os.ReadFile("/etc/machine-id"); err == nil {
+		return strings.TrimSpace(string(raw))
+	}
+
+	cachedir := envx.String(os.TempDir(), cmdopts.EnvCacheDir, cmdopts.EnvSystemdCacheDir)
+	midpath := filepath.Join(cachedir, "machine-id")
+
+	if raw, err = os.ReadFile(midpath); err == nil {
+		return strings.TrimSpace(string(raw))
+	}
+
+	log.Println("failed to read a valid machine id, generating a random uuid", err)
+	uid := uuid.Must(uuid.NewV7()).Bytes()
+	if err = os.WriteFile(midpath, uid, 0600); err == nil {
+		return strings.TrimSpace(string(uid))
+	}
+
+	panic(errorsx.Wrapf(err, "failed to generate a machine id at %s", midpath))
+}
 
 func main() {
 	var shellcli struct {
@@ -67,6 +97,7 @@ func main() {
 			"vars_cwd":             osx.Getwd("."),
 			"vars_cache_directory": envx.String(os.TempDir(), "CACHE_DIRECTORY", "XDG_CACHE_HOME"),
 			"vars_account_id":      envx.String("", "EG_ACCOUNT"),
+			"vars_machine_id":      envx.String(machineID(), "EG_MACHINE_ID"),
 			// "vars_ssh_key_path":    // fsx.LocateFirstInDir(filepath.Join(user.HomeDir, ".ssh"), "id_ed25519", "id"),
 			"vars_ssh_key_path":           filepath.Join(user.HomeDir, ".ssh", "eg"),
 			"vars_user_name":              stringsx.DefaultIfBlank(user.Name, user.Username),

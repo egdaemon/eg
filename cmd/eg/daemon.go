@@ -42,7 +42,7 @@ func (t daemon) Run(ctx *cmdopts.Global) (err error) {
 	log.Println("cache directory", t.CacheDir)
 
 	config := &ssh.ClientConfig{
-		User: t.AccountID,
+		User: t.MachineID,
 		Auth: []ssh.AuthMethod{
 			ssh.PublicKeys(signer),
 		},

@@ -28,7 +28,7 @@ func SSHProxy(global *cmdopts.Global, config *ssh.ClientConfig, signer ssh.Signe
 	// 	return nil, errors.Wrap(err, "unable to listen for ssh connections")
 	// }
 
-	log.Println("DERP", proxyl.Addr().Network(), proxyl.Addr().String())
+	log.Println("PROXY", proxyl.Addr().Network(), proxyl.Addr().String())
 	global.Cleanup.Add(1)
 	go func() {
 		defer conn.Close()

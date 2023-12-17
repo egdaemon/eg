@@ -24,7 +24,7 @@ func HTTP(global *cmdopts.Global, httpl net.Listener) (err error) {
 	httpmux := mux.NewRouter()
 	httpmux.NotFoundHandler = alice.New(httpx.RouteInvoked).ThenFunc(httpx.NotFound)
 
-	httpmux.HandleFunc("/healthz", httpx.Healthz(envx.Int(http.StatusOK, cmdopts.HealthzCode))).Methods("GET")
+	httpmux.HandleFunc("/healthz", httpx.Healthz(envx.Int(http.StatusOK, cmdopts.EnvHealthzCode))).Methods("GET")
 
 	httpmux.Handle("/b/upload", alice.New(httpx.RouteInvoked).ThenFunc(func(w http.ResponseWriter, r *http.Request) {
 		var (

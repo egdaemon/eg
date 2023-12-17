@@ -7,13 +7,13 @@ import (
 
 	"github.com/james-lawrence/eg/cmd/cmdopts"
 	"github.com/james-lawrence/eg/cmd/eg/daemons"
-	"github.com/james-lawrence/eg/internal/cryptox"
 	"github.com/james-lawrence/eg/internal/sshx"
 	"golang.org/x/crypto/ssh"
 )
 
 type daemon struct {
 	AccountID  string `name:"account" help:"account to register runner with" default:"${vars_account_id}" required:"true"`
+	MachineID  string `name:"machine" help:"unique id for this particular machine" default:"${vars_machine_id}" required:"true"`
 	Seed       string `name:"secret" help:"seed for generating ssh credentials in a consistent manner"`
 	SSHKeyPath string `name:"sshkeypath" help:"path to ssh key to use" default:"${vars_ssh_key_path}"`
 	CacheDir   string `name:"directory" help:"root directory of the repository" default:"${vars_cache_directory}"`
@@ -33,7 +33,7 @@ func (t daemon) Run(ctx *cmdopts.Global) (err error) {
 		return err
 	}
 
-	if signer, err = sshx.AutoCached(sshx.NewKeyGen(sshx.OptionKeyGenRand(cryptox.NewPRNGSHA512([]byte(t.Seed)))), t.SSHKeyPath); err != nil {
+	if signer, err = sshx.AutoCached(sshx.NewKeyGenSeeded(t.Seed), t.SSHKeyPath); err != nil {
 		return err
 	}
 
@@ -52,7 +52,7 @@ func (t daemon) Run(ctx *cmdopts.Global) (err error) {
 		},
 	}
 
-	if err = daemons.Register(ctx, t.AccountID, signer); err != nil {
+	if err = daemons.Register(ctx, t.AccountID, t.MachineID, signer); err != nil {
 		return err
 	}
 

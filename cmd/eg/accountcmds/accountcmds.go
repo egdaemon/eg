@@ -68,3 +68,8 @@ func login(ctx context.Context, chttp *http.Client, authed *authn.Authn) (err er
 	log.Println("account", stringsx.DefaultIfBlank(session.Account.Display, session.Profile.AccountId))
 	return authn.WriteSessionToken(session.Token)
 }
+
+func otp(ctx context.Context, chttp *http.Client, authed *authn.Authn) (err error) {
+	fmt.Printf("%s?lt=%s\n", envx.String(eg.EnvEGConsoleHostDefault, eg.EnvEGConsoleHost), authed.Token)
+	return nil
+}

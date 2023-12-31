@@ -27,11 +27,11 @@ import (
 	"golang.org/x/oauth2"
 )
 
-type Login struct {
+type OTP struct {
 	SSHKeyPath string `name:"sshkeypath" help:"path to ssh key to use" default:"${vars_ssh_key_path}"`
 }
 
-func (t Login) Run(gctx *cmdopts.Global, tlscfg *cmdopts.TLSConfig) (err error) {
+func (t OTP) Run(gctx *cmdopts.Global, tlscfg *cmdopts.TLSConfig) (err error) {
 	type reqstate struct {
 		PublicKey []byte `json:"pkey"`
 		Email     string `json:"email"`
@@ -50,15 +50,12 @@ func (t Login) Run(gctx *cmdopts.Global, tlscfg *cmdopts.TLSConfig) (err error) 
 	}
 
 	password := uuid.Must(uuid.NewV4())
-
 	rawstate := reqstate{
 		PublicKey: signer.PublicKey().Marshal(),
 	}
-
 	if encoded, err = jwtx.EncodeJSON(rawstate); err != nil {
 		return err
 	}
-
 	ctransport := &http.Transport{
 		TLSClientConfig: tlscfg.Config(),
 	}
@@ -118,7 +115,7 @@ func (t Login) Run(gctx *cmdopts.Global, tlscfg *cmdopts.TLSConfig) (err error) 
 			stringsx.First(os.Args...),
 		))
 	case 1:
-		return login(ctx, chttp, authed.Profiles[0])
+		return otp(ctx, chttp, authed.Profiles[0])
 	default:
 		return errorsx.Notification(errors.New("you've already registered an account; multiple account support will be implemented in the future"))
 	}

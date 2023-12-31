@@ -5,40 +5,60 @@ import (
 	"io"
 	"log"
 	"net"
+	"time"
 
 	"github.com/james-lawrence/eg/cmd/cmdopts"
 	"github.com/james-lawrence/eg/internal/errorsx"
 	"github.com/james-lawrence/eg/internal/iox"
-	"github.com/pkg/errors"
 	"golang.org/x/crypto/ssh"
+	"golang.org/x/time/rate"
 )
 
-func SSHProxy(global *cmdopts.Global, config *ssh.ClientConfig, signer ssh.Signer, httpl net.Listener) (proxyl net.Listener, err error) {
+func SSHProxy(global *cmdopts.Global, config *ssh.ClientConfig, signer ssh.Signer, httpl net.Listener) (err error) {
 	// TODO: use a tls dialer so we can proxy through 443 based on the alpn id.
-	conn, err := ssh.Dial("tcp", "localhost:8090", config)
-	if err != nil {
-		return nil, errors.Wrap(err, "unable to listen for ssh connections")
-	}
 
-	if proxyl, err = conn.Listen("tcp", "127.0.0.1:0"); err != nil {
-		return nil, errors.Wrap(err, "unable to listen for proxied http connections")
-	}
-
-	// if proxyl, err = conn.Listen("unix", "derp.socket"); err != nil {
-	// 	return nil, errors.Wrap(err, "unable to listen for ssh connections")
-	// }
-
-	log.Println("PROXY", proxyl.Addr().Network(), proxyl.Addr().String())
-	global.Cleanup.Add(1)
+	// global.Cleanup.Add(1)
 	go func() {
-		defer conn.Close()
-		defer global.Cleanup.Done()
+		var (
+			proxyl net.Listener
+		)
+		// defer global.Cleanup.Done()
 		defer global.Shutdown()
 
+		r := rate.NewLimiter(rate.Every(time.Second), 1)
 		d := net.Dialer{}
 
 		for {
+			if proxyl == nil {
+				if err = r.Wait(global.Context); err != nil {
+					log.Println(errorsx.Wrap(err, "rate limiting error when connecting to ssh"))
+					return
+				}
+				conn, err := ssh.Dial("tcp", "localhost:8090", config)
+				if err != nil {
+					log.Println(errorsx.Wrap(err, "unable to listen for ssh connections"))
+					continue
+				}
+
+				if proxyl, err = conn.Listen("tcp", "127.0.0.1:0"); err != nil {
+					log.Println(errorsx.Wrap(err, "unable to listen for proxied http connections"))
+					return
+				}
+
+				// if proxyl, err = conn.Listen("unix", "derp.socket"); err != nil {
+				// 	return nil, errorsx.Wrap(err, "unable to listen for ssh connections")
+				// }
+
+				log.Println("PROXY", proxyl, conn.RemoteAddr().String(), proxyl.Addr().Network(), proxyl.Addr().String())
+			}
+
 			proxied, err := proxyl.Accept()
+			if err == io.EOF {
+				errorsx.MaybeLog(errorsx.Wrap(iox.IgnoreEOF(proxyl.Close()), "closing ssh proxy listener failed"))
+				proxyl = nil
+				continue
+			}
+
 			if err != nil {
 				log.Println("unable to accept new proxied connections", err)
 				return
@@ -50,7 +70,7 @@ func SSHProxy(global *cmdopts.Global, config *ssh.ClientConfig, signer ssh.Signe
 		}
 	}()
 
-	return proxyl, nil
+	return nil
 }
 
 type dialer interface {
@@ -59,7 +79,7 @@ type dialer interface {
 
 func forward(ctx context.Context, dst net.Listener, d dialer, proxied net.Conn) {
 	cleanup := func() {
-		errorsx.MaybeLog(errors.Wrap(iox.IgnoreEOF(proxied.Close()), "failed to close proxy connection"))
+		errorsx.MaybeLog(errorsx.Wrap(iox.IgnoreEOF(proxied.Close()), "failed to close proxy connection"))
 	}
 
 	dconn, err := d.DialContext(ctx, dst.Addr().Network(), dst.Addr().String())

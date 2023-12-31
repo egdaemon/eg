@@ -2,6 +2,8 @@ package jwtx
 
 import (
 	"context"
+	"encoding/base64"
+	"encoding/json"
 	"net/http"
 	"strings"
 	"time"
@@ -116,4 +118,28 @@ func Validate(jwtsecret JWTSecretSource, encoded string, t jwt.Claims) error {
 	}
 
 	return nil
+}
+
+func EncodeJSON(v any) (_ string, err error) {
+	var (
+		encoded []byte
+	)
+
+	if encoded, err = json.Marshal(v); err != nil {
+		return "", err
+	}
+
+	return base64.URLEncoding.EncodeToString(encoded), nil
+}
+
+func DecodeJSON(s string, v any) (err error) {
+	var (
+		decoded []byte
+	)
+
+	if decoded, err = base64.URLEncoding.DecodeString(s); err != nil {
+		return err
+	}
+
+	return json.Unmarshal(decoded, v)
 }

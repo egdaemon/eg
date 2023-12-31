@@ -23,10 +23,9 @@ type daemon struct {
 // allowing the control plane to interogate
 func (t daemon) Run(ctx *cmdopts.Global) (err error) {
 	var (
-		signer   ssh.Signer
-		httpl    net.Listener
-		grpcl    net.Listener
-		sshproxy net.Listener
+		signer ssh.Signer
+		httpl  net.Listener
+		grpcl  net.Listener
 	)
 
 	if httpl, err = net.Listen("tcp", "127.0.1.1:8093"); err != nil {
@@ -69,10 +68,9 @@ func (t daemon) Run(ctx *cmdopts.Global) (err error) {
 		return err
 	}
 
-	if sshproxy, err = daemons.SSHProxy(ctx, config, signer, httpl); err != nil {
+	if err = daemons.SSHProxy(ctx, config, signer, httpl); err != nil {
 		return err
 	}
-	defer sshproxy.Close()
 
 	<-ctx.Context.Done()
 	return ctx.Context.Err()

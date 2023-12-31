@@ -37,8 +37,8 @@ func signup(ctx context.Context, chttp *http.Client, authed *authn.Authed) (err 
 		return errorsx.Wrap(err, "signup bad response")
 	}
 
-	log.Println("logged in as", session.Profile.Display, "-", session.Profile.Email)
-	log.Println("account", session.Account.Display)
+	log.Println("logged in as", session.Profile.Display, "-", session.Profile.Id)
+	log.Println("account", stringsx.DefaultIfBlank(session.Account.Display, session.Profile.AccountId))
 	return authn.WriteSessionToken(session.Token)
 }
 

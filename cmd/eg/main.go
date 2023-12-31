@@ -69,6 +69,7 @@ func main() {
 		AgentManagement    actlcmd                      `cmd:"" name:"actl" help:"agent management commands"`
 		Register           accountcmds.Register         `cmd:"" name:"register" help:"register with an account with eg"`
 		Login              accountcmds.Login            `cmd:"" name:"login" help:"login to a profile"`
+		Browser            accountcmds.OTP              `cmd:"" name:"browser" help:"login to the browser console"`
 		InstallCompletions kongplete.InstallCompletions `cmd:"" help:"install shell completions"`
 	}
 

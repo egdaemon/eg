@@ -20,6 +20,7 @@ import (
 	"github.com/james-lawrence/eg/internal/envx"
 	"github.com/james-lawrence/eg/internal/errorsx"
 	"github.com/james-lawrence/eg/internal/httpx"
+	"github.com/james-lawrence/eg/internal/jwtx"
 	"github.com/james-lawrence/eg/internal/sshx"
 	"github.com/james-lawrence/eg/internal/stringsx"
 	"golang.org/x/crypto/ssh"
@@ -31,10 +32,17 @@ type Login struct {
 }
 
 func (t Login) Run(gctx *cmdopts.Global, tlscfg *cmdopts.TLSConfig) (err error) {
+	type reqstate struct {
+		PublicKey []byte `json:"pkey"`
+		Email     string `json:"email"`
+		Display   string `json:"display"`
+	}
+
 	var (
-		signer ssh.Signer
-		sig    *ssh.Signature
-		authed authn.Authed
+		signer  ssh.Signer
+		sig     *ssh.Signature
+		authed  authn.Authed
+		encoded string
 	)
 
 	if signer, err = sshx.AutoCached(sshx.NewKeyGen(), t.SSHKeyPath); err != nil {
@@ -42,7 +50,14 @@ func (t Login) Run(gctx *cmdopts.Global, tlscfg *cmdopts.TLSConfig) (err error) 
 	}
 
 	password := uuid.Must(uuid.NewV4())
-	encoded := base64.RawURLEncoding.EncodeToString(signer.PublicKey().Marshal())
+
+	rawstate := reqstate{
+		PublicKey: signer.PublicKey().Marshal(),
+	}
+
+	if encoded, err = jwtx.EncodeJSON(rawstate); err != nil {
+		return err
+	}
 
 	ctransport := &http.Transport{
 		TLSClientConfig: tlscfg.Config(),

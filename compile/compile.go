@@ -7,7 +7,43 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+
+	"github.com/james-lawrence/eg/transpile"
+	"github.com/james-lawrence/eg/workspaces"
 )
+
+func FromTranspiled(ctx context.Context, ws workspaces.Context, m ...transpile.Compiled) (modules []transpile.Compiled, err error) {
+	modules = make([]transpile.Compiled, 0, len(m))
+
+	for _, root := range m {
+		var (
+			path string
+		)
+
+		if path, err = filepath.Rel(ws.TransDir, root.Path); err != nil {
+			return modules, err
+		}
+
+		path = workspaces.TrimRoot(path, filepath.Base(ws.GenModDir))
+		path = workspaces.ReplaceExt(path, ".wasm")
+		path = filepath.Join(ws.Root, ws.BuildDir, path)
+
+		if !root.Generated {
+			modules = append(modules, transpile.Compiled{Path: path, Generated: root.Generated})
+		}
+
+		if _, err = os.Stat(path); err == nil {
+			// nothing to do.
+			continue
+		}
+
+		if err = Run(ctx, ws.ModuleDir, root.Path, path); err != nil {
+			return modules, err
+		}
+	}
+
+	return modules, err
+}
 
 func Run(ctx context.Context, dir, module string, output string) (err error) {
 	log.Println("compiling initiated", module, "->", output)

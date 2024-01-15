@@ -50,6 +50,15 @@ func AgentOptionMounts(desc ...string) AgentOption {
 	}
 }
 
+func DefaultRunnerClient(ctx context.Context) (cc *grpc.ClientConn, err error) {
+	daemonpath := DefaultRunnerSocketPath()
+	log.Println("connecting", daemonpath)
+	if _, err := os.Stat(daemonpath); os.IsNotExist(err) {
+		return nil, fmt.Errorf("agent not running at %s", daemonpath)
+	}
+	return grpc.DialContext(ctx, fmt.Sprintf("unix://%s", daemonpath), grpc.WithInsecure(), grpc.WithBlock())
+}
+
 func NewRunner(ctx context.Context, root string, ws workspaces.Context, id string, options ...AgentOption) (_ *Agent, err error) {
 	var (
 		control net.Listener

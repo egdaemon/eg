@@ -128,7 +128,8 @@ func Remote(ctx context.Context, runid string, g ffigraph.Eventer, svc grpc.Clie
 			cmd.Stdout = os.Stdout
 			cmd.Stderr = os.Stderr
 			return cmd
-		})).Export("github.com/james-lawrence/eg/runtime/wasi/runtime/ffiexec.Command").NewFunctionBuilder().WithFunc(
+		})).Export("github.com/james-lawrence/eg/runtime/wasi/runtime/ffiexec.Command").
+			NewFunctionBuilder().WithFunc(
 			ffigit.Commitish(r.root),
 		).Export("github.com/james-lawrence/eg/runtime/wasi/runtime/ffigit.Commitish")
 	}

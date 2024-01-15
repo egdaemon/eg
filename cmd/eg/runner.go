@@ -1,10 +1,8 @@
 package main
 
 import (
-	"embed"
 	"fmt"
 	"io"
-	"io/fs"
 	"log"
 	"mime/multipart"
 	"net"
@@ -37,32 +35,6 @@ import (
 	"github.com/pkg/errors"
 	"google.golang.org/grpc"
 )
-
-//go:embed DefaultContainerfile
-var embedded embed.FS
-
-func preparerootcontainer(cpath string) (err error) {
-	var (
-		c   fs.File
-		dst *os.File
-	)
-
-	log.Println("default container path", cpath)
-	if c, err = embedded.Open("DefaultContainerfile"); err != nil {
-		return err
-	}
-	defer c.Close()
-
-	if dst, err = os.OpenFile(cpath, os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0600); err != nil {
-		return err
-	}
-
-	if _, err = io.Copy(dst, c); err != nil {
-		return err
-	}
-
-	return nil
-}
 
 type runner struct {
 	Dir        string `name:"directory" help:"root directory of the repository" default:"${vars_cwd}"`
@@ -146,50 +118,26 @@ func (t runner) Run(ctx *cmdopts.Global) (err error) {
 		}
 	}()
 
-	rootc := filepath.Join(ws.RunnerDir, "Containerfile")
-
-	if err = preparerootcontainer(rootc); err != nil {
-		return err
-	}
+	log.Println("cacheid", ws.CachedID)
 
 	roots, err := transpile.Autodetect(transpile.New(ws)).Run(ctx.Context)
 	if err != nil {
 		return err
 	}
 
-	log.Println("cacheid", ws.CachedID)
-
-	modules := make([]transpile.Compiled, 0, len(roots))
-
-	for _, root := range roots {
-		var (
-			path string
-		)
-
-		if path, err = filepath.Rel(ws.TransDir, root.Path); err != nil {
-			return err
-		}
-
-		path = workspaces.TrimRoot(path, filepath.Base(ws.GenModDir))
-		path = workspaces.ReplaceExt(path, ".wasm")
-		path = filepath.Join(ws.Root, ws.BuildDir, path)
-
-		if !root.Generated {
-			modules = append(modules, transpile.Compiled{Path: path, Generated: root.Generated})
-		}
-
-		if _, err = os.Stat(path); err == nil {
-			// nothing to do.
-			continue
-		}
-
-		if err = compile.Run(ctx.Context, ws.ModuleDir, root.Path, path); err != nil {
-			return err
-		}
+	modules, err := compile.FromTranspiled(ctx.Context, ws, roots...)
+	if err != nil {
+		return err
 	}
 
 	log.Println("modules", modules)
 	{
+		rootc := filepath.Join(ws.RunnerDir, "Containerfile")
+
+		if err = runners.PrepareRootContainer(rootc); err != nil {
+			return err
+		}
+
 		cmd := exec.CommandContext(ctx.Context, "podman", "build", "--timestamp", "0", "-t", "eg", "-f", rootc, t.Dir)
 		cmd.Stderr = os.Stderr
 		cmd.Stdin = os.Stdin
@@ -317,32 +265,11 @@ func (t upload) Run(ctx *cmdopts.Global) (err error) {
 
 	log.Println("cacheid", ws.CachedID)
 
-	modules := make([]transpile.Compiled, 0, len(roots))
-
-	for _, root := range roots {
-		var (
-			path string
-		)
-
-		if path, err = filepath.Rel(ws.TransDir, root.Path); err != nil {
-			return err
-		}
-
-		path = workspaces.TrimRoot(path, filepath.Base(ws.GenModDir))
-		path = workspaces.ReplaceExt(path, ".wasm")
-		path = filepath.Join(ws.Root, ws.BuildDir, path)
-
-		modules = append(modules, transpile.Compiled{Path: path, Generated: root.Generated})
-
-		if _, err = os.Stat(path); err == nil {
-			// nothing to do.
-			continue
-		}
-
-		if err = compile.Run(ctx.Context, ws.ModuleDir, root.Path, path); err != nil {
-			return err
-		}
+	modules, err := compile.FromTranspiled(ctx.Context, ws, roots...)
+	if err != nil {
+		return err
 	}
+	log.Println("modules", modules)
 
 	entry, found := slicesx.Find(func(c transpile.Compiled) bool {
 		return !c.Generated
@@ -357,7 +284,7 @@ func (t upload) Run(ctx *cmdopts.Global) (err error) {
 	}
 
 	defer func() {
-		os.RemoveAll(tmpdir)
+		errorsx.MaybeLog(errorsx.Wrap(os.RemoveAll(tmpdir), "unable to remove temp directory"))
 	}()
 
 	if environio, err = os.Create(filepath.Join(tmpdir, "environ.env")); err != nil {
@@ -395,6 +322,8 @@ func (t upload) Run(ctx *cmdopts.Global) (err error) {
 	if err = iox.Rewind(archiveio); err != nil {
 		return errorsx.Wrap(err, "unable to rewind kernel archive")
 	}
+
+	log.Println("archive", archiveio.Name())
 
 	// TODO: determine the destination based on the requirements
 	// i.e. cores, memory, labels, disk, videomem, etc.

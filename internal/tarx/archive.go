@@ -4,6 +4,7 @@ import (
 	"archive/tar"
 	"compress/gzip"
 	"io"
+	"log"
 	"os"
 	"path/filepath"
 
@@ -58,6 +59,9 @@ func Unpack(root string, r io.Reader) (err error) {
 		tr  *tar.Reader
 	)
 
+	if err = os.MkdirAll(root, 0700); err != nil {
+		return errors.Wrap(err, "unable to ensure root directory")
+	}
 	if gzr, err = gzip.NewReader(r); err != nil {
 		return errors.Wrap(err, "failed to create gzip reader")
 	}
@@ -112,6 +116,50 @@ func Unpack(root string, r io.Reader) (err error) {
 			if err := writefile(); err != nil {
 				return err
 			}
+		}
+	}
+}
+
+// prints to stderr information about the archive
+func Inspect(r io.Reader) (err error) {
+	var (
+		gzr *gzip.Reader
+		tr  *tar.Reader
+	)
+
+	if s, ok := r.(io.Seeker); ok {
+		if err = iox.Rewind(s); err != nil {
+			return errors.Wrap(err, "unable to seek to start of file")
+		}
+	}
+
+	if gzr, err = gzip.NewReader(r); err != nil {
+		return errors.Wrap(err, "failed to create gzip reader")
+	}
+	defer gzr.Close()
+
+	tr = tar.NewReader(gzr)
+
+	for {
+		header, err := tr.Next()
+		switch {
+		// if no more files are found return
+		case err == io.EOF:
+			return nil
+		// return any other error
+		case err != nil:
+			return err
+		// if the header is nil, just skip it (not sure how this happens)
+		case header == nil:
+			continue
+		}
+
+		switch header.Typeflag {
+		// if its a dir ignore
+		case tar.TypeDir:
+		// if it's a file create it
+		case tar.TypeReg:
+			log.Println(header.Name, header.Size, header.FileInfo().Size())
 		}
 	}
 }

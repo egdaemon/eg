@@ -8,6 +8,7 @@ import (
 	"github.com/james-lawrence/eg/cmd/cmdopts"
 	"github.com/james-lawrence/eg/cmd/eg/daemons"
 	"github.com/james-lawrence/eg/internal/sshx"
+	"github.com/james-lawrence/eg/runners"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -72,6 +73,5 @@ func (t daemon) Run(ctx *cmdopts.Global) (err error) {
 		return err
 	}
 
-	<-ctx.Context.Done()
-	return ctx.Context.Err()
+	return runners.Scheduler(ctx.Context)
 }

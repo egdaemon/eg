@@ -18,11 +18,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/james-lawrence/eg/internal/debugx"
-	"github.com/james-lawrence/eg/internal/envx"
-	"github.com/james-lawrence/eg/internal/errorsx"
-	"github.com/james-lawrence/eg/internal/iox"
-	"github.com/james-lawrence/eg/internal/stringsx"
+	"github.com/egdaemon/eg/internal/debugx"
+	"github.com/egdaemon/eg/internal/envx"
+	"github.com/egdaemon/eg/internal/errorsx"
+	"github.com/egdaemon/eg/internal/iox"
+	"github.com/egdaemon/eg/internal/stringsx"
 	"github.com/pkg/errors"
 	"golang.org/x/time/rate"
 )

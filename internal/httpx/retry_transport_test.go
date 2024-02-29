@@ -8,9 +8,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/james-lawrence/eg/internal/httptestx"
+	"github.com/egdaemon/eg/internal/httptestx"
 
-	. "github.com/james-lawrence/eg/internal/httpx"
+	. "github.com/egdaemon/eg/internal/httpx"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"

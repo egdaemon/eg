@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/james-lawrence/eg/internal/stringsx"
+	"github.com/egdaemon/eg/internal/stringsx"
 	"github.com/logrusorgru/aurora"
 	"github.com/mattn/go-isatty"
 	"github.com/pkg/errors"

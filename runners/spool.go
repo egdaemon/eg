@@ -6,8 +6,8 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/egdaemon/eg/internal/envx"
 	"github.com/gofrs/uuid"
-	"github.com/james-lawrence/eg/internal/envx"
 )
 
 type SpoolDirs struct {

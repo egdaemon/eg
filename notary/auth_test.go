@@ -4,8 +4,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/james-lawrence/eg/internal/sshx"
-	"github.com/james-lawrence/eg/internal/testingx"
+	"github.com/egdaemon/eg/internal/sshx"
+	"github.com/egdaemon/eg/internal/testingx"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )

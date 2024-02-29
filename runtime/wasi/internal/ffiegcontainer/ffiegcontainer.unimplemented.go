@@ -5,7 +5,7 @@ package ffiegcontainer
 import (
 	"unsafe"
 
-	"github.com/james-lawrence/eg/interp/runtime/wasi/ffierrors"
+	"github.com/egdaemon/eg/interp/runtime/wasi/ffierrors"
 )
 
 func pull(

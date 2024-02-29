@@ -4,7 +4,7 @@ package ffiexec
 
 import "unsafe"
 
-//go:wasmimport env github.com/james-lawrence/eg/runtime/wasi/runtime/ffiexec.Command
+//go:wasmimport env github.com/egdaemon/eg/runtime/wasi/runtime/ffiexec.Command
 func command(
 	deadline int64, // context.Context
 	dirptr unsafe.Pointer, dirlen uint32, // string

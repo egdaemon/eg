@@ -1,7 +1,7 @@
 package ffigraph
 
 import (
-	"github.com/james-lawrence/eg/interp/runtime/wasi/ffiguest"
+	"github.com/egdaemon/eg/interp/runtime/wasi/ffiguest"
 )
 
 func Analysing() bool {

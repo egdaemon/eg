@@ -7,9 +7,9 @@ import (
 	"os/exec"
 	"time"
 
-	"github.com/james-lawrence/eg/internal/envx"
-	"github.com/james-lawrence/eg/internal/errorsx"
-	"github.com/james-lawrence/eg/runtime/wasi/langx"
+	"github.com/egdaemon/eg/internal/envx"
+	"github.com/egdaemon/eg/internal/errorsx"
+	"github.com/egdaemon/eg/runtime/wasi/langx"
 )
 
 func mayberun(c *exec.Cmd) error {

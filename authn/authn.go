@@ -6,9 +6,9 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/james-lawrence/eg"
-	"github.com/james-lawrence/eg/internal/envx"
-	"github.com/james-lawrence/eg/internal/userx"
+	"github.com/egdaemon/eg"
+	"github.com/egdaemon/eg/internal/envx"
+	"github.com/egdaemon/eg/internal/userx"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/oauth2"
 )

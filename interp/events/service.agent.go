@@ -9,8 +9,8 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/egdaemon/eg/internal/md5x"
 	"github.com/gofrs/uuid"
-	"github.com/james-lawrence/eg/internal/md5x"
 	"github.com/pkg/errors"
 	"google.golang.org/grpc"
 )

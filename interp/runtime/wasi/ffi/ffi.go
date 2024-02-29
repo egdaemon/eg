@@ -8,7 +8,7 @@ import (
 	"io/fs"
 	"time"
 
-	"github.com/james-lawrence/eg/internal/errorsx"
+	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/tetratelabs/wazero/api"
 )
 

@@ -12,15 +12,15 @@ import (
 	"sync"
 	"syscall"
 
-	"github.com/james-lawrence/eg/internal/envx"
-	"github.com/james-lawrence/eg/internal/md5x"
-	"github.com/james-lawrence/eg/internal/osx"
-	"github.com/james-lawrence/eg/interp/c8s"
-	"github.com/james-lawrence/eg/interp/runtime/wasi/ffiegcontainer"
-	"github.com/james-lawrence/eg/interp/runtime/wasi/ffiexec"
-	"github.com/james-lawrence/eg/interp/runtime/wasi/ffigit"
-	"github.com/james-lawrence/eg/interp/runtime/wasi/ffigraph"
-	"github.com/james-lawrence/eg/runners"
+	"github.com/egdaemon/eg/internal/envx"
+	"github.com/egdaemon/eg/internal/md5x"
+	"github.com/egdaemon/eg/internal/osx"
+	"github.com/egdaemon/eg/interp/c8s"
+	"github.com/egdaemon/eg/interp/runtime/wasi/ffiegcontainer"
+	"github.com/egdaemon/eg/interp/runtime/wasi/ffiexec"
+	"github.com/egdaemon/eg/interp/runtime/wasi/ffigit"
+	"github.com/egdaemon/eg/interp/runtime/wasi/ffigraph"
+	"github.com/egdaemon/eg/runners"
 	"github.com/pkg/errors"
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
@@ -64,9 +64,9 @@ func Remote(ctx context.Context, runid string, g ffigraph.Eventer, svc grpc.Clie
 	containers := c8s.NewProxyClient(svc)
 
 	runtimeenv := func(r runner, moduledir string, cmdenv []string, host wazero.HostModuleBuilder) wazero.HostModuleBuilder {
-		return host.NewFunctionBuilder().WithFunc(ffigraph.Analysing(false)).Export("github.com/james-lawrence/eg/runtime/wasi/runtime/graph.Analysing").
-			NewFunctionBuilder().WithFunc(g.Pusher()).Export("github.com/james-lawrence/eg/runtime/wasi/runtime/graph.Push").
-			NewFunctionBuilder().WithFunc(g.Popper()).Export("github.com/james-lawrence/eg/runtime/wasi/runtime/graph.Pop").
+		return host.NewFunctionBuilder().WithFunc(ffigraph.Analysing(false)).Export("github.com/egdaemon/eg/runtime/wasi/runtime/graph.Analysing").
+			NewFunctionBuilder().WithFunc(g.Pusher()).Export("github.com/egdaemon/eg/runtime/wasi/runtime/graph.Push").
+			NewFunctionBuilder().WithFunc(g.Popper()).Export("github.com/egdaemon/eg/runtime/wasi/runtime/graph.Pop").
 			NewFunctionBuilder().WithFunc(ffiegcontainer.Pull(func(ctx context.Context, name, wdir string, options ...string) (err error) {
 			_, err = containers.Pull(ctx, &c8s.PullRequest{
 				Name:    name,
@@ -77,7 +77,7 @@ func Remote(ctx context.Context, runid string, g ffigraph.Eventer, svc grpc.Clie
 				return err
 			}
 			return nil
-		})).Export("github.com/james-lawrence/eg/runtime/wasi/runtime/ffiegcontainer.Pull").
+		})).Export("github.com/egdaemon/eg/runtime/wasi/runtime/ffiegcontainer.Pull").
 			NewFunctionBuilder().WithFunc(ffiegcontainer.Build(func(ctx context.Context, name, wdir string, definition string, options ...string) (err error) {
 			_, err = containers.Build(ctx, &c8s.BuildRequest{
 				Name:       name,
@@ -89,7 +89,7 @@ func Remote(ctx context.Context, runid string, g ffigraph.Eventer, svc grpc.Clie
 				return err
 			}
 			return nil
-		})).Export("github.com/james-lawrence/eg/runtime/wasi/runtime/ffiegcontainer.Build").
+		})).Export("github.com/egdaemon/eg/runtime/wasi/runtime/ffiegcontainer.Build").
 			NewFunctionBuilder().WithFunc(ffiegcontainer.Module(func(ctx context.Context, name, modulepath string, options ...string) (err error) {
 			cname := fmt.Sprintf("%s.%s", name, md5x.DigestString(modulepath+runid))
 			options = append(
@@ -107,7 +107,7 @@ func Remote(ctx context.Context, runid string, g ffigraph.Eventer, svc grpc.Clie
 				return err
 			}
 			return nil
-		})).Export("github.com/james-lawrence/eg/runtime/wasi/runtime/ffiegcontainer.Module").
+		})).Export("github.com/egdaemon/eg/runtime/wasi/runtime/ffiegcontainer.Module").
 			NewFunctionBuilder().WithFunc(ffiegcontainer.Run(func(ctx context.Context, name, modulepath string, cmd []string, options ...string) (err error) {
 			cname := fmt.Sprintf("%s.%s", name, md5x.DigestString(modulepath+runid))
 			_, err = containers.Run(ctx, &c8s.RunRequest{
@@ -120,7 +120,7 @@ func Remote(ctx context.Context, runid string, g ffigraph.Eventer, svc grpc.Clie
 				return err
 			}
 			return nil
-		})).Export("github.com/james-lawrence/eg/runtime/wasi/runtime/ffiegcontainer.Run").
+		})).Export("github.com/egdaemon/eg/runtime/wasi/runtime/ffiegcontainer.Run").
 			NewFunctionBuilder().WithFunc(ffiexec.Exec(func(cmd *exec.Cmd) *exec.Cmd {
 			cmd.Dir = filepath.Join(r.root, cmd.Dir)
 			cmd.Env = append(cmdenv, cmd.Env...)
@@ -128,10 +128,10 @@ func Remote(ctx context.Context, runid string, g ffigraph.Eventer, svc grpc.Clie
 			cmd.Stdout = os.Stdout
 			cmd.Stderr = os.Stderr
 			return cmd
-		})).Export("github.com/james-lawrence/eg/runtime/wasi/runtime/ffiexec.Command").
+		})).Export("github.com/egdaemon/eg/runtime/wasi/runtime/ffiexec.Command").
 			NewFunctionBuilder().WithFunc(
 			ffigit.Commitish(r.root),
-		).Export("github.com/james-lawrence/eg/runtime/wasi/runtime/ffigit.Commitish")
+		).Export("github.com/egdaemon/eg/runtime/wasi/runtime/ffigit.Commitish")
 	}
 
 	return r.perform(ctx, runid, module, runtimeenv)

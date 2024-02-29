@@ -5,7 +5,7 @@ import (
 	"log"
 	"os/exec"
 
-	"github.com/james-lawrence/eg/interp/runtime/wasi/ffi"
+	"github.com/egdaemon/eg/interp/runtime/wasi/ffi"
 	"github.com/pkg/errors"
 	"github.com/tetratelabs/wazero/api"
 )

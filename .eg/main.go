@@ -7,10 +7,10 @@ import (
 	"os"
 	"time"
 
-	"github.com/james-lawrence/eg/runtime/wasi/egenv"
-	"github.com/james-lawrence/eg/runtime/wasi/eggit"
-	"github.com/james-lawrence/eg/runtime/wasi/shell"
-	"github.com/james-lawrence/eg/runtime/wasi/yak"
+	"github.com/egdaemon/eg/runtime/wasi/egenv"
+	"github.com/egdaemon/eg/runtime/wasi/eggit"
+	"github.com/egdaemon/eg/runtime/wasi/shell"
+	"github.com/egdaemon/eg/runtime/wasi/yak"
 )
 
 func PrepareDebian(ctx context.Context, _ yak.Op) error {

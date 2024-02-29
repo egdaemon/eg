@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/james-lawrence/eg/interp/runtime/wasi/ffiguest"
+	"github.com/egdaemon/eg/interp/runtime/wasi/ffiguest"
 )
 
 func Command(ctx context.Context, dir string, environ []string, cmd string, args []string) error {

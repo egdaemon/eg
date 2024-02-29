@@ -4,7 +4,7 @@ import (
 	"context"
 	"log"
 
-	"github.com/james-lawrence/eg/interp/runtime/wasi/ffi"
+	"github.com/egdaemon/eg/interp/runtime/wasi/ffi"
 	"github.com/tetratelabs/wazero/api"
 )
 

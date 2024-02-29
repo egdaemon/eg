@@ -7,9 +7,9 @@ import (
 	"net"
 	"time"
 
-	"github.com/james-lawrence/eg/cmd/cmdopts"
-	"github.com/james-lawrence/eg/internal/errorsx"
-	"github.com/james-lawrence/eg/internal/iox"
+	"github.com/egdaemon/eg/cmd/cmdopts"
+	"github.com/egdaemon/eg/internal/errorsx"
+	"github.com/egdaemon/eg/internal/iox"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/time/rate"
 )

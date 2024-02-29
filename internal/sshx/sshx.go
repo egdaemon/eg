@@ -11,7 +11,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/james-lawrence/eg/internal/cryptox"
+	"github.com/egdaemon/eg/internal/cryptox"
 	"golang.org/x/crypto/ssh"
 )
 

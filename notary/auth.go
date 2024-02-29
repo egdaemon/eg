@@ -6,10 +6,10 @@ import (
 	"io"
 	"os"
 
+	"github.com/egdaemon/eg/internal/errorsx"
+	"github.com/egdaemon/eg/internal/sshx"
+	"github.com/egdaemon/eg/internal/userx"
 	"github.com/golang-jwt/jwt/v4"
-	"github.com/james-lawrence/eg/internal/errorsx"
-	"github.com/james-lawrence/eg/internal/sshx"
-	"github.com/james-lawrence/eg/internal/userx"
 	"golang.org/x/crypto/ssh"
 )
 

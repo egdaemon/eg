@@ -3,7 +3,7 @@ package cfgmatrices
 import (
 	"context"
 
-	"github.com/james-lawrence/eg/runtime/wasi/yak"
+	"github.com/egdaemon/eg/runtime/wasi/yak"
 )
 
 type Builder[T any] interface {

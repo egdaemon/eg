@@ -4,7 +4,7 @@ import (
 	"go/format"
 	"io"
 
-	"github.com/james-lawrence/eg/internal/iox"
+	"github.com/egdaemon/eg/internal/iox"
 	"github.com/pkg/errors"
 	"golang.org/x/tools/imports"
 )

@@ -10,10 +10,10 @@ import (
 	sync "sync"
 	"time"
 
+	"github.com/egdaemon/eg/internal/errorsx"
+	"github.com/egdaemon/eg/internal/iox"
+	"github.com/egdaemon/eg/internal/protobuflog"
 	"github.com/gofrs/uuid"
-	"github.com/james-lawrence/eg/internal/errorsx"
-	"github.com/james-lawrence/eg/internal/iox"
-	"github.com/james-lawrence/eg/internal/protobuflog"
 )
 
 const (

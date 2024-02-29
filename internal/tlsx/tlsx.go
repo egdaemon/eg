@@ -17,7 +17,7 @@ import (
 
 	"github.com/pkg/errors"
 
-	"github.com/james-lawrence/eg/internal/errorsx"
+	"github.com/egdaemon/eg/internal/errorsx"
 )
 
 // X509Option ...

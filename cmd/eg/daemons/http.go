@@ -7,13 +7,13 @@ import (
 	"net/http"
 	"path/filepath"
 
+	"github.com/egdaemon/eg/cmd/cmdopts"
+	"github.com/egdaemon/eg/internal/envx"
+	"github.com/egdaemon/eg/internal/errorsx"
+	"github.com/egdaemon/eg/internal/httpx"
+	"github.com/egdaemon/eg/runners"
 	"github.com/gofrs/uuid"
 	"github.com/gorilla/mux"
-	"github.com/james-lawrence/eg/cmd/cmdopts"
-	"github.com/james-lawrence/eg/internal/envx"
-	"github.com/james-lawrence/eg/internal/errorsx"
-	"github.com/james-lawrence/eg/internal/httpx"
-	"github.com/james-lawrence/eg/runners"
 	"github.com/justinas/alice"
 	"github.com/pkg/errors"
 )

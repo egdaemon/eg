@@ -3,7 +3,7 @@ package profilex
 import (
 	"context"
 
-	"github.com/james-lawrence/eg/internal/contextx"
+	"github.com/egdaemon/eg/internal/contextx"
 )
 
 type Stoppable interface {

@@ -8,9 +8,9 @@ import (
 	"sync"
 	"unsafe"
 
-	"github.com/james-lawrence/eg/internal/errorsx"
-	"github.com/james-lawrence/eg/runtime/wasi/internal/ffiegcontainer"
-	"github.com/james-lawrence/eg/runtime/wasi/internal/ffigraph"
+	"github.com/egdaemon/eg/internal/errorsx"
+	"github.com/egdaemon/eg/runtime/wasi/internal/ffiegcontainer"
+	"github.com/egdaemon/eg/runtime/wasi/internal/ffigraph"
 )
 
 // A reference to an operation.

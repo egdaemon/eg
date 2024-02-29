@@ -4,14 +4,14 @@ package ffiegcontainer
 
 import "unsafe"
 
-//go:wasmimport env github.com/james-lawrence/eg/runtime/wasi/runtime/ffiegcontainer.Pull
+//go:wasmimport env github.com/egdaemon/eg/runtime/wasi/runtime/ffiegcontainer.Pull
 func pull(
 	deadline int64, // context.Context
 	nameptr unsafe.Pointer, namelen uint32, // string
 	argsptr unsafe.Pointer, argssize, argslen uint32, // []string
 ) uint32
 
-//go:wasmimport env github.com/james-lawrence/eg/runtime/wasi/runtime/ffiegcontainer.Build
+//go:wasmimport env github.com/egdaemon/eg/runtime/wasi/runtime/ffiegcontainer.Build
 func build(
 	deadline int64, // context.Context
 	nameptr unsafe.Pointer, namelen uint32, // string
@@ -19,7 +19,7 @@ func build(
 	argsptr unsafe.Pointer, argssize, argslen uint32, // []string
 ) uint32
 
-//go:wasmimport env github.com/james-lawrence/eg/runtime/wasi/runtime/ffiegcontainer.Run
+//go:wasmimport env github.com/egdaemon/eg/runtime/wasi/runtime/ffiegcontainer.Run
 func run(
 	deadline int64, // context.Context
 	nameptr unsafe.Pointer, namelen uint32, // string
@@ -28,7 +28,7 @@ func run(
 	argsptr unsafe.Pointer, argssize, argslen uint32, // []string
 ) uint32
 
-//go:wasmimport env github.com/james-lawrence/eg/runtime/wasi/runtime/ffiegcontainer.Module
+//go:wasmimport env github.com/egdaemon/eg/runtime/wasi/runtime/ffiegcontainer.Module
 func module(
 	deadline int64, // context.Context
 	nameptr unsafe.Pointer, namelen uint32, // string

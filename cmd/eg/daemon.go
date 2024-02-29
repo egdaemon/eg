@@ -5,10 +5,10 @@ import (
 	"log"
 	"net"
 
-	"github.com/james-lawrence/eg/cmd/cmdopts"
-	"github.com/james-lawrence/eg/cmd/eg/daemons"
-	"github.com/james-lawrence/eg/internal/sshx"
-	"github.com/james-lawrence/eg/runners"
+	"github.com/egdaemon/eg/cmd/cmdopts"
+	"github.com/egdaemon/eg/cmd/eg/daemons"
+	"github.com/egdaemon/eg/internal/sshx"
+	"github.com/egdaemon/eg/runners"
 	"golang.org/x/crypto/ssh"
 )
 

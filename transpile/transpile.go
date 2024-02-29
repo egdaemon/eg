@@ -17,10 +17,10 @@ import (
 	"strings"
 
 	"github.com/dave/jennifer/jen"
-	"github.com/james-lawrence/eg/astbuild"
-	"github.com/james-lawrence/eg/astcodec"
-	"github.com/james-lawrence/eg/internal/errorsx"
-	"github.com/james-lawrence/eg/workspaces"
+	"github.com/egdaemon/eg/astbuild"
+	"github.com/egdaemon/eg/astcodec"
+	"github.com/egdaemon/eg/internal/errorsx"
+	"github.com/egdaemon/eg/workspaces"
 
 	"golang.org/x/tools/go/packages"
 )
@@ -82,7 +82,7 @@ func (t golang) Run(ctx context.Context) (roots []Compiled, err error) {
 			yakident = "yak"
 		)
 
-		if imp := astcodec.FindImport(c, astcodec.FindImportsByPath("github.com/james-lawrence/eg/runtime/wasi/yak")); imp != nil && imp.Name != nil {
+		if imp := astcodec.FindImport(c, astcodec.FindImportsByPath("github.com/egdaemon/eg/runtime/wasi/yak")); imp != nil && imp.Name != nil {
 			yakident = imp.Name.String()
 		}
 

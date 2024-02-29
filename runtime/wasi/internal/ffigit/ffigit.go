@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/james-lawrence/eg/interp/runtime/wasi/ffiguest"
+	"github.com/egdaemon/eg/interp/runtime/wasi/ffiguest"
 )
 
 func Commitish(ctx context.Context, treeish string) string {

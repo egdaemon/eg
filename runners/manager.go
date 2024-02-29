@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"github.com/james-lawrence/eg/workspaces"
+	"github.com/egdaemon/eg/workspaces"
 	"google.golang.org/grpc"
 )
 

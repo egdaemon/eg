@@ -6,12 +6,12 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/egdaemon/eg/authn"
+	"github.com/egdaemon/eg/cmd/cmdopts"
+	"github.com/egdaemon/eg/internal/httpx"
+	"github.com/egdaemon/eg/internal/sshx"
+	"github.com/egdaemon/eg/registration"
 	"github.com/gofrs/uuid"
-	"github.com/james-lawrence/eg/authn"
-	"github.com/james-lawrence/eg/cmd/cmdopts"
-	"github.com/james-lawrence/eg/internal/httpx"
-	"github.com/james-lawrence/eg/internal/sshx"
-	"github.com/james-lawrence/eg/registration"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/oauth2"
 )

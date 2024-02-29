@@ -7,12 +7,12 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/james-lawrence/eg"
-	"github.com/james-lawrence/eg/authn"
-	"github.com/james-lawrence/eg/internal/envx"
-	"github.com/james-lawrence/eg/internal/errorsx"
-	"github.com/james-lawrence/eg/internal/httpx"
-	"github.com/james-lawrence/eg/internal/stringsx"
+	"github.com/egdaemon/eg"
+	"github.com/egdaemon/eg/authn"
+	"github.com/egdaemon/eg/internal/envx"
+	"github.com/egdaemon/eg/internal/errorsx"
+	"github.com/egdaemon/eg/internal/httpx"
+	"github.com/egdaemon/eg/internal/stringsx"
 )
 
 func signup(ctx context.Context, chttp *http.Client, authed *authn.Authed) (err error) {

@@ -11,7 +11,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/james-lawrence/eg/internal/systemx"
+	"github.com/egdaemon/eg/internal/systemx"
 	"github.com/pkg/errors"
 )
 

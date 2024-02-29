@@ -1,7 +1,7 @@
 package env
 
 import (
-	"github.com/james-lawrence/eg/internal/envx"
+	"github.com/egdaemon/eg/internal/envx"
 )
 
 func Boolean(fallback bool, keys ...string) bool {

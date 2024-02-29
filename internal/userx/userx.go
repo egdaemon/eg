@@ -6,7 +6,7 @@ import (
 	"os/user"
 	"path/filepath"
 
-	"github.com/james-lawrence/eg/internal/envx"
+	"github.com/egdaemon/eg/internal/envx"
 )
 
 const (

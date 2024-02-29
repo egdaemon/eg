@@ -5,9 +5,9 @@ import (
 	"log"
 	"time"
 
-	"github.com/james-lawrence/eg/runtime/wasi/env"
-	"github.com/james-lawrence/eg/runtime/wasi/shell"
-	"github.com/james-lawrence/eg/runtime/wasi/yak"
+	"github.com/egdaemon/eg/runtime/wasi/env"
+	"github.com/egdaemon/eg/runtime/wasi/shell"
+	"github.com/egdaemon/eg/runtime/wasi/yak"
 )
 
 func Op1(ctx context.Context, op yak.Op) error {

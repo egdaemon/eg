@@ -4,8 +4,8 @@ import (
 	"go/ast"
 	"go/types"
 
-	"github.com/james-lawrence/eg/astbuild"
-	"github.com/james-lawrence/eg/astcodec"
+	"github.com/egdaemon/eg/astbuild"
+	"github.com/egdaemon/eg/astcodec"
 )
 
 func replaceRef(yakident string, refexpr *ast.SelectorExpr) ast.Visitor {

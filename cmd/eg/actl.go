@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/james-lawrence/eg/cmd/eg/actl"
+	"github.com/egdaemon/eg/cmd/eg/actl"
 )
 
 type actlcmd struct {

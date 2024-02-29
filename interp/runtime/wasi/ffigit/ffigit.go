@@ -4,9 +4,9 @@ import (
 	"context"
 	"log"
 
+	"github.com/egdaemon/eg/interp/runtime/wasi/ffi"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
-	"github.com/james-lawrence/eg/interp/runtime/wasi/ffi"
 	"github.com/tetratelabs/wazero/api"
 )
 

@@ -10,9 +10,9 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/dominikbraun/graph"
-	"github.com/james-lawrence/eg/internal/graphx"
-	"github.com/james-lawrence/eg/internal/stringsx"
-	"github.com/james-lawrence/eg/interp/events"
+	"github.com/egdaemon/eg/internal/graphx"
+	"github.com/egdaemon/eg/internal/stringsx"
+	"github.com/egdaemon/eg/interp/events"
 )
 
 type Node struct {

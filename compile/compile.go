@@ -8,8 +8,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/james-lawrence/eg/transpile"
-	"github.com/james-lawrence/eg/workspaces"
+	"github.com/egdaemon/eg/transpile"
+	"github.com/egdaemon/eg/workspaces"
 )
 
 func FromTranspiled(ctx context.Context, ws workspaces.Context, m ...transpile.Compiled) (modules []transpile.Compiled, err error) {

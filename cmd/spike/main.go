@@ -5,7 +5,7 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/james-lawrence/eg/internal/bytesx"
+	"github.com/egdaemon/eg/internal/bytesx"
 	"github.com/pbnjay/memory"
 )
 

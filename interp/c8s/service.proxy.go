@@ -7,9 +7,9 @@ import (
 	"os"
 	"os/exec"
 
-	"github.com/james-lawrence/eg/internal/envx"
-	"github.com/james-lawrence/eg/runtime/wasi/langx"
-	"github.com/james-lawrence/eg/workspaces"
+	"github.com/egdaemon/eg/internal/envx"
+	"github.com/egdaemon/eg/runtime/wasi/langx"
+	"github.com/egdaemon/eg/workspaces"
 	grpc "google.golang.org/grpc"
 )
 

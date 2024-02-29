@@ -13,8 +13,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/james-lawrence/eg/internal/envx"
-	"github.com/james-lawrence/eg/internal/errorsx"
+	"github.com/egdaemon/eg/internal/envx"
+	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/pkg/errors"
 )
 

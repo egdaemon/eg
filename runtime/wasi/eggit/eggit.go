@@ -3,7 +3,7 @@ package eggit
 import (
 	"context"
 
-	"github.com/james-lawrence/eg/runtime/wasi/internal/ffigit"
+	"github.com/egdaemon/eg/runtime/wasi/internal/ffigit"
 )
 
 func Commitish(ctx context.Context, treeish string) string {

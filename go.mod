@@ -1,4 +1,4 @@
-module github.com/james-lawrence/eg
+module github.com/egdaemon/eg
 
 go 1.21
 

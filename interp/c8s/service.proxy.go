@@ -85,8 +85,8 @@ func (t *ProxyService) Build(ctx context.Context, req *BuildRequest) (_ *BuildRe
 
 // Pull implements ProxyServer.
 func (t *ProxyService) Pull(ctx context.Context, req *PullRequest) (resp *PullResponse, err error) {
-	// log.Println("PROXY CONTAINER PULL INITIATED")
-	// defer log.Println("PROXY CONTAINER PULL COMPLETED")
+	log.Println("PROXY CONTAINER PULL INITIATED")
+	defer log.Println("PROXY CONTAINER PULL COMPLETED")
 
 	var (
 		cmd *exec.Cmd

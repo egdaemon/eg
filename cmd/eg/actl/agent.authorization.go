@@ -2,7 +2,6 @@ package actl
 
 import (
 	"context"
-	"crypto/tls"
 	"net/http"
 	"time"
 
@@ -21,7 +20,7 @@ type AuthorizeAgent struct {
 	ID         string `name:"id" help:"grant authorization to compute" required:""`
 }
 
-func (t AuthorizeAgent) Run(gctx *cmdopts.Global) (err error) {
+func (t AuthorizeAgent) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 	var (
 		at     string
 		signer ssh.Signer
@@ -34,7 +33,7 @@ func (t AuthorizeAgent) Run(gctx *cmdopts.Global) (err error) {
 	otp := uuid.Must(uuid.NewV4())
 
 	ctransport := &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		TLSClientConfig: tlsc.Config(),
 	}
 	chttp := &http.Client{Transport: ctransport, Timeout: 10 * time.Second}
 	chttp = httpx.DebugClient(chttp)

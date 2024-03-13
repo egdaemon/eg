@@ -22,7 +22,7 @@ type daemon struct {
 
 // essentially we use ssh forwarding from the control plane to the local http server
 // allowing the control plane to interogate
-func (t daemon) Run(ctx *cmdopts.Global) (err error) {
+func (t daemon) Run(ctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 	var (
 		signer ssh.Signer
 		httpl  net.Listener
@@ -52,7 +52,7 @@ func (t daemon) Run(ctx *cmdopts.Global) (err error) {
 		},
 	}
 
-	if err = daemons.Register(ctx, t.AccountID, t.MachineID, signer); err != nil {
+	if err = daemons.Register(ctx, tlsc, t.AccountID, t.MachineID, signer); err != nil {
 		return err
 	}
 

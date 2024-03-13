@@ -18,7 +18,7 @@ type TLSConfig struct {
 }
 
 func (t TLSConfig) Config() *tls.Config {
-	return &tls.Config{
+	return (&tls.Config{
 		InsecureSkipVerify: t.Insecure,
-	}
+	}).Clone()
 }

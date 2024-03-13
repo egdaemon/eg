@@ -1,7 +1,6 @@
 package daemons
 
 import (
-	"crypto/tls"
 	"fmt"
 	"log"
 	"net/http"
@@ -20,13 +19,13 @@ import (
 	"golang.org/x/time/rate"
 )
 
-func Register(global *cmdopts.Global, aid, machineid string, s ssh.Signer) (err error) {
+func Register(global *cmdopts.Global, tlsc *cmdopts.TLSConfig, aid, machineid string, s ssh.Signer) (err error) {
 	fingerprint := ssh.FingerprintSHA256(s.PublicKey())
 	log.Println("registering daemon with control plane initiated", aid, machineid, fingerprint)
 	defer log.Println("registering daemon with control plane completed", aid, machineid, fingerprint)
 
 	ctransport := &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		TLSClientConfig: tlsc.Config(),
 	}
 
 	c := jwtx.NewHTTP(

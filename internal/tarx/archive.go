@@ -175,6 +175,11 @@ func write(basepath, path string, tw *tar.Writer, info os.FileInfo) (err error) 
 		return errors.Wrapf(err, "failed to compute path: %s", path)
 	}
 
+	// base and path are identical
+	if target == "." {
+		target = filepath.Base(path)
+	}
+
 	if src, err = os.Open(path); err != nil {
 		return errors.Wrap(err, "failed to open path")
 	}

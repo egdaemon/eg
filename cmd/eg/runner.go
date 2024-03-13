@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"log"
@@ -10,9 +11,11 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/davecgh/go-spew/spew"
+	"github.com/egdaemon/eg/authn"
 	"github.com/egdaemon/eg/cmd/cmdopts"
 	"github.com/egdaemon/eg/cmd/eg/daemons"
 	"github.com/egdaemon/eg/cmd/ux"
@@ -22,6 +25,7 @@ import (
 	"github.com/egdaemon/eg/internal/httpx"
 	"github.com/egdaemon/eg/internal/iox"
 	"github.com/egdaemon/eg/internal/slicesx"
+	"github.com/egdaemon/eg/internal/sshx"
 	"github.com/egdaemon/eg/internal/tarx"
 	"github.com/egdaemon/eg/interp"
 	"github.com/egdaemon/eg/interp/c8s"
@@ -33,6 +37,8 @@ import (
 	"github.com/egdaemon/eg/workspaces"
 	"github.com/gofrs/uuid"
 	"github.com/pkg/errors"
+	"golang.org/x/crypto/ssh"
+	"golang.org/x/oauth2"
 	"google.golang.org/grpc"
 )
 
@@ -234,6 +240,7 @@ func (t module) Run(ctx *cmdopts.Global) (err error) {
 }
 
 type upload struct {
+	SSHKeyPath  string   `name:"sshkeypath" help:"path to ssh key to use" default:"${vars_ssh_key_path}"`
 	Dir         string   `name:"directory" help:"root directory of the repository" default:"${vars_cwd}"`
 	ModuleDir   string   `name:"moduledir" help:"must be a subdirectory in the provided directory" default:".eg"`
 	Name        string   `arg:"" name:"module" help:"name of the module to run, i.e. the folder name within moduledir" default:""`
@@ -247,25 +254,31 @@ type upload struct {
 	Labels      []string `name:"labels" help:"custom labels required"`
 }
 
-func (t upload) Run(ctx *cmdopts.Global) (err error) {
+func (t upload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 	var (
+		at                   string
+		signer               ssh.Signer
 		ws                   workspaces.Context
 		tmpdir               string
 		archiveio, environio *os.File
 	)
 
-	if ws, err = workspaces.New(ctx.Context, t.Dir, t.ModuleDir, t.Name); err != nil {
+	if signer, err = sshx.AutoCached(sshx.NewKeyGen(), t.SSHKeyPath); err != nil {
 		return err
 	}
 
-	roots, err := transpile.Autodetect(transpile.New(ws)).Run(ctx.Context)
+	if ws, err = workspaces.New(gctx.Context, t.Dir, t.ModuleDir, t.Name); err != nil {
+		return err
+	}
+
+	roots, err := transpile.Autodetect(transpile.New(ws)).Run(gctx.Context)
 	if err != nil {
 		return err
 	}
 
 	log.Println("cacheid", ws.CachedID)
 
-	modules, err := compile.FromTranspiled(ctx.Context, ws, roots...)
+	modules, err := compile.FromTranspiled(gctx.Context, ws, roots...)
 	if err != nil {
 		return err
 	}
@@ -315,7 +328,7 @@ func (t upload) Run(ctx *cmdopts.Global) (err error) {
 	}
 	defer archiveio.Close()
 
-	if err = tarx.Pack(archiveio, filepath.Join(ws.Root, ws.BuildDir)); err != nil {
+	if err = tarx.Pack(archiveio, filepath.Join(ws.Root, ws.BuildDir), environio.Name()); err != nil {
 		return errorsx.Wrap(err, "unable to pack the kernel archive")
 	}
 
@@ -324,6 +337,9 @@ func (t upload) Run(ctx *cmdopts.Global) (err error) {
 	}
 
 	log.Println("archive", archiveio.Name())
+	// if err = tarx.Inspect(archiveio); err != nil {
+	// 	log.Println(errorsx.Wrap(err, "unable to inspect archive"))
+	// }
 
 	// TODO: determine the destination based on the requirements
 	// i.e. cores, memory, labels, disk, videomem, etc.
@@ -332,7 +348,7 @@ func (t upload) Run(ctx *cmdopts.Global) (err error) {
 	// push the archive to another node that matches the requirements.
 	// in theory we could use redirects to handle that but it'd still take a performance hit.
 	mimetype, buf, err := httpx.Multipart(func(w *multipart.Writer) error {
-		part, lerr := w.CreatePart(httpx.NewMultipartHeader("application/gzip", "kernel", "kernel.tar.gz"))
+		part, lerr := w.CreatePart(httpx.NewMultipartHeader("application/gzip", "archive", "kernel.tar.gz"))
 		if lerr != nil {
 			return errorsx.Wrap(lerr, "unable to create kernel part")
 		}
@@ -341,25 +357,24 @@ func (t upload) Run(ctx *cmdopts.Global) (err error) {
 			return errorsx.Wrap(lerr, "unable to copy kernel")
 		}
 
-		part, lerr = w.CreatePart(httpx.NewMultipartHeader("text/plain", "environ", "variables.env"))
-		if lerr != nil {
-			return errorsx.Wrap(lerr, "unable to create environ part")
-		}
-
-		if _, lerr = io.Copy(part, environio); lerr != nil {
-			return errorsx.Wrap(lerr, "unable to copy kernel")
-		}
-
 		if err = w.WriteField("entrypoint", filepath.Base(entry.Path)); err != nil {
-			return errorsx.Wrap(lerr, "unable to copy entry point")
+			return errorsx.Wrap(err, "unable to copy entry point")
 		}
 
 		if err = w.WriteField("cores", t.Cores); err != nil {
-			return errorsx.Wrap(lerr, "unable to set minimum cores")
+			return errorsx.Wrap(err, "unable to set minimum cores")
 		}
 
 		if err = w.WriteField("memory", t.Memory); err != nil {
-			return errorsx.Wrap(lerr, "unable to set minimum memory")
+			return errorsx.Wrap(err, "unable to set minimum memory")
+		}
+
+		if err = w.WriteField("arch", t.Arch); err != nil {
+			return errorsx.Wrap(err, "unable to isa architecture")
+		}
+
+		if err = w.WriteField("os", t.OS); err != nil {
+			return errorsx.Wrap(err, "unable to operating system")
 		}
 
 		return nil
@@ -368,14 +383,27 @@ func (t upload) Run(ctx *cmdopts.Global) (err error) {
 		return errorsx.Wrap(err, "unable to generate multipart upload")
 	}
 
-	req, err := http.NewRequestWithContext(ctx.Context, http.MethodPost, t.Endpoint, buf)
+	cfg := authn.OAuth2SSHConfig(signer, uuid.Must(uuid.NewV4()).String())
+
+	if at, err = authn.ReadSessionToken(); err != nil {
+		return err
+	}
+
+	ctransport := &http.Transport{
+		TLSClientConfig: tlsc.Config(),
+	}
+	chttp := &http.Client{Transport: ctransport, Timeout: 10 * time.Second}
+	// chttp = httpx.DebugClient(chttp)
+	chttp = cfg.Client(context.WithValue(gctx.Context, oauth2.HTTPClient, chttp), &oauth2.Token{AccessToken: at})
+
+	req, err := http.NewRequestWithContext(gctx.Context, http.MethodPost, t.Endpoint, buf)
 	if err != nil {
 		return errorsx.Wrap(err, "unable to create kernel upload request")
 	}
 
 	req.Header.Set("Content-Type", mimetype)
 
-	resp, err := httpx.AsError(http.DefaultClient.Do(req)) //nolint:golint,bodyclose
+	resp, err := httpx.AsError(chttp.Do(req)) //nolint:golint,bodyclose
 	defer httpx.TryClose(resp)
 
 	if err != nil {

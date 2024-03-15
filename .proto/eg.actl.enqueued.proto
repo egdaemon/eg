@@ -1,0 +1,47 @@
+syntax = "proto3";
+
+package eg.actl;
+
+message Enqueued {
+  string id = 1 [ json_name = "id" ];
+  int64 created_at = 5 [ json_name = "created_at" ];
+  int64 updated_at = 6 [ json_name = "updated_at" ];
+}
+
+message EnqueuedSearchRequest {
+  string query = 1 [ json_name = "query" ];
+  int64 offset = 2 [ json_name = "offset" ];
+  int32 limit = 3 [ json_name = "limit" ];
+  string arch = 4 [ json_name = "arch" ];
+  string os = 5 [ json_name = "os" ];
+  int64 cores = 6 [ json_name = "cores" ];
+  int64 memory = 7 [ json_name = "memory" ];
+  int64 vram = 8 [ json_name = "vram" ];
+  reserved 9 to 999;
+  repeated string labels = 1000 [ json_name = "labels" ];
+}
+
+message EnqueuedSearchResponse {
+  EnqueuedSearchRequest next = 1 [ json_name = "next" ];
+  repeated Enqueued items = 2 [ json_name = "items" ];
+}
+
+message EnqueuedCreateRequest {
+  Enqueued enqueued = 1 [ json_name = "enqueue" ];
+}
+message EnqueuedCreateResponse {
+  Enqueued enqueued = 1 [ json_name = "enqueue" ];
+}
+
+message EnqueuedUpdateRequest {
+  Enqueued enqueued = 1 [ json_name = "enqueue" ];
+}
+message EnqueuedUpdateResponse {
+  Enqueued enqueued = 1 [ json_name = "enqueue" ];
+}
+
+message EnqueuedDequeueResponse {
+  Enqueued enqueued = 1 [ json_name = "enqueued" ];
+}
+
+message EnqueuedDownloadRequest {}

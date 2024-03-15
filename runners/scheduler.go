@@ -7,6 +7,7 @@ import (
 	"io"
 	"io/fs"
 	"log"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -22,7 +23,6 @@ import (
 	"github.com/egdaemon/eg/workspaces"
 	"github.com/fsnotify/fsnotify"
 	"github.com/pkg/errors"
-	"golang.org/x/crypto/ssh"
 	"google.golang.org/grpc"
 )
 
@@ -31,12 +31,11 @@ type downloader interface {
 }
 
 type RemoteDownloader struct {
-	ssh.Signer
+	client *http.Client
 }
 
 func (t RemoteDownloader) Download(ctx context.Context) (err error) {
-	// dirs := DefaultSpoolDirs()
-	return NewDownloadClient(nil).Download(ctx)
+	return NewDownloadClient(t.client).Download(ctx)
 }
 
 type localdownloader struct{}
@@ -192,32 +191,14 @@ func (t stateidle) Update(ctx context.Context) state {
 	}
 
 	// check upstream....
-	if err = t.metadata.Download(ctx); err == nil {
-		return t
-	} else if errors.Is(err, context.DeadlineExceeded) {
+	if err = t.metadata.Download(ctx); errors.Is(err, context.DeadlineExceeded) {
 		return terminate(ctx.Err())
-	} else {
+	} else if err != nil {
 		log.Println(err)
 		return newdelay(time.Second, t)
 	}
 
-	// if pending, err = fsnotify.NewWatcher(); err != nil {
-	// 	log.Println(errors.Wrap(err, "failed to watch queued directory"))
-	// 	return newdelay(time.Second, t)
-	// }
-	// defer func() { errorsx.MaybeLog(errorsx.Wrap(pending.Close(), "failed to close fs watch")) }()
-
-	// if err = pending.Add(dirs.Queued); err != nil {
-	// 	log.Println(errors.Wrap(err, "failed to watch queued directory"))
-	// 	return newdelay(time.Second, t)
-	// }
-
-	// select {
-	// case <-pending.Events:
-	// 	return t
-	// case <-ctx.Done():
-	// 	return terminate(ctx.Err())
-	// }
+	return t
 }
 
 type staterecover struct {

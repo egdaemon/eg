@@ -326,11 +326,11 @@ func easyjson61363d27DecodeGithubComEgdaemonEgRunners3(in *jlexer.Lexer, out *En
 		case "os":
 			out.Os = string(in.String())
 		case "cores":
-			out.Cores = int64(in.Int64())
+			out.Cores = uint64(in.Uint64())
 		case "memory":
-			out.Memory = int64(in.Int64())
+			out.Memory = uint64(in.Uint64())
 		case "vram":
-			out.Vram = int64(in.Int64())
+			out.Vram = uint64(in.Uint64())
 		case "labels":
 			if in.IsNull() {
 				in.Skip()
@@ -422,7 +422,7 @@ func easyjson61363d27EncodeGithubComEgdaemonEgRunners3(out *jwriter.Writer, in E
 		} else {
 			out.RawString(prefix)
 		}
-		out.Int64(int64(in.Cores))
+		out.Uint64(uint64(in.Cores))
 	}
 	if in.Memory != 0 {
 		const prefix string = ",\"memory\":"
@@ -432,7 +432,7 @@ func easyjson61363d27EncodeGithubComEgdaemonEgRunners3(out *jwriter.Writer, in E
 		} else {
 			out.RawString(prefix)
 		}
-		out.Int64(int64(in.Memory))
+		out.Uint64(uint64(in.Memory))
 	}
 	if in.Vram != 0 {
 		const prefix string = ",\"vram\":"
@@ -442,7 +442,7 @@ func easyjson61363d27EncodeGithubComEgdaemonEgRunners3(out *jwriter.Writer, in E
 		} else {
 			out.RawString(prefix)
 		}
-		out.Int64(int64(in.Vram))
+		out.Uint64(uint64(in.Vram))
 	}
 	if len(in.Labels) != 0 {
 		const prefix string = ",\"labels\":"

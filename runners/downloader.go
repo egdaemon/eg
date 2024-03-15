@@ -6,11 +6,15 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"runtime"
 
 	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/httpx"
+	"github.com/gofrs/uuid"
+	"github.com/pbnjay/memory"
+	"github.com/pkg/errors"
 )
 
 func NewDownloadClient(c *http.Client) *DownloadClient {
@@ -28,27 +32,54 @@ type DownloadClient struct {
 func (t DownloadClient) Download(ctx context.Context) (err error) {
 	var (
 		encoded []byte
-		req     EnqueuedSearchRequest
-		resp    EnqueuedDequeueResponse
+		req     = EnqueuedSearchRequest{
+			Os:     runtime.GOOS,
+			Arch:   runtime.GOARCH,
+			Cores:  uint64(runtime.NumCPU()),
+			Memory: memory.TotalMemory(),
+		}
+		resp EnqueuedDequeueResponse
 	)
 
 	if encoded, err = json.Marshal(&req); err != nil {
 		return err
 	}
 
-	httpreq, err := http.NewRequestWithContext(ctx, http.MethodPost, fmt.Sprintf("%s/eg/registration/", t.host), bytes.NewReader(encoded))
+	httpreq, err := http.NewRequestWithContext(ctx, http.MethodPost, fmt.Sprintf("%s/c/manager/dequeue", t.host), bytes.NewReader(encoded))
 	if err != nil {
 		return err
 	}
 
-	httpresp, err := httpx.AsError(t.c.Do(httpreq))
-	defer func() { errorsx.MaybeLog(httpx.AutoClose(httpresp)) }()
+	dhttpresp, err := httpx.AsError(t.c.Do(httpreq))
+	defer func() { errorsx.MaybeLog(httpx.AutoClose(dhttpresp)) }()
 	if err != nil {
 		return err
 	}
 
-	if err = json.NewDecoder(httpresp.Body).Decode(&resp); err != nil {
+	if err = json.NewDecoder(dhttpresp.Body).Decode(&resp); err != nil {
 		return err
+	}
+
+	httpreq, err = http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/c/manager/download/%s", t.host, resp.Enqueued.Id), bytes.NewReader(encoded))
+	if err != nil {
+		return err
+	}
+
+	download, err := httpx.AsError(t.c.Do(httpreq))
+	defer func() { errorsx.MaybeLog(httpx.AutoClose(download)) }()
+	if err != nil {
+		return err
+	}
+
+	dirs := DefaultSpoolDirs()
+
+	uid := uuid.FromStringOrNil(resp.Enqueued.Id)
+	if err = dirs.Download(uid, "archive.tar.gz", download.Body); err != nil {
+		return errors.Wrap(err, "unable to receive kernel archive")
+	}
+
+	if err = dirs.Enqueue(uid); err != nil {
+		return errors.Wrap(err, "unable to enqueue kernel archive")
 	}
 
 	return nil

@@ -2,8 +2,6 @@ package actl
 
 import (
 	"context"
-	"net/http"
-	"time"
 
 	"github.com/egdaemon/eg/authn"
 	"github.com/egdaemon/eg/cmd/cmdopts"
@@ -32,10 +30,7 @@ func (t AuthorizeAgent) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err 
 
 	otp := uuid.Must(uuid.NewV4())
 
-	ctransport := &http.Transport{
-		TLSClientConfig: tlsc.Config(),
-	}
-	chttp := &http.Client{Transport: ctransport, Timeout: 10 * time.Second}
+	chttp := tlsc.DefaultClient()
 	chttp = httpx.DebugClient(chttp)
 
 	ctx := context.WithValue(gctx.Context, oauth2.HTTPClient, chttp)

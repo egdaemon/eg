@@ -3,12 +3,12 @@ package daemons
 import (
 	"fmt"
 	"log"
-	"net/http"
 	"runtime"
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/egdaemon/eg/cmd/cmdopts"
+	"github.com/egdaemon/eg/internal/httpx"
 	"github.com/egdaemon/eg/internal/jwtx"
 	"github.com/egdaemon/eg/internal/systemx"
 	"github.com/egdaemon/eg/notary"
@@ -24,12 +24,8 @@ func Register(global *cmdopts.Global, tlsc *cmdopts.TLSConfig, aid, machineid st
 	log.Println("registering daemon with control plane initiated", aid, machineid, fingerprint)
 	defer log.Println("registering daemon with control plane completed", aid, machineid, fingerprint)
 
-	ctransport := &http.Transport{
-		TLSClientConfig: tlsc.Config(),
-	}
-
 	c := jwtx.NewHTTP(
-		&http.Client{Transport: ctransport, Timeout: 10 * time.Second},
+		httpx.DebugClient(tlsc.DefaultClient()),
 		jwtx.SignerFn(func() (signed string, err error) {
 			signed, err = jwt.NewWithClaims(
 				notary.NewJWTSigner(),

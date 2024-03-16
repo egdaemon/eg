@@ -240,23 +240,23 @@ func (t module) Run(ctx *cmdopts.Global) (err error) {
 }
 
 type upload struct {
-	SSHKeyPath  string   `name:"sshkeypath" help:"path to ssh key to use" default:"${vars_ssh_key_path}"`
-	Dir         string   `name:"directory" help:"root directory of the repository" default:"${vars_cwd}"`
-	ModuleDir   string   `name:"moduledir" help:"must be a subdirectory in the provided directory" default:".eg"`
-	Name        string   `arg:"" name:"module" help:"name of the module to run, i.e. the folder name within moduledir" default:""`
-	Environment []string `name:"env" short:"e" help:"define environment variables and their values to be included"`
-	Dirty       bool     `name:"dirty" help:"include all environment variables"`
-	Endpoint    string   `name:"endpoint" help:"specify the endpoint to upload to" hidden:"true"`
-	OS          string   `name:"os" help:"operating system the job requires" hidden:"true" default:"linux"`
-	Arch        string   `name:"arch" help:"instruction set the job requires" hidden:"true" default:"${vars_arch}"`
-	Cores       string   `name:"cores" help:"minimum number of cores the required" default:"${vars_cores_minimum_default}"`
-	Memory      string   `name:"memory" help:"minimum amount of ram required" default:"${vars_memory_minimum_default}"`
-	Labels      []string `name:"labels" help:"custom labels required"`
+	SSHKeyPath  string        `name:"sshkeypath" help:"path to ssh key to use" default:"${vars_ssh_key_path}"`
+	Dir         string        `name:"directory" help:"root directory of the repository" default:"${vars_cwd}"`
+	ModuleDir   string        `name:"moduledir" help:"must be a subdirectory in the provided directory" default:".eg"`
+	Name        string        `arg:"" name:"module" help:"name of the module to run, i.e. the folder name within moduledir" default:""`
+	Environment []string      `name:"env" short:"e" help:"define environment variables and their values to be included"`
+	Dirty       bool          `name:"dirty" help:"include all environment variables"`
+	Endpoint    string        `name:"endpoint" help:"specify the endpoint to upload to" default:"${vars_endpoint}/c/manager/" hidden:"true"`
+	TTL         time.Duration `name:"ttl" help:"maximum runtime for the upload" default:"1h"`
+	OS          string        `name:"os" help:"operating system the job requires" hidden:"true" default:"linux"`
+	Arch        string        `name:"arch" help:"instruction set the job requires" hidden:"true" default:"${vars_arch}"`
+	Cores       string        `name:"cores" help:"minimum number of cores the required" default:"${vars_cores_minimum_default}"`
+	Memory      string        `name:"memory" help:"minimum amount of ram required" default:"${vars_memory_minimum_default}"`
+	Labels      []string      `name:"labels" help:"custom labels required"`
 }
 
 func (t upload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 	var (
-		at                   string
 		signer               ssh.Signer
 		ws                   workspaces.Context
 		tmpdir               string
@@ -348,17 +348,12 @@ func (t upload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 	// push the archive to another node that matches the requirements.
 	// in theory we could use redirects to handle that but it'd still take a performance hit.
 	mimetype, buf, err := httpx.Multipart(func(w *multipart.Writer) error {
-		part, lerr := w.CreatePart(httpx.NewMultipartHeader("application/gzip", "archive", "kernel.tar.gz"))
-		if lerr != nil {
-			return errorsx.Wrap(lerr, "unable to create kernel part")
-		}
-
-		if _, lerr = io.Copy(part, archiveio); lerr != nil {
-			return errorsx.Wrap(lerr, "unable to copy kernel")
-		}
-
 		if err = w.WriteField("entrypoint", filepath.Base(entry.Path)); err != nil {
 			return errorsx.Wrap(err, "unable to copy entry point")
+		}
+
+		if err = w.WriteField("ttl", t.TTL.String()); err != nil {
+			return errorsx.Wrap(err, "unable to set ttl")
 		}
 
 		if err = w.WriteField("cores", t.Cores); err != nil {
@@ -377,30 +372,33 @@ func (t upload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 			return errorsx.Wrap(err, "unable to operating system")
 		}
 
+		part, lerr := w.CreatePart(httpx.NewMultipartHeader("application/gzip", "archive", "kernel.tar.gz"))
+		if lerr != nil {
+			return errorsx.Wrap(lerr, "unable to create kernel part")
+		}
+
+		if _, lerr = io.Copy(part, archiveio); lerr != nil {
+			return errorsx.Wrap(lerr, "unable to copy kernel")
+		}
+
 		return nil
 	})
 	if err != nil {
 		return errorsx.Wrap(err, "unable to generate multipart upload")
 	}
 
-	cfg := authn.OAuth2SSHConfig(signer, uuid.Must(uuid.NewV4()).String())
-
-	if at, err = authn.ReadSessionToken(); err != nil {
+	chttp, err := authn.OAuth2SSHHTTPClient(
+		context.WithValue(gctx.Context, oauth2.HTTPClient, tlsc.DefaultClient()),
+		signer,
+	)
+	if err != nil {
 		return err
 	}
-
-	ctransport := &http.Transport{
-		TLSClientConfig: tlsc.Config(),
-	}
-	chttp := &http.Client{Transport: ctransport, Timeout: 10 * time.Second}
-	// chttp = httpx.DebugClient(chttp)
-	chttp = cfg.Client(context.WithValue(gctx.Context, oauth2.HTTPClient, chttp), &oauth2.Token{AccessToken: at})
 
 	req, err := http.NewRequestWithContext(gctx.Context, http.MethodPost, t.Endpoint, buf)
 	if err != nil {
 		return errorsx.Wrap(err, "unable to create kernel upload request")
 	}
-
 	req.Header.Set("Content-Type", mimetype)
 
 	resp, err := httpx.AsError(chttp.Do(req)) //nolint:golint,bodyclose

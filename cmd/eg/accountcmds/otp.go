@@ -2,15 +2,12 @@ package accountcmds
 
 import (
 	"context"
-	"crypto/rand"
-	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
 	"net/http"
 	"os"
-	"time"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/egdaemon/eg"
@@ -22,7 +19,6 @@ import (
 	"github.com/egdaemon/eg/internal/jwtx"
 	"github.com/egdaemon/eg/internal/sshx"
 	"github.com/egdaemon/eg/internal/stringsx"
-	"github.com/gofrs/uuid"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/oauth2"
 )
@@ -40,7 +36,6 @@ func (t OTP) Run(gctx *cmdopts.Global, tlscfg *cmdopts.TLSConfig) (err error) {
 
 	var (
 		signer  ssh.Signer
-		sig     *ssh.Signature
 		authed  authn.Authed
 		encoded string
 	)
@@ -49,20 +44,19 @@ func (t OTP) Run(gctx *cmdopts.Global, tlscfg *cmdopts.TLSConfig) (err error) {
 		return err
 	}
 
-	password := uuid.Must(uuid.NewV4())
 	rawstate := reqstate{
 		PublicKey: signer.PublicKey().Marshal(),
 	}
 	if encoded, err = jwtx.EncodeJSON(rawstate); err != nil {
 		return err
 	}
-	ctransport := &http.Transport{
-		TLSClientConfig: tlscfg.Config(),
-	}
-	chttp := httpx.DebugClient(&http.Client{Transport: ctransport, Timeout: 10 * time.Second})
 
+	chttp := tlscfg.DefaultClient()
 	ctx := context.WithValue(gctx.Context, oauth2.HTTPClient, chttp)
-	cfg := authn.OAuth2SSHConfig(signer, password.String())
+	cfg, token, err := authn.OAuth2SSHToken(gctx.Context, signer)
+	if err != nil {
+		return err
+	}
 
 	authzuri := cfg.AuthCodeURL(
 		encoded,
@@ -77,17 +71,6 @@ func (t OTP) Run(gctx *cmdopts.Global, tlscfg *cmdopts.TLSConfig) (err error) {
 		return err
 	}
 	defer httpx.AutoClose(resp)
-
-	if sig, err = signer.Sign(rand.Reader, password.Bytes()); err != nil {
-		return err
-	}
-
-	encodedsig := base64.RawURLEncoding.EncodeToString(ssh.Marshal(sig))
-
-	token, err := cfg.PasswordCredentialsToken(ctx, cfg.ClientID, encodedsig)
-	if err != nil {
-		return err
-	}
 
 	authzc := cfg.Client(ctx, token)
 

@@ -19,11 +19,12 @@ func NewHTTP(c *http.Client, s signer) *http.Client {
 	if d == nil {
 		d = http.DefaultTransport
 	}
-	d = HTTPTransport{
+
+	c.Transport = HTTPTransport{
 		s: s,
 		d: d,
 	}
-	c.Transport = d
+
 	return c
 }
 

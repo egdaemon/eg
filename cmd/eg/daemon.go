@@ -1,15 +1,19 @@
 package main
 
 import (
+	"context"
 	"encoding/hex"
 	"log"
 	"net"
+	"net/http"
 
+	"github.com/egdaemon/eg/authn"
 	"github.com/egdaemon/eg/cmd/cmdopts"
 	"github.com/egdaemon/eg/cmd/eg/daemons"
 	"github.com/egdaemon/eg/internal/sshx"
 	"github.com/egdaemon/eg/runners"
 	"golang.org/x/crypto/ssh"
+	"golang.org/x/oauth2"
 )
 
 type daemon struct {
@@ -22,11 +26,12 @@ type daemon struct {
 
 // essentially we use ssh forwarding from the control plane to the local http server
 // allowing the control plane to interogate
-func (t daemon) Run(ctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
+func (t daemon) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 	var (
-		signer ssh.Signer
-		httpl  net.Listener
-		grpcl  net.Listener
+		signer     ssh.Signer
+		httpl      net.Listener
+		grpcl      net.Listener
+		authclient *http.Client
 	)
 
 	if httpl, err = net.Listen("tcp", "127.0.1.1:8093"); err != nil {
@@ -34,6 +39,11 @@ func (t daemon) Run(ctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 	}
 
 	if signer, err = sshx.AutoCached(sshx.NewKeyGenSeeded(t.Seed), t.SSHKeyPath); err != nil {
+		return err
+	}
+
+	ctx := context.WithValue(gctx.Context, oauth2.HTTPClient, tlsc.DefaultClient())
+	if authclient, err = authn.OAuth2SSHHTTPClient(ctx, signer); err != nil {
 		return err
 	}
 
@@ -52,11 +62,11 @@ func (t daemon) Run(ctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 		},
 	}
 
-	if err = daemons.Register(ctx, tlsc, t.AccountID, t.MachineID, signer); err != nil {
+	if err = daemons.Register(gctx, tlsc, t.AccountID, t.MachineID, signer); err != nil {
 		return err
 	}
 
-	if err = daemons.HTTP(ctx, httpl); err != nil {
+	if err = daemons.HTTP(gctx, httpl); err != nil {
 		return err
 	}
 	defer httpl.Close()
@@ -65,13 +75,15 @@ func (t daemon) Run(ctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 		return err
 	}
 
-	if err = daemons.Agent(ctx, grpcl); err != nil {
+	if err = daemons.Agent(gctx, grpcl); err != nil {
 		return err
 	}
 
-	if err = daemons.SSHProxy(ctx, config, signer, httpl); err != nil {
+	if err = daemons.SSHProxy(gctx, config, signer, httpl); err != nil {
 		return err
 	}
 
-	return runners.Scheduler(ctx.Context)
+	go runners.AutoDownload(gctx.Context, authclient)
+
+	return runners.Queue(gctx.Context)
 }

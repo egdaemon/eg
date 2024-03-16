@@ -4,6 +4,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"os"
 
 	"github.com/egdaemon/eg/internal/bytesx"
 	"github.com/pbnjay/memory"
@@ -11,6 +12,8 @@ import (
 
 func main() {
 	log.Println("DERP", memory.TotalMemory()/bytesx.GiB)
+	info, _ := os.Stat(".")
+	log.Println("DERP DERP", info.Size())
 	// log.SetFlags(log.Flags() | log.Lshortfile)
 
 	// var (

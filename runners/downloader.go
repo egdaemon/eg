@@ -17,6 +17,7 @@ import (
 	"github.com/pkg/errors"
 )
 
+// Downloads work from control plane.
 func NewDownloadClient(c *http.Client) *DownloadClient {
 	return &DownloadClient{
 		c:    c,

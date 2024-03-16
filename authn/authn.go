@@ -1,6 +1,9 @@
 package authn
 
 import (
+	"context"
+	"crypto/rand"
+	"encoding/base64"
 	"fmt"
 	"net/http"
 	"os"
@@ -9,6 +12,7 @@ import (
 	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/userx"
+	"github.com/gofrs/uuid"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/oauth2"
 )
@@ -23,6 +27,31 @@ func OAuth2SSHConfig(signer ssh.Signer, otp string) oauth2.Config {
 			AuthStyle: oauth2.AuthStyleInHeader,
 		},
 	}
+}
+
+func OAuth2SSHToken(ctx context.Context, signer ssh.Signer) (cfg oauth2.Config, tok *oauth2.Token, err error) {
+	var (
+		sig *ssh.Signature
+	)
+
+	password := uuid.Must(uuid.NewV4())
+
+	cfg = OAuth2SSHConfig(signer, password.String())
+	if sig, err = signer.Sign(rand.Reader, password.Bytes()); err != nil {
+		return cfg, nil, err
+	}
+
+	encodedsig := base64.RawURLEncoding.EncodeToString(ssh.Marshal(sig))
+	tok, err = cfg.PasswordCredentialsToken(ctx, cfg.ClientID, encodedsig)
+	return cfg, tok, err
+}
+
+func OAuth2SSHHTTPClient(ctx context.Context, signer ssh.Signer) (_ *http.Client, err error) {
+	cfg, token, err := OAuth2SSHToken(ctx, signer)
+	if err != nil {
+		return nil, err
+	}
+	return cfg.Client(ctx, token), nil
 }
 
 func WriteSessionToken(token string) (err error) {

@@ -3,7 +3,9 @@ package cmdopts
 import (
 	"context"
 	"crypto/tls"
+	"net/http"
 	"sync"
+	"time"
 )
 
 type Global struct {
@@ -21,4 +23,11 @@ func (t TLSConfig) Config() *tls.Config {
 	return (&tls.Config{
 		InsecureSkipVerify: t.Insecure,
 	}).Clone()
+}
+
+func (t TLSConfig) DefaultClient() *http.Client {
+	ctransport := &http.Transport{
+		TLSClientConfig: t.Config(),
+	}
+	return &http.Client{Transport: ctransport, Timeout: 10 * time.Second}
 }

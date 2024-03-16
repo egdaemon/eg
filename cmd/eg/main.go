@@ -14,6 +14,7 @@ import (
 	"syscall"
 
 	"github.com/alecthomas/kong"
+	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/cmd/cmderrors"
 	"github.com/egdaemon/eg/cmd/cmdopts"
 	"github.com/egdaemon/eg/cmd/eg/accountcmds"
@@ -95,11 +96,11 @@ func main() {
 		kong.Name("eg"),
 		kong.Description("cli for eg"),
 		kong.Vars{
-			"vars_cwd":             osx.Getwd("."),
-			"vars_cache_directory": envx.String(os.TempDir(), "CACHE_DIRECTORY", "XDG_CACHE_HOME"),
-			"vars_account_id":      envx.String("", "EG_ACCOUNT"),
-			"vars_machine_id":      envx.String(machineID(), "EG_MACHINE_ID"),
-			// "vars_ssh_key_path":    // fsx.LocateFirstInDir(filepath.Join(user.HomeDir, ".ssh"), "id_ed25519", "id"),
+			"vars_endpoint":               envx.String(eg.EnvEGAPIHostDefault, eg.EnvEGAPIHost),
+			"vars_cwd":                    osx.Getwd("."),
+			"vars_cache_directory":        envx.String(os.TempDir(), "CACHE_DIRECTORY", "XDG_CACHE_HOME"),
+			"vars_account_id":             envx.String("", "EG_ACCOUNT"),
+			"vars_machine_id":             envx.String(machineID(), "EG_MACHINE_ID"),
 			"vars_ssh_key_path":           filepath.Join(user.HomeDir, ".ssh", "eg"),
 			"vars_user_name":              stringsx.DefaultIfBlank(user.Name, user.Username),
 			"vars_user_username":          user.Username,

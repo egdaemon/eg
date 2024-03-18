@@ -173,6 +173,7 @@ func (t runner) Run(ctx *cmdopts.Global) (err error) {
 			Mdir:    ws.ModuleDir,
 			Options: options,
 		})
+
 		if err != nil {
 			return err
 		}

@@ -97,6 +97,17 @@ func FileExists(path string) bool {
 	return true
 }
 
+// FileExists returns true IFF a non-directory file exists at the provided path.
+func DirExists(path string) bool {
+	info, err := os.Stat(path)
+
+	if os.IsNotExist(err) {
+		return false
+	}
+
+	return info.IsDir()
+}
+
 // FileMD5 computes digest of file contents.
 // if something goes wrong logs and returns an empty string.
 func FileMD5(path string) string {

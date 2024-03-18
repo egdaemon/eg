@@ -9,6 +9,7 @@ import (
 
 	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/cmd/cmdopts"
+	"github.com/egdaemon/eg/internal/debugx"
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/iox"
@@ -50,7 +51,7 @@ func SSHProxy(global *cmdopts.Global, config *ssh.ClientConfig, signer ssh.Signe
 				// 	return nil, errorsx.Wrap(err, "unable to listen for ssh connections")
 				// }
 
-				log.Println("PROXY", proxyl, conn.RemoteAddr().String(), proxyl.Addr().Network(), proxyl.Addr().String())
+				debugx.Println("PROXY", proxyl, conn.RemoteAddr().String(), proxyl.Addr().Network(), proxyl.Addr().String())
 			}
 
 			proxied, err := proxyl.Accept()

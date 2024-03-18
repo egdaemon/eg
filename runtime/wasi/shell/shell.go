@@ -8,7 +8,6 @@ import (
 
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/runtime/wasi/internal/ffiexec"
-	"github.com/egdaemon/eg/runtime/wasi/internal/ffigraph"
 )
 
 type Command struct {
@@ -124,9 +123,9 @@ func retry(ctx context.Context, c Command, do func() error) (err error) {
 }
 
 func run(ctx context.Context, c Command) (err error) {
-	if ffigraph.Analysing() {
-		return nil
-	}
+	// if ffigraph.Analysing() {
+	// 	return nil
+	// }
 
 	cctx, done := context.WithTimeout(ctx, c.timeout)
 	defer done()

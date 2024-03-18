@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 
 	"github.com/egdaemon/eg/internal/envx"
+	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/gofrs/uuid"
 )
 
@@ -65,6 +66,10 @@ func (t SpoolDirs) Dequeue() (_ string, err error) {
 	}
 
 	return filepath.Join(t.Running, dir.Name()), os.Rename(filepath.Join(t.Queued, dir.Name()), filepath.Join(t.Running, dir.Name()))
+}
+
+func (t SpoolDirs) Completed(uid uuid.UUID) (err error) {
+	return errorsx.Wrap(os.RemoveAll(filepath.Join(t.Running, uid.String())), "unable to remove work")
 }
 
 func pop(dir string) (popped fs.DirEntry, err error) {

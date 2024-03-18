@@ -22,6 +22,7 @@ import (
 	"github.com/egdaemon/eg/interp/c8s"
 	"github.com/egdaemon/eg/workspaces"
 	"github.com/fsnotify/fsnotify"
+	"github.com/gofrs/uuid"
 	"github.com/pkg/errors"
 	"google.golang.org/grpc"
 )
@@ -234,11 +235,11 @@ func (t staterecover) Update(ctx context.Context) state {
 
 func beginwork(ctx context.Context, md metadata, dir string) state {
 	var (
-		err    error
-		ws     workspaces.Context
-		tmpdir string
-		ragent *Agent
-		kernel *os.File
+		err     error
+		ws      workspaces.Context
+		tmpdir  string
+		ragent  *Agent
+		archive *os.File
 	)
 
 	uid := filepath.Base(dir)
@@ -252,11 +253,11 @@ func beginwork(ctx context.Context, md metadata, dir string) state {
 		return failure(err, idle(md))
 	}
 
-	if kernel, err = os.Open(filepath.Join(dir, "kernel.tar.gz")); err != nil {
-		return failure(err, idle(md))
+	if archive, err = os.Open(filepath.Join(dir, "archive.tar.gz")); err != nil {
+		return failure(errorsx.Wrap(err, "unable to read archive"), idle(md))
 	}
 
-	if err = tarx.Unpack(filepath.Join(tmpdir, ".eg", ".cache", ".eg"), kernel); err != nil {
+	if err = tarx.Unpack(filepath.Join(tmpdir, ".eg", ".cache", ".eg"), archive); err != nil {
 		return failure(err, idle(md))
 	}
 
@@ -330,12 +331,34 @@ func (t staterunning) Update(ctx context.Context) state {
 				"--volume", fmt.Sprintf("%s:/opt/eg:O", t.ws.Root),
 			},
 		})
-		if err != nil {
-			return failure(err, idle(t.metadata))
-		}
-
-		return idle(t.metadata)
+		return completed(t.metadata, t.ragent, err)
 	}
+}
+
+func completed(md metadata, a *Agent, cause error) statecompleted {
+	return statecompleted{
+		metadata: md,
+		ragent:   a,
+		cause:    cause,
+	}
+}
+
+type statecompleted struct {
+	metadata
+	ragent *Agent
+	cause  error
+}
+
+func (t statecompleted) Update(ctx context.Context) state {
+	dirs := DefaultSpoolDirs()
+	log.Println("completed", t.ragent.id, t.ragent.workdir, filepath.Join(dirs.Running, t.ragent.id), t.cause)
+
+	if err := dirs.Completed(uuid.FromStringOrNil(t.ragent.id)); err != nil {
+		return failure(err, idle(t.metadata))
+	}
+
+	// TODO: report failure upstream.
+	return idle(t.metadata)
 }
 
 //go:embed DefaultContainerfile

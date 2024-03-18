@@ -10,7 +10,6 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"time"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/egdaemon/eg"
@@ -59,11 +58,7 @@ func (t Login) Run(gctx *cmdopts.Global, tlscfg *cmdopts.TLSConfig) (err error) 
 		return err
 	}
 
-	ctransport := &http.Transport{
-		TLSClientConfig: tlscfg.Config(),
-	}
-	chttp := httpx.DebugClient(&http.Client{Transport: ctransport, Timeout: 10 * time.Second})
-
+	chttp := tlscfg.DefaultClient()
 	ctx := context.WithValue(gctx.Context, oauth2.HTTPClient, chttp)
 	cfg := authn.OAuth2SSHConfig(signer, password.String())
 

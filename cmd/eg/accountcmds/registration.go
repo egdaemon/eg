@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"time"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/egdaemon/eg"
@@ -61,11 +60,7 @@ func (t Register) Run(gctx *cmdopts.Global, tlscfg *cmdopts.TLSConfig) (err erro
 		return err
 	}
 
-	ctransport := &http.Transport{
-		TLSClientConfig: tlscfg.Config(),
-	}
-	chttp := &http.Client{Transport: ctransport, Timeout: 10 * time.Second}
-
+	chttp := tlscfg.DefaultClient()
 	ctx := context.WithValue(gctx.Context, oauth2.HTTPClient, chttp)
 	cfg := authn.OAuth2SSHConfig(signer, password.String())
 

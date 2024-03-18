@@ -15,7 +15,7 @@ func AutoDownload(ctx context.Context, authedclient *http.Client) {
 	w := backoff.Waiter()
 	s := backoff.New(
 		backoff.Exponential(200*time.Millisecond),
-		backoff.Maximum(3*time.Second),
+		backoff.Maximum(30*time.Second),
 	)
 
 	spool := DefaultSpoolDirs()
@@ -27,11 +27,22 @@ func AutoDownload(ctx context.Context, authedclient *http.Client) {
 		case <-w.Await(s):
 		}
 
+		if dent, err := os.ReadDir(spool.Running); err != nil {
+			log.Println(errors.Wrap(err, "unable to read spool directory"))
+			continue
+		} else if len(dent) > 0 {
+			log.Println("current tasks are in the running queue, not downloading any new tasks", len(dent))
+			// fsx.PrintFS(os.DirFS(spool.Running))
+			continue
+		}
+
 		if dent, err := os.ReadDir(spool.Queued); err != nil {
 			log.Println(errors.Wrap(err, "unable to read spool directory"))
 			continue
-		} else {
-			log.Println("dent", len(dent))
+		} else if len(dent) > 0 {
+			log.Println("current tasks are queued, not downloading any new tasks", len(dent))
+			// fsx.PrintFS(os.DirFS(spool.Queued))
+			continue
 		}
 
 		if err := NewDownloadClient(authedclient).Download(ctx); err != nil {

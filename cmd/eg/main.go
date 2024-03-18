@@ -62,8 +62,8 @@ func main() {
 		cmdopts.Global
 		cmdopts.TLSConfig
 		Version            cmdopts.Version              `cmd:"" help:"display versioning information"`
-		Monitor            monitor                      `cmd:"" help:"execute the interpreter and monitor the progress"`
-		Interp             runner                       `cmd:"" help:"execute the interpreter on the given directory"`
+		Monitor            monitor                      `cmd:"" help:"execute the interpreter and monitor the progress" hidden:"true"`
+		Interp             runner                       `cmd:"" help:"execute the interpreter on the given directory" hidden:"true"`
 		Upload             upload                       `cmd:"" help:"compiles and uploads the process to the cluster"`
 		Module             module                       `cmd:"" help:"executes a compiled module directly" hidden:"true"`
 		Daemon             daemon                       `cmd:"" help:"run in daemon mode letting the control plane push jobs to machines" hidden:"true"`

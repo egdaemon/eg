@@ -218,9 +218,9 @@ func (t ContainerRunner) Command(s string) ContainerRunner {
 
 // CompileWith builds the container and
 func (t ContainerRunner) CompileWith(ctx context.Context) (err error) {
-	if ffigraph.Analysing() {
-		return nil
-	}
+	// if ffigraph.Analysing() {
+	// 	return nil
+	// }
 
 	var opts []string
 	for _, o := range t.options {

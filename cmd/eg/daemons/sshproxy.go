@@ -7,7 +7,9 @@ import (
 	"net"
 	"time"
 
+	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/cmd/cmdopts"
+	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/iox"
 	"golang.org/x/crypto/ssh"
@@ -16,7 +18,6 @@ import (
 
 func SSHProxy(global *cmdopts.Global, config *ssh.ClientConfig, signer ssh.Signer, httpl net.Listener) (err error) {
 	// TODO: use a tls dialer so we can proxy through 443 based on the alpn id.
-
 	// global.Cleanup.Add(1)
 	go func() {
 		var (
@@ -34,7 +35,7 @@ func SSHProxy(global *cmdopts.Global, config *ssh.ClientConfig, signer ssh.Signe
 					log.Println(errorsx.Wrap(err, "rate limiting error when connecting to ssh"))
 					return
 				}
-				conn, err := ssh.Dial("tcp", "localhost:8090", config)
+				conn, err := ssh.Dial("tcp", envx.String(eg.EnvEGSSHHostDefault, eg.EnvEGSSHHost), config)
 				if err != nil {
 					log.Println(errorsx.Wrap(err, "unable to listen for ssh connections"))
 					continue

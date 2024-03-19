@@ -5,6 +5,7 @@ import (
 	"log"
 	"os/exec"
 
+	"github.com/egdaemon/eg/internal/debugx"
 	"github.com/egdaemon/eg/interp/runtime/wasi/ffi"
 	"github.com/pkg/errors"
 	"github.com/tetratelabs/wazero/api"
@@ -47,9 +48,8 @@ func Exec(op func(*exec.Cmd) *exec.Cmd) func(
 
 		cmd = op(cmd)
 
-		log.Println("initiated", cmd.String())
-		// log.Println("environ", cmd.Env)
-		defer log.Println("completed", cmd.String())
+		debugx.Println("initiated", cmd.String())
+		defer debugx.Println("completed", cmd.String())
 
 		if err = mayberun(cmd); err != nil {
 			log.Println("failed to execute shell command", err)

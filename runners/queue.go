@@ -257,15 +257,15 @@ func beginwork(ctx context.Context, md metadata, dir string) state {
 		return failure(errorsx.Wrap(err, "unable to read archive"), idle(md))
 	}
 
-	if err = tarx.Unpack(filepath.Join(tmpdir, ".eg", ".cache", ".eg"), archive); err != nil {
-		return completed(md, uid, errorsx.Wrap(err, "unable to unpack archive"))
-	}
-
 	if ws, err = workspaces.New(ctx, tmpdir, ".eg", "eg"); err != nil {
 		return failure(errorsx.Wrap(err, "unable to setup workspace"), idle(md))
 	}
 
 	log.Println("workspace", spew.Sdump(ws))
+
+	if err = tarx.Unpack(filepath.Join(ws.Root, ws.RunnerDir), archive); err != nil {
+		return completed(md, uid, errorsx.Wrap(err, "unable to unpack archive"))
+	}
 
 	{
 		rootc := filepath.Join(ws.RunnerDir, "Containerfile")

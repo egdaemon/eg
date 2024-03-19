@@ -131,6 +131,7 @@ func (t *ProxyService) Module(ctx context.Context, req *ModuleRequest) (_ *Modul
 
 	options := append(
 		req.Options,
+		"--volume", fmt.Sprintf("%s:/opt/eg:O", t.ws.Root),
 		"--volume", fmt.Sprintf("%s:/opt/egruntime", t.runtimedir),
 	)
 

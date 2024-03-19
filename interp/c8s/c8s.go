@@ -7,9 +7,9 @@ import (
 	"os/exec"
 	"time"
 
-	"github.com/egdaemon/eg/internal/debugx"
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
+	"github.com/egdaemon/eg/internal/fsx"
 	"github.com/egdaemon/eg/runtime/wasi/langx"
 )
 
@@ -18,7 +18,7 @@ func mayberun(c *exec.Cmd) error {
 		return nil
 	}
 
-	debugx.Println("---------------", langx.Must(os.Getwd()), "running", c.Dir, "->", c.String(), "---------------")
+	log.Println("---------------", langx.Must(os.Getwd()), "running", c.Dir, "->", c.String(), "---------------")
 	return c.Run()
 }
 
@@ -137,9 +137,13 @@ func PodmanModuleRunCmd(image, cname, moduledir string, options ...string) []str
 		"--env", "EG_CI",
 		"--env", "EG_RUN_ID",
 		"--env", "EG_BIN",
+		// "--env-host",
+		// "--env-file", "/opt/eg.env",
 	},
 		options...,
 	)
+
+	fsx.PrintFS(os.DirFS("/opt/eg/.eg"))
 
 	return append(
 		options,

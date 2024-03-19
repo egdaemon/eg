@@ -90,11 +90,14 @@ func ensuredirs(c Context) (_ Context, err error) {
 
 		return nil
 	}
-
-	return c, mkdirs(c.GenModDir, c.BuildDir)
+	return c, mkdirs(c.RunnerDir, c.GenModDir, c.BuildDir)
 }
 
 func cacheid(ctx context.Context, root string, mdir string, cacheid hash.Hash, ignore ignorable) error {
+	if err := os.MkdirAll(filepath.Join(root, mdir), 0700); err != nil {
+		return errors.Wrapf(err, "unable to create directory: %s", root)
+	}
+
 	return fs.WalkDir(os.DirFS(root), mdir, func(path string, d fs.DirEntry, err error) error {
 		var (
 			c *os.File

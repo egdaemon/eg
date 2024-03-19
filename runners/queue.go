@@ -258,11 +258,11 @@ func beginwork(ctx context.Context, md metadata, dir string) state {
 	}
 
 	if err = tarx.Unpack(filepath.Join(tmpdir, ".eg", ".cache", ".eg"), archive); err != nil {
-		return failure(err, idle(md))
+		return completed(md, uid, errorsx.Wrap(err, "unable to unpack archive"))
 	}
 
 	if ws, err = workspaces.New(ctx, tmpdir, ".eg", "eg"); err != nil {
-		return failure(err, idle(md))
+		return failure(errorsx.Wrap(err, "unable to setup workspace"), idle(md))
 	}
 
 	log.Println("workspace", spew.Sdump(ws))
@@ -331,29 +331,29 @@ func (t staterunning) Update(ctx context.Context) state {
 				"--volume", fmt.Sprintf("%s:/opt/eg:O", t.ws.Root),
 			},
 		})
-		return completed(t.metadata, t.ragent, err)
+		return completed(t.metadata, t.ragent.id, errorsx.Compact(err, t.ragent.Close()))
 	}
 }
 
-func completed(md metadata, a *Agent, cause error) statecompleted {
+func completed(md metadata, id string, cause error) statecompleted {
 	return statecompleted{
 		metadata: md,
-		ragent:   a,
+		id:       id,
 		cause:    cause,
 	}
 }
 
 type statecompleted struct {
 	metadata
-	ragent *Agent
-	cause  error
+	id    string
+	cause error
 }
 
 func (t statecompleted) Update(ctx context.Context) state {
 	dirs := DefaultSpoolDirs()
-	log.Println("completed", t.ragent.id, t.ragent.workdir, filepath.Join(dirs.Running, t.ragent.id), t.cause)
+	log.Println("completed", t.id, filepath.Join(dirs.Running, t.id), t.cause)
 
-	if err := dirs.Completed(uuid.FromStringOrNil(t.ragent.id)); err != nil {
+	if err := dirs.Completed(uuid.FromStringOrNil(t.id)); err != nil {
 		return failure(err, idle(t.metadata))
 	}
 

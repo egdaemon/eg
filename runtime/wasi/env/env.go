@@ -19,3 +19,7 @@ func Int(fallback int, keys ...string) int {
 func Float64(fallback float64, keys ...string) float64 {
 	return envx.Float64(fallback, keys...)
 }
+
+func Debug(envs ...string) {
+	envx.Debug(envs...)
+}

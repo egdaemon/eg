@@ -40,7 +40,7 @@ func (t SpoolDirs) Download(uid uuid.UUID, name string, content io.Reader) (err 
 	}
 	defer dst.Close()
 
-	if _, err = io.Copy(dst, content); err != nil {
+	if _, err := io.Copy(dst, content); err != nil {
 		return err
 	}
 

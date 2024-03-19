@@ -143,6 +143,7 @@ func (t Agent) background() {
 	defer os.RemoveAll(t.workdir)
 
 	events.NewServiceDispatch(t.evtlog).Bind(t.srv)
+
 	c8s.NewServiceProxy(
 		t.ws,
 		t.workdir,

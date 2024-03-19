@@ -49,8 +49,6 @@ github.com/charmbracelet/bubbletea
 # github.com/charmbracelet/lipgloss v0.10.0
 ## explicit; go 1.18
 github.com/charmbracelet/lipgloss
-# github.com/chzyer/readline v1.5.1
-## explicit; go 1.15
 # github.com/cloudflare/circl v1.3.7
 ## explicit; go 1.19
 github.com/cloudflare/circl/dh/x25519
@@ -194,8 +192,6 @@ github.com/hashicorp/errwrap
 # github.com/hashicorp/go-multierror v1.1.1
 ## explicit; go 1.13
 github.com/hashicorp/go-multierror
-# github.com/ianlancetaylor/demangle v0.0.0-20230524184225-eabc099b10ab
-## explicit; go 1.13
 # github.com/jbenet/go-context v0.0.0-20150711004518-d14ea06fba99
 ## explicit
 github.com/jbenet/go-context/io

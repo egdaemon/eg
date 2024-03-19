@@ -157,12 +157,6 @@ func (t runner) Open(name string) (fs.File, error) {
 }
 
 func (t runner) perform(ctx context.Context, runid, path string, rtb runtimefn) (err error) {
-	// Create a new WebAssembly Runtime.
-	runtime := wazero.NewRuntimeWithConfig(
-		ctx,
-		wazero.NewRuntimeConfig(),
-	)
-
 	moduledir := filepath.Join(t.root, t.moduledir)
 	hostcachedir := filepath.Join(moduledir, ".cache")
 	guestcachedir := filepath.Join("/", "cache")
@@ -172,6 +166,18 @@ func (t runner) perform(ctx context.Context, runid, path string, rtb runtimefn) 
 		return errors.Wrap(err, "unable to create tmp directory")
 	}
 	defer os.RemoveAll(tmpdir)
+
+	cache, err := wazero.NewCompilationCacheWithDir(hostcachedir)
+	if err != nil {
+		return err
+	}
+	defer cache.Close(ctx)
+
+	// Create a new WebAssembly Runtime.
+	runtime := wazero.NewRuntimeWithConfig(
+		ctx,
+		wazero.NewRuntimeConfig().WithCompilationCache(cache),
+	)
 
 	cmdenv := append(
 		os.Environ(),

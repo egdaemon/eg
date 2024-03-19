@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 
+	"github.com/egdaemon/eg/internal/debugx"
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/runtime/wasi/langx"
 	"github.com/egdaemon/eg/workspaces"
@@ -63,8 +64,8 @@ func (t *ProxyService) prepcmd(cmd *exec.Cmd) *exec.Cmd {
 
 // Build implements ProxyServer.
 func (t *ProxyService) Build(ctx context.Context, req *BuildRequest) (_ *BuildResponse, err error) {
-	log.Println("PROXY CONTAINER BUILD INITIATED", langx.Must(os.Getwd()), os.Stdin, os.Stdout, os.Stderr)
-	defer log.Println("PROXY CONTAINER BUILD COMPLETED", langx.Must(os.Getwd()), os.Stdin, os.Stdout, os.Stderr)
+	debugx.Println("PROXY CONTAINER BUILD INITIATED", langx.Must(os.Getwd()), os.Stdin, os.Stdout, os.Stderr)
+	defer debugx.Println("PROXY CONTAINER BUILD COMPLETED", langx.Must(os.Getwd()), os.Stdin, os.Stdout, os.Stderr)
 
 	var (
 		cmd *exec.Cmd
@@ -85,8 +86,8 @@ func (t *ProxyService) Build(ctx context.Context, req *BuildRequest) (_ *BuildRe
 
 // Pull implements ProxyServer.
 func (t *ProxyService) Pull(ctx context.Context, req *PullRequest) (resp *PullResponse, err error) {
-	log.Println("PROXY CONTAINER PULL INITIATED")
-	defer log.Println("PROXY CONTAINER PULL COMPLETED")
+	debugx.Println("PROXY CONTAINER PULL INITIATED")
+	defer debugx.Println("PROXY CONTAINER PULL COMPLETED")
 
 	var (
 		cmd *exec.Cmd
@@ -105,8 +106,8 @@ func (t *ProxyService) Pull(ctx context.Context, req *PullRequest) (resp *PullRe
 
 // Run implements ProxyServer.
 func (t *ProxyService) Run(ctx context.Context, req *RunRequest) (_ *RunResponse, err error) {
-	log.Println("PROXY CONTAINER RUN INITIATED", langx.Must(os.Getwd()))
-	defer log.Println("PROXY CONTAINER RUN COMPLETED", langx.Must(os.Getwd()))
+	debugx.Println("PROXY CONTAINER RUN INITIATED", langx.Must(os.Getwd()))
+	defer debugx.Println("PROXY CONTAINER RUN COMPLETED", langx.Must(os.Getwd()))
 
 	options := append(
 		req.Options,
@@ -126,8 +127,8 @@ func (t *ProxyService) Run(ctx context.Context, req *RunRequest) (_ *RunResponse
 
 // Module implements ProxyServer.
 func (t *ProxyService) Module(ctx context.Context, req *ModuleRequest) (_ *ModuleResponse, err error) {
-	log.Println("PROXY CONTAINER MODULE INITIATED", langx.Must(os.Getwd()), envx.String("eg", "EG_BIN"))
-	defer log.Println("PROXY CONTAINER MODULE COMPLETED", langx.Must(os.Getwd()), envx.String("eg", "EG_BIN"))
+	debugx.Println("PROXY CONTAINER MODULE INITIATED", langx.Must(os.Getwd()), envx.String("eg", "EG_BIN"))
+	defer debugx.Println("PROXY CONTAINER MODULE COMPLETED", langx.Must(os.Getwd()), envx.String("eg", "EG_BIN"))
 
 	options := append(
 		req.Options,

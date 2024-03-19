@@ -71,8 +71,8 @@ func main() {
 	log.Println("main module")
 
 	// c1 := yak.Container("ubuntu.22.04").BuildFromFile(string(langx.Must(fs.ReadFile(embedded, "Containerfile"))))
-	// c1 := yak.Container("ubuntu.22.04").BuildFromFile(".test/Containerfile")
-	c1 := yak.Container("ubuntu.22.04").PullFrom("ubuntu:jammy")
+	c1 := yak.Container("ubuntu.22.04").BuildFromFile(".test/Containerfile")
+	// c1 := yak.Container("ubuntu.22.04").PullFrom("ubuntu:jammy")
 
 	err := yak.Perform(
 		ctx,

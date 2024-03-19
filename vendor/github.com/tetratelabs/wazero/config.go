@@ -12,8 +12,8 @@ import (
 
 	"github.com/tetratelabs/wazero/api"
 	experimentalsys "github.com/tetratelabs/wazero/experimental/sys"
-	"github.com/tetratelabs/wazero/internal/engine/compiler"
 	"github.com/tetratelabs/wazero/internal/engine/interpreter"
+	"github.com/tetratelabs/wazero/internal/engine/wazevo"
 	"github.com/tetratelabs/wazero/internal/filecache"
 	"github.com/tetratelabs/wazero/internal/internalapi"
 	"github.com/tetratelabs/wazero/internal/platform"
@@ -157,7 +157,7 @@ type RuntimeConfig interface {
 	// This is especially useful when one wants to run untrusted Wasm binaries since otherwise, any invocation of
 	// api.Function can potentially block the corresponding Goroutine forever. Moreover, it might block the
 	// entire underlying OS thread which runs the api.Function call. See "Why it's safe to execute runtime-generated
-	// machine codes against async Goroutine preemption" section in internal/engine/compiler/RATIONALE.md for detail.
+	// machine codes against async Goroutine preemption" section in RATIONALE.md for detail.
 	//
 	// Note that this comes with a bit of extra cost when enabled. The reason is that internally this forces
 	// interpreter and compiler runtimes to insert the periodical checks on the conditions above. For that reason,
@@ -223,7 +223,7 @@ const (
 func NewRuntimeConfigCompiler() RuntimeConfig {
 	ret := engineLessConfig.clone()
 	ret.engineKind = engineKindCompiler
-	ret.newEngine = compiler.NewEngine
+	ret.newEngine = wazevo.NewEngine
 	return ret
 }
 

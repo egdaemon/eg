@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"time"
 
+	"github.com/egdaemon/eg/internal/debugx"
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/runtime/wasi/langx"
@@ -17,7 +18,7 @@ func mayberun(c *exec.Cmd) error {
 		return nil
 	}
 
-	log.Println("---------------", langx.Must(os.Getwd()), "running", c.Dir, "->", c.String(), "---------------")
+	debugx.Println("---------------", langx.Must(os.Getwd()), "running", c.Dir, "->", c.String(), "---------------")
 	return c.Run()
 }
 

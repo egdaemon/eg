@@ -13,7 +13,6 @@ import (
 	"syscall"
 
 	"github.com/egdaemon/eg/internal/envx"
-	"github.com/egdaemon/eg/internal/fsx"
 	"github.com/egdaemon/eg/internal/md5x"
 	"github.com/egdaemon/eg/internal/osx"
 	"github.com/egdaemon/eg/interp/c8s"
@@ -181,7 +180,7 @@ func (t runner) perform(ctx context.Context, runid, path string, rtb runtimefn) 
 	)
 
 	envx.Debug(os.Environ()...)
-	fsx.PrintFS(os.DirFS(t.root))
+	// fsx.PrintFS(os.DirFS(t.root))
 	// environ, err := envx.FromPath(filepath.Join(t.root, t.ws.RunnerDir, "environ.env"))
 	// if err != nil {
 	// 	log.Println("unable to load environment variables", err)
@@ -190,9 +189,8 @@ func (t runner) perform(ctx context.Context, runid, path string, rtb runtimefn) 
 
 	cmdenv := append(
 		os.Environ(),
-		// fmt.Sprintf("TERM=%s", envx.String("", "TERM")),
-		fmt.Sprintf("CI=%s", envx.String("", "EG_CI", "CI")),
-		fmt.Sprintf("EG_CI=%s", envx.String("", "EG_CI", "CI")),
+		fmt.Sprintf("CI=%t", envx.Boolean(false, "EG_CI", "CI")),
+		fmt.Sprintf("EG_CI=%t", envx.Boolean(false, "EG_CI", "CI")),
 		fmt.Sprintf("EG_RUN_ID=%s", runid),
 		fmt.Sprintf("EG_ROOT_DIRECTORY=%s", t.root),
 		fmt.Sprintf("EG_CACHE_DIRECTORY=%s", envx.String(guestcachedir, "EG_CACHE_DIRECTORY", "CACHE_DIRECTORY")),
@@ -205,9 +203,9 @@ func (t runner) perform(ctx context.Context, runid, path string, rtb runtimefn) 
 	log.Println("runtime dir", t.runtimedir, "->", guestruntimedir)
 
 	mcfg := wazero.NewModuleConfig().WithEnv(
-		"CI", envx.String("", "EG_CI", "CI"),
+		"CI", envx.String("false", "EG_CI", "CI"),
 	).WithEnv(
-		"EG_CI", envx.String("", "EG_CI", "CI"),
+		"EG_CI", envx.String("false", "EG_CI", "CI"),
 	).WithEnv(
 		"EG_RUN_ID", runid,
 	).WithEnv(

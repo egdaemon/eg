@@ -97,3 +97,15 @@ func (z *zreader) Read(p []byte) (n int, err error) {
 func Zero() io.Reader {
 	return &zreader{}
 }
+
+func String(r io.Reader) string {
+	defer func() {
+		if x, ok := r.(io.Seeker); ok {
+			_ = Rewind(x)
+		}
+	}()
+
+	raw, _ := io.ReadAll(r)
+
+	return string(raw)
+}

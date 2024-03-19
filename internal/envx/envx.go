@@ -2,8 +2,10 @@
 package envx
 
 import (
+	"bufio"
 	"encoding/base64"
 	"encoding/hex"
+	"io"
 	"log"
 	"net/url"
 	"os"
@@ -115,4 +117,35 @@ func envval[T any](fallback T, parse func(string) (T, error), keys ...string) T 
 	}
 
 	return fallback
+}
+
+func Debug(envs ...string) {
+	log.Println("DEBUG ENVIRONMENT INITIATED")
+	defer log.Println("DEBUG ENVIRONMENT COMPLETED")
+	for _, e := range envs {
+		log.Println(e)
+	}
+}
+
+func FromReader(r io.Reader) (environ []string, err error) {
+	scanner := bufio.NewScanner(r)
+
+	for scanner.Scan() {
+		environ = append(environ, scanner.Text())
+	}
+
+	return environ, nil
+}
+
+func FromPath(n string) (environ []string, err error) {
+	env, err := os.Open(n)
+	if os.IsNotExist(err) {
+		return environ, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	defer env.Close()
+
+	return FromReader(env)
 }

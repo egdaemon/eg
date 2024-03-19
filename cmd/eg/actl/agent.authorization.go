@@ -5,7 +5,6 @@ import (
 
 	"github.com/egdaemon/eg/authn"
 	"github.com/egdaemon/eg/cmd/cmdopts"
-	"github.com/egdaemon/eg/internal/httpx"
 	"github.com/egdaemon/eg/internal/sshx"
 	"github.com/egdaemon/eg/registration"
 	"github.com/gofrs/uuid"
@@ -31,7 +30,7 @@ func (t AuthorizeAgent) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err 
 	otp := uuid.Must(uuid.NewV4())
 
 	chttp := tlsc.DefaultClient()
-	chttp = httpx.DebugClient(chttp)
+	// chttp = httpx.DebugClient(chttp)
 
 	ctx := context.WithValue(gctx.Context, oauth2.HTTPClient, chttp)
 	cfg := authn.OAuth2SSHConfig(signer, otp.String())

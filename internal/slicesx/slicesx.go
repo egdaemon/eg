@@ -40,6 +40,21 @@ func Find[T any](match func(T) bool, items ...T) (zero T, _ bool) {
 	return zero, false
 }
 
+// First returns first element in the slice if it exists.
+func First[T any](items ...T) (zero T, _ bool) {
+	if len(items) == 0 {
+		return zero, false
+	}
+
+	return items[0], true
+}
+
+// First returns first element in the slice if it exists, the zero value otherwise.
+func FirstOrZero[T any](items ...T) (zero T) {
+	l, _ := Last(items...)
+	return l
+}
+
 // Last returns last element in the slice if it exists.
 func Last[T any](items ...T) (zero T, _ bool) {
 	if len(items) == 0 {

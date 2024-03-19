@@ -8,7 +8,6 @@ import (
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/egdaemon/eg/cmd/cmdopts"
-	"github.com/egdaemon/eg/internal/httpx"
 	"github.com/egdaemon/eg/internal/jwtx"
 	"github.com/egdaemon/eg/internal/systemx"
 	"github.com/egdaemon/eg/notary"
@@ -25,7 +24,7 @@ func Register(global *cmdopts.Global, tlsc *cmdopts.TLSConfig, aid, machineid st
 	defer log.Println("registering daemon with control plane completed", aid, machineid, fingerprint)
 
 	c := jwtx.NewHTTP(
-		httpx.DebugClient(tlsc.DefaultClient()),
+		tlsc.DefaultClient(),
 		jwtx.SignerFn(func() (signed string, err error) {
 			signed, err = jwt.NewWithClaims(
 				notary.NewJWTSigner(),

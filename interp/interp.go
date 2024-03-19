@@ -13,6 +13,7 @@ import (
 	"syscall"
 
 	"github.com/egdaemon/eg/internal/envx"
+	"github.com/egdaemon/eg/internal/fsx"
 	"github.com/egdaemon/eg/internal/md5x"
 	"github.com/egdaemon/eg/internal/osx"
 	"github.com/egdaemon/eg/interp/c8s"
@@ -178,6 +179,14 @@ func (t runner) perform(ctx context.Context, runid, path string, rtb runtimefn) 
 		ctx,
 		wazero.NewRuntimeConfig().WithCompilationCache(cache),
 	)
+
+	envx.Debug(os.Environ()...)
+	fsx.PrintFS(os.DirFS(t.root))
+	// environ, err := envx.FromPath(filepath.Join(t.root, t.ws.RunnerDir, "environ.env"))
+	// if err != nil {
+	// 	log.Println("unable to load environment variables", err)
+	// 	return
+	// }
 
 	cmdenv := append(
 		os.Environ(),

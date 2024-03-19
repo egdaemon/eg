@@ -22,6 +22,7 @@ import (
 	"github.com/egdaemon/eg/compile"
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
+	"github.com/egdaemon/eg/internal/gitx"
 	"github.com/egdaemon/eg/internal/httpx"
 	"github.com/egdaemon/eg/internal/iox"
 	"github.com/egdaemon/eg/internal/slicesx"
@@ -320,9 +321,21 @@ func (t upload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 		}
 	}
 
+	if gitenv, err := gitx.Env(ws.Root, "origin", "HEAD"); err != nil {
+		return errorsx.Wrap(err, "unable to write git information to environment variables")
+	} else {
+		for _, e := range gitenv {
+			if _, err = fmt.Fprintf(environio, "%s\n", e); err != nil {
+				return errorsx.Wrap(err, "unable to write environment variable")
+			}
+		}
+	}
+
 	if err = iox.Rewind(environio); err != nil {
 		return errorsx.Wrap(err, "unable to rewind environment variables buffer")
 	}
+
+	// log.Println("environment\n", iox.String(environio))
 
 	if archiveio, err = os.CreateTemp(tmpdir, "kernel.*.tar.gz"); err != nil {
 		return errorsx.Wrap(err, "unable to open the kernel archive")
@@ -338,9 +351,13 @@ func (t upload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 	}
 
 	log.Println("archive", archiveio.Name())
-	// if err = tarx.Inspect(archiveio); err != nil {
-	// 	log.Println(errorsx.Wrap(err, "unable to inspect archive"))
-	// }
+	if err = tarx.Inspect(archiveio); err != nil {
+		log.Println(errorsx.Wrap(err, "unable to inspect archive"))
+	}
+
+	if err = iox.Rewind(archiveio); err != nil {
+		return errorsx.Wrap(err, "unable to rewind kernel archive")
+	}
 
 	// TODO: determine the destination based on the requirements
 	// i.e. cores, memory, labels, disk, videomem, etc.

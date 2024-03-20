@@ -117,7 +117,6 @@ func (t *ProxyService) Run(ctx context.Context, req *RunRequest) (_ *RunResponse
 	)
 	options = append(
 		options,
-		"--env-host",
 		"--volume", fmt.Sprintf("%s:/opt/eg:O", t.ws.Root),
 	)
 
@@ -130,12 +129,11 @@ func (t *ProxyService) Run(ctx context.Context, req *RunRequest) (_ *RunResponse
 
 // Module implements ProxyServer.
 func (t *ProxyService) Module(ctx context.Context, req *ModuleRequest) (_ *ModuleResponse, err error) {
-	debugx.Println("PROXY CONTAINER MODULE INITIATED", langx.Must(os.Getwd()), envx.String("eg", "EG_BIN"))
-	defer debugx.Println("PROXY CONTAINER MODULE COMPLETED", langx.Must(os.Getwd()), envx.String("eg", "EG_BIN"))
+	log.Println("PROXY CONTAINER MODULE INITIATED", langx.Must(os.Getwd()), envx.String("eg", "EG_BIN"))
+	defer log.Println("PROXY CONTAINER MODULE COMPLETED", langx.Must(os.Getwd()), envx.String("eg", "EG_BIN"))
 
 	options := append(
 		req.Options,
-		"--env-host",
 		"--volume", fmt.Sprintf("%s:/opt/eg:O", t.ws.Root),
 		"--volume", fmt.Sprintf("%s:/opt/egruntime", t.runtimedir),
 	)

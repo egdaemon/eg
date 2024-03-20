@@ -15,7 +15,6 @@ import (
 
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/iox"
-	"github.com/egdaemon/eg/internal/langx"
 	"github.com/egdaemon/eg/internal/md5x"
 	"github.com/egdaemon/eg/internal/osx"
 	"github.com/egdaemon/eg/interp/c8s"
@@ -196,7 +195,11 @@ func (t runner) perform(ctx context.Context, runid, path string, rtb runtimefn) 
 	log.Println("module dir", moduledir)
 	log.Println("cache dir", hostcachedir, "->", guestcachedir)
 	log.Println("runtime dir", t.runtimedir, "->", guestruntimedir)
-	log.Println("DERP", iox.String(langx.Must(os.Open("/opt/egruntime/environ"))))
+	if environ, err := os.Open("/opt/egruntime/environ"); err == nil {
+		log.Println("DERP", iox.String(environ))
+	} else {
+		log.Println("unable to read /opt/egruntime/environ", err)
+	}
 
 	mcfg := wazero.NewModuleConfig().WithEnv(
 		"CI", envx.String("false", "EG_CI", "CI"),

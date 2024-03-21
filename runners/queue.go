@@ -16,6 +16,7 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
+	"github.com/egdaemon/eg/internal/fsx"
 	"github.com/egdaemon/eg/internal/iox"
 	"github.com/egdaemon/eg/internal/langx"
 	"github.com/egdaemon/eg/internal/tarx"
@@ -262,7 +263,6 @@ func beginwork(ctx context.Context, md metadata, dir string) state {
 	}
 
 	log.Println("workspace", spew.Sdump(ws))
-
 	if err = tarx.Unpack(filepath.Join(ws.Root, ws.RunnerDir), archive); err != nil {
 		return completed(md, uid, errorsx.Wrap(err, "unable to unpack archive"))
 	}
@@ -284,7 +284,12 @@ func beginwork(ctx context.Context, md metadata, dir string) state {
 		}
 	}
 
-	if ragent, err = m.NewRun(ctx, ws, uid, AgentOptionAutoEGBin()); err != nil {
+	fsx.PrintFS(os.DirFS(filepath.Join(ws.Root, ws.RunnerDir)))
+	environpath := filepath.Join(ws.Root, ws.RunnerDir, "environ.env")
+	// environ := errorsx.Zero(envx.FromPath(environpath))
+	// envx.Debug(environ...)
+
+	if ragent, err = m.NewRun(ctx, ws, uid, AgentOptionEGBin(errorsx.Zero(exec.LookPath(os.Args[0]))), AgentOptionEnviron(environpath)); err != nil {
 		return failure(err, idle(md))
 	}
 

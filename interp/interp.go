@@ -9,14 +9,14 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strings"
 	"sync"
 	"syscall"
 
 	"github.com/egdaemon/eg/internal/envx"
-	"github.com/egdaemon/eg/internal/iox"
+	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/md5x"
 	"github.com/egdaemon/eg/internal/osx"
+	"github.com/egdaemon/eg/internal/wasix"
 	"github.com/egdaemon/eg/interp/c8s"
 	"github.com/egdaemon/eg/interp/runtime/wasi/ffiegcontainer"
 	"github.com/egdaemon/eg/interp/runtime/wasi/ffiexec"
@@ -195,11 +195,6 @@ func (t runner) perform(ctx context.Context, runid, path string, rtb runtimefn) 
 	log.Println("module dir", moduledir)
 	log.Println("cache dir", hostcachedir, "->", guestcachedir)
 	log.Println("runtime dir", t.runtimedir, "->", guestruntimedir)
-	if environ, err := os.Open("/opt/egruntime/environ"); err == nil {
-		log.Println("DERP", iox.String(environ))
-	} else {
-		log.Println("unable to read /opt/egruntime/environ", err)
-	}
 
 	mcfg := wazero.NewModuleConfig().WithEnv(
 		"CI", envx.String("false", "EG_CI", "CI"),
@@ -232,16 +227,9 @@ func (t runner) perform(ctx context.Context, runid, path string, rtb runtimefn) 
 			WithDirMount(t.runtimedir, guestruntimedir),
 	).WithSysNanotime().WithSysWalltime().WithRandSource(rand.Reader)
 
-	environ, err := envx.FromPath("/opt/egruntime/environ")
-	if err != nil {
-		return err
-	}
-	for _, v := range environ {
-		if k, v, ok := strings.Cut(v, "="); ok {
-			log.Println("adding environment", k, "=", v)
-			mcfg.WithEnv(k, v)
-		}
-	}
+	environ := errorsx.Zero(envx.FromPath("/opt/egruntime/environ"))
+	envx.Debug(environ...)
+	mcfg = wasix.Environ(mcfg, environ...)
 
 	wasienv, err := wasi_snapshot_preview1.NewBuilder(runtime).Instantiate(ctx)
 	if err != nil {

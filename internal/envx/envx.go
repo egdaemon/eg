@@ -5,6 +5,7 @@ import (
 	"bufio"
 	"encoding/base64"
 	"encoding/hex"
+	"errors"
 	"io"
 	"log"
 	"net/url"
@@ -13,7 +14,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/pkg/errors"
+	"github.com/egdaemon/eg/internal/errorsx"
 )
 
 func Print(environ []string) {
@@ -29,14 +30,14 @@ func Print(environ []string) {
 func Int(fallback int, keys ...string) int {
 	return envval(fallback, func(s string) (int, error) {
 		decoded, err := strconv.ParseInt(s, 10, 64)
-		return int(decoded), errors.Wrapf(err, "integer '%s' is invalid", s)
+		return int(decoded), errorsx.Wrapf(err, "integer '%s' is invalid", s)
 	}, keys...)
 }
 
 func Float64(fallback float64, keys ...string) float64 {
 	return envval(fallback, func(s string) (float64, error) {
 		decoded, err := strconv.ParseFloat(s, 64)
-		return float64(decoded), errors.Wrapf(err, "float64 '%s' is invalid", s)
+		return float64(decoded), errorsx.Wrapf(err, "float64 '%s' is invalid", s)
 	}, keys...)
 }
 
@@ -45,7 +46,7 @@ func Float64(fallback float64, keys ...string) float64 {
 func Boolean(fallback bool, keys ...string) bool {
 	return envval(fallback, func(s string) (bool, error) {
 		decoded, err := strconv.ParseBool(s)
-		return decoded, errors.Wrapf(err, "boolean '%s' is invalid", s)
+		return decoded, errorsx.Wrapf(err, "boolean '%s' is invalid", s)
 	}, keys...)
 }
 
@@ -63,7 +64,7 @@ func String(fallback string, keys ...string) string {
 func Duration(fallback time.Duration, keys ...string) time.Duration {
 	return envval(fallback, func(s string) (time.Duration, error) {
 		decoded, err := time.ParseDuration(s)
-		return decoded, errors.Wrapf(err, "time.Duration '%s' is invalid", s)
+		return decoded, errorsx.Wrapf(err, "time.Duration '%s' is invalid", s)
 	}, keys...)
 }
 
@@ -71,7 +72,7 @@ func Duration(fallback time.Duration, keys ...string) time.Duration {
 func Hex(fallback []byte, keys ...string) []byte {
 	return envval(fallback, func(s string) ([]byte, error) {
 		decoded, err := hex.DecodeString(s)
-		return decoded, errors.Wrapf(err, "invalid hex encoded data '%s'", s)
+		return decoded, errorsx.Wrapf(err, "invalid hex encoded data '%s'", s)
 	}, keys...)
 }
 
@@ -80,7 +81,7 @@ func Base64(fallback []byte, keys ...string) []byte {
 	enc := base64.RawStdEncoding.WithPadding('=')
 	return envval(fallback, func(s string) ([]byte, error) {
 		decoded, err := enc.DecodeString(s)
-		return decoded, errors.Wrapf(err, "invalid base64 encoded data '%s'", s)
+		return decoded, errorsx.Wrapf(err, "invalid base64 encoded data '%s'", s)
 	}, keys...)
 }
 
@@ -91,12 +92,12 @@ func URL(fallback string, keys ...string) *url.URL {
 	)
 
 	if parsed, err = url.Parse(fallback); err != nil {
-		panic(errors.Wrap(err, "must provide a valid fallback url"))
+		panic(errorsx.Wrap(err, "must provide a valid fallback url"))
 	}
 
 	return envval(parsed, func(s string) (*url.URL, error) {
 		decoded, err := url.Parse(s)
-		return decoded, errors.WithStack(err)
+		return decoded, errorsx.WithStack(err)
 	}, keys...)
 }
 
@@ -148,4 +149,24 @@ func FromPath(n string) (environ []string, err error) {
 	defer env.Close()
 
 	return FromReader(env)
+}
+
+type builder struct {
+	environ []string
+	failed  error
+}
+
+func (t builder) Environ() ([]string, error) {
+	return t.environ, t.failed
+}
+
+func (t builder) FromPath(n string) builder {
+	tmp, err := FromPath(n)
+	t.environ = append(t.environ, tmp...)
+	t.failed = errors.Join(t.failed, err)
+	return t
+}
+
+func Build() builder {
+	return builder{}
 }

@@ -1,10 +1,13 @@
 package fsx
 
 import (
+	"fmt"
 	"io/fs"
 	"log"
 	"os"
 	"path/filepath"
+
+	"github.com/egdaemon/eg/internal/errorsx"
 )
 
 // LocateFirstInDir locates the first file in the given directory by name.
@@ -20,19 +23,19 @@ func LocateFirstInDir(dir string, names ...string) (result string) {
 }
 
 func PrintFS(d fs.FS) {
-	log.Println("--------- FS WALK INITIATED ---------")
-	defer log.Println("--------- FS WALK COMPLETED ---------")
+	errorsx.MaybeLog(log.Output(2, fmt.Sprintln("--------- FS WALK INITIATED ---------")))
+	defer func() { errorsx.MaybeLog(log.Output(3, fmt.Sprintln("--------- FS WALK COMPLETED ---------"))) }()
 
 	err := fs.WalkDir(d, ".", func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
 
-		log.Println(path)
+		errorsx.MaybeLog(log.Output(2, fmt.Sprintln(path)))
 
 		return nil
 	})
 	if err != nil {
-		log.Println("fs walk failed", err)
+		errorsx.MaybeLog(log.Output(2, fmt.Sprintln("fs walk failed", err)))
 	}
 }

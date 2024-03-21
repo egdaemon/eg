@@ -284,7 +284,7 @@ func beginwork(ctx context.Context, md metadata, dir string) state {
 		}
 	}
 
-	if ragent, err = m.NewRun(ctx, ws, uid); err != nil {
+	if ragent, err = m.NewRun(ctx, ws, uid, AgentOptionAutoEGBin()); err != nil {
 		return failure(err, idle(md))
 	}
 

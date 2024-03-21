@@ -15,15 +15,15 @@ import (
 
 type ServiceProxyOption func(*ProxyService)
 
-func ServiceProxyOptionEnviron(environ ...string) ServiceProxyOption {
+func ServiceProxyOptionCommandEnviron(environ ...string) ServiceProxyOption {
 	return func(ps *ProxyService) {
-		ps.env = environ
+		ps.cmdenv = environ
 	}
 }
 
-func ServiceProxyOptionVolumes(v ...string) ServiceProxyOption {
+func ServiceProxyOptionContainerOptions(v ...string) ServiceProxyOption {
 	return func(ps *ProxyService) {
-		ps.volumes = v
+		ps.containeropts = v
 	}
 }
 
@@ -42,10 +42,10 @@ func NewServiceProxy(ws workspaces.Context, runtimedir string, options ...Servic
 
 type ProxyService struct {
 	UnimplementedProxyServer
-	ws         workspaces.Context
-	runtimedir string
-	env        []string
-	volumes    []string
+	ws            workspaces.Context
+	runtimedir    string
+	cmdenv        []string
+	containeropts []string
 }
 
 func (t *ProxyService) Bind(host grpc.ServiceRegistrar) {
@@ -54,7 +54,7 @@ func (t *ProxyService) Bind(host grpc.ServiceRegistrar) {
 
 func (t *ProxyService) prepcmd(cmd *exec.Cmd) *exec.Cmd {
 	cmd.Dir = t.ws.Root
-	cmd.Env = t.env
+	cmd.Env = t.cmdenv
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -110,7 +110,7 @@ func (t *ProxyService) Run(ctx context.Context, req *RunRequest) (_ *RunResponse
 
 	options := append(
 		req.Options,
-		t.volumes...,
+		t.containeropts...,
 	)
 	options = append(
 		options,
@@ -129,7 +129,7 @@ func (t *ProxyService) Module(ctx context.Context, req *ModuleRequest) (_ *Modul
 	log.Println("PROXY CONTAINER MODULE INITIATED", langx.Must(os.Getwd()))
 	defer log.Println("PROXY CONTAINER MODULE COMPLETED", langx.Must(os.Getwd()))
 
-	options := append(req.Options, t.volumes...)
+	options := append(req.Options, t.containeropts...)
 	options = append(
 		options,
 		"--volume", fmt.Sprintf("%s:/opt/eg:O", t.ws.Root),
@@ -137,7 +137,6 @@ func (t *ProxyService) Module(ctx context.Context, req *ModuleRequest) (_ *Modul
 	)
 
 	if err = PodmanModule(ctx, t.prepcmd, req.Image, req.Name, req.Mdir, options...); err != nil {
-		log.Println(err)
 		return nil, err
 	}
 

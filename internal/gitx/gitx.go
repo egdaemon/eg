@@ -1,6 +1,8 @@
 package gitx
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"log"
 
@@ -23,11 +25,53 @@ func Commitish(dir, treeish string) (_ string, err error) {
 
 	if hash, err = r.ResolveRevision(plumbing.Revision(treeish)); err != nil {
 		log.Println("unable to resolve git reference - commit will be empty", dir, treeish, err)
-
 		return "", errorsx.Wrapf(err, "unable to resolve git reference: %s - %s", treeish, dir)
 	}
 
 	return hash.String(), nil
+}
+
+func Clone(ctx context.Context, dir, uri, remote, treeish string) (err error) {
+	var (
+		r *git.Repository
+	)
+
+	branchRefName := plumbing.NewBranchReferenceName(treeish)
+
+	if r, err = git.PlainOpen(dir); err == nil {
+		remote, err := r.Remote(remote)
+		if err != nil {
+			return errorsx.Wrapf(err, "unable to find remote: '%s'", remote)
+		}
+
+		if err = remote.FetchContext(ctx, &git.FetchOptions{}); errors.Is(err, git.NoErrAlreadyUpToDate) {
+			return nil
+		} else if err != nil {
+			return errorsx.Wrap(err, "unable to fetch")
+		}
+
+		w, err := r.Worktree()
+		if err != nil {
+			return err
+		}
+
+		branchCoOpts := git.CheckoutOptions{
+			Branch: plumbing.ReferenceName(branchRefName),
+			Force:  true,
+		}
+
+		return errorsx.Wrapf(w.Checkout(&branchCoOpts), "unable to checkout '%s'", treeish)
+	} else {
+		log.Println("repository is missing attempting clone", err)
+	}
+
+	_, err = git.PlainCloneContext(ctx, dir, false, &git.CloneOptions{
+		URL:               uri,
+		ReferenceName:     branchRefName,
+		RecurseSubmodules: git.DefaultSubmoduleRecursionDepth,
+	})
+
+	return err
 }
 
 func Remote(dir, name string) (_ string, err error) {
@@ -47,8 +91,8 @@ func Remote(dir, name string) (_ string, err error) {
 	return slicesx.FirstOrZero(remote.Config().URLs...), nil
 }
 
-func Env(dir string, remote string, treeish string) (env []string, err error) {
-	commit, err := Commitish(dir, treeish)
+func Env(dir string, remote string, branch string) (env []string, err error) {
+	commit, err := Commitish(dir, branch)
 	if err != nil {
 		return nil, err
 	}
@@ -57,8 +101,10 @@ func Env(dir string, remote string, treeish string) (env []string, err error) {
 	if err != nil {
 		return nil, err
 	}
+	env = append(env, fmt.Sprintf("EG_GIT_BRANCH=%s", branch))
 	env = append(env, fmt.Sprintf("EG_GIT_COMMIT=%s", commit))
-	env = append(env, fmt.Sprintf("EG_GIT_REMOTE=%s", uri))
+	env = append(env, fmt.Sprintf("EG_GIT_REMOTE=%s", remote))
+	env = append(env, fmt.Sprintf("EG_GIT_URI=%s", uri))
 
 	return env, nil
 }

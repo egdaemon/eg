@@ -194,6 +194,16 @@ func (t *builder) FromEnviron(environ ...string) *builder {
 	return t
 }
 
+func (t *builder) FromKeys(keys ...string) *builder {
+	for _, k := range keys {
+		if v, ok := os.LookupEnv(k); ok {
+			t.environ = append(t.environ, fmt.Sprintf("%s=%v", k, v))
+		}
+	}
+
+	return t
+}
+
 func Build() *builder {
 	return &builder{}
 }

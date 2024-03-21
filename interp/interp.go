@@ -133,7 +133,10 @@ func Remote(ctx context.Context, runid string, g ffigraph.Eventer, svc grpc.Clie
 		})).Export("github.com/egdaemon/eg/runtime/wasi/runtime/ffiexec.Command").
 			NewFunctionBuilder().WithFunc(
 			ffigit.Commitish(r.root),
-		).Export("github.com/egdaemon/eg/runtime/wasi/runtime/ffigit.Commitish")
+		).Export("github.com/egdaemon/eg/runtime/wasi/runtime/ffigit.Commitish").
+			NewFunctionBuilder().WithFunc(
+			ffigit.Clone(r.root),
+		).Export("github.com/egdaemon/eg/runtime/wasi/runtime/ffigit.Clone")
 	}
 
 	return r.perform(ctx, runid, module, runtimeenv)
@@ -228,7 +231,7 @@ func (t runner) perform(ctx context.Context, runid, path string, rtb runtimefn) 
 	).WithSysNanotime().WithSysWalltime().WithRandSource(rand.Reader)
 
 	environ := errorsx.Zero(envx.FromPath("/opt/egruntime/environ"))
-	envx.Debug(environ...)
+	// envx.Debug(environ...)
 	mcfg = wasix.Environ(mcfg, environ...)
 
 	wasienv, err := wasi_snapshot_preview1.NewBuilder(runtime).Instantiate(ctx)

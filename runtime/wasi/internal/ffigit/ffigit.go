@@ -27,3 +27,21 @@ func Commitish(ctx context.Context, treeish string) string {
 
 	return string(ffiguest.BytesRead(revisionptr, revisionlen))
 }
+
+func Clone(ctx context.Context, uri, remote, branch string) error {
+	uriptr, urilen := ffiguest.String(uri)
+	remoteptr, remotelen := ffiguest.String(remote)
+	treeishptr, treeishlen := ffiguest.String(branch)
+
+	errcode := clone(
+		ffiguest.ContextDeadline(ctx),
+		uriptr, urilen,
+		remoteptr, remotelen,
+		treeishptr, treeishlen,
+	)
+	if err := ffiguest.Error(errcode, fmt.Errorf("clone failed")); err != nil {
+		return err
+	}
+
+	return nil
+}

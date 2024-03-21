@@ -44,34 +44,54 @@ import (
 )
 
 type runner struct {
-	Dir           string `name:"directory" help:"root directory of the repository" default:"${vars_cwd}"`
-	ModuleDir     string `name:"moduledir" help:"must be a subdirectory in the provided directory" default:".eg"`
-	Name          string `arg:"" name:"module" help:"name of the module to run, i.e. the folder name within moduledir" default:""`
-	Privileged    bool   `name:"privileged" help:"run the initial container in privileged mode"`
-	MountHome     bool   `name:"home" help:"mount home directory"`
-	MountEnvirons string `name:"environ" help:"environment file to pass to the module" default:""`
+	Dir           string   `name:"directory" help:"root directory of the repository" default:"${vars_cwd}"`
+	ModuleDir     string   `name:"moduledir" help:"must be a subdirectory in the provided directory" default:".eg"`
+	Name          string   `arg:"" name:"module" help:"name of the module to run, i.e. the folder name within moduledir" default:""`
+	Privileged    bool     `name:"privileged" help:"run the initial container in privileged mode"`
+	Dirty         bool     `name:"dirty" help:"include user directories and environment variables"`
+	MountEnvirons string   `name:"environ" help:"environment file to pass to the module" default:""`
+	EnvVars       []string `name:"env" short:"e" help:"environment variables to import" default:""`
 }
 
 func (t runner) Run(ctx *cmdopts.Global) (err error) {
 	var (
-		ws           workspaces.Context
-		uid          = uuid.Must(uuid.NewV7())
-		ebuf         = make(chan *ffigraph.EventInfo)
-		cc           grpc.ClientConnInterface
-		mounthome    runners.AgentOption = runners.AgentOptionNoop
-		mountegbin   runners.AgentOption = runners.AgentOptionEGBin(langx.Must(exec.LookPath(os.Args[0])))
-		mountenviron runners.AgentOption = runners.AgentOptionEnviron(t.MountEnvirons)
+		ws         workspaces.Context
+		uid        = uuid.Must(uuid.NewV7())
+		ebuf       = make(chan *ffigraph.EventInfo)
+		environio  *os.File
+		cc         grpc.ClientConnInterface
+		envvar     runners.AgentOption = runners.AgentOptionNoop
+		mounthome  runners.AgentOption = runners.AgentOptionNoop
+		mountegbin runners.AgentOption = runners.AgentOptionEGBin(langx.Must(exec.LookPath(os.Args[0])))
 	)
 
 	if ws, err = workspaces.New(ctx.Context, t.Dir, t.ModuleDir, t.Name); err != nil {
 		return err
 	}
 
-	if t.MountHome {
-		mounthome = runners.AgentOptionAutoMountHome(langx.Must(os.UserHomeDir()))
+	environpath := filepath.Join(ws.Root, ws.RunnerDir, "environ.env")
+	if environio, err = os.Create(environpath); err != nil {
+		return errorsx.Wrap(err, "unable to open the environment variable file")
+	}
+	defer environio.Close()
+
+	envb := envx.Build().
+		FromPath(t.MountEnvirons).
+		FromKeys(t.EnvVars...).
+		FromEnviron(errorsx.Zero(gitx.Env(ws.Root, "origin", "main"))...)
+
+	if err = envb.CopyTo(environio); err != nil {
+		return errorsx.Wrap(err, "unable to generate environment")
 	}
 
-	if cc, err = daemons.AutoRunnerClient(ctx, ws, uid.String(), mounthome, mountegbin, mountenviron); err != nil {
+	if t.Dirty {
+		mounthome = runners.AgentOptionAutoMountHome(langx.Must(os.UserHomeDir()))
+		envvar = runners.AgentOptionEnvKeys(
+			os.Environ()...,
+		)
+	}
+
+	if cc, err = daemons.AutoRunnerClient(ctx, ws, uid.String(), mounthome, mountegbin, envvar, runners.AgentOptionEnviron(environpath)); err != nil {
 		return err
 	}
 

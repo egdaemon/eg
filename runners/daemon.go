@@ -11,6 +11,7 @@ import (
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/egdaemon/eg/internal/envx"
+	"github.com/egdaemon/eg/internal/stringsx"
 	"github.com/egdaemon/eg/interp/c8s"
 	"github.com/egdaemon/eg/interp/events"
 	"github.com/egdaemon/eg/workspaces"
@@ -31,12 +32,27 @@ type AgentOption func(*Agent)
 
 func AgentOptionNoop(*Agent) {}
 
-func AgentOptionAutoMountHome(home string) AgentOption {
-	if strings.TrimSpace(home) == "" {
-		return AgentOptionNoop
+func AgentMountSpec(src, dst, mode string) string {
+	if strings.TrimSpace(src) == "" {
+		return ""
 	}
 
-	return AgentOptionMounts(fmt.Sprintf("%s:/root:O", home))
+	if strings.TrimSpace(dst) == "" {
+		return ""
+	}
+
+	return fmt.Sprintf("%s:%s:%s", src, dst, stringsx.DefaultIfBlank(mode, "ro"))
+}
+
+func AgentMountReadOnly(src, dst string) string {
+	return AgentMountSpec(src, dst, "ro")
+}
+
+func AgentOptionAutoMountHome(home string) AgentOption {
+	return AgentOptionMounts(
+		AgentMountSpec(home, "/root", "O"),
+		AgentMountReadOnly(envx.String("", "XDG_RUNTIME_DIR"), envx.String("", "XDG_RUNTIME_DIR")),
+	)
 }
 
 func AgentOptionAutoEGBin() AgentOption {
@@ -44,29 +60,40 @@ func AgentOptionAutoEGBin() AgentOption {
 }
 
 func AgentOptionEGBin(egbin string) AgentOption {
-	if strings.TrimSpace(egbin) == "" {
-		return AgentOptionNoop
-	}
-
-	return AgentOptionMounts(fmt.Sprintf("%s:/opt/egbin:ro", egbin))
+	return AgentOptionMounts(AgentMountReadOnly(egbin, "/opt/egbin"))
 }
 
 func AgentOptionEnviron(environpath string) AgentOption {
-	if strings.TrimSpace(environpath) == "" {
-		return AgentOptionNoop
-	}
-
-	return AgentOptionMounts(fmt.Sprintf("%s:/opt/egruntime/environ:ro", environpath))
+	return AgentOptionMounts(AgentMountReadOnly(environpath, "/opt/egruntime/environ"))
 }
 
 func AgentOptionMounts(desc ...string) AgentOption {
 	vs := []string{}
 	for _, v := range desc {
+		if strings.TrimSpace(v) == "" {
+			continue
+		}
+
 		vs = append(vs, "--volume", v)
 	}
 
 	return func(a *Agent) {
 		a.volumes = append(a.volumes, vs...)
+	}
+}
+
+func AgentOptionEnvKeys(keys ...string) AgentOption {
+	vs := []string{}
+	for _, v := range keys {
+		if v = strings.TrimSpace(v); v == "" {
+			continue
+		}
+
+		vs = append(vs, "--env", v)
+	}
+
+	return func(a *Agent) {
+		a.environ = append(a.environ, vs...)
 	}
 }
 
@@ -133,6 +160,7 @@ func NewRunner(ctx context.Context, root string, ws workspaces.Context, id strin
 type Agent struct {
 	id      string
 	workdir string
+	environ []string
 	volumes []string
 	ws      workspaces.Context
 	control net.Listener
@@ -164,10 +192,14 @@ func (t Agent) background() {
 
 	events.NewServiceDispatch(t.evtlog).Bind(t.srv)
 
+	containerOpts := []string{}
+	containerOpts = append(containerOpts, t.volumes...)
+	containerOpts = append(containerOpts, t.environ...)
+
 	c8s.NewServiceProxy(
 		t.ws,
 		t.workdir,
-		c8s.ServiceProxyOptionEnviron(
+		c8s.ServiceProxyOptionCommandEnviron(
 			append(
 				os.Environ(),
 				fmt.Sprintf("CI=%s", envx.String("", "EG_CI", "CI")),
@@ -176,8 +208,8 @@ func (t Agent) background() {
 				fmt.Sprintf("EG_ROOT_DIRECTORY=%s", t.workdir),
 			)...,
 		),
-		c8s.ServiceProxyOptionVolumes(
-			t.volumes...,
+		c8s.ServiceProxyOptionContainerOptions(
+			containerOpts...,
 		),
 	).Bind(t.srv)
 

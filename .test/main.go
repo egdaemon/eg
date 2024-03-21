@@ -3,9 +3,9 @@ package main
 import (
 	"context"
 	"log"
-	"os"
 	"time"
 
+	"github.com/egdaemon/eg/runtime/wasi/eggit"
 	"github.com/egdaemon/eg/runtime/wasi/env"
 	"github.com/egdaemon/eg/runtime/wasi/shell"
 	"github.com/egdaemon/eg/runtime/wasi/yak"
@@ -16,7 +16,7 @@ func Op1(ctx context.Context, op yak.Op) error {
 	defer log.Println("op1 completed")
 	return shell.Run(
 		ctx,
-		shell.New("env").Environ("USER", "root"),
+		shell.New("true").Environ("USER", "root"),
 	)
 }
 
@@ -70,9 +70,9 @@ func main() {
 	ctx, done := context.WithTimeout(context.Background(), time.Hour)
 	defer done()
 
-	log.Println("main module")
+	log.Println("main module initiated")
+	defer log.Println("main module completed")
 
-	env.Debug(os.Environ()...)
 	if environ, err := env.FromPath("/opt/egruntime/environ"); err != nil {
 		env.Debug(environ...)
 	}
@@ -82,8 +82,9 @@ func main() {
 
 	err := yak.Perform(
 		ctx,
+		eggit.AutoClone,
 		yak.Build(c1),
-		yak.Module(ctx, c1, Op1),
+		yak.Module(ctx, c1, DaemonTests),
 	)
 	if err != nil {
 		log.Fatalln(err)

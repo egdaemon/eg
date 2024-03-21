@@ -305,28 +305,13 @@ func (t upload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 	}
 	defer environio.Close()
 
-	if t.Dirty {
-		for _, e := range os.Environ() {
-			if _, err = fmt.Fprintf(environio, "%s\n", e); err != nil {
-				return errorsx.Wrap(err, "unable to write environment variable")
-			}
-		}
-	}
+	envb := envx.Build().
+		FromEnviron(envx.Dirty(t.Dirty)...).
+		FromEnviron(t.Environment...).
+		FromEnviron(errorsx.Zero(gitx.Env(ws.Root, "origin", "HEAD"))...)
 
-	for _, e := range t.Environment {
-		if _, err = fmt.Fprintf(environio, "%s\n", e); err != nil {
-			return errorsx.Wrap(err, "unable to write environment variable")
-		}
-	}
-
-	if gitenv, err := gitx.Env(ws.Root, "origin", "HEAD"); err != nil {
-		return errorsx.Wrap(err, "unable to write git information to environment variables")
-	} else {
-		for _, e := range gitenv {
-			if _, err = fmt.Fprintf(environio, "%s\n", e); err != nil {
-				return errorsx.Wrap(err, "unable to write environment variable")
-			}
-		}
+	if err = envb.CopyTo(environio); err != nil {
+		return errorsx.Wrap(err, "unable to write environment variables buffer")
 	}
 
 	if err = iox.Rewind(environio); err != nil {

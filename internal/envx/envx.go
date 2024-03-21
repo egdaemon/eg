@@ -157,17 +157,52 @@ type builder struct {
 	failed  error
 }
 
+func (t builder) CopyTo(w io.Writer) error {
+	if t.failed != nil {
+		return t.failed
+	}
+
+	for _, e := range t.environ {
+		if _, err := fmt.Fprintf(w, "%s\n", e); err != nil {
+			return errorsx.Wrapf(err, "unable to write environment variable: %s", e)
+		}
+	}
+
+	return nil
+}
+
 func (t builder) Environ() ([]string, error) {
 	return t.environ, t.failed
 }
 
-func (t builder) FromPath(n string) builder {
+func (t *builder) FromPath(n string) *builder {
 	tmp, err := FromPath(n)
 	t.environ = append(t.environ, tmp...)
 	t.failed = errors.Join(t.failed, err)
 	return t
 }
 
-func Build() builder {
-	return builder{}
+func (t *builder) FromReader(r io.Reader) *builder {
+	tmp, err := FromReader(r)
+	t.environ = append(t.environ, tmp...)
+	t.failed = errors.Join(t.failed, err)
+	return t
+}
+
+func (t *builder) FromEnviron(environ ...string) *builder {
+	t.environ = append(t.environ, environ...)
+	return t
+}
+
+func Build() *builder {
+	return &builder{}
+}
+
+// returns the os.Environ or an empty slice if b is false.
+func Dirty(b bool) []string {
+	if b {
+		return os.Environ()
+	}
+
+	return nil
 }

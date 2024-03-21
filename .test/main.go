@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"log"
+	"os"
 	"time"
 
 	"github.com/egdaemon/eg/runtime/wasi/env"
@@ -70,6 +71,8 @@ func main() {
 
 	log.Println("main module")
 
+	env.Debug(os.Environ()...)
+	// fsx.PrintFS(os.DirFS("/opt/egruntime/environ"))
 	// c1 := yak.Container("ubuntu.22.04").BuildFromFile(string(langx.Must(fs.ReadFile(embedded, "Containerfile"))))
 	c1 := yak.Container("ubuntu.22.04").BuildFromFile(".test/Containerfile")
 	// c1 := yak.Container("ubuntu.22.04").PullFrom("ubuntu:jammy")

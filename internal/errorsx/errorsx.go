@@ -29,6 +29,19 @@ func MaybeLog(err error) {
 	}
 }
 
+// Zero logs that the error occurred but otherwise ignores it.
+func Zero[T any](v T, err error) T {
+	if err == nil {
+		return v
+	}
+
+	if cause := log.Output(2, fmt.Sprintln(err)); cause != nil {
+		panic(cause)
+	}
+
+	return v
+}
+
 func Must(err error) {
 	if err == nil {
 		return
@@ -43,6 +56,10 @@ func Wrap(err error, m string) error {
 
 func Wrapf(err error, format string, args ...interface{}) error {
 	return errors.Wrapf(err, format, args...)
+}
+
+func WithStack(err error) error {
+	return errors.WithStack(err)
 }
 
 func Ignore(err error, ignore ...error) error {

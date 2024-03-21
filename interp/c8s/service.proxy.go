@@ -9,7 +9,6 @@ import (
 	"path/filepath"
 
 	"github.com/egdaemon/eg/internal/debugx"
-	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/systemx"
 	"github.com/egdaemon/eg/runtime/wasi/langx"
 	"github.com/egdaemon/eg/workspaces"
@@ -129,11 +128,12 @@ func (t *ProxyService) Run(ctx context.Context, req *RunRequest) (_ *RunResponse
 
 // Module implements ProxyServer.
 func (t *ProxyService) Module(ctx context.Context, req *ModuleRequest) (_ *ModuleResponse, err error) {
-	log.Println("PROXY CONTAINER MODULE INITIATED", langx.Must(os.Getwd()), envx.String("eg", "EG_BIN"))
-	defer log.Println("PROXY CONTAINER MODULE COMPLETED", langx.Must(os.Getwd()), envx.String("eg", "EG_BIN"))
+	log.Println("PROXY CONTAINER MODULE INITIATED", langx.Must(os.Getwd()))
+	defer log.Println("PROXY CONTAINER MODULE COMPLETED", langx.Must(os.Getwd()))
 
-	options := append(
-		req.Options,
+	options := append(req.Options, t.volumes...)
+	options = append(
+		options,
 		"--volume", fmt.Sprintf("%s:/opt/eg:O", t.ws.Root),
 		"--volume", fmt.Sprintf("%s:/opt/egruntime", t.runtimedir),
 	)
@@ -145,7 +145,6 @@ func (t *ProxyService) Module(ctx context.Context, req *ModuleRequest) (_ *Modul
 			"--volume", fmt.Sprintf("%s:/opt/egruntime/environ:ro", envpath),
 		)
 	}
-	options = append(options, t.volumes...)
 
 	if err = PodmanModule(ctx, t.prepcmd, req.Image, req.Name, req.Mdir, options...); err != nil {
 		log.Println(err)

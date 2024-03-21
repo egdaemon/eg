@@ -39,6 +39,18 @@ func AgentOptionAutoMountHome(home string) AgentOption {
 	return AgentOptionMounts(fmt.Sprintf("%s:/root:O", home))
 }
 
+func AgentOptionAutoEGBin() AgentOption {
+	return AgentOptionEGBin(envx.String("", "EG_BIN"))
+}
+
+func AgentOptionEGBin(egbin string) AgentOption {
+	if strings.TrimSpace(egbin) == "" {
+		return AgentOptionNoop
+	}
+
+	return AgentOptionMounts(fmt.Sprintf("%s:/opt/egbin:ro", egbin))
+}
+
 func AgentOptionMounts(desc ...string) AgentOption {
 	vs := []string{}
 	for _, v := range desc {

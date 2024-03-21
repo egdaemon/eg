@@ -23,3 +23,7 @@ func Float64(fallback float64, keys ...string) float64 {
 func Debug(envs ...string) {
 	envx.Debug(envs...)
 }
+
+func FromPath(n string) (environ []string, err error) {
+	return envx.FromPath(n)
+}

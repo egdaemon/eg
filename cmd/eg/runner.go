@@ -44,20 +44,25 @@ import (
 )
 
 type runner struct {
-	Dir        string `name:"directory" help:"root directory of the repository" default:"${vars_cwd}"`
-	ModuleDir  string `name:"moduledir" help:"must be a subdirectory in the provided directory" default:".eg"`
-	Name       string `arg:"" name:"module" help:"name of the module to run, i.e. the folder name within moduledir" default:""`
-	Privileged bool   `name:"privileged" help:"run the initial container in privileged mode"`
-	MountHome  bool   `name:"home" help:"mount home directory"`
+	Dir           string `name:"directory" help:"root directory of the repository" default:"${vars_cwd}"`
+	ModuleDir     string `name:"moduledir" help:"must be a subdirectory in the provided directory" default:".eg"`
+	Name          string `arg:"" name:"module" help:"name of the module to run, i.e. the folder name within moduledir" default:""`
+	Privileged    bool   `name:"privileged" help:"run the initial container in privileged mode"`
+	MountHome     bool   `name:"home" help:"mount home directory"`
+	MountEnvirons string `name:"environ" help:"environment file to pass to the module" default:""`
 }
 
 func (t runner) Run(ctx *cmdopts.Global) (err error) {
 	var (
-		ws        workspaces.Context
-		uid       = uuid.Must(uuid.NewV7())
-		ebuf      = make(chan *ffigraph.EventInfo)
-		cc        grpc.ClientConnInterface
-		mounthome runners.AgentOption = runners.AgentOptionNoop
+		ws           workspaces.Context
+		uid          = uuid.Must(uuid.NewV7())
+		ebuf         = make(chan *ffigraph.EventInfo)
+		cc           grpc.ClientConnInterface
+		mounthome    runners.AgentOption = runners.AgentOptionNoop
+		mountegbin   runners.AgentOption = runners.AgentOptionEGBin(langx.Must(exec.LookPath(os.Args[0])))
+		mountenviron runners.AgentOption = runners.AgentOptionMounts(
+			fmt.Sprintf("%s:/opt/egruntime/environ:ro", t.MountEnvirons),
+		)
 	)
 
 	if ws, err = workspaces.New(ctx.Context, t.Dir, t.ModuleDir, t.Name); err != nil {
@@ -68,7 +73,7 @@ func (t runner) Run(ctx *cmdopts.Global) (err error) {
 		mounthome = runners.AgentOptionAutoMountHome(langx.Must(os.UserHomeDir()))
 	}
 
-	if cc, err = daemons.AutoRunnerClient(ctx, ws, uid.String(), mounthome); err != nil {
+	if cc, err = daemons.AutoRunnerClient(ctx, ws, uid.String(), mounthome, mountegbin, mountenviron); err != nil {
 		return err
 	}
 
@@ -163,8 +168,6 @@ func (t runner) Run(ctx *cmdopts.Global) (err error) {
 			options = append(options, "--privileged")
 		}
 		options = append(options,
-			"--env", "EG_BIN",
-			"--volume", fmt.Sprintf("%s:/opt/egbin:ro", langx.Must(exec.LookPath(os.Args[0]))), // deprecated
 			"--volume", fmt.Sprintf("%s:/opt/egmodule.wasm:ro", m.Path),
 			"--volume", fmt.Sprintf("%s:/opt/eg:O", ws.Root),
 		)
@@ -197,7 +200,7 @@ func (t module) Run(ctx *cmdopts.Global) (err error) {
 	)
 
 	// TODO: fill out workspaces...
-	if cc, err = daemons.AutoRunnerClient(ctx, workspaces.Context{}, uid); err != nil {
+	if cc, err = daemons.AutoRunnerClient(ctx, workspaces.Context{}, uid, runners.AgentOptionAutoEGBin()); err != nil {
 		return err
 	}
 	go func() {
@@ -225,9 +228,6 @@ func (t module) Run(ctx *cmdopts.Global) (err error) {
 			}
 		}
 	}()
-
-	// envx.Print(os.Environ())
-	// fsx.PrintFS(os.DirFS("/opt/egruntime"))
 
 	return interp.Remote(
 		ctx.Context,

@@ -66,6 +66,7 @@ func BuildContainer(r yak.Runner) yak.OpFn {
 // main defines the setup for the CI process. here is where you define all
 // of the environments and tasks you wish to run.
 func main() {
+	log.SetFlags(log.Flags() | log.Lshortfile)
 	ctx, done := context.WithTimeout(context.Background(), time.Hour)
 	defer done()
 

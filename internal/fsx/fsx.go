@@ -31,7 +31,8 @@ func PrintFS(d fs.FS) {
 			return err
 		}
 
-		errorsx.MaybeLog(log.Output(2, fmt.Sprintln(path)))
+		info := errorsx.Zero(d.Info())
+		errorsx.MaybeLog(log.Output(4, fmt.Sprintf("%v %4d %s\n", info.Mode(), info.Size(), path)))
 
 		return nil
 	})

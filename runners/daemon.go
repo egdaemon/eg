@@ -51,6 +51,14 @@ func AgentOptionEGBin(egbin string) AgentOption {
 	return AgentOptionMounts(fmt.Sprintf("%s:/opt/egbin:ro", egbin))
 }
 
+func AgentOptionEnviron(environpath string) AgentOption {
+	if strings.TrimSpace(environpath) == "" {
+		return AgentOptionNoop
+	}
+
+	return AgentOptionMounts(fmt.Sprintf("%s:/opt/egruntime/environ:ro", environpath))
+}
+
 func AgentOptionMounts(desc ...string) AgentOption {
 	vs := []string{}
 	for _, v := range desc {

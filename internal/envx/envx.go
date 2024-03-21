@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"io"
 	"log"
 	"net/url"
@@ -121,10 +122,10 @@ func envval[T any](fallback T, parse func(string) (T, error), keys ...string) T 
 }
 
 func Debug(envs ...string) {
-	log.Println("DEBUG ENVIRONMENT INITIATED")
-	defer log.Println("DEBUG ENVIRONMENT COMPLETED")
+	errorsx.MaybeLog(log.Output(2, fmt.Sprintln("DEBUG ENVIRONMENT INITIATED")))
+	defer func() { errorsx.MaybeLog(log.Output(3, "DEBUG ENVIRONMENT COMPLETED")) }()
 	for _, e := range envs {
-		log.Println(e)
+		errorsx.MaybeLog(log.Output(2, fmt.Sprintln(e)))
 	}
 }
 

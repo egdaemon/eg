@@ -60,9 +60,7 @@ func (t runner) Run(ctx *cmdopts.Global) (err error) {
 		cc           grpc.ClientConnInterface
 		mounthome    runners.AgentOption = runners.AgentOptionNoop
 		mountegbin   runners.AgentOption = runners.AgentOptionEGBin(langx.Must(exec.LookPath(os.Args[0])))
-		mountenviron runners.AgentOption = runners.AgentOptionMounts(
-			fmt.Sprintf("%s:/opt/egruntime/environ:ro", t.MountEnvirons),
-		)
+		mountenviron runners.AgentOption = runners.AgentOptionEnviron(t.MountEnvirons)
 	)
 
 	if ws, err = workspaces.New(ctx.Context, t.Dir, t.ModuleDir, t.Name); err != nil {

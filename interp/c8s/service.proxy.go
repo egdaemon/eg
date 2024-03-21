@@ -6,10 +6,8 @@ import (
 	"log"
 	"os"
 	"os/exec"
-	"path/filepath"
 
 	"github.com/egdaemon/eg/internal/debugx"
-	"github.com/egdaemon/eg/internal/systemx"
 	"github.com/egdaemon/eg/runtime/wasi/langx"
 	"github.com/egdaemon/eg/workspaces"
 	grpc "google.golang.org/grpc"
@@ -137,14 +135,6 @@ func (t *ProxyService) Module(ctx context.Context, req *ModuleRequest) (_ *Modul
 		"--volume", fmt.Sprintf("%s:/opt/eg:O", t.ws.Root),
 		"--volume", fmt.Sprintf("%s:/opt/egruntime", t.runtimedir),
 	)
-
-	envpath := filepath.Join(t.ws.Root, t.ws.RunnerDir, "environ.env")
-	if systemx.FileExists(envpath) {
-		options = append(
-			options,
-			"--volume", fmt.Sprintf("%s:/opt/egruntime/environ:ro", envpath),
-		)
-	}
 
 	if err = PodmanModule(ctx, t.prepcmd, req.Image, req.Name, req.Mdir, options...); err != nil {
 		log.Println(err)

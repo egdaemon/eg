@@ -28,6 +28,7 @@ import (
 	"github.com/egdaemon/eg/internal/slicesx"
 	"github.com/egdaemon/eg/internal/sshx"
 	"github.com/egdaemon/eg/internal/tarx"
+	"github.com/egdaemon/eg/internal/unsafepretty"
 	"github.com/egdaemon/eg/interp"
 	"github.com/egdaemon/eg/interp/c8s"
 	"github.com/egdaemon/eg/interp/events"
@@ -48,7 +49,7 @@ type runner struct {
 	ModuleDir     string   `name:"moduledir" help:"must be a subdirectory in the provided directory" default:".eg"`
 	Name          string   `arg:"" name:"module" help:"name of the module to run, i.e. the folder name within moduledir" default:""`
 	Privileged    bool     `name:"privileged" help:"run the initial container in privileged mode"`
-	Dirty         bool     `name:"dirty" help:"include user directories and environment variables"`
+	Dirty         bool     `name:"dirty" help:"include user directories and environment variables" hidden:"true"`
 	MountEnvirons string   `name:"environ" help:"environment file to pass to the module" default:""`
 	EnvVars       []string `name:"env" short:"e" help:"environment variables to import" default:""`
 }
@@ -334,6 +335,8 @@ func (t upload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 	}
 	defer environio.Close()
 
+	log.Println("DERP DERP", t.Environment)
+
 	envb := envx.Build().
 		FromEnviron(envx.Dirty(t.Dirty)...).
 		FromEnviron(t.Environment...).
@@ -347,7 +350,7 @@ func (t upload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 		return errorsx.Wrap(err, "unable to rewind environment variables buffer")
 	}
 
-	// log.Println("environment\n", iox.String(environio))
+	log.Printf("environment\n%s\n", unsafepretty.Print(iox.String(environio), unsafepretty.OptionDisplaySpaces()))
 
 	if archiveio, err = os.CreateTemp(tmpdir, "kernel.*.tar.gz"); err != nil {
 		return errorsx.Wrap(err, "unable to open the kernel archive")

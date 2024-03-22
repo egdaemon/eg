@@ -17,11 +17,12 @@ import (
 )
 
 type daemon struct {
-	AccountID  string `name:"account" help:"account to register runner with" default:"${vars_account_id}" required:"true"`
-	MachineID  string `name:"machine" help:"unique id for this particular machine" default:"${vars_machine_id}" required:"true"`
-	Seed       string `name:"secret" help:"seed for generating ssh credentials in a consistent manner"`
-	SSHKeyPath string `name:"sshkeypath" help:"path to ssh key to use" default:"${vars_ssh_key_path}"`
-	CacheDir   string `name:"directory" help:"root directory of the repository" default:"${vars_cache_directory}"`
+	AccountID    string `name:"account" help:"account to register runner with" default:"${vars_account_id}" required:"true"`
+	MachineID    string `name:"machine" help:"unique id for this particular machine" default:"${vars_machine_id}" required:"true"`
+	Seed         string `name:"secret" help:"seed for generating ssh credentials in a consistent manner"`
+	SSHKeyPath   string `name:"sshkeypath" help:"path to ssh key to use" default:"${vars_ssh_key_path}"`
+	CacheDir     string `name:"directory" help:"root directory of the repository" default:"${vars_cache_directory}"`
+	SSHAgentPath string `name:"sshagentpath" help:"ssh agent socket path" default:"${vars_cwd}/ssh.agent.socket"`
 }
 
 // essentially we use ssh forwarding from the control plane to the local http server
@@ -85,5 +86,20 @@ func (t daemon) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 
 	go runners.AutoDownload(gctx.Context, authclient)
 
-	return runners.Queue(gctx.Context)
+	log.Println("DERP DERP", t.SSHAgentPath)
+	if err = daemons.SSHAgent(gctx, t.SSHAgentPath); err != nil {
+		return err
+	}
+
+	return runners.Queue(
+		gctx.Context,
+		runners.QueueOptionAgentOpts(
+			runners.AgentOptionMounts(
+				runners.AgentMountReadWrite(
+					t.SSHAgentPath,
+					"/opt/egruntime/ssh.agent.socket",
+				),
+			),
+		),
+	)
 }

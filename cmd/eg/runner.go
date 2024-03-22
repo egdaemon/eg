@@ -91,7 +91,16 @@ func (t runner) Run(ctx *cmdopts.Global) (err error) {
 		)
 	}
 
-	if cc, err = daemons.AutoRunnerClient(ctx, ws, uid.String(), mounthome, mountegbin, envvar, runners.AgentOptionEnviron(environpath)); err != nil {
+	if cc, err = daemons.AutoRunnerClient(
+		ctx,
+		ws,
+		uid.String(),
+		mounthome,
+		mountegbin,
+		envvar,
+		runners.AgentOptionEnviron(environpath),
+		runners.AgentOptionMounts(runners.AgentMountReadWrite(filepath.Join(ws.Root, ws.CacheDir), "/cache")),
+	); err != nil {
 		return err
 	}
 
@@ -185,9 +194,9 @@ func (t runner) Run(ctx *cmdopts.Global) (err error) {
 		if t.Privileged {
 			options = append(options, "--privileged")
 		}
+
 		options = append(options,
-			"--volume", fmt.Sprintf("%s:/opt/egmodule.wasm:ro", m.Path),
-			"--volume", fmt.Sprintf("%s:/opt/eg:O", ws.Root),
+			"--volume", runners.AgentMountReadOnly(m.Path, "/opt/egmodule.wasm"),
 		)
 		_, err = runner.Module(ctx.Context, &c8s.ModuleRequest{
 			Image:   "eg",

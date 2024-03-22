@@ -90,7 +90,7 @@ func ensuredirs(c Context) (_ Context, err error) {
 
 		return nil
 	}
-	return c, mkdirs(c.RunnerDir, c.GenModDir, c.BuildDir)
+	return c, mkdirs(c.RunnerDir, c.GenModDir, c.BuildDir, c.CacheDir)
 }
 
 func cacheid(ctx context.Context, root string, mdir string, cacheid hash.Hash, ignore ignorable) error {

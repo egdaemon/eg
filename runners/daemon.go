@@ -48,6 +48,10 @@ func AgentMountReadOnly(src, dst string) string {
 	return AgentMountSpec(src, dst, "ro")
 }
 
+func AgentMountReadWrite(src, dst string) string {
+	return AgentMountSpec(src, dst, "rw")
+}
+
 func AgentOptionAutoMountHome(home string) AgentOption {
 	return AgentOptionMounts(
 		AgentMountSpec(home, "/root", "O"),

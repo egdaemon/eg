@@ -133,7 +133,7 @@ func (t *ProxyService) Module(ctx context.Context, req *ModuleRequest) (_ *Modul
 	options = append(
 		options,
 		"--volume", fmt.Sprintf("%s:/opt/eg:O", t.ws.Root),
-		"--volume", fmt.Sprintf("%s:/opt/egruntime", t.runtimedir),
+		"--volume", fmt.Sprintf("%s:/opt/egruntime:ro", t.runtimedir),
 	)
 
 	if err = PodmanModule(ctx, t.prepcmd, req.Image, req.Name, req.Mdir, options...); err != nil {

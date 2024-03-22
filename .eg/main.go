@@ -34,7 +34,6 @@ func BuildDebian(ctx context.Context, _ yak.Op) error {
 			Environ("GOWORK", "off"),
 		shell.New("/usr/lib/go-1.21/bin/go version"),
 		shell.New("/usr/lib/go-1.21/bin/go build -buildvcs ./cmd/...").
-			Environ("GOPROXY", "off").
 			Directory(".dist/deb/src"),
 		shell.New("debuild -S -k1472F4128AD327A04323220509F9FEB7D4D09CF4").Directory(".dist/deb"),
 		shell.New("dput -f -c deb/dput.config eg eg_${VERSION}_source.changes").Directory(".dist"),

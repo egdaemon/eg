@@ -3,10 +3,12 @@ package main
 import (
 	"context"
 	"log"
+	"os"
 	"time"
 
 	"github.com/egdaemon/eg/runtime/wasi/eggit"
 	"github.com/egdaemon/eg/runtime/wasi/env"
+	"github.com/egdaemon/eg/runtime/wasi/fsx"
 	"github.com/egdaemon/eg/runtime/wasi/shell"
 	"github.com/egdaemon/eg/runtime/wasi/yak"
 )
@@ -73,9 +75,13 @@ func main() {
 	log.Println("main module initiated")
 	defer log.Println("main module completed")
 
-	if environ, err := env.FromPath("/opt/egruntime/environ"); err != nil {
+	if environ, err := env.FromPath("/opt/egruntime/environ"); err == nil {
 		env.Debug(environ...)
+	} else {
+		log.Println("DERP DERP", err)
 	}
+
+	fsx.PrintFS(os.DirFS("/opt/egruntime"))
 	// c1 := yak.Container("ubuntu.22.04").BuildFromFile(string(langx.Must(fs.ReadFile(embedded, "Containerfile"))))
 	c1 := yak.Container("ubuntu.22.04").BuildFromFile(".test/Containerfile")
 	// c1 := yak.Container("ubuntu.22.04").PullFrom("ubuntu:jammy")

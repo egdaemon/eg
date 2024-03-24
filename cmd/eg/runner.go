@@ -52,21 +52,24 @@ type runner struct {
 	Dirty         bool     `name:"dirty" help:"include user directories and environment variables" hidden:"true"`
 	MountEnvirons string   `name:"environ" help:"environment file to pass to the module" default:""`
 	EnvVars       []string `name:"env" short:"e" help:"environment variables to import" default:""`
+	SSHAgent      bool     `name:"sshagent" help:"enable ssh agent" hidden:"true"`
 }
 
-func (t runner) Run(ctx *cmdopts.Global) (err error) {
+func (t runner) Run(gctx *cmdopts.Global) (err error) {
 	var (
 		ws         workspaces.Context
 		uid        = uuid.Must(uuid.NewV7())
 		ebuf       = make(chan *ffigraph.EventInfo)
 		environio  *os.File
 		cc         grpc.ClientConnInterface
+		sshmount   runners.AgentOption = runners.AgentOptionNoop
+		sshenvvar  runners.AgentOption = runners.AgentOptionNoop
 		envvar     runners.AgentOption = runners.AgentOptionNoop
 		mounthome  runners.AgentOption = runners.AgentOptionNoop
 		mountegbin runners.AgentOption = runners.AgentOptionEGBin(langx.Must(exec.LookPath(os.Args[0])))
 	)
 
-	if ws, err = workspaces.New(ctx.Context, t.Dir, t.ModuleDir, t.Name); err != nil {
+	if ws, err = workspaces.New(gctx.Context, t.Dir, t.ModuleDir, t.Name); err != nil {
 		return err
 	}
 
@@ -81,22 +84,40 @@ func (t runner) Run(ctx *cmdopts.Global) (err error) {
 		FromKeys(t.EnvVars...).
 		FromEnviron(errorsx.Zero(gitx.Env(ws.Root, "origin", "main"))...)
 
-	if err = envb.CopyTo(environio); err != nil {
-		return errorsx.Wrap(err, "unable to generate environment")
-	}
-
 	if t.Dirty {
 		mounthome = runners.AgentOptionAutoMountHome(langx.Must(os.UserHomeDir()))
 		envvar = runners.AgentOptionEnvKeys(os.Environ()...)
 	}
 
+	if t.SSHAgent {
+		sshmount = runners.AgentOptionMounts(
+			runners.AgentMountOverlay(
+				filepath.Join(langx.Must(os.UserHomeDir()), ".ssh"),
+				"/root/.ssh",
+			),
+			runners.AgentMountReadWrite(
+				envx.String("", "SSH_AUTH_SOCK"),
+				"/opt/egruntime/ssh.agent.socket",
+			),
+		)
+
+		sshenvvar = runners.AgentOptionEnvKeys("SSH_AUTH_SOCK=/opt/egruntime/ssh.agent.socket")
+		envb.FromEnviron("SSH_AUTH_SOCK=/opt/egruntime/ssh.agent.socket")
+	}
+
+	if err = envb.CopyTo(environio); err != nil {
+		return errorsx.Wrap(err, "unable to generate environment")
+	}
+
 	if cc, err = daemons.AutoRunnerClient(
-		ctx,
+		gctx,
 		ws,
 		uid.String(),
 		mounthome,
 		mountegbin,
 		envvar,
+		sshmount,
+		sshenvvar,
 		runners.AgentOptionEnviron(environpath),
 		runners.AgentOptionMounts(runners.AgentMountReadWrite(filepath.Join(ws.Root, ws.CacheDir), "/cache")),
 	); err != nil {
@@ -145,10 +166,10 @@ func (t runner) Run(ctx *cmdopts.Global) (err error) {
 		c := events.NewEventsClient(cc)
 		for {
 			select {
-			case <-ctx.Context.Done():
+			case <-gctx.Context.Done():
 				return
 			case evt := <-ebuf:
-				if _, err := c.Dispatch(ctx.Context, events.NewDispatch(makeevt(evt))); err != nil {
+				if _, err := c.Dispatch(gctx.Context, events.NewDispatch(makeevt(evt))); err != nil {
 					log.Println("unable to dispatch event", err, spew.Sdump(evt))
 					continue
 				}
@@ -158,12 +179,12 @@ func (t runner) Run(ctx *cmdopts.Global) (err error) {
 
 	log.Println("cacheid", ws.CachedID)
 
-	roots, err := transpile.Autodetect(transpile.New(ws)).Run(ctx.Context)
+	roots, err := transpile.Autodetect(transpile.New(ws)).Run(gctx.Context)
 	if err != nil {
 		return err
 	}
 
-	modules, err := compile.FromTranspiled(ctx.Context, ws, roots...)
+	modules, err := compile.FromTranspiled(gctx.Context, ws, roots...)
 	if err != nil {
 		return err
 	}
@@ -176,7 +197,7 @@ func (t runner) Run(ctx *cmdopts.Global) (err error) {
 			return err
 		}
 
-		cmd := exec.CommandContext(ctx.Context, "podman", "build", "--timestamp", "0", "-t", "eg", "-f", rootc, t.Dir)
+		cmd := exec.CommandContext(gctx.Context, "podman", "build", "--timestamp", "0", "-t", "eg", "-f", rootc, t.Dir)
 		cmd.Stderr = os.Stderr
 		cmd.Stdin = os.Stdin
 		cmd.Stdout = os.Stdout
@@ -197,7 +218,7 @@ func (t runner) Run(ctx *cmdopts.Global) (err error) {
 		options = append(options,
 			"--volume", runners.AgentMountReadOnly(m.Path, "/opt/egmodule.wasm"),
 		)
-		_, err = runner.Module(ctx.Context, &c8s.ModuleRequest{
+		_, err = runner.Module(gctx.Context, &c8s.ModuleRequest{
 			Image:   "eg",
 			Name:    fmt.Sprintf("eg-%s", uid.String()),
 			Mdir:    ws.ModuleDir,

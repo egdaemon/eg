@@ -52,9 +52,15 @@ func AgentMountReadWrite(src, dst string) string {
 	return AgentMountSpec(src, dst, "rw")
 }
 
+// Mounts a path using a overlay FS making it mutable within the container
+// but those changes don't persist.
+func AgentMountOverlay(src, dst string) string {
+	return AgentMountSpec(src, dst, "O")
+}
+
 func AgentOptionAutoMountHome(home string) AgentOption {
 	return AgentOptionMounts(
-		AgentMountSpec(home, "/root", "O"),
+		AgentMountOverlay(home, "/root"),
 		AgentMountReadOnly(envx.String("", "XDG_RUNTIME_DIR"), envx.String("", "XDG_RUNTIME_DIR")),
 	)
 }

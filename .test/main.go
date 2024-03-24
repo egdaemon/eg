@@ -8,10 +8,20 @@ import (
 
 	"github.com/egdaemon/eg/runtime/wasi/eggit"
 	"github.com/egdaemon/eg/runtime/wasi/env"
-	"github.com/egdaemon/eg/runtime/wasi/fsx"
 	"github.com/egdaemon/eg/runtime/wasi/shell"
 	"github.com/egdaemon/eg/runtime/wasi/yak"
 )
+
+func Debug(ctx context.Context, op yak.Op) error {
+	log.Println("debug initiated")
+	defer log.Println("debug completed")
+	env.Debug(os.Environ()...)
+	return shell.Run(
+		ctx,
+		shell.New("ls -lha /opt/eg"),
+		shell.New("ssh -v -T git@github.com"),
+	)
+}
 
 func Op1(ctx context.Context, op yak.Op) error {
 	log.Println("op1 initiated")
@@ -22,10 +32,9 @@ func Op1(ctx context.Context, op yak.Op) error {
 	)
 }
 
-func Op2(context.Context, yak.Op) error {
+func Op2(ctx context.Context, op yak.Op) error {
 	log.Println("op2 initiated")
 	defer log.Println("op2 completed")
-
 	return nil
 }
 
@@ -47,6 +56,7 @@ func DaemonTests(ctx context.Context, _ yak.Op) error {
 	return yak.Perform(
 		ctx,
 		yak.Parallel(
+			Debug,
 			Op1,
 			Op2,
 			// yak.Module(ctx, c1, Op3),
@@ -81,13 +91,13 @@ func main() {
 		log.Println("DERP DERP", err)
 	}
 
-	fsx.PrintFS(os.DirFS("/opt/egruntime"))
 	// c1 := yak.Container("ubuntu.22.04").BuildFromFile(string(langx.Must(fs.ReadFile(embedded, "Containerfile"))))
 	c1 := yak.Container("ubuntu.22.04").BuildFromFile(".test/Containerfile")
 	// c1 := yak.Container("ubuntu.22.04").PullFrom("ubuntu:jammy")
 
 	err := yak.Perform(
 		ctx,
+		Debug,
 		eggit.AutoClone,
 		yak.Build(c1),
 		yak.Module(ctx, c1, DaemonTests),

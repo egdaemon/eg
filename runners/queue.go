@@ -68,18 +68,17 @@ func (t localdownloader) Download(ctx context.Context) (err error) {
 
 type metadata struct {
 	downloader
-	aoptions []AgentOption
+	agentopts []AgentOption
 }
 
 type QueueOption func(*metadata)
 
-func QueueOptionAgentOpts(opts ...AgentOption) QueueOption {
+func QueueOptionNoop(m *metadata) {}
+func QueueOptionAgentOptions(options ...AgentOption) QueueOption {
 	return func(m *metadata) {
-		m.aoptions = opts
+		m.agentopts = options
 	}
 }
-
-func QueueOptionNoop(m *metadata) {}
 
 // runs the scheduler until the context is cancelled.
 func Queue(ctx context.Context, options ...func(*metadata)) (err error) {
@@ -290,13 +289,13 @@ func beginwork(ctx context.Context, md metadata, dir string) state {
 	// environ := errorsx.Zero(envx.FromPath(environpath))
 	// envx.Debug(environ...)
 
-	aopts := []AgentOption(nil)
+	aopts := make([]AgentOption, 0, len(md.agentopts)+2)
+	aopts = append(aopts, md.agentopts...)
 	aopts = append(
 		aopts,
 		AgentOptionEGBin(errorsx.Zero(exec.LookPath(os.Args[0]))),
 		AgentOptionEnviron(environpath),
 	)
-	aopts = append(aopts, md.aoptions...)
 
 	if ragent, err = m.NewRun(ctx, ws, uid, aopts...); err != nil {
 		return failure(err, idle(md))

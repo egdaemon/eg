@@ -210,13 +210,11 @@ func (t Agent) background() {
 		t.ws,
 		t.workdir,
 		c8s.ServiceProxyOptionCommandEnviron(
-			append(
-				os.Environ(),
-				fmt.Sprintf("CI=%s", envx.String("", "EG_CI", "CI")),
-				fmt.Sprintf("EG_CI=%s", envx.String("", "EG_CI", "CI")),
-				fmt.Sprintf("EG_RUN_ID=%s", t.id),
-				fmt.Sprintf("EG_ROOT_DIRECTORY=%s", t.workdir),
-			)...,
+			fmt.Sprintf("PATH=%s", envx.String("", "PATH")),
+			fmt.Sprintf("CI=%s", envx.String("", "EG_CI", "CI")),
+			fmt.Sprintf("EG_CI=%s", envx.String("", "EG_CI", "CI")),
+			fmt.Sprintf("EG_RUN_ID=%s", t.id),
+			fmt.Sprintf("EG_ROOT_DIRECTORY=%s", t.workdir),
 		),
 		c8s.ServiceProxyOptionContainerOptions(
 			containerOpts...,

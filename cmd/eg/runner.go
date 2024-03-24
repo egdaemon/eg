@@ -354,8 +354,6 @@ func (t upload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 	}
 	defer environio.Close()
 
-	log.Println("DERP DERP", t.Environment)
-
 	envb := envx.Build().
 		FromEnviron(envx.Dirty(t.Dirty)...).
 		FromEnviron(t.Environment...).

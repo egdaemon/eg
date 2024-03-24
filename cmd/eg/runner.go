@@ -87,9 +87,7 @@ func (t runner) Run(ctx *cmdopts.Global) (err error) {
 
 	if t.Dirty {
 		mounthome = runners.AgentOptionAutoMountHome(langx.Must(os.UserHomeDir()))
-		envvar = runners.AgentOptionEnvKeys(
-			os.Environ()...,
-		)
+		envvar = runners.AgentOptionEnvKeys(os.Environ()...)
 	}
 
 	if cc, err = daemons.AutoRunnerClient(

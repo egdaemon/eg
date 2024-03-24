@@ -17,12 +17,14 @@ import (
 )
 
 type daemon struct {
-	AccountID    string `name:"account" help:"account to register runner with" default:"${vars_account_id}" required:"true"`
-	MachineID    string `name:"machine" help:"unique id for this particular machine" default:"${vars_machine_id}" required:"true"`
-	Seed         string `name:"secret" help:"seed for generating ssh credentials in a consistent manner"`
-	SSHKeyPath   string `name:"sshkeypath" help:"path to ssh key to use" default:"${vars_ssh_key_path}"`
-	CacheDir     string `name:"directory" help:"root directory of the repository" default:"${vars_cache_directory}"`
-	SSHAgentPath string `name:"sshagentpath" help:"ssh agent socket path" default:"${vars_cwd}/ssh.agent.socket"`
+	AccountID    string   `name:"account" help:"account to register runner with" default:"${vars_account_id}" required:"true"`
+	MachineID    string   `name:"machine" help:"unique id for this particular machine" default:"${vars_machine_id}" required:"true"`
+	Seed         string   `name:"secret" help:"seed for generating ssh credentials in a consistent manner"`
+	SSHKeyPath   string   `name:"sshkeypath" help:"path to ssh key to use" default:"${vars_ssh_key_path}"`
+	SSHAgentPath string   `name:"sshagentpath" help:"ssh agent socket path" default:"${vars_cwd}/ssh.agent.socket"`
+	CacheDir     string   `name:"directory" help:"local cache directory" default:"${vars_cache_directory}"`
+	MountDirs    []string `name:"mounts" short:"m" help:"folders to mount" default:""`
+	EnvVars      []string `name:"env" short:"e" help:"environment variables to import" default:""`
 }
 
 // essentially we use ssh forwarding from the control plane to the local http server
@@ -93,13 +95,15 @@ func (t daemon) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 
 	return runners.Queue(
 		gctx.Context,
-		runners.QueueOptionAgentOpts(
+		runners.QueueOptionAgentOptions(
 			runners.AgentOptionMounts(
 				runners.AgentMountReadWrite(
 					t.SSHAgentPath,
 					"/opt/egruntime/ssh.agent.socket",
 				),
 			),
+			runners.AgentOptionMounts(t.MountDirs...),
+			runners.AgentOptionEnvKeys(t.EnvVars...),
 		),
 	)
 }

@@ -36,6 +36,10 @@ func Clone(ctx context.Context, dir, uri, remote, treeish string) (err error) {
 		r *git.Repository
 	)
 
+	// envx.Debug(os.Environ()...)
+	// fsx.PrintFS(os.DirFS("/dev"))
+	// fsx.PrintFS(os.DirFS("/opt/egruntime"))
+
 	branchRefName := plumbing.NewBranchReferenceName(treeish)
 
 	if r, err = git.PlainOpen(dir); err == nil {

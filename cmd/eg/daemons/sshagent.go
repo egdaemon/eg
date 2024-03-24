@@ -13,6 +13,8 @@ import (
 )
 
 func SSHAgent(gctx *cmdopts.Global, socketpath string) error {
+	log.Println("ssh agent socket", socketpath)
+
 	s, err := net.Listen("unix", socketpath)
 	if err != nil {
 		return errorsx.Wrap(err, "ssh agent listen failed")
@@ -78,21 +80,3 @@ func (t sagent) Signers() ([]ssh.Signer, error) {
 	defer log.Println("SIGNERS COMPLETED")
 	return nil, fmt.Errorf("NOT IMPLEMENTED")
 }
-
-// go func() {
-// 	// keyring := agent.NewKeyring()
-
-// 	defer s.Close()
-// 	log.Println("SSH SOCKET", s.Addr().String())
-// 	for {
-// 		conn, err := s.Accept()
-// 		if err != nil {
-// 			errorsx.MaybeLog(errorsx.Wrap(err, "accept failed"))
-// 			return
-// 		}
-
-// 		go func() {
-// 			errorsx.MaybeLog(errorsx.Wrap(agent.ServeAgent(sagent{}, conn), "agent serving done"))
-// 		}()
-// 	}
-// }()

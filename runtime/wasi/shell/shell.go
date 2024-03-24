@@ -36,6 +36,13 @@ func (t Command) Timeout(d time.Duration) Command {
 	return t
 }
 
+// append a set of environment variables in the form KEY=VALUE to the environment.
+func (t Command) EnvironFrom(environ ...string) Command {
+	t.environ = append(t.environ, environ...)
+	return t
+}
+
+// append a specific key/value environment variable.
 func (t Command) Environ(k, v string) Command {
 	t.environ = append(t.environ, fmt.Sprintf("%s=%s", k, v))
 	return t

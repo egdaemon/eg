@@ -88,7 +88,6 @@ func (t daemon) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 
 	go runners.AutoDownload(gctx.Context, authclient)
 
-	log.Println("DERP DERP", t.SSHAgentPath)
 	if err = daemons.SSHAgent(gctx, t.SSHAgentPath); err != nil {
 		return err
 	}

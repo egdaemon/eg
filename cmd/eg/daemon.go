@@ -10,6 +10,7 @@ import (
 	"github.com/egdaemon/eg/authn"
 	"github.com/egdaemon/eg/cmd/cmdopts"
 	"github.com/egdaemon/eg/cmd/eg/daemons"
+	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/sshx"
 	"github.com/egdaemon/eg/runners"
 	"golang.org/x/crypto/ssh"
@@ -23,7 +24,7 @@ type daemon struct {
 	SSHKeyPath   string   `name:"sshkeypath" help:"path to ssh key to use" default:"${vars_ssh_key_path}"`
 	SSHAgentPath string   `name:"sshagentpath" help:"ssh agent socket path" default:"${vars_cwd}/ssh.agent.socket"`
 	CacheDir     string   `name:"directory" help:"local cache directory" default:"${vars_cache_directory}"`
-	MountDirs    []string `name:"mounts" short:"m" help:"folders to mount" default:""`
+	MountDirs    []string `name:"mounts" short:"m" help:"folders to mount using podman mount specs" default:""`
 	EnvVars      []string `name:"env" short:"e" help:"environment variables to import" default:""`
 }
 
@@ -97,10 +98,11 @@ func (t daemon) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 		runners.QueueOptionAgentOptions(
 			runners.AgentOptionMounts(
 				runners.AgentMountReadWrite(
-					t.SSHAgentPath,
+					envx.String(t.SSHAgentPath, "SSH_AUTH_SOCK"),
 					"/opt/egruntime/ssh.agent.socket",
 				),
 			),
+			runners.AgentOptionEnvKeys("SSH_AUTH_SOCK=/opt/egruntime/ssh.agent.socket"),
 			runners.AgentOptionMounts(t.MountDirs...),
 			runners.AgentOptionEnvKeys(t.EnvVars...),
 		),

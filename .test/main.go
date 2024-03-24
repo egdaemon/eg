@@ -19,7 +19,7 @@ func Debug(ctx context.Context, op yak.Op) error {
 	return shell.Run(
 		ctx,
 		shell.New("ls -lha /opt/eg"),
-		shell.New("ssh -v -T git@github.com"),
+		shell.New("ssh -v -T git@github.com || true"),
 	)
 }
 

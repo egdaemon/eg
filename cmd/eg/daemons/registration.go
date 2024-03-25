@@ -3,7 +3,6 @@ package daemons
 import (
 	"fmt"
 	"log"
-	"runtime"
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
@@ -13,12 +12,11 @@ import (
 	"github.com/egdaemon/eg/notary"
 	"github.com/egdaemon/eg/registration"
 	"github.com/golang-jwt/jwt/v4"
-	"github.com/pbnjay/memory"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/time/rate"
 )
 
-func Register(global *cmdopts.Global, tlsc *cmdopts.TLSConfig, aid, machineid string, s ssh.Signer) (err error) {
+func Register(global *cmdopts.Global, tlsc *cmdopts.TLSConfig, runtimecfg *cmdopts.RuntimeResources, aid, machineid string, s ssh.Signer) (err error) {
 	fingerprint := ssh.FingerprintSHA256(s.PublicKey())
 	log.Println("registering daemon with control plane initiated", aid, machineid, fingerprint)
 	defer log.Println("registering daemon with control plane completed", aid, machineid, fingerprint)
@@ -55,10 +53,10 @@ func Register(global *cmdopts.Global, tlsc *cmdopts.TLSConfig, aid, machineid st
 		regreq := &registration.RegistrationRequest{
 			Registration: &registration.Registration{
 				Description: fmt.Sprintf("%s - %s", systemx.HostnameOrDefault("unknown.eg.lan"), fingerprint),
-				Os:          runtime.GOOS,
-				Arch:        runtime.GOARCH,
-				Cores:       uint64(runtime.NumCPU()),
-				Memory:      memory.TotalMemory(),
+				Os:          runtimecfg.OS,
+				Arch:        runtimecfg.Arch,
+				Cores:       runtimecfg.Cores,
+				Memory:      runtimecfg.Memory,
 				Publickey:   ssh.MarshalAuthorizedKey(s.PublicKey()),
 				Labels:      []string{},
 			},
@@ -76,7 +74,11 @@ func Register(global *cmdopts.Global, tlsc *cmdopts.TLSConfig, aid, machineid st
 		}
 
 		if authzedts.After(time.Now()) {
-			log.Printf("waiting for registration to be accepted. run `eg actl authorize --id='%s'` to accept\n", reg.Registration.Id)
+			insecure := ""
+			if tlsc.Insecure {
+				insecure = " --insecure"
+			}
+			log.Printf("waiting for registration to be accepted. run `eg actl authorize --id='%s'%s` to accept\n", reg.Registration.Id, insecure)
 			continue
 		}
 

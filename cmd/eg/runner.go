@@ -56,7 +56,7 @@ type runner struct {
 	GitReference  string   `name:"git-ref" help:"name of the branch or commit to checkout" default:"${vars_git_default_reference}"`
 }
 
-func (t runner) Run(gctx *cmdopts.Global) (err error) {
+func (t runner) Run(gctx *cmdopts.Global, runtimecfg *cmdopts.RuntimeResources) (err error) {
 	var (
 		ws         workspaces.Context
 		uid        = uuid.Must(uuid.NewV7())
@@ -113,6 +113,8 @@ func (t runner) Run(gctx *cmdopts.Global) (err error) {
 	if err = envb.CopyTo(environio); err != nil {
 		return errorsx.Wrap(err, "unable to generate environment")
 	}
+
+	log.Println("detected runtime configuration", spew.Sdump(runtimecfg))
 
 	if cc, err = daemons.AutoRunnerClient(
 		gctx,

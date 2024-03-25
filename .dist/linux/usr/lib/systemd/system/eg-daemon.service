@@ -1,0 +1,20 @@
+[Unit]
+Description=eg runtime daemon
+After=network.target
+
+[Service]
+PrivateDevices=true
+ProtectControlGroups=true
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectSystem=full
+Restart=on-failure
+CacheDirectory=%p
+ConfigurationDirectory=%p
+RuntimeDirectory=%p
+RuntimeDirectoryMode=0700
+EnvironmentFile=-/etc/eg/daemon.env
+ExecStart=/usr/bin/eg
+
+[Install]
+WantedBy=default.target

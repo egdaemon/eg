@@ -81,3 +81,18 @@ func DefaultDirectory(rel string, roots ...string) (path string) {
 
 	return path
 }
+
+// HomeDirectoryOrDefault loads the user home directory or fallsback to the provided
+// path when an error occurs.
+func HomeDirectoryOrDefault(fallback string) (dir string) {
+	var (
+		err error
+	)
+
+	if dir, err = os.UserHomeDir(); err != nil {
+		log.Println("failed to get user home directory", err)
+		return fallback
+	}
+
+	return dir
+}

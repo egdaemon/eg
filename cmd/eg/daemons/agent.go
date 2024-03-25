@@ -11,6 +11,7 @@ import (
 	"github.com/egdaemon/eg/cmd/cmdopts"
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
+	"github.com/egdaemon/eg/internal/fsx"
 	"github.com/egdaemon/eg/interp/events"
 	"github.com/egdaemon/eg/runners"
 	"github.com/egdaemon/eg/runtime/wasi/langx"
@@ -55,7 +56,7 @@ func MaybeAgentListener() (n net.Listener, err error) {
 
 func DefaultRunnerClient(ctx context.Context) (cc *grpc.ClientConn, err error) {
 	daemonpath := runners.DefaultRunnerSocketPath()
-	log.Println("connecting", daemonpath)
+	log.Println("connecting", daemonpath, fsx.FileExists(daemonpath))
 	if _, err := os.Stat(daemonpath); os.IsNotExist(err) {
 		return nil, fmt.Errorf("agent not running at %s", daemonpath)
 	}
@@ -74,7 +75,6 @@ func AutoRunnerClient(global *cmdopts.Global, ws workspaces.Context, uid string,
 	log.Println("initializing runner", uid)
 	m := runners.NewManager(
 		global.Context,
-		langx.Must(filepath.Abs(runners.DefaultManagerDirectory())),
 	)
 
 	if ragent, err = m.NewRun(global.Context, ws, uid, options...); err != nil {

@@ -53,6 +53,8 @@ type runner struct {
 	MountEnvirons string   `name:"environ" help:"environment file to pass to the module" default:""`
 	EnvVars       []string `name:"env" short:"e" help:"environment variables to import" default:""`
 	SSHAgent      bool     `name:"sshagent" help:"enable ssh agent" hidden:"true"`
+	GitRemote     string   `name:"git-remote" help:"name of the git remote to use" default:"origin"`
+	GitReference  string   `name:"git-ref" help:"name of the branch or commit to checkout" default:"main"`
 }
 
 func (t runner) Run(gctx *cmdopts.Global) (err error) {
@@ -70,10 +72,12 @@ func (t runner) Run(gctx *cmdopts.Global) (err error) {
 	)
 
 	if ws, err = workspaces.New(gctx.Context, t.Dir, t.ModuleDir, t.Name); err != nil {
-		return err
+		return errorsx.Wrap(err, "unable to setup workspace")
 	}
 
-	environpath := filepath.Join(ws.Root, ws.RunnerDir, "environ.env")
+	defer os.RemoveAll(filepath.Join(ws.Root, ws.RuntimeDir))
+
+	environpath := filepath.Join(ws.Root, ws.RuntimeDir, "environ.env")
 	if environio, err = os.Create(environpath); err != nil {
 		return errorsx.Wrap(err, "unable to open the environment variable file")
 	}
@@ -82,7 +86,7 @@ func (t runner) Run(gctx *cmdopts.Global) (err error) {
 	envb := envx.Build().
 		FromPath(t.MountEnvirons).
 		FromKeys(t.EnvVars...).
-		FromEnviron(errorsx.Zero(gitx.Env(ws.Root, "origin", "main"))...)
+		FromEnviron(errorsx.Zero(gitx.Env(ws.Root, t.GitRemote, t.GitReference))...)
 
 	if t.Dirty {
 		mounthome = runners.AgentOptionAutoMountHome(langx.Must(os.UserHomeDir()))
@@ -121,7 +125,7 @@ func (t runner) Run(gctx *cmdopts.Global) (err error) {
 		runners.AgentOptionEnviron(environpath),
 		runners.AgentOptionMounts(runners.AgentMountReadWrite(filepath.Join(ws.Root, ws.CacheDir), "/cache")),
 	); err != nil {
-		return err
+		return errorsx.Wrap(err, "unable to setup runner")
 	}
 
 	// enable event logging
@@ -191,7 +195,7 @@ func (t runner) Run(gctx *cmdopts.Global) (err error) {
 
 	log.Println("modules", modules)
 	{
-		rootc := filepath.Join(ws.RunnerDir, "Containerfile")
+		rootc := filepath.Join(ws.RuntimeDir, "Containerfile")
 
 		if err = runners.PrepareRootContainer(rootc); err != nil {
 			return err
@@ -218,15 +222,16 @@ func (t runner) Run(gctx *cmdopts.Global) (err error) {
 		options = append(options,
 			"--volume", runners.AgentMountReadOnly(m.Path, "/opt/egmodule.wasm"),
 		)
+
 		_, err = runner.Module(gctx.Context, &c8s.ModuleRequest{
 			Image:   "eg",
 			Name:    fmt.Sprintf("eg-%s", uid.String()),
-			Mdir:    ws.ModuleDir,
+			Mdir:    ws.BuildDir,
 			Options: options,
 		})
 
 		if err != nil {
-			return err
+			return errorsx.Wrap(err, "module execution failed")
 		}
 	}
 
@@ -241,13 +246,17 @@ type module struct {
 
 func (t module) Run(ctx *cmdopts.Global) (err error) {
 	var (
+		ws   workspaces.Context
 		uid  = envx.String(uuid.Nil.String(), "EG_RUN_ID")
 		ebuf = make(chan *ffigraph.EventInfo)
 		cc   grpc.ClientConnInterface
 	)
 
-	// TODO: fill out workspaces...
-	if cc, err = daemons.AutoRunnerClient(ctx, workspaces.Context{}, uid, runners.AgentOptionAutoEGBin()); err != nil {
+	if ws, err = workspaces.FromEnv(ctx.Context, t.Dir, t.Module); err != nil {
+		return err
+	}
+
+	if cc, err = daemons.AutoRunnerClient(ctx, ws, uid, runners.AgentOptionAutoEGBin()); err != nil {
 		return err
 	}
 	go func() {
@@ -289,19 +298,21 @@ func (t module) Run(ctx *cmdopts.Global) (err error) {
 }
 
 type upload struct {
-	SSHKeyPath  string        `name:"sshkeypath" help:"path to ssh key to use" default:"${vars_ssh_key_path}"`
-	Dir         string        `name:"directory" help:"root directory of the repository" default:"${vars_cwd}"`
-	ModuleDir   string        `name:"moduledir" help:"must be a subdirectory in the provided directory" default:".eg"`
-	Name        string        `arg:"" name:"module" help:"name of the module to run, i.e. the folder name within moduledir" default:""`
-	Environment []string      `name:"env" short:"e" help:"define environment variables and their values to be included"`
-	Dirty       bool          `name:"dirty" help:"include all environment variables"`
-	Endpoint    string        `name:"endpoint" help:"specify the endpoint to upload to" default:"${vars_endpoint}/c/manager/" hidden:"true"`
-	TTL         time.Duration `name:"ttl" help:"maximum runtime for the upload" default:"1h"`
-	OS          string        `name:"os" help:"operating system the job requires" hidden:"true" default:"linux"`
-	Arch        string        `name:"arch" help:"instruction set the job requires" hidden:"true" default:"${vars_arch}"`
-	Cores       string        `name:"cores" help:"minimum number of cores the required" default:"${vars_cores_minimum_default}"`
-	Memory      string        `name:"memory" help:"minimum amount of ram required" default:"${vars_memory_minimum_default}"`
-	Labels      []string      `name:"labels" help:"custom labels required"`
+	SSHKeyPath   string        `name:"sshkeypath" help:"path to ssh key to use" default:"${vars_ssh_key_path}"`
+	Dir          string        `name:"directory" help:"root directory of the repository" default:"${vars_cwd}"`
+	ModuleDir    string        `name:"moduledir" help:"must be a subdirectory in the provided directory" default:".eg"`
+	Name         string        `arg:"" name:"module" help:"name of the module to run, i.e. the folder name within moduledir" default:""`
+	Environment  []string      `name:"env" short:"e" help:"define environment variables and their values to be included"`
+	Dirty        bool          `name:"dirty" help:"include all environment variables"`
+	Endpoint     string        `name:"endpoint" help:"specify the endpoint to upload to" default:"${vars_endpoint}/c/manager/" hidden:"true"`
+	TTL          time.Duration `name:"ttl" help:"maximum runtime for the upload" default:"1h"`
+	OS           string        `name:"os" help:"operating system the job requires" hidden:"true" default:"linux"`
+	Arch         string        `name:"arch" help:"instruction set the job requires" hidden:"true" default:"${vars_arch}"`
+	Cores        string        `name:"cores" help:"minimum number of cores the required" default:"${vars_cores_minimum_default}"`
+	Memory       string        `name:"memory" help:"minimum amount of ram required" default:"${vars_memory_minimum_default}"`
+	Labels       []string      `name:"labels" help:"custom labels required"`
+	GitRemote    string        `name:"git-remote" help:"name of the git remote to use" default:"origin"`
+	GitReference string        `name:"git-ref" help:"name of the branch or commit to checkout" default:"main"`
 }
 
 func (t upload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
@@ -357,7 +368,7 @@ func (t upload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 	envb := envx.Build().
 		FromEnviron(envx.Dirty(t.Dirty)...).
 		FromEnviron(t.Environment...).
-		FromEnviron(errorsx.Zero(gitx.Env(ws.Root, "origin", "HEAD"))...)
+		FromEnviron(errorsx.Zero(gitx.Env(ws.Root, t.GitRemote, t.GitReference))...)
 
 	if err = envb.CopyTo(environio); err != nil {
 		return errorsx.Wrap(err, "unable to write environment variables buffer")
@@ -390,6 +401,9 @@ func (t upload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 	if err = iox.Rewind(archiveio); err != nil {
 		return errorsx.Wrap(err, "unable to rewind kernel archive")
 	}
+
+	ainfo := errorsx.Zero(os.Stat(archiveio.Name()))
+	log.Println("archive metadata", ainfo.Name(), ainfo.Size())
 
 	// TODO: determine the destination based on the requirements
 	// i.e. cores, memory, labels, disk, videomem, etc.

@@ -100,6 +100,7 @@ func Unpack(root string, r io.Reader) (err error) {
 		// if it's a file create it
 		case tar.TypeReg:
 			writefile := func() error {
+				// log.Println("writing", header.Name, "->", target)
 				if dst, err = os.OpenFile(target, os.O_CREATE|os.O_RDWR, os.FileMode(header.Mode)); err != nil {
 					return errors.Wrapf(err, "failed to open file: %s", target)
 				}
@@ -129,12 +130,14 @@ func Inspect(r io.Reader) (err error) {
 
 	if s, ok := r.(io.Seeker); ok {
 		if err = iox.Rewind(s); err != nil {
-			return errors.Wrap(err, "unable to seek to start of file")
+			return errorsx.Wrap(err, "unable to seek to start of file")
 		}
+
+		defer func() { errorsx.MaybeLog(errorsx.Wrap(iox.Rewind(s), "unable to rewind")) }()
 	}
 
 	if gzr, err = gzip.NewReader(r); err != nil {
-		return errors.Wrap(err, "failed to create gzip reader")
+		return errorsx.Wrap(err, "failed to create gzip reader")
 	}
 	defer gzr.Close()
 
@@ -180,6 +183,7 @@ func write(basepath, path string, tw *tar.Writer, info os.FileInfo) (err error) 
 		target = filepath.Base(path)
 	}
 
+	// log.Println("writing", path, "->", target)
 	if src, err = os.Open(path); err != nil {
 		return errors.Wrap(err, "failed to open path")
 	}

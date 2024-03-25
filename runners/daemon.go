@@ -116,23 +116,19 @@ func DefaultRunnerClient(ctx context.Context) (cc *grpc.ClientConn, err error) {
 	return grpc.DialContext(ctx, fmt.Sprintf("unix://%s", daemonpath), grpc.WithInsecure(), grpc.WithBlock())
 }
 
-func NewRunner(ctx context.Context, root string, ws workspaces.Context, id string, options ...AgentOption) (_ *Agent, err error) {
+func NewRunner(ctx context.Context, ws workspaces.Context, id string, options ...AgentOption) (_ *Agent, err error) {
 	var (
 		control net.Listener
-		workdir = filepath.Join(root, id)
 		logdst  *os.File
 		evtlog  *events.Log
+		cspath  = filepath.Join(ws.Root, ws.RuntimeDir, "control.socket")
 	)
 
-	if err = os.MkdirAll(workdir, 0700); err != nil {
+	if logdst, err = os.Create(filepath.Join(ws.Root, ws.RuntimeDir, "daemon.log")); err != nil {
 		return nil, errors.WithStack(err)
 	}
 
-	if logdst, err = os.Create(filepath.Join(workdir, "daemon.log")); err != nil {
-		return nil, errors.WithStack(err)
-	}
-
-	if control, err = net.Listen("unix", filepath.Join(workdir, "control.socket")); err != nil {
+	if control, err = net.Listen("unix", cspath); err != nil {
 		return nil, errors.WithStack(err)
 	}
 
@@ -141,14 +137,16 @@ func NewRunner(ctx context.Context, root string, ws workspaces.Context, id strin
 		control.Close()
 	}()
 
-	if evtlog, err = events.NewLogEnsureDir(events.NewLogDirFromRunID(root, id)); err != nil {
+	if evtlog, err = events.NewLogEnsureDir(events.NewLogDirFromRunID(ws.Root, ws.RuntimeDir)); err != nil {
 		return nil, errors.WithStack(err)
 	}
+
+	log.Println("runner", id)
+	log.Println("workspace", spew.Sdump(ws))
 
 	r := &Agent{
 		id:      id,
 		ws:      ws,
-		workdir: workdir,
 		control: control,
 		evtlog:  evtlog,
 		srv: grpc.NewServer(
@@ -169,7 +167,6 @@ func NewRunner(ctx context.Context, root string, ws workspaces.Context, id strin
 
 type Agent struct {
 	id      string
-	workdir string
 	environ []string
 	volumes []string
 	ws      workspaces.Context
@@ -181,7 +178,8 @@ type Agent struct {
 }
 
 func (t Agent) Dial(ctx context.Context) (conn *grpc.ClientConn, err error) {
-	return grpc.DialContext(ctx, fmt.Sprintf("unix://%s", filepath.Join(t.workdir, "control.socket")), grpc.WithInsecure())
+	cspath := filepath.Join(t.ws.Root, t.ws.RuntimeDir, "control.socket")
+	return grpc.DialContext(ctx, fmt.Sprintf("unix://%s", cspath), grpc.WithInsecure())
 }
 
 func (t Agent) Close() error {
@@ -193,12 +191,9 @@ func (t Agent) Close() error {
 
 func (t Agent) background() {
 	log.Println("RUNNER INITIATED", t.id)
-	log.Println("working directory", t.workdir)
-	log.Println("workspace", spew.Sdump(t.ws))
 	log.Println("control socket", t.control.Addr().String())
 	defer close(t.blocked)
 	defer log.Println("RUNNER COMPLETED", t.id)
-	defer os.RemoveAll(t.workdir)
 
 	events.NewServiceDispatch(t.evtlog).Bind(t.srv)
 
@@ -208,13 +203,11 @@ func (t Agent) background() {
 
 	c8s.NewServiceProxy(
 		t.ws,
-		t.workdir,
 		c8s.ServiceProxyOptionCommandEnviron(
 			fmt.Sprintf("PATH=%s", envx.String("", "PATH")),
 			fmt.Sprintf("CI=%s", envx.String("", "EG_CI", "CI")),
 			fmt.Sprintf("EG_CI=%s", envx.String("", "EG_CI", "CI")),
 			fmt.Sprintf("EG_RUN_ID=%s", t.id),
-			fmt.Sprintf("EG_ROOT_DIRECTORY=%s", t.workdir),
 		),
 		c8s.ServiceProxyOptionContainerOptions(
 			containerOpts...,

@@ -36,10 +36,6 @@ func Clone(ctx context.Context, dir, uri, remote, treeish string) (err error) {
 		r *git.Repository
 	)
 
-	// envx.Debug(os.Environ()...)
-	// fsx.PrintFS(os.DirFS("/dev"))
-	// fsx.PrintFS(os.DirFS("/opt/egruntime"))
-
 	branchRefName := plumbing.NewBranchReferenceName(treeish)
 
 	if r, err = git.PlainOpen(dir); err == nil {
@@ -66,7 +62,7 @@ func Clone(ctx context.Context, dir, uri, remote, treeish string) (err error) {
 
 		return errorsx.Wrapf(w.Checkout(&branchCoOpts), "unable to checkout '%s'", treeish)
 	} else {
-		log.Println("repository is missing attempting clone", err)
+		log.Println(errorsx.Wrap(err, "repository is missing attempting clone"))
 	}
 
 	_, err = git.PlainCloneContext(ctx, dir, false, &git.CloneOptions{
@@ -75,7 +71,7 @@ func Clone(ctx context.Context, dir, uri, remote, treeish string) (err error) {
 		RecurseSubmodules: git.DefaultSubmoduleRecursionDepth,
 	})
 
-	return err
+	return errorsx.Wrapf(err, "unable to clone: %s - %s", uri, treeish)
 }
 
 func Remote(dir, name string) (_ string, err error) {

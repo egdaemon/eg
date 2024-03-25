@@ -18,8 +18,9 @@ func Debug(ctx context.Context, op yak.Op) error {
 	env.Debug(os.Environ()...)
 	return shell.Run(
 		ctx,
-		shell.New("ls -lha /opt/eg"),
-		shell.New("ssh -v -T git@github.com || true"),
+		// shell.New("ls -lha /opt/eg"),
+		shell.New("ls -lha /opt/eg/.test/Containerfile || true"),
+		// shell.New("ssh -T git@github.com || true"),
 	)
 }
 
@@ -56,10 +57,8 @@ func DaemonTests(ctx context.Context, _ yak.Op) error {
 	return yak.Perform(
 		ctx,
 		yak.Parallel(
-			Debug,
 			Op1,
 			Op2,
-			// yak.Module(ctx, c1, Op3),
 		),
 		yak.When(env.Boolean(false, "CI"), yak.Sequential(
 			Op1,
@@ -85,20 +84,14 @@ func main() {
 	log.Println("main module initiated")
 	defer log.Println("main module completed")
 
-	if environ, err := env.FromPath("/opt/egruntime/environ"); err == nil {
-		env.Debug(environ...)
-	} else {
-		log.Println("DERP DERP", err)
-	}
-
 	// c1 := yak.Container("ubuntu.22.04").BuildFromFile(string(langx.Must(fs.ReadFile(embedded, "Containerfile"))))
-	c1 := yak.Container("ubuntu.22.04").BuildFromFile(".test/Containerfile")
 	// c1 := yak.Container("ubuntu.22.04").PullFrom("ubuntu:jammy")
+	c1 := yak.Container("ubuntu.22.04").BuildFromFile(".test/Containerfile")
 
 	err := yak.Perform(
 		ctx,
-		Debug,
 		eggit.AutoClone,
+		Debug,
 		yak.Build(c1),
 		yak.Module(ctx, c1, DaemonTests),
 	)

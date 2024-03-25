@@ -37,6 +37,15 @@ func Int(fallback int, keys ...string) int {
 	}, keys...)
 }
 
+// retrieve a uint64 flag from the environment, checks each key in order
+// first to parse successfully is returned.
+func Uint64(fallback uint64, keys ...string) uint64 {
+	return envval(fallback, func(s string) (uint64, error) {
+		decoded, err := strconv.ParseUint(s, 10, 64)
+		return decoded, errorsx.Wrapf(err, "uint64 '%s' is invalid", s)
+	}, keys...)
+}
+
 func Float64(fallback float64, keys ...string) float64 {
 	return envval(fallback, func(s string) (float64, error) {
 		decoded, err := strconv.ParseFloat(s, 64)

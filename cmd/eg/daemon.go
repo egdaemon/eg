@@ -7,6 +7,7 @@ import (
 	"net"
 	"net/http"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/egdaemon/eg/authn"
 	"github.com/egdaemon/eg/cmd/cmdopts"
 	"github.com/egdaemon/eg/cmd/eg/daemons"
@@ -30,7 +31,7 @@ type daemon struct {
 
 // essentially we use ssh forwarding from the control plane to the local http server
 // allowing the control plane to interogate
-func (t daemon) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
+func (t daemon) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, runtimecfg *cmdopts.RuntimeResources) (err error) {
 	var (
 		signer     ssh.Signer
 		httpl      net.Listener
@@ -54,6 +55,7 @@ func (t daemon) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 	log.Println("running daemon initiated")
 	defer log.Println("running daemon completed")
 	log.Println("cache directory", t.CacheDir)
+	log.Println("detected runtime configuration", spew.Sdump(runtimecfg))
 
 	config := &ssh.ClientConfig{
 		User: t.MachineID,
@@ -66,7 +68,7 @@ func (t daemon) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 		},
 	}
 
-	if err = daemons.Register(gctx, tlsc, t.AccountID, t.MachineID, signer); err != nil {
+	if err = daemons.Register(gctx, tlsc, runtimecfg, t.AccountID, t.MachineID, signer); err != nil {
 		return err
 	}
 
@@ -89,9 +91,9 @@ func (t daemon) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 
 	go runners.AutoDownload(gctx.Context, authclient)
 
-	if err = daemons.SSHAgent(gctx, t.SSHAgentPath); err != nil {
-		return err
-	}
+	// if err = daemons.SSHAgent(gctx, t.SSHAgentPath); err != nil {
+	// 	return err
+	// }
 
 	return runners.Queue(
 		gctx.Context,

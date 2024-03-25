@@ -28,6 +28,7 @@ import (
 	"github.com/egdaemon/eg/internal/userx"
 	"github.com/go-git/go-git/v5"
 	"github.com/gofrs/uuid"
+	"github.com/pbnjay/memory"
 	"github.com/willabides/kongplete"
 )
 
@@ -62,6 +63,7 @@ func main() {
 	var shellcli struct {
 		cmdopts.Global
 		cmdopts.TLSConfig
+		cmdopts.RuntimeResources
 		Version            cmdopts.Version              `cmd:"" help:"display versioning information"`
 		Monitor            monitor                      `cmd:"" help:"execute the interpreter and monitor the progress" hidden:"true"`
 		Local              runner                       `cmd:"" help:"execute the interpreter on the given directory" hidden:"true"`
@@ -107,9 +109,9 @@ func main() {
 			"vars_user_username":           user.Username,
 			"vars_os":                      runtime.GOOS,
 			"vars_arch":                    runtime.GOARCH,
-			"vars_cores_minimum_default":   strconv.Itoa(1),
-			"vars_memory_minimum_default":  strconv.Itoa(bytesx.GiB),
-			"vars_disk_minimum_default":    strconv.Itoa(8 * bytesx.GiB),
+			"vars_cores_minimum_default":   strconv.FormatUint(envx.Uint64(uint64(runtime.NumCPU()), "EG_RESOURCES_CORES"), 10),
+			"vars_memory_minimum_default":  strconv.FormatUint(envx.Uint64(memory.TotalMemory(), "EG_RESOURCES_MEMORY"), 10),
+			"vars_disk_minimum_default":    strconv.FormatUint(envx.Uint64(8*bytesx.GiB, "EG_RESOURCES_DISK"), 10),
 			"vars_git_default_remote_name": git.DefaultRemoteName,
 			"vars_git_default_reference":   "main",
 		},
@@ -117,6 +119,7 @@ func main() {
 		kong.Bind(
 			&shellcli.Global,
 			&shellcli.TLSConfig,
+			&shellcli.RuntimeResources,
 		),
 		kong.TypeMapper(reflect.TypeOf(&net.IP{}), kong.MapperFunc(cmdopts.ParseIP)),
 		kong.TypeMapper(reflect.TypeOf(&net.TCPAddr{}), kong.MapperFunc(cmdopts.ParseTCPAddr)),

@@ -15,7 +15,7 @@ import (
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/md5x"
-	"github.com/egdaemon/eg/internal/osx"
+	"github.com/egdaemon/eg/internal/userx"
 	"github.com/egdaemon/eg/internal/wasix"
 	"github.com/egdaemon/eg/interp/c8s"
 	"github.com/egdaemon/eg/interp/runtime/wasi/ffiegcontainer"
@@ -214,7 +214,7 @@ func (t runner) perform(ctx context.Context, runid, path string, rtb runtimefn) 
 	).WithEnv(
 		"RUNTIME_DIRECTORY", guestruntimedir,
 	).WithEnv(
-		"HOME", osx.UserHomeDir("/root"),
+		"HOME", userx.HomeDirectoryOrDefault("/root"),
 	).WithEnv(
 		"TERM", envx.String("", "TERM"),
 	).WithStdin(

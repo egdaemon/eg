@@ -42,9 +42,9 @@ func Zero[T any](v T, err error) T {
 	return v
 }
 
-func Must(err error) {
+func Must[T any](v T, err error) T {
 	if err == nil {
-		return
+		return v
 	}
 
 	panic(err)

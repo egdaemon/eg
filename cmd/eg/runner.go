@@ -34,7 +34,6 @@ import (
 	"github.com/egdaemon/eg/interp/events"
 	"github.com/egdaemon/eg/interp/runtime/wasi/ffigraph"
 	"github.com/egdaemon/eg/runners"
-	"github.com/egdaemon/eg/runtime/wasi/langx"
 	"github.com/egdaemon/eg/transpile"
 	"github.com/egdaemon/eg/workspaces"
 	"github.com/gofrs/uuid"
@@ -53,8 +52,8 @@ type runner struct {
 	MountEnvirons string   `name:"environ" help:"environment file to pass to the module" default:""`
 	EnvVars       []string `name:"env" short:"e" help:"environment variables to import" default:""`
 	SSHAgent      bool     `name:"sshagent" help:"enable ssh agent" hidden:"true"`
-	GitRemote     string   `name:"git-remote" help:"name of the git remote to use" default:"origin"`
-	GitReference  string   `name:"git-ref" help:"name of the branch or commit to checkout" default:"main"`
+	GitRemote     string   `name:"git-remote" help:"name of the git remote to use" default:"${vars_git_default_remote_name}"`
+	GitReference  string   `name:"git-ref" help:"name of the branch or commit to checkout" default:"${vars_git_default_reference}"`
 }
 
 func (t runner) Run(gctx *cmdopts.Global) (err error) {
@@ -68,7 +67,7 @@ func (t runner) Run(gctx *cmdopts.Global) (err error) {
 		sshenvvar  runners.AgentOption = runners.AgentOptionNoop
 		envvar     runners.AgentOption = runners.AgentOptionNoop
 		mounthome  runners.AgentOption = runners.AgentOptionNoop
-		mountegbin runners.AgentOption = runners.AgentOptionEGBin(langx.Must(exec.LookPath(os.Args[0])))
+		mountegbin runners.AgentOption = runners.AgentOptionEGBin(errorsx.Must(exec.LookPath(os.Args[0])))
 	)
 
 	if ws, err = workspaces.New(gctx.Context, t.Dir, t.ModuleDir, t.Name); err != nil {
@@ -85,18 +84,18 @@ func (t runner) Run(gctx *cmdopts.Global) (err error) {
 
 	envb := envx.Build().
 		FromPath(t.MountEnvirons).
-		FromKeys(t.EnvVars...).
+		FromEnv(t.EnvVars...).
+		FromEnv(os.Environ()...).
 		FromEnviron(errorsx.Zero(gitx.Env(ws.Root, t.GitRemote, t.GitReference))...)
 
 	if t.Dirty {
-		mounthome = runners.AgentOptionAutoMountHome(langx.Must(os.UserHomeDir()))
-		envvar = runners.AgentOptionEnvKeys(os.Environ()...)
+		mounthome = runners.AgentOptionAutoMountHome(errorsx.Must(os.UserHomeDir()))
 	}
 
 	if t.SSHAgent {
 		sshmount = runners.AgentOptionMounts(
 			runners.AgentMountOverlay(
-				filepath.Join(langx.Must(os.UserHomeDir()), ".ssh"),
+				filepath.Join(errorsx.Must(os.UserHomeDir()), ".ssh"),
 				"/root/.ssh",
 			),
 			runners.AgentMountReadWrite(
@@ -108,6 +107,8 @@ func (t runner) Run(gctx *cmdopts.Global) (err error) {
 		sshenvvar = runners.AgentOptionEnvKeys("SSH_AUTH_SOCK=/opt/egruntime/ssh.agent.socket")
 		envb.FromEnviron("SSH_AUTH_SOCK=/opt/egruntime/ssh.agent.socket")
 	}
+
+	// envx.Debug(errorsx.Zero(envb.Environ())...)
 
 	if err = envb.CopyTo(environio); err != nil {
 		return errorsx.Wrap(err, "unable to generate environment")
@@ -259,6 +260,7 @@ func (t module) Run(ctx *cmdopts.Global) (err error) {
 	if cc, err = daemons.AutoRunnerClient(ctx, ws, uid, runners.AgentOptionAutoEGBin()); err != nil {
 		return err
 	}
+
 	go func() {
 		makeevt := func(e *ffigraph.EventInfo) *events.Message {
 			switch e.State {
@@ -311,8 +313,8 @@ type upload struct {
 	Cores        string        `name:"cores" help:"minimum number of cores the required" default:"${vars_cores_minimum_default}"`
 	Memory       string        `name:"memory" help:"minimum amount of ram required" default:"${vars_memory_minimum_default}"`
 	Labels       []string      `name:"labels" help:"custom labels required"`
-	GitRemote    string        `name:"git-remote" help:"name of the git remote to use" default:"origin"`
-	GitReference string        `name:"git-ref" help:"name of the branch or commit to checkout" default:"main"`
+	GitRemote    string        `name:"git-remote" help:"name of the git remote to use" default:"${vars_git_default_remote_name}"`
+	GitReference string        `name:"git-ref" help:"name of the branch or commit to checkout" default:"${vars_git_default_reference}"`
 }
 
 func (t upload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {

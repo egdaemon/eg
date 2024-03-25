@@ -30,6 +30,21 @@ func HostnameOrDefault(fallback string) string {
 	return hostname
 }
 
+// HomeDirectoryOrDefault loads the user home directory or fallsback to the provided
+// path when an error occurs.
+func HomeDirectoryOrDefault(fallback string) (dir string) {
+	var (
+		err error
+	)
+
+	if dir, err = os.UserHomeDir(); err != nil {
+		log.Println("failed to get user home directory", err)
+		return fallback
+	}
+
+	return dir
+}
+
 // WorkingDirectoryOrDefault loads the working directory or fallsback to the provided
 // path when an error occurs.
 func WorkingDirectoryOrDefault(fallback string) (dir string) {

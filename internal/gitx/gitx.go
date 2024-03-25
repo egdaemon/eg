@@ -69,6 +69,7 @@ func Clone(ctx context.Context, dir, uri, remote, treeish string) (err error) {
 		URL:               uri,
 		ReferenceName:     branchRefName,
 		RecurseSubmodules: git.DefaultSubmoduleRecursionDepth,
+		SingleBranch:      true,
 	})
 
 	return errorsx.Wrapf(err, "unable to clone: %s - %s", uri, treeish)

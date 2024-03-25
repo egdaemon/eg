@@ -15,7 +15,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/egdaemon/eg/internal/debugx"
 	"github.com/egdaemon/eg/internal/errorsx"
+	"github.com/egdaemon/eg/internal/slicesx"
 )
 
 func Print(environ []string) {
@@ -175,6 +177,16 @@ func (t builder) Environ() ([]string, error) {
 	return t.environ, t.failed
 }
 
+// set a single variable to a value.
+func (t *builder) Var(k, v string) *builder {
+	if encoded := Format(k, v); encoded != "" {
+		t.environ = append(t.environ, fmt.Sprintf("%s=%s", k, v))
+	}
+	return t
+}
+
+// extract environment variables from a file on disk.
+// missing files are treated as noops.
 func (t *builder) FromPath(n string) *builder {
 	tmp, err := FromPath(n)
 	t.environ = append(t.environ, tmp...)
@@ -182,6 +194,8 @@ func (t *builder) FromPath(n string) *builder {
 	return t
 }
 
+// extract environment variables from an io.Reader.
+// the format is the standard .env file formats.
 func (t *builder) FromReader(r io.Reader) *builder {
 	tmp, err := FromReader(r)
 	t.environ = append(t.environ, tmp...)
@@ -194,14 +208,78 @@ func (t *builder) FromEnviron(environ ...string) *builder {
 	return t
 }
 
-func (t *builder) FromKeys(keys ...string) *builder {
+// extract the key/value pairs from the os.Environ.
+// empty keys are passed as k=
+func (t *builder) FromEnv(keys ...string) *builder {
+	vars := make([]string, 0, len(keys))
+
 	for _, k := range keys {
 		if v, ok := os.LookupEnv(k); ok {
-			t.environ = append(t.environ, fmt.Sprintf("%s=%v", k, v))
+			vars = append(vars, Format(k, v, FormatOptionTransforms(allowAll)))
 		}
 	}
 
+	t.environ = append(t.environ, vars...)
+
 	return t
+}
+
+type formatoption func(*formatopts)
+type formatopts struct {
+	transformer func(string) string // transforms that result in empty strings are ignored.
+}
+
+func allowAll(s string) string {
+	return s
+}
+
+func ignoreEmptyVariables(s string) string {
+	if strings.HasSuffix(s, "=") {
+		return ""
+	}
+
+	return s
+}
+
+func FormatOptionTransforms(transforms ...func(string) string) formatoption {
+	combined := func(s string) string {
+		for _, trans := range transforms {
+			s = trans(s)
+		}
+
+		return s
+	}
+
+	return func(f *formatopts) {
+		f.transformer = combined
+	}
+}
+
+// set many keys to the same value.
+func Vars(v string, keys ...string) (environ []string) {
+	environ = make([]string, 0, len(keys))
+	for _, k := range keys {
+		environ = append(environ, Format(k, v))
+	}
+
+	return environ
+}
+
+// format a environment variable in k=v.
+//
+// - doesn't currently escape values. it may in the future.
+//
+// - if the key or value are an empty string it'll return an empty string. it will log if debugging is enabled.
+func Format(k, v string, options ...func(*formatopts)) string {
+	opts := slicesx.Reduce(&formatopts{
+		transformer: ignoreEmptyVariables,
+	}, options...)
+	evar := strings.TrimSpace(opts.transformer(fmt.Sprintf("%s=%s", k, v)))
+	if evar == "" {
+		debugx.Println("ignoring variable", k, "transform was empty")
+	}
+
+	return fmt.Sprintf("%s=%s", k, v)
 }
 
 func Build() *builder {

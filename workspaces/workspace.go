@@ -39,25 +39,35 @@ func (t ignoredir) Ignore(path string, d fs.DirEntry) error {
 }
 
 type Context struct {
-	Module    string // name of the module
-	CachedID  string // unique id generated from the content of the module.
-	Root      string // workspace root directory.
-	ModuleDir string // eg module directory; relative to the root
-	CacheDir  string // cache directory. relative to the module directory.
-	RunnerDir string // cache directory for the runner.
-	BuildDir  string // directory for built wasm modules; relative to the cache directory.
-	TransDir  string // root directory for the transpiled code; relative to the cache directory.
-	GenModDir string // root directory for generated modules; relative to the cache directory.
-	Ignore    ignorable
+	Module     string // name of the module
+	CachedID   string // unique id generated from the content of the module.
+	Root       string // workspace root directory.
+	WorkingDir string // working directory for modules.
+	ModuleDir  string // eg module directory; relative to the root
+	CacheDir   string // cache directory. relative to the module directory.
+	RuntimeDir string // cache directory for the runner.
+	BuildDir   string // directory for built wasm modules; relative to the cache directory.
+	TransDir   string // root directory for the transpiled code; relative to the cache directory.
+	GenModDir  string // root directory for generated modules; relative to the cache directory.
+	Ignore     ignorable
 }
 
 func (t Context) FS() fs.FS {
 	return os.DirFS(t.Root)
 }
 
+func FromEnv(ctx context.Context, root, name string) (zero Context, err error) {
+	return Context{
+		Module:     name,
+		Root:       root,
+		RuntimeDir: "egruntime",
+	}, nil
+}
+
 func New(ctx context.Context, root string, mdir string, name string) (zero Context, err error) {
 	cidmd5 := md5.New()
 	cdir := filepath.Join(mdir, ".cache")
+	runtimedir := filepath.Join(mdir, ".egruntime")
 	ignore := ignoredir{path: cdir, reason: "cache directory"}
 
 	if err = cacheid(ctx, root, mdir, cidmd5, ignore); err != nil {
@@ -67,22 +77,24 @@ func New(ctx context.Context, root string, mdir string, name string) (zero Conte
 	cid := hex.EncodeToString(cidmd5.Sum(nil))
 
 	return ensuredirs(Context{
-		Module:    name,
-		CachedID:  cid,
-		Root:      root,
-		ModuleDir: mdir,
-		CacheDir:  cdir,
-		RunnerDir: filepath.Join(cdir, ".eg"),
-		BuildDir:  filepath.Join(cdir, ".eg", "build", cid),
-		TransDir:  filepath.Join(cdir, ".eg", "trans", cid),
-		GenModDir: filepath.Join(cdir, ".eg", "trans", cid, ".genmod"),
-		Ignore:    ignore,
+		Module:     name,
+		CachedID:   cid,
+		Root:       root,
+		ModuleDir:  mdir,
+		CacheDir:   cdir,
+		RuntimeDir: runtimedir,
+		WorkingDir: filepath.Join(runtimedir, "mounted"),
+		BuildDir:   filepath.Join(cdir, "build", cid),
+		TransDir:   filepath.Join(cdir, "trans", cid),
+		GenModDir:  filepath.Join(cdir, "trans", cid, ".genmod"),
+		Ignore:     ignore,
 	})
 }
 
 func ensuredirs(c Context) (_ Context, err error) {
 	mkdirs := func(paths ...string) error {
 		for _, p := range paths {
+			// log.Printf("------ making directory %s ------\n", p)
 			if err = os.MkdirAll(p, 0700); err != nil {
 				return errors.Wrapf(err, "unable to create directory: %s", p)
 			}
@@ -90,7 +102,13 @@ func ensuredirs(c Context) (_ Context, err error) {
 
 		return nil
 	}
-	return c, mkdirs(c.RunnerDir, c.GenModDir, c.BuildDir, c.CacheDir)
+	return c, mkdirs(
+		filepath.Join(c.Root, c.RuntimeDir),
+		filepath.Join(c.Root, c.WorkingDir),
+		filepath.Join(c.Root, c.GenModDir),
+		filepath.Join(c.Root, c.BuildDir),
+		filepath.Join(c.Root, c.CacheDir),
+	)
 }
 
 func cacheid(ctx context.Context, root string, mdir string, cacheid hash.Hash, ignore ignorable) error {

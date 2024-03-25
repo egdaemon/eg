@@ -140,7 +140,7 @@ func (t golang) Run(ctx context.Context) (roots []Compiled, err error) {
 				generr = errors.Join(generr, cause)
 			}
 
-			genwasm := filepath.Join(t.Context.Workspace.BuildDir, gendir, fmt.Sprintf("module.%d.%d.wasm", pos.Line, pos.Column))
+			genwasm := filepath.Join(gendir, fmt.Sprintf("module.%d.%d.wasm", pos.Line, pos.Column))
 			m := &module{
 				fname:    filepath.Join(t.Workspace.GenModDir, gendir, fmt.Sprintf("module.%d.%d.go", pos.Line, pos.Column)),
 				original: buf,
@@ -163,7 +163,7 @@ func (t golang) Run(ctx context.Context) (roots []Compiled, err error) {
 
 			pos := pkg.Fset.PositionFor(ce.Pos(), true)
 			pos.Filename = strings.TrimPrefix(pos.Filename, t.Workspace.Root+"/")
-			genwasm := filepath.Join(t.Context.Workspace.BuildDir, gendir, fmt.Sprintf("module.%d.%d.wasm", pos.Line, pos.Column))
+			genwasm := filepath.Join(gendir, fmt.Sprintf("module.%d.%d.wasm", pos.Line, pos.Column))
 
 			return astbuild.CallExpr(astbuild.SelExpr(yakident, "UnsafeRunner"), ctxarg, rarg, astbuild.StringLiteral(genwasm))
 		}, execExpr)

@@ -16,7 +16,6 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
-	"github.com/egdaemon/eg/internal/fsx"
 	"github.com/egdaemon/eg/internal/iox"
 	"github.com/egdaemon/eg/internal/langx"
 	"github.com/egdaemon/eg/internal/tarx"
@@ -245,10 +244,6 @@ func beginwork(ctx context.Context, md metadata, dir string) state {
 
 	uid := filepath.Base(dir)
 	log.Println("initializing runner", uid, dir)
-	m := NewManager(
-		ctx,
-		langx.Must(filepath.Abs(DefaultManagerDirectory())),
-	)
 
 	if tmpdir, err = os.MkdirTemp(envx.String(os.TempDir(), "CACHE_DIRECTORY"), fmt.Sprintf("eg.work.%s.*", uid)); err != nil {
 		return failure(err, idle(md))
@@ -258,17 +253,19 @@ func beginwork(ctx context.Context, md metadata, dir string) state {
 		return failure(errorsx.Wrap(err, "unable to read archive"), idle(md))
 	}
 
+	errorsx.MaybeLog(tarx.Inspect(archive))
+
 	if ws, err = workspaces.New(ctx, tmpdir, ".eg", "eg"); err != nil {
 		return failure(errorsx.Wrap(err, "unable to setup workspace"), idle(md))
 	}
 
 	log.Println("workspace", spew.Sdump(ws))
-	if err = tarx.Unpack(filepath.Join(ws.Root, ws.RunnerDir), archive); err != nil {
+	if err = tarx.Unpack(filepath.Join(ws.Root, ws.RuntimeDir), archive); err != nil {
 		return completed(md, uid, errorsx.Wrap(err, "unable to unpack archive"))
 	}
 
 	{
-		rootc := filepath.Join(ws.RunnerDir, "Containerfile")
+		rootc := filepath.Join(filepath.Join(ws.Root, ws.RuntimeDir), "Containerfile")
 
 		if err = PrepareRootContainer(rootc); err != nil {
 			return failure(err, idle(md))
@@ -284,8 +281,8 @@ func beginwork(ctx context.Context, md metadata, dir string) state {
 		}
 	}
 
-	fsx.PrintFS(os.DirFS(filepath.Join(ws.Root, ws.RunnerDir)))
-	environpath := filepath.Join(ws.Root, ws.RunnerDir, "environ.env")
+	environpath := filepath.Join(ws.Root, ws.RuntimeDir, "environ.env")
+	// fsx.PrintDir(os.DirFS(filepath.Join(ws.Root)))
 	// environ := errorsx.Zero(envx.FromPath(environpath))
 	// envx.Debug(environ...)
 
@@ -295,6 +292,10 @@ func beginwork(ctx context.Context, md metadata, dir string) state {
 		aopts,
 		AgentOptionEGBin(errorsx.Zero(exec.LookPath(os.Args[0]))),
 		AgentOptionEnviron(environpath),
+	)
+
+	m := NewManager(
+		ctx,
 	)
 
 	if ragent, err = m.NewRun(ctx, ws, uid, aopts...); err != nil {
@@ -319,15 +320,14 @@ func (t staterunning) Update(ctx context.Context) state {
 		cc  grpc.ClientConnInterface
 	)
 
+	// fsx.PrintFS(os.DirFS(filepath.Join(t.ws.Root)))
 	m := NewManager(
 		ctx,
-		langx.Must(filepath.Abs(DefaultManagerDirectory())),
 	)
 
-	if cc, err = m.Dial(ctx, t.ragent.id); err != nil {
+	if cc, err = m.Dial(ctx, t.ws); err != nil {
 		return failure(err, idle(t.metadata))
 	}
-
 	runner := c8s.NewProxyClient(cc)
 
 	select {
@@ -337,11 +337,10 @@ func (t staterunning) Update(ctx context.Context) state {
 		_, err := runner.Module(ctx, &c8s.ModuleRequest{
 			Image: "eg",
 			Name:  fmt.Sprintf("eg-%s", t.ragent.id),
-			Mdir:  t.ws.ModuleDir,
+			Mdir:  t.ws.RuntimeDir,
 			Options: []string{
 				"--env", "EG_BIN",
-				"--volume", fmt.Sprintf("%s:/opt/egmodule.wasm:ro", filepath.Join(t.ws.RunnerDir, "main.wasm")),
-				"--volume", fmt.Sprintf("%s:/opt/eg:O", t.ws.Root),
+				"--volume", fmt.Sprintf("%s:/opt/egmodule.wasm:ro", filepath.Join(t.ws.Root, t.ws.RuntimeDir, "main.wasm")),
 			},
 		})
 		return completed(t.metadata, t.ragent.id, errorsx.Compact(err, t.ragent.Close()))
@@ -382,6 +381,9 @@ func PrepareRootContainer(cpath string) (err error) {
 		c   fs.File
 		dst *os.File
 	)
+
+	// log.Println("---------------------- Prepare Root Container Initiated ----------------------")
+	// defer log.Println("---------------------- Prepare Root Container Completed ----------------------")
 
 	log.Println("default container path", cpath)
 	if c, err = embedded.Open("DefaultContainerfile"); err != nil {

@@ -17,25 +17,23 @@ func DefaultRunnerDirectory(uid string) string {
 	return filepath.Join(DefaultManagerDirectory(), uid)
 }
 
-func NewManager(ctx context.Context, dir string) *Manager {
+func NewManager(ctx context.Context) *Manager {
 	ctx, done := context.WithCancel(ctx)
 	return &Manager{
 		ctx:  ctx,
 		done: done,
-		dir:  dir,
 	}
 }
 
 type Manager struct {
-	dir  string
 	ctx  context.Context
 	done context.CancelFunc
 }
 
 func (t Manager) NewRun(ctx context.Context, ws workspaces.Context, id string, options ...AgentOption) (*Agent, error) {
-	return NewRunner(t.ctx, t.dir, ws, id, options...)
+	return NewRunner(t.ctx, ws, id, options...)
 }
 
-func (t Manager) Dial(ctx context.Context, id string) (conn *grpc.ClientConn, err error) {
-	return grpc.DialContext(ctx, fmt.Sprintf("unix://%s", filepath.Join(t.dir, id, "control.socket")), grpc.WithInsecure())
+func (t Manager) Dial(ctx context.Context, ws workspaces.Context) (conn *grpc.ClientConn, err error) {
+	return grpc.DialContext(ctx, fmt.Sprintf("unix://%s", filepath.Join(ws.Root, ws.RuntimeDir, "control.socket")), grpc.WithInsecure())
 }

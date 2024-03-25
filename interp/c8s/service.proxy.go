@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"path/filepath"
 
 	"github.com/egdaemon/eg/internal/debugx"
 	"github.com/egdaemon/eg/runtime/wasi/langx"
@@ -27,12 +28,10 @@ func ServiceProxyOptionContainerOptions(v ...string) ServiceProxyOption {
 	}
 }
 
-func NewServiceProxy(ws workspaces.Context, runtimedir string, options ...ServiceProxyOption) *ProxyService {
+func NewServiceProxy(ws workspaces.Context, options ...ServiceProxyOption) *ProxyService {
 	svc := &ProxyService{
-		ws:         ws,
-		runtimedir: runtimedir,
+		ws: ws,
 	}
-
 	for _, opt := range options {
 		opt(svc)
 	}
@@ -43,7 +42,6 @@ func NewServiceProxy(ws workspaces.Context, runtimedir string, options ...Servic
 type ProxyService struct {
 	UnimplementedProxyServer
 	ws            workspaces.Context
-	runtimedir    string
 	cmdenv        []string
 	containeropts []string
 }
@@ -63,14 +61,16 @@ func (t *ProxyService) prepcmd(cmd *exec.Cmd) *exec.Cmd {
 
 // Build implements ProxyServer.
 func (t *ProxyService) Build(ctx context.Context, req *BuildRequest) (_ *BuildResponse, err error) {
-	debugx.Println("PROXY CONTAINER BUILD INITIATED", langx.Must(os.Getwd()), os.Stdin, os.Stdout, os.Stderr)
-	defer debugx.Println("PROXY CONTAINER BUILD COMPLETED", langx.Must(os.Getwd()), os.Stdin, os.Stdout, os.Stderr)
+	log.Println("PROXY CONTAINER BUILD INITIATED", langx.Must(os.Getwd()), t.ws.Root)
+	defer log.Println("PROXY CONTAINER BUILD COMPLETED", langx.Must(os.Getwd()), t.ws.Root)
 
 	var (
 		cmd *exec.Cmd
 	)
 
-	if cmd, err = PodmanBuild(ctx, req.Name, req.Directory, req.Definition, req.Options...); err != nil {
+	abspath := filepath.Join(t.ws.Root, t.ws.WorkingDir, req.Definition)
+
+	if cmd, err = PodmanBuild(ctx, req.Name, req.Directory, abspath, req.Options...); err != nil {
 		log.Println("unable to create build command", err)
 		return nil, err
 	}
@@ -114,7 +114,7 @@ func (t *ProxyService) Run(ctx context.Context, req *RunRequest) (_ *RunResponse
 	)
 	options = append(
 		options,
-		"--volume", fmt.Sprintf("%s:/opt/eg:O", t.ws.Root),
+		"--volume", fmt.Sprintf("%s:/opt/eg:O", filepath.Join(t.ws.Root, t.ws.WorkingDir)),
 	)
 
 	if err = PodmanRun(ctx, t.prepcmd, req.Image, req.Name, req.Command, options...); err != nil {
@@ -126,14 +126,14 @@ func (t *ProxyService) Run(ctx context.Context, req *RunRequest) (_ *RunResponse
 
 // Module implements ProxyServer.
 func (t *ProxyService) Module(ctx context.Context, req *ModuleRequest) (_ *ModuleResponse, err error) {
-	log.Println("PROXY CONTAINER MODULE INITIATED", langx.Must(os.Getwd()))
-	defer log.Println("PROXY CONTAINER MODULE COMPLETED", langx.Must(os.Getwd()))
+	debugx.Println("PROXY CONTAINER MODULE INITIATED", langx.Must(os.Getwd()))
+	defer debugx.Println("PROXY CONTAINER MODULE COMPLETED", langx.Must(os.Getwd()))
 
 	options := append(req.Options, t.containeropts...)
 	options = append(
 		options,
-		"--volume", fmt.Sprintf("%s:/opt/eg:O", t.ws.Root),
-		"--volume", fmt.Sprintf("%s:/opt/egruntime:ro", t.runtimedir),
+		"--volume", fmt.Sprintf("%s:/opt/egruntime:rw", filepath.Join(t.ws.Root, t.ws.RuntimeDir)),
+		"--volume", fmt.Sprintf("%s:/opt/eg:rw", filepath.Join(t.ws.Root, t.ws.WorkingDir)),
 	)
 
 	if err = PodmanModule(ctx, t.prepcmd, req.Image, req.Name, req.Mdir, options...); err != nil {

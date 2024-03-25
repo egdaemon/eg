@@ -96,7 +96,7 @@ func Remote(ctx context.Context, runid string, g ffigraph.Eventer, svc grpc.Clie
 			cname := fmt.Sprintf("%s.%s", name, md5x.DigestString(modulepath+runid))
 			options = append(
 				options,
-				"--volume", fmt.Sprintf("%s:/opt/egmodule.wasm:ro", modulepath),
+				"--volume", fmt.Sprintf("%s:/opt/egmodule.wasm:ro", filepath.Join(r.moduledir, modulepath)),
 			)
 
 			_, err = containers.Module(ctx, &c8s.ModuleRequest{
@@ -166,7 +166,7 @@ func (t runner) perform(ctx context.Context, runid, path string, rtb runtimefn) 
 	hostcachedir := filepath.Join(moduledir, ".cache")
 	guestcachedir := filepath.Join("/", "cache")
 	guestruntimedir := runners.DefaultRunnerRuntimeDir()
-	tmpdir, err := os.MkdirTemp(moduledir, "eg.tmp.*")
+	tmpdir, err := os.MkdirTemp(t.root, "eg.tmp.*")
 	if err != nil {
 		return errors.Wrap(err, "unable to create tmp directory")
 	}

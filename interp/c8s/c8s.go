@@ -146,7 +146,7 @@ func PodmanModuleExecCmd(cname, moduledir string) []string {
 		cname,
 		envx.String("eg", "EG_BIN"),
 		"module",
-		"--directory=/opt/eg",
+		"--directory", "/opt/eg",
 		"--moduledir", moduledir,
 		"/opt/egmodule.wasm",
 	}

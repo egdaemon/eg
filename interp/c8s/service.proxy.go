@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 
 	"github.com/egdaemon/eg/internal/debugx"
-	"github.com/egdaemon/eg/runtime/wasi/langx"
+	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/workspaces"
 	grpc "google.golang.org/grpc"
 )
@@ -61,8 +61,8 @@ func (t *ProxyService) prepcmd(cmd *exec.Cmd) *exec.Cmd {
 
 // Build implements ProxyServer.
 func (t *ProxyService) Build(ctx context.Context, req *BuildRequest) (_ *BuildResponse, err error) {
-	log.Println("PROXY CONTAINER BUILD INITIATED", langx.Must(os.Getwd()), t.ws.Root)
-	defer log.Println("PROXY CONTAINER BUILD COMPLETED", langx.Must(os.Getwd()), t.ws.Root)
+	debugx.Println("PROXY CONTAINER BUILD INITIATED", errorsx.Zero(os.Getwd()), t.ws.Root)
+	defer debugx.Println("PROXY CONTAINER BUILD COMPLETED", errorsx.Zero(os.Getwd()), t.ws.Root)
 
 	var (
 		cmd *exec.Cmd
@@ -105,8 +105,8 @@ func (t *ProxyService) Pull(ctx context.Context, req *PullRequest) (resp *PullRe
 
 // Run implements ProxyServer.
 func (t *ProxyService) Run(ctx context.Context, req *RunRequest) (_ *RunResponse, err error) {
-	debugx.Println("PROXY CONTAINER RUN INITIATED", langx.Must(os.Getwd()))
-	defer debugx.Println("PROXY CONTAINER RUN COMPLETED", langx.Must(os.Getwd()))
+	debugx.Println("PROXY CONTAINER RUN INITIATED", errorsx.Zero(os.Getwd()))
+	defer debugx.Println("PROXY CONTAINER RUN COMPLETED", errorsx.Zero(os.Getwd()))
 
 	options := append(
 		req.Options,
@@ -126,8 +126,8 @@ func (t *ProxyService) Run(ctx context.Context, req *RunRequest) (_ *RunResponse
 
 // Module implements ProxyServer.
 func (t *ProxyService) Module(ctx context.Context, req *ModuleRequest) (_ *ModuleResponse, err error) {
-	debugx.Println("PROXY CONTAINER MODULE INITIATED", langx.Must(os.Getwd()))
-	defer debugx.Println("PROXY CONTAINER MODULE COMPLETED", langx.Must(os.Getwd()))
+	debugx.Println("PROXY CONTAINER MODULE INITIATED", errorsx.Zero(os.Getwd()))
+	defer debugx.Println("PROXY CONTAINER MODULE COMPLETED", errorsx.Zero(os.Getwd()))
 
 	options := append(req.Options, t.containeropts...)
 	options = append(

@@ -11,6 +11,7 @@ import (
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/egdaemon/eg/internal/envx"
+	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/stringsx"
 	"github.com/egdaemon/eg/interp/c8s"
 	"github.com/egdaemon/eg/interp/events"
@@ -60,6 +61,7 @@ func AgentMountOverlay(src, dst string) string {
 
 func AgentOptionAutoMountHome(home string) AgentOption {
 	return AgentOptionMounts(
+		AgentMountOverlay(home, home),
 		AgentMountOverlay(home, "/root"),
 		AgentMountReadOnly(envx.String("", "XDG_RUNTIME_DIR"), envx.String("", "XDG_RUNTIME_DIR")),
 	)
@@ -94,12 +96,12 @@ func AgentOptionMounts(desc ...string) AgentOption {
 
 func AgentOptionEnvKeys(keys ...string) AgentOption {
 	vs := []string{}
-	for _, v := range keys {
-		if v = strings.TrimSpace(v); v == "" {
+	for _, k := range keys {
+		if k = strings.TrimSpace(k); k == "" {
 			continue
 		}
 
-		vs = append(vs, "--env", v)
+		vs = append(vs, "--env", k)
 	}
 
 	return func(a *Agent) {
@@ -191,9 +193,10 @@ func (t Agent) Close() error {
 
 func (t Agent) background() {
 	log.Println("RUNNER INITIATED", t.id)
-	log.Println("control socket", t.control.Addr().String())
-	defer close(t.blocked)
 	defer log.Println("RUNNER COMPLETED", t.id)
+	defer close(t.blocked)
+
+	log.Println("control socket", t.control.Addr().String())
 
 	events.NewServiceDispatch(t.evtlog).Bind(t.srv)
 
@@ -204,10 +207,15 @@ func (t Agent) background() {
 	c8s.NewServiceProxy(
 		t.ws,
 		c8s.ServiceProxyOptionCommandEnviron(
-			fmt.Sprintf("PATH=%s", envx.String("", "PATH")),
-			fmt.Sprintf("CI=%s", envx.String("", "EG_CI", "CI")),
-			fmt.Sprintf("EG_CI=%s", envx.String("", "EG_CI", "CI")),
-			fmt.Sprintf("EG_RUN_ID=%s", t.id),
+			errorsx.Zero(
+				envx.Build().FromEnv("PATH", "TERM", "COLORTERM", "LANG").Var(
+					"CI", envx.String("", "EG_CI", "CI"),
+				).Var(
+					"EG_CI", envx.String("", "EG_CI", "CI"),
+				).Var(
+					"EG_RUN_ID", t.id,
+				).Environ(),
+			)...,
 		),
 		c8s.ServiceProxyOptionContainerOptions(
 			containerOpts...,

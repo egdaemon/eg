@@ -9,8 +9,8 @@ func RunID() string {
 	return os.Getenv("EG_RUN_ID")
 }
 
-func WorkDirectory() string {
-	return os.Getenv("EG_ROOT_DIRECTORY")
+func GitCommit() string {
+	return os.Getenv("EG_GIT_COMMIT")
 }
 
 func CacheDirectory() string {

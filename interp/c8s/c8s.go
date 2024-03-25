@@ -11,7 +11,6 @@ import (
 	"github.com/egdaemon/eg/internal/debugx"
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
-	"github.com/egdaemon/eg/runtime/wasi/langx"
 )
 
 func silence(c *exec.Cmd) *exec.Cmd {
@@ -24,7 +23,7 @@ func mayberun(c *exec.Cmd) error {
 		return nil
 	}
 
-	debugx.Println("---------------", langx.Must(os.Getwd()), "running", c.Dir, "->", c.String(), "---------------")
+	debugx.Println("---------------", errorsx.Must(os.Getwd()), "running", c.Dir, "->", c.String(), "---------------")
 	return c.Run()
 }
 

@@ -26,6 +26,7 @@ import (
 	"github.com/egdaemon/eg/internal/osx"
 	"github.com/egdaemon/eg/internal/stringsx"
 	"github.com/egdaemon/eg/internal/userx"
+	"github.com/go-git/go-git/v5"
 	"github.com/gofrs/uuid"
 	"github.com/willabides/kongplete"
 )
@@ -96,19 +97,21 @@ func main() {
 		kong.Name("eg"),
 		kong.Description("cli for eg"),
 		kong.Vars{
-			"vars_endpoint":               envx.String(eg.EnvEGAPIHostDefault, eg.EnvEGAPIHost),
-			"vars_cwd":                    osx.Getwd("."),
-			"vars_cache_directory":        envx.String(os.TempDir(), "CACHE_DIRECTORY", "XDG_CACHE_HOME"),
-			"vars_account_id":             envx.String("", "EG_ACCOUNT"),
-			"vars_machine_id":             envx.String(machineID(), "EG_MACHINE_ID"),
-			"vars_ssh_key_path":           filepath.Join(user.HomeDir, ".ssh", "eg"),
-			"vars_user_name":              stringsx.DefaultIfBlank(user.Name, user.Username),
-			"vars_user_username":          user.Username,
-			"vars_os":                     runtime.GOOS,
-			"vars_arch":                   runtime.GOARCH,
-			"vars_cores_minimum_default":  strconv.Itoa(1),
-			"vars_memory_minimum_default": strconv.Itoa(bytesx.GiB),
-			"vars_disk_minimum_default":   strconv.Itoa(8 * bytesx.GiB),
+			"vars_endpoint":                envx.String(eg.EnvEGAPIHostDefault, eg.EnvEGAPIHost),
+			"vars_cwd":                     osx.Getwd("."),
+			"vars_cache_directory":         envx.String(os.TempDir(), "CACHE_DIRECTORY", "XDG_CACHE_HOME"),
+			"vars_account_id":              envx.String("", "EG_ACCOUNT"),
+			"vars_machine_id":              envx.String(machineID(), "EG_MACHINE_ID"),
+			"vars_ssh_key_path":            filepath.Join(user.HomeDir, ".ssh", "eg"),
+			"vars_user_name":               stringsx.DefaultIfBlank(user.Name, user.Username),
+			"vars_user_username":           user.Username,
+			"vars_os":                      runtime.GOOS,
+			"vars_arch":                    runtime.GOARCH,
+			"vars_cores_minimum_default":   strconv.Itoa(1),
+			"vars_memory_minimum_default":  strconv.Itoa(bytesx.GiB),
+			"vars_disk_minimum_default":    strconv.Itoa(8 * bytesx.GiB),
+			"vars_git_default_remote_name": git.DefaultRemoteName,
+			"vars_git_default_reference":   "main",
 		},
 		kong.UsageOnError(),
 		kong.Bind(

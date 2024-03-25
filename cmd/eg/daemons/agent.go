@@ -14,7 +14,6 @@ import (
 	"github.com/egdaemon/eg/internal/fsx"
 	"github.com/egdaemon/eg/interp/events"
 	"github.com/egdaemon/eg/runners"
-	"github.com/egdaemon/eg/runtime/wasi/langx"
 	"github.com/egdaemon/eg/workspaces"
 	"github.com/pkg/errors"
 	"google.golang.org/grpc"
@@ -98,7 +97,7 @@ func Agent(global *cmdopts.Global, grpcl net.Listener) (err error) {
 	)
 
 	events.NewServiceAgent(
-		langx.Must(filepath.Abs(runners.DefaultManagerDirectory())),
+		errorsx.Must(filepath.Abs(runners.DefaultManagerDirectory())),
 	).Bind(srv)
 
 	global.Cleanup.Add(1)

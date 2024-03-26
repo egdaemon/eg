@@ -1,11 +1,12 @@
 Source: eg
 Section: misc
 Maintainer: ${DEBFULLNAME} <${DEBEMAIL}>
+Standards-Version: 4.6.0.1
 Priority: extra
-Build-Depends: golang-1.21, dh-make, debhelper, build-essential
+Build-Depends: golang-1.21, dh-make, debhelper
 
 Package: eg
 Section: misc
 Architecture: amd64 arm64
 Description: developer friendly continuous integration
-Depends: podman
+Depends: podman, ${misc:Depends}

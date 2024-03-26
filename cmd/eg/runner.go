@@ -303,21 +303,17 @@ func (t module) Run(ctx *cmdopts.Global) (err error) {
 }
 
 type upload struct {
-	SSHKeyPath  string        `name:"sshkeypath" help:"path to ssh key to use" default:"${vars_ssh_key_path}"`
-	Dir         string        `name:"directory" help:"root directory of the repository" default:"${vars_cwd}"`
-	ModuleDir   string        `name:"moduledir" help:"must be a subdirectory in the provided directory" default:".eg"`
-	Name        string        `arg:"" name:"module" help:"name of the module to run, i.e. the folder name within moduledir" default:""`
-	Environment []string      `name:"env" short:"e" help:"define environment variables and their values to be included"`
-	Dirty       bool          `name:"dirty" help:"include all environment variables"`
-	Endpoint    string        `name:"endpoint" help:"specify the endpoint to upload to" default:"${vars_endpoint}/c/manager/" hidden:"true"`
-	TTL         time.Duration `name:"ttl" help:"maximum runtime for the upload" default:"1h"`
-	// OS           string        `name:"os" help:"operating system the job requires" hidden:"true" default:"linux"`
-	// Arch         string        `name:"arch" help:"instruction set the job requires" hidden:"true" default:"${vars_arch}"`
-	// Cores        string        `name:"cores" help:"minimum number of cores the required" default:"${vars_cores_minimum_default}"`
-	// Memory       string        `name:"memory" help:"minimum amount of ram required" default:"${vars_memory_minimum_default}"`
-	Labels       []string `name:"labels" help:"custom labels required"`
-	GitRemote    string   `name:"git-remote" help:"name of the git remote to use" default:"${vars_git_default_remote_name}"`
-	GitReference string   `name:"git-ref" help:"name of the branch or commit to checkout" default:"${vars_git_default_reference}"`
+	SSHKeyPath   string        `name:"sshkeypath" help:"path to ssh key to use" default:"${vars_ssh_key_path}"`
+	Dir          string        `name:"directory" help:"root directory of the repository" default:"${vars_cwd}"`
+	ModuleDir    string        `name:"moduledir" help:"must be a subdirectory in the provided directory" default:".eg"`
+	Name         string        `arg:"" name:"module" help:"name of the module to run, i.e. the folder name within moduledir" default:""`
+	Environment  []string      `name:"env" short:"e" help:"define environment variables and their values to be included"`
+	Dirty        bool          `name:"dirty" help:"include all environment variables"`
+	Endpoint     string        `name:"endpoint" help:"specify the endpoint to upload to" default:"${vars_endpoint}/c/manager/" hidden:"true"`
+	TTL          time.Duration `name:"ttl" help:"maximum runtime for the upload" default:"1h"`
+	Labels       []string      `name:"labels" help:"custom labels required"`
+	GitRemote    string        `name:"git-remote" help:"name of the git remote to use" default:"${vars_git_default_remote_name}"`
+	GitReference string        `name:"git-ref" help:"name of the branch or commit to checkout" default:"${vars_git_default_reference}"`
 }
 
 func (t upload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, runtimecfg *cmdopts.RuntimeResources) (err error) {

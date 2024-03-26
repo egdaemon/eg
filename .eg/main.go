@@ -74,8 +74,8 @@ func main() {
 	c1 := yak.Container(c1name).
 		OptionEnv("VCS_REVISION", egenv.GitCommit()).
 		OptionEnv("VERSION", fmt.Sprintf("0.0.%d", time.Now().Unix())).
-		OptionEnv("DEBEMAIL", "jljatone@gmail.com").
-		OptionEnv("DEBFULLNAME", "James Lawrence").
+		OptionEnv("DEBEMAIL", "engineering@egdaemon.com").
+		OptionEnv("DEBFULLNAME", "engineering").
 		OptionEnv("DISTRO", "jammy").
 		OptionEnv("CHANGELOG_DATE", time.Now().Format(time.RFC1123Z)).
 		OptionVolumeWritable(

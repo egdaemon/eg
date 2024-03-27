@@ -14,8 +14,8 @@ func Digest(b []byte) string {
 	return hex.EncodeToString(d[:])
 }
 
-// DigestString to md5 hex encoded string
-func DigestString(s string) string {
+// String to md5 hex encoded string
+func String(s string) string {
 	return Digest([]byte(s))
 }
 

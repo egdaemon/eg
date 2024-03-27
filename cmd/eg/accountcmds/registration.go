@@ -2,22 +2,13 @@ package accountcmds
 
 import (
 	"context"
-	"crypto/rand"
-	"encoding/base64"
-	"encoding/json"
 	"errors"
-	"fmt"
-	"log"
-	"net/http"
 
-	"github.com/davecgh/go-spew/spew"
-	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/authn"
 	"github.com/egdaemon/eg/cmd/cmdopts"
-	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
-	"github.com/egdaemon/eg/internal/httpx"
 	"github.com/egdaemon/eg/internal/jwtx"
+	"github.com/egdaemon/eg/internal/md5x"
 	"github.com/egdaemon/eg/internal/sshx"
 	"github.com/gofrs/uuid"
 	"golang.org/x/crypto/ssh"
@@ -32,16 +23,18 @@ type Register struct {
 
 func (t Register) Run(gctx *cmdopts.Global, tlscfg *cmdopts.TLSConfig) (err error) {
 	type reqstate struct {
+		ID        string `json:"id"`
 		PublicKey []byte `json:"pkey"`
 		Email     string `json:"email"`
 		Display   string `json:"display"`
 	}
 
 	var (
-		signer  ssh.Signer
-		sig     *ssh.Signature
-		authed  authn.Authed
-		encoded string
+		signer    ssh.Signer
+		authed    authn.Authed
+		encoded   string
+		exchanged jwtx.AuthResponse
+		token     *oauth2.Token
 	)
 
 	if signer, err = sshx.AutoCached(sshx.NewKeyGen(), t.SSHKeyPath); err != nil {
@@ -49,8 +42,8 @@ func (t Register) Run(gctx *cmdopts.Global, tlscfg *cmdopts.TLSConfig) (err erro
 	}
 
 	password := uuid.Must(uuid.NewV4())
-
 	rawstate := reqstate{
+		ID:        md5x.String(password.String()),
 		PublicKey: signer.PublicKey().Marshal(),
 		Email:     t.Email,
 		Display:   t.Name,
@@ -62,56 +55,37 @@ func (t Register) Run(gctx *cmdopts.Global, tlscfg *cmdopts.TLSConfig) (err erro
 
 	chttp := tlscfg.DefaultClient()
 	ctx := context.WithValue(gctx.Context, oauth2.HTTPClient, chttp)
-	cfg := authn.OAuth2SSHConfig(signer, password.String())
+	cfg := authn.OAuth2SSHConfig(signer, password.String(), authn.EndpointSSHAuth())
 
 	authzuri := cfg.AuthCodeURL(
 		encoded,
 		oauth2.AccessTypeOffline,
 	)
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, authzuri, nil)
-	if err != nil {
-		return err
-	}
-	resp, err := httpx.AsError(chttp.Do(req))
-	if err != nil {
-		return err
-	}
-	defer httpx.AutoClose(resp)
 
-	if sig, err = signer.Sign(rand.Reader, password.Bytes()); err != nil {
+	if exchanged, err = jwtx.Exchange(ctx, chttp, authzuri); err != nil {
 		return err
 	}
 
-	encodedsig := base64.RawURLEncoding.EncodeToString(ssh.Marshal(sig))
-
-	token, err := cfg.PasswordCredentialsToken(ctx, cfg.ClientID, encodedsig)
-	if err != nil {
+	if token, err = cfg.Exchange(ctx, exchanged.Code, oauth2.AccessTypeOffline); err != nil {
 		return err
 	}
 
-	authzc := cfg.Client(ctx, token)
-
-	req, err = http.NewRequestWithContext(ctx, http.MethodPost, fmt.Sprintf("%s/authn/ssh", envx.String(eg.EnvEGAPIHostDefault, eg.EnvEGAPIHost)), nil)
-	if err != nil {
-		return err
-	}
-	resp3, err := httpx.AsError(authzc.Do(req))
-	if err != nil {
-		return err
-	}
-	defer httpx.AutoClose(resp3)
-
-	if err = json.NewDecoder(resp3.Body).Decode(&authed); err != nil {
+	if err = authn.WriteRefreshToken(token.RefreshToken); err != nil {
 		return err
 	}
 
-	log.Println("authed", spew.Sdump(&authed))
+	// debugx.Println("token received", spew.Sdump(token))
+	if err = loginssh(ctx, cfg.Client(ctx, token), &authed); err != nil {
+		return err
+	}
+
+	// log.Println("authed", spew.Sdump(&authed))
 
 	switch len(authed.Profiles) {
 	case 0:
 		return signup(ctx, chttp, &authed)
 	case 1:
-		return login(ctx, chttp, authed.Profiles[0])
+		return session(ctx, chttp, authed.Profiles[0])
 	default:
 		return errorsx.Notification(errors.New("you've already registered an account; multiple account support will be implemented in the future"))
 	}

@@ -439,6 +439,8 @@ func easyjsonDabade4DecodeGithubComEgdaemonEgRegistration5(in *jlexer.Lexer, out
 				}
 				(*out.Registration).UnmarshalEasyJSON(in)
 			}
+		case "global":
+			out.Global = bool(in.Bool())
 		default:
 			in.SkipRecursive()
 		}
@@ -458,6 +460,16 @@ func easyjsonDabade4EncodeGithubComEgdaemonEgRegistration5(out *jwriter.Writer, 
 		first = false
 		out.RawString(prefix[1:])
 		(*in.Registration).MarshalEasyJSON(out)
+	}
+	if in.Global {
+		const prefix string = ",\"global\":"
+		if first {
+			first = false
+			out.RawString(prefix[1:])
+		} else {
+			out.RawString(prefix)
+		}
+		out.Bool(bool(in.Global))
 	}
 	out.RawByte('}')
 }

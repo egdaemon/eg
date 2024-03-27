@@ -1,5 +1,5 @@
-//go:build !debug.enabled
-// +build !debug.enabled
+//go:build debug.disabled
+// +build debug.disabled
 
 package debugx
 

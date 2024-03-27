@@ -93,7 +93,7 @@ func Remote(ctx context.Context, runid string, g ffigraph.Eventer, svc grpc.Clie
 			return nil
 		})).Export("github.com/egdaemon/eg/runtime/wasi/runtime/ffiegcontainer.Build").
 			NewFunctionBuilder().WithFunc(ffiegcontainer.Module(func(ctx context.Context, name, modulepath string, options ...string) (err error) {
-			cname := fmt.Sprintf("%s.%s", name, md5x.DigestString(modulepath+runid))
+			cname := fmt.Sprintf("%s.%s", name, md5x.String(modulepath+runid))
 			options = append(
 				options,
 				"--volume", fmt.Sprintf("%s:/opt/egmodule.wasm:ro", filepath.Join(r.moduledir, modulepath)),
@@ -111,7 +111,7 @@ func Remote(ctx context.Context, runid string, g ffigraph.Eventer, svc grpc.Clie
 			return nil
 		})).Export("github.com/egdaemon/eg/runtime/wasi/runtime/ffiegcontainer.Module").
 			NewFunctionBuilder().WithFunc(ffiegcontainer.Run(func(ctx context.Context, name, modulepath string, cmd []string, options ...string) (err error) {
-			cname := fmt.Sprintf("%s.%s", name, md5x.DigestString(modulepath+runid))
+			cname := fmt.Sprintf("%s.%s", name, md5x.String(modulepath+runid))
 			_, err = containers.Run(ctx, &c8s.RunRequest{
 				Image:   name,
 				Name:    cname,

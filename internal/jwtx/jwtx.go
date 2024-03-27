@@ -11,6 +11,8 @@ import (
 	"github.com/gofrs/uuid"
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/pkg/errors"
+
+	"github.com/egdaemon/eg/internal/httpx"
 )
 
 const (
@@ -142,4 +144,28 @@ func DecodeJSON(s string, v any) (err error) {
 	}
 
 	return json.Unmarshal(decoded, v)
+}
+
+type AuthResponse struct {
+	Code  string `json:"code"`
+	State string `json:"state"`
+}
+
+func Exchange(ctx context.Context, chttp *http.Client, uri string) (r AuthResponse, err error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, uri, nil)
+	if err != nil {
+		return r, err
+	}
+
+	resp, err := httpx.AsError(chttp.Do(req))
+	if err != nil {
+		return r, err
+	}
+	defer httpx.AutoClose(resp)
+
+	if err = json.NewDecoder(resp.Body).Decode(&r); err != nil {
+		return r, err
+	}
+
+	return r, nil
 }

@@ -455,6 +455,7 @@ func (t upload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, runtimecfg *c
 	chttp, err := authn.OAuth2SSHHTTPClient(
 		context.WithValue(gctx.Context, oauth2.HTTPClient, tlsc.DefaultClient()),
 		signer,
+		authn.EndpointSSHAuth(),
 	)
 	if err != nil {
 		return err

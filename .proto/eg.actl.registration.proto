@@ -26,6 +26,7 @@ message RegistrationResponse {
 
 message RegistrationGrantRequest {
   Registration registration = 1 [ json_name = "registration" ];
+  bool global = 2 [ json_name = "global" ];
 }
 
 message RegistrationGrantResponse {

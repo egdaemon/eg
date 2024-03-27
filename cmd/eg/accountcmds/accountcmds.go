@@ -39,34 +39,22 @@ func signup(ctx context.Context, chttp *http.Client, authed *authn.Authed) (err 
 
 	log.Println("logged in as", session.Profile.Display, "-", session.Profile.Id)
 	log.Println("account", stringsx.DefaultIfBlank(session.Account.Display, session.Profile.AccountId))
-	return authn.WriteSessionToken(session.Token)
+	return nil
 }
 
-func login(ctx context.Context, chttp *http.Client, authed *authn.Authn) (err error) {
-	var (
-		session authn.Current
-		req     *http.Request
-	)
+func loginssh(ctx context.Context, chttp *http.Client, authed *authn.Authed) (err error) {
+	return authn.ExchangeAuthed(ctx, chttp, fmt.Sprintf("%s/authn/ssh", envx.String(eg.EnvEGAPIHostDefault, eg.EnvEGAPIHost)), authed)
+}
 
-	req, err = http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/authn/current", envx.String(eg.EnvEGAPIHostDefault, eg.EnvEGAPIHost)), nil)
+func session(ctx context.Context, chttp *http.Client, authed *authn.Authn) (err error) {
+	session, err := authn.Session(ctx, chttp, authed.Token)
 	if err != nil {
-		return err
-	}
-	authn.BearerAuthorization(req, authed.Token)
-
-	resp, err := httpx.AsError(chttp.Do(req))
-	if err != nil {
-		return err
-	}
-	defer httpx.AutoClose(resp)
-
-	if err = json.NewDecoder(resp.Body).Decode(&session); err != nil {
 		return err
 	}
 
 	log.Println("logged in as", session.Profile.Display, "-", session.Profile.Id)
 	log.Println("account", stringsx.DefaultIfBlank(session.Account.Display, session.Profile.AccountId))
-	return authn.WriteSessionToken(session.Token)
+	return nil
 }
 
 func otp(ctx context.Context, chttp *http.Client, authed *authn.Authn) (err error) {

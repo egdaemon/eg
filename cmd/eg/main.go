@@ -86,15 +86,12 @@ func main() {
 	shellcli.Context = contextx.WithWaitGroup(context.Background(), shellcli.Cleanup)
 	shellcli.Context, shellcli.Shutdown = context.WithCancel(shellcli.Context)
 
-	log.SetFlags(log.Flags() | log.Lshortfile)
 	go debugx.DumpOnSignal(shellcli.Context, syscall.SIGUSR2)
 	go cmdopts.Cleanup(shellcli.Context, shellcli.Shutdown, shellcli.Cleanup, func() {
 		log.Println("waiting for systems to shutdown")
 	}, os.Kill, os.Interrupt)
 
 	user := userx.CurrentUserOrDefault(userx.Root())
-
-	envx.Debug(os.Environ()...)
 
 	parser := kong.Must(
 		&shellcli,
@@ -136,6 +133,10 @@ func main() {
 	if ctx, err = parser.Parse(os.Args[1:]); err != nil {
 		log.Println(cmderrors.Sprint(err))
 		os.Exit(1)
+	}
+
+	if envx.Boolean(false, eg.EnvLogsDebug) {
+		envx.Debug(os.Environ()...)
 	}
 
 	if err = ctx.Run(); err != nil {

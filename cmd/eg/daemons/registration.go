@@ -8,6 +8,7 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/egdaemon/eg/cmd/cmdopts"
 	"github.com/egdaemon/eg/internal/jwtx"
+	"github.com/egdaemon/eg/internal/md5x"
 	"github.com/egdaemon/eg/internal/systemx"
 	"github.com/egdaemon/eg/notary"
 	"github.com/egdaemon/eg/registration"
@@ -24,7 +25,7 @@ func Register(global *cmdopts.Global, tlsc *cmdopts.TLSConfig, runtimecfg *cmdop
 	c := jwtx.NewHTTP(
 		tlsc.DefaultClient(),
 		jwtx.SignerFn(func() (signed string, err error) {
-			signed, err = jwt.NewWithClaims(
+			return jwt.NewWithClaims(
 				notary.NewJWTSigner(),
 				jwtx.NewJWTClaims(
 					machineid,
@@ -32,12 +33,6 @@ func Register(global *cmdopts.Global, tlsc *cmdopts.TLSConfig, runtimecfg *cmdop
 					jwtx.ClaimsOptionIssuer(aid),
 				),
 			).SignedString(s)
-
-			if err != nil {
-				return "", err
-			}
-
-			return signed, err
 		}),
 	)
 
@@ -78,7 +73,7 @@ func Register(global *cmdopts.Global, tlsc *cmdopts.TLSConfig, runtimecfg *cmdop
 			if tlsc.Insecure {
 				insecure = " --insecure"
 			}
-			log.Printf("waiting for registration to be accepted. run `eg actl authorize --id='%s'%s` to accept\n", reg.Registration.Id, insecure)
+			log.Printf("waiting for registration to be accepted. run `eg actl authorize --id='%s'%s` to accept\n", md5x.String(fingerprint), insecure)
 			continue
 		}
 

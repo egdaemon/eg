@@ -53,7 +53,7 @@ func (t OTP) Run(gctx *cmdopts.Global, tlscfg *cmdopts.TLSConfig) (err error) {
 
 	chttp := tlscfg.DefaultClient()
 	ctx := context.WithValue(gctx.Context, oauth2.HTTPClient, chttp)
-	cfg, token, err := authn.OAuth2SSHToken(gctx.Context, signer)
+	cfg, token, err := authn.OAuth2SSHToken(gctx.Context, signer, authn.EndpointSSHAuth())
 	if err != nil {
 		return err
 	}

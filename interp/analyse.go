@@ -66,7 +66,7 @@ func Analyse(ctx context.Context, g ffigraph.Eventer, runid, dir string, module 
 				// cmd.Stdout = os.Stdout
 				// return cmd
 			}
-			cname := fmt.Sprintf("%s.%s", name, md5x.DigestString(modulepath+runid))
+			cname := fmt.Sprintf("%s.%s", name, md5x.String(modulepath+runid))
 
 			options = append(
 				options,
@@ -85,7 +85,7 @@ func Analyse(ctx context.Context, g ffigraph.Eventer, runid, dir string, module 
 				// cmd.Stdout = os.Stdout
 				// return cmd
 			}
-			cname := fmt.Sprintf("%s.%s", name, md5x.DigestString(runid))
+			cname := fmt.Sprintf("%s.%s", name, md5x.String(runid))
 			options = append(
 				options,
 				"--volume", fmt.Sprintf("%s:%s:O", r.runtimedir, runners.DefaultRunnerRuntimeDir()),

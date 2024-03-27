@@ -1,0 +1,67 @@
+syntax = "proto3";
+
+package ci.authz;
+
+message Authorization {
+  bool compute_read = 1 [ json_name = "compute_read" ];
+  bool compute_modify = 2 [ json_name = "compute_modify" ];
+  bool quota_read = 3 [ json_name = "quota_read" ];
+  bool quota_modify = 4 [ json_name = "quota_modify" ];
+  bool repository_read = 5 [ json_name = "repository_read" ];
+  bool repository_modify = 6 [ json_name = "repository_modify" ];
+  bool compute_shared = 7 [ json_name = "compute_shared" ];
+}
+
+message Token {
+  // START OF STANDARD FIELDS
+  string id = 1 [ json_name = "jti" ];
+  string account_id = 2 [ json_name = "iss" ];
+  string profile_id = 3 [ json_name = "sub" ];
+  string session_id = 4 [ json_name = "sid" ];
+  int64 issued = 5 [ json_name = "iat" ];
+  int64 expires = 6 [ json_name = "exp" ];
+  int64 not_before = 7 [ json_name = "nbf" ];
+  string bearer = 8 [ json_name = "bearer" ];
+  // END OF STANDARD FIELDS
+  reserved 9 to 999;
+  bool compute_read = 1000 [ json_name = "compute_read" ];
+  bool compute_modify = 1002 [ json_name = "compute_modify" ];
+  bool quota_read = 1003 [ json_name = "quota_read" ];
+  bool quota_modify = 1004 [ json_name = "quota_modify" ];
+  bool repository_read = 1005 [ json_name = "repository_read" ];
+  bool repository_modify = 1006 [ json_name = "repository_modify" ];
+  bool compute_shared = 1007 [ json_name = "compute_shared" ];
+}
+
+message AuthzRequest {}
+message AuthzResponse { Token token = 1 [ json_name = "token" ]; }
+
+message GrantRequest {
+  string profile_id = 1 [ json_name = "profile_id" ];
+  Authorization authorization = 2 [ json_name = "authorization" ];
+}
+message GrantResponse {
+  string profile_id = 1 [ json_name = "profile_id" ];
+  Authorization authorization = 2;
+}
+
+message RevokeRequest {
+  string profile_id = 1 [ json_name = "profile_id" ];
+  Authorization authorization = 2 [ json_name = "authorization" ];
+}
+message RevokeResponse {
+  string profile_id = 1 [ json_name = "profile_id" ];
+  Authorization authorization = 2 [ json_name = "authorization" ];
+}
+
+message ProfileRequest { string profile_id = 1 [ json_name = "profile_id" ]; }
+message ProfileResponse {
+  Authorization authorization = 1 [ json_name = "authorization" ];
+}
+
+service Backend {
+  rpc authz(AuthzRequest) returns (AuthzResponse) {}
+  rpc profile(ProfileRequest) returns (ProfileResponse) {}
+  rpc grant(GrantRequest) returns (GrantResponse) {}
+  rpc revoke(RevokeRequest) returns (RevokeResponse) {}
+}

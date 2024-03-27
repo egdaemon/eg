@@ -1,7 +1,7 @@
-//go:build debug.disabled
-// +build debug.disabled
+//go:build trace.disabled
+// +build trace.disabled
 
-package debugx
+package tracex
 
 // Println noop. should get optimized out by compiler.
 func Println(v ...interface{}) {}

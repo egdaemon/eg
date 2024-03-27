@@ -48,7 +48,7 @@ func (t daemon) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, runtimecfg *c
 	}
 
 	ctx := context.WithValue(gctx.Context, oauth2.HTTPClient, tlsc.DefaultClient())
-	if authclient, err = authn.OAuth2SSHHTTPClient(ctx, signer); err != nil {
+	if authclient, err = authn.OAuth2SSHHTTPClient(ctx, signer, authn.EndpointSSHAuth()); err != nil {
 		return err
 	}
 

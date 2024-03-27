@@ -17,3 +17,11 @@ const (
 	EnvEGConsoleHostDefault = "https://console.egdaemon.com"
 	// EnvEGConsoleHostDefault = "https://localhost:8080"
 )
+
+// Logging settings
+const (
+	EnvLogsInfo    = "EG_LOGS_INFO"    // enable logging for info statements. boolean, see strconv.ParseBool for valid values.
+	EnvLogsDebug   = "EG_LOGS_DEBUG"   // enable logging for debug statements. boolean, see strconv.ParseBool for valid values.
+	EnvLogsTrace   = "EG_LOGS_TRACE"   // enable logging for trace statements. boolean, see strconv.ParseBool for valid values.
+	EnvLogsNetwork = "EG_LOGS_NETWORK" // enable logging for network requests. boolean, see strconv.ParseBool for valid values.
+)

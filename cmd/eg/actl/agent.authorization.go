@@ -5,7 +5,6 @@ import (
 
 	"github.com/egdaemon/eg/authn"
 	"github.com/egdaemon/eg/cmd/cmdopts"
-	"github.com/egdaemon/eg/internal/httpx"
 	"github.com/egdaemon/eg/internal/sshx"
 	"github.com/egdaemon/eg/registration"
 	"golang.org/x/crypto/ssh"
@@ -32,7 +31,7 @@ func (t AuthorizeAgent) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err 
 	ctx := context.WithValue(gctx.Context, oauth2.HTTPClient, tlsc.DefaultClient())
 	httpc := oauth2.NewClient(ctx, tokensrc)
 
-	rc := registration.NewRegistrationClient(httpx.DebugClient(httpc))
+	rc := registration.NewRegistrationClient(httpc)
 	if _, err = rc.Grant(ctx, &registration.RegistrationGrantRequest{Registration: &registration.Registration{Id: t.ID}, Global: t.Shared}); err != nil {
 		return err
 	}

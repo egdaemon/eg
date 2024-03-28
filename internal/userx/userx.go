@@ -61,12 +61,12 @@ func DefaultDirLocation(rel string) string {
 func DefaultCacheDirectory() string {
 	user := CurrentUserOrDefault(Root())
 	if user.Uid == Root().Uid {
-		return filepath.Join("/", "var", "cache", DefaultDir)
+		return envx.String(filepath.Join("/", "var", "cache", DefaultDir), "CACHE_DIRECTORY")
 	}
 
-	root := envx.String(filepath.Join(user.HomeDir, ".cache"), "CACHE_DIRECTORY", "XDG_CACHE_HOME")
+	root := filepath.Join(user.HomeDir, ".cache", DefaultDir)
 
-	return filepath.Join(root, DefaultDir)
+	return envx.String(root, "CACHE_DIRECTORY", "XDG_CACHE_HOME")
 }
 
 // DefaultDirectory finds the first directory root that exists and then returns
@@ -90,7 +90,7 @@ func HomeDirectoryOrDefault(fallback string) (dir string) {
 	)
 
 	if dir, err = os.UserHomeDir(); err != nil {
-		log.Println("failed to get user home directory", err)
+		log.Println("unable to get user home directory", err)
 		return fallback
 	}
 

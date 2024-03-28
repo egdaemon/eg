@@ -69,6 +69,18 @@ func DefaultCacheDirectory() string {
 	return envx.String(root, "CACHE_DIRECTORY", "XDG_CACHE_HOME")
 }
 
+// DefaultRuntimeDirectory runtime directory for storing data.
+func DefaultRuntimeDirectory() string {
+	user := CurrentUserOrDefault(Root())
+	if user.Uid == Root().Uid {
+		return envx.String(filepath.Join("/", "run", DefaultDir), "RUNTIME_DIRECTORY")
+	}
+
+	root := filepath.Join(user.HomeDir, ".cache", DefaultDir, "run")
+
+	return envx.String(root, "RUNTIME_DIRECTORY")
+}
+
 // DefaultDirectory finds the first directory root that exists and then returns
 // that root directory joined with the relative path provided.
 func DefaultDirectory(rel string, roots ...string) (path string) {

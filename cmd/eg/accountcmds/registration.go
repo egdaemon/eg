@@ -50,7 +50,7 @@ func (t Register) Run(gctx *cmdopts.Global, tlscfg *cmdopts.TLSConfig) (err erro
 	}
 
 	if encoded, err = jwtx.EncodeJSON(rawstate); err != nil {
-		return err
+		return errorsx.Wrap(err, "unable to encode state")
 	}
 
 	chttp := tlscfg.DefaultClient()
@@ -62,16 +62,20 @@ func (t Register) Run(gctx *cmdopts.Global, tlscfg *cmdopts.TLSConfig) (err erro
 		oauth2.AccessTypeOffline,
 	)
 
-	if exchanged, err = jwtx.Exchange(ctx, chttp, authzuri); err != nil {
-		return err
+	if exchanged, err = jwtx.RetrieveAuthCode(ctx, chttp, authzuri); err != nil {
+		return errorsx.Wrap(err, "unable to retrieve auth code")
+	}
+
+	if exchanged.State != encoded {
+		return errorsx.Wrap(err, "mismatch oauth state")
 	}
 
 	if token, err = cfg.Exchange(ctx, exchanged.Code, oauth2.AccessTypeOffline); err != nil {
-		return err
+		return errorsx.Wrap(err, "failed to exchange code of oauth2 token")
 	}
 
 	if err = authn.WriteRefreshToken(token.RefreshToken); err != nil {
-		return err
+		return errorsx.Wrap(err, "unable to write token to disk")
 	}
 
 	// debugx.Println("token received", spew.Sdump(token))

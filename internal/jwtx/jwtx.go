@@ -151,7 +151,7 @@ type AuthResponse struct {
 	State string `json:"state"`
 }
 
-func Exchange(ctx context.Context, chttp *http.Client, uri string) (r AuthResponse, err error) {
+func RetrieveAuthCode(ctx context.Context, chttp *http.Client, uri string) (r AuthResponse, err error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, uri, nil)
 	if err != nil {
 		return r, err

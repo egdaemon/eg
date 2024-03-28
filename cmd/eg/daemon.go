@@ -12,6 +12,7 @@ import (
 	"github.com/egdaemon/eg/cmd/cmdopts"
 	"github.com/egdaemon/eg/cmd/eg/daemons"
 	"github.com/egdaemon/eg/internal/envx"
+	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/sshx"
 	"github.com/egdaemon/eg/runners"
 	"golang.org/x/crypto/ssh"
@@ -44,7 +45,7 @@ func (t daemon) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, runtimecfg *c
 	}
 
 	if signer, err = sshx.AutoCached(sshx.NewKeyGenSeeded(t.Seed), t.SSHKeyPath); err != nil {
-		return err
+		return errorsx.Wrap(err, "unable to retrieve identity credentials")
 	}
 
 	ctx := context.WithValue(gctx.Context, oauth2.HTTPClient, tlsc.DefaultClient())

@@ -103,6 +103,7 @@ func main() {
 			"vars_cache_directory":         userx.DefaultCacheDirectory(),
 			"vars_account_id":              envx.String("", "EG_ACCOUNT"),
 			"vars_machine_id":              envx.String(machineID(), "EG_MACHINE_ID"),
+			"vars_entropy_seed":            envx.String(errorsx.Must(uuid.NewV4()).String(), "EG_ENTROPY_SEED"),
 			"vars_ssh_key_path":            filepath.Join(userx.HomeDirectoryOrDefault(user.HomeDir), ".ssh", "eg"),
 			"vars_user_name":               stringsx.DefaultIfBlank(user.Name, user.Username),
 			"vars_user_username":           user.Username,

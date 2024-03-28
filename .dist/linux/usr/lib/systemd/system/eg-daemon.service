@@ -14,7 +14,7 @@ ConfigurationDirectory=%p
 RuntimeDirectory=%p
 RuntimeDirectoryMode=0700
 EnvironmentFile=-/etc/eg/daemon.env
-ExecStart=/usr/bin/eg
+ExecStart=/usr/bin/eg daemon
 
 [Install]
 WantedBy=default.target

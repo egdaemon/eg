@@ -38,7 +38,7 @@ func (t Login) Run(gctx *cmdopts.Global, tlscfg *cmdopts.TLSConfig) (err error) 
 
 	refreshtoken, err := authn.ReadRefreshToken()
 	if err != nil {
-		return err
+		return errorsx.WithStack(err)
 	}
 	if err = loginssh(ctx, cfg.Client(ctx, refreshtoken), &authed); err != nil {
 		return err

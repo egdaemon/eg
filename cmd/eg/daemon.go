@@ -24,7 +24,7 @@ type daemon struct {
 	MachineID    string   `name:"machine" help:"unique id for this particular machine" default:"${vars_machine_id}" required:"true"`
 	Seed         string   `name:"secret" help:"seed for generating ssh credentials in a consistent manner" default:"${vars_entropy_seed}"`
 	SSHKeyPath   string   `name:"sshkeypath" help:"path to ssh key to use" default:"${vars_ssh_key_path}"`
-	SSHAgentPath string   `name:"sshagentpath" help:"ssh agent socket path" default:"${vars_cwd}/ssh.agent.socket"`
+	SSHAgentPath string   `name:"sshagentpath" help:"ssh agent socket path" default:"${vars_runtime_directory}/ssh.agent.socket"`
 	CacheDir     string   `name:"directory" help:"local cache directory" default:"${vars_cache_directory}"`
 	MountDirs    []string `name:"mounts" short:"m" help:"folders to mount using podman mount specs" default:""`
 	EnvVars      []string `name:"env" short:"e" help:"environment variables to import" default:""`

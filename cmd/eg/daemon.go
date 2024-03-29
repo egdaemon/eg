@@ -48,10 +48,10 @@ func (t daemon) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, runtimecfg *c
 		return errorsx.Wrap(err, "unable to retrieve identity credentials")
 	}
 
+	tokensrc := authn.NewAuthzTokenSource(tlsc.DefaultClient(), signer, authn.EndpointCompute())
+
 	ctx := context.WithValue(gctx.Context, oauth2.HTTPClient, tlsc.DefaultClient())
-	if authclient, err = authn.OAuth2SSHHTTPClient(ctx, signer, authn.EndpointSSHAuth()); err != nil {
-		return err
-	}
+	authclient = oauth2.NewClient(ctx, tokensrc)
 
 	log.Println("running daemon initiated")
 	defer log.Println("running daemon completed")

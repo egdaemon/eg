@@ -6,6 +6,7 @@ import (
 	"os/user"
 	"path/filepath"
 
+	"github.com/egdaemon/eg/internal/debugx"
 	"github.com/egdaemon/eg/internal/envx"
 )
 
@@ -102,7 +103,7 @@ func HomeDirectoryOrDefault(fallback string) (dir string) {
 	)
 
 	if dir, err = os.UserHomeDir(); err != nil {
-		log.Println("unable to get user home directory", err)
+		debugx.Println("unable to get user home directory", err)
 		return fallback
 	}
 

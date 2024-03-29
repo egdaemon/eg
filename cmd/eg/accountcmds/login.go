@@ -4,12 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
 	"os"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/egdaemon/eg/authn"
 	"github.com/egdaemon/eg/cmd/cmdopts"
+	"github.com/egdaemon/eg/internal/debugx"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/sshx"
 	"github.com/egdaemon/eg/internal/stringsx"
@@ -36,7 +36,7 @@ func (t Login) Run(gctx *cmdopts.Global, tlscfg *cmdopts.TLSConfig) (err error) 
 	ctx := context.WithValue(gctx.Context, oauth2.HTTPClient, chttp)
 	cfg = authn.OAuth2SSHConfig(signer, "", authn.EndpointSSHAuth())
 
-	refreshtoken, err := authn.ReadRefreshToken()
+	refreshtoken, err := authn.AutoRefreshToken(ctx, signer)
 	if err != nil {
 		return errorsx.WithStack(err)
 	}
@@ -44,7 +44,7 @@ func (t Login) Run(gctx *cmdopts.Global, tlscfg *cmdopts.TLSConfig) (err error) 
 		return err
 	}
 
-	log.Println("authed", spew.Sdump(&authed))
+	debugx.Println("authed", spew.Sdump(&authed))
 
 	switch len(authed.Profiles) {
 	case 0:

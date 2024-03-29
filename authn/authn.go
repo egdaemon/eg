@@ -15,7 +15,9 @@ import (
 
 	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/internal/envx"
+	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/httpx"
+	"github.com/egdaemon/eg/internal/jwtx"
 	"github.com/egdaemon/eg/internal/userx"
 	"github.com/gofrs/uuid"
 	"golang.org/x/crypto/ssh"
@@ -146,14 +148,78 @@ func (t TokenSourceFromEndpoint) Token() (_ *oauth2.Token, err error) {
 }
 
 func OAuth2SSHHTTPClient(ctx context.Context, signer ssh.Signer, endpoint oauth2.Endpoint) (_ *http.Client, err error) {
-	cfg := OAuth2SSHConfig(signer, "", endpoint)
+	type reqstate struct {
+		ID        string `json:"id"`
+		PublicKey []byte `json:"pkey"`
+	}
+	var (
+		encoded string
+	)
 
-	token, err := ReadRefreshToken()
+	id, err := uuid.NewV4()
+	if err != nil {
+		return nil, err
+	}
+	rawstate := reqstate{
+		ID:        id.String(),
+		PublicKey: signer.PublicKey().Marshal(),
+	}
+
+	if encoded, err = jwtx.EncodeJSON(rawstate); err != nil {
+		return nil, errorsx.Wrap(err, "unable to encode state")
+	}
+
+	token, err := autotoken(ctx, signer, encoded)
 	if err != nil {
 		return nil, err
 	}
 
+	cfg := OAuth2SSHConfig(signer, "", endpoint)
 	return cfg.Client(ctx, token), nil
+}
+
+func autotoken(ctx context.Context, signer ssh.Signer, state string) (_ *oauth2.Token, err error) {
+	var (
+		ok        bool
+		chttp     *http.Client
+		exchanged jwtx.AuthResponse
+		token     *oauth2.Token
+	)
+
+	if t, err := ReadRefreshToken(); err == nil {
+		return t, nil
+	}
+
+	if chttp, ok = ctx.Value(oauth2.HTTPClient).(*http.Client); !ok {
+		return nil, fmt.Errorf("missing http client from context")
+	}
+
+	cfg := OAuth2SSHConfig(signer, "", EndpointSSHAuth())
+
+	authzuri := cfg.AuthCodeURL(
+		state,
+		oauth2.AccessTypeOffline,
+	)
+
+	dc := httpx.DebugClient(chttp)
+	if exchanged, err = jwtx.RetrieveAuthCode(ctx, dc, authzuri); err != nil {
+		return nil, errorsx.Wrap(err, "unable to retrieve auth code")
+	}
+
+	if exchanged.State != state {
+		log.Printf("WAT exchanged: '%s', encoded: '%s'\n", exchanged.State, state)
+		return nil, fmt.Errorf("mismatch oauth state")
+	}
+
+	if token, err = cfg.Exchange(ctx, exchanged.Code, oauth2.AccessTypeOffline); err != nil {
+		return nil, errorsx.Wrap(err, "failed to exchange code of oauth2 token")
+	}
+
+	if err = WriteRefreshToken(token.RefreshToken); err != nil {
+		return nil, errorsx.Wrap(err, "unable to write token to disk")
+	}
+
+	return token, nil
 }
 
 func WriteRefreshToken(token string) (err error) {
@@ -190,7 +256,6 @@ func Session(ctx context.Context, c *http.Client, bearer string) (_ *Current, er
 	)
 	req, err = http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/authn/current", envx.String(eg.EnvEGAPIHostDefault, eg.EnvEGAPIHost)), nil)
 	if err != nil {
-		log.Println("CHECKPOINT")
 		return nil, err
 	}
 	BearerAuthorization(req, bearer)
@@ -201,7 +266,6 @@ func Session(ctx context.Context, c *http.Client, bearer string) (_ *Current, er
 	defer httpx.AutoClose(resp)
 
 	if err = json.NewDecoder(resp.Body).Decode(&session); err != nil {
-		log.Println("CHECKPOINT")
 		return nil, err
 	}
 

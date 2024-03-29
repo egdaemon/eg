@@ -21,7 +21,7 @@ import (
 )
 
 func DefaultAgentSocketPath() string {
-	return filepath.Join(envx.String(os.TempDir(), "STATE_DIRECTORY"), "agent.socket")
+	return filepath.Join(envx.String(os.TempDir(), "RUNTIME_DIRECTORY"), "agent.socket")
 }
 
 func DefaultAgentListener() (n net.Listener, err error) {

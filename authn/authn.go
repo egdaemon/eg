@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -201,14 +200,12 @@ func autotoken(ctx context.Context, signer ssh.Signer, state string) (_ *oauth2.
 		oauth2.AccessTypeOffline,
 	)
 
-	dc := httpx.DebugClient(chttp)
-	if exchanged, err = jwtx.RetrieveAuthCode(ctx, dc, authzuri); err != nil {
+	if exchanged, err = jwtx.RetrieveAuthCode(ctx, chttp, authzuri); err != nil {
 		return nil, errorsx.Wrap(err, "unable to retrieve auth code")
 	}
 
 	if exchanged.State != state {
-		log.Printf("WAT exchanged: '%s', encoded: '%s'\n", exchanged.State, state)
-		return nil, fmt.Errorf("mismatch oauth state")
+		return nil, fmt.Errorf("mismatch oauth state sent: '%s' retrieved: '%s'", state, exchanged.State)
 	}
 
 	if token, err = cfg.Exchange(ctx, exchanged.Code, oauth2.AccessTypeOffline); err != nil {

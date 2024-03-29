@@ -249,6 +249,10 @@ func WriteRefreshToken(token string) (err error) {
 		return err
 	}
 
+	if err = os.Setenv("EG_SESSION_TOKEN", token); err != nil {
+		return err
+	}
+
 	if err = os.WriteFile(path, []byte(token), 0600); err != nil {
 		return err
 	}
@@ -257,8 +261,13 @@ func WriteRefreshToken(token string) (err error) {
 }
 
 func ReadRefreshToken() (_ *oauth2.Token, err error) {
-	path := filepath.Join(userx.DefaultCacheDirectory(), "session.token")
-	raw, err := os.ReadFile(path)
+	raw, ok := os.LookupEnv("EG_SESSION_TOKEN")
+	if !ok {
+		return nil, fmt.Errorf("session token missing")
+	}
+
+	// path := filepath.Join(userx.DefaultCacheDirectory(), "session.token")
+	// raw, err := os.ReadFile(path)
 	return &oauth2.Token{
 		TokenType:    "BEARER",
 		RefreshToken: string(raw),

@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"encoding/hex"
 	"log"
 	"net"
@@ -49,9 +48,7 @@ func (t daemon) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, runtimecfg *c
 	}
 
 	tokensrc := authn.NewAuthzTokenSource(tlsc.DefaultClient(), signer, authn.EndpointCompute())
-
-	ctx := context.WithValue(gctx.Context, oauth2.HTTPClient, tlsc.DefaultClient())
-	authclient = oauth2.NewClient(ctx, tokensrc)
+	authclient = oauth2.NewClient(gctx.Context, tokensrc)
 
 	log.Println("running daemon initiated")
 	defer log.Println("running daemon completed")

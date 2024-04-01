@@ -163,6 +163,10 @@ func FromPath(n string) (environ []string, err error) {
 	return FromReader(env)
 }
 
+func Build() *builder {
+	return &builder{}
+}
+
 type builder struct {
 	environ []string
 	failed  error
@@ -289,10 +293,6 @@ func Format(k, v string, options ...func(*formatopts)) string {
 	}
 
 	return fmt.Sprintf("%s=%s", k, v)
-}
-
-func Build() *builder {
-	return &builder{}
 }
 
 // returns the os.Environ or an empty slice if b is false.

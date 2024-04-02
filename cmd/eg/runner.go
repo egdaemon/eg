@@ -197,6 +197,10 @@ func (t runner) Run(gctx *cmdopts.Global, runtimecfg *cmdopts.RuntimeResources) 
 		return err
 	}
 
+	if len(modules) == 0 {
+		return errors.New("no usable modules detected")
+	}
+
 	log.Println("modules", modules)
 	{
 		rootc := filepath.Join(ws.RuntimeDir, "Containerfile")

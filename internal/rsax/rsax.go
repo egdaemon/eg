@@ -11,7 +11,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/egdaemon/eg/internal/systemx"
+	"github.com/egdaemon/eg/internal/fsx"
 	"github.com/pkg/errors"
 )
 
@@ -30,7 +30,7 @@ func Auto() (pkey []byte, err error) {
 
 // CachedAuto loads/generates an RSA key at the provided filepath.
 func CachedAuto(path string) (pkey []byte, err error) {
-	if systemx.FileExists(path) {
+	if fsx.FileExists(path) {
 		return os.ReadFile(path)
 	}
 
@@ -47,7 +47,7 @@ func CachedAuto(path string) (pkey []byte, err error) {
 
 // CachedAutoDeterministic loads/generates an RSA key at the provided filepath.
 func CachedAutoDeterministic(seed []byte, path string) (pkey []byte, err error) {
-	if systemx.FileExists(path) {
+	if fsx.FileExists(path) {
 		return os.ReadFile(path)
 	}
 
@@ -68,7 +68,7 @@ func CachedAutoDeterministic(seed []byte, path string) (pkey []byte, err error) 
 
 // CachedGenerate loads/generates an SSH key at the provided filepath.
 func CachedGenerate(path string, bits int) (pkey []byte, err error) {
-	if systemx.FileExists(path) {
+	if fsx.FileExists(path) {
 		return os.ReadFile(path)
 	}
 

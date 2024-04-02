@@ -187,7 +187,7 @@ func (t golang) Run(ctx context.Context) (roots []Compiled, err error) {
 			formatted string
 			buf       = bytes.NewBuffer(nil)
 		)
-
+		log.Println("writing transformed to", dst)
 		if err = (&printer.Config{Mode: printer.TabIndent}).Fprint(buf, pkg.Fset, c); err != nil {
 			return err
 		}
@@ -230,8 +230,7 @@ func (t golang) Run(ctx context.Context) (roots []Compiled, err error) {
 			return roots, err
 		}
 
-		log.Println("writing transformed to", dst)
-		if err = rewrite(ftoken, dst, c); err != nil {
+		if err = rewrite(ftoken, filepath.Join(t.Context.Workspace.Root, dst), c); err != nil {
 			return roots, err
 		}
 
@@ -260,13 +259,7 @@ func (t golang) Run(ctx context.Context) (roots []Compiled, err error) {
 		log.Println("workspace", spew.Sdump(t.Context.Workspace))
 		log.Println("root", t.Context.Workspace.Root)
 		log.Println("original", m.fname)
-		// dst, err := workspaces.PathTranspiled(t.Context.Workspace, filepath.Join(t.Context.Workspace.Root, t.Context.Workspace.ModuleDir), filepath.Join(t.Context.Workspace.Root, m.fname))
-		// if err != nil {
-		// 	return roots, errorsx.Wrap(err, "unable to generate dst for generated module")
-		// }
 
-		// log.Println("writing transformed to", dst)
-		// if err = rewrite(fset.File(result.Pos()), dst, result); err != nil {
 		if err = rewrite(fset.File(result.Pos()), m.fname, result); err != nil {
 			return roots, err
 		}

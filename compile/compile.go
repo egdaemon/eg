@@ -54,7 +54,6 @@ func Run(ctx context.Context, dir, module string, output string) (err error) {
 		return err
 	}
 
-	// fsx.PrintDir(os.DirFS(dir))
 	cmd := exec.CommandContext(ctx, "go", "build", "-trimpath", "-o", output, strings.TrimPrefix(module, dir+"/"))
 	cmd.Env = append(os.Environ(), "GOOS=wasip1", "GOARCH=wasm")
 	cmd.Dir = dir
@@ -62,7 +61,7 @@ func Run(ctx context.Context, dir, module string, output string) (err error) {
 	cmd.Stderr = os.Stderr
 	cmd.Stdout = os.Stdout
 
-	log.Println("executing", errorsx.Must(os.Getwd()), dir, cmd.String())
+	log.Println("executing", dir, cmd.String())
 
 	return cmd.Run()
 }

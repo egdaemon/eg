@@ -71,7 +71,7 @@ func New(ctx context.Context, root string, mdir string, name string) (zero Conte
 	ignore := ignoredir{path: cdir, reason: "cache directory"}
 
 	if err = cacheid(ctx, root, mdir, cidmd5, ignore); err != nil {
-		return zero, err
+		return zero, errorsx.Wrap(err, "unable to create cache id")
 	}
 
 	cid := hex.EncodeToString(cidmd5.Sum(nil))

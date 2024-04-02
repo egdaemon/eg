@@ -90,7 +90,9 @@ type TokenSourceFromEndpoint struct {
 
 func (t TokenSourceFromEndpoint) Token() (_ *oauth2.Token, err error) {
 	type bearer struct {
-		Bearer string `json:"bearer"`
+		Issued  int64  `json:"issued"`
+		Expires int64  `json:"expires"`
+		Bearer  string `json:"bearer"`
 	}
 	type msg struct {
 		Token bearer `json:"token"`
@@ -148,7 +150,7 @@ func (t TokenSourceFromEndpoint) Token() (_ *oauth2.Token, err error) {
 		return nil, err
 	}
 
-	return &oauth2.Token{TokenType: "BEARER", AccessToken: token.Token.Bearer}, nil
+	return &oauth2.Token{TokenType: "BEARER", AccessToken: token.Token.Bearer, Expiry: time.UnixMilli(token.Token.Expires)}, nil
 }
 
 func autotokenstate(signer ssh.Signer) (encoded string, err error) {

@@ -6,7 +6,6 @@ import (
 	"os"
 	"time"
 
-	"github.com/egdaemon/eg/runtime/wasi/eggit"
 	"github.com/egdaemon/eg/runtime/wasi/env"
 	"github.com/egdaemon/eg/runtime/wasi/shell"
 	"github.com/egdaemon/eg/runtime/wasi/yak"
@@ -68,12 +67,6 @@ func DaemonTests(ctx context.Context, _ yak.Op) error {
 	)
 }
 
-func BuildContainer(r yak.Runner) yak.OpFn {
-	return func(ctx context.Context, _ yak.Op) error {
-		return r.CompileWith(ctx)
-	}
-}
-
 // main defines the setup for the CI process. here is where you define all
 // of the environments and tasks you wish to run.
 func main() {
@@ -86,14 +79,15 @@ func main() {
 
 	// c1 := yak.Container("ubuntu.22.04").BuildFromFile(string(langx.Must(fs.ReadFile(embedded, "Containerfile"))))
 	// c1 := yak.Container("ubuntu.22.04").PullFrom("ubuntu:jammy")
-	c1 := yak.Container("ubuntu.22.04").BuildFromFile(".test/Containerfile")
+	// c1 := yak.Container("ubuntu.22.04").BuildFromFile(".test/Containerfile")
 
 	err := yak.Perform(
 		ctx,
-		eggit.AutoClone,
+		// eggit.AutoClone,
 		Debug,
-		yak.Build(c1),
-		yak.Module(ctx, c1, DaemonTests),
+		DaemonTests,
+		// yak.Build(c1),
+		// yak.Module(ctx, c1, DaemonTests),
 	)
 	if err != nil {
 		log.Fatalln(err)

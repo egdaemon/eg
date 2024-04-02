@@ -1,12 +1,9 @@
 package systemx
 
 import (
-	"crypto/md5"
-	"encoding/hex"
 	"log"
 	"net"
 	"os"
-	"os/user"
 )
 
 // HostnameOrLocalhost returns the hostname, otherwise fallsback to localhost.
@@ -45,32 +42,6 @@ func WorkingDirectoryOrDefault(fallback string) (dir string) {
 	return dir
 }
 
-// MustUser ...
-func MustUser() *user.User {
-	u, err := user.Current()
-	if err != nil {
-		panic(err)
-	}
-
-	return u
-}
-
-// CurrentUserOrDefault returns the current user or the default configured user.
-// (usually root)
-func CurrentUserOrDefault(d user.User) (result *user.User) {
-	var (
-		err error
-	)
-
-	if result, err = user.Current(); err != nil {
-		log.Println("failed to retrieve current user, using default", err)
-		tmp := d
-		return &tmp
-	}
-
-	return result
-}
-
 // HostIP ...
 func HostIP(host string) net.IP {
 	ip, err := net.ResolveIPAddr("ip", host)
@@ -80,48 +51,4 @@ func HostIP(host string) net.IP {
 	}
 
 	return ip.IP
-}
-
-// FileExists returns true IFF a non-directory file exists at the provided path.
-func FileExists(path string) bool {
-	info, err := os.Stat(path)
-
-	if os.IsNotExist(err) {
-		return false
-	}
-
-	if info.IsDir() {
-		return false
-	}
-
-	return true
-}
-
-// FileExists returns true IFF a non-directory file exists at the provided path.
-func DirExists(path string) bool {
-	info, err := os.Stat(path)
-
-	if os.IsNotExist(err) {
-		return false
-	}
-
-	return info.IsDir()
-}
-
-// FileMD5 computes digest of file contents.
-// if something goes wrong logs and returns an empty string.
-func FileMD5(path string) string {
-	var (
-		err  error
-		read []byte
-	)
-
-	if read, err = os.ReadFile(path); err != nil {
-		log.Println("digest failed", err)
-		return ""
-	}
-
-	digest := md5.Sum(read)
-
-	return hex.EncodeToString(digest[:])
 }

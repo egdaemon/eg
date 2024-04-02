@@ -15,7 +15,6 @@ import (
 
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
-	"github.com/pkg/errors"
 )
 
 func DefaultStateDirectory() string {
@@ -96,7 +95,7 @@ func ensuredirs(c Context) (_ Context, err error) {
 		for _, p := range paths {
 			// log.Printf("------ making directory %s ------\n", p)
 			if err = os.MkdirAll(p, 0700); err != nil {
-				return errors.Wrapf(err, "unable to create directory: %s", p)
+				return errorsx.Wrapf(err, "unable to create directory: %s", p)
 			}
 		}
 
@@ -113,7 +112,7 @@ func ensuredirs(c Context) (_ Context, err error) {
 
 func cacheid(ctx context.Context, root string, mdir string, cacheid hash.Hash, ignore ignorable) error {
 	if err := os.MkdirAll(filepath.Join(root, mdir), 0700); err != nil {
-		return errors.Wrapf(err, "unable to create directory: %s", root)
+		return errorsx.Wrapf(err, "unable to create directory: %s", root)
 	}
 
 	return fs.WalkDir(os.DirFS(root), mdir, func(path string, d fs.DirEntry, err error) error {
@@ -143,12 +142,12 @@ func cacheid(ctx context.Context, root string, mdir string, cacheid hash.Hash, i
 			return nil
 		}
 
-		if c, err = os.Open(path); err != nil {
-			return err
+		if c, err = os.Open(filepath.Join(root, path)); err != nil {
+			return errorsx.WithStack(err)
 		}
 
 		if _, err = io.Copy(cacheid, c); err != nil {
-			return err
+			return errorsx.Wrapf(err, "unable to digest file: %s", path)
 		}
 
 		return nil

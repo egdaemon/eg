@@ -23,7 +23,6 @@ import (
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/iox"
 	"github.com/egdaemon/eg/internal/stringsx"
-	"github.com/pkg/errors"
 	"golang.org/x/time/rate"
 )
 
@@ -93,7 +92,7 @@ func Debug(original http.Handler) http.Handler {
 	return http.HandlerFunc(func(resp http.ResponseWriter, req *http.Request) {
 		raw, err := httputil.DumpRequest(req, true)
 		if err != nil {
-			log.Println(errors.Wrap(err, "failed to dump request"))
+			log.Println(errorsx.Wrap(err, "failed to dump request"))
 		} else {
 			log.Println(string(raw))
 		}
@@ -222,7 +221,7 @@ func ErrorCode(resp *http.Response) error {
 		return nil
 	}
 
-	return Error{Code: resp.StatusCode, cause: errors.New(resp.Status)}
+	return Error{Code: resp.StatusCode, cause: errorsx.New(resp.Status)}
 }
 
 func AsError(r *http.Response, err error) (*http.Response, error) {
@@ -231,7 +230,7 @@ func AsError(r *http.Response, err error) (*http.Response, error) {
 	}
 
 	if r.StatusCode >= 400 {
-		return r, &Error{Code: r.StatusCode, cause: errors.New(r.Status)}
+		return r, &Error{Code: r.StatusCode, cause: errorsx.New(r.Status)}
 	}
 
 	return r, nil
@@ -262,7 +261,7 @@ func IgnoreError(err error, code ...int) bool {
 		ok    bool
 	)
 
-	if cause, ok = errors.Cause(err).(Error); !ok {
+	if cause, ok = errorsx.Cause(err).(Error); !ok {
 		return false
 	}
 
@@ -290,7 +289,7 @@ func NotFound(resp http.ResponseWriter, req *http.Request) {
 func Multipart(do func(*multipart.Writer) error) (_ string, _ *os.File, err error) {
 	buffer, err := os.CreateTemp(envx.String("", "CACHE_DIRECTORY"), "multipart.upload.bin.")
 	if err != nil {
-		return "", nil, errors.Wrap(err, "unable to create tmpfile buffer")
+		return "", nil, errorsx.Wrap(err, "unable to create tmpfile buffer")
 	}
 
 	mw := multipart.NewWriter(buffer)
@@ -301,11 +300,11 @@ func Multipart(do func(*multipart.Writer) error) (_ string, _ *os.File, err erro
 
 	// Close the form
 	if err = mw.Close(); err != nil {
-		return "", nil, errors.Wrap(err, "unable to close writer request")
+		return "", nil, errorsx.Wrap(err, "unable to close writer request")
 	}
 
 	if err = iox.Rewind(buffer); err != nil {
-		return "", nil, errors.Wrap(err, "rewind buffer")
+		return "", nil, errorsx.Wrap(err, "rewind buffer")
 	}
 
 	return mw.FormDataContentType(), buffer, nil

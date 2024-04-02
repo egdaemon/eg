@@ -4,8 +4,8 @@ import (
 	"go/format"
 	"io"
 
+	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/iox"
-	"github.com/pkg/errors"
 	"golang.org/x/tools/imports"
 )
 
@@ -30,7 +30,7 @@ func Reformat(in formattableio) (err error) {
 	}
 
 	if raw, err = imports.Process("generated.go", []byte(string(raw)), nil); err != nil {
-		return errors.Wrap(err, "failed to add required imports")
+		return errorsx.Wrap(err, "failed to add required imports")
 	}
 
 	// ensure we're at the start of the file.
@@ -39,11 +39,11 @@ func Reformat(in formattableio) (err error) {
 	}
 
 	if err = in.Truncate(0); err != nil {
-		return errors.Wrap(err, "failed to truncate file")
+		return errorsx.Wrap(err, "failed to truncate file")
 	}
 
 	if _, err = in.Write(raw); err != nil {
-		return errors.Wrap(err, "failed to write formatted content")
+		return errorsx.Wrap(err, "failed to write formatted content")
 	}
 
 	return nil
@@ -56,11 +56,11 @@ func Format(s string) (_ string, err error) {
 	)
 
 	if raw, err = imports.Process("generated.go", []byte(s), &imports.Options{Fragment: true, Comments: true, TabIndent: true, TabWidth: 8}); err != nil {
-		return "", errors.Wrap(err, "failed to add required imports")
+		return "", errorsx.Wrap(err, "failed to add required imports")
 	}
 
 	if raw, err = format.Source(raw); err != nil {
-		return "", errors.Wrap(err, "failed to format source")
+		return "", errorsx.Wrap(err, "failed to format source")
 	}
 
 	return string(raw), nil

@@ -4,12 +4,12 @@ import (
 	"io"
 	"os"
 
-	"github.com/pkg/errors"
+	"github.com/egdaemon/eg/internal/errorsx"
 )
 
 // IgnoreEOF returns nil if err is io.EOF
 func IgnoreEOF(err error) error {
-	if errors.Cause(err) != io.EOF {
+	if errorsx.Cause(err) != io.EOF {
 		return err
 	}
 

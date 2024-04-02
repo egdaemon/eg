@@ -187,6 +187,7 @@ func (t golang) Run(ctx context.Context) (roots []Compiled, err error) {
 			buf       = bytes.NewBuffer(nil)
 		)
 
+		log.Println("writing transformed to", dst)
 		if err = (&printer.Config{Mode: printer.TabIndent}).Fprint(buf, pkg.Fset, c); err != nil {
 			return err
 		}

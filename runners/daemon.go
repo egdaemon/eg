@@ -16,7 +16,6 @@ import (
 	"github.com/egdaemon/eg/interp/c8s"
 	"github.com/egdaemon/eg/interp/events"
 	"github.com/egdaemon/eg/workspaces"
-	"github.com/pkg/errors"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
@@ -127,11 +126,11 @@ func NewRunner(ctx context.Context, ws workspaces.Context, id string, options ..
 	)
 
 	if logdst, err = os.Create(filepath.Join(ws.Root, ws.RuntimeDir, "daemon.log")); err != nil {
-		return nil, errors.WithStack(err)
+		return nil, errorsx.WithStack(err)
 	}
 
 	if control, err = net.Listen("unix", cspath); err != nil {
-		return nil, errors.WithStack(err)
+		return nil, errorsx.WithStack(err)
 	}
 
 	go func() {
@@ -140,7 +139,7 @@ func NewRunner(ctx context.Context, ws workspaces.Context, id string, options ..
 	}()
 
 	if evtlog, err = events.NewLogEnsureDir(events.NewLogDirFromRunID(ws.Root, ws.RuntimeDir)); err != nil {
-		return nil, errors.WithStack(err)
+		return nil, errorsx.WithStack(err)
 	}
 
 	log.Println("runner", id)

@@ -10,7 +10,6 @@ import (
 
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/iox"
-	"github.com/pkg/errors"
 )
 
 // Pack the set of paths into the archive. caller is responsible for rewinding the writer.
@@ -48,7 +47,7 @@ func Pack(dst io.Writer, paths ...string) (err error) {
 		}
 	}
 
-	return errors.Wrap(tw.Flush(), "failed to flush archive")
+	return errorsx.Wrap(tw.Flush(), "failed to flush archive")
 }
 
 // Unpack the archive from the reader into the root directory.
@@ -60,10 +59,10 @@ func Unpack(root string, r io.Reader) (err error) {
 	)
 
 	if err = os.MkdirAll(root, 0700); err != nil {
-		return errors.Wrap(err, "unable to ensure root directory")
+		return errorsx.Wrap(err, "unable to ensure root directory")
 	}
 	if gzr, err = gzip.NewReader(r); err != nil {
-		return errors.Wrap(err, "failed to create gzip reader")
+		return errorsx.Wrap(err, "failed to create gzip reader")
 	}
 	defer gzr.Close()
 
@@ -92,23 +91,23 @@ func Unpack(root string, r io.Reader) (err error) {
 		case tar.TypeDir:
 			if _, err = os.Stat(target); os.IsNotExist(err) {
 				if err = os.MkdirAll(target, os.FileMode(header.Mode)); err != nil {
-					return errors.Wrapf(err, "failed to create directory: %s", target)
+					return errorsx.Wrapf(err, "failed to create directory: %s", target)
 				}
 			} else if err != nil {
-				return errors.Wrapf(err, "failed to stat directory: %s", target)
+				return errorsx.Wrapf(err, "failed to stat directory: %s", target)
 			}
 		// if it's a file create it
 		case tar.TypeReg:
 			writefile := func() error {
 				// log.Println("writing", header.Name, "->", target)
 				if dst, err = os.OpenFile(target, os.O_CREATE|os.O_RDWR, os.FileMode(header.Mode)); err != nil {
-					return errors.Wrapf(err, "failed to open file: %s", target)
+					return errorsx.Wrapf(err, "failed to open file: %s", target)
 				}
 				defer dst.Close()
 
 				// copy over contents
 				if _, err = io.Copy(dst, tr); err != nil {
-					return errors.Wrapf(err, "failed to copy contents: %s", target)
+					return errorsx.Wrapf(err, "failed to copy contents: %s", target)
 				}
 
 				return nil
@@ -175,7 +174,7 @@ func write(basepath, path string, tw *tar.Writer, info os.FileInfo) (err error) 
 	)
 
 	if target, err = filepath.Rel(basepath, path); err != nil {
-		return errors.Wrapf(err, "failed to compute path: %s", path)
+		return errorsx.Wrapf(err, "failed to compute path: %s", path)
 	}
 
 	// base and path are identical
@@ -185,17 +184,17 @@ func write(basepath, path string, tw *tar.Writer, info os.FileInfo) (err error) 
 
 	// log.Println("writing", path, "->", target)
 	if src, err = os.Open(path); err != nil {
-		return errors.Wrap(err, "failed to open path")
+		return errorsx.Wrap(err, "failed to open path")
 	}
 	defer src.Close()
 
 	if header, err = tar.FileInfoHeader(info, path); err != nil {
-		return errors.Wrap(err, "failed to created header")
+		return errorsx.Wrap(err, "failed to created header")
 	}
 	header.Name = target
 
 	if err = tw.WriteHeader(header); err != nil {
-		return errors.Wrapf(err, "failed to write header to tar archive: %s", path)
+		return errorsx.Wrapf(err, "failed to write header to tar archive: %s", path)
 	}
 
 	// return on directories since there will be no content to tar
@@ -204,7 +203,7 @@ func write(basepath, path string, tw *tar.Writer, info os.FileInfo) (err error) 
 	}
 
 	if _, err = io.Copy(tw, src); err != nil {
-		return errors.Wrapf(err, "failed to write contexts to tar archive: %s", path)
+		return errorsx.Wrapf(err, "failed to write contexts to tar archive: %s", path)
 	}
 
 	return nil

@@ -15,8 +15,6 @@ import (
 	"os"
 	"time"
 
-	"github.com/pkg/errors"
-
 	"github.com/egdaemon/eg/internal/errorsx"
 )
 
@@ -100,12 +98,12 @@ func X509TemplateRand(r io.Reader, d time.Duration, c clock, options ...X509Opti
 	serialNumberLimit := new(big.Int).Lsh(big.NewInt(1), 128)
 
 	if serialNumber, err = rand.Int(r, serialNumberLimit); err != nil {
-		return template, errors.WithStack(err)
+		return template, errorsx.WithStack(err)
 	}
 
 	orgHash := md5.New()
 	if _, err = io.CopyN(orgHash, r, 1024); err != nil {
-		return template, errors.WithStack(err)
+		return template, errorsx.WithStack(err)
 	}
 
 	template = x509.Certificate{
@@ -125,7 +123,7 @@ func X509TemplateRand(r io.Reader, d time.Duration, c clock, options ...X509Opti
 		opt(&template)
 	}
 
-	return template, errors.WithStack(err)
+	return template, errorsx.WithStack(err)
 }
 
 // X509Template ...
@@ -139,14 +137,14 @@ func SignedRSAGen(bits int, template, parent x509.Certificate, parentKey *rsa.Pr
 		priv *rsa.PrivateKey
 	)
 	if priv, err = rsa.GenerateKey(rand.Reader, bits); err != nil {
-		return priv, derBytes, errors.WithStack(err)
+		return priv, derBytes, errorsx.WithStack(err)
 	}
 
 	if derBytes, err = x509.CreateCertificate(rand.Reader, &template, &parent, &priv.PublicKey, parentKey); err != nil {
-		return priv, derBytes, errors.WithStack(err)
+		return priv, derBytes, errorsx.WithStack(err)
 	}
 
-	return priv, derBytes, errors.WithStack(err)
+	return priv, derBytes, errorsx.WithStack(err)
 }
 
 // SelfSignedRSAGen generate a self signed certificate.
@@ -157,14 +155,14 @@ func SelfSignedRSAGen(bits int, template x509.Certificate) (priv *rsa.PrivateKey
 // SelfSignedRSAGen generate a self signed certificate.
 func SelfSignedRSARandGen(r io.Reader, bits int, template x509.Certificate) (priv *rsa.PrivateKey, derBytes []byte, err error) {
 	if priv, err = rsa.GenerateKey(r, bits); err != nil {
-		return priv, derBytes, errors.WithStack(err)
+		return priv, derBytes, errorsx.WithStack(err)
 	}
 
 	if derBytes, err = x509.CreateCertificate(r, &template, &template, &priv.PublicKey, priv); err != nil {
-		return priv, derBytes, errors.WithStack(err)
+		return priv, derBytes, errorsx.WithStack(err)
 	}
 
-	return priv, derBytes, errors.WithStack(err)
+	return priv, derBytes, errorsx.WithStack(err)
 }
 
 // SelfSigned signs its own certificate ..
@@ -175,7 +173,7 @@ func SelfSigned(priv *rsa.PrivateKey, template *x509.Certificate) (_ *rsa.Privat
 // SelfSignedRand signs its own certificate ..
 func SelfSignedRand(r io.Reader, priv *rsa.PrivateKey, template *x509.Certificate) (_ *rsa.PrivateKey, derBytes []byte, err error) {
 	if derBytes, err = x509.CreateCertificate(r, template, template, &priv.PublicKey, priv); err != nil {
-		return priv, derBytes, errors.WithStack(err)
+		return priv, derBytes, errorsx.WithStack(err)
 	}
 
 	return priv, derBytes, nil
@@ -195,11 +193,11 @@ func WriteTLS(key *rsa.PrivateKey, derBytes []byte, err error) func(io.Writer, i
 		}
 
 		if err = pem.Encode(certw, &pem.Block{Type: "CERTIFICATE", Bytes: derBytes}); err != nil {
-			return errors.WithStack(err)
+			return errorsx.WithStack(err)
 		}
 
 		if err = pem.Encode(keyw, &pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(key)}); err != nil {
-			return errors.WithStack(err)
+			return errorsx.WithStack(err)
 		}
 
 		return nil
@@ -208,7 +206,7 @@ func WriteTLS(key *rsa.PrivateKey, derBytes []byte, err error) func(io.Writer, i
 
 // WritePrivateKey ...
 func WritePrivateKey(dst io.Writer, key *rsa.PrivateKey) error {
-	return errors.WithStack(pem.Encode(dst, &pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(key)}))
+	return errorsx.WithStack(pem.Encode(dst, &pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(key)}))
 }
 
 // WritePrivateKeyFile ...
@@ -226,7 +224,7 @@ func WritePrivateKeyFile(path string, key *rsa.PrivateKey) (err error) {
 
 // WriteCertificate ...
 func WriteCertificate(dst io.Writer, cert []byte) error {
-	return errors.WithStack(pem.Encode(dst, &pem.Block{Type: "CERTIFICATE", Bytes: cert}))
+	return errorsx.WithStack(pem.Encode(dst, &pem.Block{Type: "CERTIFICATE", Bytes: cert}))
 }
 
 // WriteCertificateFile ...
@@ -300,11 +298,11 @@ func DecodePEMCertificate(encoded []byte) (cert *x509.Certificate, err error) {
 	)
 
 	if p, _ = pem.Decode(encoded); p == nil {
-		return cert, errors.Wrap(err, "unable to decode pem certificate")
+		return cert, errorsx.Wrap(err, "unable to decode pem certificate")
 	}
 
 	if cert, err = x509.ParseCertificate(p.Bytes); err != nil {
-		return cert, errors.Wrap(err, "failed parse certificate")
+		return cert, errorsx.Wrap(err, "failed parse certificate")
 	}
 
 	return cert, nil

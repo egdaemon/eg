@@ -11,8 +11,8 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/fsx"
-	"github.com/pkg/errors"
 )
 
 const (
@@ -166,7 +166,7 @@ func DecodeFile(path string) (priv *rsa.PrivateKey, err error) {
 func Decode(encoded []byte) (priv *rsa.PrivateKey, err error) {
 	b, _ := pem.Decode(encoded)
 	if priv, err = x509.ParsePKCS1PrivateKey(b.Bytes); err != nil {
-		return nil, errors.WithStack(err)
+		return nil, errorsx.WithStack(err)
 	}
 
 	return priv, nil

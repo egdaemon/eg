@@ -15,7 +15,6 @@ import (
 	"github.com/egdaemon/eg/interp/events"
 	"github.com/egdaemon/eg/runners"
 	"github.com/egdaemon/eg/workspaces"
-	"github.com/pkg/errors"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
@@ -32,7 +31,7 @@ func DefaultAgentListener() (n net.Listener, err error) {
 
 	log.Println("spawning host agent", daemonpath)
 	if n, err = net.Listen("unix", daemonpath); err != nil {
-		return nil, errors.WithStack(err)
+		return nil, errorsx.WithStack(err)
 	}
 
 	return n, err
@@ -47,7 +46,7 @@ func MaybeAgentListener() (n net.Listener, err error) {
 
 	log.Println("spawning host agent", daemonpath)
 	if n, err = net.Listen("unix", daemonpath); err != nil {
-		return nil, errors.WithStack(err)
+		return nil, errorsx.WithStack(err)
 	}
 
 	return n, err

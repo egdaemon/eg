@@ -3,6 +3,7 @@ package runners
 import (
 	"context"
 	"embed"
+	"errors"
 	"fmt"
 	"io"
 	"io/fs"
@@ -23,7 +24,6 @@ import (
 	"github.com/egdaemon/eg/workspaces"
 	"github.com/fsnotify/fsnotify"
 	"github.com/gofrs/uuid"
-	"github.com/pkg/errors"
 	"google.golang.org/grpc"
 )
 
@@ -49,12 +49,12 @@ func (t localdownloader) Download(ctx context.Context) (err error) {
 	dirs := DefaultSpoolDirs()
 
 	if pending, err = fsnotify.NewWatcher(); err != nil {
-		return errors.Wrap(err, "failed to watch queued directory")
+		return errorsx.Wrap(err, "failed to watch queued directory")
 	}
 	defer func() { errorsx.MaybeLog(errorsx.Wrap(pending.Close(), "failed to close fs watch")) }()
 
 	if err = pending.Add(dirs.Queued); err != nil {
-		return errors.Wrap(err, "failed to watch queued directory")
+		return errorsx.Wrap(err, "failed to watch queued directory")
 	}
 
 	select {
@@ -121,7 +121,7 @@ type stateterminated struct {
 }
 
 func (t stateterminated) Update(ctx context.Context) state {
-	log.Println(errors.Wrap(t.cause, "terminating scheduler due to error"))
+	log.Println(errorsx.Wrap(t.cause, "terminating scheduler due to error"))
 	return nil
 }
 
@@ -189,7 +189,7 @@ func (t stateidle) Update(ctx context.Context) state {
 
 	// otherwise wait for work.
 	if err = os.MkdirAll(dirs.Queued, 0700); err != nil {
-		log.Println(errors.Wrap(err, "unable to create queued directory"))
+		log.Println(errorsx.Wrap(err, "unable to create queued directory"))
 		return newdelay(time.Second, t)
 	}
 

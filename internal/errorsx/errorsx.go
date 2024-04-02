@@ -1,11 +1,10 @@
 package errorsx
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"time"
-
-	"github.com/pkg/errors"
 )
 
 // Compact returns the first error in the set, if any.
@@ -48,18 +47,6 @@ func Must[T any](v T, err error) T {
 	}
 
 	panic(err)
-}
-
-func Wrap(err error, m string) error {
-	return errors.Wrap(err, m)
-}
-
-func Wrapf(err error, format string, args ...interface{}) error {
-	return errors.Wrapf(err, format, args...)
-}
-
-func WithStack(err error) error {
-	return errors.WithStack(err)
 }
 
 func Ignore(err error, ignore ...error) error {

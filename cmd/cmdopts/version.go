@@ -1,6 +1,7 @@
 package cmdopts
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"runtime/debug"
@@ -10,7 +11,6 @@ import (
 	"github.com/egdaemon/eg/internal/stringsx"
 	"github.com/logrusorgru/aurora"
 	"github.com/mattn/go-isatty"
-	"github.com/pkg/errors"
 )
 
 var (

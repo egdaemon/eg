@@ -6,8 +6,8 @@ import (
 	"os/exec"
 
 	"github.com/egdaemon/eg/internal/debugx"
+	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/interp/runtime/wasi/ffi"
-	"github.com/pkg/errors"
 	"github.com/tetratelabs/wazero/api"
 )
 
@@ -76,19 +76,19 @@ func Command(
 	)
 
 	if dir, err = ffi.ReadString(m.Memory(), diroffset, dirlen); err != nil {
-		return nil, errors.Wrap(err, "unable to read command name argument")
+		return nil, errorsx.Wrap(err, "unable to read command name argument")
 	}
 
 	if name, err = ffi.ReadString(m.Memory(), nameoffset, namelen); err != nil {
-		return nil, errors.Wrap(err, "unable to read command name argument")
+		return nil, errorsx.Wrap(err, "unable to read command name argument")
 	}
 
 	if args, err = ffi.ReadStringArray(m.Memory(), argsoffset, argslen, argssize); err != nil {
-		return nil, errors.Wrap(err, "unable to read command arguments")
+		return nil, errorsx.Wrap(err, "unable to read command arguments")
 	}
 
 	if environ, err = ffi.ReadStringArray(m.Memory(), envoffset, envlen, envsize); err != nil {
-		return nil, errors.Wrap(err, "unable to read command environment")
+		return nil, errorsx.Wrap(err, "unable to read command environment")
 	}
 
 	cmd := exec.CommandContext(ctx, name, args...)

@@ -6,7 +6,7 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/pkg/errors"
+	"github.com/egdaemon/eg/internal/errorsx"
 )
 
 // EncodeJSON encode data into the http.Request body.
@@ -16,7 +16,7 @@ func EncodeJSON(req *http.Request, body interface{}) (err error) {
 	)
 
 	if encoded, err = json.Marshal(body); err != nil {
-		return errors.WithStack(err)
+		return errorsx.WithStack(err)
 	}
 
 	req.Header.Set("Content-Type", "application/json")

@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/alecthomas/kong"
-	"github.com/pkg/errors"
+	"github.com/egdaemon/eg/internal/errorsx"
 )
 
 // ParseIP addresses
@@ -29,7 +29,7 @@ func ParseTCPAddr(ctx *kong.DecodeContext, target reflect.Value) (err error) {
 	)
 
 	if addr, err = net.ResolveTCPAddr("tcp", saddr); err != nil {
-		return errors.Wrapf(err, "unable to resolve tcp address %s - %s", saddr, ctx.Value.Name)
+		return errorsx.Wrapf(err, "unable to resolve tcp address %s - %s", saddr, ctx.Value.Name)
 	}
 
 	target.Set(reflect.ValueOf(addr))
@@ -56,7 +56,7 @@ func ParseTCPAddrArray(ctx *kong.DecodeContext, target reflect.Value) (err error
 		)
 
 		if addr, err = net.ResolveTCPAddr("tcp", saddr); err != nil {
-			return errors.Wrapf(err, "unable to resolve tcp address %s : %s", saddr, token)
+			return errorsx.Wrapf(err, "unable to resolve tcp address %s : %s", saddr, token)
 		}
 
 		results = append(results, addr)

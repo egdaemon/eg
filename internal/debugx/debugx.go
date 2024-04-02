@@ -15,7 +15,6 @@ import (
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/iox"
 	"github.com/egdaemon/eg/internal/stringsx"
-	"github.com/pkg/errors"
 )
 
 func genDst() (path string, dst io.WriteCloser) {
@@ -28,7 +27,7 @@ func genDst() (path string, dst io.WriteCloser) {
 	path = filepath.Join(os.TempDir(), fmt.Sprintf("%s-%s-%s.trace", filepath.Base(os.Args[0]), t.Format("2006-01-02"), ts))
 
 	if dst, err = os.Create(path); err != nil {
-		log.Println(errors.Wrapf(err, "failed to open file: %s", path))
+		log.Println(errorsx.Wrapf(err, "failed to open file: %s", path))
 		log.Println("routine dump falling back to stderr")
 		return "stderr", iox.WriteNopCloser(os.Stderr)
 	}

@@ -3,11 +3,10 @@ package rsax
 import (
 	"crypto/rsa"
 	"crypto/sha512"
+	"errors"
 	"io"
 	"math"
 	"math/big"
-
-	"github.com/pkg/errors"
 )
 
 // NewSHA512CSPRNG generate a csprng using sha512.

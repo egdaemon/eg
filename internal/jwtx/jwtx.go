@@ -8,9 +8,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/gofrs/uuid"
 	"github.com/golang-jwt/jwt/v4"
-	"github.com/pkg/errors"
 
 	"github.com/egdaemon/eg/internal/httpx"
 )
@@ -22,7 +22,7 @@ const (
 type JWTSecretSource func() []byte
 
 func NotAuthorized() error {
-	return errors.New("not authorized")
+	return errorsx.New("not authorized")
 }
 
 type Option func(*jwt.RegisteredClaims)
@@ -112,11 +112,11 @@ func Validate(jwtsecret JWTSecretSource, encoded string, t jwt.Claims) error {
 	}, jwt.WithValidMethods([]string{jwt.SigningMethodHS512.Alg()}))
 
 	if err != nil {
-		return errors.Wrap(err, "unable to parse jwt token")
+		return errorsx.Wrap(err, "unable to parse jwt token")
 	}
 
 	if !token.Valid {
-		return errors.Errorf("invalid token %s", t)
+		return errorsx.Errorf("invalid token %s", t)
 	}
 
 	return nil

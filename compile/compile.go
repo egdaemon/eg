@@ -51,7 +51,7 @@ func Run(ctx context.Context, dir, module string, output string) (err error) {
 	log.Println("compiling initiated", module, "->", output)
 	defer log.Println("compiling completed", module, "->", output)
 	log.Println("WAAAT", userx.DefaultCacheDirectory(), systemx.WorkingDirectoryOrDefault(os.TempDir()))
-	if err = os.MkdirAll(filepath.Dir(output), 0750); err != nil {
+	if err = os.MkdirAll(filepath.Join(dir, filepath.Dir(output)), 0750); err != nil {
 		return err
 	}
 

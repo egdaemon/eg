@@ -3,6 +3,7 @@ package interp
 import (
 	"context"
 	"crypto/rand"
+	"errors"
 	"fmt"
 	"io/fs"
 	"log"
@@ -23,7 +24,6 @@ import (
 	"github.com/egdaemon/eg/interp/runtime/wasi/ffigit"
 	"github.com/egdaemon/eg/interp/runtime/wasi/ffigraph"
 	"github.com/egdaemon/eg/runners"
-	"github.com/pkg/errors"
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
 	"google.golang.org/grpc"
@@ -168,7 +168,7 @@ func (t runner) perform(ctx context.Context, runid, path string, rtb runtimefn) 
 	guestruntimedir := runners.DefaultRunnerRuntimeDir()
 	tmpdir, err := os.MkdirTemp(t.root, "eg.tmp.*")
 	if err != nil {
-		return errors.Wrap(err, "unable to create tmp directory")
+		return errorsx.Wrap(err, "unable to create tmp directory")
 	}
 	defer os.RemoveAll(tmpdir)
 

@@ -8,8 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/egdaemon/eg/internal/systemx"
-	"github.com/egdaemon/eg/internal/userx"
+	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/transpile"
 	"github.com/egdaemon/eg/workspaces"
 )
@@ -23,7 +22,8 @@ func FromTranspiled(ctx context.Context, ws workspaces.Context, m ...transpile.C
 		)
 
 		if path, err = filepath.Rel(ws.TransDir, root.Path); err != nil {
-			return modules, err
+			// if path, err = filepath.Rel(ws.TransDir, workspaces.TrimRoot(root.Path, ws.Root)); err != nil {
+			return modules, errorsx.Wrapf(err, "base(%s) %s", ws.TransDir, root.Path)
 		}
 
 		path = workspaces.TrimRoot(path, filepath.Base(ws.GenModDir))
@@ -39,7 +39,7 @@ func FromTranspiled(ctx context.Context, ws workspaces.Context, m ...transpile.C
 			continue
 		}
 
-		if err = Run(ctx, ws.ModuleDir, root.Path, path); err != nil {
+		if err = Run(ctx, ws.Root, root.Path, path); err != nil {
 			return modules, err
 		}
 	}
@@ -48,13 +48,14 @@ func FromTranspiled(ctx context.Context, ws workspaces.Context, m ...transpile.C
 }
 
 func Run(ctx context.Context, dir, module string, output string) (err error) {
-	log.Println("compiling initiated", module, "->", output)
-	defer log.Println("compiling completed", module, "->", output)
-	log.Println("WAAAT", userx.DefaultCacheDirectory(), systemx.WorkingDirectoryOrDefault(os.TempDir()))
+	log.Println("compiling initiated", dir, module, "->", output)
+	defer log.Println("compiling completed", dir, module, "->", output)
+
 	if err = os.MkdirAll(filepath.Join(dir, filepath.Dir(output)), 0750); err != nil {
 		return err
 	}
 
+	// fsx.PrintDir(os.DirFS(dir))
 	cmd := exec.CommandContext(ctx, "go", "build", "-trimpath", "-o", output, strings.TrimPrefix(module, dir+"/"))
 	cmd.Env = append(os.Environ(), "GOOS=wasip1", "GOARCH=wasm")
 	cmd.Dir = dir
@@ -62,7 +63,7 @@ func Run(ctx context.Context, dir, module string, output string) (err error) {
 	cmd.Stderr = os.Stderr
 	cmd.Stdout = os.Stdout
 
-	log.Println("compiling", cmd.String())
+	log.Println("executing", errorsx.Must(os.Getwd()), dir, cmd.String())
 
 	return cmd.Run()
 }

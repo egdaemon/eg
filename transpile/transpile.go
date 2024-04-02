@@ -16,6 +16,8 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/davecgh/go-spew/spew"
+
 	"github.com/dave/jennifer/jen"
 	"github.com/egdaemon/eg/astbuild"
 	"github.com/egdaemon/eg/astcodec"
@@ -74,7 +76,6 @@ func (t golang) Run(ctx context.Context) (roots []Compiled, err error) {
 	if pkg, err = astcodec.Load(pkgc); err != nil {
 		return roots, errorsx.Wrap(err, "unable to load package")
 	}
-
 	generatedmodules := make([]*module, 0, 128)
 
 	transform := func(ftoken *token.File, gendir string, c *ast.File) error {
@@ -187,7 +188,6 @@ func (t golang) Run(ctx context.Context) (roots []Compiled, err error) {
 			buf       = bytes.NewBuffer(nil)
 		)
 
-		log.Println("writing transformed to", dst)
 		if err = (&printer.Config{Mode: printer.TabIndent}).Fprint(buf, pkg.Fset, c); err != nil {
 			return err
 		}
@@ -230,6 +230,7 @@ func (t golang) Run(ctx context.Context) (roots []Compiled, err error) {
 			return roots, err
 		}
 
+		log.Println("writing transformed to", dst)
 		if err = rewrite(ftoken, dst, c); err != nil {
 			return roots, err
 		}
@@ -256,6 +257,16 @@ func (t golang) Run(ctx context.Context) (roots []Compiled, err error) {
 		main.Type.Params.Opening = token.NoPos
 
 		result := astcodec.ReplaceFunction(o, main, astcodec.FindFunctionsByName("main"))
+		log.Println("workspace", spew.Sdump(t.Context.Workspace))
+		log.Println("root", t.Context.Workspace.Root)
+		log.Println("original", m.fname)
+		// dst, err := workspaces.PathTranspiled(t.Context.Workspace, filepath.Join(t.Context.Workspace.Root, t.Context.Workspace.ModuleDir), filepath.Join(t.Context.Workspace.Root, m.fname))
+		// if err != nil {
+		// 	return roots, errorsx.Wrap(err, "unable to generate dst for generated module")
+		// }
+
+		// log.Println("writing transformed to", dst)
+		// if err = rewrite(fset.File(result.Pos()), dst, result); err != nil {
 		if err = rewrite(fset.File(result.Pos()), m.fname, result); err != nil {
 			return roots, err
 		}

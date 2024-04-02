@@ -79,7 +79,7 @@ func PrintDir(d fs.FS) {
 		info := errorsx.Zero(d.Info())
 		log.Printf("%v %4d %s\n", info.Mode(), info.Size(), info.Name())
 
-		if d.IsDir() {
+		if d.IsDir() && info.Name() != "." {
 			return fs.SkipDir
 		}
 

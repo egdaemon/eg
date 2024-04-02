@@ -336,9 +336,6 @@ func Exec(ctx context.Context, r Runner) OpFn {
 // used to replace invocations at runtime.
 func UnsafeRunner(ctx context.Context, r Runner, modulepath string) OpFn {
 	return func(ctx context.Context, o Op) error {
-		if err := r.CompileWith(ctx); err != nil {
-			return err
-		}
 		return r.RunWith(ctx, modulepath)
 	}
 }
@@ -346,12 +343,6 @@ func UnsafeRunner(ctx context.Context, r Runner, modulepath string) OpFn {
 // Deprecated: this is intended for internal use only. do not use.
 // used to replace the module invocations at runtime.
 func UnsafeExec(ctx context.Context, r Runner, modulepath string) OpFn {
-	if err := r.CompileWith(ctx); err != nil {
-		return func(context.Context, Op) error {
-			return err
-		}
-	}
-
 	return func(ctx context.Context, o Op) error {
 		return r.RunWith(ctx, modulepath)
 	}

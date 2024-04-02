@@ -2,21 +2,15 @@ package accountcmds
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
-	"net/http"
 	"os"
 
 	"github.com/davecgh/go-spew/spew"
-	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/authn"
 	"github.com/egdaemon/eg/cmd/cmdopts"
-	"github.com/egdaemon/eg/internal/envx"
+	"github.com/egdaemon/eg/internal/debugx"
 	"github.com/egdaemon/eg/internal/errorsx"
-	"github.com/egdaemon/eg/internal/httpx"
-	"github.com/egdaemon/eg/internal/jwtx"
 	"github.com/egdaemon/eg/internal/sshx"
 	"github.com/egdaemon/eg/internal/stringsx"
 	"golang.org/x/crypto/ssh"
@@ -35,60 +29,27 @@ func (t OTP) Run(gctx *cmdopts.Global, tlscfg *cmdopts.TLSConfig) (err error) {
 	}
 
 	var (
-		signer  ssh.Signer
-		authed  authn.Authed
-		encoded string
+		signer ssh.Signer
+		authed authn.Authed
 	)
 
 	if signer, err = sshx.AutoCached(sshx.NewKeyGen(), t.SSHKeyPath); err != nil {
 		return err
 	}
 
-	rawstate := reqstate{
-		PublicKey: signer.PublicKey().Marshal(),
-	}
-	if encoded, err = jwtx.EncodeJSON(rawstate); err != nil {
-		return err
-	}
-
 	chttp := tlscfg.DefaultClient()
 	ctx := context.WithValue(gctx.Context, oauth2.HTTPClient, chttp)
-	cfg, token, err := authn.OAuth2SSHToken(gctx.Context, signer, authn.EndpointSSHAuth())
+	cfg := authn.OAuth2SSHConfig(signer, "", authn.EndpointSSHAuth())
+
+	refreshtoken, err := authn.AutoRefreshToken(ctx, signer)
 	if err != nil {
+		return errorsx.WithStack(err)
+	}
+	if err = loginssh(ctx, cfg.Client(ctx, refreshtoken), &authed); err != nil {
 		return err
 	}
 
-	authzuri := cfg.AuthCodeURL(
-		encoded,
-		oauth2.AccessTypeOffline,
-	)
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, authzuri, nil)
-	if err != nil {
-		return err
-	}
-	resp, err := httpx.AsError(chttp.Do(req))
-	if err != nil {
-		return err
-	}
-	defer httpx.AutoClose(resp)
-
-	authzc := cfg.Client(ctx, token)
-
-	req, err = http.NewRequestWithContext(ctx, http.MethodPost, fmt.Sprintf("%s/authn/ssh", envx.String(eg.EnvEGAPIHostDefault, eg.EnvEGAPIHost)), nil)
-	if err != nil {
-		return err
-	}
-	resp3, err := httpx.AsError(authzc.Do(req))
-	if err != nil {
-		return err
-	}
-	defer httpx.AutoClose(resp3)
-
-	if err = json.NewDecoder(resp3.Body).Decode(&authed); err != nil {
-		return err
-	}
-
-	log.Println("authed", spew.Sdump(&authed))
+	debugx.Println("authed", spew.Sdump(&authed))
 
 	switch len(authed.Profiles) {
 	case 0:

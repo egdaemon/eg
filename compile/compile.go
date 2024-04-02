@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/egdaemon/eg/internal/systemx"
+	"github.com/egdaemon/eg/internal/userx"
 	"github.com/egdaemon/eg/transpile"
 	"github.com/egdaemon/eg/workspaces"
 )
@@ -48,7 +50,7 @@ func FromTranspiled(ctx context.Context, ws workspaces.Context, m ...transpile.C
 func Run(ctx context.Context, dir, module string, output string) (err error) {
 	log.Println("compiling initiated", module, "->", output)
 	defer log.Println("compiling completed", module, "->", output)
-
+	log.Println("WAAAT", userx.DefaultCacheDirectory(), systemx.WorkingDirectoryOrDefault(os.TempDir()))
 	if err = os.MkdirAll(filepath.Dir(output), 0750); err != nil {
 		return err
 	}

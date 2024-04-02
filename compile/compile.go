@@ -22,7 +22,6 @@ func FromTranspiled(ctx context.Context, ws workspaces.Context, m ...transpile.C
 		)
 
 		if path, err = filepath.Rel(ws.TransDir, root.Path); err != nil {
-			// if path, err = filepath.Rel(ws.TransDir, workspaces.TrimRoot(root.Path, ws.Root)); err != nil {
 			return modules, errorsx.Wrapf(err, "base(%s) %s", ws.TransDir, root.Path)
 		}
 

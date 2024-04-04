@@ -27,7 +27,7 @@ func SSHProxy(global *cmdopts.Global, config *ssh.ClientConfig, signer ssh.Signe
 		// defer global.Cleanup.Done()
 		defer global.Shutdown()
 
-		r := rate.NewLimiter(rate.Every(time.Second), 1)
+		r := rate.NewLimiter(rate.Every(10*time.Second), 1)
 		d := net.Dialer{}
 
 		for {

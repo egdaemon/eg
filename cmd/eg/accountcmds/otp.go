@@ -22,12 +22,6 @@ type OTP struct {
 }
 
 func (t OTP) Run(gctx *cmdopts.Global, tlscfg *cmdopts.TLSConfig) (err error) {
-	type reqstate struct {
-		PublicKey []byte `json:"pkey"`
-		Email     string `json:"email"`
-		Display   string `json:"display"`
-	}
-
 	var (
 		signer ssh.Signer
 		authed authn.Authed

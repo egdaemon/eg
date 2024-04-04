@@ -122,7 +122,7 @@ func (t TokenSourceFromEndpoint) Token() (_ *oauth2.Token, err error) {
 	}
 
 	if len(authed.Profiles) != 1 {
-		return nil, fmt.Errorf("too many profiles: %s - %d", authed.Identity.Id, len(authed.Profiles))
+		return nil, fmt.Errorf("expected a single profile: %s - %d", authed.Identity.Id, len(authed.Profiles))
 	}
 
 	session, err := Session(ctx, t.c, authed.Profiles[0].Token)

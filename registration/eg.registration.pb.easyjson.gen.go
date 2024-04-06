@@ -441,6 +441,8 @@ func easyjsonDabade4DecodeGithubComEgdaemonEgRegistration5(in *jlexer.Lexer, out
 			}
 		case "global":
 			out.Global = bool(in.Bool())
+		case "expiration":
+			out.Expiration = uint64(in.Uint64())
 		default:
 			in.SkipRecursive()
 		}
@@ -470,6 +472,16 @@ func easyjsonDabade4EncodeGithubComEgdaemonEgRegistration5(out *jwriter.Writer, 
 			out.RawString(prefix)
 		}
 		out.Bool(bool(in.Global))
+	}
+	if in.Expiration != 0 {
+		const prefix string = ",\"expiration\":"
+		if first {
+			first = false
+			out.RawString(prefix[1:])
+		} else {
+			out.RawString(prefix)
+		}
+		out.Uint64(uint64(in.Expiration))
 	}
 	out.RawByte('}')
 }

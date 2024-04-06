@@ -421,7 +421,7 @@ func (t upload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, runtimecfg *c
 			return errorsx.Wrap(err, "unable to copy entry point")
 		}
 
-		if err = w.WriteField("ttl", t.TTL.String()); err != nil {
+		if err = w.WriteField("ttl", strconv.FormatInt(t.TTL.Milliseconds(), 10)); err != nil {
 			return errorsx.Wrap(err, "unable to set ttl")
 		}
 

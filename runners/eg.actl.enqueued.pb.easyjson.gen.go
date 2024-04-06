@@ -331,6 +331,8 @@ func easyjson61363d27DecodeGithubComEgdaemonEgRunners3(in *jlexer.Lexer, out *En
 			out.Memory = uint64(in.Uint64())
 		case "vram":
 			out.Vram = uint64(in.Uint64())
+		case "cluster_id":
+			out.ClusterId = string(in.String())
 		case "labels":
 			if in.IsNull() {
 				in.Skip()
@@ -443,6 +445,16 @@ func easyjson61363d27EncodeGithubComEgdaemonEgRunners3(out *jwriter.Writer, in E
 			out.RawString(prefix)
 		}
 		out.Uint64(uint64(in.Vram))
+	}
+	if in.ClusterId != "" {
+		const prefix string = ",\"cluster_id\":"
+		if first {
+			first = false
+			out.RawString(prefix[1:])
+		} else {
+			out.RawString(prefix)
+		}
+		out.String(string(in.ClusterId))
 	}
 	if len(in.Labels) != 0 {
 		const prefix string = ",\"labels\":"
@@ -798,6 +810,20 @@ func easyjson61363d27DecodeGithubComEgdaemonEgRunners8(in *jlexer.Lexer, out *En
 			out.CreatedAt = int64(in.Int64())
 		case "updated_at":
 			out.UpdatedAt = int64(in.Int64())
+		case "arch":
+			out.Arch = string(in.String())
+		case "os":
+			out.Os = string(in.String())
+		case "cores":
+			out.Cores = uint64(in.Uint64())
+		case "memory":
+			out.Memory = uint64(in.Uint64())
+		case "vram":
+			out.Vram = uint64(in.Uint64())
+		case "ttl":
+			out.Ttl = uint64(in.Uint64())
+		case "cluster_id":
+			out.ClusterId = string(in.String())
 		default:
 			in.SkipRecursive()
 		}
@@ -837,6 +863,76 @@ func easyjson61363d27EncodeGithubComEgdaemonEgRunners8(out *jwriter.Writer, in E
 			out.RawString(prefix)
 		}
 		out.Int64(int64(in.UpdatedAt))
+	}
+	if in.Arch != "" {
+		const prefix string = ",\"arch\":"
+		if first {
+			first = false
+			out.RawString(prefix[1:])
+		} else {
+			out.RawString(prefix)
+		}
+		out.String(string(in.Arch))
+	}
+	if in.Os != "" {
+		const prefix string = ",\"os\":"
+		if first {
+			first = false
+			out.RawString(prefix[1:])
+		} else {
+			out.RawString(prefix)
+		}
+		out.String(string(in.Os))
+	}
+	if in.Cores != 0 {
+		const prefix string = ",\"cores\":"
+		if first {
+			first = false
+			out.RawString(prefix[1:])
+		} else {
+			out.RawString(prefix)
+		}
+		out.Uint64(uint64(in.Cores))
+	}
+	if in.Memory != 0 {
+		const prefix string = ",\"memory\":"
+		if first {
+			first = false
+			out.RawString(prefix[1:])
+		} else {
+			out.RawString(prefix)
+		}
+		out.Uint64(uint64(in.Memory))
+	}
+	if in.Vram != 0 {
+		const prefix string = ",\"vram\":"
+		if first {
+			first = false
+			out.RawString(prefix[1:])
+		} else {
+			out.RawString(prefix)
+		}
+		out.Uint64(uint64(in.Vram))
+	}
+	if in.Ttl != 0 {
+		const prefix string = ",\"ttl\":"
+		if first {
+			first = false
+			out.RawString(prefix[1:])
+		} else {
+			out.RawString(prefix)
+		}
+		out.Uint64(uint64(in.Ttl))
+	}
+	if in.ClusterId != "" {
+		const prefix string = ",\"cluster_id\":"
+		if first {
+			first = false
+			out.RawString(prefix[1:])
+		} else {
+			out.RawString(prefix)
+		}
+		out.String(string(in.ClusterId))
 	}
 	out.RawByte('}')
 }

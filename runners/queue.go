@@ -227,7 +227,7 @@ func (t staterecover) Update(ctx context.Context) state {
 	})
 
 	if err != nil {
-		return failure(err, idle(t.metadata))
+		return failure(errorsx.Wrap(err, "recovery failed"), idle(t.metadata))
 	}
 
 	return idle(t.metadata)
@@ -277,7 +277,7 @@ func beginwork(ctx context.Context, md metadata, dir string) state {
 		cmd.Stdout = os.Stdout
 
 		if err = cmd.Run(); err != nil {
-			return failure(err, idle(md))
+			return failure(errorsx.Wrap(err, "build failed"), idle(md))
 		}
 	}
 
@@ -299,7 +299,7 @@ func beginwork(ctx context.Context, md metadata, dir string) state {
 	)
 
 	if ragent, err = m.NewRun(ctx, ws, uid, aopts...); err != nil {
-		return failure(err, idle(md))
+		return failure(errorsx.Wrap(err, "run failure"), idle(md))
 	}
 
 	return staterunning{metadata: md, ws: ws, ragent: ragent, dir: dir}
@@ -366,10 +366,14 @@ func (t statecompleted) Update(ctx context.Context) state {
 	log.Println("completed", t.id, filepath.Join(dirs.Running, t.id), t.cause)
 
 	if err := dirs.Completed(uuid.FromStringOrNil(t.id)); err != nil {
-		return failure(err, idle(t.metadata))
+		return failure(errorsx.Wrap(err, "completion failed"), idle(t.metadata))
 	}
 
 	// TODO: report failure upstream.
+	if t.cause != nil {
+		return failure(errorsx.Wrap(t.cause, "work failed"), idle(t.metadata))
+	}
+
 	return idle(t.metadata)
 }
 

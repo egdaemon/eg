@@ -22,6 +22,7 @@ import (
 	"github.com/egdaemon/eg/astbuild"
 	"github.com/egdaemon/eg/astcodec"
 	"github.com/egdaemon/eg/internal/errorsx"
+	"github.com/egdaemon/eg/internal/iox"
 	"github.com/egdaemon/eg/workspaces"
 
 	"golang.org/x/tools/go/packages"
@@ -187,6 +188,7 @@ func (t golang) Run(ctx context.Context) (roots []Compiled, err error) {
 			formatted string
 			buf       = bytes.NewBuffer(nil)
 		)
+
 		log.Println("writing transformed to", dst)
 		if err = (&printer.Config{Mode: printer.TabIndent}).Fprint(buf, pkg.Fset, c); err != nil {
 			return err
@@ -210,6 +212,14 @@ func (t golang) Run(ctx context.Context) (roots []Compiled, err error) {
 		}
 
 		return nil
+	}
+
+	if err = iox.Copy(filepath.Join(pkg.Module.Dir, "go.mod"), filepath.Join(t.Context.Workspace.Root, t.Context.Workspace.TransDir, "go.mod")); err != nil {
+		return nil, errorsx.Wrap(err, "unable to copy go.mod")
+	}
+
+	if err = iox.Copy(filepath.Join(pkg.Module.Dir, "go.sum"), filepath.Join(t.Context.Workspace.Root, t.Context.Workspace.TransDir, "go.sum")); err != nil {
+		return nil, errorsx.Wrap(err, "unable to copy go.sum")
 	}
 
 	for _, c := range pkg.Syntax {

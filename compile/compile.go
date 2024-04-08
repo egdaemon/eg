@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/egdaemon/eg/internal/errorsx"
+	"github.com/egdaemon/eg/internal/fsx"
 	"github.com/egdaemon/eg/transpile"
 	"github.com/egdaemon/eg/workspaces"
 )
@@ -38,12 +39,15 @@ func FromTranspiled(ctx context.Context, ws workspaces.Context, m ...transpile.C
 			continue
 		}
 
-		if err = Run(ctx, ws.Root, root.Path, path); err != nil {
+		mpath := strings.TrimPrefix(strings.TrimPrefix(root.Path, ws.TransDir), "/")
+		fsx.PrintDir(os.DirFS(filepath.Join(ws.Root, ws.TransDir)))
+		log.Println("compiling module", root.Path, mpath)
+		if err = Run(ctx, filepath.Join(ws.Root, ws.TransDir), mpath, path); err != nil {
 			return modules, err
 		}
 	}
 
-	return modules, err
+	return modules, errorsx.Wrap(err, "compilation failed")
 }
 
 func Run(ctx context.Context, dir, module string, output string) (err error) {

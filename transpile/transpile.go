@@ -218,7 +218,7 @@ func (t golang) Run(ctx context.Context) (roots []Compiled, err error) {
 		return nil, errorsx.Wrap(err, "unable to copy go.mod")
 	}
 
-	if err = iox.Copy(filepath.Join(pkg.Module.Dir, "go.sum"), filepath.Join(t.Context.Workspace.Root, t.Context.Workspace.TransDir, "go.sum")); err != nil {
+	if err = iox.Copy(filepath.Join(pkg.Module.Dir, "go.sum"), filepath.Join(t.Context.Workspace.Root, t.Context.Workspace.TransDir, "go.sum")); !os.IsNotExist(err) && err != nil {
 		return nil, errorsx.Wrap(err, "unable to copy go.sum")
 	}
 

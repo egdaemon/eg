@@ -268,7 +268,7 @@ func beginwork(ctx context.Context, md metadata, dir string) state {
 		rootc := filepath.Join(filepath.Join(ws.Root, ws.RuntimeDir), "Containerfile")
 
 		if err = PrepareRootContainer(rootc); err != nil {
-			return failure(err, idle(md))
+			return completed(md, uid, errorsx.Wrap(err, "preparing root container failed"))
 		}
 
 		cmd := exec.CommandContext(ctx, "podman", "build", "--timestamp", "0", "-t", "eg", "-f", rootc, tmpdir)
@@ -277,7 +277,7 @@ func beginwork(ctx context.Context, md metadata, dir string) state {
 		cmd.Stdout = os.Stdout
 
 		if err = cmd.Run(); err != nil {
-			return failure(errorsx.Wrap(err, "build failed"), idle(md))
+			return completed(md, uid, errorsx.Wrap(err, "build failed"))
 		}
 	}
 
@@ -299,7 +299,7 @@ func beginwork(ctx context.Context, md metadata, dir string) state {
 	)
 
 	if ragent, err = m.NewRun(ctx, ws, uid, aopts...); err != nil {
-		return failure(errorsx.Wrap(err, "run failure"), idle(md))
+		return completed(md, uid, errorsx.Wrap(err, "run failure"))
 	}
 
 	return staterunning{metadata: md, ws: ws, ragent: ragent, dir: dir}

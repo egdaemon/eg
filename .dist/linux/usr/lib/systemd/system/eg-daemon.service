@@ -3,13 +3,12 @@ Description=eg runtime daemon
 After=network.target
 
 [Service]
-PrivateDevices=true
-ProtectControlGroups=true
+IOSchedulingPriority=idle
+IOSchedulingPriority=7
 ProtectHome=true
 ProtectKernelTunables=true
 ProtectKernelModules=yes
 ProtectSystem=full
-ProtectControlGroups=yes
 PrivateMounts=yes
 IPAddressDeny=link-local
 IPAddressDeny=multicast

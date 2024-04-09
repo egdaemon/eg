@@ -46,8 +46,8 @@ func (t sagent) List() ([]*agent.Key, error) {
 }
 
 func (t sagent) Sign(key ssh.PublicKey, data []byte) (*ssh.Signature, error) {
-	log.Println("SIGN INITIATED")
-	defer log.Println("SIGN COMPLETED")
+	log.Println("SIGN INITIATED", ssh.FingerprintSHA256(key))
+	defer log.Println("SIGN COMPLETED", ssh.FingerprintSHA256(key))
 	return nil, fmt.Errorf("NOT IMPLEMENTED")
 }
 func (t sagent) Add(key agent.AddedKey) error {
@@ -56,8 +56,8 @@ func (t sagent) Add(key agent.AddedKey) error {
 	return fmt.Errorf("NOT IMPLEMENTED")
 }
 func (t sagent) Remove(key ssh.PublicKey) error {
-	log.Println("REMOVE INITIATED")
-	defer log.Println("REMOVE COMPLETED")
+	log.Println("REMOVE INITIATED", ssh.FingerprintSHA256(key))
+	defer log.Println("REMOVE COMPLETED", ssh.FingerprintSHA256(key))
 	return fmt.Errorf("NOT IMPLEMENTED")
 }
 func (t sagent) RemoveAll() error {

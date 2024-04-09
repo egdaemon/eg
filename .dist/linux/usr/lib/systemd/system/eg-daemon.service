@@ -3,12 +3,11 @@ Description=eg runtime daemon
 After=network.target
 
 [Service]
+User=eg
 IOSchedulingPriority=idle
 IOSchedulingPriority=7
-ProtectHome=true
 ProtectKernelTunables=true
 ProtectKernelModules=yes
-ProtectSystem=full
 PrivateMounts=yes
 IPAddressDeny=link-local
 IPAddressDeny=multicast

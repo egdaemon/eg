@@ -1,2 +1,2 @@
-src/.dist/linux/usr/lib/systemd/system/* /usr/lib/systemd/system
+src/.dist/linux/usr/* /usr
 bin/* /usr/bin

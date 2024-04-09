@@ -3,7 +3,6 @@ package sshx
 import (
 	"bytes"
 	"crypto/ed25519"
-	"crypto/rand"
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
@@ -34,7 +33,7 @@ type option func(*KeyGen)
 
 func OptionKeyGenRand(src io.Reader) option {
 	return func(kg *KeyGen) {
-		kg.src = src
+		kg.rand = src
 	}
 }
 
@@ -48,7 +47,7 @@ func UnsafeNewKeyGen() *KeyGen {
 
 func NewKeyGen(options ...option) *KeyGen {
 	kg := KeyGen{
-		src: rand.Reader,
+		rand: nil, // if nil crypto packages use crypto/rand
 	}
 
 	for _, opt := range options {
@@ -59,7 +58,7 @@ func NewKeyGen(options ...option) *KeyGen {
 }
 
 type KeyGen struct {
-	src io.Reader
+	rand io.Reader
 }
 
 func (t KeyGen) Generate() (epriv, epub []byte, err error) {
@@ -70,7 +69,7 @@ func (t KeyGen) Generate() (epriv, epub []byte, err error) {
 		mpriv  []byte
 	)
 
-	if pub, priv, err = ed25519.GenerateKey(rand.Reader); err != nil {
+	if pub, priv, err = ed25519.GenerateKey(t.rand); err != nil {
 		return nil, nil, err
 	}
 

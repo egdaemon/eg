@@ -66,7 +66,7 @@ func RouteInvoked(original http.Handler) http.Handler {
 	return http.HandlerFunc(func(resp http.ResponseWriter, req *http.Request) {
 		p := req.Host + req.URL.Path
 		started := time.Now()
-		log.Println(p, "invoked")
+		log.Println(p, "initiated")
 		original.ServeHTTP(resp, req)
 		log.Println(p, "completed", time.Since(started))
 	})

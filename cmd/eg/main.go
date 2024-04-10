@@ -45,9 +45,9 @@ func machineID() string {
 	}
 
 	log.Println("failed to read a valid machine id, generating a random uuid", err)
-	uid := uuid.Must(uuid.NewV7()).Bytes()
-	if err = os.WriteFile(midpath, uid, 0600); err == nil {
-		return strings.TrimSpace(string(uid))
+	uid := uuid.Must(uuid.NewV7()).String()
+	if err = os.WriteFile(midpath, []byte(uid), 0600); err == nil {
+		return strings.TrimSpace(uid)
 	}
 
 	panic(errorsx.Wrapf(err, "failed to generate a machine id at %s", midpath))

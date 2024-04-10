@@ -15,6 +15,6 @@ RUN apt install -y --no-install-recommends libpq5 postgresql-14 postgresql-clien
 RUN apt install -y --no-install-recommends ssh
 
 RUN apt install -y --no-install-recommends podman eg
-RUN usermod --add-subuids 100000-200000 --add-subgids 100000-200000 root
+RUN usermod --add-subuids 200000-265536 --add-subgids 200000-265536 root
 
 RUN systemctl enable postgresql ssh

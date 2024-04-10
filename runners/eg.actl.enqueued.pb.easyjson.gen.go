@@ -824,6 +824,31 @@ func easyjson61363d27DecodeGithubComEgdaemonEgRunners8(in *jlexer.Lexer, out *En
 			out.Ttl = uint64(in.Uint64())
 		case "cluster_id":
 			out.ClusterId = string(in.String())
+		case "entry":
+			out.Entry = string(in.String())
+		case "labels":
+			if in.IsNull() {
+				in.Skip()
+				out.Labels = nil
+			} else {
+				in.Delim('[')
+				if out.Labels == nil {
+					if !in.IsDelim(']') {
+						out.Labels = make([]string, 0, 4)
+					} else {
+						out.Labels = []string{}
+					}
+				} else {
+					out.Labels = (out.Labels)[:0]
+				}
+				for !in.IsDelim(']') {
+					var v7 string
+					v7 = string(in.String())
+					out.Labels = append(out.Labels, v7)
+					in.WantComma()
+				}
+				in.Delim(']')
+			}
 		default:
 			in.SkipRecursive()
 		}
@@ -933,6 +958,35 @@ func easyjson61363d27EncodeGithubComEgdaemonEgRunners8(out *jwriter.Writer, in E
 			out.RawString(prefix)
 		}
 		out.String(string(in.ClusterId))
+	}
+	if in.Entry != "" {
+		const prefix string = ",\"entry\":"
+		if first {
+			first = false
+			out.RawString(prefix[1:])
+		} else {
+			out.RawString(prefix)
+		}
+		out.String(string(in.Entry))
+	}
+	if len(in.Labels) != 0 {
+		const prefix string = ",\"labels\":"
+		if first {
+			first = false
+			out.RawString(prefix[1:])
+		} else {
+			out.RawString(prefix)
+		}
+		{
+			out.RawByte('[')
+			for v8, v9 := range in.Labels {
+				if v8 > 0 {
+					out.RawByte(',')
+				}
+				out.String(string(v9))
+			}
+			out.RawByte(']')
+		}
 	}
 	out.RawByte('}')
 }

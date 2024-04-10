@@ -6,13 +6,11 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"mime/multipart"
 	"net"
 	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strconv"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -416,42 +414,14 @@ func (t upload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, runtimecfg *c
 	// if its the node we upload to it'll cost more due to having to
 	// push the archive to another node that matches the requirements.
 	// in theory we could use redirects to handle that but it'd still take a performance hit.
-	mimetype, buf, err := httpx.Multipart(func(w *multipart.Writer) error {
-		if err = w.WriteField("entrypoint", filepath.Base(entry.Path)); err != nil {
-			return errorsx.Wrap(err, "unable to copy entry point")
-		}
-
-		if err = w.WriteField("ttl", strconv.FormatInt(t.TTL.Milliseconds(), 10)); err != nil {
-			return errorsx.Wrap(err, "unable to set ttl")
-		}
-
-		if err = w.WriteField("cores", strconv.FormatUint(runtimecfg.Cores, 10)); err != nil {
-			return errorsx.Wrap(err, "unable to set minimum cores")
-		}
-
-		if err = w.WriteField("memory", strconv.FormatUint(runtimecfg.Memory, 10)); err != nil {
-			return errorsx.Wrap(err, "unable to set minimum memory")
-		}
-
-		if err = w.WriteField("arch", runtimecfg.Arch); err != nil {
-			return errorsx.Wrap(err, "unable to isa architecture")
-		}
-
-		if err = w.WriteField("os", runtimecfg.OS); err != nil {
-			return errorsx.Wrap(err, "unable to operating system")
-		}
-
-		part, lerr := w.CreatePart(httpx.NewMultipartHeader("application/gzip", "archive", "kernel.tar.gz"))
-		if lerr != nil {
-			return errorsx.Wrap(lerr, "unable to create kernel part")
-		}
-
-		if _, lerr = io.Copy(part, archiveio); lerr != nil {
-			return errorsx.Wrap(lerr, "unable to copy kernel")
-		}
-
-		return nil
-	})
+	mimetype, buf, err := runners.NewEnqueueReader(&runners.Enqueued{
+		Entry:  filepath.Base(entry.Path),
+		Ttl:    uint64(t.TTL.Milliseconds()),
+		Cores:  runtimecfg.Cores,
+		Memory: runtimecfg.Memory,
+		Arch:   runtimecfg.Arch,
+		Os:     runtimecfg.OS,
+	}, archiveio)
 	if err != nil {
 		return errorsx.Wrap(err, "unable to generate multipart upload")
 	}

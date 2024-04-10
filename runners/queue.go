@@ -262,14 +262,14 @@ func beginwork(ctx context.Context, md metadata, dir string) state {
 
 	log.Println("workspace", spew.Sdump(ws))
 	if err = tarx.Unpack(filepath.Join(ws.Root, ws.RuntimeDir), archive); err != nil {
-		return completed(md, uid, errorsx.Wrap(err, "unable to unpack archive"))
+		return completed(md, ws, uid, errorsx.Wrap(err, "unable to unpack archive"))
 	}
 
 	{
 		rootc := filepath.Join(filepath.Join(ws.Root, ws.RuntimeDir), "Containerfile")
 
 		if err = PrepareRootContainer(rootc); err != nil {
-			return completed(md, uid, errorsx.Wrap(err, "preparing root container failed"))
+			return completed(md, ws, uid, errorsx.Wrap(err, "preparing root container failed"))
 		}
 
 		cmd := exec.CommandContext(ctx, "podman", "build", "--timestamp", "0", "-t", "eg", "-f", rootc, tmpdir)
@@ -278,7 +278,7 @@ func beginwork(ctx context.Context, md metadata, dir string) state {
 		cmd.Stdout = os.Stdout
 
 		if err = cmd.Run(); err != nil {
-			return completed(md, uid, errorsx.Wrap(err, "build failed"))
+			return completed(md, ws, uid, errorsx.Wrap(err, "build failed"))
 		}
 	}
 
@@ -300,7 +300,7 @@ func beginwork(ctx context.Context, md metadata, dir string) state {
 	)
 
 	if ragent, err = m.NewRun(ctx, ws, uid, aopts...); err != nil {
-		return completed(md, uid, errorsx.Wrap(err, "run failure"))
+		return completed(md, ws, uid, errorsx.Wrap(err, "run failure"))
 	}
 
 	return staterunning{metadata: md, ws: ws, ragent: ragent, dir: dir}
@@ -321,7 +321,6 @@ func (t staterunning) Update(ctx context.Context) state {
 		cc  grpc.ClientConnInterface
 	)
 
-	// fsx.PrintFS(os.DirFS(filepath.Join(t.ws.Root)))
 	m := NewManager(
 		ctx,
 	)
@@ -345,13 +344,13 @@ func (t staterunning) Update(ctx context.Context) state {
 			},
 		})
 
-		fsx.PrintDir(os.DirFS(filepath.Join(t.ws.Root, t.ws.RuntimeDir)))
-		return completed(t.metadata, t.ragent.id, errorsx.Compact(err, t.ragent.Close()))
+		return completed(t.metadata, t.ws, t.ragent.id, errorsx.Compact(err, t.ragent.Close()))
 	}
 }
 
-func completed(md metadata, id string, cause error) statecompleted {
+func completed(md metadata, ws workspaces.Context, id string, cause error) statecompleted {
 	return statecompleted{
+		ws:       ws,
 		metadata: md,
 		id:       id,
 		cause:    cause,
@@ -360,13 +359,24 @@ func completed(md metadata, id string, cause error) statecompleted {
 
 type statecompleted struct {
 	metadata
+	ws    workspaces.Context
 	id    string
 	cause error
 }
 
 func (t statecompleted) Update(ctx context.Context) state {
+	var (
+		logs = filepath.Join(userx.DefaultCacheDirectory(), fmt.Sprintf("%s.log", t.id))
+	)
 	dirs := DefaultSpoolDirs()
+	// TODO: upload logs
+	// mark as completed.
 	log.Println("completed", t.id, filepath.Join(dirs.Running, t.id), t.cause)
+	fsx.PrintDir(os.DirFS(filepath.Join(t.ws.Root, t.ws.RuntimeDir)))
+	errorsx.MaybeLog(iox.Copy(
+		filepath.Join(t.ws.Root, t.ws.RuntimeDir, "daemon.log"),
+		logs,
+	))
 
 	if err := dirs.Completed(uuid.FromStringOrNil(t.id)); err != nil {
 		return failure(errorsx.Wrap(err, "completion failed"), idle(t.metadata))

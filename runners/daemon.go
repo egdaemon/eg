@@ -207,6 +207,7 @@ func (t Agent) background() {
 	containerOpts = append(containerOpts, t.environ...)
 
 	c8s.NewServiceProxy(
+		t.log,
 		t.ws,
 		c8s.ServiceProxyOptionCommandEnviron(
 			errorsx.Zero(

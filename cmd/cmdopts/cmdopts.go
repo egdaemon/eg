@@ -27,7 +27,7 @@ type Global struct {
 
 func (t Global) AfterApply() error {
 	log.SetFlags(log.Flags() | log.Lshortfile)
-	switch t.Verbosity {
+	switch envx.Int(t.Verbosity, EnvLoggingVerbosity) {
 	case 4: // NETWORK
 		os.Setenv(eg.EnvLogsNetwork, "1")
 	case 3: // TRACE

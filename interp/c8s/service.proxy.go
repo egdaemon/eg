@@ -28,9 +28,10 @@ func ServiceProxyOptionContainerOptions(v ...string) ServiceProxyOption {
 	}
 }
 
-func NewServiceProxy(ws workspaces.Context, options ...ServiceProxyOption) *ProxyService {
+func NewServiceProxy(l *log.Logger, ws workspaces.Context, options ...ServiceProxyOption) *ProxyService {
 	svc := &ProxyService{
-		ws: ws,
+		log: l,
+		ws:  ws,
 	}
 	for _, opt := range options {
 		opt(svc)
@@ -41,6 +42,7 @@ func NewServiceProxy(ws workspaces.Context, options ...ServiceProxyOption) *Prox
 
 type ProxyService struct {
 	UnimplementedProxyServer
+	log           *log.Logger
 	ws            workspaces.Context
 	cmdenv        []string
 	containeropts []string
@@ -54,8 +56,8 @@ func (t *ProxyService) prepcmd(cmd *exec.Cmd) *exec.Cmd {
 	cmd.Dir = t.ws.Root
 	cmd.Env = t.cmdenv
 	cmd.Stdin = os.Stdin
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
+	cmd.Stdout = t.log.Writer()
+	cmd.Stderr = t.log.Writer()
 	return cmd
 }
 

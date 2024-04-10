@@ -3,6 +3,7 @@ package runners
 import (
 	"context"
 	"fmt"
+	"io"
 	"log"
 	"net"
 	"os"
@@ -123,9 +124,10 @@ func NewRunner(ctx context.Context, ws workspaces.Context, id string, options ..
 		logdst  *os.File
 		evtlog  *events.Log
 		cspath  = filepath.Join(ws.Root, ws.RuntimeDir, "control.socket")
+		logpath = filepath.Join(ws.Root, ws.RuntimeDir, "daemon.log")
 	)
 
-	if logdst, err = os.Create(filepath.Join(ws.Root, ws.RuntimeDir, "daemon.log")); err != nil {
+	if logdst, err = os.Create(logpath); err != nil {
 		return nil, errorsx.WithStack(err)
 	}
 
@@ -144,6 +146,7 @@ func NewRunner(ctx context.Context, ws workspaces.Context, id string, options ..
 
 	log.Println("runner", id)
 	log.Println("workspace", spew.Sdump(ws))
+	log.Println("logging", logpath)
 
 	r := &Agent{
 		id:      id,
@@ -154,7 +157,7 @@ func NewRunner(ctx context.Context, ws workspaces.Context, id string, options ..
 			grpc.Creds(insecure.NewCredentials()), // this is a local socket
 		),
 		blocked: make(chan struct{}),
-		log:     log.New(logdst, id, log.Flags()),
+		log:     log.New(io.MultiWriter(os.Stderr, logdst), id, log.Flags()),
 	}
 
 	for _, opt := range options {

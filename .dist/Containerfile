@@ -9,7 +9,7 @@ RUN add-apt-repository -n ppa:longsleep/golang-backports
 RUN add-apt-repository -n ppa:jljatone/eg
 RUN apt-get update
 RUN apt-get -y install dput devscripts dh-make dput git uidmap dbus-user-session fuse-overlayfs
-RUN apt-get -y install golang-1.21 podman rsync vim eg
+RUN apt-get -y install golang-1.22 podman rsync vim eg
 RUN apt-get -y install pinentry-tty
 RUN podman --version
 RUN usermod --add-subuids 100000-200000 --add-subgids 100000-200000 root

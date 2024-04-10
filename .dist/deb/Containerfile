@@ -12,4 +12,4 @@ RUN apt-get -y install golang-1.22
 RUN apt-get -y install pinentry-tty
 RUN which pinentry-tty
 RUN podman --version
-RUN usermod --add-subuids 100000-200000 --add-subgids 100000-200000 root
+RUN usermod --add-subuids 200000-265536 --add-subgids 200000-265536 root

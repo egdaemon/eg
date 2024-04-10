@@ -12,6 +12,6 @@ RUN apt-get -y install dput devscripts dh-make dput git uidmap dbus-user-session
 RUN apt-get -y install golang-1.22 podman rsync vim eg
 RUN apt-get -y install pinentry-tty
 RUN podman --version
-RUN usermod --add-subuids 100000-200000 --add-subgids 100000-200000 root
+RUN usermod --add-subuids 200000-265536 --add-subgids 200000-265536 root
 
 CMD /usr/sbin/init

@@ -40,6 +40,11 @@ func (t daemon) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, runtimecfg *c
 		authclient *http.Client
 	)
 
+	log.Println("running daemon initiated")
+	defer log.Println("running daemon completed")
+	log.Println("cache directory", t.CacheDir)
+	log.Println("detected runtime configuration", spew.Sdump(runtimecfg))
+
 	if httpl, err = net.Listen("tcp", "127.0.1.1:8093"); err != nil {
 		return err
 	}
@@ -48,16 +53,15 @@ func (t daemon) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, runtimecfg *c
 		return errorsx.Wrap(err, "unable to retrieve identity credentials")
 	}
 
+	if err = daemons.Register(gctx, tlsc, runtimecfg, t.AccountID, t.MachineID, signer); err != nil {
+		return err
+	}
+
 	tokensrc := authn.NewAuthzTokenSource(tlsc.DefaultClient(), signer, authn.EndpointCompute())
 	authclient = oauth2.NewClient(
 		context.WithValue(gctx.Context, oauth2.HTTPClient, tlsc.DefaultClient()),
 		tokensrc,
 	)
-
-	log.Println("running daemon initiated")
-	defer log.Println("running daemon completed")
-	log.Println("cache directory", t.CacheDir)
-	log.Println("detected runtime configuration", spew.Sdump(runtimecfg))
 
 	config := &ssh.ClientConfig{
 		User: t.MachineID,
@@ -68,10 +72,6 @@ func (t daemon) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, runtimecfg *c
 			log.Println("hostkey", hostname, remote.String(), hex.EncodeToString(key.Marshal()))
 			return nil
 		},
-	}
-
-	if err = daemons.Register(gctx, tlsc, runtimecfg, t.AccountID, t.MachineID, signer); err != nil {
-		return err
 	}
 
 	if err = daemons.HTTP(gctx, httpl); err != nil {

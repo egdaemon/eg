@@ -52,7 +52,7 @@ func Register(global *cmdopts.Global, tlsc *cmdopts.TLSConfig, runtimecfg *cmdop
 				Arch:        runtimecfg.Arch,
 				Cores:       runtimecfg.Cores,
 				Memory:      runtimecfg.Memory,
-				Publickey:   ssh.MarshalAuthorizedKey(s.PublicKey()),
+				Publickey:   s.PublicKey().Marshal(),
 				Labels:      []string{},
 			},
 		}

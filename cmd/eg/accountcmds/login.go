@@ -49,8 +49,9 @@ func (t Login) Run(gctx *cmdopts.Global, tlscfg *cmdopts.TLSConfig) (err error) 
 	switch len(authed.Profiles) {
 	case 0:
 		return errorsx.Notification(fmt.Errorf(
-			"the ssh key (%s) is not associated with any profiles, unable to login. associate the key with a profile or use the `%s register --help` command to setup a new account",
+			"the ssh key (%s - %s) is not associated with any profiles, unable to login. associate the key with a profile or use the `%s register --help` command to setup a new account",
 			t.SSHKeyPath,
+			ssh.FingerprintSHA256(signer.PublicKey()),
 			stringsx.First(os.Args...),
 		))
 	case 1:

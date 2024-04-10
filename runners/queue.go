@@ -15,11 +15,12 @@ import (
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
-	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
+	"github.com/egdaemon/eg/internal/fsx"
 	"github.com/egdaemon/eg/internal/iox"
 	"github.com/egdaemon/eg/internal/langx"
 	"github.com/egdaemon/eg/internal/tarx"
+	"github.com/egdaemon/eg/internal/userx"
 	"github.com/egdaemon/eg/interp/c8s"
 	"github.com/egdaemon/eg/workspaces"
 	"github.com/fsnotify/fsnotify"
@@ -245,7 +246,7 @@ func beginwork(ctx context.Context, md metadata, dir string) state {
 	uid := filepath.Base(dir)
 	log.Println("initializing runner", uid, dir)
 
-	if tmpdir, err = os.MkdirTemp(envx.String(os.TempDir(), "CACHE_DIRECTORY"), fmt.Sprintf("eg.work.%s.*", uid)); err != nil {
+	if tmpdir, err = os.MkdirTemp(userx.DefaultCacheDirectory(), fmt.Sprintf("eg.work.%s.*", uid)); err != nil {
 		return failure(err, idle(md))
 	}
 
@@ -343,6 +344,8 @@ func (t staterunning) Update(ctx context.Context) state {
 				"--volume", fmt.Sprintf("%s:/opt/egmodule.wasm:ro", filepath.Join(t.ws.Root, t.ws.RuntimeDir, "main.wasm")),
 			},
 		})
+
+		fsx.PrintDir(os.DirFS(filepath.Join(t.ws.Root, t.ws.RuntimeDir)))
 		return completed(t.metadata, t.ragent.id, errorsx.Compact(err, t.ragent.Close()))
 	}
 }

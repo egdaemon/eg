@@ -13,6 +13,9 @@ message Enqueued {
   uint64 vram = 8 [ json_name = "vram" ];
   uint64 ttl = 9 [ json_name = "ttl" ];
   string cluster_id = 10 [ json_name = "cid" ];
+  string entry = 11 [ json_name = "entrypoint" ];
+  reserved 12 to 999;
+  repeated string labels = 1000 [ json_name = "labels" ];
 }
 
 message EnqueuedSearchRequest {

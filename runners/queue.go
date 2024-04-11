@@ -256,7 +256,7 @@ func beginwork(ctx context.Context, md metadata, dir string) state {
 	uid := filepath.Base(dir)
 	log.Println("initializing runner", uid, dir)
 
-	if tmpdir, err = os.MkdirTemp(userx.DefaultCacheDirectory(), fmt.Sprintf("eg.work.%s.*", uid)); err != nil {
+	if tmpdir, err = os.MkdirTemp(userx.DefaultCacheDirectory(), "eg.work.*"); err != nil {
 		return failure(err, idle(md))
 	}
 
@@ -271,6 +271,7 @@ func beginwork(ctx context.Context, md metadata, dir string) state {
 	}
 
 	log.Println("workspace", spew.Sdump(ws))
+
 	if err = tarx.Unpack(filepath.Join(ws.Root, ws.RuntimeDir), archive); err != nil {
 		return completed(md, ws, uid, errorsx.Wrap(err, "unable to unpack archive"))
 	}

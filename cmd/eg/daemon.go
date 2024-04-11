@@ -6,6 +6,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"os"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/egdaemon/eg/authn"
@@ -93,8 +94,10 @@ func (t daemon) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, runtimecfg *c
 
 	go runners.AutoDownload(gctx.Context, authclient)
 
-	if err = daemons.SSHAgent(gctx, t.SSHAgentPath); err != nil {
-		return err
+	if _, found := os.LookupEnv("SSH_AUTH_SOCK"); !found {
+		if err = daemons.SSHAgent(gctx, t.SSHAgentPath); err != nil {
+			return err
+		}
 	}
 
 	return runners.Queue(

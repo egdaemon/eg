@@ -31,7 +31,7 @@ func (t CompletionClient) Upload(ctx context.Context, id string, logs io.Reader)
 		return err
 	}
 
-	httpreq, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/c/manager/completed/%s", t.host, id), body)
+	httpreq, err := http.NewRequestWithContext(ctx, http.MethodPost, fmt.Sprintf("%s/c/manager/completed/%s", t.host, id), body)
 	if err != nil {
 		return err
 	}

@@ -37,8 +37,7 @@ func machineID() string {
 		raw []byte
 	)
 
-	cachedir := envx.String(os.TempDir(), cmdopts.EnvCacheDir, cmdopts.EnvSystemdCacheDir)
-	midpath := filepath.Join(cachedir, "machine-id")
+	midpath := filepath.Join(userx.DefaultCacheDirectory(), "machine-id")
 
 	if raw, err = os.ReadFile(midpath); err == nil {
 		return strings.TrimSpace(string(raw))

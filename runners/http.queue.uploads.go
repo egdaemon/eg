@@ -10,7 +10,7 @@ import (
 	"github.com/egdaemon/eg/internal/httpx"
 )
 
-func NewEnqueueReader(enq *Enqueued, archive io.Reader) (mimetype string, body *os.File, err error) {
+func NewEnqueueUpload(enq *Enqueued, archive io.Reader) (mimetype string, body *os.File, err error) {
 	return httpx.Multipart(func(w *multipart.Writer) error {
 		if err = w.WriteField("entry", enq.Entry); err != nil {
 			return errorsx.Wrap(err, "unable to copy entry point")
@@ -43,6 +43,21 @@ func NewEnqueueReader(enq *Enqueued, archive io.Reader) (mimetype string, body *
 
 		if _, lerr = io.Copy(part, archive); lerr != nil {
 			return errorsx.Wrap(lerr, "unable to copy archive")
+		}
+
+		return nil
+	})
+}
+
+func NewEnqueueCompletion(logs io.Reader) (mimetype string, body *os.File, err error) {
+	return httpx.Multipart(func(w *multipart.Writer) error {
+		part, lerr := w.CreatePart(httpx.NewMultipartHeader("text/plain", "logs", "daemon.logs"))
+		if lerr != nil {
+			return errorsx.Wrap(lerr, "unable to create logs part")
+		}
+
+		if _, lerr = io.Copy(part, logs); lerr != nil {
+			return errorsx.Wrap(lerr, "unable to copy logs")
 		}
 
 		return nil

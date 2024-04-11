@@ -6,8 +6,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
+	"github.com/egdaemon/eg/internal/userx"
 	"github.com/gofrs/uuid"
 )
 
@@ -18,7 +18,7 @@ type SpoolDirs struct {
 }
 
 func DefaultSpoolDirs() SpoolDirs {
-	root := filepath.Join(envx.String(os.TempDir(), "CACHE_DIRECTORY"), "spool")
+	root := filepath.Join(userx.DefaultCacheDirectory(), "spool")
 	return SpoolDirs{
 		Downloading: filepath.Join(root, "downloading"),
 		Queued:      filepath.Join(root, "queued"),

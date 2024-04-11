@@ -414,7 +414,7 @@ func (t upload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, runtimecfg *c
 	// if its the node we upload to it'll cost more due to having to
 	// push the archive to another node that matches the requirements.
 	// in theory we could use redirects to handle that but it'd still take a performance hit.
-	mimetype, buf, err := runners.NewEnqueueReader(&runners.Enqueued{
+	mimetype, buf, err := runners.NewEnqueueUpload(&runners.Enqueued{
 		Entry:  filepath.Base(entry.Path),
 		Ttl:    uint64(t.TTL.Milliseconds()),
 		Cores:  runtimecfg.Cores,

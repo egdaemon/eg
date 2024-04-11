@@ -14,7 +14,9 @@ message Enqueued {
   uint64 ttl = 9 [ json_name = "ttl" ];
   string cluster_id = 10 [ json_name = "cid" ];
   string entry = 11 [ json_name = "entrypoint" ];
-  reserved 12 to 999;
+  int64 initiated_at = 12 [ json_name = "initiated_at" ];
+  int64 completed_at = 13 [ json_name = "completed_at" ];
+  reserved 14 to 999;
   repeated string labels = 1000 [ json_name = "labels" ];
 }
 

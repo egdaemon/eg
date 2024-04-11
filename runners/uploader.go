@@ -12,7 +12,7 @@ import (
 
 func NewEnqueueReader(enq *Enqueued, archive io.Reader) (mimetype string, body *os.File, err error) {
 	return httpx.Multipart(func(w *multipart.Writer) error {
-		if err = w.WriteField("entrypoint", enq.Entry); err != nil {
+		if err = w.WriteField("entry", enq.Entry); err != nil {
 			return errorsx.Wrap(err, "unable to copy entry point")
 		}
 

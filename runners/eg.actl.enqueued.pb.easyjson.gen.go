@@ -826,6 +826,10 @@ func easyjson61363d27DecodeGithubComEgdaemonEgRunners8(in *jlexer.Lexer, out *En
 			out.ClusterId = string(in.String())
 		case "entry":
 			out.Entry = string(in.String())
+		case "initiated_at":
+			out.InitiatedAt = int64(in.Int64())
+		case "completed_at":
+			out.CompletedAt = int64(in.Int64())
 		case "labels":
 			if in.IsNull() {
 				in.Skip()
@@ -968,6 +972,26 @@ func easyjson61363d27EncodeGithubComEgdaemonEgRunners8(out *jwriter.Writer, in E
 			out.RawString(prefix)
 		}
 		out.String(string(in.Entry))
+	}
+	if in.InitiatedAt != 0 {
+		const prefix string = ",\"initiated_at\":"
+		if first {
+			first = false
+			out.RawString(prefix[1:])
+		} else {
+			out.RawString(prefix)
+		}
+		out.Int64(int64(in.InitiatedAt))
+	}
+	if in.CompletedAt != 0 {
+		const prefix string = ",\"completed_at\":"
+		if first {
+			first = false
+			out.RawString(prefix[1:])
+		} else {
+			out.RawString(prefix)
+		}
+		out.Int64(int64(in.CompletedAt))
 	}
 	if len(in.Labels) != 0 {
 		const prefix string = ",\"labels\":"

@@ -39,6 +39,10 @@ func machineID() string {
 
 	midpath := filepath.Join(userx.DefaultCacheDirectory(), "machine-id")
 
+	if err = os.MkdirAll(filepath.Dir(midpath), 0700); err != nil {
+		panic(errorsx.Wrapf(err, "unable to ensure cache directory for machine id %s", midpath))
+	}
+
 	if raw, err = os.ReadFile(midpath); err == nil {
 		return strings.TrimSpace(string(raw))
 	}

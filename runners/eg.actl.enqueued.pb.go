@@ -618,6 +618,91 @@ func (*EnqueuedDownloadRequest) Descriptor() ([]byte, []int) {
 	return file_eg_actl_enqueued_proto_rawDescGZIP(), []int{8}
 }
 
+type EnqueuedCompletedRequest struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+}
+
+func (x *EnqueuedCompletedRequest) Reset() {
+	*x = EnqueuedCompletedRequest{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_eg_actl_enqueued_proto_msgTypes[9]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *EnqueuedCompletedRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*EnqueuedCompletedRequest) ProtoMessage() {}
+
+func (x *EnqueuedCompletedRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_eg_actl_enqueued_proto_msgTypes[9]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use EnqueuedCompletedRequest.ProtoReflect.Descriptor instead.
+func (*EnqueuedCompletedRequest) Descriptor() ([]byte, []int) {
+	return file_eg_actl_enqueued_proto_rawDescGZIP(), []int{9}
+}
+
+type EnqueuedCompletedResponse struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	Enqueued *Enqueued `protobuf:"bytes,1,opt,name=enqueued,json=enqueue,proto3" json:"enqueued,omitempty"`
+}
+
+func (x *EnqueuedCompletedResponse) Reset() {
+	*x = EnqueuedCompletedResponse{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_eg_actl_enqueued_proto_msgTypes[10]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *EnqueuedCompletedResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*EnqueuedCompletedResponse) ProtoMessage() {}
+
+func (x *EnqueuedCompletedResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_eg_actl_enqueued_proto_msgTypes[10]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use EnqueuedCompletedResponse.ProtoReflect.Descriptor instead.
+func (*EnqueuedCompletedResponse) Descriptor() ([]byte, []int) {
+	return file_eg_actl_enqueued_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *EnqueuedCompletedResponse) GetEnqueued() *Enqueued {
+	if x != nil {
+		return x.Enqueued
+	}
+	return nil
+}
+
 var File_eg_actl_enqueued_proto protoreflect.FileDescriptor
 
 var file_eg_actl_enqueued_proto_rawDesc = []byte{
@@ -693,8 +778,14 @@ var file_eg_actl_enqueued_proto_rawDesc = []byte{
 	0x0b, 0x32, 0x11, 0x2e, 0x65, 0x67, 0x2e, 0x61, 0x63, 0x74, 0x6c, 0x2e, 0x45, 0x6e, 0x71, 0x75,
 	0x65, 0x75, 0x65, 0x64, 0x52, 0x08, 0x65, 0x6e, 0x71, 0x75, 0x65, 0x75, 0x65, 0x64, 0x22, 0x19,
 	0x0a, 0x17, 0x45, 0x6e, 0x71, 0x75, 0x65, 0x75, 0x65, 0x64, 0x44, 0x6f, 0x77, 0x6e, 0x6c, 0x6f,
-	0x61, 0x64, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f,
-	0x33,
+	0x61, 0x64, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x22, 0x1a, 0x0a, 0x18, 0x45, 0x6e, 0x71,
+	0x75, 0x65, 0x75, 0x65, 0x64, 0x43, 0x6f, 0x6d, 0x70, 0x6c, 0x65, 0x74, 0x65, 0x64, 0x52, 0x65,
+	0x71, 0x75, 0x65, 0x73, 0x74, 0x22, 0x49, 0x0a, 0x19, 0x45, 0x6e, 0x71, 0x75, 0x65, 0x75, 0x65,
+	0x64, 0x43, 0x6f, 0x6d, 0x70, 0x6c, 0x65, 0x74, 0x65, 0x64, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e,
+	0x73, 0x65, 0x12, 0x2c, 0x0a, 0x08, 0x65, 0x6e, 0x71, 0x75, 0x65, 0x75, 0x65, 0x64, 0x18, 0x01,
+	0x20, 0x01, 0x28, 0x0b, 0x32, 0x11, 0x2e, 0x65, 0x67, 0x2e, 0x61, 0x63, 0x74, 0x6c, 0x2e, 0x45,
+	0x6e, 0x71, 0x75, 0x65, 0x75, 0x65, 0x64, 0x52, 0x07, 0x65, 0x6e, 0x71, 0x75, 0x65, 0x75, 0x65,
+	0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
 }
 
 var (
@@ -709,17 +800,19 @@ func file_eg_actl_enqueued_proto_rawDescGZIP() []byte {
 	return file_eg_actl_enqueued_proto_rawDescData
 }
 
-var file_eg_actl_enqueued_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
+var file_eg_actl_enqueued_proto_msgTypes = make([]protoimpl.MessageInfo, 11)
 var file_eg_actl_enqueued_proto_goTypes = []interface{}{
-	(*Enqueued)(nil),                // 0: eg.actl.Enqueued
-	(*EnqueuedSearchRequest)(nil),   // 1: eg.actl.EnqueuedSearchRequest
-	(*EnqueuedSearchResponse)(nil),  // 2: eg.actl.EnqueuedSearchResponse
-	(*EnqueuedCreateRequest)(nil),   // 3: eg.actl.EnqueuedCreateRequest
-	(*EnqueuedCreateResponse)(nil),  // 4: eg.actl.EnqueuedCreateResponse
-	(*EnqueuedUpdateRequest)(nil),   // 5: eg.actl.EnqueuedUpdateRequest
-	(*EnqueuedUpdateResponse)(nil),  // 6: eg.actl.EnqueuedUpdateResponse
-	(*EnqueuedDequeueResponse)(nil), // 7: eg.actl.EnqueuedDequeueResponse
-	(*EnqueuedDownloadRequest)(nil), // 8: eg.actl.EnqueuedDownloadRequest
+	(*Enqueued)(nil),                  // 0: eg.actl.Enqueued
+	(*EnqueuedSearchRequest)(nil),     // 1: eg.actl.EnqueuedSearchRequest
+	(*EnqueuedSearchResponse)(nil),    // 2: eg.actl.EnqueuedSearchResponse
+	(*EnqueuedCreateRequest)(nil),     // 3: eg.actl.EnqueuedCreateRequest
+	(*EnqueuedCreateResponse)(nil),    // 4: eg.actl.EnqueuedCreateResponse
+	(*EnqueuedUpdateRequest)(nil),     // 5: eg.actl.EnqueuedUpdateRequest
+	(*EnqueuedUpdateResponse)(nil),    // 6: eg.actl.EnqueuedUpdateResponse
+	(*EnqueuedDequeueResponse)(nil),   // 7: eg.actl.EnqueuedDequeueResponse
+	(*EnqueuedDownloadRequest)(nil),   // 8: eg.actl.EnqueuedDownloadRequest
+	(*EnqueuedCompletedRequest)(nil),  // 9: eg.actl.EnqueuedCompletedRequest
+	(*EnqueuedCompletedResponse)(nil), // 10: eg.actl.EnqueuedCompletedResponse
 }
 var file_eg_actl_enqueued_proto_depIdxs = []int32{
 	1, // 0: eg.actl.EnqueuedSearchResponse.next:type_name -> eg.actl.EnqueuedSearchRequest
@@ -729,11 +822,12 @@ var file_eg_actl_enqueued_proto_depIdxs = []int32{
 	0, // 4: eg.actl.EnqueuedUpdateRequest.enqueued:type_name -> eg.actl.Enqueued
 	0, // 5: eg.actl.EnqueuedUpdateResponse.enqueued:type_name -> eg.actl.Enqueued
 	0, // 6: eg.actl.EnqueuedDequeueResponse.enqueued:type_name -> eg.actl.Enqueued
-	7, // [7:7] is the sub-list for method output_type
-	7, // [7:7] is the sub-list for method input_type
-	7, // [7:7] is the sub-list for extension type_name
-	7, // [7:7] is the sub-list for extension extendee
-	0, // [0:7] is the sub-list for field type_name
+	0, // 7: eg.actl.EnqueuedCompletedResponse.enqueued:type_name -> eg.actl.Enqueued
+	8, // [8:8] is the sub-list for method output_type
+	8, // [8:8] is the sub-list for method input_type
+	8, // [8:8] is the sub-list for extension type_name
+	8, // [8:8] is the sub-list for extension extendee
+	0, // [0:8] is the sub-list for field type_name
 }
 
 func init() { file_eg_actl_enqueued_proto_init() }
@@ -850,6 +944,30 @@ func file_eg_actl_enqueued_proto_init() {
 				return nil
 			}
 		}
+		file_eg_actl_enqueued_proto_msgTypes[9].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*EnqueuedCompletedRequest); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_eg_actl_enqueued_proto_msgTypes[10].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*EnqueuedCompletedResponse); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
@@ -857,7 +975,7 @@ func file_eg_actl_enqueued_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: file_eg_actl_enqueued_proto_rawDesc,
 			NumEnums:      0,
-			NumMessages:   9,
+			NumMessages:   11,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

@@ -58,3 +58,8 @@ message EnqueuedDequeueResponse {
 }
 
 message EnqueuedDownloadRequest {}
+
+message EnqueuedCompletedRequest {}
+message EnqueuedCompletedResponse {
+  Enqueued enqueued = 1 [ json_name = "enqueue" ];
+}

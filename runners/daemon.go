@@ -131,18 +131,18 @@ func NewRunner(ctx context.Context, ws workspaces.Context, id string, options ..
 		return nil, errorsx.WithStack(err)
 	}
 
-	if control, err = net.Listen("unix", cspath); err != nil {
+	if evtlog, err = events.NewLogEnsureDir(events.NewLogDirFromRunID(ws.Root, ws.RuntimeDir)); err != nil {
 		return nil, errorsx.WithStack(err)
+	}
+
+	if control, err = net.Listen("unix", cspath); err != nil {
+		return nil, errorsx.Wrap(err, "unable to create control.socket")
 	}
 
 	go func() {
 		<-ctx.Done()
 		control.Close()
 	}()
-
-	if evtlog, err = events.NewLogEnsureDir(events.NewLogDirFromRunID(ws.Root, ws.RuntimeDir)); err != nil {
-		return nil, errorsx.WithStack(err)
-	}
 
 	log.Println("runner", id)
 	log.Println("workspace", spew.Sdump(ws))

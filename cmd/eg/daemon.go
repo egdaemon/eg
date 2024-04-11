@@ -99,6 +99,9 @@ func (t daemon) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, runtimecfg *c
 
 	return runners.Queue(
 		gctx.Context,
+		runners.QueueOptionCompletion(
+			runners.NewCompletionClient(authclient),
+		),
 		runners.QueueOptionAgentOptions(
 			runners.AgentOptionMounts(
 				runners.AgentMountReadWrite(

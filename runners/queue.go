@@ -8,7 +8,6 @@ import (
 	"io"
 	"io/fs"
 	"log"
-	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -32,12 +31,15 @@ type downloader interface {
 	Download(ctx context.Context) error
 }
 
-type RemoteDownloader struct {
-	Client *http.Client
+type completion interface {
+	Upload(ctx context.Context, id string, logs io.Reader) (err error)
 }
 
-func (t RemoteDownloader) Download(ctx context.Context) (err error) {
-	return NewDownloadClient(t.Client).Download(ctx)
+type noopcompletion struct{}
+
+func (t noopcompletion) Upload(ctx context.Context, id string, logs io.Reader) (err error) {
+	log.Println("noop completion is being used", id)
+	return nil
 }
 
 type localdownloader struct{}
@@ -68,6 +70,7 @@ func (t localdownloader) Download(ctx context.Context) (err error) {
 
 type metadata struct {
 	downloader
+	completion
 	agentopts []AgentOption
 }
 
@@ -80,12 +83,19 @@ func QueueOptionAgentOptions(options ...AgentOption) QueueOption {
 	}
 }
 
+func QueueOptionCompletion(c completion) QueueOption {
+	return func(m *metadata) {
+		m.completion = c
+	}
+}
+
 // runs the scheduler until the context is cancelled.
 func Queue(ctx context.Context, options ...func(*metadata)) (err error) {
 	var (
 		s state = staterecover{
 			metadata: langx.Clone(
 				metadata{
+					completion: noopcompletion{},
 					downloader: localdownloader{},
 				},
 				options...,
@@ -366,23 +376,27 @@ type statecompleted struct {
 
 func (t statecompleted) Update(ctx context.Context) state {
 	var (
-		logs = filepath.Join(userx.DefaultCacheDirectory(), fmt.Sprintf("%s.log", t.id))
+		logpath = filepath.Join(t.ws.Root, t.ws.RuntimeDir, "daemon.log")
 	)
 	dirs := DefaultSpoolDirs()
-	// TODO: upload logs
-	// mark as completed.
+
 	log.Println("completed", t.id, filepath.Join(dirs.Running, t.id), t.cause)
 	fsx.PrintDir(os.DirFS(filepath.Join(t.ws.Root, t.ws.RuntimeDir)))
-	errorsx.MaybeLog(iox.Copy(
-		filepath.Join(t.ws.Root, t.ws.RuntimeDir, "daemon.log"),
-		logs,
-	))
+
+	logs, err := os.Open(logpath)
+	if err != nil {
+		return failure(errorsx.Wrap(err, "unable open logs for upload"), idle(t.metadata))
+	}
+	defer logs.Close()
+
+	if err = t.metadata.completion.Upload(ctx, t.id, logs); err != nil {
+		return failure(errorsx.Wrap(err, "unable upload completion"), idle(t.metadata))
+	}
 
 	if err := dirs.Completed(uuid.FromStringOrNil(t.id)); err != nil {
 		return failure(errorsx.Wrap(err, "completion failed"), idle(t.metadata))
 	}
 
-	// TODO: report failure upstream.
 	if t.cause != nil {
 		return failure(errorsx.Wrap(t.cause, "work failed"), idle(t.metadata))
 	}

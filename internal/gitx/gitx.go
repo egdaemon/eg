@@ -102,10 +102,14 @@ func Env(dir string, remote string, branch string) (env []string, err error) {
 	if err != nil {
 		return nil, err
 	}
-	env = append(env, fmt.Sprintf("EG_GIT_BRANCH=%s", branch))
-	env = append(env, fmt.Sprintf("EG_GIT_COMMIT=%s", commit))
-	env = append(env, fmt.Sprintf("EG_GIT_REMOTE=%s", remote))
-	env = append(env, fmt.Sprintf("EG_GIT_URI=%s", uri))
 
+	return HeadEnv(uri, uri, branch, commit)
+}
+
+func HeadEnv(vcs, uri string, ref, commit string) (env []string, err error) {
+	env = append(env, fmt.Sprintf("EG_GIT_VCS=%s", vcs))
+	env = append(env, fmt.Sprintf("EG_GIT_URI=%s", uri))
+	env = append(env, fmt.Sprintf("EG_GIT_REF=%s", ref))
+	env = append(env, fmt.Sprintf("EG_GIT_COMMIT=%s", commit))
 	return env, nil
 }

@@ -230,7 +230,7 @@ func (t runner) perform(ctx context.Context, runid, path string, rtb runtimefn) 
 			WithDirMount(t.runtimedir, guestruntimedir),
 	).WithSysNanotime().WithSysWalltime().WithRandSource(rand.Reader)
 
-	environ := errorsx.Zero(envx.FromPath("/opt/egruntime/environ"))
+	environ := errorsx.Zero(envx.FromPath("/opt/egruntime/environ.env"))
 	// envx.Debug(environ...)
 	mcfg = wasix.Environ(mcfg, environ...)
 

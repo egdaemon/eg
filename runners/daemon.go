@@ -76,7 +76,7 @@ func AgentOptionEGBin(egbin string) AgentOption {
 }
 
 func AgentOptionEnviron(environpath string) AgentOption {
-	return AgentOptionMounts(AgentMountReadOnly(environpath, "/opt/egruntime/environ"))
+	return AgentOptionMounts(AgentMountReadOnly(environpath, "/opt/egruntime/environ.env"))
 }
 
 func AgentOptionMounts(desc ...string) AgentOption {

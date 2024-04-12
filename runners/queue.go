@@ -379,30 +379,50 @@ func (t statecompleted) Update(ctx context.Context) state {
 	var (
 		logpath = filepath.Join(t.ws.Root, t.ws.RuntimeDir, "daemon.log")
 	)
-	dirs := DefaultSpoolDirs()
 
+	dirs := DefaultSpoolDirs()
 	log.Println("completed", t.id, filepath.Join(dirs.Running, t.id), t.cause)
+
 	fsx.PrintDir(os.DirFS(filepath.Join(t.ws.Root, t.ws.RuntimeDir)))
 
 	logs, err := os.Open(logpath)
 	if err != nil {
-		return failure(errorsx.Wrap(err, "unable open logs for upload"), idle(t.metadata))
+		return discard(t.id, t.metadata, failure(errorsx.Wrap(err, "unable open logs for upload"), idle(t.metadata)))
 	}
 	defer logs.Close()
 
 	if err = t.metadata.completion.Upload(ctx, t.id, logs); err != nil {
-		return failure(errorsx.Wrap(err, "unable upload completion"), idle(t.metadata))
-	}
-
-	if err := dirs.Completed(uuid.FromStringOrNil(t.id)); err != nil {
-		return failure(errorsx.Wrap(err, "completion failed"), idle(t.metadata))
+		return discard(t.id, t.metadata, failure(errorsx.Wrap(err, "unable upload completion"), idle(t.metadata)))
 	}
 
 	if t.cause != nil {
-		return failure(errorsx.Wrap(t.cause, "work failed"), idle(t.metadata))
+		return discard(t.id, t.metadata, failure(errorsx.Wrap(t.cause, "work failed"), idle(t.metadata)))
 	}
 
-	return idle(t.metadata)
+	return discard(t.id, t.metadata, idle(t.metadata))
+}
+
+func discard(id string, md metadata, next state) statediscard {
+	return statediscard{
+		id:       id,
+		metadata: md,
+		n:        next,
+	}
+}
+
+type statediscard struct {
+	metadata
+	id string
+	n  state
+}
+
+func (t statediscard) Update(ctx context.Context) state {
+	dirs := DefaultSpoolDirs()
+	if err := dirs.Completed(uuid.FromStringOrNil(t.id)); err != nil {
+		return failure(errorsx.Wrap(err, "completion failed"), t.n)
+	}
+
+	return t.n
 }
 
 //go:embed DefaultContainerfile

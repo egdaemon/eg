@@ -41,7 +41,7 @@ func (t RegistrationClient) Registration(ctx context.Context, req *RegistrationR
 	}
 
 	httpresp, err := httpx.AsError(t.c.Do(httpreq))
-	defer func() { errorsx.MaybeLog(httpx.AutoClose(httpresp)) }()
+	defer func() { errorsx.Log(httpx.AutoClose(httpresp)) }()
 	if err != nil {
 		return nil, err
 	}
@@ -69,7 +69,7 @@ func (t RegistrationClient) Search(ctx context.Context, req *RegistrationSearchR
 	}
 
 	httpresp, err := httpx.AsError(t.c.Do(httpreq))
-	defer func() { errorsx.MaybeLog(httpx.AutoClose(httpresp)) }()
+	defer func() { errorsx.Log(httpx.AutoClose(httpresp)) }()
 	if err != nil {
 		return nil, err
 	}
@@ -97,7 +97,7 @@ func (t RegistrationClient) Grant(ctx context.Context, req *RegistrationGrantReq
 	}
 
 	httpresp, err := httpx.AsError(t.c.Do(httpreq))
-	defer func() { errorsx.MaybeLog(httpx.AutoClose(httpresp)) }()
+	defer func() { errorsx.Log(httpx.AutoClose(httpresp)) }()
 	if err != nil {
 		return nil, err
 	}

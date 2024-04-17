@@ -20,7 +20,7 @@ func Pack(dst io.Writer, paths ...string) (err error) {
 	)
 
 	if s, ok := dst.(io.Seeker); ok {
-		defer errorsx.MaybeLog(errorsx.Wrap(iox.Rewind(s), "unable to rewind archive"))
+		defer errorsx.Log(errorsx.Wrap(iox.Rewind(s), "unable to rewind archive"))
 	}
 
 	gw = gzip.NewWriter(dst)
@@ -132,7 +132,7 @@ func Inspect(r io.Reader) (err error) {
 			return errorsx.Wrap(err, "unable to seek to start of file")
 		}
 
-		defer func() { errorsx.MaybeLog(errorsx.Wrap(iox.Rewind(s), "unable to rewind")) }()
+		defer func() { errorsx.Log(errorsx.Wrap(iox.Rewind(s), "unable to rewind")) }()
 	}
 
 	if gzr, err = gzip.NewReader(r); err != nil {

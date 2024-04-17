@@ -6,7 +6,7 @@ import (
 	"github.com/egdaemon/eg/authn"
 	"github.com/egdaemon/eg/cmd/cmdopts"
 	"github.com/egdaemon/eg/internal/sshx"
-	"github.com/egdaemon/eg/registration"
+	"github.com/egdaemon/eg/runners/registration"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/oauth2"
 )

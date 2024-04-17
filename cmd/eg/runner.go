@@ -360,7 +360,7 @@ func (t upload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, runtimecfg *c
 	}
 
 	defer func() {
-		errorsx.MaybeLog(errorsx.Wrap(os.RemoveAll(tmpdir), "unable to remove temp directory"))
+		errorsx.Log(errorsx.Wrap(os.RemoveAll(tmpdir), "unable to remove temp directory"))
 	}()
 
 	if environio, err = os.Create(filepath.Join(tmpdir, "environ.env")); err != nil {

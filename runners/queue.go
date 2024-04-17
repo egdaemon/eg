@@ -54,7 +54,7 @@ func (t localdownloader) Download(ctx context.Context) (err error) {
 	if pending, err = fsnotify.NewWatcher(); err != nil {
 		return errorsx.Wrap(err, "failed to watch queued directory")
 	}
-	defer func() { errorsx.MaybeLog(errorsx.Wrap(pending.Close(), "failed to close fs watch")) }()
+	defer func() { errorsx.Log(errorsx.Wrap(pending.Close(), "failed to close fs watch")) }()
 
 	if err = pending.Add(dirs.Queued); err != nil {
 		return errorsx.Wrap(err, "failed to watch queued directory")
@@ -264,7 +264,7 @@ func beginwork(ctx context.Context, md metadata, dir string) state {
 		return failure(errorsx.Wrap(err, "unable to read archive"), idle(md))
 	}
 
-	errorsx.MaybeLog(tarx.Inspect(archive))
+	errorsx.Log(tarx.Inspect(archive))
 
 	if ws, err = workspaces.New(ctx, tmpdir, ".eg", "eg"); err != nil {
 		return failure(errorsx.Wrap(err, "unable to setup workspace"), idle(md))

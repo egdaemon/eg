@@ -52,7 +52,7 @@ func (t DownloadClient) Download(ctx context.Context) (err error) {
 	}
 
 	dhttpresp, err := httpx.AsError(t.c.Do(httpreq))
-	defer func() { errorsx.MaybeLog(httpx.AutoClose(dhttpresp)) }()
+	defer func() { errorsx.Log(httpx.AutoClose(dhttpresp)) }()
 	if err != nil {
 		return err
 	}
@@ -67,7 +67,7 @@ func (t DownloadClient) Download(ctx context.Context) (err error) {
 	}
 
 	download, err := httpx.AsError(t.c.Do(httpreq))
-	defer func() { errorsx.MaybeLog(httpx.AutoClose(download)) }()
+	defer func() { errorsx.Log(httpx.AutoClose(download)) }()
 	if err != nil {
 		return err
 	}

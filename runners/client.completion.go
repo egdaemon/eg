@@ -38,7 +38,7 @@ func (t CompletionClient) Upload(ctx context.Context, id string, logs io.Reader)
 	httpreq.Header.Set("Content-Type", mimetype)
 
 	download, err := httpx.AsError(t.c.Do(httpreq))
-	defer func() { errorsx.MaybeLog(httpx.AutoClose(download)) }()
+	defer func() { errorsx.Log(httpx.AutoClose(download)) }()
 	if err != nil {
 		return err
 	}

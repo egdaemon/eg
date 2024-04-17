@@ -56,7 +56,7 @@ func SSHProxy(global *cmdopts.Global, config *ssh.ClientConfig, signer ssh.Signe
 
 			proxied, err := proxyl.Accept()
 			if err == io.EOF {
-				errorsx.MaybeLog(errorsx.Wrap(iox.IgnoreEOF(proxyl.Close()), "closing ssh proxy listener failed"))
+				errorsx.Log(errorsx.Wrap(iox.IgnoreEOF(proxyl.Close()), "closing ssh proxy listener failed"))
 				proxyl = nil
 				continue
 			}
@@ -81,7 +81,7 @@ type dialer interface {
 
 func forward(ctx context.Context, dst net.Listener, d dialer, proxied net.Conn) {
 	cleanup := func() {
-		errorsx.MaybeLog(errorsx.Wrap(iox.IgnoreEOF(proxied.Close()), "failed to close proxy connection"))
+		errorsx.Log(errorsx.Wrap(iox.IgnoreEOF(proxied.Close()), "failed to close proxy connection"))
 	}
 
 	dconn, err := d.DialContext(ctx, dst.Addr().Network(), dst.Addr().String())

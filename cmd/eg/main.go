@@ -68,9 +68,10 @@ func main() {
 		Module             module                       `cmd:"" help:"executes a compiled module directly" hidden:"true"`
 		Daemon             daemon                       `cmd:"" help:"run in daemon mode letting the control plane push jobs to machines" hidden:"true"`
 		AgentManagement    actlcmd                      `cmd:"" name:"actl" help:"agent management commands"`
-		Register           accountcmds.Register         `cmd:"" name:"register" help:"register with an account with eg"`
+		Register           accountcmds.Signup           `cmd:"" name:"register" help:"register with an account with eg"`
 		Login              accountcmds.Login            `cmd:"" name:"login" help:"login to a profile"`
 		Browser            accountcmds.OTP              `cmd:"" name:"browser" help:"login to the browser console"`
+		Ident              accountcmds.Identity         `cmd:"" name:"iden" help:"display current credentials"`
 		InstallCompletions kongplete.InstallCompletions `cmd:"" help:"install shell completions"`
 	}
 
@@ -96,6 +97,7 @@ func main() {
 		kong.Description("cli for eg"),
 		kong.Vars{
 			"vars_endpoint":          envx.String(eg.EnvEGAPIHostDefault, eg.EnvEGAPIHost),
+			"vars_console_endpoint":  envx.String(eg.EnvEGConsoleHostDefault, eg.EnvEGConsoleHost),
 			"vars_cwd":               osx.Getwd("."),
 			"vars_runtime_directory": userx.DefaultRuntimeDirectory(),
 			"vars_cache_directory":   userx.DefaultCacheDirectory(),

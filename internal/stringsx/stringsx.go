@@ -33,3 +33,7 @@ func First(values ...string) string {
 
 	return values[0]
 }
+
+func Blank(s string) bool {
+	return len(strings.TrimSpace(s)) == 0
+}

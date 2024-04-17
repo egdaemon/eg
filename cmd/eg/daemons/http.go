@@ -35,39 +35,39 @@ func HTTP(global *cmdopts.Global, httpl net.Listener) (err error) {
 
 		if uid, err = uuid.NewV7(); err != nil {
 			log.Println(errorsx.Wrap(err, "unable to generate uuid"))
-			errorsx.MaybeLog(httpx.WriteEmptyJSON(w, http.StatusBadRequest))
+			errorsx.Log(httpx.WriteEmptyJSON(w, http.StatusBadRequest))
 			return
 		}
 
 		if kernelc, kernelh, err = r.FormFile("kernel"); err != nil {
 			log.Println(errorsx.Wrap(err, "kernel file parameter required"))
-			errorsx.MaybeLog(httpx.WriteEmptyJSON(w, http.StatusBadRequest))
+			errorsx.Log(httpx.WriteEmptyJSON(w, http.StatusBadRequest))
 			return
 		}
 		defer kernelc.Close()
 
 		if err = dirs.Download(uid, kernelh.Filename, kernelc); err != nil {
 			log.Println(errorsx.Wrap(err, "unable to receive kernel archive"))
-			errorsx.MaybeLog(httpx.WriteEmptyJSON(w, http.StatusBadRequest))
+			errorsx.Log(httpx.WriteEmptyJSON(w, http.StatusBadRequest))
 			return
 		}
 
 		if envc, envh, err = r.FormFile("environ"); err != nil {
 			log.Println(errorsx.Wrap(err, "environ file parameter required"))
-			errorsx.MaybeLog(httpx.WriteEmptyJSON(w, http.StatusBadRequest))
+			errorsx.Log(httpx.WriteEmptyJSON(w, http.StatusBadRequest))
 			return
 		}
 		defer envc.Close()
 
 		if err = dirs.Download(uid, envh.Filename, envc); err != nil {
 			log.Println(errorsx.Wrap(err, "unable to receive environment file"))
-			errorsx.MaybeLog(httpx.WriteEmptyJSON(w, http.StatusBadRequest))
+			errorsx.Log(httpx.WriteEmptyJSON(w, http.StatusBadRequest))
 			return
 		}
 
 		if err = dirs.Enqueue(uid); err != nil {
 			log.Println(errorsx.Wrap(err, "unable to enqueue"))
-			errorsx.MaybeLog(httpx.WriteEmptyJSON(w, http.StatusBadRequest))
+			errorsx.Log(httpx.WriteEmptyJSON(w, http.StatusBadRequest))
 			return
 		}
 

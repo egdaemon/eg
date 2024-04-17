@@ -49,8 +49,8 @@ func DirExists(path string) bool {
 }
 
 func PrintFS(d fs.FS) {
-	errorsx.MaybeLog(log.Output(2, fmt.Sprintln("--------- FS WALK INITIATED ---------")))
-	defer func() { errorsx.MaybeLog(log.Output(3, fmt.Sprintln("--------- FS WALK COMPLETED ---------"))) }()
+	errorsx.Log(log.Output(2, fmt.Sprintln("--------- FS WALK INITIATED ---------")))
+	defer func() { errorsx.Log(log.Output(3, fmt.Sprintln("--------- FS WALK COMPLETED ---------"))) }()
 
 	err := fs.WalkDir(d, ".", func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
@@ -58,18 +58,18 @@ func PrintFS(d fs.FS) {
 		}
 
 		info := errorsx.Zero(d.Info())
-		errorsx.MaybeLog(log.Output(7, fmt.Sprintf("%v %4d %s\n", info.Mode(), info.Size(), path)))
+		errorsx.Log(log.Output(7, fmt.Sprintf("%v %4d %s\n", info.Mode(), info.Size(), path)))
 
 		return nil
 	})
 	if err != nil {
-		errorsx.MaybeLog(log.Output(2, fmt.Sprintln("fs walk failed", err)))
+		errorsx.Log(log.Output(2, fmt.Sprintln("fs walk failed", err)))
 	}
 }
 
 func PrintDir(d fs.FS) {
-	errorsx.MaybeLog(log.Output(2, fmt.Sprintln("--------- PRINT DIR INITIATED ---------")))
-	defer func() { errorsx.MaybeLog(log.Output(3, fmt.Sprintln("--------- PRINT DIR COMPLETED ---------"))) }()
+	errorsx.Log(log.Output(2, fmt.Sprintln("--------- PRINT DIR INITIATED ---------")))
+	defer func() { errorsx.Log(log.Output(3, fmt.Sprintln("--------- PRINT DIR COMPLETED ---------"))) }()
 
 	err := fs.WalkDir(d, ".", func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
@@ -86,6 +86,6 @@ func PrintDir(d fs.FS) {
 		return nil
 	})
 	if err != nil {
-		errorsx.MaybeLog(log.Output(2, fmt.Sprintln("print dir failed", err)))
+		errorsx.Log(log.Output(2, fmt.Sprintln("print dir failed", err)))
 	}
 }

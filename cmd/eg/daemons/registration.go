@@ -11,7 +11,7 @@ import (
 	"github.com/egdaemon/eg/internal/md5x"
 	"github.com/egdaemon/eg/internal/systemx"
 	"github.com/egdaemon/eg/notary"
-	"github.com/egdaemon/eg/registration"
+	"github.com/egdaemon/eg/runners/registration"
 	"github.com/golang-jwt/jwt/v4"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/time/rate"

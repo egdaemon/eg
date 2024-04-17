@@ -130,7 +130,7 @@ func (t *Log) Write(ctx context.Context, events ...*Message) error {
 	defer t.l.Unlock()
 
 	replacefh := func(old io.Closer, path string) (_ *os.File, err error) {
-		errorsx.MaybeLog(errorsx.Wrap(iox.MaybeClose(old), "unable to close log file"))
+		errorsx.Log(errorsx.Wrap(iox.MaybeClose(old), "unable to close log file"))
 		return os.OpenFile(path, os.O_CREATE|os.O_RDWR|os.O_APPEND, 0600)
 	}
 
@@ -212,7 +212,7 @@ func (t *Reader) Read(ctx context.Context, dst *[]*Message) (err error) {
 	)
 
 	replacefh := func(old *os.File, path string) (_ *os.File, err error) {
-		errorsx.MaybeLog(errorsx.Wrap(iox.MaybeClose(old), "unable to close log file"))
+		errorsx.Log(errorsx.Wrap(iox.MaybeClose(old), "unable to close log file"))
 		return os.Open(path)
 	}
 

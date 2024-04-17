@@ -18,7 +18,7 @@ func Compact(errs ...error) error {
 	return nil
 }
 
-func MaybeLog(err error) {
+func Log(err error) {
 	if err == nil {
 		return
 	}

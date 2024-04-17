@@ -25,12 +25,12 @@ func SSHAgent(gctx *cmdopts.Global, socketpath string) error {
 		for {
 			conn, err := s.Accept()
 			if err != nil {
-				errorsx.MaybeLog(errorsx.Wrap(err, "accept failed"))
+				errorsx.Log(errorsx.Wrap(err, "accept failed"))
 				return
 			}
 
 			go func() {
-				errorsx.MaybeLog(errorsx.Wrap(agent.ServeAgent(sagent{}, conn), "agent serving done"))
+				errorsx.Log(errorsx.Wrap(agent.ServeAgent(sagent{}, conn), "agent serving done"))
 			}()
 		}
 	}()

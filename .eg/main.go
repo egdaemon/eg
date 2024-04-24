@@ -7,14 +7,14 @@ import (
 	"os"
 	"time"
 
+	"github.com/egdaemon/eg/runtime/wasi/eg"
 	"github.com/egdaemon/eg/runtime/wasi/egenv"
 	"github.com/egdaemon/eg/runtime/wasi/eggit"
 	"github.com/egdaemon/eg/runtime/wasi/env"
 	"github.com/egdaemon/eg/runtime/wasi/shell"
-	"github.com/egdaemon/eg/runtime/wasi/yak"
 )
 
-func Debug(ctx context.Context, op yak.Op) error {
+func Debug(ctx context.Context, op eg.Op) error {
 	log.Println("debug initiated")
 	defer log.Println("debug completed")
 	env.Debug(os.Environ()...)
@@ -27,7 +27,7 @@ func Debug(ctx context.Context, op yak.Op) error {
 	)
 }
 
-func PrepareDebian(ctx context.Context, _ yak.Op) error {
+func PrepareDebian(ctx context.Context, _ eg.Op) error {
 	return shell.Run(
 		ctx,
 		shell.New("git show -s --format=%ct HEAD"),
@@ -40,7 +40,7 @@ func PrepareDebian(ctx context.Context, _ yak.Op) error {
 	)
 }
 
-func BuildDebian(ctx context.Context, _ yak.Op) error {
+func BuildDebian(ctx context.Context, _ eg.Op) error {
 	return shell.Run(
 		ctx,
 		shell.New("env").
@@ -71,7 +71,7 @@ func main() {
 		log.Fatalln(err)
 	}
 
-	c1 := yak.Container(c1name).
+	c1 := eg.Container(c1name).
 		OptionEnv("VCS_REVISION", egenv.GitCommit()).
 		OptionEnv("VERSION", fmt.Sprintf("0.0.%d", time.Now().Unix())).
 		OptionEnv("DEBEMAIL", "engineering@egdaemon.com").
@@ -85,15 +85,15 @@ func main() {
 			".dist/deb", "/opt/eg/.dist/deb",
 		)
 
-	err := yak.Perform(
+	err := eg.Perform(
 		ctx,
 		Debug,
 		eggit.AutoClone,
-		yak.Parallel(
-			yak.Build(yak.Container(c1name).
+		eg.Parallel(
+			eg.Build(eg.Container(c1name).
 				BuildFromFile(".dist/Containerfile")),
 		),
-		yak.Module(ctx, c1, PrepareDebian, BuildDebian),
+		eg.Module(ctx, c1, PrepareDebian, BuildDebian),
 	)
 
 	if err != nil {

@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/egdaemon/eg/runtime/wasi/eg"
 	"github.com/egdaemon/eg/runtime/wasi/env"
 	"github.com/egdaemon/eg/runtime/wasi/internal/ffigit"
-	"github.com/egdaemon/eg/runtime/wasi/yak"
 )
 
 func Commitish(ctx context.Context, treeish string) string {
@@ -26,6 +26,6 @@ func Clone(ctx context.Context, uri, remote, branch string) error {
 	return ffigit.Clone(ctx, uri, remote, branch)
 }
 
-func AutoClone(ctx context.Context, _ yak.Op) error {
+func AutoClone(ctx context.Context, _ eg.Op) error {
 	return Clone(ctx, env.String("", "EG_GIT_URI"), env.String("origin", "EG_GIT_REMOTE"), env.String("main", "EG_GIT_BRANCH"))
 }

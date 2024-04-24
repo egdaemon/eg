@@ -1,4 +1,4 @@
-package yak
+package eg
 
 import (
 	"context"

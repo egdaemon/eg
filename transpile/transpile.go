@@ -81,16 +81,16 @@ func (t golang) Run(ctx context.Context) (roots []Compiled, err error) {
 
 	transform := func(ftoken *token.File, gendir string, c *ast.File) error {
 		var (
-			yakident = "yak"
+			egident = "eg"
 		)
 
-		if imp := astcodec.FindImport(c, astcodec.FindImportsByPath("github.com/egdaemon/eg/runtime/wasi/yak")); imp != nil && imp.Name != nil {
-			yakident = imp.Name.String()
+		if imp := astcodec.FindImport(c, astcodec.FindImportsByPath("github.com/egdaemon/eg/runtime/wasi/eg")); imp != nil && imp.Name != nil {
+			egident = imp.Name.String()
 		}
 
-		refexpr := astbuild.SelExpr(yakident, "Ref")
-		refmodule := astbuild.SelExpr(yakident, "Module")
-		refexec := astbuild.SelExpr(yakident, "Exec")
+		refexpr := astbuild.SelExpr(egident, "Ref")
+		refmodule := astbuild.SelExpr(egident, "Module")
+		refexec := astbuild.SelExpr(egident, "Exec")
 
 		// make a clone of the buffer
 		buf := bytes.NewBuffer(nil)
@@ -127,9 +127,9 @@ func (t golang) Run(ctx context.Context) (roots []Compiled, err error) {
 			main.Commentf("automatically generated from: %s", pos)
 			main.Func().Id("main").Params().Block(
 				jen.If(
-					jen.Id("err").Op(":=").Add(jen.Qual(yakident, "Perform").Call(
+					jen.Id("err").Op(":=").Add(jen.Qual(egident, "Perform").Call(
 						jen.Id("context.Background()"),
-						jen.Qual(yakident, "Sequential").Call(statements...)),
+						jen.Qual(egident, "Sequential").Call(statements...)),
 					),
 					jen.Id("err").Op("!=").Id("nil"),
 				).Block(
@@ -151,7 +151,7 @@ func (t golang) Run(ctx context.Context) (roots []Compiled, err error) {
 			}
 			generatedmodules = append(generatedmodules, m)
 
-			return astbuild.CallExpr(astbuild.SelExpr(yakident, "UnsafeRunner"), ctxarg, astbuild.CallExpr(astbuild.SelExpr(types.ExprString(rarg), "ToModuleRunner")), astbuild.StringLiteral(genwasm))
+			return astbuild.CallExpr(astbuild.SelExpr(egident, "UnsafeRunner"), ctxarg, astbuild.CallExpr(astbuild.SelExpr(types.ExprString(rarg), "ToModuleRunner")), astbuild.StringLiteral(genwasm))
 		}, moduleExpr)
 
 		genexec := astcodec.NewCallExprReplacement(func(ce *ast.CallExpr) *ast.CallExpr {
@@ -167,12 +167,12 @@ func (t golang) Run(ctx context.Context) (roots []Compiled, err error) {
 			pos.Filename = strings.TrimPrefix(pos.Filename, t.Workspace.Root+"/")
 			genwasm := filepath.Join(gendir, fmt.Sprintf("module.%d.%d.wasm", pos.Line, pos.Column))
 
-			return astbuild.CallExpr(astbuild.SelExpr(yakident, "UnsafeRunner"), ctxarg, rarg, astbuild.StringLiteral(genwasm))
+			return astbuild.CallExpr(astbuild.SelExpr(egident, "UnsafeRunner"), ctxarg, rarg, astbuild.StringLiteral(genwasm))
 		}, execExpr)
 
 		v := astcodec.Multivisit(
 			// astcodec.Filter(grapher(pkg.Fset), moduleExpr),
-			replaceRef(yakident, refexpr),
+			replaceRef(egident, refexpr),
 			genmod,
 			genexec,
 		)

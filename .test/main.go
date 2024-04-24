@@ -6,12 +6,12 @@ import (
 	"os"
 	"time"
 
+	"github.com/egdaemon/eg/runtime/wasi/eg"
 	"github.com/egdaemon/eg/runtime/wasi/env"
 	"github.com/egdaemon/eg/runtime/wasi/shell"
-	"github.com/egdaemon/eg/runtime/wasi/yak"
 )
 
-func Debug(ctx context.Context, op yak.Op) error {
+func Debug(ctx context.Context, op eg.Op) error {
 	log.Println("debug initiated")
 	defer log.Println("debug completed")
 	env.Debug(os.Environ()...)
@@ -23,7 +23,7 @@ func Debug(ctx context.Context, op yak.Op) error {
 	)
 }
 
-func Op1(ctx context.Context, op yak.Op) error {
+func Op1(ctx context.Context, op eg.Op) error {
 	log.Println("op1 initiated")
 	defer log.Println("op1 completed")
 	return shell.Run(
@@ -32,34 +32,34 @@ func Op1(ctx context.Context, op yak.Op) error {
 	)
 }
 
-func Op2(ctx context.Context, op yak.Op) error {
+func Op2(ctx context.Context, op eg.Op) error {
 	log.Println("op2 initiated")
 	defer log.Println("op2 completed")
 	return nil
 }
 
-func Op3(context.Context, yak.Op) error {
+func Op3(context.Context, eg.Op) error {
 	log.Println("op3 initiated")
 	defer log.Println("op3 completed")
 
 	return nil
 }
 
-func Op4(context.Context, yak.Op) error {
+func Op4(context.Context, eg.Op) error {
 	log.Println("op4 initiated")
 	defer log.Println("op4 completed")
 	time.Sleep(1 * time.Second)
 	return nil
 }
 
-func DaemonTests(ctx context.Context, _ yak.Op) error {
-	return yak.Perform(
+func DaemonTests(ctx context.Context, _ eg.Op) error {
+	return eg.Perform(
 		ctx,
-		yak.Parallel(
+		eg.Parallel(
 			Op1,
 			Op2,
 		),
-		yak.When(env.Boolean(false, "CI"), yak.Sequential(
+		eg.When(env.Boolean(false, "CI"), eg.Sequential(
 			Op1,
 			Op2,
 			Op3,
@@ -77,17 +77,17 @@ func main() {
 	log.Println("main module initiated")
 	defer log.Println("main module completed")
 
-	// c1 := yak.Container("ubuntu.22.04").BuildFromFile(string(langx.Must(fs.ReadFile(embedded, "Containerfile"))))
-	// c1 := yak.Container("ubuntu.22.04").PullFrom("ubuntu:jammy")
-	// c1 := yak.Container("ubuntu.22.04").BuildFromFile(".test/Containerfile")
+	// c1 := eg.Container("ubuntu.22.04").BuildFromFile(string(langx.Must(fs.ReadFile(embedded, "Containerfile"))))
+	// c1 := eg.Container("ubuntu.22.04").PullFrom("ubuntu:jammy")
+	// c1 := eg.Container("ubuntu.22.04").BuildFromFile(".test/Containerfile")
 
-	err := yak.Perform(
+	err := eg.Perform(
 		ctx,
 		// eggit.AutoClone,
 		Debug,
 		DaemonTests,
-		// yak.Build(c1),
-		// yak.Module(ctx, c1, DaemonTests),
+		// eg.Build(c1),
+		// eg.Module(ctx, c1, DaemonTests),
 	)
 	if err != nil {
 		log.Fatalln(err)

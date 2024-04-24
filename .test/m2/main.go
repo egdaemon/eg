@@ -5,23 +5,23 @@ import (
 	"log"
 	"time"
 
-	"github.com/egdaemon/eg/runtime/wasi/yak"
+	"github.com/egdaemon/eg/runtime/wasi/eg"
 )
 
-func Op1(ctx context.Context, op yak.Op) error {
+func Op1(ctx context.Context, op eg.Op) error {
 	log.Println("op1 initiated")
 	defer log.Println("op1 completed")
 	return nil
 }
 
-func Op2(context.Context, yak.Op) error {
+func Op2(context.Context, eg.Op) error {
 	log.Println("op2 initiated")
 	defer log.Println("op2 completed")
 
 	return nil
 }
 
-func Op3(context.Context, yak.Op) error {
+func Op3(context.Context, eg.Op) error {
 	log.Println("op3 initiated")
 	defer log.Println("op3 completed")
 
@@ -34,7 +34,7 @@ func main() {
 	ctx, done := context.WithTimeout(context.Background(), time.Hour)
 	defer done()
 	log.Println("MODULE m2")
-	err := yak.Perform(
+	err := eg.Perform(
 		ctx,
 		Op1,
 		Op2,

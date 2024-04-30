@@ -5,6 +5,7 @@ import (
 
 	"github.com/egdaemon/eg/authn"
 	"github.com/egdaemon/eg/cmd/cmdopts"
+	"github.com/egdaemon/eg/compute"
 	"github.com/egdaemon/eg/internal/sshx"
 	"github.com/egdaemon/eg/runners/registration"
 	"golang.org/x/crypto/ssh"
@@ -26,7 +27,7 @@ func (t AuthorizeAgent) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err 
 		return err
 	}
 
-	tokensrc := authn.NewAuthzTokenSource(tlsc.DefaultClient(), signer, authn.EndpointCompute())
+	tokensrc := compute.NewAuthzTokenSource(tlsc.DefaultClient(), signer, authn.EndpointCompute())
 
 	ctx := context.WithValue(gctx.Context, oauth2.HTTPClient, tlsc.DefaultClient())
 	httpc := oauth2.NewClient(ctx, tokensrc)

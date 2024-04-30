@@ -12,6 +12,7 @@ import (
 	"github.com/egdaemon/eg/authn"
 	"github.com/egdaemon/eg/cmd/cmdopts"
 	"github.com/egdaemon/eg/cmd/eg/daemons"
+	"github.com/egdaemon/eg/compute"
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/sshx"
@@ -58,7 +59,7 @@ func (t daemon) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, runtimecfg *c
 		return err
 	}
 
-	tokensrc := authn.NewAuthzTokenSource(tlsc.DefaultClient(), signer, authn.EndpointCompute())
+	tokensrc := compute.NewAuthzTokenSource(tlsc.DefaultClient(), signer, authn.EndpointCompute())
 	authclient = oauth2.NewClient(
 		context.WithValue(gctx.Context, oauth2.HTTPClient, tlsc.DefaultClient()),
 		tokensrc,

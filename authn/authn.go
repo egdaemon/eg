@@ -9,7 +9,6 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"time"
 
 	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/internal/envx"
@@ -31,7 +30,7 @@ func EndpointSSHAuth() oauth2.Endpoint {
 }
 
 func EndpointCompute() string {
-	return fmt.Sprintf("%s/c/authz/token", envx.String(eg.EnvEGAPIHostDefault, eg.EnvEGAPIHost))
+	return fmt.Sprintf("%s/c/authz/", envx.String(eg.EnvEGAPIHostDefault, eg.EnvEGAPIHost))
 }
 
 func OAuth2SSHConfig(signer ssh.Signer, otp string, endpoint oauth2.Endpoint) oauth2.Config {
@@ -78,82 +77,7 @@ func ExchangeAuthed(ctx context.Context, chttp *http.Client, endpoint string, au
 	return nil
 }
 
-func NewAuthzTokenSource(c *http.Client, signer ssh.Signer, endpoint string) TokenSourceFromEndpoint {
-	return TokenSourceFromEndpoint{c: c, signer: signer, endpoint: endpoint}
-}
-
-type TokenSourceFromEndpoint struct {
-	c        *http.Client
-	endpoint string
-	signer   ssh.Signer
-}
-
-func (t TokenSourceFromEndpoint) Token() (_ *oauth2.Token, err error) {
-	type bearer struct {
-		Issued  int64  `json:"issued"`
-		Expires int64  `json:"expires"`
-		Bearer  string `json:"bearer"`
-	}
-	type msg struct {
-		Token bearer `json:"token"`
-	}
-	var (
-		authed  Authed
-		token   msg
-		encoded string
-	)
-	ctx, done := context.WithTimeout(context.Background(), 10*time.Second)
-	defer done()
-
-	if encoded, err = autotokenstate(t.signer); err != nil {
-		return nil, err
-	}
-
-	refreshtoken, err := autoRefreshTokenState(context.WithValue(ctx, oauth2.HTTPClient, t.c), t.signer, encoded)
-	if err != nil {
-		return nil, err
-	}
-
-	cfg := OAuth2SSHConfig(t.signer, "", EndpointSSHAuth())
-	chttp := cfg.Client(context.WithValue(ctx, oauth2.HTTPClient, t.c), refreshtoken)
-
-	if err = ExchangeAuthed(ctx, chttp, fmt.Sprintf("%s/authn/ssh", envx.String(eg.EnvEGAPIHostDefault, eg.EnvEGAPIHost)), &authed); err != nil {
-		return nil, err
-	}
-
-	if len(authed.Profiles) != 1 {
-		return nil, fmt.Errorf("expected a single profile: %s - %d", authed.Identity.Id, len(authed.Profiles))
-	}
-
-	session, err := Session(ctx, t.c, authed.Profiles[0].Token)
-	if err != nil {
-		return nil, err
-	}
-
-	chttp = cfg.Client(context.WithValue(ctx, oauth2.HTTPClient, t.c), &oauth2.Token{
-		TokenType:   "BEARER",
-		AccessToken: session.Token,
-	})
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, t.endpoint, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	resp, err := httpx.AsError(chttp.Do(req))
-	if err != nil {
-		return nil, err
-	}
-	defer httpx.AutoClose(resp)
-
-	if err = json.NewDecoder(resp.Body).Decode(&token); err != nil {
-		return nil, err
-	}
-
-	return &oauth2.Token{TokenType: "BEARER", AccessToken: token.Token.Bearer, Expiry: time.UnixMilli(token.Token.Expires)}, nil
-}
-
-func autotokenstate(signer ssh.Signer) (encoded string, err error) {
+func AutoTokenState(signer ssh.Signer) (encoded string, err error) {
 	type reqstate struct {
 		ID        string `json:"id"`
 		PublicKey []byte `json:"pkey"`
@@ -175,17 +99,7 @@ func autotokenstate(signer ssh.Signer) (encoded string, err error) {
 	return encoded, nil
 }
 
-func OAuth2SSHHTTPClient(ctx context.Context, signer ssh.Signer, endpoint oauth2.Endpoint) (_ *http.Client, err error) {
-	token, err := AutoRefreshToken(ctx, signer)
-	if err != nil {
-		return nil, err
-	}
-
-	cfg := OAuth2SSHConfig(signer, "", endpoint)
-	return cfg.Client(ctx, token), nil
-}
-
-func autoRefreshTokenState(ctx context.Context, signer ssh.Signer, state string) (_ *oauth2.Token, err error) {
+func AutoRefreshTokenState(ctx context.Context, signer ssh.Signer, state string) (_ *oauth2.Token, err error) {
 	var (
 		ok        bool
 		chttp     *http.Client
@@ -227,6 +141,16 @@ func autoRefreshTokenState(ctx context.Context, signer ssh.Signer, state string)
 	return token, nil
 }
 
+func OAuth2SSHHTTPClient(ctx context.Context, signer ssh.Signer, endpoint oauth2.Endpoint) (_ *http.Client, err error) {
+	token, err := AutoRefreshToken(ctx, signer)
+	if err != nil {
+		return nil, err
+	}
+
+	cfg := OAuth2SSHConfig(signer, "", endpoint)
+	return cfg.Client(ctx, token), nil
+}
+
 func AutoRefreshToken(ctx context.Context, signer ssh.Signer) (_ *oauth2.Token, err error) {
 	var (
 		state string
@@ -236,11 +160,11 @@ func AutoRefreshToken(ctx context.Context, signer ssh.Signer) (_ *oauth2.Token, 
 		return t, nil
 	}
 
-	if state, err = autotokenstate(signer); err != nil {
+	if state, err = AutoTokenState(signer); err != nil {
 		return nil, err
 	}
 
-	return autoRefreshTokenState(ctx, signer, state)
+	return AutoRefreshTokenState(ctx, signer, state)
 }
 
 func WriteRefreshToken(token string) (err error) {

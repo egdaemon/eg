@@ -93,7 +93,7 @@ func (t TokenSourceFromEndpoint) Token() (_ *oauth2.Token, err error) {
 		return nil, err
 	}
 
-	resp, err := httpx.AsError(httpx.DebugClient(chttp).Do(req))
+	resp, err := httpx.AsError(chttp.Do(req))
 	if err != nil {
 		return nil, err
 	}

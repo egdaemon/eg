@@ -58,10 +58,3 @@ message ProfileRequest { string profile_id = 1 [ json_name = "profile_id" ]; }
 message ProfileResponse {
   Authorization authorization = 1 [ json_name = "authorization" ];
 }
-
-service Backend {
-  rpc authz(AuthzRequest) returns (AuthzResponse) {}
-  rpc profile(ProfileRequest) returns (ProfileResponse) {}
-  rpc grant(GrantRequest) returns (GrantResponse) {}
-  rpc revoke(RevokeRequest) returns (RevokeResponse) {}
-}

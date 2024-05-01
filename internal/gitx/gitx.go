@@ -8,6 +8,7 @@ import (
 
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
+	"github.com/go-git/go-git/v5/plumbing/transport"
 
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/slicesx"
@@ -31,7 +32,7 @@ func Commitish(dir, treeish string) (_ string, err error) {
 	return hash.String(), nil
 }
 
-func Clone(ctx context.Context, dir, uri, remote, treeish string) (err error) {
+func Clone(ctx context.Context, auth transport.AuthMethod, dir, uri, remote, treeish string) (err error) {
 	var (
 		r *git.Repository
 	)
@@ -69,6 +70,7 @@ func Clone(ctx context.Context, dir, uri, remote, treeish string) (err error) {
 		URL:               uri,
 		ReferenceName:     branchRefName,
 		RecurseSubmodules: git.DefaultSubmoduleRecursionDepth,
+		Auth:              auth,
 		SingleBranch:      true,
 	})
 

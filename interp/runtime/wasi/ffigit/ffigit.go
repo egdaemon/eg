@@ -3,7 +3,9 @@ package ffigit
 import (
 	"context"
 	"log"
+	"os"
 
+	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/gitx"
 	"github.com/egdaemon/eg/interp/runtime/wasi/ffi"
@@ -70,6 +72,10 @@ func Clone(dir string) func(
 			treeish string
 		)
 
+		log.Println("DEBUGGING CLONE ENVIRONMENT INITIATED")
+		envx.Debug(os.Environ()...)
+		log.Println("DEBUGGING CLONE ENVIRONMENT COMPLETED")
+
 		if uri, err = ffi.ReadString(m.Memory(), uriptr, urilen); err != nil {
 			log.Println("unable to read uri", err)
 			return 1
@@ -85,7 +91,7 @@ func Clone(dir string) func(
 			return 1
 		}
 
-		if err := gitx.Clone(ctx, dir, uri, remote, treeish); err != nil {
+		if err := gitx.Clone(ctx, nil, dir, uri, remote, treeish); err != nil {
 			log.Println(errorsx.Wrap(err, "clone failed"))
 			return 1
 		}

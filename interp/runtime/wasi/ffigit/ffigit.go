@@ -76,9 +76,9 @@ func CloneV1(dir string) func(
 			auth    transport.AuthMethod
 		)
 
-		log.Println("DEBUGGING CLONE ENVIRONMENT INITIATED")
+		log.Println("DEBUGGING CLONE V1 ENVIRONMENT INITIATED")
 		envx.Debug(os.Environ()...)
-		log.Println("DEBUGGING CLONE ENVIRONMENT COMPLETED")
+		log.Println("DEBUGGING CLONE V1 ENVIRONMENT COMPLETED")
 
 		if uri, err = ffi.ReadString(m.Memory(), uriptr, urilen); err != nil {
 			log.Println("unable to read uri", err)
@@ -138,9 +138,9 @@ func CloneV2(dir string) func(
 			auth    transport.AuthMethod
 		)
 
-		log.Println("DEBUGGING CLONE ENVIRONMENT INITIATED")
+		log.Println("DEBUGGING CLONE V2 ENVIRONMENT INITIATED")
 		envx.Debug(os.Environ()...)
-		log.Println("DEBUGGING CLONE ENVIRONMENT COMPLETED")
+		log.Println("DEBUGGING CLONE V2 ENVIRONMENT COMPLETED")
 
 		if uri, err = ffi.ReadString(m.Memory(), uriptr, urilen); err != nil {
 			log.Println("unable to read uri", err)
@@ -162,9 +162,12 @@ func CloneV2(dir string) func(
 			return 1
 		}
 
-		log.Println("DERP", env)
-		if username, password := envx.String("", "EG_GIT_AUTH_HTTP_USERNAME"), envx.String("", "EG_GIT_AUTH_HTTP_PASSWORD"); !(stringsx.Blank(username) || !stringsx.Blank(password)) {
+		environ := envx.NewEnvironFromStrings(env...)
+		log.Println("DERP", environ.String("", "EG_GIT_AUTH_HTTP_USERNAME"), environ.String("", "EG_GIT_AUTH_HTTP_PASSWORD"))
+		if username, password := environ.String("", "EG_GIT_AUTH_HTTP_USERNAME"), environ.String("", "EG_GIT_AUTH_HTTP_PASSWORD"); !(stringsx.Blank(username) || !stringsx.Blank(password)) {
 			auth = &githttp.BasicAuth{Username: username, Password: password}
+		} else {
+			log.Println("no auth detected", username, password)
 		}
 
 		if err := gitx.Clone(ctx, auth, dir, uri, remote, treeish); err != nil {

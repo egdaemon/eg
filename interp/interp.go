@@ -135,8 +135,11 @@ func Remote(ctx context.Context, runid string, g ffigraph.Eventer, svc grpc.Clie
 			ffigit.Commitish(r.root),
 		).Export("github.com/egdaemon/eg/runtime/wasi/runtime/ffigit.Commitish").
 			NewFunctionBuilder().WithFunc(
-			ffigit.Clone(r.root),
-		).Export("github.com/egdaemon/eg/runtime/wasi/runtime/ffigit.Clone")
+			ffigit.CloneV1(r.root),
+		).Export("github.com/egdaemon/eg/runtime/wasi/runtime/ffigit.Clone").
+			NewFunctionBuilder().WithFunc(
+			ffigit.CloneV2(r.root),
+		).Export("github.com/egdaemon/eg/runtime/wasi/runtime/ffigit.CloneV2")
 	}
 
 	return r.perform(ctx, runid, module, runtimeenv)

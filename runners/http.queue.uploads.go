@@ -49,8 +49,12 @@ func NewEnqueueUpload(enq *Enqueued, archive io.Reader) (mimetype string, body *
 	})
 }
 
-func NewEnqueueCompletion(logs io.Reader) (mimetype string, body *os.File, err error) {
+func NewEnqueueCompletion(cause error, logs io.Reader) (mimetype string, body *os.File, err error) {
 	return httpx.Multipart(func(w *multipart.Writer) error {
+		if err = w.WriteField("successful", strconv.FormatBool(cause == nil)); err != nil {
+			return errorsx.Wrap(err, "unable to write completion state")
+		}
+
 		part, lerr := w.CreatePart(httpx.NewMultipartHeader("text/plain", "logs", "daemon.logs"))
 		if lerr != nil {
 			return errorsx.Wrap(lerr, "unable to create logs part")

@@ -8,7 +8,10 @@ import (
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/gitx"
+	"github.com/egdaemon/eg/internal/stringsx"
 	"github.com/egdaemon/eg/interp/runtime/wasi/ffi"
+	"github.com/go-git/go-git/v5/plumbing/transport"
+	githttp "github.com/go-git/go-git/v5/plumbing/transport/http"
 	"github.com/tetratelabs/wazero/api"
 )
 
@@ -70,6 +73,7 @@ func Clone(dir string) func(
 			uri     string
 			remote  string
 			treeish string
+			auth    transport.AuthMethod
 		)
 
 		log.Println("DEBUGGING CLONE ENVIRONMENT INITIATED")
@@ -91,7 +95,11 @@ func Clone(dir string) func(
 			return 1
 		}
 
-		if err := gitx.Clone(ctx, nil, dir, uri, remote, treeish); err != nil {
+		if username, password := envx.String("", "EG_GIT_AUTH_HTTP_USERNAME"), envx.String("", "EG_GIT_AUTH_HTTP_PASSWORD"); !(stringsx.Blank(username) || !stringsx.Blank(password)) {
+			auth = &githttp.BasicAuth{Username: username, Password: password}
+		}
+
+		if err := gitx.Clone(ctx, auth, dir, uri, remote, treeish); err != nil {
 			log.Println(errorsx.Wrap(err, "clone failed"))
 			return 1
 		}

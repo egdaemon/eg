@@ -31,7 +31,80 @@ func Print(environ []string) {
 // Int retrieve a integer flag from the environment, checks each key in order
 // first to parse successfully is returned.
 func Int(fallback int, keys ...string) int {
-	return envval(fallback, func(s string) (int, error) {
+	return NewEnviron(os.Getenv).Int(fallback, keys...)
+}
+
+// retrieve a uint64 flag from the environment, checks each key in order
+// first to parse successfully is returned.
+func Uint64(fallback uint64, keys ...string) uint64 {
+	return NewEnviron(os.Getenv).Uint64(fallback, keys...)
+}
+
+func Float64(fallback float64, keys ...string) float64 {
+	return NewEnviron(os.Getenv).Float64(fallback, keys...)
+}
+
+// Boolean retrieve a boolean flag from the environment, checks each key in order
+// first to parse successfully is returned.
+func Boolean(fallback bool, keys ...string) bool {
+	return NewEnviron(os.Getenv).Boolean(fallback, keys...)
+}
+
+// String retrieve a string value from the environment, checks each key in order
+// first string found is returned.
+func String(fallback string, keys ...string) string {
+	return NewEnviron(os.Getenv).String(fallback, keys...)
+}
+
+// Duration retrieves a time.Duration from the environment, checks each key in order
+// first successful parse to a duration is returned.
+func Duration(fallback time.Duration, keys ...string) time.Duration {
+	return NewEnviron(os.Getenv).Duration(fallback, keys...)
+}
+
+// Hex read value as a hex encoded string.
+func Hex(fallback []byte, keys ...string) []byte {
+	return NewEnviron(os.Getenv).Hex(fallback, keys...)
+}
+
+// Base64 read value as a base64 encoded string
+func Base64(fallback []byte, keys ...string) []byte {
+	return NewEnviron(os.Getenv).Base64(fallback, keys...)
+}
+
+func URL(fallback string, keys ...string) *url.URL {
+	return NewEnviron(os.Getenv).URL(fallback, keys...)
+}
+
+type environ struct {
+	m func(string) string
+}
+
+func NewEnviron(m func(s string) string) environ {
+	return environ{m: m}
+}
+
+func NewEnvironFromStrings(environ ...string) environ {
+	m := make(map[string]string, len(environ))
+	for _, i := range environ {
+		if idx := strings.IndexRune(i, '='); idx > -1 {
+			m[i[:idx]] = i[idx+1:]
+		}
+	}
+
+	return NewEnviron(func(k string) string {
+		if v, ok := m[k]; ok {
+			return v
+		}
+
+		return k
+	})
+}
+
+// Int retrieve a integer flag from the environment, checks each key in order
+// first to parse successfully is returned.
+func (t environ) Int(fallback int, keys ...string) int {
+	return envval(fallback, t.m, func(s string) (int, error) {
 		decoded, err := strconv.ParseInt(s, 10, 64)
 		return int(decoded), errorsx.Wrapf(err, "integer '%s' is invalid", s)
 	}, keys...)
@@ -39,15 +112,15 @@ func Int(fallback int, keys ...string) int {
 
 // retrieve a uint64 flag from the environment, checks each key in order
 // first to parse successfully is returned.
-func Uint64(fallback uint64, keys ...string) uint64 {
-	return envval(fallback, func(s string) (uint64, error) {
+func (t environ) Uint64(fallback uint64, keys ...string) uint64 {
+	return envval(fallback, t.m, func(s string) (uint64, error) {
 		decoded, err := strconv.ParseUint(s, 10, 64)
 		return decoded, errorsx.Wrapf(err, "uint64 '%s' is invalid", s)
 	}, keys...)
 }
 
-func Float64(fallback float64, keys ...string) float64 {
-	return envval(fallback, func(s string) (float64, error) {
+func (t environ) Float64(fallback float64, keys ...string) float64 {
+	return envval(fallback, t.m, func(s string) (float64, error) {
 		decoded, err := strconv.ParseFloat(s, 64)
 		return float64(decoded), errorsx.Wrapf(err, "float64 '%s' is invalid", s)
 	}, keys...)
@@ -55,8 +128,8 @@ func Float64(fallback float64, keys ...string) float64 {
 
 // Boolean retrieve a boolean flag from the environment, checks each key in order
 // first to parse successfully is returned.
-func Boolean(fallback bool, keys ...string) bool {
-	return envval(fallback, func(s string) (bool, error) {
+func (t environ) Boolean(fallback bool, keys ...string) bool {
+	return envval(fallback, t.m, func(s string) (bool, error) {
 		decoded, err := strconv.ParseBool(s)
 		return decoded, errorsx.Wrapf(err, "boolean '%s' is invalid", s)
 	}, keys...)
@@ -64,8 +137,8 @@ func Boolean(fallback bool, keys ...string) bool {
 
 // String retrieve a string value from the environment, checks each key in order
 // first string found is returned.
-func String(fallback string, keys ...string) string {
-	return envval(fallback, func(s string) (string, error) {
+func (t environ) String(fallback string, keys ...string) string {
+	return envval(fallback, t.m, func(s string) (string, error) {
 		// we'll never receive an empty string because envval skips empty strings.
 		return s, nil
 	}, keys...)
@@ -73,31 +146,31 @@ func String(fallback string, keys ...string) string {
 
 // Duration retrieves a time.Duration from the environment, checks each key in order
 // first successful parse to a duration is returned.
-func Duration(fallback time.Duration, keys ...string) time.Duration {
-	return envval(fallback, func(s string) (time.Duration, error) {
+func (t environ) Duration(fallback time.Duration, keys ...string) time.Duration {
+	return envval(fallback, t.m, func(s string) (time.Duration, error) {
 		decoded, err := time.ParseDuration(s)
 		return decoded, errorsx.Wrapf(err, "time.Duration '%s' is invalid", s)
 	}, keys...)
 }
 
 // Hex read value as a hex encoded string.
-func Hex(fallback []byte, keys ...string) []byte {
-	return envval(fallback, func(s string) ([]byte, error) {
+func (t environ) Hex(fallback []byte, keys ...string) []byte {
+	return envval(fallback, t.m, func(s string) ([]byte, error) {
 		decoded, err := hex.DecodeString(s)
 		return decoded, errorsx.Wrapf(err, "invalid hex encoded data '%s'", s)
 	}, keys...)
 }
 
 // Base64 read value as a base64 encoded string
-func Base64(fallback []byte, keys ...string) []byte {
+func (t environ) Base64(fallback []byte, keys ...string) []byte {
 	enc := base64.RawStdEncoding.WithPadding('=')
-	return envval(fallback, func(s string) ([]byte, error) {
+	return envval(fallback, t.m, func(s string) ([]byte, error) {
 		decoded, err := enc.DecodeString(s)
 		return decoded, errorsx.Wrapf(err, "invalid base64 encoded data '%s'", s)
 	}, keys...)
 }
 
-func URL(fallback string, keys ...string) *url.URL {
+func (t environ) URL(fallback string, keys ...string) *url.URL {
 	var (
 		err    error
 		parsed *url.URL
@@ -107,15 +180,15 @@ func URL(fallback string, keys ...string) *url.URL {
 		panic(errorsx.Wrap(err, "must provide a valid fallback url"))
 	}
 
-	return envval(parsed, func(s string) (*url.URL, error) {
+	return envval(parsed, t.m, func(s string) (*url.URL, error) {
 		decoded, err := url.Parse(s)
 		return decoded, errorsx.WithStack(err)
 	}, keys...)
 }
 
-func envval[T any](fallback T, parse func(string) (T, error), keys ...string) T {
+func envval[T any](fallback T, m func(string) string, parse func(string) (T, error), keys ...string) T {
 	for _, k := range keys {
-		s := strings.TrimSpace(os.Getenv(k))
+		s := strings.TrimSpace(m(k))
 		if s == "" {
 			continue
 		}

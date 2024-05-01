@@ -98,8 +98,11 @@ func Analyse(ctx context.Context, g ffigraph.Eventer, runid, dir string, module 
 			ffigit.Commitish(dir),
 		).Export("github.com/egdaemon/eg/runtime/wasi/runtime/ffigit.Commitish").
 			NewFunctionBuilder().WithFunc(
-			ffigit.Clone(dir),
-		).Export("github.com/egdaemon/eg/runtime/wasi/runtime/ffigit.Clone")
+			ffigit.CloneV1(dir),
+		).Export("github.com/egdaemon/eg/runtime/wasi/runtime/ffigit.Clone").
+			NewFunctionBuilder().WithFunc(
+			ffigit.CloneV2(r.root),
+		).Export("github.com/egdaemon/eg/runtime/wasi/runtime/ffigit.CloneV2")
 	}
 
 	if err = r.perform(ctx, runid, module, runtimeenv); err != nil {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"os"
 
 	"github.com/egdaemon/eg/interp/runtime/wasi/ffiguest"
 )
@@ -32,13 +33,16 @@ func Clone(ctx context.Context, uri, remote, branch string) error {
 	uriptr, urilen := ffiguest.String(uri)
 	remoteptr, remotelen := ffiguest.String(remote)
 	treeishptr, treeishlen := ffiguest.String(branch)
+	envptr, envsize, envlen := ffiguest.StringArray(os.Environ()...)
 
-	errcode := clone(
+	errcode := clone2(
 		ffiguest.ContextDeadline(ctx),
 		uriptr, urilen,
 		remoteptr, remotelen,
 		treeishptr, treeishlen,
+		envptr, envsize, envlen,
 	)
+
 	if err := ffiguest.Error(errcode, fmt.Errorf("clone failed")); err != nil {
 		return err
 	}

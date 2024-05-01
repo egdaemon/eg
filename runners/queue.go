@@ -32,12 +32,12 @@ type downloader interface {
 }
 
 type completion interface {
-	Upload(ctx context.Context, id string, logs io.Reader) (err error)
+	Upload(ctx context.Context, id string, cause error, logs io.Reader) (err error)
 }
 
 type noopcompletion struct{}
 
-func (t noopcompletion) Upload(ctx context.Context, id string, logs io.Reader) (err error) {
+func (t noopcompletion) Upload(ctx context.Context, id string, cause error, logs io.Reader) (err error) {
 	log.Println("noop completion is being used", id)
 	return nil
 }
@@ -391,7 +391,7 @@ func (t statecompleted) Update(ctx context.Context) state {
 	}
 	defer logs.Close()
 
-	if err = t.metadata.completion.Upload(ctx, t.id, logs); err != nil {
+	if err = t.metadata.completion.Upload(ctx, t.id, t.cause, logs); err != nil {
 		return discard(t.id, t.metadata, failure(errorsx.Wrap(err, "unable upload completion"), idle(t.metadata)))
 	}
 

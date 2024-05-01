@@ -27,5 +27,5 @@ func Clone(ctx context.Context, uri, remote, branch string) error {
 }
 
 func AutoClone(ctx context.Context, _ eg.Op) error {
-	return Clone(ctx, env.String("", "EG_GIT_URI"), env.String("origin", "EG_GIT_REMOTE"), env.String("main", "EG_GIT_BRANCH"))
+	return Clone(ctx, env.String("", "EG_GIT_URI"), env.String("origin", "EG_GIT_REMOTE"), env.String("main", "EG_GIT_REF"))
 }

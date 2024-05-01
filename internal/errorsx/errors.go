@@ -157,6 +157,11 @@ type withStack struct {
 	*stack
 }
 
+// provide compatibility with honeybadger stack tracing.
+func (w *withStack) Callers() []uintptr {
+	return *w.stack
+}
+
 func (w *withStack) Cause() error { return w.error }
 
 // Unwrap provides compatibility for Go 1.13 error chains.

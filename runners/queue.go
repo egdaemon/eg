@@ -89,6 +89,30 @@ func QueueOptionCompletion(c completion) QueueOption {
 	}
 }
 
+func BuildRootContainer(ctx context.Context) error {
+	tmpdir, err := os.MkdirTemp("", "eg.container.build")
+	if err != nil {
+		return errorsx.Wrap(err, "unable to preprate root container")
+	}
+	defer os.RemoveAll(tmpdir)
+	rootc := filepath.Join(tmpdir, "Containerfile")
+
+	if err = PrepareRootContainer(rootc); err != nil {
+		return errorsx.Wrap(err, "preparing root container failed")
+	}
+
+	cmd := exec.CommandContext(ctx, "podman", "build", "--timestamp", "0", "-t", "eg", "-f", rootc, tmpdir)
+	cmd.Stderr = os.Stderr
+	cmd.Stdin = os.Stdin
+	cmd.Stdout = os.Stdout
+
+	if err = cmd.Run(); err != nil {
+		return errorsx.Wrap(err, "build failed")
+	}
+
+	return nil
+}
+
 // runs the scheduler until the context is cancelled.
 func Queue(ctx context.Context, options ...func(*metadata)) (err error) {
 	var (
@@ -274,23 +298,6 @@ func beginwork(ctx context.Context, md metadata, dir string) state {
 
 	if err = tarx.Unpack(filepath.Join(ws.Root, ws.RuntimeDir), archive); err != nil {
 		return completed(md, ws, uid, errorsx.Wrap(err, "unable to unpack archive"))
-	}
-
-	{
-		rootc := filepath.Join(filepath.Join(ws.Root, ws.RuntimeDir), "Containerfile")
-
-		if err = PrepareRootContainer(rootc); err != nil {
-			return completed(md, ws, uid, errorsx.Wrap(err, "preparing root container failed"))
-		}
-
-		cmd := exec.CommandContext(ctx, "podman", "build", "--timestamp", "0", "-t", "eg", "-f", rootc, tmpdir)
-		cmd.Stderr = os.Stderr
-		cmd.Stdin = os.Stdin
-		cmd.Stdout = os.Stdout
-
-		if err = cmd.Run(); err != nil {
-			return completed(md, ws, uid, errorsx.Wrap(err, "build failed"))
-		}
 	}
 
 	environpath := filepath.Join(ws.Root, ws.RuntimeDir, "environ.env")

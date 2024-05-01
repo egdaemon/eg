@@ -101,6 +101,10 @@ func (t daemon) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, runtimecfg *c
 		}
 	}
 
+	if err = runners.BuildRootContainer(gctx.Context); err != nil {
+		return err
+	}
+
 	return runners.Queue(
 		gctx.Context,
 		runners.QueueOptionCompletion(

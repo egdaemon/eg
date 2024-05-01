@@ -83,6 +83,7 @@ func main() {
 	shellcli.Cleanup = &sync.WaitGroup{}
 	shellcli.Context = contextx.WithWaitGroup(context.Background(), shellcli.Cleanup)
 	shellcli.Context, shellcli.Shutdown = context.WithCancel(shellcli.Context)
+	log.SetFlags(log.Lshortfile | log.LUTC | log.Ltime)
 
 	go debugx.DumpOnSignal(shellcli.Context, syscall.SIGUSR2)
 	go cmdopts.Cleanup(shellcli.Context, shellcli.Shutdown, shellcli.Cleanup, func() {
@@ -148,6 +149,7 @@ func main() {
 
 	if err = ctx.Run(); err != nil {
 		log.Println(cmderrors.Sprint(err))
+		os.Exit(1)
 	}
 
 	shellcli.Shutdown()

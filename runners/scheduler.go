@@ -16,6 +16,7 @@ func AutoDownload(ctx context.Context, authedclient *http.Client) {
 	s := backoff.New(
 		backoff.Exponential(200*time.Millisecond),
 		backoff.Maximum(30*time.Second),
+		backoff.Jitter(0.02),
 	)
 
 	spool := DefaultSpoolDirs()

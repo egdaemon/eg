@@ -49,6 +49,20 @@ func Jitter(multiplier float64) Option {
 	}
 }
 
+func JitterRandWindow(d time.Duration) Option {
+	return func(s Strategy) Strategy {
+		return StrategyFunc(func(attempt int64) time.Duration {
+			delta := time.Duration(rand.Intn(int(d)/2) - rand.Intn(int(d)))
+			x := s.Backoff(attempt)
+			if x == math.MaxInt64 && delta > 0 {
+				return x
+			}
+
+			return x + delta
+		})
+	}
+}
+
 // New backoff
 func New(s Strategy, options ...Option) Strategy {
 	for _, opt := range options {

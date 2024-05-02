@@ -78,9 +78,9 @@ func main() {
 		OptionEnv("DEBFULLNAME", "engineering").
 		OptionEnv("DISTRO", "jammy").
 		OptionEnv("CHANGELOG_DATE", time.Now().Format(time.RFC1123Z)).
-		OptionVolumeWritable(
-			".eg/.cache/.dist", "/opt/eg/.dist",
-		).
+		// OptionVolumeWritable(
+		// 	".eg/.cache/.dist", "/opt/eg/.dist",
+		// ).
 		OptionVolume(
 			".dist/deb", "/opt/eg/.dist/deb",
 		)

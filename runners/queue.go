@@ -304,6 +304,23 @@ func beginwork(ctx context.Context, md metadata, dir string) state {
 		return completed(md, ws, uid, errorsx.Wrap(err, "unable to unpack archive"))
 	}
 
+	{
+		rootc := filepath.Join(filepath.Join(ws.Root, ws.RuntimeDir), "Containerfile")
+
+		if err = PrepareRootContainer(rootc); err != nil {
+			return completed(md, ws, uid, errorsx.Wrap(err, "preparing root container failed"))
+		}
+
+		cmd := exec.CommandContext(ctx, "podman", "build", "--timestamp", "0", "-t", "eg", "-f", rootc, tmpdir)
+		cmd.Stderr = os.Stderr
+		cmd.Stdin = os.Stdin
+		cmd.Stdout = os.Stdout
+
+		if err = cmd.Run(); err != nil {
+			return completed(md, ws, uid, errorsx.Wrap(err, "build failed"))
+		}
+	}
+
 	environpath := filepath.Join(ws.Root, ws.RuntimeDir, "environ.env")
 	// fsx.PrintDir(os.DirFS(filepath.Join(ws.Root)))
 	// environ := errorsx.Zero(envx.FromPath(environpath))

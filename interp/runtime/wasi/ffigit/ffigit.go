@@ -164,7 +164,7 @@ func CloneV2(dir string) func(
 
 		environ := envx.NewEnvironFromStrings(env...)
 		log.Println("DERP", environ.String("", "EG_GIT_AUTH_HTTP_USERNAME"), environ.String("", "EG_GIT_AUTH_HTTP_PASSWORD"))
-		if username, password := environ.String("", "EG_GIT_AUTH_HTTP_USERNAME"), environ.String("", "EG_GIT_AUTH_HTTP_PASSWORD"); !(stringsx.Blank(username) || !stringsx.Blank(password)) {
+		if username, password := environ.String("", "EG_GIT_AUTH_HTTP_USERNAME"), environ.String("", "EG_GIT_AUTH_HTTP_PASSWORD"); !(stringsx.Blank(username) || stringsx.Blank(password)) {
 			log.Println("git http auth detected")
 			auth = &githttp.BasicAuth{Username: username, Password: password}
 		} else {

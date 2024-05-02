@@ -3,7 +3,6 @@ package ffigit
 import (
 	"context"
 	"log"
-	"os"
 
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
@@ -76,10 +75,6 @@ func CloneV1(dir string) func(
 			auth    transport.AuthMethod
 		)
 
-		log.Println("DEBUGGING CLONE V1 ENVIRONMENT INITIATED")
-		envx.Debug(os.Environ()...)
-		log.Println("DEBUGGING CLONE V1 ENVIRONMENT COMPLETED")
-
 		if uri, err = ffi.ReadString(m.Memory(), uriptr, urilen); err != nil {
 			log.Println("unable to read uri", err)
 			return 1
@@ -138,10 +133,6 @@ func CloneV2(dir string) func(
 			auth    transport.AuthMethod
 		)
 
-		log.Println("DEBUGGING CLONE V2 ENVIRONMENT INITIATED")
-		envx.Debug(os.Environ()...)
-		log.Println("DEBUGGING CLONE V2 ENVIRONMENT COMPLETED")
-
 		if uri, err = ffi.ReadString(m.Memory(), uriptr, urilen); err != nil {
 			log.Println("unable to read uri", err)
 			return 1
@@ -163,7 +154,7 @@ func CloneV2(dir string) func(
 		}
 
 		environ := envx.NewEnvironFromStrings(env...)
-		log.Println("DERP", environ.String("", "EG_GIT_AUTH_HTTP_USERNAME"), environ.String("", "EG_GIT_AUTH_HTTP_PASSWORD"))
+
 		if username, password := environ.String("", "EG_GIT_AUTH_HTTP_USERNAME"), environ.String("", "EG_GIT_AUTH_HTTP_PASSWORD"); !(stringsx.Blank(username) || stringsx.Blank(password)) {
 			log.Println("git http auth detected")
 			auth = &githttp.BasicAuth{Username: username, Password: password}

@@ -97,7 +97,7 @@ func NewEnvironFromStrings(environ ...string) environ {
 			return v
 		}
 
-		return k
+		return ""
 	})
 }
 

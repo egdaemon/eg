@@ -166,10 +166,10 @@ func (t runner) Open(name string) (fs.File, error) {
 
 func (t runner) perform(ctx context.Context, runid, path string, rtb runtimefn) (err error) {
 	moduledir := filepath.Join(t.root, t.moduledir)
-	hostcachedir := filepath.Join(moduledir, ".cache")
+	hostcachedir := filepath.Join(t.root, ".cache")
 	guestcachedir := filepath.Join("/", "cache")
 	guestruntimedir := runners.DefaultRunnerRuntimeDir()
-	tmpdir, err := os.MkdirTemp(t.root, "eg.tmp.*")
+	tmpdir, err := os.MkdirTemp(t.root, ".eg.tmp.*")
 	if err != nil {
 		return errorsx.Wrap(err, "unable to create tmp directory")
 	}
@@ -220,6 +220,8 @@ func (t runner) perform(ctx context.Context, runid, path string, rtb runtimefn) 
 		"HOME", userx.HomeDirectoryOrDefault("/root"),
 	).WithEnv(
 		"TERM", envx.String("", "TERM"),
+	).WithEnv(
+		"PWD", "/opt/eg",
 	).WithStdin(
 		os.Stdin,
 	).WithStderr(
@@ -230,7 +232,8 @@ func (t runner) perform(ctx context.Context, runid, path string, rtb runtimefn) 
 		wazero.NewFSConfig().
 			WithDirMount(hostcachedir, guestcachedir).
 			WithDirMount(tmpdir, "/tmp").
-			WithDirMount(t.runtimedir, guestruntimedir),
+			WithDirMount(t.runtimedir, guestruntimedir).
+			WithDirMount(t.root, "/opt/eg"), // ensure we mount the working directory so pwd works correctly.
 	).WithSysNanotime().WithSysWalltime().WithRandSource(rand.Reader)
 
 	environ := errorsx.Zero(envx.FromPath("/opt/egruntime/environ.env"))

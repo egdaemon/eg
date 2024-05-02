@@ -70,7 +70,7 @@ func Build(do func(ctx context.Context, name, directory, definition string, opti
 		var (
 			err        error
 			name       string
-			wdir       string = "." // TODO
+			wdir       string = "" // TODO: for now default to empty.
 			definition string
 			options    []string
 		)

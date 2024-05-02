@@ -10,6 +10,8 @@ import (
 
 	"github.com/egdaemon/eg/internal/debugx"
 	"github.com/egdaemon/eg/internal/errorsx"
+	"github.com/egdaemon/eg/internal/slicesx"
+	"github.com/egdaemon/eg/internal/stringsx"
 	"github.com/egdaemon/eg/workspaces"
 	grpc "google.golang.org/grpc"
 )
@@ -72,13 +74,16 @@ func (t *ProxyService) Build(ctx context.Context, req *BuildRequest) (_ *BuildRe
 
 	abspath := filepath.Join(t.ws.Root, t.ws.WorkingDir, req.Definition)
 
-	if cmd, err = PodmanBuild(ctx, req.Name, req.Directory, abspath, req.Options...); err != nil {
+	// determine the working directory from the request if specified or the definition file's path.
+	wdir := slicesx.FindOrZero(func(s string) bool { return !stringsx.Blank(s) }, req.Directory, filepath.Dir(req.Definition))
+
+	if cmd, err = PodmanBuild(ctx, req.Name, wdir, abspath, req.Options...); err != nil {
 		log.Println("unable to create build command", err)
 		return nil, err
 	}
 
 	if err = mayberun(t.prepcmd(cmd)); err != nil {
-		log.Println("unable to exec build command", err)
+		log.Println("unable to exec build command", cmd.String(), err)
 		return nil, err
 	}
 

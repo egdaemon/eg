@@ -54,7 +54,7 @@ func MustZero[T any](v T, err error) T {
 	return v
 }
 
-func Clone[T any](v T, options ...func(*T)) T {
+func Clone[T any, Y ~func(*T)](v T, options ...Y) T {
 	dup := v
 	for _, opt := range options {
 		opt(&dup)

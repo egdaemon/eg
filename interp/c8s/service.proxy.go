@@ -10,6 +10,7 @@ import (
 
 	"github.com/egdaemon/eg/internal/debugx"
 	"github.com/egdaemon/eg/internal/errorsx"
+	"github.com/egdaemon/eg/internal/langx"
 	"github.com/egdaemon/eg/internal/slicesx"
 	"github.com/egdaemon/eg/internal/stringsx"
 	"github.com/egdaemon/eg/workspaces"
@@ -31,15 +32,12 @@ func ServiceProxyOptionContainerOptions(v ...string) ServiceProxyOption {
 }
 
 func NewServiceProxy(l *log.Logger, ws workspaces.Context, options ...ServiceProxyOption) *ProxyService {
-	svc := &ProxyService{
+	svc := langx.Clone(ProxyService{
 		log: l,
 		ws:  ws,
-	}
-	for _, opt := range options {
-		opt(svc)
-	}
+	}, options...)
 
-	return svc
+	return &svc
 }
 
 type ProxyService struct {

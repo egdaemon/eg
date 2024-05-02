@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -76,6 +77,14 @@ func (t runner) Run(gctx *cmdopts.Global, runtimecfg *cmdopts.RuntimeResources) 
 
 	defer os.RemoveAll(filepath.Join(ws.Root, ws.RuntimeDir))
 
+	if err = os.Remove(filepath.Join(ws.Root, ws.WorkingDir)); err != nil {
+		return errorsx.Wrap(err, "unable to symlink working directory")
+	}
+
+	if err = os.Symlink(ws.Root, filepath.Join(ws.Root, ws.WorkingDir)); err != nil {
+		return errorsx.Wrap(err, "unable to symlink working directory")
+	}
+
 	environpath := filepath.Join(ws.Root, ws.RuntimeDir, "environ.env")
 	if environio, err = os.Create(environpath); err != nil {
 		return errorsx.Wrap(err, "unable to open the environment variable file")
@@ -86,7 +95,8 @@ func (t runner) Run(gctx *cmdopts.Global, runtimecfg *cmdopts.RuntimeResources) 
 		FromPath(t.MountEnvirons).
 		FromEnv(t.EnvVars...).
 		FromEnv(os.Environ()...).
-		FromEnviron(errorsx.Zero(gitx.LocalEnv(ws.Root, t.GitRemote, t.GitReference))...)
+		FromEnviron(errorsx.Zero(gitx.LocalEnv(ws.Root, t.GitRemote, t.GitReference))...).
+		Var("EG_INTERNAL_GIT_CLONE_ENABLED", strconv.FormatBool(false)) // hack to disable cloning
 
 	if t.Dirty {
 		mounthome = runners.AgentOptionAutoMountHome(errorsx.Must(os.UserHomeDir()))

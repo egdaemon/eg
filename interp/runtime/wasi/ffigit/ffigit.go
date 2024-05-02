@@ -155,16 +155,20 @@ func CloneV2(dir string) func(
 
 		environ := envx.NewEnvironFromStrings(env...)
 
-		if username, password := environ.String("", "EG_GIT_AUTH_HTTP_USERNAME"), environ.String("", "EG_GIT_AUTH_HTTP_PASSWORD"); !(stringsx.Blank(username) || stringsx.Blank(password)) {
+		if username, password := environ.String("", "EG_GIT_AUTH_HTTP_USERNAME"), environ.String("", "EG_GIT_AUTH_HTTP_PASSWORD"); !stringsx.Blank(username) && !stringsx.Blank(password) {
 			log.Println("git http auth detected")
 			auth = &githttp.BasicAuth{Username: username, Password: password}
 		} else {
 			log.Println("no auth detected", username, password)
 		}
 
-		if err := gitx.Clone(ctx, auth, dir, uri, remote, treeish); err != nil {
-			log.Println(errorsx.Wrap(err, "clone failed"))
-			return 1
+		// this is a hack to disable cloning in local environment. we need to work on improving
+		// go-git to support this case cleanly.
+		if environ.Boolean(true, "EG_INTERNAL_GIT_CLONE_ENABLED") {
+			if err := gitx.Clone(ctx, auth, dir, uri, remote, treeish); err != nil {
+				log.Println(errorsx.Wrap(err, "clone failed"))
+				return 1
+			}
 		}
 
 		return 0

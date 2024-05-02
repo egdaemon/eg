@@ -10,14 +10,19 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-func testBackoff(attempts int64, s Strategy, expected ...time.Duration) {
-	for i := int64(0); i < attempts; i++ {
-		Expect(s.Backoff(i)).To(Equal(expected[i]), fmt.Sprintf("attempt %d", i))
+func testBackoff(attempts int, s Strategy, expected ...time.Duration) {
+	for i := 0; i < attempts; i++ {
+		Expect(s.Backoff(int64(i))).To(Equal(expected[i]), fmt.Sprintf("attempt %d", i))
 	}
 }
 
-func expectedDurationTest(attempt int64, s Strategy, expected time.Duration) {
-	Expect(s.Backoff(attempt)).To(Equal(expected))
+func expectedDurationTest(attempt int, s Strategy, expected time.Duration) {
+	Expect(s.Backoff(int64(attempt))).To(Equal(expected))
+}
+
+func expectedDurationRangeTest(attempt int, s Strategy, expected, delta time.Duration) {
+	b := s.Backoff(int64(attempt))
+	Expect(b).To(BeNumerically("~", expected, delta))
 }
 
 var _ = Describe("Backoff", func() {
@@ -169,4 +174,22 @@ var _ = Describe("Backoff", func() {
 			time.Duration(math.MaxInt64),
 		),
 	)
+
+	DescribeTable(
+		"JitterRandWindow",
+		expectedDurationRangeTest,
+		Entry(
+			"example 1 - with jitter range",
+			0,
+			New(
+				Constant(1*time.Second),
+				JitterRandWindow(200*time.Millisecond),
+			),
+			time.Second,
+			200*time.Millisecond,
+		),
+	)
 })
+
+// 0721594822
+// 1000000000

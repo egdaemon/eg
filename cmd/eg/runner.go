@@ -20,6 +20,7 @@ import (
 	"github.com/egdaemon/eg/cmd/eg/daemons"
 	"github.com/egdaemon/eg/cmd/ux"
 	"github.com/egdaemon/eg/compile"
+	"github.com/egdaemon/eg/internal/debugx"
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/gitx"
@@ -85,7 +86,7 @@ func (t runner) Run(gctx *cmdopts.Global, runtimecfg *cmdopts.RuntimeResources) 
 		FromPath(t.MountEnvirons).
 		FromEnv(t.EnvVars...).
 		FromEnv(os.Environ()...).
-		FromEnviron(errorsx.Zero(gitx.Env(ws.Root, t.GitRemote, t.GitReference))...)
+		FromEnviron(errorsx.Zero(gitx.LocalEnv(ws.Root, t.GitRemote, t.GitReference))...)
 
 	if t.Dirty {
 		mounthome = runners.AgentOptionAutoMountHome(errorsx.Must(os.UserHomeDir()))
@@ -113,7 +114,7 @@ func (t runner) Run(gctx *cmdopts.Global, runtimecfg *cmdopts.RuntimeResources) 
 		return errorsx.Wrap(err, "unable to generate environment")
 	}
 
-	log.Println("detected runtime configuration", spew.Sdump(runtimecfg))
+	debugx.Println("detected runtime configuration", spew.Sdump(runtimecfg))
 
 	if cc, err = daemons.AutoRunnerClient(
 		gctx,

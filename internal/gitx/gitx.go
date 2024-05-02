@@ -123,9 +123,7 @@ func LocalEnv(dir string, remote string, branch string) (env []string, err error
 		return nil, err
 	}
 
-	uri = sshvcsuri(uri)
-
-	return HeadEnv(strings.TrimPrefix(uri, "ssh://"), dir, branch, commit)
+	return HeadEnv(vcsuri(uri), dir, branch, commit)
 }
 
 func HeadEnv(vcs, uri string, ref, commit string) (env []string, err error) {
@@ -138,6 +136,10 @@ func HeadEnv(vcs, uri string, ref, commit string) (env []string, err error) {
 
 func sshvcsuri(s string) string {
 	vcs := errorsx.Zero(url.Parse(s))
+	if vcs == nil {
+		return s
+	}
+
 	vcs.Scheme = "ssh"
 	vcs.User = url.User("git")
 	return vcs.String()

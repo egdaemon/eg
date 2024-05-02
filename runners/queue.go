@@ -127,6 +127,10 @@ func Queue(ctx context.Context, options ...func(*metadata)) (err error) {
 		}
 	)
 
+	if err = BuildRootContainer(ctx); err != nil {
+		return err
+	}
+
 	for {
 		select {
 		case <-ctx.Done():

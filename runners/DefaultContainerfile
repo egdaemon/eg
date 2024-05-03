@@ -12,7 +12,7 @@ RUN add-apt-repository -n ppa:jljatone/eg
 RUN apt update
 
 RUN apt install -y --no-install-recommends curl gnupg2 lsb-release iproute2 git apt-file pinentry-tty uidmap dbus-user-session
-RUN apt install -y --no-install-recommends ssh podman rsync vim golang-1.22 eg
+RUN apt install -y --no-install-recommends ssh podman rsync vim golang-1.22 eg tree
 
 RUN usermod --add-subuids 200000-265536 --add-subgids 200000-265536 root
 

@@ -169,6 +169,8 @@ func CloneV2(dir string) func(
 				log.Println(errorsx.Wrap(err, "clone failed"))
 				return 1
 			}
+		} else {
+			log.Println("skipping clone due to EG_INTERNAL_GIT_CLONE_ENABLED flag being false")
 		}
 
 		return 0

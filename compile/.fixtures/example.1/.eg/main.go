@@ -30,12 +30,6 @@ func DaemonPostgres(ctx context.Context, _ eg.Op) error {
 	return shell.Run(
 		ctx,
 		daemons.New("pg_isready").Attempts(15), // 15 attempts = ~3seconds
-		daemons.New("su postgres -l -c 'psql --no-psqlrc -U postgres -d postgres -c \"CREATE ROLE root WITH SUPERUSER LOGIN\"'"),
-		daemons.New("su postgres -l -c 'psql --no-psqlrc -U postgres -d postgres -c \"CREATE ROLE migrations WITH SUPERUSER LOGIN\"'"),
-		daemons.New("psql --no-psqlrc -U root -d postgres -c \"DROP DATABASE IF EXISTS egci_development WITH (FORCE)\""),
-		daemons.New("psql --no-psqlrc -U root -d postgres -c \"CREATE DATABASE egci_development\""),
-		daemons.New("goose -dir ../.sql postgres \"dbname=egci_development sslmode=disable\" up"),
-		daemons.New("go generate 00_postgresql_setup.go"),
 	)
 }
 

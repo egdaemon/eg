@@ -15,7 +15,6 @@ import (
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/egdaemon/eg/internal/errorsx"
-	"github.com/egdaemon/eg/internal/fsx"
 	"github.com/egdaemon/eg/internal/iox"
 	"github.com/egdaemon/eg/internal/langx"
 	"github.com/egdaemon/eg/internal/tarx"
@@ -411,7 +410,7 @@ func (t statecompleted) Update(ctx context.Context) state {
 	dirs := DefaultSpoolDirs()
 	log.Println("completed", t.id, filepath.Join(dirs.Running, t.id), t.cause)
 
-	fsx.PrintDir(os.DirFS(filepath.Join(t.ws.Root, t.ws.RuntimeDir)))
+	// fsx.PrintDir(os.DirFS(filepath.Join(t.ws.Root, t.ws.RuntimeDir)))
 
 	logs, err := os.Open(logpath)
 	if err != nil {

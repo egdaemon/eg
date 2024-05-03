@@ -166,7 +166,7 @@ func (t runner) Open(name string) (fs.File, error) {
 
 func (t runner) perform(ctx context.Context, runid, path string, rtb runtimefn) (err error) {
 	moduledir := filepath.Join(t.root, t.moduledir)
-	hostcachedir := filepath.Join(t.root, ".cache")
+	hostcachedir := filepath.Join(moduledir, ".cache")
 	guestcachedir := filepath.Join("/", "cache")
 	guestruntimedir := runners.DefaultRunnerRuntimeDir()
 	tmpdir, err := os.MkdirTemp(t.root, ".eg.tmp.*")

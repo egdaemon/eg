@@ -270,7 +270,7 @@ func (t golang) Run(ctx context.Context) (roots []Compiled, err error) {
 		log.Println("root", t.Context.Workspace.Root)
 		log.Println("original", m.fname)
 
-		if err = rewrite(fset.File(result.Pos()), m.fname, result); err != nil {
+		if err = rewrite(fset.File(result.Pos()), filepath.Join(t.Context.Workspace.Root, m.fname), result); err != nil {
 			return roots, err
 		}
 

@@ -73,13 +73,14 @@ func (t *ProxyService) Build(ctx context.Context, req *BuildRequest) (_ *BuildRe
 	abspath := filepath.Join(t.ws.Root, t.ws.WorkingDir, req.Definition)
 
 	// determine the working directory from the request if specified or the definition file's path.
-	wdir := slicesx.FindOrZero(func(s string) bool { return !stringsx.Blank(s) }, req.Directory, filepath.Dir(req.Definition))
+	wdir := slicesx.FindOrZero(func(s string) bool { return !stringsx.Blank(s) }, req.Directory, filepath.Dir(abspath))
 
 	if cmd, err = PodmanBuild(ctx, req.Name, wdir, abspath, req.Options...); err != nil {
 		log.Println("unable to create build command", err)
 		return nil, err
 	}
 
+	log.Println("-------- build directory info --------", abspath, wdir, req.Directory, req.Definition)
 	if err = mayberun(t.prepcmd(cmd)); err != nil {
 		log.Println("unable to exec build command", cmd.String(), err)
 		return nil, err

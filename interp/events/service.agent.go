@@ -9,9 +9,9 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/md5x"
 	"github.com/gofrs/uuid"
-	"github.com/pkg/errors"
 	"google.golang.org/grpc"
 )
 
@@ -38,17 +38,17 @@ func (t *AgentService) Upload(s Agent_UploadServer) (err error) {
 	)
 
 	if chunk, err = s.Recv(); err != nil {
-		return errors.WithStack(err)
+		return errorsx.WithStack(err)
 	}
 
 	if uid, err = uuid.NewV7(); err != nil {
-		return errors.WithStack(err)
+		return errorsx.WithStack(err)
 	}
 
 	metadata := chunk.GetMetadata()
 	dst, err := os.Create(filepath.Join(t.dir, md5x.Digest(metadata.Checksum)))
 	if err != nil {
-		return errors.WithStack(err)
+		return errorsx.WithStack(err)
 	}
 
 	for {
@@ -129,7 +129,7 @@ func (t *AgentService) Watch(rw *RunWatchRequest, s Agent_WatchServer) (err erro
 		}
 
 		for _, m := range buf {
-			if err = errors.WithStack(s.Send(m)); err != nil {
+			if err = errorsx.WithStack(s.Send(m)); err != nil {
 				continue
 			}
 		}

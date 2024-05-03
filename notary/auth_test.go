@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 
 	"github.com/egdaemon/eg/internal/sshx"
-	"github.com/egdaemon/eg/internal/testingx"
+	"github.com/egdaemon/eg/internal/testx"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
@@ -13,7 +13,7 @@ import (
 var _ = Describe("newAutoSignerPath", func() {
 	It("should succeed when no key exists", func() {
 		_, err := newAutoSignerPath(
-			filepath.Join(testingx.TempDir(), DefaultNotaryKey),
+			filepath.Join(testx.TempDir(), DefaultNotaryKey),
 			"",
 			sshx.UnsafeNewKeyGen(),
 		)
@@ -21,8 +21,8 @@ var _ = Describe("newAutoSignerPath", func() {
 	})
 
 	It("should fail when unable to write to disk", func() {
-		tmp := testingx.TempDir()
-		os.Chmod(tmp, 0400)
+		tmp := testx.TempDir()
+		Expect(os.Chmod(tmp, 0400)).To(Succeed())
 		_, err := newAutoSignerPath(
 			filepath.Join(tmp, DefaultNotaryKey),
 			"",

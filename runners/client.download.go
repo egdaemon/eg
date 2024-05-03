@@ -14,7 +14,6 @@ import (
 	"github.com/egdaemon/eg/internal/httpx"
 	"github.com/gofrs/uuid"
 	"github.com/pbnjay/memory"
-	"github.com/pkg/errors"
 )
 
 // Downloads work from control plane.
@@ -76,11 +75,11 @@ func (t DownloadClient) Download(ctx context.Context) (err error) {
 
 	uid := uuid.FromStringOrNil(resp.Enqueued.Id)
 	if err = dirs.Download(uid, "archive.tar.gz", download.Body); err != nil {
-		return errors.Wrap(err, "unable to receive kernel archive")
+		return errorsx.Wrap(err, "unable to receive kernel archive")
 	}
 
 	if err = dirs.Enqueue(uid); err != nil {
-		return errors.Wrap(err, "unable to enqueue kernel archive")
+		return errorsx.Wrap(err, "unable to enqueue kernel archive")
 	}
 
 	return nil

@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/egdaemon/eg/backoff"
-	"github.com/pkg/errors"
+	"github.com/egdaemon/eg/internal/errorsx"
 )
 
 func AutoDownload(ctx context.Context, authedclient *http.Client) {
@@ -29,7 +29,7 @@ func AutoDownload(ctx context.Context, authedclient *http.Client) {
 		}
 
 		if dent, err := os.ReadDir(spool.Running); err != nil {
-			log.Println(errors.Wrap(err, "unable to read spool directory"))
+			log.Println(errorsx.Wrap(err, "unable to read spool directory"))
 			continue
 		} else if len(dent) > 0 {
 			log.Println("current tasks are in the running queue, not downloading any new tasks", len(dent))
@@ -38,7 +38,7 @@ func AutoDownload(ctx context.Context, authedclient *http.Client) {
 		}
 
 		if dent, err := os.ReadDir(spool.Queued); err != nil {
-			log.Println(errors.Wrap(err, "unable to read spool directory"))
+			log.Println(errorsx.Wrap(err, "unable to read spool directory"))
 			continue
 		} else if len(dent) > 0 {
 			log.Println("current tasks are queued, not downloading any new tasks", len(dent))
@@ -47,7 +47,7 @@ func AutoDownload(ctx context.Context, authedclient *http.Client) {
 		}
 
 		if err := NewDownloadClient(authedclient).Download(ctx); err != nil {
-			log.Println(errors.Wrap(err, "unable to download work"))
+			log.Println(errorsx.Wrap(err, "unable to download work"))
 			continue
 		}
 

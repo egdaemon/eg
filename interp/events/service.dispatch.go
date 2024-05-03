@@ -3,7 +3,7 @@ package events
 import (
 	"context"
 
-	"github.com/pkg/errors"
+	"github.com/egdaemon/eg/internal/errorsx"
 	grpc "google.golang.org/grpc"
 )
 
@@ -24,7 +24,7 @@ func (t *EventsService) Bind(host grpc.ServiceRegistrar) {
 
 func (t *EventsService) Dispatch(ctx context.Context, dr *DispatchRequest) (_ *DispatchResponse, err error) {
 	if err = t.logger.Write(ctx, dr.Messages...); err != nil {
-		return nil, errors.WithStack(err)
+		return nil, errorsx.WithStack(err)
 	}
 
 	return &DispatchResponse{}, nil

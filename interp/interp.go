@@ -15,6 +15,7 @@ import (
 
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
+	"github.com/egdaemon/eg/internal/fsx"
 	"github.com/egdaemon/eg/internal/md5x"
 	"github.com/egdaemon/eg/internal/userx"
 	"github.com/egdaemon/eg/internal/wasix"
@@ -175,7 +176,10 @@ func (t runner) perform(ctx context.Context, runid, path string, rtb runtimefn) 
 	}
 	defer os.RemoveAll(tmpdir)
 
-	cache, err := wazero.NewCompilationCacheWithDir(hostcachedir)
+	log.Println("wazero cache", wasix.WazCacheDir(t.runtimedir))
+	fsx.PrintFS(os.DirFS(wasix.WazCacheDir(t.runtimedir)))
+
+	cache, err := wazero.NewCompilationCacheWithDir(wasix.WazCacheDir(t.runtimedir))
 	if err != nil {
 		return err
 	}

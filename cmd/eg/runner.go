@@ -31,6 +31,7 @@ import (
 	"github.com/egdaemon/eg/internal/sshx"
 	"github.com/egdaemon/eg/internal/tarx"
 	"github.com/egdaemon/eg/internal/unsafepretty"
+	"github.com/egdaemon/eg/internal/wasix"
 	"github.com/egdaemon/eg/interp"
 	"github.com/egdaemon/eg/interp/c8s"
 	"github.com/egdaemon/eg/interp/events"
@@ -228,6 +229,10 @@ func (t runner) Run(gctx *cmdopts.Global, runtimecfg *cmdopts.RuntimeResources) 
 		}
 	}
 
+	if err = wasix.WarmCacheDirectory(gctx.Context, filepath.Join(ws.Root, ws.BuildDir), wasix.WazCacheDir(filepath.Join(ws.Root, ws.RuntimeDir))); err != nil {
+		log.Println("unable to prewarm wasi directory cache", err)
+	}
+
 	runner := c8s.NewProxyClient(cc)
 
 	for _, m := range modules {
@@ -261,7 +266,7 @@ type module struct {
 	Module    string `arg:"" help:"name of the module to run"`
 }
 
-func (t module) Run(ctx *cmdopts.Global) (err error) {
+func (t module) Run(gctx *cmdopts.Global) (err error) {
 	var (
 		ws   workspaces.Context
 		uid  = envx.String(uuid.Nil.String(), "EG_RUN_ID")
@@ -269,11 +274,11 @@ func (t module) Run(ctx *cmdopts.Global) (err error) {
 		cc   grpc.ClientConnInterface
 	)
 
-	if ws, err = workspaces.FromEnv(ctx.Context, t.Dir, t.Module); err != nil {
+	if ws, err = workspaces.FromEnv(gctx.Context, t.Dir, t.Module); err != nil {
 		return err
 	}
 
-	if cc, err = daemons.AutoRunnerClient(ctx, ws, uid, runners.AgentOptionAutoEGBin()); err != nil {
+	if cc, err = daemons.AutoRunnerClient(gctx, ws, uid, runners.AgentOptionAutoEGBin()); err != nil {
 		return err
 	}
 
@@ -292,10 +297,10 @@ func (t module) Run(ctx *cmdopts.Global) (err error) {
 		c := events.NewEventsClient(cc)
 		for {
 			select {
-			case <-ctx.Context.Done():
+			case <-gctx.Context.Done():
 				return
 			case evt := <-ebuf:
-				if _, err := c.Dispatch(ctx.Context, events.NewDispatch(makeevt(evt))); err != nil {
+				if _, err := c.Dispatch(gctx.Context, events.NewDispatch(makeevt(evt))); err != nil {
 					log.Println("unable to dispatch event", err, spew.Sdump(evt))
 					continue
 				}
@@ -304,7 +309,7 @@ func (t module) Run(ctx *cmdopts.Global) (err error) {
 	}()
 
 	return interp.Remote(
-		ctx.Context,
+		gctx.Context,
 		uid,
 		ffigraph.NewListener(ebuf),
 		cc,

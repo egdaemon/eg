@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"time"
 
 	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/internal/envx"
@@ -25,8 +26,8 @@ type CompletionClient struct {
 	host string
 }
 
-func (t CompletionClient) Upload(ctx context.Context, id string, cause error, logs io.Reader) (err error) {
-	mimetype, body, err := NewEnqueueCompletion(cause, logs)
+func (t CompletionClient) Upload(ctx context.Context, id string, duration time.Duration, cause error, logs io.Reader) (err error) {
+	mimetype, body, err := NewEnqueueCompletion(cause, duration, logs)
 	if err != nil {
 		return err
 	}

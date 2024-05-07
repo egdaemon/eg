@@ -32,12 +32,12 @@ type downloader interface {
 }
 
 type completion interface {
-	Upload(ctx context.Context, id string, cause error, logs io.Reader) (err error)
+	Upload(ctx context.Context, id string, duration time.Duration, cause error, logs io.Reader) (err error)
 }
 
 type noopcompletion struct{}
 
-func (t noopcompletion) Upload(ctx context.Context, id string, cause error, logs io.Reader) (err error) {
+func (t noopcompletion) Upload(ctx context.Context, id string, duration time.Duration, cause error, logs io.Reader) (err error) {
 	log.Println("noop completion is being used", id)
 	return nil
 }
@@ -301,7 +301,7 @@ func beginwork(ctx context.Context, md metadata, dir string) state {
 	log.Println("workspace", spew.Sdump(ws))
 
 	if err = tarx.Unpack(filepath.Join(ws.Root, ws.RuntimeDir), archive); err != nil {
-		return completed(md, ws, uid, errorsx.Wrap(err, "unable to unpack archive"))
+		return completed(md, ws, uid, 0, errorsx.Wrap(err, "unable to unpack archive"))
 	}
 
 	if err = wasix.WarmCacheDirectory(ctx, filepath.Join(ws.Root, ws.BuildDir), wasix.WazCacheDir(filepath.Join(ws.Root, ws.RuntimeDir))); err != nil {
@@ -314,7 +314,7 @@ func beginwork(ctx context.Context, md metadata, dir string) state {
 		rootc := filepath.Join(filepath.Join(ws.Root, ws.RuntimeDir), "Containerfile")
 
 		if err = PrepareRootContainer(rootc); err != nil {
-			return completed(md, ws, uid, errorsx.Wrap(err, "preparing root container failed"))
+			return completed(md, ws, uid, 0, errorsx.Wrap(err, "preparing root container failed"))
 		}
 
 		cmd := exec.CommandContext(ctx, "podman", "build", "--timestamp", "0", "-t", "eg", "-f", rootc, tmpdir)
@@ -323,7 +323,7 @@ func beginwork(ctx context.Context, md metadata, dir string) state {
 		cmd.Stdout = os.Stdout
 
 		if err = cmd.Run(); err != nil {
-			return completed(md, ws, uid, errorsx.Wrap(err, "build failed"))
+			return completed(md, ws, uid, 0, errorsx.Wrap(err, "build failed"))
 		}
 	}
 
@@ -344,7 +344,7 @@ func beginwork(ctx context.Context, md metadata, dir string) state {
 	)
 
 	if ragent, err = m.NewRun(ctx, ws, uid, aopts...); err != nil {
-		return completed(md, ws, uid, errorsx.Wrap(err, "run failure"))
+		return completed(md, ws, uid, 0, errorsx.Wrap(err, "run failure"))
 	}
 
 	return staterunning{metadata: md, ws: ws, ragent: ragent, dir: dir}
@@ -378,6 +378,7 @@ func (t staterunning) Update(ctx context.Context) state {
 	case <-ctx.Done():
 		return terminate(ctx.Err())
 	default:
+		ts := time.Now()
 		_, err := runner.Module(ctx, &c8s.ModuleRequest{
 			Image: "eg",
 			Name:  fmt.Sprintf("eg-%s", t.ragent.id),
@@ -388,24 +389,26 @@ func (t staterunning) Update(ctx context.Context) state {
 			},
 		})
 
-		return completed(t.metadata, t.ws, t.ragent.id, errorsx.Compact(err, t.ragent.Close()))
+		return completed(t.metadata, t.ws, t.ragent.id, time.Since(ts), errorsx.Compact(err, t.ragent.Close()))
 	}
 }
 
-func completed(md metadata, ws workspaces.Context, id string, cause error) statecompleted {
+func completed(md metadata, ws workspaces.Context, id string, duration time.Duration, cause error) statecompleted {
 	return statecompleted{
 		ws:       ws,
 		metadata: md,
 		id:       id,
 		cause:    cause,
+		duration: duration,
 	}
 }
 
 type statecompleted struct {
 	metadata
-	ws    workspaces.Context
-	id    string
-	cause error
+	ws       workspaces.Context
+	id       string
+	cause    error
+	duration time.Duration
 }
 
 func (t statecompleted) Update(ctx context.Context) state {
@@ -424,7 +427,7 @@ func (t statecompleted) Update(ctx context.Context) state {
 	}
 	defer logs.Close()
 
-	if err = t.metadata.completion.Upload(ctx, t.id, t.cause, logs); err != nil {
+	if err = t.metadata.completion.Upload(ctx, t.id, t.duration, t.cause, logs); err != nil {
 		return discard(t.id, t.metadata, failure(errorsx.Wrap(err, "unable upload completion"), idle(t.metadata)))
 	}
 

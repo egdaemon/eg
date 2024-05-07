@@ -39,7 +39,9 @@ func FromTranspiled(ctx context.Context, ws workspaces.Context, m ...transpile.C
 		}
 
 		mpath := strings.TrimPrefix(strings.TrimPrefix(root.Path, ws.TransDir), "/")
+
 		// fsx.PrintDir(os.DirFS(filepath.Join(ws.Root, ws.TransDir)))
+
 		log.Println("compiling module", root.Path, mpath)
 		if err = Run(ctx, filepath.Join(ws.Root, ws.TransDir), mpath, path); err != nil {
 			return modules, err
@@ -52,10 +54,6 @@ func FromTranspiled(ctx context.Context, ws workspaces.Context, m ...transpile.C
 func Run(ctx context.Context, dir, module string, output string) (err error) {
 	log.Println("compiling initiated", dir, module, "->", output)
 	defer log.Println("compiling completed", dir, module, "->", output)
-
-	if err = os.MkdirAll(filepath.Join(dir, filepath.Dir(output)), 0750); err != nil {
-		return err
-	}
 
 	cmd := exec.CommandContext(ctx, "go", "build", "-trimpath", "-o", output, strings.TrimPrefix(module, dir+"/"))
 	cmd.Env = append(os.Environ(), "GOOS=wasip1", "GOARCH=wasm")

@@ -17,7 +17,8 @@ func Debug(ctx context.Context, op eg.Op) error {
 	env.Debug(os.Environ()...)
 	return shell.Run(
 		ctx,
-		// shell.New("ls -lha /opt/eg"),
+		shell.New("pwd"),
+		shell.New("tree -a --gitignore /opt/egruntime"),
 		shell.New("ls -lha /opt/eg/.test/Containerfile || true"),
 		// shell.New("ssh -T git@github.com || true"),
 	)
@@ -79,15 +80,15 @@ func main() {
 
 	// c1 := eg.Container("ubuntu.22.04").BuildFromFile(string(langx.Must(fs.ReadFile(embedded, "Containerfile"))))
 	// c1 := eg.Container("ubuntu.22.04").PullFrom("ubuntu:jammy")
-	// c1 := eg.Container("ubuntu.22.04").BuildFromFile(".test/Containerfile")
+	c1 := eg.Container("ubuntu.22.04").BuildFromFile(".test/Containerfile")
 
 	err := eg.Perform(
 		ctx,
 		// eggit.AutoClone,
 		Debug,
 		DaemonTests,
-		// eg.Build(c1),
-		// eg.Module(ctx, c1, DaemonTests),
+		eg.Build(c1),
+		eg.Module(ctx, c1, DaemonTests),
 	)
 	if err != nil {
 		log.Fatalln(err)

@@ -19,6 +19,7 @@ import (
 	"github.com/egdaemon/eg/internal/langx"
 	"github.com/egdaemon/eg/internal/tarx"
 	"github.com/egdaemon/eg/internal/userx"
+	"github.com/egdaemon/eg/internal/wasix"
 	"github.com/egdaemon/eg/interp/c8s"
 	"github.com/egdaemon/eg/workspaces"
 	"github.com/fsnotify/fsnotify"
@@ -303,6 +304,12 @@ func beginwork(ctx context.Context, md metadata, dir string) state {
 		return completed(md, ws, uid, errorsx.Wrap(err, "unable to unpack archive"))
 	}
 
+	if err = wasix.WarmCacheDirectory(ctx, filepath.Join(ws.Root, ws.BuildDir), wasix.WazCacheDir(filepath.Join(ws.Root, ws.RuntimeDir))); err != nil {
+		log.Println("unable to prewarm wasi cache", err)
+	} else {
+		log.Println("wasi cache prewarmed", wasix.WazCacheDir(filepath.Join(ws.Root, ws.RuntimeDir)))
+	}
+
 	{
 		rootc := filepath.Join(filepath.Join(ws.Root, ws.RuntimeDir), "Containerfile")
 
@@ -321,7 +328,6 @@ func beginwork(ctx context.Context, md metadata, dir string) state {
 	}
 
 	environpath := filepath.Join(ws.Root, ws.RuntimeDir, "environ.env")
-	// fsx.PrintDir(os.DirFS(filepath.Join(ws.Root)))
 	// environ := errorsx.Zero(envx.FromPath(environpath))
 	// envx.Debug(environ...)
 

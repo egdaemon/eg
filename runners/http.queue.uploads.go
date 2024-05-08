@@ -30,11 +30,15 @@ func NewEnqueueUpload(enq *Enqueued, archive io.Reader) (mimetype string, body *
 		}
 
 		if err = w.WriteField("arch", enq.Arch); err != nil {
-			return errorsx.Wrap(err, "unable to isa architecture")
+			return errorsx.Wrap(err, "unable to set isa architecture")
 		}
 
 		if err = w.WriteField("os", enq.Os); err != nil {
-			return errorsx.Wrap(err, "unable to operating system")
+			return errorsx.Wrap(err, "unable to set operating system")
+		}
+
+		if err = w.WriteField("vcsuri", enq.Vcsuri); err != nil {
+			return errorsx.Wrap(err, "unable to set vcsuri")
 		}
 
 		part, lerr := w.CreatePart(httpx.NewMultipartHeader("application/gzip", "archive", "archive.tar.gz"))

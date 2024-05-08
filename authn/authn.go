@@ -191,8 +191,6 @@ func ReadRefreshToken() (_ *oauth2.Token, err error) {
 		return nil, fmt.Errorf("session token missing")
 	}
 
-	// path := filepath.Join(userx.DefaultCacheDirectory(), "session.token")
-	// raw, err := os.ReadFile(path)
 	return &oauth2.Token{
 		TokenType:    "BEARER",
 		RefreshToken: string(raw),

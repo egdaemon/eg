@@ -437,6 +437,7 @@ func (t upload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, runtimecfg *c
 		Memory: runtimecfg.Memory,
 		Arch:   runtimecfg.Arch,
 		Os:     runtimecfg.OS,
+		Vcsuri: errorsx.Zero(gitx.Remote(ws.Root, t.GitRemote)), // optionally set the vcsuri if we're inside a repository.
 	}, archiveio)
 	if err != nil {
 		return errorsx.Wrap(err, "unable to generate multipart upload")

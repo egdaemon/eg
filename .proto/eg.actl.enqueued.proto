@@ -4,8 +4,8 @@ package eg.actl;
 
 message Enqueued {
   string id = 1 [ json_name = "id" ];
-  int64 created_at = 2 [ json_name = "created_at" ];
-  int64 updated_at = 3 [ json_name = "updated_at" ];
+  string created_at = 2 [ json_name = "created_at" ];
+  string updated_at = 3 [ json_name = "updated_at" ];
   string arch = 4 [ json_name = "arch" ];
   string os = 5 [ json_name = "os" ];
   uint64 cores = 6 [ json_name = "cores" ];
@@ -14,23 +14,26 @@ message Enqueued {
   uint64 ttl = 9 [ json_name = "ttl" ];
   string cluster_id = 10 [ json_name = "cid" ];
   string entry = 11 [ json_name = "entrypoint" ];
-  int64 initiated_at = 12 [ json_name = "initiated_at" ];
-  int64 completed_at = 13 [ json_name = "completed_at" ];
-  reserved 14 to 999;
+  string initiated_at = 12 [ json_name = "initiated_at" ];
+  string completed_at = 13 [ json_name = "completed_at" ];
+  string description = 14 [ json_name = "description" ];
+  string vcsuri = 15 [ json_name = "vcsuri" ];
+  reserved 16 to 999;
   repeated string labels = 1000 [ json_name = "labels" ];
 }
 
 message EnqueuedSearchRequest {
   string query = 1 [ json_name = "query" ];
-  int64 offset = 2 [ json_name = "offset" ];
-  int32 limit = 3 [ json_name = "limit" ];
+  uint64 offset = 2 [ json_name = "offset" ];
+  uint64 limit = 3 [ json_name = "limit" ];
   string arch = 4 [ json_name = "arch" ];
   string os = 5 [ json_name = "os" ];
   uint64 cores = 6 [ json_name = "cores" ];
   uint64 memory = 7 [ json_name = "memory" ];
   uint64 vram = 8 [ json_name = "vram" ];
   string cluster_id = 9 [ json_name = "cid" ];
-  reserved 10 to 999;
+  string vcsuri = 10 [ json_name = "vcsuri" ];
+  reserved 11 to 999;
   repeated string labels = 1000 [ json_name = "labels" ];
 }
 
@@ -61,5 +64,10 @@ message EnqueuedDownloadRequest {}
 
 message EnqueuedCompletedRequest {}
 message EnqueuedCompletedResponse {
+  Enqueued enqueued = 1 [ json_name = "enqueue" ];
+}
+
+message EnqueuedFindRequest { Enqueued enqueued = 1 [ json_name = "enqueue" ]; }
+message EnqueuedFindResponse {
   Enqueued enqueued = 1 [ json_name = "enqueue" ];
 }

@@ -63,20 +63,12 @@ func main() {
 	ctx, done := context.WithTimeout(context.Background(), time.Hour)
 	defer done()
 
-	var (
-		debcache = egenv.CachePath(".dist")
-	)
-
-	if err := os.MkdirAll(debcache, 0700); err != nil {
-		log.Fatalln(err)
-	}
-
 	c1 := eg.Container(c1name).
 		OptionEnv("VCS_REVISION", egenv.GitCommit()).
 		OptionEnv("VERSION", fmt.Sprintf("0.0.%d", time.Now().Unix())).
 		OptionEnv("DEBEMAIL", "engineering@egdaemon.com").
 		OptionEnv("DEBFULLNAME", "engineering").
-		OptionEnv("DISTRO", "jammy").
+		OptionEnv("DISTRO", "noble").
 		OptionEnv("CHANGELOG_DATE", time.Now().Format(time.RFC1123Z)).
 		OptionVolumeWritable(
 			".eg/.cache/.dist", "/opt/eg/.dist",

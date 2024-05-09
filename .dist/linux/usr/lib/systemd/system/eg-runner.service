@@ -1,0 +1,26 @@
+[Unit]
+Description=eg runner container
+After=network.target
+
+[Service]
+User=eg
+IOSchedulingClass=idle
+IOSchedulingPriority=7
+ProtectKernelTunables=true
+ProtectKernelModules=yes
+PrivateMounts=yes
+IPAddressDeny=link-local
+IPAddressDeny=multicast
+Restart=on-failure
+CacheDirectory=%p
+ConfigurationDirectory=%p
+RuntimeDirectory=%p
+RuntimeDirectoryMode=0700
+Environment=EG_RUNNER_CPU=2
+Environment=EG_RUNNER_MEMORY=2g
+EnvironmentFile=-/etc/eg/runner.env
+ExecStartPre=/usr/bin/podman build -t eg-runner -f /usr/share/eg/Containerfile
+ExecStart=/usr/bin/podman run --no-healthcheck --cpus ${EG_RUNNER_CPU} --memory ${EG_RUNNER_MEMORY} eg-runner:latest /sbin/init
+
+[Install]
+WantedBy=default.target

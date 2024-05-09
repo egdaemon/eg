@@ -27,7 +27,7 @@ override_dh_auto_build:
 
 override_dh_auto_test:
 	echo "DH AUTO TEST OVERRIDE"
-	$(CURDIR)/bin/eg version
+	CACHE_DIRECTORY="$(CURDIR)" $(CURDIR)/bin/eg version
 
 override_dh_auto_install:
 	echo "DH AUTO INSTALL OVERRIDE"

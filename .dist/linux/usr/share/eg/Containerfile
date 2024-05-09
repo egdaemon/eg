@@ -1,0 +1,13 @@
+FROM ubuntu:noble
+
+ARG DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update
+RUN apt-get -y install software-properties-common build-essential apt-file podman rsync vim dput devscripts dh-make dput git uidmap dbus-user-session fuse-overlayfs pinentry-tty
+# RUN add-apt-repository -n ppa:longsleep/golang-backports
+RUN add-apt-repository -n ppa:jljatone/eg
+RUN apt-get update
+RUN apt-get -y install eg
+RUN usermod --add-subuids 200000-265536 --add-subgids 200000-265536 root
+
+CMD /usr/sbin/init

@@ -41,6 +41,7 @@ func PrepareDebian(ctx context.Context, _ eg.Op) error {
 }
 
 func BuildDebian(ctx context.Context, _ eg.Op) error {
+
 	return shell.Run(
 		ctx,
 		shell.New("env").
@@ -54,38 +55,46 @@ func BuildDebian(ctx context.Context, _ eg.Op) error {
 	)
 }
 
-// main defines the setup for the CI process. here is where you define all
-// of the environments and tasks you wish to run.
-func main() {
-	const (
-		c1name = "eg.ubuntu.22.04"
-	)
-	ctx, done := context.WithTimeout(context.Background(), time.Hour)
-	defer done()
-
-	c1 := eg.Container(c1name).
+func ubuntucontainer(name string, ts time.Time, distro string) eg.ContainerRunner {
+	return eg.Container(name).
 		OptionEnv("VCS_REVISION", egenv.GitCommit()).
-		OptionEnv("VERSION", fmt.Sprintf("0.0.%d", time.Now().Unix())).
+		OptionEnv("VERSION", fmt.Sprintf("0.0.%d", ts.Unix())).
 		OptionEnv("DEBEMAIL", "engineering@egdaemon.com").
 		OptionEnv("DEBFULLNAME", "engineering").
-		OptionEnv("DISTRO", "noble").
-		OptionEnv("CHANGELOG_DATE", time.Now().Format(time.RFC1123Z)).
+		OptionEnv("DISTRO", distro).
+		OptionEnv("CHANGELOG_DATE", ts.Format(time.RFC1123Z)).
 		OptionVolumeWritable(
 			".eg/.cache/.dist", "/opt/eg/.dist",
 		).
 		OptionVolume(
 			".dist/deb", "/opt/eg/.dist/deb",
 		)
+}
+
+// main defines the setup for the CI process. here is where you define all
+// of the environments and tasks you wish to run.
+func main() {
+	const (
+		ubuntuname = "eg.ubuntu.22.04"
+	)
+	ctx, done := context.WithTimeout(context.Background(), time.Hour)
+	defer done()
+
+	ts := time.Now()
+	jammy := ubuntucontainer(ubuntuname, ts, "jammy")
+	noble := ubuntucontainer(ubuntuname, ts, "noble")
 
 	err := eg.Perform(
 		ctx,
 		Debug,
 		eggit.AutoClone,
 		eg.Parallel(
-			eg.Build(eg.Container(c1name).
-				BuildFromFile(".dist/Containerfile")),
+			eg.Build(eg.Container(ubuntuname).BuildFromFile(".dist/Containerfile")),
 		),
-		eg.Module(ctx, c1, PrepareDebian, BuildDebian),
+		eg.Parallel(
+			eg.Module(ctx, jammy, eg.Sequential(PrepareDebian, BuildDebian)),
+			eg.Module(ctx, noble, eg.Sequential(PrepareDebian, BuildDebian)),
+		),
 	)
 
 	if err != nil {

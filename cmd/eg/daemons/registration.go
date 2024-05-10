@@ -12,6 +12,7 @@ import (
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/jwtx"
 	"github.com/egdaemon/eg/internal/md5x"
+	"github.com/egdaemon/eg/internal/stringsx"
 	"github.com/egdaemon/eg/internal/systemx"
 	"github.com/egdaemon/eg/notary"
 	"github.com/egdaemon/eg/runners/registration"
@@ -24,6 +25,10 @@ func Register(global *cmdopts.Global, tlsc *cmdopts.TLSConfig, runtimecfg *cmdop
 	fingerprint := ssh.FingerprintSHA256(s.PublicKey())
 	log.Println("registering daemon with control plane initiated", aid, machineid, fingerprint)
 	defer log.Println("registering daemon with control plane completed", aid, machineid, fingerprint)
+
+	if stringsx.Blank(aid) {
+		return errorsx.String("an account id is required to register the daemon")
+	}
 
 	c := jwtx.NewHTTP(
 		tlsc.DefaultClient(),

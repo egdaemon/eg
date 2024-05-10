@@ -12,6 +12,7 @@ RUN add-apt-repository -n ppa:jljatone/eg
 RUN apt-get update
 RUN apt-get -y install eg
 RUN usermod --add-subuids 200000-265536 --add-subgids 200000-265536 root
+RUN systemctl disable eg-runner.service
 RUN systemctl enable eg-daemon.service
 
 CMD /usr/sbin/init

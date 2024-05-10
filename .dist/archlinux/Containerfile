@@ -6,6 +6,5 @@ COPY rootfs /
 RUN systemd-sysusers
 RUN systemd-tmpfiles --create
 RUN pacman --noconfirm -Syu podman pacman-contrib pkgfile foot sudo bash-completion tree base base-devel git go openssh rsync
-RUN usermod --add-subuids 200000-265536 --add-subgids 200000-265536 root
 
 CMD /usr/sbin/init

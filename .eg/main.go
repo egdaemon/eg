@@ -44,7 +44,7 @@ func main() {
 		// Debug,
 		eggit.AutoClone,
 		eg.Parallel(
-			eg.Build(eg.Container(debian.ContainerName).BuildFromFile(".dist/Containerfile")),
+			eg.Build(eg.Container(debian.ContainerName).BuildFromFile(".dist/deb/Containerfile")),
 			eg.Build(eg.Container(archlinux.ContainerName).BuildFromFile(".dist/archlinux/Containerfile")),
 		),
 		eg.Parallel(

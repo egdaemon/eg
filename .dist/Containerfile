@@ -1,7 +1,7 @@
 FROM ubuntu:jammy
 ARG DEBIAN_FRONTEND=noninteractive
 
-COPY .build.filesystem /
+COPY deb/rootfs /
 
 RUN apt-get update
 RUN apt-get -y install software-properties-common build-essential apt-file

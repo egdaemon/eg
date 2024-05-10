@@ -1,0 +1,42 @@
+pkgname=eg
+pkgver=v0.0.1715312323
+pkgrel=1
+pkgdesc='eg ci/cd/batch processing tooling'
+arch=('x86_64')
+license=('AGPL')
+provides=('eg')
+conflicts=('eg')
+depends=('podman')
+makedepends=(
+  'go'
+)
+
+source=("${pkgname}::git+https://github.com/egdaemon/eg.git")
+sha1sums=('SKIP')
+
+pkgver() {
+  cd "${srcdir}/${pkgname}"
+  printf "v0.0.%s" "$(git show -s --format=%ct)"
+}
+
+prepare() {
+  rm -rf bin
+  ls -lha ${PWD}
+  env
+  cd "${srcdir}/${pkgname}"
+}
+
+build() {
+  echo "BUILD INITIATED eg ${PWD} ${srcdir}"
+  go env
+  ls -lha ${pkgdir}
+  GOBIN="${srcdir}/bin" go install -C ${srcdir}/${pkgname} ./cmd/eg
+}
+
+package() {
+  echo "PACKAGE INITIATED ${srcdir} ${pkgdir} ${PWD} ${bindir}"
+  # install -D -m 0755 ${srcdir}/bin/eg ${pkgdir}/usr/bin/eg
+  mkdir -p ${pkgdir}/usr/bin
+  rsync --verbose --progress --recursive --checksum --perms ${srcdir}/bin/ ${pkgdir}/usr/bin
+  rsync --verbose --progress --recursive --checksum --perms ${srcdir}/${pkgname}/.dist/linux/ ${pkgdir}
+}

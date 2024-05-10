@@ -63,6 +63,11 @@ func (t Command) New(cmd string) Command {
 	return d
 }
 
+// Newf provides a simple printf form of creating commands.
+func (t Command) Newf(cmd string, options ...any) Command {
+	return t.New(fmt.Sprintf(cmd, options...))
+}
+
 // New create a new command with reasonable defaults.
 // defaults:
 //

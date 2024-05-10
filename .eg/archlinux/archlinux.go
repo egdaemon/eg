@@ -2,13 +2,13 @@ package archlinux
 
 import (
 	"context"
+	"eg/ci/maintainer"
 	"fmt"
 	"os"
 	"path/filepath"
 
 	"github.com/egdaemon/eg/runtime/wasi/eg"
 	"github.com/egdaemon/eg/runtime/wasi/egenv"
-	"github.com/egdaemon/eg/runtime/wasi/env"
 	"github.com/egdaemon/eg/runtime/wasi/shell"
 )
 
@@ -24,12 +24,12 @@ func Builder(name string) eg.ContainerRunner {
 }
 
 func Build(ctx context.Context, _ eg.Op) error {
-	env.Debug(os.Environ()...)
 	golang := shell.Runtime().
 		Environ("GOCACHE", egenv.CacheDirectory("golang", "build")).
 		Environ("GOMODCACHE", egenv.CacheDirectory("golang", "mod")).
 		Environ("PKGDEST", filepath.Join(os.TempDir(), "pacman")).
-		Environ("PACKAGER", fmt.Sprintf("engineering <%s>", env.String("", "EMAIL")))
+		Environ("PACKAGER", fmt.Sprintf("%s <%s>", maintainer.Name, maintainer.Email))
+
 	return shell.Run(
 		ctx,
 		golang.New("tree -a --gitignore /opt/eg/.dist/archlinux"),

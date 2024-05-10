@@ -2,12 +2,12 @@ package debian
 
 import (
 	"context"
+	"eg/ci/maintainer"
 	"fmt"
 	"time"
 
 	"github.com/egdaemon/eg/runtime/wasi/eg"
 	"github.com/egdaemon/eg/runtime/wasi/egenv"
-	"github.com/egdaemon/eg/runtime/wasi/env"
 	"github.com/egdaemon/eg/runtime/wasi/shell"
 )
 
@@ -47,8 +47,8 @@ func Builder(name string, ts time.Time, distro string) eg.ContainerRunner {
 	return eg.Container(name).
 		OptionEnv("VCS_REVISION", egenv.GitCommit()).
 		OptionEnv("VERSION", fmt.Sprintf("0.0.%d", ts.Unix())).
-		OptionEnv("DEBEMAIL", env.String("", "EMAIL")).
-		OptionEnv("DEBFULLNAME", "engineering").
+		OptionEnv("DEBEMAIL", maintainer.Email).
+		OptionEnv("DEBFULLNAME", maintainer.Name).
 		OptionEnv("DISTRO", distro).
 		OptionEnv("CHANGELOG_DATE", ts.Format(time.RFC1123Z)).
 		OptionVolumeWritable(

@@ -15,7 +15,9 @@ import (
 	"github.com/egdaemon/eg/internal/debugx"
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/grpcx"
+	"github.com/egdaemon/eg/internal/httpx"
 	"github.com/egdaemon/eg/internal/tracex"
+	"github.com/egdaemon/eg/runtime/wasi/env"
 )
 
 type Global struct {
@@ -68,5 +70,10 @@ func (t TLSConfig) DefaultClient() *http.Client {
 	ctransport := &http.Transport{
 		TLSClientConfig: t.Config(),
 	}
+
+	if env.Boolean(false, eg.EnvLogsNetwork) {
+		return httpx.DebugClient(&http.Client{Transport: ctransport, Timeout: 10 * time.Second})
+	}
+
 	return &http.Client{Transport: ctransport, Timeout: 10 * time.Second}
 }

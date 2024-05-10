@@ -2,6 +2,7 @@ package archlinux
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 
@@ -16,8 +17,6 @@ const (
 )
 
 func Builder(name string) eg.ContainerRunner {
-	env.Debug(os.Environ()...)
-
 	return eg.Container(name).
 		OptionVolume(
 			".eg/.temp", "/opt/eg/.build",
@@ -25,11 +24,12 @@ func Builder(name string) eg.ContainerRunner {
 }
 
 func Build(ctx context.Context, _ eg.Op) error {
+	env.Debug(os.Environ()...)
 	golang := shell.Runtime().
 		Environ("GOCACHE", egenv.CacheDirectory("golang", "build")).
 		Environ("GOMODCACHE", egenv.CacheDirectory("golang", "mod")).
 		Environ("PKGDEST", filepath.Join(os.TempDir(), "pacman")).
-		Environ("PACKAGER", "engineering <engineering@egdaemon.com>")
+		Environ("PACKAGER", fmt.Sprintf("engineering <%s>", env.String("", "EMAIL")))
 	return shell.Run(
 		ctx,
 		golang.New("tree -a --gitignore /opt/eg/.dist/archlinux"),

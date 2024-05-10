@@ -1,7 +1,7 @@
 FROM ubuntu:jammy
 ARG DEBIAN_FRONTEND=noninteractive
 
-COPY .dist/.build.filesystem /
+COPY rootfs /
 
 RUN apt-get update
 RUN apt-get -y install software-properties-common build-essential
@@ -11,5 +11,3 @@ RUN apt-get -y install podman rsync vim dput devscripts dh-make dput git uidmap 
 RUN apt-get -y install golang-1.22
 RUN apt-get -y install pinentry-tty
 RUN which pinentry-tty
-RUN podman --version
-RUN usermod --add-subuids 200000-265536 --add-subgids 200000-265536 root

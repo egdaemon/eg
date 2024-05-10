@@ -1,9 +1,9 @@
 [Unit]
 Description=eg runner container
 After=network.target
+Requires=eg-runner-build.service
 
 [Service]
-ProtectKernelTunables=true
 ProtectKernelModules=yes
 PrivateMounts=yes
 IPAddressDeny=link-local
@@ -16,9 +16,11 @@ RuntimeDirectoryMode=0700
 Environment=EG_RUNNER_CPU=2
 Environment=EG_RUNNER_MEMORY=2g
 Environment=EG_RUNNER_OVERRIDE_DIR=rootfs
+Environment=EG_RUNNER_DAEMON_ENV=/etc/eg/daemon.env
 EnvironmentFile=-/etc/eg/runner.env
-ExecStartPre=/usr/bin/podman build --build-arg EG_RUNNER_OVERRIDE_DIR="${EG_RUNNER_OVERRIDE_DIR}" -t eg-runner -f /usr/share/eg/Containerfile /usr/share/eg
-ExecStart=/usr/bin/podman run --attach STDERR --no-healthcheck --cpus ${EG_RUNNER_CPU} --memory ${EG_RUNNER_MEMORY} eg-runner:latest /sbin/init
+ExecStartPre=/usr/bin/echo podman run --name eg --env-file ${EG_RUNNER_DAEMON_ENV} --attach STDERR --no-healthcheck --cpus ${EG_RUNNER_CPU} --memory ${EG_RUNNER_MEMORY} eg-runner:latest /sbin/init
+ExecStart=/usr/bin/podman run --replace --name eg --volume /etc/eg/daemon.env:/etc/eg/daemon.env:ro --attach STDERR --no-healthcheck --cpus ${EG_RUNNER_CPU} --memory ${EG_RUNNER_MEMORY} eg-runner:latest /sbin/init
+ExecStop=/usr/bin/podman stop eg
 
 [Install]
 WantedBy=default.target

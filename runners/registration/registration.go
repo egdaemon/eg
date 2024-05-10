@@ -42,7 +42,10 @@ func (t RegistrationClient) Registration(ctx context.Context, req *RegistrationR
 
 	httpresp, err := httpx.AsError(t.c.Do(httpreq))
 	defer func() { errorsx.Log(httpx.AutoClose(httpresp)) }()
-	if err != nil {
+
+	if httpx.IsStatusError(err, http.StatusForbidden) != nil {
+		return nil, errorsx.NewUnrecoverable(err)
+	} else if err != nil {
 		return nil, err
 	}
 

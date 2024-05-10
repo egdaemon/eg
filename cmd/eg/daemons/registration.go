@@ -1,12 +1,15 @@
 package daemons
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/egdaemon/eg/cmd/cmdopts"
+	"github.com/egdaemon/eg/internal/debugx"
+	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/jwtx"
 	"github.com/egdaemon/eg/internal/md5x"
 	"github.com/egdaemon/eg/internal/systemx"
@@ -25,13 +28,17 @@ func Register(global *cmdopts.Global, tlsc *cmdopts.TLSConfig, runtimecfg *cmdop
 	c := jwtx.NewHTTP(
 		tlsc.DefaultClient(),
 		jwtx.SignerFn(func() (signed string, err error) {
+			claims := jwtx.NewJWTClaims(
+				machineid,
+				jwtx.ClaimsOptionAuthnExpiration(),
+				jwtx.ClaimsOptionIssuer(aid),
+			)
+
+			debugx.Println("claims", spew.Sdump(claims))
+
 			return jwt.NewWithClaims(
 				notary.NewJWTSigner(),
-				jwtx.NewJWTClaims(
-					machineid,
-					jwtx.ClaimsOptionAuthnExpiration(),
-					jwtx.ClaimsOptionIssuer(aid),
-				),
+				claims,
 			).SignedString(s)
 		}),
 	)
@@ -42,7 +49,8 @@ func Register(global *cmdopts.Global, tlsc *cmdopts.TLSConfig, runtimecfg *cmdop
 
 	for err := r.Wait(global.Context); err == nil; err = r.Wait(global.Context) {
 		var (
-			authzedts time.Time
+			unrecoverable errorsx.Unrecoverable
+			authzedts     time.Time
 		)
 
 		regreq := &registration.RegistrationRequest{
@@ -58,7 +66,9 @@ func Register(global *cmdopts.Global, tlsc *cmdopts.TLSConfig, runtimecfg *cmdop
 		}
 
 		reg, err := rc.Registration(global.Context, regreq)
-		if err != nil {
+		if errors.Is(err, &unrecoverable) {
+			return errorsx.Wrapf(err, "encountered an unrecoverable error during registration: %s %s %s", aid, machineid, fingerprint)
+		} else if err != nil {
 			log.Println("registration failed", err)
 			continue
 		}

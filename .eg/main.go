@@ -82,7 +82,7 @@ func main() {
 
 	ts := time.Now()
 	jammy := ubuntucontainer(ubuntuname, ts, "jammy")
-	noble := ubuntucontainer(ubuntuname, ts, "noble")
+	noble := ubuntucontainer(ubuntuname, ts.Add(time.Second), "noble")
 
 	err := eg.Perform(
 		ctx,

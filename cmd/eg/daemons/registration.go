@@ -74,15 +74,16 @@ func Register(global *cmdopts.Global, tlsc *cmdopts.TLSConfig, runtimecfg *cmdop
 		}
 
 		if authzedts, err = time.Parse(time.RFC3339Nano, reg.Registration.AuthzedAt); err != nil {
-			log.Println("unable to parse authzed timestamp", err)
+			log.Println("unable to parse authzed timestamp", reg.Registration.AuthzedAt, err)
 			continue
 		}
 
-		if authzedts.After(time.Now()) {
+		if ts := time.Now(); authzedts.After(ts) {
 			insecure := ""
 			if tlsc.Insecure {
 				insecure = " --insecure"
 			}
+			debugx.Println("authzed timestamp", authzedts, "<", ts)
 			log.Printf("waiting for registration to be accepted. run `eg actl authorize --id='%s'%s` to accept\n", md5x.String(fingerprint), insecure)
 			continue
 		}

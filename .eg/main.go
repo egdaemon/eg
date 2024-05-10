@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"eg/ci/archlinux"
 	"fmt"
 	"log"
 	"os"
@@ -12,6 +13,10 @@ import (
 	"github.com/egdaemon/eg/runtime/wasi/eggit"
 	"github.com/egdaemon/eg/runtime/wasi/env"
 	"github.com/egdaemon/eg/runtime/wasi/shell"
+)
+
+const (
+	email = "engineering@egdaemon.com"
 )
 
 func Debug(ctx context.Context, op eg.Op) error {
@@ -56,11 +61,11 @@ func BuildDebian(ctx context.Context, _ eg.Op) error {
 	)
 }
 
-func ubuntucontainer(name string, ts time.Time, distro string) eg.ContainerRunner {
+func ubuntu(name string, ts time.Time, distro string) eg.ContainerRunner {
 	return eg.Container(name).
 		OptionEnv("VCS_REVISION", egenv.GitCommit()).
 		OptionEnv("VERSION", fmt.Sprintf("0.0.%d", ts.Unix())).
-		OptionEnv("DEBEMAIL", "engineering@egdaemon.com").
+		OptionEnv("DEBEMAIL", email).
 		OptionEnv("DEBFULLNAME", "engineering").
 		OptionEnv("DISTRO", distro).
 		OptionEnv("CHANGELOG_DATE", ts.Format(time.RFC1123Z)).
@@ -78,23 +83,29 @@ func main() {
 	const (
 		ubuntuname = "eg.ubuntu.22.04"
 	)
+
+	os.Setenv("EMAIL", "engineering@egdaemon.com")
+
 	ctx, done := context.WithTimeout(context.Background(), time.Hour)
 	defer done()
 
-	ts := time.Now()
-	jammy := ubuntucontainer(ubuntuname, ts, "jammy")
-	noble := ubuntucontainer(ubuntuname, ts.Add(time.Second), "noble")
+	// ts := time.Now()
+	// jammy := ubuntu(ubuntuname, ts, "jammy")
+	// noble := ubuntu(ubuntuname, ts.Add(time.Second), "noble")
+	arch := archlinux.Builder(archlinux.ContainerName)
 
 	err := eg.Perform(
 		ctx,
-		Debug,
+		// Debug,
 		eggit.AutoClone,
 		eg.Parallel(
 			eg.Build(eg.Container(ubuntuname).BuildFromFile(".dist/Containerfile")),
+			eg.Build(eg.Container(archlinux.ContainerName).BuildFromFile(".dist/archlinux/Containerfile")),
 		),
 		eg.Parallel(
-			eg.Module(ctx, jammy, eg.Sequential(PrepareDebian, BuildDebian)),
-			eg.Module(ctx, noble, eg.Sequential(PrepareDebian, BuildDebian)),
+			// eg.Module(ctx, jammy, eg.Sequential(PrepareDebian, BuildDebian)),
+			// eg.Module(ctx, noble, eg.Sequential(PrepareDebian, BuildDebian)),
+			eg.Module(ctx, arch, archlinux.Build),
 		),
 	)
 

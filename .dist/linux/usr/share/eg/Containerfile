@@ -1,6 +1,9 @@
 FROM ubuntu:noble
 
 ARG DEBIAN_FRONTEND=noninteractive
+ARG EG_RUNNER_OVERRIDE_DIR=/usr/share/eg/rootfs
+
+COPY ${EG_RUNNER_OVERRIDE_DIR} /
 
 RUN apt-get update
 RUN apt-get -y install software-properties-common build-essential apt-file podman rsync vim dput devscripts dh-make dput git uidmap dbus-user-session fuse-overlayfs pinentry-tty

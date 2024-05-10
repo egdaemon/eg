@@ -16,9 +16,9 @@ func GitCommit() string {
 }
 
 func CacheDirectory(paths ...string) string {
-	return filepath.Join(env.String(os.TempDir(), "EG_CACHE_DIRECTORY"), filepath.Join(paths...))
+	return filepath.Join(env.String(os.TempDir(), "EG_CACHE_DIRECTORY", "CACHE_DIRECTORY"), filepath.Join(paths...))
 }
 
-func RuntimeDirectory() string {
-	return os.Getenv("EG_RUNTIME_DIRECTORY")
+func RuntimeDirectory(paths ...string) string {
+	return filepath.Join(env.String(os.TempDir(), "EG_RUNTIME_DIRECTORY"), filepath.Join(paths...))
 }

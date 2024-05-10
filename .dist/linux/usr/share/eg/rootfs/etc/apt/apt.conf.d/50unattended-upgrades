@@ -4,6 +4,9 @@
 // from non-security sources (e.g. chromium). By allowing the release
 // pocket these get automatically pulled in.
 Unattended-Upgrade::Allowed-Origins {
+	// allow eg to upgrade automatically.
+	"LP-PPA-jljatone-eg:${distro_codename}";
+
 	"${distro_id}:${distro_codename}";
 	"${distro_id}:${distro_codename}-security";
 	// Extended Security Maintenance; doesn't necessarily exist for

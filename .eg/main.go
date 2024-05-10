@@ -41,7 +41,6 @@ func PrepareDebian(ctx context.Context, _ eg.Op) error {
 }
 
 func BuildDebian(ctx context.Context, _ eg.Op) error {
-
 	return shell.Run(
 		ctx,
 		shell.New("env").
@@ -50,7 +49,9 @@ func BuildDebian(ctx context.Context, _ eg.Op) error {
 		shell.New("/usr/lib/go-1.22/bin/go version"),
 		shell.New("/usr/lib/go-1.22/bin/go build -buildvcs ./cmd/...").
 			Directory(".dist/deb/src"),
+		shell.New("echo ${GPG_PASSPHRASE} | gpg-preset-passphrase --present 1472F4128AD327A04323220509F9FEB7D4D09CF4").Environ("GPG_PASSPHRASE", env.String("", "GPG_PASSPHRASE")),
 		shell.New("debuild -S -k1472F4128AD327A04323220509F9FEB7D4D09CF4").Directory(".dist/deb"),
+		shell.New("/usr/bin/false"),
 		shell.New("dput -f -c deb/dput.config eg eg_${VERSION}_source.changes").Directory(".dist"),
 	)
 }

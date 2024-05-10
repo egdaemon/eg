@@ -268,6 +268,23 @@ func IgnoreError(err error, code ...int) bool {
 	return CheckStatusCode(cause.Code, code...)
 }
 
+func IsStatusError(err error, code ...int) error {
+	var (
+		cause Error
+		ok    bool
+	)
+
+	if cause, ok = errorsx.Cause(err).(Error); !ok {
+		return nil
+	}
+
+	if !CheckStatusCode(cause.Code, code...) {
+		return nil
+	}
+
+	return err
+}
+
 // MimeType extracts mimetype from request, defaults to application/
 func MimeType(h http.Header) string {
 	const fallback = "application/octet-stream"

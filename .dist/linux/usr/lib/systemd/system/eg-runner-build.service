@@ -1,0 +1,23 @@
+[Unit]
+Description=eg runner container
+After=network.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ProtectKernelModules=yes
+PrivateMounts=yes
+IPAddressDeny=link-local
+IPAddressDeny=multicast
+Restart=on-failure
+CacheDirectory=%p
+ConfigurationDirectory=%p
+RuntimeDirectory=%p
+RuntimeDirectoryMode=0700
+Environment=EG_RUNNER_OVERRIDE_DIR=rootfs
+EnvironmentFile=-/etc/eg/runner.env
+ExecStart=/usr/bin/podman build --build-arg EG_RUNNER_OVERRIDE_DIR="${EG_RUNNER_OVERRIDE_DIR}" -t eg-runner -f /usr/share/eg/Containerfile /usr/share/eg
+
+
+[Install]
+WantedBy=default.target

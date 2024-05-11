@@ -5,7 +5,7 @@
 // pocket these get automatically pulled in.
 Unattended-Upgrade::Allowed-Origins {
 	// allow eg to upgrade automatically.
-	"LP-PPA-jljatone-eg:${distro_codename}";
+	"LP-PPA-egdaemon-eg:${distro_codename}";
 
 	"${distro_id}:${distro_codename}";
 	"${distro_id}:${distro_codename}-security";

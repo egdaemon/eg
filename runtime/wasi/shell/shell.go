@@ -79,6 +79,11 @@ func New(cmd string) Command {
 	}
 }
 
+// Newf provides a simple printf form of creating commands.
+func Newf(cmd string, options ...any) Command {
+	return New(fmt.Sprintf(cmd, options...))
+}
+
 // Runtime creates a Command with no specified command to run.
 // and can be used as a template:
 //

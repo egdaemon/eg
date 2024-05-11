@@ -8,7 +8,7 @@ RUN apt update
 # general utilities
 RUN apt install -y software-properties-common build-essential
 RUN add-apt-repository -n ppa:longsleep/golang-backports
-RUN add-apt-repository -n ppa:jljatone/eg
+RUN add-apt-repository -n ppa:egdaemon/eg
 RUN apt update
 
 RUN apt install -y --no-install-recommends curl gnupg2 lsb-release iproute2 git apt-file pinentry-tty uidmap dbus-user-session

@@ -15,6 +15,7 @@ import (
 
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
+	"github.com/egdaemon/eg/internal/fsx"
 )
 
 func DefaultStateDirectory() string {
@@ -91,17 +92,8 @@ func New(ctx context.Context, root string, mdir string, name string) (zero Conte
 }
 
 func ensuredirs(c Context) (_ Context, err error) {
-	mkdirs := func(paths ...string) error {
-		for _, p := range paths {
-			// log.Printf("------ making directory %s ------\n", p)
-			if err = os.MkdirAll(p, 0700); err != nil {
-				return errorsx.Wrapf(err, "unable to create directory: %s", p)
-			}
-		}
-
-		return nil
-	}
-	return c, mkdirs(
+	return c, fsx.MkDirs(
+		0700,
 		filepath.Join(c.Root, c.RuntimeDir),
 		filepath.Join(c.Root, c.WorkingDir),
 		filepath.Join(c.Root, c.GenModDir),

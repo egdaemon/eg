@@ -7,8 +7,10 @@ import (
 	"path/filepath"
 
 	"github.com/egdaemon/eg/internal/errorsx"
+	"github.com/egdaemon/eg/internal/fsx"
 	"github.com/egdaemon/eg/internal/userx"
 	"github.com/gofrs/uuid"
+	"github.com/pkg/errors"
 )
 
 type SpoolDirs struct {
@@ -19,11 +21,15 @@ type SpoolDirs struct {
 
 func DefaultSpoolDirs() SpoolDirs {
 	root := filepath.Join(userx.DefaultCacheDirectory(), "spool")
-	return SpoolDirs{
+	dirs := SpoolDirs{
 		Downloading: filepath.Join(root, "downloading"),
 		Queued:      filepath.Join(root, "queued"),
 		Running:     filepath.Join(root, "running"),
 	}
+
+	errorsx.Log(errors.Wrap(fsx.MkDirs(0700, dirs.Downloading, dirs.Queued, dirs.Running), "unable to make spool directories"))
+
+	return dirs
 }
 
 func (t SpoolDirs) Download(uid uuid.UUID, name string, content io.Reader) (err error) {

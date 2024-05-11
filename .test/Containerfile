@@ -6,7 +6,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 RUN apt update
 RUN apt-get -y install software-properties-common build-essential uidmap dbus-user-session apt-file
 RUN add-apt-repository -n ppa:longsleep/golang-backports
-RUN add-apt-repository -n ppa:jljatone/eg
+RUN add-apt-repository -n ppa:egdaemon/eg
 RUN apt update
 
 # general utilities

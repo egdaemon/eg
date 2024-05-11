@@ -78,6 +78,7 @@ func HTTP(global *cmdopts.Global, httpl net.Listener) (err error) {
 	go func() {
 		defer global.Cleanup.Done()
 		defer global.Shutdown()
+		defer log.Println("http shutting down")
 		if err := http.Serve(httpl, httpmux); err != nil {
 			log.Println("failed to start http server", err)
 		}

@@ -21,14 +21,11 @@ pkgver() {
 
 prepare() {
   rm -rf bin
-  ls -lha ${PWD}
-  env
   cd "${srcdir}/${pkgname}"
 }
 
 build() {
   echo "BUILD INITIATED eg ${PWD} ${srcdir}"
-  go env
   GOBIN="${startdir}/bin" go install -C ${srcdir}/${pkgname} ./cmd/eg
 }
 

@@ -105,6 +105,22 @@ func loadcached(path string) (s ssh.Signer, err error) {
 	return ssh.ParsePrivateKey(privencoded)
 }
 
+func SignerFromGenerator(kg keygen) (s ssh.Signer, err error) {
+	var (
+		privencoded []byte
+	)
+
+	if privencoded, _, err = kg.Generate(); err != nil {
+		return nil, err
+	}
+
+	if s, err = ssh.ParsePrivateKey(privencoded); err != nil {
+		return nil, err
+	}
+
+	return s, nil
+}
+
 func AutoCached(kg keygen, path string) (s ssh.Signer, err error) {
 	var (
 		privencoded, pubencoded []byte

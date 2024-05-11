@@ -89,7 +89,7 @@ func Register(global *cmdopts.Global, tlsc *cmdopts.TLSConfig, runtimecfg *cmdop
 				insecure = " --insecure"
 			}
 			debugx.Println("authzed timestamp", authzedts, "<", ts)
-			log.Printf("waiting for registration to be accepted. run `eg actl authorize --id='%s'%s` to accept\n", md5x.String(fingerprint), insecure)
+			log.Printf("waiting for registration to be accepted. run `eg actl authorize id '%s'%s` to accept\n", md5x.String(fingerprint), insecure)
 			continue
 		}
 

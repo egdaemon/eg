@@ -101,6 +101,10 @@ func NewEnvironFromStrings(environ ...string) environ {
 	})
 }
 
+func (t environ) Map(s string) string {
+	return t.m(s)
+}
+
 // Int retrieve a integer flag from the environment, checks each key in order
 // first to parse successfully is returned.
 func (t environ) Int(fallback int, keys ...string) int {

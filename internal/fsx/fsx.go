@@ -132,3 +132,13 @@ func CloneTree(dstdir string, rootdir string, archive fs.FS) (err error) {
 		return nil
 	})
 }
+
+func MkDirs(perm fs.FileMode, paths ...string) (err error) {
+	for _, p := range paths {
+		if err = os.MkdirAll(p, perm); err != nil {
+			return errorsx.Wrapf(err, "unable to create directory: %s", p)
+		}
+	}
+
+	return nil
+}

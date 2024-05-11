@@ -6,7 +6,7 @@ ARG EG_RUNNER_OVERRIDE_DIR=/usr/share/eg/rootfs
 COPY ${EG_RUNNER_OVERRIDE_DIR} /
 
 RUN apt-get update
-RUN apt-get -y install software-properties-common build-essential apt-file podman rsync vim dput devscripts dh-make dput git uidmap dbus-user-session fuse-overlayfs pinentry-tty
+RUN apt-get -y install software-properties-common build-essential apt-file podman rsync vim dput devscripts dh-make dput git uidmap dbus-user-session fuse-overlayfs pinentry-tty inetutils-ping
 # RUN add-apt-repository -n ppa:longsleep/golang-backports
 RUN add-apt-repository -n ppa:jljatone/eg
 RUN apt-get update

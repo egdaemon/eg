@@ -17,6 +17,9 @@ ConfigurationDirectory=%p
 RuntimeDirectory=%p
 RuntimeDirectoryMode=0700
 EnvironmentFile=-/etc/eg/daemon.env
+#PermissionsStartOnly=true
+ExecStartPre=/usr/bin/loginctl enable-linger eg
+ExecStartPre=/usr/bin/sleep 3
 ExecStart=/usr/bin/eg daemon
 
 [Install]

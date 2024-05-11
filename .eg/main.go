@@ -14,10 +14,6 @@ import (
 	"github.com/egdaemon/eg/runtime/wasi/shell"
 )
 
-const (
-	email = "engineering@egdaemon.com"
-)
-
 func Debug(ctx context.Context, op eg.Op) error {
 	log.Println("debug initiated")
 	defer log.Println("debug completed")

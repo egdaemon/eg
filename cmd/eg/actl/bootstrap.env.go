@@ -38,10 +38,18 @@ type BootstrapEnvDaemon struct {
 	Seed      string `name:"seed" placeholder:"00000000-0000-0000-0000-000000000000"`
 }
 
-func (t BootstrapEnvDaemon) Run(gctx *cmdopts.Global) (err error) {
+func (t BootstrapEnvDaemon) Run(gctx *cmdopts.Global, runtimecfg *cmdopts.RuntimeResources) (err error) {
+	memory := numericx.Max(runtimecfg.Memory, uint64(float64(memory.TotalMemory())*0.9))
+
 	return envx.Build().Var(
 		"EG_ACCOUNT", t.AccountID,
 	).Var(
 		"EG_ENTROPY_SEED", stringsx.DefaultIfBlank(t.Seed, uuid.Must(uuid.NewV4()).String()),
+	).Var(
+		"EG_RESOURCES_CORES", strconv.FormatUint(numericx.Max(uint64(runtime.NumCPU()), runtimecfg.Cores), 10),
+	).Var(
+		"EG_RESOURCES_MEMORY", strconv.FormatUint(memory, 10),
+	).Var(
+		"EG_RESOURCES_DISK", strconv.FormatUint(runtimecfg.Disk, 10),
 	).CopyTo(os.Stdout)
 }

@@ -19,7 +19,7 @@ Environment=EG_RUNNER_OVERRIDE_DIR=rootfs
 Environment=EG_RUNNER_DAEMON_ENV=/etc/eg/daemon.env
 EnvironmentFile=-/etc/eg/runner.env
 ExecStartPre=/usr/bin/echo podman run --name eg --env-file ${EG_RUNNER_DAEMON_ENV} --attach STDERR --no-healthcheck --cpus ${EG_RUNNER_CPU} --memory ${EG_RUNNER_MEMORY} eg-runner:latest /sbin/init
-ExecStart=/usr/bin/podman run --replace --name eg --volume /etc/eg/daemon.env:/etc/eg/daemon.env:ro --attach STDERR --no-healthcheck --cpus ${EG_RUNNER_CPU} --memory ${EG_RUNNER_MEMORY} eg-runner:latest /sbin/init
+ExecStart=/usr/bin/podman run --replace --name eg --cap-add=sys_admin,mknod --security-opt label=disable --device /dev/fuse --volume /etc/eg/daemon.env:/etc/eg/daemon.env:ro --attach STDERR --no-healthcheck --cpus ${EG_RUNNER_CPU} --memory ${EG_RUNNER_MEMORY} eg-runner:latest /sbin/init
 ExecStop=/usr/bin/podman stop eg
 
 [Install]

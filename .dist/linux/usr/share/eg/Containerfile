@@ -11,8 +11,14 @@ RUN apt-get -y install software-properties-common build-essential apt-file podma
 RUN add-apt-repository -n ppa:jljatone/eg
 RUN apt-get update
 RUN apt-get -y install eg
-RUN usermod --add-subuids 300000-365535 --add-subgids 300000-365535 root
+RUN systemd-sysusers
+RUN systemd-tmpfiles --create
+RUN usermod --add-subuids 100000-165535 --add-subgids 100000-165535 eg
+RUN systemctl disable eg-runner-build.service
 RUN systemctl disable eg-runner.service
-RUN systemctl enable eg-daemon.service
+RUN systemctl disable eg-daemon.service
+# RUN mkdir -p
+# RUN touch /var/lib/systemd/linger/eg
+
 
 CMD /usr/sbin/init

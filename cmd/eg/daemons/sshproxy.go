@@ -26,6 +26,7 @@ func SSHProxy(global *cmdopts.Global, config *ssh.ClientConfig, signer ssh.Signe
 		)
 		// defer global.Cleanup.Done()
 		defer global.Shutdown()
+		defer log.Println("SSH Proxy shuttingdown")
 
 		r := rate.NewLimiter(rate.Every(10*time.Second), 1)
 		d := net.Dialer{}
@@ -38,7 +39,7 @@ func SSHProxy(global *cmdopts.Global, config *ssh.ClientConfig, signer ssh.Signe
 				}
 				conn, err := ssh.Dial("tcp", envx.String(eg.EnvEGSSHHostDefault, eg.EnvEGSSHHost), config)
 				if err != nil {
-					log.Println(errorsx.Wrap(err, "unable to listen for ssh connections"))
+					log.Println(errorsx.Wrapf(err, "unable to listen for ssh connections: %s", envx.String(eg.EnvEGSSHHostDefault, eg.EnvEGSSHHost)))
 					continue
 				}
 

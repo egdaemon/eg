@@ -12,6 +12,7 @@ import (
 	"github.com/egdaemon/eg/runtime/wasi/eggit"
 	"github.com/egdaemon/eg/runtime/wasi/env"
 	"github.com/egdaemon/eg/runtime/wasi/shell"
+	"github.com/egdaemon/eg/runtime/x/wasi/shellx"
 )
 
 func Debug(ctx context.Context, op eg.Op) error {
@@ -34,6 +35,10 @@ func main() {
 	defer done()
 
 	ts := time.Now()
+
+	if s, err := shellx.String(ctx, "/usr/bin/echo", "hello world"); err == nil {
+		log.Println("shell output", s)
+	}
 
 	err := eg.Perform(
 		ctx,

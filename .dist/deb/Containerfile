@@ -6,8 +6,12 @@ COPY rootfs /
 RUN apt-get update
 RUN apt-get -y install software-properties-common build-essential
 RUN add-apt-repository -n ppa:longsleep/golang-backports
+
+# github cli initiated
+RUN apt-key adv --keyserver keyserver.ubuntu.com --recv-key C99B11DEB97541F0
+RUN apt-add-repository https://cli.github.com/packages
+# github cline completed
+
 RUN apt-get update
-RUN apt-get -y install podman rsync vim dput devscripts dh-make dput git uidmap dbus-user-session
-RUN apt-get -y install golang-1.22
-RUN apt-get -y install pinentry-tty
-RUN which pinentry-tty
+RUN apt-get -y install podman rsync vim dput devscripts dh-make dput git uidmap dbus-user-session golang-1.22 pinentry-tty
+RUN apt-get -y install gh

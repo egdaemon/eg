@@ -152,7 +152,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	log.Println("shutting down")
+	debugx.Println("shutting down")
 	shellcli.Shutdown()
 	shellcli.Cleanup.Wait()
 }

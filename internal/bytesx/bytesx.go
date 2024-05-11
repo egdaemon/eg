@@ -4,10 +4,10 @@ import (
 	"fmt"
 )
 
-type Unit int
+type Unit int64
 
 func (t Unit) Format(f fmt.State, verb rune) {
-	div := 1
+	div := int64(1)
 	suffix := ""
 	switch {
 	case t > EiB:

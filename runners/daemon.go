@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/davecgh/go-spew/spew"
+	"github.com/egdaemon/eg/internal/debugx"
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/stringsx"
@@ -145,7 +146,7 @@ func NewRunner(ctx context.Context, ws workspaces.Context, id string, options ..
 	}()
 
 	log.Println("runner", id)
-	log.Println("workspace", spew.Sdump(ws))
+	debugx.Println("workspace", spew.Sdump(ws))
 	log.Println("logging", logpath)
 
 	r := &Agent{

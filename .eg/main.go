@@ -34,8 +34,6 @@ func main() {
 	ctx, done := context.WithTimeout(context.Background(), time.Hour)
 	defer done()
 
-	ts := time.Now()
-
 	if s, err := shellx.String(ctx, "/usr/bin/echo", "hello world"); err == nil {
 		log.Println("shell output", s)
 	}
@@ -49,8 +47,8 @@ func main() {
 			eg.Build(eg.Container(archlinux.ContainerName).BuildFromFile(".dist/archlinux/Containerfile")),
 		),
 		eg.Parallel(
-			eg.Module(ctx, debian.Builder(debian.ContainerName, ts, "jammy"), debian.Build),
-			eg.Module(ctx, debian.Builder(debian.ContainerName, ts.Add(time.Second), "noble"), debian.Build),
+			eg.Module(ctx, debian.Builder(debian.ContainerName, "jammy"), debian.Build),
+			eg.Module(ctx, debian.Builder(debian.ContainerName, "noble"), debian.Build),
 			eg.Module(ctx, archlinux.Builder(archlinux.ContainerName), archlinux.Build),
 		),
 	)

@@ -1,6 +1,8 @@
 package backoff
 
 import (
+	"crypto/md5"
+	"encoding/binary"
 	"math"
 	"math/bits"
 	"math/rand"
@@ -165,4 +167,41 @@ func (t *awaiter) Await(d Strategy) <-chan time.Time {
 
 func Waiter() Awaiter {
 	return &awaiter{}
+}
+
+// generate a *consistent* duration based on the input i within the
+// provided window. this isn't the best location for these functions.
+// but the lack of a better location.
+func DynamicHashDuration(window time.Duration, i string) time.Duration {
+	if window == 0 {
+		return 0
+	}
+
+	return time.Duration(DynamicHashWindow(i, uint64(window)))
+}
+
+func DynamicHashHour(i string) time.Duration {
+	return DynamicHashDuration(60*time.Minute, i)
+}
+
+func DynamicHash45m(i string) time.Duration {
+	return DynamicHashDuration(45*time.Minute, i)
+}
+
+func DynamicHash15m(i string) time.Duration {
+	return DynamicHashDuration(15*time.Minute, i)
+}
+
+func DynamicHash5m(i string) time.Duration {
+	return DynamicHashDuration(5*time.Minute, i)
+}
+
+func DynamicHashDay(i string) time.Weekday {
+	return time.Weekday(DynamicHashWindow(i, 7))
+}
+
+// uint64 to prevent negative values
+func DynamicHashWindow(i string, n uint64) uint64 {
+	digest := md5.Sum([]byte(i))
+	return binary.LittleEndian.Uint64(digest[:]) % n
 }

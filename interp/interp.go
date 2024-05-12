@@ -176,6 +176,10 @@ func (t runner) perform(ctx context.Context, runid, path string, rtb runtimefn) 
 	}
 	defer os.RemoveAll(tmpdir)
 
+	if err = fsx.MkDirs(0777, hostcachedir); err != nil {
+		return errorsx.Wrap(err, "unable to ensure host cache directory")
+	}
+
 	log.Println("wazero cache", wasix.WazCacheDir(t.runtimedir))
 	fsx.PrintFS(os.DirFS(wasix.WazCacheDir(t.runtimedir)))
 

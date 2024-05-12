@@ -2,6 +2,7 @@ package eggit
 
 import (
 	"context"
+	"encoding/hex"
 	"fmt"
 	"os"
 	"strings"
@@ -11,16 +12,49 @@ import (
 	"github.com/egdaemon/eg/runtime/wasi/eg"
 	"github.com/egdaemon/eg/runtime/wasi/env"
 	"github.com/egdaemon/eg/runtime/wasi/internal/ffigit"
-	"github.com/go-git/go-git/v5/plumbing"
-	"github.com/go-git/go-git/v5/plumbing/object"
 )
 
-type Commit = object.Commit
+type hash [20]byte
 
-func EnvCommit() *Commit {
-	return &Commit{
-		Hash: plumbing.NewHash(os.Getenv("EG_GIT_HEAD_COMMIT")),
-		Committer: object.Signature{
+// NewHash return a new Hash from a hexadecimal hash representation
+func nhash(s string) hash {
+	b, _ := hex.DecodeString(s)
+
+	var h hash
+	copy(h[:], b)
+
+	return h
+}
+
+func (h hash) IsZero() bool {
+	var empty hash
+	return h == empty
+}
+
+func (h hash) String() string {
+	return hex.EncodeToString(h[:])
+}
+
+type signature struct {
+	Name  string
+	Email string
+	When  time.Time
+}
+
+type commit struct {
+	// Hash of the commit object.
+	Hash hash
+	// Author is the original author of the commit.
+	Author signature
+	// Committer is the one performing the commit, might be different from
+	// Author.
+	Committer signature
+}
+
+func EnvCommit() *commit {
+	return &commit{
+		Hash: nhash(os.Getenv("EG_GIT_HEAD_COMMIT")),
+		Committer: signature{
 			Name:  os.Getenv("EG_GIT_HEAD_COMMIT_AUTHOR"),
 			Email: os.Getenv("EG_GIT_HEAD_COMMIT_EMAIL"),
 			When:  errorsx.Zero(time.Parse(time.RFC3339, os.Getenv("EG_GIT_HEAD_COMMIT_TIMESTAMP"))),

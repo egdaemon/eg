@@ -119,12 +119,7 @@ func HeadEnv(repo *git.Repository, vcs, uri string, treeish string) (env []strin
 	if hash, err = repo.ResolveRevision(plumbing.Revision(treeish)); err != nil {
 		return nil, errorsx.Wrapf(err, "unable to resolve git reference: %s", treeish)
 	} else if commit, err = repo.CommitObject(*hash); err != nil {
-
-	} else {
-		commit = &object.Commit{
-			Hash:      plumbing.ZeroHash,
-			Committer: object.Signature{},
-		}
+		return nil, errorsx.Wrapf(err, "unable to resolve git reference: %s", treeish)
 	}
 
 	return envx.Build().Var(

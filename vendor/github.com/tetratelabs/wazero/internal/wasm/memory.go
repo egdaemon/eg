@@ -12,8 +12,8 @@ import (
 	"unsafe"
 
 	"github.com/tetratelabs/wazero/api"
+	"github.com/tetratelabs/wazero/experimental"
 	"github.com/tetratelabs/wazero/internal/internalapi"
-	"github.com/tetratelabs/wazero/internal/platform"
 	"github.com/tetratelabs/wazero/internal/wasmruntime"
 )
 
@@ -59,69 +59,43 @@ type MemoryInstance struct {
 	// with a fixed weight of 1 and no spurious notifications.
 	waiters sync.Map
 
-	mmappedBuffer []byte
-	closed        bool
+	expBuffer experimental.LinearMemory
 }
 
 // NewMemoryInstance creates a new instance based on the parameters in the SectionIDMemory.
-func NewMemoryInstance(memSec *Memory) *MemoryInstance {
-	min := MemoryPagesToBytesNum(memSec.Min)
-	capacity := MemoryPagesToBytesNum(memSec.Cap)
+func NewMemoryInstance(memSec *Memory, allocator experimental.MemoryAllocator) *MemoryInstance {
+	minBytes := MemoryPagesToBytesNum(memSec.Min)
+	capBytes := MemoryPagesToBytesNum(memSec.Cap)
+	maxBytes := MemoryPagesToBytesNum(memSec.Max)
 
 	var buffer []byte
-	var cap uint32
-	var mmappedBuffer []byte
-	if memSec.IsShared {
-		// Memory accesses can happen at the same time that memory is resized, meaning
-		// we cannot have the memory base move during operation. mmap allows allocating memory virtually so
-		// we can grow without changing the base. The spec requires max for shared memory currently because
-		// all threads implementations are effectively expected to use mmap for shared memory.
-		max := MemoryPagesToBytesNum(memSec.Max)
-		var b []byte
-		if platform.MmapSupported && max > 0 {
-			var err error
-			b, err = platform.MmapMemory(int(max))
-			if err != nil {
-				panic(fmt.Errorf("unable to mmap memory: %w", err))
-			}
-			mmappedBuffer = b
-		} else {
-			// mmap not supported so we just preallocate a normal buffer. This will often be large, i.e. ~4GB,
-			// and likely isn't practical, but interpreter usage should be rare and the Wasm binary can be
-			// edited to reduce max memory size if support for non-mmap platforms is required.
-			b = make([]byte, max)
-		}
-		buffer = b[:MemoryPagesToBytesNum(memSec.Min)]
-		cap = memSec.Max
+	var expBuffer experimental.LinearMemory
+	if allocator != nil {
+		expBuffer = allocator.Allocate(capBytes, maxBytes)
+		buffer = expBuffer.Reallocate(minBytes)
+	} else if memSec.IsShared {
+		// Shared memory needs a fixed buffer, so allocate with the maximum size.
+		//
+		// The rationale as to why we can simply use make([]byte) to a fixed buffer is that Go's GC is non-relocating.
+		// That is not a part of Go spec, but is well-known thing in Go community (wazero's compiler heavily relies on it!)
+		// 	* https://github.com/go4org/unsafe-assume-no-moving-gc
+		//
+		// Also, allocating Max here isn't harmful as the Go runtime uses mmap for large allocations, therefore,
+		// the memory buffer allocation here is virtual and doesn't consume physical memory until it's used.
+		// 	* https://github.com/golang/go/blob/8121604559035734c9677d5281bbdac8b1c17a1e/src/runtime/malloc.go#L1059
+		//	* https://github.com/golang/go/blob/8121604559035734c9677d5281bbdac8b1c17a1e/src/runtime/malloc.go#L1165
+		buffer = make([]byte, minBytes, maxBytes)
 	} else {
-		buffer = make([]byte, min, capacity)
-		cap = memSec.Cap
+		buffer = make([]byte, minBytes, capBytes)
 	}
-
 	return &MemoryInstance{
-		Buffer:        buffer,
-		Min:           memSec.Min,
-		Cap:           cap,
-		Max:           memSec.Max,
-		Shared:        memSec.IsShared,
-		mmappedBuffer: mmappedBuffer,
+		Buffer:    buffer,
+		Min:       memSec.Min,
+		Cap:       memoryBytesNumToPages(uint64(cap(buffer))),
+		Max:       memSec.Max,
+		Shared:    memSec.IsShared,
+		expBuffer: expBuffer,
 	}
-}
-
-func (m *MemoryInstance) Close() error {
-	if m.mmappedBuffer == nil {
-		// No need to release anything for non-mmapped memory.
-		return nil
-	}
-
-	m.Mux.Lock()
-	defer m.Mux.Unlock()
-
-	if m.closed {
-		return nil
-	}
-	m.closed = true
-	return platform.MunmapCodeSegment(m.mmappedBuffer)
 }
 
 // Definition implements the same method as documented on api.Memory.
@@ -131,12 +105,12 @@ func (m *MemoryInstance) Definition() api.MemoryDefinition {
 
 // Size implements the same method as documented on api.Memory.
 func (m *MemoryInstance) Size() uint32 {
-	return m.size()
+	return uint32(len(m.Buffer))
 }
 
 // ReadByte implements the same method as documented on api.Memory.
 func (m *MemoryInstance) ReadByte(offset uint32) (byte, bool) {
-	if offset >= m.size() {
+	if !m.hasSize(offset, 1) {
 		return 0, false
 	}
 	return m.Buffer[offset], true
@@ -188,7 +162,7 @@ func (m *MemoryInstance) Read(offset, byteCount uint32) ([]byte, bool) {
 
 // WriteByte implements the same method as documented on api.Memory.
 func (m *MemoryInstance) WriteByte(offset uint32, v byte) bool {
-	if offset >= m.size() {
+	if !m.hasSize(offset, 1) {
 		return false
 	}
 	m.Buffer[offset] = v
@@ -249,7 +223,7 @@ func MemoryPagesToBytesNum(pages uint32) (bytesNum uint64) {
 
 // Grow implements the same method as documented on api.Memory.
 func (m *MemoryInstance) Grow(delta uint32) (result uint32, ok bool) {
-	currentPages := memoryBytesNumToPages(uint64(len(m.Buffer)))
+	currentPages := m.Pages()
 	if delta == 0 {
 		return currentPages, true
 	}
@@ -258,6 +232,22 @@ func (m *MemoryInstance) Grow(delta uint32) (result uint32, ok bool) {
 	newPages := currentPages + delta
 	if newPages > m.Max || int32(delta) < 0 {
 		return 0, false
+	} else if m.expBuffer != nil {
+		buffer := m.expBuffer.Reallocate(MemoryPagesToBytesNum(newPages))
+		if m.Shared {
+			if unsafe.SliceData(buffer) != unsafe.SliceData(m.Buffer) {
+				panic("shared memory cannot move, this is a bug in the memory allocator")
+			}
+			// We assume grow is called under a guest lock.
+			// But the memory length is accessed elsewhere,
+			// so use atomic to make the new length visible across threads.
+			atomicStoreLengthAndCap(&m.Buffer, uintptr(len(buffer)), uintptr(cap(buffer)))
+			m.Cap = memoryBytesNumToPages(uint64(cap(buffer)))
+		} else {
+			m.Buffer = buffer
+			m.Cap = newPages
+		}
+		return currentPages, true
 	} else if newPages > m.Cap { // grow the memory.
 		if m.Shared {
 			panic("shared memory cannot be grown, this is a bug in wazero")
@@ -266,19 +256,20 @@ func (m *MemoryInstance) Grow(delta uint32) (result uint32, ok bool) {
 		m.Cap = newPages
 		return currentPages, true
 	} else { // We already have the capacity we need.
-		sp := (*reflect.SliceHeader)(unsafe.Pointer(&m.Buffer))
 		if m.Shared {
-			// Use atomic write to ensure new length is visible across threads.
-			atomic.StoreUintptr((*uintptr)(unsafe.Pointer(&sp.Len)), uintptr(MemoryPagesToBytesNum(newPages)))
+			// We assume grow is called under a guest lock.
+			// But the memory length is accessed elsewhere,
+			// so use atomic to make the new length visible across threads.
+			atomicStoreLength(&m.Buffer, uintptr(MemoryPagesToBytesNum(newPages)))
 		} else {
-			sp.Len = int(MemoryPagesToBytesNum(newPages))
+			m.Buffer = m.Buffer[:MemoryPagesToBytesNum(newPages)]
 		}
 		return currentPages, true
 	}
 }
 
-// PageSize returns the current memory buffer size in pages.
-func (m *MemoryInstance) PageSize() (result uint32) {
+// Pages implements the same method as documented on api.Memory.
+func (m *MemoryInstance) Pages() (result uint32) {
 	return memoryBytesNumToPages(uint64(len(m.Buffer)))
 }
 
@@ -303,14 +294,25 @@ func PagesToUnitOfBytes(pages uint32) string {
 
 // Below are raw functions used to implement the api.Memory API:
 
+// Uses atomic write to update the length of a slice.
+func atomicStoreLengthAndCap(slice *[]byte, length uintptr, cap uintptr) {
+	slicePtr := (*reflect.SliceHeader)(unsafe.Pointer(slice))
+	capPtr := (*uintptr)(unsafe.Pointer(&slicePtr.Cap))
+	atomic.StoreUintptr(capPtr, cap)
+	lenPtr := (*uintptr)(unsafe.Pointer(&slicePtr.Len))
+	atomic.StoreUintptr(lenPtr, length)
+}
+
+// Uses atomic write to update the length of a slice.
+func atomicStoreLength(slice *[]byte, length uintptr) {
+	slicePtr := (*reflect.SliceHeader)(unsafe.Pointer(slice))
+	lenPtr := (*uintptr)(unsafe.Pointer(&slicePtr.Len))
+	atomic.StoreUintptr(lenPtr, length)
+}
+
 // memoryBytesNumToPages converts the given number of bytes into the number of pages.
 func memoryBytesNumToPages(bytesNum uint64) (pages uint32) {
 	return uint32(bytesNum >> MemoryPageSizeInBits)
-}
-
-// size returns the size in bytes of the buffer.
-func (m *MemoryInstance) size() uint32 {
-	return uint32(len(m.Buffer)) // We don't lock here because size can't become smaller.
 }
 
 // hasSize returns true if Len is sufficient for byteCount at the given offset.

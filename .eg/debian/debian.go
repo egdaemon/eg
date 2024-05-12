@@ -46,6 +46,7 @@ func build(ctx context.Context, _ eg.Op) error {
 
 func Builder(name string, distro string) eg.ContainerRunner {
 	c := eggit.EnvCommit()
+
 	return eg.Container(name).
 		OptionEnv("VCS_REVISION", c.Hash.String()).
 		OptionEnv("VERSION", fmt.Sprintf("0.0.%d", c.Committer.When.Unix())).

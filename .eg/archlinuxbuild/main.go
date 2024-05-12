@@ -8,7 +8,6 @@ import (
 
 	"github.com/egdaemon/eg/runtime/wasi/eg"
 	"github.com/egdaemon/eg/runtime/wasi/eggit"
-	"github.com/egdaemon/eg/runtime/x/wasi/shellx"
 )
 
 // main defines the setup for the CI process. here is where you define all
@@ -16,10 +15,6 @@ import (
 func main() {
 	ctx, done := context.WithTimeout(context.Background(), time.Hour)
 	defer done()
-
-	if s, err := shellx.String(ctx, "/usr/bin/echo", "hello world"); err == nil {
-		log.Println("shell output", s)
-	}
 
 	err := eg.Perform(
 		ctx,

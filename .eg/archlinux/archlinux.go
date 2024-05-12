@@ -35,7 +35,7 @@ func Build(ctx context.Context, _ eg.Op) error {
 		golang.New("tree -a --gitignore /opt/eg/.dist/archlinux"),
 		golang.New("rsync --recursive /opt/eg/.dist/archlinux/ .build"),
 		golang.New("chown -R build:build .build"),
-		golang.New("tls -lha /cache"),
+		golang.New("ls -lha /cache"),
 		golang.Directory(".build").New("sudo -E -u build makepkg -f -c -C"),
 		golang.New("tree -a --gitignore .build"),
 		golang.Newf(

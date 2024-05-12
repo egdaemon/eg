@@ -122,6 +122,7 @@ func PodmanModuleRunCmd(image, cname, moduledir string, options ...string) []str
 	options = append([]string{
 		"run",
 		"--name", cname,
+		"--pids-limit", "-1",
 		"--detach",
 		"--env", "CI",
 		"--env", "EG_CI",

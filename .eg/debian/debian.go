@@ -2,7 +2,9 @@ package debian
 
 import (
 	"context"
+	"crypto/md5"
 	"eg/ci/maintainer"
+	"encoding/binary"
 	"fmt"
 	"time"
 
@@ -49,7 +51,7 @@ func Builder(name string, distro string) eg.ContainerRunner {
 
 	return eg.Container(name).
 		OptionEnv("VCS_REVISION", c.Hash.String()).
-		OptionEnv("VERSION", fmt.Sprintf("0.0.%d", c.Committer.When.Unix())).
+		OptionEnv("VERSION", fmt.Sprintf("0.0.%d", c.Committer.When.Add(dynamicduration(10*time.Second, distro)).UnixMilli())).
 		OptionEnv("DEBEMAIL", maintainer.Email).
 		OptionEnv("DEBFULLNAME", maintainer.Name).
 		OptionEnv("DISTRO", distro).
@@ -64,4 +66,21 @@ func Builder(name string, distro string) eg.ContainerRunner {
 
 func Build(ctx context.Context, _ eg.Op) error {
 	return eg.Perform(ctx, prepare, build)
+}
+
+// uint64 to prevent negative values
+func dynamichashversion(i string, n uint64) uint64 {
+	digest := md5.Sum([]byte(i))
+	return binary.LittleEndian.Uint64(digest[:]) % n
+}
+
+// generate a *consistent* duration based on the input i within the
+// provided window. this isn't the best location for these functions.
+// but the lack of a better location.
+func dynamicduration(window time.Duration, i string) time.Duration {
+	if window == 0 {
+		return 0
+	}
+
+	return time.Duration(dynamichashversion(i, uint64(window)))
 }

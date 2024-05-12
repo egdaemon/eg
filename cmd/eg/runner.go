@@ -39,6 +39,7 @@ import (
 	"github.com/egdaemon/eg/runners"
 	"github.com/egdaemon/eg/transpile"
 	"github.com/egdaemon/eg/workspaces"
+	"github.com/go-git/go-git/v5"
 	"github.com/gofrs/uuid"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/oauth2"
@@ -61,6 +62,7 @@ type runner struct {
 func (t runner) Run(gctx *cmdopts.Global, runtimecfg *cmdopts.RuntimeResources) (err error) {
 	var (
 		ws         workspaces.Context
+		repo       *git.Repository
 		uid        = uuid.Must(uuid.NewV7())
 		ebuf       = make(chan *ffigraph.EventInfo)
 		environio  *os.File
@@ -92,11 +94,15 @@ func (t runner) Run(gctx *cmdopts.Global, runtimecfg *cmdopts.RuntimeResources) 
 	}
 	defer environio.Close()
 
+	if repo, err = git.PlainOpen(ws.Root); err != nil {
+		return errorsx.Wrap(err, "unable to open git repository")
+	}
+
 	envb := envx.Build().
 		FromPath(t.MountEnvirons).
 		FromEnv(t.EnvVars...).
 		FromEnv(os.Environ()...).
-		FromEnviron(errorsx.Zero(gitx.LocalEnv(ws.Root, t.GitRemote, t.GitReference))...).
+		FromEnviron(errorsx.Zero(gitx.LocalEnv(repo, t.GitRemote, t.GitReference))...).
 		Var("EG_INTERNAL_GIT_CLONE_ENABLED", strconv.FormatBool(false)) // hack to disable cloning
 
 	if t.Dirty {
@@ -338,6 +344,7 @@ func (t upload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, runtimecfg *c
 	var (
 		signer               ssh.Signer
 		ws                   workspaces.Context
+		repo                 *git.Repository
 		tmpdir               string
 		archiveio, environio *os.File
 	)
@@ -384,10 +391,14 @@ func (t upload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, runtimecfg *c
 	}
 	defer environio.Close()
 
+	if repo, err = git.PlainOpen(ws.Root); err != nil {
+		return errorsx.Wrap(err, "unable to open git repository")
+	}
+
 	envb := envx.Build().
 		FromEnviron(envx.Dirty(t.Dirty)...).
 		FromEnviron(t.Environment...).
-		FromEnviron(errorsx.Zero(gitx.Env(ws.Root, t.GitRemote, t.GitReference))...)
+		FromEnviron(errorsx.Zero(gitx.Env(repo, t.GitRemote, t.GitReference))...)
 
 	if err = envb.CopyTo(environio); err != nil {
 		return errorsx.Wrap(err, "unable to write environment variables buffer")
@@ -437,7 +448,7 @@ func (t upload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, runtimecfg *c
 		Memory: runtimecfg.Memory,
 		Arch:   runtimecfg.Arch,
 		Os:     runtimecfg.OS,
-		Vcsuri: errorsx.Zero(gitx.Remote(ws.Root, t.GitRemote)), // optionally set the vcsuri if we're inside a repository.
+		Vcsuri: errorsx.Zero(gitx.Remote(repo, t.GitRemote)), // optionally set the vcsuri if we're inside a repository.
 	}, archiveio)
 	if err != nil {
 		return errorsx.Wrap(err, "unable to generate multipart upload")

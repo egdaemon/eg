@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/egdaemon/eg/runtime/wasi/eg"
-	"github.com/egdaemon/eg/runtime/wasi/egenv"
+	"github.com/egdaemon/eg/runtime/wasi/eggit"
 	"github.com/egdaemon/eg/runtime/wasi/shell"
 )
 
@@ -44,14 +44,15 @@ func build(ctx context.Context, _ eg.Op) error {
 	)
 }
 
-func Builder(name string, ts time.Time, distro string) eg.ContainerRunner {
+func Builder(name string, distro string) eg.ContainerRunner {
+	c := eggit.EnvCommit()
 	return eg.Container(name).
-		OptionEnv("VCS_REVISION", egenv.GitCommit()).
-		OptionEnv("VERSION", fmt.Sprintf("0.0.%d", ts.Unix())).
+		OptionEnv("VCS_REVISION", c.Hash.String()).
+		OptionEnv("VERSION", fmt.Sprintf("0.0.%d", c.Committer.When.Unix())).
 		OptionEnv("DEBEMAIL", maintainer.Email).
 		OptionEnv("DEBFULLNAME", maintainer.Name).
 		OptionEnv("DISTRO", distro).
-		OptionEnv("CHANGELOG_DATE", ts.Format(time.RFC1123Z)).
+		OptionEnv("CHANGELOG_DATE", c.Committer.When.Format(time.RFC1123Z)).
 		OptionVolumeWritable(
 			".eg/.cache/.dist", "/opt/eg/.dist",
 		).

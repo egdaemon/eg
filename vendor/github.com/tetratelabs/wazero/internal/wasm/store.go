@@ -8,7 +8,8 @@ import (
 	"sync/atomic"
 
 	"github.com/tetratelabs/wazero/api"
-	"github.com/tetratelabs/wazero/internal/close"
+	"github.com/tetratelabs/wazero/experimental"
+	"github.com/tetratelabs/wazero/internal/expctxkeys"
 	"github.com/tetratelabs/wazero/internal/internalapi"
 	"github.com/tetratelabs/wazero/internal/leb128"
 	internalsys "github.com/tetratelabs/wazero/internal/sys"
@@ -124,7 +125,7 @@ type (
 		Source *Module
 
 		// CloseNotifier is an experimental hook called once on close.
-		CloseNotifier close.Notifier
+		CloseNotifier experimental.CloseNotifier
 	}
 
 	// DataInstance holds bytes corresponding to the data segment in a module.
@@ -362,8 +363,10 @@ func (s *Store) instantiate(
 		return nil, err
 	}
 
+	allocator, _ := ctx.Value(expctxkeys.MemoryAllocatorKey{}).(experimental.MemoryAllocator)
+
 	m.buildGlobals(module, m.Engine.FunctionInstanceReference)
-	m.buildMemory(module)
+	m.buildMemory(module, allocator)
 	m.Exports = module.Exports
 	for _, exp := range m.Exports {
 		if exp.Type == ExternTypeTable {

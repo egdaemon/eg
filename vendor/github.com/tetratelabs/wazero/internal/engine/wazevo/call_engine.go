@@ -12,6 +12,7 @@ import (
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/experimental"
 	"github.com/tetratelabs/wazero/internal/engine/wazevo/wazevoapi"
+	"github.com/tetratelabs/wazero/internal/expctxkeys"
 	"github.com/tetratelabs/wazero/internal/internalapi"
 	"github.com/tetratelabs/wazero/internal/wasm"
 	"github.com/tetratelabs/wazero/internal/wasmdebug"
@@ -193,9 +194,9 @@ func (c *callEngine) CallWithStack(ctx context.Context, paramResultStack []uint6
 
 // CallWithStack implements api.Function.
 func (c *callEngine) callWithStack(ctx context.Context, paramResultStack []uint64) (err error) {
-	snapshotEnabled := ctx.Value(experimental.EnableSnapshotterKey{}) != nil
+	snapshotEnabled := ctx.Value(expctxkeys.EnableSnapshotterKey{}) != nil
 	if snapshotEnabled {
-		ctx = context.WithValue(ctx, experimental.SnapshotterKey{}, c)
+		ctx = context.WithValue(ctx, expctxkeys.SnapshotterKey{}, c)
 	}
 
 	if wazevoapi.StackGuardCheckEnabled {
@@ -528,8 +529,7 @@ func opaqueViewFromPtr(ptr uintptr) []byte {
 	var opaque []byte
 	sh := (*reflect.SliceHeader)(unsafe.Pointer(&opaque))
 	sh.Data = ptr
-	sh.Len = 24
-	sh.Cap = 24
+	setSliceLimits(sh, 24, 24)
 	return opaque
 }
 
@@ -574,8 +574,7 @@ func (c *callEngine) cloneStack(l uintptr) (newSP, newFP, newTop uintptr, newSta
 	{
 		sh := (*reflect.SliceHeader)(unsafe.Pointer(&prevStackAligned))
 		sh.Data = c.stackTop - relSp
-		sh.Len = int(relSp)
-		sh.Cap = int(relSp)
+		setSliceLimits(sh, relSp, relSp)
 	}
 	newTop = alignedStackTop(newStack)
 	{
@@ -583,8 +582,7 @@ func (c *callEngine) cloneStack(l uintptr) (newSP, newFP, newTop uintptr, newSta
 		newFP = newTop - relFp
 		sh := (*reflect.SliceHeader)(unsafe.Pointer(&newStackAligned))
 		sh.Data = newSP
-		sh.Len = int(relSp)
-		sh.Cap = int(relSp)
+		setSliceLimits(sh, relSp, relSp)
 	}
 	copy(newStackAligned, prevStackAligned)
 	return

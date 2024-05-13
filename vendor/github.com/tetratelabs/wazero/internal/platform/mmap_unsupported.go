@@ -1,4 +1,4 @@
-//go:build !(darwin || linux || freebsd || windows)
+//go:build !(darwin || linux || freebsd || windows) || tinygo
 
 package platform
 
@@ -20,10 +20,6 @@ func mmapCodeSegmentAMD64(size int) ([]byte, error) {
 }
 
 func mmapCodeSegmentARM64(size int) ([]byte, error) {
-	panic(errUnsupported)
-}
-
-func mmapMemory(size int) ([]byte, error) {
 	panic(errUnsupported)
 }
 

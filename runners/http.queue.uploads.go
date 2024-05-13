@@ -56,8 +56,8 @@ func NewEnqueueUpload(enq *Enqueued, archive io.Reader) (mimetype string, body *
 
 func NewEnqueueCompletion(cause error, duration time.Duration, logs io.Reader) (mimetype string, body *os.File, err error) {
 	return httpx.Multipart(func(w *multipart.Writer) error {
-		if err = w.WriteField("duration", strconv.FormatInt(duration.Milliseconds(), 10)); err != nil {
-			return errorsx.Wrap(err, "unable to write completion state")
+		if err = w.WriteField("duration", strconv.FormatUint(uint64(duration.Milliseconds()), 10)); err != nil {
+			return errorsx.Wrap(err, "unable to write duration")
 		}
 
 		if err = w.WriteField("successful", strconv.FormatBool(cause == nil)); err != nil {

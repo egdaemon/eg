@@ -181,7 +181,7 @@ func (t runner) perform(ctx context.Context, runid, path string, rtb runtimefn) 
 	}
 
 	log.Println("wazero cache", wasix.WazCacheDir(t.runtimedir))
-	fsx.PrintFS(os.DirFS(wasix.WazCacheDir(t.runtimedir)))
+	// fsx.PrintFS(os.DirFS(wasix.WazCacheDir(t.runtimedir)))
 
 	cache, err := wazero.NewCompilationCacheWithDir(wasix.WazCacheDir(t.runtimedir))
 	if err != nil {

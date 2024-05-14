@@ -156,17 +156,16 @@ type awaiter struct {
 }
 
 func (t *awaiter) Reset() {
-	atomic.StoreInt64(&t.attempts, 0)
+	atomic.StoreInt64(&t.attempts, -1)
 }
 
 func (t *awaiter) Await(d Strategy) <-chan time.Time {
-	defer atomic.AddInt64(&t.attempts, 1)
-	delay := d.Backoff(t.attempts)
+	delay := d.Backoff(atomic.AddInt64(&t.attempts, 1))
 	return time.After(delay)
 }
 
 func Waiter() Awaiter {
-	return &awaiter{}
+	return &awaiter{attempts: -1}
 }
 
 // generate a *consistent* duration based on the input i within the

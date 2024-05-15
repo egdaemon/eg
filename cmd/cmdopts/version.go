@@ -60,3 +60,8 @@ func (t Version) Run(ctx *Global) (err error) {
 
 	return errors.New("unable to detect build information")
 }
+
+func ModPath() string {
+	info, _ := debug.ReadBuildInfo()
+	return info.Main.Path
+}

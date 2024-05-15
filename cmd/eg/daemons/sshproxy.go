@@ -37,6 +37,8 @@ func SSHProxy(global *cmdopts.Global, config *ssh.ClientConfig, signer ssh.Signe
 					log.Println(errorsx.Wrap(err, "rate limiting error when connecting to ssh"))
 					return
 				}
+
+				debugx.Println("creating reverse tunnel connection")
 				conn, err := ssh.Dial("tcp", envx.String(eg.EnvEGSSHHostDefault, eg.EnvEGSSHHost), config)
 				if err != nil {
 					log.Println(errorsx.Wrapf(err, "unable to listen for ssh connections: %s", envx.String(eg.EnvEGSSHHostDefault, eg.EnvEGSSHHost)))

@@ -1,6 +1,7 @@
 package fsx
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"io/fs"
@@ -92,10 +93,17 @@ func PrintDir(d fs.FS) {
 	}
 }
 
-func CloneTree(dstdir string, rootdir string, archive fs.FS) (err error) {
+func CloneTree(ctx context.Context, dstdir string, rootdir string, archive fs.FS) (err error) {
 	return fs.WalkDir(archive, rootdir, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
+		}
+
+		// allow clone tree to be cancellable.
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
 		}
 
 		if d.IsDir() && rootdir == path {

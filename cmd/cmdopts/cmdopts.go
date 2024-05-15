@@ -71,9 +71,11 @@ func (t TLSConfig) DefaultClient() *http.Client {
 		TLSClientConfig: t.Config(),
 	}
 
+	defaultclient := &http.Client{Transport: ctransport, Timeout: 20 * time.Second}
+
 	if env.Boolean(false, eg.EnvLogsNetwork) {
-		return httpx.DebugClient(&http.Client{Transport: ctransport, Timeout: 10 * time.Second})
+		return httpx.DebugClient(defaultclient)
 	}
 
-	return &http.Client{Transport: ctransport, Timeout: 10 * time.Second}
+	return defaultclient
 }

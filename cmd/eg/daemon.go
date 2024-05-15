@@ -22,6 +22,7 @@ import (
 )
 
 type daemon struct {
+	runtimecfg   cmdopts.RuntimeResources
 	AccountID    string   `name:"account" help:"account to register runner with" default:"${vars_account_id}" required:"true"`
 	MachineID    string   `name:"machine" help:"unique id for this particular machine" default:"${vars_machine_id}" required:"true"`
 	Seed         string   `name:"seed" help:"seed for generating ssh credentials in a consistent manner" default:"${vars_entropy_seed}"`
@@ -34,7 +35,7 @@ type daemon struct {
 
 // essentially we use ssh forwarding from the control plane to the local http server
 // allowing the control plane to interogate
-func (t daemon) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, runtimecfg *cmdopts.RuntimeResources) (err error) {
+func (t daemon) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 	var (
 		signer     ssh.Signer
 		httpl      net.Listener
@@ -45,7 +46,7 @@ func (t daemon) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, runtimecfg *c
 	log.Println("running daemon initiated")
 	defer log.Println("running daemon completed")
 	log.Println("cache directory", t.CacheDir)
-	log.Println("detected runtime configuration", spew.Sdump(runtimecfg))
+	log.Println("detected runtime configuration", spew.Sdump(t.runtimecfg))
 
 	if httpl, err = net.Listen("tcp", "127.0.1.1:8093"); err != nil {
 		return err
@@ -55,7 +56,7 @@ func (t daemon) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, runtimecfg *c
 		return errorsx.Wrap(err, "unable to retrieve identity credentials")
 	}
 
-	if err = daemons.Register(gctx, tlsc, runtimecfg, t.AccountID, t.MachineID, signer); err != nil {
+	if err = daemons.Register(gctx, tlsc, &t.runtimecfg, t.AccountID, t.MachineID, signer); err != nil {
 		return err
 	}
 

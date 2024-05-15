@@ -1,8 +1,14 @@
 package env
 
 import (
+	"time"
+
 	"github.com/egdaemon/eg/internal/envx"
 )
+
+func Duration(fallback time.Duration, keys ...string) time.Duration {
+	return envx.Duration(fallback, keys...)
+}
 
 func Boolean(fallback bool, keys ...string) bool {
 	return envx.Boolean(fallback, keys...)

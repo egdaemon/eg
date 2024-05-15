@@ -18,6 +18,7 @@ import (
 	"github.com/egdaemon/eg/cmd/cmderrors"
 	"github.com/egdaemon/eg/cmd/cmdopts"
 	"github.com/egdaemon/eg/cmd/eg/accountcmds"
+	"github.com/egdaemon/eg/cmd/eg/compute"
 	"github.com/egdaemon/eg/internal/bytesx"
 	"github.com/egdaemon/eg/internal/contextx"
 	"github.com/egdaemon/eg/internal/debugx"
@@ -60,11 +61,10 @@ func main() {
 	var shellcli struct {
 		cmdopts.Global
 		cmdopts.TLSConfig
-		cmdopts.RuntimeResources
 		Version            cmdopts.Version              `cmd:"" help:"display versioning information"`
 		Monitor            monitor                      `cmd:"" help:"execute the interpreter and monitor the progress" hidden:"true"`
 		Local              runner                       `cmd:"" help:"execute the interpreter on the given directory" hidden:"true"`
-		Upload             upload                       `cmd:"" help:"compiles and uploads the process to the cluster"`
+		Compute            compute.Cmd                  `cmd:"" help:"commands for running compute workloads"`
 		Module             module                       `cmd:"" help:"executes a compiled module directly" hidden:"true"`
 		Daemon             daemon                       `cmd:"" help:"run in daemon mode letting the control plane push jobs to machines" hidden:"true"`
 		AgentManagement    actlcmd                      `cmd:"" name:"actl" help:"agent management commands"`
@@ -126,7 +126,6 @@ func main() {
 		kong.Bind(
 			&shellcli.Global,
 			&shellcli.TLSConfig,
-			&shellcli.RuntimeResources,
 		),
 		kong.TypeMapper(reflect.TypeOf(&net.IP{}), kong.MapperFunc(cmdopts.ParseIP)),
 		kong.TypeMapper(reflect.TypeOf(&net.TCPAddr{}), kong.MapperFunc(cmdopts.ParseTCPAddr)),

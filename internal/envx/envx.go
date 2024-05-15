@@ -209,12 +209,17 @@ func envval[T any](fallback T, m func(string) string, parse func(string) (T, err
 	return fallback
 }
 
-func Debug(envs ...string) {
-	errorsx.Log(log.Output(2, fmt.Sprintln("DEBUG ENVIRONMENT INITIATED")))
-	defer func() { errorsx.Log(log.Output(3, "DEBUG ENVIRONMENT COMPLETED")) }()
+func PrintEnv(envs ...string) string {
+	s := fmt.Sprintln("DEBUG ENVIRONMENT INITIATED")
 	for _, e := range envs {
-		errorsx.Log(log.Output(2, fmt.Sprintln(e)))
+		s += fmt.Sprintln(e)
 	}
+	s += fmt.Sprintln("DEBUG ENVIRONMENT COMPLETED")
+	return s
+}
+
+func Debug(envs ...string) {
+	errorsx.Log(log.Output(2, PrintEnv(envs...)))
 }
 
 func FromReader(r io.Reader) (environ []string, err error) {

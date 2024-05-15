@@ -26,7 +26,7 @@ var _ = Describe("FromTranspiled", func() {
 
 		tmpdir := testx.TempDir()
 
-		Expect(fsx.CloneTree(tmpdir, "example.1", os.DirFS(testx.Fixture()))).To(Succeed())
+		Expect(fsx.CloneTree(ctx, tmpdir, "example.1", os.DirFS(testx.Fixture()))).To(Succeed())
 		ws, err = workspaces.New(ctx, tmpdir, ".eg", "")
 		Expect(err).To(Succeed())
 		roots, err := transpile.Autodetect(transpile.New(ws)).Run(ctx)
@@ -52,7 +52,7 @@ var _ = Describe("wasix warm cache", func() {
 		wazcache, err := os.MkdirTemp(tmpdir, "wazcache")
 		Expect(err).To(Succeed())
 
-		Expect(fsx.CloneTree(tmpdir, "example.1", os.DirFS(testx.Fixture()))).To(Succeed())
+		Expect(fsx.CloneTree(ctx, tmpdir, "example.1", os.DirFS(testx.Fixture()))).To(Succeed())
 		ws, err = workspaces.New(ctx, tmpdir, ".eg", "")
 		Expect(err).To(Succeed())
 		roots, err := transpile.Autodetect(transpile.New(ws)).Run(ctx)

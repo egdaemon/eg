@@ -203,10 +203,8 @@ func (t runner) Run(gctx *cmdopts.Global) (err error) {
 	}
 
 	log.Println("modules", modules)
-	{
-		if err = runners.BuildRootContainerPath(gctx.Context, filepath.Join(ws.RuntimeDir, "Containerfile"), t.Dir); err != nil {
-			return err
-		}
+	if err = runners.BuildRootContainerPath(gctx.Context, t.Dir, filepath.Join(ws.RuntimeDir, "Containerfile")); err != nil {
+		return err
 	}
 
 	if err = wasix.WarmCacheDirectory(gctx.Context, filepath.Join(ws.Root, ws.BuildDir), wasix.WazCacheDir(filepath.Join(ws.Root, ws.RuntimeDir))); err != nil {

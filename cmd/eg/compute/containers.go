@@ -52,6 +52,7 @@ type c8sUpload struct {
 }
 
 func (t c8sUpload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
+	const buildir = "build"
 	var (
 		tmpdir               string
 		ws                   workspaces.Context
@@ -76,11 +77,11 @@ func (t c8sUpload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error
 		errorsx.Log(errorsx.Wrap(os.RemoveAll(tmpdir), "unable to remove temp directory"))
 	}()
 
-	if err = fsx.MkDirs(0700, filepath.Join(tmpdir, ".eg"), filepath.Join(tmpdir, "werk", "mounted", "workspace")); err != nil {
+	if err = fsx.MkDirs(0700, filepath.Join(tmpdir, ".eg"), filepath.Join(tmpdir, buildir, "mounted", "workspace")); err != nil {
 		return err
 	}
 
-	autoruncontainer := filepath.Join(tmpdir, "werk", "mounted", "workspace", "Containerfile")
+	autoruncontainer := filepath.Join(tmpdir, buildir, "mounted", "workspace", "Containerfile")
 
 	if err = fsx.CloneTree(gctx.Context, filepath.Join(tmpdir, ".eg"), ".bootstrap.c8s", embeddedc8supload); err != nil {
 		return err
@@ -147,7 +148,7 @@ func (t c8sUpload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error
 	}
 	defer archiveio.Close()
 
-	if err = tarx.Pack(archiveio, filepath.Join(ws.Root, ws.BuildDir), environio.Name(), filepath.Join(tmpdir, "werk")); err != nil {
+	if err = tarx.Pack(archiveio, filepath.Join(ws.Root, ws.BuildDir), environio.Name(), filepath.Join(tmpdir, buildir)); err != nil {
 		return errorsx.Wrap(err, "unable to pack the kernel archive")
 	}
 
@@ -164,7 +165,9 @@ func (t c8sUpload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error
 		return errorsx.Wrap(err, "unable to rewind kernel archive")
 	}
 
-	iox.Copy(archiveio.Name(), "derp.tar.gz")
+	if err = iox.Copy(archiveio.Name(), "archive.tar.gz"); err != nil {
+		return errorsx.Wrap(err, "unable to copy archive")
+	}
 	ainfo := errorsx.Zero(os.Stat(archiveio.Name()))
 	log.Println("archive metadata", ainfo.Name(), ainfo.Size())
 

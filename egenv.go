@@ -25,3 +25,7 @@ const (
 	EnvLogsTrace   = "EG_LOGS_TRACE"   // enable logging for trace statements. boolean, see strconv.ParseBool for valid values.
 	EnvLogsNetwork = "EG_LOGS_NETWORK" // enable logging for network requests. boolean, see strconv.ParseBool for valid values.
 )
+
+const (
+	EnvScheduleMaximumDelay = "EG_COMPUTE_SCHEDULER_MAXIMUM_DELAY"
+)

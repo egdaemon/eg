@@ -97,12 +97,12 @@ func BuildRootContainer(ctx context.Context) error {
 	defer os.RemoveAll(tmpdir)
 	rootc := filepath.Join(tmpdir, "Containerfile")
 
-	return BuildRootContainerPath(ctx, rootc, tmpdir)
+	return BuildRootContainerPath(ctx, tmpdir, rootc)
 }
 
 func BuildRootContainerPath(ctx context.Context, dir, path string) (err error) {
 	if err = PrepareRootContainer(path); err != nil {
-		return errorsx.Wrap(err, "preparing root container failed")
+		return errorsx.Wrapf(err, "preparing root container failed: %s", path)
 	}
 
 	cmd := exec.CommandContext(ctx, "podman", "build", "--timestamp", "0", "-t", "eg", "-f", path, dir)

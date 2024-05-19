@@ -12,6 +12,7 @@ import (
 	"strings"
 	"sync"
 	"syscall"
+	"time"
 
 	"github.com/alecthomas/kong"
 	"github.com/egdaemon/eg"
@@ -97,6 +98,7 @@ func main() {
 		kong.Name("eg"),
 		kong.Description("cli for eg"),
 		kong.Vars{
+			"vars_timestamp_started": time.Now().UTC().Format(time.RFC3339),
 			"vars_endpoint":          envx.String(eg.EnvEGAPIHostDefault, eg.EnvEGAPIHost),
 			"vars_console_endpoint":  envx.String(eg.EnvEGConsoleHostDefault, eg.EnvEGConsoleHost),
 			"vars_cwd":               osx.Getwd("."),

@@ -292,6 +292,15 @@ func beginwork(ctx context.Context, md metadata, dir string) state {
 		return failure(err, idle(md))
 	}
 
+	defer func() {
+		if err == nil {
+			return
+		}
+
+		log.Println("error detected clearing tmp directory", tmpdir)
+		errorsx.Log(errorsx.Wrap(os.RemoveAll(tmpdir), "unable to remove tmpdir"))
+	}()
+
 	if archive, err = os.Open(filepath.Join(dir, "archive.tar.gz")); err != nil {
 		return failure(errorsx.Wrap(err, "unable to read archive"), idle(md))
 	}
@@ -351,7 +360,7 @@ func beginwork(ctx context.Context, md metadata, dir string) state {
 		return completed(md, ws, uid, 0, errorsx.Wrap(err, "run failure"))
 	}
 
-	return staterunning{metadata: md, ws: ws, ragent: ragent, dir: dir}
+	return staterunning{metadata: md, ws: ws, ragent: ragent, dir: dir, tmpdir: tmpdir}
 }
 
 type staterunning struct {
@@ -359,10 +368,15 @@ type staterunning struct {
 	ws     workspaces.Context
 	ragent *Agent
 	dir    string
+	tmpdir string
 }
 
 func (t staterunning) Update(ctx context.Context) state {
-	log.Println("working", t.dir)
+	log.Println("work initiated", t.dir)
+	defer func() {
+		log.Println("clearing temp directory", t.tmpdir)
+		errorsx.Log(errorsx.Wrap(os.RemoveAll(t.tmpdir), "unable to remove tmpdir"))
+	}()
 
 	var (
 		err error

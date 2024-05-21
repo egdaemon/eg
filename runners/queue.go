@@ -314,7 +314,7 @@ func beginwork(ctx context.Context, md metadata, dir string) state {
 	log.Println("workspace", spew.Sdump(ws))
 
 	if err = tarx.Unpack(filepath.Join(ws.Root, ws.RuntimeDir), archive); err != nil {
-		return completed(md, ws, uid, 0, errorsx.Wrap(err, "unable to unpack archive"))
+		return completed(md, tmpdir, ws, uid, 0, errorsx.Wrap(err, "unable to unpack archive"))
 	}
 
 	if err = wasix.WarmCacheDirectory(ctx, filepath.Join(ws.Root, ws.BuildDir), wasix.WazCacheDir(filepath.Join(ws.Root, ws.RuntimeDir))); err != nil {
@@ -327,7 +327,7 @@ func beginwork(ctx context.Context, md metadata, dir string) state {
 		rootc := filepath.Join(filepath.Join(ws.Root, ws.RuntimeDir), "Containerfile")
 
 		if err = PrepareRootContainer(rootc); err != nil {
-			return completed(md, ws, uid, 0, errorsx.Wrap(err, "preparing root container failed"))
+			return completed(md, tmpdir, ws, uid, 0, errorsx.Wrap(err, "preparing root container failed"))
 		}
 
 		cmd := exec.CommandContext(ctx, "podman", "build", "--timestamp", "0", "-t", "eg", "-f", rootc, tmpdir)
@@ -336,7 +336,7 @@ func beginwork(ctx context.Context, md metadata, dir string) state {
 		cmd.Stdout = os.Stdout
 
 		if err = cmd.Run(); err != nil {
-			return completed(md, ws, uid, 0, errorsx.Wrap(err, "build failed"))
+			return completed(md, tmpdir, ws, uid, 0, errorsx.Wrap(err, "build failed"))
 		}
 	}
 
@@ -357,7 +357,7 @@ func beginwork(ctx context.Context, md metadata, dir string) state {
 	)
 
 	if ragent, err = m.NewRun(ctx, ws, uid, aopts...); err != nil {
-		return completed(md, ws, uid, 0, errorsx.Wrap(err, "run failure"))
+		return completed(md, tmpdir, ws, uid, 0, errorsx.Wrap(err, "run failure"))
 	}
 
 	return staterunning{metadata: md, ws: ws, ragent: ragent, dir: dir, tmpdir: tmpdir}
@@ -373,10 +373,6 @@ type staterunning struct {
 
 func (t staterunning) Update(ctx context.Context) state {
 	log.Println("work initiated", t.dir)
-	defer func() {
-		log.Println("clearing temp directory", t.tmpdir)
-		errorsx.Log(errorsx.Wrap(os.RemoveAll(t.tmpdir), "unable to remove tmpdir"))
-	}()
 
 	var (
 		err error
@@ -407,14 +403,15 @@ func (t staterunning) Update(ctx context.Context) state {
 			},
 		})
 
-		return completed(t.metadata, t.ws, t.ragent.id, time.Since(ts), errorsx.Compact(err, t.ragent.Close()))
+		return completed(t.metadata, t.tmpdir, t.ws, t.ragent.id, time.Since(ts), errorsx.Compact(err, t.ragent.Close()))
 	}
 }
 
-func completed(md metadata, ws workspaces.Context, id string, duration time.Duration, cause error) statecompleted {
+func completed(md metadata, tmpdir string, ws workspaces.Context, id string, duration time.Duration, cause error) statecompleted {
 	return statecompleted{
 		ws:       ws,
 		metadata: md,
+		tmpdir:   tmpdir,
 		id:       id,
 		cause:    cause,
 		duration: duration,
@@ -424,6 +421,7 @@ func completed(md metadata, ws workspaces.Context, id string, duration time.Dura
 type statecompleted struct {
 	metadata
 	ws       workspaces.Context
+	tmpdir   string
 	id       string
 	cause    error
 	duration time.Duration
@@ -433,6 +431,11 @@ func (t statecompleted) Update(ctx context.Context) state {
 	var (
 		logpath = filepath.Join(t.ws.Root, t.ws.RuntimeDir, "daemon.log")
 	)
+
+	defer func() {
+		log.Println("clearing temp directory", t.tmpdir)
+		errorsx.Log(errorsx.Wrap(os.RemoveAll(t.tmpdir), "unable to remove tmpdir"))
+	}()
 
 	dirs := DefaultSpoolDirs()
 	log.Println("completed", t.id, filepath.Join(dirs.Running, t.id), t.cause)

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/egdaemon/eg"
@@ -31,6 +32,9 @@ func (t CompletionClient) Upload(ctx context.Context, id string, duration time.D
 	if err != nil {
 		return err
 	}
+
+	defer os.RemoveAll(body.Name())
+	defer body.Close()
 
 	httpreq, err := http.NewRequestWithContext(ctx, http.MethodPost, fmt.Sprintf("%s/c/manager/completed/%s", t.host, id), body)
 	if err != nil {

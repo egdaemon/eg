@@ -18,6 +18,11 @@ import (
 )
 
 func SSHProxy(global *cmdopts.Global, config *ssh.ClientConfig, signer ssh.Signer, httpl net.Listener) (err error) {
+	// disable ssh reverse proxy connection until we decide to use it.
+	if envx.Boolean(true, eg.EnvEGSSHProxyDisabled) {
+		return nil
+	}
+
 	// TODO: use a tls dialer so we can proxy through 443 based on the alpn id.
 	// global.Cleanup.Add(1)
 	go func() {

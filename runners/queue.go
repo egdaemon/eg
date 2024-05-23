@@ -18,7 +18,6 @@ import (
 	"github.com/egdaemon/eg/internal/iox"
 	"github.com/egdaemon/eg/internal/langx"
 	"github.com/egdaemon/eg/internal/tarx"
-	"github.com/egdaemon/eg/internal/userx"
 	"github.com/egdaemon/eg/internal/wasix"
 	"github.com/egdaemon/eg/interp/c8s"
 	"github.com/egdaemon/eg/workspaces"
@@ -288,7 +287,7 @@ func beginwork(ctx context.Context, md metadata, dir string) state {
 	uid := filepath.Base(dir)
 	log.Println("initializing runner", uid, dir)
 
-	if tmpdir, err = os.MkdirTemp(userx.DefaultCacheDirectory(), "eg.work.*"); err != nil {
+	if tmpdir, err = os.MkdirTemp(dir, "eg.work.*"); err != nil {
 		return failure(err, idle(md))
 	}
 

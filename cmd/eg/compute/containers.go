@@ -76,17 +76,18 @@ func (t c8sUpload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error
 		errorsx.Log(errorsx.Wrap(os.RemoveAll(tmpdir), "unable to remove temp directory"))
 	}()
 
-	if err = fsx.MkDirs(0700, filepath.Join(tmpdir, ".eg"), filepath.Join(tmpdir, buildir, "mounted", "workspace")); err != nil {
+	egdir := filepath.Join(tmpdir, ".eg")
+	if err = fsx.MkDirs(0700, egdir, filepath.Join(tmpdir, buildir, "mounted", "workspace")); err != nil {
 		return err
 	}
 
 	autoruncontainer := filepath.Join(tmpdir, buildir, "mounted", "workspace", "Containerfile")
 
-	if err = fsx.CloneTree(gctx.Context, filepath.Join(tmpdir, ".eg"), ".bootstrap.c8s", embeddedc8supload); err != nil {
+	if err = fsx.CloneTree(gctx.Context, egdir, ".bootstrap.c8s", embeddedc8supload); err != nil {
 		return err
 	}
 
-	if err = compile.InitGolang(gctx.Context, tmpdir, cmdopts.ModPath()); err != nil {
+	if err = compile.InitGolang(gctx.Context, egdir, cmdopts.ModPath()); err != nil {
 		return err
 	}
 

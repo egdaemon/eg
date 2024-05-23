@@ -13,6 +13,24 @@ import (
 	"github.com/egdaemon/eg/workspaces"
 )
 
+func InitGolang(ctx context.Context, dir string, packages ...string) error {
+	cmd := exec.CommandContext(ctx, "go", "mod", "init", "eg/compute")
+	cmd.Dir = filepath.Join(dir, ".eg")
+	if err := cmd.Run(); err != nil {
+		return errorsx.Wrapf(err, "unable to initialize go.mod: %s", cmd.Dir)
+	}
+
+	for _, pkg := range packages {
+		cmd = exec.CommandContext(ctx, "go", "get", "-u", pkg)
+		cmd.Dir = filepath.Join(dir, ".eg")
+		if err := cmd.Run(); err != nil {
+			return errorsx.Wrapf(err, "unable to download default packages: %s", cmd.String())
+		}
+	}
+
+	return nil
+}
+
 func FromTranspiled(ctx context.Context, ws workspaces.Context, m ...transpile.Compiled) (modules []transpile.Compiled, err error) {
 	modules = make([]transpile.Compiled, 0, len(m))
 

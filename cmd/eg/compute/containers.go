@@ -7,7 +7,6 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"os/exec"
 	"path/filepath"
 
 	"github.com/egdaemon/eg/authn"
@@ -87,15 +86,7 @@ func (t c8sUpload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error
 		return err
 	}
 
-	cmd := exec.CommandContext(gctx.Context, "go", "mod", "init", "eg/compute")
-	cmd.Dir = filepath.Join(tmpdir, ".eg")
-	if err = cmd.Run(); err != nil {
-		return err
-	}
-
-	cmd = exec.CommandContext(gctx.Context, "go", "get", "-u", cmdopts.ModPath())
-	cmd.Dir = filepath.Join(tmpdir, ".eg")
-	if err = cmd.Run(); err != nil {
+	if err = compile.InitGolang(gctx.Context, tmpdir, cmdopts.ModPath()); err != nil {
 		return err
 	}
 

@@ -44,7 +44,7 @@ func (t RegistrationClient) Registration(ctx context.Context, req *RegistrationR
 	defer func() { errorsx.Log(httpx.AutoClose(httpresp)) }()
 
 	if httpx.IsStatusError(err, http.StatusForbidden) != nil {
-		return nil, errorsx.NewUnrecoverable(err)
+		return nil, errorsx.UserFriendly(errorsx.NewUnrecoverable(errorsx.Wrap(err, "enable networking logging export `export EG_LOGS_NETWORK=\"1\"` for more details")))
 	} else if err != nil {
 		return nil, err
 	}

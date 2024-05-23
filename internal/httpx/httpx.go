@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -254,6 +255,20 @@ func (t Error) Error() string {
 	return t.cause.Error()
 }
 
+func (t Error) Is(target error) bool {
+	_, ok := target.(*Error)
+	return ok
+}
+
+func (t Error) As(target any) bool {
+	if x, ok := target.(*Error); ok {
+		*x = t
+		return ok
+	}
+
+	return false
+}
+
 // IgnoreError ...
 func IgnoreError(err error, code ...int) bool {
 	var (
@@ -271,10 +286,9 @@ func IgnoreError(err error, code ...int) bool {
 func IsStatusError(err error, code ...int) error {
 	var (
 		cause Error
-		ok    bool
 	)
 
-	if cause, ok = errorsx.Cause(err).(Error); !ok {
+	if !errors.As(err, &cause) {
 		return nil
 	}
 

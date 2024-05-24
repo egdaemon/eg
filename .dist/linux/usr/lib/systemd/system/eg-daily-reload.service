@@ -1,0 +1,21 @@
+[Unit]
+Description=daily reload for the daemon to pick up any updates.
+After=network.target
+After=apt-daily-upgrade.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ProtectKernelModules=yes
+PrivateMounts=yes
+IPAddressDeny=link-local
+IPAddressDeny=multicast
+Restart=on-failure
+CacheDirectory=%p
+ConfigurationDirectory=%p
+RuntimeDirectory=%p
+RuntimeDirectoryMode=0700
+ExecStart=/usr/bin/systemctl reload eg-daemon.service eg-scheduling.service
+
+[Install]
+WantedBy=apt-daily-upgrade.timer

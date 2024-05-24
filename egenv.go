@@ -7,9 +7,8 @@ const (
 )
 
 const (
-	EnvEGSSHHost          = "EG_SSH_REVERSE_PROXY_HOST"
-	EnvEGSSHProxyDisabled = "EG_SSH_REVERSE_PROXY_DISABLED"
-	EnvEGSSHHostDefault   = "api.egdaemon.com:8090"
+	EnvEGSSHHost        = "EG_SSH_HOST"
+	EnvEGSSHHostDefault = "api.egdaemon.com:8090"
 	// EnvEGSSHHostDefault = "localhost:8090"
 )
 

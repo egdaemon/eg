@@ -63,6 +63,7 @@ func main() {
 		cmdopts.Global
 		cmdopts.TLSConfig
 		Version            cmdopts.Version              `cmd:"" help:"display versioning information"`
+		Downloader         downloader                   `cmd:"" help:"downloader and command and control process for decoupling the daemon from the controller" hidden:"true"`
 		Monitor            monitor                      `cmd:"" help:"execute the interpreter and monitor the progress" hidden:"true"`
 		Local              runner                       `cmd:"" help:"execute the interpreter on the given directory" hidden:"true"`
 		Compute            compute.Cmd                  `cmd:"" help:"commands for running compute workloads"`

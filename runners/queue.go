@@ -308,7 +308,8 @@ func beginwork(ctx context.Context, md metadata, dir string) state {
 	uid := filepath.Base(dir)
 	log.Println("initializing runner", uid, dir)
 
-	if tmpdir, err = os.MkdirTemp(dir, "eg.work.*"); err != nil {
+	tmpdir = filepath.Join(dir, "work")
+	if err = os.Mkdir(tmpdir, 0700); err != nil {
 		return failure(err, idle(md))
 	}
 

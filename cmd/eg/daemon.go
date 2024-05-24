@@ -28,6 +28,7 @@ type daemon struct {
 	Seed         string   `name:"seed" help:"seed for generating ssh credentials in a consistent manner" default:"${vars_entropy_seed}"`
 	SSHKeyPath   string   `name:"sshkeypath" help:"path to ssh key to use" default:"${vars_ssh_key_path}"`
 	SSHAgentPath string   `name:"sshagentpath" help:"ssh agent socket path" default:"${vars_runtime_directory}/ssh.agent.socket"`
+	Autodownload bool     `name:"autodownload" help:"enable/disable the basic download scheduler" default:"true"`
 	CacheDir     string   `name:"directory" help:"local cache directory" default:"${vars_cache_directory}"`
 	MountDirs    []string `name:"mounts" short:"m" help:"folders to mount using podman mount specs" default:""`
 	EnvVars      []string `name:"env" short:"e" help:"environment variables to import" default:""`
@@ -94,7 +95,9 @@ func (t daemon) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 		return err
 	}
 
-	go runners.AutoDownload(gctx.Context, authclient)
+	if t.Autodownload {
+		go runners.AutoDownload(gctx.Context, authclient)
+	}
 
 	if _, found := os.LookupEnv("SSH_AUTH_SOCK"); !found {
 		if err = daemons.SSHAgent(gctx, t.SSHAgentPath); err != nil {

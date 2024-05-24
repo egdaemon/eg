@@ -11,6 +11,7 @@ import (
 	"github.com/egdaemon/eg/authn"
 	"github.com/egdaemon/eg/cmd/cmdopts"
 	"github.com/egdaemon/eg/compile"
+	"github.com/egdaemon/eg/compute"
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/gitx"
@@ -156,14 +157,11 @@ func (t upload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 		return errorsx.Wrap(err, "unable to generate multipart upload")
 	}
 
-	chttp, err := authn.OAuth2SSHHTTPClient(
+	tokensrc := compute.NewAuthzTokenSource(tlsc.DefaultClient(), signer, authn.EndpointCompute())
+	chttp := oauth2.NewClient(
 		context.WithValue(gctx.Context, oauth2.HTTPClient, tlsc.DefaultClient()),
-		signer,
-		authn.EndpointSSHAuth(),
+		tokensrc,
 	)
-	if err != nil {
-		return err
-	}
 
 	req, err := http.NewRequestWithContext(gctx.Context, http.MethodPost, t.Endpoint, buf)
 	if err != nil {

@@ -5,6 +5,8 @@ ARG EG_RUNNER_OVERRIDE_DIR=/usr/share/eg/rootfs
 
 COPY ${EG_RUNNER_OVERRIDE_DIR} /
 
+# remove the docker settings.... they're absurd and break base assumptions.
+RUN rm /etc/apt/apt.conf.d/docker-*
 RUN apt-get update
 RUN apt-get -y install software-properties-common build-essential apt-file podman rsync vim dput devscripts dh-make dput git uidmap dbus-user-session fuse-overlayfs pinentry-tty inetutils-ping iproute2
 # RUN add-apt-repository -n ppa:longsleep/golang-backports

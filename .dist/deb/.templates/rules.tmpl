@@ -28,11 +28,3 @@ override_dh_auto_build:
 override_dh_auto_test:
 	echo "DH AUTO TEST OVERRIDE"
 	CACHE_DIRECTORY="$(CURDIR)" $(CURDIR)/bin/eg version
-
-override_dh_auto_install:
-	echo "DH AUTO INSTALL OVERRIDE"
-	systemctl daemon-reload
-	# send sighup to request a restart of the service. we don't want
-	# to forcibly restart because it might be processing work but we want to restart
-	# before the next job.
-	systemctl reload eg-daemon.service

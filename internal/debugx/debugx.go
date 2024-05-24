@@ -54,18 +54,32 @@ func DumpRoutines() (path string, err error) {
 // DumpOnSignal runs the DumpRoutes method and prints to stderr whenever one of the provided
 // signals is received.
 func DumpOnSignal(ctx context.Context, sigs ...os.Signal) {
-	signals := make(chan os.Signal, 1)
-	signal.Notify(signals, sigs...)
+	OnSignal(func() error {
+		if path, err := DumpRoutines(); err == nil {
+			log.Println("dump located at:", path)
+			return nil
+		} else {
+			return errorsx.Wrap(err, "goroutine dump failed")
+		}
+	})(ctx, sigs...)
+}
 
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-signals:
-			if path, err := DumpRoutines(); err == nil {
-				log.Println("dump located at:", path)
-			} else {
-				log.Println("failed to dump routines:", err)
+func OnSignal(do func() error) func(context.Context, ...os.Signal) {
+	return func(ctx context.Context, sigs ...os.Signal) {
+		signals := make(chan os.Signal, 1)
+		signal.Notify(signals, sigs...)
+
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case s := <-signals:
+				log.Println("signal processing initiated", s)
+				defer log.Println("signal processing completed", s)
+
+				if err := do(); err != nil {
+					log.Println("signal processing failed", s, err)
+				}
 			}
 		}
 	}

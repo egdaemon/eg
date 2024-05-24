@@ -11,9 +11,11 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"syscall"
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
+	"github.com/egdaemon/eg/internal/debugx"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/iox"
 	"github.com/egdaemon/eg/internal/langx"
@@ -68,6 +70,7 @@ func (t localdownloader) Download(ctx context.Context) (err error) {
 }
 
 type metadata struct {
+	reload chan error
 	downloader
 	completion
 	agentopts []AgentOption
@@ -118,10 +121,20 @@ func BuildRootContainerPath(ctx context.Context, dir, path string) (err error) {
 
 // runs the scheduler until the context is cancelled.
 func Queue(ctx context.Context, options ...func(*metadata)) (err error) {
+	// monitor for reload signals, can't use the context because we
+	// dont want to interrupt running work but only want to stop after a run.
+	reload := make(chan error, 1)
+	go debugx.OnSignal(func() error {
+		reload <- errorsx.String("reload daemon signal received")
+		close(reload)
+		return nil
+	})(ctx, syscall.SIGHUP)
+
 	var (
 		s state = staterecover{
 			metadata: langx.Clone(
 				metadata{
+					reload:     reload,
 					completion: noopcompletion{},
 					downloader: localdownloader{},
 				},
@@ -221,6 +234,14 @@ func (t stateidle) Update(ctx context.Context) state {
 	)
 
 	dirs := DefaultSpoolDirs()
+
+	select {
+	case <-ctx.Done():
+		return failure(ctx.Err(), nil)
+	case cause := <-t.metadata.reload:
+		return failure(cause, nil)
+	default:
+	}
 
 	// check if we have work in the queue.
 	if dir, err := dirs.Dequeue(); err == nil {

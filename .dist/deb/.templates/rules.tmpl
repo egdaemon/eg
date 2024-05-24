@@ -12,7 +12,8 @@ DH_VERBOSE = 1
 # package maintainers to append LDFLAGS
 #export DEB_LDFLAGS_MAINT_APPEND = -Wl,--as-needed
 
-%: dh $@ --with=systemd
+%:
+	dh $@ --with=systemd
 
 override_dh_auto_build:
 	echo "DH AUTO BUILD OVERRIDE"
@@ -30,11 +31,8 @@ override_dh_auto_test:
 
 override_dh_auto_install:
 	echo "DH AUTO INSTALL OVERRIDE"
-
-override_dh_postinst:
-	echo "DH AUTO POST INSTALL OVERRIDE"
 	systemctl daemon-reload
 	# send sighup to request a restart of the service. we don't want
 	# to forcibly restart because it might be processing work but we want to restart
 	# before the next job.
-	systemctl kill -s SIGHUP eg-daemon.service
+	systemctl reload eg-daemon.service

@@ -2,18 +2,14 @@ package main
 
 import (
 	"context"
-	"encoding/hex"
 	"log"
-	"net"
 	"net/http"
-	"os"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/egdaemon/eg/authn"
 	"github.com/egdaemon/eg/cmd/cmdopts"
 	"github.com/egdaemon/eg/cmd/eg/daemons"
 	"github.com/egdaemon/eg/compute"
-	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/sshx"
 	"github.com/egdaemon/eg/runners"
@@ -21,7 +17,7 @@ import (
 	"golang.org/x/oauth2"
 )
 
-type daemon struct {
+type downloader struct {
 	runtimecfg   cmdopts.RuntimeResources
 	AccountID    string   `name:"account" help:"account to register runner with" default:"${vars_account_id}" required:"true"`
 	MachineID    string   `name:"machine" help:"unique id for this particular machine" default:"${vars_machine_id}" required:"true"`
@@ -36,11 +32,9 @@ type daemon struct {
 
 // essentially we use ssh forwarding from the control plane to the local http server
 // allowing the control plane to interogate
-func (t daemon) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
+func (t downloader) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 	var (
 		signer     ssh.Signer
-		httpl      net.Listener
-		grpcl      net.Listener
 		authclient *http.Client
 	)
 
@@ -48,10 +42,6 @@ func (t daemon) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 	defer log.Println("running daemon completed")
 	log.Println("cache directory", t.CacheDir)
 	log.Println("detected runtime configuration", spew.Sdump(t.runtimecfg))
-
-	if httpl, err = net.Listen("tcp", "127.0.1.1:8093"); err != nil {
-		return err
-	}
 
 	if signer, err = sshx.AutoCached(sshx.NewKeyGenSeeded(t.Seed), t.SSHKeyPath); err != nil {
 		return errorsx.Wrap(err, "unable to retrieve identity credentials")
@@ -67,63 +57,7 @@ func (t daemon) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 		tokensrc,
 	)
 
-	config := &ssh.ClientConfig{
-		User: t.MachineID,
-		Auth: []ssh.AuthMethod{
-			ssh.PublicKeys(signer),
-		},
-		HostKeyCallback: func(hostname string, remote net.Addr, key ssh.PublicKey) error {
-			log.Println("hostkey", hostname, remote.String(), hex.EncodeToString(key.Marshal()))
-			return nil
-		},
-	}
+	go runners.AutoDownload(gctx.Context, authclient)
 
-	if err = daemons.HTTP(gctx, httpl); err != nil {
-		return err
-	}
-	defer httpl.Close()
-
-	if grpcl, err = daemons.DefaultAgentListener(); err != nil {
-		return err
-	}
-
-	if err = daemons.Agent(gctx, grpcl); err != nil {
-		return err
-	}
-
-	if err = daemons.SSHProxy(gctx, config, signer, httpl); err != nil {
-		return err
-	}
-
-	if t.Autodownload {
-		go runners.AutoDownload(gctx.Context, authclient)
-	}
-
-	if _, found := os.LookupEnv("SSH_AUTH_SOCK"); !found {
-		if err = daemons.SSHAgent(gctx, t.SSHAgentPath); err != nil {
-			return err
-		}
-	}
-
-	if err = runners.BuildRootContainer(gctx.Context); err != nil {
-		return err
-	}
-
-	return runners.Queue(
-		gctx.Context,
-		runners.QueueOptionCompletion(
-			runners.NewCompletionClient(authclient),
-		),
-		runners.QueueOptionAgentOptions(
-			runners.AgentOptionMounts(
-				runners.AgentMountReadWrite(
-					envx.String(t.SSHAgentPath, "SSH_AUTH_SOCK"),
-					"/opt/egruntime/ssh.agent.socket",
-				),
-			),
-			runners.AgentOptionEnvKeys("SSH_AUTH_SOCK=/opt/egruntime/ssh.agent.socket"),
-			runners.AgentOptionMounts(t.MountDirs...),
-			runners.AgentOptionEnvKeys(t.EnvVars...),
-		),
-	)
+	return nil
 }

@@ -81,17 +81,24 @@ func Clone(ctx context.Context, auth transport.AuthMethod, dir, uri, remote, tre
 	return errorsx.Wrapf(err, "unable to clone: %s - %s", uri, treeish)
 }
 
-func Remote(r *git.Repository, name string) (_ string, err error) {
+// return the canonical URI for a repository according to eg. which is git@host:repository.git
+func CanonicalURI(r *git.Repository, name string) (_ string, err error) {
 	remote, err := r.Remote(name)
 	if err != nil {
 		return "", errorsx.Wrapf(err, "unable to detect remote: %s", name)
 	}
 
-	return slicesx.FirstOrZero(remote.Config().URLs...), nil
+	uri := slicesx.FirstOrZero(remote.Config().URLs...)
+
+	if strings.ContainsRune(uri, '@') {
+		return uri, nil
+	}
+
+	return sshvcsuri(uri), nil
 }
 
 func Env(repo *git.Repository, remote string, branch string) (env []string, err error) {
-	uri, err := Remote(repo, remote)
+	uri, err := CanonicalURI(repo, remote)
 	if err != nil {
 		return nil, err
 	}
@@ -102,7 +109,7 @@ func Env(repo *git.Repository, remote string, branch string) (env []string, err 
 // ideally we shouldn't need this but unfortunately go-git doesn't apply instead of rules properly.
 // and from the issue tracker that leads to the question of if it works with the git credential helper.
 func LocalEnv(repo *git.Repository, remote string, branch string) (env []string, err error) {
-	uri, err := Remote(repo, remote)
+	uri, err := CanonicalURI(repo, remote)
 	if err != nil {
 		return nil, err
 	}

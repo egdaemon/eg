@@ -303,18 +303,13 @@ func beginwork(ctx context.Context, md metadata, dir string) state {
 		tmpdir  string
 		ragent  *Agent
 		archive *os.File
-		_uid    uuid.UUID
 	)
 
-	if _uid, err = uidfrompath(filepath.Join(dir, "uuid")); err != nil {
-		return failure(err, idle(md))
-	}
-	uid := _uid.String()
-
+	uid := filepath.Base(dir)
 	log.Println("initializing runner", uid, dir)
 
 	tmpdir = filepath.Join(dir, "work")
-	if err = os.MkdirAll(tmpdir, 0700); err != nil {
+	if err = os.Mkdir(tmpdir, 0700); err != nil {
 		return failure(err, idle(md))
 	}
 
@@ -457,6 +452,11 @@ func (t statecompleted) Update(ctx context.Context) state {
 	var (
 		logpath = filepath.Join(t.ws.Root, t.ws.RuntimeDir, "daemon.log")
 	)
+
+	defer func() {
+		log.Println("clearing temp directory", t.tmpdir)
+		errorsx.Log(errorsx.Wrap(os.RemoveAll(t.tmpdir), "unable to remove tmpdir"))
+	}()
 
 	dirs := DefaultSpoolDirs()
 	log.Println("completed", t.id, filepath.Join(dirs.Running, t.id), t.cause)

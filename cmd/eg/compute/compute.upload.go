@@ -30,17 +30,18 @@ import (
 )
 
 type upload struct {
-	runtimecfg   cmdopts.RuntimeResources
-	SSHKeyPath   string   `name:"sshkeypath" help:"path to ssh key to use" default:"${vars_ssh_key_path}"`
-	Dir          string   `name:"directory" help:"root directory of the repository" default:"${vars_cwd}"`
-	ModuleDir    string   `name:"moduledir" help:"must be a subdirectory in the provided directory" default:".eg"`
-	Name         string   `arg:"" name:"module" help:"name of the module to run, i.e. the folder name within moduledir" default:""`
-	Environment  []string `name:"env" short:"e" help:"define environment variables and their values to be included"`
-	Dirty        bool     `name:"dirty" help:"include all environment variables"`
-	Endpoint     string   `name:"endpoint" help:"specify the endpoint to upload to" default:"${vars_endpoint}/c/manager/" hidden:"true"`
-	Labels       []string `name:"labels" help:"custom labels required"`
-	GitRemote    string   `name:"git-remote" help:"name of the git remote to use" default:"${vars_git_default_remote_name}"`
-	GitReference string   `name:"git-ref" help:"name of the branch or commit to checkout" default:"${vars_git_default_reference}"`
+	runtimecfg    cmdopts.RuntimeResources
+	HostedCompute bool     `name:"shared-compute" help:"allow hosted compute" default:"false"`
+	SSHKeyPath    string   `name:"sshkeypath" help:"path to ssh key to use" default:"${vars_ssh_key_path}"`
+	Dir           string   `name:"directory" help:"root directory of the repository" default:"${vars_cwd}"`
+	ModuleDir     string   `name:"moduledir" help:"must be a subdirectory in the provided directory" default:".eg"`
+	Name          string   `arg:"" name:"module" help:"name of the module to run, i.e. the folder name within moduledir" default:""`
+	Environment   []string `name:"env" short:"e" help:"define environment variables and their values to be included"`
+	Dirty         bool     `name:"dirty" help:"include all environment variables"`
+	Endpoint      string   `name:"endpoint" help:"specify the endpoint to upload to" default:"${vars_endpoint}/c/manager/" hidden:"true"`
+	Labels        []string `name:"labels" help:"custom labels required"`
+	GitRemote     string   `name:"git-remote" help:"name of the git remote to use" default:"${vars_git_default_remote_name}"`
+	GitReference  string   `name:"git-ref" help:"name of the branch or commit to checkout" default:"${vars_git_default_reference}"`
 }
 
 func (t upload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
@@ -145,13 +146,14 @@ func (t upload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 	// push the archive to another node that matches the requirements.
 	// in theory we could use redirects to handle that but it'd still take a performance hit.
 	mimetype, buf, err := runners.NewEnqueueUpload(&runners.Enqueued{
-		Entry:  filepath.Base(entry.Path),
-		Ttl:    uint64(t.runtimecfg.TTL.Milliseconds()),
-		Cores:  t.runtimecfg.Cores,
-		Memory: t.runtimecfg.Memory,
-		Arch:   t.runtimecfg.Arch,
-		Os:     t.runtimecfg.OS,
-		Vcsuri: errorsx.Zero(gitx.CanonicalURI(repo, t.GitRemote)), // optionally set the vcsuri if we're inside a repository.
+		Entry:       filepath.Base(entry.Path),
+		Ttl:         uint64(t.runtimecfg.TTL.Milliseconds()),
+		Cores:       t.runtimecfg.Cores,
+		Memory:      t.runtimecfg.Memory,
+		Arch:        t.runtimecfg.Arch,
+		Os:          t.runtimecfg.OS,
+		AllowShared: t.HostedCompute,
+		Vcsuri:      errorsx.Zero(gitx.CanonicalURI(repo, t.GitRemote)), // optionally set the vcsuri if we're inside a repository.
 	}, archiveio)
 	if err != nil {
 		return errorsx.Wrap(err, "unable to generate multipart upload")

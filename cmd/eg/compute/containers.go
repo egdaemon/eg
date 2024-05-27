@@ -176,7 +176,7 @@ func (t c8sUpload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error
 		Memory: t.runtimecfg.Memory,
 		Arch:   t.runtimecfg.Arch,
 		Os:     t.runtimecfg.OS,
-		Vcsuri: errorsx.Zero(gitx.Remote(repo, t.GitRemote)), // optionally set the vcsuri if we're inside a repository.
+		Vcsuri: errorsx.Zero(gitx.CanonicalURI(repo, t.GitRemote)), // optionally set the vcsuri if we're inside a repository.
 	}, archiveio)
 	if err != nil {
 		return errorsx.Wrap(err, "unable to generate multipart upload")

@@ -1,6 +1,7 @@
 package runners
 
 import (
+	"encoding/hex"
 	"io"
 	"io/fs"
 	"os"
@@ -22,9 +23,9 @@ type SpoolDirs struct {
 func DefaultSpoolDirs() SpoolDirs {
 	root := filepath.Join(userx.DefaultCacheDirectory(), "spool")
 	dirs := SpoolDirs{
-		Downloading: filepath.Join(root, "downloading"),
-		Queued:      filepath.Join(root, "queued"),
-		Running:     filepath.Join(root, "running"),
+		Downloading: filepath.Join(root, "d"),
+		Queued:      filepath.Join(root, "q"),
+		Running:     filepath.Join(root, "r"),
 	}
 
 	errorsx.Log(errors.Wrap(fsx.MkDirs(0700, dirs.Downloading, dirs.Queued, dirs.Running), "unable to make spool directories"))
@@ -32,16 +33,36 @@ func DefaultSpoolDirs() SpoolDirs {
 	return dirs
 }
 
+func iddirname(uid uuid.UUID) string {
+	return hex.EncodeToString(uid.Bytes()[:6])
+}
+
+func uidfrompath(path string) (uid uuid.UUID, err error) {
+	var (
+		encodedid []byte
+	)
+	if encodedid, err = os.ReadFile(path); err != nil {
+		return uid, errorsx.Wrapf(err, "unable read uuid from disk: %s", path)
+	}
+
+	uid, err = uuid.FromBytes(encodedid)
+	return uid, errorsx.Wrapf(err, "unable read uuid from disk: %s", path)
+}
+
 func (t SpoolDirs) Download(uid uuid.UUID, name string, content io.Reader) (err error) {
 	var (
 		dst *os.File
 	)
 
-	if err = os.MkdirAll(filepath.Join(t.Downloading, uid.String()), 0700); err != nil {
+	if err = os.MkdirAll(filepath.Join(t.Downloading, iddirname(uid)), 0700); err != nil {
 		return err
 	}
 
-	if dst, err = os.Create(filepath.Join(t.Downloading, uid.String(), name)); err != nil {
+	if err = os.WriteFile(filepath.Join(t.Downloading, iddirname(uid), "uuid"), uid.Bytes(), 0600); err != nil {
+		return errorsx.Wrap(err, "unable to write run id to disk")
+	}
+
+	if dst, err = os.Create(filepath.Join(t.Downloading, iddirname(uid), name)); err != nil {
 		return err
 	}
 	defer dst.Close()
@@ -58,7 +79,7 @@ func (t SpoolDirs) Enqueue(uid uuid.UUID) (err error) {
 		return err
 	}
 
-	return os.Rename(filepath.Join(t.Downloading, uid.String()), filepath.Join(t.Queued, uid.String()))
+	return os.Rename(filepath.Join(t.Downloading, iddirname(uid)), filepath.Join(t.Queued, iddirname(uid)))
 }
 
 func (t SpoolDirs) Dequeue() (_ string, err error) {
@@ -75,7 +96,7 @@ func (t SpoolDirs) Dequeue() (_ string, err error) {
 }
 
 func (t SpoolDirs) Completed(uid uuid.UUID) (err error) {
-	return errorsx.Wrap(os.RemoveAll(filepath.Join(t.Running, uid.String())), "unable to remove work")
+	return errorsx.Wrap(os.RemoveAll(filepath.Join(t.Running, iddirname(uid))), "unable to remove work")
 }
 
 func pop(dir string) (popped fs.DirEntry, err error) {

@@ -95,6 +95,13 @@ func (t daemon) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 		return err
 	}
 
+	go func() {
+		if cause := daemons.Ping(gctx, tlsc, &t.runtimecfg, t.AccountID, t.MachineID, signer); cause != nil {
+			log.Println("ping failed", cause)
+			// gctx.Shutdown()
+		}
+	}()
+
 	if t.Autodownload {
 		go runners.AutoDownload(gctx.Context, authclient)
 	}

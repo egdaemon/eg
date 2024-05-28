@@ -30,7 +30,7 @@ func SSHProxy(global *cmdopts.Global, config *ssh.ClientConfig, signer ssh.Signe
 			proxyl net.Listener
 		)
 		// defer global.Cleanup.Done()
-		defer global.Shutdown()
+		defer global.Shutdown(nil)
 		defer log.Println("SSH Proxy shuttingdown")
 
 		r := rate.NewLimiter(rate.Every(10*time.Second), 1)

@@ -21,6 +21,18 @@ import (
 	"golang.org/x/time/rate"
 )
 
+func genregistration(s ssh.Signer, runtimecfg *cmdopts.RuntimeResources) *registration.Registration {
+	return &registration.Registration{
+		Description: fmt.Sprintf("%s - %s", systemx.HostnameOrDefault("unknown.eg.lan"), ssh.FingerprintSHA256(s.PublicKey())),
+		Os:          runtimecfg.OS,
+		Arch:        runtimecfg.Arch,
+		Cores:       runtimecfg.Cores,
+		Memory:      runtimecfg.Memory,
+		Publickey:   s.PublicKey().Marshal(),
+		Labels:      []string{},
+	}
+}
+
 func Register(global *cmdopts.Global, tlsc *cmdopts.TLSConfig, runtimecfg *cmdopts.RuntimeResources, aid, machineid string, s ssh.Signer) (err error) {
 	fingerprint := ssh.FingerprintSHA256(s.PublicKey())
 	log.Println("registering daemon with control plane initiated", aid, machineid, fingerprint)
@@ -59,15 +71,7 @@ func Register(global *cmdopts.Global, tlsc *cmdopts.TLSConfig, runtimecfg *cmdop
 		)
 
 		regreq := &registration.RegistrationRequest{
-			Registration: &registration.Registration{
-				Description: fmt.Sprintf("%s - %s", systemx.HostnameOrDefault("unknown.eg.lan"), fingerprint),
-				Os:          runtimecfg.OS,
-				Arch:        runtimecfg.Arch,
-				Cores:       runtimecfg.Cores,
-				Memory:      runtimecfg.Memory,
-				Publickey:   s.PublicKey().Marshal(),
-				Labels:      []string{},
-			},
+			Registration: genregistration(s, runtimecfg),
 		}
 
 		reg, err := rc.Registration(global.Context, regreq)

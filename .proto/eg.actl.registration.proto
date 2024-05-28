@@ -6,8 +6,8 @@ message Registration {
   string id = 1 [ json_name = "id" ];
   string description = 2 [ json_name = "description" ];
   bytes publickey = 3 [ json_name = "pkey" ];
-  string authzed_at = 4 [ json_name = " authzed_at" ];
-  string expires_at = 5 [ json_name = " expires_at" ];
+  string authzed_at = 4 [ json_name = "authzed_at" ];
+  string expires_at = 5 [ json_name = "expires_at" ];
   reserved 6 to 899;
   string os = 900 [ json_name = "os" ];
   string arch = 901 [ json_name = "arch" ]; // the native architecture.
@@ -15,6 +15,11 @@ message Registration {
   uint64 memory = 903 [ json_name = "memory" ];
   repeated string labels = 1000 [ json_name = "labels" ];
 }
+
+message PingRequest {
+  Registration registration = 1 [ json_name = "registration" ];
+}
+message PingResponse {}
 
 message RegistrationRequest {
   Registration registration = 1 [ json_name = "registration" ];

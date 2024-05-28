@@ -84,7 +84,7 @@ func main() {
 
 	shellcli.Cleanup = &sync.WaitGroup{}
 	shellcli.Context = contextx.WithWaitGroup(context.Background(), shellcli.Cleanup)
-	shellcli.Context, shellcli.Shutdown = context.WithCancel(shellcli.Context)
+	shellcli.Context, shellcli.Shutdown = context.WithCancelCause(shellcli.Context)
 	log.SetFlags(log.Lshortfile | log.LUTC | log.Ltime)
 
 	go debugx.DumpOnSignal(shellcli.Context, syscall.SIGUSR2)
@@ -155,6 +155,6 @@ func main() {
 	}
 
 	debugx.Println("shutting down")
-	shellcli.Shutdown()
+	shellcli.Shutdown(nil)
 	shellcli.Cleanup.Wait()
 }

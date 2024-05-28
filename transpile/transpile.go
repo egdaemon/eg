@@ -80,7 +80,7 @@ func (t golang) Run(ctx context.Context) (roots []Compiled, err error) {
 	generatedmodules := make([]*module, 0, 128)
 
 	if pkg.Module == nil {
-		return roots, errorsx.String("unable to load golang module")
+		return roots, errorsx.String("unable to load golang module, if you're using go.work check that the module is declared there")
 	}
 
 	transform := func(ftoken *token.File, gendir string, c *ast.File) error {

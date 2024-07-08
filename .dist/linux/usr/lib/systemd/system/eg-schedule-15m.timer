@@ -1,0 +1,11 @@
+[Unit]
+Description=Run once every fifteen minutes.
+
+[Timer]
+OnCalendar=*:0/15
+Persistent=true
+Unit=schedule-15m.target
+AccuracySec=1s
+
+[Install]
+WantedBy=default.target

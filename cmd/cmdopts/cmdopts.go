@@ -32,6 +32,7 @@ func (t Global) AfterApply() error {
 	switch envx.Int(t.Verbosity, EnvLoggingVerbosity) {
 	case 4: // NETWORK
 		os.Setenv(eg.EnvLogsNetwork, "1")
+		fallthrough
 	case 3: // TRACE
 		tracex.SetOutput(os.Stderr)
 		tracex.SetFlags(log.Flags())
@@ -43,6 +44,7 @@ func (t Global) AfterApply() error {
 		os.Setenv(eg.EnvLogsDebug, "1")
 		fallthrough
 	case 1: // INFO
+		fallthrough
 	default: // ERROR - minimal
 	}
 

@@ -1,0 +1,15 @@
+[Unit]
+Description=podman disk usage cleanup
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ProtectKernelModules=yes
+PrivateMounts=yes
+IPAddressDeny=link-local
+IPAddressDeny=multicast
+ExecStart=/usr/bin/podman system prune
+
+
+[Install]
+WantedBy=eg-schedule-15m.target

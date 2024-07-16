@@ -9,7 +9,6 @@ import (
 
 	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/authn"
-	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/httpx"
 	"github.com/egdaemon/eg/internal/stringsx"
@@ -21,7 +20,7 @@ func signup(ctx context.Context, chttp *http.Client, authed *authn.Authed) (err 
 		req     *http.Request
 	)
 
-	req, err = http.NewRequestWithContext(ctx, http.MethodPost, fmt.Sprintf("%s/authn/signup", envx.String(eg.EnvEGAPIHostDefault, eg.EnvEGAPIHost)), nil)
+	req, err = http.NewRequestWithContext(ctx, http.MethodPost, fmt.Sprintf("%s/authn/signup", eg.EnvAPIHostDefault()), nil)
 	if err != nil {
 		return errorsx.Wrap(err, "signup request")
 	}
@@ -43,7 +42,7 @@ func signup(ctx context.Context, chttp *http.Client, authed *authn.Authed) (err 
 }
 
 func loginssh(ctx context.Context, chttp *http.Client, authed *authn.Authed) (err error) {
-	return authn.ExchangeAuthed(ctx, chttp, fmt.Sprintf("%s/authn/ssh", envx.String(eg.EnvEGAPIHostDefault, eg.EnvEGAPIHost)), authed)
+	return authn.ExchangeAuthed(ctx, chttp, fmt.Sprintf("%s/authn/ssh", eg.EnvAPIHostDefault()), authed)
 }
 
 func session(ctx context.Context, chttp *http.Client, authed *authn.Authn) (err error) {
@@ -58,6 +57,6 @@ func session(ctx context.Context, chttp *http.Client, authed *authn.Authn) (err 
 }
 
 func otp(ctx context.Context, chttp *http.Client, authed *authn.Authn) (err error) {
-	fmt.Printf("%s?lt=%s\n", envx.String(eg.EnvEGConsoleHostDefault, eg.EnvEGConsoleHost), authed.Token)
+	fmt.Printf("%s?lt=%s\n", eg.EnvConsoleHostDefault(), authed.Token)
 	return nil
 }

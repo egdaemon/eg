@@ -9,7 +9,6 @@ import (
 
 	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/authn"
-	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/httpx"
 	"github.com/golang-jwt/jwt/v4"
 	"golang.org/x/crypto/ssh"
@@ -70,7 +69,7 @@ func (t TokenSourceFromEndpoint) Token() (_ *oauth2.Token, err error) {
 	cfg := authn.OAuth2SSHConfig(t.signer, "", authn.EndpointSSHAuth())
 	chttp := cfg.Client(context.WithValue(ctx, oauth2.HTTPClient, t.c), refreshtoken)
 
-	if err = authn.ExchangeAuthed(ctx, chttp, fmt.Sprintf("%s/authn/ssh", envx.String(eg.EnvEGAPIHostDefault, eg.EnvEGAPIHost)), &authed); err != nil {
+	if err = authn.ExchangeAuthed(ctx, chttp, fmt.Sprintf("%s/authn/ssh", eg.EnvAPIHostDefault()), &authed); err != nil {
 		return nil, err
 	}
 

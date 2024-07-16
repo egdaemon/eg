@@ -8,7 +8,6 @@ import (
 	"net/http"
 
 	"github.com/egdaemon/eg"
-	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/httpx"
 )
@@ -16,7 +15,7 @@ import (
 func NewRegistrationClient(c *http.Client) *RegistrationClient {
 	return &RegistrationClient{
 		c:    c,
-		host: envx.String(eg.EnvEGAPIHostDefault, eg.EnvEGAPIHost),
+		host: eg.EnvAPIHostDefault(),
 	}
 }
 

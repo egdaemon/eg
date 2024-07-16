@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/egdaemon/eg"
-	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/httpx"
 )
@@ -18,7 +17,7 @@ import (
 func NewCompletionClient(c *http.Client) *CompletionClient {
 	return &CompletionClient{
 		c:    c,
-		host: envx.String(eg.EnvEGAPIHostDefault, eg.EnvEGAPIHost),
+		host: eg.EnvAPIHostDefault(),
 	}
 }
 

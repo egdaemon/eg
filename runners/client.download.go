@@ -9,7 +9,6 @@ import (
 	"runtime"
 
 	"github.com/egdaemon/eg"
-	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/httpx"
 	"github.com/gofrs/uuid"
@@ -20,7 +19,7 @@ import (
 func NewDownloadClient(c *http.Client) *DownloadClient {
 	return &DownloadClient{
 		c:    c,
-		host: envx.String(eg.EnvEGAPIHostDefault, eg.EnvEGAPIHost),
+		host: eg.EnvAPIHostDefault(),
 	}
 }
 

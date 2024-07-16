@@ -8,7 +8,6 @@ import (
 	"net/http"
 
 	"github.com/egdaemon/eg"
-	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/httpx"
 )
@@ -16,7 +15,7 @@ import (
 func NewPingClient(c *http.Client) *PingClient {
 	return &PingClient{
 		c:    c,
-		host: envx.String(eg.EnvEGAPIHostDefault, eg.EnvEGAPIHost),
+		host: eg.EnvAPIHostDefault(),
 	}
 }
 

@@ -1,22 +1,23 @@
 package eg
 
-const (
-	EnvEGAPIHost        = "EG_API_HOST"
-	EnvEGAPIHostDefault = "https://api.egdaemon.com"
-	// EnvEGAPIHostDefault = "https://localhost:8081"
+var (
+	apiHostDefault     = "https://api.egdaemon.com"
+	consoleHostDefault = "https://console.egdaemon.com"
 )
+
+func EnvAPIHostDefault() string {
+	return apiHostDefault
+}
+
+func EnvConsoleHostDefault() string {
+	return consoleHostDefault
+}
 
 const (
 	EnvEGSSHHost          = "EG_SSH_REVERSE_PROXY_HOST"
 	EnvEGSSHProxyDisabled = "EG_SSH_REVERSE_PROXY_DISABLED"
 	EnvEGSSHHostDefault   = "api.egdaemon.com:8090"
 	// EnvEGSSHHostDefault = "localhost:8090"
-)
-
-const (
-	EnvEGConsoleHost        = "EG_CONSOLE_HOST"
-	EnvEGConsoleHostDefault = "https://console.egdaemon.com"
-	// EnvEGConsoleHostDefault = "https://localhost:8080"
 )
 
 // Logging settings

@@ -11,7 +11,6 @@ import (
 	"path/filepath"
 
 	"github.com/egdaemon/eg"
-	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/httpx"
 	"github.com/egdaemon/eg/internal/jwtx"
@@ -23,14 +22,14 @@ import (
 
 func EndpointSSHAuth() oauth2.Endpoint {
 	return oauth2.Endpoint{
-		AuthURL:   fmt.Sprintf("%s/oauth2/ssh/auth", envx.String(eg.EnvEGAPIHostDefault, eg.EnvEGAPIHost)),
-		TokenURL:  fmt.Sprintf("%s/oauth2/ssh/token", envx.String(eg.EnvEGAPIHostDefault, eg.EnvEGAPIHost)),
+		AuthURL:   fmt.Sprintf("%s/oauth2/ssh/auth", eg.EnvAPIHostDefault()),
+		TokenURL:  fmt.Sprintf("%s/oauth2/ssh/token", eg.EnvAPIHostDefault()),
 		AuthStyle: oauth2.AuthStyleInHeader,
 	}
 }
 
 func EndpointCompute() string {
-	return fmt.Sprintf("%s/c/authz/", envx.String(eg.EnvEGAPIHostDefault, eg.EnvEGAPIHost))
+	return fmt.Sprintf("%s/c/authz/", eg.EnvAPIHostDefault())
 }
 
 func OAuth2SSHConfig(signer ssh.Signer, otp string, endpoint oauth2.Endpoint) oauth2.Config {
@@ -206,7 +205,7 @@ func Session(ctx context.Context, c *http.Client, bearer string) (_ *Current, er
 		session Current
 		req     *http.Request
 	)
-	req, err = http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/authn/current", envx.String(eg.EnvEGAPIHostDefault, eg.EnvEGAPIHost)), nil)
+	req, err = http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/authn/current", eg.EnvAPIHostDefault()), nil)
 	if err != nil {
 		return nil, err
 	}

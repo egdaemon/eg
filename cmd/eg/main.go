@@ -100,8 +100,8 @@ func main() {
 		kong.Description("cli for eg"),
 		kong.Vars{
 			"vars_timestamp_started": time.Now().UTC().Format(time.RFC3339),
-			"vars_endpoint":          envx.String(eg.EnvEGAPIHostDefault, eg.EnvEGAPIHost),
-			"vars_console_endpoint":  envx.String(eg.EnvEGConsoleHostDefault, eg.EnvEGConsoleHost),
+			"vars_endpoint":          eg.EnvAPIHostDefault(),
+			"vars_console_endpoint":  eg.EnvConsoleHostDefault(),
 			"vars_cwd":               osx.Getwd("."),
 			"vars_runtime_directory": userx.DefaultRuntimeDirectory(),
 			"vars_cache_directory":   userx.DefaultCacheDirectory(),
@@ -148,6 +148,8 @@ func main() {
 	if envx.Boolean(false, eg.EnvLogsDebug) {
 		envx.Debug(os.Environ()...)
 	}
+
+	debugx.Println("DERP DERP", eg.EnvAPIHostDefault())
 
 	if err = ctx.Run(); err != nil {
 		log.Println(cmderrors.Sprint(err))

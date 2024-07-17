@@ -328,13 +328,13 @@ func beginwork(ctx context.Context, md metadata, dir string) state {
 	}()
 
 	if archive, err = os.Open(filepath.Join(dir, "archive.tar.gz")); err != nil {
-		return failure(errorsx.Wrap(err, "unable to read archive"), idle(md))
+		return discard(uid, md, failure(errorsx.Wrap(err, "unable to read archive"), idle(md)))
 	}
 
 	errorsx.Log(tarx.Inspect(archive))
 
 	if ws, err = workspaces.New(ctx, tmpdir, ".eg", "eg"); err != nil {
-		return failure(errorsx.Wrap(err, "unable to setup workspace"), idle(md))
+		return discard(uid, md, failure(errorsx.Wrap(err, "unable to setup workspace"), idle(md)))
 	}
 
 	log.Println("workspace", spew.Sdump(ws))

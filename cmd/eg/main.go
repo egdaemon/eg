@@ -110,7 +110,7 @@ func main() {
 			"vars_ssh_key_path": filepath.Join(
 				envx.String(
 					filepath.Join(userx.HomeDirectoryOrDefault(user.HomeDir), ".ssh"),
-					"CACHE_DIRECTORY",
+					"CONFIGURATION_DIRECTORY",
 				),
 				"eg",
 			),

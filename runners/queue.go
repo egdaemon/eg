@@ -376,6 +376,7 @@ func beginwork(ctx context.Context, md metadata, dir string) state {
 		aopts,
 		AgentOptionEGBin(errorsx.Zero(exec.LookPath(os.Args[0]))),
 		AgentOptionEnviron(environpath),
+		// AgentOptionEnv("EG_CACHE_DIRECTORY", filepath.Join(ws.Root, ws.ModuleDir, ws.CacheDir)),
 	)
 
 	m := NewManager(

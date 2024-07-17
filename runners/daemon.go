@@ -95,6 +95,12 @@ func AgentOptionMounts(desc ...string) AgentOption {
 	}
 }
 
+func AgentOptionEnv(key, value string) AgentOption {
+	return func(a *Agent) {
+		a.environ = append(a.environ, "--env", key, value)
+	}
+}
+
 func AgentOptionEnvKeys(keys ...string) AgentOption {
 	vs := []string{}
 	for _, k := range keys {

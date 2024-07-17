@@ -28,6 +28,15 @@ func Debug(ctx context.Context, op eg.Op) error {
 	)
 }
 
+func Prepare(ctx context.Context, op eg.Op) error {
+	return shell.Run(
+		ctx,
+		shell.Newf("pwd"),
+		// shell.Newf("mkdir -p %s", egenv.CacheDirectory(".dist")),
+		shell.New("mkdir -p .eg/.cache/.dist"),
+	)
+}
+
 // main defines the setup for the CI process. here is where you define all
 // of the environments and tasks you wish to run.
 func main() {
@@ -38,10 +47,15 @@ func main() {
 		log.Println("shell output", s)
 	}
 
+	log.Println("debug initiated")
+	defer log.Println("debug completed")
+	env.Debug(os.Environ()...)
+
 	err := eg.Perform(
 		ctx,
-		// Debug,
+		Debug,
 		eggit.AutoClone,
+		Prepare,
 		eg.Parallel(
 			eg.Build(eg.Container(debian.ContainerName).BuildFromFile(".dist/deb/Containerfile")),
 			eg.Build(eg.Container(archlinux.ContainerName).BuildFromFile(".dist/archlinux/Containerfile")),

@@ -6,7 +6,6 @@ import (
 	"eg/ci/maintainer"
 	"encoding/binary"
 	"fmt"
-	"os"
 	"time"
 
 	"github.com/egdaemon/eg/runtime/wasi/eg"
@@ -49,11 +48,6 @@ func build(ctx context.Context, _ eg.Op) error {
 
 func Builder(name string, distro string) eg.ContainerRunner {
 	c := eggit.EnvCommit()
-
-	// ensure directory is available.
-	if err := os.MkdirAll(".eg/.cache/.dist", 0777); err != nil {
-		panic(err)
-	}
 
 	return eg.Container(name).
 		OptionEnv("VCS_REVISION", c.Hash.String()).

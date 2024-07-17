@@ -97,7 +97,7 @@ func AgentOptionMounts(desc ...string) AgentOption {
 
 func AgentOptionEnv(key, value string) AgentOption {
 	return func(a *Agent) {
-		a.environ = append(a.environ, "--env", key, value)
+		a.environ = append(a.environ, "--env", fmt.Sprintf("%s=%s", key, value))
 	}
 }
 
@@ -127,11 +127,12 @@ func DefaultRunnerClient(ctx context.Context) (cc *grpc.ClientConn, err error) {
 
 func NewRunner(ctx context.Context, ws workspaces.Context, id string, options ...AgentOption) (_ *Agent, err error) {
 	var (
-		control net.Listener
-		logdst  *os.File
-		evtlog  *events.Log
-		cspath  = filepath.Join(ws.Root, ws.RuntimeDir, "control.socket")
-		logpath = filepath.Join(ws.Root, ws.RuntimeDir, "daemon.log")
+		control   net.Listener
+		logdst    *os.File
+		evtlog    *events.Log
+		cspath    = filepath.Join(ws.Root, ws.RuntimeDir, "control.socket")
+		logpath   = filepath.Join(ws.Root, ws.RuntimeDir, "daemon.log")
+		metricsdb = filepath.Join(ws.Root, ws.RuntimeDir, "metrics.db")
 	)
 
 	if logdst, err = os.Create(logpath); err != nil {
@@ -156,10 +157,11 @@ func NewRunner(ctx context.Context, ws workspaces.Context, id string, options ..
 	log.Println("logging", logpath)
 
 	r := &Agent{
-		id:      id,
-		ws:      ws,
-		control: control,
-		evtlog:  evtlog,
+		id:        id,
+		ws:        ws,
+		control:   control,
+		evtlog:    evtlog,
+		metricsdb: metricsdb,
 		srv: grpc.NewServer(
 			grpc.Creds(insecure.NewCredentials()), // this is a local socket
 		),
@@ -177,15 +179,16 @@ func NewRunner(ctx context.Context, ws workspaces.Context, id string, options ..
 }
 
 type Agent struct {
-	id      string
-	environ []string
-	volumes []string
-	ws      workspaces.Context
-	control net.Listener
-	srv     *grpc.Server
-	log     *log.Logger
-	blocked chan struct{}
-	evtlog  *events.Log
+	id        string
+	environ   []string
+	volumes   []string
+	ws        workspaces.Context
+	control   net.Listener
+	srv       *grpc.Server
+	log       *log.Logger
+	metricsdb string
+	blocked   chan struct{}
+	evtlog    *events.Log
 }
 
 func (t Agent) Dial(ctx context.Context) (conn *grpc.ClientConn, err error) {
@@ -206,6 +209,7 @@ func (t Agent) background() {
 	defer close(t.blocked)
 
 	log.Println("control socket", t.control.Addr().String())
+	log.Println("metrics database", t.metricsdb)
 
 	events.NewServiceDispatch(t.evtlog).Bind(t.srv)
 

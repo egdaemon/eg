@@ -12,6 +12,7 @@ import (
 	"github.com/egdaemon/eg/cmd/cmdopts"
 	"github.com/egdaemon/eg/compile"
 	"github.com/egdaemon/eg/compute"
+	"github.com/egdaemon/eg/internal/bytesx"
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/gitx"
@@ -137,7 +138,7 @@ func (t upload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 	}
 
 	ainfo := errorsx.Zero(os.Stat(archiveio.Name()))
-	log.Println("archive metadata", ainfo.Name(), ainfo.Size())
+	log.Println("archive metadata", ainfo.Name(), bytesx.Unit(ainfo.Size()))
 
 	// TODO: determine the destination based on the requirements
 	// i.e. cores, memory, labels, disk, videomem, etc.
@@ -146,7 +147,7 @@ func (t upload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 	// push the archive to another node that matches the requirements.
 	// in theory we could use redirects to handle that but it'd still take a performance hit.
 	mimetype, buf, err := runners.NewEnqueueUpload(&runners.Enqueued{
-		Entry:       filepath.Base(entry.Path),
+		Entry:       filepath.Join(ws.Module, filepath.Base(entry.Path)),
 		Ttl:         uint64(t.runtimecfg.TTL.Milliseconds()),
 		Cores:       t.runtimecfg.Cores,
 		Memory:      t.runtimecfg.Memory,

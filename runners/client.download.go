@@ -77,6 +77,14 @@ func (t DownloadClient) Download(ctx context.Context) (err error) {
 		return errorsx.Wrap(err, "unable to receive kernel archive")
 	}
 
+	if encoded, err = json.Marshal(&resp); err != nil {
+		return errorsx.Wrap(err, "unable to write metadata")
+	}
+
+	if err = dirs.Download(uid, "metadata.json", bytes.NewBuffer(encoded)); err != nil {
+		return errorsx.Wrap(err, "unable to write metadata")
+	}
+
 	if err = dirs.Enqueue(uid); err != nil {
 		return errorsx.Wrap(err, "unable to enqueue kernel archive")
 	}

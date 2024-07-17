@@ -3,6 +3,7 @@ package runners
 import (
 	"context"
 	"embed"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -298,12 +299,16 @@ func (t staterecover) Update(ctx context.Context) state {
 
 func beginwork(ctx context.Context, md metadata, dir string) state {
 	var (
-		err     error
-		ws      workspaces.Context
-		tmpdir  string
-		ragent  *Agent
-		archive *os.File
-		_uid    uuid.UUID
+		err      error
+		ws       workspaces.Context
+		tmpdir   string
+		ragent   *Agent
+		archive  *os.File
+		_uid     uuid.UUID
+		encoded  []byte
+		metadata = &EnqueuedDequeueResponse{
+			Enqueued: &Enqueued{Entry: "main.wasm"},
+		}
 	)
 
 	if _uid, err = uidfrompath(filepath.Join(dir, "uuid")); err != nil {
@@ -312,9 +317,18 @@ func beginwork(ctx context.Context, md metadata, dir string) state {
 	uid := _uid.String()
 
 	log.Println("initializing runner", uid, dir)
-
 	tmpdir = filepath.Join(dir, "work")
+	// fsx.PrintDir(os.DirFS(dir))
+
 	if err = os.MkdirAll(tmpdir, 0700); err != nil {
+		return failure(err, idle(md))
+	}
+
+	if encoded, err = os.ReadFile(filepath.Join(dir, "metadata.json")); err != nil {
+		return failure(err, idle(md))
+	}
+
+	if err = json.Unmarshal(encoded, metadata); err != nil {
 		return failure(err, idle(md))
 	}
 
@@ -386,7 +400,7 @@ func beginwork(ctx context.Context, md metadata, dir string) state {
 		return completed(md, tmpdir, ws, uid, 0, errorsx.Wrap(err, "run failure"))
 	}
 
-	return staterunning{metadata: md, ws: ws, ragent: ragent, dir: dir, tmpdir: tmpdir}
+	return staterunning{metadata: md, ws: ws, ragent: ragent, dir: dir, tmpdir: tmpdir, entry: metadata.Enqueued.Entry}
 }
 
 type staterunning struct {
@@ -395,6 +409,7 @@ type staterunning struct {
 	ragent *Agent
 	dir    string
 	tmpdir string
+	entry  string
 }
 
 func (t staterunning) Update(ctx context.Context) state {
@@ -425,7 +440,7 @@ func (t staterunning) Update(ctx context.Context) state {
 			Mdir:  t.ws.RuntimeDir,
 			Options: []string{
 				"--env", "EG_BIN",
-				"--volume", fmt.Sprintf("%s:/opt/egmodule.wasm:ro", filepath.Join(t.ws.Root, t.ws.RuntimeDir, "main.wasm")),
+				"--volume", fmt.Sprintf("%s:/opt/egmodule.wasm:ro", filepath.Join(t.ws.Root, t.ws.RuntimeDir, t.entry)),
 			},
 		})
 

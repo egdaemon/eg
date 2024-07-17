@@ -89,12 +89,11 @@ func CanonicalURI(r *git.Repository, name string) (_ string, err error) {
 	}
 
 	uri := slicesx.FirstOrZero(remote.Config().URLs...)
-
 	if strings.ContainsRune(uri, '@') {
 		return uri, nil
 	}
 
-	return sshvcsuri(uri), nil
+	return vcsuri(uri), nil
 }
 
 func Env(repo *git.Repository, remote string, branch string) (env []string, err error) {
@@ -103,7 +102,7 @@ func Env(repo *git.Repository, remote string, branch string) (env []string, err 
 		return nil, err
 	}
 
-	return HeadEnv(repo, vcsuri(uri), uri, branch)
+	return HeadEnv(repo, uri, uri, branch)
 }
 
 // ideally we shouldn't need this but unfortunately go-git doesn't apply instead of rules properly.
@@ -114,7 +113,7 @@ func LocalEnv(repo *git.Repository, remote string, branch string) (env []string,
 		return nil, err
 	}
 
-	return HeadEnv(repo, vcsuri(uri), "/opt/eg", branch)
+	return HeadEnv(repo, uri, "/opt/eg", branch)
 }
 
 func HeadEnv(repo *git.Repository, vcs, uri string, treeish string) (env []string, err error) {
@@ -158,5 +157,5 @@ func sshvcsuri(s string) string {
 }
 
 func vcsuri(s string) string {
-	return strings.TrimPrefix(sshvcsuri(s), "ssh://")
+	return strings.Replace(strings.TrimPrefix(sshvcsuri(s), "ssh://"), "/", ":", 1)
 }

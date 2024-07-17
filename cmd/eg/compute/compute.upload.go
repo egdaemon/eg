@@ -31,7 +31,7 @@ import (
 )
 
 type upload struct {
-	runtimecfg    cmdopts.RuntimeResources
+	cmdopts.RuntimeResources
 	HostedCompute bool     `name:"shared-compute" help:"allow hosted compute" default:"false"`
 	SSHKeyPath    string   `name:"sshkeypath" help:"path to ssh key to use" default:"${vars_ssh_key_path}"`
 	Dir           string   `name:"directory" help:"root directory of the repository" default:"${vars_cwd}"`
@@ -148,11 +148,11 @@ func (t upload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 	// in theory we could use redirects to handle that but it'd still take a performance hit.
 	mimetype, buf, err := runners.NewEnqueueUpload(&runners.Enqueued{
 		Entry:       filepath.Join(ws.Module, filepath.Base(entry.Path)),
-		Ttl:         uint64(t.runtimecfg.TTL.Milliseconds()),
-		Cores:       t.runtimecfg.Cores,
-		Memory:      t.runtimecfg.Memory,
-		Arch:        t.runtimecfg.Arch,
-		Os:          t.runtimecfg.OS,
+		Ttl:         uint64(t.RuntimeResources.TTL.Milliseconds()),
+		Cores:       t.RuntimeResources.Cores,
+		Memory:      t.RuntimeResources.Memory,
+		Arch:        t.RuntimeResources.Arch,
+		Os:          t.RuntimeResources.OS,
 		AllowShared: t.HostedCompute,
 		Vcsuri:      errorsx.Zero(gitx.CanonicalURI(repo, t.GitRemote)), // optionally set the vcsuri if we're inside a repository.
 	}, archiveio)

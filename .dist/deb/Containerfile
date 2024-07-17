@@ -4,7 +4,7 @@ ARG DEBIAN_FRONTEND=noninteractive
 COPY rootfs /
 
 RUN apt-get update
-RUN apt-get -y install software-properties-common build-essential
+RUN apt-get -y install software-properties-common build-essential ca-certificates
 RUN add-apt-repository -n ppa:longsleep/golang-backports
 RUN add-apt-repository -n ppa:egdaemon/eg
 

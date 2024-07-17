@@ -24,6 +24,7 @@ import (
 	"github.com/egdaemon/eg/interp/runtime/wasi/ffiexec"
 	"github.com/egdaemon/eg/interp/runtime/wasi/ffigit"
 	"github.com/egdaemon/eg/interp/runtime/wasi/ffigraph"
+	"github.com/egdaemon/eg/interp/runtime/wasi/ffimetric"
 	"github.com/egdaemon/eg/runners"
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
@@ -140,7 +141,10 @@ func Remote(ctx context.Context, runid string, g ffigraph.Eventer, svc grpc.Clie
 		).Export("github.com/egdaemon/eg/runtime/wasi/runtime/ffigit.Clone").
 			NewFunctionBuilder().WithFunc(
 			ffigit.CloneV2(r.root),
-		).Export("github.com/egdaemon/eg/runtime/wasi/runtime/ffigit.CloneV2")
+		).Export("github.com/egdaemon/eg/runtime/wasi/runtime/ffigit.CloneV2").
+			NewFunctionBuilder().WithFunc(
+			ffimetric.Metric,
+		).Export("github.com/egdaemon/eg/runtime/wasi/runtime/metrics.Record")
 	}
 
 	return r.perform(ctx, runid, module, runtimeenv)

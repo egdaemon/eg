@@ -12,6 +12,7 @@ import (
 	"github.com/egdaemon/eg/interp/runtime/wasi/ffiexec"
 	"github.com/egdaemon/eg/interp/runtime/wasi/ffigit"
 	"github.com/egdaemon/eg/interp/runtime/wasi/ffigraph"
+	"github.com/egdaemon/eg/interp/runtime/wasi/ffimetric"
 	"github.com/egdaemon/eg/runners"
 	"github.com/tetratelabs/wazero"
 )
@@ -102,7 +103,9 @@ func Analyse(ctx context.Context, g ffigraph.Eventer, runid, dir string, module 
 		).Export("github.com/egdaemon/eg/runtime/wasi/runtime/ffigit.Clone").
 			NewFunctionBuilder().WithFunc(
 			ffigit.CloneV2(r.root),
-		).Export("github.com/egdaemon/eg/runtime/wasi/runtime/ffigit.CloneV2")
+		).Export("github.com/egdaemon/eg/runtime/wasi/runtime/ffigit.CloneV2").
+			NewFunctionBuilder().WithFunc(ffimetric.Metric).
+			Export("github.com/egdaemon/eg/runtime/wasi/runtime/metrics.Record")
 	}
 
 	if err = r.perform(ctx, runid, module, runtimeenv); err != nil {

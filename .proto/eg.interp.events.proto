@@ -29,15 +29,23 @@ message Task {
   int64 deadline = 5; // unix timestamp.
 }
 
+// metric event contains a json set of fields
+message Metric {
+  string name = 1;
+  reserved 2 to 999;
+  bytes fieldsJSON = 1000;
+}
+
 // Represents every message recorded when executing a job
 message Message {
-  string id = 1;
-  int64 ts = 2; // unix timestamp.
+  string id = 1; // uuid v7
+  int64 ts = 2;  // unix timestamp.
 
   oneof Event {
     LogHeader preamble = 100;
     Heartbeat heartbeat = 101;
     Task task = 102;
+    Metric metric = 103;
   }
 }
 

@@ -22,7 +22,8 @@ func readInputs(ctx context.Context, msgs chan<- Msg, input io.Reader) error {
 }
 
 func readConInputs(ctx context.Context, msgsch chan<- Msg, con windows.Handle) error {
-	var ps coninput.ButtonState // keep track of previous mouse state
+	var ps coninput.ButtonState                 // keep track of previous mouse state
+	var ws coninput.WindowBufferSizeEventRecord // keep track of the last window size event
 	for {
 		events, err := coninput.ReadNConsoleInputs(con, 16)
 		if err != nil {
@@ -38,17 +39,30 @@ func readConInputs(ctx context.Context, msgsch chan<- Msg, con windows.Handle) e
 				}
 
 				for i := 0; i < int(e.RepeatCount); i++ {
+					eventKeyType := keyType(e)
+					var runes []rune
+
+					// Add the character only if the key type is an actual character and not a control sequence.
+					// This mimics the behavior in readAnsiInputs where the character is also removed.
+					// We don't need to handle KeySpace here. See the comment in keyType().
+					if eventKeyType == KeyRunes {
+						runes = []rune{e.Char}
+					}
+
 					msgs = append(msgs, KeyMsg{
-						Type:  keyType(e),
-						Runes: []rune{e.Char},
+						Type:  eventKeyType,
+						Runes: runes,
 						Alt:   e.ControlKeyState.Contains(coninput.LEFT_ALT_PRESSED | coninput.RIGHT_ALT_PRESSED),
 					})
 				}
 			case coninput.WindowBufferSizeEventRecord:
-				msgs = append(msgs, WindowSizeMsg{
-					Width:  int(e.Size.X),
-					Height: int(e.Size.Y),
-				})
+				if e != ws {
+					ws = e
+					msgs = append(msgs, WindowSizeMsg{
+						Width:  int(e.Size.X),
+						Height: int(e.Size.Y),
+					})
+				}
 			case coninput.MouseEventRecord:
 				event := mouseEvent(ps, e)
 				if event.Type != MouseUnknown {

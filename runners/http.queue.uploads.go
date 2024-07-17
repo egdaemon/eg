@@ -17,6 +17,10 @@ func NewEnqueueUpload(enq *Enqueued, archive io.Reader) (mimetype string, body *
 			return errorsx.Wrap(err, "unable to copy entry point")
 		}
 
+		if err = w.WriteField("allow_shared", strconv.FormatBool(enq.AllowShared)); err != nil {
+			return errorsx.Wrap(err, "unable to copy allow_shared")
+		}
+
 		if err = w.WriteField("ttl", strconv.FormatUint(enq.Ttl, 10)); err != nil {
 			return errorsx.Wrap(err, "unable to set ttl")
 		}

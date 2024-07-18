@@ -1,0 +1,16 @@
+#!/usr/bin/make -f
+# See debhelper(7) (uncomment to enable)
+# output every command that modifies files on the build system.
+DH_VERBOSE=1
+
+%:
+	dh $@
+
+override_dh_auto_build:
+	echo "DH AUTO BUILD OVERRIDE"
+	GEN=ninja make -j 8 -C src
+	DESTDIR="rootfs" cmake --install src/build"
+
+# override_dh_auto_test:
+# 	echo "DH AUTO TEST OVERRIDE"
+# 	CACHE_DIRECTORY="$(CURDIR)" $(CURDIR)/bin/eg version

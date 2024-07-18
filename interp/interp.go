@@ -128,7 +128,9 @@ func Remote(ctx context.Context, runid string, g ffigraph.Eventer, svc grpc.Clie
 			return nil
 		})).Export("github.com/egdaemon/eg/runtime/wasi/runtime/ffiegcontainer.Run").
 			NewFunctionBuilder().WithFunc(ffiexec.Exec(func(cmd *exec.Cmd) *exec.Cmd {
-			cmd.Dir = filepath.Join(r.root, cmd.Dir)
+			if !filepath.IsAbs(cmd.Dir) {
+				cmd.Dir = filepath.Join(r.root, cmd.Dir)
+			}
 			cmd.Env = append(cmdenv, cmd.Env...)
 			cmd.Stdin = os.Stdin
 			cmd.Stdout = os.Stdout

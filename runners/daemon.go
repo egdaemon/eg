@@ -2,6 +2,7 @@ package runners
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"io"
 	"log"
@@ -18,6 +19,7 @@ import (
 	"github.com/egdaemon/eg/interp/c8s"
 	"github.com/egdaemon/eg/interp/events"
 	"github.com/egdaemon/eg/workspaces"
+	_ "github.com/marcboeker/go-duckdb"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
@@ -127,12 +129,13 @@ func DefaultRunnerClient(ctx context.Context) (cc *grpc.ClientConn, err error) {
 
 func NewRunner(ctx context.Context, ws workspaces.Context, id string, options ...AgentOption) (_ *Agent, err error) {
 	var (
-		control   net.Listener
-		logdst    *os.File
-		evtlog    *events.Log
-		cspath    = filepath.Join(ws.Root, ws.RuntimeDir, "control.socket")
-		logpath   = filepath.Join(ws.Root, ws.RuntimeDir, "daemon.log")
-		metricsdb = filepath.Join(ws.Root, ws.RuntimeDir, "metrics.db")
+		control  net.Listener
+		logdst   *os.File
+		evtlog   *events.Log
+		db       *sql.DB
+		cspath   = filepath.Join(ws.Root, ws.RuntimeDir, "control.socket")
+		logpath  = filepath.Join(ws.Root, ws.RuntimeDir, "daemon.log")
+		eventsdb = filepath.Join(ws.Root, ws.RuntimeDir, "analytics.db")
 	)
 
 	if logdst, err = os.Create(logpath); err != nil {
@@ -141,6 +144,14 @@ func NewRunner(ctx context.Context, ws workspaces.Context, id string, options ..
 
 	if evtlog, err = events.NewLogEnsureDir(events.NewLogDirFromRunID(ws.Root, ws.RuntimeDir)); err != nil {
 		return nil, errorsx.WithStack(err)
+	}
+
+	if db, err = sql.Open("duckdb", eventsdb); err != nil {
+		return nil, errorsx.Wrap(err, "unable to create analytics.db")
+	}
+
+	if err = events.PrepareMetrics(ctx, db); err != nil {
+		return nil, errorsx.Wrap(err, "unable to prepare analytics.db")
 	}
 
 	if control, err = net.Listen("unix", cspath); err != nil {
@@ -152,16 +163,12 @@ func NewRunner(ctx context.Context, ws workspaces.Context, id string, options ..
 		control.Close()
 	}()
 
-	log.Println("runner", id)
-	debugx.Println("workspace", spew.Sdump(ws))
-	log.Println("logging", logpath)
-
 	r := &Agent{
-		id:        id,
-		ws:        ws,
-		control:   control,
-		evtlog:    evtlog,
-		metricsdb: metricsdb,
+		id:          id,
+		ws:          ws,
+		control:     control,
+		evtlog:      evtlog,
+		analyticsdb: db,
 		srv: grpc.NewServer(
 			grpc.Creds(insecure.NewCredentials()), // this is a local socket
 		),
@@ -173,22 +180,29 @@ func NewRunner(ctx context.Context, ws workspaces.Context, id string, options ..
 		opt(r)
 	}
 
-	go r.background()
+	go func() {
+		log.Println("RUNNER INITIATED", r.id)
+		log.Println("control socket", control.Addr().String())
+		log.Println("analytics database", eventsdb)
+		debugx.Println("workspace", spew.Sdump(ws))
+		defer log.Println("RUNNER COMPLETED", r.id)
+		r.background()
+	}()
 
 	return r, nil
 }
 
 type Agent struct {
-	id        string
-	environ   []string
-	volumes   []string
-	ws        workspaces.Context
-	control   net.Listener
-	srv       *grpc.Server
-	log       *log.Logger
-	metricsdb string
-	blocked   chan struct{}
-	evtlog    *events.Log
+	id          string
+	environ     []string
+	volumes     []string
+	ws          workspaces.Context
+	analyticsdb *sql.DB
+	control     net.Listener
+	srv         *grpc.Server
+	log         *log.Logger
+	blocked     chan struct{}
+	evtlog      *events.Log
 }
 
 func (t Agent) Dial(ctx context.Context) (conn *grpc.ClientConn, err error) {
@@ -204,14 +218,10 @@ func (t Agent) Close() error {
 }
 
 func (t Agent) background() {
-	log.Println("RUNNER INITIATED", t.id)
-	defer log.Println("RUNNER COMPLETED", t.id)
 	defer close(t.blocked)
+	defer t.analyticsdb.Close()
 
-	log.Println("control socket", t.control.Addr().String())
-	log.Println("metrics database", t.metricsdb)
-
-	events.NewServiceDispatch(t.evtlog).Bind(t.srv)
+	events.NewServiceDispatch(t.evtlog, t.analyticsdb).Bind(t.srv)
 
 	containerOpts := []string{}
 	containerOpts = append(containerOpts, t.volumes...)

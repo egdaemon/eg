@@ -1,6 +1,7 @@
 package userx
 
 import (
+	"fmt"
 	"log"
 	"os"
 	"os/user"
@@ -73,13 +74,14 @@ func DefaultCacheDirectory() string {
 // DefaultRuntimeDirectory runtime directory for storing data.
 func DefaultRuntimeDirectory() string {
 	user := CurrentUserOrDefault(Root())
+
 	if user.Uid == Root().Uid {
-		return envx.String(filepath.Join("/", "run", DefaultDir), "RUNTIME_DIRECTORY")
+		return envx.String(filepath.Join("/", "run", DefaultDir), "RUNTIME_DIRECTORY", "XDG_RUNTIME_DIR")
 	}
 
-	root := filepath.Join(user.HomeDir, ".cache", DefaultDir, "run")
+	defaultdir := filepath.Join(os.TempDir(), fmt.Sprintf("%s-%s", DefaultDir, "runtime"))
 
-	return envx.String(root, "RUNTIME_DIRECTORY")
+	return envx.String(defaultdir, "RUNTIME_DIRECTORY", "XDG_RUNTIME_DIR")
 }
 
 // DefaultDirectory finds the first directory root that exists and then returns

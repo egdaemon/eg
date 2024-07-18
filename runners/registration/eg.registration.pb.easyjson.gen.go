@@ -719,3 +719,137 @@ func (v *Registration) UnmarshalJSON(data []byte) error {
 func (v *Registration) UnmarshalEasyJSON(l *jlexer.Lexer) {
 	easyjsonDabade4DecodeGithubComEgdaemonEgRunnersRegistration6(l, v)
 }
+func easyjsonDabade4DecodeGithubComEgdaemonEgRunnersRegistration7(in *jlexer.Lexer, out *PingResponse) {
+	isTopLevel := in.IsStart()
+	if in.IsNull() {
+		if isTopLevel {
+			in.Consumed()
+		}
+		in.Skip()
+		return
+	}
+	in.Delim('{')
+	for !in.IsDelim('}') {
+		key := in.UnsafeFieldName(false)
+		in.WantColon()
+		if in.IsNull() {
+			in.Skip()
+			in.WantComma()
+			continue
+		}
+		switch key {
+		default:
+			in.SkipRecursive()
+		}
+		in.WantComma()
+	}
+	in.Delim('}')
+	if isTopLevel {
+		in.Consumed()
+	}
+}
+func easyjsonDabade4EncodeGithubComEgdaemonEgRunnersRegistration7(out *jwriter.Writer, in PingResponse) {
+	out.RawByte('{')
+	first := true
+	_ = first
+	out.RawByte('}')
+}
+
+// MarshalJSON supports json.Marshaler interface
+func (v PingResponse) MarshalJSON() ([]byte, error) {
+	w := jwriter.Writer{}
+	easyjsonDabade4EncodeGithubComEgdaemonEgRunnersRegistration7(&w, v)
+	return w.Buffer.BuildBytes(), w.Error
+}
+
+// MarshalEasyJSON supports easyjson.Marshaler interface
+func (v PingResponse) MarshalEasyJSON(w *jwriter.Writer) {
+	easyjsonDabade4EncodeGithubComEgdaemonEgRunnersRegistration7(w, v)
+}
+
+// UnmarshalJSON supports json.Unmarshaler interface
+func (v *PingResponse) UnmarshalJSON(data []byte) error {
+	r := jlexer.Lexer{Data: data}
+	easyjsonDabade4DecodeGithubComEgdaemonEgRunnersRegistration7(&r, v)
+	return r.Error()
+}
+
+// UnmarshalEasyJSON supports easyjson.Unmarshaler interface
+func (v *PingResponse) UnmarshalEasyJSON(l *jlexer.Lexer) {
+	easyjsonDabade4DecodeGithubComEgdaemonEgRunnersRegistration7(l, v)
+}
+func easyjsonDabade4DecodeGithubComEgdaemonEgRunnersRegistration8(in *jlexer.Lexer, out *PingRequest) {
+	isTopLevel := in.IsStart()
+	if in.IsNull() {
+		if isTopLevel {
+			in.Consumed()
+		}
+		in.Skip()
+		return
+	}
+	in.Delim('{')
+	for !in.IsDelim('}') {
+		key := in.UnsafeFieldName(false)
+		in.WantColon()
+		if in.IsNull() {
+			in.Skip()
+			in.WantComma()
+			continue
+		}
+		switch key {
+		case "registration":
+			if in.IsNull() {
+				in.Skip()
+				out.Registration = nil
+			} else {
+				if out.Registration == nil {
+					out.Registration = new(Registration)
+				}
+				(*out.Registration).UnmarshalEasyJSON(in)
+			}
+		default:
+			in.SkipRecursive()
+		}
+		in.WantComma()
+	}
+	in.Delim('}')
+	if isTopLevel {
+		in.Consumed()
+	}
+}
+func easyjsonDabade4EncodeGithubComEgdaemonEgRunnersRegistration8(out *jwriter.Writer, in PingRequest) {
+	out.RawByte('{')
+	first := true
+	_ = first
+	if in.Registration != nil {
+		const prefix string = ",\"registration\":"
+		first = false
+		out.RawString(prefix[1:])
+		(*in.Registration).MarshalEasyJSON(out)
+	}
+	out.RawByte('}')
+}
+
+// MarshalJSON supports json.Marshaler interface
+func (v PingRequest) MarshalJSON() ([]byte, error) {
+	w := jwriter.Writer{}
+	easyjsonDabade4EncodeGithubComEgdaemonEgRunnersRegistration8(&w, v)
+	return w.Buffer.BuildBytes(), w.Error
+}
+
+// MarshalEasyJSON supports easyjson.Marshaler interface
+func (v PingRequest) MarshalEasyJSON(w *jwriter.Writer) {
+	easyjsonDabade4EncodeGithubComEgdaemonEgRunnersRegistration8(w, v)
+}
+
+// UnmarshalJSON supports json.Unmarshaler interface
+func (v *PingRequest) UnmarshalJSON(data []byte) error {
+	r := jlexer.Lexer{Data: data}
+	easyjsonDabade4DecodeGithubComEgdaemonEgRunnersRegistration8(&r, v)
+	return r.Error()
+}
+
+// UnmarshalEasyJSON supports easyjson.Unmarshaler interface
+func (v *PingRequest) UnmarshalEasyJSON(l *jlexer.Lexer) {
+	easyjsonDabade4DecodeGithubComEgdaemonEgRunnersRegistration8(l, v)
+}

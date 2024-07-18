@@ -52,6 +52,15 @@ func NewTask(t *Task) *Message {
 	})
 }
 
+func NewMetric(name string, encoded []byte) *Message {
+	return NewMessage(&Message_Metric{
+		Metric: &Metric{
+			Name:       name,
+			FieldsJSON: encoded,
+		},
+	})
+}
+
 func NewTaskPending(id, desc string) *Message {
 	return NewTask(&Task{
 		Id:          id,

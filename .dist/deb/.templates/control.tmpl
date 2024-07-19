@@ -3,10 +3,10 @@ Section: misc
 Maintainer: ${DEBFULLNAME} <${DEBEMAIL}>
 Standards-Version: 4.6.0.1
 Priority: extra
-Build-Depends: golang-1.22, dh-make, debhelper
+Build-Depends: golang-1.22, dh-make, debhelper, duckdb
 
 Package: eg
 Section: misc
 Architecture: any
 Description: developer friendly continuous integration
-Depends: podman, ${misc:Depends}
+Depends: podman, duckdb, ${misc:Depends}

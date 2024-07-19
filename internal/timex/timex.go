@@ -1,6 +1,7 @@
 package timex
 
 import (
+	"context"
 	"math"
 	"time"
 )
@@ -23,10 +24,23 @@ func Every(d time.Duration, do func()) {
 }
 
 // NowAndEvery executes the provided function immeditately and every duration.
-func NowAndEvery(d time.Duration, do func()) {
-	do()
-	for range time.Tick(d) {
-		do()
+func NowAndEvery(ctx context.Context, d time.Duration, do func(context.Context) error) error {
+	if err := do(ctx); err != nil {
+		return err
+	}
+
+	t := time.NewTicker(d)
+	defer t.Stop()
+
+	for {
+		select {
+		case <-t.C:
+			if err := do(ctx); err != nil {
+				return err
+			}
+		case <-ctx.Done():
+			return ctx.Err()
+		}
 	}
 }
 

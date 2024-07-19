@@ -26,8 +26,8 @@ type CompletionClient struct {
 	host string
 }
 
-func (t CompletionClient) Upload(ctx context.Context, id string, duration time.Duration, cause error, logs io.Reader) (err error) {
-	mimetype, body, err := NewEnqueueCompletion(cause, duration, logs)
+func (t CompletionClient) Upload(ctx context.Context, id string, duration time.Duration, cause error, logs io.Reader, analytics io.Reader) (err error) {
+	mimetype, body, err := NewEnqueueCompletion(cause, duration, logs, analytics)
 	if err != nil {
 		return err
 	}

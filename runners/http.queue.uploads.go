@@ -58,7 +58,7 @@ func NewEnqueueUpload(enq *Enqueued, archive io.Reader) (mimetype string, body *
 	})
 }
 
-func NewEnqueueCompletion(cause error, duration time.Duration, logs io.Reader) (mimetype string, body *os.File, err error) {
+func NewEnqueueCompletion(cause error, duration time.Duration, logs io.Reader, analytics io.Reader) (mimetype string, body *os.File, err error) {
 	return httpx.Multipart(func(w *multipart.Writer) error {
 		if err = w.WriteField("duration", strconv.FormatUint(uint64(duration.Milliseconds()), 10)); err != nil {
 			return errorsx.Wrap(err, "unable to write duration")
@@ -75,6 +75,15 @@ func NewEnqueueCompletion(cause error, duration time.Duration, logs io.Reader) (
 
 		if _, lerr = io.Copy(part, logs); lerr != nil {
 			return errorsx.Wrap(lerr, "unable to copy logs")
+		}
+
+		apart, aerr := w.CreatePart(httpx.NewMultipartHeader("application/vnd.egdaemon-analytics", "analytics", "analytics.db"))
+		if aerr != nil {
+			return errorsx.Wrap(aerr, "unable to create analytics part")
+		}
+
+		if _, lerr = io.Copy(apart, analytics); lerr != nil {
+			return errorsx.Wrap(lerr, "unable to copy analytics")
 		}
 
 		return nil

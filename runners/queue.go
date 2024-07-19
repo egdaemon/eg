@@ -18,6 +18,7 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/egdaemon/eg/internal/debugx"
 	"github.com/egdaemon/eg/internal/errorsx"
+	"github.com/egdaemon/eg/internal/fsx"
 	"github.com/egdaemon/eg/internal/iox"
 	"github.com/egdaemon/eg/internal/langx"
 	"github.com/egdaemon/eg/internal/tarx"
@@ -34,12 +35,12 @@ type downloader interface {
 }
 
 type completion interface {
-	Upload(ctx context.Context, id string, duration time.Duration, cause error, logs io.Reader) (err error)
+	Upload(ctx context.Context, id string, duration time.Duration, cause error, logs io.Reader, analytics io.Reader) (err error)
 }
 
 type noopcompletion struct{}
 
-func (t noopcompletion) Upload(ctx context.Context, id string, duration time.Duration, cause error, logs io.Reader) (err error) {
+func (t noopcompletion) Upload(ctx context.Context, id string, duration time.Duration, cause error, logs io.Reader, analytics io.Reader) (err error) {
 	log.Println("noop completion is being used", id)
 	return nil
 }
@@ -470,13 +471,14 @@ type statecompleted struct {
 
 func (t statecompleted) Update(ctx context.Context) state {
 	var (
-		logpath = filepath.Join(t.ws.Root, t.ws.RuntimeDir, "daemon.log")
+		logpath       = filepath.Join(t.ws.Root, t.ws.RuntimeDir, "daemon.log")
+		analyticspath = filepath.Join(t.ws.Root, t.ws.RuntimeDir, "analytics.db")
 	)
 
 	dirs := DefaultSpoolDirs()
 	log.Println("completed", t.id, filepath.Join(dirs.Running, t.id), t.cause)
 
-	// fsx.PrintDir(os.DirFS(filepath.Join(t.ws.Root, t.ws.RuntimeDir)))
+	fsx.PrintDir(os.DirFS(filepath.Join(t.ws.Root, t.ws.RuntimeDir)))
 
 	logs, err := os.Open(logpath)
 	if err != nil {
@@ -484,7 +486,13 @@ func (t statecompleted) Update(ctx context.Context) state {
 	}
 	defer logs.Close()
 
-	if err = t.metadata.completion.Upload(ctx, t.id, t.duration, t.cause, logs); err != nil {
+	analytics, err := os.Open(analyticspath)
+	if err != nil {
+		return discard(t.id, t.metadata, failure(errorsx.Wrap(err, "unable open analytics for upload"), idle(t.metadata)))
+	}
+	defer analytics.Close()
+
+	if err = t.metadata.completion.Upload(ctx, t.id, t.duration, t.cause, logs, analytics); err != nil {
 		return discard(t.id, t.metadata, failure(errorsx.Wrap(err, "unable upload completion"), idle(t.metadata)))
 	}
 

@@ -148,8 +148,6 @@ func main() {
 		envx.Debug(os.Environ()...)
 	}
 
-	debugx.Println("DERP DERP", eg.EnvAPIHostDefault())
-
 	if err = ctx.Run(); err != nil {
 		log.Println(cmderrors.Sprint(err))
 		os.Exit(1)

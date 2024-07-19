@@ -25,3 +25,7 @@ func CacheDirectory(paths ...string) string {
 func RuntimeDirectory(paths ...string) string {
 	return filepath.Join(env.String(os.TempDir(), "EG_RUNTIME_DIRECTORY"), filepath.Join(paths...))
 }
+
+func RootDirectory(paths ...string) string {
+	return filepath.Join(env.String("/opt/eg", "EG_ROOT_DIRECTORY"), filepath.Join(paths...))
+}

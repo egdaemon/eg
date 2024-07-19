@@ -18,6 +18,8 @@ override_dh_auto_build:
 	tree duckdb
 	echo ${CMAKE_BUILD_PARALLEL_LEVEL}
 
+override_dh_usrlocal:
+	echo "DH usrlocal override due to over restrict rules"
 # cmake -S . -B build -D CMAKE_BUILD_TYPE=Release -D CMAKE_INSTALL_PREFIX=/usr
 # cmake --build build
 # DESTDIR="rootfs" cmake --install build

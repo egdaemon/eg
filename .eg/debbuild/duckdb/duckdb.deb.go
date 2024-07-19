@@ -2,8 +2,11 @@ package duckdb
 
 import (
 	"context"
+	"crypto/md5"
 	"eg/ci/maintainer"
 	"embed"
+	"encoding/binary"
+	"fmt"
 	"log"
 	"os"
 	"path/filepath"
@@ -56,7 +59,7 @@ func build(distro string) eg.OpFn {
 		runtime := shell.Runtime().
 			Directory(relpath).
 			Environ("DEB_PACKAGE_NAME", "duckdb").
-			Environ("DEB_VERSION", "1.0.1").
+			Environ("DEB_VERSION", fmt.Sprintf("1.0.%d", c.Committer.When.Add(dynamicduration(10*time.Second, distro)).UnixMilli())).
 			Environ("DEB_DISTRO", distro).
 			Environ("DEB_CHANGELOG_DATE", c.Committer.When.Format(time.RFC1123Z)).
 			Environ("DEB_EMAIL", maintainer.Email).
@@ -71,6 +74,7 @@ func build(distro string) eg.OpFn {
 			runtime.New("cat debian/rules | envsubst | tee debian/rules"),
 			runtime.New("cat debian/changelog"),
 			runtime.Newf("debuild -S -k%s", maintainer.GPGFingerprint),
+			// runtime.Newf("rsync --verbose --progress --recursive --perms ./ %s", egenv.CacheDirectory("duckdb")),
 			runtime.New("pwd"),
 			runtime.New("tree -L 2 .."),
 			// runtime.New("tar -tvf ../duckdb_1.0.0.tar.xz"),
@@ -88,4 +92,21 @@ func Build() eg.OpFn {
 			build("jammy"),
 		)
 	}
+}
+
+// uint64 to prevent negative values
+func dynamichashversion(i string, n uint64) uint64 {
+	digest := md5.Sum([]byte(i))
+	return binary.LittleEndian.Uint64(digest[:]) % n
+}
+
+// generate a *consistent* duration based on the input i within the
+// provided window. this isn't the best location for these functions.
+// but the lack of a better location.
+func dynamicduration(window time.Duration, i string) time.Duration {
+	if window == 0 {
+		return 0
+	}
+
+	return time.Duration(dynamichashversion(i, uint64(window)))
 }

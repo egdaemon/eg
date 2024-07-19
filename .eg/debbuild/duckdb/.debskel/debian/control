@@ -3,7 +3,7 @@ Section: misc
 Maintainer: ${DEB_FULLNAME} <${DEB_EMAIL}>
 Standards-Version: 4.6.0.1
 Priority: extra
-Build-Depends: dh-make, debhelper, git, g++, cmake, ninja-build, libssl-dev
+Build-Depends: dh-make, debhelper, git, g++, cmake, ninja-build, libssl-dev, tree
 
 Package: ${DEB_PACKAGE_NAME}
 Section: misc

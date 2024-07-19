@@ -20,6 +20,7 @@ import (
 	"github.com/egdaemon/eg/interp/events"
 	"github.com/egdaemon/eg/workspaces"
 	_ "github.com/marcboeker/go-duckdb"
+	_ "github.com/shirou/gopsutil/v4/cpu"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
@@ -186,7 +187,7 @@ func NewRunner(ctx context.Context, ws workspaces.Context, id string, options ..
 		log.Println("analytics database", eventsdb)
 		debugx.Println("workspace", spew.Sdump(ws))
 		defer log.Println("RUNNER COMPLETED", r.id)
-		r.background()
+		r.background(ctx)
 	}()
 
 	return r, nil
@@ -217,9 +218,11 @@ func (t Agent) Close() error {
 	return nil
 }
 
-func (t Agent) background() {
+func (t Agent) background(ctx context.Context) {
 	defer close(t.blocked)
 	defer t.analyticsdb.Close()
+
+	go systemload(ctx, t.analyticsdb)
 
 	events.NewServiceDispatch(t.evtlog, t.analyticsdb).Bind(t.srv)
 

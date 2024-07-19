@@ -191,6 +191,10 @@ github.com/go-git/go-git/v5/utils/trace
 ## explicit; go 1.18
 github.com/go-logr/logr
 github.com/go-logr/logr/funcr
+# github.com/go-ole/go-ole v1.2.6
+## explicit; go 1.12
+github.com/go-ole/go-ole
+github.com/go-ole/go-ole/oleutil
 # github.com/go-task/slim-sprig/v3 v3.0.0
 ## explicit; go 1.20
 github.com/go-task/slim-sprig/v3
@@ -269,6 +273,9 @@ github.com/logrusorgru/aurora
 # github.com/lucasb-eyer/go-colorful v1.2.0
 ## explicit; go 1.12
 github.com/lucasb-eyer/go-colorful
+# github.com/lufia/plan9stats v0.0.0-20211012122336-39d0f177ccd0
+## explicit; go 1.16
+github.com/lufia/plan9stats
 # github.com/mailru/easyjson v0.7.7
 ## explicit; go 1.12
 github.com/mailru/easyjson
@@ -357,6 +364,9 @@ github.com/pkg/errors
 github.com/posener/complete
 github.com/posener/complete/cmd
 github.com/posener/complete/cmd/install
+# github.com/power-devops/perfstat v0.0.0-20210106213030-5aafc221ea8c
+## explicit; go 1.14
+github.com/power-devops/perfstat
 # github.com/rivo/uniseg v0.4.7
 ## explicit; go 1.18
 github.com/rivo/uniseg
@@ -366,6 +376,16 @@ github.com/riywo/loginshell
 # github.com/sergi/go-diff v1.3.2-0.20230802210424-5b0b94c5c0d3
 ## explicit; go 1.13
 github.com/sergi/go-diff/diffmatchpatch
+# github.com/shirou/gopsutil/v4 v4.24.6
+## explicit; go 1.18
+github.com/shirou/gopsutil/v4/common
+github.com/shirou/gopsutil/v4/cpu
+github.com/shirou/gopsutil/v4/disk
+github.com/shirou/gopsutil/v4/internal/common
+github.com/shirou/gopsutil/v4/mem
+# github.com/shoenig/go-m1cpu v0.1.6
+## explicit; go 1.20
+github.com/shoenig/go-m1cpu
 # github.com/skeema/knownhosts v1.3.0
 ## explicit; go 1.17
 github.com/skeema/knownhosts
@@ -406,6 +426,12 @@ github.com/tetratelabs/wazero/internal/wasm/binary
 github.com/tetratelabs/wazero/internal/wasmdebug
 github.com/tetratelabs/wazero/internal/wasmruntime
 github.com/tetratelabs/wazero/sys
+# github.com/tklauser/go-sysconf v0.3.12
+## explicit; go 1.13
+github.com/tklauser/go-sysconf
+# github.com/tklauser/numcpus v0.6.1
+## explicit; go 1.13
+github.com/tklauser/numcpus
 # github.com/willabides/kongplete v0.4.0
 ## explicit; go 1.17
 github.com/willabides/kongplete
@@ -416,6 +442,9 @@ github.com/xanzy/ssh-agent
 # github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e
 ## explicit; go 1.19
 github.com/xo/terminfo
+# github.com/yusufpapurcu/wmi v1.2.4
+## explicit; go 1.16
+github.com/yusufpapurcu/wmi
 # github.com/zeebo/xxh3 v1.0.2
 ## explicit; go 1.17
 github.com/zeebo/xxh3
@@ -470,6 +499,7 @@ golang.org/x/sys/cpu
 golang.org/x/sys/execabs
 golang.org/x/sys/unix
 golang.org/x/sys/windows
+golang.org/x/sys/windows/registry
 # golang.org/x/text v0.16.0
 ## explicit; go 1.18
 golang.org/x/text/encoding

@@ -10,6 +10,8 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"runtime"
+	"strconv"
 	"time"
 
 	"github.com/egdaemon/eg/runtime/wasi/eg"
@@ -18,6 +20,7 @@ import (
 	"github.com/egdaemon/eg/runtime/wasi/env"
 	"github.com/egdaemon/eg/runtime/wasi/shell"
 	"github.com/egdaemon/eg/runtime/x/wasi/egfs"
+	"github.com/shirou/gopsutil/v4/cpu"
 )
 
 //go:embed .debskel
@@ -25,15 +28,19 @@ var debskel embed.FS
 
 func prepare(ctx context.Context, _ eg.Op) error {
 	relpath, _ := filepath.Rel(egenv.RootDirectory(), egenv.RuntimeDirectory())
-	log.Println("BDIR", relpath)
+	count, _ := cpu.Counts(false)
+	log.Println("-------------------------------------------", "BDIR", relpath, runtime.NumCPU(), count, "-------------------------------------------")
 
-	runtime := shell.Runtime().
-		Directory(relpath)
+	sruntime := shell.Runtime().
+		Directory(relpath).Environ("CMAKE_BUILD_PARALLEL_LEVEL", strconv.Itoa(runtime.NumCPU()))
 
 	return shell.Run(
 		ctx,
-		runtime.New("tree ."),
-		runtime.New("git clone git@github.com:duckdb/duckdb duckdb"),
+		sruntime.New("tree ."),
+		sruntime.New("git clone git@github.com:duckdb/duckdb duckdb"),
+		// TODO: get cores working properly.
+		// sruntime.Newf("echo make -C duckdb -j %d bundle-library", runtime.NumCPU()),
+		// sruntime.Newf("make -C duckdb -j %d bundle-library", runtime.NumCPU()),
 	)
 }
 
@@ -54,12 +61,12 @@ func build(distro string) eg.OpFn {
 		}
 
 		relpath, _ := filepath.Rel(egenv.RootDirectory(), bdir)
-		log.Println("BDIR", bdir, relpath)
+
 		c := eggit.EnvCommit()
 		runtime := shell.Runtime().
 			Directory(relpath).
 			Environ("DEB_PACKAGE_NAME", "duckdb").
-			Environ("DEB_VERSION", fmt.Sprintf("1.0.%d", c.Committer.When.Add(dynamicduration(10*time.Second, distro)).UnixMilli())).
+			Environ("DEB_VERSION", fmt.Sprintf("1.0.0.%d", c.Committer.When.Add(dynamicduration(10*time.Second, distro)).UnixMilli())).
 			Environ("DEB_DISTRO", distro).
 			Environ("DEB_CHANGELOG_DATE", c.Committer.When.Format(time.RFC1123Z)).
 			Environ("DEB_EMAIL", maintainer.Email).
@@ -74,10 +81,7 @@ func build(distro string) eg.OpFn {
 			runtime.New("cat debian/rules | envsubst | tee debian/rules"),
 			runtime.New("cat debian/changelog"),
 			runtime.Newf("debuild -S -k%s", maintainer.GPGFingerprint),
-			// runtime.Newf("rsync --verbose --progress --recursive --perms ./ %s", egenv.CacheDirectory("duckdb")),
-			runtime.New("pwd"),
 			runtime.New("tree -L 2 .."),
-			// runtime.New("tar -tvf ../duckdb_1.0.0.tar.xz"),
 			runtime.New("dput -f -c dput.config duckdb ../duckdb_${DEB_VERSION}_source.changes"),
 		)
 	}
@@ -90,6 +94,7 @@ func Build() eg.OpFn {
 			ctx,
 			prepare,
 			build("jammy"),
+			build("noble"),
 		)
 	}
 }

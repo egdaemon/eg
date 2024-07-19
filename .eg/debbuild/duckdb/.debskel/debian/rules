@@ -11,12 +11,14 @@ override_dh_auto_build:
 	CMAKE_BUILD_PARALLEL_LEVEL="$(nproc)"
 	mkdir -p rootfs
 	tree -L 2 .
-	cmake -S src -B build -D CMAKE_BUILD_TYPE=Release -D CMAKE_INSTALL_PREFIX=/usr
-	cmake --build build
+	GEN=ninja make -C src
+	DESTDIR="rootfs" cmake --install build/release
 	tree -L 2 .
-	DESTDIR="rootfs" cmake --install build
-	tree -L 2 .
+	echo ${CMAKE_BUILD_PARALLEL_LEVEL}
 
+# cmake -S . -B build -D CMAKE_BUILD_TYPE=Release -D CMAKE_INSTALL_PREFIX=/usr
+# cmake --build build
+# DESTDIR="rootfs" cmake --install build
 # override_dh_auto_test:
 # 	echo "DH AUTO TEST OVERRIDE"
 # 	CACHE_DIRECTORY="$(CURDIR)" $(CURDIR)/bin/eg version

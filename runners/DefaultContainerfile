@@ -16,7 +16,7 @@ RUN apt install -y --no-install-recommends curl gnupg2 lsb-release iproute2 git 
 RUN apt install -y --no-install-recommends ssh podman rsync vim golang-1.22 eg tree
 # dependencies for duckdb while bootstrapping
 RUN apt install -y --no-install-recommends cmake ninja-build ccache dput devscripts dh-make dput libssl-dev
-# RUN apt install -y --no-install-recommends duckdb
+RUN apt install -y --no-install-recommends duckdb
 
 RUN usermod --add-subuids 200000-265535 --add-subgids 200000-265535 root
 

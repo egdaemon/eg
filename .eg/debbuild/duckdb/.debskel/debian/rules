@@ -7,22 +7,15 @@ DH_VERBOSE=1
 	dh $@
 
 override_dh_auto_build:
-	echo "DH AUTO BUILD OVERRIDE"
+	echo "DH AUTO BUILD OVERRIDE ${CMAKE_BUILD_PARALLEL_LEVEL}"
 	export CMAKE_BUILD_PARALLEL_LEVEL="$(nproc)"
 	export OVERRIDE_GIT_DESCRIBE="v${PACKAGE_VERSION}"
 	mkdir -p duckdb
-	tree -L 2 .
 	GEN=ninja make -C src
 	DESTDIR="duckdb" cmake --install src/build/release
 	tree -L 2 .
 	tree duckdb
-	echo ${CMAKE_BUILD_PARALLEL_LEVEL}
+
 
 override_dh_usrlocal:
 	echo "DH usrlocal override due to over restrict rules"
-# cmake -S . -B build -D CMAKE_BUILD_TYPE=Release -D CMAKE_INSTALL_PREFIX=/usr
-# cmake --build build
-# DESTDIR="rootfs" cmake --install build
-# override_dh_auto_test:
-# 	echo "DH AUTO TEST OVERRIDE"
-# 	CACHE_DIRECTORY="$(CURDIR)" $(CURDIR)/bin/eg version

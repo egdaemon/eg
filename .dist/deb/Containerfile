@@ -7,6 +7,7 @@ RUN apt-get update
 RUN apt-get -y install software-properties-common build-essential ca-certificates
 RUN add-apt-repository -n ppa:longsleep/golang-backports
 RUN add-apt-repository -n ppa:egdaemon/eg
+RUN add-apt-repository -n ppa:egdaemon/duckdb
 
 # github cli initiated
 # RUN apt-key adv --keyserver keyserver.ubuntu.com --recv-key C99B11DEB97541F0
@@ -14,5 +15,5 @@ RUN add-apt-repository -n ppa:egdaemon/eg
 # github cli completed
 
 RUN apt-get update
-RUN apt-get -y install podman rsync vim dput devscripts dh-make dput git uidmap dbus-user-session golang-1.22 pinentry-tty eg
+RUN apt-get -y install podman rsync vim dput devscripts dh-make dput git uidmap dbus-user-session golang-1.22 pinentry-tty eg duckdb
 # RUN apt-get -y install gh

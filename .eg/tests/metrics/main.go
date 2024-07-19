@@ -32,4 +32,6 @@ func main() {
 	if err := egmetrics.Record(ctx, "cpu", automcpu()); err != nil {
 		log.Fatalln(err)
 	}
+
+	time.Sleep(time.Minute)
 }

@@ -1,1 +1,1 @@
-rootfs/usr/* /usr
+duckdb/usr/* /usr

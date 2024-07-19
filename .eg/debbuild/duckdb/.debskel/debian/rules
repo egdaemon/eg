@@ -8,12 +8,14 @@ DH_VERBOSE=1
 
 override_dh_auto_build:
 	echo "DH AUTO BUILD OVERRIDE"
+	env
 	CMAKE_BUILD_PARALLEL_LEVEL="$(nproc)"
-	mkdir -p rootfs
+	mkdir -p duckdb
 	tree -L 2 .
 	GEN=ninja make -C src
-	DESTDIR="rootfs" cmake --install build/release
+	DESTDIR="duckdb" cmake --install src/build/release
 	tree -L 2 .
+	tree duckdb
 	echo ${CMAKE_BUILD_PARALLEL_LEVEL}
 
 # cmake -S . -B build -D CMAKE_BUILD_TYPE=Release -D CMAKE_INSTALL_PREFIX=/usr

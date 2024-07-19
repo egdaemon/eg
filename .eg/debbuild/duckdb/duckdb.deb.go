@@ -66,6 +66,7 @@ func build(distro string) eg.OpFn {
 		runtime := shell.Runtime().
 			Directory(relpath).
 			Environ("DEB_PACKAGE_NAME", "duckdb").
+			Environ("PACKAGE_VERSION", "1.0.0").
 			Environ("DEB_VERSION", fmt.Sprintf("1.0.0.%d", c.Committer.When.Add(dynamicduration(10*time.Second, distro)).UnixMilli())).
 			Environ("DEB_DISTRO", distro).
 			Environ("DEB_CHANGELOG_DATE", c.Committer.When.Format(time.RFC1123Z)).

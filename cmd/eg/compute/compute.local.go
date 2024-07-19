@@ -29,6 +29,7 @@ import (
 )
 
 type local struct {
+	cmdopts.RuntimeResources
 	Dir           string   `name:"directory" help:"root directory of the repository" default:"${vars_cwd}"`
 	ModuleDir     string   `name:"moduledir" help:"must be a subdirectory in the provided directory" default:".eg"`
 	Name          string   `arg:"" name:"module" help:"name of the module to run, i.e. the folder name within moduledir" default:""`
@@ -216,6 +217,7 @@ func (t local) Run(gctx *cmdopts.Global) (err error) {
 
 		options = append(options,
 			"--volume", runners.AgentMountReadOnly(m.Path, "/opt/egmodule.wasm"),
+			"--cpus", strconv.FormatUint(t.RuntimeResources.Cores, 10),
 		)
 
 		_, err = runner.Module(gctx.Context, &pc8s.ModuleRequest{

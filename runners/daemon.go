@@ -222,7 +222,12 @@ func (t Agent) background(ctx context.Context) {
 	defer close(t.blocked)
 	defer t.analyticsdb.Close()
 
+	// periodic sampling of system metrics
 	go systemload(ctx, t.analyticsdb)
+	// final sample
+	defer func() {
+		errorsx.Log(systemloadsample(ctx, t.analyticsdb))
+	}()
 
 	events.NewServiceDispatch(t.evtlog, t.analyticsdb).Bind(t.srv)
 

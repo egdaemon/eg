@@ -11,6 +11,7 @@ import (
 	"github.com/egdaemon/eg/internal/timex"
 	"github.com/gofrs/uuid"
 	"github.com/shirou/gopsutil/v4/cpu"
+	"github.com/shirou/gopsutil/v4/disk"
 	"github.com/shirou/gopsutil/v4/mem"
 )
 
@@ -19,62 +20,103 @@ func systemload(ctx context.Context, analytics *sql.DB) {
 		errorsx.Log(do(ctx, analytics))
 	}
 
-	go report(systemloadcpu)
-	go report(systemloadmemory)
+	go report(systemcpu)
+	go report(systemmemory)
+	go report(systemdisk)
 }
 
-func systemloadcpu(ctx context.Context, analytics *sql.DB) error {
+func systemloadsample(ctx context.Context, analytics *sql.DB) error {
+	return errorsx.Compact(
+		samplecompute(ctx, analytics),
+		samplememory(ctx, analytics),
+	)
+}
+
+func systemdisk(ctx context.Context, analytics *sql.DB) error {
+	if _, err := analytics.ExecContext(ctx, "CREATE TABLE IF NOT EXISTS 'metrics.eg.disk' (id UUID PRIMARY KEY, name TEXT NOT NULL, path TEXT NOT NULL, ts TIMESTAMP NOT NULL, percent FLOAT4 NOT NULL)"); err != nil {
+		return err
+	}
+
+	return timex.NowAndEvery(ctx, 5*time.Second, func(ctx context.Context) error {
+		return sampledisk(ctx, analytics)
+	})
+}
+
+func sampledisk(ctx context.Context, analytics *sql.DB) error {
+	var (
+		err   error
+		usage *disk.UsageStat
+	)
+
+	if usage, err = disk.UsageWithContext(ctx, "/"); err != nil {
+		return errorsx.Wrap(err, "unable to retrieve compute")
+	}
+
+	if err := analytics.QueryRowContext(ctx, "INSERT INTO 'metrics.eg.disk' (id, name, ts, path, percent) VALUES (?, 'disk', ?, ?, ?) RETURNING percent", uuid.Must(uuid.NewV7()).String(), time.Now().UTC(), usage.Path, usage.UsedPercent).Scan(&usage.UsedPercent); err != nil {
+		return err
+	}
+
+	debugx.Println("metrics.eg.disk", usage.Path, usage.UsedPercent)
+
+	return nil
+}
+
+func samplecompute(ctx context.Context, analytics *sql.DB) error {
+	var (
+		err   error
+		loads []float64
+	)
+
+	if loads, err = cpu.PercentWithContext(ctx, 0, false); err != nil {
+		return errorsx.Wrap(err, "unable to retrieve compute")
+	}
+
+	load := slicesx.FirstOrZero(loads...)
+
+	if err := analytics.QueryRowContext(ctx, "INSERT INTO 'metrics.eg.cpu' (id, name, ts, load) VALUES (?, 'compute', ?, ?) RETURNING load", uuid.Must(uuid.NewV7()).String(), time.Now().UTC(), load).Scan(&load); err != nil {
+		return err
+	}
+
+	debugx.Println("metrics.eg.compute", load)
+	return nil
+}
+
+func systemcpu(ctx context.Context, analytics *sql.DB) error {
 	if _, err := analytics.ExecContext(ctx, "CREATE TABLE IF NOT EXISTS 'metrics.eg.cpu' (id UUID PRIMARY KEY, name TEXT NOT NULL, ts TIMESTAMP NOT NULL, load FLOAT4 NOT NULL)"); err != nil {
 		return err
 	}
 
 	return timex.NowAndEvery(ctx, 5*time.Second, func(ctx context.Context) error {
-		var (
-			err   error
-			loads []float64
-		)
-
-		if loads, err = cpu.PercentWithContext(ctx, 0, false); err != nil {
-			return errorsx.Wrap(err, "unable to retrieve compute")
-		}
-
-		load := slicesx.FirstOrZero(loads...)
-
-		if err := analytics.QueryRowContext(ctx, "INSERT INTO 'metrics.eg.cpu' (id, name, ts, load) VALUES (?, 'compute', ?, ?) RETURNING load", uuid.Must(uuid.NewV7()).String(), time.Now().UTC(), load).Scan(&load); err != nil {
-			return err
-		}
-
-		debugx.Println("metrics.eg.compute", load)
-		return nil
+		return samplecompute(ctx, analytics)
 	})
 }
 
-func systemloadmemory(ctx context.Context, analytics *sql.DB) error {
+func samplememory(ctx context.Context, analytics *sql.DB) error {
 	const query = "INSERT INTO 'metrics.eg.memory' (id, name, ts, percent, unused, used, cached, total) VALUES (?, 'memory', ?, ?, ?, ?, ?, ?) RETURNING percent"
+	var (
+		err     error
+		usage   *mem.VirtualMemoryStat
+		percent float64
+	)
+
+	if usage, err = mem.VirtualMemoryWithContext(ctx); err != nil {
+		return errorsx.Wrap(err, "unable to retrieve memory usage")
+	}
+
+	if err := analytics.QueryRowContext(ctx, query, uuid.Must(uuid.NewV7()).String(), time.Now().UTC(), usage.UsedPercent, usage.Free, usage.Used, usage.Cached, usage.Total).Scan(&percent); err != nil {
+		return err
+	}
+
+	debugx.Println("metrics.eg.memory.percent", percent)
+	return nil
+}
+
+func systemmemory(ctx context.Context, analytics *sql.DB) error {
 	if _, err := analytics.ExecContext(ctx, "CREATE TABLE IF NOT EXISTS 'metrics.eg.memory' (id UUID PRIMARY KEY, name TEXT NOT NULL, ts TIMESTAMP NOT NULL, percent FLOAT4 NOT NULL, unused INT8 NOT NULL, used INT8 NOT NULL, cached INT8 NOT NULL, total INT8 NOT NULL)"); err != nil {
 		return err
 	}
-	// unused, used, cached, total
+
 	return timex.NowAndEvery(ctx, 5*time.Second, func(ctx context.Context) error {
-		var (
-			err     error
-			usage   *mem.VirtualMemoryStat
-			percent float64
-		)
-
-		if usage, err = mem.VirtualMemoryWithContext(ctx); err != nil {
-			return errorsx.Wrap(err, "unable to retrieve memory usage")
-		}
-
-		if err := analytics.QueryRowContext(ctx, query, uuid.Must(uuid.NewV7()).String(), time.Now().UTC(), usage.UsedPercent, usage.Free, usage.Used, usage.Cached, usage.Total).Scan(&percent); err != nil {
-			return err
-		}
-
-		debugx.Println("metrics.eg.memory.percent", usage.UsedPercent)
-		debugx.Println("metrics.eg.memory.free", usage.Free)
-		debugx.Println("metrics.eg.memory.used", usage.Used)
-		debugx.Println("metrics.eg.memory.cached", usage.Cached)
-		debugx.Println("metrics.eg.memory.total", usage.Total)
-		return nil
+		return samplememory(ctx, analytics)
 	})
 }

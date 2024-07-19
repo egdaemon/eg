@@ -7,6 +7,8 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
+	"strconv"
 
 	"github.com/egdaemon/eg/internal/debugx"
 	"github.com/egdaemon/eg/internal/errorsx"
@@ -135,7 +137,10 @@ func (t *ProxyService) Module(ctx context.Context, req *ModuleRequest) (_ *Modul
 	debugx.Println("PROXY CONTAINER MODULE INITIATED", errorsx.Zero(os.Getwd()))
 	defer debugx.Println("PROXY CONTAINER MODULE COMPLETED", errorsx.Zero(os.Getwd()))
 
-	options := append(req.Options, t.containeropts...)
+	log.Println("-------------------------------------------", runtime.NumCPU(), "-------------------------------------------")
+
+	options := append(t.containeropts, "--cpus", strconv.Itoa(runtime.NumCPU()))
+	options = append(options, req.Options...)
 	options = append(
 		options,
 		"--volume", fmt.Sprintf("%s:/opt/egruntime:rw", filepath.Join(t.ws.Root, t.ws.RuntimeDir)),

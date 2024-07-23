@@ -4,8 +4,6 @@ import (
 	"context"
 	"eg/ci/maintainer"
 	"fmt"
-	"os"
-	"path/filepath"
 
 	"github.com/egdaemon/eg/runtime/wasi/eg"
 	"github.com/egdaemon/eg/runtime/wasi/egenv"
@@ -17,31 +15,28 @@ const (
 )
 
 func Builder(name string) eg.ContainerRunner {
-	return eg.Container(name).
-		OptionVolume(
-			".eg/.temp", "/opt/eg/.build",
-		)
+	return eg.Container(name)
 }
 
 func Build(ctx context.Context, _ eg.Op) error {
+	gocache := egenv.CacheDirectory("golang", "pkg")
+	gomodcache := egenv.CacheDirectory("golang", "mod")
+	bdir := egenv.EphemeralDirectory(".build")
+	pkgdest := egenv.CacheDirectory("pacman")
 	golang := shell.Runtime().
-		Environ("GOCACHE", egenv.CacheDirectory("golang", "build")).
-		Environ("GOMODCACHE", egenv.CacheDirectory("golang", "mod")).
-		Environ("PKGDEST", filepath.Join(os.TempDir(), "pacman")).
+		Environ("GOCACHE", gocache).
+		Environ("GOMODCACHE", gomodcache).
+		Environ("PKGDEST", pkgdest).
 		Environ("PACKAGER", fmt.Sprintf("%s <%s>", maintainer.Name, maintainer.Email))
 
 	return shell.Run(
 		ctx,
-		golang.New("tree -a --gitignore /opt/eg/.dist/archlinux"),
-		golang.New("rsync --recursive /opt/eg/.dist/archlinux/ .build"),
-		golang.New("chown -R build:build .build"),
-		golang.New("ls -lha /cache"),
-		golang.Directory(".build").New("sudo -E -u build makepkg -f -c -C"),
-		golang.New("tree -a --gitignore .build"),
-		golang.Newf(
-			"rsync --recursive %s/ %s",
-			filepath.Join(os.TempDir(), "pacman"),
-			egenv.CacheDirectory("pacman"),
-		),
+		golang.Newf("mkdir -p %s %s", bdir, gocache),
+		golang.Newf("chmod 0777 %s %s %s", gocache, pkgdest, egenv.EphemeralDirectory()),
+		golang.New("tree -L 2 -a --gitignore /opt/eg/.dist/archlinux"),
+		golang.Newf("rsync --recursive /opt/eg/.dist/archlinux/ %s", bdir),
+		golang.Newf("chown -R build:root %s", bdir),
+		golang.Newf("echo --------------------------- %s ---------------------------", egenv.CacheDirectory()),
+		golang.Directory(bdir).New("sudo -E -u build makepkg -f -c -C"),
 	)
 }

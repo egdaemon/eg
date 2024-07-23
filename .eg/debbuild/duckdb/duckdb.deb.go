@@ -65,8 +65,6 @@ func build(distro string) eg.OpFn {
 		c := eggit.EnvCommit()
 		runtime := shell.Runtime().
 			Directory(relpath).
-			Environ("BUILD_JSON", "1").
-			Environ("OVERRIDE_GIT_DESCRIBE", "1.0.0").
 			Environ("DEB_PACKAGE_NAME", "duckdb").
 			Environ("PACKAGE_VERSION", "1.0.0").
 			Environ("DEB_VERSION", fmt.Sprintf("1.0.0.%d", c.Committer.When.Add(dynamicduration(10*time.Second, distro)).UnixMilli())).

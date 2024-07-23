@@ -15,18 +15,19 @@ source=("${pkgname}::git+https://github.com/egdaemon/eg.git")
 sha1sums=('SKIP')
 
 pkgver() {
-  cd "${srcdir}/${pkgname}"
+  cd "${pkgname}"
   printf "v0.0.%s" "$(git show -s --format=%ct)"
 }
 
 prepare() {
   rm -rf bin
-  cd "${srcdir}/${pkgname}"
+  cd "${pkgname}"
 }
 
 build() {
-  echo "BUILD INITIATED eg ${PWD} ${srcdir}"
-  GOBIN="${startdir}/bin" go install -C ${srcdir}/${pkgname} ./cmd/eg
+  echo "BUILD INITIATED eg ${PWD} ${srcdir} -- ${startdir}"
+  echo "USER: $(whoami)"
+  GOBIN="${startdir}/bin" go install -C ${pkgname} ./cmd/eg
 }
 
 package() {

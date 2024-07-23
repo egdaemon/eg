@@ -178,7 +178,7 @@ func (t runner) perform(ctx context.Context, runid, path string, rtb runtimefn) 
 	hostcachedir := filepath.Join(moduledir, ".cache")
 	guestcachedir := filepath.Join("/", "cache")
 	guestruntimedir := runners.DefaultRunnerRuntimeDir()
-	tmpdir, err := os.MkdirTemp(filepath.Join(t.root, t.moduledir), ".tmp.*")
+	tmpdir, err := os.MkdirTemp(t.runtimedir, ".tmp.*")
 	if err != nil {
 		return errorsx.Wrap(err, "unable to create tmp directory")
 	}

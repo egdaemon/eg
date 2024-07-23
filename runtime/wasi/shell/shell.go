@@ -3,6 +3,7 @@ package shell
 import (
 	"context"
 	"fmt"
+	"log"
 	"math"
 	"time"
 
@@ -16,6 +17,7 @@ type Command struct {
 	environ   []string
 	timeout   time.Duration
 	attempts  int16
+	lenient   bool
 }
 
 // number of attempts to make before giving up.
@@ -27,6 +29,12 @@ func (t Command) Attempts(a int16) Command {
 // directory to run the command in. must be a relative path.
 func (t Command) Directory(d string) Command {
 	t.directory = d
+	return t
+}
+
+// directory to run the command in. must be a relative path.
+func (t Command) Lenient(d bool) Command {
+	t.lenient = d
 	return t
 }
 
@@ -146,7 +154,13 @@ func run(ctx context.Context, c Command) (err error) {
 
 	cctx, done := context.WithTimeout(ctx, c.timeout)
 	defer done()
-
 	cmd := append([]string{"-c"}, c.cmd)
-	return ffiexec.Command(cctx, c.directory, c.environ, "bash", cmd)
+
+	err = ffiexec.Command(cctx, c.directory, c.environ, "bash", cmd)
+	if c.lenient && err != nil {
+		log.Println("command failed, but lenient mode enable", err)
+		return nil
+	}
+
+	return err
 }

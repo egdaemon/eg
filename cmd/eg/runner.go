@@ -6,11 +6,9 @@ import (
 	"log"
 	"net"
 
-	tea "github.com/charmbracelet/bubbletea"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/egdaemon/eg/cmd/cmdopts"
 	"github.com/egdaemon/eg/cmd/eg/daemons"
-	"github.com/egdaemon/eg/cmd/ux"
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/interp"
 	"github.com/egdaemon/eg/interp/events"
@@ -109,11 +107,11 @@ func (t monitor) Run(ctx *cmdopts.Global) (err error) {
 		return err
 	}
 
-	p := tea.NewProgram(
-		ux.NewGraph(),
-		tea.WithoutSignalHandler(),
-		tea.WithContext(ctx.Context),
-	)
+	// p := tea.NewProgram(
+	// 	ux.NewGraph(),
+	// 	tea.WithoutSignalHandler(),
+	// 	tea.WithContext(ctx.Context),
+	// )
 
 	go func() {
 		for {
@@ -132,18 +130,19 @@ func (t monitor) Run(ctx *cmdopts.Global) (err error) {
 				continue
 			}
 
-			p.Send(m)
+			log.Println("evt", spew.Sdump(m))
+			// p.Send(m)
 		}
 	}()
 
-	go func() {
-		<-ctx.Context.Done()
-		p.Send(tea.Quit)
-	}()
+	// go func() {
+	// 	<-ctx.Context.Done()
+	// 	p.Send(tea.Quit)
+	// }()
 
-	if _, err := p.Run(); err != nil {
-		return err
-	}
+	// if _, err := p.Run(); err != nil {
+	// 	return err
+	// }
 
 	return nil
 }

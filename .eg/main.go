@@ -21,6 +21,10 @@ func Debug(ctx context.Context, op eg.Op) error {
 	env.Debug(os.Environ()...)
 	return shell.Run(
 		ctx,
+		shell.New("tree -a -L 2 /opt/eg"),
+		shell.New("ls -lha /opt/egruntime"),
+		// shell.New("tree -a -L 2 /cache").Lenient(true),
+		shell.New("ls -lha /cache"),
 		// shell.New("ls -lha /opt/eg"),
 		// shell.New("ls -lha /root"),
 		// shell.New("ls -lha /root/.ssh && md5sum /root/.ssh/known_hosts"),
@@ -61,9 +65,9 @@ func main() {
 			eg.Build(eg.Container(archlinux.ContainerName).BuildFromFile(".dist/archlinux/Containerfile")),
 		),
 		eg.Parallel(
-			eg.Module(ctx, debian.Builder(debian.ContainerName, "jammy"), debian.Build),
-			eg.Module(ctx, debian.Builder(debian.ContainerName, "noble"), debian.Build),
-			// eg.Module(ctx, archlinux.Builder(archlinux.ContainerName), archlinux.Build),
+			// eg.Module(ctx, debian.Builder(debian.ContainerName, "jammy"), debian.Build),
+			// eg.Module(ctx, debian.Builder(debian.ContainerName, "noble"), debian.Build),
+			eg.Module(ctx, archlinux.Builder(archlinux.ContainerName), archlinux.Build),
 		),
 	)
 

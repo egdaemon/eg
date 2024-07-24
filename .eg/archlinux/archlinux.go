@@ -33,10 +33,9 @@ func Build(ctx context.Context, _ eg.Op) error {
 		ctx,
 		golang.Newf("mkdir -p %s %s", bdir, gocache),
 		golang.Newf("chmod 0777 %s %s %s", gocache, pkgdest, egenv.EphemeralDirectory()),
-		golang.New("tree -L 2 -a --gitignore /opt/eg/.dist/archlinux"),
 		golang.Newf("rsync --recursive /opt/eg/.dist/archlinux/ %s", bdir),
 		golang.Newf("chown -R build:root %s", bdir),
-		golang.Newf("echo --------------------------- %s ---------------------------", egenv.CacheDirectory()),
 		golang.Directory(bdir).New("sudo -E -u build makepkg -f -c -C"),
+		golang.Newf("paccache -c %s -rk1", pkgdest),
 	)
 }

@@ -438,7 +438,7 @@ func (t staterunning) Update(ctx context.Context) state {
 		_, err := runner.Module(ctx, &c8s.ModuleRequest{
 			Image: "eg",
 			Name:  fmt.Sprintf("eg-%s", t.ragent.id),
-			Mdir:  t.ws.RuntimeDir,
+			Mdir:  t.ws.RuntimeDir, // TODO REVISIT
 			Options: []string{
 				"--env", "EG_BIN",
 				"--volume", fmt.Sprintf("%s:/opt/egmodule.wasm:ro", filepath.Join(t.ws.Root, t.ws.RuntimeDir, t.entry)),

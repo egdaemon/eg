@@ -223,7 +223,7 @@ func (t local) Run(gctx *cmdopts.Global) (err error) {
 		_, err = runner.Module(gctx.Context, &pc8s.ModuleRequest{
 			Image:   "eg",
 			Name:    fmt.Sprintf("eg-%s", uid.String()),
-			Mdir:    ws.BuildDir,
+			Mdir:    ws.BuildDir, // TODO REVISIT THIS.
 			Options: options,
 		})
 

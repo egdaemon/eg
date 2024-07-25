@@ -93,6 +93,26 @@ func PrintDir(d fs.FS) {
 	}
 }
 
+func Clone(ctx context.Context, src string, dst string) (err error) {
+	sio, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer sio.Close()
+
+	dio, err := os.OpenFile(dst, os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0600)
+	if err != nil {
+		return err
+	}
+	defer dio.Close()
+
+	if _, err = io.Copy(dio, sio); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func CloneTree(ctx context.Context, dstdir string, rootdir string, archive fs.FS) (err error) {
 	return fs.WalkDir(archive, rootdir, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {

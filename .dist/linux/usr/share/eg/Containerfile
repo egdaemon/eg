@@ -11,6 +11,7 @@ RUN apt-get update
 RUN apt-get -y install software-properties-common build-essential apt-file podman rsync vim dput devscripts dh-make dput git uidmap dbus-user-session fuse-overlayfs pinentry-tty inetutils-ping iproute2
 # RUN add-apt-repository -n ppa:longsleep/golang-backports
 RUN add-apt-repository -n ppa:egdaemon/eg
+RUN add-apt-repository -n ppa:egdaemon/duckdb
 RUN apt-get update
 RUN apt-get -y install eg
 RUN systemd-sysusers

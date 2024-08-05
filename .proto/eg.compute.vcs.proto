@@ -1,0 +1,18 @@
+syntax = "proto3";
+
+package eg.compute;
+
+message GitCredentialsAutomatic {
+} // used to signal using the local devices credentials.
+
+message GitCredentialsHTTP {
+  string username = 1 [ json_name = "username" ];
+  string password = 2 [ json_name = "password" ];
+}
+
+message GitAccessCredentials {
+  oneof Credentials {
+    GitCredentialsAutomatic automatic = 100;
+    GitCredentialsHTTP git_http = 101;
+  }
+}

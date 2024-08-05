@@ -18,7 +18,7 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/egdaemon/eg/internal/debugx"
 	"github.com/egdaemon/eg/internal/errorsx"
-	"github.com/egdaemon/eg/internal/fsx"
+	"github.com/egdaemon/eg/internal/gitx"
 	"github.com/egdaemon/eg/internal/iox"
 	"github.com/egdaemon/eg/internal/langx"
 	"github.com/egdaemon/eg/internal/tarx"
@@ -391,6 +391,7 @@ func beginwork(ctx context.Context, md metadata, dir string) state {
 		aopts,
 		AgentOptionEGBin(errorsx.Zero(exec.LookPath(os.Args[0]))),
 		AgentOptionEnviron(environpath),
+		AgentOptionEnv(gitx.EnvAuthEGAccessToken, metadata.AccessToken),
 	)
 
 	m := NewManager(
@@ -478,7 +479,7 @@ func (t statecompleted) Update(ctx context.Context) state {
 	dirs := DefaultSpoolDirs()
 	log.Println("completed", t.id, filepath.Join(dirs.Running, t.id), t.cause)
 
-	fsx.PrintDir(os.DirFS(filepath.Join(t.ws.Root, t.ws.RuntimeDir)))
+	// fsx.PrintDir(os.DirFS(filepath.Join(t.ws.Root, t.ws.RuntimeDir)))
 
 	logs, err := os.Open(logpath)
 	if err != nil {

@@ -1,0 +1,7 @@
+// automatically clean apt cache
+APT::Periodic::Enable "1";
+APT::Periodic::Verbose "1";
+APT::Periodic::AutocleanInterval "1";
+APT::Periodic::CleanInterval "1";
+APT::Periodic::MinAge "2";
+APT::Periodic::MaxAge "30";

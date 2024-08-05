@@ -173,6 +173,11 @@ func (t RateLimitTransport) RoundTrip(req *http.Request) (*http.Response, error)
 	return t.Delegate.RoundTrip(req)
 }
 
+func BindRetryTransport(c *http.Client, codes ...int) *http.Client {
+	c.Transport = NewRetryTransport(c.Transport, codes...)
+	return c
+}
+
 // NewRetryTransport create a Transport that reattempts a single time if the specified
 // codes are seen.
 func NewRetryTransport(rt http.RoundTripper, codes ...int) RetryTransport {

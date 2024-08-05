@@ -7,8 +7,11 @@ import (
 	"os"
 	"time"
 
+	"github.com/egdaemon/eg/runtime/wasi/eg"
+	"github.com/egdaemon/eg/runtime/wasi/eggit"
 	"github.com/egdaemon/eg/runtime/wasi/egmetrics"
 	"github.com/egdaemon/eg/runtime/wasi/env"
+	"github.com/egdaemon/eg/runtime/wasi/shell"
 )
 
 type MetricCPU struct {
@@ -21,6 +24,14 @@ func automcpu() MetricCPU {
 	}
 }
 
+func Debug(ctx context.Context, op eg.Op) error {
+	log.Println("debug initiated")
+	defer log.Println("debug completed")
+	env.Debug(os.Environ()...)
+	return shell.Run(
+		ctx,
+	)
+}
 func main() {
 	ctx, done := context.WithTimeout(context.Background(), time.Hour)
 	defer done()
@@ -33,5 +44,15 @@ func main() {
 		log.Fatalln(err)
 	}
 
-	time.Sleep(time.Minute)
+	err := eg.Perform(
+		ctx,
+		eggit.AutoClone,
+		Debug,
+	)
+
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	time.Sleep(time.Second)
 }

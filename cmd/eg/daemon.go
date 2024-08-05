@@ -15,6 +15,7 @@ import (
 	"github.com/egdaemon/eg/compute"
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
+	"github.com/egdaemon/eg/internal/httpx"
 	"github.com/egdaemon/eg/internal/sshx"
 	"github.com/egdaemon/eg/runners"
 	"golang.org/x/crypto/ssh"
@@ -22,16 +23,17 @@ import (
 )
 
 type daemon struct {
-	runtimecfg   cmdopts.RuntimeResources
-	AccountID    string   `name:"account" help:"account to register runner with" default:"${vars_account_id}" required:"true"`
-	MachineID    string   `name:"machine" help:"unique id for this particular machine" default:"${vars_machine_id}" required:"true"`
-	Seed         string   `name:"seed" help:"seed for generating ssh credentials in a consistent manner" default:"${vars_entropy_seed}"`
-	SSHKeyPath   string   `name:"sshkeypath" help:"path to ssh key to use" default:"${vars_ssh_key_path}"`
-	SSHAgentPath string   `name:"sshagentpath" help:"ssh agent socket path" default:"${vars_runtime_directory}/ssh.agent.socket"`
-	Autodownload bool     `name:"autodownload" help:"enable/disable the basic download scheduler" default:"true"`
-	CacheDir     string   `name:"directory" help:"local cache directory" default:"${vars_cache_directory}"`
-	MountDirs    []string `name:"mounts" short:"m" help:"folders to mount using podman mount specs" default:""`
-	EnvVars      []string `name:"env" short:"e" help:"environment variables to import" default:""`
+	runtimecfg    cmdopts.RuntimeResources
+	AccountID     string   `name:"account" help:"account to register runner with" default:"${vars_account_id}" required:"true"`
+	MachineID     string   `name:"machine" help:"unique id for this particular machine" default:"${vars_machine_id}" required:"true"`
+	Seed          string   `name:"seed" help:"seed for generating ssh credentials in a consistent manner" default:"${vars_entropy_seed}"`
+	SSHKeyPath    string   `name:"sshkeypath" help:"path to ssh key to use" default:"${vars_ssh_key_path}"`
+	SSHAgentPath  string   `name:"sshagentpath" help:"ssh agent socket path" default:"${vars_runtime_directory}/ssh.agent.socket"`
+	SSHKnownHosts string   `name:"sshknownhostspath" help:"ssh known hosts path" default:"${vars_ssh_known_hosts_path}"`
+	Autodownload  bool     `name:"autodownload" help:"enable/disable the basic download scheduler" default:"true"`
+	CacheDir      string   `name:"directory" help:"local cache directory" default:"${vars_cache_directory}"`
+	MountDirs     []string `name:"mounts" short:"m" help:"folders to mount using podman mount specs" default:""`
+	EnvVars       []string `name:"env" short:"e" help:"environment variables to import" default:""`
 }
 
 // essentially we use ssh forwarding from the control plane to the local http server
@@ -60,10 +62,10 @@ func (t daemon) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 	if err = daemons.Register(gctx, tlsc, &t.runtimecfg, t.AccountID, t.MachineID, signer); err != nil {
 		return err
 	}
-
-	tokensrc := compute.NewAuthzTokenSource(tlsc.DefaultClient(), signer, authn.EndpointCompute())
+	c := httpx.BindRetryTransport(tlsc.DefaultClient(), http.StatusTooManyRequests, http.StatusBadGateway)
+	tokensrc := compute.NewAuthzTokenSource(c, signer, authn.EndpointCompute())
 	authclient = oauth2.NewClient(
-		context.WithValue(gctx.Context, oauth2.HTTPClient, tlsc.DefaultClient()),
+		context.WithValue(gctx.Context, oauth2.HTTPClient, c),
 		tokensrc,
 	)
 
@@ -127,6 +129,7 @@ func (t daemon) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 					envx.String(t.SSHAgentPath, "SSH_AUTH_SOCK"),
 					"/opt/egruntime/ssh.agent.socket",
 				),
+				runners.AgentMountReadOnly(t.SSHKnownHosts, "/etc/ssh/ssh_known_hosts"),
 			),
 			runners.AgentOptionEnvKeys("SSH_AUTH_SOCK=/opt/egruntime/ssh.agent.socket"),
 			runners.AgentOptionMounts(t.MountDirs...),

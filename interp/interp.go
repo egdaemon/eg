@@ -144,7 +144,7 @@ func Remote(ctx context.Context, runid string, g ffigraph.Eventer, svc grpc.Clie
 			ffigit.CloneV1(r.root),
 		).Export("github.com/egdaemon/eg/runtime/wasi/runtime/ffigit.Clone").
 			NewFunctionBuilder().WithFunc(
-			ffigit.CloneV2(r.root),
+			ffigit.CloneV2(r.root, r.runtimedir),
 		).Export("github.com/egdaemon/eg/runtime/wasi/runtime/ffigit.CloneV2").
 			NewFunctionBuilder().WithFunc(
 			ffimetric.Metric(evtclient),
@@ -230,6 +230,8 @@ func (t runner) perform(ctx context.Context, runid, path string, rtb runtimefn) 
 		"EG_CACHE_DIRECTORY", envx.String(guestcachedir, "EG_CACHE_DIRECTORY", "CACHE_DIRECTORY"),
 	).WithEnv(
 		"EG_RUNTIME_DIRECTORY", tmpdir,
+	// ).WithEnv(
+	// 	gitx.EnvAuthEGAccessToken, envx.String("", gitx.EnvAuthEGAccessToken),
 	).WithEnv(
 		"RUNTIME_DIRECTORY", guestruntimedir,
 	).WithEnv(

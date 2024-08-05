@@ -20,4 +20,7 @@ RUN apt install -y --no-install-recommends duckdb
 
 RUN usermod --add-subuids 200000-265535 --add-subgids 200000-265535 root
 
+# preload some wellknown hosts
+RUN ssh-keyscan -H github.com >> /etc/ssh/ssh_known_hosts
+RUN ssh-keyscan -H gitlab.com >> /etc/ssh/ssh_known_hosts
 RUN systemctl enable ssh

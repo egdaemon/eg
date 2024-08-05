@@ -10,6 +10,7 @@ import (
 	"github.com/egdaemon/eg/cmd/cmdopts"
 	"github.com/egdaemon/eg/cmd/eg/daemons"
 	"github.com/egdaemon/eg/internal/envx"
+	"github.com/egdaemon/eg/internal/gitx"
 	"github.com/egdaemon/eg/interp"
 	"github.com/egdaemon/eg/interp/events"
 	"github.com/egdaemon/eg/interp/runtime/wasi/ffigraph"
@@ -20,12 +21,13 @@ import (
 )
 
 type module struct {
-	Dir       string `name:"directory" help:"root directory of the repository" default:"${vars_cwd}"`
-	ModuleDir string `name:"moduledir" help:"must be a subdirectory in the provided directory" default:".eg"`
-	Module    string `arg:"" help:"name of the module to run"`
+	Dir        string `name:"directory" help:"root directory of the repository" default:"${vars_cwd}"`
+	ModuleDir  string `name:"moduledir" help:"must be a subdirectory in the provided directory" default:".eg"`
+	RuntimeDir string `name:"runtimedir" help:"runtime directory" hidden:"true" default:"/opt/egruntime/"`
+	Module     string `arg:"" help:"name of the module to run"`
 }
 
-func (t module) Run(gctx *cmdopts.Global) (err error) {
+func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 	var (
 		ws   workspaces.Context
 		uid  = envx.String(uuid.Nil.String(), "EG_RUN_ID")
@@ -67,6 +69,10 @@ func (t module) Run(gctx *cmdopts.Global) (err error) {
 		}
 	}()
 
+	if err = gitx.AutomaticCredentialRefresh(gctx.Context, tlsc.DefaultClient(), t.RuntimeDir, envx.String("", gitx.EnvAuthEGAccessToken)); err != nil {
+		return err
+	}
+
 	return interp.Remote(
 		gctx.Context,
 		uid,
@@ -75,7 +81,7 @@ func (t module) Run(gctx *cmdopts.Global) (err error) {
 		t.Dir,
 		t.Module,
 		interp.OptionModuleDir(t.ModuleDir),
-		interp.OptionRuntimeDir("/opt/egruntime"),
+		interp.OptionRuntimeDir(t.RuntimeDir),
 	)
 }
 

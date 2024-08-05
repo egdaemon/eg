@@ -751,6 +751,8 @@ func easyjson61363d27DecodeGithubComEgdaemonEgRunners7(in *jlexer.Lexer, out *En
 				}
 				(*out.Enqueued).UnmarshalEasyJSON(in)
 			}
+		case "access_token":
+			out.AccessToken = string(in.String())
 		default:
 			in.SkipRecursive()
 		}
@@ -770,6 +772,16 @@ func easyjson61363d27EncodeGithubComEgdaemonEgRunners7(out *jwriter.Writer, in E
 		first = false
 		out.RawString(prefix[1:])
 		(*in.Enqueued).MarshalEasyJSON(out)
+	}
+	if in.AccessToken != "" {
+		const prefix string = ",\"access_token\":"
+		if first {
+			first = false
+			out.RawString(prefix[1:])
+		} else {
+			out.RawString(prefix)
+		}
+		out.String(string(in.AccessToken))
 	}
 	out.RawByte('}')
 }

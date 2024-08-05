@@ -102,7 +102,7 @@ func Analyse(ctx context.Context, g ffigraph.Eventer, runid, dir string, module 
 			ffigit.CloneV1(dir),
 		).Export("github.com/egdaemon/eg/runtime/wasi/runtime/ffigit.Clone").
 			NewFunctionBuilder().WithFunc(
-			ffigit.CloneV2(r.root),
+			ffigit.CloneV2(r.root, r.runtimedir),
 		).Export("github.com/egdaemon/eg/runtime/wasi/runtime/ffigit.CloneV2").
 			NewFunctionBuilder().WithFunc(ffimetric.Metric).
 			Export("github.com/egdaemon/eg/runtime/wasi/runtime/metrics.Record")

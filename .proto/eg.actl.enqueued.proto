@@ -59,6 +59,7 @@ message EnqueuedUpdateResponse {
 
 message EnqueuedDequeueResponse {
   Enqueued enqueued = 1 [ json_name = "enqueued" ];
+  string access_token = 2 [ json_name = "access_token" ];
 }
 
 message EnqueuedDownloadRequest {}

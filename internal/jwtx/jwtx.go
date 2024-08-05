@@ -65,6 +65,14 @@ func ClaimsOptionID(s string) Option {
 	}
 }
 
+func ClaimsOptionComposed(opts ...Option) Option {
+	return func(rc *jwt.RegisteredClaims) {
+		for _, opt := range opts {
+			opt(rc)
+		}
+	}
+}
+
 func NewJWTClaims(subject string, options ...Option) (c jwt.RegisteredClaims) {
 	ts := time.Now()
 	c = jwt.RegisteredClaims{

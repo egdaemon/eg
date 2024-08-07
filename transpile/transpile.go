@@ -171,7 +171,7 @@ func (t golang) Run(ctx context.Context) (roots []Compiled, err error) {
 			pos.Filename = strings.TrimPrefix(pos.Filename, t.Workspace.Root+"/")
 			genwasm := filepath.Join(gendir, fmt.Sprintf("module.%d.%d.wasm", pos.Line, pos.Column))
 
-			return astbuild.CallExpr(astbuild.SelExpr(egident, "UnsafeRunner"), ctxarg, rarg, astbuild.StringLiteral(genwasm))
+			return astbuild.CallExpr(astbuild.SelExpr(egident, "UnsafeExec"), ctxarg, rarg, astbuild.StringLiteral(genwasm))
 		}, execExpr)
 
 		v := astcodec.Multivisit(

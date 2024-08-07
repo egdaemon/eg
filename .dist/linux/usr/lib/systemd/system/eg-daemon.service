@@ -20,7 +20,7 @@ EnvironmentFile=-/etc/eg/daemon.env
 PermissionsStartOnly=true
 ExecStartPre=/usr/bin/loginctl enable-linger eg
 ExecStartPre=/usr/bin/sleep 3
-ExecStart=/usr/bin/eg daemon
+ExecStart=/usr/bin/eg daemon --sshknownhostspath=/etc/ssh/ssh_known_hosts
 
 [Install]
 WantedBy=default.target

@@ -1,0 +1,3 @@
+FROM ubuntu:noble
+
+CMD /usr/sbin/init

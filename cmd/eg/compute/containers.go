@@ -43,6 +43,7 @@ var embeddedc8supload embed.FS
 
 type c8sUpload struct {
 	runtimecfg    cmdopts.RuntimeResources
+	HostedCompute bool     `name:"shared-compute" help:"allow hosted compute" default:"false"`
 	Containerfile string   `arg:"" help:"path to the container file to run" default:"Containerfile"`
 	SSHKeyPath    string   `name:"sshkeypath" help:"path to ssh key to use" default:"${vars_ssh_key_path}"`
 	Environment   []string `name:"env" short:"e" help:"define environment variables and their values to be included"`
@@ -157,9 +158,9 @@ func (t c8sUpload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error
 		return errorsx.Wrap(err, "unable to rewind kernel archive")
 	}
 
-	if err = iox.Copy(archiveio.Name(), "archive.tar.gz"); err != nil {
-		return errorsx.Wrap(err, "unable to copy archive")
-	}
+	// if err = iox.Copy(archiveio.Name(), "archive.tar.gz"); err != nil {
+	// 	return errorsx.Wrap(err, "unable to copy archive")
+	// }
 	ainfo := errorsx.Zero(os.Stat(archiveio.Name()))
 	log.Println("archive metadata", ainfo.Name(), ainfo.Size())
 
@@ -170,13 +171,15 @@ func (t c8sUpload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error
 	// push the archive to another node that matches the requirements.
 	// in theory we could use redirects to handle that but it'd still take a performance hit.
 	mimetype, buf, err := runners.NewEnqueueUpload(&runners.Enqueued{
-		Entry:  filepath.Base(entry.Path),
-		Ttl:    uint64(t.runtimecfg.TTL.Milliseconds()),
-		Cores:  t.runtimecfg.Cores,
-		Memory: t.runtimecfg.Memory,
-		Arch:   t.runtimecfg.Arch,
-		Os:     t.runtimecfg.OS,
-		Vcsuri: errorsx.Zero(gitx.CanonicalURI(repo, t.GitRemote)), // optionally set the vcsuri if we're inside a repository.
+		AllowShared: t.HostedCompute,
+		Entry:       filepath.Base(entry.Path),
+		Ttl:         uint64(t.runtimecfg.TTL.Milliseconds()),
+		Cores:       t.runtimecfg.Cores,
+		Memory:      t.runtimecfg.Memory,
+		Arch:        t.runtimecfg.Arch,
+		Os:          t.runtimecfg.OS,
+		Vcsuri:      errorsx.Zero(gitx.CanonicalURI(repo, t.GitRemote)), // optionally set the vcsuri if we're inside a repository.
+
 	}, archiveio)
 	if err != nil {
 		return errorsx.Wrap(err, "unable to generate multipart upload")

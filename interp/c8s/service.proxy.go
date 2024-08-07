@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strconv"
+	"strings"
 
 	"github.com/egdaemon/eg/internal/debugx"
 	"github.com/egdaemon/eg/internal/errorsx"
@@ -122,10 +123,11 @@ func (t *ProxyService) Run(ctx context.Context, req *RunRequest) (_ *RunResponse
 	)
 	options = append(
 		options,
-		"--volume", fmt.Sprintf("%s:/opt/eg:O", filepath.Join(t.ws.Root, t.ws.WorkingDir)),
+		"--volume", fmt.Sprintf("%s:/opt/eg:rw", filepath.Join(t.ws.Root, t.ws.WorkingDir)),
 	)
 
 	if err = PodmanRun(ctx, t.prepcmd, req.Image, req.Name, req.Command, options...); err != nil {
+		log.Println("failed", req.Image, req.Name, req.Command, strings.Join(options, ", "))
 		return nil, err
 	}
 

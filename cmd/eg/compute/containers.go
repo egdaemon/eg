@@ -36,6 +36,7 @@ import (
 
 type c8s struct {
 	Upload c8sUpload `cmd:"" help:"upload and run a container file"`
+	Local  c8sLocal  `cmd:"" help:"upload and run a container file"`
 }
 
 //go:embed .bootstrap.c8s

@@ -6,7 +6,7 @@ arch=('x86_64')
 license=('AGPL')
 provides=('eg')
 conflicts=('eg')
-depends=('podman')
+depends=('podman', 'aardvark-dns')
 makedepends=(
   'go'
 )

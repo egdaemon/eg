@@ -6,8 +6,10 @@ Requires=eg-runner-build.service
 [Service]
 ProtectKernelModules=yes
 PrivateMounts=yes
-IPAddressDeny=link-local
-# interfers with ip v6 support.
+# interfers with ip v6 support. narrow to just the 169.254.x.x range
+# and the aws metadata ipv6 address for now
+IPAddressDeny=169.254.0.0/16,[fd00:ec2::254]
+#IPAddressDeny=link-local
 #IPAddressDeny=multicast
 Restart=on-failure
 CacheDirectory=%p

@@ -1,0 +1,6 @@
+__pycache__
+.egpyenv
+.egpytest
+egpy.egg-info
+build
+dist

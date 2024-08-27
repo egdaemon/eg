@@ -1,0 +1,10 @@
+[project]
+dynamic = ["version"]
+name = "egpy"
+description = "package for integrating with eg runtime"
+authors = [{ name = "EG Engineering", email = "engineering@egdaemon.com" }]
+dependencies = ["grpcio", "grpcio-tools", "uuid7"]
+
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"

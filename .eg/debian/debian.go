@@ -14,7 +14,7 @@ import (
 )
 
 const (
-	ContainerName = "eg.ubuntu.22.04"
+	ContainerName = "eg.ubuntu.24.04"
 )
 
 func prepare(ctx context.Context, _ eg.Op) error {

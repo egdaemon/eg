@@ -49,7 +49,7 @@ func (t c8sLocal) Run(gctx *cmdopts.Global) (err error) {
 	)
 
 	if tmpdir, err = os.MkdirTemp("", "eg.c8s.upload.*"); err != nil {
-		return errorsx.Wrap(err, "unable to  create temporary directory")
+		return errorsx.Wrap(err, "unable to create temporary directory")
 	}
 
 	defer func() {
@@ -57,18 +57,17 @@ func (t c8sLocal) Run(gctx *cmdopts.Global) (err error) {
 	}()
 
 	if ws, err = workspaces.New(gctx.Context, tmpdir, ".eg", ""); err != nil {
-		return err
+		return errorsx.Wrap(err, "unable to initialize workspace")
 	}
 
 	egdir := filepath.Join(ws.Root, ws.ModuleDir)
 	autoruncontainer := filepath.Join(ws.Root, ws.WorkingDir, "workspace", "Containerfile")
 	if err = fsx.MkDirs(0700, filepath.Dir(autoruncontainer)); err != nil {
-		return err
+		return errorsx.Wrap(err, "unable to write autorunnable containerfil")
 	}
-	fsx.PrintFS(os.DirFS(ws.Root))
 
 	if err = fsx.CloneTree(gctx.Context, egdir, ".bootstrap.c8s", embeddedc8supload); err != nil {
-		return err
+		return errorsx.Wrap(err, "unable to clone tree")
 	}
 
 	if err = compile.InitGolang(gctx.Context, egdir, cmdopts.ModPath()); err != nil {

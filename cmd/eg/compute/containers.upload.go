@@ -43,7 +43,7 @@ var embeddedc8supload embed.FS
 
 type c8sUpload struct {
 	runtimecfg    cmdopts.RuntimeResources
-	HostedCompute bool     `name:"shared-compute" help:"allow hosted compute" default:"false"`
+	HostedCompute bool     `name:"shared-compute" help:"allow hosted compute" default:"true"`
 	Containerfile string   `arg:"" help:"path to the container file to run" default:"Containerfile"`
 	SSHKeyPath    string   `name:"sshkeypath" help:"path to ssh key to use" default:"${vars_ssh_key_path}"`
 	Environment   []string `name:"env" short:"e" help:"define environment variables and their values to be included"`

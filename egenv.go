@@ -1,9 +1,12 @@
 package eg
 
+import "github.com/egdaemon/eg/internal/stringsx"
+
 var (
-	apiHostDefault     = "https://api.egdaemon.com"
-	consoleHostDefault = "https://console.egdaemon.com"
-	tlsinsecure        = "false"
+	apiHostDefault          = "https://api.egdaemon.com"
+	consoleHostDefault      = "https://console.egdaemon.com"
+	tlsinsecure             = "false"
+	containerAPIHostDefault = ""
 )
 
 func EnvTLSInsecure() string {
@@ -18,11 +21,14 @@ func EnvConsoleHostDefault() string {
 	return consoleHostDefault
 }
 
+func EnvContainerAPIHostDefault() string {
+	return stringsx.First(containerAPIHostDefault, apiHostDefault)
+}
+
 const (
 	EnvEGSSHHost          = "EG_SSH_REVERSE_PROXY_HOST"
 	EnvEGSSHProxyDisabled = "EG_SSH_REVERSE_PROXY_DISABLED"
 	EnvEGSSHHostDefault   = "api.egdaemon.com:8090"
-	// EnvEGSSHHostDefault = "localhost:8090"
 )
 
 // Logging settings

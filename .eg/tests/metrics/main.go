@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/egdaemon/eg/runtime/wasi/eg"
-	"github.com/egdaemon/eg/runtime/wasi/eggit"
 	"github.com/egdaemon/eg/runtime/wasi/egmetrics"
 	"github.com/egdaemon/eg/runtime/wasi/env"
 	"github.com/egdaemon/eg/runtime/wasi/shell"
@@ -46,7 +45,6 @@ func main() {
 
 	err := eg.Perform(
 		ctx,
-		eggit.AutoClone,
 		Debug,
 	)
 

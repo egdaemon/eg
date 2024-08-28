@@ -12,7 +12,6 @@ import (
 	"github.com/egdaemon/eg/authn"
 	"github.com/egdaemon/eg/cmd/cmdopts"
 	"github.com/egdaemon/eg/compile"
-	"github.com/egdaemon/eg/internal/debugx"
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/fsx"
@@ -135,7 +134,7 @@ func (t c8sUpload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error
 		return errorsx.Wrap(err, "unable to rewind environment variables buffer")
 	}
 
-	debugx.Printf(envx.PrintEnv(errorsx.Zero(envb.Environ())...))
+	// debugx.Println(envx.PrintEnv(errorsx.Zero(envb.Environ())...))
 
 	if archiveio, err = os.CreateTemp(tmpdir, "kernel.*.tar.gz"); err != nil {
 		return errorsx.Wrap(err, "unable to open the kernel archive")

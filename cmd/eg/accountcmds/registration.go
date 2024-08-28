@@ -35,7 +35,7 @@ func (t Signup) Run(gctx *cmdopts.Global, tlscfg *cmdopts.TLSConfig) (err error)
 	}
 
 	if !stringsx.Blank(t.Account) {
-		uri.Host = fmt.Sprintf("%s.%s", t.Account, t.Endpoint)
+		uri.Host = fmt.Sprintf("%s.%s", t.Account, uri.Host)
 	}
 	q := uri.Query()
 	q.Add("pubkey", base64.URLEncoding.EncodeToString(signer.PublicKey().Marshal()))

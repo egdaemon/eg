@@ -3,7 +3,12 @@ package eg
 var (
 	apiHostDefault     = "https://api.egdaemon.com"
 	consoleHostDefault = "https://console.egdaemon.com"
+	tlsinsecure        = "false"
 )
+
+func EnvTLSInsecure() string {
+	return tlsinsecure
+}
 
 func EnvAPIHostDefault() string {
 	return apiHostDefault

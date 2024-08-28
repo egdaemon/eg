@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
 	"os"
 
 	"github.com/davecgh/go-spew/spew"
@@ -11,6 +12,7 @@ import (
 	"github.com/egdaemon/eg/cmd/cmdopts"
 	"github.com/egdaemon/eg/internal/debugx"
 	"github.com/egdaemon/eg/internal/errorsx"
+	"github.com/egdaemon/eg/internal/httpx"
 	"github.com/egdaemon/eg/internal/sshx"
 	"github.com/egdaemon/eg/internal/stringsx"
 	"golang.org/x/crypto/ssh"
@@ -32,7 +34,7 @@ func (t Login) Run(gctx *cmdopts.Global, tlscfg *cmdopts.TLSConfig) (err error) 
 		return err
 	}
 
-	chttp := tlscfg.DefaultClient()
+	chttp := httpx.BindRetryTransport(tlscfg.DefaultClient(), http.StatusTooManyRequests, http.StatusBadGateway)
 	ctx := context.WithValue(gctx.Context, oauth2.HTTPClient, chttp)
 	cfg = authn.OAuth2SSHConfig(signer, "", authn.EndpointSSHAuth())
 

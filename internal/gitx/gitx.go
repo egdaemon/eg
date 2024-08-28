@@ -204,7 +204,7 @@ func AutomaticCredentialRefresh(ctx context.Context, c *http.Client, dst string,
 func credentialRefresh(ctx context.Context, c *http.Client, dst, token string) error {
 	// const hostname = "https://host.containers.internal:8081"
 	// req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/r/vcsaccess/", hostname), nil)
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/r/vcsaccess/", eg.EnvAPIHostDefault()), nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/r/vcsaccess/", eg.EnvContainerAPIHostDefault()), nil)
 	if err != nil {
 		return errorsx.Wrap(err, "unable to create http request")
 	}

@@ -59,7 +59,7 @@ func (t Global) AfterApply() error {
 }
 
 type TLSConfig struct {
-	Insecure bool `help:"allow unsigned (and therefor insecure) tls certificates to be used" name:"insecure" default:"false"`
+	Insecure bool `help:"allow unsigned (and therefor insecure) tls certificates to be used" name:"insecure" default:"${vars_tls_insecure_default}"`
 }
 
 func (t TLSConfig) Config() *tls.Config {

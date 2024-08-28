@@ -129,33 +129,6 @@ func (t local) Run(gctx *cmdopts.Global) (err error) {
 		return errorsx.Wrap(err, "unable to setup runner")
 	}
 
-	// enable event logging
-	// w, err := events.NewAgentClient(cc).Watch(ctx.Context, &events.RunWatchRequest{Run: &events.RunMetadata{Id: uid.Bytes()}})
-	// if err != nil {
-	// 	return err
-	// }
-
-	// go func() {
-	// 	for {
-	// 		select {
-	// 		case <-ctx.Context.Done():
-	// 			return
-	// 		default:
-	// 		}
-
-	// 		m, err := w.Recv()
-	// 		if err == io.EOF {
-	// 			log.Println("EOF received")
-	// 			return
-	// 		} else if err != nil {
-	// 			log.Println("unable to receive message", err)
-	// 			continue
-	// 		}
-
-	// 		log.Println("DERP", spew.Sdump(m))
-	// 	}
-	// }()
-
 	go func() {
 		makeevt := func(e *ffigraph.EventInfo) *events.Message {
 			switch e.State {

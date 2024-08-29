@@ -1,23 +1,28 @@
 package main
 
 import (
+	"database/sql"
 	"fmt"
-	"io"
 	"log"
 	"net"
+	"path/filepath"
 
 	"github.com/davecgh/go-spew/spew"
+	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/cmd/cmdopts"
 	"github.com/egdaemon/eg/cmd/eg/daemons"
 	"github.com/egdaemon/eg/internal/envx"
+	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/gitx"
 	"github.com/egdaemon/eg/interp"
+	"github.com/egdaemon/eg/interp/c8s"
 	"github.com/egdaemon/eg/interp/events"
 	"github.com/egdaemon/eg/interp/runtime/wasi/ffigraph"
 	"github.com/egdaemon/eg/runners"
 	"github.com/egdaemon/eg/workspaces"
 	"github.com/gofrs/uuid"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 type module struct {
@@ -37,6 +42,70 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 
 	if ws, err = workspaces.FromEnv(gctx.Context, t.Dir, t.Module); err != nil {
 		return err
+	}
+
+	if err = gitx.AutomaticCredentialRefresh(gctx.Context, tlsc.DefaultClient(), t.RuntimeDir, envx.String("", gitx.EnvAuthEGAccessToken)); err != nil {
+		return err
+	}
+
+	if envx.Boolean(false, eg.EnvComputeRootModule) {
+		var (
+			control net.Listener
+			db      *sql.DB
+		)
+
+		log.Println("---------------------------- ROOT MODULE INITIATED ----------------------------")
+		defer log.Println("---------------------------- ROOT MODULE COMPLETED ----------------------------")
+
+		cspath := filepath.Join(ws.Root, ws.RuntimeDir, "control.socket")
+		if control, err = net.Listen("unix", cspath); err != nil {
+			return errorsx.Wrap(err, "unable to create control.socket")
+		}
+		srv := grpc.NewServer(
+			grpc.Creds(insecure.NewCredentials()), // this is a local socket
+		)
+
+		if db, err = sql.Open("duckdb", filepath.Join(ws.Root, ws.RuntimeDir, "analytics.db")); err != nil {
+			return errorsx.Wrap(err, "unable to create analytics.db")
+		}
+		defer db.Close()
+		if err = events.PrepareMetrics(gctx.Context, db); err != nil {
+			return errorsx.Wrap(err, "unable to prepare analytics.db")
+		}
+		// periodic sampling of system metrics
+		go runners.BackgroundSystemLoad(gctx.Context, db)
+		// final sample
+		defer func() {
+			errorsx.Log(runners.SampleSystemLoad(gctx.Context, db))
+		}()
+
+		events.NewServiceDispatch(db).Bind(srv)
+
+		containerOpts := []string{}
+
+		c8s.NewServiceProxy(
+			log.Default(),
+			ws,
+			c8s.ServiceProxyOptionCommandEnviron(
+				errorsx.Zero(
+					envx.Build().FromEnv("PATH", "TERM", "COLORTERM", "LANG", "CI", "EG_CI", "EG_RUN_ID").Environ(),
+				)...,
+			),
+			c8s.ServiceProxyOptionContainerOptions(
+				containerOpts...,
+			),
+		).Bind(srv)
+
+		go func() {
+			if err = srv.Serve(control); err != nil {
+				log.Println(errorsx.Wrap(err, "unable to create control socket"))
+				return
+			}
+		}()
+		defer func() {
+			<-gctx.Context.Done()
+			srv.GracefulStop()
+		}()
 	}
 
 	if cc, err = daemons.AutoRunnerClient(gctx, ws, uid, runners.AgentOptionAutoEGBin()); err != nil {
@@ -69,10 +138,6 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 		}
 	}()
 
-	if err = gitx.AutomaticCredentialRefresh(gctx.Context, tlsc.DefaultClient(), t.RuntimeDir, envx.String("", gitx.EnvAuthEGAccessToken)); err != nil {
-		return err
-	}
-
 	return interp.Remote(
 		gctx.Context,
 		uid,
@@ -83,72 +148,4 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 		interp.OptionModuleDir(t.ModuleDir),
 		interp.OptionRuntimeDir(t.RuntimeDir),
 	)
-}
-
-type monitor struct {
-	RunID string `name:"runid"`
-}
-
-func (t monitor) Run(ctx *cmdopts.Global) (err error) {
-	var (
-		cc    *grpc.ClientConn
-		grpcl net.Listener
-	)
-
-	if grpcl, err = daemons.DefaultAgentListener(); err != nil {
-		return err
-	}
-	defer grpcl.Close()
-
-	if err = daemons.Agent(ctx, grpcl); err != nil {
-		return err
-	}
-
-	if cc, err = daemons.DefaultRunnerClient(ctx.Context); err != nil {
-		return err
-	}
-
-	w, err := events.NewAgentClient(cc).Watch(ctx.Context, &events.RunWatchRequest{Run: &events.RunMetadata{Id: uuid.FromStringOrNil(t.RunID).Bytes()}})
-	if err != nil {
-		return err
-	}
-
-	// p := tea.NewProgram(
-	// 	ux.NewGraph(),
-	// 	tea.WithoutSignalHandler(),
-	// 	tea.WithContext(ctx.Context),
-	// )
-
-	go func() {
-		for {
-			select {
-			case <-ctx.Context.Done():
-				return
-			default:
-			}
-
-			m, err := w.Recv()
-			if err == io.EOF {
-				log.Println("EOF received")
-				return
-			} else if err != nil {
-				log.Println("unable to receive message", err)
-				continue
-			}
-
-			log.Println("evt", spew.Sdump(m))
-			// p.Send(m)
-		}
-	}()
-
-	// go func() {
-	// 	<-ctx.Context.Done()
-	// 	p.Send(tea.Quit)
-	// }()
-
-	// if _, err := p.Run(); err != nil {
-	// 	return err
-	// }
-
-	return nil
 }

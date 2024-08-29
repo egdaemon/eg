@@ -12,6 +12,8 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
+	"strconv"
 	"syscall"
 	"time"
 
@@ -27,7 +29,6 @@ import (
 	"github.com/egdaemon/eg/workspaces"
 	"github.com/fsnotify/fsnotify"
 	"github.com/gofrs/uuid"
-	"google.golang.org/grpc"
 )
 
 type downloader interface {
@@ -416,36 +417,31 @@ type staterunning struct {
 
 func (t staterunning) Update(ctx context.Context) state {
 	log.Println("work initiated", t.dir)
-
-	var (
-		err error
-		cc  grpc.ClientConnInterface
-	)
-
-	m := NewManager(
-		ctx,
-	)
-
-	if cc, err = m.Dial(ctx, t.ws); err != nil {
-		return failure(err, idle(t.metadata))
-	}
-	runner := c8s.NewProxyClient(cc)
-
 	select {
 	case <-ctx.Done():
 		return terminate(ctx.Err())
 	default:
-		ts := time.Now()
-		_, err := runner.Module(ctx, &c8s.ModuleRequest{
-			Image: "eg",
-			Name:  fmt.Sprintf("eg-%s", t.ragent.id),
-			Mdir:  t.ws.RuntimeDir, // TODO REVISIT
-			Options: []string{
-				"--env", "EG_BIN",
-				"--volume", fmt.Sprintf("%s:/opt/egmodule.wasm:ro", filepath.Join(t.ws.Root, t.ws.RuntimeDir, t.entry)),
-			},
-		})
+		options := make([]string, 0, len(t.ragent.volumes)+len(t.ragent.environ)+2)
+		options = append(
+			options,
+			"--cpus", strconv.Itoa(runtime.NumCPU()),
+			"--volume", fmt.Sprintf("%s:/opt/egmodule.wasm:ro", filepath.Join(t.ws.Root, t.ws.RuntimeDir, t.entry)),
+			"--volume", fmt.Sprintf("%s:/opt/egruntime:rw", filepath.Join(t.ws.Root, t.ws.RuntimeDir)),
+			"--volume", fmt.Sprintf("%s:/opt/eg:rw", filepath.Join(t.ws.Root, t.ws.WorkingDir)),
+		)
 
+		prepcmd := func(cmd *exec.Cmd) *exec.Cmd {
+			cmd.Dir = t.ws.Root
+			// cmd.Env = t.cmdenv
+			cmd.Stdin = os.Stdin
+			cmd.Stdout = log.Writer()
+			cmd.Stderr = log.Writer()
+			return cmd
+		}
+
+		ts := time.Now()
+		// TODO REVISIT using t.ws.RuntimeDir as moduledir.
+		err := c8s.PodmanModule(ctx, prepcmd, "eg", fmt.Sprintf("eg-%s", t.ragent.id), t.ws.RuntimeDir, options...)
 		return completed(t.metadata, t.tmpdir, t.ws, t.ragent.id, time.Since(ts), errorsx.Compact(err, t.ragent.Close()))
 	}
 }

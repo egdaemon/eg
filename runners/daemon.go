@@ -2,11 +2,8 @@ package runners
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
-	"io"
 	"log"
-	"net"
 	"os"
 	"path/filepath"
 	"strings"
@@ -14,15 +11,11 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/egdaemon/eg/internal/debugx"
 	"github.com/egdaemon/eg/internal/envx"
-	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/stringsx"
-	"github.com/egdaemon/eg/interp/c8s"
-	"github.com/egdaemon/eg/interp/events"
 	"github.com/egdaemon/eg/workspaces"
 	_ "github.com/marcboeker/go-duckdb"
 	_ "github.com/shirou/gopsutil/v4/cpu"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 )
 
 func DefaultRunnerRuntimeDir() string {
@@ -129,52 +122,10 @@ func DefaultRunnerClient(ctx context.Context) (cc *grpc.ClientConn, err error) {
 }
 
 func NewRunner(ctx context.Context, ws workspaces.Context, id string, options ...AgentOption) (_ *Agent, err error) {
-	var (
-		control  net.Listener
-		logdst   *os.File
-		evtlog   *events.Log
-		db       *sql.DB
-		cspath   = filepath.Join(ws.Root, ws.RuntimeDir, "control.socket")
-		logpath  = filepath.Join(ws.Root, ws.RuntimeDir, "daemon.log")
-		eventsdb = filepath.Join(ws.Root, ws.RuntimeDir, "analytics.db")
-	)
-
-	if logdst, err = os.Create(logpath); err != nil {
-		return nil, errorsx.WithStack(err)
-	}
-
-	if evtlog, err = events.NewLogEnsureDir(events.NewLogDirFromRunID(ws.Root, ws.RuntimeDir)); err != nil {
-		return nil, errorsx.WithStack(err)
-	}
-
-	if db, err = sql.Open("duckdb", eventsdb); err != nil {
-		return nil, errorsx.Wrap(err, "unable to create analytics.db")
-	}
-
-	if err = events.PrepareMetrics(ctx, db); err != nil {
-		return nil, errorsx.Wrap(err, "unable to prepare analytics.db")
-	}
-
-	if control, err = net.Listen("unix", cspath); err != nil {
-		return nil, errorsx.Wrap(err, "unable to create control.socket")
-	}
-
-	go func() {
-		<-ctx.Done()
-		control.Close()
-	}()
-
 	r := &Agent{
-		id:          id,
-		ws:          ws,
-		control:     control,
-		evtlog:      evtlog,
-		analyticsdb: db,
-		srv: grpc.NewServer(
-			grpc.Creds(insecure.NewCredentials()), // this is a local socket
-		),
+		id:      id,
+		ws:      ws,
 		blocked: make(chan struct{}),
-		log:     log.New(io.MultiWriter(os.Stderr, logdst), id, log.Flags()),
 	}
 
 	for _, opt := range options {
@@ -183,8 +134,6 @@ func NewRunner(ctx context.Context, ws workspaces.Context, id string, options ..
 
 	go func() {
 		log.Println("RUNNER INITIATED", r.id)
-		log.Println("control socket", control.Addr().String())
-		log.Println("analytics database", eventsdb)
 		debugx.Println("workspace", spew.Sdump(ws))
 		defer log.Println("RUNNER COMPLETED", r.id)
 		r.background(ctx)
@@ -194,16 +143,11 @@ func NewRunner(ctx context.Context, ws workspaces.Context, id string, options ..
 }
 
 type Agent struct {
-	id          string
-	environ     []string
-	volumes     []string
-	ws          workspaces.Context
-	analyticsdb *sql.DB
-	control     net.Listener
-	srv         *grpc.Server
-	log         *log.Logger
-	blocked     chan struct{}
-	evtlog      *events.Log
+	id      string
+	environ []string
+	volumes []string
+	ws      workspaces.Context
+	blocked chan struct{}
 }
 
 func (t Agent) Dial(ctx context.Context) (conn *grpc.ClientConn, err error) {
@@ -213,49 +157,15 @@ func (t Agent) Dial(ctx context.Context) (conn *grpc.ClientConn, err error) {
 
 func (t Agent) Close() error {
 	log.Println("graceful shutdown initiated")
-	t.srv.GracefulStop()
 	<-t.blocked
 	return nil
 }
 
 func (t Agent) background(ctx context.Context) {
 	defer close(t.blocked)
-	defer t.analyticsdb.Close()
-
-	// periodic sampling of system metrics
-	go systemload(ctx, t.analyticsdb)
-	// final sample
-	defer func() {
-		errorsx.Log(systemloadsample(ctx, t.analyticsdb))
-	}()
-
-	events.NewServiceDispatch(t.evtlog, t.analyticsdb).Bind(t.srv)
-
 	containerOpts := []string{}
 	containerOpts = append(containerOpts, t.volumes...)
 	containerOpts = append(containerOpts, t.environ...)
 
-	c8s.NewServiceProxy(
-		t.log,
-		t.ws,
-		c8s.ServiceProxyOptionCommandEnviron(
-			errorsx.Zero(
-				envx.Build().FromEnv("PATH", "TERM", "COLORTERM", "LANG").Var(
-					"CI", envx.String("", "EG_CI", "CI"),
-				).Var(
-					"EG_CI", envx.String("", "EG_CI", "CI"),
-				).Var(
-					"EG_RUN_ID", t.id,
-				).Environ(),
-			)...,
-		),
-		c8s.ServiceProxyOptionContainerOptions(
-			containerOpts...,
-		),
-	).Bind(t.srv)
-
-	if err := t.srv.Serve(t.control); err != nil {
-		t.log.Println("runner shutdown", err)
-		return
-	}
+	log.Println("CONTAINER OPTIONS", containerOpts)
 }

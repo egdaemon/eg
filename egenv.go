@@ -40,6 +40,7 @@ const (
 )
 
 const (
+	EnvComputeRootModule    = "EG_COMPUTE_ROOT_MODULE" // default is always false, but is set to true for the root module.
 	EnvScheduleMaximumDelay = "EG_COMPUTE_SCHEDULER_MAXIMUM_DELAY"
 	EnvPingMinimumDelay     = "EG_COMPUTE_PING_MINIMUM_DELAY"
 )

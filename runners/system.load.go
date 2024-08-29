@@ -15,7 +15,7 @@ import (
 	"github.com/shirou/gopsutil/v4/mem"
 )
 
-func systemload(ctx context.Context, analytics *sql.DB) {
+func BackgroundSystemLoad(ctx context.Context, analytics *sql.DB) {
 	report := func(do func(ctx context.Context, analytics *sql.DB) error) {
 		errorsx.Log(do(ctx, analytics))
 	}
@@ -25,7 +25,7 @@ func systemload(ctx context.Context, analytics *sql.DB) {
 	go report(systemdisk)
 }
 
-func systemloadsample(ctx context.Context, analytics *sql.DB) error {
+func SampleSystemLoad(ctx context.Context, analytics *sql.DB) error {
 	return errorsx.Compact(
 		samplecompute(ctx, analytics),
 		samplememory(ctx, analytics),

@@ -64,7 +64,6 @@ func main() {
 		cmdopts.TLSConfig
 		Version            cmdopts.Version              `cmd:"" help:"display versioning information"`
 		Downloader         downloader                   `cmd:"" help:"downloader and command and control process for decoupling the daemon from the controller" hidden:"true"`
-		Monitor            monitor                      `cmd:"" help:"execute the interpreter and monitor the progress" hidden:"true"`
 		Compute            compute.Cmd                  `cmd:"" help:"commands for running compute workloads"`
 		Module             module                       `cmd:"" help:"executes a compiled module directly" hidden:"true"`
 		Daemon             daemon                       `cmd:"" help:"run in daemon mode letting the control plane push jobs to machines" hidden:"true"`

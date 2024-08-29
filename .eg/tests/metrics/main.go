@@ -29,6 +29,9 @@ func Debug(ctx context.Context, op eg.Op) error {
 	env.Debug(os.Environ()...)
 	return shell.Run(
 		ctx,
+		shell.Newf("apt-get install stress"),
+		shell.Newf("stress -t 30 -c %d", 24),
+		shell.Newf("stress -t 30 -m %d", 24),
 	)
 }
 func main() {

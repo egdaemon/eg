@@ -12,13 +12,13 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
-	"strconv"
 	"syscall"
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
+	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/internal/debugx"
+	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/gitx"
 	"github.com/egdaemon/eg/internal/iox"
@@ -393,6 +393,11 @@ func beginwork(ctx context.Context, md metadata, dir string) state {
 		AgentOptionEGBin(errorsx.Zero(exec.LookPath(os.Args[0]))),
 		AgentOptionEnviron(environpath),
 		AgentOptionEnv(gitx.EnvAuthEGAccessToken, metadata.AccessToken),
+		AgentOptionCores(metadata.Enqueued.Cores),
+		AgentOptionMemory(metadata.Enqueued.Memory),
+		AgentOptionCommandLine("--cap-add", "NET_ADMIN"), // required for loopback device creation inside the container
+		AgentOptionCommandLine("--cap-add", "SYS_ADMIN"), // required for rootless container building https://github.com/containers/podman/issues/4056#issuecomment-612893749
+		AgentOptionCommandLine("--device", "/dev/fuse"),  // required for rootless container building https://github.com/containers/podman/issues/4056#issuecomment-612893749
 	)
 
 	m := NewManager(
@@ -421,28 +426,39 @@ func (t staterunning) Update(ctx context.Context) state {
 	case <-ctx.Done():
 		return terminate(ctx.Err())
 	default:
-		options := make([]string, 0, len(t.ragent.volumes)+len(t.ragent.environ)+2)
-		options = append(
-			options,
-			"--cpus", strconv.Itoa(runtime.NumCPU()),
+		var (
+			err     error
+			logdst  *os.File
+			logpath = filepath.Join(t.ws.Root, t.ws.RuntimeDir, "daemon.log")
+		)
+
+		if logdst, err = os.Create(logpath); err != nil {
+			return completed(t.metadata, t.tmpdir, t.ws, t.ragent.id, 0, err)
+		}
+		defer logdst.Close()
+		options := append(
+			t.ragent.Options(),
+			"--env", envx.FormatBool(eg.EnvComputeRootModule, true),
+			"--env", envx.Format(eg.EnvComputeRunID, t.ragent.id),
 			"--volume", fmt.Sprintf("%s:/opt/egmodule.wasm:ro", filepath.Join(t.ws.Root, t.ws.RuntimeDir, t.entry)),
 			"--volume", fmt.Sprintf("%s:/opt/egruntime:rw", filepath.Join(t.ws.Root, t.ws.RuntimeDir)),
 			"--volume", fmt.Sprintf("%s:/opt/eg:rw", filepath.Join(t.ws.Root, t.ws.WorkingDir)),
 		)
 
+		logger := log.New(io.MultiWriter(os.Stderr, logdst), t.ragent.id, log.Flags())
 		prepcmd := func(cmd *exec.Cmd) *exec.Cmd {
 			cmd.Dir = t.ws.Root
 			// cmd.Env = t.cmdenv
-			cmd.Stdin = os.Stdin
-			cmd.Stdout = log.Writer()
-			cmd.Stderr = log.Writer()
+			// cmd.Stdin = os.Stdin
+			cmd.Stdout = logger.Writer()
+			cmd.Stderr = logger.Writer()
 			return cmd
 		}
 
 		ts := time.Now()
 		// TODO REVISIT using t.ws.RuntimeDir as moduledir.
-		err := c8s.PodmanModule(ctx, prepcmd, "eg", fmt.Sprintf("eg-%s", t.ragent.id), t.ws.RuntimeDir, options...)
-		return completed(t.metadata, t.tmpdir, t.ws, t.ragent.id, time.Since(ts), errorsx.Compact(err, t.ragent.Close()))
+		err = c8s.PodmanModule(ctx, prepcmd, "eg", fmt.Sprintf("eg-%s", t.ragent.id), t.ws.RuntimeDir, options...)
+		return completed(t.metadata, t.tmpdir, t.ws, t.ragent.id, time.Since(ts), err)
 	}
 }
 

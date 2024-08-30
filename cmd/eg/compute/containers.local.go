@@ -110,7 +110,7 @@ func (t c8sLocal) Run(gctx *cmdopts.Global) (err error) {
 		sshmount,
 		sshenvvar,
 		runners.AgentOptionEnviron(environpath),
-		runners.AgentOptionMounts(runners.AgentMountReadWrite(filepath.Join(ws.Root, ws.CacheDir), "/cache")),
+		runners.AgentOptionVolumes(runners.AgentMountReadWrite(filepath.Join(ws.Root, ws.CacheDir), "/cache")),
 	); err != nil {
 		return errorsx.Wrap(err, "unable to setup runner")
 	}

@@ -1,5 +1,5 @@
 
-FROM archlinux:latest
+FROM docker.io/library/archlinux:latest
 
 COPY rootfs /
 

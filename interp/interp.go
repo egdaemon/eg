@@ -13,6 +13,8 @@ import (
 	"sync"
 	"syscall"
 
+	"github.com/egdaemon/eg"
+	"github.com/egdaemon/eg/internal/debugx"
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/fsx"
@@ -188,7 +190,7 @@ func (t runner) perform(ctx context.Context, runid, path string, rtb runtimefn) 
 		return errorsx.Wrap(err, "unable to ensure host cache directory")
 	}
 
-	log.Println("wazero cache", wasix.WazCacheDir(t.runtimedir))
+	debugx.Println("wazero cache", wasix.WazCacheDir(t.runtimedir))
 	// fsx.PrintFS(os.DirFS(wasix.WazCacheDir(t.runtimedir)))
 
 	cache, err := wazero.NewCompilationCacheWithDir(wasix.WazCacheDir(t.runtimedir))
@@ -207,23 +209,23 @@ func (t runner) perform(ctx context.Context, runid, path string, rtb runtimefn) 
 		os.Environ(),
 		fmt.Sprintf("CI=%t", envx.Boolean(false, "EG_CI", "CI")),
 		fmt.Sprintf("EG_CI=%t", envx.Boolean(false, "EG_CI", "CI")),
-		fmt.Sprintf("EG_RUN_ID=%s", runid),
+		envx.Format(eg.EnvComputeRunID, runid),
 		fmt.Sprintf("EG_ROOT_DIRECTORY=%s", t.root),
 		fmt.Sprintf("EG_CACHE_DIRECTORY=%s", envx.String(guestcachedir, "EG_CACHE_DIRECTORY", "CACHE_DIRECTORY")),
 		fmt.Sprintf("EG_RUNTIME_DIRECTORY=%s", guestruntimedir),
 		fmt.Sprintf("RUNTIME_DIRECTORY=%s", guestruntimedir),
 	)
 
-	log.Println("module dir", moduledir)
-	log.Println("cache dir", hostcachedir, "->", guestcachedir)
-	log.Println("runtime dir", t.runtimedir, "->", guestruntimedir)
+	debugx.Println("module dir", moduledir)
+	debugx.Println("cache dir", hostcachedir, "->", guestcachedir)
+	debugx.Println("runtime dir", t.runtimedir, "->", guestruntimedir)
 
 	mcfg := wazero.NewModuleConfig().WithEnv(
 		"CI", envx.String("false", "EG_CI", "CI"),
 	).WithEnv(
 		"EG_CI", envx.String("false", "EG_CI", "CI"),
 	).WithEnv(
-		"EG_RUN_ID", runid,
+		eg.EnvComputeRunID, runid,
 	).WithEnv(
 		"EG_ROOT_DIRECTORY", t.root,
 	).WithEnv(

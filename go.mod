@@ -3,6 +3,7 @@ module github.com/egdaemon/eg
 go 1.21
 
 require (
+	github.com/KimMachineGun/automemlimit v0.6.1
 	github.com/alecthomas/kong v0.9.0
 	github.com/davecgh/go-spew v1.1.1
 	github.com/dominikbraun/graph v0.23.0
@@ -16,6 +17,7 @@ require (
 	github.com/pbnjay/memory v0.0.0-20210728143218-7b4eea64cf58
 	github.com/pkg/errors v0.9.1
 	github.com/willabides/kongplete v0.4.0
+	go.uber.org/automaxprocs v1.5.3
 	golang.org/x/crypto v0.26.0
 	golang.org/x/time v0.5.0
 	google.golang.org/grpc v1.65.0
@@ -23,7 +25,6 @@ require (
 
 require (
 	dario.cat/mergo v1.0.0 // indirect
-	github.com/KimMachineGun/automemlimit v0.6.1 // indirect
 	github.com/Microsoft/go-winio v0.6.2 // indirect
 	github.com/ProtonMail/go-crypto v1.0.0 // indirect
 	github.com/apache/arrow/go/v14 v14.0.2 // indirect
@@ -62,7 +63,6 @@ require (
 	github.com/xanzy/ssh-agent v0.3.3 // indirect
 	github.com/yusufpapurcu/wmi v1.2.4 // indirect
 	github.com/zeebo/xxh3 v1.0.2 // indirect
-	go.uber.org/automaxprocs v1.5.3 // indirect
 	golang.org/x/sync v0.8.0 // indirect
 	golang.org/x/xerrors v0.0.0-20240716161551-93cc26a95ae9 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240711142825-46eb208f015d // indirect

@@ -1,6 +1,9 @@
 package eg
 
-import "github.com/egdaemon/eg/internal/stringsx"
+import (
+	"github.com/egdaemon/eg/internal/slicesx"
+	"github.com/egdaemon/eg/internal/stringsx"
+)
 
 var (
 	apiHostDefault          = "https://api.egdaemon.com"
@@ -22,7 +25,7 @@ func EnvConsoleHostDefault() string {
 }
 
 func EnvContainerAPIHostDefault() string {
-	return stringsx.First(containerAPIHostDefault, apiHostDefault)
+	return slicesx.FindOrZero(stringsx.Present, containerAPIHostDefault, apiHostDefault)
 }
 
 const (

@@ -6,21 +6,20 @@ ENV DEBIAN_FRONTEND=noninteractive
 RUN apt update
 
 # general utilities
-RUN apt install -y software-properties-common build-essential ca-certificates
+RUN apt install -y software-properties-common build-essential ca-certificates curl
 RUN add-apt-repository -n ppa:longsleep/golang-backports
 RUN add-apt-repository -n ppa:egdaemon/eg
 RUN add-apt-repository -n ppa:egdaemon/duckdb
 RUN apt update
 
 RUN apt install -y --no-install-recommends curl gnupg2 lsb-release iproute2 git apt-file pinentry-tty uidmap dbus-user-session
-RUN apt install -y --no-install-recommends ssh podman rsync vim golang-1.22 eg tree
+RUN apt install -y --no-install-recommends ssh podman rsync vim golang-1.22 eg tree fuse-overlayfs
 # dependencies for duckdb while bootstrapping
 RUN apt install -y --no-install-recommends cmake ninja-build ccache dput devscripts dh-make dput libssl-dev
 RUN apt install -y --no-install-recommends duckdb
 
-RUN usermod --add-subuids 200000-265535 --add-subgids 200000-265535 root
-
-# preload some wellknown hosts
+# preload some well known hosts
 RUN ssh-keyscan -H github.com >> /etc/ssh/ssh_known_hosts
 RUN ssh-keyscan -H gitlab.com >> /etc/ssh/ssh_known_hosts
+
 RUN systemctl enable ssh

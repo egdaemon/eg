@@ -7,8 +7,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
-	"strconv"
 	"strings"
 
 	"github.com/egdaemon/eg/internal/debugx"
@@ -139,14 +137,10 @@ func (t *ProxyService) Module(ctx context.Context, req *ModuleRequest) (_ *Modul
 	debugx.Println("PROXY CONTAINER MODULE INITIATED", errorsx.Zero(os.Getwd()))
 	defer debugx.Println("PROXY CONTAINER MODULE COMPLETED", errorsx.Zero(os.Getwd()))
 
-	log.Println("-------------------------------------------", runtime.NumCPU(), "-------------------------------------------")
-
-	options := append(t.containeropts, "--cpus", strconv.Itoa(runtime.NumCPU()))
-	options = append(options, req.Options...)
+	options := append(t.containeropts, req.Options...)
 	options = append(
 		options,
-		"--volume", fmt.Sprintf("%s:/opt/egruntime:rw", filepath.Join(t.ws.Root, t.ws.RuntimeDir)),
-		"--volume", fmt.Sprintf("%s:/opt/eg:rw", filepath.Join(t.ws.Root, t.ws.WorkingDir)),
+		"--volume", "/opt/eg:/opt/eg:rw",
 	)
 
 	if err = PodmanModule(ctx, t.prepcmd, req.Image, req.Name, req.Mdir, options...); err != nil {

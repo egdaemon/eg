@@ -57,7 +57,7 @@ func First[T any](items ...T) (zero T, _ bool) {
 
 // First returns first element in the slice if it exists, the zero value otherwise.
 func FirstOrZero[T any](items ...T) (zero T) {
-	l, _ := Last(items...)
+	l, _ := First(items...)
 	return l
 }
 

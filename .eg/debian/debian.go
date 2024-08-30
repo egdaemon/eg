@@ -52,7 +52,7 @@ func Builder(name string, distro string) eg.ContainerRunner {
 
 	return eg.Container(name).
 		OptionEnv("VCS_REVISION", c.Hash.String()).
-		OptionEnv("VERSION", fmt.Sprintf("0.0.%d", c.Committer.When.Add(dynamicduration(10*time.Second, distro+c.Hash.String())).UnixMilli())).
+		OptionEnv("VERSION", fmt.Sprintf("0.0.%d", time.Now().Add(dynamicduration(10*time.Second, distro)).UnixMilli())).
 		OptionEnv("DEBEMAIL", maintainer.Email).
 		OptionEnv("DEBFULLNAME", maintainer.Name).
 		OptionEnv("DISTRO", distro).

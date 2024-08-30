@@ -361,11 +361,9 @@ func Vars(v string, keys ...string) (environ []string) {
 }
 
 // format a environment variable in k=v.
-//
 // - doesn't currently escape values. it may in the future.
-//
 // - if the key or value are an empty string it'll return an empty string. it will log if debugging is enabled.
-func Format(k, v string, options ...func(*formatopts)) string {
+func Format[T ~string](k string, v T, options ...func(*formatopts)) string {
 	opts := slicesx.Reduce(&formatopts{
 		transformer: ignoreEmptyVariables,
 	}, options...)
@@ -375,6 +373,11 @@ func Format(k, v string, options ...func(*formatopts)) string {
 	}
 
 	return fmt.Sprintf("%s=%s", k, v)
+}
+
+// see format
+func FormatBool(k string, v bool, options ...func(*formatopts)) string {
+	return Format(k, strconv.FormatBool(v), options...)
 }
 
 // returns the os.Environ or an empty slice if b is false.

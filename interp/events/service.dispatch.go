@@ -8,17 +8,15 @@ import (
 	"google.golang.org/grpc"
 )
 
-func NewServiceDispatch(logger *Log, db *sql.DB) *EventsService {
+func NewServiceDispatch(db *sql.DB) *EventsService {
 	return &EventsService{
-		logger: logger,
-		db:     db,
+		db: db,
 	}
 }
 
 type EventsService struct {
 	UnimplementedEventsServer
-	logger *Log
-	db     *sql.DB
+	db *sql.DB
 }
 
 func (t *EventsService) Bind(host grpc.ServiceRegistrar) {
@@ -26,10 +24,6 @@ func (t *EventsService) Bind(host grpc.ServiceRegistrar) {
 }
 
 func (t *EventsService) Dispatch(ctx context.Context, dr *DispatchRequest) (_ *DispatchResponse, err error) {
-	// if err = t.logger.Write(ctx, dr.Messages...); err != nil {
-	// 	return nil, errorsx.WithStack(err)
-	// }
-
 	if err = RecordMetric(ctx, t.db, dr.Messages...); err != nil {
 		return nil, errorsx.WithStack(err)
 	}

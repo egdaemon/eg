@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/egdaemon/eg/runtime/wasi/eg"
+	"github.com/egdaemon/eg/runtime/wasi/egenv"
 	"github.com/egdaemon/eg/runtime/wasi/eggit"
 	"github.com/egdaemon/eg/runtime/wasi/shell"
 )
@@ -51,11 +52,13 @@ func Builder(name string, distro string) eg.ContainerRunner {
 
 	return eg.Container(name).
 		OptionEnv("VCS_REVISION", c.Hash.String()).
-		OptionEnv("VERSION", fmt.Sprintf("0.0.%d", c.Committer.When.Add(dynamicduration(10*time.Second, distro)).UnixMilli())).
+		OptionEnv("VERSION", fmt.Sprintf("0.0.%d", time.Now().Add(dynamicduration(10*time.Second, distro)).UnixMilli())).
 		OptionEnv("DEBEMAIL", maintainer.Email).
 		OptionEnv("DEBFULLNAME", maintainer.Name).
 		OptionEnv("DISTRO", distro).
 		OptionEnv("CHANGELOG_DATE", c.Committer.When.Format(time.RFC1123Z)).
+		OptionEnv("GOCACHE", egenv.CacheDirectory("golang")).
+		OptionEnv("GOMODCACHE", egenv.CacheDirectory("go", "pkg", "mod")).
 		OptionVolumeWritable(
 			".eg/.cache/.dist", "/opt/eg/.dist",
 		).

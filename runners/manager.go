@@ -31,7 +31,7 @@ type Manager struct {
 }
 
 func (t Manager) NewRun(ctx context.Context, ws workspaces.Context, id string, options ...AgentOption) (*Agent, error) {
-	return NewRunner(t.ctx, ws, id, options...)
+	return NewRunner(t.ctx, ws, id, options...), nil
 }
 
 func (t Manager) Dial(ctx context.Context, ws workspaces.Context) (conn *grpc.ClientConn, err error) {

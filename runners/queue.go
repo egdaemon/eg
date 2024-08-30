@@ -16,7 +16,9 @@ import (
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
+	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/internal/debugx"
+	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/gitx"
 	"github.com/egdaemon/eg/internal/iox"
@@ -27,7 +29,6 @@ import (
 	"github.com/egdaemon/eg/workspaces"
 	"github.com/fsnotify/fsnotify"
 	"github.com/gofrs/uuid"
-	"google.golang.org/grpc"
 )
 
 type downloader interface {
@@ -392,6 +393,11 @@ func beginwork(ctx context.Context, md metadata, dir string) state {
 		AgentOptionEGBin(errorsx.Zero(exec.LookPath(os.Args[0]))),
 		AgentOptionEnviron(environpath),
 		AgentOptionEnv(gitx.EnvAuthEGAccessToken, metadata.AccessToken),
+		AgentOptionCores(metadata.Enqueued.Cores),
+		AgentOptionMemory(metadata.Enqueued.Memory),
+		AgentOptionCommandLine("--cap-add", "NET_ADMIN"), // required for loopback device creation inside the container
+		AgentOptionCommandLine("--cap-add", "SYS_ADMIN"), // required for rootless container building https://github.com/containers/podman/issues/4056#issuecomment-612893749
+		AgentOptionCommandLine("--device", "/dev/fuse"),  // required for rootless container building https://github.com/containers/podman/issues/4056#issuecomment-612893749
 	)
 
 	m := NewManager(
@@ -416,37 +422,43 @@ type staterunning struct {
 
 func (t staterunning) Update(ctx context.Context) state {
 	log.Println("work initiated", t.dir)
-
-	var (
-		err error
-		cc  grpc.ClientConnInterface
-	)
-
-	m := NewManager(
-		ctx,
-	)
-
-	if cc, err = m.Dial(ctx, t.ws); err != nil {
-		return failure(err, idle(t.metadata))
-	}
-	runner := c8s.NewProxyClient(cc)
-
 	select {
 	case <-ctx.Done():
 		return terminate(ctx.Err())
 	default:
-		ts := time.Now()
-		_, err := runner.Module(ctx, &c8s.ModuleRequest{
-			Image: "eg",
-			Name:  fmt.Sprintf("eg-%s", t.ragent.id),
-			Mdir:  t.ws.RuntimeDir, // TODO REVISIT
-			Options: []string{
-				"--env", "EG_BIN",
-				"--volume", fmt.Sprintf("%s:/opt/egmodule.wasm:ro", filepath.Join(t.ws.Root, t.ws.RuntimeDir, t.entry)),
-			},
-		})
+		var (
+			err     error
+			logdst  *os.File
+			logpath = filepath.Join(t.ws.Root, t.ws.RuntimeDir, "daemon.log")
+		)
 
-		return completed(t.metadata, t.tmpdir, t.ws, t.ragent.id, time.Since(ts), errorsx.Compact(err, t.ragent.Close()))
+		if logdst, err = os.Create(logpath); err != nil {
+			return completed(t.metadata, t.tmpdir, t.ws, t.ragent.id, 0, err)
+		}
+		defer logdst.Close()
+		options := append(
+			t.ragent.Options(),
+			"--env", envx.FormatBool(eg.EnvComputeRootModule, true),
+			"--env", envx.Format(eg.EnvComputeRunID, t.ragent.id),
+			"--volume", fmt.Sprintf("%s:/opt/egmodule.wasm:ro", filepath.Join(t.ws.Root, t.ws.RuntimeDir, t.entry)),
+			"--volume", fmt.Sprintf("%s:/opt/egruntime:rw", filepath.Join(t.ws.Root, t.ws.RuntimeDir)),
+			"--volume", fmt.Sprintf("%s:/opt/eg:rw", filepath.Join(t.ws.Root, t.ws.WorkingDir)),
+		)
+
+		logger := log.New(io.MultiWriter(os.Stderr, logdst), t.ragent.id, log.Flags())
+		prepcmd := func(cmd *exec.Cmd) *exec.Cmd {
+			cmd.Dir = t.ws.Root
+			// cmd.Env = t.cmdenv
+			// cmd.Stdin = os.Stdin
+			cmd.Stdout = logger.Writer()
+			cmd.Stderr = logger.Writer()
+			return cmd
+		}
+
+		ts := time.Now()
+		// TODO REVISIT using t.ws.RuntimeDir as moduledir.
+		err = c8s.PodmanModule(ctx, prepcmd, "eg", fmt.Sprintf("eg-%s", t.ragent.id), t.ws.RuntimeDir, options...)
+		return completed(t.metadata, t.tmpdir, t.ws, t.ragent.id, time.Since(ts), err)
 	}
 }
 

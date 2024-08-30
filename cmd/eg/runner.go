@@ -5,12 +5,15 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"os/exec"
 	"path/filepath"
+	"runtime"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/cmd/cmdopts"
 	"github.com/egdaemon/eg/cmd/eg/daemons"
+	"github.com/egdaemon/eg/internal/bytesx"
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/gitx"
@@ -23,6 +26,9 @@ import (
 	"github.com/gofrs/uuid"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+
+	"github.com/KimMachineGun/automemlimit/memlimit"
+	"go.uber.org/automaxprocs/maxprocs"
 )
 
 type module struct {
@@ -35,7 +41,7 @@ type module struct {
 func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 	var (
 		ws   workspaces.Context
-		uid  = envx.String(uuid.Nil.String(), "EG_RUN_ID")
+		uid  = envx.String(uuid.Nil.String(), eg.EnvComputeRunID)
 		ebuf = make(chan *ffigraph.EventInfo)
 		cc   grpc.ClientConnInterface
 	)
@@ -50,14 +56,28 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 
 	if envx.Boolean(false, eg.EnvComputeRootModule) {
 		var (
-			control net.Listener
-			db      *sql.DB
+			control   net.Listener
+			db        *sql.DB
+			vmemlimit int64
 		)
 
+		// automatically detect the correct number of max procs for the module
+		if _, err = maxprocs.Set(maxprocs.Logger(log.Printf)); err != nil {
+			return errorsx.Wrap(err, "unable to set cpu limits")
+		}
+
+		if vmemlimit, err = memlimit.SetGoMemLimitWithOpts(memlimit.WithProvider(memlimit.FromCgroup)); err != nil {
+			return errorsx.Wrap(err, "unable to set max limits")
+		}
+
 		log.Println("---------------------------- ROOT MODULE INITIATED ----------------------------")
+		log.Println("run id", uid)
+		log.Println("number of cores", runtime.GOMAXPROCS(-1))
+		log.Println("ram available", bytesx.Unit(vmemlimit))
+		// env.Debug(os.Environ()...)
 		defer log.Println("---------------------------- ROOT MODULE COMPLETED ----------------------------")
 
-		cspath := filepath.Join(ws.Root, ws.RuntimeDir, "control.socket")
+		cspath := filepath.Join(t.RuntimeDir, "control.socket")
 		if control, err = net.Listen("unix", cspath); err != nil {
 			return errorsx.Wrap(err, "unable to create control.socket")
 		}
@@ -65,7 +85,7 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 			grpc.Creds(insecure.NewCredentials()), // this is a local socket
 		)
 
-		if db, err = sql.Open("duckdb", filepath.Join(ws.Root, ws.RuntimeDir, "analytics.db")); err != nil {
+		if db, err = sql.Open("duckdb", filepath.Join(t.RuntimeDir, "analytics.db")); err != nil {
 			return errorsx.Wrap(err, "unable to create analytics.db")
 		}
 		defer db.Close()
@@ -82,13 +102,20 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 		events.NewServiceDispatch(db).Bind(srv)
 
 		containerOpts := []string{}
+		containerOpts = append(containerOpts, runners.AgentOptionVolumeSpecs(
+			runners.AgentMountReadWrite("/root", "/root"),
+			runners.AgentMountReadWrite("/cache", "/cache"),
+			runners.AgentMountReadWrite("/opt/egruntime", "/opt/egruntime"),
+			runners.AgentMountReadWrite("/var/lib/containers", "/var/lib/containers"),
+			runners.AgentMountReadOnly(errorsx.Must(exec.LookPath("/opt/egbin")), "/opt/egbin"),
+		)...)
 
 		c8s.NewServiceProxy(
 			log.Default(),
 			ws,
 			c8s.ServiceProxyOptionCommandEnviron(
 				errorsx.Zero(
-					envx.Build().FromEnv("PATH", "TERM", "COLORTERM", "LANG", "CI", "EG_CI", "EG_RUN_ID").Environ(),
+					envx.Build().FromEnv("PATH", "TERM", "COLORTERM", "LANG", "CI", "EG_CI", "EG_BIN", eg.EnvComputeContainerExec, eg.EnvComputeRunID).Environ(),
 				)...,
 			),
 			c8s.ServiceProxyOptionContainerOptions(
@@ -102,10 +129,11 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 				return
 			}
 		}()
-		defer func() {
-			<-gctx.Context.Done()
-			srv.GracefulStop()
-		}()
+		defer srv.GracefulStop()
+	} else {
+		log.Println("---------------------------- MODULE INITIATED ----------------------------")
+		// env.Debug(os.Environ()...)
+		defer log.Println("---------------------------- MODULE COMPLETED ----------------------------")
 	}
 
 	if cc, err = daemons.AutoRunnerClient(gctx, ws, uid, runners.AgentOptionAutoEGBin()); err != nil {

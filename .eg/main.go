@@ -21,14 +21,10 @@ func Debug(ctx context.Context, op eg.Op) error {
 	env.Debug(os.Environ()...)
 	return shell.Run(
 		ctx,
-		shell.New("tree -a -L 2 /opt/eg"),
+		shell.New("tree -a -L 1 /opt"),
 		shell.New("ls -lha /opt/egruntime"),
-		// shell.New("tree -a -L 2 /cache").Lenient(true),
 		shell.New("ls -lha /cache"),
-		// shell.New("ls -lha /opt/eg"),
-		// shell.New("ls -lha /root"),
-		// shell.New("ls -lha /root/.ssh && md5sum /root/.ssh/known_hosts"),
-		// shell.New("ssh -T git@github.com || true"),
+		shell.New("ls -lha /root"),
 	)
 }
 
@@ -50,10 +46,6 @@ func main() {
 	if s, err := shellx.String(ctx, "/usr/bin/echo", "hello world"); err == nil {
 		log.Println("shell output", s)
 	}
-
-	log.Println("debug initiated")
-	defer log.Println("debug completed")
-	env.Debug(os.Environ()...)
 
 	err := eg.Perform(
 		ctx,

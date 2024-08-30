@@ -83,7 +83,6 @@ func AutoRunnerClient(global *cmdopts.Global, ws workspaces.Context, uid string,
 	go func() {
 		defer global.Cleanup.Done()
 		<-global.Context.Done()
-		errorsx.Log(errorsx.Wrap(ragent.Close(), "unable to cleanly stop runner"))
 	}()
 
 	return ragent.Dial(global.Context)

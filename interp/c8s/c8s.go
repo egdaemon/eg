@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"time"
 
+	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/internal/debugx"
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
@@ -126,7 +127,7 @@ func PodmanModuleRunCmd(image, cname, moduledir string, options ...string) []str
 		"--detach",
 		"--env", "CI",
 		"--env", "EG_CI",
-		"--env", "EG_RUN_ID",
+		"--env", eg.EnvComputeRunID,
 		"--env", "EG_BIN",
 	},
 		options...,
@@ -142,7 +143,7 @@ func PodmanModuleRunCmd(image, cname, moduledir string, options ...string) []str
 func PodmanModuleExecCmd(cname, moduledir string) []string {
 	return []string{
 		"exec",
-		envx.String("-i", "EG_EXEC_OPTIONS"),
+		envx.String("-i", eg.EnvComputeContainerExec),
 		cname,
 		envx.String("eg", "EG_BIN"),
 		"module",

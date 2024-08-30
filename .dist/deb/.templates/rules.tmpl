@@ -18,9 +18,9 @@ DH_VERBOSE = 1
 override_dh_auto_build:
 	echo "DH AUTO BUILD OVERRIDE"
 	echo "$(CURDIR)"
-	mkdir $(CURDIR)/bin $(CURDIR)/.gocache
+	mkdir $(CURDIR)/bin
 	ls -lha $(CURDIR)
-	GOCACHE="$(CURDIR)/.gocache" GOBIN="$(CURDIR)/bin" /usr/lib/go-1.22/bin/go env
+	GOBIN="$(CURDIR)/bin" GOCACHE="$(CURDIR)/.gocache" /usr/lib/go-1.22/bin/go env
 	ls -lha $(CURDIR)/src
 	GOWORK="off" GOPROXY="direct" GOCACHE="$(CURDIR)/.gocache" GOBIN="$(CURDIR)/bin" /usr/lib/go-1.22/bin/go build -C src -mod=vendor -ldflags="-X 'github.com/egdaemon/eg/cmd/cmdopts.Treeish=${VCS_REVISION}'" -tags "no_duckdb_arrow" -o "$(CURDIR)/bin" -buildvcs=false ./cmd/...
 	ls -lha $(CURDIR)/bin

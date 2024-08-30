@@ -124,7 +124,7 @@ func (t daemon) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 			runners.NewCompletionClient(authclient),
 		),
 		runners.QueueOptionAgentOptions(
-			runners.AgentOptionMounts(
+			runners.AgentOptionVolumes(
 				runners.AgentMountReadWrite(
 					envx.String(t.SSHAgentPath, "SSH_AUTH_SOCK"),
 					"/opt/egruntime/ssh.agent.socket",
@@ -132,7 +132,7 @@ func (t daemon) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 				runners.AgentMountReadOnly(t.SSHKnownHosts, "/etc/ssh/ssh_known_hosts"),
 			),
 			runners.AgentOptionEnvKeys("SSH_AUTH_SOCK=/opt/egruntime/ssh.agent.socket"),
-			runners.AgentOptionMounts(t.MountDirs...),
+			runners.AgentOptionVolumes(t.MountDirs...),
 			runners.AgentOptionEnvKeys(t.EnvVars...),
 		),
 	)

@@ -178,12 +178,12 @@ func (t local) Run(gctx *cmdopts.Global) (err error) {
 		),
 		// runners.AgentOptionEnv("DOCKER_HOST", "/run/podman/podman.sock"),
 		runners.AgentOptionEnviron(environpath),
+		// runners.AgentOptionCommandLine("--env-file", environpath),
 		runners.AgentOptionCommandLine("--cap-add", "NET_ADMIN"), // required for loopback device creation inside the container
 		runners.AgentOptionCommandLine("--cap-add", "SYS_ADMIN"), // required for rootless container building https://github.com/containers/podman/issues/4056#issuecomment-612893749
 		runners.AgentOptionCommandLine("--device", "/dev/fuse"),
-		runners.AgentOptionCommandLine("--env-file", environpath),
-		runners.AgentOptionCores(t.RuntimeResources.Cores),
-		runners.AgentOptionMemory(t.RuntimeResources.Memory),
+		// runners.AgentOptionCores(t.RuntimeResources.Cores),
+		// runners.AgentOptionMemory(t.RuntimeResources.Memory),
 	)
 
 	for _, m := range modules {

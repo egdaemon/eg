@@ -101,14 +101,21 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 
 		events.NewServiceDispatch(db).Bind(srv)
 
-		containerOpts := []string{}
-		containerOpts = append(containerOpts, runners.AgentOptionVolumeSpecs(
-			runners.AgentMountReadWrite("/root", "/root"),
-			runners.AgentMountReadWrite("/cache", "/cache"),
-			runners.AgentMountReadWrite("/opt/egruntime", "/opt/egruntime"),
-			runners.AgentMountReadWrite("/var/lib/containers", "/var/lib/containers"),
-			runners.AgentMountReadOnly(errorsx.Must(exec.LookPath("/opt/egbin")), "/opt/egbin"),
-		)...)
+		ragent := runners.NewRunner(
+			gctx.Context,
+			ws,
+			uid,
+			runners.AgentOptionVolumes(
+				runners.AgentMountReadWrite("/root", "/root"),
+				runners.AgentMountReadWrite("/cache", "/cache"),
+				runners.AgentMountReadWrite("/opt/egruntime", "/opt/egruntime"),
+				runners.AgentMountReadWrite("/var/lib/containers", "/var/lib/containers"),
+				runners.AgentMountReadOnly(errorsx.Must(exec.LookPath("/opt/egbin")), "/opt/egbin"),
+			),
+			runners.AgentOptionCommandLine("--cap-add", "NET_ADMIN"), // required for loopback device creation inside the container
+			runners.AgentOptionCommandLine("--cap-add", "SYS_ADMIN"), // required for rootless container building https://github.com/containers/podman/issues/4056#issuecomment-612893749
+			runners.AgentOptionCommandLine("--network", "host"),      // ipv4 group bullshit. pretty sure its a podman 4 issue that was resolved in podman 5. this is 'safe' to do because we are already in a container.
+		)
 
 		c8s.NewServiceProxy(
 			log.Default(),
@@ -119,7 +126,7 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 				)...,
 			),
 			c8s.ServiceProxyOptionContainerOptions(
-				containerOpts...,
+				ragent.Options()...,
 			),
 		).Bind(srv)
 

@@ -46,7 +46,7 @@ var _ = Describe("Retry Transport", func() {
 			time.Sleep(time.Hour)
 		}))
 		defer s.Close()
-		c := http.DefaultClient
+		c := &http.Client{}
 		c.Transport = NewRetryTransport(c.Transport, http.StatusBadGateway)
 
 		ctx, done := context.WithTimeout(context.Background(), -1*time.Second)

@@ -132,10 +132,7 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 		).Bind(srv)
 
 		go func() {
-			if err = srv.Serve(control); err != nil {
-				log.Println(errorsx.Wrap(err, "unable to create control socket"))
-				return
-			}
+			errorsx.Log(errorsx.Wrap(srv.Serve(control), "unable to create control socket"))
 		}()
 		defer srv.GracefulStop()
 	} else {

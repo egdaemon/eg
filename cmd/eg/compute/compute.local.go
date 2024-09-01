@@ -193,6 +193,7 @@ func (t local) Run(gctx *cmdopts.Global) (err error) {
 			"--env", envx.Format(eg.EnvComputeRunID, uid.String()),
 		)
 		options = append(options, runners.AgentOptionVolumeSpecs(
+			runners.AgentMountReadOnly(filepath.Join(ws.Root, ws.BuildDir, "main.wasm.d"), "/opt/egruntime/main.wasm.d"),
 			runners.AgentMountReadOnly(m.Path, "/opt/egmodule.wasm"),
 			runners.AgentMountReadWrite(filepath.Join(ws.Root, ws.WorkingDir), "/opt/eg"),
 			mountegbin,
@@ -206,8 +207,8 @@ func (t local) Run(gctx *cmdopts.Global) (err error) {
 			return cmd
 		}
 
-		// TODO REVISIT using ws.BuildDir as moduledir.
-		err := c8s.PodmanModule(gctx.Context, prepcmd, "eg", fmt.Sprintf("eg-%s", uid.String()), ws.BuildDir, options...)
+		// TODO REVISIT using t.ws.RuntimeDir as moduledir.
+		err := c8s.PodmanModule(gctx.Context, prepcmd, "eg", fmt.Sprintf("eg-%s", uid.String()), ws.RuntimeDir, options...)
 		if err != nil {
 			return errorsx.Wrap(err, "module execution failed")
 		}

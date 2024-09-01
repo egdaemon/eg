@@ -22,6 +22,7 @@ func Debug(ctx context.Context, op eg.Op) error {
 	return shell.Run(
 		ctx,
 		shell.New("tree -a -L 1 /opt"),
+		shell.New("tree -a -L 2 /opt/egruntime"),
 		shell.New("ls -lha /opt/egruntime"),
 		shell.New("ls -lha /cache"),
 		shell.New("ls -lha /root"),

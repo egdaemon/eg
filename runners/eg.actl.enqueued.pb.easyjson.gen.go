@@ -1144,6 +1144,8 @@ func easyjson61363d27DecodeGithubComEgdaemonEgRunners12(in *jlexer.Lexer, out *E
 			out.Vcsuri = string(in.String())
 		case "allow_shared":
 			out.AllowShared = bool(in.Bool())
+		case "account_id":
+			out.AccountId = string(in.String())
 		case "labels":
 			if in.IsNull() {
 				in.Skip()
@@ -1336,6 +1338,16 @@ func easyjson61363d27EncodeGithubComEgdaemonEgRunners12(out *jwriter.Writer, in 
 			out.RawString(prefix)
 		}
 		out.Bool(bool(in.AllowShared))
+	}
+	if in.AccountId != "" {
+		const prefix string = ",\"account_id\":"
+		if first {
+			first = false
+			out.RawString(prefix[1:])
+		} else {
+			out.RawString(prefix)
+		}
+		out.String(string(in.AccountId))
 	}
 	if len(in.Labels) != 0 {
 		const prefix string = ",\"labels\":"

@@ -19,7 +19,8 @@ message Enqueued {
   string description = 14 [ json_name = "description" ];
   string vcsuri = 15 [ json_name = "vcsuri" ];
   bool allow_shared = 16 [ json_name = "allow_shared" ];
-  reserved 17 to 999;
+  string account_id = 17 [ json_name = "account_id" ];
+  reserved 18 to 999;
   repeated string labels = 1000 [ json_name = "labels" ];
 }
 

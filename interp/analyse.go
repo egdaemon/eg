@@ -21,7 +21,6 @@ func Analyse(ctx context.Context, g ffigraph.Eventer, runid, dir string, module 
 	var (
 		r = runner{
 			root:       dir,
-			moduledir:  ".eg",
 			runtimedir: runners.DefaultRunnerDirectory(runid),
 			initonce:   &sync.Once{},
 		}
@@ -31,7 +30,7 @@ func Analyse(ctx context.Context, g ffigraph.Eventer, runid, dir string, module 
 		opt(&r)
 	}
 
-	runtimeenv := func(r runner, moduledir string, cmdenv []string, host wazero.HostModuleBuilder) wazero.HostModuleBuilder {
+	runtimeenv := func(r runner, cmdenv []string, host wazero.HostModuleBuilder) wazero.HostModuleBuilder {
 		return host.NewFunctionBuilder().
 			WithFunc(ffigraph.Analysing(true)).Export("github.com/egdaemon/eg/runtime/wasi/runtime/graph.Analysing").
 			NewFunctionBuilder().
@@ -71,7 +70,7 @@ func Analyse(ctx context.Context, g ffigraph.Eventer, runid, dir string, module 
 
 			options = append(
 				options,
-				"-w", r.moduledir,
+				"-w", r.root,
 				"--volume", fmt.Sprintf("%s:/opt/eg:O", r.root),
 			)
 
@@ -91,7 +90,7 @@ func Analyse(ctx context.Context, g ffigraph.Eventer, runid, dir string, module 
 				options,
 				"--volume", fmt.Sprintf("%s:%s:O", r.runtimedir, runners.DefaultRunnerRuntimeDir()),
 			)
-			return c8s.PodmanModule(ctx, cmdctx, name, cname, r.moduledir, options...)
+			return c8s.PodmanModule(ctx, cmdctx, name, cname, r.root, options...)
 		})).Export("github.com/egdaemon/eg/runtime/wasi/runtime/ffiegcontainer.Module").
 			NewFunctionBuilder().WithFunc(ffiexec.Exec(func(cmd *exec.Cmd) *exec.Cmd {
 			return nil

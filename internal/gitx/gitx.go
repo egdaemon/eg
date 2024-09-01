@@ -190,6 +190,7 @@ func AutomaticCredentialRefresh(ctx context.Context, c *http.Client, dst string,
 		return nil
 	}
 
+	log.Println("periodic git credentials refresh enabled")
 	if err := credentialRefresh(ctx, c, dst, token); err != nil {
 		return errorsx.Wrap(err, "failed to initially fetch access token")
 	}

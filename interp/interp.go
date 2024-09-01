@@ -36,13 +36,6 @@ import (
 
 type Option func(*runner)
 
-// OptionModuleDir name of the directory that contains eg directives
-func OptionModuleDir(s string) Option {
-	return func(r *runner) {
-		r.moduledir = s
-	}
-}
-
 // OptionRuntimeDir
 func OptionRuntimeDir(s string) Option {
 	return func(r *runner) {
@@ -50,7 +43,7 @@ func OptionRuntimeDir(s string) Option {
 	}
 }
 
-type runtimefn func(r runner, moduledir string, cmdenv []string, host wazero.HostModuleBuilder) wazero.HostModuleBuilder
+type runtimefn func(r runner, cmdenv []string, host wazero.HostModuleBuilder) wazero.HostModuleBuilder
 
 // Remote uses the api to implement particular actions like building and running containers.
 // may not be necessary.
@@ -58,12 +51,10 @@ func Remote(ctx context.Context, runid string, g ffigraph.Eventer, svc grpc.Clie
 	var (
 		r = runner{
 			root:       dir,
-			moduledir:  ".eg",
 			runtimedir: runners.DefaultRunnerDirectory(runid),
 			initonce:   &sync.Once{},
 		}
 	)
-
 	for _, opt := range options {
 		opt(&r)
 	}
@@ -71,7 +62,7 @@ func Remote(ctx context.Context, runid string, g ffigraph.Eventer, svc grpc.Clie
 	containers := c8s.NewProxyClient(svc)
 	evtclient := events.NewEventsClient(svc)
 
-	runtimeenv := func(r runner, moduledir string, cmdenv []string, host wazero.HostModuleBuilder) wazero.HostModuleBuilder {
+	runtimeenv := func(r runner, cmdenv []string, host wazero.HostModuleBuilder) wazero.HostModuleBuilder {
 		return host.NewFunctionBuilder().WithFunc(ffigraph.Analysing(false)).Export("github.com/egdaemon/eg/runtime/wasi/runtime/graph.Analysing").
 			NewFunctionBuilder().WithFunc(g.Pusher()).Export("github.com/egdaemon/eg/runtime/wasi/runtime/graph.Push").
 			NewFunctionBuilder().WithFunc(g.Popper()).Export("github.com/egdaemon/eg/runtime/wasi/runtime/graph.Pop").
@@ -102,13 +93,13 @@ func Remote(ctx context.Context, runid string, g ffigraph.Eventer, svc grpc.Clie
 			cname := fmt.Sprintf("%s.%s", name, md5x.String(modulepath+runid))
 			options = append(
 				options,
-				"--volume", fmt.Sprintf("%s:/opt/egmodule.wasm:ro", filepath.Join(r.moduledir, modulepath)),
+				"--volume", fmt.Sprintf("%s:/opt/egmodule.wasm:ro", filepath.Join(r.runtimedir, modulepath)),
 			)
 
 			_, err = containers.Module(ctx, &c8s.ModuleRequest{
 				Image:   name,
 				Name:    cname,
-				Mdir:    r.moduledir,
+				Mdir:    r.runtimedir,
 				Options: options,
 			})
 			if err != nil {
@@ -159,7 +150,6 @@ func Remote(ctx context.Context, runid string, g ffigraph.Eventer, svc grpc.Clie
 type runner struct {
 	root       string
 	runtimedir string
-	moduledir  string
 	initonce   *sync.Once
 }
 
@@ -176,8 +166,7 @@ func (t runner) Open(name string) (fs.File, error) {
 }
 
 func (t runner) perform(ctx context.Context, runid, path string, rtb runtimefn) (err error) {
-	moduledir := filepath.Join(t.root, t.moduledir)
-	hostcachedir := filepath.Join(moduledir, ".cache")
+	hostcachedir := filepath.Join(t.runtimedir, "cache")
 	guestcachedir := filepath.Join("/", "cache")
 	guestruntimedir := runners.DefaultRunnerRuntimeDir()
 	tmpdir, err := os.MkdirTemp(t.runtimedir, ".tmp.*")
@@ -216,7 +205,6 @@ func (t runner) perform(ctx context.Context, runid, path string, rtb runtimefn) 
 		fmt.Sprintf("RUNTIME_DIRECTORY=%s", guestruntimedir),
 	)
 
-	debugx.Println("module dir", moduledir)
 	debugx.Println("cache dir", hostcachedir, "->", guestcachedir)
 	debugx.Println("runtime dir", t.runtimedir, "->", guestruntimedir)
 
@@ -266,7 +254,7 @@ func (t runner) perform(ctx context.Context, runid, path string, rtb runtimefn) 
 	}
 	defer wasienv.Close(ctx)
 
-	hostenv, err := rtb(t, moduledir, cmdenv, runtime.NewHostModuleBuilder("env")).
+	hostenv, err := rtb(t, cmdenv, runtime.NewHostModuleBuilder("env")).
 		Instantiate(ctx)
 	if err != nil {
 		return err

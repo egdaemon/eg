@@ -39,7 +39,7 @@ type local struct {
 	GPGAgent       bool     `name:"gpgagent" help:"enable gpg agent" hidden:"true"`
 	GitRemote      string   `name:"git-remote" help:"name of the git remote to use" default:"${vars_git_default_remote_name}"`
 	GitReference   string   `name:"git-ref" help:"name of the branch or commit to checkout" default:"${vars_git_default_reference}"`
-	ContainerCache string   `name:"croot" help:"container storage, ideally we'd be about to share with the host but for now" hidden:"true" default:"${vars_container_cache_directory}"`
+	ContainerCache string   `name:"croot" help:"container storage, ideally we'd be able to share with the host but for now" hidden:"true" default:"${vars_container_cache_directory}"`
 }
 
 func (t local) Run(gctx *cmdopts.Global) (err error) {

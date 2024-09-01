@@ -33,7 +33,7 @@ import (
 
 type module struct {
 	Dir        string `name:"directory" help:"root directory of the repository" default:"${vars_cwd}"`
-	ModuleDir  string `name:"moduledir" help:"must be a subdirectory in the provided directory" default:".eg"`
+	ModuleDir  string `name:"moduledir" help:"deprecated removed once infrastructure is updated" hidden:"true" default:".eg"`
 	RuntimeDir string `name:"runtimedir" help:"runtime directory" hidden:"true" default:"/opt/egruntime/"`
 	Module     string `arg:"" help:"name of the module to run"`
 }
@@ -178,7 +178,6 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 		cc,
 		t.Dir,
 		t.Module,
-		interp.OptionModuleDir(t.ModuleDir),
 		interp.OptionRuntimeDir(t.RuntimeDir),
 	)
 }

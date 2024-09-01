@@ -20,10 +20,12 @@ import (
 	"github.com/egdaemon/eg/internal/debugx"
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
+	"github.com/egdaemon/eg/internal/fsx"
 	"github.com/egdaemon/eg/internal/gitx"
 	"github.com/egdaemon/eg/internal/iox"
 	"github.com/egdaemon/eg/internal/langx"
 	"github.com/egdaemon/eg/internal/tarx"
+	"github.com/egdaemon/eg/internal/userx"
 	"github.com/egdaemon/eg/internal/wasix"
 	"github.com/egdaemon/eg/interp/c8s"
 	"github.com/egdaemon/eg/workspaces"
@@ -386,7 +388,7 @@ func beginwork(ctx context.Context, md metadata, dir string) state {
 	// environ := errorsx.Zero(envx.FromPath(environpath))
 	// envx.Debug(environ...)
 
-	aopts := make([]AgentOption, 0, len(md.agentopts)+2)
+	aopts := make([]AgentOption, 0, len(md.agentopts)+32)
 	aopts = append(aopts, md.agentopts...)
 	aopts = append(
 		aopts,
@@ -427,10 +429,15 @@ func (t staterunning) Update(ctx context.Context) state {
 		return terminate(ctx.Err())
 	default:
 		var (
-			err     error
-			logdst  *os.File
-			logpath = filepath.Join(t.ws.Root, t.ws.RuntimeDir, "daemon.log")
+			err          error
+			containerdir = filepath.Join(userx.DefaultCacheDirectory(), "containers")
+			logdst       *os.File
+			logpath      = filepath.Join(t.ws.Root, t.ws.RuntimeDir, "daemon.log")
 		)
+
+		if err = fsx.MkDirs(0700, containerdir); err != nil {
+			return terminate(errorsx.Wrap(err, "unable to setup container cache"))
+		}
 
 		if logdst, err = os.Create(logpath); err != nil {
 			return completed(t.metadata, t.tmpdir, t.ws, t.ragent.id, 0, err)
@@ -438,18 +445,18 @@ func (t staterunning) Update(ctx context.Context) state {
 		defer logdst.Close()
 		options := append(
 			t.ragent.Options(),
+			"--volume", AgentMountReadWrite(containerdir, "/var/lib/containers"),
+			"--volume", AgentMountReadOnly(filepath.Join(t.ws.Root, t.ws.RuntimeDir, t.entry), "/opt/egmodule.wasm"),
+			"--volume", AgentMountReadWrite(filepath.Join(t.ws.Root, t.ws.RuntimeDir), "/opt/egruntime"),
+			"--volume", AgentMountReadWrite(filepath.Join(t.ws.Root, t.ws.WorkingDir), "/opt/eg"),
+			"--volume", AgentMountReadWrite(filepath.Join(t.ws.Root, t.ws.CacheDir), "/cache"),
 			"--env", envx.FormatBool(eg.EnvComputeRootModule, true),
 			"--env", envx.Format(eg.EnvComputeRunID, t.ragent.id),
-			"--volume", fmt.Sprintf("%s:/opt/egmodule.wasm:ro", filepath.Join(t.ws.Root, t.ws.RuntimeDir, t.entry)),
-			"--volume", fmt.Sprintf("%s:/opt/egruntime:rw", filepath.Join(t.ws.Root, t.ws.RuntimeDir)),
-			"--volume", fmt.Sprintf("%s:/opt/eg:rw", filepath.Join(t.ws.Root, t.ws.WorkingDir)),
 		)
 
 		logger := log.New(io.MultiWriter(os.Stderr, logdst), t.ragent.id, log.Flags())
 		prepcmd := func(cmd *exec.Cmd) *exec.Cmd {
 			cmd.Dir = t.ws.Root
-			// cmd.Env = t.cmdenv
-			// cmd.Stdin = os.Stdin
 			cmd.Stdout = logger.Writer()
 			cmd.Stderr = logger.Writer()
 			return cmd

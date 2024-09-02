@@ -461,7 +461,6 @@ func (t staterunning) Update(ctx context.Context) state {
 			"--volume", AgentMountReadWrite(filepath.Join(t.ws.Root, t.ws.WorkingDir), "/opt/eg"),
 			"--volume", AgentMountReadWrite(filepath.Join(t.ws.Root, t.ws.CacheDir), "/cache"),
 			"--env", envx.FormatBool(eg.EnvComputeRootModule, true),
-			"--env", envx.Format(eg.EnvComputeRunID, t.ragent.id),
 		)
 
 		logger := log.New(io.MultiWriter(os.Stderr, logdst), t.ragent.id, log.Flags())

@@ -17,7 +17,7 @@ import (
 	"github.com/tetratelabs/wazero"
 )
 
-func Analyse(ctx context.Context, g ffigraph.Eventer, runid, dir string, module string, options ...Option) (err error) {
+func Analyse(ctx context.Context, g ffigraph.Eventer, aid, runid, dir string, module string, options ...Option) (err error) {
 	var (
 		r = runner{
 			root:       dir,
@@ -74,7 +74,7 @@ func Analyse(ctx context.Context, g ffigraph.Eventer, runid, dir string, module 
 				"--volume", fmt.Sprintf("%s:/opt/eg:O", r.root),
 			)
 
-			return c8s.PodmanRun(ctx, cmdctx, name, cname, cmd, options...)
+			return c8s.PodmanRun(ctx, cmdctx, fmt.Sprintf("%s.%s", aid, name), cname, cmd, options...)
 		})).Export("github.com/egdaemon/eg/runtime/wasi/runtime/ffiegcontainer.Run").
 			NewFunctionBuilder().WithFunc(ffiegcontainer.Module(func(ctx context.Context, name, modulepath string, options ...string) (err error) {
 			cmdctx := func(cmd *exec.Cmd) *exec.Cmd {
@@ -90,7 +90,7 @@ func Analyse(ctx context.Context, g ffigraph.Eventer, runid, dir string, module 
 				options,
 				"--volume", fmt.Sprintf("%s:%s:O", r.runtimedir, runners.DefaultRunnerRuntimeDir()),
 			)
-			return c8s.PodmanModule(ctx, cmdctx, name, cname, r.root, options...)
+			return c8s.PodmanModule(ctx, cmdctx, fmt.Sprintf("%s.%s", aid, name), cname, r.root, options...)
 		})).Export("github.com/egdaemon/eg/runtime/wasi/runtime/ffiegcontainer.Module").
 			NewFunctionBuilder().WithFunc(ffiexec.Exec(func(cmd *exec.Cmd) *exec.Cmd {
 			return nil

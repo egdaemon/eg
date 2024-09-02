@@ -41,6 +41,7 @@ type module struct {
 func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 	var (
 		ws   workspaces.Context
+		aid  = envx.String(uuid.Nil.String(), eg.EnvComputeAccountID)
 		uid  = envx.String(uuid.Nil.String(), eg.EnvComputeRunID)
 		ebuf = make(chan *ffigraph.EventInfo)
 		cc   grpc.ClientConnInterface
@@ -71,6 +72,7 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 		}
 
 		log.Println("---------------------------- ROOT MODULE INITIATED ----------------------------")
+		log.Println("account", aid)
 		log.Println("run id", uid)
 		log.Println("number of cores", runtime.GOMAXPROCS(-1))
 		log.Println("ram available", bytesx.Unit(vmemlimit))
@@ -123,7 +125,7 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 			ws,
 			c8s.ServiceProxyOptionCommandEnviron(
 				errorsx.Zero(
-					envx.Build().FromEnv("PATH", "TERM", "COLORTERM", "LANG", "CI", "EG_CI", "EG_BIN", eg.EnvComputeContainerExec, eg.EnvComputeRunID).Environ(),
+					envx.Build().FromEnv("PATH", "TERM", "COLORTERM", "LANG", "CI", "EG_CI", eg.EnvComputeBin, eg.EnvComputeContainerExec, eg.EnvComputeRunID).Environ(),
 				)...,
 			),
 			c8s.ServiceProxyOptionContainerOptions(
@@ -173,6 +175,7 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 
 	return interp.Remote(
 		gctx.Context,
+		aid,
 		uid,
 		ffigraph.NewListener(ebuf),
 		cc,

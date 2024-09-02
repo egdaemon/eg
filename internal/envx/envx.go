@@ -3,6 +3,7 @@ package envx
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/base64"
 	"encoding/hex"
 	"errors"
@@ -263,6 +264,25 @@ func (t builder) CopyTo(w io.Writer) error {
 		if _, err := fmt.Fprintf(w, "%s\n", e); err != nil {
 			return errorsx.Wrapf(err, "unable to write environment variable: %s", e)
 		}
+	}
+
+	return nil
+}
+
+func (t builder) WriteTo(path string) error {
+	var (
+		buf bytes.Buffer
+	)
+	if t.failed != nil {
+		return t.failed
+	}
+
+	if err := t.CopyTo(&buf); err != nil {
+		return err
+	}
+
+	if err := os.WriteFile(path, buf.Bytes(), 0600); err != nil {
+		return err
 	}
 
 	return nil

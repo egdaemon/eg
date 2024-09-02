@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/langx"
 	"github.com/egdaemon/eg/internal/stringsx"
@@ -65,7 +66,7 @@ func AgentOptionAutoMountHome(home string) AgentOption {
 }
 
 func AgentOptionAutoEGBin() AgentOption {
-	return AgentOptionEGBin(envx.String("", "EG_BIN"))
+	return AgentOptionEGBin(envx.String("", eg.EnvComputeBin))
 }
 
 func AgentOptionEGBin(egbin string) AgentOption {

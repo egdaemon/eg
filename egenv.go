@@ -48,6 +48,7 @@ const (
 	EnvComputeAccountID     = "EG_COMPUTE_ACCOUNT_ID"   // deadline for compute workload
 	EnvComputeTTL           = "EG_COMPUTE_TTL"          // deadline for compute workload
 	EnvComputeContainerExec = "EG_COMPUTE_EXEC_OPTIONS" // CLI options for podman exec
+	EnvComputeBin           = "EG_BIN"
 	EnvScheduleMaximumDelay = "EG_COMPUTE_SCHEDULER_MAXIMUM_DELAY"
 	EnvPingMinimumDelay     = "EG_COMPUTE_PING_MINIMUM_DELAY"
 )

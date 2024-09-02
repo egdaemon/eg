@@ -43,10 +43,11 @@ const (
 )
 
 const (
-	EnvComputeRootModule    = "EG_COMPUTE_ROOT_MODULE" // default is always false, but is set to true for the root module to bootstrap services
-	EnvComputeRunID         = "EG_COMPUTE_RUN_ID"      // run id for the compute workload
-	EnvComputeTTL           = "EG_COMPUTE_TTL"         // deadline for compute workload
-	EnvComputeContainerExec = "EG_EXEC_OPTIONS"        // CLI options for podman exec
+	EnvComputeRootModule    = "EG_COMPUTE_ROOT_MODULE"  // default is always false, but is set to true for the root module to bootstrap services
+	EnvComputeRunID         = "EG_COMPUTE_RUN_ID"       // run id for the compute workload
+	EnvComputeAccountID     = "EG_COMPUTE_ACCOUNT_ID"   // deadline for compute workload
+	EnvComputeTTL           = "EG_COMPUTE_TTL"          // deadline for compute workload
+	EnvComputeContainerExec = "EG_COMPUTE_EXEC_OPTIONS" // CLI options for podman exec
 	EnvScheduleMaximumDelay = "EG_COMPUTE_SCHEDULER_MAXIMUM_DELAY"
 	EnvPingMinimumDelay     = "EG_COMPUTE_PING_MINIMUM_DELAY"
 )

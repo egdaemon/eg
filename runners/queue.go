@@ -385,8 +385,18 @@ func beginwork(ctx context.Context, md metadata, dir string) state {
 	}
 
 	environpath := filepath.Join(ws.Root, ws.RuntimeDir, "environ.env")
-	// environ := errorsx.Zero(envx.FromPath(environpath))
-	// envx.Debug(environ...)
+
+	envb := envx.Build().FromPath(environpath).
+		Var(gitx.EnvAuthEGAccessToken, metadata.AccessToken).
+		Var(eg.EnvComputeRunID, uid).
+		Var(eg.EnvComputeAccountID, metadata.Enqueued.AccountId).
+		Var(eg.EnvComputeTTL, time.Duration(metadata.Enqueued.Ttl).String())
+
+	// envx.Debug(errorsx.Zero(envb.Environ())...)
+
+	if err = envb.WriteTo(environpath); err != nil {
+		return completed(md, tmpdir, ws, uid, 0, errorsx.Wrap(err, "failed to update environment file"))
+	}
 
 	aopts := make([]AgentOption, 0, len(md.agentopts)+32)
 	aopts = append(aopts, md.agentopts...)
@@ -394,7 +404,7 @@ func beginwork(ctx context.Context, md metadata, dir string) state {
 		aopts,
 		AgentOptionEGBin(errorsx.Zero(exec.LookPath(os.Args[0]))),
 		AgentOptionEnviron(environpath),
-		AgentOptionEnv(gitx.EnvAuthEGAccessToken, metadata.AccessToken),
+		AgentOptionCommandLine("--env-file", environpath),
 		AgentOptionCores(metadata.Enqueued.Cores),
 		AgentOptionMemory(metadata.Enqueued.Memory),
 		AgentOptionCommandLine("--cap-add", "NET_ADMIN"), // required for loopback device creation inside the container

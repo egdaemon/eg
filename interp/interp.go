@@ -47,7 +47,7 @@ type runtimefn func(r runner, cmdenv []string, host wazero.HostModuleBuilder) wa
 
 // Remote uses the api to implement particular actions like building and running containers.
 // may not be necessary.
-func Remote(ctx context.Context, runid string, g ffigraph.Eventer, svc grpc.ClientConnInterface, dir string, module string, options ...Option) error {
+func Remote(ctx context.Context, aid string, runid string, g ffigraph.Eventer, svc grpc.ClientConnInterface, dir string, module string, options ...Option) error {
 	var (
 		r = runner{
 			root:       dir,
@@ -68,7 +68,7 @@ func Remote(ctx context.Context, runid string, g ffigraph.Eventer, svc grpc.Clie
 			NewFunctionBuilder().WithFunc(g.Popper()).Export("github.com/egdaemon/eg/runtime/wasi/runtime/graph.Pop").
 			NewFunctionBuilder().WithFunc(ffiegcontainer.Pull(func(ctx context.Context, name, wdir string, options ...string) (err error) {
 			_, err = containers.Pull(ctx, &c8s.PullRequest{
-				Name:    name,
+				Name:    fmt.Sprintf("%s.%s", aid, name),
 				Dir:     wdir,
 				Options: options,
 			})
@@ -79,7 +79,7 @@ func Remote(ctx context.Context, runid string, g ffigraph.Eventer, svc grpc.Clie
 		})).Export("github.com/egdaemon/eg/runtime/wasi/runtime/ffiegcontainer.Pull").
 			NewFunctionBuilder().WithFunc(ffiegcontainer.Build(func(ctx context.Context, name, wdir string, definition string, options ...string) (err error) {
 			_, err = containers.Build(ctx, &c8s.BuildRequest{
-				Name:       name,
+				Name:       fmt.Sprintf("%s.%s", aid, name),
 				Directory:  wdir,
 				Definition: definition,
 				Options:    options,
@@ -97,7 +97,7 @@ func Remote(ctx context.Context, runid string, g ffigraph.Eventer, svc grpc.Clie
 			)
 
 			_, err = containers.Module(ctx, &c8s.ModuleRequest{
-				Image:   name,
+				Image:   fmt.Sprintf("%s.%s", aid, name),
 				Name:    cname,
 				Mdir:    r.runtimedir,
 				Options: options,
@@ -110,7 +110,7 @@ func Remote(ctx context.Context, runid string, g ffigraph.Eventer, svc grpc.Clie
 			NewFunctionBuilder().WithFunc(ffiegcontainer.Run(func(ctx context.Context, name, modulepath string, cmd []string, options ...string) (err error) {
 			cname := fmt.Sprintf("%s.%s", name, md5x.String(modulepath+runid))
 			_, err = containers.Run(ctx, &c8s.RunRequest{
-				Image:   name,
+				Image:   fmt.Sprintf("%s.%s", aid, name),
 				Name:    cname,
 				Command: cmd,
 				Options: options,
@@ -220,8 +220,6 @@ func (t runner) perform(ctx context.Context, runid, path string, rtb runtimefn) 
 		"EG_CACHE_DIRECTORY", envx.String(guestcachedir, "EG_CACHE_DIRECTORY", "CACHE_DIRECTORY"),
 	).WithEnv(
 		"EG_RUNTIME_DIRECTORY", tmpdir,
-	// ).WithEnv(
-	// 	gitx.EnvAuthEGAccessToken, envx.String("", gitx.EnvAuthEGAccessToken),
 	).WithEnv(
 		"RUNTIME_DIRECTORY", guestruntimedir,
 	).WithEnv(

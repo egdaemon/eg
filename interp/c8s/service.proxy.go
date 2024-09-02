@@ -81,7 +81,6 @@ func (t *ProxyService) Build(ctx context.Context, req *BuildRequest) (_ *BuildRe
 		return nil, err
 	}
 
-	log.Println("-------- build directory info --------", abspath, wdir, req.Directory, req.Definition)
 	if err = mayberun(t.prepcmd(cmd)); err != nil {
 		log.Println("unable to exec build command", cmd.String(), err)
 		return nil, err

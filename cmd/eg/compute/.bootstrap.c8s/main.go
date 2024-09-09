@@ -3,14 +3,14 @@ package main
 import (
 	"context"
 	"log"
-	"time"
 
 	"github.com/egdaemon/eg/runtime/wasi/eg"
+	"github.com/egdaemon/eg/runtime/wasi/egenv"
 )
 
 func main() {
 	const cname = "eg.c8s.workload"
-	ctx, done := context.WithTimeout(context.Background(), time.Hour)
+	ctx, done := context.WithTimeout(context.Background(), egenv.TTL())
 	defer done()
 
 	err := eg.Perform(

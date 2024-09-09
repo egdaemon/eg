@@ -76,6 +76,9 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 		log.Println("run id", uid)
 		log.Println("number of cores", runtime.GOMAXPROCS(-1))
 		log.Println("ram available", bytesx.Unit(vmemlimit))
+		// fsx.PrintDir(os.DirFS("/opt"))
+		// fsx.PrintDir(os.DirFS("/opt/egruntime"))
+		// fsx.PrintDir(os.DirFS("/opt/eg/workspace"))
 		// env.Debug(os.Environ()...)
 		defer log.Println("---------------------------- ROOT MODULE COMPLETED ----------------------------")
 

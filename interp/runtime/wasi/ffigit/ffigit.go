@@ -153,7 +153,7 @@ func CloneV2(dir string, runtimedir string) func(
 		}
 
 		environ := envx.NewEnvironFromStrings(env...)
-		envx.Debug(env...)
+		// envx.Debug(env...)
 		autoauth := func() transport.AuthMethod {
 			if auth, err := gitx.LoadCredentials(ctx, uri, runtimedir); auth != nil {
 				log.Println("git access token detected", auth)

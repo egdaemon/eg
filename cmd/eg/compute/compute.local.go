@@ -152,15 +152,6 @@ func (t local) Run(gctx *cmdopts.Global) (err error) {
 		privileged = runners.AgentOptionCommandLine("--privileged")
 	}
 
-	// execx.StringStdout(
-	// 	gctx.Context,
-	// 	"podman info --format '{{.Host.RemoteSocket.Path}}'",
-	// )
-	// execx.StringStdout(
-	// 	gctx.Context,
-	// 	"podman info --format '{{.Store.GraphRoot}}'",
-	// )
-
 	ragent := runners.NewRunner(
 		gctx.Context,
 		ws,
@@ -182,22 +173,19 @@ func (t local) Run(gctx *cmdopts.Global) (err error) {
 		runners.AgentOptionCommandLine("--cap-add", "NET_ADMIN"),  // required for loopback device creation inside the container
 		runners.AgentOptionCommandLine("--cap-add", "SYS_ADMIN"),  // required for rootless container building https://github.com/containers/podman/issues/4056#issuecomment-612893749
 		runners.AgentOptionCommandLine("--device", "/dev/fuse"),
-		// runners.AgentOptionCores(t.RuntimeResources.Cores),
-		// runners.AgentOptionMemory(t.RuntimeResources.Memory),
+		runners.AgentOptionEnv(eg.EnvComputeRootModule, strconv.FormatBool(true)),
+		runners.AgentOptionEnv(eg.EnvComputeRunID, uid.String()),
 	)
 
 	for _, m := range modules {
 		options := append(
 			ragent.Options(),
-			"--env", envx.FormatBool(eg.EnvComputeRootModule, true),
-			"--env", envx.Format(eg.EnvComputeRunID, uid.String()),
-		)
-		options = append(options, runners.AgentOptionVolumeSpecs(
-			runners.AgentMountReadOnly(filepath.Join(ws.Root, ws.BuildDir, "main.wasm.d"), "/opt/egruntime/main.wasm.d"),
-			runners.AgentMountReadOnly(m.Path, "/opt/egmodule.wasm"),
-			runners.AgentMountReadWrite(filepath.Join(ws.Root, ws.WorkingDir), "/opt/eg"),
-			mountegbin,
-		)...)
+			runners.AgentOptionVolumeSpecs(
+				runners.AgentMountReadOnly(filepath.Join(ws.Root, ws.BuildDir, ws.Module, "main.wasm.d"), filepath.Join("/opt/egruntime", ws.Module, "main.wasm.d")),
+				runners.AgentMountReadOnly(m.Path, "/opt/egmodule.wasm"),
+				runners.AgentMountReadWrite(filepath.Join(ws.Root, ws.WorkingDir), "/opt/eg"),
+				mountegbin,
+			)...)
 
 		prepcmd := func(cmd *exec.Cmd) *exec.Cmd {
 			cmd.Dir = ws.Root

@@ -9,36 +9,35 @@ import (
 	"path/filepath"
 	"strconv"
 
+	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/cmd/cmdopts"
-	"github.com/egdaemon/eg/cmd/eg/daemons"
 	"github.com/egdaemon/eg/compile"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/fsx"
 	"github.com/egdaemon/eg/internal/iox"
 	"github.com/egdaemon/eg/internal/wasix"
-	pc8s "github.com/egdaemon/eg/interp/c8s"
+	"github.com/egdaemon/eg/interp/c8s"
 	"github.com/egdaemon/eg/runners"
 	"github.com/egdaemon/eg/transpile"
 	"github.com/egdaemon/eg/workspaces"
 	"github.com/gofrs/uuid"
-	"google.golang.org/grpc"
 )
 
 type c8sLocal struct {
 	cmdopts.RuntimeResources
-	Dir           string   `name:"directory" help:"root directory of the repository" default:"${vars_cwd}"`
-	Containerfile string   `arg:"" help:"path to the container file to run" default:"Containerfile"`
-	SSHKeyPath    string   `name:"sshkeypath" help:"path to ssh key to use" default:"${vars_ssh_key_path}"`
-	Environment   []string `name:"env" short:"e" help:"define environment variables and their values to be included"`
-	GitRemote     string   `name:"git-remote" help:"name of the git remote to use" default:"${vars_git_default_remote_name}"`
-	Endpoint      string   `name:"endpoint" help:"specify the endpoint to upload to" default:"${vars_endpoint}/c/manager/" hidden:"true"`
+	Dir            string   `name:"directory" help:"root directory of the repository" default:"${vars_cwd}"`
+	Containerfile  string   `arg:"" help:"path to the container file to run" default:"Containerfile"`
+	SSHKeyPath     string   `name:"sshkeypath" help:"path to ssh key to use" default:"${vars_ssh_key_path}"`
+	Environment    []string `name:"env" short:"e" help:"define environment variables and their values to be included"`
+	GitRemote      string   `name:"git-remote" help:"name of the git remote to use" default:"${vars_git_default_remote_name}"`
+	Endpoint       string   `name:"endpoint" help:"specify the endpoint to upload to" default:"${vars_endpoint}/c/manager/" hidden:"true"`
+	ContainerCache string   `name:"croot" help:"container storage, ideally we'd be able to share with the host but for now" hidden:"true" default:"${vars_container_cache_directory}"`
 }
 
 func (t c8sLocal) Run(gctx *cmdopts.Global) (err error) {
 	var (
 		tmpdir     string
 		ws         workspaces.Context
-		cc         grpc.ClientConnInterface
 		environio  *os.File
 		uid                            = uuid.Must(uuid.NewV7())
 		sshmount   runners.AgentOption = runners.AgentOptionNoop
@@ -100,8 +99,12 @@ func (t c8sLocal) Run(gctx *cmdopts.Global) (err error) {
 	}
 	defer environio.Close()
 
-	if cc, err = daemons.AutoRunnerClient(
-		gctx,
+	if err = wasix.WarmCacheDirectory(gctx.Context, filepath.Join(ws.Root, ws.BuildDir), wasix.WazCacheDir(filepath.Join(ws.Root, ws.RuntimeDir))); err != nil {
+		log.Println("unable to prewarm wasi directory cache", err)
+	}
+
+	ragent := runners.NewRunner(
+		gctx.Context,
 		ws,
 		uid.String(),
 		mounthome,
@@ -109,33 +112,38 @@ func (t c8sLocal) Run(gctx *cmdopts.Global) (err error) {
 		envvar,
 		sshmount,
 		sshenvvar,
+		runners.AgentOptionVolumes(
+			runners.AgentMountReadWrite(filepath.Join(ws.Root, ws.CacheDir), "/cache"),
+			runners.AgentMountReadWrite(filepath.Join(ws.Root, ws.RuntimeDir), "/opt/egruntime"),
+			runners.AgentMountReadWrite(t.ContainerCache, "/var/lib/containers"),
+		),
 		runners.AgentOptionEnviron(environpath),
-		runners.AgentOptionVolumes(runners.AgentMountReadWrite(filepath.Join(ws.Root, ws.CacheDir), "/cache")),
-	); err != nil {
-		return errorsx.Wrap(err, "unable to setup runner")
-	}
+		runners.AgentOptionCommandLine("--env-file", environpath), // required for tty to work correctly in local mode.
+		runners.AgentOptionCommandLine("--cap-add", "NET_ADMIN"),  // required for loopback device creation inside the container
+		runners.AgentOptionCommandLine("--cap-add", "SYS_ADMIN"),  // required for rootless container building https://github.com/containers/podman/issues/4056#issuecomment-612893749
+		runners.AgentOptionCommandLine("--device", "/dev/fuse"),
+		runners.AgentOptionEnv(eg.EnvComputeRootModule, strconv.FormatBool(true)),
+		runners.AgentOptionEnv(eg.EnvComputeRunID, uid.String()),
+	)
 
-	if err = wasix.WarmCacheDirectory(gctx.Context, filepath.Join(ws.Root, ws.BuildDir), wasix.WazCacheDir(filepath.Join(ws.Root, ws.RuntimeDir))); err != nil {
-		log.Println("unable to prewarm wasi directory cache", err)
+	prepcmd := func(cmd *exec.Cmd) *exec.Cmd {
+		cmd.Dir = ws.Root
+		cmd.Stdout = log.Writer()
+		cmd.Stderr = log.Writer()
+		cmd.Stdin = os.Stdin
+		return cmd
 	}
-
-	runner := pc8s.NewProxyClient(cc)
 
 	for _, m := range modules {
-		options := []string{}
+		options := append(
+			ragent.Options(),
+			runners.AgentOptionVolumeSpecs(
+				runners.AgentMountReadOnly(m.Path, "/opt/egmodule.wasm"),
+				runners.AgentMountReadWrite(filepath.Join(ws.Root, ws.WorkingDir), "/opt/eg"),
+			)...)
 
-		options = append(options,
-			"--volume", runners.AgentMountReadOnly(m.Path, "/opt/egmodule.wasm"),
-			"--cpus", strconv.FormatUint(t.RuntimeResources.Cores, 10),
-		)
-
-		_, err = runner.Module(gctx.Context, &pc8s.ModuleRequest{
-			Image:   "eg",
-			Name:    fmt.Sprintf("eg-%s", uid.String()),
-			Mdir:    ws.BuildDir, // TODO REVISIT THIS.
-			Options: options,
-		})
-
+		// TODO REVISIT using t.ws.RuntimeDir as moduledir.
+		err := c8s.PodmanModule(gctx.Context, prepcmd, "eg", fmt.Sprintf("eg-%s", uid.String()), ws.RuntimeDir, options...)
 		if err != nil {
 			return errorsx.Wrap(err, "module execution failed")
 		}

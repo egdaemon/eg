@@ -5,12 +5,12 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"time"
 
 	"eg/ci/debian"
 
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/runtime/wasi/eg"
+	"github.com/egdaemon/eg/runtime/wasi/egenv"
 	"github.com/egdaemon/eg/runtime/wasi/eggit"
 	"github.com/egdaemon/eg/runtime/wasi/shell"
 )
@@ -37,7 +37,7 @@ func Build(ctx context.Context, _ eg.Op) error {
 }
 
 func main() {
-	ctx, done := context.WithTimeout(context.Background(), time.Hour)
+	ctx, done := context.WithTimeout(context.Background(), egenv.TTL())
 	defer done()
 
 	err := eg.Perform(

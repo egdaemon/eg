@@ -95,6 +95,16 @@ func Clone(ctx context.Context, auth transport.AuthMethod, dir, uri, remote, tre
 	return errorsx.Wrapf(err, "unable to clone: %s - %s", uri, treeish)
 }
 
+// return the clone uri handling quirks of specific forges.
+// aka: github requires the use of the http clone url for its authentication token.
+func QuirkCloneURI(r *git.Repository, name string) (_ string, err error) {
+	uri, err := CanonicalURI(r, name)
+
+	replaced := strings.Replace(uri, "git@github.com:", "https://github.com/", -1)
+
+	return replaced, err
+}
+
 // return the canonical URI for a repository according to eg. which is git@host:repository.git
 func CanonicalURI(r *git.Repository, name string) (_ string, err error) {
 	remote, err := r.Remote(name)

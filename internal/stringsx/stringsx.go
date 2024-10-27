@@ -27,11 +27,13 @@ func DefaultIfBlank(s, defaultValue string) string {
 
 // First get the first value from the array.
 func First(values ...string) string {
-	if len(values) == 0 {
-		return ""
+	for _, s := range values {
+		if strings.TrimSpace(s) != "" {
+			return s
+		}
 	}
 
-	return values[0]
+	return ""
 }
 
 func Blank(s string) bool {

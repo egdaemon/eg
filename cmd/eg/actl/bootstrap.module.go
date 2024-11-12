@@ -2,14 +2,16 @@ package actl
 
 import (
 	"embed"
+	"os"
 	"path/filepath"
 
 	"github.com/egdaemon/eg/cmd/cmdopts"
 	"github.com/egdaemon/eg/compile"
+	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/fsx"
 )
 
-//go:embed .bootstrap.module
+//go:embed all:.bootstrap.module
 var embeddedbootstrapmodule embed.FS
 
 type BootstrapModule struct {
@@ -19,6 +21,10 @@ type BootstrapModule struct {
 
 func (t BootstrapModule) Run(gctx *cmdopts.Global) (err error) {
 	egdir := filepath.Join(t.Dir, t.Relative)
+	if _, err := os.Stat(egdir); err == nil {
+		return errorsx.UserFriendly(errorsx.Errorf("directory already exists, refusing to initialize a new eg module: %s", egdir))
+	}
+
 	if err = fsx.CloneTree(gctx.Context, egdir, ".bootstrap.module", embeddedbootstrapmodule); err != nil {
 		return err
 	}

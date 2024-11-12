@@ -18,8 +18,6 @@ func HelloWorld(ctx context.Context, op eg.Op) error {
 	return nil
 }
 
-// main defines the setup for the CI process. here is where you define all
-// of the environments and tasks you wish to run.
 func main() {
 	ctx, done := context.WithTimeout(context.Background(), egenv.TTL())
 	defer done()

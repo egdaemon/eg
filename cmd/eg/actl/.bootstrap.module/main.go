@@ -15,6 +15,7 @@ func HelloWorld(ctx context.Context, op eg.Op) error {
 	log.Println("debug initiated")
 	defer log.Println("debug completed")
 	env.Debug(os.Environ()...)
+	return nil
 }
 
 // main defines the setup for the CI process. here is where you define all

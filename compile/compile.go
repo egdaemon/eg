@@ -31,6 +31,16 @@ func InitGolang(ctx context.Context, dir string, packages ...string) error {
 	return nil
 }
 
+func InitGolangTidy(ctx context.Context, dir string) error {
+	cmd := exec.CommandContext(ctx, "go", "mod", "tidy")
+	cmd.Dir = dir
+	if err := cmd.Run(); err != nil {
+		return errorsx.Wrapf(err, "unable to tidy go.mod: %s", cmd.Dir)
+	}
+
+	return nil
+}
+
 func FromTranspiled(ctx context.Context, ws workspaces.Context, m ...transpile.Compiled) (modules []transpile.Compiled, err error) {
 	modules = make([]transpile.Compiled, 0, len(m))
 

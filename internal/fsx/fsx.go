@@ -114,6 +114,10 @@ func Clone(ctx context.Context, src string, dst string) (err error) {
 }
 
 func CloneTree(ctx context.Context, dstdir string, rootdir string, archive fs.FS) (err error) {
+	if err = os.MkdirAll(dstdir, 0700); err != nil {
+		return err
+	}
+
 	return fs.WalkDir(archive, rootdir, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err

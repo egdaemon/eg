@@ -2,6 +2,7 @@ package execx
 
 import (
 	"io/fs"
+	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -51,8 +52,10 @@ func LookPath(file string) (string, error) {
 	}
 
 	path := os.Getenv("PATH")
+	log.Println("PATH", path)
 	for _, dir := range filepath.SplitList(path) {
 		path := filepath.Join(dir, file)
+		log.Println("DERP CHECKING", path)
 		if err := findExecutable(path); err == nil {
 			if !filepath.IsAbs(path) {
 				return path, &exec.Error{Name: file, Err: exec.ErrDot}

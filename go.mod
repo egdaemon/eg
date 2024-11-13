@@ -1,6 +1,6 @@
 module github.com/egdaemon/eg
 
-go 1.21
+go 1.23.2
 
 require (
 	github.com/KimMachineGun/automemlimit v0.6.1
@@ -76,7 +76,7 @@ require (
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/posener/complete v1.2.3 // indirect
 	github.com/riywo/loginshell v0.0.0-20200815045211-7d26008be1ab // indirect
-	golang.org/x/mod v0.20.0 // indirect
+	golang.org/x/mod v0.20.0
 	golang.org/x/net v0.28.0 // indirect
 	golang.org/x/text v0.17.0 // indirect
 	google.golang.org/protobuf v1.34.2

@@ -18,9 +18,9 @@ import (
 func AutoCompile() eg.OpFn {
 	return eg.OpFn(func(ctx context.Context, _ eg.Op) error {
 		// golang's wasm implementation doesn't have a reasonable default in place. it defaults to returning not found.
-		path := errorsx.Zero(execx.LookPath("go"))
+		// path := errorsx.Zero(execx.LookPath("go"))
 		for gomod := range modfilex.FindModules(egenv.RootDirectory()) {
-			err := ffiexec.Command(ctx, egenv.RootDirectory(), os.Environ(), path, []string{
+			err := ffiexec.Command(ctx, egenv.RootDirectory(), os.Environ(), "go", []string{
 				"build",
 				fmt.Sprintf("%s/...", filepath.Dir(gomod)),
 			})

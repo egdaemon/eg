@@ -27,11 +27,13 @@ const ErrNotFound = errorsx.String("executable file not found in $path")
 func findExecutable(file string) error {
 	d, err := os.Stat(file)
 	if err != nil {
+		log.Println("finding failed", err)
 		return err
 	}
 	if m := d.Mode(); !m.IsDir() && m&0111 != 0 {
 		return nil
 	}
+	log.Println("finding failed permission")
 	return fs.ErrPermission
 }
 

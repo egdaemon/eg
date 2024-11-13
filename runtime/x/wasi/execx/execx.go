@@ -26,3 +26,7 @@ func String(ctx context.Context, prog string, args ...string) (_ string, err err
 func MaybeRun(c *exec.Cmd) error {
 	return execx.MaybeRun(c)
 }
+
+func LookPath(name string) (string, error) {
+	return execx.LookPath(name)
+}

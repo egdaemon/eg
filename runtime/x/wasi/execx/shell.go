@@ -1,4 +1,4 @@
-package shellx
+package execx
 
 import (
 	"bytes"

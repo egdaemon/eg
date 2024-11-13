@@ -31,4 +31,6 @@ func clone2(
 	remoteptr unsafe.Pointer, remotelen uint32, // string
 	treeishptr unsafe.Pointer, treeishlen uint32, // string
 	envptr unsafe.Pointer, envsize, envlen uint32, // []string
-) (errcode uint32)
+) (errcode uint32) {
+	return ffierrors.ErrNotImplemented
+}

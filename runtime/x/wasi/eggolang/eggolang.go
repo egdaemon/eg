@@ -3,6 +3,7 @@ package eggolang
 import (
 	"context"
 	"fmt"
+	"os"
 	"os/exec"
 	"path/filepath"
 
@@ -11,6 +12,7 @@ import (
 	"github.com/egdaemon/eg/internal/modfilex"
 	"github.com/egdaemon/eg/runtime/wasi/eg"
 	"github.com/egdaemon/eg/runtime/wasi/egenv"
+	"github.com/egdaemon/eg/runtime/wasi/egunsafe/ffiexec"
 )
 
 func AutoCompile() eg.OpFn {
@@ -18,10 +20,15 @@ func AutoCompile() eg.OpFn {
 		// golang's wasm implementation doesn't have a reasonable default in place. it defaults to returning not found.
 		path := errorsx.Zero(execx.LookPath("go"))
 		for gomod := range modfilex.FindModules(egenv.RootDirectory()) {
-			if err := execx.MaybeRun(exec.CommandContext(ctx, path, "build", fmt.Sprintf("%s/...", filepath.Dir(gomod)))); err != nil {
+			err := ffiexec.Command(ctx, egenv.RootDirectory(), os.Environ(), path, []string{
+				"build",
+				fmt.Sprintf("%s/...", filepath.Dir(gomod)),
+			})
+			if err != nil {
 				return errorsx.Wrap(err, "unable to compile")
 			}
 		}
+
 		return nil
 	})
 }

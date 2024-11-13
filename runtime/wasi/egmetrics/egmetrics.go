@@ -3,7 +3,7 @@ package egmetrics
 import (
 	"context"
 
-	"github.com/egdaemon/eg/runtime/wasi/internal/ffimetric"
+	"github.com/egdaemon/eg/runtime/wasi/egunsafe/ffimetric"
 )
 
 // Records a metric payload for the given name. the name

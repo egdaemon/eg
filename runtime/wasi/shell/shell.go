@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/egdaemon/eg/internal/errorsx"
-	"github.com/egdaemon/eg/runtime/wasi/internal/ffiexec"
+	"github.com/egdaemon/eg/runtime/wasi/unsafe/ffiexec"
 )
 
 type Command struct {

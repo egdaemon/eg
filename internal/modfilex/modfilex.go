@@ -45,7 +45,7 @@ func FindModules(root string) iter.Seq[string] {
 			}
 
 			if !yield(filepath.Join(root, path)) {
-				return fmt.Errorf("failed to yield module path: %s", path)
+				return fmt.Errorf("failed to yield module path: %s", filepath.Join(root, path))
 			}
 
 			return nil

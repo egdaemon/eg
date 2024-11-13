@@ -2,7 +2,9 @@
 
 package ffiexec
 
-import "unsafe"
+import (
+	"unsafe"
+)
 
 //go:wasmimport env github.com/egdaemon/eg/runtime/wasi/runtime/ffiexec.Command
 func command(

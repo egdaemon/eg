@@ -9,8 +9,8 @@ import (
 	"unsafe"
 
 	"github.com/egdaemon/eg/internal/errorsx"
-	"github.com/egdaemon/eg/runtime/wasi/internal/ffiegcontainer"
-	"github.com/egdaemon/eg/runtime/wasi/internal/ffigraph"
+	"github.com/egdaemon/eg/runtime/wasi/egunsafe/ffiegcontainer"
+	"github.com/egdaemon/eg/runtime/wasi/egunsafe/ffigraph"
 )
 
 // A reference to an operation.

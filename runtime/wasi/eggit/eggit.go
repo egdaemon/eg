@@ -10,8 +10,8 @@ import (
 
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/runtime/wasi/eg"
+	"github.com/egdaemon/eg/runtime/wasi/egunsafe/ffigit"
 	"github.com/egdaemon/eg/runtime/wasi/env"
-	"github.com/egdaemon/eg/runtime/wasi/internal/ffigit"
 )
 
 type hash [20]byte

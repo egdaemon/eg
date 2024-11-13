@@ -15,8 +15,10 @@ import (
 
 func AutoCompile() eg.OpFn {
 	return eg.OpFn(func(ctx context.Context, _ eg.Op) error {
+		// golang's wasm implementation doesn't have a reasonable default in place. it defaults to returning not found.
+		path := errorsx.Zero(execx.LookPath("go"))
 		for gomod := range modfilex.FindModules(egenv.RootDirectory()) {
-			if err := execx.MaybeRun(exec.CommandContext(ctx, "go", "build", fmt.Sprintf("%s/...", filepath.Dir(gomod)))); err != nil {
+			if err := execx.MaybeRun(exec.CommandContext(ctx, path, "build", fmt.Sprintf("%s/...", filepath.Dir(gomod)))); err != nil {
 				return errorsx.Wrap(err, "unable to compile")
 			}
 		}
@@ -26,8 +28,10 @@ func AutoCompile() eg.OpFn {
 
 func AutoTest() eg.OpFn {
 	return eg.OpFn(func(ctx context.Context, _ eg.Op) error {
+		// golang's wasm implementation doesn't have a reasonable default in place. it defaults to returning not found.
+		path := errorsx.Zero(execx.LookPath("go"))
 		for gomod := range modfilex.FindModules(egenv.RootDirectory()) {
-			if err := execx.MaybeRun(exec.CommandContext(ctx, "go", "test", fmt.Sprintf("%s/...", filepath.Dir(gomod)))); err != nil {
+			if err := execx.MaybeRun(exec.CommandContext(ctx, path, "test", fmt.Sprintf("%s/...", filepath.Dir(gomod)))); err != nil {
 				return errorsx.Wrap(err, "unable to run tests")
 			}
 		}

@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"os/exec"
+
+	"github.com/egdaemon/eg/internal/execx"
 )
 
 func String(ctx context.Context, prog string, args ...string) (_ string, err error) {
@@ -19,4 +21,8 @@ func String(ctx context.Context, prog string, args ...string) (_ string, err err
 	}
 
 	return buf.String(), nil
+}
+
+func MaybeRun(c *exec.Cmd) error {
+	return execx.MaybeRun(c)
 }

@@ -12,6 +12,7 @@ import (
 	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/cmd/cmdopts"
 	"github.com/egdaemon/eg/compile"
+	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/fsx"
 	"github.com/egdaemon/eg/internal/iox"
@@ -123,6 +124,7 @@ func (t c8sLocal) Run(gctx *cmdopts.Global) (err error) {
 		runners.AgentOptionCommandLine("--cap-add", "SYS_ADMIN"),  // required for rootless container building https://github.com/containers/podman/issues/4056#issuecomment-612893749
 		runners.AgentOptionCommandLine("--device", "/dev/fuse"),
 		runners.AgentOptionEnv(eg.EnvComputeRootModule, strconv.FormatBool(true)),
+		runners.AgentOptionEnv(eg.EnvComputeModuleNestedLevel, strconv.Itoa(envx.Int(0, eg.EnvComputeModuleNestedLevel))),
 		runners.AgentOptionEnv(eg.EnvComputeRunID, uid.String()),
 	)
 

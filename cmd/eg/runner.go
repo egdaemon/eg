@@ -55,7 +55,7 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 		return err
 	}
 
-	if envx.Boolean(false, eg.EnvComputeRootModule) {
+	if mlevel := envx.Int(0, eg.EnvComputeModuleNestedLevel); mlevel == 0 || envx.Boolean(false, eg.EnvComputeRootModule) {
 		var (
 			control   net.Listener
 			db        *sql.DB
@@ -141,9 +141,9 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 		}()
 		defer srv.GracefulStop()
 	} else {
-		log.Println("---------------------------- MODULE INITIATED ----------------------------")
+		log.Printf("---------------------------- MODULE INITIATED %d ----------------------------\n", mlevel)
 		// env.Debug(os.Environ()...)
-		defer log.Println("---------------------------- MODULE COMPLETED ----------------------------")
+		defer log.Printf("---------------------------- MODULE COMPLETED %d ----------------------------\n", mlevel)
 	}
 
 	if cc, err = daemons.AutoRunnerClient(gctx, ws, uid, runners.AgentOptionAutoEGBin()); err != nil {

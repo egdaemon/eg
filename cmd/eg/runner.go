@@ -8,7 +8,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
-	"strconv"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/egdaemon/eg"
@@ -56,7 +55,7 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 		return err
 	}
 
-	if mlevel := envx.Int(0, eg.EnvComputeRootModule); mlevel == 0 {
+	if mlevel := envx.Int(0, eg.EnvComputeModuleNestedLevel); mlevel == 0 || envx.Boolean(false, eg.EnvComputeRootModule) {
 		var (
 			control   net.Listener
 			db        *sql.DB
@@ -118,11 +117,10 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 				runners.AgentMountReadWrite("/var/lib/containers", "/var/lib/containers"),
 				runners.AgentMountReadOnly(errorsx.Must(exec.LookPath("/opt/egbin")), "/opt/egbin"),
 			),
-			runners.AgentOptionCommandLine("--cap-add", "NET_ADMIN"),                                                   // required for loopback device creation inside the container
-			runners.AgentOptionCommandLine("--cap-add", "SYS_ADMIN"),                                                   // required for rootless container building https://github.com/containers/podman/issues/4056#issuecomment-612893749
-			runners.AgentOptionCommandLine("--device", "/dev/fuse"),                                                    // required for rootless container building https://github.com/containers/podman/issues/4056#issuecomment-612893749
-			runners.AgentOptionCommandLine("--network", "host"),                                                        // ipv4 group bullshit. pretty sure its a podman 4 issue that was resolved in podman 5. this is 'safe' to do because we are already in a container.
-			runners.AgentOptionEnv(eg.EnvComputeModuleNestedLevel, strconv.Itoa(envx.Int(0, eg.EnvComputeRootModule))), // increment level
+			runners.AgentOptionCommandLine("--cap-add", "NET_ADMIN"), // required for loopback device creation inside the container
+			runners.AgentOptionCommandLine("--cap-add", "SYS_ADMIN"), // required for rootless container building https://github.com/containers/podman/issues/4056#issuecomment-612893749
+			runners.AgentOptionCommandLine("--device", "/dev/fuse"),  // required for rootless container building https://github.com/containers/podman/issues/4056#issuecomment-612893749
+			runners.AgentOptionCommandLine("--network", "host"),      // ipv4 group bullshit. pretty sure its a podman 4 issue that was resolved in podman 5. this is 'safe' to do because we are already in a container.
 		)
 
 		c8s.NewServiceProxy(

@@ -18,6 +18,7 @@ import (
 
 	"github.com/egdaemon/eg/internal/debugx"
 	"github.com/egdaemon/eg/internal/errorsx"
+	"github.com/egdaemon/eg/internal/numericx"
 	"github.com/egdaemon/eg/internal/slicesx"
 )
 
@@ -398,6 +399,11 @@ func Format[T ~string](k string, v T, options ...func(*formatopts)) string {
 // see format
 func FormatBool(k string, v bool, options ...func(*formatopts)) string {
 	return Format(k, strconv.FormatBool(v), options...)
+}
+
+// see format
+func FormatInt[T numericx.Integer](k string, v T, options ...func(*formatopts)) string {
+	return Format(k, fmt.Sprintf("%d", v), options...)
 }
 
 // returns the os.Environ or an empty slice if b is false.

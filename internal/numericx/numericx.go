@@ -1,6 +1,17 @@
 package numericx
 
-func Max[T int | int8 | int16 | int32 | int64 | ~uint | ~uint8 | ~uint16 | ~uint32 | ~uint64 | ~uintptr | float32 | float64](first T, values ...T) T {
+type Integer interface {
+	int | int8 | int16 | int32 | int64 | ~uint | ~uint8 | ~uint16 | ~uint32 | ~uint64
+}
+
+type Float interface {
+	float32 | float64
+}
+type Numeric interface {
+	Integer | Float | ~uintptr
+}
+
+func Max[T Numeric](first T, values ...T) T {
 	cmp := first
 	for _, v := range values {
 		if cmp > v {
@@ -12,7 +23,7 @@ func Max[T int | int8 | int16 | int32 | int64 | ~uint | ~uint8 | ~uint16 | ~uint
 	return cmp
 }
 
-func Min[T int | int8 | int16 | int32 | int64 | ~uint | ~uint8 | ~uint16 | ~uint32 | ~uint64 | ~uintptr | float32 | float64](first T, values ...T) T {
+func Min[T Numeric](first T, values ...T) T {
 	cmp := first
 	for _, v := range values {
 		if cmp < v {

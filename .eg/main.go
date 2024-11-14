@@ -12,7 +12,7 @@ import (
 	"github.com/egdaemon/eg/runtime/wasi/eggit"
 	"github.com/egdaemon/eg/runtime/wasi/env"
 	"github.com/egdaemon/eg/runtime/wasi/shell"
-	"github.com/egdaemon/eg/runtime/x/wasi/shellx"
+	"github.com/egdaemon/eg/runtime/x/wasi/execx"
 )
 
 func Debug(ctx context.Context, op eg.Op) error {
@@ -44,7 +44,7 @@ func main() {
 	ctx, done := context.WithTimeout(context.Background(), time.Hour)
 	defer done()
 
-	if s, err := shellx.String(ctx, "/usr/bin/echo", "hello world"); err == nil {
+	if s, err := execx.String(ctx, "/usr/bin/echo", "hello world"); err == nil {
 		log.Println("shell output", s)
 	}
 
@@ -60,6 +60,7 @@ func main() {
 		eg.Parallel(
 			eg.Module(ctx, debian.Builder(debian.ContainerName, "jammy"), debian.Build),
 			eg.Module(ctx, debian.Builder(debian.ContainerName, "noble"), debian.Build),
+			eg.Module(ctx, debian.Builder(debian.ContainerName, "ocular"), debian.Build),
 			// eg.Module(ctx, archlinux.Builder(archlinux.ContainerName), archlinux.Build),
 		),
 	)

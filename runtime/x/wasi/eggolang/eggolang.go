@@ -3,22 +3,47 @@ package eggolang
 import (
 	"context"
 	"fmt"
+	"go/build"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/egdaemon/eg/internal/errorsx"
+	"github.com/egdaemon/eg/internal/langx"
 	"github.com/egdaemon/eg/internal/modfilex"
 	"github.com/egdaemon/eg/runtime/wasi/eg"
 	"github.com/egdaemon/eg/runtime/wasi/egenv"
 	"github.com/egdaemon/eg/runtime/wasi/egunsafe/ffiexec"
 )
 
-func AutoCompile() eg.OpFn {
+type CompileOption func(*compileOption)
+
+func CompileOptionTags(tags ...string) CompileOption {
+	return func(c *compileOption) {
+		c.bctx.BuildTags = tags
+	}
+}
+
+type compileOption struct {
+	bctx build.Context
+}
+
+func AutoCompile(options ...CompileOption) eg.OpFn {
+	var (
+		tags  string
+		copts compileOption
+	)
+	copts = langx.Clone(copts, options...)
+	if len(copts.bctx.BuildTags) > 0 {
+		tags = fmt.Sprintf("-tags=%s", strings.Join(copts.bctx.BuildTags, ","))
+	}
+
 	return eg.OpFn(func(ctx context.Context, _ eg.Op) error {
 		// golang's wasm implementation doesn't have a reasonable default in place. it defaults to returning not found.
 		for gomod := range modfilex.FindModules(egenv.RootDirectory()) {
 			err := ffiexec.Command(ctx, egenv.RootDirectory(), os.Environ(), "go", []string{
 				"build",
+				tags,
 				fmt.Sprintf("%s/...", filepath.Dir(gomod)),
 			})
 			if err != nil {
@@ -30,12 +55,35 @@ func AutoCompile() eg.OpFn {
 	})
 }
 
-func AutoTest() eg.OpFn {
+type TestOption func(*testOption)
+
+func TestOptionTags(tags ...string) TestOption {
+	return func(c *testOption) {
+		c.bctx.BuildTags = tags
+	}
+}
+
+type testOption struct {
+	bctx build.Context
+}
+
+func AutoTest(options ...TestOption) eg.OpFn {
+	var (
+		tags string
+		opts testOption
+	)
+
+	opts = langx.Clone(opts, options...)
+	if len(opts.bctx.BuildTags) > 0 {
+		tags = fmt.Sprintf("-tags=%s", strings.Join(opts.bctx.BuildTags, ","))
+	}
+
 	return eg.OpFn(func(ctx context.Context, _ eg.Op) error {
 		// golang's wasm implementation doesn't have a reasonable default in place. it defaults to returning not found.
 		for gomod := range modfilex.FindModules(egenv.RootDirectory()) {
 			err := ffiexec.Command(ctx, egenv.RootDirectory(), os.Environ(), "go", []string{
 				"test",
+				tags,
 				fmt.Sprintf("%s/...", filepath.Dir(gomod)),
 			})
 			if err != nil {

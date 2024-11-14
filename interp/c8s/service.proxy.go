@@ -8,7 +8,9 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/internal/debugx"
+	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/langx"
 	"github.com/egdaemon/eg/internal/slicesx"
@@ -139,6 +141,7 @@ func (t *ProxyService) Module(ctx context.Context, req *ModuleRequest) (_ *Modul
 	options = append(
 		options,
 		"--volume", "/opt/eg:/opt/eg:rw",
+		"--env", envx.FormatInt(eg.EnvComputeModuleNestedLevel, envx.Int(0, eg.EnvComputeModuleNestedLevel)+1), // increment level
 	)
 
 	if err = PodmanModule(ctx, t.prepcmd, req.Image, req.Name, req.Mdir, options...); err != nil {

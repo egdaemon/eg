@@ -96,6 +96,7 @@ func Build() eg.OpFn {
 			prepare,
 			build("jammy"),
 			build("noble"),
+			build("ocular"),
 		)
 	}
 }

@@ -6,17 +6,17 @@ ENV DEBIAN_FRONTEND=noninteractive
 RUN apt update
 
 # general utilities
-RUN apt install -y software-properties-common build-essential ca-certificates curl
+RUN apt install -o Acquire::ForceIPv4=true -y software-properties-common build-essential ca-certificates curl
 RUN add-apt-repository -n ppa:longsleep/golang-backports
 RUN add-apt-repository -n ppa:egdaemon/eg
 RUN add-apt-repository -n ppa:egdaemon/duckdb
 RUN apt update
 
-RUN apt install -y --no-install-recommends curl gnupg2 lsb-release iproute2 git apt-file pinentry-tty uidmap dbus-user-session
-RUN apt install -y --no-install-recommends ssh podman rsync vim golang-1.23 eg tree fuse-overlayfs
+RUN apt install -o Acquire::ForceIPv4=true -y --no-install-recommends curl gnupg2 lsb-release iproute2 git apt-file pinentry-tty uidmap dbus-user-session
+RUN apt install -o Acquire::ForceIPv4=true -y --no-install-recommends ssh podman rsync vim golang-1.23 eg tree fuse-overlayfs
 # dependencies for duckdb while bootstrapping
-RUN apt install -y --no-install-recommends cmake ninja-build ccache dput devscripts dh-make dput libssl-dev
-RUN apt install -y --no-install-recommends duckdb
+RUN apt install -o Acquire::ForceIPv4=true -y --no-install-recommends cmake ninja-build ccache dput devscripts dh-make dput libssl-dev
+RUN apt install -o Acquire::ForceIPv4=true -y --no-install-recommends duckdb
 
 # properly link golang into the path.
 RUN ln -s /usr/lib/go-1.23/bin/go /usr/local/bin/go

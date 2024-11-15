@@ -13,10 +13,13 @@ RUN add-apt-repository -n ppa:egdaemon/duckdb
 RUN apt update
 
 RUN apt install -y --no-install-recommends curl gnupg2 lsb-release iproute2 git apt-file pinentry-tty uidmap dbus-user-session
-RUN apt install -y --no-install-recommends ssh podman rsync vim golang-1.22 eg tree fuse-overlayfs
+RUN apt install -y --no-install-recommends ssh podman rsync vim golang-1.23 eg tree fuse-overlayfs
 # dependencies for duckdb while bootstrapping
 RUN apt install -y --no-install-recommends cmake ninja-build ccache dput devscripts dh-make dput libssl-dev
 RUN apt install -y --no-install-recommends duckdb
+
+# properly link golang into the path.
+RUN ln -s /usr/lib/go-1.23/bin/go /usr/local/bin/go
 
 # preload some well known hosts
 RUN ssh-keyscan -H github.com >> /etc/ssh/ssh_known_hosts

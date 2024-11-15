@@ -21,6 +21,7 @@ import (
 	"github.com/dave/jennifer/jen"
 	"github.com/egdaemon/eg/astbuild"
 	"github.com/egdaemon/eg/astcodec"
+	"github.com/egdaemon/eg/internal/debugx"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/iox"
 	"github.com/egdaemon/eg/workspaces"
@@ -270,9 +271,9 @@ func (t golang) Run(ctx context.Context) (roots []Compiled, err error) {
 		main.Type.Params.Opening = token.NoPos
 
 		result := astcodec.ReplaceFunction(o, main, astcodec.FindFunctionsByName("main"))
-		log.Println("workspace", spew.Sdump(t.Context.Workspace))
-		log.Println("root", t.Context.Workspace.Root)
-		log.Println("original", m.fname)
+		debugx.Println("workspace", spew.Sdump(t.Context.Workspace))
+		debugx.Println("root", t.Context.Workspace.Root)
+		debugx.Println("original", m.fname)
 
 		if err = rewrite(fset.File(result.Pos()), filepath.Join(t.Context.Workspace.Root, m.fname), result); err != nil {
 			return roots, err

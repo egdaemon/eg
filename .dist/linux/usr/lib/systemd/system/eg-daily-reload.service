@@ -15,7 +15,7 @@ CacheDirectory=%p
 ConfigurationDirectory=%p
 RuntimeDirectory=%p
 RuntimeDirectoryMode=0700
-ExecStart=/usr/bin/systemctl reload eg-daemon.service eg-scheduling.service
+ExecStart=/usr/bin/systemctl restart eg-daemon.service
 
 [Install]
 WantedBy=apt-daily-upgrade.timer

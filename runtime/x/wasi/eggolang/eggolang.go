@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/langx"
 	"github.com/egdaemon/eg/internal/modfilex"
@@ -38,10 +39,18 @@ func AutoCompile(options ...CompileOption) eg.OpFn {
 		tags = fmt.Sprintf("-tags=%s", strings.Join(copts.bctx.BuildTags, ","))
 	}
 
-	return eg.OpFn(func(ctx context.Context, _ eg.Op) error {
+	return eg.OpFn(func(ctx context.Context, _ eg.Op) (err error) {
+		var (
+			goenv []string
+		)
+
+		if goenv, err = Env(); err != nil {
+			return err
+		}
+
 		// golang's wasm implementation doesn't have a reasonable default in place. it defaults to returning not found.
 		for gomod := range modfilex.FindModules(egenv.RootDirectory()) {
-			err := ffiexec.Command(ctx, egenv.RootDirectory(), os.Environ(), "go", []string{
+			err := ffiexec.Command(ctx, egenv.RootDirectory(), goenv, "go", []string{
 				"build",
 				tags,
 				fmt.Sprintf("%s/...", filepath.Dir(gomod)),
@@ -78,10 +87,18 @@ func AutoTest(options ...TestOption) eg.OpFn {
 		tags = fmt.Sprintf("-tags=%s", strings.Join(opts.bctx.BuildTags, ","))
 	}
 
-	return eg.OpFn(func(ctx context.Context, _ eg.Op) error {
+	return eg.OpFn(func(ctx context.Context, _ eg.Op) (err error) {
+		var (
+			goenv []string
+		)
+
+		if goenv, err = Env(); err != nil {
+			return err
+		}
+
 		// golang's wasm implementation doesn't have a reasonable default in place. it defaults to returning not found.
 		for gomod := range modfilex.FindModules(egenv.RootDirectory()) {
-			err := ffiexec.Command(ctx, egenv.RootDirectory(), os.Environ(), "go", []string{
+			err := ffiexec.Command(ctx, egenv.RootDirectory(), goenv, "go", []string{
 				"test",
 				tags,
 				fmt.Sprintf("%s/...", filepath.Dir(gomod)),
@@ -92,4 +109,8 @@ func AutoTest(options ...TestOption) eg.OpFn {
 		}
 		return nil
 	})
+}
+
+func Env() ([]string, error) {
+	return envx.Build().FromEnv(os.Environ()...).Var("GOCACHE", egenv.CacheDirectory("golang")).Environ()
 }

@@ -12,11 +12,12 @@ import (
 	"github.com/egdaemon/eg/internal/debugx"
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
+	"github.com/egdaemon/eg/internal/execx"
 	"github.com/egdaemon/eg/internal/langx"
 	"github.com/egdaemon/eg/internal/slicesx"
 	"github.com/egdaemon/eg/internal/stringsx"
 	"github.com/egdaemon/eg/workspaces"
-	grpc "google.golang.org/grpc"
+	"google.golang.org/grpc"
 )
 
 type ServiceProxyOption func(*ProxyService)
@@ -82,7 +83,7 @@ func (t *ProxyService) Build(ctx context.Context, req *BuildRequest) (_ *BuildRe
 		return nil, err
 	}
 
-	if err = mayberun(t.prepcmd(cmd)); err != nil {
+	if err = execx.MaybeRun(t.prepcmd(cmd)); err != nil {
 		log.Println("unable to exec build command", cmd.String(), err)
 		return nil, err
 	}
@@ -103,7 +104,7 @@ func (t *ProxyService) Pull(ctx context.Context, req *PullRequest) (resp *PullRe
 		return nil, err
 	}
 
-	if err = mayberun(t.prepcmd(cmd)); err != nil {
+	if err = execx.MaybeRun(t.prepcmd(cmd)); err != nil {
 		return nil, err
 	}
 

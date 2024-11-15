@@ -4,28 +4,18 @@ import (
 	context "context"
 	"io"
 	"log"
-	"os"
 	"os/exec"
 	"time"
 
 	"github.com/egdaemon/eg"
-	"github.com/egdaemon/eg/internal/debugx"
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
+	"github.com/egdaemon/eg/internal/execx"
 )
 
 func silence(c *exec.Cmd) *exec.Cmd {
 	c.Stdout = io.Discard
 	return c
-}
-
-func mayberun(c *exec.Cmd) error {
-	if c == nil {
-		return nil
-	}
-
-	debugx.Println("---------------", errorsx.Must(os.Getwd()), "running", c.Dir, "->", c.String(), "---------------")
-	return c.Run()
 }
 
 func cleanup(ctx context.Context, cmdctx func(*exec.Cmd) *exec.Cmd, cname string) {
@@ -34,14 +24,14 @@ func cleanup(ctx context.Context, cmdctx func(*exec.Cmd) *exec.Cmd, cname string
 
 	// don't care about this error; if the container doesn't exist its fine; if something
 	// actually prevented it from being stopped then our startup command will fail.
-	if err := mayberun(silence(cmdctx(exec.CommandContext(cctx, "podman", "stop", cname)))); err != nil {
+	if err := execx.MaybeRun(silence(cmdctx(exec.CommandContext(cctx, "podman", "stop", cname)))); err != nil {
 		log.Println(err)
 		return
 	}
 
 	// don't care about this error; if the container doesn't exist its fine; if something
 	// actually prevented it from being removed then our startup command will fail.
-	if err := mayberun(silence(cmdctx(exec.CommandContext(cctx, "podman", "rm", cname)))); err != nil {
+	if err := execx.MaybeRun(silence(cmdctx(exec.CommandContext(cctx, "podman", "rm", cname)))); err != nil {
 		log.Println(err)
 		return
 	}
@@ -82,7 +72,7 @@ func PodmanRun(ctx context.Context, cmdctx func(*exec.Cmd) *exec.Cmd, image, cna
 	cmd.Args = append(cmd.Args, image)
 	cmd.Args = append(cmd.Args, command...)
 
-	if err = mayberun(cmdctx(cmd)); err != nil {
+	if err = execx.MaybeRun(cmdctx(cmd)); err != nil {
 		return err
 	}
 
@@ -102,7 +92,7 @@ func PodmanModule(ctx context.Context, cmdctx func(*exec.Cmd) *exec.Cmd, image, 
 		PodmanModuleRunCmd(image, cname, moduledir, options...)...,
 	))
 
-	if err = mayberun(cmd); err != nil {
+	if err = execx.MaybeRun(cmd); err != nil {
 		return errorsx.Wrap(err, "unable to run container")
 	}
 
@@ -112,7 +102,7 @@ func PodmanModule(ctx context.Context, cmdctx func(*exec.Cmd) *exec.Cmd, image, 
 		PodmanModuleExecCmd(cname, moduledir)...,
 	))
 
-	if err = mayberun(cmd); err != nil {
+	if err = execx.MaybeRun(cmd); err != nil {
 		return errorsx.Wrap(err, "unable to exec module")
 	}
 

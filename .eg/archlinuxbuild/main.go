@@ -4,16 +4,16 @@ import (
 	"context"
 	"eg/ci/archlinux"
 	"log"
-	"time"
 
 	"github.com/egdaemon/eg/runtime/wasi/eg"
+	"github.com/egdaemon/eg/runtime/wasi/egenv"
 	"github.com/egdaemon/eg/runtime/wasi/eggit"
 )
 
 // main defines the setup for the CI process. here is where you define all
 // of the environments and tasks you wish to run.
 func main() {
-	ctx, done := context.WithTimeout(context.Background(), time.Hour)
+	ctx, done := context.WithTimeout(context.Background(), egenv.TTL())
 	defer done()
 
 	err := eg.Perform(

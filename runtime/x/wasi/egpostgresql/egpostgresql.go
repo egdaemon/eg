@@ -29,8 +29,8 @@ func RecreateDatabase(name string) eg.OpFn {
 		runtime := shell.Runtime()
 		return shell.Run(
 			ctx,
-			runtime.Newf("psql --no-psqlrc -d postgres -c \"DROP DATABASE IF EXISTS '%s' WITH (FORCE)\"", name),
-			runtime.Newf("psql --no-psqlrc -d postgres -c \"CREATE DATABASE '%s'\"", name),
+			runtime.Newf("psql --no-psqlrc -d postgres -c \"DROP DATABASE IF EXISTS \"%s\" WITH (FORCE)\"", name),
+			runtime.Newf("psql --no-psqlrc -d postgres -c \"CREATE DATABASE \"%s\"\"", name),
 		)
 	}
 }
@@ -41,7 +41,7 @@ func InsertSuperuser(name string) eg.OpFn {
 		runtime := shell.Runtime()
 		return shell.Run(
 			ctx,
-			runtime.Newf("psql --no-psqlrc -d postgres -c \"CREATE ROLE '%s' WITH SUPERUSER LOGIN\"'", name),
+			runtime.Newf("psql --no-psqlrc -d postgres -c \"CREATE ROLE \"%s\" WITH SUPERUSER LOGIN\"", name),
 		)
 	}
 }

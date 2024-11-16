@@ -111,6 +111,10 @@ func AutoTest(options ...TestOption) eg.OpFn {
 	})
 }
 
+func CacheDirectory() string {
+	return egenv.CacheDirectory("golang")
+}
+
 func Env() ([]string, error) {
-	return envx.Build().FromEnv(os.Environ()...).Var("GOCACHE", egenv.CacheDirectory("golang")).Environ()
+	return envx.Build().FromEnv(os.Environ()...).Var("GOCACHE", CacheDirectory()).Environ()
 }

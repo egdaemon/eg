@@ -58,7 +58,7 @@ func Builder(name string, distro string) eg.ContainerRunner {
 		OptionEnv("DISTRO", distro).
 		OptionEnv("CHANGELOG_DATE", c.Committer.When.Format(time.RFC1123Z)).
 		OptionEnv("GOCACHE", egenv.CacheDirectory("golang")).
-		OptionEnv("GOMODCACHE", egenv.CacheDirectory("go", "pkg", "mod")).
+		OptionEnv("GOMODCACHE", egenv.CacheDirectory("golang", "mod")).
 		OptionVolumeWritable(
 			".eg/.cache/.dist", "/opt/eg/.dist",
 		).

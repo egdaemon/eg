@@ -5,29 +5,13 @@ import (
 	"eg/ci/archlinux"
 	"eg/ci/debian"
 	"log"
-	"os"
-	"time"
 
 	"github.com/egdaemon/eg/runtime/wasi/eg"
+	"github.com/egdaemon/eg/runtime/wasi/egenv"
 	"github.com/egdaemon/eg/runtime/wasi/eggit"
-	"github.com/egdaemon/eg/runtime/wasi/env"
 	"github.com/egdaemon/eg/runtime/wasi/shell"
 	"github.com/egdaemon/eg/runtime/x/wasi/execx"
 )
-
-func Debug(ctx context.Context, op eg.Op) error {
-	log.Println("debug initiated")
-	defer log.Println("debug completed")
-	env.Debug(os.Environ()...)
-	return shell.Run(
-		ctx,
-		shell.New("tree -a -L 1 /opt"),
-		shell.New("tree -a -L 2 /opt/egruntime"),
-		shell.New("ls -lha /opt/egruntime"),
-		shell.New("ls -lha /cache"),
-		shell.New("ls -lha /root"),
-	)
-}
 
 func Prepare(ctx context.Context, op eg.Op) error {
 	return shell.Run(
@@ -39,7 +23,7 @@ func Prepare(ctx context.Context, op eg.Op) error {
 }
 
 func main() {
-	ctx, done := context.WithTimeout(context.Background(), time.Hour)
+	ctx, done := context.WithTimeout(context.Background(), egenv.TTL())
 	defer done()
 
 	if s, err := execx.String(ctx, "/usr/bin/echo", "hello world"); err == nil {
@@ -48,7 +32,6 @@ func main() {
 
 	err := eg.Perform(
 		ctx,
-		Debug,
 		eggit.AutoClone,
 		Prepare,
 		eg.Parallel(
@@ -59,7 +42,7 @@ func main() {
 			eg.Module(ctx, debian.Builder(debian.ContainerName, "jammy"), debian.Build),
 			eg.Module(ctx, debian.Builder(debian.ContainerName, "noble"), debian.Build),
 			eg.Module(ctx, debian.Builder(debian.ContainerName, "ocular"), debian.Build),
-			// eg.Module(ctx, archlinux.Builder(archlinux.ContainerName), archlinux.Build),
+			eg.Module(ctx, archlinux.Builder(archlinux.ContainerName), archlinux.Build),
 		),
 	)
 

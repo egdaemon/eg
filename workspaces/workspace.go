@@ -92,12 +92,14 @@ func New(ctx context.Context, root string, mdir string, name string) (zero Conte
 }
 
 func ensuredirs(c Context) (_ Context, err error) {
+	// need to ensure that certain directories and files exists
+	// since they're mounted into containers.
 	return c, fsx.MkDirs(
 		0700,
 		filepath.Join(c.Root, c.RuntimeDir),
 		filepath.Join(c.Root, c.WorkingDir),
 		filepath.Join(c.Root, c.GenModDir),
-		filepath.Join(c.Root, c.BuildDir),
+		filepath.Join(c.Root, c.BuildDir, "main.wasm.d"),
 		filepath.Join(c.Root, c.CacheDir),
 	)
 }

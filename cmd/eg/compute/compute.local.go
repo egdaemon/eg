@@ -182,7 +182,10 @@ func (t local) Run(gctx *cmdopts.Global) (err error) {
 		options := append(
 			ragent.Options(),
 			runners.AgentOptionVolumeSpecs(
-				runners.AgentMountReadOnly(filepath.Join(ws.Root, ws.BuildDir, ws.Module, "main.wasm.d"), filepath.Join("/opt/egruntime", ws.Module, "main.wasm.d")),
+				runners.AgentMountReadOnly(
+					filepath.Join(ws.Root, ws.BuildDir, ws.Module, "main.wasm.d"),
+					filepath.Join("/opt/egruntime", ws.Module, "main.wasm.d"),
+				),
 				runners.AgentMountReadOnly(m.Path, "/opt/egmodule.wasm"),
 				runners.AgentMountReadWrite(filepath.Join(ws.Root, ws.WorkingDir), "/opt/eg"),
 				mountegbin,

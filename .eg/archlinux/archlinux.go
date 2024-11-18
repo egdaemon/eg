@@ -19,23 +19,22 @@ func Builder(name string) eg.ContainerRunner {
 }
 
 func Build(ctx context.Context, _ eg.Op) error {
-	gocache := egenv.CacheDirectory("golang", "pkg")
-	gomodcache := egenv.CacheDirectory("golang", "mod")
+	cdir := egenv.CacheDirectory(".dist", "pacman")
+	templatedir := egenv.RootDirectory(".dist", "archlinux")
 	bdir := egenv.EphemeralDirectory(".build")
-	pkgdest := egenv.CacheDirectory("pacman")
+	pkgdest := egenv.EphemeralDirectory("pacman")
 	golang := shell.Runtime().
-		Environ("GOCACHE", gocache).
-		Environ("GOMODCACHE", gomodcache).
 		Environ("PKGDEST", pkgdest).
 		Environ("PACKAGER", fmt.Sprintf("%s <%s>", maintainer.Name, maintainer.Email))
 
 	return shell.Run(
 		ctx,
-		golang.Newf("mkdir -p %s %s", bdir, gocache),
-		golang.Newf("chmod 0777 %s %s %s", gocache, pkgdest, egenv.EphemeralDirectory()),
-		golang.Newf("rsync --recursive /opt/eg/.dist/archlinux/ %s", bdir),
+		golang.Newf("echo %s", templatedir),
+		golang.Newf("sudo -E -u build rsync --recursive %s/ %s", templatedir, bdir),
 		golang.Newf("chown -R build:root %s", bdir),
-		golang.Directory(bdir).New("sudo -E -u build makepkg -f -c -C"),
-		golang.Newf("paccache -c %s -rk1", pkgdest),
+		golang.Newf("sudo -u build mkdir -p %s", pkgdest),
+		golang.Directory(bdir).New("sudo --preserve-env=PKGDEST,PACKAGER -u build makepkg -f -c -C"),
+		golang.Newf("rsync --recursive %s/ %s", pkgdest, cdir),
+		golang.Newf("paccache -c %s -rk2", cdir),
 	)
 }

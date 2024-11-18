@@ -10,7 +10,7 @@ override_dh_auto_build:
 	echo "DH AUTO BUILD OVERRIDE ${CMAKE_BUILD_PARALLEL_LEVEL}"
 	export CMAKE_BUILD_PARALLEL_LEVEL="$(nproc)"
 	mkdir -p duckdb
-	GEN=ninja OVERRIDE_GIT_DESCRIBE="v${PACKAGE_VERSION}" BUILD_JSON="1" make -C src
+	GEN=ninja OVERRIDE_GIT_DESCRIBE="v${PACKAGE_VERSION}" BUILD_JSON="1" BUILD_ICU="1" BUILD_INET="1" make -C src
 	DESTDIR="duckdb" cmake --install src/build/release
 	tree -L 2 .
 	tree duckdb

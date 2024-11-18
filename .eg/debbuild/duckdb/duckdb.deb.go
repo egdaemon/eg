@@ -11,7 +11,6 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
-	"strconv"
 	"time"
 
 	"github.com/egdaemon/eg/runtime/wasi/eg"
@@ -32,11 +31,10 @@ func prepare(ctx context.Context, _ eg.Op) error {
 	log.Println("-------------------------------------------", "BDIR", relpath, runtime.NumCPU(), count, "-------------------------------------------")
 
 	sruntime := shell.Runtime().
-		Directory(relpath).Environ("CMAKE_BUILD_PARALLEL_LEVEL", strconv.Itoa(runtime.NumCPU()))
+		Directory(relpath)
 
 	return shell.Run(
 		ctx,
-		sruntime.New("tree ."),
 		sruntime.New("git clone git@github.com:duckdb/duckdb duckdb"),
 		// TODO: get cores working properly.
 		// sruntime.Newf("echo make -C duckdb -j %d bundle-library", runtime.NumCPU()),
@@ -66,8 +64,8 @@ func build(distro string) eg.OpFn {
 		runtime := shell.Runtime().
 			Directory(relpath).
 			Environ("DEB_PACKAGE_NAME", "duckdb").
-			Environ("PACKAGE_VERSION", "1.0.0").
-			Environ("DEB_VERSION", fmt.Sprintf("1.0.0.%d", c.Committer.When.Add(dynamicduration(10*time.Second, distro)).UnixMilli())).
+			Environ("PACKAGE_VERSION", "1.1.3").
+			Environ("DEB_VERSION", fmt.Sprintf("1.1.3.%d", c.Committer.When.Add(dynamicduration(10*time.Second, distro)).UnixMilli())).
 			Environ("DEB_DISTRO", distro).
 			Environ("DEB_CHANGELOG_DATE", c.Committer.When.Format(time.RFC1123Z)).
 			Environ("DEB_EMAIL", maintainer.Email).
@@ -76,14 +74,12 @@ func build(distro string) eg.OpFn {
 		return shell.Run(
 			ctx,
 			runtime.New("rsync --verbose --progress --recursive --perms ../../duckdb/ src/"),
-			runtime.New("tree -L 2 ."),
 			runtime.New("cat debian/changelog | envsubst | tee debian/changelog"),
 			runtime.New("cat debian/control | envsubst | tee debian/control"),
 			runtime.New("cat debian/rules | envsubst | tee debian/rules"),
 			runtime.New("cat debian/changelog"),
 			runtime.Newf("debuild -S -k%s", maintainer.GPGFingerprint),
-			runtime.New("tree -L 2 .."),
-			runtime.New("dput -f -c dput.config duckdb ../duckdb_${DEB_VERSION}_source.changes"),
+			runtime.New("dput -d -f -P -c dput.config duckdb ../duckdb_${DEB_VERSION}_source.changes"),
 		)
 	}
 }
@@ -94,7 +90,7 @@ func Build() eg.OpFn {
 		return eg.Perform(
 			ctx,
 			prepare,
-			build("jammy"),
+			// build("jammy"),
 			build("noble"),
 			build("ocular"),
 		)

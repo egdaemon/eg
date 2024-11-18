@@ -99,7 +99,7 @@ func ensuredirs(c Context) (_ Context, err error) {
 		filepath.Join(c.Root, c.RuntimeDir),
 		filepath.Join(c.Root, c.WorkingDir),
 		filepath.Join(c.Root, c.GenModDir),
-		filepath.Join(c.Root, c.BuildDir, "main.wasm.d"),
+		filepath.Join(c.Root, c.BuildDir, c.Module, "main.wasm.d"),
 		filepath.Join(c.Root, c.CacheDir),
 	)
 }

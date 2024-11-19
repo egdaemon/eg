@@ -14,10 +14,13 @@ import (
 	"github.com/pkg/errors"
 )
 
+const defaultPerms = 0700 | os.ModeSetgid
+
 type SpoolDirs struct {
 	Downloading string
 	Queued      string
 	Running     string
+	Tombstoned  string
 }
 
 func DefaultSpoolDirs() SpoolDirs {
@@ -26,9 +29,10 @@ func DefaultSpoolDirs() SpoolDirs {
 		Downloading: filepath.Join(root, "d"),
 		Queued:      filepath.Join(root, "q"),
 		Running:     filepath.Join(root, "r"),
+		Tombstoned:  filepath.Join(root, "t"),
 	}
 
-	errorsx.Log(errors.Wrap(fsx.MkDirs(0700, dirs.Downloading, dirs.Queued, dirs.Running), "unable to make spool directories"))
+	errorsx.Log(errors.Wrap(fsx.MkDirs(defaultPerms, dirs.Downloading, dirs.Queued, dirs.Running, dirs.Tombstoned), "unable to make spool directories"))
 
 	return dirs
 }
@@ -54,7 +58,7 @@ func (t SpoolDirs) Download(uid uuid.UUID, name string, content io.Reader) (err 
 		dst *os.File
 	)
 
-	if err = os.MkdirAll(filepath.Join(t.Downloading, iddirname(uid)), 0700); err != nil {
+	if err = os.MkdirAll(filepath.Join(t.Downloading, iddirname(uid)), defaultPerms); err != nil {
 		return err
 	}
 
@@ -75,7 +79,7 @@ func (t SpoolDirs) Download(uid uuid.UUID, name string, content io.Reader) (err 
 }
 
 func (t SpoolDirs) Enqueue(uid uuid.UUID) (err error) {
-	if err = os.MkdirAll(t.Queued, 0700); err != nil {
+	if err = os.MkdirAll(t.Queued, defaultPerms); err != nil {
 		return err
 	}
 
@@ -83,7 +87,7 @@ func (t SpoolDirs) Enqueue(uid uuid.UUID) (err error) {
 }
 
 func (t SpoolDirs) Dequeue() (_ string, err error) {
-	if err = os.MkdirAll(t.Running, 0700); err != nil {
+	if err = os.MkdirAll(t.Running, defaultPerms); err != nil {
 		return "", err
 	}
 
@@ -96,7 +100,13 @@ func (t SpoolDirs) Dequeue() (_ string, err error) {
 }
 
 func (t SpoolDirs) Completed(uid uuid.UUID) (err error) {
-	return errorsx.Wrap(os.RemoveAll(filepath.Join(t.Running, iddirname(uid))), "unable to remove work")
+	// we tombstone before removing. we do this because if there are permission issues within
+	// the directory structure deleting as this user running the command will not work and we need to let the OS handle it.
+	if err = os.Rename(filepath.Join(t.Running, iddirname(uid)), filepath.Join(t.Tombstoned, iddirname(uid))); err != nil {
+		return errorsx.Wrap(err, "unable to tombstone work")
+	}
+
+	return errorsx.Wrap(os.RemoveAll(filepath.Join(t.Tombstoned, iddirname(uid))), "unable to remove work")
 }
 
 func pop(dir string) (popped fs.DirEntry, err error) {

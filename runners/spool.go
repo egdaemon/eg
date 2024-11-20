@@ -2,6 +2,7 @@ package runners
 
 import (
 	"encoding/hex"
+	"fmt"
 	"io"
 	"io/fs"
 	"os"
@@ -102,11 +103,22 @@ func (t SpoolDirs) Dequeue() (_ string, err error) {
 func (t SpoolDirs) Completed(uid uuid.UUID) (err error) {
 	// we tombstone before removing. we do this because if there are permission issues within
 	// the directory structure deleting as this user running the command will not work and we need to let the OS handle it.
-	if err = os.Rename(filepath.Join(t.Running, iddirname(uid)), filepath.Join(t.Tombstoned, iddirname(uid))); err != nil {
-		return errorsx.Wrap(err, "unable to tombstone work")
+	// We can fail to remove a folder due to  permission issues in files and subfolders. optimistically attempt to remove the
+	// the folder. if it succeeds, great. if it fails fall back to moving the work directory into a tombstone directory.
+	// this ensures that we can continue processing work. but since we can repeat work multiple times lets give the tombstoned
+	// folder a unique time based prefix.
+	if err = errorsx.Wrap(os.RemoveAll(filepath.Join(t.Running, iddirname(uid))), "unable to remove work"); err == nil {
+		return nil
 	}
 
-	return errorsx.Wrap(os.RemoveAll(filepath.Join(t.Tombstoned, iddirname(uid))), "unable to remove work")
+	return errorsx.Wrapf(
+		os.Rename(
+			filepath.Join(t.Running, iddirname(uid)),
+			filepath.Join(t.Tombstoned, fmt.Sprintf("%s-%s", uuid.Must(uuid.NewV7()).String(), iddirname(uid))),
+		),
+		"unable to tombstone work directory: %s",
+		iddirname(uid),
+	)
 }
 
 func pop(dir string) (popped fs.DirEntry, err error) {

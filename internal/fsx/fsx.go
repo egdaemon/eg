@@ -170,6 +170,10 @@ func MkDirs(perm fs.FileMode, paths ...string) (err error) {
 		if err = os.MkdirAll(p, perm); err != nil {
 			return errorsx.Wrapf(err, "unable to create directory: %s", p)
 		}
+
+		if err = os.Chmod(p, perm); err != nil {
+			return errorsx.Wrapf(err, "unable to set directory mod: %s", p)
+		}
 	}
 
 	return nil

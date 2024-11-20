@@ -40,11 +40,12 @@ type module struct {
 
 func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 	var (
-		ws   workspaces.Context
-		aid  = envx.String(uuid.Nil.String(), eg.EnvComputeAccountID)
-		uid  = envx.String(uuid.Nil.String(), eg.EnvComputeRunID)
-		ebuf = make(chan *ffigraph.EventInfo)
-		cc   grpc.ClientConnInterface
+		ws    workspaces.Context
+		aid   = envx.String(uuid.Nil.String(), eg.EnvComputeAccountID)
+		uid   = envx.String(uuid.Nil.String(), eg.EnvComputeRunID)
+		descr = envx.String("", eg.EnvComputeVCS)
+		ebuf  = make(chan *ffigraph.EventInfo)
+		cc    grpc.ClientConnInterface
 	)
 
 	if ws, err = workspaces.FromEnv(gctx.Context, t.Dir, t.Module); err != nil {
@@ -74,6 +75,7 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 		log.Println("---------------------------- ROOT MODULE INITIATED ----------------------------")
 		log.Println("account", aid)
 		log.Println("run id", uid)
+		log.Println("repository", descr)
 		log.Println("number of cores", runtime.GOMAXPROCS(-1))
 		log.Println("ram available", bytesx.Unit(vmemlimit))
 		// fsx.PrintDir(os.DirFS("/opt"))

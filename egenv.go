@@ -46,7 +46,8 @@ const (
 	EnvComputeModuleNestedLevel = "EG_COMPUTE_MODULE_LEVEL" // number of nested levels the current module is running in.
 	EnvComputeRootModule        = "EG_COMPUTE_ROOT_MODULE"  // default is always false, but is set to true for the root module to bootstrap services
 	EnvComputeRunID             = "EG_COMPUTE_RUN_ID"       // run id for the compute workload
-	EnvComputeAccountID         = "EG_COMPUTE_ACCOUNT_ID"   // deadline for compute workload
+	EnvComputeAccountID         = "EG_COMPUTE_ACCOUNT_ID"   // account id of the compute workload
+	EnvComputeVCS               = "EG_COMPUTE_VCS_URI"      // vcs uri for the compute workload
 	EnvComputeTTL               = "EG_COMPUTE_TTL"          // deadline for compute workload
 	EnvComputeContainerExec     = "EG_COMPUTE_EXEC_OPTIONS" // CLI options for podman exec
 	EnvComputeBin               = "EG_BIN"

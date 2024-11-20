@@ -390,6 +390,7 @@ func beginwork(ctx context.Context, md metadata, dir string) state {
 		Var(gitx.EnvAuthEGAccessToken, metadata.AccessToken).
 		Var(eg.EnvComputeRunID, uid).
 		Var(eg.EnvComputeAccountID, metadata.Enqueued.AccountId).
+		Var(eg.EnvComputeVCS, metadata.Enqueued.Vcsuri).
 		Var(eg.EnvComputeTTL, time.Duration(metadata.Enqueued.Ttl).String())
 
 	// envx.Debug(errorsx.Zero(envb.Environ())...)

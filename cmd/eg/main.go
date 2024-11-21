@@ -20,6 +20,7 @@ import (
 	"github.com/egdaemon/eg/cmd/cmdopts"
 	"github.com/egdaemon/eg/cmd/eg/accountcmds"
 	"github.com/egdaemon/eg/cmd/eg/compute"
+	"github.com/egdaemon/eg/cmd/eg/daemons"
 	"github.com/egdaemon/eg/internal/bytesx"
 	"github.com/egdaemon/eg/internal/contextx"
 	"github.com/egdaemon/eg/internal/debugx"
@@ -72,6 +73,7 @@ func main() {
 		Login              accountcmds.Login            `cmd:"" name:"login" help:"login to a profile"`
 		Browser            accountcmds.OTP              `cmd:"" name:"browser" help:"login to the browser console"`
 		Ident              accountcmds.Identity         `cmd:"" name:"iden" help:"display current credentials"`
+		DiskUsage          daemons.DiskUsage            `cmd:"" name:"disk-usage" help:"monitors disk usage and executes services when above threshold"`
 		InstallCompletions kongplete.InstallCompletions `cmd:"" help:"install shell completions"`
 	}
 

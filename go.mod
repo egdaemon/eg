@@ -5,6 +5,7 @@ go 1.23.2
 require (
 	github.com/KimMachineGun/automemlimit v0.6.1
 	github.com/alecthomas/kong v1.4.0
+	github.com/coreos/go-systemd/v22 v22.5.0
 	github.com/davecgh/go-spew v1.1.1
 	github.com/dominikbraun/graph v0.23.0
 	github.com/fsnotify/fsnotify v1.8.0
@@ -31,7 +32,6 @@ require (
 	github.com/cilium/ebpf v0.16.0 // indirect
 	github.com/cloudflare/circl v1.3.9 // indirect
 	github.com/containerd/cgroups/v3 v3.0.3 // indirect
-	github.com/coreos/go-systemd/v22 v22.5.0 // indirect
 	github.com/cyphar/filepath-securejoin v0.3.0 // indirect
 	github.com/docker/go-units v0.5.0 // indirect
 	github.com/ebitengine/purego v0.8.1 // indirect

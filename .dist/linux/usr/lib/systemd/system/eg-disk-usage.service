@@ -1,0 +1,14 @@
+[Unit]
+Description=event driven disk ussage monitoring.
+
+[Service]
+Type=simple
+ProtectKernelModules=yes
+PrivateMounts=yes
+IPAddressDeny=link-local
+IPAddressDeny=multicast
+ExecStart=/usr/bin/eg disk-usage eg-podman-maintenance.service
+
+
+[Install]
+WantedBy=default.target

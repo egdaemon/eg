@@ -20,7 +20,7 @@ RUN systemd-tmpfiles --remove
 RUN usermod --add-subuids 100000-165535 --add-subgids 100000-165535 eg
 RUN systemctl disable eg-runner-build.service
 RUN systemctl disable eg-runner.service
-RUN systemctl enable eg-daemon.service eg-daily-reload.service
+RUN systemctl enable eg-daemon.service eg-daily-reload.service eg-disk-usage.service
 
 # preload some wellknown hosts
 RUN ssh-keyscan -H github.com >> /etc/ssh/ssh_known_hosts

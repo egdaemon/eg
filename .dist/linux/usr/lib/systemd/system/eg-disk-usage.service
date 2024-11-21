@@ -8,7 +8,7 @@ ProtectKernelModules=yes
 PrivateMounts=yes
 IPAddressDeny=link-local
 IPAddressDeny=multicast
-ExecStart=/usr/bin/eg disk-usage eg-podman-maintenance.service
+ExecStart=/usr/bin/eg disk-usage eg-podman-maintenance.service systemd-tmpfiles-clean.service
 
 
 [Install]

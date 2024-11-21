@@ -21,7 +21,7 @@ import (
 )
 
 type Global struct {
-	Verbosity int                     `help:"increase verbosity of logging" short:"v" type:"counter" default:"0"`
+	Verbosity int                     `help:"increase verbosity of logging" short:"v" type:"counter" default:"0" env:"EG_LOGGING_VERBOSITY"`
 	Context   context.Context         `kong:"-"`
 	Shutdown  context.CancelCauseFunc `kong:"-"`
 	Cleanup   *sync.WaitGroup         `kong:"-"`
@@ -29,7 +29,7 @@ type Global struct {
 
 func (t Global) AfterApply() error {
 	log.SetFlags(log.Flags() | log.Lshortfile)
-	switch envx.Int(t.Verbosity, EnvLoggingVerbosity) {
+	switch envx.Int(t.Verbosity, eg.EnvComputeLoggingVerbosity) {
 	case 4: // NETWORK
 		os.Setenv(eg.EnvLogsNetwork, "1")
 		fallthrough

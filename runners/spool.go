@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"log"
 	"os"
 	"path/filepath"
 
@@ -109,6 +110,8 @@ func (t SpoolDirs) Completed(uid uuid.UUID) (err error) {
 	// folder a unique time based prefix.
 	if err = errorsx.Wrap(os.RemoveAll(filepath.Join(t.Running, iddirname(uid))), "unable to remove work"); err == nil {
 		return nil
+	} else {
+		log.Println(err)
 	}
 
 	return errorsx.Wrapf(

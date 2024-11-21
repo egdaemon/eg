@@ -10,10 +10,12 @@ override_dh_auto_build:
 	echo "DH AUTO BUILD OVERRIDE ${CMAKE_BUILD_PARALLEL_LEVEL}"
 	export CMAKE_BUILD_PARALLEL_LEVEL="$(nproc)"
 	mkdir -p duckdb
-	GEN=ninja OVERRIDE_GIT_DESCRIBE="v${PACKAGE_VERSION}" BUILD_JSON="1" BUILD_ICU="1" BUILD_INET="1" make -C src
+	GEN=ninja OVERRIDE_GIT_DESCRIBE="v${PACKAGE_VERSION}" ENABLE_EXTENSION_AUTOLOADING=1 ENABLE_EXTENSION_AUTOINSTALL=1 CORE_EXTENSIONS='autocomplete;tpcd;fts;json;parquet;icu' make -C src
 	DESTDIR="duckdb" cmake --install src/build/release
 	tree -L 2 .
 	tree duckdb
+	echo "8e16b986c4e873d997830f9d3a965161  duckdb/usr/local/include/duckdb.h" > duckdb.md5
+	md5sum -c duckdb.md5
 
 
 override_dh_usrlocal:

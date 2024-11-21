@@ -3,6 +3,7 @@ Description=event driven disk ussage monitoring.
 
 [Service]
 Type=simple
+Restart=on-failure
 ProtectKernelModules=yes
 PrivateMounts=yes
 IPAddressDeny=link-local

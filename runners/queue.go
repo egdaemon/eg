@@ -112,7 +112,7 @@ func BuildRootContainerPath(ctx context.Context, dir, path string) (err error) {
 		return errorsx.Wrapf(err, "preparing root container failed: %s", path)
 	}
 
-	cmd := exec.CommandContext(ctx, "podman", "build", "--timestamp", "0", "-t", "eg", "-f", path, dir)
+	cmd := exec.CommandContext(ctx, "podman", "build", "-t", "eg", "-f", path, dir)
 	cmd.Stderr = os.Stderr
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
@@ -336,6 +336,7 @@ func beginwork(ctx context.Context, md metadata, dir string) state {
 		return failure(err, idle(md))
 	}
 
+	log.Println("metadata", spew.Sdump(metadata.Enqueued))
 	defer func() {
 		if err == nil {
 			return
@@ -403,6 +404,7 @@ func beginwork(ctx context.Context, md metadata, dir string) state {
 	aopts = append(aopts, md.agentopts...)
 	aopts = append(
 		aopts,
+		AgentOptionAutoRemote(),
 		AgentOptionEGBin(errorsx.Zero(exec.LookPath(os.Args[0]))),
 		AgentOptionEnviron(environpath),
 		AgentOptionCommandLine("--env-file", environpath),
@@ -421,16 +423,17 @@ func beginwork(ctx context.Context, md metadata, dir string) state {
 		return completed(md, tmpdir, ws, uid, 0, errorsx.Wrap(err, "run failure"))
 	}
 
-	return staterunning{metadata: md, ws: ws, ragent: ragent, dir: dir, tmpdir: tmpdir, entry: metadata.Enqueued.Entry}
+	return staterunning{metadata: md, enqueued: metadata.Enqueued, ws: ws, ragent: ragent, dir: dir, tmpdir: tmpdir, entry: metadata.Enqueued.Entry}
 }
 
 type staterunning struct {
 	metadata
-	ws     workspaces.Context
-	ragent *Agent
-	dir    string
-	tmpdir string
-	entry  string
+	enqueued *Enqueued
+	ws       workspaces.Context
+	ragent   *Agent
+	dir      string
+	tmpdir   string
+	entry    string
 }
 
 func (t staterunning) Update(ctx context.Context) state {
@@ -441,13 +444,14 @@ func (t staterunning) Update(ctx context.Context) state {
 	default:
 		var (
 			err          error
-			containerdir = filepath.Join(userx.DefaultCacheDirectory(), "containers")
+			containerdir = filepath.Join(userx.DefaultCacheDirectory(), "containers", t.enqueued.AccountId)
+			cachedir     = filepath.Join(userx.DefaultCacheDirectory(), "workloadcache", t.enqueued.AccountId)
 			logdst       *os.File
 			logpath      = filepath.Join(t.ws.Root, t.ws.RuntimeDir, "daemon.log")
 		)
 
-		if err = fsx.MkDirs(0700, containerdir); err != nil {
-			return terminate(errorsx.Wrap(err, "unable to setup container cache"))
+		if err = fsx.MkDirs(0700, containerdir, cachedir); err != nil {
+			return terminate(errorsx.Wrap(err, "unable to setup container and cache directories"))
 		}
 
 		if logdst, err = os.Create(logpath); err != nil {
@@ -460,7 +464,7 @@ func (t staterunning) Update(ctx context.Context) state {
 			"--volume", AgentMountReadOnly(filepath.Join(t.ws.Root, t.ws.RuntimeDir, t.entry), "/opt/egmodule.wasm"),
 			"--volume", AgentMountReadWrite(filepath.Join(t.ws.Root, t.ws.RuntimeDir), "/opt/egruntime"),
 			"--volume", AgentMountReadWrite(filepath.Join(t.ws.Root, t.ws.WorkingDir), "/opt/eg"),
-			"--volume", AgentMountReadWrite(filepath.Join(t.ws.Root, t.ws.CacheDir), "/cache"),
+			"--volume", AgentMountReadWrite(cachedir, "/cache"),
 			"--env", envx.FormatBool(eg.EnvComputeRootModule, true),
 			"--env", envx.FormatInt(eg.EnvComputeModuleNestedLevel, 0),
 		)

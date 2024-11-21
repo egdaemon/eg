@@ -152,6 +152,7 @@ func (t local) Run(gctx *cmdopts.Global) (err error) {
 		privileged = runners.AgentOptionCommandLine("--privileged")
 	}
 
+	// envx.Debug(os.Environ()...)
 	ragent := runners.NewRunner(
 		gctx.Context,
 		ws,
@@ -162,12 +163,12 @@ func (t local) Run(gctx *cmdopts.Global) (err error) {
 		sshmount,
 		sshenvvar,
 		gpgmount,
+		runners.AgentOptionAutoRemote(),
 		runners.AgentOptionVolumes(
 			runners.AgentMountReadWrite(filepath.Join(ws.Root, ws.CacheDir), "/cache"),
 			runners.AgentMountReadWrite(filepath.Join(ws.Root, ws.RuntimeDir), "/opt/egruntime"),
 			runners.AgentMountReadWrite(t.ContainerCache, "/var/lib/containers"),
 		),
-		// runners.AgentOptionEnv("DOCKER_HOST", "/run/podman/podman.sock"),
 		runners.AgentOptionEnviron(environpath),
 		runners.AgentOptionCommandLine("--env-file", environpath), // required for tty to work correct in local mode.
 		runners.AgentOptionCommandLine("--cap-add", "NET_ADMIN"),  // required for loopback device creation inside the container

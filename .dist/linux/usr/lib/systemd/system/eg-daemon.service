@@ -1,13 +1,12 @@
 [Unit]
 Description=eg runtime daemon
 After=network.target
+Require=podman.service
 
 [Service]
 User=eg
 IOSchedulingClass=idle
 IOSchedulingPriority=7
-#ProtectKernelTunables=true
-#ProtectKernelModules=yes
 PrivateMounts=yes
 IPAddressDeny=link-local
 IPAddressDeny=multicast
@@ -17,9 +16,10 @@ ConfigurationDirectory=%p
 RuntimeDirectory=%p
 RuntimeDirectoryMode=0700
 EnvironmentFile=-/etc/eg/daemon.env
+EnvironmentFile=-/etc/eg/daemon.gen.env
 PermissionsStartOnly=true
 ExecStartPre=/usr/bin/loginctl enable-linger eg
-ExecStartPre=/usr/bin/sleep 3
+ExecStartPre=/usr/bin/sleep 1
 ExecStart=/usr/bin/eg daemon --sshknownhostspath=/etc/ssh/ssh_known_hosts
 
 [Install]

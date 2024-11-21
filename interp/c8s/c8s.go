@@ -48,7 +48,7 @@ func PodmanPull(ctx context.Context, name string, options ...string) (cmd *exec.
 
 func PodmanBuild(ctx context.Context, name string, dir string, definition string, options ...string) (cmd *exec.Cmd, err error) {
 	args := []string{
-		"build", "--stdin", "--timestamp", "0", "-t", name, "-f", definition,
+		"--remote", "build", "--stdin", "-t", name, "-f", definition,
 	}
 	args = append(args, options...)
 	args = append(args, dir)
@@ -62,11 +62,10 @@ func PodmanRun(ctx context.Context, cmdctx func(*exec.Cmd) *exec.Cmd, image, cna
 	)
 
 	log.Println("running", image, cname)
-
 	defer cleanup(ctx, cmdctx, cname)
 
 	cmd = exec.CommandContext(
-		ctx, "podman", "run", "-i", "--name", cname,
+		ctx, "podman", "--remote", "run", "-i", "--name", cname,
 	)
 	cmd.Args = append(cmd.Args, options...)
 	cmd.Args = append(cmd.Args, image)
@@ -111,6 +110,7 @@ func PodmanModule(ctx context.Context, cmdctx func(*exec.Cmd) *exec.Cmd, image, 
 
 func PodmanModuleRunCmd(image, cname, moduledir string, options ...string) []string {
 	options = append([]string{
+		"--remote",
 		"run",
 		"--name", cname,
 		"--pids-limit", "-1",
@@ -132,6 +132,7 @@ func PodmanModuleRunCmd(image, cname, moduledir string, options ...string) []str
 
 func PodmanModuleExecCmd(cname, moduledir string) []string {
 	return []string{
+		"--remote",
 		"exec",
 		envx.String("-i", eg.EnvComputeContainerExec),
 		cname,

@@ -8,7 +8,9 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/internal/debugx"
+	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
 )
 
@@ -18,6 +20,15 @@ func MaybeRun(c *exec.Cmd) error {
 	}
 
 	debugx.Println("---------------", errorsx.Must(os.Getwd()), "running", c.Dir, "->", c.String(), "---------------")
+	return c.Run()
+}
+
+func MaybeRunDebug(c *exec.Cmd) error {
+	if c == nil {
+		return nil
+	}
+
+	log.Println("---------------", envx.Int(0, eg.EnvComputeModuleNestedLevel), os.Getpid(), errorsx.Must(os.Getwd()), "running", c.Dir, "->", c.String(), "---------------")
 	return c.Run()
 }
 

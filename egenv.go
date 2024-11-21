@@ -29,6 +29,7 @@ func EnvContainerAPIHostDefault() string {
 }
 
 const (
+	EnvContainerHost      = "CONTAINER_HOST"
 	EnvEGSSHHost          = "EG_SSH_REVERSE_PROXY_HOST"
 	EnvEGSSHProxyDisabled = "EG_SSH_REVERSE_PROXY_DISABLED"
 	EnvEGSSHHostDefault   = "api.egdaemon.com:8090"

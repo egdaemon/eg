@@ -83,7 +83,7 @@ func (t *ProxyService) Build(ctx context.Context, req *BuildRequest) (_ *BuildRe
 		return nil, err
 	}
 
-	if err = execx.MaybeRun(t.prepcmd(cmd)); err != nil {
+	if err = execx.MaybeRunDebug(t.prepcmd(cmd)); err != nil {
 		log.Println("unable to exec build command", cmd.String(), err)
 		return nil, err
 	}

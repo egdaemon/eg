@@ -51,7 +51,6 @@ func (t c8sLocal) Run(gctx *cmdopts.Global) (err error) {
 	if tmpdir, err = os.MkdirTemp("", "eg.c8s.upload.*"); err != nil {
 		return errorsx.Wrap(err, "unable to create temporary directory")
 	}
-
 	defer func() {
 		errorsx.Log(errorsx.Wrap(os.RemoveAll(tmpdir), "unable to remove temp directory"))
 	}()
@@ -113,6 +112,7 @@ func (t c8sLocal) Run(gctx *cmdopts.Global) (err error) {
 		envvar,
 		sshmount,
 		sshenvvar,
+		runners.AgentOptionAutoRemote(),
 		runners.AgentOptionVolumes(
 			runners.AgentMountReadWrite(filepath.Join(ws.Root, ws.CacheDir), "/cache"),
 			runners.AgentMountReadWrite(filepath.Join(ws.Root, ws.RuntimeDir), "/opt/egruntime"),

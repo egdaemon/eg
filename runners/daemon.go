@@ -130,6 +130,32 @@ func AgentOptionEnvKeys(keys ...string) AgentOption {
 	}
 }
 
+func AgentOptionAutoRemote() AgentOption {
+	if host := envx.String("", eg.EnvContainerHost); stringsx.Present(host) {
+		return AgentOptionCompose(
+			AgentOptionEnv(eg.EnvContainerHost, "/opt/egruntime/podman.socket"),
+			AgentOptionVolumes(
+				AgentMountReadWrite(
+					strings.TrimPrefix(host, "unix://"),
+					"/opt/egruntime/podman.socket",
+				),
+			),
+		)
+	} else {
+		log.Println("container host not present", host)
+	}
+
+	return AgentOptionNoop
+}
+
+func AgentOptionCompose(options ...AgentOption) AgentOption {
+	return func(a *Agent) {
+		for _, opt := range options {
+			opt(a)
+		}
+	}
+}
+
 func AgentOptionCommandLine(literal ...string) AgentOption {
 	return func(a *Agent) {
 		a.literals = append(a.literals, literal...)

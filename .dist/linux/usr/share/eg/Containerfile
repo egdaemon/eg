@@ -9,7 +9,6 @@ COPY ${EG_RUNNER_OVERRIDE_DIR} /
 RUN rm /etc/apt/apt.conf.d/docker-*
 RUN apt-get update
 RUN apt-get -y install software-properties-common build-essential apt-file podman rsync vim dput devscripts dh-make dput git uidmap dbus-user-session fuse-overlayfs pinentry-tty inetutils-ping iproute2
-# RUN add-apt-repository -n ppa:longsleep/golang-backports
 RUN add-apt-repository -n ppa:egdaemon/eg
 RUN add-apt-repository -n ppa:egdaemon/duckdb
 RUN apt-get update
@@ -25,8 +24,5 @@ RUN systemctl enable eg-daemon.service eg-daily-reload.service eg-disk-usage.ser
 # preload some wellknown hosts
 RUN ssh-keyscan -H github.com >> /etc/ssh/ssh_known_hosts
 RUN ssh-keyscan -H gitlab.com >> /etc/ssh/ssh_known_hosts
-
-# RUN mkdir -p
-# RUN touch /var/lib/systemd/linger/eg
 
 CMD /usr/sbin/init

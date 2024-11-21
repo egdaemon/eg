@@ -59,6 +59,15 @@ func Ignore(err error, ignore ...error) error {
 	return err
 }
 
+// MaybePanic panic when error is seen.
+func MaybePanic(err error) {
+	if err == nil {
+		return
+	}
+
+	panic(err)
+}
+
 // CompactMonad an error that collects and returns the first error encountered.
 type CompactMonad struct {
 	cause error

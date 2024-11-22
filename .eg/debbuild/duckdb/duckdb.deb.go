@@ -25,24 +25,28 @@ import (
 //go:embed .debskel
 var debskel embed.FS
 
-func prepare(ctx context.Context, _ eg.Op) error {
-	relpath, _ := filepath.Rel(egenv.RootDirectory(), egenv.RuntimeDirectory())
-	count, _ := cpu.Counts(false)
-	log.Println("-------------------------------------------", "BDIR", relpath, runtime.NumCPU(), count, "-------------------------------------------")
+func prepare(version string) func(ctx context.Context, _ eg.Op) error {
+	return func(ctx context.Context, _ eg.Op) error {
+		relpath, _ := filepath.Rel(egenv.RootDirectory(), egenv.RuntimeDirectory())
+		count, _ := cpu.Counts(false)
+		log.Println("-------------------------------------------", "BDIR", relpath, runtime.NumCPU(), count, "-------------------------------------------")
 
-	sruntime := shell.Runtime().
-		Directory(relpath)
+		sruntime := shell.Runtime().
+			Directory(relpath)
 
-	return shell.Run(
-		ctx,
-		sruntime.New("git clone git@github.com:duckdb/duckdb duckdb"),
-		// TODO: get cores working properly.
-		// sruntime.Newf("echo make -C duckdb -j %d bundle-library", runtime.NumCPU()),
-		// sruntime.Newf("make -C duckdb -j %d bundle-library", runtime.NumCPU()),
-	)
+		return shell.Run(
+			ctx,
+			sruntime.Newf("git clone -b v%s --depth 1 https://github.com/duckdb/duckdb.git duckdb", version),
+			sruntime.New("echo \"8e16b986c4e873d997830f9d3a965161  duckdb/src/include/duckdb.h\" > duckdb.md5"),
+			sruntime.New("md5sum -c duckdb.md5"),
+			// TODO: get cores working properly.
+			// sruntime.Newf("echo make -C duckdb -j %d bundle-library", runtime.NumCPU()),
+			// sruntime.Newf("make -C duckdb -j %d bundle-library", runtime.NumCPU()),
+		)
+	}
 }
 
-func build(distro string) eg.OpFn {
+func build(distro, version string) eg.OpFn {
 	return func(ctx context.Context, _ eg.Op) error {
 		pdir, err := os.MkdirTemp(egenv.RuntimeDirectory(), "duckdb.deb.build.*")
 		if err != nil {
@@ -64,8 +68,8 @@ func build(distro string) eg.OpFn {
 		runtime := shell.Runtime().
 			Directory(relpath).
 			Environ("DEB_PACKAGE_NAME", "duckdb").
-			Environ("PACKAGE_VERSION", "1.1.3").
-			Environ("DEB_VERSION", fmt.Sprintf("1.1.3.%d", c.Committer.When.Add(dynamicduration(10*time.Second, distro)).UnixMilli())).
+			Environ("PACKAGE_VERSION", version).
+			Environ("DEB_VERSION", fmt.Sprintf("%s.%d", version, c.Committer.When.Add(dynamicduration(10*time.Second, distro)).UnixMilli())).
 			Environ("DEB_DISTRO", distro).
 			Environ("DEB_CHANGELOG_DATE", c.Committer.When.Format(time.RFC1123Z)).
 			Environ("DEB_EMAIL", maintainer.Email).
@@ -86,13 +90,13 @@ func build(distro string) eg.OpFn {
 
 func Build() eg.OpFn {
 	return func(ctx context.Context, _ eg.Op) error {
+		const version = "1.1.3"
 		env.Debug(os.Environ()...)
 		return eg.Perform(
 			ctx,
-			prepare,
-			// build("jammy"),
-			build("noble"),
-			build("ocular"),
+			prepare(version),
+			build("noble", version),
+			build("oracular", version),
 		)
 	}
 }

@@ -13,7 +13,7 @@ RUN add-apt-repository -n ppa:egdaemon/duckdb
 RUN apt update
 
 RUN apt install -o Acquire::ForceIPv4=true -y --no-install-recommends curl gnupg2 lsb-release iproute2 git apt-file pinentry-tty uidmap dbus-user-session
-RUN apt install -o Acquire::ForceIPv4=true -y --no-install-recommends ssh podman rsync vim golang-1.23 eg tree fuse-overlayfs
+RUN apt install -o Acquire::ForceIPv4=true -y --no-install-recommends ssh podman netavark rsync vim golang-1.23 eg tree fuse-overlayfs
 # dependencies for duckdb while bootstrapping
 RUN apt install -o Acquire::ForceIPv4=true -y --no-install-recommends cmake ninja-build ccache dput devscripts dh-make dput libssl-dev
 RUN apt install -o Acquire::ForceIPv4=true -y --no-install-recommends duckdb

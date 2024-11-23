@@ -4,6 +4,6 @@ COPY rootfs /
 
 RUN systemd-sysusers
 RUN systemd-tmpfiles --create
-RUN pacman --noconfirm -Syu podman pacman-contrib pkgfile foot sudo bash-completion tree base base-devel git go openssh rsync github-cli
+RUN pacman --noconfirm -Syu podman netavark pacman-contrib pkgfile foot sudo bash-completion tree base base-devel git go openssh rsync github-cli
 
 CMD /usr/sbin/init

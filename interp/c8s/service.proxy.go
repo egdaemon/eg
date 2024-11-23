@@ -87,9 +87,9 @@ func (t *ProxyService) Build(ctx context.Context, req *BuildRequest) (_ *BuildRe
 		return nil, err
 	}
 
-	if err = PodmanPrune(ctx, silence); err != nil {
-		log.Println("unable to exec podman prune command", err)
-	}
+	// if err = PodmanPrune(ctx, silence); err != nil {
+	// 	log.Println("unable to exec podman prune command", err)
+	// }
 
 	return &BuildResponse{}, nil
 }

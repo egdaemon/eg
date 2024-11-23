@@ -12,6 +12,7 @@ import (
 	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/cmd/cmdopts"
 	"github.com/egdaemon/eg/compile"
+	"github.com/egdaemon/eg/internal/debugx"
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/fsx"
@@ -152,6 +153,9 @@ func (t local) Run(gctx *cmdopts.Global) (err error) {
 		privileged = runners.AgentOptionCommandLine("--privileged")
 	}
 
+	debugx.Println("container cache", t.ContainerCache)
+
+	// envx.Debug(os.Environ()...)
 	ragent := runners.NewRunner(
 		gctx.Context,
 		ws,
@@ -167,7 +171,6 @@ func (t local) Run(gctx *cmdopts.Global) (err error) {
 			runners.AgentMountReadWrite(filepath.Join(ws.Root, ws.RuntimeDir), "/opt/egruntime"),
 			runners.AgentMountReadWrite(t.ContainerCache, "/var/lib/containers"),
 		),
-		// runners.AgentOptionEnv("DOCKER_HOST", "/run/podman/podman.sock"),
 		runners.AgentOptionEnviron(environpath),
 		runners.AgentOptionCommandLine("--env-file", environpath), // required for tty to work correct in local mode.
 		runners.AgentOptionCommandLine("--cap-add", "NET_ADMIN"),  // required for loopback device creation inside the container
@@ -176,6 +179,7 @@ func (t local) Run(gctx *cmdopts.Global) (err error) {
 		runners.AgentOptionEnv(eg.EnvComputeRootModule, strconv.FormatBool(true)),
 		runners.AgentOptionEnv(eg.EnvComputeModuleNestedLevel, strconv.Itoa(envx.Int(0, eg.EnvComputeModuleNestedLevel))),
 		runners.AgentOptionEnv(eg.EnvComputeRunID, uid.String()),
+		runners.AgentOptionEnv(eg.EnvComputeLoggingVerbosity, strconv.Itoa(gctx.Verbosity)),
 	)
 
 	for _, m := range modules {

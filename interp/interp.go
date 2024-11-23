@@ -29,6 +29,7 @@ import (
 	"github.com/egdaemon/eg/interp/runtime/wasi/ffigraph"
 	"github.com/egdaemon/eg/interp/runtime/wasi/ffimetric"
 	"github.com/egdaemon/eg/runners"
+	"github.com/gofrs/uuid"
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
 	"google.golang.org/grpc"
@@ -68,7 +69,7 @@ func Remote(ctx context.Context, aid string, runid string, g ffigraph.Eventer, s
 			NewFunctionBuilder().WithFunc(g.Popper()).Export("github.com/egdaemon/eg/runtime/wasi/runtime/graph.Pop").
 			NewFunctionBuilder().WithFunc(ffiegcontainer.Pull(func(ctx context.Context, name, wdir string, options ...string) (err error) {
 			_, err = containers.Pull(ctx, &c8s.PullRequest{
-				Name:    fmt.Sprintf("%s.%s", aid, name),
+				Name:    name,
 				Dir:     wdir,
 				Options: options,
 			})
@@ -79,7 +80,7 @@ func Remote(ctx context.Context, aid string, runid string, g ffigraph.Eventer, s
 		})).Export("github.com/egdaemon/eg/runtime/wasi/runtime/ffiegcontainer.Pull").
 			NewFunctionBuilder().WithFunc(ffiegcontainer.Build(func(ctx context.Context, name, wdir string, definition string, options ...string) (err error) {
 			_, err = containers.Build(ctx, &c8s.BuildRequest{
-				Name:       fmt.Sprintf("%s.%s", aid, name),
+				Name:       name,
 				Directory:  wdir,
 				Definition: definition,
 				Options:    options,
@@ -97,7 +98,7 @@ func Remote(ctx context.Context, aid string, runid string, g ffigraph.Eventer, s
 			)
 
 			_, err = containers.Module(ctx, &c8s.ModuleRequest{
-				Image:   fmt.Sprintf("%s.%s", aid, name),
+				Image:   name,
 				Name:    cname,
 				Mdir:    r.runtimedir,
 				Options: options,
@@ -110,7 +111,7 @@ func Remote(ctx context.Context, aid string, runid string, g ffigraph.Eventer, s
 			NewFunctionBuilder().WithFunc(ffiegcontainer.Run(func(ctx context.Context, name, modulepath string, cmd []string, options ...string) (err error) {
 			cname := fmt.Sprintf("%s.%s", name, md5x.String(modulepath+runid))
 			_, err = containers.Run(ctx, &c8s.RunRequest{
-				Image:   fmt.Sprintf("%s.%s", aid, name),
+				Image:   name,
 				Name:    cname,
 				Command: cmd,
 				Options: options,
@@ -215,11 +216,17 @@ func (t runner) perform(ctx context.Context, runid, path string, rtb runtimefn) 
 	).WithEnv(
 		eg.EnvComputeRunID, runid,
 	).WithEnv(
+		eg.EnvComputeAccountID, envx.String(uuid.Nil.String(), eg.EnvComputeAccountID),
+	).WithEnv(
+		eg.EnvComputeModuleNestedLevel, envx.String("-1", eg.EnvComputeModuleNestedLevel),
+	).WithEnv(
+		eg.EnvComputeLoggingVerbosity, envx.String("-1", eg.EnvComputeLoggingVerbosity),
+	).WithEnv(
 		"EG_ROOT_DIRECTORY", t.root,
 	).WithEnv(
 		"EG_CACHE_DIRECTORY", envx.String(guestcachedir, "EG_CACHE_DIRECTORY", "CACHE_DIRECTORY"),
 	).WithEnv(
-		"EG_RUNTIME_DIRECTORY", tmpdir,
+		"EG_RUNTIME_DIRECTORY", guestruntimedir,
 	).WithEnv(
 		"RUNTIME_DIRECTORY", guestruntimedir,
 	).WithEnv(

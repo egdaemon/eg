@@ -17,7 +17,7 @@ import (
 )
 
 type DiskUsage struct {
-	Threshold float64       `name:"threshold" help:"threshold to trigger services at" default:"0.80"`
+	Threshold float64       `name:"threshold" help:"percent threshold to trigger services at" default:"80"`
 	Period    time.Duration `name:"frequency" help:"frequency to check" default:"1m"`
 	Services  []string      `arg:"" name:"services" placeholder:"eg.service" required:"true"`
 }

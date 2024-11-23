@@ -8,10 +8,20 @@ import (
 	"sync"
 	"unsafe"
 
+	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/runtime/wasi/egunsafe/ffiegcontainer"
 	"github.com/egdaemon/eg/runtime/wasi/egunsafe/ffigraph"
 )
+
+// Generally unsafe predefined runner for modules useful
+// for providing a base line environment but has no long term
+// stability promises.
+func DefaultModule() ContainerRunner {
+	path := "eg.default.module"
+	errorsx.MaybePanic(eg.PrepareRootContainer(path))
+	return Container("eg").BuildFromFile(path)
+}
 
 // A reference to an operation.
 type Reference interface {

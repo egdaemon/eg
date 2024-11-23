@@ -135,5 +135,6 @@ func (t daemon) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 			runners.AgentOptionVolumes(t.MountDirs...),
 			runners.AgentOptionEnvKeys(t.EnvVars...),
 		),
+		runners.QueueOptionLogVerbosity(gctx.Verbosity),
 	)
 }

@@ -46,8 +46,6 @@ func (t DiskUsage) perform(ctx context.Context, conn *dbus.Conn) error {
 		}
 	}
 
-	log.Println("services that will be started", t.Services)
-
 	parts, _ := disk.Partitions(false)
 	max := 0.0
 	for _, p := range parts {
@@ -69,6 +67,8 @@ func (t DiskUsage) perform(ctx context.Context, conn *dbus.Conn) error {
 	if max < t.Threshold {
 		debugx.Println("usage below threshold", max, "<", t.Threshold)
 		return nil
+	} else {
+		log.Println("clearing disk space due to threshhold", max, "<", t.Threshold)
 	}
 
 	for _, s := range t.Services {
@@ -93,6 +93,8 @@ func (t DiskUsage) Run(gctx *cmdopts.Global) (err error) {
 			return errorsx.Wrap(err, "failed to connect to systemd bus")
 		}
 	}
+
+	log.Println("services that will be started", t.Services)
 
 	if err = t.perform(gctx.Context, conn); err != nil {
 		return err

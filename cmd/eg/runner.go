@@ -78,10 +78,7 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 		log.Println("repository", descr)
 		log.Println("number of cores", runtime.GOMAXPROCS(-1))
 		log.Println("ram available", bytesx.Unit(vmemlimit))
-		// fsx.PrintDir(os.DirFS("/opt"))
-		// fsx.PrintDir(os.DirFS("/opt/egruntime"))
-		// fsx.PrintDir(os.DirFS("/opt/eg/workspace"))
-		// env.Debug(os.Environ()...)
+		log.Println("logging level", gctx.Verbosity)
 		defer log.Println("---------------------------- ROOT MODULE COMPLETED ----------------------------")
 
 		cspath := filepath.Join(t.RuntimeDir, "control.socket")
@@ -107,7 +104,6 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 		}()
 
 		events.NewServiceDispatch(db).Bind(srv)
-
 		ragent := runners.NewRunner(
 			gctx.Context,
 			ws,
@@ -117,8 +113,8 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 				runners.AgentMountReadWrite("/cache", "/cache"),
 				runners.AgentMountReadWrite("/opt/egruntime", "/opt/egruntime"),
 				runners.AgentMountReadWrite("/var/lib/containers", "/var/lib/containers"),
-				runners.AgentMountReadOnly(errorsx.Must(exec.LookPath("/opt/egbin")), "/opt/egbin"),
 			),
+			runners.AgentOptionEGBin(errorsx.Must(exec.LookPath("/opt/egbin"))),
 			runners.AgentOptionCommandLine("--cap-add", "NET_ADMIN"), // required for loopback device creation inside the container
 			runners.AgentOptionCommandLine("--cap-add", "SYS_ADMIN"), // required for rootless container building https://github.com/containers/podman/issues/4056#issuecomment-612893749
 			runners.AgentOptionCommandLine("--device", "/dev/fuse"),  // required for rootless container building https://github.com/containers/podman/issues/4056#issuecomment-612893749
@@ -145,6 +141,11 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 	} else {
 		log.Printf("---------------------------- MODULE INITIATED %d ----------------------------\n", mlevel)
 		// env.Debug(os.Environ()...)
+		log.Println("account", aid)
+		log.Println("run id", uid)
+		log.Println("repository", descr)
+		log.Println("number of cores", runtime.GOMAXPROCS(-1))
+		log.Println("logging level", gctx.Verbosity)
 		defer log.Printf("---------------------------- MODULE COMPLETED %d ----------------------------\n", mlevel)
 	}
 

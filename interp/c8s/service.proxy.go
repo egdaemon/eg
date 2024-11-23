@@ -77,7 +77,6 @@ func (t *ProxyService) Build(ctx context.Context, req *BuildRequest) (_ *BuildRe
 
 	// determine the working directory from the request if specified or the definition file's path.
 	wdir := slicesx.FindOrZero(func(s string) bool { return !stringsx.Blank(s) }, req.Directory, filepath.Dir(abspath))
-
 	if cmd, err = PodmanBuild(ctx, req.Name, wdir, abspath, req.Options...); err != nil {
 		log.Println("unable to create build command", err)
 		return nil, err
@@ -86,6 +85,10 @@ func (t *ProxyService) Build(ctx context.Context, req *BuildRequest) (_ *BuildRe
 	if err = execx.MaybeRun(t.prepcmd(cmd)); err != nil {
 		log.Println("unable to exec build command", cmd.String(), err)
 		return nil, err
+	}
+
+	if err = PodmanPrune(ctx, silence); err != nil {
+		log.Println("unable to exec podman prune command", err)
 	}
 
 	return &BuildResponse{}, nil

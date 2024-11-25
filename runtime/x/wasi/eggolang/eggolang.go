@@ -15,6 +15,7 @@ import (
 	"github.com/egdaemon/eg/runtime/wasi/eg"
 	"github.com/egdaemon/eg/runtime/wasi/egenv"
 	"github.com/egdaemon/eg/runtime/wasi/egunsafe/ffiexec"
+	"github.com/egdaemon/eg/runtime/wasi/shell"
 )
 
 type CompileOption func(*compileOption)
@@ -123,9 +124,20 @@ func CacheModuleDirectory() string {
 	return egenv.CacheDirectory("golang", "mod")
 }
 
+// attempt to build the golang environment that sets up
+// the golang environment for caching.
 func Env() ([]string, error) {
 	return envx.Build().FromEnv(os.Environ()...).
 		Var("GOCACHE", CacheBuildDirectory()).
 		Var("GOMODCACHE", CacheModuleDirectory()).
 		Environ()
+}
+
+// Create a shell runtime that properly
+// sets up the golang environment for caching.
+func Runtime() shell.Command {
+	return shell.Runtime().
+		EnvironFrom(
+			errorsx.Must(Env())...,
+		)
 }

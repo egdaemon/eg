@@ -19,8 +19,8 @@ func Debug(ctx context.Context, op eg.Op) error {
 		ctx,
 		shell.New("pwd"),
 		shell.New("tree -a --gitignore /opt/egruntime"),
-		shell.New("ls -lha /opt/eg/.test/Containerfile || true"),
-		// shell.New("ssh -T git@github.com || true"),
+		shell.New("ls -lha /opt/eg/.test/Containerfile"),
+		shell.New("ssh -T git@github.com").Lenient(true),
 	)
 }
 
@@ -29,7 +29,7 @@ func Op1(ctx context.Context, op eg.Op) error {
 	defer log.Println("op1 completed")
 	return shell.Run(
 		ctx,
-		shell.New("true").Environ("USER", "root"),
+		shell.New("true"),
 	)
 }
 
@@ -78,14 +78,11 @@ func main() {
 	log.Println("main module initiated")
 	defer log.Println("main module completed")
 
-	// c1 := eg.Container("ubuntu.22.04").BuildFromFile(string(langx.Must(fs.ReadFile(embedded, "Containerfile"))))
-	// c1 := eg.Container("ubuntu.22.04").PullFrom("ubuntu:jammy")
 	c1 := eg.Container("ubuntu.22.04").BuildFromFile(".test/Containerfile")
 
 	err := eg.Perform(
 		ctx,
 		// eggit.AutoClone,
-		Debug,
 		DaemonTests,
 		eg.Build(c1),
 		eg.Module(ctx, c1, DaemonTests),

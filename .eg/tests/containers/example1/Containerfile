@@ -1,3 +1,3 @@
-FROM ubuntu:noble
+FROM ubuntu:oracular
 
 CMD /usr/bin/echo hello world

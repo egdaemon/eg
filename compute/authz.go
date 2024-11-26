@@ -9,6 +9,8 @@ import (
 
 	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/authn"
+	"github.com/egdaemon/eg/internal/debugx"
+	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/httpx"
 	"github.com/golang-jwt/jwt/v4"
 	"golang.org/x/crypto/ssh"
@@ -54,23 +56,28 @@ func (t TokenSourceFromEndpoint) Token() (_ *oauth2.Token, err error) {
 		m       msg
 		encoded string
 	)
+
+	defer func() {
+		errorsx.Log(err)
+	}()
+
 	ctx, done := context.WithTimeout(context.Background(), 10*time.Second)
 	defer done()
 
 	if encoded, err = authn.AutoTokenState(t.signer); err != nil {
-		return nil, err
+		return nil, errorsx.Wrap(err, "unable to generated token state")
 	}
 
 	refreshtoken, err := authn.AutoRefreshTokenState(context.WithValue(ctx, oauth2.HTTPClient, t.c), t.signer, encoded)
 	if err != nil {
-		return nil, err
+		return nil, errorsx.Wrap(err, "unable to generate refresh token")
 	}
 
 	cfg := authn.OAuth2SSHConfig(t.signer, "", authn.EndpointSSHAuth())
 	chttp := cfg.Client(context.WithValue(ctx, oauth2.HTTPClient, t.c), refreshtoken)
 
 	if err = authn.ExchangeAuthed(ctx, chttp, fmt.Sprintf("%s/authn/ssh", eg.EnvAPIHostDefault()), &authed); err != nil {
-		return nil, err
+		return nil, errorsx.Wrap(err, "exchange failed")
 	}
 
 	if len(authed.Profiles) != 1 {
@@ -79,7 +86,7 @@ func (t TokenSourceFromEndpoint) Token() (_ *oauth2.Token, err error) {
 
 	session, err := authn.Session(ctx, t.c, authed.Profiles[0].Token)
 	if err != nil {
-		return nil, err
+		return nil, errorsx.Wrap(err, "session creation failed")
 	}
 
 	chttp = cfg.Client(context.WithValue(ctx, oauth2.HTTPClient, t.c), &oauth2.Token{
@@ -102,5 +109,7 @@ func (t TokenSourceFromEndpoint) Token() (_ *oauth2.Token, err error) {
 		return nil, err
 	}
 
-	return &oauth2.Token{TokenType: "BEARER", AccessToken: m.Token.Bearer, Expiry: time.UnixMilli(m.Token.Expires)}, nil
+	ts := time.UnixMilli(m.Token.Expires)
+	debugx.Println("token expiration", ts, time.Until(ts))
+	return &oauth2.Token{TokenType: "BEARER", AccessToken: m.Token.Bearer, Expiry: ts}, nil
 }

@@ -112,16 +112,16 @@ func AutoTest(options ...TestOption) eg.OpFn {
 	})
 }
 
-func CacheDirectory() string {
-	return egenv.CacheDirectory("golang")
+func CacheDirectory(dirs ...string) string {
+	return egenv.CacheDirectory("eg.golang", filepath.Join(dirs...))
 }
 
 func CacheBuildDirectory() string {
-	return egenv.CacheDirectory("golang", "build")
+	return CacheDirectory("build")
 }
 
 func CacheModuleDirectory() string {
-	return egenv.CacheDirectory("golang", "mod")
+	return CacheDirectory("mod")
 }
 
 // attempt to build the golang environment that sets up

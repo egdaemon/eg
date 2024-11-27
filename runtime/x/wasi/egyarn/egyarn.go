@@ -4,6 +4,7 @@ package egyarn
 
 import (
 	"os"
+	"path/filepath"
 
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
@@ -11,8 +12,8 @@ import (
 	"github.com/egdaemon/eg/runtime/wasi/shell"
 )
 
-func CacheDirectory() string {
-	return egenv.CacheDirectory("egyarn")
+func CacheDirectory(dirs ...string) string {
+	return egenv.CacheDirectory("eg.yarn", filepath.Join(dirs...))
 }
 
 // attempt to build the yarn environment that properly

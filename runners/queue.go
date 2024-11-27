@@ -536,7 +536,7 @@ func (t statecompleted) Update(ctx context.Context) state {
 	defer analytics.Close()
 
 	if err = t.metadata.completion.Upload(ctx, t.id, t.duration, t.cause, logs, analytics); err != nil {
-		return discard(t.id, t.metadata, failure(errorsx.Wrap(err, "unable upload completion"), idle(t.metadata)))
+		return discard(t.id, t.metadata, failure(errorsx.Wrapf(err, "unable to upload completion: %s", t.id), idle(t.metadata)))
 	}
 
 	if t.cause != nil {

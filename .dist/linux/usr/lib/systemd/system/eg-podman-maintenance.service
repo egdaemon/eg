@@ -9,7 +9,3 @@ PrivateMounts=yes
 IPAddressDeny=link-local
 IPAddressDeny=multicast
 ExecStart=/usr/bin/podman system prune -f
-
-
-[Install]
-WantedBy=eg-schedule-15m.target

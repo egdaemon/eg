@@ -109,7 +109,7 @@ func (t TokenSourceFromEndpoint) Token() (_ *oauth2.Token, err error) {
 		return nil, err
 	}
 
-	ts := time.UnixMilli(m.Token.Expires)
+	ts := time.UnixMilli(m.Token.Expires).Add(-10 * time.Second)
 	debugx.Println("token expiration", ts, time.Until(ts))
 	return &oauth2.Token{TokenType: "BEARER", AccessToken: m.Token.Bearer, Expiry: ts}, nil
 }

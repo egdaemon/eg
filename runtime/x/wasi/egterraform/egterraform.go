@@ -1,6 +1,6 @@
-// Package egyarn has supporting functions for configuring the environment for running yarn berry for caching.
-// in the future we may support previous versions.
-package egyarn
+// Package egterraform has supporting functions for configuring the environment for running terraform commands
+// within eg.
+package egterraform
 
 import (
 	"os"
@@ -13,14 +13,14 @@ import (
 )
 
 func CacheDirectory(dirs ...string) string {
-	return egenv.CacheDirectory("eg.yarn", filepath.Join(dirs...))
+	return egenv.CacheDirectory("eg.terraform", filepath.Join(dirs...))
 }
 
 // attempt to build the yarn environment that properly
 func Env() ([]string, error) {
 	return envx.Build().FromEnv(os.Environ()...).
-		Var("YARN_CACHE_FOLDER", CacheDirectory()).
-		Var("YARN_ENABLE_GLOBAL_CACHE", envx.VarBool(false)).
+		Var("TF_PLUGIN_CACHE_DIR", CacheDirectory("plugins")).
+		Var("TF_IN_AUTOMATION", envx.VarBool(true)).
 		Environ()
 }
 

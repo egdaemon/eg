@@ -381,6 +381,11 @@ func Vars(v string, keys ...string) (environ []string) {
 	return environ
 }
 
+// format a boolean value to true/false strings.
+func VarBool(b bool) string {
+	return strconv.FormatBool(b)
+}
+
 // format a environment variable in k=v.
 // - doesn't currently escape values. it may in the future.
 // - if the key or value are an empty string it'll return an empty string. it will log if debugging is enabled.

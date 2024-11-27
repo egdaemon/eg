@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strconv"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/egdaemon/eg"
@@ -108,6 +109,7 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 			gctx.Context,
 			ws,
 			uid,
+			runners.AgentOptionEnv(eg.EnvComputeTLSInsecure, strconv.FormatBool(tlsc.Insecure)),
 			runners.AgentOptionVolumes(
 				runners.AgentMountReadWrite("/root", "/root"),
 				runners.AgentMountReadWrite("/cache", "/cache"),

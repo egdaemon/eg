@@ -1,3 +1,5 @@
+// Package egyarn has supporting functions for configuring the environment for running yarn berry for caching.
+// in the future we may support previous versions.
 package egyarn
 
 import (

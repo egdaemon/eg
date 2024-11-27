@@ -7,8 +7,10 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"strconv"
 
 	"github.com/davecgh/go-spew/spew"
+	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/authn"
 	"github.com/egdaemon/eg/cmd/cmdopts"
 	"github.com/egdaemon/eg/cmd/eg/daemons"
@@ -134,6 +136,7 @@ func (t daemon) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 			runners.AgentOptionEnvKeys("SSH_AUTH_SOCK=/opt/egruntime/ssh.agent.socket"),
 			runners.AgentOptionVolumes(t.MountDirs...),
 			runners.AgentOptionEnvKeys(t.EnvVars...),
+			runners.AgentOptionEnv(eg.EnvComputeTLSInsecure, strconv.FormatBool(tlsc.Insecure)),
 		),
 		runners.QueueOptionLogVerbosity(gctx.Verbosity),
 	)

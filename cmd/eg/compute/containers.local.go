@@ -141,7 +141,7 @@ func (t c8sLocal) Run(gctx *cmdopts.Global) (err error) {
 			ragent.Options(),
 			runners.AgentOptionVolumeSpecs(
 				runners.AgentMountReadOnly(m.Path, "/opt/egmodule.wasm"),
-				runners.AgentMountReadWrite(filepath.Join(ws.Root, ws.WorkingDir), "/opt/eg"),
+				runners.AgentMountReadWrite(filepath.Join(ws.Root, ws.WorkingDir), eg.DefaultRootDirectory),
 			)...)
 
 		// TODO REVISIT using t.ws.RuntimeDir as moduledir.

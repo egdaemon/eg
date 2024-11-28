@@ -20,11 +20,11 @@ func RunID() string {
 }
 
 func CacheDirectory(paths ...string) string {
-	return filepath.Join(env.String(os.TempDir(), "EG_CACHE_DIRECTORY", "CACHE_DIRECTORY"), filepath.Join(paths...))
+	return filepath.Join(env.String(os.TempDir(), eg.EnvComputeCacheDirectory, "CACHE_DIRECTORY"), filepath.Join(paths...))
 }
 
 func RuntimeDirectory(paths ...string) string {
-	return filepath.Join(env.String(os.TempDir(), "EG_RUNTIME_DIRECTORY"), filepath.Join(paths...))
+	return filepath.Join(env.String(os.TempDir(), eg.EnvComputeRuntimeDirectory), filepath.Join(paths...))
 }
 
 func EphemeralDirectory(paths ...string) string {
@@ -32,5 +32,5 @@ func EphemeralDirectory(paths ...string) string {
 }
 
 func RootDirectory(paths ...string) string {
-	return filepath.Join(env.String("/opt/eg", "EG_ROOT_DIRECTORY"), filepath.Join(paths...))
+	return filepath.Join(env.String(eg.DefaultRootDirectory, eg.EnvComputeRootDirectory), filepath.Join(paths...))
 }

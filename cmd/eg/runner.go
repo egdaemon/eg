@@ -128,7 +128,18 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 			ws,
 			c8s.ServiceProxyOptionCommandEnviron(
 				errorsx.Zero(
-					envx.Build().FromEnv("PATH", "TERM", "COLORTERM", "LANG", "CI", "EG_CI", eg.EnvComputeBin, eg.EnvComputeContainerExec, eg.EnvComputeRunID).Environ(),
+					envx.Build().FromEnv(
+						"PATH",
+						"TERM",
+						"COLORTERM",
+						"LANG",
+						"CI",
+						"EG_CI",
+						eg.EnvComputeBin,
+						eg.EnvComputeContainerExec,
+						eg.EnvComputeRunID,
+						eg.EnvComputeAccountID,
+					).Environ(),
 				)...,
 			),
 			c8s.ServiceProxyOptionContainerOptions(

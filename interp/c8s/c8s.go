@@ -133,6 +133,7 @@ func PodmanModuleRunCmd(image, cname, moduledir string, options ...string) []str
 		"--env", "EG_CI",
 		"--env", eg.EnvComputeRunID,
 		"--env", eg.EnvComputeBin,
+		"--env", eg.EnvComputeAccountID,
 	},
 		options...,
 	)
@@ -151,7 +152,7 @@ func PodmanModuleExecCmd(cname, moduledir string) []string {
 		cname,
 		envx.String("eg", eg.EnvComputeBin),
 		"module",
-		"--directory", "/opt/eg",
+		"--directory", eg.DefaultRootDirectory,
 		"--moduledir", moduledir,
 		"/opt/egmodule.wasm",
 	}

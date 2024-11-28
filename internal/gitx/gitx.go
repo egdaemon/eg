@@ -23,6 +23,7 @@ import (
 
 	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/compute"
+	"github.com/egdaemon/eg/internal/debugx"
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/httpx"
@@ -137,7 +138,7 @@ func LocalEnv(repo *git.Repository, remote string, branch string) (env []string,
 		return nil, err
 	}
 
-	return HeadEnv(repo, uri, "/opt/eg", branch)
+	return HeadEnv(repo, uri, eg.DefaultRootDirectory, branch)
 }
 
 func HeadEnv(repo *git.Repository, vcs, uri string, treeish string) (env []string, err error) {
@@ -196,11 +197,11 @@ func VCSDownloadToken(aid string, vcsuri string, options ...jwtx.Option) jwt.Reg
 // Automatically refresh the git credentials from an access token immediately the first time and then periodically in the background.
 func AutomaticCredentialRefresh(ctx context.Context, c *http.Client, dst string, token string) error {
 	if stringsx.Blank(token) {
-		log.Println("access token blank skipping")
+		debugx.Println("access token blank skipping")
 		return nil
 	}
 
-	log.Println("periodic git credentials refresh enabled")
+	debugx.Println("periodic git credentials refresh enabled")
 	if err := credentialRefresh(ctx, c, dst, token); err != nil {
 		return errorsx.Wrap(err, "failed to initially fetch access token")
 	}

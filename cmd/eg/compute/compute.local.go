@@ -191,7 +191,7 @@ func (t local) Run(gctx *cmdopts.Global) (err error) {
 					filepath.Join("/opt/egruntime", ws.Module, "main.wasm.d"),
 				),
 				runners.AgentMountReadOnly(m.Path, "/opt/egmodule.wasm"),
-				runners.AgentMountReadWrite(filepath.Join(ws.Root, ws.WorkingDir), "/opt/eg"),
+				runners.AgentMountReadWrite(filepath.Join(ws.Root, ws.WorkingDir), eg.DefaultRootDirectory),
 				mountegbin,
 			)...)
 

@@ -59,9 +59,16 @@ const (
 	EnvComputeVCS               = "EG_COMPUTE_VCS_URI"       // vcs uri for the compute workload
 	EnvComputeTTL               = "EG_COMPUTE_TTL"           // deadline for compute workload
 	EnvComputeContainerExec     = "EG_COMPUTE_EXEC_OPTIONS"  // CLI options for podman exec
+	EnvComputeRootDirectory     = "EG_COMPUTE_ROOT_DIRECTORY"
+	EnvComputeCacheDirectory    = "EG_COMPUTE_CACHE_DIRECTORY"
+	EnvComputeRuntimeDirectory  = "EG_COMPUTE_RUNTIME_DIRECTORY"
 	EnvComputeBin               = "EG_BIN"
 	EnvScheduleMaximumDelay     = "EG_COMPUTE_SCHEDULER_MAXIMUM_DELAY"
 	EnvPingMinimumDelay         = "EG_COMPUTE_PING_MINIMUM_DELAY"
+)
+
+const (
+	DefaultRootDirectory = "/opt/eg"
 )
 
 //go:embed DefaultContainerfile

@@ -202,6 +202,8 @@ func (t runner) perform(ctx context.Context, runid, path string, rtb runtimefn) 
 		eg.EnvComputeRunID,
 		eg.EnvComputeAccountID,
 	).Var(
+		eg.EnvComputeRootDirectory, t.root,
+	).Var(
 		eg.EnvComputeCacheDirectory, envx.String(guestcachedir, eg.EnvComputeCacheDirectory, "CACHE_DIRECTORY"),
 	).Var(
 		eg.EnvComputeRuntimeDirectory, guestruntimedir,

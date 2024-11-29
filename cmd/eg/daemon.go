@@ -64,6 +64,7 @@ func (t daemon) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 	if err = daemons.Register(gctx, tlsc, &t.runtimecfg, t.AccountID, t.MachineID, signer); err != nil {
 		return err
 	}
+
 	c := httpx.BindRetryTransport(tlsc.DefaultClient(), http.StatusTooManyRequests, http.StatusBadGateway)
 	tokensrc := compute.NewAuthzTokenSource(c, signer, authn.EndpointCompute())
 	authclient = oauth2.NewClient(
@@ -92,17 +93,18 @@ func (t daemon) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 	}
 
 	if err = daemons.Agent(gctx, grpcl); err != nil {
-		return err
+		return errorsx.Wrap(err, "unable to initialize daemon")
 	}
 
 	if err = daemons.SSHProxy(gctx, config, signer, httpl); err != nil {
-		return err
+		return errorsx.Wrap(err, "unable to enable ssh proxy")
 	}
 
 	go func() {
-		if cause := daemons.Ping(gctx, tlsc, &t.runtimecfg, t.AccountID, t.MachineID, signer); cause != nil {
-			log.Println("ping failed", cause)
-			// gctx.Shutdown()
+		for {
+			if cause := daemons.Ping(gctx, tlsc, &t.runtimecfg, t.AccountID, t.MachineID, signer); cause != nil {
+				log.Println("ping failed", cause)
+			}
 		}
 	}()
 
@@ -112,7 +114,7 @@ func (t daemon) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 
 	if _, found := os.LookupEnv("SSH_AUTH_SOCK"); !found {
 		if err = daemons.SSHAgent(gctx, t.SSHAgentPath); err != nil {
-			return err
+			return errorsx.Wrap(err, "ssh agent failed")
 		}
 	}
 

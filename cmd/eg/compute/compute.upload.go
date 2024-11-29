@@ -177,6 +177,7 @@ func (t upload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 	}
 	req.Header.Set("Content-Type", mimetype)
 
+	log.Println("uploading", t.Endpoint)
 	resp, err := httpx.AsError(chttp.Do(req)) //nolint:golint,bodyclose
 	defer httpx.TryClose(resp)
 

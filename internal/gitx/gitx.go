@@ -6,10 +6,10 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"net/url"
+	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -232,7 +232,7 @@ func credentialRefresh(ctx context.Context, c *http.Client, dst, token string) e
 		return errorsx.Wrap(err, "unable to create http request")
 	}
 
-	if err = ioutil.WriteFile(filepath.Join(dst, "vcsaccess.token"), encoded, 0666); err != nil {
+	if err = os.WriteFile(filepath.Join(dst, "vcsaccess.token"), encoded, 0666); err != nil {
 		return errorsx.Wrap(err, "unable to write credentials")
 	}
 
@@ -243,7 +243,7 @@ func LoadCredentials(ctx context.Context, vcsuri string, dir string) (transport.
 	var (
 		httpauth compute.GitCredentialsHTTP
 	)
-	encoded, err := ioutil.ReadFile(filepath.Join(dir, "vcsaccess.token"))
+	encoded, err := os.ReadFile(filepath.Join(dir, "vcsaccess.token"))
 	if err != nil {
 		return nil, err
 	}

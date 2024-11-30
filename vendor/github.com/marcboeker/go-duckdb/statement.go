@@ -1,7 +1,6 @@
 package duckdb
 
 /*
-#include <stdlib.h>
 #include <duckdb.h>
 */
 import "C"
@@ -59,7 +58,7 @@ func (s *stmt) bind(args []driver.NamedValue) error {
 		C.duckdb_free(unsafe.Pointer(name))
 
 		// fallback on index position
-		var arg = args[i]
+		arg := args[i]
 
 		// override with ordinal if set
 		for _, v := range args {
@@ -135,18 +134,18 @@ func (s *stmt) bind(args []driver.NamedValue) error {
 		case string:
 			val := C.CString(v)
 			if rv := C.duckdb_bind_varchar(*s.stmt, C.idx_t(i+1), val); rv == C.DuckDBError {
-				C.free(unsafe.Pointer(val))
+				C.duckdb_free(unsafe.Pointer(val))
 				return errCouldNotBind
 			}
-			C.free(unsafe.Pointer(val))
+			C.duckdb_free(unsafe.Pointer(val))
 		case []byte:
 			val := C.CBytes(v)
 			l := len(v)
 			if rv := C.duckdb_bind_blob(*s.stmt, C.idx_t(i+1), val, C.uint64_t(l)); rv == C.DuckDBError {
-				C.free(unsafe.Pointer(val))
+				C.duckdb_free(unsafe.Pointer(val))
 				return errCouldNotBind
 			}
-			C.free(unsafe.Pointer(val))
+			C.duckdb_free(unsafe.Pointer(val))
 		case time.Time:
 			val := C.duckdb_timestamp{
 				micros: C.int64_t(v.UTC().UnixMicro()),
@@ -221,9 +220,9 @@ func (s *stmt) execute(ctx context.Context, args []driver.NamedValue) (*C.duckdb
 
 	var pendingRes C.duckdb_pending_result
 	if state := C.duckdb_pending_prepared(*s.stmt, &pendingRes); state == C.DuckDBError {
-		dbErr := C.GoString(C.duckdb_pending_error(pendingRes))
+		dbErr := getDuckDBError(C.GoString(C.duckdb_pending_error(pendingRes)))
 		C.duckdb_destroy_pending(&pendingRes)
-		return nil, errors.New(dbErr)
+		return nil, dbErr
 	}
 	defer C.duckdb_destroy_pending(&pendingRes)
 
@@ -254,9 +253,9 @@ func (s *stmt) execute(ctx context.Context, args []driver.NamedValue) (*C.duckdb
 			return nil, ctx.Err()
 		}
 
-		err := C.GoString(C.duckdb_result_error(&res))
+		err := getDuckDBError(C.GoString(C.duckdb_result_error(&res)))
 		C.duckdb_destroy_result(&res)
-		return nil, errors.New(err)
+		return nil, err
 	}
 
 	return &res, nil

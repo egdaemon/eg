@@ -7,10 +7,8 @@ import (
 	"embed"
 	"encoding/binary"
 	"fmt"
-	"log"
 	"os"
 	"path/filepath"
-	"runtime"
 	"time"
 
 	"github.com/egdaemon/eg/runtime/wasi/eg"
@@ -19,7 +17,6 @@ import (
 	"github.com/egdaemon/eg/runtime/wasi/env"
 	"github.com/egdaemon/eg/runtime/wasi/shell"
 	"github.com/egdaemon/eg/runtime/x/wasi/egfs"
-	"github.com/shirou/gopsutil/v4/cpu"
 )
 
 //go:embed .debskel
@@ -28,8 +25,6 @@ var debskel embed.FS
 func prepare(version string) func(ctx context.Context, _ eg.Op) error {
 	return func(ctx context.Context, _ eg.Op) error {
 		relpath, _ := filepath.Rel(egenv.RootDirectory(), egenv.RuntimeDirectory())
-		count, _ := cpu.Counts(false)
-		log.Println("-------------------------------------------", "BDIR", relpath, runtime.NumCPU(), count, "-------------------------------------------")
 
 		sruntime := shell.Runtime().
 			Directory(relpath)

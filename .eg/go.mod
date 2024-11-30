@@ -2,18 +2,6 @@ module eg/ci
 
 go 1.23.2
 
-require (
-	github.com/egdaemon/eg v0.0.0-20241114150548-0c80bc5a46b2
-	github.com/shirou/gopsutil/v4 v4.24.6
-)
+require github.com/egdaemon/eg v0.0.0-20241130145445-d8a79743df0f
 
-require (
-	github.com/go-ole/go-ole v1.2.6 // indirect
-	github.com/lufia/plan9stats v0.0.0-20211012122336-39d0f177ccd0 // indirect
-	github.com/power-devops/perfstat v0.0.0-20210106213030-5aafc221ea8c // indirect
-	github.com/shoenig/go-m1cpu v0.1.6 // indirect
-	github.com/tklauser/go-sysconf v0.3.12 // indirect
-	github.com/tklauser/numcpus v0.6.1 // indirect
-	github.com/yusufpapurcu/wmi v1.2.4 // indirect
-	golang.org/x/sys v0.24.0 // indirect
-)
+require github.com/gofrs/uuid v4.4.0+incompatible // indirect

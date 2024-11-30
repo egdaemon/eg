@@ -34,30 +34,31 @@ github.com/ProtonMail/go-crypto/openpgp/s2k
 # github.com/alecthomas/kong v1.4.0
 ## explicit; go 1.20
 github.com/alecthomas/kong
-# github.com/apache/arrow/go/v14 v14.0.2
-## explicit; go 1.20
-github.com/apache/arrow/go/v14/arrow
-github.com/apache/arrow/go/v14/arrow/array
-github.com/apache/arrow/go/v14/arrow/arrio
-github.com/apache/arrow/go/v14/arrow/bitutil
-github.com/apache/arrow/go/v14/arrow/cdata
-github.com/apache/arrow/go/v14/arrow/decimal128
-github.com/apache/arrow/go/v14/arrow/decimal256
-github.com/apache/arrow/go/v14/arrow/encoded
-github.com/apache/arrow/go/v14/arrow/endian
-github.com/apache/arrow/go/v14/arrow/float16
-github.com/apache/arrow/go/v14/arrow/internal
-github.com/apache/arrow/go/v14/arrow/internal/debug
-github.com/apache/arrow/go/v14/arrow/internal/dictutils
-github.com/apache/arrow/go/v14/arrow/internal/flatbuf
-github.com/apache/arrow/go/v14/arrow/ipc
-github.com/apache/arrow/go/v14/arrow/memory
-github.com/apache/arrow/go/v14/arrow/memory/internal/cgoalloc
-github.com/apache/arrow/go/v14/arrow/memory/mallocator
-github.com/apache/arrow/go/v14/internal/bitutils
-github.com/apache/arrow/go/v14/internal/hashing
-github.com/apache/arrow/go/v14/internal/json
-github.com/apache/arrow/go/v14/internal/utils
+# github.com/apache/arrow-go/v18 v18.0.0
+## explicit; go 1.22.0
+github.com/apache/arrow-go/v18/arrow
+github.com/apache/arrow-go/v18/arrow/array
+github.com/apache/arrow-go/v18/arrow/arrio
+github.com/apache/arrow-go/v18/arrow/bitutil
+github.com/apache/arrow-go/v18/arrow/cdata
+github.com/apache/arrow-go/v18/arrow/decimal
+github.com/apache/arrow-go/v18/arrow/decimal128
+github.com/apache/arrow-go/v18/arrow/decimal256
+github.com/apache/arrow-go/v18/arrow/encoded
+github.com/apache/arrow-go/v18/arrow/endian
+github.com/apache/arrow-go/v18/arrow/float16
+github.com/apache/arrow-go/v18/arrow/internal
+github.com/apache/arrow-go/v18/arrow/internal/debug
+github.com/apache/arrow-go/v18/arrow/internal/dictutils
+github.com/apache/arrow-go/v18/arrow/internal/flatbuf
+github.com/apache/arrow-go/v18/arrow/ipc
+github.com/apache/arrow-go/v18/arrow/memory
+github.com/apache/arrow-go/v18/arrow/memory/internal/cgoalloc
+github.com/apache/arrow-go/v18/arrow/memory/mallocator
+github.com/apache/arrow-go/v18/internal/bitutils
+github.com/apache/arrow-go/v18/internal/hashing
+github.com/apache/arrow-go/v18/internal/json
+github.com/apache/arrow-go/v18/internal/utils
 # github.com/cilium/ebpf v0.16.0
 ## explicit; go 1.21
 github.com/cilium/ebpf
@@ -261,8 +262,8 @@ github.com/justinas/alice
 # github.com/kevinburke/ssh_config v1.2.0
 ## explicit
 github.com/kevinburke/ssh_config
-# github.com/klauspost/compress v1.17.9
-## explicit; go 1.20
+# github.com/klauspost/compress v1.17.11
+## explicit; go 1.21
 github.com/klauspost/compress
 github.com/klauspost/compress/fse
 github.com/klauspost/compress/huff0
@@ -285,8 +286,8 @@ github.com/mailru/easyjson
 github.com/mailru/easyjson/buffer
 github.com/mailru/easyjson/jlexer
 github.com/mailru/easyjson/jwriter
-# github.com/marcboeker/go-duckdb v1.7.0
-## explicit; go 1.21
+# github.com/marcboeker/go-duckdb v1.8.3
+## explicit; go 1.23
 github.com/marcboeker/go-duckdb
 # github.com/mattn/go-isatty v0.0.20
 ## explicit; go 1.15
@@ -294,7 +295,7 @@ github.com/mattn/go-isatty
 # github.com/mitchellh/mapstructure v1.5.0
 ## explicit; go 1.14
 github.com/mitchellh/mapstructure
-# github.com/onsi/ginkgo/v2 v2.21.0
+# github.com/onsi/ginkgo/v2 v2.22.0
 ## explicit; go 1.22.0
 github.com/onsi/ginkgo/v2
 github.com/onsi/ginkgo/v2/config
@@ -316,13 +317,14 @@ github.com/onsi/ginkgo/v2/internal/parallel_support
 github.com/onsi/ginkgo/v2/internal/testingtproxy
 github.com/onsi/ginkgo/v2/reporters
 github.com/onsi/ginkgo/v2/types
-# github.com/onsi/gomega v1.35.1
+# github.com/onsi/gomega v1.36.0
 ## explicit; go 1.22
 github.com/onsi/gomega
 github.com/onsi/gomega/format
 github.com/onsi/gomega/internal
 github.com/onsi/gomega/internal/gutil
 github.com/onsi/gomega/matchers
+github.com/onsi/gomega/matchers/internal/miter
 github.com/onsi/gomega/matchers/support/goraph/bipartitegraph
 github.com/onsi/gomega/matchers/support/goraph/edge
 github.com/onsi/gomega/matchers/support/goraph/node
@@ -376,7 +378,7 @@ github.com/sirupsen/logrus
 # github.com/skeema/knownhosts v1.3.0
 ## explicit; go 1.17
 github.com/skeema/knownhosts
-# github.com/tetratelabs/wazero v1.8.1
+# github.com/tetratelabs/wazero v1.8.2
 ## explicit; go 1.21
 github.com/tetratelabs/wazero
 github.com/tetratelabs/wazero/api
@@ -453,16 +455,16 @@ golang.org/x/crypto/ssh
 golang.org/x/crypto/ssh/agent
 golang.org/x/crypto/ssh/internal/bcrypt_pbkdf
 golang.org/x/crypto/ssh/knownhosts
-# golang.org/x/exp v0.0.0-20240823005443-9b4947da3948
-## explicit; go 1.20
+# golang.org/x/exp v0.0.0-20241108190413-2d47ceb2692f
+## explicit; go 1.22.0
 golang.org/x/exp/constraints
 golang.org/x/exp/maps
-# golang.org/x/mod v0.21.0
+# golang.org/x/mod v0.22.0
 ## explicit; go 1.22.0
 golang.org/x/mod/internal/lazyregexp
 golang.org/x/mod/module
 golang.org/x/mod/semver
-# golang.org/x/net v0.30.0
+# golang.org/x/net v0.31.0
 ## explicit; go 1.18
 golang.org/x/net/context
 golang.org/x/net/html
@@ -476,7 +478,7 @@ golang.org/x/net/internal/socks
 golang.org/x/net/internal/timeseries
 golang.org/x/net/proxy
 golang.org/x/net/trace
-# golang.org/x/oauth2 v0.23.0
+# golang.org/x/oauth2 v0.24.0
 ## explicit; go 1.18
 golang.org/x/oauth2
 golang.org/x/oauth2/internal
@@ -515,7 +517,7 @@ golang.org/x/text/unicode/norm
 # golang.org/x/time v0.8.0
 ## explicit; go 1.18
 golang.org/x/time/rate
-# golang.org/x/tools v0.26.0
+# golang.org/x/tools v0.27.0
 ## explicit; go 1.22.0
 golang.org/x/tools/cmd/goimports
 golang.org/x/tools/cmd/stringer

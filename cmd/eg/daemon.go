@@ -105,6 +105,12 @@ func (t daemon) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 			if cause := daemons.Ping(gctx, tlsc, &t.runtimecfg, t.AccountID, t.MachineID, signer); cause != nil {
 				log.Println("ping failed", cause)
 			}
+
+			select {
+			case <-gctx.Context.Done():
+				return
+			default:
+			}
 		}
 	}()
 

@@ -382,7 +382,7 @@ func beginwork(ctx context.Context, md metadata, dir string) state {
 			return completed(md, tmpdir, ws, uid, 0, errorsx.Wrap(err, "preparing root container failed"))
 		}
 
-		cmd := exec.CommandContext(ctx, "podman", "build", "--timestamp", "0", "-t", "eg", "-f", rootc, tmpdir)
+		cmd := exec.CommandContext(ctx, "podman", "build", "-t", "eg", "-f", rootc, tmpdir)
 		cmd.Stderr = os.Stderr
 		cmd.Stdin = os.Stdin
 		cmd.Stdout = os.Stdout

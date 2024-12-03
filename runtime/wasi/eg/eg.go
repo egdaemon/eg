@@ -351,7 +351,7 @@ func UnsafeRunner(ctx context.Context, r Runner, modulepath string) OpFn {
 }
 
 // Deprecated: this is intended for internal use only. do not use.
-// used to replace the module invocations at runtime.
+// used to replace the exec invocations at runtime.
 func UnsafeExec(ctx context.Context, r Runner, modulepath string) OpFn {
 	return func(ctx context.Context, o Op) error {
 		return r.RunWith(ctx, modulepath)

@@ -1,28 +1,52 @@
-FROM ubuntu:oracular
+# FROM ubuntu:oracular
 
-# put apt in non-interactive mode
-ENV DEBIAN_FRONTEND=noninteractive
+# # put apt in non-interactive mode
+# ENV DEBIAN_FRONTEND=noninteractive
 
-RUN apt update
+# RUN apt update
 
-# general utilities
-RUN apt install -o Acquire::ForceIPv4=true -y software-properties-common build-essential ca-certificates curl
-RUN add-apt-repository -n ppa:longsleep/golang-backports
-RUN add-apt-repository -n ppa:egdaemon/eg
-RUN add-apt-repository -n ppa:egdaemon/duckdb
-RUN apt update
+# # general utilities
+# RUN apt install -o Acquire::ForceIPv4=true -y software-properties-common build-essential ca-certificates curl
+# RUN add-apt-repository -n ppa:longsleep/golang-backports
+# RUN add-apt-repository -n ppa:egdaemon/eg
+# RUN add-apt-repository -n ppa:egdaemon/duckdb
+# RUN apt update
 
-RUN apt install -o Acquire::ForceIPv4=true -y --no-install-recommends curl gnupg2 lsb-release iproute2 git apt-file pinentry-tty uidmap dbus-user-session
-RUN apt install -o Acquire::ForceIPv4=true -y --no-install-recommends ssh podman netavark rsync vim golang-1.23 eg tree fuse-overlayfs
-# dependencies for duckdb while bootstrapping
-RUN apt install -o Acquire::ForceIPv4=true -y --no-install-recommends cmake ninja-build ccache dput devscripts dh-make dput libssl-dev
-RUN apt install -o Acquire::ForceIPv4=true -y --no-install-recommends duckdb
+# RUN apt install -o Acquire::ForceIPv4=true -y --no-install-recommends curl gnupg2 lsb-release iproute2 git apt-file pinentry-tty uidmap dbus-user-session
+# RUN apt install -o Acquire::ForceIPv4=true -y --no-install-recommends ssh podman netavark rsync vim golang-1.23 eg tree fuse-overlayfs
+# # dependencies for duckdb while bootstrapping
+# RUN apt install -o Acquire::ForceIPv4=true -y --no-install-recommends cmake ninja-build ccache dput devscripts dh-make dput libssl-dev
+# RUN apt install -o Acquire::ForceIPv4=true -y --no-install-recommends duckdb
 
-# properly link golang into the path.
-RUN ln -s /usr/lib/go-1.23/bin/go /usr/local/bin/go
+# # properly link golang into the path.
+# RUN ln -s /usr/lib/go-1.23/bin/go /usr/local/bin/go
+
+# # preload some well known hosts
+# RUN ssh-keyscan -H github.com >> /etc/ssh/ssh_known_hosts
+# RUN ssh-keyscan -H gitlab.com >> /etc/ssh/ssh_known_hosts
+
+# RUN systemctl enable ssh
+
+
+FROM docker.io/library/archlinux:latest
+
+# overriding base package as it doesn't work well with EFI systems?
+#Type Path                                Mode User Group Age         Argument
+RUN echo "d     /var/lib/tpm2-tss/system/keystore   2775 tss  tss   -           -"                      > /usr/lib/tmpfiles.d/tpm2-tss-fapi.conf
+RUN echo "a+    /var/lib/tpm2-tss/system/keystore   -    -    -     -           default:group:tss:rwx" >> /usr/lib/tmpfiles.d/tpm2-tss-fapi.conf
+RUN echo "d     /run/tpm2-tss/eventlog              2775 tss  tss   -           -"                     >> /usr/lib/tmpfiles.d/tpm2-tss-fapi.conf
+RUN echo "a+    /run/tpm2-tss/eventlog              -    -    -     -           default:group:tss:rwx" >> /usr/lib/tmpfiles.d/tpm2-tss-fapi.conf
+
+RUN systemd-tmpfiles --create
+RUN pacman --noconfirm -Syu podman netavark pacman-contrib pkgfile foot sudo bash-completion tree base base-devel git go openssh rsync github-cli
+RUN pacman --noconfirm -S fuse-overlayfs curl lsb-release pinentry shadow
+RUN git clone https://github.com/egdaemon/eg.git
+RUN GOBIN="/usr/local/bin" go install -C eg ./cmd/...
 
 # preload some well known hosts
 RUN ssh-keyscan -H github.com >> /etc/ssh/ssh_known_hosts
 RUN ssh-keyscan -H gitlab.com >> /etc/ssh/ssh_known_hosts
 
-RUN systemctl enable ssh
+# RUN usermod --add-subuids 100000-165535 --add-subgids 100000-165535 root
+
+RUN podman info

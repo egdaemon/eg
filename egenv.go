@@ -6,6 +6,7 @@ import (
 	"io/fs"
 	"log"
 	"os"
+	"path/filepath"
 
 	"github.com/egdaemon/eg/internal/slicesx"
 	"github.com/egdaemon/eg/internal/stringsx"
@@ -88,6 +89,10 @@ func PrepareRootContainer(cpath string) (err error) {
 		return err
 	}
 	defer c.Close()
+
+	if err = os.MkdirAll(filepath.Dir(cpath), 0700); err != nil {
+		return err
+	}
 
 	if dst, err = os.OpenFile(cpath, os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0600); err != nil {
 		return err

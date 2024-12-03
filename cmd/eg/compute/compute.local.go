@@ -56,7 +56,7 @@ func (t local) Run(gctx *cmdopts.Global) (err error) {
 		mounthome  runners.AgentOption = runners.AgentOptionNoop
 		privileged runners.AgentOption = runners.AgentOptionNoop
 		gpgmount   runners.AgentOption = runners.AgentOptionNoop
-		mountegbin                     = runners.AgentMountReadOnly(errorsx.Must(exec.LookPath(os.Args[0])), "/opt/egbin")
+		mountegbin runners.AgentOption = runners.AgentOptionEGBin(errorsx.Must(exec.LookPath(os.Args[0])))
 	)
 
 	// TODO: create a kong bind variable to do this automatically and inject as needed.
@@ -166,6 +166,7 @@ func (t local) Run(gctx *cmdopts.Global) (err error) {
 		sshmount,
 		sshenvvar,
 		gpgmount,
+		mountegbin,
 		runners.AgentOptionVolumes(
 			runners.AgentMountReadWrite(filepath.Join(ws.Root, ws.CacheDir), "/cache"),
 			runners.AgentMountReadWrite(filepath.Join(ws.Root, ws.RuntimeDir), "/opt/egruntime"),
@@ -192,7 +193,6 @@ func (t local) Run(gctx *cmdopts.Global) (err error) {
 				),
 				runners.AgentMountReadOnly(m.Path, "/opt/egmodule.wasm"),
 				runners.AgentMountReadWrite(filepath.Join(ws.Root, ws.WorkingDir), eg.DefaultRootDirectory),
-				mountegbin,
 			)...)
 
 		prepcmd := func(cmd *exec.Cmd) *exec.Cmd {

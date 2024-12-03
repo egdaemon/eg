@@ -92,6 +92,9 @@ func (t c8sLocal) Run(gctx *cmdopts.Global) (err error) {
 	}
 
 	log.Println("modules", modules)
+	if err = runners.BuildRootContainerPath(gctx.Context, t.Dir, filepath.Join(ws.RuntimeDir, "Containerfile")); err != nil {
+		return err
+	}
 
 	environpath := filepath.Join(ws.Root, ws.RuntimeDir, "environ.env")
 	if environio, err = os.Create(environpath); err != nil {

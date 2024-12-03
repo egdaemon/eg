@@ -115,12 +115,10 @@ func (t *ProxyService) Run(ctx context.Context, req *RunRequest) (_ *RunResponse
 	debugx.Println("PROXY CONTAINER RUN INITIATED", errorsx.Zero(os.Getwd()))
 	defer debugx.Println("PROXY CONTAINER RUN COMPLETED", errorsx.Zero(os.Getwd()))
 
-	options := append(
-		req.Options,
-		t.containeropts...,
-	)
+	options := append(t.containeropts, req.Options...)
 	options = append(
 		options,
+		"--env", envx.FormatInt(eg.EnvComputeModuleNestedLevel, envx.Int(0, eg.EnvComputeModuleNestedLevel)+1), // increment level
 		"--volume", "/opt/eg:/opt/eg:rw",
 	)
 
@@ -140,8 +138,8 @@ func (t *ProxyService) Module(ctx context.Context, req *ModuleRequest) (_ *Modul
 	options := append(t.containeropts, req.Options...)
 	options = append(
 		options,
-		"--volume", "/opt/eg:/opt/eg:rw",
 		"--env", envx.FormatInt(eg.EnvComputeModuleNestedLevel, envx.Int(0, eg.EnvComputeModuleNestedLevel)+1), // increment level
+		"--volume", "/opt/eg:/opt/eg:rw",
 	)
 
 	if err = PodmanModule(ctx, t.prepcmd, req.Image, req.Name, req.Mdir, options...); err != nil {

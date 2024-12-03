@@ -1,7 +1,7 @@
 package c8s
 
 import (
-	context "context"
+	"context"
 	"io"
 	"log"
 	"os/exec"
@@ -127,7 +127,7 @@ func PodmanModuleRunCmd(image, cname, moduledir string, options ...string) []str
 	options = append([]string{
 		"run",
 		"--name", cname,
-		"--pids-limit", "-1",
+		"--pids-limit", "-1", // this can probably be removed now that we have it in the runner.go file.
 		"--detach",
 		"--env", "CI",
 		"--env", "EG_CI",

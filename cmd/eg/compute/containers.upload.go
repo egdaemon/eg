@@ -42,7 +42,7 @@ type c8scmds struct {
 var embeddedc8supload embed.FS
 
 type c8sUpload struct {
-	runtimecfg    cmdopts.RuntimeResources
+	cmdopts.RuntimeResources
 	HostedCompute bool     `name:"shared-compute" help:"allow hosted compute" default:"true"`
 	Containerfile string   `arg:"" help:"path to the container file to run" default:"Containerfile"`
 	SSHKeyPath    string   `name:"sshkeypath" help:"path to ssh key to use" default:"${vars_ssh_key_path}"`
@@ -173,13 +173,12 @@ func (t c8sUpload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error
 	mimetype, buf, err := runners.NewEnqueueUpload(&runners.Enqueued{
 		AllowShared: t.HostedCompute,
 		Entry:       filepath.Base(entry.Path),
-		Ttl:         uint64(t.runtimecfg.TTL.Milliseconds()),
-		Cores:       t.runtimecfg.Cores,
-		Memory:      t.runtimecfg.Memory,
-		Arch:        t.runtimecfg.Arch,
-		Os:          t.runtimecfg.OS,
+		Ttl:         uint64(t.RuntimeResources.TTL.Milliseconds()),
+		Cores:       t.RuntimeResources.Cores,
+		Memory:      t.RuntimeResources.Memory,
+		Arch:        t.RuntimeResources.Arch,
+		Os:          t.RuntimeResources.OS,
 		Vcsuri:      errorsx.Zero(gitx.CanonicalURI(repo, t.GitRemote)), // optionally set the vcsuri if we're inside a repository.
-
 	}, archiveio)
 	if err != nil {
 		return errorsx.Wrap(err, "unable to generate multipart upload")

@@ -6,6 +6,7 @@ import (
 	"os/exec"
 	"sync"
 
+	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/internal/md5x"
 	"github.com/egdaemon/eg/interp/c8s"
 	"github.com/egdaemon/eg/interp/runtime/wasi/ffiegcontainer"
@@ -88,7 +89,7 @@ func Analyse(ctx context.Context, g ffigraph.Eventer, aid, runid, dir string, mo
 			cname := fmt.Sprintf("%s.%s", name, md5x.String(runid))
 			options = append(
 				options,
-				"--volume", fmt.Sprintf("%s:%s:O", r.runtimedir, runners.DefaultRunnerRuntimeDir()),
+				"--volume", fmt.Sprintf("%s:%s:O", r.runtimedir, eg.DefaultRuntimeDirectory),
 			)
 			return c8s.PodmanModule(ctx, cmdctx, fmt.Sprintf("%s.%s", aid, name), cname, r.root, options...)
 		})).Export("github.com/egdaemon/eg/runtime/wasi/runtime/ffiegcontainer.Module").

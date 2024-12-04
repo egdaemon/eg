@@ -3,23 +3,12 @@ package main
 import (
 	"context"
 	"log"
-	"math/rand"
 
 	"github.com/egdaemon/eg/runtime/wasi/eg"
 	"github.com/egdaemon/eg/runtime/wasi/egenv"
-	"github.com/egdaemon/eg/runtime/wasi/egmetrics"
+	"github.com/egdaemon/eg/runtime/wasi/eggit"
 	"github.com/egdaemon/eg/runtime/wasi/shell"
 )
-
-type MetricCPU struct {
-	Load float32
-}
-
-func automcpu() MetricCPU {
-	return MetricCPU{
-		Load: rand.Float32(),
-	}
-}
 
 func Debug(ctx context.Context, op eg.Op) error {
 	log.Println("debug initiated")
@@ -37,20 +26,28 @@ func Debug(ctx context.Context, op eg.Op) error {
 	)
 }
 
+func ChangeDetected(ctx context.Context, op eg.Op) error {
+	log.Println("change detected")
+	return nil
+}
+
 func main() {
 	ctx, done := context.WithTimeout(context.Background(), egenv.TTL())
 	defer done()
 
-	err := eg.Perform(
+	mods, err := eggit.NewModified(ctx)
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	err = eg.Perform(
 		ctx,
 		Debug,
+		eg.When(mods.Changed(egenv.RootDirectory()), ChangeDetected),
 	)
 
 	if err != nil {
 		log.Fatalln(err)
 	}
 
-	if err := egmetrics.Record(ctx, "cpu", automcpu()); err != nil {
-		log.Fatalln(err)
-	}
 }

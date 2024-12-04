@@ -19,12 +19,8 @@ import (
 	"google.golang.org/grpc"
 )
 
-func DefaultRunnerRuntimeDir() string {
-	return filepath.Join("/", "opt", "egruntime")
-}
-
 func DefaultRunnerSocketPath() string {
-	return filepath.Join(DefaultRunnerRuntimeDir(), "control.socket")
+	return eg.DefaultRuntimeDirectory("control.socket")
 }
 
 type AgentOption func(*Agent)
@@ -74,7 +70,7 @@ func AgentOptionEGBin(egbin string) AgentOption {
 }
 
 func AgentOptionEnviron(environpath string) AgentOption {
-	return AgentOptionVolumes(AgentMountReadOnly(environpath, "/opt/egruntime/environ.env"))
+	return AgentOptionVolumes(AgentMountReadOnly(environpath, eg.DefaultRuntimeDirectory("environ.env")))
 }
 
 func AgentOptionVolumeSpecs(desc ...string) []string {
@@ -133,11 +129,11 @@ func AgentOptionEnvKeys(keys ...string) AgentOption {
 func AgentOptionAutoRemote() AgentOption {
 	if host := envx.String("", eg.EnvContainerHost); stringsx.Present(host) {
 		return AgentOptionCompose(
-			AgentOptionEnv(eg.EnvContainerHost, "/opt/egruntime/podman.socket"),
+			AgentOptionEnv(eg.EnvContainerHost, eg.DefaultRuntimeDirectory("podman.socket")),
 			AgentOptionVolumes(
 				AgentMountReadWrite(
 					strings.TrimPrefix(host, "unix://"),
-					"/opt/egruntime/podman.socket",
+					eg.DefaultRuntimeDirectory("podman.socket"),
 				),
 			),
 		)

@@ -5,6 +5,7 @@ import (
 
 	_eg "github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/runtime/wasi/eg"
+	"github.com/egdaemon/eg/runtime/wasi/egenv"
 	"github.com/egdaemon/eg/runtime/wasi/env"
 	"github.com/egdaemon/eg/runtime/wasi/shell"
 	"github.com/gofrs/uuid"
@@ -27,9 +28,9 @@ func Module(ctx context.Context, op eg.Op) error {
 func FileTree(ctx context.Context, op eg.Op) error {
 	return shell.Run(
 		ctx,
-		shell.New("tree -a -L 1 /cache"),
 		shell.New("tree -a -L 1 /opt"),
-		shell.New("tree -a -L 2 /opt/egruntime"),
+		shell.Newf("tree -a -L 1 %s", egenv.CacheDirectory()),
+		shell.Newf("tree -a -L 2 %s", egenv.RuntimeDirectory()),
 	)
 }
 

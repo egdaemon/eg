@@ -29,18 +29,19 @@ import (
 
 type local struct {
 	cmdopts.RuntimeResources
-	Dir            string   `name:"directory" help:"root directory of the repository" default:"${vars_cwd}"`
-	ModuleDir      string   `name:"moduledir" help:"must be a subdirectory in the provided directory" default:".eg"`
-	Name           string   `arg:"" name:"module" help:"name of the module to run, i.e. the folder name within moduledir" default:""`
-	Privileged     bool     `name:"privileged" help:"run the initial container in privileged mode"`
-	Dirty          bool     `name:"dirty" help:"include user directories and environment variables" hidden:"true"`
-	MountEnvirons  string   `name:"environ" help:"environment file to pass to the module" default:""`
-	EnvVars        []string `name:"env" short:"e" help:"environment variables to import" default:""`
-	SSHAgent       bool     `name:"sshagent" help:"enable ssh agent" hidden:"true"`
-	GPGAgent       bool     `name:"gpgagent" help:"enable gpg agent" hidden:"true"`
-	GitRemote      string   `name:"git-remote" help:"name of the git remote to use" default:"${vars_git_default_remote_name}"`
-	GitReference   string   `name:"git-ref" help:"name of the branch or commit to checkout" default:"${vars_git_default_reference}"`
-	ContainerCache string   `name:"croot" help:"container storage, ideally we'd be able to share with the host but for now" hidden:"true" default:"${vars_container_cache_directory}"`
+	Dir              string   `name:"directory" help:"root directory of the repository" default:"${vars_cwd}"`
+	ModuleDir        string   `name:"moduledir" help:"must be a subdirectory in the provided directory" default:".eg"`
+	Name             string   `arg:"" name:"module" help:"name of the module to run, i.e. the folder name within moduledir" default:""`
+	Privileged       bool     `name:"privileged" help:"run the initial container in privileged mode"`
+	Dirty            bool     `name:"dirty" help:"include user directories and environment variables" hidden:"true"`
+	EnvironmentPaths string   `name:"envpath" help:"environment files to pass to the module" default:""`
+	Environment      []string `name:"env" short:"e" help:"define environment variables and their values to be included"`
+	SSHAgent         bool     `name:"sshagent" help:"enable ssh agent" hidden:"true"`
+	GPGAgent         bool     `name:"gpgagent" help:"enable gpg agent" hidden:"true"`
+	GitRemote        string   `name:"git-remote" help:"name of the git remote to use" default:"${vars_git_default_remote_name}"`
+	GitReference     string   `name:"git-ref" help:"name of the branch or commit to checkout" default:"${vars_git_default_reference}"`
+	ContainerCache   string   `name:"croot" help:"container storage, ideally we'd be able to share with the host but for now" hidden:"true" default:"${vars_container_cache_directory}"`
+	Impure           bool     `name:"impure" help:"clone the repository before building and executing the container"`
 }
 
 func (t local) Run(gctx *cmdopts.Global) (err error) {
@@ -89,8 +90,8 @@ func (t local) Run(gctx *cmdopts.Global) (err error) {
 	}
 
 	envb := envx.Build().
-		FromPath(t.MountEnvirons).
-		FromEnv(t.EnvVars...).
+		FromPath(t.EnvironmentPaths).
+		FromEnv(t.Environment...).
 		FromEnv(os.Environ()...).
 		FromEnv(eg.EnvComputeContainerExec).
 		FromEnviron(errorsx.Zero(gitx.LocalEnv(repo, t.GitRemote, t.GitReference))...).

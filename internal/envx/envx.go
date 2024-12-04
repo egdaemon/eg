@@ -303,10 +303,12 @@ func (t *builder) Var(k, v string) *builder {
 
 // extract environment variables from a file on disk.
 // missing files are treated as noops.
-func (t *builder) FromPath(n string) *builder {
-	tmp, err := FromPath(n)
-	t.environ = append(t.environ, tmp...)
-	t.failed = errors.Join(t.failed, err)
+func (t *builder) FromPath(p ...string) *builder {
+	for _, n := range p {
+		tmp, err := FromPath(n)
+		t.environ = append(t.environ, tmp...)
+		t.failed = errors.Join(t.failed, err)
+	}
 	return t
 }
 

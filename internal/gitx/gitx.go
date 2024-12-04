@@ -130,15 +130,27 @@ func Env(repo *git.Repository, remote string, branch string, vcsclone string) (e
 	return HeadEnv(repo, uri, stringsx.First(vcsclone, uri), branch)
 }
 
-// ideally we shouldn't need this but unfortunately go-git doesn't apply instead of rules properly.
+// ideally we shouldn't need this but unfortunately go-git doesn't apply 'instead of' rules properly.
 // and from the issue tracker that leads to the question of if it works with the git credential helper.
 func LocalEnv(repo *git.Repository, remote string, branch string) (env []string, err error) {
+	var (
+		benv []string
+	)
+
 	uri, err := CanonicalURI(repo, remote)
 	if err != nil {
 		return nil, err
 	}
 
-	return HeadEnv(repo, uri, eg.DefaultRootDirectory, branch)
+	if env, err = HeadEnv(repo, uri, eg.DefaultRootDirectory, branch); err != nil {
+		return nil, err
+	}
+
+	if benv, err = BaseEnv(repo, uri, eg.DefaultRootDirectory, "main"); err != nil {
+		return nil, err
+	}
+
+	return append(env, benv...), nil
 }
 
 func HeadEnv(repo *git.Repository, vcs, uri string, treeish string) (env []string, err error) {
@@ -149,24 +161,51 @@ func HeadEnv(repo *git.Repository, vcs, uri string, treeish string) (env []strin
 
 	if hash, err = repo.ResolveRevision(plumbing.Revision(treeish)); err != nil {
 		return nil, errorsx.Wrapf(err, "unable to resolve git reference: %s", treeish)
-	} else if commit, err = repo.CommitObject(*hash); err != nil {
+	}
+
+	if commit, err = repo.CommitObject(*hash); err != nil {
 		return nil, errorsx.Wrapf(err, "unable to resolve git reference: %s", treeish)
 	}
 
 	return envx.Build().Var(
-		"EG_GIT_HEAD_VCS", vcs,
+		eg.EnvGitHeadVCS, vcs,
 	).Var(
-		"EG_GIT_HEAD_URI", uri,
+		eg.EnvGitHeadURI, uri,
 	).Var(
-		"EG_GIT_HEAD_REF", treeish,
+		eg.EnvGitHeadRef, treeish,
 	).Var(
-		"EG_GIT_HEAD_COMMIT", commit.Hash.String(),
+		eg.EnvGitHeadCommit, commit.Hash.String(),
 	).Var(
-		"EG_GIT_HEAD_COMMIT_AUTHOR", commit.Committer.Name,
+		eg.EnvGitHeadCommitAuthor, commit.Committer.Name,
 	).Var(
-		"EG_GIT_HEAD_COMMIT_EMAIL", commit.Committer.Email,
+		eg.EnvGitHeadCommitEmail, commit.Committer.Email,
 	).Var(
-		"EG_GIT_HEAD_COMMIT_TIMESTAMP", commit.Committer.When.Format(time.RFC3339),
+		eg.EnvGitHeadCommitTimestamp, commit.Committer.When.Format(time.RFC3339),
+	).Environ()
+}
+
+func BaseEnv(repo *git.Repository, vcs, uri string, treeish string) (env []string, err error) {
+	var (
+		hash   *plumbing.Hash
+		commit *object.Commit
+	)
+
+	if hash, err = repo.ResolveRevision(plumbing.Revision(treeish)); err != nil {
+		return nil, errorsx.Wrapf(err, "unable to resolve git reference: %s", treeish)
+	}
+
+	if commit, err = repo.CommitObject(*hash); err != nil {
+		return nil, errorsx.Wrapf(err, "unable to resolve git reference: %s", treeish)
+	}
+
+	return envx.Build().Var(
+		eg.EnvGitBaseURI, vcs,
+	).Var(
+		eg.EnvGitBaseURI, uri,
+	).Var(
+		eg.EnvGitBaseRef, treeish,
+	).Var(
+		eg.EnvGitBaseCommit, commit.Hash.String(),
 	).Environ()
 }
 

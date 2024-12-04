@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/egdaemon/eg"
+	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/runtime/wasi/env"
 )
 
@@ -33,4 +34,8 @@ func EphemeralDirectory(paths ...string) string {
 
 func RootDirectory(paths ...string) string {
 	return filepath.Join(env.String(eg.DefaultRootDirectory, eg.EnvComputeRootDirectory), filepath.Join(paths...))
+}
+
+func Boolean(fallback bool, keys ...string) bool {
+	return envx.Boolean(fallback, keys...)
 }

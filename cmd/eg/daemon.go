@@ -137,11 +137,11 @@ func (t daemon) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 			runners.AgentOptionVolumes(
 				runners.AgentMountReadWrite(
 					envx.String(t.SSHAgentPath, "SSH_AUTH_SOCK"),
-					"/opt/egruntime/ssh.agent.socket",
+					eg.DefaultRuntimeDirectory("ssh.agent.socket"),
 				),
 				runners.AgentMountReadOnly(t.SSHKnownHosts, "/etc/ssh/ssh_known_hosts"),
 			),
-			runners.AgentOptionEnvKeys("SSH_AUTH_SOCK=/opt/egruntime/ssh.agent.socket"),
+			runners.AgentOptionEnv("SSH_AUTH_SOCK", eg.DefaultRuntimeDirectory("ssh.agent.socket")),
 			runners.AgentOptionVolumes(t.MountDirs...),
 			runners.AgentOptionEnvKeys(t.EnvVars...),
 			runners.AgentOptionEnv(eg.EnvComputeTLSInsecure, strconv.FormatBool(tlsc.Insecure)),

@@ -5,7 +5,7 @@ from . import interp
 from uuid_extensions import uuid7str
 
 def defaultRunnerRuntimeDir() -> str:
-	return os.environ.get("EG_RUNTIME_DIRECTORY", os.path.join("/", "opt", "egruntime"))
+	return os.environ.get("EG_RUNTIME_DIRECTORY", os.path.join("/", "opt", "eg.runtime"))
 
 def defaultRunnerSocketPath() -> str:
 	return os.path.join(defaultRunnerRuntimeDir(), "control.socket")

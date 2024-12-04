@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/egdaemon/eg/runtime/wasi/eg"
+	"github.com/egdaemon/eg/runtime/wasi/egenv"
 	"github.com/egdaemon/eg/runtime/wasi/env"
 	"github.com/egdaemon/eg/runtime/wasi/shell"
 )
@@ -18,7 +19,7 @@ func Debug(ctx context.Context, op eg.Op) error {
 	return shell.Run(
 		ctx,
 		shell.New("pwd"),
-		shell.New("tree -a --gitignore /opt/egruntime"),
+		shell.Newf("tree -a --gitignore %s", egenv.RuntimeDirectory()),
 		shell.New("ls -lha /opt/eg/.test/Containerfile"),
 		shell.New("ssh -T git@github.com").Lenient(true),
 	)

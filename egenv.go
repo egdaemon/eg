@@ -70,6 +70,20 @@ const (
 )
 
 const (
+	EnvGitBaseVCS             = "EG_GIT_BASE_VCS"
+	EnvGitBaseURI             = "EG_GIT_BASE_URI"
+	EnvGitBaseRef             = "EG_GIT_BASE_REF"
+	EnvGitBaseCommit          = "EG_GIT_BASE_COMMIT"
+	EnvGitHeadVCS             = "EG_GIT_HEAD_VCS"
+	EnvGitHeadURI             = "EG_GIT_HEAD_URI"
+	EnvGitHeadRef             = "EG_GIT_HEAD_REF"
+	EnvGitHeadCommit          = "EG_GIT_HEAD_COMMIT"
+	EnvGitHeadCommitAuthor    = "EG_GIT_HEAD_COMMIT_AUTHOR"
+	EnvGitHeadCommitEmail     = "EG_GIT_HEAD_COMMIT_EMAIL"
+	EnvGitHeadCommitTimestamp = "EG_GIT_HEAD_COMMIT_TIMESTAMP"
+)
+
+const (
 	DefaultRootDirectory = "/opt/eg"
 )
 

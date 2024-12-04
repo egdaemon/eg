@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/runtime/wasi/eg"
 	"github.com/egdaemon/eg/runtime/wasi/egunsafe/ffigit"
@@ -80,4 +81,12 @@ func Clone(ctx context.Context, uri, remote, branch string) error {
 
 func AutoClone(ctx context.Context, _ eg.Op) error {
 	return Clone(ctx, env.String("", "EG_GIT_HEAD_URI"), env.String("origin", "EG_GIT_HEAD_REMOTE"), env.String("main", "EG_GIT_HEAD_REF"))
+}
+
+func Modified(paths ...string) eg.OpFn {
+	return func(ctx context.Context, o eg.Op) error {
+		envx.Debug(os.Environ()...)
+		return nil
+		// execx.String(ctx, "git", "diff", f)
+	}
 }

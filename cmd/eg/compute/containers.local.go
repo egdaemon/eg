@@ -137,8 +137,8 @@ func (t c8sLocal) Run(gctx *cmdopts.Global) (err error) {
 		sshmount,
 		sshenvvar,
 		runners.AgentOptionVolumes(
-			runners.AgentMountReadWrite(filepath.Join(ws.Root, ws.CacheDir), "/cache"),
-			runners.AgentMountReadWrite(filepath.Join(ws.Root, ws.RuntimeDir), "/opt/egruntime"),
+			runners.AgentMountReadWrite(filepath.Join(ws.Root, ws.CacheDir), eg.DefaultCacheDirectory()),
+			runners.AgentMountReadWrite(filepath.Join(ws.Root, ws.RuntimeDir), eg.DefaultRuntimeDirectory()),
 			runners.AgentMountReadWrite(t.ContainerCache, "/var/lib/containers"),
 		),
 		runners.AgentOptionEnviron(environpath),
@@ -166,7 +166,7 @@ func (t c8sLocal) Run(gctx *cmdopts.Global) (err error) {
 			ragent.Options(),
 			runners.AgentOptionVolumeSpecs(
 				runners.AgentMountReadOnly(m.Path, "/opt/egmodule.wasm"),
-				runners.AgentMountReadWrite(filepath.Join(ws.Root, ws.WorkingDir), eg.DefaultRootDirectory),
+				runners.AgentMountReadWrite(filepath.Join(ws.Root, ws.WorkingDir), eg.DefaultRootDirectory()),
 			)...)
 
 		// TODO REVISIT using t.ws.RuntimeDir as moduledir.

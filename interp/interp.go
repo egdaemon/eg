@@ -168,8 +168,6 @@ func (t runner) Open(name string) (fs.File, error) {
 
 func (t runner) perform(ctx context.Context, runid, path string, rtb runtimefn) (err error) {
 	hostcachedir := filepath.Join(t.runtimedir, "cache")
-	guestcachedir := filepath.Join("/", "cache")
-	guestruntimedir := runners.DefaultRunnerRuntimeDir()
 	tmpdir, err := os.MkdirTemp(t.runtimedir, ".tmp.*")
 	if err != nil {
 		return errorsx.Wrap(err, "unable to create tmp directory")
@@ -204,18 +202,18 @@ func (t runner) perform(ctx context.Context, runid, path string, rtb runtimefn) 
 	).Var(
 		eg.EnvComputeRootDirectory, t.root,
 	).Var(
-		eg.EnvComputeCacheDirectory, envx.String(guestcachedir, eg.EnvComputeCacheDirectory, "CACHE_DIRECTORY"),
+		eg.EnvComputeCacheDirectory, envx.String(eg.DefaultCacheDirectory(), eg.EnvComputeCacheDirectory, "CACHE_DIRECTORY"),
 	).Var(
-		eg.EnvComputeRuntimeDirectory, guestruntimedir,
+		eg.EnvComputeRuntimeDirectory, eg.DefaultRuntimeDirectory(),
 	).Var(
-		"RUNTIME_DIRECTORY", guestruntimedir,
+		"RUNTIME_DIRECTORY", eg.DefaultRuntimeDirectory(),
 	).Environ()
 	if err != nil {
 		return err
 	}
 
-	debugx.Println("cache dir", hostcachedir, "->", guestcachedir)
-	debugx.Println("runtime dir", t.runtimedir, "->", guestruntimedir)
+	debugx.Println("cache dir", hostcachedir, "->", eg.DefaultCacheDirectory())
+	debugx.Println("runtime dir", t.runtimedir, "->", eg.DefaultRuntimeDirectory())
 
 	mcfg := wazero.NewModuleConfig().WithEnv(
 		"CI", envx.String("false", "EG_CI", "CI"),
@@ -232,17 +230,22 @@ func (t runner) perform(ctx context.Context, runid, path string, rtb runtimefn) 
 	).WithEnv(
 		eg.EnvComputeRootDirectory, t.root,
 	).WithEnv(
-		eg.EnvComputeCacheDirectory, envx.String(guestcachedir, eg.EnvComputeCacheDirectory, "CACHE_DIRECTORY"),
+		eg.EnvComputeCacheDirectory, envx.String(eg.DefaultCacheDirectory(), eg.EnvComputeCacheDirectory, "CACHE_DIRECTORY"),
 	).WithEnv(
-		eg.EnvComputeRuntimeDirectory, guestruntimedir,
+		eg.EnvComputeRuntimeDirectory, eg.DefaultRuntimeDirectory(),
 	).WithEnv(
-		"RUNTIME_DIRECTORY", guestruntimedir,
+		"RUNTIME_DIRECTORY", eg.DefaultRuntimeDirectory(),
+	).WithEnv(
+		"PATH", os.Getenv("PATH"),
 	).WithEnv(
 		"HOME", userx.HomeDirectoryOrDefault("/root"),
 	).WithEnv(
 		"TERM", envx.String("", "TERM"),
 	).WithEnv(
-		"PWD", eg.DefaultRootDirectory,
+		"PWD", eg.DefaultRootDirectory(),
+	).WithEnv(
+		"TMPDIR",
+		filepath.Join(eg.DefaultRuntimeDirectory(), filepath.Base(tmpdir)),
 	).WithStdin(
 		os.Stdin,
 	).WithStderr(
@@ -251,13 +254,12 @@ func (t runner) perform(ctx context.Context, runid, path string, rtb runtimefn) 
 		os.Stdout,
 	).WithFSConfig(
 		wazero.NewFSConfig().
-			WithDirMount(hostcachedir, guestcachedir).
-			WithDirMount(tmpdir, "/tmp").
-			WithDirMount(t.runtimedir, guestruntimedir).
-			WithDirMount(t.root, eg.DefaultRootDirectory), // ensure we mount the working directory so pwd works correctly.
+			WithDirMount(t.runtimedir, eg.DefaultRuntimeDirectory()).
+			WithDirMount(hostcachedir, eg.DefaultCacheDirectory()).
+			WithDirMount(t.root, eg.DefaultRootDirectory()), // ensure we mount the working directory so pwd works correctly.
 	).WithSysNanotime().WithSysWalltime().WithRandSource(rand.Reader)
 
-	environ := errorsx.Zero(envx.FromPath("/opt/egruntime/environ.env"))
+	environ := errorsx.Zero(envx.FromPath(eg.DefaultRuntimeDirectory("environ.env")))
 	// envx.Debug(environ...)
 	mcfg = wasix.Environ(mcfg, environ...)
 

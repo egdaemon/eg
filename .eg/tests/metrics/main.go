@@ -28,8 +28,9 @@ func Debug(ctx context.Context, op eg.Op) error {
 		ctx,
 		shell.New("env"),
 		shell.New("pwd"),
-		shell.New("tree -L 2 /opt/egruntime"),
-		shell.New("truncate --size 0 /opt/egruntime/environ.env").Lenient(true),
+		shell.Newf("tree -L 2 %s", egenv.RuntimeDirectory()),
+		shell.Newf("truncate --size 0 %s", egenv.RuntimeDirectory("environ.env")).Lenient(true),
+		shell.Newf("tree -L 2 %s", egenv.RootDirectory()),
 		shell.Newf("apt-get install stress"),
 		shell.Newf("stress -t 5 -c %d", 24),
 		shell.Newf("stress -t 5 -m %d", 24), // requires 6GB of ram

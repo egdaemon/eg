@@ -107,6 +107,7 @@ func main() {
 			"vars_runtime_directory":         userx.DefaultRuntimeDirectory(),
 			"vars_cache_directory":           userx.DefaultCacheDirectory(),
 			"vars_container_cache_directory": filepath.Join(userx.DefaultCacheDirectory(), "containers"),
+			"vars_eg_runtime_directory":      eg.DefaultRuntimeDirectory(),
 			"vars_account_id":                envx.String("", "EG_ACCOUNT"),
 			"vars_machine_id":                envx.String(machineID(), "EG_MACHINE_ID"),
 			"vars_entropy_seed":              envx.String(errorsx.Must(uuid.NewV4()).String(), "EG_ENTROPY_SEED"),
@@ -128,6 +129,7 @@ func main() {
 			"vars_disk_minimum_default":    strconv.FormatUint(envx.Uint64(2*bytesx.GiB, "EG_RESOURCES_DISK"), 10),
 			"vars_git_default_remote_name": git.DefaultRemoteName,
 			"vars_git_default_reference":   "main",
+			"vars_git_head_reference":      "HEAD",
 		},
 		kong.UsageOnError(),
 		kong.Bind(

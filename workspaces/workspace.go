@@ -60,14 +60,14 @@ func FromEnv(ctx context.Context, root, name string) (zero Context, err error) {
 	return Context{
 		Module:     name,
 		Root:       root,
-		RuntimeDir: "egruntime",
+		RuntimeDir: "eg.runtime",
 	}, nil
 }
 
 func New(ctx context.Context, root string, mdir string, name string) (zero Context, err error) {
 	cidmd5 := md5.New()
 	cdir := filepath.Join(mdir, ".cache")
-	runtimedir := filepath.Join(mdir, ".egruntime")
+	runtimedir := filepath.Join(mdir, ".eg.runtime")
 	ignore := ignoredir{path: cdir, reason: "cache directory"}
 
 	if err = cacheid(ctx, root, mdir, cidmd5, ignore); err != nil {

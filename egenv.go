@@ -66,6 +66,7 @@ const (
 	EnvComputeBin               = "EG_BIN"
 	EnvScheduleMaximumDelay     = "EG_COMPUTE_SCHEDULER_MAXIMUM_DELAY"
 	EnvPingMinimumDelay         = "EG_COMPUTE_PING_MINIMUM_DELAY"
+	EnvComputeContainerImpure   = "EG_C8S_IMPURE"
 )
 
 const (

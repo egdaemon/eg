@@ -15,30 +15,35 @@ import (
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/fsx"
+	"github.com/egdaemon/eg/internal/gitx"
 	"github.com/egdaemon/eg/internal/iox"
 	"github.com/egdaemon/eg/internal/wasix"
 	"github.com/egdaemon/eg/interp/c8s"
 	"github.com/egdaemon/eg/runners"
 	"github.com/egdaemon/eg/transpile"
 	"github.com/egdaemon/eg/workspaces"
+	"github.com/go-git/go-git/v5"
 	"github.com/gofrs/uuid"
 )
 
 type c8sLocal struct {
 	cmdopts.RuntimeResources
-	Dir            string   `name:"directory" help:"root directory of the repository" default:"${vars_cwd}"`
-	Containerfile  string   `arg:"" help:"path to the container file to run" default:"Containerfile"`
-	SSHKeyPath     string   `name:"sshkeypath" help:"path to ssh key to use" default:"${vars_ssh_key_path}"`
-	Environment    []string `name:"env" short:"e" help:"define environment variables and their values to be included"`
-	GitRemote      string   `name:"git-remote" help:"name of the git remote to use" default:"${vars_git_default_remote_name}"`
-	Endpoint       string   `name:"endpoint" help:"specify the endpoint to upload to" default:"${vars_endpoint}/c/manager/" hidden:"true"`
-	ContainerCache string   `name:"croot" help:"container storage, ideally we'd be able to share with the host but for now" hidden:"true" default:"${vars_container_cache_directory}"`
+	Dir              string   `name:"directory" help:"root directory of the repository" default:"${vars_cwd}"`
+	Containerfile    string   `arg:"" help:"path to the container file to run" default:"Containerfile"`
+	SSHKeyPath       string   `name:"sshkeypath" help:"path to ssh key to use" default:"${vars_ssh_key_path}"`
+	EnvironmentPaths []string `name:"envpath" help:"environment files to pass to the module" default:""`
+	Environment      []string `name:"env" short:"e" help:"define environment variables and their values to be included"`
+	GitRemote        string   `name:"git-remote" help:"name of the git remote to use" default:"${vars_git_default_remote_name}"`
+	GitReference     string   `name:"git-ref" help:"name of the branch or commit to checkout" default:"${vars_git_default_reference}"`
+	Endpoint         string   `name:"endpoint" help:"specify the endpoint to upload to" default:"${vars_endpoint}/c/manager/" hidden:"true"`
+	ContainerCache   string   `name:"croot" help:"container storage, ideally we'd be able to share with the host but for now" hidden:"true" default:"${vars_container_cache_directory}"`
 }
 
 func (t c8sLocal) Run(gctx *cmdopts.Global) (err error) {
 	var (
 		tmpdir     string
 		ws         workspaces.Context
+		repo       *git.Repository
 		environio  *os.File
 		uid                            = uuid.Must(uuid.NewV7())
 		sshmount   runners.AgentOption = runners.AgentOptionNoop
@@ -96,11 +101,27 @@ func (t c8sLocal) Run(gctx *cmdopts.Global) (err error) {
 		return err
 	}
 
+	if repo, err = git.PlainOpen("."); err != nil {
+		return errorsx.Wrap(err, "unable to open git repository")
+	}
+
 	environpath := filepath.Join(ws.Root, ws.RuntimeDir, "environ.env")
 	if environio, err = os.Create(environpath); err != nil {
 		return errorsx.Wrap(err, "unable to open the environment variable file")
 	}
 	defer environio.Close()
+
+	envb := envx.Build().
+		FromPath(t.EnvironmentPaths...).
+		FromEnv(t.Environment...).
+		FromEnv(os.Environ()...).
+		FromEnv(eg.EnvComputeContainerExec).
+		FromEnviron(errorsx.Zero(gitx.LocalEnv(repo, t.GitRemote, t.GitReference))...).
+		Var("EG_INTERNAL_GIT_CLONE_ENABLED", strconv.FormatBool(false)) // hack to disable cloning
+
+	if err = envb.CopyTo(environio); err != nil {
+		return errorsx.Wrap(err, "unable to generate environment")
+	}
 
 	if err = wasix.WarmCacheDirectory(gctx.Context, filepath.Join(ws.Root, ws.BuildDir), wasix.WazCacheDir(filepath.Join(ws.Root, ws.RuntimeDir))); err != nil {
 		log.Println("unable to prewarm wasi directory cache", err)
@@ -125,6 +146,7 @@ func (t c8sLocal) Run(gctx *cmdopts.Global) (err error) {
 		runners.AgentOptionCommandLine("--cap-add", "NET_ADMIN"),  // required for loopback device creation inside the container
 		runners.AgentOptionCommandLine("--cap-add", "SYS_ADMIN"),  // required for rootless container building https://github.com/containers/podman/issues/4056#issuecomment-612893749
 		runners.AgentOptionCommandLine("--device", "/dev/fuse"),
+		runners.AgentOptionCommandLine("--pids-limit", "-1"), // more bullshit. without this we get "Error: OCI runtime error: crun: the requested cgroup controller `pids` is not available"
 		runners.AgentOptionEnv(eg.EnvComputeRootModule, strconv.FormatBool(true)),
 		runners.AgentOptionEnv(eg.EnvComputeModuleNestedLevel, strconv.Itoa(envx.Int(0, eg.EnvComputeModuleNestedLevel))),
 		runners.AgentOptionEnv(eg.EnvComputeRunID, uid.String()),

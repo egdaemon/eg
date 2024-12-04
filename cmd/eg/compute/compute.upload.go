@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 
 	"github.com/egdaemon/eg/authn"
 	"github.com/egdaemon/eg/cmd/cmdopts"
@@ -45,6 +46,7 @@ type upload struct {
 	GitRemote     string   `name:"git-remote" help:"name of the git remote to use" default:"${vars_git_default_remote_name}"`
 	GitReference  string   `name:"git-ref" help:"name of the branch or commit to checkout" default:"${vars_git_default_reference}"`
 	GitClone      string   `name:"git-clone-uri" help:"clone uri"`
+	Impure        bool     `name:"impure" help:"clone the repository before building and executing the container"`
 }
 
 func (t upload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
@@ -107,6 +109,7 @@ func (t upload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 	envb := envx.Build().
 		FromEnviron(envx.Dirty(t.Dirty)...).
 		FromEnviron(t.Environment...).
+		Var("EG_C8S_IMPURE", strconv.FormatBool(t.Impure)).
 		FromEnviron(errorsx.Zero(gitx.Env(repo, t.GitRemote, t.GitReference, t.GitClone))...)
 
 	if err = envb.CopyTo(environio); err != nil {

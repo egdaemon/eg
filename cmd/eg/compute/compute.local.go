@@ -39,7 +39,7 @@ type local struct {
 	SSHAgent         bool     `name:"sshagent" help:"enable ssh agent" hidden:"true"`
 	GPGAgent         bool     `name:"gpgagent" help:"enable gpg agent" hidden:"true"`
 	GitRemote        string   `name:"git-remote" help:"name of the git remote to use" default:"${vars_git_default_remote_name}"`
-	GitReference     string   `name:"git-ref" help:"name of the branch or commit to checkout" default:"${vars_git_default_reference}"`
+	GitReference     string   `name:"git-ref" help:"name of the branch or commit to checkout" default:"${vars_git_head_reference}"`
 	ContainerCache   string   `name:"croot" help:"container storage, ideally we'd be able to share with the host but for now" hidden:"true" default:"${vars_container_cache_directory}"`
 	Impure           bool     `name:"impure" help:"clone the repository before building and executing the container"`
 }
@@ -113,12 +113,12 @@ func (t local) Run(gctx *cmdopts.Global) (err error) {
 			),
 			runners.AgentMountReadWrite(
 				envx.String("", "SSH_AUTH_SOCK"),
-				"/opt/egruntime/ssh.agent.socket",
+				eg.DefaultRuntimeDirectory("ssh.agent.socket"),
 			),
 		)
 
-		sshenvvar = runners.AgentOptionEnvKeys("SSH_AUTH_SOCK=/opt/egruntime/ssh.agent.socket")
-		envb.FromEnviron("SSH_AUTH_SOCK=/opt/egruntime/ssh.agent.socket")
+		sshenvvar = runners.AgentOptionEnv("SSH_AUTH_SOCK", eg.DefaultRuntimeDirectory("ssh.agent.socket"))
+		envb.Var("SSH_AUTH_SOCK", eg.DefaultRuntimeDirectory("ssh.agent.socket"))
 	}
 
 	if err = envb.CopyTo(environio); err != nil {
@@ -169,8 +169,8 @@ func (t local) Run(gctx *cmdopts.Global) (err error) {
 		gpgmount,
 		mountegbin,
 		runners.AgentOptionVolumes(
-			runners.AgentMountReadWrite(filepath.Join(ws.Root, ws.CacheDir), "/cache"),
-			runners.AgentMountReadWrite(filepath.Join(ws.Root, ws.RuntimeDir), "/opt/egruntime"),
+			runners.AgentMountReadWrite(filepath.Join(ws.Root, ws.CacheDir), eg.DefaultCacheDirectory()),
+			runners.AgentMountReadWrite(filepath.Join(ws.Root, ws.RuntimeDir), eg.DefaultRuntimeDirectory()),
 			runners.AgentMountReadWrite(t.ContainerCache, "/var/lib/containers"),
 		),
 		runners.AgentOptionEnviron(environpath),
@@ -190,10 +190,10 @@ func (t local) Run(gctx *cmdopts.Global) (err error) {
 			runners.AgentOptionVolumeSpecs(
 				runners.AgentMountReadOnly(
 					filepath.Join(ws.Root, ws.BuildDir, ws.Module, "main.wasm.d"),
-					filepath.Join("/opt/egruntime", ws.Module, "main.wasm.d"),
+					eg.DefaultRuntimeDirectory(ws.Module, "main.wasm.d"),
 				),
 				runners.AgentMountReadOnly(m.Path, "/opt/egmodule.wasm"),
-				runners.AgentMountReadWrite(filepath.Join(ws.Root, ws.WorkingDir), eg.DefaultRootDirectory),
+				runners.AgentMountReadWrite(filepath.Join(ws.Root, ws.WorkingDir), eg.DefaultRootDirectory()),
 			)...)
 
 		prepcmd := func(cmd *exec.Cmd) *exec.Cmd {

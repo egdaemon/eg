@@ -83,9 +83,17 @@ const (
 	EnvGitHeadCommitTimestamp = "EG_GIT_HEAD_COMMIT_TIMESTAMP"
 )
 
-const (
-	DefaultRootDirectory = "/opt/eg"
-)
+func DefaultCacheDirectory(rel ...string) string {
+	return filepath.Join("/", "opt", "eg.cache", filepath.Join(rel...))
+}
+
+func DefaultRuntimeDirectory(rel ...string) string {
+	return filepath.Join("/", "opt", "eg.runtime", filepath.Join(rel...))
+}
+
+func DefaultRootDirectory(rel ...string) string {
+	return filepath.Join("/", "opt", "eg", filepath.Join(rel...))
+}
 
 //go:embed DefaultContainerfile
 var Embedded embed.FS

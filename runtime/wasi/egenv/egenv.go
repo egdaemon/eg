@@ -33,7 +33,7 @@ func EphemeralDirectory(paths ...string) string {
 }
 
 func RootDirectory(paths ...string) string {
-	return filepath.Join(env.String(eg.DefaultRootDirectory, eg.EnvComputeRootDirectory), filepath.Join(paths...))
+	return filepath.Join(env.String(eg.DefaultRootDirectory(), eg.EnvComputeRootDirectory), filepath.Join(paths...))
 }
 
 func Boolean(fallback bool, keys ...string) bool {

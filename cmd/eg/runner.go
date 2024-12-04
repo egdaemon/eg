@@ -35,7 +35,7 @@ import (
 type module struct {
 	Dir        string `name:"directory" help:"root directory of the repository" default:"${vars_cwd}"`
 	ModuleDir  string `name:"moduledir" help:"deprecated removed once infrastructure is updated" hidden:"true" default:".eg"`
-	RuntimeDir string `name:"runtimedir" help:"runtime directory" hidden:"true" default:"/opt/egruntime/"`
+	RuntimeDir string `name:"runtimedir" help:"runtime directory" hidden:"true" default:"${vars_eg_runtime_directory}"`
 	Module     string `arg:"" help:"name of the module to run"`
 }
 
@@ -112,8 +112,8 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 			runners.AgentOptionEnv(eg.EnvComputeTLSInsecure, strconv.FormatBool(tlsc.Insecure)),
 			runners.AgentOptionVolumes(
 				runners.AgentMountReadWrite("/root", "/root"),
-				runners.AgentMountReadWrite("/cache", "/cache"),
-				runners.AgentMountReadWrite("/opt/egruntime", "/opt/egruntime"),
+				runners.AgentMountReadWrite(eg.DefaultCacheDirectory(), eg.DefaultCacheDirectory()),
+				runners.AgentMountReadWrite(eg.DefaultRuntimeDirectory(), eg.DefaultRuntimeDirectory()),
 				runners.AgentMountReadWrite("/var/lib/containers", "/var/lib/containers"),
 			),
 			runners.AgentOptionEGBin(errorsx.Must(exec.LookPath("/opt/egbin"))),

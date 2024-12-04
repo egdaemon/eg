@@ -111,7 +111,7 @@ func (t modified) Changed(paths ...string) bool {
 	}, t.changed...))
 }
 
-func NewModified(ctx context.Context) (modified, error) {
+func DetectModified(ctx context.Context) (modified, error) {
 	hcommit := envx.String("", _eg.EnvGitHeadCommit)
 	bcommit := envx.String(hcommit, _eg.EnvGitBaseCommit)
 	if stringsx.Blank(hcommit) {
@@ -124,7 +124,10 @@ func NewModified(ctx context.Context) (modified, error) {
 	err := shell.Run(
 		ctx,
 		shell.Newf("ls -lha /opt"),
-		shell.Newf("git diff --name-only %s..%s | tee %s", bcommit, hcommit, egenv.EphemeralDirectory("eg.git.mod")),
+		shell.New("pwd"),
+		shell.Newf(
+			"git diff --name-only %s..%s | tee %s", bcommit, hcommit, egenv.EphemeralDirectory("eg.git.mod"),
+		).Directory(egenv.RootDirectory()),
 		shell.Newf("cat %s", egenv.EphemeralDirectory("eg.git.mod")),
 	)
 	if err != nil {

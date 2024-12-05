@@ -8,7 +8,9 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 
+	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/authn"
 	"github.com/egdaemon/eg/cmd/cmdopts"
 	"github.com/egdaemon/eg/compile"
@@ -44,10 +46,12 @@ var embeddedc8supload embed.FS
 type c8sUpload struct {
 	cmdopts.RuntimeResources
 	HostedCompute bool     `name:"shared-compute" help:"allow hosted compute" default:"true"`
+	Clone         bool     `name:"clone-repo" help:"clone the repository before running the container" default:"false"`
 	Containerfile string   `arg:"" help:"path to the container file to run" default:"Containerfile"`
 	SSHKeyPath    string   `name:"sshkeypath" help:"path to ssh key to use" default:"${vars_ssh_key_path}"`
 	Environment   []string `name:"env" short:"e" help:"define environment variables and their values to be included"`
 	GitRemote     string   `name:"git-remote" help:"name of the git remote to use" default:"${vars_git_default_remote_name}"`
+	GitReference  string   `name:"git-ref" help:"name of the branch or commit to checkout" default:"${vars_git_head_reference}"`
 	Endpoint      string   `name:"endpoint" help:"specify the endpoint to upload to" default:"${vars_endpoint}/c/manager/" hidden:"true"`
 }
 
@@ -124,7 +128,9 @@ func (t c8sUpload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error
 	defer environio.Close()
 
 	envb := envx.Build().
-		FromEnviron(t.Environment...)
+		FromEnviron(t.Environment...).
+		FromEnviron(errorsx.Zero(gitx.LocalEnv(repo, t.GitRemote, t.GitReference))...).
+		Var(eg.EnvComputeContainerImpure, strconv.FormatBool(t.Clone))
 
 	if err = envb.CopyTo(environio); err != nil {
 		return errorsx.Wrap(err, "unable to write environment variables buffer")

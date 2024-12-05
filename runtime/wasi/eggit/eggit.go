@@ -123,8 +123,8 @@ func DetectModified(ctx context.Context) (modified, error) {
 
 	err := shell.Run(
 		ctx,
-		shell.Newf("ls -lha /opt"),
-		shell.New("pwd"),
+		// shell.Newf("ls -lha /opt"),
+		// shell.New("pwd"),
 		shell.Newf(
 			"git diff --name-only %s..%s | tee %s", bcommit, hcommit, egenv.EphemeralDirectory("eg.git.mod"),
 		).Directory(egenv.RootDirectory()),

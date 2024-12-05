@@ -8,10 +8,13 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 
+	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/authn"
 	"github.com/egdaemon/eg/cmd/cmdopts"
 	"github.com/egdaemon/eg/compile"
+	"github.com/egdaemon/eg/internal/debugx"
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/fsx"
@@ -44,10 +47,13 @@ var embeddedc8supload embed.FS
 type c8sUpload struct {
 	cmdopts.RuntimeResources
 	HostedCompute bool     `name:"shared-compute" help:"allow hosted compute" default:"true"`
+	Clone         bool     `name:"clone-repo" help:"clone the repository before running the container" default:"false"`
 	Containerfile string   `arg:"" help:"path to the container file to run" default:"Containerfile"`
 	SSHKeyPath    string   `name:"sshkeypath" help:"path to ssh key to use" default:"${vars_ssh_key_path}"`
 	Environment   []string `name:"env" short:"e" help:"define environment variables and their values to be included"`
 	GitRemote     string   `name:"git-remote" help:"name of the git remote to use" default:"${vars_git_default_remote_name}"`
+	GitReference  string   `name:"git-ref" help:"name of the branch or commit to checkout" default:"${vars_git_default_reference}"`
+	GitClone      string   `name:"git-clone-uri" help:"clone uri"`
 	Endpoint      string   `name:"endpoint" help:"specify the endpoint to upload to" default:"${vars_endpoint}/c/manager/" hidden:"true"`
 }
 
@@ -78,17 +84,21 @@ func (t c8sUpload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error
 	}()
 
 	egdir := filepath.Join(tmpdir, ".eg")
-	if err = fsx.MkDirs(0700, egdir, filepath.Join(tmpdir, buildir, "mounted", "workspace")); err != nil {
+	if err = fsx.MkDirs(0700, egdir, filepath.Join(tmpdir, buildir, "workspace")); err != nil {
 		return err
 	}
 
-	autoruncontainer := filepath.Join(tmpdir, buildir, "mounted", "workspace", "Containerfile")
+	autoruncontainer := filepath.Join(tmpdir, buildir, "workspace", "Containerfile")
 
 	if err = fsx.CloneTree(gctx.Context, egdir, ".bootstrap.c8s", embeddedc8supload); err != nil {
 		return err
 	}
 
 	if err = compile.InitGolang(gctx.Context, egdir, cmdopts.ModPath()); err != nil {
+		return err
+	}
+
+	if err = compile.InitGolangTidy(gctx.Context, egdir); err != nil {
 		return err
 	}
 
@@ -124,7 +134,9 @@ func (t c8sUpload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error
 	defer environio.Close()
 
 	envb := envx.Build().
-		FromEnviron(t.Environment...)
+		FromEnviron(t.Environment...).
+		FromEnviron(errorsx.Zero(gitx.Env(repo, t.GitRemote, t.GitReference, t.GitClone))...).
+		Var(eg.EnvComputeContainerImpure, strconv.FormatBool(t.Clone))
 
 	if err = envb.CopyTo(environio); err != nil {
 		return errorsx.Wrap(err, "unable to write environment variables buffer")
@@ -134,7 +146,7 @@ func (t c8sUpload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error
 		return errorsx.Wrap(err, "unable to rewind environment variables buffer")
 	}
 
-	// debugx.Println(envx.PrintEnv(errorsx.Zero(envb.Environ())...))
+	debugx.Println(envx.PrintEnv(errorsx.Zero(envb.Environ())...))
 
 	if archiveio, err = os.CreateTemp(tmpdir, "kernel.*.tar.gz"); err != nil {
 		return errorsx.Wrap(err, "unable to open the kernel archive")

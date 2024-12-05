@@ -35,7 +35,7 @@ func main() {
 	ctx, done := context.WithTimeout(context.Background(), egenv.TTL())
 	defer done()
 
-	mods, err := eggit.NewModified(ctx)
+	mods, err := eggit.DetectModified(ctx)
 	if err != nil {
 		log.Fatalln(err)
 	}

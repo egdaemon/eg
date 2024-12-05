@@ -78,6 +78,10 @@ func (t c8sLocal) Run(gctx *cmdopts.Global) (err error) {
 		return err
 	}
 
+	if err = compile.InitGolangTidy(gctx.Context, egdir); err != nil {
+		return err
+	}
+
 	if err = iox.Copy(t.Containerfile, autoruncontainer); err != nil {
 		return err
 	}

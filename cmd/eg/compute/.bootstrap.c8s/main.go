@@ -8,6 +8,7 @@ import (
 	"github.com/egdaemon/eg/runtime/wasi/eg"
 	"github.com/egdaemon/eg/runtime/wasi/egenv"
 	"github.com/egdaemon/eg/runtime/wasi/eggit"
+	"github.com/egdaemon/eg/runtime/x/wasi/egbug"
 )
 
 func main() {
@@ -17,6 +18,7 @@ func main() {
 
 	err := eg.Perform(
 		ctx,
+		egbug.Env,
 		eg.When(egenv.Boolean(false, _eg.EnvComputeContainerImpure), eggit.AutoClone),
 		eg.Build(eg.Container(cname).BuildFromFile("workspace/Containerfile")),
 		eg.Exec(ctx, eg.Container(cname)),

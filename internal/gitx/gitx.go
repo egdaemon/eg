@@ -127,7 +127,7 @@ func Env(repo *git.Repository, remote string, branch string, vcsclone string) (e
 		return nil, err
 	}
 
-	return HeadEnv(repo, uri, stringsx.First(vcsclone, uri), branch)
+	return HeadEnv(repo, uri, stringsx.First(vcsclone, errorsx.Zero(QuirkCloneURI(repo, remote))), branch)
 }
 
 // ideally we shouldn't need this but unfortunately go-git doesn't apply 'instead of' rules properly.

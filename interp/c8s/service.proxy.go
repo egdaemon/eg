@@ -73,7 +73,10 @@ func (t *ProxyService) Build(ctx context.Context, req *BuildRequest) (_ *BuildRe
 		cmd *exec.Cmd
 	)
 
-	abspath := filepath.Join(t.ws.Root, t.ws.WorkingDir, req.Definition)
+	abspath := req.Definition
+	if !filepath.IsAbs(abspath) {
+		abspath = filepath.Join(t.ws.Root, t.ws.WorkingDir, req.Definition)
+	}
 
 	// determine the working directory from the request if specified or the definition file's path.
 	wdir := slicesx.FindOrZero(func(s string) bool { return !stringsx.Blank(s) }, req.Directory, filepath.Dir(abspath))

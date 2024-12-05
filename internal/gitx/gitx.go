@@ -82,7 +82,7 @@ func Clone(ctx context.Context, auth transport.AuthMethod, dir, uri, remote, tre
 
 		return errorsx.Wrapf(w.Checkout(&branchCoOpts), "unable to checkout '%s'", treeish)
 	} else {
-		log.Println(errorsx.Wrap(err, "repository is missing attempting clone"))
+		log.Println(errorsx.Wrapf(err, "repository is missing attempting clone: %s", uri))
 	}
 
 	_, err = git.PlainCloneContext(ctx, dir, false, &git.CloneOptions{
@@ -150,7 +150,9 @@ func LocalEnv(repo *git.Repository, remote string, branch string) (env []string,
 		return nil, err
 	}
 
-	return append(env, benv...), nil
+	env = append(env, benv...)
+	env = append(env, envx.Format(eg.EnvComputeVCS, uri))
+	return env, nil
 }
 
 func HeadEnv(repo *git.Repository, vcs, uri string, treeish string) (env []string, err error) {

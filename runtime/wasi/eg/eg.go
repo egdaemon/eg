@@ -163,6 +163,18 @@ func When(b bool, o OpFn) OpFn {
 	}
 }
 
+// Conditional When that takes a function to invoke to determine
+// if the operation should be executed.
+func DeferredWhen(b func() bool, o OpFn) OpFn {
+	return func(ctx context.Context, i Op) error {
+		if !b() {
+			return nil
+		}
+
+		return o(ctx, ref(o))
+	}
+}
+
 type Runner interface {
 	CompileWith(ctx context.Context) (err error)
 	RunWith(ctx context.Context, mpath string) (err error)

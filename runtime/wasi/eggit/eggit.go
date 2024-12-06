@@ -125,15 +125,28 @@ func DetectModified(ctx context.Context) (modified, error) {
 		log.Println(errorsx.Errorf("environment variable %s is empty", _eg.EnvGitBaseCommit))
 	}
 
-	err := shell.Run(
-		ctx,
-		shell.Newf(
-			"git diff --name-only %s..%s | tee %s", bcommit, hcommit, path,
-		).Directory(egenv.RootDirectory()),
-		shell.Newf("cat %s", path),
-	)
-	if err != nil {
-		return modified{}, errorsx.Wrap(err, "unable to determine modified paths")
+	if hcommit == bcommit {
+		err := shell.Run(
+			ctx,
+			shell.Newf(
+				"git diff-tree --no-commit-id --name-only -r %s | tee %s", hcommit, path,
+			).Directory(egenv.RootDirectory()),
+			shell.Newf("cat %s", path),
+		)
+		if err != nil {
+			return modified{}, errorsx.Wrap(err, "unable to determine modified paths")
+		}
+	} else {
+		err := shell.Run(
+			ctx,
+			shell.Newf(
+				"git diff --name-only %s..%s | tee %s", bcommit, hcommit, path,
+			).Directory(egenv.RootDirectory()),
+			shell.Newf("cat %s", path),
+		)
+		if err != nil {
+			return modified{}, errorsx.Wrap(err, "unable to determine modified paths")
+		}
 	}
 
 	mods, err := os.Open(path)

@@ -102,7 +102,6 @@ func (t modified) Changed(paths ...string) bool {
 	return stringsx.Present(slicesx.FindOrZero(func(s string) bool {
 		for _, n := range paths {
 			if strings.HasPrefix(s, n) {
-				log.Println("changes detected", s, n)
 				return true
 			}
 		}
@@ -154,5 +153,11 @@ func DetectModified(ctx context.Context) (modified, error) {
 		return modified{}, errorsx.Wrap(err, "unable to open mods")
 	}
 	changed := iox.String(mods)
-	return modified{changed: strings.Split(changed, "\n")}, nil
+
+	return modified{
+		changed: slicesx.Filter(
+			func(v string) bool { return stringsx.Present(v) },
+			strings.Split(changed, "\n")...,
+		),
+	}, nil
 }

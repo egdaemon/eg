@@ -25,14 +25,14 @@ prepare() {
 }
 
 build() {
-  echo "BUILD INITIATED eg ${PWD} -- ${startdir}"
+  echo "BUILD INITIATED eg ${PWD} -- ${srcdir} ${BUILDDIR}"
   echo "USER: $(whoami)"
-  GOBIN="${startdir}/bin" go install -C ${pkgname} ./cmd/eg
+  GOBIN="${srcdir}/../bin" go install -C ${pkgname} ./cmd/eg
 }
 
 package() {
   echo "PACKAGE INITIATED ${pkgdir} ${PWD} ${bindir}"
   mkdir -p ${pkgdir}/usr/bin
-  rsync --verbose --progress --recursive --checksum --perms ${startdir}/bin/ ${pkgdir}/usr/bin
-  rsync --verbose --progress --recursive --checksum --perms ${startdir}/src/${pkgname}/.dist/linux/ ${pkgdir}
+  rsync --verbose --progress --recursive --checksum --perms ${srcdir}/../bin/ ${pkgdir}/usr/bin
+  rsync --verbose --progress --recursive --checksum --perms ${srcdir}/${pkgname}/.dist/linux/ ${pkgdir}
 }

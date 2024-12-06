@@ -81,7 +81,7 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 		log.Println("ram available", bytesx.Unit(vmemlimit))
 		log.Println("logging level", gctx.Verbosity)
 		defer log.Println("---------------------------- ROOT MODULE COMPLETED ----------------------------")
-		log.Println("RUNTIME DIR", t.RuntimeDir)
+
 		cspath := filepath.Join(t.RuntimeDir, "control.socket")
 		if control, err = net.Listen("unix", cspath); err != nil {
 			return errorsx.Wrap(err, "unable to create control.socket")
@@ -114,6 +114,7 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 				runners.AgentMountReadWrite("/root", "/root"),
 				runners.AgentMountReadWrite(eg.DefaultCacheDirectory(), eg.DefaultCacheDirectory()),
 				runners.AgentMountReadWrite(eg.DefaultRuntimeDirectory(), eg.DefaultRuntimeDirectory()),
+				runners.AgentMountReadWrite(eg.DefaultRuntimeDirectory(), eg.DefaultTempDirectory()),
 				runners.AgentMountReadWrite("/var/lib/containers", "/var/lib/containers"),
 			),
 			runners.AgentOptionEGBin(errorsx.Must(exec.LookPath("/opt/egbin"))),

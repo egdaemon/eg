@@ -247,7 +247,7 @@ func (t runner) perform(ctx context.Context, runid, path string, rtb runtimefn) 
 		"PWD", eg.DefaultRootDirectory(),
 	).WithEnv(
 		"TMPDIR",
-		filepath.Join(eg.DefaultRuntimeDirectory(), filepath.Base(tmpdir)),
+		eg.DefaultTempDirectory(filepath.Base(tmpdir)),
 	).WithStdin(
 		os.Stdin,
 	).WithStderr(
@@ -257,6 +257,7 @@ func (t runner) perform(ctx context.Context, runid, path string, rtb runtimefn) 
 	).WithFSConfig(
 		wazero.NewFSConfig().
 			WithDirMount(t.runtimedir, eg.DefaultRuntimeDirectory()).
+			WithDirMount(tmpdir, eg.DefaultTempDirectory(filepath.Base(tmpdir))).
 			WithDirMount(hostcachedir, eg.DefaultCacheDirectory()).
 			WithDirMount(t.root, eg.DefaultRootDirectory()), // ensure we mount the working directory so pwd works correctly.
 	).WithSysNanotime().WithSysWalltime().WithRandSource(rand.Reader)

@@ -418,6 +418,7 @@ func beginwork(ctx context.Context, md metadata, dir string) state {
 		AgentOptionCommandLine("--env-file", environpath),
 		AgentOptionCores(metadata.Enqueued.Cores),
 		AgentOptionMemory(metadata.Enqueued.Memory),
+		AgentOptionCommandLine("--userns", "host"),       // properly map host user into containers.
 		AgentOptionCommandLine("--cap-add", "NET_ADMIN"), // required for loopback device creation inside the container
 		AgentOptionCommandLine("--cap-add", "SYS_ADMIN"), // required for rootless container building https://github.com/containers/podman/issues/4056#issuecomment-612893749
 		AgentOptionCommandLine("--device", "/dev/fuse"),  // required for rootless container building https://github.com/containers/podman/issues/4056#issuecomment-612893749
@@ -473,6 +474,7 @@ func (t staterunning) Update(ctx context.Context) state {
 			"--volume", AgentMountReadOnly(filepath.Join(t.ws.Root, t.ws.RuntimeDir, t.entry), "/opt/egmodule.wasm"),
 			"--volume", AgentMountReadWrite(filepath.Join(t.ws.Root, t.ws.RuntimeDir), eg.DefaultRuntimeDirectory()),
 			"--volume", AgentMountReadWrite(filepath.Join(t.ws.Root, t.ws.WorkingDir), eg.DefaultRootDirectory()),
+			"--volume", AgentMountReadWrite(filepath.Join(t.ws.Root, t.ws.TemporaryDir), eg.DefaultTempDirectory()),
 			"--volume", AgentMountReadWrite(cachedir, eg.DefaultCacheDirectory()),
 			"--env", envx.FormatBool(eg.EnvComputeRootModule, true),
 			"--env", envx.FormatInt(eg.EnvComputeModuleNestedLevel, 0),

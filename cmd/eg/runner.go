@@ -114,9 +114,11 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 				runners.AgentMountReadWrite("/root", "/root"),
 				runners.AgentMountReadWrite(eg.DefaultCacheDirectory(), eg.DefaultCacheDirectory()),
 				runners.AgentMountReadWrite(eg.DefaultRuntimeDirectory(), eg.DefaultRuntimeDirectory()),
+				runners.AgentMountReadWrite(eg.DefaultRuntimeDirectory(), eg.DefaultTempDirectory()),
 				runners.AgentMountReadWrite("/var/lib/containers", "/var/lib/containers"),
 			),
 			runners.AgentOptionEGBin(errorsx.Must(exec.LookPath("/opt/egbin"))),
+			runners.AgentOptionCommandLine("--userns", "host"),       // properly map host user into containers.
 			runners.AgentOptionCommandLine("--cap-add", "NET_ADMIN"), // required for loopback device creation inside the container
 			runners.AgentOptionCommandLine("--cap-add", "SYS_ADMIN"), // required for rootless container building https://github.com/containers/podman/issues/4056#issuecomment-612893749
 			runners.AgentOptionCommandLine("--device", "/dev/fuse"),  // required for rootless container building https://github.com/containers/podman/issues/4056#issuecomment-612893749

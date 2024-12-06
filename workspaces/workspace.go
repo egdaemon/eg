@@ -39,17 +39,18 @@ func (t ignoredir) Ignore(path string, d fs.DirEntry) error {
 }
 
 type Context struct {
-	Module     string // name of the module
-	CachedID   string // unique id generated from the content of the module.
-	Root       string // workspace root directory.
-	WorkingDir string // working directory for modules.
-	ModuleDir  string // eg module directory; relative to the root
-	CacheDir   string // cache directory. relative to the module directory.
-	RuntimeDir string // cache directory for the runner.
-	BuildDir   string // directory for built wasm modules; relative to the cache directory.
-	TransDir   string // root directory for the transpiled code; relative to the cache directory.
-	GenModDir  string // root directory for generated modules; relative to the cache directory.
-	Ignore     ignorable
+	Module       string // name of the module
+	CachedID     string // unique id generated from the content of the module.
+	Root         string // workspace root directory.
+	WorkingDir   string // working directory for modules.
+	ModuleDir    string // eg module directory; relative to the root
+	CacheDir     string // cache directory. relative to the module directory.
+	RuntimeDir   string // cache directory for the runner.
+	TemporaryDir string // temporary data directory.
+	BuildDir     string // directory for built wasm modules; relative to the cache directory.
+	TransDir     string // root directory for the transpiled code; relative to the cache directory.
+	GenModDir    string // root directory for generated modules; relative to the cache directory.
+	Ignore       ignorable
 }
 
 func (t Context) FS() fs.FS {
@@ -77,17 +78,18 @@ func New(ctx context.Context, root string, mdir string, name string) (zero Conte
 	cid := hex.EncodeToString(cidmd5.Sum(nil))
 
 	return ensuredirs(Context{
-		Module:     name,
-		CachedID:   cid,
-		Root:       root,
-		ModuleDir:  mdir,
-		CacheDir:   cdir,
-		RuntimeDir: runtimedir,
-		WorkingDir: filepath.Join(runtimedir, "mounted"),
-		BuildDir:   filepath.Join(cdir, "build", cid),
-		TransDir:   filepath.Join(cdir, "trans", cid),
-		GenModDir:  filepath.Join(cdir, "trans", cid, ".genmod"),
-		Ignore:     ignore,
+		Module:       name,
+		CachedID:     cid,
+		Root:         root,
+		ModuleDir:    mdir,
+		CacheDir:     cdir,
+		RuntimeDir:   runtimedir,
+		WorkingDir:   filepath.Join(runtimedir, "mounted"),
+		TemporaryDir: filepath.Join(runtimedir, "tmp"),
+		BuildDir:     filepath.Join(cdir, "build", cid),
+		TransDir:     filepath.Join(cdir, "trans", cid),
+		GenModDir:    filepath.Join(cdir, "trans", cid, ".genmod"),
+		Ignore:       ignore,
 	})
 }
 
@@ -98,6 +100,7 @@ func ensuredirs(c Context) (_ Context, err error) {
 		0700,
 		filepath.Join(c.Root, c.RuntimeDir),
 		filepath.Join(c.Root, c.WorkingDir),
+		filepath.Join(c.Root, c.TemporaryDir),
 		filepath.Join(c.Root, c.GenModDir),
 		filepath.Join(c.Root, c.BuildDir, c.Module, "main.wasm.d"),
 		filepath.Join(c.Root, c.CacheDir),

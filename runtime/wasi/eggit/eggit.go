@@ -12,7 +12,6 @@ import (
 	_eg "github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
-	"github.com/egdaemon/eg/internal/fsx"
 	"github.com/egdaemon/eg/internal/iox"
 	"github.com/egdaemon/eg/internal/slicesx"
 	"github.com/egdaemon/eg/internal/stringsx"
@@ -112,6 +111,10 @@ func (t modified) Changed(paths ...string) bool {
 }
 
 func DetectModified(ctx context.Context) (modified, error) {
+	var (
+		path = egenv.RuntimeDirectory("eg.git.mod")
+	)
+
 	hcommit := envx.String("", _eg.EnvGitHeadCommit)
 	bcommit := envx.String(hcommit, _eg.EnvGitBaseCommit)
 	if stringsx.Blank(hcommit) {
@@ -123,19 +126,16 @@ func DetectModified(ctx context.Context) (modified, error) {
 
 	err := shell.Run(
 		ctx,
-		// shell.Newf("ls -lha /opt"),
-		// shell.New("pwd"),
 		shell.Newf(
-			"git diff --name-only %s..%s | tee %s", bcommit, hcommit, egenv.EphemeralDirectory("eg.git.mod"),
+			"git diff --name-only %s..%s | tee %s", bcommit, hcommit, path,
 		).Directory(egenv.RootDirectory()),
-		shell.Newf("cat %s", egenv.EphemeralDirectory("eg.git.mod")),
+		shell.Newf("cat %s", path),
 	)
 	if err != nil {
 		return modified{}, errorsx.Wrap(err, "unable to determine modified paths")
 	}
 
-	fsx.PrintDir(os.DirFS(egenv.EphemeralDirectory()))
-	mods, err := os.Open(egenv.EphemeralDirectory("eg.git.mod"))
+	mods, err := os.Open(path)
 	if err != nil {
 		return modified{}, errorsx.Wrap(err, "unable to open mods")
 	}

@@ -81,7 +81,7 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 		log.Println("ram available", bytesx.Unit(vmemlimit))
 		log.Println("logging level", gctx.Verbosity)
 		defer log.Println("---------------------------- ROOT MODULE COMPLETED ----------------------------")
-
+		log.Println("RUNTIME DIR", t.RuntimeDir)
 		cspath := filepath.Join(t.RuntimeDir, "control.socket")
 		if control, err = net.Listen("unix", cspath); err != nil {
 			return errorsx.Wrap(err, "unable to create control.socket")
@@ -117,6 +117,7 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 				runners.AgentMountReadWrite("/var/lib/containers", "/var/lib/containers"),
 			),
 			runners.AgentOptionEGBin(errorsx.Must(exec.LookPath("/opt/egbin"))),
+			runners.AgentOptionCommandLine("--userns", "host"),       // properly map host user into containers.
 			runners.AgentOptionCommandLine("--cap-add", "NET_ADMIN"), // required for loopback device creation inside the container
 			runners.AgentOptionCommandLine("--cap-add", "SYS_ADMIN"), // required for rootless container building https://github.com/containers/podman/issues/4056#issuecomment-612893749
 			runners.AgentOptionCommandLine("--device", "/dev/fuse"),  // required for rootless container building https://github.com/containers/podman/issues/4056#issuecomment-612893749

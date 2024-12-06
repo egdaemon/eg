@@ -94,6 +94,7 @@ func main() {
 
 	user := userx.CurrentUserOrDefault(userx.Root())
 
+	log.Println("WAKA", eg.DefaultRuntimeDirectory())
 	parser := kong.Must(
 		&shellcli,
 		kong.Name("eg"),

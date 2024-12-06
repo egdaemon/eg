@@ -146,6 +146,7 @@ func (t c8sLocal) Run(gctx *cmdopts.Global) (err error) {
 			runners.AgentMountReadWrite(t.ContainerCache, "/var/lib/containers"),
 		),
 		runners.AgentOptionEnviron(environpath),
+		runners.AgentOptionCommandLine("--userns", "host"),        // properly map host user into containers.
 		runners.AgentOptionCommandLine("--env-file", environpath), // required for tty to work correctly in local mode.
 		runners.AgentOptionCommandLine("--cap-add", "NET_ADMIN"),  // required for loopback device creation inside the container
 		runners.AgentOptionCommandLine("--cap-add", "SYS_ADMIN"),  // required for rootless container building https://github.com/containers/podman/issues/4056#issuecomment-612893749

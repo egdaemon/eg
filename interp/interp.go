@@ -173,7 +173,9 @@ func (t runner) perform(ctx context.Context, runid, path string, rtb runtimefn) 
 		return errorsx.Wrap(err, "unable to create tmp directory")
 	}
 	defer os.RemoveAll(tmpdir)
-
+	if err = os.Chmod(tmpdir, 0777); err != nil {
+		return errorsx.Wrap(err, "unable to adjust tmp directory permissions")
+	}
 	if err = fsx.MkDirs(0777, hostcachedir); err != nil {
 		return errorsx.Wrap(err, "unable to ensure host cache directory")
 	}

@@ -95,6 +95,10 @@ func DefaultRootDirectory(rel ...string) string {
 	return filepath.Join("/", "opt", "eg", filepath.Join(rel...))
 }
 
+func DefaultTempDirectory(rel ...string) string {
+	return filepath.Join("/", "opt", "eg.tmp", filepath.Join(rel...))
+}
+
 //go:embed DefaultContainerfile
 var Embedded embed.FS
 

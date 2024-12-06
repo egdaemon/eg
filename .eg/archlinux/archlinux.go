@@ -4,6 +4,7 @@ import (
 	"context"
 	"eg/ci/maintainer"
 	"fmt"
+	"path/filepath"
 
 	"github.com/egdaemon/eg/runtime/wasi/eg"
 	"github.com/egdaemon/eg/runtime/wasi/egenv"
@@ -21,20 +22,20 @@ func Builder(name string) eg.ContainerRunner {
 func Build(ctx context.Context, _ eg.Op) error {
 	cdir := egenv.CacheDirectory(".dist", "pacman")
 	templatedir := egenv.RootDirectory(".dist", "archlinux")
-	bdir := egenv.EphemeralDirectory(".build")
-	pkgdest := egenv.EphemeralDirectory("pacman")
-	golang := shell.Runtime().
+	pkgdest := filepath.Join("/", "tmp", "pacman")
+	mkpkgruntime := shell.Runtime().
 		Environ("PKGDEST", pkgdest).
+		Environ("BUILDDIR", filepath.Join("/", "tmp", "build")).
+		Environ("SRCDEST", filepath.Join("/", "tmp", "src")).
 		Environ("PACKAGER", fmt.Sprintf("%s <%s>", maintainer.Name, maintainer.Email))
 
 	return shell.Run(
 		ctx,
-		golang.Newf("echo %s", templatedir),
-		golang.Newf("sudo -E -u build rsync --recursive %s/ %s", templatedir, bdir),
-		golang.Newf("chown -R build:root %s", bdir),
-		golang.Newf("sudo -u build mkdir -p %s", pkgdest),
-		golang.Directory(bdir).New("sudo --preserve-env=PKGDEST,PACKAGER -u build makepkg -f -c -C"),
-		golang.Newf("rsync --recursive %s/ %s", pkgdest, cdir),
-		golang.Newf("paccache -c %s -rk2", cdir),
+		mkpkgruntime.Newf("mkdir -p %s", cdir),
+		mkpkgruntime.New("sudo --preserve-env=PKGDEST,PACKAGER,BUILDDIR -u build env"),
+		mkpkgruntime.Directory(templatedir).New("sudo --preserve-env=PKGDEST,PACKAGER,BUILDDIR,SRCDEST -g root -u build pwd"),
+		mkpkgruntime.Directory(templatedir).New("sudo --preserve-env=PKGDEST,PACKAGER,BUILDDIR,SRCDEST -g root -u build makepkg -f"),
+		mkpkgruntime.Newf("rsync --recursive %s/ %s", pkgdest, cdir),
+		mkpkgruntime.Newf("paccache -c %s -rk2", cdir),
 	)
 }

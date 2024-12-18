@@ -1,3 +1,4 @@
 cmd/spike
-eg.default.module
+.eg.runtime
+.eg.cache
 notes-*.md

@@ -1,5 +1,7 @@
-module eg/ci
+module eg/compute
 
-go 1.21
+go 1.23.2
 
-require github.com/egdaemon/eg v0.0.0-20240502011256-63d48c052127
+toolchain go1.23.4
+
+require github.com/egdaemon/eg v0.0.0-20241217234913-4df49a6898cf

@@ -7,6 +7,7 @@ import (
 	"go/token"
 	"go/types"
 	"log"
+	"os"
 
 	"golang.org/x/tools/go/ast/astutil"
 	"golang.org/x/tools/go/packages"
@@ -24,8 +25,13 @@ func AutoFileSet(c *packages.Config) {
 	c.Fset = token.NewFileSet()
 }
 
+func DisableGowork(c *packages.Config) {
+	c.Env = append(c.Env, "GOWORK=off")
+}
+
 func DefaultPkgLoad(options ...LoadOpt) *packages.Config {
 	cfg := &packages.Config{
+		Env:  os.Environ(),
 		Mode: packages.NeedName | packages.NeedImports | packages.NeedTypes | packages.NeedSyntax | packages.NeedFiles | packages.NeedDeps | packages.NeedModule,
 	}
 

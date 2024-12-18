@@ -16,14 +16,12 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/davecgh/go-spew/spew"
-
 	"github.com/dave/jennifer/jen"
 	"github.com/egdaemon/eg/astbuild"
 	"github.com/egdaemon/eg/astcodec"
 	"github.com/egdaemon/eg/internal/debugx"
-	"github.com/egdaemon/eg/internal/errorsx"
-	"github.com/egdaemon/eg/internal/iox"
+	"github.com/egdaemon/eg/internal/fsx"
+	"github.com/egdaemon/eg/internal/langx"
 	"github.com/egdaemon/eg/workspaces"
 
 	"golang.org/x/tools/go/packages"
@@ -53,210 +51,80 @@ func Autodetect(tctx Context) Transpiler {
 	return golang{Context: tctx}
 }
 
+type module struct {
+	fname    string
+	original *bytes.Buffer
+	main     *bytes.Buffer
+	pos      token.Position
+}
+
 type golang struct {
 	Context
 }
 
 func (t golang) Run(ctx context.Context) (roots []Compiled, err error) {
-	type module struct {
-		fname    string
-		original *bytes.Buffer
-		main     *bytes.Buffer
-		pos      token.Position
-	}
-
 	var (
-		dst string
-		pkg *packages.Package
+		dst  string
+		pset []*packages.Package
 	)
+	transdir := filepath.Join(t.Context.Workspace.Root, t.Context.Workspace.TransDir)
+
+	err = fsx.CloneTree(ctx, transdir, ".", os.DirFS(filepath.Join(t.Context.Workspace.Root, t.Context.Workspace.ModuleDir)))
+	if err != nil {
+		return roots, err
+	}
 
 	pkgc := astcodec.DefaultPkgLoad(
-		astcodec.LoadDir(filepath.Join(t.Context.Workspace.Root, t.Context.Workspace.ModuleDir, t.Context.Workspace.Module)),
+		astcodec.LoadDir(transdir),
 		astcodec.AutoFileSet,
+		astcodec.DisableGowork, // dont want to do this but until I figure out the issue.
 	)
 
-	if pkg, err = astcodec.Load(pkgc); err != nil {
-		return roots, errorsx.Wrap(err, "unable to load package")
-	}
 	generatedmodules := make([]*module, 0, 128)
-
-	if pkg.Module == nil {
-		return roots, errorsx.String("unable to load golang module, if you're using go.work check that the module is declared there")
+	if pset, err = packages.Load(pkgc, "./..."); err != nil {
+		return nil, err
 	}
 
-	transform := func(ftoken *token.File, gendir string, c *ast.File) error {
-		var (
-			egident = "eg"
-		)
-
-		if imp := astcodec.FindImport(c, astcodec.FindImportsByPath("github.com/egdaemon/eg/runtime/wasi/eg")); imp != nil && imp.Name != nil {
-			egident = imp.Name.String()
-		}
-
-		refexpr := astbuild.SelExpr(egident, "Ref")
-		refmodule := astbuild.SelExpr(egident, "Module")
-		refexec := astbuild.SelExpr(egident, "Exec")
-
-		// make a clone of the buffer
-		buf := bytes.NewBuffer(nil)
-		if err = printer.Fprint(buf, pkg.Fset, c); err != nil {
-			return err
-		}
-
-		moduleExpr := func(ce *ast.CallExpr) bool {
-			return astcodec.TypePattern(refmodule)(ce.Fun)
-		}
-
-		execExpr := func(ce *ast.CallExpr) bool {
-			return astcodec.TypePattern(refexec)(ce.Fun)
-		}
-
-		generr := error(nil)
-		genmod := astcodec.NewCallExprReplacement(func(ce *ast.CallExpr) *ast.CallExpr {
-			if len(ce.Args) < 3 {
-				log.Println("unable to transpile module call")
-				return ce
-			}
-
-			ctxarg := ce.Args[0]
-			rarg := ce.Args[1]
-			statements := make([]jen.Code, 0, len(ce.Args[2:]))
-			for _, op := range ce.Args[2:] {
-				statements = append(statements, jen.Id(types.ExprString(op)))
-			}
-
-			pos := pkg.Fset.PositionFor(ce.Pos(), true)
-			pos.Filename = strings.TrimPrefix(pos.Filename, t.Workspace.Root+"/")
-
-			main := jen.NewFile("main")
-			main.Commentf("automatically generated from: %s", pos)
-			main.Func().Id("main").Params().Block(
-				jen.If(
-					jen.Id("err").Op(":=").Add(jen.Qual(egident, "Perform").Call(
-						jen.Id("context.Background()"),
-						jen.Qual(egident, "Sequential").Call(statements...)),
-					),
-					jen.Id("err").Op("!=").Id("nil"),
-				).Block(
-					jen.Panic(jen.Id("err")),
-				),
+	for _, pkg := range pset {
+		target := filepath.Join(langx.Autoderef(pkg.Module).Path, t.Workspace.Module)
+		for _, c := range pkg.Syntax {
+			var (
+				gendir string
+				genm   []*module
 			)
+			ftoken := pkg.Fset.File(c.Pos())
 
-			mainbuf := bytes.NewBuffer(nil)
-			if cause := main.Render(mainbuf); cause != nil {
-				generr = errors.Join(generr, cause)
+			if dst, err = workspaces.PathTranspiled(t.Context.Workspace, transdir, ftoken.Name()); err != nil {
+				return roots, err
 			}
 
-			genwasm := filepath.Join(gendir, fmt.Sprintf("module.%d.%d.wasm", pos.Line, pos.Column))
-			m := &module{
-				fname:    filepath.Join(t.Workspace.GenModDir, gendir, fmt.Sprintf("module.%d.%d.go", pos.Line, pos.Column)),
-				original: buf,
-				main:     mainbuf,
-				pos:      pos,
-			}
-			generatedmodules = append(generatedmodules, m)
-
-			return astbuild.CallExpr(astbuild.SelExpr(egident, "UnsafeRunner"), ctxarg, astbuild.CallExpr(astbuild.SelExpr(types.ExprString(rarg), "ToModuleRunner")), astbuild.StringLiteral(genwasm))
-		}, moduleExpr)
-
-		genexec := astcodec.NewCallExprReplacement(func(ce *ast.CallExpr) *ast.CallExpr {
-			if len(ce.Args) < 2 {
-				log.Println("unable to transpile exec call", len(ce.Args))
-				return ce
+			if gendir, err = filepath.Rel(transdir, workspaces.ReplaceExt(ftoken.Name(), ".wasm.d")); err != nil {
+				return roots, err
 			}
 
-			ctxarg := ce.Args[0]
-			rarg := ce.Args[1]
+			if genm, err = transform(t.Workspace, pkg.Fset, gendir, c); err != nil {
+				return roots, err
+			}
 
-			pos := pkg.Fset.PositionFor(ce.Pos(), true)
-			pos.Filename = strings.TrimPrefix(pos.Filename, t.Workspace.Root+"/")
-			genwasm := filepath.Join(gendir, fmt.Sprintf("module.%d.%d.wasm", pos.Line, pos.Column))
+			if err = rewrite(filepath.Join(t.Context.Workspace.Root, dst), c); err != nil {
+				return roots, err
+			}
 
-			return astbuild.CallExpr(astbuild.SelExpr(egident, "UnsafeExec"), ctxarg, rarg, astbuild.StringLiteral(genwasm))
-		}, execExpr)
+			if target != pkg.ID {
+				debugx.Println("ignoring", target, pkg.ID)
+				continue
+			}
 
-		v := astcodec.Multivisit(
-			// astcodec.Filter(grapher(pkg.Fset), moduleExpr),
-			replaceRef(egident, refexpr),
-			genmod,
-			genexec,
-		)
+			generatedmodules = append(generatedmodules, genm...)
 
-		ast.Walk(v, c)
-
-		return generr
-	}
-
-	rewrite := func(ftoken *token.File, dst string, c ast.Node) error {
-		var (
-			iodst     *os.File
-			formatted string
-			buf       = bytes.NewBuffer(nil)
-		)
-
-		log.Println("writing transformed to", dst)
-		if err = (&printer.Config{Mode: printer.TabIndent}).Fprint(buf, pkg.Fset, c); err != nil {
-			return err
-		}
-
-		if formatted, err = astcodec.Format(buf.String()); err != nil {
-			return err
-		}
-
-		if err = os.MkdirAll(filepath.Dir(dst), 0700); err != nil {
-			return err
-		}
-
-		if iodst, err = os.OpenFile(dst, os.O_CREATE|os.O_TRUNC|os.O_RDWR, 0600); err != nil {
-			return err
-		}
-		defer iodst.Close()
-
-		if _, err := io.Copy(iodst, bytes.NewBufferString(formatted)); err != nil {
-			return err
-		}
-
-		return nil
-	}
-
-	if err = iox.Copy(filepath.Join(pkg.Module.Dir, "go.mod"), filepath.Join(t.Context.Workspace.Root, t.Context.Workspace.TransDir, "go.mod")); err != nil {
-		return nil, errorsx.Wrap(err, "unable to copy go.mod")
-	}
-
-	if err = iox.Copy(filepath.Join(pkg.Module.Dir, "go.sum"), filepath.Join(t.Context.Workspace.Root, t.Context.Workspace.TransDir, "go.sum")); !os.IsNotExist(err) && err != nil {
-		return nil, errorsx.Wrap(err, "unable to copy go.sum")
-	}
-
-	for _, c := range pkg.Syntax {
-		var (
-			gendir string
-		)
-		ftoken := pkg.Fset.File(c.Pos())
-
-		if dst, err = workspaces.PathTranspiled(t.Context.Workspace, filepath.Join(t.Context.Workspace.Root, t.Context.Workspace.ModuleDir), ftoken.Name()); err != nil {
-			return roots, err
-		}
-
-		if gendir, err = filepath.Rel(filepath.Join(t.Context.Workspace.Root, t.Context.Workspace.ModuleDir), workspaces.ReplaceExt(ftoken.Name(), ".wasm.d")); err != nil {
-			return roots, err
-		}
-
-		if err = transform(ftoken, gendir, c); err != nil {
-			return roots, err
-		}
-
-		if err = rewrite(ftoken, filepath.Join(t.Context.Workspace.Root, dst), c); err != nil {
-			return roots, err
-		}
-
-		if mainfn := astcodec.FindFunctionDecl(pkg, astcodec.FindFunctionsByName("main")); mainfn != nil {
-			roots = append(roots, Compiled{Path: dst})
+			if mainfn := astcodec.FindFunctionDecl(pkg, astcodec.FindFunctionsByName("main")); mainfn != nil {
+				roots = append(roots, Compiled{Path: dst})
+			}
 		}
 	}
 
 	for _, m := range generatedmodules {
-		fset := token.NewFileSet()
-		o, err := parser.ParseFile(fset, m.fname, m.original, 0)
+		o, err := parser.ParseFile(pkgc.Fset, m.fname, m.original, 0)
 		if err != nil {
 			return roots, err
 		}
@@ -271,11 +139,9 @@ func (t golang) Run(ctx context.Context) (roots []Compiled, err error) {
 		main.Type.Params.Opening = token.NoPos
 
 		result := astcodec.ReplaceFunction(o, main, astcodec.FindFunctionsByName("main"))
-		debugx.Println("workspace", spew.Sdump(t.Context.Workspace))
-		debugx.Println("root", t.Context.Workspace.Root)
-		debugx.Println("original", m.fname)
+		log.Println("original", m.fname)
 
-		if err = rewrite(fset.File(result.Pos()), filepath.Join(t.Context.Workspace.Root, m.fname), result); err != nil {
+		if err = rewrite(filepath.Join(t.Context.Workspace.Root, m.fname), result); err != nil {
 			return roots, err
 		}
 
@@ -283,4 +149,150 @@ func (t golang) Run(ctx context.Context) (roots []Compiled, err error) {
 	}
 
 	return roots, nil
+}
+
+func transform(ws workspaces.Context, fset *token.FileSet, gendir string, c *ast.File) (generatedmodules []*module, err error) {
+	var (
+		egident    = "eg"
+		egenvident = "egenv"
+	)
+
+	if imp := astcodec.FindImport(c, astcodec.FindImportsByPath("github.com/egdaemon/eg/runtime/wasi/eg")); imp != nil && imp.Name != nil {
+		egident = imp.Name.String()
+	}
+
+	if imp := astcodec.FindImport(c, astcodec.FindImportsByPath("github.com/egdaemon/eg/runtime/wasi/egenv")); imp != nil && imp.Name != nil {
+		egenvident = imp.Name.String()
+	}
+
+	refexpr := astbuild.SelExpr(egident, "Ref")
+	refmodule := astbuild.SelExpr(egident, "Module")
+	refexec := astbuild.SelExpr(egident, "Exec")
+
+	// make a clone of the buffer
+	buf := bytes.NewBuffer(nil)
+	if err = printer.Fprint(buf, fset, c); err != nil {
+		return generatedmodules, err
+	}
+
+	moduleExpr := func(ce *ast.CallExpr) bool {
+		return astcodec.TypePattern(refmodule)(ce.Fun)
+	}
+
+	execExpr := func(ce *ast.CallExpr) bool {
+		return astcodec.TypePattern(refexec)(ce.Fun)
+	}
+
+	generr := error(nil)
+	genmod := astcodec.NewCallExprReplacement(func(ce *ast.CallExpr) *ast.CallExpr {
+		if len(ce.Args) < 3 {
+			log.Println("unable to transpile module call")
+			return ce
+		}
+
+		ctxarg := ce.Args[0]
+		rarg := ce.Args[1]
+		statements := make([]jen.Code, 0, len(ce.Args[2:]))
+		for _, op := range ce.Args[2:] {
+			statements = append(statements, jen.Id(types.ExprString(op)))
+		}
+
+		pos := fset.PositionFor(ce.Pos(), true)
+		pos.Filename = strings.TrimPrefix(pos.Filename, ws.Root+"/")
+
+		main := jen.NewFile("main")
+		main.Commentf("automatically generated from: %s", pos)
+		main.Func().Id("main").Params().Block(
+			jen.List(jen.Id("ctx"), jen.Id("done")).Op(":=").Add(
+				jen.Qual("context", "WithTimeout").Call(
+					jen.Qual("context", "Background").Call(),
+					jen.Qual(egenvident, "TTL").Call(),
+				),
+			),
+			jen.Defer().Add(jen.Id("done").Call()),
+			jen.If(
+				jen.Id("err").Op(":=").Add(jen.Qual(egident, "Perform").Call(
+					jen.Id("ctx"),
+					jen.Qual(egident, "Sequential").Call(statements...)),
+				),
+				jen.Id("err").Op("!=").Id("nil"),
+			).Block(
+				jen.Panic(jen.Id("err")),
+			),
+		)
+
+		mainbuf := bytes.NewBuffer(nil)
+		if cause := main.Render(mainbuf); cause != nil {
+			generr = errors.Join(generr, cause)
+		}
+
+		genwasm := filepath.Join(gendir, fmt.Sprintf("module.%d.%d.wasm", pos.Line, pos.Column))
+		m := &module{
+			fname:    filepath.Join(ws.GenModDir, gendir, fmt.Sprintf("module.%d.%d.go", pos.Line, pos.Column)),
+			original: buf,
+			main:     mainbuf,
+			pos:      pos,
+		}
+		generatedmodules = append(generatedmodules, m)
+		return astbuild.CallExpr(astbuild.SelExpr(egident, "UnsafeRunner"), ctxarg, astbuild.CallExpr(astbuild.SelExpr(types.ExprString(rarg), "ToModuleRunner")), astbuild.StringLiteral(genwasm))
+	}, moduleExpr)
+
+	genexec := astcodec.NewCallExprReplacement(func(ce *ast.CallExpr) *ast.CallExpr {
+		if len(ce.Args) < 2 {
+			log.Println("unable to transpile exec call", len(ce.Args))
+			return ce
+		}
+
+		ctxarg := ce.Args[0]
+		rarg := ce.Args[1]
+
+		pos := fset.PositionFor(ce.Pos(), true)
+		pos.Filename = strings.TrimPrefix(pos.Filename, ws.Root+"/")
+		genwasm := filepath.Join(gendir, fmt.Sprintf("module.%d.%d.wasm", pos.Line, pos.Column))
+
+		return astbuild.CallExpr(astbuild.SelExpr(egident, "UnsafeExec"), ctxarg, rarg, astbuild.StringLiteral(genwasm))
+	}, execExpr)
+
+	v := astcodec.Multivisit(
+		// astcodec.Filter(grapher(pkg.Fset), moduleExpr),
+		replaceRef(egident, refexpr),
+		genmod,
+		genexec,
+	)
+
+	ast.Walk(v, c)
+
+	return generatedmodules, generr
+}
+
+func rewrite(dst string, c ast.Node) (err error) {
+	var (
+		iodst     *os.File
+		formatted string
+		buf       = bytes.NewBuffer(nil)
+	)
+
+	debugx.Println("writing transformed to", dst)
+	if err = (&printer.Config{Mode: printer.TabIndent}).Fprint(buf, token.NewFileSet(), c); err != nil {
+		return err
+	}
+
+	if formatted, err = astcodec.Format(buf.String()); err != nil {
+		return err
+	}
+
+	if err = os.MkdirAll(filepath.Dir(dst), 0700); err != nil {
+		return err
+	}
+
+	if iodst, err = os.OpenFile(dst, os.O_CREATE|os.O_TRUNC|os.O_RDWR, 0600); err != nil {
+		return err
+	}
+	defer iodst.Close()
+
+	if _, err := io.Copy(iodst, bytes.NewBufferString(formatted)); err != nil {
+		return err
+	}
+
+	return nil
 }

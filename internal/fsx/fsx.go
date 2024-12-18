@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/egdaemon/eg/internal/debugx"
 	"github.com/egdaemon/eg/internal/errorsx"
 )
 
@@ -139,7 +140,7 @@ func CloneTree(ctx context.Context, dstdir string, rootdir string, archive fs.FS
 			dst = path
 		}
 
-		log.Println("cloning", rootdir, path, "->", dst, os.FileMode(0755), os.FileMode(0600))
+		debugx.Println("cloning", rootdir, path, "->", dst, os.FileMode(0755), os.FileMode(0600))
 
 		if d.IsDir() {
 			return os.MkdirAll(dst, 0755)

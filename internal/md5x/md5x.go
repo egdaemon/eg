@@ -8,15 +8,15 @@ import (
 	"github.com/gofrs/uuid"
 )
 
-// Digest to md5 hex encoded string
-func Digest(b []byte) string {
+// DigestHex to md5 hex encoded string
+func DigestHex(b []byte) string {
 	d := md5.Sum(b)
 	return hex.EncodeToString(d[:])
 }
 
 // String to md5 hex encoded string
 func String(s string) string {
-	return Digest([]byte(s))
+	return DigestHex([]byte(s))
 }
 
 // DigestX digest byte slice

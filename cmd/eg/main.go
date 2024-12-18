@@ -155,6 +155,7 @@ func main() {
 		log.Println("api host", eg.EnvAPIHostDefault())
 		log.Println("console host", eg.EnvConsoleHostDefault())
 		log.Println("container api host", eg.EnvContainerAPIHostDefault())
+		log.Println("tls insecure", eg.EnvTLSInsecure())
 	}
 
 	if err = ctx.Run(); err != nil {

@@ -3,15 +3,12 @@ package interp
 import (
 	"context"
 	"crypto/rand"
-	"errors"
 	"fmt"
-	"io/fs"
 	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"sync"
-	"syscall"
 
 	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/internal/debugx"
@@ -152,18 +149,6 @@ type runner struct {
 	root       string
 	runtimedir string
 	initonce   *sync.Once
-}
-
-func (t runner) Open(name string) (fs.File, error) {
-	path := filepath.Join(t.root, filepath.Clean(name))
-
-	if f, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0600); err == nil {
-		return f, nil
-	} else if errors.Is(err, syscall.EISDIR) {
-		return os.OpenFile(path, os.O_RDONLY, 0600)
-	} else {
-		return nil, err
-	}
 }
 
 func (t runner) perform(ctx context.Context, runid, path string, rtb runtimefn) (err error) {

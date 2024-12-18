@@ -4,7 +4,6 @@ import (
 	"context"
 	"log"
 	"os"
-	"time"
 
 	"github.com/egdaemon/eg/runtime/wasi/eg"
 	"github.com/egdaemon/eg/runtime/wasi/egenv"
@@ -61,15 +60,13 @@ func ConsoleLinting(ctx context.Context, _ eg.Op) error {
 	return nil
 }
 
-// main defines the setup for the CI process. here is where you define all
-// of the environments and tasks you wish to run.
 func main() {
 	log.SetFlags(log.Lshortfile | log.LUTC | log.Ltime)
-	ctx, done := context.WithTimeout(context.Background(), time.Hour)
+	ctx, done := context.WithTimeout(context.Background(), egenv.TTL())
 	defer done()
 
 	var (
-		debcache = egenv.CachePath(".dist")
+		debcache = egenv.CacheDirectory(".dist")
 	)
 
 	if err := os.MkdirAll(debcache, 0700); err != nil {

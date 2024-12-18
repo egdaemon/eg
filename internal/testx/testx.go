@@ -31,6 +31,12 @@ func ReadString(path ...string) string {
 	return string(errorsx.Must(os.ReadFile(filepath.Join(path...))))
 }
 
+func ReadMD5(path ...string) string {
+	d := md5.New()
+	_ = errorsx.Must(d.Write(errorsx.Must(os.ReadFile(filepath.Join(path...)))))
+	return uuid.FromBytesOrNil(d.Sum(nil)).String()
+}
+
 // Must is a small language extension for panicing on the common
 // value, error return pattern. only used in tests.
 func Must[T any](v T, err error) T {

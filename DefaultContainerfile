@@ -18,6 +18,8 @@ RUN apt install -o Acquire::ForceIPv4=true -y --no-install-recommends ssh podman
 RUN apt install -o Acquire::ForceIPv4=true -y --no-install-recommends cmake ninja-build ccache dput devscripts dh-make dput libssl-dev
 RUN apt install -o Acquire::ForceIPv4=true -y --no-install-recommends duckdb
 
+RUN systemd-sysusers
+
 # properly link golang into the path.
 RUN ln -s /usr/lib/go-1.23/bin/go /usr/local/bin/go
 

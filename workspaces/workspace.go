@@ -4,7 +4,6 @@ package workspaces
 import (
 	"context"
 	"crypto/md5"
-	"encoding/hex"
 	"hash"
 	"io"
 	"io/fs"
@@ -16,6 +15,7 @@ import (
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/fsx"
+	"github.com/gofrs/uuid"
 )
 
 func DefaultStateDirectory() string {
@@ -67,16 +67,15 @@ func FromEnv(ctx context.Context, root, name string) (zero Context, err error) {
 
 func New(ctx context.Context, root string, mdir string, name string) (zero Context, err error) {
 	cidmd5 := md5.New()
-	cdir := filepath.Join(mdir, ".cache")
-	runtimedir := filepath.Join(mdir, ".eg.runtime")
+	cdir := filepath.Join(".eg.cache")
+	runtimedir := filepath.Join(".eg.runtime")
 	ignore := ignoredir{path: cdir, reason: "cache directory"}
 
 	if err = cacheid(ctx, root, mdir, cidmd5, ignore); err != nil {
 		return zero, errorsx.Wrap(err, "unable to create cache id")
 	}
 
-	cid := hex.EncodeToString(cidmd5.Sum(nil))
-
+	cid := uuid.FromBytesOrNil(cidmd5.Sum(nil)).String()
 	return ensuredirs(Context{
 		Module:       name,
 		CachedID:     cid,
@@ -86,9 +85,9 @@ func New(ctx context.Context, root string, mdir string, name string) (zero Conte
 		RuntimeDir:   runtimedir,
 		WorkingDir:   filepath.Join(runtimedir, "mounted"),
 		TemporaryDir: filepath.Join(runtimedir, "tmp"),
-		BuildDir:     filepath.Join(cdir, "build", cid),
-		TransDir:     filepath.Join(cdir, "trans", cid),
-		GenModDir:    filepath.Join(cdir, "trans", cid, ".genmod"),
+		BuildDir:     filepath.Join(runtimedir, "gen", cid, "build"),
+		TransDir:     filepath.Join(runtimedir, "gen", cid, "trans"),
+		GenModDir:    filepath.Join(runtimedir, "gen", cid, "trans", ".genmod"),
 		Ignore:       ignore,
 	})
 }

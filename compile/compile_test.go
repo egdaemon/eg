@@ -38,6 +38,30 @@ var _ = Describe("FromTranspiled", func() {
 		Expect(modules[0].Generated).To(BeFalse())
 		Expect(modules[0].Path).To(Equal(filepath.Join(tmpdir, ws.BuildDir, "main.wasm")))
 	})
+
+	It("should transform nested modules", func(ctx context.Context) {
+		var (
+			err error
+			ws  workspaces.Context
+		)
+
+		tmpdir := testx.TempDir()
+
+		Expect(fsx.CloneTree(ctx, tmpdir, "example.2", os.DirFS(testx.Fixture()))).To(Succeed())
+		ws, err = workspaces.New(ctx, tmpdir, ".eg", "")
+		Expect(err).To(Succeed())
+		roots, err := transpile.Autodetect(transpile.New(ws)).Run(ctx)
+		Expect(err).To(Succeed())
+
+		modules, err := compile.FromTranspiled(ctx, ws, roots...)
+
+		Expect(err).To(Succeed())
+		Expect(modules).To(HaveLen(1))
+		Expect(modules[0].Generated).To(BeFalse())
+		Expect(modules[0].Path).To(Equal(filepath.Join(tmpdir, ws.BuildDir, "main.wasm")))
+		Expect(testx.ReadMD5(filepath.Join(tmpdir, ws.TransDir, "m1", "m1.go"))).To(Equal("cf2887b6-90db-98bf-2852-9d244908affa"), testx.ReadString(filepath.Join(tmpdir, ws.TransDir, "m1", "m1.go")))
+		Expect(testx.ReadMD5(filepath.Join(tmpdir, ws.TransDir, "m1", "m2", "m2.go"))).To(Equal("8bb1e3e1-2b99-ce5f-d6f4-33c99acb4777"))
+	})
 })
 
 var _ = Describe("wasix warm cache", func() {

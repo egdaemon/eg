@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/egdaemon/eg/internal/debugx"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/transpile"
 	"github.com/egdaemon/eg/workspaces"
@@ -80,8 +81,8 @@ func FromTranspiled(ctx context.Context, ws workspaces.Context, m ...transpile.C
 }
 
 func Run(ctx context.Context, dir, module string, output string) (err error) {
-	log.Println("compiling initiated", dir, module, "->", output)
-	defer log.Println("compiling completed", dir, module, "->", output)
+	debugx.Println("compiling initiated", dir, module, "->", output)
+	defer debugx.Println("compiling completed", dir, module, "->", output)
 
 	cmd := exec.CommandContext(ctx, "go", "build", "-trimpath", "-o", output, strings.TrimPrefix(module, dir+"/"))
 	cmd.Env = append(os.Environ(), "GOOS=wasip1", "GOARCH=wasm")
@@ -90,7 +91,7 @@ func Run(ctx context.Context, dir, module string, output string) (err error) {
 	cmd.Stderr = os.Stderr
 	cmd.Stdout = os.Stdout
 
-	log.Println("executing", dir, cmd.String())
+	debugx.Println("executing", dir, cmd.String())
 
 	return cmd.Run()
 }

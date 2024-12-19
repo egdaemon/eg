@@ -39,7 +39,7 @@ func build(ctx context.Context, _ eg.Op) error {
 			Environ("GOPROXY", "off").
 			Environ("GOWORK", "off"),
 		runtime.New("go version"),
-		runtime.New("go build -buildvcs ./cmd/...").
+		runtime.New("go build  -tags \"no_duckdb_arrow\" -buildvcs ./cmd/...").
 			Directory(".dist/deb/src"),
 		// shell.New("echo ${GPG_PASSPHRASE} | gpg-preset-passphrase --present {key}").Environ("GPG_PASSPHRASE", env.String("", "GPG_PASSPHRASE")),
 		runtime.Newf("debuild -S -k%s", maintainer.GPGFingerprint).Directory(".dist/deb"),

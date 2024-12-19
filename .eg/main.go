@@ -23,7 +23,13 @@ func main() {
 			c1.BuildFromFile(".dist/deb/Containerfile"),
 		),
 		eg.Parallel(
-			eg.Module(ctx, c1, eggolang.AutoTest()),
+			eg.Module(
+				ctx,
+				c1,
+				eggolang.AutoTest(
+					eggolang.TestOptionTags("no_duckdb_arrow"),
+				),
+			),
 		),
 	)
 

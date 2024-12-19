@@ -2,8 +2,11 @@ package egbug
 
 import (
 	"context"
+	"fmt"
+	"sync/atomic"
 
 	_eg "github.com/egdaemon/eg"
+	"github.com/egdaemon/eg/internal/langx"
 	"github.com/egdaemon/eg/runtime/wasi/eg"
 	"github.com/egdaemon/eg/runtime/wasi/egenv"
 	"github.com/egdaemon/eg/runtime/wasi/env"
@@ -46,4 +49,29 @@ func Images(ctx context.Context, op eg.Op) error {
 		ctx,
 		shell.New("podman images"),
 	)
+}
+
+func NewCounter() *counter {
+	return langx.Autoptr(counter(0))
+}
+
+type counter uint64
+
+func (t *counter) Op(ctx context.Context, op eg.Op) error {
+	atomic.AddUint64((*uint64)(t), 1)
+	return nil
+}
+
+func (t *counter) Current() uint64 {
+	return uint64(*t)
+}
+
+func (t *counter) Assert(v uint64) eg.OpFn {
+	return func(ctx context.Context, op eg.Op) error {
+		if v := t.Current(); v != 1 {
+			return fmt.Errorf("expected counter to have been invoked once, actual: %d\n", v)
+		}
+
+		return nil
+	}
 }

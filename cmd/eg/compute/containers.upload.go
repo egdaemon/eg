@@ -170,9 +170,6 @@ func (t c8sUpload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error
 		return errorsx.Wrap(err, "unable to rewind kernel archive")
 	}
 
-	// if err = iox.Copy(archiveio.Name(), "archive.tar.gz"); err != nil {
-	// 	return errorsx.Wrap(err, "unable to copy archive")
-	// }
 	ainfo := errorsx.Zero(os.Stat(archiveio.Name()))
 	log.Println("archive metadata", ainfo.Name(), ainfo.Size())
 

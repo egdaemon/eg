@@ -68,8 +68,8 @@ func (t *counter) Current() uint64 {
 
 func (t *counter) Assert(v uint64) eg.OpFn {
 	return func(ctx context.Context, op eg.Op) error {
-		if v := t.Current(); v != 1 {
-			return fmt.Errorf("expected counter to have been invoked once, actual: %d\n", v)
+		if c := t.Current(); c != 1 {
+			return fmt.Errorf("expected counter to have %d, actual: %d\n", v, c)
 		}
 
 		return nil

@@ -20,10 +20,12 @@ func main() {
 	err := eg.Perform(
 		ctx,
 		eg.When(mods.Changed(), c1.Op),
-		c1.Assert(1),
+		c1.Assert(0),
 	)
 
 	if err != nil {
 		log.Fatalln(err)
 	}
+
+	log.Println("git.detect.changes successful", c1.Current())
 }

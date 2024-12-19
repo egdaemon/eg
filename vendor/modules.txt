@@ -118,7 +118,7 @@ github.com/ebitengine/purego
 github.com/ebitengine/purego/internal/cgo
 github.com/ebitengine/purego/internal/fakecgo
 github.com/ebitengine/purego/internal/strings
-# github.com/egdaemon/eg v0.0.0-20241219184811-e98b59c23f46
+# github.com/egdaemon/eg v0.0.0-20241219185551-cbd44d2522ad
 ## explicit; go 1.23.2
 # github.com/emirpasic/gods v1.18.1
 ## explicit; go 1.2

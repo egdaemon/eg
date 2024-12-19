@@ -153,9 +153,9 @@ func Parallel(operations ...OpFn) OpFn {
 	}
 }
 
-func When(b bool, o OpFn) OpFn {
+func When(b func(ctx context.Context) bool, o OpFn) OpFn {
 	return func(ctx context.Context, i Op) error {
-		if !b {
+		if !b(ctx) {
 			return nil
 		}
 

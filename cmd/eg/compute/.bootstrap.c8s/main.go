@@ -17,7 +17,7 @@ func main() {
 
 	err := eg.Perform(
 		ctx,
-		eg.When(func(ctx context.Context) bool { return egenv.Boolean(false, _eg.EnvComputeContainerImpure) }, eggit.AutoClone),
+		eg.When(egenv.Boolean(false, _eg.EnvComputeContainerImpure), eggit.AutoClone),
 		eg.Build(eg.Container(cname).BuildFromFile(egenv.RuntimeDirectory("workspace", "Containerfile"))),
 		eg.Exec(ctx, eg.Container(cname)),
 	)

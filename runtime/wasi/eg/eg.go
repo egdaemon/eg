@@ -153,13 +153,13 @@ func Parallel(operations ...OpFn) OpFn {
 	}
 }
 
-// Utility function that converts a boolean value into the expected form for the When
-// function.
-func BoolFn(b bool) func(ctx context.Context) bool {
-	return func(ctx context.Context) bool { return b }
+// make a operation conditional on a boolean value.
+func When(b bool, o OpFn) OpFn {
+	return WhenFn(func(ctx context.Context) bool { return b }, o)
 }
 
-func When(b func(ctx context.Context) bool, o OpFn) OpFn {
+// make an operation conditional on a boolean function.
+func WhenFn(b func(ctx context.Context) bool, o OpFn) OpFn {
 	return func(ctx context.Context, i Op) error {
 		if !b(ctx) {
 			return nil

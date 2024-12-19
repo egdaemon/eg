@@ -19,7 +19,7 @@ func main() {
 
 	err := eg.Perform(
 		ctx,
-		eg.When(mods.Changed(), c1.Op),
+		eg.WhenFn(mods.Changed(), c1.Op),
 		c1.Assert(0),
 	)
 

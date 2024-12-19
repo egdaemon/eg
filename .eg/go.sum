@@ -2,5 +2,7 @@ github.com/egdaemon/eg v0.0.0-20241219184811-e98b59c23f46 h1:C07s0d1QABk2kkCEu8N
 github.com/egdaemon/eg v0.0.0-20241219184811-e98b59c23f46/go.mod h1:J5qGxwarpMO4kQWgyEtAwULqK0rG4MoLAHk6BHq2ceo=
 github.com/egdaemon/eg v0.0.0-20241219185551-cbd44d2522ad h1:tFnpWpfPtUY8Xy0Z9/GzT2+/ZMjBLBYL8viRq4bqwu8=
 github.com/egdaemon/eg v0.0.0-20241219185551-cbd44d2522ad/go.mod h1:Tv/P5QY5bN9tNT6XkcjwOC7yI0EvL0N9YkX39AsiFXE=
+github.com/egdaemon/eg v0.0.0-20241219190745-68fa604ce42b h1:zHQ1bs+WKPdfb+/em2riQVSpLEfOEi1IxhqNxjUmcO4=
+github.com/egdaemon/eg v0.0.0-20241219190745-68fa604ce42b/go.mod h1:Tv/P5QY5bN9tNT6XkcjwOC7yI0EvL0N9YkX39AsiFXE=
 github.com/gofrs/uuid v4.4.0+incompatible h1:3qXRTX8/NbyulANqlc0lchS1gqAVxRgsuW1YrTJupqA=
 github.com/gofrs/uuid v4.4.0+incompatible/go.mod h1:b2aQJv3Z4Fp6yNu3cdSllBxTCLRxnplIgP/c0N/04lM=

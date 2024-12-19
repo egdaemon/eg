@@ -177,3 +177,12 @@ func RetrieveAuthCode(ctx context.Context, chttp *http.Client, uri string) (r Au
 
 	return r, nil
 }
+
+func DebugString(s string) string {
+	parts := strings.Split(s, ".")
+	if len(parts) != 3 {
+		return s
+	}
+	decoded, _ := jwt.DecodeSegment(parts[1])
+	return string(decoded)
+}

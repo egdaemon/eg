@@ -65,7 +65,7 @@ func (t c8sLocal) Run(gctx *cmdopts.Global) (err error) {
 	}
 
 	egdir := filepath.Join(ws.Root, ws.ModuleDir)
-	autoruncontainer := filepath.Join(ws.Root, ws.WorkingDir, "workspace", "Containerfile")
+	autoruncontainer := filepath.Join(ws.Root, ws.RuntimeDir, "workspace", "Containerfile")
 	if err = fsx.MkDirs(0700, filepath.Dir(autoruncontainer)); err != nil {
 		return errorsx.Wrap(err, "unable to write autorunnable containerfil")
 	}
@@ -151,8 +151,8 @@ func (t c8sLocal) Run(gctx *cmdopts.Global) (err error) {
 		runners.AgentOptionCommandLine("--env-file", environpath), // required for tty to work correctly in local mode.
 		runners.AgentOptionCommandLine("--cap-add", "NET_ADMIN"),  // required for loopback device creation inside the container
 		runners.AgentOptionCommandLine("--cap-add", "SYS_ADMIN"),  // required for rootless container building https://github.com/containers/podman/issues/4056#issuecomment-612893749
-		runners.AgentOptionCommandLine("--device", "/dev/fuse"),
-		runners.AgentOptionCommandLine("--pids-limit", "-1"), // more bullshit. without this we get "Error: OCI runtime error: crun: the requested cgroup controller `pids` is not available"
+		runners.AgentOptionCommandLine("--device", "/dev/fuse"),   //
+		runners.AgentOptionCommandLine("--pids-limit", "-1"),      // more bullshit. without this we get "Error: OCI runtime error: crun: the requested cgroup controller `pids` is not available"
 		runners.AgentOptionEnv(eg.EnvComputeRootModule, strconv.FormatBool(true)),
 		runners.AgentOptionEnv(eg.EnvComputeModuleNestedLevel, strconv.Itoa(envx.Int(0, eg.EnvComputeModuleNestedLevel))),
 		runners.AgentOptionEnv(eg.EnvComputeRunID, uid.String()),
@@ -176,7 +176,7 @@ func (t c8sLocal) Run(gctx *cmdopts.Global) (err error) {
 			)...)
 
 		// TODO REVISIT using t.ws.RuntimeDir as moduledir.
-		err := c8s.PodmanModule(gctx.Context, prepcmd, "eg", fmt.Sprintf("eg-%s", uid.String()), ws.RuntimeDir, options...)
+		err := c8s.PodmanModule(gctx.Context, prepcmd, "eg", fmt.Sprintf("eg-%s", uid.String()), ws.Root, options...)
 		if err != nil {
 			return errorsx.Wrap(err, "module execution failed")
 		}

@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	_eg "github.com/egdaemon/eg"
@@ -91,26 +92,11 @@ func AutoClone(ctx context.Context, _ eg.Op) error {
 }
 
 type modified struct {
+	init    sync.Once
 	changed []string
 }
 
-func (t modified) Changed(paths ...string) bool {
-	if len(t.changed) == 0 {
-		return true
-	}
-
-	return stringsx.Present(slicesx.FindOrZero(func(s string) bool {
-		for _, n := range paths {
-			if strings.HasPrefix(s, n) {
-				return true
-			}
-		}
-
-		return false
-	}, t.changed...))
-}
-
-func DetectModified(ctx context.Context) (modified, error) {
+func (t *modified) detect(ctx context.Context) error {
 	var (
 		path = egenv.RuntimeDirectory("eg.git.mod")
 	)
@@ -127,7 +113,7 @@ func DetectModified(ctx context.Context) (modified, error) {
 	if hcommit == bcommit {
 		// this is the where we compare a single commit.
 		// just assume everything changed.
-		return modified{}, nil
+		return nil
 	} else {
 		err := shell.Run(
 			ctx,
@@ -137,20 +123,41 @@ func DetectModified(ctx context.Context) (modified, error) {
 			shell.Newf("cat %s", path),
 		)
 		if err != nil {
-			return modified{}, errorsx.Wrap(err, "unable to determine modified paths")
+			return errorsx.Wrap(err, "unable to determine modified paths")
 		}
 	}
 
 	mods, err := os.Open(path)
 	if err != nil {
-		return modified{}, errorsx.Wrap(err, "unable to open mods")
+		return errorsx.Wrap(err, "unable to open mods")
 	}
-	changed := iox.String(mods)
 
-	return modified{
-		changed: slicesx.Filter(
-			func(v string) bool { return stringsx.Present(v) },
-			strings.Split(changed, "\n")...,
-		),
-	}, nil
+	t.changed = strings.Split(iox.String(mods), "\n")
+	return nil
+}
+
+func (t *modified) Changed(paths ...string) func(context.Context) bool {
+	return func(ctx context.Context) bool {
+		t.init.Do(func() {
+			errorsx.Log(t.detect(ctx))
+		})
+
+		if len(t.changed) == 0 || len(paths) == 0 {
+			return true
+		}
+
+		return stringsx.Present(slicesx.FindOrZero(func(s string) bool {
+			for _, n := range paths {
+				if strings.HasPrefix(s, n) {
+					return true
+				}
+			}
+
+			return false
+		}, t.changed...))
+	}
+}
+
+func NewModified() modified {
+	return modified{init: sync.Once{}}
 }

@@ -118,7 +118,7 @@ github.com/ebitengine/purego
 github.com/ebitengine/purego/internal/cgo
 github.com/ebitengine/purego/internal/fakecgo
 github.com/ebitengine/purego/internal/strings
-# github.com/egdaemon/eg v0.0.0-20241219144023-9ced59a7cf6e
+# github.com/egdaemon/eg v0.0.0-20241219184811-e98b59c23f46
 ## explicit; go 1.23.2
 # github.com/emirpasic/gods v1.18.1
 ## explicit; go 1.2
@@ -467,7 +467,7 @@ golang.org/x/exp/maps
 golang.org/x/mod/internal/lazyregexp
 golang.org/x/mod/module
 golang.org/x/mod/semver
-# golang.org/x/net v0.32.0
+# golang.org/x/net v0.33.0
 ## explicit; go 1.18
 golang.org/x/net/context
 golang.org/x/net/html

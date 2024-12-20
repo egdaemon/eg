@@ -65,3 +65,9 @@ func RootDirectory(paths ...string) string {
 func Boolean(fallback bool, keys ...string) bool {
 	return envx.Boolean(fallback, keys...)
 }
+
+// Extract a string formatted environment variable from the given keys.
+// returns the first valid result if none of the keys exist then the fallback is returned.
+func String(fallback string, keys ...string) string {
+	return envx.String(fallback, keys...)
+}

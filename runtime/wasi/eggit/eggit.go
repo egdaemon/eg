@@ -12,7 +12,7 @@ import (
 	"time"
 
 	_eg "github.com/egdaemon/eg"
-	"github.com/egdaemon/eg/internal/envx"
+	"github.com/egdaemon/eg/internal/debugx"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/iox"
 	"github.com/egdaemon/eg/internal/slicesx"
@@ -97,7 +97,7 @@ func AutoClone(ctx context.Context, _ eg.Op) error {
 }
 
 type modified struct {
-	init    sync.Once
+	derp    sync.Once
 	changed []string
 }
 
@@ -106,18 +106,20 @@ func (t *modified) detect(ctx context.Context) error {
 		path = egenv.RuntimeDirectory("eg.git.mod")
 	)
 
-	hcommit := envx.String("", _eg.EnvGitHeadCommit)
-	bcommit := envx.String(hcommit, _eg.EnvGitBaseCommit)
-	if stringsx.Blank(hcommit) {
-		log.Println(errorsx.Errorf("environment variable %s is empty", _eg.EnvGitHeadCommit))
+	hcommit := egenv.String("", _eg.EnvGitHeadCommit)
+	bcommit := egenv.String(hcommit, _eg.EnvGitBaseCommit)
+	if strings.TrimSpace(hcommit) == "" {
+		log.Println(fmt.Errorf("environment variable %s is empty", _eg.EnvGitHeadCommit))
+	} else {
+		debugx.Println("git.modified head commit", hcommit)
 	}
-	if stringsx.Blank(bcommit) {
-		log.Println(errorsx.Errorf("environment variable %s is empty", _eg.EnvGitBaseCommit))
+	if strings.TrimSpace(bcommit) == "" {
+		log.Println(fmt.Errorf("environment variable %s is empty", _eg.EnvGitBaseCommit))
+	} else {
+		debugx.Println("git.modified base commit", bcommit)
 	}
 
 	if hcommit == bcommit {
-		// this is the where we compare a single commit.
-		// just assume everything changed.
 		return nil
 	} else {
 		err := shell.Run(
@@ -128,26 +130,33 @@ func (t *modified) detect(ctx context.Context) error {
 			shell.Newf("cat %s", path),
 		)
 		if err != nil {
-			return errorsx.Wrap(err, "unable to determine modified paths")
+			return err
 		}
 	}
 
 	mods, err := os.Open(path)
 	if err != nil {
-		return errorsx.Wrap(err, "unable to open mods")
+		return err
 	}
 
-	t.changed = strings.Split(iox.String(mods), "\n")
+	smods := iox.String(mods)
+	log.Printf("mods '%s'\n", smods)
+
+	if stringsx.Blank(smods) {
+		return nil
+	}
+
+	t.changed = strings.Split(smods, "\n")
 	return nil
 }
 
-// check if the provided paths have any changes.
 func (t *modified) Changed(paths ...string) func(context.Context) bool {
 	return func(ctx context.Context) bool {
-		t.init.Do(func() {
-			errorsx.Log(t.detect(ctx))
+		t.derp.Do(func() {
+			log.Println(t.detect(ctx))
 		})
 
+		log.Println("changed", len(t.changed), t.changed, "paths", len(paths))
 		if len(t.changed) == 0 || len(paths) == 0 {
 			return true
 		}
@@ -164,9 +173,8 @@ func (t *modified) Changed(paths ...string) func(context.Context) bool {
 	}
 }
 
-// used to check what directories have changed between the base and current commit.
 func NewModified() modified {
-	return modified{init: sync.Once{}}
+	return modified{derp: sync.Once{}}
 }
 
 // ensures the workspace has not been modified. useful for detecting

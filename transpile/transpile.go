@@ -138,7 +138,7 @@ func (t golang) Run(ctx context.Context) (roots []Compiled, err error) {
 		main.Type.Params.Opening = token.NoPos
 
 		result := astcodec.ReplaceFunction(o, main, astcodec.FindFunctionsByName("main"))
-		log.Println("original", m.fname)
+		debugx.Println("original", m.fname)
 
 		if err = rewrite(filepath.Join(t.Context.Workspace.Root, m.fname), token.NewFileSet(), result); err != nil {
 			return roots, err
@@ -270,7 +270,7 @@ func rewrite(dst string, fset *token.FileSet, c ast.Node) (err error) {
 	)
 
 	debugx.Println("writing transformed to", dst)
-	if err = (&printer.Config{}).Fprint(buf, fset, c); err != nil {
+	if err = (&printer.Config{Mode: printer.TabIndent | printer.UseSpaces}).Fprint(buf, fset, c); err != nil {
 		return err
 	}
 

@@ -15,6 +15,7 @@ import (
 	"github.com/egdaemon/eg/cmd/cmdopts"
 	"github.com/egdaemon/eg/cmd/eg/daemons"
 	"github.com/egdaemon/eg/internal/bytesx"
+	"github.com/egdaemon/eg/internal/debugx"
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/gitx"
@@ -157,11 +158,11 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 	} else {
 		log.Printf("---------------------------- MODULE INITIATED %d ----------------------------\n", mlevel)
 		// env.Debug(os.Environ()...)
-		log.Println("account", aid)
-		log.Println("run id", uid)
-		log.Println("repository", descr)
-		log.Println("number of cores", runtime.GOMAXPROCS(-1))
-		log.Println("logging level", gctx.Verbosity)
+		debugx.Println("account", aid)
+		debugx.Println("run id", uid)
+		debugx.Println("repository", descr)
+		debugx.Println("number of cores", runtime.GOMAXPROCS(-1))
+		debugx.Println("logging level", gctx.Verbosity)
 		defer log.Printf("---------------------------- MODULE COMPLETED %d ----------------------------\n", mlevel)
 	}
 

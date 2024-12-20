@@ -258,6 +258,16 @@ func (t nodePrinter) Visit(node ast.Node) (w ast.Visitor) {
 	return t
 }
 
+func Noop() ast.Visitor {
+	return noop{}
+}
+
+type noop struct{}
+
+func (t noop) Visit(node ast.Node) (w ast.Visitor) {
+	return t
+}
+
 type filter struct {
 	delegate ast.Visitor
 	pattern  func(ast.Node) bool

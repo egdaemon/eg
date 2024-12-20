@@ -173,6 +173,12 @@ func NewModified() modified {
 // if there have been changes during the run.
 func Pristine() eg.OpFn {
 	return func(ctx context.Context, _ eg.Op) error {
-		return shell.Run(ctx, shell.New("git diff-index --quiet HEAD || (echo \"repository is dirty, aborting\" && false)"))
+		log.Println("ensuring git repository has not changed initiated")
+		defer log.Println("ensuring git repository has not changed completed")
+		return shell.Run(
+			ctx,
+			shell.New("git diff-index --name-only HEAD"),
+			shell.New("git diff-index --quiet HEAD"),
+		)
 	}
 }

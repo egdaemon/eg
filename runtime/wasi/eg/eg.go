@@ -23,7 +23,7 @@ func DefaultModule() ContainerRunner {
 	return Container("eg").BuildFromFile(path)
 }
 
-// A reference to an operation.
+// A reference to an operation. used during instrumentation.
 type Reference interface {
 	ID() string
 }
@@ -78,6 +78,7 @@ func UnsafeTranspiledRef(name string, o OpFn) Reference {
 	}
 }
 
+// execute the provided tasks in sequential order.
 func Perform(ctx context.Context, tasks ...OpFn) error {
 	return ffigraph.WrapErr(nil, namedop("perform"), func() error {
 		for _, t := range tasks {
@@ -169,18 +170,7 @@ func WhenFn(b func(ctx context.Context) bool, o OpFn) OpFn {
 	}
 }
 
-// Conditional When that takes a function to invoke to determine
-// if the operation should be executed.
-func DeferredWhen(b func() bool, o OpFn) OpFn {
-	return func(ctx context.Context, i Op) error {
-		if !b() {
-			return nil
-		}
-
-		return o(ctx, ref(o))
-	}
-}
-
+// interface to workload runners, used to represent containers, vms, or other such runtimes.
 type Runner interface {
 	CompileWith(ctx context.Context) (err error)
 	RunWith(ctx context.Context, mpath string) (err error)
@@ -229,16 +219,19 @@ type ContainerRunner struct {
 	built      *sync.Once
 }
 
+// specifies the location of the container file on disk.
 func (t ContainerRunner) BuildFromFile(s string) ContainerRunner {
 	t.definition = s
 	return t
 }
 
+// pull the container from a remote repository.
 func (t ContainerRunner) PullFrom(s string) ContainerRunner {
 	t.pull = s
 	return t
 }
 
+// the command to execute.
 func (t ContainerRunner) Command(s string) ContainerRunner {
 	t.cmd = strings.Split(s, " ")
 	return t
@@ -277,15 +270,18 @@ func (t ContainerRunner) RunWith(ctx context.Context, mpath string) (err error) 
 	return errorsx.Wrapf(ffiegcontainer.Run(ctx, t.name, mpath, t.cmd, opts), "unable to run the container: %s", t.name)
 }
 
+// internal use.
 func (t ContainerRunner) ToModuleRunner() ContainerModuleRunner {
 	return ContainerModuleRunner{ContainerRunner: t}
 }
 
+// unsafe not recommended for use.
 func (t ContainerRunner) OptionPrivileged() ContainerRunner {
 	t.options = append(t.options, (coption{}).privileged())
 	return t
 }
 
+// experimental not recommended for use.
 func (t ContainerRunner) OptionUser(username string) ContainerRunner {
 	t.options = append(t.options, (coption{}).user(username))
 	return t

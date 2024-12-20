@@ -59,8 +59,8 @@ var _ = Describe("FromTranspiled", func() {
 		Expect(modules).To(HaveLen(1))
 		Expect(modules[0].Generated).To(BeFalse())
 		Expect(modules[0].Path).To(Equal(filepath.Join(tmpdir, ws.BuildDir, "main.wasm")))
-		Expect(testx.ReadMD5(filepath.Join(tmpdir, ws.TransDir, "m1", "m1.go"))).To(Equal("cf2887b6-90db-98bf-2852-9d244908affa"), testx.ReadString(filepath.Join(tmpdir, ws.TransDir, "m1", "m1.go")))
-		Expect(testx.ReadMD5(filepath.Join(tmpdir, ws.TransDir, "m1", "m2", "m2.go"))).To(Equal("8bb1e3e1-2b99-ce5f-d6f4-33c99acb4777"))
+		Expect(testx.ReadMD5(filepath.Join(tmpdir, ws.TransDir, "m1", "m1.go"))).To(Equal("e690798e-0ee1-13ed-a296-42a21dc7fc3b"), testx.ReadString(filepath.Join(tmpdir, ws.TransDir, "m1", "m1.go")))
+		Expect(testx.ReadMD5(filepath.Join(tmpdir, ws.TransDir, "m1", "m2", "m2.go"))).To(Equal("11b3ede1-72e6-812c-adf9-0e9a81a35265"))
 	})
 })
 

@@ -1,3 +1,4 @@
+// Package eggit provides functionality around git and assumes that the git command is available.
 package eggit
 
 import (
@@ -60,6 +61,7 @@ type commit struct {
 	Committer signature
 }
 
+// retrieve the commit metadata from from the environment.
 func EnvCommit() *commit {
 	return &commit{
 		Hash: nhash(os.Getenv(_eg.EnvGitHeadCommit)),
@@ -71,11 +73,13 @@ func EnvCommit() *commit {
 	}
 }
 
+// determine the commit hash for the given name.
 func Commitish(ctx context.Context, treeish string) string {
 	return ffigit.Commitish(ctx, treeish)
 }
 
-func Clone(ctx context.Context, uri, remote, branch string) error {
+// clone a git repository from the given uri, remote and treeish.
+func Clone(ctx context.Context, uri, remote, commit string) error {
 	if strings.TrimSpace(uri) == "" {
 		return fmt.Errorf("unable to clone url not specified: %s", uri)
 	}
@@ -84,9 +88,10 @@ func Clone(ctx context.Context, uri, remote, branch string) error {
 		return fmt.Errorf("unable to clone remote not specified: %s", remote)
 	}
 
-	return ffigit.Clone(ctx, uri, remote, branch)
+	return ffigit.Clone(ctx, uri, remote, commit)
 }
 
+// clone the repository specified by the eg environment variables into the working directory.
 func AutoClone(ctx context.Context, _ eg.Op) error {
 	return Clone(ctx, env.String("", "EG_GIT_HEAD_URI"), env.String("origin", "EG_GIT_HEAD_REMOTE"), env.String("main", "EG_GIT_HEAD_REF"))
 }
@@ -136,6 +141,7 @@ func (t *modified) detect(ctx context.Context) error {
 	return nil
 }
 
+// check if the provided paths have any changes.
 func (t *modified) Changed(paths ...string) func(context.Context) bool {
 	return func(ctx context.Context) bool {
 		t.init.Do(func() {
@@ -158,6 +164,15 @@ func (t *modified) Changed(paths ...string) func(context.Context) bool {
 	}
 }
 
+// used to check what directories have changed between the base and current commit.
 func NewModified() modified {
 	return modified{init: sync.Once{}}
+}
+
+// ensures the workspace has not been modified. useful for detecting
+// if there have been changes during the run.
+func Pristine() eg.OpFn {
+	return func(ctx context.Context, _ eg.Op) error {
+		return shell.Run(ctx, shell.New("git diff-index --quiet HEAD || (echo \"repository is dirty, aborting\" && false)"))
+	}
 }

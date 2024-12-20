@@ -16,26 +16,52 @@ func TTL() time.Duration {
 	return env.Duration(time.Hour, eg.EnvComputeTTL)
 }
 
+// Read the run ID from the environment
 func RunID() string {
-	return os.Getenv(eg.EnvComputeRunID)
+	return env.String("00000000-0000-0000-0000-000000000000", eg.EnvComputeRunID)
 }
 
+// returns the absolute path to the cache directory, when arguments are provided they are joined
+// joined with the cache directory.
+//
+// files stored in the cache directory are maintained between runs on a best effort basis.
+// files prefixed with .eg are reserved for system use.
+//
+// e.g.) CacheDirectory("foo", "bar") -> "/cache/foo/bar"
 func CacheDirectory(paths ...string) string {
 	return filepath.Join(env.String(os.TempDir(), eg.EnvComputeCacheDirectory, "CACHE_DIRECTORY"), filepath.Join(paths...))
 }
 
+// returns the absolute path to the runtime directory, when arguments are provided they are joined
+// joined with the runime directory.
+//
+// files stored in the runtime directory are maintained for the duration of a workload. every module
+// will be able to read the data stored in the runtime folder.
+//
+// e.g.) RuntimeDirectory("foo", "bar") -> "/runtime/foo/bar"
 func RuntimeDirectory(paths ...string) string {
 	return filepath.Join(env.String(os.TempDir(), eg.EnvComputeRuntimeDirectory), filepath.Join(paths...))
 }
 
+// returns the absolute path to the ephemeral directory, when arguments are provided they are joined
+// joined with the ephemeral directory.
+//
+// files stored in the ephemeral directory are maintained for the duration of a single module's execution.
+// and is unique to that module.
+//
+// e.g.) RuntimeDirectory("foo", "bar") -> "/ephemeral/foo/bar"
 func EphemeralDirectory(paths ...string) string {
 	return filepath.Join(os.TempDir(), filepath.Join(paths...))
 }
 
+// returns the absolute path to the working directory of the module. this directory is the
+// initial working directory of the workload and is used for cloning git repositories etc.
 func RootDirectory(paths ...string) string {
 	return filepath.Join(env.String(eg.DefaultRootDirectory(), eg.EnvComputeRootDirectory), filepath.Join(paths...))
 }
 
+// Extract a boolean formatted environment variable from the given keys
+// returns the first valid result if none of the keys exist then the fallback is returned.
 func Boolean(fallback bool, keys ...string) bool {
 	return envx.Boolean(fallback, keys...)
 }

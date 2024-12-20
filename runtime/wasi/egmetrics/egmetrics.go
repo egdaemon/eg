@@ -10,8 +10,8 @@ import (
 // field is an opaque string identifying the metric.
 // the payload must be consistent with field name -> types.
 // the prefix 'eg.' is reserved for system use.
-// i.e.) ✓ Record(ctx, "example.metric.1", m)
-// i.e.) x Record(ctx, "eg.example.metric.1", m)
+// e.g.) ✓ Record(ctx, "example.metric.1", m)
+// e.g.) x Record(ctx, "eg.example.metric.1", m)
 // metrics will be encoded as follows:
 //   - every event will be given a uuid v7 id.
 //   - every event will be given a timestamp.

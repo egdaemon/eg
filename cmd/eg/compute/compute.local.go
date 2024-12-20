@@ -68,7 +68,6 @@ func (t local) Run(gctx *cmdopts.Global) (err error) {
 	if ws, err = workspaces.New(gctx.Context, t.Dir, t.ModuleDir, t.Name); err != nil {
 		return errorsx.Wrap(err, "unable to setup workspace")
 	}
-
 	defer os.RemoveAll(filepath.Join(ws.Root, ws.RuntimeDir))
 
 	if err = os.Remove(filepath.Join(ws.Root, ws.WorkingDir)); err != nil {

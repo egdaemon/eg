@@ -23,7 +23,6 @@ import (
 	"github.com/egdaemon/eg/internal/fsx"
 	"github.com/egdaemon/eg/internal/langx"
 	"github.com/egdaemon/eg/workspaces"
-
 	"golang.org/x/tools/go/packages"
 )
 
@@ -106,7 +105,7 @@ func (t golang) Run(ctx context.Context) (roots []Compiled, err error) {
 				return roots, err
 			}
 
-			if err = rewrite(filepath.Join(t.Context.Workspace.Root, dst), c); err != nil {
+			if err = rewrite(filepath.Join(t.Context.Workspace.Root, dst), pkg.Fset, c); err != nil {
 				return roots, err
 			}
 
@@ -141,7 +140,7 @@ func (t golang) Run(ctx context.Context) (roots []Compiled, err error) {
 		result := astcodec.ReplaceFunction(o, main, astcodec.FindFunctionsByName("main"))
 		log.Println("original", m.fname)
 
-		if err = rewrite(filepath.Join(t.Context.Workspace.Root, m.fname), result); err != nil {
+		if err = rewrite(filepath.Join(t.Context.Workspace.Root, m.fname), token.NewFileSet(), result); err != nil {
 			return roots, err
 		}
 
@@ -254,18 +253,16 @@ func transform(ws workspaces.Context, fset *token.FileSet, gendir string, c *ast
 	}, execExpr)
 
 	v := astcodec.Multivisit(
-		// astcodec.Filter(grapher(pkg.Fset), moduleExpr),
 		replaceRef(egident, refexpr),
 		genmod,
 		genexec,
 	)
-
 	ast.Walk(v, c)
 
 	return generatedmodules, generr
 }
 
-func rewrite(dst string, c ast.Node) (err error) {
+func rewrite(dst string, fset *token.FileSet, c ast.Node) (err error) {
 	var (
 		iodst     *os.File
 		formatted string
@@ -273,7 +270,7 @@ func rewrite(dst string, c ast.Node) (err error) {
 	)
 
 	debugx.Println("writing transformed to", dst)
-	if err = (&printer.Config{Mode: printer.TabIndent}).Fprint(buf, token.NewFileSet(), c); err != nil {
+	if err = (&printer.Config{}).Fprint(buf, fset, c); err != nil {
 		return err
 	}
 

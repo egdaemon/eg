@@ -140,7 +140,6 @@ func (t *modified) detect(ctx context.Context) error {
 	}
 
 	smods := iox.String(mods)
-	log.Printf("mods '%s'\n", smods)
 
 	if stringsx.Blank(smods) {
 		return nil
@@ -156,7 +155,7 @@ func (t *modified) Changed(paths ...string) func(context.Context) bool {
 			log.Println(t.detect(ctx))
 		})
 
-		log.Println("changed", len(t.changed), t.changed, "paths", len(paths))
+		debugx.Println("changed", len(t.changed), t.changed, "paths", len(paths))
 		if len(t.changed) == 0 || len(paths) == 0 {
 			return true
 		}

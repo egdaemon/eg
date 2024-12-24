@@ -83,6 +83,11 @@ const (
 	EnvGitHeadCommitTimestamp = "EG_GIT_HEAD_COMMIT_TIMESTAMP"
 )
 
+const (
+	EnvUnsafeCacheID         = "EG_UNSAFE_CACHE_ID"
+	EnvUnsafeGitCloneEnabled = "EG_UNSAFE_GIT_CLONE_ENABLED"
+)
+
 func DefaultCacheDirectory(rel ...string) string {
 	return filepath.Join("/", "opt", "eg.cache", filepath.Join(rel...))
 }

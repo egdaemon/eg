@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 
+	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/gitx"
@@ -173,13 +174,13 @@ func CloneV2(dir string, runtimedir string) func(
 
 		// this is a hack to disable cloning in local environment. we need to work on improving
 		// go-git to support this case cleanly.
-		if environ.Boolean(true, "EG_INTERNAL_GIT_CLONE_ENABLED") {
+		if environ.Boolean(true, eg.EnvUnsafeGitCloneEnabled) {
 			if err := gitx.Clone(ctx, autoauth(), dir, uri, remote, treeish); err != nil {
 				log.Println(errorsx.Wrap(err, "clone failed"))
 				return 1
 			}
 		} else {
-			log.Println("skipping clone due to EG_INTERNAL_GIT_CLONE_ENABLED flag being false")
+			log.Printf("skipping clone due to %s flag being false", eg.EnvUnsafeGitCloneEnabled)
 		}
 
 		return 0

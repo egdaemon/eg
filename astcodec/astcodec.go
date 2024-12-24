@@ -252,6 +252,8 @@ func (t nodePrinter) Visit(node ast.Node) (w ast.Visitor) {
 	switch x := node.(type) {
 	case *ast.CallExpr:
 		log.Println("invocation of", types.ExprString(x.Fun))
+	case *ast.ImportSpec:
+		log.Println("import", x.Name.String(), x.Path.Value)
 	default:
 		log.Printf("%T\n", x)
 	}

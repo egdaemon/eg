@@ -201,6 +201,7 @@ func transform(ws workspaces.Context, fset *token.FileSet, gendir string, c *ast
 
 		main := jen.NewFile("main")
 		main.Commentf("automatically generated from: %s", pos)
+
 		main.Func().Id("main").Params().Block(
 			jen.List(jen.Id("ctx"), jen.Id("done")).Op(":=").Add(
 				jen.Qual("context", "WithTimeout").Call(

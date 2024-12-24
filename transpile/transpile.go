@@ -262,7 +262,7 @@ func transform(ws workspaces.Context, fset *token.FileSet, gendir string, c *ast
 	)
 	ast.Walk(v, c)
 
-	// TODO enable after its shipped.
+	// "golang.org/x/tools/go/ast/astutil"
 	// if ok := astutil.AddNamedImport(fset, c, "_", "github.com/egdaemon/eg/runtime/autowasinet"); !ok {
 	// 	log.Println("did not add wasinet")
 	// }

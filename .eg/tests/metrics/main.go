@@ -108,7 +108,7 @@ func main() {
 	err := eg.Perform(
 		ctx,
 		Debug,
-		// TCPTransfer,
+		TCPTransfer,
 	)
 
 	if err != nil {

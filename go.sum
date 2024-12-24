@@ -56,6 +56,16 @@ github.com/egdaemon/wasinet v0.0.0-20241224144318-3ffdccd8a08d h1:5vWvgtUAlyr4UB
 github.com/egdaemon/wasinet v0.0.0-20241224144318-3ffdccd8a08d/go.mod h1:Vrshfq2KHg5uxoEQ9/78v43gG+SSnOBU6vi3OHaa2EA=
 github.com/egdaemon/wasinet v0.0.0-20241224151548-f70fdb23995e h1:vVGe7StiB8g/ga7ziKUgCSuYnyhyD7mY/AvafcvmSFY=
 github.com/egdaemon/wasinet v0.0.0-20241224151548-f70fdb23995e/go.mod h1:Vrshfq2KHg5uxoEQ9/78v43gG+SSnOBU6vi3OHaa2EA=
+github.com/egdaemon/wasinet v0.0.0-20241224182642-c3d46558d293 h1:b17a6gm8Yo0o1GhqBO945twg+ZgJi8RvhT8LkktCO1g=
+github.com/egdaemon/wasinet v0.0.0-20241224182642-c3d46558d293/go.mod h1:Vrshfq2KHg5uxoEQ9/78v43gG+SSnOBU6vi3OHaa2EA=
+github.com/egdaemon/wasinet v0.0.0-20241224183132-d1d2841938f0 h1:ad+TnKGM/cBPnmF6/S4HlJw1H4YJkNNXbWaWau73148=
+github.com/egdaemon/wasinet v0.0.0-20241224183132-d1d2841938f0/go.mod h1:Vrshfq2KHg5uxoEQ9/78v43gG+SSnOBU6vi3OHaa2EA=
+github.com/egdaemon/wasinet v0.0.0-20241224184831-31d6c0e21b02 h1:1qBzy2IufhfKW9DOBXpYUmCRnwoGUM7gf//nXTfhOOY=
+github.com/egdaemon/wasinet v0.0.0-20241224184831-31d6c0e21b02/go.mod h1:Vrshfq2KHg5uxoEQ9/78v43gG+SSnOBU6vi3OHaa2EA=
+github.com/egdaemon/wasinet v0.0.0-20241224185626-2579b2475804 h1:QpBhLFxZFdmIrO9KtpWlNSHYQSri5W4H89o5xCU1Itg=
+github.com/egdaemon/wasinet v0.0.0-20241224185626-2579b2475804/go.mod h1:Vrshfq2KHg5uxoEQ9/78v43gG+SSnOBU6vi3OHaa2EA=
+github.com/egdaemon/wasinet v0.0.0-20241224191200-8de558ef4d51 h1:bI/MiFP51HGI0CrmHQJvQdOb8lXAalEOaCd/vgPVCFg=
+github.com/egdaemon/wasinet v0.0.0-20241224191200-8de558ef4d51/go.mod h1:Vrshfq2KHg5uxoEQ9/78v43gG+SSnOBU6vi3OHaa2EA=
 github.com/elazarl/goproxy v0.0.0-20230808193330-2592e75ae04a h1:mATvB/9r/3gvcejNsXKSkQ6lcIaNec2nyfOdlTBR2lU=
 github.com/elazarl/goproxy v0.0.0-20230808193330-2592e75ae04a/go.mod h1:Ro8st/ElPeALwNFlcTpWmkr6IoMFfkjXAvTHpevnDsM=
 github.com/emirpasic/gods v1.18.1 h1:FXtiHYKDGKCW2KzwZKx0iC0PQmdlorYgdFG9jPXJ1Bc=

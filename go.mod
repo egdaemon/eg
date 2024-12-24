@@ -35,7 +35,7 @@ require (
 	github.com/cyphar/filepath-securejoin v0.3.0 // indirect
 	github.com/docker/go-units v0.5.0 // indirect
 	github.com/ebitengine/purego v0.8.1 // indirect
-	github.com/egdaemon/wasinet v0.0.0-20241224151548-f70fdb23995e // indirect
+	github.com/egdaemon/wasinet v0.0.0-20241224183132-d1d2841938f0 // indirect
 	github.com/emirpasic/gods v1.18.1 // indirect
 	github.com/go-git/gcfg v1.5.1-0.20230307220236-3a3c6141e376 // indirect
 	github.com/go-git/go-billy/v5 v5.5.0 // indirect

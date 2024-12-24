@@ -40,11 +40,11 @@ func BytesResult(d []byte, reslengthdst *uint32) (unsafe.Pointer, uint32, unsafe
 	return unsafe.Pointer(unsafe.SliceData(d)), uint32(len(d)), unsafe.Pointer(reslengthdst)
 }
 
-func Bytes(d []byte) (unsafe.Pointer, uintptr) {
-	return unsafe.Pointer(unsafe.SliceData(d)), uintptr(len(d))
+func Bytes(d []byte) (unsafe.Pointer, uint32) {
+	return unsafe.Pointer(unsafe.SliceData(d)), uint32(len(d))
 }
 
-func BytesRead(dptr unsafe.Pointer, dlen uintptr) []byte {
+func BytesRead(dptr unsafe.Pointer, dlen uint32) []byte {
 	return unsafe.Slice((*byte)(dptr), dlen)
 }
 
@@ -64,7 +64,7 @@ func WriteInt32(dst unsafe.Pointer, src int32) {
 	*(*int32)(dst) = src
 }
 
-func ReadUint32(ptr unsafe.Pointer, length uintptr) uint32 {
+func ReadUint32(ptr unsafe.Pointer, length uint32) uint32 {
 	return binary.LittleEndian.Uint32(BytesRead(ptr, length))
 }
 
@@ -76,10 +76,10 @@ func WriteRaw[T any](dst unsafe.Pointer, src T) {
 	*(*T)(dst) = src
 }
 
-func Raw[T any](s *T) (unsafe.Pointer, uintptr) {
-	return unsafe.Pointer(s), unsafe.Sizeof(*s)
+func Raw[T any](s *T) (unsafe.Pointer, uint32) {
+	return unsafe.Pointer(s), uint32(unsafe.Sizeof(*s))
 }
 
-func RawRead[T any](ptr unsafe.Pointer, dlen uintptr) *T {
+func RawRead[T any](ptr unsafe.Pointer, dlen uint32) *T {
 	return (*T)(ptr)
 }

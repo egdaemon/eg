@@ -120,7 +120,7 @@ func setsockopt(fd, level, opt int, value int) error {
 
 func getsockname(fd int) (sa sockaddr, err error) {
 	var rsa rawSockaddrAny
-	errno := sock_getlocaladdr(int32(fd), unsafe.Pointer(&rsa))
+	errno := sock_getlocaladdr(int32(fd), unsafe.Pointer(&rsa), uint32(unsafe.Sizeof(rsa)))
 	if errno != 0 {
 		return nil, errno
 	}
@@ -129,7 +129,7 @@ func getsockname(fd int) (sa sockaddr, err error) {
 
 func getpeername(fd int) (sockaddr, error) {
 	var rsa rawSockaddrAny
-	errno := sock_getpeeraddr(int32(fd), unsafe.Pointer(&rsa))
+	errno := sock_getpeeraddr(int32(fd), unsafe.Pointer(&rsa), uint32(unsafe.Sizeof(rsa)))
 	if errno != 0 {
 		return nil, errno
 	}
@@ -147,7 +147,7 @@ type sockipaddr[T any] struct {
 }
 
 func (s *sockipaddr[T]) sockaddr() *rawSockaddrAny {
-	ptr, plen := unsafe.Pointer(s), unsafe.Sizeof(*s)
+	ptr, plen := unsafe.Pointer(s), uint32(unsafe.Sizeof(*s))
 	buf := ffiguest.BytesRead(ptr, plen)
 
 	raddr := rawSockaddrAny{
@@ -181,7 +181,7 @@ type sockaddrUnix struct {
 }
 
 func (s *sockaddrUnix) sockaddr() *rawSockaddrAny {
-	ptr, plen := unsafe.Pointer(s), unsafe.Sizeof(*s)
+	ptr, plen := unsafe.Pointer(s), uint32(unsafe.Sizeof(*s))
 	buf := ffiguest.BytesRead(ptr, plen)
 	raddr := rawSockaddrAny{
 		family: syscall.AF_UNIX,
@@ -210,66 +210,68 @@ type iovec struct {
 }
 
 func recvfrom(fd int, iovs [][]byte, flags int32) (n int, addr rawSockaddrAny, port, oflags int32, err error) {
-	iovsBuf := make([]iovec, 0, 8)
-	for _, iov := range iovs {
-		iovsBuf = append(iovsBuf, iovec{
-			ptr: unsafe.Pointer(unsafe.SliceData(iov)),
-			len: uintptr(len(iov)),
-		})
-	}
-	addrBuf := addressBuffer{
-		ptr: unsafe.Pointer(&addr),
-		len: unsafe.Sizeof(addr),
-	}
-	nread := int32(0)
-	errno := sock_recv_from(
-		int32(fd),
-		unsafe.Pointer(unsafe.SliceData(iovsBuf)),
-		int32(len(iovsBuf)),
-		unsafe.Pointer(&addrBuf),
-		flags,
-		unsafe.Pointer(&port),
-		unsafe.Pointer(&nread),
-		unsafe.Pointer(&oflags),
-	)
-	if errno != 0 {
-		return int(nread), addr, port, oflags, errno
-	}
-	runtime.KeepAlive(addrBuf)
-	runtime.KeepAlive(iovsBuf)
-	runtime.KeepAlive(iovs)
-	return int(nread), addr, port, oflags, nil
+	return 0, addr, 0, 0, syscall.ENOTSUP
+	// iovsBuf := make([]iovec, 0, 8)
+	// for _, iov := range iovs {
+	// 	iovsBuf = append(iovsBuf, iovec{
+	// 		ptr: unsafe.Pointer(unsafe.SliceData(iov)),
+	// 		len: uintptr(len(iov)),
+	// 	})
+	// }
+	// addrBuf := addressBuffer{
+	// 	ptr: unsafe.Pointer(&addr),
+	// 	len: unsafe.Sizeof(addr),
+	// }
+	// nread := int32(0)
+	// errno := sock_recv_from(
+	// 	int32(fd),
+	// 	unsafe.Pointer(unsafe.SliceData(iovsBuf)),
+	// 	int32(len(iovsBuf)),
+	// 	unsafe.Pointer(&addrBuf),
+	// 	flags,
+	// 	unsafe.Pointer(&port),
+	// 	unsafe.Pointer(&nread),
+	// 	unsafe.Pointer(&oflags),
+	// )
+	// if errno != 0 {
+	// 	return int(nread), addr, port, oflags, errno
+	// }
+	// runtime.KeepAlive(addrBuf)
+	// runtime.KeepAlive(iovsBuf)
+	// runtime.KeepAlive(iovs)
+	// return int(nread), addr, port, oflags, nil
 }
 
 func sendto(fd int, iovs [][]byte, addr rawSockaddrAny, port, flags int32) (int, error) {
-	iovsBuf := make([]iovec, 0, 8)
-	for _, iov := range iovs {
-		iovsBuf = append(iovsBuf, iovec{
-			ptr: (unsafe.Pointer(unsafe.SliceData(iov))),
-			len: uintptr(len(iov)),
-		})
-	}
-	addrBuf := addressBuffer{
-		ptr: unsafe.Pointer(&addr),
-		len: unsafe.Sizeof(addr),
-	}
-	nwritten := int32(0)
-	errno := sock_send_to(
-		int32(fd),
-		unsafe.Pointer(unsafe.SliceData(iovsBuf)),
-		int32(len(iovsBuf)),
-		unsafe.Pointer(&addrBuf),
-		port,
-		flags,
-		unsafe.Pointer(&nwritten),
-	)
-	if errno != 0 {
-		return int(nwritten), errno
-	}
-	runtime.KeepAlive(addrBuf)
-	runtime.KeepAlive(iovsBuf)
-	runtime.KeepAlive(iovs)
-	return int(nwritten), nil
+	return 0, syscall.ENOTSUP
+	// iovsBuf := make([]iovec, 0, 8)
+	// for _, iov := range iovs {
+	// 	iovsBuf = append(iovsBuf, iovec{
+	// 		ptr: (unsafe.Pointer(unsafe.SliceData(iov))),
+	// 		len: uintptr(len(iov)),
+	// 	})
+	// }
+	// addrBuf := addressBuffer{
+	// 	ptr: unsafe.Pointer(&addr),
+	// 	len: unsafe.Sizeof(addr),
+	// }
+	// nwritten := int32(0)
+	// errno := sock_send_to(
+	// 	int32(fd),
+	// 	unsafe.Pointer(unsafe.SliceData(iovsBuf)),
+	// 	int32(len(iovsBuf)),
+	// 	unsafe.Pointer(&addrBuf),
+	// 	port,
+	// 	flags,
+	// 	unsafe.Pointer(&nwritten),
+	// )
+	// if errno != 0 {
+	// 	return int(nwritten), errno
+	// }
+	// runtime.KeepAlive(addrBuf)
+	// runtime.KeepAlive(iovsBuf)
+	// runtime.KeepAlive(iovs)
+	// return int(nwritten), nil
 }
 
 func anyToSockaddr(rsa *rawSockaddrAny) (sockaddr, error) {

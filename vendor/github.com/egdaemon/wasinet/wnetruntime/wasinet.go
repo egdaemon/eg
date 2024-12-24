@@ -74,12 +74,12 @@ func (t network) PeerAddr(ctx context.Context, fd int) (unix.Sockaddr, error) {
 func (t network) SetSocketOption(ctx context.Context, fd int, level, name int, value []byte) error {
 	switch name {
 	case syscall.SO_LINGER: // this is untested.
-		v := ffiguest.RawRead[unix.Timeval](unsafe.Pointer(&value), uintptr(len(value)))
+		v := ffiguest.RawRead[unix.Timeval](unsafe.Pointer(&value), uint32(len(value)))
 		return unix.SetsockoptTimeval(fd, level, name, v)
 	case syscall.SO_BINDTODEVICE: // this is untested.
 		return ffi.Errno(unix.SetsockoptString(fd, level, name, string(value)))
 	default:
-		value := ffiguest.ReadUint32(unsafe.Pointer(&value), uintptr(len(value)))
+		value := ffiguest.ReadUint32(unsafe.Pointer(&value), uint32(len(value)))
 		return ffi.Errno(unix.SetsockoptInt(fd, level, name, int(value)))
 	}
 }

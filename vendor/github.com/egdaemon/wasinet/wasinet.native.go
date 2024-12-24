@@ -67,7 +67,7 @@ func sock_open(af int32, socktype int32, proto int32, fd unsafe.Pointer) syscall
 	return ffi.Errno(errno)
 }
 
-func sock_bind(fd int32, addr unsafe.Pointer, addrlen uintptr) syscall.Errno {
+func sock_bind(fd int32, addr unsafe.Pointer, addrlen uint32) syscall.Errno {
 	wsa, err := unixsockaddr(ffiguest.RawRead[rawSockaddrAny](addr, addrlen))
 	if err != nil {
 		return ffi.Errno(err)
@@ -80,7 +80,7 @@ func sock_listen(fd int32, backlog int32) syscall.Errno {
 	return ffi.Errno(unix.Listen(int(fd), int(backlog)))
 }
 
-func sock_connect(fd int32, addr unsafe.Pointer, addrlen uintptr) syscall.Errno {
+func sock_connect(fd int32, addr unsafe.Pointer, addrlen uint32) syscall.Errno {
 	wsa, err := unixsockaddr(ffiguest.RawRead[rawSockaddrAny](addr, addrlen))
 	if err != nil {
 		return ffi.Errno(err)
@@ -97,7 +97,7 @@ func sock_getsockopt(fd int32, level uint32, name uint32, dst unsafe.Pointer, _ 
 	}
 }
 
-func sock_setsockopt(fd int32, level uint32, name uint32, valueptr unsafe.Pointer, valueLen uintptr) syscall.Errno {
+func sock_setsockopt(fd int32, level uint32, name uint32, valueptr unsafe.Pointer, valueLen uint32) syscall.Errno {
 	switch name {
 	case syscall.SO_LINGER: // this is untested.
 		value := ffiguest.RawRead[unix.Timeval](valueptr, valueLen)

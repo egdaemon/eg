@@ -16,6 +16,8 @@ import (
 	"path/filepath"
 	"strings"
 
+	"golang.org/x/tools/go/ast/astutil"
+
 	"github.com/dave/jennifer/jen"
 	"github.com/egdaemon/eg/astbuild"
 	"github.com/egdaemon/eg/astcodec"
@@ -259,6 +261,10 @@ func transform(ws workspaces.Context, fset *token.FileSet, gendir string, c *ast
 		genexec,
 	)
 	ast.Walk(v, c)
+
+	if ok := astutil.AddNamedImport(fset, c, "_", "github.com/egdaemon/eg/runtime/autowasinet"); !ok {
+		log.Println("did not add wasinet")
+	}
 
 	return generatedmodules, generr
 }

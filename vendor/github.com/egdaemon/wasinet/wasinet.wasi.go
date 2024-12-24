@@ -13,11 +13,11 @@ func sock_open(af int32, socktype int32, proto int32, fd unsafe.Pointer) syscall
 
 //go:wasmimport wasinet_v0 sock_bind
 //go:noescape
-func sock_bind(fd int32, addr unsafe.Pointer, addrlen uintptr) syscall.Errno
+func sock_bind(fd int32, addr unsafe.Pointer, addrlen uint32) syscall.Errno
 
 //go:wasmimport wasinet_v0 sock_connect
 //go:noescape
-func sock_connect(fd int32, addr unsafe.Pointer, addrlen uintptr) syscall.Errno
+func sock_connect(fd int32, addr unsafe.Pointer, addrlen uint32) syscall.Errno
 
 //go:wasmimport wasinet_v0 sock_listen
 //go:noescape

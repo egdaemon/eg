@@ -147,7 +147,7 @@ type sockipaddr[T any] struct {
 }
 
 func (s *sockipaddr[T]) sockaddr() *rawSockaddrAny {
-	ptr, plen := unsafe.Pointer(s), unsafe.Sizeof(*s)
+	ptr, plen := unsafe.Pointer(s), uint32(unsafe.Sizeof(*s))
 	buf := ffiguest.BytesRead(ptr, plen)
 
 	raddr := rawSockaddrAny{
@@ -181,7 +181,7 @@ type sockaddrUnix struct {
 }
 
 func (s *sockaddrUnix) sockaddr() *rawSockaddrAny {
-	ptr, plen := unsafe.Pointer(s), unsafe.Sizeof(*s)
+	ptr, plen := unsafe.Pointer(s), uint32(unsafe.Sizeof(*s))
 	buf := ffiguest.BytesRead(ptr, plen)
 	raddr := rawSockaddrAny{
 		family: syscall.AF_UNIX,

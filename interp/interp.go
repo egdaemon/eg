@@ -25,6 +25,8 @@ import (
 	"github.com/egdaemon/eg/interp/runtime/wasi/ffigit"
 	"github.com/egdaemon/eg/interp/runtime/wasi/ffigraph"
 	"github.com/egdaemon/eg/interp/runtime/wasi/ffimetric"
+	"github.com/egdaemon/eg/interp/runtime/wasi/ffiwasinet"
+	"github.com/egdaemon/eg/interp/wasidebug"
 	"github.com/egdaemon/eg/runners"
 	"github.com/gofrs/uuid"
 	"github.com/tetratelabs/wazero"
@@ -257,6 +259,12 @@ func (t runner) perform(ctx context.Context, runid, path string, rtb runtimefn) 
 	}
 	defer wasienv.Close(ctx)
 
+	wasinet, err := ffiwasinet.Wazero(runtime).Instantiate(ctx)
+	if err != nil {
+		return err
+	}
+	defer wasinet.Close(ctx)
+
 	hostenv, err := rtb(t, cmdenv, runtime.NewHostModuleBuilder("env")).
 		Instantiate(ctx)
 	if err != nil {
@@ -264,7 +272,8 @@ func (t runner) perform(ctx context.Context, runid, path string, rtb runtimefn) 
 	}
 	defer hostenv.Close(ctx)
 
-	// wasidebug.Host(hostenv)
+	wasidebug.Host(wasinet)
+
 	log.Println("interp initiated", path)
 	defer log.Println("interp completed", path)
 	wasi, err := os.ReadFile(path)

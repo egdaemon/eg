@@ -26,7 +26,6 @@ import (
 	"github.com/egdaemon/eg/interp/runtime/wasi/ffigraph"
 	"github.com/egdaemon/eg/interp/runtime/wasi/ffimetric"
 	"github.com/egdaemon/eg/interp/runtime/wasi/ffiwasinet"
-	"github.com/egdaemon/eg/interp/wasidebug"
 	"github.com/egdaemon/eg/runners"
 	"github.com/gofrs/uuid"
 	"github.com/tetratelabs/wazero"
@@ -272,7 +271,7 @@ func (t runner) perform(ctx context.Context, runid, path string, rtb runtimefn) 
 	}
 	defer hostenv.Close(ctx)
 
-	wasidebug.Host(wasinet)
+	// wasidebug.Host(wasinet)
 
 	log.Println("interp initiated", path)
 	defer log.Println("interp completed", path)

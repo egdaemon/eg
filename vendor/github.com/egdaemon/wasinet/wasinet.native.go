@@ -111,7 +111,7 @@ func sock_setsockopt(fd int32, level uint32, name uint32, valueptr unsafe.Pointe
 	}
 }
 
-func sock_getlocaladdr(fd int32, addr unsafe.Pointer) syscall.Errno {
+func sock_getlocaladdr(fd int32, addr unsafe.Pointer, _ uint32) syscall.Errno {
 	sa, err := unix.Getsockname(int(fd))
 	if err != nil {
 		return ffi.Errno(err)
@@ -124,7 +124,7 @@ func sock_getlocaladdr(fd int32, addr unsafe.Pointer) syscall.Errno {
 	return ffi.ErrnoSuccess()
 }
 
-func sock_getpeeraddr(fd int32, addr unsafe.Pointer) syscall.Errno {
+func sock_getpeeraddr(fd int32, addr unsafe.Pointer, _ uint32) syscall.Errno {
 	sa, err := unix.Getpeername(int(fd))
 	if err != nil {
 		return ffi.Errno(err)

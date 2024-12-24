@@ -117,7 +117,7 @@ github.com/ebitengine/purego
 github.com/ebitengine/purego/internal/cgo
 github.com/ebitengine/purego/internal/fakecgo
 github.com/ebitengine/purego/internal/strings
-# github.com/egdaemon/wasinet v0.0.0-20241224183132-d1d2841938f0
+# github.com/egdaemon/wasinet v0.0.0-20241224191200-8de558ef4d51
 ## explicit; go 1.23.4
 github.com/egdaemon/wasinet
 github.com/egdaemon/wasinet/autohijack

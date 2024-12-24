@@ -46,6 +46,16 @@ github.com/dominikbraun/graph v0.23.0 h1:TdZB4pPqCLFxYhdyMFb1TBdFxp8XLcJfTTBQucV
 github.com/dominikbraun/graph v0.23.0/go.mod h1:yOjYyogZLY1LSG9E33JWZJiq5k83Qy2C6POAuiViluc=
 github.com/ebitengine/purego v0.8.1 h1:sdRKd6plj7KYW33EH5As6YKfe8m9zbN9JMrOjNVF/BE=
 github.com/ebitengine/purego v0.8.1/go.mod h1:iIjxzd6CiRiOG0UyXP+V1+jWqUXVjPKLAI0mRfJZTmQ=
+github.com/egdaemon/wasinet v0.0.0-20241224132947-e2c7b41053fe h1:JuFZh8O/8Y8tRK4JxYYZw2ZOXtwBlUXthPk+MqeF6N0=
+github.com/egdaemon/wasinet v0.0.0-20241224132947-e2c7b41053fe/go.mod h1:LkYnRBG6ZfdW7HCH7Ih4lTGVFiX5Uon9M1ou5y2LCig=
+github.com/egdaemon/wasinet v0.0.0-20241224133501-e1baeae08b60 h1:Fx1zKTxmeiBiuYiHPoxFhvvDGCi5eS24qSSKMdfibU8=
+github.com/egdaemon/wasinet v0.0.0-20241224133501-e1baeae08b60/go.mod h1:LkYnRBG6ZfdW7HCH7Ih4lTGVFiX5Uon9M1ou5y2LCig=
+github.com/egdaemon/wasinet v0.0.0-20241224134025-39c348557a57 h1:4LeNrMtEL5qxVDLtRdNvKnGHm1QvpJxv4chOcLZB9fg=
+github.com/egdaemon/wasinet v0.0.0-20241224134025-39c348557a57/go.mod h1:LkYnRBG6ZfdW7HCH7Ih4lTGVFiX5Uon9M1ou5y2LCig=
+github.com/egdaemon/wasinet v0.0.0-20241224144318-3ffdccd8a08d h1:5vWvgtUAlyr4UB2j6RomxEjnPWXmLjh2skUwaCUh3eM=
+github.com/egdaemon/wasinet v0.0.0-20241224144318-3ffdccd8a08d/go.mod h1:Vrshfq2KHg5uxoEQ9/78v43gG+SSnOBU6vi3OHaa2EA=
+github.com/egdaemon/wasinet v0.0.0-20241224151548-f70fdb23995e h1:vVGe7StiB8g/ga7ziKUgCSuYnyhyD7mY/AvafcvmSFY=
+github.com/egdaemon/wasinet v0.0.0-20241224151548-f70fdb23995e/go.mod h1:Vrshfq2KHg5uxoEQ9/78v43gG+SSnOBU6vi3OHaa2EA=
 github.com/elazarl/goproxy v0.0.0-20230808193330-2592e75ae04a h1:mATvB/9r/3gvcejNsXKSkQ6lcIaNec2nyfOdlTBR2lU=
 github.com/elazarl/goproxy v0.0.0-20230808193330-2592e75ae04a/go.mod h1:Ro8st/ElPeALwNFlcTpWmkr6IoMFfkjXAvTHpevnDsM=
 github.com/emirpasic/gods v1.18.1 h1:FXtiHYKDGKCW2KzwZKx0iC0PQmdlorYgdFG9jPXJ1Bc=

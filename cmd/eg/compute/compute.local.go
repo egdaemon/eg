@@ -94,7 +94,8 @@ func (t local) Run(gctx *cmdopts.Global) (err error) {
 		FromEnv(os.Environ()...).
 		FromEnv(eg.EnvComputeContainerExec).
 		FromEnviron(errorsx.Zero(gitx.LocalEnv(repo, t.GitRemote, t.GitReference))...).
-		Var("EG_INTERNAL_GIT_CLONE_ENABLED", strconv.FormatBool(false)) // hack to disable cloning
+		Var(eg.EnvUnsafeCacheID, ws.CachedID).
+		Var(eg.EnvUnsafeGitCloneEnabled, strconv.FormatBool(false)) // hack to disable cloning
 
 	if t.Dirty {
 		mounthome = runners.AgentOptionAutoMountHome(homedir)

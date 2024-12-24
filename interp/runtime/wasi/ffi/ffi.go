@@ -5,12 +5,31 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
+	"net"
+	"syscall"
 	"time"
 
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/tetratelabs/wazero/api"
 )
+
+type Memory interface {
+
+	// // ReadUint32Le reads a uint32 in little-endian encoding from the underlying buffer at the offset in or returns
+	// // false if out of range.
+	ReadUint32Le(offset uint32) (uint32, bool)
+
+	Read(offset, byteCount uint32) ([]byte, bool)
+
+	// WriteUint32Le writes the value in little-endian encoding to the underlying buffer at the offset in or returns
+	// false if out of range.
+	WriteUint32Le(offset, v uint32) bool
+
+	// // Write writes the slice to the underlying buffer at the offset or returns false if out of range.
+	Write(offset uint32, v []byte) bool
+}
 
 func ReadString(m api.Memory, offset uint32, len uint32) (string, error) {
 	var (
@@ -107,4 +126,45 @@ func ReadJSON(m api.Memory, offset uint32, len uint32, v interface{}) (err error
 	}
 
 	return nil
+}
+
+func ErrnoSuccess() syscall.Errno {
+	return syscall.Errno(0x0)
+}
+
+func Errno(err error) syscall.Errno {
+	if err == nil {
+		return ErrnoSuccess()
+	}
+
+	if err == syscall.EAGAIN {
+		return syscall.EAGAIN
+	}
+
+	return makeErrnoSlow(err)
+}
+
+func makeErrnoSlow(err error) (ret syscall.Errno) {
+	var timeout interface{ Timeout() bool }
+	if errors.As(err, &ret) {
+		return ret
+	}
+	switch {
+	case errors.Is(err, context.Canceled):
+		return syscall.ECANCELED
+	case errors.Is(err, context.DeadlineExceeded):
+		return syscall.ETIMEDOUT
+	case errors.Is(err, io.ErrUnexpectedEOF),
+		errors.Is(err, fs.ErrClosed),
+		errors.Is(err, net.ErrClosed):
+		return syscall.EIO
+	}
+
+	if errors.As(err, &timeout) {
+		if timeout.Timeout() {
+			return syscall.ETIMEDOUT
+		}
+	}
+
+	panic(fmt.Errorf("unexpected error: %v", err))
 }

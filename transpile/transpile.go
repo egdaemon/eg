@@ -23,6 +23,7 @@ import (
 	"github.com/egdaemon/eg/internal/fsx"
 	"github.com/egdaemon/eg/internal/langx"
 	"github.com/egdaemon/eg/workspaces"
+	"golang.org/x/tools/go/ast/astutil"
 	"golang.org/x/tools/go/packages"
 )
 
@@ -124,13 +125,11 @@ func (t golang) Run(ctx context.Context) (roots []Compiled, err error) {
 	for _, m := range generatedmodules {
 		o, err := parser.ParseFile(pkgc.Fset, m.fname, m.original, 0)
 		if err != nil {
-			log.Println("DERP")
 			return roots, err
 		}
 
 		mfn, err := parser.ParseFile(token.NewFileSet(), m.fname, m.main.String(), 0)
 		if err != nil {
-			log.Println("DERP")
 			return roots, err
 		}
 
@@ -142,7 +141,6 @@ func (t golang) Run(ctx context.Context) (roots []Compiled, err error) {
 		debugx.Println("original", m.fname)
 
 		if err = rewrite(filepath.Join(t.Context.Workspace.Root, m.fname), token.NewFileSet(), result); err != nil {
-			log.Println("DERP")
 			return roots, err
 		}
 
@@ -262,10 +260,9 @@ func transform(ws workspaces.Context, fset *token.FileSet, gendir string, c *ast
 	)
 	ast.Walk(v, c)
 
-	// "golang.org/x/tools/go/ast/astutil"
-	// if ok := astutil.AddNamedImport(fset, c, "_", "github.com/egdaemon/eg/runtime/autowasinet"); !ok {
-	// 	log.Println("did not add wasinet")
-	// }
+	if ok := astutil.AddNamedImport(fset, c, "_", "github.com/egdaemon/eg/runtime/autowasinet"); !ok {
+		log.Println("did not add wasinet")
+	}
 
 	return generatedmodules, generr
 }

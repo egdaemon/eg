@@ -18,6 +18,10 @@ func Depth() int {
 	return env.Int(-1, _eg.EnvComputeModuleNestedLevel)
 }
 
+func CacheID() string {
+	return env.String("00000000-0000-0000-0000-000000000000", _eg.EnvUnsafeCacheID)
+}
+
 func Module(ctx context.Context, op eg.Op) error {
 	return shell.Run(
 		ctx,

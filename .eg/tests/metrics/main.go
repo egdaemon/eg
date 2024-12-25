@@ -7,6 +7,7 @@ import (
 	"log"
 	"math/rand"
 	"net"
+	"net/http"
 
 	"github.com/egdaemon/eg/runtime/wasi/eg"
 	"github.com/egdaemon/eg/runtime/wasi/egenv"
@@ -76,12 +77,23 @@ func checkTransfer(ctx context.Context, li net.Listener) error {
 	return nil
 }
 
-func TCPTransfer(ctx context.Context, op eg.Op) error {
+func TCPTest(ctx context.Context, op eg.Op) error {
 	if err := checkTransfer(ctx, listentcp("tcp", ":0")); err != nil {
 		return err
 	}
+	return nil
+}
 
-	log.Println("----------------------------- WOOOOT -----------------------------")
+func HTTPTest(ctx context.Context, op eg.Op) error {
+	rsp, err := http.Get("https://www.google.com")
+	if err != nil {
+		return err
+	}
+
+	if rsp.StatusCode != http.StatusOK {
+		return fmt.Errorf("unexpected status code: %d", rsp.StatusCode)
+	}
+
 	return nil
 }
 
@@ -102,13 +114,15 @@ func Debug(ctx context.Context, op eg.Op) error {
 }
 
 func main() {
+	log.SetFlags(log.Lshortfile)
 	ctx, done := context.WithTimeout(context.Background(), egenv.TTL())
 	defer done()
 
 	err := eg.Perform(
 		ctx,
-		Debug,
-		TCPTransfer,
+		// Debug,
+		TCPTest,
+		HTTPTest,
 	)
 
 	if err != nil {

@@ -4,22 +4,21 @@ package wasinet
 
 import (
 	"context"
-	"encoding/binary"
 	"log"
 	"net"
-	"strconv"
 	"syscall"
 	"unsafe"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/egdaemon/wasinet/ffi"
-	"github.com/egdaemon/wasinet/ffiguest"
+	"github.com/egdaemon/wasinet/internal/errorsx"
 	"golang.org/x/sys/unix"
 )
 
 // The native implementation ensure the api interopt is correct.
 
-func unixsockaddr(v *rawsocketaddr) (sa unix.Sockaddr, err error) {
-	wsa, err := rawtosockaddr(v)
+func unixsockaddr(v rawsocketaddr) (sa unix.Sockaddr, err error) {
+	wsa, err := rawtosockaddr(&v, 3)
 	if err != nil {
 		return nil, err
 	}
@@ -36,38 +35,14 @@ func unixsockaddr(v *rawsocketaddr) (sa unix.Sockaddr, err error) {
 	}
 }
 
-func unixsockaddrToRaw(sa unix.Sockaddr) (*rawsocketaddr, error) {
-	switch t := sa.(type) {
-	case *unix.SockaddrInet4:
-		a := sockipaddr[sockip4]{port: uint32(t.Port), addr: sockip4{ip: t.Addr}}
-		return a.sockaddr(), nil
-
-	case *unix.SockaddrInet6:
-		a := sockipaddr[sockip6]{port: uint32(t.Port), addr: sockip6{ip: t.Addr, zone: strconv.FormatUint(uint64(t.ZoneId), 10)}} //t.ZoneId}}
-		return a.sockaddr(), nil
-	case *unix.SockaddrUnix:
-		name := t.Name
-		if len(name) == 0 {
-			// For consistency across platforms, replace empty unix socket
-			// addresses with @. On Linux, addresses where the first byte is
-			// a null byte are considered abstract unix sockets, and the first
-			// byte is replaced with @.
-			name = "@"
-		}
-		return (&sockaddrUnix{name: name}).sockaddr(), nil
-	default:
-		return nil, syscall.EINVAL
-	}
-}
-
 func sock_open(af int32, socktype int32, proto int32, fd unsafe.Pointer) syscall.Errno {
 	_fd, errno := unix.Socket(int(af), int(socktype), int(proto))
-	ffiguest.WriteInt32(fd, int32(_fd))
+	ffi.WriteInt32(fd, int32(_fd))
 	return ffi.Errno(errno)
 }
 
-func sock_bind(fd int32, addr unsafe.Pointer, addrlen uint32) syscall.Errno {
-	wsa, err := unixsockaddr(ffiguest.RawRead[rawsocketaddr](addr))
+func sock_bind(fd int32, addrptr unsafe.Pointer, addrlen uint32) syscall.Errno {
+	wsa, err := unixsockaddr(ffi.UnsafeClone[rawsocketaddr](addrptr))
 	if err != nil {
 		return ffi.Errno(err)
 	}
@@ -80,7 +55,7 @@ func sock_listen(fd int32, backlog int32) syscall.Errno {
 }
 
 func sock_connect(fd int32, addr unsafe.Pointer, addrlen uint32) syscall.Errno {
-	wsa, err := unixsockaddr(ffiguest.RawRead[rawsocketaddr](addr))
+	wsa, err := unixsockaddr(ffi.UnsafeClone[rawsocketaddr](addr))
 	if err != nil {
 		return ffi.Errno(err)
 	}
@@ -91,7 +66,7 @@ func sock_getsockopt(fd int32, level uint32, name uint32, dst unsafe.Pointer, _ 
 	switch name {
 	default:
 		v, err := unix.GetsockoptInt(int(fd), int(level), int(name))
-		ffiguest.WriteUint32(dst, uint32(v))
+		errorsx.MaybePanic(ffi.Uint32Write(ffi.Native{}, dst, uint32(v)))
 		return ffi.Errno(err)
 	}
 }
@@ -99,40 +74,48 @@ func sock_getsockopt(fd int32, level uint32, name uint32, dst unsafe.Pointer, _ 
 func sock_setsockopt(fd int32, level uint32, name uint32, valueptr unsafe.Pointer, valueLen uint32) syscall.Errno {
 	switch name {
 	case syscall.SO_LINGER: // this is untested.
-		value := ffiguest.RawRead[unix.Timeval](valueptr)
-		return ffi.Errno(unix.SetsockoptTimeval(int(fd), int(level), int(name), value))
+		value := ffi.UnsafeClone[unix.Timeval](valueptr)
+		return ffi.Errno(unix.SetsockoptTimeval(int(fd), int(level), int(name), &value))
 	case syscall.SO_BINDTODEVICE: // this is untested.
-		value := ffiguest.StringRead(valueptr, uint32(valueLen))
+		value := errorsx.Must(ffi.ReadString(ffi.Native{}, valueptr, uint32(valueLen)))
 		return ffi.Errno(unix.SetsockoptString(int(fd), int(level), int(name), value))
 	default:
-		value := binary.LittleEndian.Uint32(ffiguest.BytesRead(valueptr, valueLen))
+		value := errorsx.Must(ffi.Uint32Read(ffi.Native{}, valueptr, valueLen))
 		return ffi.Errno(unix.SetsockoptInt(int(fd), int(level), int(name), int(value)))
 	}
 }
 
-func sock_getlocaladdr(fd int32, addr unsafe.Pointer, _ uint32) syscall.Errno {
+func sock_getlocaladdr(fd int32, addrptr unsafe.Pointer, addrlen uint32) syscall.Errno {
 	sa, err := unix.Getsockname(int(fd))
 	if err != nil {
 		return ffi.Errno(err)
 	}
-	_addr, err := unixsockaddrToRaw(sa)
+	addr, err := unixsockaddrToRaw(sa)
 	if err != nil {
 		return ffi.Errno(err)
 	}
-	ffiguest.WriteRaw(addr, *_addr)
+
+	if err = ffi.RawWrite(ffi.Native{}, &addr, addrptr, addrlen); err != nil {
+		return ffi.Errno(err)
+	}
+
 	return ffi.ErrnoSuccess()
 }
 
-func sock_getpeeraddr(fd int32, addr unsafe.Pointer, _ uint32) syscall.Errno {
+func sock_getpeeraddr(fd int32, addrptr unsafe.Pointer, addrlen uint32) syscall.Errno {
 	sa, err := unix.Getpeername(int(fd))
 	if err != nil {
 		return ffi.Errno(err)
 	}
-	_addr, err := unixsockaddrToRaw(sa)
+	addr, err := unixsockaddrToRaw(sa)
 	if err != nil {
 		return ffi.Errno(err)
 	}
-	ffiguest.WriteRaw(addr, *_addr)
+
+	if err = ffi.RawWrite(ffi.Native{}, &addr, addrptr, addrlen); err != nil {
+		return ffi.Errno(err)
+	}
+
 	return ffi.ErrnoSuccess()
 }
 
@@ -144,7 +127,7 @@ func sock_recv_from(
 	nread unsafe.Pointer,
 	oflags unsafe.Pointer,
 ) syscall.Errno {
-	vecs := ffiguest.SliceDataRead[[]byte](iovs, iovslen)
+	vecs := errorsx.Must(ffi.ReadSlice[[]byte](ffi.Native{}, iovs, iovslen))
 	for {
 		n, _, roflags, sa, err := unix.RecvmsgBuffers(int(fd), vecs, nil, int(iflags))
 		switch err {
@@ -163,9 +146,17 @@ func sock_recv_from(
 			return ffi.Errno(err)
 		}
 
-		ffiguest.WriteRaw(addrptr, *addr)
-		ffiguest.WriteUint32(nread, uint32(n))
-		ffiguest.WriteUint32(oflags, uint32(roflags))
+		if err := ffi.RawWrite(ffi.Native{}, &addr, addrptr, uint32(unsafe.Sizeof(addr))); err != nil {
+			return ffi.Errno(err)
+		}
+
+		if err := ffi.Uint32Write(ffi.Native{}, nread, uint32(n)); err != nil {
+			return ffi.Errno(err)
+		}
+
+		if err := ffi.Uint32Write(ffi.Native{}, oflags, uint32(roflags)); err != nil {
+			return ffi.Errno(err)
+		}
 
 		return ffi.ErrnoSuccess()
 	}
@@ -174,20 +165,35 @@ func sock_recv_from(
 func sock_send_to(
 	fd int32,
 	iovs unsafe.Pointer, iovslen uint32,
-	addr unsafe.Pointer,
+	addrptr unsafe.Pointer, _addrlen uint32,
 	flags int32,
 	nwritten unsafe.Pointer,
 ) syscall.Errno {
-	vecs := ffiguest.SliceDataRead[[]byte](iovs, iovslen)
-	sa, err := unixsockaddr(ffiguest.RawRead[rawsocketaddr](addr))
+	vec, err := ffi.ReadSlice[ffi.Vector](ffi.Native{}, iovs, iovslen)
 	if err != nil {
 		return ffi.Errno(err)
 	}
+	// vec := ffig.SliceDataRead[ffig.Vector](iovs, iovslen)
+	vecs, err := ffi.ReadVector[byte](ffi.Native{}, vec...)
+	if err != nil {
+		return ffi.Errno(err)
+	}
+	// vecs := ffig.ReadVector[byte](vec...)
+
+	sa, err := unixsockaddr(ffi.UnsafeClone[rawsocketaddr](addrptr))
+	if err != nil {
+		return ffi.Errno(err)
+	}
+	log.Println("SendTo", fd, flags, spew.Sdump(sa), spew.Sdump(vecs))
 	// dispatch-run/wasi-go has linux special cased here.
 	// did not faithfully follow it because it might be caused by other complexity.
 	// https://github.com/dispatchrun/wasi-go/blob/038d5104aacbb966c25af43797473f03c5da3e4f/systems/unix/system.go#L640
 	n, err := unix.SendmsgBuffers(int(fd), vecs, nil, sa, int(flags))
-	ffiguest.WriteUint32(nwritten, uint32(n))
+
+	if err := ffi.Uint32Write(ffi.Native{}, nwritten, uint32(n)); err != nil {
+		return ffi.Errno(err)
+	}
+
 	return ffi.Errno(err)
 }
 
@@ -238,14 +244,66 @@ func sock_getaddrport(
 		port int
 	)
 
-	network := ffiguest.StringRead(networkptr, networklen)
-	service := ffiguest.StringRead(serviceptr, servicelen)
+	network := errorsx.Must(ffi.ReadString(ffi.Native{}, networkptr, networklen))
+	service := errorsx.Must(ffi.ReadString(ffi.Native{}, serviceptr, servicelen))
 
 	if port, err = net.DefaultResolver.LookupPort(context.Background(), network, service); err != nil {
 		return uint32(ffi.Errno(err))
 	}
 
-	ffiguest.WriteUint32(portptr, uint32(port))
+	if err = ffi.Uint32Write(ffi.Native{}, portptr, uint32(port)); err != nil {
+		return uint32(ffi.Errno(err))
+	}
 
 	return 0
+}
+
+// passthrough since there is no diffference.
+func sock_determine_host_af_family(
+	wasi int32,
+) int32 {
+	return wasi
+}
+
+func netaddrfamily(addr net.Addr) int {
+	ipfamily := func(ip net.IP) int {
+		if ip.To4() == nil {
+			log.Println("AF_INET6 detected", syscall.AF_INET6)
+			return syscall.AF_INET6
+		}
+
+		log.Println("AF_INET detected")
+		return syscall.AF_INET
+	}
+
+	log.Printf("netaddrfamily %T - %s\n", addr, addr)
+	switch a := addr.(type) {
+	case *net.IPAddr:
+		return ipfamily(a.IP)
+	case *net.TCPAddr:
+		return ipfamily(a.IP)
+	case *net.UDPAddr:
+		return ipfamily(a.IP)
+	case *net.UnixAddr:
+		return syscall.AF_UNIX
+	}
+
+	return syscall.AF_INET
+}
+
+func rawtosockaddr(rsa *rawsocketaddr, id int) (sockaddr, error) {
+	log.Println("rsa.family", id, "-", rsa.family, syscall.AF_INET, syscall.AF_INET6, syscall.AF_UNIX)
+	switch rsa.family {
+	case syscall.AF_INET:
+		addr := (*sockipaddr[sockip4])(unsafe.Pointer(&rsa.addr))
+		return addr, nil
+	case syscall.AF_INET6:
+		addr := (*sockipaddr[sockip6])(unsafe.Pointer(&rsa.addr))
+		return addr, nil
+	case syscall.AF_UNIX:
+		addr := (*sockaddrUnix)(unsafe.Pointer(&rsa.addr))
+		return addr, nil
+	default:
+		return nil, syscall.ENOTSUP
+	}
 }

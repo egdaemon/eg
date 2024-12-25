@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"syscall"
 
-	"github.com/egdaemon/wasinet/ffiguest"
+	"github.com/egdaemon/wasinet/ffi"
 )
 
 func resolveaddrip(op, network, address string) (res []net.IP, err error) {
@@ -35,9 +35,10 @@ func resolveaddrip(op, network, address string) (res []net.IP, err error) {
 
 	buf := make([]byte, 0, net.IPv6len*8)
 
-	networkptr, networklen := ffiguest.String(network)
-	addressptr, addresslen := ffiguest.String(address)
-	bufptr, buflen, bufres := ffiguest.BytesResult(buf, &bufreslength)
+	networkptr, networklen := ffi.String(network)
+	addressptr, addresslen := ffi.String(address)
+	bufptr, buflen := ffi.Slice(buf)
+	bufresptr, _ := ffi.Pointer(&bufreslength)
 	errno := sock_getaddrip(
 		networkptr,
 		networklen,
@@ -45,7 +46,7 @@ func resolveaddrip(op, network, address string) (res []net.IP, err error) {
 		addresslen,
 		bufptr,
 		buflen,
-		bufres,
+		bufresptr,
 	)
 
 	for i := 0; i < int(bufreslength); i += net.IPv6len {
@@ -64,14 +65,15 @@ func resolveport(network, service string) (_port int, err error) {
 		return _port, nil
 	}
 
-	networkptr, networklen := ffiguest.String(network)
-	serviceptr, servicelen := ffiguest.String(service)
+	networkptr, networklen := ffi.String(network)
+	serviceptr, servicelen := ffi.String(service)
+	portptr, _ := ffi.Pointer(&port)
 	errno := sock_getaddrport(
 		networkptr,
 		networklen,
 		serviceptr,
 		servicelen,
-		ffiguest.Uint32(&port),
+		portptr,
 	)
 
 	return int(port), syscall.Errno(errno)

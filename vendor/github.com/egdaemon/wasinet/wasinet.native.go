@@ -18,9 +18,8 @@ import (
 
 // The native implementation ensure the api interopt is correct.
 
-func unixsockaddr(v *rawSockaddrAny) (sa unix.Sockaddr, err error) {
-	// v := ffiguest.RawRead[rawSockaddrAny](addr, addrLen)
-	wsa, err := anyToSockaddr(v)
+func unixsockaddr(v *rawsocketaddr) (sa unix.Sockaddr, err error) {
+	wsa, err := rawtosockaddr(v)
 	if err != nil {
 		return nil, err
 	}
@@ -37,7 +36,7 @@ func unixsockaddr(v *rawSockaddrAny) (sa unix.Sockaddr, err error) {
 	}
 }
 
-func wasisocketaddr(sa unix.Sockaddr) (*rawSockaddrAny, error) {
+func unixsockaddrToRaw(sa unix.Sockaddr) (*rawsocketaddr, error) {
 	switch t := sa.(type) {
 	case *unix.SockaddrInet4:
 		a := sockipaddr[sockip4]{port: uint32(t.Port), addr: sockip4{ip: t.Addr}}
@@ -68,7 +67,7 @@ func sock_open(af int32, socktype int32, proto int32, fd unsafe.Pointer) syscall
 }
 
 func sock_bind(fd int32, addr unsafe.Pointer, addrlen uint32) syscall.Errno {
-	wsa, err := unixsockaddr(ffiguest.RawRead[rawSockaddrAny](addr, addrlen))
+	wsa, err := unixsockaddr(ffiguest.RawRead[rawsocketaddr](addr))
 	if err != nil {
 		return ffi.Errno(err)
 	}
@@ -81,7 +80,7 @@ func sock_listen(fd int32, backlog int32) syscall.Errno {
 }
 
 func sock_connect(fd int32, addr unsafe.Pointer, addrlen uint32) syscall.Errno {
-	wsa, err := unixsockaddr(ffiguest.RawRead[rawSockaddrAny](addr, addrlen))
+	wsa, err := unixsockaddr(ffiguest.RawRead[rawsocketaddr](addr))
 	if err != nil {
 		return ffi.Errno(err)
 	}
@@ -100,7 +99,7 @@ func sock_getsockopt(fd int32, level uint32, name uint32, dst unsafe.Pointer, _ 
 func sock_setsockopt(fd int32, level uint32, name uint32, valueptr unsafe.Pointer, valueLen uint32) syscall.Errno {
 	switch name {
 	case syscall.SO_LINGER: // this is untested.
-		value := ffiguest.RawRead[unix.Timeval](valueptr, valueLen)
+		value := ffiguest.RawRead[unix.Timeval](valueptr)
 		return ffi.Errno(unix.SetsockoptTimeval(int(fd), int(level), int(name), value))
 	case syscall.SO_BINDTODEVICE: // this is untested.
 		value := ffiguest.StringRead(valueptr, uint32(valueLen))
@@ -116,7 +115,7 @@ func sock_getlocaladdr(fd int32, addr unsafe.Pointer, _ uint32) syscall.Errno {
 	if err != nil {
 		return ffi.Errno(err)
 	}
-	_addr, err := wasisocketaddr(sa)
+	_addr, err := unixsockaddrToRaw(sa)
 	if err != nil {
 		return ffi.Errno(err)
 	}
@@ -129,7 +128,7 @@ func sock_getpeeraddr(fd int32, addr unsafe.Pointer, _ uint32) syscall.Errno {
 	if err != nil {
 		return ffi.Errno(err)
 	}
-	_addr, err := wasisocketaddr(sa)
+	_addr, err := unixsockaddrToRaw(sa)
 	if err != nil {
 		return ffi.Errno(err)
 	}
@@ -139,27 +138,57 @@ func sock_getpeeraddr(fd int32, addr unsafe.Pointer, _ uint32) syscall.Errno {
 
 func sock_recv_from(
 	fd int32,
-	iovs unsafe.Pointer,
-	iovsCount int32,
-	addr unsafe.Pointer,
+	iovs unsafe.Pointer, iovslen uint32,
+	addrptr unsafe.Pointer,
 	iflags int32,
-	port unsafe.Pointer,
 	nread unsafe.Pointer,
 	oflags unsafe.Pointer,
 ) syscall.Errno {
-	return syscall.ENOTSUP
+	vecs := ffiguest.SliceDataRead[[]byte](iovs, iovslen)
+	for {
+		n, _, roflags, sa, err := unix.RecvmsgBuffers(int(fd), vecs, nil, int(iflags))
+		switch err {
+		case nil:
+			// nothing to do.
+		case syscall.EINTR, syscall.EWOULDBLOCK:
+			continue
+		default:
+			log.Println("failed", err)
+			return ffi.Errno(err)
+		}
+
+		addr, err := unixsockaddrToRaw(sa)
+		if err != nil {
+			log.Println("failed", err)
+			return ffi.Errno(err)
+		}
+
+		ffiguest.WriteRaw(addrptr, *addr)
+		ffiguest.WriteUint32(nread, uint32(n))
+		ffiguest.WriteUint32(oflags, uint32(roflags))
+
+		return ffi.ErrnoSuccess()
+	}
 }
 
 func sock_send_to(
 	fd int32,
-	iovs unsafe.Pointer,
-	iovsCount int32,
+	iovs unsafe.Pointer, iovslen uint32,
 	addr unsafe.Pointer,
-	port int32,
 	flags int32,
 	nwritten unsafe.Pointer,
 ) syscall.Errno {
-	return syscall.ENOTSUP
+	vecs := ffiguest.SliceDataRead[[]byte](iovs, iovslen)
+	sa, err := unixsockaddr(ffiguest.RawRead[rawsocketaddr](addr))
+	if err != nil {
+		return ffi.Errno(err)
+	}
+	// dispatch-run/wasi-go has linux special cased here.
+	// did not faithfully follow it because it might be caused by other complexity.
+	// https://github.com/dispatchrun/wasi-go/blob/038d5104aacbb966c25af43797473f03c5da3e4f/systems/unix/system.go#L640
+	n, err := unix.SendmsgBuffers(int(fd), vecs, nil, sa, int(flags))
+	ffiguest.WriteUint32(nwritten, uint32(n))
+	return ffi.Errno(err)
 }
 
 func sock_shutdown(fd, how int32) syscall.Errno {

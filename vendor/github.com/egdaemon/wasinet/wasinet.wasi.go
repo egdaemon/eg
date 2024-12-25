@@ -39,30 +39,26 @@ func sock_getlocaladdr(fd int32, addr unsafe.Pointer, addrlen uint32) syscall.Er
 //go:noescape
 func sock_getpeeraddr(fd int32, addr unsafe.Pointer, addrlen uint32) syscall.Errno
 
-// //go:wasmimport wasinet_v0 sock_recv_from
-// //go:noescape
-// func sock_recv_from(
-// 	fd int32,
-// 	iovs unsafe.Pointer,
-// 	iovsCount int32,
-// 	addr unsafe.Pointer,
-// 	iflags int32,
-// 	port unsafe.Pointer,
-// 	nread unsafe.Pointer,
-// 	oflags unsafe.Pointer,
-// ) syscall.Errno
+//go:wasmimport wasinet_v0 sock_recv_from
+//go:noescape
+func sock_recv_from(
+	fd int32,
+	iovs unsafe.Pointer, iovslen uint32,
+	addrptr unsafe.Pointer,
+	iflags int32,
+	nread unsafe.Pointer,
+	oflags unsafe.Pointer,
+) syscall.Errno
 
-// //go:wasmimport wasinet_v0 sock_send_to
-// //go:noescape
-// func sock_send_to(
-// 	fd int32,
-// 	iovs unsafe.Pointer,
-// 	iovsCount int32,
-// 	addr unsafe.Pointer,
-// 	port int32,
-// 	flags int32,
-// 	nwritten unsafe.Pointer,
-// ) syscall.Errno
+//go:wasmimport wasinet_v0 sock_send_to
+//go:noescape
+func sock_send_to(
+	fd int32,
+	iovs unsafe.Pointer, iovslen uint32,
+	addr unsafe.Pointer,
+	flags int32,
+	nwritten unsafe.Pointer,
+) syscall.Errno
 
 //go:wasmimport wasinet_v0 sock_shutdown
 func sock_shutdown(fd, how int32) syscall.Errno

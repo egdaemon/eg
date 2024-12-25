@@ -48,6 +48,8 @@ github.com/ebitengine/purego v0.8.1 h1:sdRKd6plj7KYW33EH5As6YKfe8m9zbN9JMrOjNVF/
 github.com/ebitengine/purego v0.8.1/go.mod h1:iIjxzd6CiRiOG0UyXP+V1+jWqUXVjPKLAI0mRfJZTmQ=
 github.com/egdaemon/wasinet v0.0.0-20241224191200-8de558ef4d51 h1:bI/MiFP51HGI0CrmHQJvQdOb8lXAalEOaCd/vgPVCFg=
 github.com/egdaemon/wasinet v0.0.0-20241224191200-8de558ef4d51/go.mod h1:Vrshfq2KHg5uxoEQ9/78v43gG+SSnOBU6vi3OHaa2EA=
+github.com/egdaemon/wasinet v0.0.0-20241225084903-a9206b5c31e1 h1:8ccqd4nsqwPTDGmgMECOKQ7XS0Hr5GawLH9Hipjn108=
+github.com/egdaemon/wasinet v0.0.0-20241225084903-a9206b5c31e1/go.mod h1:Vrshfq2KHg5uxoEQ9/78v43gG+SSnOBU6vi3OHaa2EA=
 github.com/elazarl/goproxy v0.0.0-20230808193330-2592e75ae04a h1:mATvB/9r/3gvcejNsXKSkQ6lcIaNec2nyfOdlTBR2lU=
 github.com/elazarl/goproxy v0.0.0-20230808193330-2592e75ae04a/go.mod h1:Ro8st/ElPeALwNFlcTpWmkr6IoMFfkjXAvTHpevnDsM=
 github.com/emirpasic/gods v1.18.1 h1:FXtiHYKDGKCW2KzwZKx0iC0PQmdlorYgdFG9jPXJ1Bc=

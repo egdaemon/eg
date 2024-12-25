@@ -15,7 +15,7 @@ import (
 func readsockaddr(
 	m ffi.Memory, addr uintptr, addrlen uint32,
 ) (unix.Sockaddr, error) {
-	wsa, err := ffi.RawRead[rawSockaddrAny](m, addr, addrlen)
+	wsa, err := ffi.RawRead[rawsocketaddr](m, addr, addrlen)
 	if err != nil {
 		return nil, err
 	}
@@ -94,18 +94,25 @@ func SocketListen(fn ListenFn) ListenHostFn {
 }
 
 type SendToFn func(ctx context.Context, fd int, buf []byte, flags int, to unix.Sockaddr) (int, error)
-type SendToHostFn func(ctx context.Context, m ffi.Memory, fd int32, buf uintptr, len uint32, flags int32, addr uintptr, addrlen uint32) syscall.Errno
+type SendToHostFn func(
+	ctx context.Context,
+	m ffi.Memory,
+	fd int32,
+	iovs uintptr, iovslen uint32,
+	addr uintptr,
+	flags int32,
+	nwritten uintptr,
+) syscall.Errno
 
 func SocketSendTo(fn SendToFn) SendToHostFn {
 	return func(
 		ctx context.Context,
 		m ffi.Memory,
 		fd int32,
-		buf uintptr,
-		len uint32,
-		flags int32,
+		iovs uintptr, iovslen uint32,
 		addr uintptr,
-		addrlen uint32,
+		flags int32,
+		nwritten uintptr,
 	) syscall.Errno {
 		log.Println("socket_send_to is not implemented")
 		return syscall.ENOTSUP
@@ -113,18 +120,27 @@ func SocketSendTo(fn SendToFn) SendToHostFn {
 }
 
 type RecvFromFn func(ctx context.Context, fd int, buf []byte, flags int, from unix.Sockaddr) (int, unix.Sockaddr, error)
-type RecvFromHostFn func(ctx context.Context, m ffi.Memory, fd int32, buf uintptr, len uint32, flags int32, addr uintptr, addrlen uintptr) syscall.Errno
+type RecvFromHostFn func(
+	ctx context.Context,
+	m ffi.Memory,
+	fd int32,
+	iovs uintptr, iovslen uint32,
+	addrptr uintptr,
+	iflags int32,
+	nread uintptr,
+	oflags uintptr,
+) syscall.Errno
 
 func SocketRecvFrom(fn RecvFromFn) RecvFromHostFn {
 	return func(
 		ctx context.Context,
 		m ffi.Memory,
 		fd int32,
-		buf uintptr,
-		len uint32,
-		flags int32,
-		addr uintptr,
-		addrlen uintptr,
+		iovs uintptr, iovslen uint32,
+		addrptr uintptr,
+		iflags int32,
+		nread uintptr,
+		oflags uintptr,
 	) syscall.Errno {
 		log.Println("socket_recv_from is not implemented")
 		return syscall.ENOTSUP
@@ -199,7 +215,7 @@ func SocketLocalAddr(fn LocalAddrFn) LocalAddrHostFn {
 		if err != nil {
 			return ffi.Errno(err)
 		}
-		addr, err := wasisocketaddr(sa)
+		addr, err := unixsockaddrToRaw(sa)
 		if err != nil {
 			return ffi.Errno(err)
 		}
@@ -222,7 +238,7 @@ func SocketPeerAddr(fn PeerAddrFn) PeerAddrHostFn {
 		if err != nil {
 			return ffi.Errno(err)
 		}
-		addr, err := wasisocketaddr(sa)
+		addr, err := unixsockaddrToRaw(sa)
 		if err != nil {
 			return ffi.Errno(err)
 		}
@@ -311,11 +327,6 @@ func SocketAddrIP(fn AddrIPFn) AddrIPHostFn {
 		if err != nil {
 			return ffi.Errno(err)
 		}
-
-		// if ip, err = net.DefaultResolver.LookupIP(ctx, network, address); err != nil {
-		// 	log.Println("socket ip lookup failed", err)
-		// 	return syscall.EINVAL
-		// }
 
 		if ip, err = fn(ctx, network, address); err != nil {
 			log.Println("socket ip lookup failed", err)

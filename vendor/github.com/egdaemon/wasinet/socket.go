@@ -3,12 +3,14 @@ package wasinet
 import (
 	"context"
 	"errors"
+	"log"
 	"net"
 	"os"
 	"runtime"
 	"syscall"
 	"unsafe"
 
+	"github.com/egdaemon/wasinet/ffi"
 	"github.com/egdaemon/wasinet/ffiguest"
 )
 
@@ -119,25 +121,25 @@ func setsockopt(fd, level, opt int, value int) error {
 }
 
 func getsockname(fd int) (sa sockaddr, err error) {
-	var rsa rawSockaddrAny
+	var rsa rawsocketaddr
 	errno := sock_getlocaladdr(int32(fd), unsafe.Pointer(&rsa), uint32(unsafe.Sizeof(rsa)))
 	if errno != 0 {
 		return nil, errno
 	}
-	return anyToSockaddr(&rsa)
+	return rawtosockaddr(&rsa)
 }
 
 func getpeername(fd int) (sockaddr, error) {
-	var rsa rawSockaddrAny
+	var rsa rawsocketaddr
 	errno := sock_getpeeraddr(int32(fd), unsafe.Pointer(&rsa), uint32(unsafe.Sizeof(rsa)))
 	if errno != 0 {
 		return nil, errno
 	}
-	return anyToSockaddr(&rsa)
+	return rawtosockaddr(&rsa)
 }
 
 type sockaddr interface {
-	sockaddr() *rawSockaddrAny
+	sockaddr() *rawsocketaddr
 	sockport() uint
 }
 
@@ -146,17 +148,21 @@ type sockipaddr[T any] struct {
 	port uint32
 }
 
-func (s *sockipaddr[T]) sockaddr() *rawSockaddrAny {
+func (s *sockipaddr[T]) sockaddr() *rawsocketaddr {
 	ptr, plen := unsafe.Pointer(s), uint32(unsafe.Sizeof(*s))
 	buf := ffiguest.BytesRead(ptr, plen)
 
-	raddr := rawSockaddrAny{
+	raddr := rawsocketaddr{
 		family: syscall.AF_INET,
 	}
 
-	switch any(s.addr).(type) {
+	switch x := any(s.addr).(type) {
+	case sockip4:
+		raddr.family = syscall.AF_INET
 	case sockip6:
 		raddr.family = syscall.AF_INET6
+	default:
+		log.Printf("WAAAAT %T\n", x)
 	}
 
 	copy(raddr.addr[:], buf)
@@ -180,10 +186,10 @@ type sockaddrUnix struct {
 	name string
 }
 
-func (s *sockaddrUnix) sockaddr() *rawSockaddrAny {
+func (s *sockaddrUnix) sockaddr() *rawsocketaddr {
 	ptr, plen := unsafe.Pointer(s), uint32(unsafe.Sizeof(*s))
 	buf := ffiguest.BytesRead(ptr, plen)
-	raddr := rawSockaddrAny{
+	raddr := rawsocketaddr{
 		family: syscall.AF_UNIX,
 	}
 	copy(raddr.addr[:], buf)
@@ -194,87 +200,46 @@ func (s *sockaddrUnix) sockport() uint {
 	return 0
 }
 
-type rawSockaddrAny struct {
+type rawsocketaddr struct {
 	family uint16
 	addr   [126]byte
 }
 
-type addressBuffer struct {
-	ptr unsafe.Pointer
-	len uintptr
+func recvfrom(fd int, iovs [][]byte, flags int32) (n int, addr rawsocketaddr, oflags int32, err error) {
+	iovsptr, iovslen := ffiguest.SliceData(iovs)
+	addrptr, _ := ffiguest.Raw(&addr)
+	errno := sock_recv_from(
+		int32(fd),
+		iovsptr, iovslen,
+		addrptr,
+		flags,
+		unsafe.Pointer(&n),
+		unsafe.Pointer(&oflags),
+	)
+	runtime.KeepAlive(addrptr)
+	runtime.KeepAlive(iovsptr)
+	runtime.KeepAlive(iovs)
+	return n, addr, oflags, ffi.ErrErrno(errno)
 }
 
-type iovec struct {
-	ptr unsafe.Pointer
-	len uintptr
+func sendto(fd int, iovs [][]byte, addr rawsocketaddr, flags int32) (int, error) {
+	iovsptr, iovslen := ffiguest.SliceData(iovs)
+	addrptr, _ := ffiguest.Raw(&addr)
+
+	nwritten := int(0)
+	errno := sock_send_to(
+		int32(fd),
+		iovsptr, iovslen,
+		addrptr,
+		flags,
+		unsafe.Pointer(&nwritten),
+	)
+	runtime.KeepAlive(addr)
+	runtime.KeepAlive(iovs)
+	return nwritten, errno
 }
 
-func recvfrom(fd int, iovs [][]byte, flags int32) (n int, addr rawSockaddrAny, port, oflags int32, err error) {
-	return 0, addr, 0, 0, syscall.ENOTSUP
-	// iovsBuf := make([]iovec, 0, 8)
-	// for _, iov := range iovs {
-	// 	iovsBuf = append(iovsBuf, iovec{
-	// 		ptr: unsafe.Pointer(unsafe.SliceData(iov)),
-	// 		len: uintptr(len(iov)),
-	// 	})
-	// }
-	// addrBuf := addressBuffer{
-	// 	ptr: unsafe.Pointer(&addr),
-	// 	len: unsafe.Sizeof(addr),
-	// }
-	// nread := int32(0)
-	// errno := sock_recv_from(
-	// 	int32(fd),
-	// 	unsafe.Pointer(unsafe.SliceData(iovsBuf)),
-	// 	int32(len(iovsBuf)),
-	// 	unsafe.Pointer(&addrBuf),
-	// 	flags,
-	// 	unsafe.Pointer(&port),
-	// 	unsafe.Pointer(&nread),
-	// 	unsafe.Pointer(&oflags),
-	// )
-	// if errno != 0 {
-	// 	return int(nread), addr, port, oflags, errno
-	// }
-	// runtime.KeepAlive(addrBuf)
-	// runtime.KeepAlive(iovsBuf)
-	// runtime.KeepAlive(iovs)
-	// return int(nread), addr, port, oflags, nil
-}
-
-func sendto(fd int, iovs [][]byte, addr rawSockaddrAny, port, flags int32) (int, error) {
-	return 0, syscall.ENOTSUP
-	// iovsBuf := make([]iovec, 0, 8)
-	// for _, iov := range iovs {
-	// 	iovsBuf = append(iovsBuf, iovec{
-	// 		ptr: (unsafe.Pointer(unsafe.SliceData(iov))),
-	// 		len: uintptr(len(iov)),
-	// 	})
-	// }
-	// addrBuf := addressBuffer{
-	// 	ptr: unsafe.Pointer(&addr),
-	// 	len: unsafe.Sizeof(addr),
-	// }
-	// nwritten := int32(0)
-	// errno := sock_send_to(
-	// 	int32(fd),
-	// 	unsafe.Pointer(unsafe.SliceData(iovsBuf)),
-	// 	int32(len(iovsBuf)),
-	// 	unsafe.Pointer(&addrBuf),
-	// 	port,
-	// 	flags,
-	// 	unsafe.Pointer(&nwritten),
-	// )
-	// if errno != 0 {
-	// 	return int(nwritten), errno
-	// }
-	// runtime.KeepAlive(addrBuf)
-	// runtime.KeepAlive(iovsBuf)
-	// runtime.KeepAlive(iovs)
-	// return int(nwritten), nil
-}
-
-func anyToSockaddr(rsa *rawSockaddrAny) (sockaddr, error) {
+func rawtosockaddr(rsa *rawsocketaddr) (sockaddr, error) {
 	switch rsa.family {
 	case syscall.AF_INET:
 		addr := (*sockipaddr[sockip4])(unsafe.Pointer(&rsa.addr))

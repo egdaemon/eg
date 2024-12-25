@@ -1,4 +1,3 @@
-## workspace
 # dario.cat/mergo v1.0.0
 ## explicit; go 1.13
 dario.cat/mergo
@@ -118,9 +117,7 @@ github.com/ebitengine/purego
 github.com/ebitengine/purego/internal/cgo
 github.com/ebitengine/purego/internal/fakecgo
 github.com/ebitengine/purego/internal/strings
-# github.com/egdaemon/eg v0.0.0-20241224192656-b849cdf0dea0
-## explicit; go 1.23.4
-# github.com/egdaemon/wasinet v0.0.0-20241224191200-8de558ef4d51
+# github.com/egdaemon/wasinet v0.0.0-20241225084903-a9206b5c31e1
 ## explicit; go 1.23.4
 github.com/egdaemon/wasinet
 github.com/egdaemon/wasinet/autohijack

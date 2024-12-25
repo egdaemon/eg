@@ -2,6 +2,7 @@ package ffiwasinet
 
 import (
 	"context"
+	"syscall"
 
 	"github.com/egdaemon/wasinet"
 	"github.com/egdaemon/wasinet/wnetruntime"
@@ -106,6 +107,19 @@ func Wazero(runtime wazero.Runtime) wazero.HostModuleBuilder {
 	) uint32 {
 		return uint32(wasinet.SocketAddrPort(wnet.AddrPort)(ctx, m.Memory(), uintptr(networkptr), networklen, uintptr(serviceptr), servicelen, uintptr(portptr)))
 	}).Export("sock_getaddrport").
+		NewFunctionBuilder().WithFunc(func(
+		ctx context.Context,
+		m api.Module,
+		fd int32,
+		iovs uint32, iovslen uint32,
+		addrptr uint32,
+		iflags int32,
+		nreadptr uint32,
+		oflagsptr uint32,
+	) uint32 {
+		// return uint32(wasinet.SocketRecvFrom())
+		return uint32(syscall.ENOTSUP)
+	}).Export("sock_recv_from").
 		NewFunctionBuilder().WithFunc(func(
 		ctx context.Context, m api.Module, fd, how int32,
 	) uint32 {

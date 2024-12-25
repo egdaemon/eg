@@ -40,6 +40,14 @@ func BytesResult(d []byte, reslengthdst *uint32) (unsafe.Pointer, uint32, unsafe
 	return unsafe.Pointer(unsafe.SliceData(d)), uint32(len(d)), unsafe.Pointer(reslengthdst)
 }
 
+func SliceData[T any](d []T) (unsafe.Pointer, uint32) {
+	return unsafe.Pointer(unsafe.SliceData(d)), uint32(len(d))
+}
+
+func SliceDataRead[T any](ptr unsafe.Pointer, length uint32) []T {
+	return unsafe.Slice((*T)(ptr), length)
+}
+
 func Bytes(d []byte) (unsafe.Pointer, uint32) {
 	return unsafe.Pointer(unsafe.SliceData(d)), uint32(len(d))
 }
@@ -80,6 +88,6 @@ func Raw[T any](s *T) (unsafe.Pointer, uint32) {
 	return unsafe.Pointer(s), uint32(unsafe.Sizeof(*s))
 }
 
-func RawRead[T any](ptr unsafe.Pointer, dlen uint32) *T {
+func RawRead[T any](ptr unsafe.Pointer) *T {
 	return (*T)(ptr)
 }

@@ -28,7 +28,7 @@ import (
 
 type c8sLocal struct {
 	cmdopts.RuntimeResources
-	Dir              string   `name:"directory" help:"root directory of the repository" default:"${vars_cwd}"`
+	Dir              string   `name:"directory" help:"root directory of the repository" default:"${vars_git_directory}"`
 	Containerfile    string   `arg:"" help:"path to the container file to run" default:"Containerfile"`
 	SSHKeyPath       string   `name:"sshkeypath" help:"path to ssh key to use" default:"${vars_ssh_key_path}"`
 	EnvironmentPaths []string `name:"envpath" help:"environment files to pass to the module" default:""`

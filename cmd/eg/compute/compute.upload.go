@@ -35,7 +35,7 @@ type upload struct {
 	cmdopts.RuntimeResources
 	HostedCompute bool     `name:"shared-compute" help:"allow hosted compute" default:"true"`
 	SSHKeyPath    string   `name:"sshkeypath" help:"path to ssh key to use" default:"${vars_ssh_key_path}"`
-	Dir           string   `name:"directory" help:"root directory of the repository" default:"${vars_cwd}"`
+	Dir           string   `name:"directory" help:"root directory of the repository" default:"${vars_git_directory}"`
 	ModuleDir     string   `name:"moduledir" help:"must be a subdirectory in the provided directory" default:".eg"`
 	Name          string   `arg:"" name:"module" help:"name of the module to run, i.e. the folder name within moduledir" default:""`
 	Environment   []string `name:"env" short:"e" help:"define environment variables and their values to be included"`

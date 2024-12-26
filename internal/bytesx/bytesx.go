@@ -1,6 +1,8 @@
 package bytesx
 
 import (
+	"crypto/md5"
+	"encoding/hex"
 	"fmt"
 )
 
@@ -43,3 +45,23 @@ const (
 	PiB
 	EiB
 )
+
+type Debug []byte
+
+func (t Debug) Format(f fmt.State, verb rune) {
+	digest := func(b []byte) string {
+		d := md5.Sum(b)
+		return hex.EncodeToString(d[:])
+	}
+	switch verb {
+	case 's':
+		_, _ = f.Write([]byte(digest(t)))
+	case 'v':
+		_, _ = f.Write([]byte(digest(t)))
+		if f.Flag('+') {
+			_, _ = f.Write([]byte(" "))
+			_, _ = f.Write([]byte(fmt.Sprintf("%v", []byte(t))))
+		}
+
+	}
+}

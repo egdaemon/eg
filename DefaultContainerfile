@@ -27,4 +27,9 @@ RUN ln -s /usr/lib/go-1.23/bin/go /usr/local/bin/go
 RUN ssh-keyscan -H github.com >> /etc/ssh/ssh_known_hosts
 RUN ssh-keyscan -H gitlab.com >> /etc/ssh/ssh_known_hosts
 
+# temporarily configure systemd-resolvd until eg package is updated.
+RUN mkdir -p /etc/systemd/resolved.conf.d
+RUN echo "# configure systemd-resolvd to listen on the ip:port\n# combinations golang has configured.\n[Resolve]\nDNSStubListenerExtra=127.0.0.1\nDNSStubListenerExtra=[::1]:53" >> /etc/systemd/resolved.conf.d/wasi.dns.conf
+RUN cat /etc/systemd/resolved.conf.d/wasi.dns.conf
+
 RUN systemctl enable ssh

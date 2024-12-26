@@ -1,7 +1,6 @@
 package ffi
 
 import (
-	"log"
 	"syscall"
 	"unsafe"
 )
@@ -41,11 +40,11 @@ func BytesRead(m Memory, offset unsafe.Pointer, len uint32) (data []byte, err er
 	return data, nil
 }
 
-func RawRead(m Memory, dst unsafe.Pointer, ptr unsafe.Pointer, dlen uint32) (err error) {
+func RawRead(m Memory, dm Memory, dst unsafe.Pointer, ptr unsafe.Pointer, dlen uint32) (err error) {
 	if binary, ok := m.Read(ptr, dlen); !ok {
 		return syscall.EFAULT
 	} else {
-		if !m.Write(dst, binary) {
+		if !dm.Write(dst, binary) {
 			return syscall.EFAULT
 		}
 		return nil
@@ -56,11 +55,9 @@ func RawWrite[T any](m Memory, v *T, dst unsafe.Pointer, dlen uint32) error {
 	sz := unsafe.Sizeof(*v)
 	ptr := (*byte)(unsafe.Pointer(v))
 	bytes := unsafe.Slice(ptr, sz)
-	log.Printf("%d %T %p, %p, %v\n", sz, v, v, ptr, bytes)
 	if !m.Write(dst, bytes) {
 		return syscall.EFAULT
 	}
-	// runtime.KeepAlive(v)
 	return nil
 }
 

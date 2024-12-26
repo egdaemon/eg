@@ -9,7 +9,6 @@ import (
 	"syscall"
 	"unsafe"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/egdaemon/wasinet/ffi"
 	"github.com/egdaemon/wasinet/internal/errorsx"
 	"golang.org/x/sys/unix"
@@ -18,7 +17,7 @@ import (
 // The native implementation ensure the api interopt is correct.
 
 func unixsockaddr(v rawsocketaddr) (sa unix.Sockaddr, err error) {
-	wsa, err := rawtosockaddr(&v, 3)
+	wsa, err := rawtosockaddr(&v)
 	if err != nil {
 		return nil, err
 	}
@@ -147,14 +146,17 @@ func sock_recv_from(
 		}
 
 		if err := ffi.RawWrite(ffi.Native{}, &addr, addrptr, uint32(unsafe.Sizeof(addr))); err != nil {
+			log.Println("failed", err)
 			return ffi.Errno(err)
 		}
 
 		if err := ffi.Uint32Write(ffi.Native{}, nread, uint32(n)); err != nil {
+			log.Println("failed", err)
 			return ffi.Errno(err)
 		}
 
 		if err := ffi.Uint32Write(ffi.Native{}, oflags, uint32(roflags)); err != nil {
+			log.Println("failed", err)
 			return ffi.Errno(err)
 		}
 
@@ -173,18 +175,17 @@ func sock_send_to(
 	if err != nil {
 		return ffi.Errno(err)
 	}
-	// vec := ffig.SliceDataRead[ffig.Vector](iovs, iovslen)
+
 	vecs, err := ffi.ReadVector[byte](ffi.Native{}, vec...)
 	if err != nil {
 		return ffi.Errno(err)
 	}
-	// vecs := ffig.ReadVector[byte](vec...)
 
 	sa, err := unixsockaddr(ffi.UnsafeClone[rawsocketaddr](addrptr))
 	if err != nil {
 		return ffi.Errno(err)
 	}
-	log.Println("SendTo", fd, flags, spew.Sdump(sa), spew.Sdump(vecs))
+
 	// dispatch-run/wasi-go has linux special cased here.
 	// did not faithfully follow it because it might be caused by other complexity.
 	// https://github.com/dispatchrun/wasi-go/blob/038d5104aacbb966c25af43797473f03c5da3e4f/systems/unix/system.go#L640
@@ -268,15 +269,12 @@ func sock_determine_host_af_family(
 func netaddrfamily(addr net.Addr) int {
 	ipfamily := func(ip net.IP) int {
 		if ip.To4() == nil {
-			log.Println("AF_INET6 detected", syscall.AF_INET6)
 			return syscall.AF_INET6
 		}
 
-		log.Println("AF_INET detected")
 		return syscall.AF_INET
 	}
 
-	log.Printf("netaddrfamily %T - %s\n", addr, addr)
 	switch a := addr.(type) {
 	case *net.IPAddr:
 		return ipfamily(a.IP)
@@ -291,8 +289,7 @@ func netaddrfamily(addr net.Addr) int {
 	return syscall.AF_INET
 }
 
-func rawtosockaddr(rsa *rawsocketaddr, id int) (sockaddr, error) {
-	log.Println("rsa.family", id, "-", rsa.family, syscall.AF_INET, syscall.AF_INET6, syscall.AF_UNIX)
+func rawtosockaddr(rsa *rawsocketaddr) (sockaddr, error) {
 	switch rsa.family {
 	case syscall.AF_INET:
 		addr := (*sockipaddr[sockip4])(unsafe.Pointer(&rsa.addr))

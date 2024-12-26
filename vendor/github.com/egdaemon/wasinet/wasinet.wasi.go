@@ -94,15 +94,12 @@ func netaddrfamily(addr net.Addr) int {
 	}
 	ipfamily := func(ip net.IP) int {
 		if ip.To4() == nil {
-			log.Println("AF_INET6 detected", translated(syscall.AF_INET6))
 			return translated(syscall.AF_INET6)
 		}
 
-		log.Println("AF_INET detected")
 		return translated(syscall.AF_INET)
 	}
 
-	log.Printf("netaddrfamily %T - %s\n", addr, addr)
 	switch a := addr.(type) {
 	case *net.IPAddr:
 		return ipfamily(a.IP)
@@ -124,14 +121,13 @@ var (
 	hostAFUNIX  = int32(syscall.AF_UNIX)
 )
 
-func rawtosockaddr(rsa *rawsocketaddr, id int) (sockaddr, error) {
+func rawtosockaddr(rsa *rawsocketaddr) (sockaddr, error) {
 	maponce.Do(func() {
 		hostAFINET = sock_determine_host_af_family(hostAFINET)
 		hostAFINET6 = sock_determine_host_af_family(hostAFINET6)
 		hostAFUNIX = sock_determine_host_af_family(hostAFUNIX)
 	})
 
-	log.Println("rsa.family", id, "-", rsa.family, syscall.AF_INET, syscall.AF_INET6, syscall.AF_UNIX)
 	switch int32(rsa.family) {
 	case hostAFINET:
 		addr := (*sockipaddr[sockip4])(unsafe.Pointer(&rsa.addr))

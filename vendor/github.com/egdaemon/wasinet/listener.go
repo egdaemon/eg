@@ -291,7 +291,7 @@ func (c *packetConn) ReadMsgUDPAddrPort(b, oob []byte) (n, oobn, flags int, addr
 			return true
 		}
 
-		sockaddr, err := rawtosockaddr(&raw, 0)
+		sockaddr, err := rawtosockaddr(&raw)
 		if err != nil {
 			log.Println("failed to decode address", raw.family, syscall.AF_INET, syscall.AF_INET6, err)
 			return true
@@ -359,7 +359,6 @@ func (c *packetConn) WriteMsgUDP(b, oob []byte, addr *net.UDPAddr) (n, oobn int,
 
 func (c *packetConn) WriteMsgUDPAddrPort(b, oob []byte, addrPort netip.AddrPort) (n, oobn int, err error) {
 	rawConnErr := c.conn.Write(func(fd uintptr) (done bool) {
-		log.Println("DERP DERP", addrPort.Addr().String(), addrPort.Port())
 		var raw rawsocketaddr
 		if raw, err = netipaddrportToRaw(addrPort); err != nil {
 			return false

@@ -10,16 +10,15 @@ import (
 	"syscall"
 	"unsafe"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/egdaemon/wasinet/ffi"
 	"golang.org/x/sys/unix"
 )
 
 // translate wasi syscall.AF_* to the host.
 func DetermineHostAFFamily(wasi int32) (r int32) {
-	defer func() {
-		log.Println("family translated", wasi, "->", r)
-	}()
+	// defer func() {
+	// 	log.Println("family translated", wasi, "->", r)
+	// }()
 	switch wasi {
 	case 3:
 		return syscall.AF_INET6
@@ -35,7 +34,7 @@ func readsockaddr(
 ) (unix.Sockaddr, error) {
 	var wsa rawsocketaddr
 	wsaptr, _ := ffi.Pointer(&wsa)
-	if err := ffi.RawRead(m, wsaptr, addr, addrlen); err != nil {
+	if err := ffi.RawRead(m, ffi.Native{}, wsaptr, addr, addrlen); err != nil {
 		return nil, err
 	}
 
@@ -142,7 +141,6 @@ func SocketSendTo(fn SendToFn) SendToHostFn {
 	) syscall.Errno {
 		log.Println("socket send_to initated")
 		defer log.Println("socket send_to completed")
-		log.Println("reading", unsafe.Pointer(iovs), iovslen)
 
 		vec, err := ffi.ReadSlice[ffi.Vector](m, unsafe.Pointer(iovs), iovslen)
 		if err != nil {
@@ -152,16 +150,15 @@ func SocketSendTo(fn SendToFn) SendToHostFn {
 
 		vecs, err := ffi.ReadVector[byte](m, vec...)
 		if err != nil {
-			log.Println("failed", err)
 			return ffi.Errno(err)
 		}
-		log.Println("DERP DERP", vecs)
+
 		sa, err := readsockaddr(m, unsafe.Pointer(addrptr), addrlen)
 		if err != nil {
 			log.Println("failed", err)
 			return ffi.Errno(err)
 		}
-
+		log.Println("sending to", sa)
 		n, err := fn(ctx, int(fd), sa, vecs, int(flags))
 		if err != nil {
 			log.Println("failed", err)
@@ -207,9 +204,12 @@ func SocketRecvFrom(fn RecvFromFn) RecvFromHostFn {
 			return ffi.Errno(err)
 		}
 
-		log.Println("socket_recv_from is not implemented", len(vecs), len(vecs[0]))
+		log.Println("socket_recv_from vecs initiated", len(vecs), string(vecs[0]))
+		defer func() { log.Println("socket_recv_from vecs completed", len(vecs), string(vecs[0])) }()
 		n, roflags, sa, err := fn(ctx, int(fd), vecs, int(iflags))
 		if err != nil {
+			// syscall.ECONNREFUSED
+			log.Printf("derp: %v %T %+v %d\n", sa, err, err, err)
 			return ffi.Errno(err)
 		}
 
@@ -313,7 +313,7 @@ func SocketLocalAddr(fn LocalAddrFn) LocalAddrHostFn {
 		if err != nil {
 			return ffi.Errno(err)
 		}
-		log.Println("DERP DERP", spew.Sdump(addr))
+
 		if err := ffi.RawWrite(m, &addr, unsafe.Pointer(addrptr), addrlen); err != nil {
 			return ffi.Errno(err)
 		}
@@ -344,7 +344,6 @@ func SocketPeerAddr(fn PeerAddrFn) PeerAddrHostFn {
 			return ffi.Errno(err)
 		}
 
-		log.Println("DERP DERP", sa, spew.Sdump(addr))
 		return ffi.Errno(ffi.RawWrite(m, &addr, unsafe.Pointer(addrptr), addrlen))
 	}
 }
@@ -466,16 +465,13 @@ func SocketAddrIP(fn AddrIPFn) AddrIPHostFn {
 func unixsockaddrToRaw(sa unix.Sockaddr) (zero rawsocketaddr, error error) {
 	switch t := sa.(type) {
 	case *unix.SockaddrInet4:
-		log.Println("ip4 detected")
 		a := sockipaddr[sockip4]{port: uint32(t.Port), addr: sockip4{ip: t.Addr}}
 		return a.sockaddr(), nil
 
 	case *unix.SockaddrInet6:
-		log.Println("ip6 detected")
 		a := sockipaddr[sockip6]{port: uint32(t.Port), addr: sockip6{ip: t.Addr, zone: strconv.FormatUint(uint64(t.ZoneId), 10)}}
 		return a.sockaddr(), nil
 	case *unix.SockaddrUnix:
-		log.Println("unix detected")
 		name := t.Name
 		if len(name) == 0 {
 			// For consistency across platforms, replace empty unix socket

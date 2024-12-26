@@ -4,13 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
 	"net"
 	"os"
 	"syscall"
 	"time"
-
-	"github.com/davecgh/go-spew/spew"
 )
 
 // Dialer is a type similar to net.Dialer but it uses the dial functions defined
@@ -109,7 +106,7 @@ func dialAddr(ctx context.Context, addr net.Addr) (net.Conn, error) {
 	if err != nil {
 		return nil, os.NewSyscallError("socket", err)
 	}
-	log.Println("dialing", af, sotype, addr.String())
+
 	fd, err := socket(af, sotype, netaddrproto(addr))
 	if err != nil {
 		return nil, os.NewSyscallError("socket", err)
@@ -120,11 +117,6 @@ func dialAddr(ctx context.Context, addr net.Addr) (net.Conn, error) {
 		}
 	}()
 
-	// if err := setNonBlock(fd); err != nil {
-	// 	log.Println("nonblock failed", fd, err)
-	// 	return nil, err
-	// }
-	log.Println("checkpoint")
 	if sotype == syscall.SOCK_DGRAM && af != syscall.AF_UNIX {
 		if err := setsockopt(fd, SOL_SOCKET, SO_BROADCAST, 1); err != nil {
 			// If the system does not support broadcast we should still be able
@@ -138,12 +130,11 @@ func dialAddr(ctx context.Context, addr net.Addr) (net.Conn, error) {
 		}
 	}
 
-	log.Println("checkpoint")
 	connectAddr, err := socketAddress(addr)
 	if err != nil {
 		return nil, os.NewSyscallError("sockaddr", err)
 	}
-	log.Println("checkpoint")
+
 	var inProgress bool
 	switch err := connect(fd, connectAddr); err {
 	case nil:
@@ -152,19 +143,16 @@ func dialAddr(ctx context.Context, addr net.Addr) (net.Conn, error) {
 	default:
 		return nil, os.NewSyscallError("connect", err)
 	}
-	log.Println("checkpoint", sotype, syscall.SOCK_DGRAM)
+
 	if sotype == syscall.SOCK_DGRAM {
 		name, err := getsockname(fd)
 		if err != nil {
-			log.Println("sockname failed", err)
 			return nil, err
 		}
 		peer, err := getpeername(fd)
 		if err != nil {
-			log.Println("peername failed", err)
 			return nil, err
 		}
-		log.Println("checkpoint", spew.Sdump(name), spew.Sdump(peer))
 		f := os.NewFile(uintptr(fd), "")
 		fd = -1
 		return makePacketConn(f, name, peer), nil
@@ -213,12 +201,10 @@ func dialAddr(ctx context.Context, addr net.Addr) (net.Conn, error) {
 
 		select {
 		case err := <-errch:
-			log.Println("checkpoint", err)
 			if err != nil {
 				return nil, os.NewSyscallError("connect", err)
 			}
 		case <-ctx.Done():
-			log.Println("checkpoint")
 			// This should interrupt the async connect operation handled by the
 			// goroutine.
 			f.Close()
@@ -228,7 +214,7 @@ func dialAddr(ctx context.Context, addr net.Addr) (net.Conn, error) {
 			return nil, context.Cause(ctx)
 		}
 	}
-	log.Println("checkpoint")
+
 	c, err := net.FileConn(f)
 	if err != nil {
 		return nil, fmt.Errorf("net.FileConn: %w", err)

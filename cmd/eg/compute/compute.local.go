@@ -71,7 +71,7 @@ func (t local) Run(gctx *cmdopts.Global) (err error) {
 	defer os.RemoveAll(filepath.Join(ws.Root, ws.RuntimeDir))
 
 	if err = os.Remove(filepath.Join(ws.Root, ws.WorkingDir)); err != nil {
-		return errorsx.Wrap(err, "unable to symlink working directory")
+		return errorsx.Wrap(err, "unable to remove working directory")
 	}
 
 	if err = os.Symlink(ws.Root, filepath.Join(ws.Root, ws.WorkingDir)); err != nil {

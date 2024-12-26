@@ -2,7 +2,6 @@ package ffiwasinet
 
 import (
 	"context"
-	"syscall"
 
 	"github.com/egdaemon/wasinet"
 	"github.com/egdaemon/wasinet/wnetruntime"
@@ -24,12 +23,12 @@ func Wazero(runtime wazero.Runtime) wazero.HostModuleBuilder {
 		NewFunctionBuilder().WithFunc(func(
 		ctx context.Context,
 		m api.Module,
-		af uint32,
-		socktype uint32,
-		proto uint32,
+		af int32,
+		socktype int32,
+		proto int32,
 		fdptr uint32,
 	) uint32 {
-		errno := uint32(wasinet.SocketOpen(wnet.Open)(ctx, wnetruntime.WazeroMem(m.Memory()), af, socktype|syscall.SOCK_NONBLOCK, proto, uintptr(fdptr)))
+		errno := uint32(wasinet.SocketOpen(wnet.Open)(ctx, wnetruntime.WazeroMem(m.Memory()), af, socktype, proto, uintptr(fdptr)))
 		return errno
 	}).Export("sock_open").
 		NewFunctionBuilder().WithFunc(func(
@@ -120,12 +119,12 @@ func Wazero(runtime wazero.Runtime) wazero.HostModuleBuilder {
 		m api.Module,
 		fd int32,
 		iovs uint32, iovslen uint32,
-		addrptr uint32,
+		addrptr uint32, addrlen uint32,
 		iflags int32,
 		nreadptr uint32,
 		oflagsptr uint32,
 	) uint32 {
-		return uint32(wasinet.SocketRecvFrom(wnet.RecvFrom)(ctx, wnetruntime.WazeroMem(m.Memory()), fd, uintptr(iovs), iovslen, uintptr(addrptr), iflags, uintptr(nreadptr), uintptr(oflagsptr)))
+		return uint32(wasinet.SocketRecvFrom(wnet.RecvFrom)(ctx, wnetruntime.WazeroMem(m.Memory()), fd, uintptr(iovs), iovslen, uintptr(addrptr), addrlen, iflags, uintptr(nreadptr), uintptr(oflagsptr)))
 	}).Export("sock_recv_from").
 		NewFunctionBuilder().WithFunc(func(
 		ctx context.Context,

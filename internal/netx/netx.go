@@ -55,9 +55,9 @@ type debugconn struct {
 }
 
 func (t debugconn) Read(b []byte) (n int, err error) {
-	log.Println("net.Conn.Read initiated", fmt.Sprintf(t.format, bytesx.Debug(b)))
+	log.Println("net.Conn.Read initiated", t.Conn.RemoteAddr().String(), fmt.Sprintf(t.format, bytesx.Debug(b)))
 	defer func() {
-		log.Println("net.Conn.Read completed", fmt.Sprintf(t.format, bytesx.Debug(b)))
+		log.Println("net.Conn.Read completed", t.Conn.RemoteAddr().String(), fmt.Sprintf(t.format, bytesx.Debug(b)))
 	}()
 
 	return t.Conn.Read(b)
@@ -67,9 +67,9 @@ func (t debugconn) Read(b []byte) (n int, err error) {
 // Write can be made to time out and return an error after a fixed
 // time limit; see SetDeadline and SetWriteDeadline.
 func (t debugconn) Write(b []byte) (n int, err error) {
-	log.Println("net.Conn.Write initiated", fmt.Sprintf(t.format, bytesx.Debug(b)))
+	log.Println("net.Conn.Write initiated", t.Conn.RemoteAddr().String(), fmt.Sprintf(t.format, bytesx.Debug(b)))
 	defer func() {
-		log.Println("net.Conn.Write completed", fmt.Sprintf(t.format, bytesx.Debug(b)))
+		log.Println("net.Conn.Write completed", t.Conn.RemoteAddr().String(), fmt.Sprintf(t.format, bytesx.Debug(b)))
 	}()
 
 	return t.Conn.Write(b)
@@ -94,9 +94,9 @@ func (t debugpacketconn) Read(b []byte) (n int, err error) {
 		return 0, syscall.ENOTSUP
 	}
 
-	log.Println("net.Conn.Read initiated", fmt.Sprintf(t.format, bytesx.Debug(b)))
+	log.Println("net.Conn.Read initiated", c.RemoteAddr().String(), fmt.Sprintf(t.format, bytesx.Debug(b)))
 	defer func() {
-		log.Println("net.Conn.Read completed", fmt.Sprintf(t.format, bytesx.Debug(b)), fmt.Sprintf(t.format, errorsx.Stack()))
+		log.Println("net.Conn.Read completed", c.RemoteAddr().String(), fmt.Sprintf(t.format, bytesx.Debug(b)), fmt.Sprintf(t.format, errorsx.Stack()))
 	}()
 
 	return c.Read(b)
@@ -110,9 +110,9 @@ func (t debugpacketconn) Write(b []byte) (n int, err error) {
 	if !ok {
 		return 0, syscall.ENOTSUP
 	}
-	log.Println("net.Conn.Write initiated", fmt.Sprintf(t.format, bytesx.Debug(b)))
+	log.Println("net.Conn.Write initiated", c.RemoteAddr().String(), fmt.Sprintf(t.format, bytesx.Debug(b)))
 	defer func() {
-		log.Println("net.Conn.Write completed", fmt.Sprintf(t.format, bytesx.Debug(b)), fmt.Sprintf(t.format, errorsx.Stack()))
+		log.Println("net.Conn.Write completed", c.RemoteAddr().String(), fmt.Sprintf(t.format, bytesx.Debug(b)), fmt.Sprintf(t.format, errorsx.Stack()))
 	}()
 
 	return c.Write(b)

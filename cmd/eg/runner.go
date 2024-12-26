@@ -235,7 +235,7 @@ func (t wasiCmd) Run(gctx *cmdopts.Global) (err error) {
 	}
 
 	mpath := ws.Temporary("test.wasm")
-
+	log.Println("wasipath", ws.TemporaryDir, mpath)
 	if err = compile.Run(ctx, t.Dir, t.Module, mpath); err != nil {
 		return err
 	}
@@ -251,10 +251,11 @@ func (t wasiCmd) Run(gctx *cmdopts.Global) (err error) {
 	).WithStdout(
 		os.Stdout,
 	).WithFSConfig(
-		wazero.NewFSConfig(),
+		wazero.NewFSConfig().
+			WithDirMount("/etc/resolv.conf", "/etc/resolv.conf"),
 	).WithSysNanotime().WithSysWalltime().WithRandSource(rand.Reader)
 
-	environ := errorsx.Zero(envx.FromPath(eg.DefaultRuntimeDirectory("environ.env")))
+	environ := errorsx.Zero(envx.Build().FromEnviron(os.Environ()...).Environ())
 	// envx.Debug(environ...)
 	mcfg = wasix.Environ(mcfg, environ...)
 

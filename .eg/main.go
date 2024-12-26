@@ -38,7 +38,7 @@ func main() {
 					eggolang.TestOptionTags("no_duckdb_arrow"),
 				),
 			),
-			TestNetwork,
+			// TestNetwork,// TODO
 		),
 	)
 

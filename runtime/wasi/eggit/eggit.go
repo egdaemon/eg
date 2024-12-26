@@ -152,7 +152,7 @@ func (t *modified) detect(ctx context.Context) error {
 func (t *modified) Changed(paths ...string) func(context.Context) bool {
 	return func(ctx context.Context) bool {
 		t.derp.Do(func() {
-			log.Println(t.detect(ctx))
+			errorsx.Log(t.detect(ctx))
 		})
 
 		debugx.Println("changed", len(t.changed), t.changed, "paths", len(paths))

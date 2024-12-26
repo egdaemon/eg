@@ -2,6 +2,8 @@ package bytesx
 
 import (
 	"fmt"
+
+	"github.com/egdaemon/eg/internal/md5x"
 )
 
 type Unit int64
@@ -43,3 +45,19 @@ const (
 	PiB
 	EiB
 )
+
+type Debug []byte
+
+func (t Debug) Format(f fmt.State, verb rune) {
+	switch verb {
+	case 's':
+		_, _ = f.Write([]byte(md5x.DigestHex(t)))
+	case 'v':
+		_, _ = f.Write([]byte(md5x.DigestHex(t)))
+		if f.Flag('+') {
+			_, _ = f.Write([]byte(" "))
+			_, _ = f.Write([]byte(fmt.Sprintf("%v", []byte(t))))
+		}
+
+	}
+}

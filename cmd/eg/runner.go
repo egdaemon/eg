@@ -1,10 +1,13 @@
 package main
 
 import (
+	"context"
+	"crypto/rand"
 	"database/sql"
 	"fmt"
 	"log"
 	"net"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
@@ -14,18 +17,23 @@ import (
 	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/cmd/cmdopts"
 	"github.com/egdaemon/eg/cmd/eg/daemons"
+	"github.com/egdaemon/eg/compile"
 	"github.com/egdaemon/eg/internal/bytesx"
 	"github.com/egdaemon/eg/internal/debugx"
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/gitx"
+	"github.com/egdaemon/eg/internal/wasix"
 	"github.com/egdaemon/eg/interp"
 	"github.com/egdaemon/eg/interp/c8s"
 	"github.com/egdaemon/eg/interp/events"
 	"github.com/egdaemon/eg/interp/runtime/wasi/ffigraph"
+	"github.com/egdaemon/eg/interp/runtime/wasi/ffiwasinet"
 	"github.com/egdaemon/eg/runners"
 	"github.com/egdaemon/eg/workspaces"
 	"github.com/gofrs/uuid"
+	"github.com/tetratelabs/wazero"
+	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
@@ -34,7 +42,7 @@ import (
 )
 
 type module struct {
-	Dir        string `name:"directory" help:"root directory of the repository" default:"${vars_cwd}"`
+	Dir        string `name:"directory" help:"root directory of the repository" default:"${vars_git_directory}"`
 	ModuleDir  string `name:"moduledir" help:"deprecated removed once infrastructure is updated" hidden:"true" default:".eg"`
 	RuntimeDir string `name:"runtimedir" help:"runtime directory" hidden:"true" default:"${vars_eg_runtime_directory}"`
 	Module     string `arg:"" help:"name of the module to run"`
@@ -206,4 +214,90 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 		t.Module,
 		interp.OptionRuntimeDir(t.RuntimeDir),
 	)
+}
+
+type wasiCmd struct {
+	Dir       string `name:"directory" help:"root directory of the repository" default:"${vars_git_directory}"`
+	Module    string `arg:"" help:"name of the module to run"`
+	ModuleDir string `name:"moduledir" help:"deprecated removed once infrastructure is updated" hidden:"true" default:".eg"`
+}
+
+func (t wasiCmd) Run(gctx *cmdopts.Global) (err error) {
+	var (
+		ws workspaces.Context
+	)
+
+	ctx, done := context.WithCancel(gctx.Context)
+	defer done()
+
+	if ws, err = workspaces.FromEnv(gctx.Context, t.Dir, t.Module); err != nil {
+		return err
+	}
+
+	mpath := ws.Temporary("test.wasm")
+
+	if err = compile.Run(ctx, t.Dir, t.Module, mpath); err != nil {
+		return err
+	}
+	runtime := wazero.NewRuntimeWithConfig(
+		ctx,
+		wazero.NewRuntimeConfigInterpreter(),
+	)
+
+	mcfg := wazero.NewModuleConfig().WithStdin(
+		os.Stdin,
+	).WithStderr(
+		os.Stderr,
+	).WithStdout(
+		os.Stdout,
+	).WithFSConfig(
+		wazero.NewFSConfig(),
+	).WithSysNanotime().WithSysWalltime().WithRandSource(rand.Reader)
+
+	environ := errorsx.Zero(envx.FromPath(eg.DefaultRuntimeDirectory("environ.env")))
+	// envx.Debug(environ...)
+	mcfg = wasix.Environ(mcfg, environ...)
+
+	wasienv, err := wasi_snapshot_preview1.NewBuilder(runtime).Instantiate(ctx)
+	if err != nil {
+		return err
+	}
+	defer wasienv.Close(ctx)
+
+	wasinet, err := ffiwasinet.Wazero(runtime).Instantiate(ctx)
+	if err != nil {
+		return err
+	}
+	defer wasinet.Close(ctx)
+
+	hostenv, err := runtime.
+		NewHostModuleBuilder("env").
+		Instantiate(ctx)
+	if err != nil {
+		return err
+	}
+	defer hostenv.Close(ctx)
+
+	log.Println("interp initiated", mpath)
+	defer log.Println("interp completed", mpath)
+	wasi, err := os.ReadFile(mpath)
+	if err != nil {
+		return err
+	}
+
+	c, err := runtime.CompileModule(ctx, wasi)
+	if err != nil {
+		return err
+	}
+	defer c.Close(ctx)
+
+	// wasidebug.Module(c)
+
+	m, err := runtime.InstantiateModule(ctx, c, mcfg.WithName(mpath))
+	if err != nil {
+		return err
+	}
+	defer m.Close(ctx)
+
+	return nil
 }

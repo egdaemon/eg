@@ -2,7 +2,6 @@ package ffiwasinet
 
 import (
 	"context"
-	"log"
 	"syscall"
 
 	"github.com/egdaemon/wasinet"
@@ -30,11 +29,7 @@ func Wazero(runtime wazero.Runtime) wazero.HostModuleBuilder {
 		proto uint32,
 		fdptr uint32,
 	) uint32 {
-		log.Println("AF", af, syscall.AF_INET, syscall.AF_INET6, syscall.AF_UNIX)
-		log.Println("stype", socktype, syscall.SOCK_STREAM, syscall.SOCK_DGRAM)
-		log.Println("proto", proto, syscall.IPPROTO_IP, syscall.IPPROTO_IPV6, syscall.IPPROTO_TCP)
-		errno := uint32(wasinet.SocketOpen(wnet.Open)(ctx, wnetruntime.WazeroMem(m.Memory()), af, socktype, proto, uintptr(fdptr)))
-		log.Println("DERP", errno)
+		errno := uint32(wasinet.SocketOpen(wnet.Open)(ctx, wnetruntime.WazeroMem(m.Memory()), af, socktype|syscall.SOCK_NONBLOCK, proto, uintptr(fdptr)))
 		return errno
 	}).Export("sock_open").
 		NewFunctionBuilder().WithFunc(func(
@@ -51,7 +46,6 @@ func Wazero(runtime wazero.Runtime) wazero.HostModuleBuilder {
 		addr uint32,
 		addrlen uint32,
 	) uint32 {
-		log.Println("SOCKET CONNECT", fd)
 		return uint32(wasinet.SocketConnect(wnet.Connect)(ctx, wnetruntime.WazeroMem(m.Memory()), fd, uintptr(addr), addrlen))
 	}).Export("sock_connect").
 		NewFunctionBuilder().WithFunc(func(

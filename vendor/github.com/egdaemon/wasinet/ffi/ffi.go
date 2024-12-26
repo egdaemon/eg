@@ -1,131 +1,149 @@
 package ffi
 
 import (
-	"context"
 	"syscall"
-	"time"
 	"unsafe"
 )
 
 type Memory interface {
-	// // ReadUint32Le reads a uint32 in little-endian encoding from the underlying buffer at the offset in or returns
-	// // false if out of range.
-	ReadUint32Le(offset uint32) (uint32, bool)
+	Read(offset unsafe.Pointer, byteCount uint32) ([]byte, bool)
 
-	Read(offset, byteCount uint32) ([]byte, bool)
+	// Write writes the slice to the underlying buffer at the offset or returns false if out of range.
+	Write(offset unsafe.Pointer, v []byte) bool
+
+	// ReadUint32Le reads a uint32 in little-endian encoding from the underlying buffer at the offset in or returns
+	// false if out of range.
+	ReadUint32Le(offset unsafe.Pointer) (uint32, bool)
 
 	// WriteUint32Le writes the value in little-endian encoding to the underlying buffer at the offset in or returns
 	// false if out of range.
-	WriteUint32Le(offset, v uint32) bool
-
-	// Write writes the slice to the underlying buffer at the offset or returns false if out of range.
-	Write(offset uint32, v []byte) bool
+	WriteUint32Le(offset unsafe.Pointer, v uint32) bool
 }
 
-func ReadString(m Memory, offset uintptr, len uint32) (string, error) {
-	var (
-		ok   bool
-		data []byte
-	)
-
-	if data, ok = m.Read(uint32(offset), len); !ok {
-		return "", syscall.EFAULT
+func ReadSlice[T any](m Memory, offset unsafe.Pointer, dlen uint32) (zero []T, err error) {
+	if binary, ok := m.Read(offset, dlen); !ok {
+		return zero, syscall.EFAULT
+	} else {
+		return *(*[]T)(unsafe.Pointer(&binary)), nil
 	}
-
-	return string(data), nil
 }
 
-func ReadStringArray(m Memory, offset uint32, length uint32, argssize uint32) (args []string, err error) {
-	args = make([]string, 0, length)
-
-	for offset, i := offset, uint32(0); i < length*2; offset, i = offset+(2*argssize), i+2 {
-		var (
-			data []byte
-		)
-
-		if data, err = ReadArrayElement(m, offset, argssize); err != nil {
-			return nil, err
-		}
-
-		args = append(args, string(data))
-	}
-
-	return args, nil
-}
-
-func ReadArrayElement(m Memory, offset, len uint32) (data []byte, err error) {
-	var (
-		ok            bool
-		eoffset, elen uint32
-	)
-
-	if eoffset, ok = m.ReadUint32Le(offset); !ok {
-		return nil, syscall.EFAULT
-	}
-
-	if elen, ok = m.ReadUint32Le(offset + len); !ok {
-		return nil, syscall.EFAULT
-	}
-
-	if data, ok = m.Read(eoffset, elen); !ok {
-		return nil, syscall.EFAULT
-	}
-
-	return data, nil
-}
-
-func ReadMicroDeadline(ctx context.Context, deadline int64) (context.Context, context.CancelFunc) {
-	return context.WithDeadline(ctx, time.UnixMicro(deadline))
-}
-
-func BytesRead(m Memory, offset uintptr, len uint32) (data []byte, err error) {
+func BytesRead(m Memory, offset unsafe.Pointer, len uint32) (data []byte, err error) {
 	var (
 		ok bool
 	)
 
-	if data, ok = m.Read(uint32(offset), len); !ok {
+	if data, ok = m.Read(offset, len); !ok {
 		return nil, syscall.EFAULT
 	}
 
 	return data, nil
 }
 
-func RawRead[T any](m Memory, ptr uintptr, dlen uint32) (zero *T, err error) {
-	if binary, ok := m.Read(uint32(ptr), dlen); !ok {
-		return zero, syscall.EFAULT
+func RawRead(m Memory, dm Memory, dst unsafe.Pointer, ptr unsafe.Pointer, dlen uint32) (err error) {
+	if binary, ok := m.Read(ptr, dlen); !ok {
+		return syscall.EFAULT
 	} else {
-		return (*T)(unsafe.Pointer(unsafe.SliceData(binary))), nil
+		if !dm.Write(dst, binary) {
+			return syscall.EFAULT
+		}
+		return nil
 	}
 }
 
-func Uint32Read(m Memory, ptr uintptr, dlen uint32) (uint32, error) {
-	if v, ok := m.ReadUint32Le(uint32(ptr)); !ok {
+func RawWrite[T any](m Memory, v *T, dst unsafe.Pointer, dlen uint32) error {
+	sz := unsafe.Sizeof(*v)
+	ptr := (*byte)(unsafe.Pointer(v))
+	bytes := unsafe.Slice(ptr, sz)
+	if !m.Write(dst, bytes) {
+		return syscall.EFAULT
+	}
+	return nil
+}
+
+func Uint32Read(m Memory, ptr unsafe.Pointer, dlen uint32) (uint32, error) {
+	if v, ok := m.ReadUint32Le(ptr); !ok {
 		return 0, syscall.EFAULT
 	} else {
 		return v, nil
 	}
 }
 
-func Uint32Write(m Memory, dst uintptr, v uint32) error {
-	if !m.WriteUint32Le(uint32(dst), v) {
+func Uint32Write(m Memory, dst unsafe.Pointer, v uint32) error {
+	if !m.WriteUint32Le(dst, v) {
 		return syscall.EFAULT
 	}
 
 	return nil
 }
 
-func RawWrite[T any](m Memory, v T, dst uintptr, dlen uint32) error {
-	if !m.Write(uint32(dst), unsafe.Slice((*byte)(unsafe.Pointer(&v)), unsafe.Sizeof(v))) {
+func BytesWrite(m Memory, v []byte, dst unsafe.Pointer, dlen uint32) error {
+	if !m.Write(dst, v) {
 		return syscall.EFAULT
 	}
 
 	return nil
 }
 
-func BytesWrite(m Memory, v []byte, dst uintptr, dlen uint32) error {
-	if !m.Write(uint32(dst), v) {
-		return syscall.EFAULT
+func WriteInt32(dst unsafe.Pointer, src int32) {
+	*(*int32)(dst) = src
+}
+
+func UnsafeClone[T any](ptr unsafe.Pointer) T {
+	return *(*T)(ptr)
+}
+
+type Vector struct {
+	Offset unsafe.Pointer
+	Length uint32
+}
+
+func SliceVector[T any](eles ...[]T) []Vector {
+	iovsBuf := make([]Vector, 0, len(eles))
+	for _, iov := range eles {
+		iovsBuf = append(iovsBuf, Vector{
+			Offset: unsafe.Pointer(unsafe.SliceData(iov)),
+			Length: uint32(len(iov)),
+		})
 	}
 
-	return nil
+	return iovsBuf
+}
+
+func ReadVector[T any](m Memory, eles ...Vector) ([][]T, error) {
+	r := make([][]T, 0, len(eles))
+	for _, v := range eles {
+		if v2, err := ReadSlice[T](m, unsafe.Pointer(v.Offset), v.Length); err != nil {
+			return r, err
+		} else {
+			r = append(r, v2)
+		}
+	}
+
+	return r, nil
+}
+
+func Pointer[T any](s *T) (unsafe.Pointer, uint32) {
+	return unsafe.Pointer(s), uint32(unsafe.Sizeof(*s))
+}
+
+func ReadString(m Memory, offset unsafe.Pointer, len uint32) (string, error) {
+	var (
+		ok   bool
+		data []byte
+	)
+
+	if data, ok = m.Read(offset, len); !ok {
+		return "", syscall.EFAULT
+	}
+
+	return string(data), nil
+}
+
+func String(s string) (unsafe.Pointer, uint32) {
+	return unsafe.Pointer(unsafe.StringData(s)), uint32(len(s))
+}
+
+func Slice[T any](d []T) (unsafe.Pointer, uint32) {
+	return unsafe.Pointer(unsafe.SliceData(d)), uint32(len(d))
 }

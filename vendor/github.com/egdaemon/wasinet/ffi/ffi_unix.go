@@ -14,6 +14,14 @@ func ErrnoSuccess() syscall.Errno {
 	return syscall.Errno(0x0)
 }
 
+// convert a syscall.Errno into an idiomatic golang error.
+func ErrErrno(cause syscall.Errno) error {
+	if cause == ErrnoSuccess() {
+		return nil
+	}
+	return cause
+}
+
 func Errno(err error) syscall.Errno {
 	if err == nil {
 		return ErrnoSuccess()

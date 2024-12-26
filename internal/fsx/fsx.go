@@ -12,7 +12,23 @@ import (
 
 	"github.com/egdaemon/eg/internal/debugx"
 	"github.com/egdaemon/eg/internal/errorsx"
+	"github.com/egdaemon/eg/internal/systemx"
 )
+
+// Locate - looks for the provided filename up the file tree.
+// and returns the path once found, if no path is found then it returns
+// the name without a directory, which makes its a relative path.
+func Locate(name string) string {
+	// fallback to root so it'll stop immediately.
+	for dir := systemx.WorkingDirectoryOrDefault("."); dir != "/"; dir = filepath.Dir(dir) {
+		path := filepath.Join(dir, name)
+		if _, err := os.Stat(path); err == nil {
+			return path
+		}
+	}
+
+	return name
+}
 
 // LocateFirstInDir locates the first file in the given directory by name.
 func LocateFirstInDir(dir string, names ...string) (result string) {

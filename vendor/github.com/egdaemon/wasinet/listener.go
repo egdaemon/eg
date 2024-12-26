@@ -4,11 +4,14 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log"
 	"net"
 	"net/netip"
 	"os"
 	"syscall"
 	"time"
+
+	"github.com/egdaemon/wasinet/internal/errorsx"
 )
 
 // Listen announces on the local network address.
@@ -237,9 +240,9 @@ func (c *packetConn) ReadFrom(b []byte) (n int, addr net.Addr, err error) {
 
 func (c *packetConn) ReadMsgUnix(b, oob []byte) (n, oobn, flags int, addr *net.UnixAddr, err error) {
 	rawConnErr := c.conn.Read(func(fd uintptr) (done bool) {
-		var raw rawSockaddrAny
+		var raw rawsocketaddr
 		var oflags int32
-		n, raw, _, oflags, err = recvfrom(int(fd), [][]byte{b}, 0)
+		n, raw, oflags, err = recvfrom(int(fd), [][]byte{b}, 0)
 		if err == syscall.EAGAIN {
 			return false
 		}
@@ -271,11 +274,10 @@ func (c *packetConn) ReadMsgUDP(b, oob []byte) (n, oobn, flags int, addr *net.UD
 }
 
 func (c *packetConn) ReadMsgUDPAddrPort(b, oob []byte) (n, oobn, flags int, addrPort netip.AddrPort, err error) {
-	rawConnErr := c.conn.Read(func(fd uintptr) (done bool) {
-		var raw rawSockaddrAny
-		var port int32
+	werr := c.conn.Read(func(fd uintptr) (done bool) {
+		var raw rawsocketaddr
 		var oflags int32
-		n, raw, port, oflags, err = recvfrom(int(fd), [][]byte{b}, 0)
+		n, raw, oflags, err = recvfrom(int(fd), [][]byte{b}, 0)
 		if err == syscall.EAGAIN {
 			return false
 		}
@@ -285,28 +287,39 @@ func (c *packetConn) ReadMsgUDPAddrPort(b, oob []byte) (n, oobn, flags int, addr
 			n, err = 0, io.EOF
 			return true
 		}
-		var addr netip.Addr
-		switch raw.family {
-		case syscall.AF_INET:
-			addr = netip.AddrFrom4(([4]byte)(raw.addr[:4]))
-		case syscall.AF_INET6:
-			addr = netip.AddrFrom16(([16]byte)(raw.addr[:16]))
+		if err != nil {
+			return true
 		}
-		addrPort = netip.AddrPortFrom(addr, uint16(port))
+
+		sockaddr, err := rawtosockaddr(&raw)
+		if err != nil {
+			log.Println("failed to decode address", raw.family, syscall.AF_INET, syscall.AF_INET6, err)
+			return true
+		}
+
+		switch saddr := sockaddr.(type) {
+		case *sockipaddr[sockip4]:
+			addrPort = netip.AddrPortFrom(netip.AddrFrom4(saddr.addr.ip), uint16(saddr.port))
+		case *sockipaddr[sockip6]:
+			addrPort = netip.AddrPortFrom(netip.AddrFrom16(saddr.addr.ip), uint16(saddr.port))
+		default:
+			log.Printf("unsupported address %T\n", saddr)
+			return true
+		}
+
 		flags = int(oflags)
 		return true
 	})
-	if rawConnErr != nil {
-		err = rawConnErr
-	}
-	if n == 0 && err == nil {
+
+	if n == 0 && werr == nil {
 		err = io.EOF
 	}
-	return
+
+	return n, oobn, flags, addrPort, err
 }
 
 func (c *packetConn) Write(b []byte) (int, error) {
-	return c.file.Write(b)
+	return c.WriteTo(b, c.raddr)
 }
 
 func (c *packetConn) WriteTo(b []byte, addr net.Addr) (int, error) {
@@ -332,16 +345,12 @@ func (c *packetConn) WriteTo(b []byte, addr net.Addr) (int, error) {
 }
 
 func (c *packetConn) WriteMsgUnix(b, oob []byte, addr *net.UnixAddr) (n, oobn int, err error) {
-	rawConnErr := c.conn.Write(func(fd uintptr) (done bool) {
-		raw := rawSockaddrAny{family: syscall.AF_UNIX}
-		copy(raw.addr[:], addr.Name)
-		n, err = sendto(int(fd), [][]byte{b}, raw, 0, 0)
+	werr := c.conn.Write(func(fd uintptr) (done bool) {
+		raw := (&sockaddrUnix{name: addr.Name}).sockaddr()
+		n, err = sendto(int(fd), [][]byte{b}, raw, 0)
 		return err != syscall.EAGAIN
 	})
-	if rawConnErr != nil {
-		err = rawConnErr
-	}
-	return
+	return n, oobn, errorsx.Compact(werr, err)
 }
 
 func (c *packetConn) WriteMsgUDP(b, oob []byte, addr *net.UDPAddr) (n, oobn int, err error) {
@@ -350,19 +359,11 @@ func (c *packetConn) WriteMsgUDP(b, oob []byte, addr *net.UDPAddr) (n, oobn int,
 
 func (c *packetConn) WriteMsgUDPAddrPort(b, oob []byte, addrPort netip.AddrPort) (n, oobn int, err error) {
 	rawConnErr := c.conn.Write(func(fd uintptr) (done bool) {
-		var raw rawSockaddrAny
-		addr := addrPort.Addr()
-		port := addrPort.Port()
-		if addr.Is4() {
-			raw.family = syscall.AF_INET
-			ipv4 := addr.As4()
-			copy(raw.addr[:], ipv4[:])
-		} else {
-			raw.family = syscall.AF_INET6
-			ipv6 := addr.As16()
-			copy(raw.addr[:], ipv6[:])
+		var raw rawsocketaddr
+		if raw, err = netipaddrportToRaw(addrPort); err != nil {
+			return false
 		}
-		n, err = sendto(int(fd), [][]byte{b}, raw, int32(port), 0)
+		n, err = sendto(int(fd), [][]byte{b}, raw, 0)
 		return err != syscall.EAGAIN
 	})
 	if rawConnErr != nil {

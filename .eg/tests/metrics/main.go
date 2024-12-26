@@ -84,8 +84,17 @@ func TCPTest(ctx context.Context, op eg.Op) error {
 	return nil
 }
 
+func DNSTCPResolveTest(ctx context.Context, op eg.Op) error {
+	ip, err := net.ResolveTCPAddr("tcp", "www.google.com:443")
+	if err != nil {
+		return err
+	}
+	log.Println("IP ADDRESS", ip.IP, ip.Port)
+	return nil
+}
+
 func HTTPTest(ctx context.Context, op eg.Op) error {
-	rsp, err := http.Get("https://www.google.com")
+	rsp, err := http.Get("https://localhost:8080")
 	if err != nil {
 		return err
 	}
@@ -121,8 +130,9 @@ func main() {
 	err := eg.Perform(
 		ctx,
 		// Debug,
-		TCPTest,
-		HTTPTest,
+		DNSTCPResolveTest,
+		// TCPTest,
+		// HTTPTest,
 	)
 
 	if err != nil {

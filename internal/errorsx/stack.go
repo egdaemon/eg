@@ -136,6 +136,10 @@ func (st StackTrace) formatSlice(s fmt.State, verb rune) {
 	_, _ = io.WriteString(s, "]")
 }
 
+func Stack() *stack {
+	return callers()
+}
+
 // stack represents a stack of program counters.
 type stack []uintptr
 

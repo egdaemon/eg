@@ -150,6 +150,10 @@ func cacheid(ctx context.Context, root string, mdir string, cacheid hash.Hash, i
 	})
 }
 
+func (t Context) Temporary(path ...string) string {
+	return filepath.Join(t.TemporaryDir, filepath.Join(path...))
+}
+
 func PathRel(tctx Context, mdir string, current string) (path string, err error) {
 	if path, err = filepath.Rel(mdir, current); err != nil {
 		return "", err

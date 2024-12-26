@@ -20,6 +20,7 @@ func digest(b []byte) string {
 	d := md5.Sum(b)
 	return hex.EncodeToString(d[:])
 }
+
 func listentcp(network, address string) net.Listener {
 	li, err := net.Listen(network, address)
 	if err != nil {

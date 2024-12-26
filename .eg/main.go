@@ -7,8 +7,16 @@ import (
 	"github.com/egdaemon/eg/runtime/wasi/eg"
 	"github.com/egdaemon/eg/runtime/wasi/egenv"
 	"github.com/egdaemon/eg/runtime/wasi/eggit"
+	"github.com/egdaemon/eg/runtime/wasi/shell"
 	"github.com/egdaemon/eg/runtime/x/wasi/eggolang"
 )
+
+func TestNetwork(ctx context.Context, op eg.Op) error {
+	return shell.Run(
+		ctx,
+		shell.New("eg compute local tests/network"),
+	)
+}
 
 func main() {
 	log.SetFlags(log.Lshortfile | log.LUTC | log.Ltime)
@@ -30,6 +38,7 @@ func main() {
 					eggolang.TestOptionTags("no_duckdb_arrow"),
 				),
 			),
+			TestNetwork,
 		),
 	)
 

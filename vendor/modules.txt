@@ -122,12 +122,17 @@ github.com/ebitengine/purego/internal/strings
 ## explicit; go 1.23.4
 # github.com/egdaemon/wasinet v0.0.0-20241226171513-951ac3ecca85
 ## explicit; go 1.23.4
-github.com/egdaemon/wasinet
-github.com/egdaemon/wasinet/autohijack
-github.com/egdaemon/wasinet/ffi
-github.com/egdaemon/wasinet/internal/errorsx
-github.com/egdaemon/wasinet/internal/langx
-github.com/egdaemon/wasinet/wnetruntime
+# github.com/egdaemon/wasinet/wasinet v0.0.0-20241226204817-41c1a744d3ba
+## explicit; go 1.23.4
+github.com/egdaemon/wasinet/wasinet
+github.com/egdaemon/wasinet/wasinet/autohijack
+github.com/egdaemon/wasinet/wasinet/ffi
+github.com/egdaemon/wasinet/wasinet/internal/errorsx
+github.com/egdaemon/wasinet/wasinet/internal/langx
+github.com/egdaemon/wasinet/wasinet/wnetruntime
+# github.com/egdaemon/wasinet/wazeronet v0.0.0-20241226204817-41c1a744d3ba
+## explicit; go 1.23.4
+github.com/egdaemon/wasinet/wazeronet
 # github.com/emirpasic/gods v1.18.1
 ## explicit; go 1.2
 github.com/emirpasic/gods/containers

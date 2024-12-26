@@ -10,8 +10,8 @@ import (
 	"syscall"
 	"unsafe"
 
-	"github.com/egdaemon/wasinet/ffi"
-	"github.com/egdaemon/wasinet/internal/errorsx"
+	"github.com/egdaemon/wasinet/wasinet/ffi"
+	"github.com/egdaemon/wasinet/wasinet/internal/errorsx"
 )
 
 const (

@@ -9,8 +9,8 @@ import (
 	"syscall"
 	"unsafe"
 
-	"github.com/egdaemon/wasinet/ffi"
-	"github.com/egdaemon/wasinet/internal/errorsx"
+	"github.com/egdaemon/wasinet/wasinet/ffi"
+	"github.com/egdaemon/wasinet/wasinet/internal/errorsx"
 	"golang.org/x/sys/unix"
 )
 
@@ -95,7 +95,7 @@ func sock_getlocaladdr(fd int32, addrptr unsafe.Pointer, addrlen uint32) syscall
 	if err != nil {
 		return ffi.Errno(err)
 	}
-	addr, err := unixsockaddrToRaw(sa)
+	addr, err := Sockaddr(sa)
 	if err != nil {
 		return ffi.Errno(err)
 	}
@@ -113,7 +113,7 @@ func sock_getpeeraddr(fd int32, addrptr unsafe.Pointer, addrlen uint32) syscall.
 	if err != nil {
 		return ffi.Errno(err)
 	}
-	addr, err := unixsockaddrToRaw(sa)
+	addr, err := Sockaddr(sa)
 	if err != nil {
 		return ffi.Errno(err)
 	}
@@ -147,7 +147,7 @@ func sock_recv_from(
 			return ffi.Errno(err)
 		}
 
-		addr, err := unixsockaddrToRaw(sa)
+		addr, err := Sockaddr(sa)
 		if err != nil {
 			log.Println("failed", err)
 			return ffi.Errno(err)

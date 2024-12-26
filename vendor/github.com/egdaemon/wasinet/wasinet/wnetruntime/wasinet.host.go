@@ -1,16 +1,16 @@
 //go:build !wasip1
 
-package wasinet
+package wnetruntime
 
 import (
 	"context"
 	"log"
 	"net"
-	"strconv"
 	"syscall"
 	"unsafe"
 
-	"github.com/egdaemon/wasinet/ffi"
+	"github.com/egdaemon/wasinet/wasinet"
+	"github.com/egdaemon/wasinet/wasinet/ffi"
 	"golang.org/x/sys/unix"
 )
 
@@ -27,18 +27,6 @@ func DetermineHostAFFamily(wasi int32) (r int32) {
 	default:
 		return syscall.AF_INET
 	}
-}
-
-func readsockaddr(
-	m ffi.Memory, addr unsafe.Pointer, addrlen uint32,
-) (unix.Sockaddr, error) {
-	var wsa rawsocketaddr
-	wsaptr, _ := ffi.Pointer(&wsa)
-	if err := ffi.RawRead(m, ffi.Native{}, wsaptr, addr, addrlen); err != nil {
-		return nil, err
-	}
-
-	return unixsockaddr(wsa)
 }
 
 type OpenFn func(ctx context.Context, af, socktype, protocol int) (fd int, err error)
@@ -70,7 +58,7 @@ func SocketBind(bind BindFn) BindHostFn {
 		addr uintptr,
 		addrlen uint32,
 	) syscall.Errno {
-		sa, err := readsockaddr(m, unsafe.Pointer(addr), addrlen)
+		sa, err := wasinet.ReadSockaddr(m, unsafe.Pointer(addr), addrlen)
 		if err != nil {
 			return ffi.Errno(err)
 		}
@@ -89,7 +77,7 @@ func SocketConnect(fn ConnectFn) ConnectHostFn {
 		addr uintptr,
 		addrlen uint32,
 	) syscall.Errno {
-		sa, err := readsockaddr(m, unsafe.Pointer(addr), addrlen)
+		sa, err := wasinet.ReadSockaddr(m, unsafe.Pointer(addr), addrlen)
 		if err != nil {
 			return ffi.Errno(err)
 		}
@@ -146,7 +134,7 @@ func SocketSendTo(fn SendToFn) SendToHostFn {
 			return ffi.Errno(err)
 		}
 
-		sa, err := readsockaddr(m, unsafe.Pointer(addrptr), addrlen)
+		sa, err := wasinet.ReadSockaddr(m, unsafe.Pointer(addrptr), addrlen)
 		if err != nil {
 			log.Println("failed", err)
 			return ffi.Errno(err)
@@ -200,7 +188,7 @@ func SocketRecvFrom(fn RecvFromFn) RecvFromHostFn {
 			return ffi.Errno(err)
 		}
 
-		addr, err := unixsockaddrToRaw(sa)
+		addr, err := wasinet.Sockaddr(sa)
 		if err != nil {
 			return ffi.Errno(err)
 		}
@@ -290,7 +278,7 @@ func SocketLocalAddr(fn LocalAddrFn) LocalAddrHostFn {
 			return ffi.Errno(err)
 		}
 
-		addr, err := unixsockaddrToRaw(sa)
+		addr, err := wasinet.Sockaddr(sa)
 		if err != nil {
 			return ffi.Errno(err)
 		}
@@ -318,7 +306,7 @@ func SocketPeerAddr(fn PeerAddrFn) PeerAddrHostFn {
 		if err != nil {
 			return ffi.Errno(err)
 		}
-		addr, err := unixsockaddrToRaw(sa)
+		addr, err := wasinet.Sockaddr(sa)
 		if err != nil {
 			return ffi.Errno(err)
 		}
@@ -438,30 +426,5 @@ func SocketAddrIP(fn AddrIPFn) AddrIPHostFn {
 		}
 
 		return ffi.Errno(ffi.Uint32Write(m, unsafe.Pointer(ipreslen), uint32(len(buf))))
-	}
-}
-
-func unixsockaddrToRaw(sa unix.Sockaddr) (zero rawsocketaddr, error error) {
-	switch t := sa.(type) {
-	case *unix.SockaddrInet4:
-		a := sockipaddr[sockip4]{port: uint32(t.Port), addr: sockip4{ip: t.Addr}}
-		return a.sockaddr(), nil
-
-	case *unix.SockaddrInet6:
-		a := sockipaddr[sockip6]{port: uint32(t.Port), addr: sockip6{ip: t.Addr, zone: strconv.FormatUint(uint64(t.ZoneId), 10)}}
-		return a.sockaddr(), nil
-	case *unix.SockaddrUnix:
-		name := t.Name
-		if len(name) == 0 {
-			// For consistency across platforms, replace empty unix socket
-			// addresses with @. On Linux, addresses where the first byte is
-			// a null byte are considered abstract unix sockets, and the first
-			// byte is replaced with @.
-			name = "@"
-		}
-		return (&sockaddrUnix{name: name}).sockaddr(), nil
-	default:
-		log.Printf("unspoorted unix.Sockaddr: %T\n", t)
-		return zero, syscall.EINVAL
 	}
 }

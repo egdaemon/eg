@@ -11,7 +11,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/egdaemon/wasinet/internal/errorsx"
+	"github.com/egdaemon/wasinet/wasinet/internal/errorsx"
 )
 
 // Listen announces on the local network address.

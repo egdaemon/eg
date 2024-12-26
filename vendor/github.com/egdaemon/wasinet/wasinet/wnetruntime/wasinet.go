@@ -9,16 +9,37 @@ import (
 	"syscall"
 	"unsafe"
 
-	"github.com/egdaemon/wasinet/ffi"
-	"github.com/egdaemon/wasinet/internal/errorsx"
-	"github.com/egdaemon/wasinet/internal/langx"
+	"github.com/egdaemon/wasinet/wasinet/ffi"
+	"github.com/egdaemon/wasinet/wasinet/internal/errorsx"
+	"github.com/egdaemon/wasinet/wasinet/internal/langx"
 	"golang.org/x/sys/unix"
+)
+
+const (
+	Namespace = "wasinet_v0"
 )
 
 const (
 	WASI_AF_INET  = 2
 	WASI_AF_INET6 = 3
 )
+
+// Socket interface
+type Socket interface {
+	Open(ctx context.Context, af, socktype, protocol int) (fd int, err error)
+	Bind(ctx context.Context, fd int, sa unix.Sockaddr) error
+	Connect(ctx context.Context, fd int, sa unix.Sockaddr) error
+	Listen(ctx context.Context, fd, backlog int) error
+	LocalAddr(ctx context.Context, fd int) (unix.Sockaddr, error)
+	PeerAddr(ctx context.Context, fd int) (unix.Sockaddr, error)
+	SetSocketOption(ctx context.Context, fd int, level, name int, value []byte) error
+	GetSocketOption(ctx context.Context, fd int, level, name int, value []byte) (any, error)
+	Shutdown(ctx context.Context, fd, how int) error
+	AddrIP(ctx context.Context, network string, address string) ([]net.IP, error)
+	AddrPort(ctx context.Context, network string, service string) (int, error)
+	RecvFrom(ctx context.Context, fd int, vecs [][]byte, flags int) (int, int, unix.Sockaddr, error)
+	SendTo(ctx context.Context, fd int, sa unix.Sockaddr, vecs [][]byte, flags int) (int, error)
+}
 
 type IP interface {
 	Allow(...netip.Prefix) IP
@@ -33,7 +54,7 @@ func OptionAllow(cidrs ...netip.Prefix) Option {
 }
 
 // unrestricted network defaults.
-func Unrestricted(opts ...Option) *network {
+func Unrestricted(opts ...Option) Socket {
 	return langx.Autoptr(
 		langx.Clone(
 			network{},
@@ -44,7 +65,7 @@ func Unrestricted(opts ...Option) *network {
 
 // the network by default disallows all network activity. use unrestricted
 // or manually configure using options.
-func New(opts ...Option) *network {
+func New(opts ...Option) Socket {
 	return langx.Autoptr(langx.Clone(network{}, opts...))
 }
 

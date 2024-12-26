@@ -26,6 +26,11 @@ require (
 )
 
 require (
+	github.com/egdaemon/wasinet/wasinet v0.0.0-20241226204817-41c1a744d3ba // indirect
+	github.com/egdaemon/wasinet/wazeronet v0.0.0-20241226204817-41c1a744d3ba // indirect
+)
+
+require (
 	dario.cat/mergo v1.0.0 // indirect
 	github.com/Microsoft/go-winio v0.6.2 // indirect
 	github.com/ProtonMail/go-crypto v1.0.0 // indirect

@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"syscall"
 
-	"github.com/egdaemon/wasinet/ffi"
+	"github.com/egdaemon/wasinet/wasinet/ffi"
 )
 
 func resolveaddrip(op, network, address string) (res []net.IP, err error) {

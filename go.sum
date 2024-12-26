@@ -108,6 +108,8 @@ github.com/egdaemon/wasinet v0.0.0-20241226164554-07e13fd55579 h1:gTVP+tzT99+B4P
 github.com/egdaemon/wasinet v0.0.0-20241226164554-07e13fd55579/go.mod h1:Vrshfq2KHg5uxoEQ9/78v43gG+SSnOBU6vi3OHaa2EA=
 github.com/egdaemon/wasinet v0.0.0-20241226170644-ba71b938925b h1:G+pTO03rWd6xKBpiw7jEsk7MwAoeF04mEFbknepjxPE=
 github.com/egdaemon/wasinet v0.0.0-20241226170644-ba71b938925b/go.mod h1:Vrshfq2KHg5uxoEQ9/78v43gG+SSnOBU6vi3OHaa2EA=
+github.com/egdaemon/wasinet v0.0.0-20241226171513-951ac3ecca85 h1:06X0Xkv2i8xXeBJPEqz5pnieivLR08yVIEe37aSqj/M=
+github.com/egdaemon/wasinet v0.0.0-20241226171513-951ac3ecca85/go.mod h1:Vrshfq2KHg5uxoEQ9/78v43gG+SSnOBU6vi3OHaa2EA=
 github.com/elazarl/goproxy v0.0.0-20230808193330-2592e75ae04a h1:mATvB/9r/3gvcejNsXKSkQ6lcIaNec2nyfOdlTBR2lU=
 github.com/elazarl/goproxy v0.0.0-20230808193330-2592e75ae04a/go.mod h1:Ro8st/ElPeALwNFlcTpWmkr6IoMFfkjXAvTHpevnDsM=
 github.com/emirpasic/gods v1.18.1 h1:FXtiHYKDGKCW2KzwZKx0iC0PQmdlorYgdFG9jPXJ1Bc=

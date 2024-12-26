@@ -26,6 +26,7 @@ import (
 	"github.com/egdaemon/eg/internal/debugx"
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
+	"github.com/egdaemon/eg/internal/gitx"
 	"github.com/egdaemon/eg/internal/osx"
 	"github.com/egdaemon/eg/internal/stringsx"
 	"github.com/egdaemon/eg/internal/userx"
@@ -67,6 +68,7 @@ func main() {
 		Downloader         downloader                   `cmd:"" help:"downloader and command and control process for decoupling the daemon from the controller" hidden:"true"`
 		Compute            compute.Cmd                  `cmd:"" help:"commands for running compute workloads"`
 		Module             module                       `cmd:"" help:"executes a compiled module directly" hidden:"true"`
+		Wasi               wasiCmd                      `cmd:"" help:"run a standalone wasi module" hidden:"true"`
 		Daemon             daemon                       `cmd:"" help:"run in daemon mode letting the control plane push jobs to machines" hidden:"true"`
 		AgentManagement    actlcmd                      `cmd:"" name:"actl" help:"agent management commands"`
 		Register           accountcmds.Signup           `cmd:"" name:"register" help:"register with an account with eg"`
@@ -104,6 +106,7 @@ func main() {
 			"vars_console_endpoint":          eg.EnvConsoleHostDefault(),
 			"vars_tls_insecure_default":      eg.EnvTLSInsecure(),
 			"vars_cwd":                       osx.Getwd("."),
+			"vars_git_directory":             envx.String(gitx.DetectRoot(), "EG_GIT_REPOSITORY"),
 			"vars_runtime_directory":         userx.DefaultRuntimeDirectory(),
 			"vars_cache_directory":           userx.DefaultCacheDirectory(),
 			"vars_container_cache_directory": filepath.Join(userx.DefaultCacheDirectory(), "containers"),

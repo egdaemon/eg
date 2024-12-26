@@ -35,7 +35,7 @@ import (
 	"github.com/willabides/kongplete"
 
 	// ensure its a dependency.
-	_ "github.com/egdaemon/wasinet"
+	_ "github.com/egdaemon/wasinet/wasinet"
 )
 
 func machineID() string {

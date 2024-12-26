@@ -1,5 +1,5 @@
 package autowasinet
 
 import (
-	_ "github.com/egdaemon/wasinet/autohijack"
+	_ "github.com/egdaemon/wasinet/wasinet/autohijack"
 )

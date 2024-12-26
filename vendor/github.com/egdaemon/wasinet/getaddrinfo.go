@@ -9,6 +9,7 @@ import (
 )
 
 func resolveaddrip(op, network, address string) (res []net.IP, err error) {
+	// log.Println("resolveaddrip", network, address)
 	if ip := net.ParseIP(address); ip != nil {
 		return []net.IP{ip}, nil
 	}

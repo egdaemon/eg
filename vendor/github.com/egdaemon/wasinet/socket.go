@@ -33,13 +33,11 @@ func lookupAddr(_ context.Context, op, network, address string) ([]net.Addr, err
 
 	port, err := resolveport(network, service)
 	if err != nil {
-
 		return nil, os.NewSyscallError("resolveport", err)
 	}
 
 	ips, err := resolveaddrip(op, network, hostname)
 	if err != nil {
-
 		return nil, os.NewSyscallError("resolveaddrip", err)
 	}
 
@@ -61,6 +59,7 @@ func lookupAddr(_ context.Context, op, network, address string) ([]net.Addr, err
 
 func socket(af, sotype, proto int) (fd int, err error) {
 	var newfd int32 = -1
+	// log.Println("socket", af, sotype, proto)
 	errno := sock_open(int32(af), int32(sotype), int32(proto), unsafe.Pointer(&newfd))
 	if errno != 0 {
 		return -1, errno
@@ -203,12 +202,14 @@ type rawsocketaddr struct {
 }
 
 func recvfrom(fd int, iovs [][]byte, flags int32) (n int, addr rawsocketaddr, oflags int32, err error) {
-	iovsptr, iovslen := ffi.Slice(iovs)
-	addrptr, _ := ffi.Pointer(&addr)
+	vecs := ffi.SliceVector(iovs...)
+	iovsptr, iovslen := ffi.Slice(vecs)
+	addrptr, addrlen := ffi.Pointer(&addr)
+
 	errno := sock_recv_from(
 		int32(fd),
 		iovsptr, iovslen,
-		addrptr,
+		addrptr, addrlen,
 		flags,
 		unsafe.Pointer(&n),
 		unsafe.Pointer(&oflags),

@@ -47,7 +47,7 @@ func sock_getpeeraddr(fd int32, addr unsafe.Pointer, addrlen uint32) syscall.Err
 func sock_recv_from(
 	fd int32,
 	iovs unsafe.Pointer, iovslen uint32,
-	addrptr unsafe.Pointer,
+	addrptr unsafe.Pointer, _addrlen uint32,
 	iflags int32,
 	nread unsafe.Pointer,
 	oflags unsafe.Pointer,

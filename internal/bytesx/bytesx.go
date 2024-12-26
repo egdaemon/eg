@@ -1,9 +1,9 @@
 package bytesx
 
 import (
+	"crypto/md5"
+	"encoding/hex"
 	"fmt"
-
-	"github.com/egdaemon/eg/internal/md5x"
 )
 
 type Unit int64
@@ -49,11 +49,15 @@ const (
 type Debug []byte
 
 func (t Debug) Format(f fmt.State, verb rune) {
+	digest := func(b []byte) string {
+		d := md5.Sum(b)
+		return hex.EncodeToString(d[:])
+	}
 	switch verb {
 	case 's':
-		_, _ = f.Write([]byte(md5x.DigestHex(t)))
+		_, _ = f.Write([]byte(digest(t)))
 	case 'v':
-		_, _ = f.Write([]byte(md5x.DigestHex(t)))
+		_, _ = f.Write([]byte(digest(t)))
 		if f.Flag('+') {
 			_, _ = f.Write([]byte(" "))
 			_, _ = f.Write([]byte(fmt.Sprintf("%v", []byte(t))))

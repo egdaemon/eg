@@ -18,7 +18,6 @@ and be runtime agnostic while enabling network functionality within a guest wasi
 In the meantime, I'd like to thank the authors of [wazero](https://github.com/tetratelabs/wazero), and [dispatchrun/net](https://github.com/dispatchrun/net). both wonderful pieces of software and I shameless plumbed their depths when implementing this library.
 
 ### known missing functionality.
-- currently recvfrom, send_to functions are not implemented resulting in WriteMsgUnix,WriteMsgUDPAddrPort methods not working.
 - unix sockets are untested.
 - many socopts are untested.
 

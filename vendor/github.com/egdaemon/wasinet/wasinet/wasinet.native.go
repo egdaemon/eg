@@ -37,7 +37,7 @@ func unixsockaddr(v rawsocketaddr) (sa unix.Sockaddr, err error) {
 func sock_open(af int32, socktype int32, proto int32, fd unsafe.Pointer) syscall.Errno {
 	log.Println("sock_open", af, socktype, proto)
 	_fd, errno := unix.Socket(int(af), int(socktype), int(proto))
-	ffi.WriteInt32(fd, int32(_fd))
+	ffi.Int32Write(fd, int32(_fd))
 	return ffi.Errno(errno)
 }
 
@@ -80,7 +80,7 @@ func sock_setsockopt(fd int32, level uint32, name uint32, valueptr unsafe.Pointe
 		value := ffi.UnsafeClone[unix.Timeval](valueptr)
 		return ffi.Errno(unix.SetsockoptTimeval(int(fd), int(level), int(name), &value))
 	case syscall.SO_BINDTODEVICE: // this is untested.
-		value := errorsx.Must(ffi.ReadString(ffi.Native{}, valueptr, uint32(valuelen)))
+		value := errorsx.Must(ffi.StringRead(ffi.Native{}, valueptr, uint32(valuelen)))
 		return ffi.Errno(unix.SetsockoptString(int(fd), int(level), int(name), value))
 	default:
 		value := errorsx.Must(ffi.Uint32Read(ffi.Native{}, valueptr, valuelen))
@@ -133,7 +133,7 @@ func sock_recv_from(
 	nread unsafe.Pointer,
 	oflags unsafe.Pointer,
 ) syscall.Errno {
-	vecs := errorsx.Must(ffi.ReadSlice[[]byte](ffi.Native{}, iovs, iovslen))
+	vecs := errorsx.Must(ffi.SliceRead[[]byte](ffi.Native{}, iovs, iovslen))
 	for {
 		log.Println("recvMsgBuffers", fd, iflags)
 		n, _, roflags, sa, err := unix.RecvmsgBuffers(int(fd), vecs, nil, int(iflags))
@@ -179,12 +179,12 @@ func sock_send_to(
 	flags int32,
 	nwritten unsafe.Pointer,
 ) syscall.Errno {
-	vec, err := ffi.ReadSlice[ffi.Vector](ffi.Native{}, iovs, iovslen)
+	vec, err := ffi.SliceRead[ffi.Vector](ffi.Native{}, iovs, iovslen)
 	if err != nil {
 		return ffi.Errno(err)
 	}
 
-	vecs, err := ffi.ReadVector[byte](ffi.Native{}, vec...)
+	vecs, err := ffi.VectorRead[byte](ffi.Native{}, vec...)
 	if err != nil {
 		return ffi.Errno(err)
 	}
@@ -254,8 +254,8 @@ func sock_getaddrport(
 		port int
 	)
 
-	network := errorsx.Must(ffi.ReadString(ffi.Native{}, networkptr, networklen))
-	service := errorsx.Must(ffi.ReadString(ffi.Native{}, serviceptr, servicelen))
+	network := errorsx.Must(ffi.StringRead(ffi.Native{}, networkptr, networklen))
+	service := errorsx.Must(ffi.StringRead(ffi.Native{}, serviceptr, servicelen))
 
 	log.Println("sock_getaddrport", network, service)
 	if port, err = net.DefaultResolver.LookupPort(context.Background(), network, service); err != nil {

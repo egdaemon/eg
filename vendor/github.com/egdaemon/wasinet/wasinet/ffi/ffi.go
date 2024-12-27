@@ -20,7 +20,7 @@ type Memory interface {
 	WriteUint32Le(offset unsafe.Pointer, v uint32) bool
 }
 
-func ReadSlice[T any](m Memory, offset unsafe.Pointer, dlen uint32) (zero []T, err error) {
+func SliceRead[T any](m Memory, offset unsafe.Pointer, dlen uint32) (zero []T, err error) {
 	if binary, ok := m.Read(offset, dlen); !ok {
 		return zero, syscall.EFAULT
 	} else {
@@ -61,6 +61,10 @@ func RawWrite[T any](m Memory, v *T, dst unsafe.Pointer, dlen uint32) error {
 	return nil
 }
 
+func Uint32ReadNative(ptr unsafe.Pointer, len uint32) (uint32, error) {
+	return Uint32Read(Native{}, ptr, len)
+}
+
 func Uint32Read(m Memory, ptr unsafe.Pointer, dlen uint32) (uint32, error) {
 	if v, ok := m.ReadUint32Le(ptr); !ok {
 		return 0, syscall.EFAULT
@@ -85,7 +89,7 @@ func BytesWrite(m Memory, v []byte, dst unsafe.Pointer, dlen uint32) error {
 	return nil
 }
 
-func WriteInt32(dst unsafe.Pointer, src int32) {
+func Int32Write(dst unsafe.Pointer, src int32) {
 	*(*int32)(dst) = src
 }
 
@@ -98,7 +102,7 @@ type Vector struct {
 	Length uint32
 }
 
-func SliceVector[T any](eles ...[]T) []Vector {
+func VectorSlice[T any](eles ...[]T) []Vector {
 	iovsBuf := make([]Vector, 0, len(eles))
 	for _, iov := range eles {
 		iovsBuf = append(iovsBuf, Vector{
@@ -110,10 +114,10 @@ func SliceVector[T any](eles ...[]T) []Vector {
 	return iovsBuf
 }
 
-func ReadVector[T any](m Memory, eles ...Vector) ([][]T, error) {
+func VectorRead[T any](m Memory, eles ...Vector) ([][]T, error) {
 	r := make([][]T, 0, len(eles))
 	for _, v := range eles {
-		if v2, err := ReadSlice[T](m, unsafe.Pointer(v.Offset), v.Length); err != nil {
+		if v2, err := SliceRead[T](m, unsafe.Pointer(v.Offset), v.Length); err != nil {
 			return r, err
 		} else {
 			r = append(r, v2)
@@ -127,7 +131,11 @@ func Pointer[T any](s *T) (unsafe.Pointer, uint32) {
 	return unsafe.Pointer(s), uint32(unsafe.Sizeof(*s))
 }
 
-func ReadString(m Memory, offset unsafe.Pointer, len uint32) (string, error) {
+func StringReadNative(offset unsafe.Pointer, len uint32) (string, error) {
+	return StringRead(Native{}, offset, len)
+}
+
+func StringRead(m Memory, offset unsafe.Pointer, len uint32) (string, error) {
 	var (
 		ok   bool
 		data []byte

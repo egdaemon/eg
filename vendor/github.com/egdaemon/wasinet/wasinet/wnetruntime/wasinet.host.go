@@ -100,12 +100,12 @@ func SocketListen(fn ListenFn) ListenHostFn {
 }
 
 func vectorread[T any](m ffi.Memory, iovs uintptr, iovslen uint32) ([][]T, error) {
-	vec, err := ffi.ReadSlice[ffi.Vector](m, unsafe.Pointer(iovs), iovslen)
+	vec, err := ffi.SliceRead[ffi.Vector](m, unsafe.Pointer(iovs), iovslen)
 	if err != nil {
 		return nil, err
 	}
 
-	return ffi.ReadVector[T](m, vec...)
+	return ffi.VectorRead[T](m, vec...)
 }
 
 type SendToFn func(ctx context.Context, fd int, sa unix.Sockaddr, vecs [][]byte, flags int) (int, error)
@@ -352,11 +352,11 @@ func SocketAddrPort(portfn AddrPortFn) AddrPortHostFn {
 		log.Println("socket addrport initated")
 		defer log.Println("socket addport completed")
 
-		network, err := ffi.ReadString(m, unsafe.Pointer(networkptr), networklen)
+		network, err := ffi.StringRead(m, unsafe.Pointer(networkptr), networklen)
 		if err != nil {
 			return ffi.Errno(err)
 		}
-		service, err := ffi.ReadString(m, unsafe.Pointer(serviceptr), servicelen)
+		service, err := ffi.StringRead(m, unsafe.Pointer(serviceptr), servicelen)
 		if err != nil {
 			return ffi.Errno(err)
 		}
@@ -397,11 +397,11 @@ func SocketAddrIP(fn AddrIPFn) AddrIPHostFn {
 		log.Println("socket addrip initated")
 		defer log.Println("socket addrip completed")
 
-		network, err := ffi.ReadString(m, unsafe.Pointer(networkptr), networklen)
+		network, err := ffi.StringRead(m, unsafe.Pointer(networkptr), networklen)
 		if err != nil {
 			return ffi.Errno(err)
 		}
-		address, err := ffi.ReadString(m, unsafe.Pointer(addressptr), addresslen)
+		address, err := ffi.StringRead(m, unsafe.Pointer(addressptr), addresslen)
 		if err != nil {
 			return ffi.Errno(err)
 		}

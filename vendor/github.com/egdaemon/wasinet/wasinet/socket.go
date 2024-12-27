@@ -155,7 +155,7 @@ type sockipaddr[T any] struct {
 
 func (s sockipaddr[T]) sockaddr() rawsocketaddr {
 	ptr, plen := ffi.Pointer(&s)
-	buf := errorsx.Must(ffi.ReadSlice[byte](ffi.Native{}, ptr, plen))
+	buf := errorsx.Must(ffi.SliceRead[byte](ffi.Native{}, ptr, plen))
 	raddr := rawsocketaddr{}
 
 	switch x := any(s.addr).(type) {
@@ -187,7 +187,7 @@ type sockaddrUnix struct {
 
 func (s *sockaddrUnix) sockaddr() rawsocketaddr {
 	ptr, plen := ffi.Pointer(&s)
-	buf := errorsx.Must(ffi.ReadSlice[byte](ffi.Native{}, ptr, plen))
+	buf := errorsx.Must(ffi.SliceRead[byte](ffi.Native{}, ptr, plen))
 
 	raddr := rawsocketaddr{
 		family: uint16(sock_determine_host_af_family(syscall.AF_UNIX)),
@@ -202,7 +202,7 @@ type rawsocketaddr struct {
 }
 
 func recvfrom(fd int, iovs [][]byte, flags int32) (n int, addr rawsocketaddr, oflags int32, err error) {
-	vecs := ffi.SliceVector(iovs...)
+	vecs := ffi.VectorSlice(iovs...)
 	iovsptr, iovslen := ffi.Slice(vecs)
 	addrptr, addrlen := ffi.Pointer(&addr)
 
@@ -221,7 +221,7 @@ func recvfrom(fd int, iovs [][]byte, flags int32) (n int, addr rawsocketaddr, of
 }
 
 func sendto(fd int, iovs [][]byte, addr rawsocketaddr, flags int32) (int, error) {
-	vecs := ffi.SliceVector(iovs...)
+	vecs := ffi.VectorSlice(iovs...)
 	iovsptr, iovslen := ffi.Slice(vecs)
 	addrptr, addrlen := ffi.Pointer(&addr)
 
@@ -268,7 +268,11 @@ func netaddr(network string, ip net.IP, port int) net.Addr {
 	return nil
 }
 
-func newOpError(op string, addr net.Addr, err error) error {
+func netOpErr(op string, addr net.Addr, err error) error {
+	if err == nil {
+		return nil
+	}
+
 	return &net.OpError{
 		Op:   op,
 		Net:  addr.Network(),
@@ -277,10 +281,14 @@ func newOpError(op string, addr net.Addr, err error) error {
 	}
 }
 
-type netAddr struct{ network, address string }
+func unresolvedaddr(network, address string) net.Addr {
+	return &unresolvedaddress{network: network, address: address}
+}
 
-func (na *netAddr) Network() string { return na.address }
-func (na *netAddr) String() string  { return na.address }
+type unresolvedaddress struct{ network, address string }
+
+func (na *unresolvedaddress) Network() string { return na.network }
+func (na *unresolvedaddress) String() string  { return na.address }
 
 func setNonBlock(fd int) error {
 	if err := syscall.SetNonblock(fd, true); err != nil {

@@ -23,14 +23,13 @@ func Listen(network, address string) (net.Listener, error) {
 	}
 	addrs, err := lookupAddr(context.Background(), oplisten, network, address)
 	if err != nil {
-		addr := &netAddr{network, address}
-		return nil, listenErr(addr, err)
+		return nil, netOpErr(oplisten, unresolvedaddr(network, address), err)
 	}
 
 	firstaddr := addrs[0]
 
 	lstn, err := listenAddr(firstaddr)
-	return lstn, listenErr(firstaddr, err)
+	return lstn, netOpErr(oplisten, firstaddr, err)
 }
 
 // ListenPacket creates a listening packet connection.
@@ -42,25 +41,14 @@ func ListenPacket(network, address string) (net.PacketConn, error) {
 	}
 	addrs, err := lookupAddr(context.Background(), oplisten, network, address)
 	if err != nil {
-		addr := &netAddr{network, address}
-		return nil, listenErr(addr, err)
+		return nil, netOpErr(oplisten, unresolvedaddr(network, address), err)
 	}
 	conn, err := listenPacketAddr(addrs[0])
-	if err != nil {
-		return nil, listenErr(addrs[0], err)
-	}
-	return conn, nil
+	return conn, netOpErr(oplisten, addrs[0], err)
 }
 
 func unsupportedNetwork(network, address string) error {
 	return fmt.Errorf("unsupported network: %s://%s", network, address)
-}
-
-func listenErr(addr net.Addr, err error) error {
-	if err == nil {
-		return nil
-	}
-	return newOpError("listen", addr, err)
 }
 
 func listenAddr(addr net.Addr) (net.Listener, error) {

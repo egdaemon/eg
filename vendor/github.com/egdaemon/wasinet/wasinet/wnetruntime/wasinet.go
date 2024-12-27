@@ -4,6 +4,8 @@ package wnetruntime
 
 import (
 	"context"
+	"fmt"
+	"log/slog"
 	"net"
 	"net/netip"
 	"syscall"
@@ -74,32 +76,32 @@ type network struct {
 }
 
 func (t network) Open(ctx context.Context, af, socktype, protocol int) (fd int, err error) {
-	// log.Println("sock_open", af, socktype, protocol)
+	slog.Log(ctx, slog.LevelDebug, "sock_open", slog.Int("af", af), slog.Int("socktype", socktype), slog.Int("protocol", protocol))
 	return unix.Socket(af, socktype, protocol)
 }
 
 func (t network) Bind(ctx context.Context, fd int, sa unix.Sockaddr) error {
-	// log.Println("sock_bind", fd, sa)
+	slog.Log(ctx, slog.LevelDebug, "sock_bind", slog.Int("fd", fd), slog.String("addr", fmt.Sprintf("%v", sa)))
 	return unix.Bind(fd, sa)
 }
 
 func (t network) Connect(ctx context.Context, fd int, sa unix.Sockaddr) error {
-	// log.Println("sock_connect", fd, sa)
+	slog.Log(ctx, slog.LevelDebug, "sock_connect", slog.Int("fd", fd), slog.String("addr", fmt.Sprintf("%v", sa)))
 	return unix.Connect(fd, sa)
 }
 
 func (t network) Listen(ctx context.Context, fd, backlog int) error {
-	// log.Println("sock_listen", fd, backlog)
+	slog.Log(ctx, slog.LevelDebug, "sock_listen", slog.Int("fd", fd), slog.Int("backlog", backlog))
 	return unix.Listen(fd, backlog)
 }
 
 func (t network) LocalAddr(ctx context.Context, fd int) (unix.Sockaddr, error) {
-	// log.Println("sock_localaddr", fd)
+	slog.Log(ctx, slog.LevelDebug, "sock_localaddr", slog.Int("fd", fd))
 	return unix.Getsockname(fd)
 }
 
 func (t network) PeerAddr(ctx context.Context, fd int) (unix.Sockaddr, error) {
-	// log.Println("sock_peeraddr", fd)
+	slog.Log(ctx, slog.LevelDebug, "sock_peeraddr", slog.Int("fd", fd))
 	return unix.Getpeername(fd)
 }
 
@@ -113,11 +115,12 @@ func (t network) SetSocketOption(ctx context.Context, fd int, level, name int, v
 		}
 		return unix.SetsockoptTimeval(fd, level, name, v)
 	case syscall.SO_BINDTODEVICE: // this is untested.
+		value := errorsx.Must(ffi.StringReadNative(ffi.Slice(value)))
+		slog.Log(ctx, slog.LevelDebug, "sock_setsockopt_string", slog.Int("fd", fd), slog.Int("level", level), slog.Int("name", name), slog.String("value", value))
 		return ffi.Errno(unix.SetsockoptString(fd, level, name, string(value)))
 	default:
-		valueptr, valueptrlen := ffi.Slice(value)
-		value := errorsx.Must(ffi.Uint32Read(ffi.Native{}, valueptr, valueptrlen))
-		// log.Println("sock_setsockopt", fd, level, name, value)
+		value := errorsx.Must(ffi.Uint32ReadNative(ffi.Slice(value)))
+		slog.Log(ctx, slog.LevelDebug, "sock_setsockopt_int", slog.Int("fd", fd), slog.Int("level", level), slog.Int("name", name), slog.Uint64("value", uint64(value)))
 		return ffi.Errno(unix.SetsockoptInt(fd, level, name, int(value)))
 	}
 }
@@ -134,22 +137,23 @@ func (t network) GetSocketOption(ctx context.Context, fd int, level, name int, v
 }
 
 func (t network) Shutdown(ctx context.Context, fd, how int) error {
+	slog.Log(ctx, slog.LevelDebug, "sock_Shutdown", slog.Int("fd", fd), slog.Int("how", how))
 	return unix.Shutdown(fd, how)
 }
 
 func (t network) AddrIP(ctx context.Context, network string, address string) ([]net.IP, error) {
-	// log.Println("sock_getaddrip", network, address)
+	slog.Log(ctx, slog.LevelDebug, "sock_getaddrip", slog.String("network", network), slog.String("address", address))
 	return net.DefaultResolver.LookupIP(ctx, network, address)
 }
 
 func (t network) AddrPort(ctx context.Context, network string, service string) (int, error) {
-	// log.Println("sock_getaddrport", network, service)
+	slog.Log(ctx, slog.LevelDebug, "sock_getaddrport", slog.String("network", network), slog.String("service", service))
 	return net.DefaultResolver.LookupPort(ctx, network, service)
 }
 
 func (t network) RecvFrom(ctx context.Context, fd int, vecs [][]byte, flags int) (int, int, unix.Sockaddr, error) {
 	for {
-		// log.Println("recvMsgBuffers", fd, flags)
+		slog.Log(ctx, slog.LevelDebug, "recvMsgBuffers", slog.Int("fd", fd), slog.Int("flags", flags))
 		n, _, roflags, sa, err := unix.RecvmsgBuffers(fd, vecs, nil, flags)
 		if err == nil {
 			return n, roflags, sa, nil

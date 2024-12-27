@@ -99,7 +99,7 @@ func DNSTCPResolveTest(ctx context.Context, op eg.Op) error {
 }
 
 func HTTPTest(ctx context.Context, op eg.Op) error {
-	rsp, err := http.Get("https://www.google.com")
+	rsp, err := http.Get("https://egdaemon.com")
 	if err != nil {
 		return err
 	}

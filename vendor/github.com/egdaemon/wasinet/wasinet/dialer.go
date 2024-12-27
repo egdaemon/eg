@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net"
 	"os"
 	"syscall"
@@ -36,30 +37,29 @@ func (d *Dialer) Dial(network, address string) (net.Conn, error) {
 func (d *Dialer) DialContext(ctx context.Context, network, address string) (net.Conn, error) {
 	timeout := d.Timeout
 	if !d.Deadline.IsZero() {
-		deadline := time.Until(d.Deadline)
-		if timeout == 0 || deadline < timeout {
-			timeout = deadline
-		}
+		dl := max(0, time.Until(d.Deadline))
+		timeout = min(max(d.Timeout, dl), dl)
 	}
+
 	if timeout > 0 {
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithTimeout(ctx, timeout)
 		defer cancel()
 	}
 	if d.LocalAddr != nil {
-		println("wasip1.Dialer: LocalAddr not yet supported on GOOS=wasip1")
+		slog.WarnContext(ctx, "wasip1.Dialer: LocalAddr not yet supported on GOOS=wasip1")
 	}
 	if d.Resolver != nil {
-		println("wasip1.Dialer: Resolver ignored because it is not supported on GOOS=wasip1")
+		slog.WarnContext(ctx, "wasip1.Dialer: Resolver ignored because it is not supported on GOOS=wasip1")
 	}
 	if d.Cancel != nil {
-		println("wasip1.Dialer: Cancel channel not implemented on GOOS=wasip1")
+		slog.WarnContext(ctx, "wasip1.Dialer: Cancel channel not implemented on GOOS=wasip1")
 	}
 	if d.Control != nil {
-		println("wasip1.Dialer: Control function not yet supported on GOOS=wasip1")
+		slog.WarnContext(ctx, "wasip1.Dialer: Control function not yet supported on GOOS=wasip1")
 	}
 	if d.ControlContext != nil {
-		println("wasip1.Dialer: ControlContext function not yet supported on GOOS=wasip1")
+		slog.WarnContext(ctx, "wasip1.Dialer: ControlContext function not yet supported on GOOS=wasip1")
 	}
 	// TOOD:
 	// - use LocalAddr to bind to a socket prior to establishing the connection
@@ -78,8 +78,7 @@ func Dial(network, address string) (net.Conn, error) {
 func DialContext(ctx context.Context, network, address string) (net.Conn, error) {
 	addrs, err := lookupAddr(ctx, opdial, network, address)
 	if err != nil {
-		addr := &netAddr{network, address}
-		return nil, dialErr(addr, err)
+		return nil, netOpErr(opdial, unresolvedaddr(network, address), err)
 	}
 	var addr net.Addr
 	var conn net.Conn
@@ -88,16 +87,13 @@ func DialContext(ctx context.Context, network, address string) (net.Conn, error)
 		if err == nil {
 			return conn, nil
 		}
+
 		if ctx.Err() != nil {
 			break
 		}
 	}
 
-	return nil, dialErr(addr, err)
-}
-
-func dialErr(addr net.Addr, err error) error {
-	return newOpError("dial", addr, err)
+	return nil, netOpErr(opdial, unresolvedaddr(network, address), err)
 }
 
 func dialAddr(ctx context.Context, addr net.Addr) (net.Conn, error) {
@@ -116,6 +112,10 @@ func dialAddr(ctx context.Context, addr net.Addr) (net.Conn, error) {
 			syscall.Close(fd)
 		}
 	}()
+
+	// if err := setNonBlock(fd); err != nil {
+	// 	return nil, err
+	// }
 
 	if sotype == syscall.SOCK_DGRAM && af != syscall.AF_UNIX {
 		if err := setsockopt(fd, SOL_SOCKET, SO_BROADCAST, 1); err != nil {

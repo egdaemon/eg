@@ -14,11 +14,20 @@ import (
 
 	"github.com/egdaemon/eg/runtime/wasi/eg"
 	"github.com/egdaemon/eg/runtime/wasi/egenv"
+	"github.com/egdaemon/eg/runtime/wasi/shell"
 )
 
 func digest(b []byte) string {
 	d := md5.Sum(b)
 	return hex.EncodeToString(d[:])
+}
+
+func DNSDebug(ctx context.Context, _ eg.Op) (err error) {
+	return shell.Run(
+		ctx,
+		shell.Newf("systemctl status systemd-resolved.service"),
+		shell.New("ss -t -l -n -p"),
+	)
 }
 
 func listentcp(network, address string) net.Listener {
@@ -90,7 +99,7 @@ func DNSTCPResolveTest(ctx context.Context, op eg.Op) error {
 }
 
 func HTTPTest(ctx context.Context, op eg.Op) error {
-	rsp, err := http.Get("https://localhost:8080")
+	rsp, err := http.Get("https://www.google.com")
 	if err != nil {
 		return err
 	}
@@ -158,6 +167,7 @@ func main() {
 
 	err := eg.Perform(
 		ctx,
+		DNSDebug,
 		DNSTCPResolveTest,
 		TCPTest,
 		HTTPTest,

@@ -60,7 +60,7 @@ func Builder(name string, distro string) eg.ContainerRunner {
 		OptionEnv("GOCACHE", egenv.CacheDirectory("golang")).
 		OptionEnv("GOMODCACHE", egenv.CacheDirectory("golang", "mod")).
 		OptionVolumeWritable(
-			".eg/.cache/.dist", "/opt/eg/.dist",
+			egenv.CacheDirectory(".dist"), "/opt/eg/.dist",
 		).
 		OptionVolume(
 			".dist/deb", "/opt/eg/.dist/deb",

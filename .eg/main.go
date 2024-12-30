@@ -22,7 +22,6 @@ func main() {
 	log.SetFlags(log.Lshortfile | log.LUTC | log.Ltime)
 	ctx, done := context.WithTimeout(context.Background(), egenv.TTL())
 	defer done()
-
 	c1 := eg.Container("eg.ubuntu.24.10")
 	err := eg.Perform(
 		ctx,
@@ -38,7 +37,7 @@ func main() {
 					eggolang.TestOptionTags("no_duckdb_arrow"),
 				),
 			),
-			// TestNetwork,// TODO
+			// TestNetwork, // TODO
 		),
 	)
 

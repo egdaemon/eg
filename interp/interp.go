@@ -26,9 +26,12 @@ import (
 	"github.com/egdaemon/eg/interp/runtime/wasi/ffigraph"
 	"github.com/egdaemon/eg/interp/runtime/wasi/ffimetric"
 	"github.com/egdaemon/eg/interp/runtime/wasi/ffiwasinet"
+	"github.com/egdaemon/eg/interp/wasidebug"
 	"github.com/egdaemon/eg/runners"
 	"github.com/gofrs/uuid"
 	"github.com/tetratelabs/wazero"
+	"github.com/tetratelabs/wazero/experimental"
+	"github.com/tetratelabs/wazero/experimental/logging"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
 	"google.golang.org/grpc"
 )
@@ -153,6 +156,7 @@ type runner struct {
 }
 
 func (t runner) perform(ctx context.Context, runid, path string, rtb runtimefn) (err error) {
+	tracedebug := envx.Boolean(false, eg.EnvLogsTrace)
 	hostcachedir := filepath.Join(t.runtimedir, "cache")
 	tmpdir, err := os.MkdirTemp(t.runtimedir, ".tmp.*")
 	if err != nil {
@@ -174,6 +178,11 @@ func (t runner) perform(ctx context.Context, runid, path string, rtb runtimefn) 
 		return err
 	}
 	defer cache.Close(ctx)
+
+	if tracedebug {
+		ctx = experimental.WithFunctionListenerFactory(ctx,
+			logging.NewHostLoggingListenerFactory(os.Stderr, logging.LogScopeAll))
+	}
 
 	// Create a new WebAssembly Runtime.
 	runtime := wazero.NewRuntimeWithConfig(
@@ -264,6 +273,10 @@ func (t runner) perform(ctx context.Context, runid, path string, rtb runtimefn) 
 	}
 	defer wasinet.Close(ctx)
 
+	if tracedebug {
+		wasidebug.Host(wasinet)
+	}
+
 	hostenv, err := rtb(t, cmdenv, runtime.NewHostModuleBuilder("env")).
 		Instantiate(ctx)
 	if err != nil {
@@ -271,7 +284,9 @@ func (t runner) perform(ctx context.Context, runid, path string, rtb runtimefn) 
 	}
 	defer hostenv.Close(ctx)
 
-	// wasidebug.Host(wasinet)
+	if tracedebug {
+		wasidebug.Host(hostenv)
+	}
 
 	log.Println("interp initiated", path)
 	defer log.Println("interp completed", path)

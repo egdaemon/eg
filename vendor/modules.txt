@@ -117,7 +117,7 @@ github.com/ebitengine/purego
 github.com/ebitengine/purego/internal/cgo
 github.com/ebitengine/purego/internal/fakecgo
 github.com/ebitengine/purego/internal/strings
-# github.com/egdaemon/wasinet/wasinet v0.0.0-20241230023724-45d424a87294
+# github.com/egdaemon/wasinet/wasinet v0.0.0-20241230124507-2a54ddc9c245
 ## explicit; go 1.23.4
 github.com/egdaemon/wasinet/wasinet
 github.com/egdaemon/wasinet/wasinet/autohijack
@@ -129,7 +129,7 @@ github.com/egdaemon/wasinet/wasinet/internal/langx
 github.com/egdaemon/wasinet/wasinet/stdlib/wasip1net
 github.com/egdaemon/wasinet/wasinet/stdlib/wasip1syscall
 github.com/egdaemon/wasinet/wasinet/wnetruntime
-# github.com/egdaemon/wasinet/wazeronet v0.0.0-20241230023724-45d424a87294
+# github.com/egdaemon/wasinet/wazeronet v0.0.0-20241230124507-2a54ddc9c245
 ## explicit; go 1.23.4
 github.com/egdaemon/wasinet/wazeronet
 # github.com/emirpasic/gods v1.18.1
@@ -398,8 +398,11 @@ github.com/skeema/knownhosts
 github.com/tetratelabs/wazero
 github.com/tetratelabs/wazero/api
 github.com/tetratelabs/wazero/experimental
+github.com/tetratelabs/wazero/experimental/logging
 github.com/tetratelabs/wazero/experimental/sys
 github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1
+github.com/tetratelabs/wazero/internal/assemblyscript
+github.com/tetratelabs/wazero/internal/assemblyscript/logging
 github.com/tetratelabs/wazero/internal/descriptor
 github.com/tetratelabs/wazero/internal/engine/interpreter
 github.com/tetratelabs/wazero/internal/engine/wazevo
@@ -416,6 +419,7 @@ github.com/tetratelabs/wazero/internal/fsapi
 github.com/tetratelabs/wazero/internal/ieee754
 github.com/tetratelabs/wazero/internal/internalapi
 github.com/tetratelabs/wazero/internal/leb128
+github.com/tetratelabs/wazero/internal/logging
 github.com/tetratelabs/wazero/internal/moremath
 github.com/tetratelabs/wazero/internal/platform
 github.com/tetratelabs/wazero/internal/sock
@@ -425,6 +429,7 @@ github.com/tetratelabs/wazero/internal/u32
 github.com/tetratelabs/wazero/internal/u64
 github.com/tetratelabs/wazero/internal/version
 github.com/tetratelabs/wazero/internal/wasip1
+github.com/tetratelabs/wazero/internal/wasip1/logging
 github.com/tetratelabs/wazero/internal/wasm
 github.com/tetratelabs/wazero/internal/wasm/binary
 github.com/tetratelabs/wazero/internal/wasmdebug

@@ -4,6 +4,9 @@ package wazeronet
 
 import (
 	"context"
+	"log"
+	"log/slog"
+	"os"
 
 	"github.com/egdaemon/wasinet/wasinet/wnetruntime"
 	"github.com/tetratelabs/wazero"
@@ -11,6 +14,10 @@ import (
 )
 
 func Module(runtime wazero.Runtime, wnet wnetruntime.Socket) wazero.HostModuleBuilder {
+	slog.SetLogLoggerLevel(slog.LevelDebug)
+	log.SetFlags(log.Flags() | log.Lshortfile)
+	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{AddSource: true})))
+	log.SetFlags(log.Lshortfile)
 	return runtime.NewHostModuleBuilder(wnetruntime.Namespace).
 		NewFunctionBuilder().WithFunc(func(
 		ctx context.Context,
@@ -83,6 +90,7 @@ func Module(runtime wazero.Runtime, wnet wnetruntime.Socket) wazero.HostModuleBu
 		addr uint32,
 		addrlen uint32,
 	) uint32 {
+		log.Println("sock-getlocaladdr")
 		return uint32(wnetruntime.SocketLocalAddr(wnet.LocalAddr)(ctx, Memory(m.Memory()), fd, uintptr(addr), addrlen))
 	}).Export("sock_getlocaladdr").
 		NewFunctionBuilder().WithFunc(func(
@@ -118,27 +126,34 @@ func Module(runtime wazero.Runtime, wnet wnetruntime.Socket) wazero.HostModuleBu
 		m api.Module,
 		fd int32,
 		iovs uint32, iovslen uint32,
+		oobptr uint32, ooblen uint32,
 		addrptr uint32, addrlen uint32,
 		iflags int32,
 		nreadptr uint32,
 		oflagsptr uint32,
 	) uint32 {
-		return uint32(wnetruntime.SocketRecvFrom(wnet.RecvFrom)(ctx, Memory(m.Memory()), fd, uintptr(iovs), iovslen, uintptr(addrptr), addrlen, iflags, uintptr(nreadptr), uintptr(oflagsptr)))
+		return uint32(wnetruntime.SocketRecvFrom(wnet.RecvFrom)(ctx, Memory(m.Memory()), fd, uintptr(iovs), iovslen, uintptr(oobptr), ooblen, uintptr(addrptr), addrlen, iflags, uintptr(nreadptr), uintptr(oflagsptr)))
 	}).Export("sock_recv_from").
 		NewFunctionBuilder().WithFunc(func(
 		ctx context.Context,
 		m api.Module,
 		fd int32,
 		iovsptr uint32, iovslen uint32,
+		oobptr uint32, ooblen uint32,
 		addrptr uint32, addrlen uint32,
 		flags int32,
 		nwritten uint32,
 	) uint32 {
-		return uint32(wnetruntime.SocketSendTo(wnet.SendTo)(ctx, Memory(m.Memory()), fd, uintptr(iovsptr), iovslen, uintptr(addrptr), addrlen, flags, uintptr(nwritten)))
+		return uint32(wnetruntime.SocketSendTo(wnet.SendTo)(ctx, Memory(m.Memory()), fd, uintptr(iovsptr), iovslen, uintptr(oobptr), ooblen, uintptr(addrptr), addrlen, flags, uintptr(nwritten)))
 	}).Export("sock_send_to").
 		NewFunctionBuilder().WithFunc(func(
 		ctx context.Context, m api.Module, fd, how int32,
 	) uint32 {
 		return uint32(wnetruntime.SocketShutdown(wnet.Shutdown)(ctx, Memory(m.Memory()), fd, how))
-	}).Export("sock_shutdown")
+	}).Export("sock_shutdown").
+		NewFunctionBuilder().WithFunc(func(
+		ctx context.Context, m api.Module, fd int32, nfd uint32, addrptr uint32, addrlen uint32,
+	) uint32 {
+		return uint32(wnetruntime.SocketAccept(wnet.Accept)(ctx, Memory(m.Memory()), fd, uintptr(nfd), uintptr(addrptr), addrlen))
+	}).Export("sock_accept")
 }

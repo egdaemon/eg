@@ -117,15 +117,19 @@ github.com/ebitengine/purego
 github.com/ebitengine/purego/internal/cgo
 github.com/ebitengine/purego/internal/fakecgo
 github.com/ebitengine/purego/internal/strings
-# github.com/egdaemon/wasinet/wasinet v0.0.0-20241227132529-9edff2b9db4a
+# github.com/egdaemon/wasinet/wasinet v0.0.0-20241230023724-45d424a87294
 ## explicit; go 1.23.4
 github.com/egdaemon/wasinet/wasinet
 github.com/egdaemon/wasinet/wasinet/autohijack
 github.com/egdaemon/wasinet/wasinet/ffi
+github.com/egdaemon/wasinet/wasinet/ffierrors
+github.com/egdaemon/wasinet/wasinet/ffiguest
 github.com/egdaemon/wasinet/wasinet/internal/errorsx
 github.com/egdaemon/wasinet/wasinet/internal/langx
+github.com/egdaemon/wasinet/wasinet/stdlib/wasip1net
+github.com/egdaemon/wasinet/wasinet/stdlib/wasip1syscall
 github.com/egdaemon/wasinet/wasinet/wnetruntime
-# github.com/egdaemon/wasinet/wazeronet v0.0.0-20241227132529-9edff2b9db4a
+# github.com/egdaemon/wasinet/wazeronet v0.0.0-20241230023724-45d424a87294
 ## explicit; go 1.23.4
 github.com/egdaemon/wasinet/wazeronet
 # github.com/emirpasic/gods v1.18.1

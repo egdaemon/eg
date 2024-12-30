@@ -89,8 +89,12 @@ func BytesWrite(m Memory, v []byte, dst unsafe.Pointer, dlen uint32) error {
 	return nil
 }
 
-func Int32Write(dst unsafe.Pointer, src int32) {
-	*(*int32)(dst) = src
+func Int32Write(m Memory, dst unsafe.Pointer, v int32) error {
+	if !m.WriteUint32Le(dst, uint32(v)) {
+		return syscall.EFAULT
+	}
+
+	return nil
 }
 
 func UnsafeClone[T any](ptr unsafe.Pointer) T {

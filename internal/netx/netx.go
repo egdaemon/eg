@@ -119,7 +119,7 @@ func (t debugpacketconn) Write(b []byte) (n int, err error) {
 }
 
 func (t debugpacketconn) ReadFrom(b []byte) (n int, addr net.Addr, err error) {
-	log.Println("net.PacketConn.ReadFrom initiated ", fmt.Sprintf(t.format, bytesx.Debug(b)))
+	log.Println("net.PacketConn.ReadFrom initiated", fmt.Sprintf(t.format, bytesx.Debug(b)))
 	defer func() {
 		result := "completed"
 		if err != nil {

@@ -9,9 +9,9 @@ import (
 	"net"
 	"net/netip"
 	"syscall"
-	"unsafe"
 
 	"github.com/egdaemon/wasinet/wasinet/ffi"
+	"github.com/egdaemon/wasinet/wasinet/ffierrors"
 	"github.com/egdaemon/wasinet/wasinet/internal/errorsx"
 	"github.com/egdaemon/wasinet/wasinet/internal/langx"
 	"golang.org/x/sys/unix"
@@ -32,6 +32,7 @@ type Socket interface {
 	Bind(ctx context.Context, fd int, sa unix.Sockaddr) error
 	Connect(ctx context.Context, fd int, sa unix.Sockaddr) error
 	Listen(ctx context.Context, fd, backlog int) error
+	Accept(ctx context.Context, fd int) (nfd int, sa unix.Sockaddr, err error)
 	LocalAddr(ctx context.Context, fd int) (unix.Sockaddr, error)
 	PeerAddr(ctx context.Context, fd int) (unix.Sockaddr, error)
 	SetSocketOption(ctx context.Context, fd int, level, name int, value []byte) error
@@ -39,8 +40,8 @@ type Socket interface {
 	Shutdown(ctx context.Context, fd, how int) error
 	AddrIP(ctx context.Context, network string, address string) ([]net.IP, error)
 	AddrPort(ctx context.Context, network string, service string) (int, error)
-	RecvFrom(ctx context.Context, fd int, vecs [][]byte, flags int) (int, int, unix.Sockaddr, error)
-	SendTo(ctx context.Context, fd int, sa unix.Sockaddr, vecs [][]byte, flags int) (int, error)
+	RecvFrom(ctx context.Context, fd int, vecs [][]byte, oob []byte, flags int) (int, int, unix.Sockaddr, error)
+	SendTo(ctx context.Context, fd int, sa unix.Sockaddr, vecs [][]byte, oob []byte, flags int) (int, error)
 }
 
 type IP interface {
@@ -77,7 +78,9 @@ type network struct {
 
 func (t network) Open(ctx context.Context, af, socktype, protocol int) (fd int, err error) {
 	slog.Log(ctx, slog.LevelDebug, "sock_open", slog.Int("af", af), slog.Int("socktype", socktype), slog.Int("protocol", protocol))
-	return unix.Socket(af, socktype, protocol)
+	// syscall.SOCK_NONBLOCK|syscall.SOCK_CLOEXEC are required by golang's runtime for the pollfd to operate correctly.
+	// as a result we unconditionally set them here.
+	return unix.Socket(af, socktype|syscall.SOCK_NONBLOCK|syscall.SOCK_CLOEXEC, protocol)
 }
 
 func (t network) Bind(ctx context.Context, fd int, sa unix.Sockaddr) error {
@@ -85,7 +88,7 @@ func (t network) Bind(ctx context.Context, fd int, sa unix.Sockaddr) error {
 	return unix.Bind(fd, sa)
 }
 
-func (t network) Connect(ctx context.Context, fd int, sa unix.Sockaddr) error {
+func (t network) Connect(ctx context.Context, fd int, sa unix.Sockaddr) (err error) {
 	slog.Log(ctx, slog.LevelDebug, "sock_connect", slog.Int("fd", fd), slog.String("addr", fmt.Sprintf("%v", sa)))
 	return unix.Connect(fd, sa)
 }
@@ -95,33 +98,41 @@ func (t network) Listen(ctx context.Context, fd, backlog int) error {
 	return unix.Listen(fd, backlog)
 }
 
+func (t network) Accept(ctx context.Context, fd int) (nfd int, sa unix.Sockaddr, err error) {
+	slog.Log(ctx, slog.LevelDebug, "sock_accept", slog.Int("fd", fd))
+	return unix.Accept(fd)
+}
+
 func (t network) LocalAddr(ctx context.Context, fd int) (unix.Sockaddr, error) {
 	slog.Log(ctx, slog.LevelDebug, "sock_localaddr", slog.Int("fd", fd))
 	return unix.Getsockname(fd)
 }
 
-func (t network) PeerAddr(ctx context.Context, fd int) (unix.Sockaddr, error) {
+func (t network) PeerAddr(ctx context.Context, fd int) (_ unix.Sockaddr, err error) {
 	slog.Log(ctx, slog.LevelDebug, "sock_peeraddr", slog.Int("fd", fd))
 	return unix.Getpeername(fd)
 }
 
 func (t network) SetSocketOption(ctx context.Context, fd int, level, name int, value []byte) error {
 	switch name {
-	case syscall.SO_LINGER: // this is untested.
+	case syscall.SO_LINGER, syscall.SO_RCVTIMEO, syscall.SO_SNDTIMEO:
 		v := &unix.Timeval{}
-		tvptr, tvlen := ffi.Pointer(v)
-		if err := ffi.RawRead(ffi.Native{}, ffi.Native{}, tvptr, unsafe.Pointer(&value), tvlen); err != nil {
-			return ffi.Errno(err)
+		vptr, vlen := ffi.Slice(value)
+		tvptr, _ := ffi.Pointer(v)
+		if err := ffi.RawRead(ffi.Native{}, ffi.Native{}, tvptr, vptr, vlen); err != nil {
+			return err
 		}
-		return unix.SetsockoptTimeval(fd, level, name, v)
+		errno := unix.SetsockoptTimeval(fd, level, name, v)
+		slog.Log(ctx, slog.LevelDebug, "sock_setsockopt_timeval", slog.Int("fd", fd), slog.Int("level", level), slog.Int("name", name), slog.Any("value", v), slog.Int("errno", int(ffierrors.Errno(errno))))
+		return errno
 	case syscall.SO_BINDTODEVICE: // this is untested.
 		value := errorsx.Must(ffi.StringReadNative(ffi.Slice(value)))
 		slog.Log(ctx, slog.LevelDebug, "sock_setsockopt_string", slog.Int("fd", fd), slog.Int("level", level), slog.Int("name", name), slog.String("value", value))
-		return ffi.Errno(unix.SetsockoptString(fd, level, name, string(value)))
+		return unix.SetsockoptString(fd, level, name, string(value))
 	default:
 		value := errorsx.Must(ffi.Uint32ReadNative(ffi.Slice(value)))
 		slog.Log(ctx, slog.LevelDebug, "sock_setsockopt_int", slog.Int("fd", fd), slog.Int("level", level), slog.Int("name", name), slog.Uint64("value", uint64(value)))
-		return ffi.Errno(unix.SetsockoptInt(fd, level, name, int(value)))
+		return unix.SetsockoptInt(fd, level, name, int(value))
 	}
 }
 
@@ -137,7 +148,7 @@ func (t network) GetSocketOption(ctx context.Context, fd int, level, name int, v
 }
 
 func (t network) Shutdown(ctx context.Context, fd, how int) error {
-	slog.Log(ctx, slog.LevelDebug, "sock_Shutdown", slog.Int("fd", fd), slog.Int("how", how))
+	slog.Log(ctx, slog.LevelDebug, "sock_shutdown", slog.Int("fd", fd), slog.Int("how", how))
 	return unix.Shutdown(fd, how)
 }
 
@@ -151,31 +162,14 @@ func (t network) AddrPort(ctx context.Context, network string, service string) (
 	return net.DefaultResolver.LookupPort(ctx, network, service)
 }
 
-func (t network) RecvFrom(ctx context.Context, fd int, vecs [][]byte, flags int) (int, int, unix.Sockaddr, error) {
-	for {
-		slog.Log(ctx, slog.LevelDebug, "recvMsgBuffers", slog.Int("fd", fd), slog.Int("flags", flags))
-		n, _, roflags, sa, err := unix.RecvmsgBuffers(fd, vecs, nil, flags)
-		if err == nil {
-			return n, roflags, sa, nil
-		}
-
-		switch err {
-		case syscall.EINTR, syscall.EWOULDBLOCK:
-		default:
-			return n, roflags, sa, err
-		}
-
-		select {
-		case <-ctx.Done():
-			return n, roflags, sa, ctx.Err()
-		default:
-		}
-	}
+func (t network) RecvFrom(ctx context.Context, fd int, vecs [][]byte, oob []byte, flags int) (int, int, unix.Sockaddr, error) {
+	n, _, roflags, sa, err := unix.RecvmsgBuffers(fd, vecs, oob, flags)
+	return n, roflags, sa, err
 }
 
-func (t network) SendTo(ctx context.Context, fd int, sa unix.Sockaddr, vecs [][]byte, flags int) (int, error) {
+func (t network) SendTo(ctx context.Context, fd int, sa unix.Sockaddr, vecs [][]byte, oob []byte, flags int) (int, error) {
 	// dispatch-run/wasi-go has linux special cased here.
 	// did not faithfully follow it because it might be caused by other complexity.
 	// https://github.com/dispatchrun/wasi-go/blob/038d5104aacbb966c25af43797473f03c5da3e4f/systems/unix/system.go#L640
-	return unix.SendmsgBuffers(int(fd), vecs, nil, sa, int(flags))
+	return unix.SendmsgBuffers(int(fd), vecs, oob, sa, int(flags))
 }

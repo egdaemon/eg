@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/tls"
 	"log"
-	"log/slog"
 	"net/http"
 	"os"
 	"sync"
@@ -40,7 +39,6 @@ func (t Global) AfterApply() error {
 		os.Setenv(eg.EnvLogsTrace, "1")
 		fallthrough
 	case 2: // DEBUG
-		slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelDebug})))
 		debugx.SetOutput(os.Stderr)
 		debugx.SetFlags(log.Flags())
 		os.Setenv(eg.EnvLogsDebug, "1")
@@ -48,7 +46,6 @@ func (t Global) AfterApply() error {
 	case 1: // INFO
 		fallthrough
 	default: // ERROR - minimal
-		slog.SetLogLoggerLevel(slog.LevelError)
 	}
 
 	// enable GRPC logging

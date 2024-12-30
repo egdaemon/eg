@@ -8,8 +8,8 @@ require (
 	github.com/coreos/go-systemd/v22 v22.5.0
 	github.com/davecgh/go-spew v1.1.1
 	github.com/dominikbraun/graph v0.23.0
-	github.com/egdaemon/wasinet/wasinet v0.0.0-20241230023724-45d424a87294
-	github.com/egdaemon/wasinet/wazeronet v0.0.0-20241230023724-45d424a87294
+	github.com/egdaemon/wasinet/wasinet v0.0.0-20241230124507-2a54ddc9c245
+	github.com/egdaemon/wasinet/wazeronet v0.0.0-20241230124507-2a54ddc9c245
 	github.com/fsnotify/fsnotify v1.8.0
 	github.com/gorilla/websocket v1.5.3
 	github.com/logrusorgru/aurora v2.0.3+incompatible

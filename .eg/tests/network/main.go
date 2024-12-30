@@ -12,10 +12,10 @@ import (
 	"net"
 	"net/http"
 
-	"github.com/egdaemon/eg/internal/netx"
 	"github.com/egdaemon/eg/runtime/wasi/eg"
 	"github.com/egdaemon/eg/runtime/wasi/egenv"
 	"github.com/egdaemon/eg/runtime/wasi/shell"
+	"github.com/egdaemon/wasinet/wasinet"
 )
 
 func digest(b []byte) string {
@@ -57,34 +57,50 @@ func listentcp(network, address string) net.Listener {
 	return li
 }
 
-func checkTransfer(ctx context.Context, li net.Listener) error {
+func checkTransfer(ctx context.Context, li net.Listener, amount int64) error {
 	var (
-		buf []byte = make([]byte, 128)
+		serr       error
+		amountsent int64
 	)
 
 	conn, err := net.Dial(li.Addr().Network(), li.Addr().String())
 	if err != nil {
 		return err
 	}
-	defer conn.Close()
 
-	if _, err = conn.Write([]byte("hello world")); err != nil {
+	digestsent := md5.New()
+	digestrecv := md5.New()
+
+	go func() {
+		amountsent, serr = io.CopyN(conn, io.TeeReader(rand.Reader, digestsent), amount)
+	}()
+
+	n, err := io.Copy(digestrecv, io.LimitReader(conn, amount))
+	if err != nil {
 		return err
 	}
 
-	if n, err := conn.Read(buf); err != nil {
-		return err
-	} else if v := string(buf[:n]); v != "hello world" {
-		return fmt.Errorf("recieved %s expected %s", v, "hello world")
-	} else {
-		log.Println("transferred", string(buf[:n]))
+	if serr != nil {
+		return serr
+	}
+
+	if amount != n {
+		return fmt.Errorf("didnt receive all data", amount, "!=", n)
+	}
+
+	if amount != amountsent {
+		return fmt.Errorf("didnt receive all data", amount, "!=", amountsent)
+	}
+
+	if !bytes.Equal(digestsent.Sum(nil), digestrecv.Sum(nil)) {
+		return fmt.Errorf("digests didnt match")
 	}
 
 	return nil
 }
 
 func TCPTest(ctx context.Context, op eg.Op) error {
-	if err := checkTransfer(ctx, listentcp("tcp", ":0")); err != nil {
+	if err := checkTransfer(ctx, listentcp("tcp", "localhost:0"), 16*1024); err != nil {
 		return err
 	}
 	return nil
@@ -125,13 +141,16 @@ func HTTPServerTest(ctx context.Context, op eg.Op) (err error) {
 
 	m := http.NewServeMux()
 	m.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		log.Println("request received")
+		defer log.Println("request completed")
+
 		if _, err := io.Copy(w, bytes.NewBuffer(buf.Bytes())); err != nil {
 			log.Println("copy failed", err)
 			return
 		}
 	})
 
-	if l, err = net.Listen("tcp", ":0"); err != nil {
+	if l, err = wasinet.Listen(context.Background(), "tcp", "localhost:0"); err != nil {
 		return err
 	}
 	defer l.Close()
@@ -142,7 +161,8 @@ func HTTPServerTest(ctx context.Context, op eg.Op) (err error) {
 		}
 	}()
 
-	rsp, err := http.Get(fmt.Sprintf("http://%s", l.Addr().String()))
+	log.Println("server addr", l.Addr().String())
+	rsp, err := http.Get(fmt.Sprintf("http://%s/", l.Addr().String()))
 	if err != nil {
 		return err
 	}
@@ -161,28 +181,26 @@ func HTTPServerTest(ctx context.Context, op eg.Op) (err error) {
 	log.Println("successfully ran http server")
 	return nil
 }
+
+func init() {
+	wasinet.Hijack()
+	http.DefaultTransport = wasinet.InsecureHTTP()
+}
+
 func main() {
 	log.SetFlags(log.Lshortfile)
 	ctx, done := context.WithTimeout(context.Background(), egenv.TTL())
 	defer done()
 
-	net.DefaultResolver.PreferGo = true
-	net.DefaultResolver.Dial = func(ctx context.Context, network, address string) (net.Conn, error) {
-		log.Println("dialing ------------------------", network, address)
-		conn, err := wasinet.DialContext(ctx, network, address)
-		if err != nil {
-			return nil, err
-		}
-		return netx.DebugConn("%v", conn), nil
-	}
-
 	err := eg.Perform(
 		ctx,
-		DNSDebug,
-		DNSTCPResolveTest,
-		TCPTest,
-		HTTPTest,
-		HTTPServerTest,
+		eg.Parallel(
+			DNSDebug,
+			DNSTCPResolveTest,
+			TCPTest,
+			HTTPTest,
+			HTTPServerTest,
+		),
 	)
 
 	if err != nil {

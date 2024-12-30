@@ -4,14 +4,11 @@ package wnetruntime
 
 import (
 	"context"
-	"fmt"
-	"log/slog"
 	"net"
 	"net/netip"
 	"syscall"
 
 	"github.com/egdaemon/wasinet/wasinet/ffi"
-	"github.com/egdaemon/wasinet/wasinet/ffierrors"
 	"github.com/egdaemon/wasinet/wasinet/internal/errorsx"
 	"github.com/egdaemon/wasinet/wasinet/internal/langx"
 	"golang.org/x/sys/unix"
@@ -77,39 +74,39 @@ type network struct {
 }
 
 func (t network) Open(ctx context.Context, af, socktype, protocol int) (fd int, err error) {
-	slog.Log(ctx, slog.LevelDebug, "sock_open", slog.Int("af", af), slog.Int("socktype", socktype), slog.Int("protocol", protocol))
+	// slog.Log(ctx, slog.LevelDebug, "sock_open", slog.Int("af", af), slog.Int("socktype", socktype), slog.Int("protocol", protocol))
 	// syscall.SOCK_NONBLOCK|syscall.SOCK_CLOEXEC are required by golang's runtime for the pollfd to operate correctly.
 	// as a result we unconditionally set them here.
 	return unix.Socket(af, socktype|syscall.SOCK_NONBLOCK|syscall.SOCK_CLOEXEC, protocol)
 }
 
 func (t network) Bind(ctx context.Context, fd int, sa unix.Sockaddr) error {
-	slog.Log(ctx, slog.LevelDebug, "sock_bind", slog.Int("fd", fd), slog.String("addr", fmt.Sprintf("%v", sa)))
+	// slog.Log(ctx, slog.LevelDebug, "sock_bind", slog.Int("fd", fd), slog.String("addr", fmt.Sprintf("%v", sa)))
 	return unix.Bind(fd, sa)
 }
 
 func (t network) Connect(ctx context.Context, fd int, sa unix.Sockaddr) (err error) {
-	slog.Log(ctx, slog.LevelDebug, "sock_connect", slog.Int("fd", fd), slog.String("addr", fmt.Sprintf("%v", sa)))
+	// slog.Log(ctx, slog.LevelDebug, "sock_connect", slog.Int("fd", fd), slog.String("addr", fmt.Sprintf("%v", sa)))
 	return unix.Connect(fd, sa)
 }
 
 func (t network) Listen(ctx context.Context, fd, backlog int) error {
-	slog.Log(ctx, slog.LevelDebug, "sock_listen", slog.Int("fd", fd), slog.Int("backlog", backlog))
+	// slog.Log(ctx, slog.LevelDebug, "sock_listen", slog.Int("fd", fd), slog.Int("backlog", backlog))
 	return unix.Listen(fd, backlog)
 }
 
 func (t network) Accept(ctx context.Context, fd int) (nfd int, sa unix.Sockaddr, err error) {
-	slog.Log(ctx, slog.LevelDebug, "sock_accept", slog.Int("fd", fd))
+	// slog.Log(ctx, slog.LevelDebug, "sock_accept", slog.Int("fd", fd))
 	return unix.Accept(fd)
 }
 
 func (t network) LocalAddr(ctx context.Context, fd int) (unix.Sockaddr, error) {
-	slog.Log(ctx, slog.LevelDebug, "sock_localaddr", slog.Int("fd", fd))
+	// slog.Log(ctx, slog.LevelDebug, "sock_localaddr", slog.Int("fd", fd))
 	return unix.Getsockname(fd)
 }
 
 func (t network) PeerAddr(ctx context.Context, fd int) (_ unix.Sockaddr, err error) {
-	slog.Log(ctx, slog.LevelDebug, "sock_peeraddr", slog.Int("fd", fd))
+	// slog.Log(ctx, slog.LevelDebug, "sock_peeraddr", slog.Int("fd", fd))
 	return unix.Getpeername(fd)
 }
 
@@ -123,15 +120,15 @@ func (t network) SetSocketOption(ctx context.Context, fd int, level, name int, v
 			return err
 		}
 		errno := unix.SetsockoptTimeval(fd, level, name, v)
-		slog.Log(ctx, slog.LevelDebug, "sock_setsockopt_timeval", slog.Int("fd", fd), slog.Int("level", level), slog.Int("name", name), slog.Any("value", v), slog.Int("errno", int(ffierrors.Errno(errno))))
+		// slog.Log(ctx, slog.LevelDebug, "sock_setsockopt_timeval", slog.Int("fd", fd), slog.Int("level", level), slog.Int("name", name), slog.Any("value", v), slog.Int("errno", int(ffierrors.Errno(errno))))
 		return errno
 	case syscall.SO_BINDTODEVICE: // this is untested.
 		value := errorsx.Must(ffi.StringReadNative(ffi.Slice(value)))
-		slog.Log(ctx, slog.LevelDebug, "sock_setsockopt_string", slog.Int("fd", fd), slog.Int("level", level), slog.Int("name", name), slog.String("value", value))
+		// slog.Log(ctx, slog.LevelDebug, "sock_setsockopt_string", slog.Int("fd", fd), slog.Int("level", level), slog.Int("name", name), slog.String("value", value))
 		return unix.SetsockoptString(fd, level, name, string(value))
 	default:
 		value := errorsx.Must(ffi.Uint32ReadNative(ffi.Slice(value)))
-		slog.Log(ctx, slog.LevelDebug, "sock_setsockopt_int", slog.Int("fd", fd), slog.Int("level", level), slog.Int("name", name), slog.Uint64("value", uint64(value)))
+		// slog.Log(ctx, slog.LevelDebug, "sock_setsockopt_int", slog.Int("fd", fd), slog.Int("level", level), slog.Int("name", name), slog.Uint64("value", uint64(value)))
 		return unix.SetsockoptInt(fd, level, name, int(value))
 	}
 }
@@ -148,17 +145,17 @@ func (t network) GetSocketOption(ctx context.Context, fd int, level, name int, v
 }
 
 func (t network) Shutdown(ctx context.Context, fd, how int) error {
-	slog.Log(ctx, slog.LevelDebug, "sock_shutdown", slog.Int("fd", fd), slog.Int("how", how))
+	// slog.Log(ctx, slog.LevelDebug, "sock_shutdown", slog.Int("fd", fd), slog.Int("how", how))
 	return unix.Shutdown(fd, how)
 }
 
 func (t network) AddrIP(ctx context.Context, network string, address string) ([]net.IP, error) {
-	slog.Log(ctx, slog.LevelDebug, "sock_getaddrip", slog.String("network", network), slog.String("address", address))
+	// slog.Log(ctx, slog.LevelDebug, "sock_getaddrip", slog.String("network", network), slog.String("address", address))
 	return net.DefaultResolver.LookupIP(ctx, network, address)
 }
 
 func (t network) AddrPort(ctx context.Context, network string, service string) (int, error) {
-	slog.Log(ctx, slog.LevelDebug, "sock_getaddrport", slog.String("network", network), slog.String("service", service))
+	// slog.Log(ctx, slog.LevelDebug, "sock_getaddrport", slog.String("network", network), slog.String("service", service))
 	return net.DefaultResolver.LookupPort(ctx, network, service)
 }
 

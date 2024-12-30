@@ -4,7 +4,6 @@ package wasip1syscall
 
 import (
 	"log"
-	"log/slog"
 	"strconv"
 	"syscall"
 	"unsafe"
@@ -84,13 +83,12 @@ func Sockaddr(sa unix.Sockaddr) (zero *RawSocketAddress, error error) {
 		}
 		return (&addressany[addrunix]{addr: addrunix{name: name}}).Sockaddr(), nil
 	default:
-		slog.Debug("unsupported unix.Sockaddr", slog.Any("sa", sa))
+		log.Println("unsupported unix.Sockaddr", sa)
 		return zero, syscall.EINVAL
 	}
 }
 
 func rawtosockaddr(rsa *RawSocketAddress) (sockaddr, error) {
-	log.Println("(native) FAMILY", rsa.Family, syscall.AF_INET, syscall.AF_INET6)
 	switch int32(rsa.Family) {
 	case syscall.AF_INET:
 		addr := (*addressany[addrip4])(unsafe.Pointer(&rsa.Addr))

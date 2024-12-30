@@ -209,15 +209,31 @@ func transform(ws workspaces.Context, fset *token.FileSet, gendir string, c *ast
 					jen.Qual(egenvident, "TTL").Call(),
 				),
 			),
+			// jen.Defer().Add(jen.Func().Params().Block(
+			// 	jen.Qual("log", "Println").Call(
+			// 		jen.Lit("POST MODULE"),
+			// 	),
+			// 	jen.If(
+			// 		jen.Id("cause").Op(":=").Add(jen.Id("recover").Call()),
+			// 		jen.Id("cause").Op("!=").Id("nil"),
+			// 	).Block(
+			// 		jen.Qual("log", "Println").Call(
+			// 			jen.Lit("le sigh recovered"),
+			// 			jen.Id("cause"),
+			// 		),
+			// 	),
+			// ).Call()),
 			jen.Defer().Add(jen.Id("done").Call()),
 			jen.If(
 				jen.Id("err").Op(":=").Add(jen.Qual(egident, "Perform").Call(
-					jen.Id("ctx"),
-					jen.Qual(egident, "Sequential").Call(statements...)),
+					append([]jen.Code{jen.Id("ctx")}, statements...)...,
+				),
 				),
 				jen.Id("err").Op("!=").Id("nil"),
 			).Block(
-				jen.Panic(jen.Id("err")),
+				jen.Qual("log", "Fatalln").Call(
+					jen.Id("err"),
+				),
 			),
 		)
 

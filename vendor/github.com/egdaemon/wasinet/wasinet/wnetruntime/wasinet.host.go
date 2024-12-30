@@ -22,9 +22,9 @@ func TranslateErrno(err error) syscall.Errno {
 
 // translate wasi syscall.AF_* to the host.
 func DetermineHostAFFamily(wasi int32) (r int32) {
-	defer func() {
-		log.Println("family translated", wasi, "->", r)
-	}()
+	// defer func() {
+	// 	log.Println("family translated", wasi, "->", r)
+	// }()
 	switch wasi {
 	case 3:
 		return syscall.AF_INET6

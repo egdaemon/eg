@@ -42,7 +42,7 @@ func main() {
 			eg.Module(ctx, debian.Builder(debian.ContainerName, "jammy"), debian.Build),
 			eg.Module(ctx, debian.Builder(debian.ContainerName, "noble"), debian.Build),
 			eg.Module(ctx, debian.Builder(debian.ContainerName, "oracular"), debian.Build),
-			eg.Module(ctx, archlinux.Builder(archlinux.ContainerName), archlinux.Build),
+			// eg.Module(ctx, archlinux.Builder(archlinux.ContainerName), archlinux.Build),
 		),
 	)
 

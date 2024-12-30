@@ -4,9 +4,6 @@ package wazeronet
 
 import (
 	"context"
-	"log"
-	"log/slog"
-	"os"
 
 	"github.com/egdaemon/wasinet/wasinet/wnetruntime"
 	"github.com/tetratelabs/wazero"
@@ -14,10 +11,6 @@ import (
 )
 
 func Module(runtime wazero.Runtime, wnet wnetruntime.Socket) wazero.HostModuleBuilder {
-	slog.SetLogLoggerLevel(slog.LevelDebug)
-	log.SetFlags(log.Flags() | log.Lshortfile)
-	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{AddSource: true})))
-	log.SetFlags(log.Lshortfile)
 	return runtime.NewHostModuleBuilder(wnetruntime.Namespace).
 		NewFunctionBuilder().WithFunc(func(
 		ctx context.Context,
@@ -90,7 +83,6 @@ func Module(runtime wazero.Runtime, wnet wnetruntime.Socket) wazero.HostModuleBu
 		addr uint32,
 		addrlen uint32,
 	) uint32 {
-		log.Println("sock-getlocaladdr")
 		return uint32(wnetruntime.SocketLocalAddr(wnet.LocalAddr)(ctx, Memory(m.Memory()), fd, uintptr(addr), addrlen))
 	}).Export("sock_getlocaladdr").
 		NewFunctionBuilder().WithFunc(func(

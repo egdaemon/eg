@@ -2,7 +2,7 @@ package wasinet
 
 import (
 	"context"
-	"log/slog"
+	"log"
 	"net"
 	"os"
 	"syscall"
@@ -50,19 +50,19 @@ func (d *Dialer) DialContext(ctx context.Context, network, address string) (net.
 		defer cancel()
 	}
 	if d.LocalAddr != nil {
-		slog.WarnContext(ctx, "wasip1.Dialer: LocalAddr not yet supported on GOOS=wasip1")
+		log.Println("wasip1.Dialer: LocalAddr not yet supported on GOOS=wasip1")
 	}
 	if d.Resolver != nil {
-		slog.WarnContext(ctx, "wasip1.Dialer: Resolver ignored because it is not supported on GOOS=wasip1")
+		log.Println("wasip1.Dialer: Resolver ignored because it is not supported on GOOS=wasip1")
 	}
 	if d.Cancel != nil {
-		slog.WarnContext(ctx, "wasip1.Dialer: Cancel channel not implemented on GOOS=wasip1")
+		log.Println("wasip1.Dialer: Cancel channel not implemented on GOOS=wasip1")
 	}
 	if d.Control != nil {
-		slog.WarnContext(ctx, "wasip1.Dialer: Control function not yet supported on GOOS=wasip1")
+		log.Println("wasip1.Dialer: Control function not yet supported on GOOS=wasip1")
 	}
 	if d.ControlContext != nil {
-		slog.WarnContext(ctx, "wasip1.Dialer: ControlContext function not yet supported on GOOS=wasip1")
+		log.Println("wasip1.Dialer: ControlContext function not yet supported on GOOS=wasip1")
 	}
 	// TOOD:
 	// - use LocalAddr to bind to a socket prior to establishing the connection

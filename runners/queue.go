@@ -399,9 +399,8 @@ func beginwork(ctx context.Context, md metadata, dir string) state {
 		Var(eg.EnvComputeRunID, uid).
 		Var(eg.EnvComputeAccountID, metadata.Enqueued.AccountId).
 		Var(eg.EnvComputeVCS, metadata.Enqueued.Vcsuri).
-		Var(eg.EnvComputeLoggingVerbosity, strconv.Itoa(md.logVerbosity)).
 		Var(eg.EnvComputeTTL, time.Duration(metadata.Enqueued.Ttl).String()).
-		Var(eg.EnvComputeLoggingVerbosity, envx.String("0", eg.EnvComputeLoggingVerbosity))
+		Var(eg.EnvComputeLoggingVerbosity, envx.String(strconv.Itoa(md.logVerbosity), eg.EnvComputeLoggingVerbosity))
 
 	// envx.Debug(errorsx.Zero(envb.Environ())...)
 

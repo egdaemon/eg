@@ -6,5 +6,7 @@ github.com/egdaemon/eg v0.0.0-20241226175130-f3143a154317 h1:zYisT7224wPTTwvDCZw
 github.com/egdaemon/eg v0.0.0-20241226175130-f3143a154317/go.mod h1:v0FRokYvmElsmaCjDplvHBVX0TGg39m7Q6XraGHInAU=
 github.com/egdaemon/wasinet v0.0.0-20241226171513-951ac3ecca85 h1:06X0Xkv2i8xXeBJPEqz5pnieivLR08yVIEe37aSqj/M=
 github.com/egdaemon/wasinet v0.0.0-20241226171513-951ac3ecca85/go.mod h1:Vrshfq2KHg5uxoEQ9/78v43gG+SSnOBU6vi3OHaa2EA=
+github.com/egdaemon/wasinet/wasinet v0.0.0-20241230023724-45d424a87294 h1:VGLtE+Wkq06m8HFvwQUTo5H+sUPDpkP7jD6nvyYIqww=
+github.com/egdaemon/wasinet/wasinet v0.0.0-20241230023724-45d424a87294/go.mod h1:vPVQ3HHYTa9Fe7lz+ZBqI49kw76LSTQfvKZlO8QpWsY=
 golang.org/x/sys v0.28.0 h1:Fksou7UEQUWlKvIdsqzJmUmCX3cZuD2+P3XyyzwMhlA=
 golang.org/x/sys v0.28.0/go.mod h1:/VUhepiaJMQUp4+oa/7Zr1D23ma6VTLIYjOOTFZPUcA=

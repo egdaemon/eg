@@ -12,6 +12,7 @@ import (
 	"net"
 	"net/http"
 
+	"github.com/egdaemon/eg/internal/netx"
 	"github.com/egdaemon/eg/runtime/wasi/eg"
 	"github.com/egdaemon/eg/runtime/wasi/egenv"
 	"github.com/egdaemon/eg/runtime/wasi/shell"
@@ -164,6 +165,16 @@ func main() {
 	log.SetFlags(log.Lshortfile)
 	ctx, done := context.WithTimeout(context.Background(), egenv.TTL())
 	defer done()
+
+	net.DefaultResolver.PreferGo = true
+	net.DefaultResolver.Dial = func(ctx context.Context, network, address string) (net.Conn, error) {
+		log.Println("dialing ------------------------", network, address)
+		conn, err := wasinet.DialContext(ctx, network, address)
+		if err != nil {
+			return nil, err
+		}
+		return netx.DebugConn("%v", conn), nil
+	}
 
 	err := eg.Perform(
 		ctx,

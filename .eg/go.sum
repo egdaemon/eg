@@ -1,9 +1,9 @@
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
-github.com/egdaemon/eg v0.0.0-20241226175130-f3143a154317 h1:zYisT7224wPTTwvDCZwV59CKoOHAUWz5msWGSpRr6Bs=
-github.com/egdaemon/eg v0.0.0-20241226175130-f3143a154317/go.mod h1:v0FRokYvmElsmaCjDplvHBVX0TGg39m7Q6XraGHInAU=
-github.com/egdaemon/wasinet/wasinet v0.0.0-20241230121905-5a2c3b4bfd4d h1:7iYN9k7kallW8aWG9uIpgBlfMx+6VRLs9xwBb9Lkj7U=
-github.com/egdaemon/wasinet/wasinet v0.0.0-20241230121905-5a2c3b4bfd4d/go.mod h1:vPVQ3HHYTa9Fe7lz+ZBqI49kw76LSTQfvKZlO8QpWsY=
+github.com/egdaemon/eg v0.0.0-20241230131023-68622a5e7b2a h1:O0KzkBRXFzKUyKxT7lzMV1YlH7p49fO9U0FeZy/yXyM=
+github.com/egdaemon/eg v0.0.0-20241230131023-68622a5e7b2a/go.mod h1:mBnxuNCD/zoUo4G1Cub69uIppx/IioEe0SHkw7oFNHA=
+github.com/egdaemon/wasinet/wasinet v0.0.0-20241230124507-2a54ddc9c245 h1:RrfQTjB6qcdQEhd+O2ftHIJn23waQTsBcVBBlQaJX4Y=
+github.com/egdaemon/wasinet/wasinet v0.0.0-20241230124507-2a54ddc9c245/go.mod h1:vPVQ3HHYTa9Fe7lz+ZBqI49kw76LSTQfvKZlO8QpWsY=
 github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=
 github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
 github.com/stretchr/testify v1.10.0 h1:Xv5erBjTwe/5IxqUQTdXv5kgmIvbHo3QQyRwhJsOfJA=

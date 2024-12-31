@@ -23,6 +23,18 @@ func CachedID() string {
 	return env.String(nilUUID, _eg.EnvUnsafeCacheID)
 }
 
+// prints debugging information about the current user.
+func Users(ctx context.Context, op eg.Op) error {
+	return shell.Run(
+		ctx,
+		shell.New("id"),
+		shell.New("id -u eg"),
+		shell.New("users"),
+		shell.New("groups"),
+	)
+}
+
+// prints debugging information about the currently executing module.
 func Module(ctx context.Context, op eg.Op) error {
 	return shell.Run(
 		ctx,
@@ -33,6 +45,7 @@ func Module(ctx context.Context, op eg.Op) error {
 	)
 }
 
+// prints debugging information about the environment workspaces.
 func FileTree(ctx context.Context, op eg.Op) error {
 	return shell.Run(
 		ctx,
@@ -42,6 +55,7 @@ func FileTree(ctx context.Context, op eg.Op) error {
 	)
 }
 
+// prints current environment variables.
 func Env(ctx context.Context, op eg.Op) error {
 	return shell.Run(
 		ctx,

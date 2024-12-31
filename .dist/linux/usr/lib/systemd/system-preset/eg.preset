@@ -1,0 +1,8 @@
+disable eg-daemon.service
+disable eg-daily-reload.service
+disable eg-disk-usage.service
+disable eg-podman-maintenance.service
+disable eg-runner-build.service
+disable eg-runner.service
+disable eg-schedule-15m.timer
+disable eg-schedule-15m.target

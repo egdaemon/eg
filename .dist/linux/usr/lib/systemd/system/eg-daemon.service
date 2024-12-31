@@ -3,7 +3,7 @@ Description=eg runtime daemon
 After=network.target
 
 [Service]
-User=eg
+User=egd
 IOSchedulingClass=idle
 IOSchedulingPriority=7
 PrivateMounts=yes

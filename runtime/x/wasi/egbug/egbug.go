@@ -25,33 +25,42 @@ func CachedID() string {
 
 // prints debugging information about the current user.
 func Users(ctx context.Context, op eg.Op) error {
+	privileged := shell.Runtime().Privileged()
 	return shell.Run(
 		ctx,
-		shell.New("id"),
-		shell.New("id -u egd"),
-		shell.New("users"),
-		shell.New("groups"),
+		privileged.New("id"),
+		privileged.New("id -u egd"),
+		privileged.New("users"),
+		privileged.New("groups"),
+		privileged.New("cat /proc/self/uid_map"),
+		privileged.New("cat /proc/self/gid_map"),
+		privileged.New("ls -lha /usr/lib/tmpfiles.d"),
+		privileged.New("cat /usr/lib/tmpfiles.d/00-eg-daemon.conf"),
+		privileged.New("cat /usr/lib/tmpfiles.d/*"),
 	)
 }
 
 // prints debugging information about the currently executing module.
 func Module(ctx context.Context, op eg.Op) error {
+	privileged := shell.Runtime().Privileged()
 	return shell.Run(
 		ctx,
-		shell.Newf("echo run id      : %s", env.String(nilUUID, _eg.EnvComputeRunID)),
-		shell.Newf("echo account id  : %s", env.String(nilUUID, _eg.EnvComputeAccountID)),
-		shell.Newf("echo module depth: %d", Depth()),
-		shell.Newf("echo module log  : %d", env.Int(-1, _eg.EnvComputeLoggingVerbosity)),
+		privileged.Newf("echo run id      : %s", env.String(nilUUID, _eg.EnvComputeRunID)),
+		privileged.Newf("echo account id  : %s", env.String(nilUUID, _eg.EnvComputeAccountID)),
+		privileged.Newf("echo module depth: %d", Depth()),
+		privileged.Newf("echo module log  : %d", env.Int(-1, _eg.EnvComputeLoggingVerbosity)),
 	)
 }
 
 // prints debugging information about the environment workspaces.
 func FileTree(ctx context.Context, op eg.Op) error {
+	privileged := shell.Runtime().Privileged()
 	return shell.Run(
 		ctx,
-		shell.New("tree -a -L 1 /opt"),
-		shell.Newf("tree -a -L 1 %s", egenv.CacheDirectory()),
-		shell.Newf("tree -a -L 2 %s", egenv.RuntimeDirectory()),
+		privileged.New("ls -lhan /opt"),
+		privileged.New("tree -a -L 1 /opt"),
+		privileged.Newf("tree -a -L 1 %s", egenv.CacheDirectory()),
+		privileged.Newf("tree -a -L 2 %s", egenv.RuntimeDirectory()),
 	)
 }
 

@@ -19,9 +19,9 @@ import (
 	"github.com/dave/jennifer/jen"
 	"github.com/egdaemon/eg/astbuild"
 	"github.com/egdaemon/eg/astcodec"
-	"github.com/egdaemon/eg/internal/debugx"
 	"github.com/egdaemon/eg/internal/fsx"
 	"github.com/egdaemon/eg/internal/langx"
+	"github.com/egdaemon/eg/internal/tracex"
 	"github.com/egdaemon/eg/workspaces"
 	"golang.org/x/tools/go/ast/astutil"
 	"golang.org/x/tools/go/packages"
@@ -110,7 +110,7 @@ func (t golang) Run(ctx context.Context) (roots []Compiled, err error) {
 			}
 
 			if target != pkg.ID {
-				debugx.Println("ignoring", target, pkg.ID)
+				tracex.Println("ignoring", target, pkg.ID)
 				continue
 			}
 
@@ -138,7 +138,7 @@ func (t golang) Run(ctx context.Context) (roots []Compiled, err error) {
 		main.Type.Params.Opening = token.NoPos
 
 		result := astcodec.ReplaceFunction(o, main, astcodec.FindFunctionsByName("main"))
-		debugx.Println("original", m.fname)
+		tracex.Println("original", m.fname)
 
 		if err = rewrite(filepath.Join(t.Context.Workspace.Root, m.fname), token.NewFileSet(), result); err != nil {
 			return roots, err
@@ -290,7 +290,7 @@ func rewrite(dst string, fset *token.FileSet, c ast.Node) (err error) {
 		buf       = bytes.NewBuffer(nil)
 	)
 
-	debugx.Println("writing transformed to", dst)
+	tracex.Println("writing transformed to", dst)
 	if err = (&printer.Config{Mode: printer.TabIndent | printer.UseSpaces}).Fprint(buf, fset, c); err != nil {
 		return err
 	}

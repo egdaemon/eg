@@ -8,10 +8,12 @@ import (
 	"time"
 
 	"github.com/egdaemon/eg/internal/errorsx"
+	"github.com/egdaemon/eg/internal/stringsx"
 	"github.com/egdaemon/eg/runtime/wasi/egunsafe/ffiexec"
 )
 
 type Command struct {
+	user      string
 	cmd       string
 	directory string
 	environ   []string
@@ -56,6 +58,18 @@ func (t Command) Environ(k, v string) Command {
 	return t
 }
 
+// user to run the command as
+func (t Command) As(u string) Command {
+	t.user = u
+	return t
+}
+
+// shorthand for As("") which runs the command as root.
+func (t Command) Privileged() Command {
+	t.user = ""
+	return t
+}
+
 // New clone the current command configuration and replace the command
 // that will be executed.
 func (t Command) New(cmd string) Command {
@@ -82,6 +96,7 @@ func (t Command) Newf(cmd string, options ...any) Command {
 //	timeout: 5 minutes.
 func New(cmd string) Command {
 	return Command{
+		user:    "egd", // default user to execute commands as
 		cmd:     cmd,
 		timeout: 5 * time.Minute,
 	}
@@ -104,9 +119,7 @@ func Newf(cmd string, options ...any) Command {
 //
 // )
 func Runtime() Command {
-	return Command{
-		timeout: 5 * time.Minute,
-	}
+	return New("")
 }
 
 func Run(ctx context.Context, cmds ...Command) (err error) {
@@ -148,13 +161,13 @@ func retry(ctx context.Context, c Command, do func() error) (err error) {
 }
 
 func run(ctx context.Context, c Command) (err error) {
-	// if ffigraph.Analysing() {
-	// 	return nil
-	// }
-
 	cctx, done := context.WithTimeout(ctx, c.timeout)
 	defer done()
-	cmd := append([]string{"-c"}, c.cmd)
+
+	cmd := []string{"-c", stringsx.Join(" ", "sudo", "-E", "-u", c.user, c.cmd)}
+	if c.user == "" {
+		cmd = []string{"-c", stringsx.Join(" ", c.cmd)}
+	}
 
 	err = ffiexec.Command(cctx, c.directory, c.environ, "bash", cmd)
 	if c.lenient && err != nil {

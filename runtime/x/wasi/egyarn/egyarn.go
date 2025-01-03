@@ -13,7 +13,7 @@ import (
 )
 
 func CacheDirectory(dirs ...string) string {
-	return egenv.CacheDirectory("eg.yarn", filepath.Join(dirs...))
+	return egenv.CacheDirectory(".eg", "yarn", filepath.Join(dirs...))
 }
 
 // attempt to build the yarn environment that properly

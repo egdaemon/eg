@@ -6,7 +6,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 RUN apt update
 
 # general utilities
-RUN apt install -o Acquire::ForceIPv4=true -y software-properties-common build-essential ca-certificates curl
+RUN apt install -o Acquire::ForceIPv4=true -y software-properties-common build-essential ca-certificates curl sudo
 RUN add-apt-repository -n ppa:longsleep/golang-backports
 RUN add-apt-repository -n ppa:egdaemon/eg
 RUN add-apt-repository -n ppa:egdaemon/duckdb
@@ -17,8 +17,6 @@ RUN apt install -o Acquire::ForceIPv4=true -y --no-install-recommends ssh podman
 # dependencies for duckdb while bootstrapping
 RUN apt install -o Acquire::ForceIPv4=true -y --no-install-recommends cmake ninja-build ccache dput devscripts dh-make dput libssl-dev
 RUN apt install -o Acquire::ForceIPv4=true -y --no-install-recommends duckdb
-
-RUN systemd-sysusers
 
 # properly link golang into the path.
 RUN ln -s /usr/lib/go-1.23/bin/go /usr/local/bin/go
@@ -33,3 +31,6 @@ RUN echo "# configure systemd-resolvd to listen on the ip:port\n# combinations g
 RUN cat /etc/systemd/resolved.conf.d/wasi.dns.conf
 
 RUN systemctl enable ssh
+
+RUN systemd-sysusers
+RUN systemd-tmpfiles --create

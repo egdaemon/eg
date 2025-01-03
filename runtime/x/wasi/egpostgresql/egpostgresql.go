@@ -13,7 +13,7 @@ import (
 
 // configure the locally running instance of postgresql for use by local users.
 func Auto(ctx context.Context, _ eg.Op) (err error) {
-	runtime := shell.Runtime()
+	runtime := shell.Runtime().Privileged()
 	return shell.Run(
 		ctx,
 		runtime.New("pg_isready").Attempts(15), // 15 attempts = ~3seconds
@@ -26,7 +26,7 @@ func Auto(ctx context.Context, _ eg.Op) (err error) {
 // Forcibly creates and destroys a database. Should be run after Auto has initialized the default user.
 func RecreateDatabase(name string) eg.OpFn {
 	return func(ctx context.Context, _ eg.Op) (err error) {
-		runtime := shell.Runtime()
+		runtime := shell.Runtime().Privileged()
 		return shell.Run(
 			ctx,
 			runtime.Newf("psql --no-psqlrc -d postgres -c \"DROP DATABASE IF EXISTS \"%s\" WITH (FORCE)\"", name),
@@ -38,7 +38,7 @@ func RecreateDatabase(name string) eg.OpFn {
 // Create a superuser with the provided name. Should be run after Auto has initialized the default user.
 func InsertSuperuser(name string) eg.OpFn {
 	return func(ctx context.Context, _ eg.Op) (err error) {
-		runtime := shell.Runtime()
+		runtime := shell.Runtime().Privileged()
 		return shell.Run(
 			ctx,
 			runtime.Newf("psql --no-psqlrc -d postgres -c \"CREATE ROLE \"%s\" WITH SUPERUSER LOGIN\"", name),

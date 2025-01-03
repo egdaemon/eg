@@ -28,7 +28,7 @@ func Users(ctx context.Context, op eg.Op) error {
 	return shell.Run(
 		ctx,
 		shell.New("id"),
-		shell.New("id -u eg"),
+		shell.New("id -u egd"),
 		shell.New("users"),
 		shell.New("groups"),
 	)

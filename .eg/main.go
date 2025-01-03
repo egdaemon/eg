@@ -8,6 +8,7 @@ import (
 	"github.com/egdaemon/eg/runtime/wasi/egenv"
 	"github.com/egdaemon/eg/runtime/wasi/eggit"
 	"github.com/egdaemon/eg/runtime/wasi/shell"
+	"github.com/egdaemon/eg/runtime/x/wasi/egbug"
 	"github.com/egdaemon/eg/runtime/x/wasi/eggolang"
 )
 
@@ -23,17 +24,20 @@ func main() {
 	ctx, done := context.WithTimeout(context.Background(), egenv.TTL())
 	defer done()
 
-	c1 := eg.Container("eg.ubuntu.24.10")
+	// c1 := eg.Container("eg.ubuntu.24.10")
 	err := eg.Perform(
 		ctx,
 		eggit.AutoClone,
 		eg.Build(
-			c1.BuildFromFile(".dist/deb/Containerfile"),
+			// c1.BuildFromFile(".dist/deb/Containerfile"),
+			eg.DefaultModule(),
 		),
 		eg.Parallel(
 			eg.Module(
 				ctx,
-				c1,
+				eg.DefaultModule(),
+				egbug.Users,
+				egbug.FileTree,
 				eggolang.AutoTest(
 					eggolang.TestOptionTags("no_duckdb_arrow"),
 				),

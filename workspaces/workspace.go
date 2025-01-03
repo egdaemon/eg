@@ -76,6 +76,7 @@ func New(ctx context.Context, root string, mdir string, name string) (zero Conte
 	}
 
 	cid := uuid.FromBytesOrNil(cidmd5.Sum(nil)).String()
+
 	return ensuredirs(Context{
 		Module:       name,
 		CachedID:     cid,
@@ -93,17 +94,29 @@ func New(ctx context.Context, root string, mdir string, name string) (zero Conte
 }
 
 func ensuredirs(c Context) (_ Context, err error) {
+	rdir, err := os.Stat(c.Root)
+	if err != nil {
+		return c, err
+	}
+
 	// need to ensure that certain directories and files exists
 	// since they're mounted into containers.
-	return c, fsx.MkDirs(
-		0700,
-		filepath.Join(c.Root, c.RuntimeDir),
-		filepath.Join(c.Root, c.WorkingDir),
+	// the 4 caching/tmp directories are given 0777 permissions
+	// because unprivileged users may need to access them.
+	err1 := fsx.MkDirs(
+		0770,
 		filepath.Join(c.Root, c.TemporaryDir),
 		filepath.Join(c.Root, c.GenModDir),
 		filepath.Join(c.Root, c.BuildDir, c.Module, "main.wasm.d"),
 		filepath.Join(c.Root, c.CacheDir),
 	)
+	// need to ensure that certain directories and files exists
+	// since they're mounted into containers.
+	return c, errorsx.Compact(err1, fsx.MkDirs(
+		rdir.Mode(),
+		filepath.Join(c.Root, c.RuntimeDir),
+		filepath.Join(c.Root, c.WorkingDir),
+	))
 }
 
 func cacheid(ctx context.Context, root string, mdir string, cacheid hash.Hash, ignore ignorable) error {

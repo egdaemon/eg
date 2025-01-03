@@ -10,9 +10,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/egdaemon/eg/internal/debugx"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/systemx"
+	"github.com/egdaemon/eg/internal/tracex"
 )
 
 // Locate - looks for the provided filename up the file tree.
@@ -156,7 +156,7 @@ func CloneTree(ctx context.Context, dstdir string, rootdir string, archive fs.FS
 			dst = path
 		}
 
-		debugx.Println("cloning", rootdir, path, "->", dst, os.FileMode(0755), os.FileMode(0600))
+		tracex.Println("cloning", rootdir, path, "->", dst, os.FileMode(0755), os.FileMode(0600))
 
 		if d.IsDir() {
 			return os.MkdirAll(dst, 0755)

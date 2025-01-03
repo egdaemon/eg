@@ -16,9 +16,10 @@ import (
 func Prepare(ctx context.Context, op eg.Op) error {
 	return shell.Run(
 		ctx,
-		shell.Newf("pwd"),
-		// shell.Newf("mkdir -p %s", egenv.CacheDirectory(".dist")),
-		shell.New("mkdir -p .eg/.cache/.dist"),
+		shell.New("ls -lha /opt"),
+		shell.Newf("ls -lha %s", egenv.CacheDirectory()),
+		shell.Newf("mkdir -p %s", egenv.CacheDirectory(".dist")),
+		shell.Newf("ls -lha %s", egenv.CacheDirectory(".dist")),
 	)
 }
 

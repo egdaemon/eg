@@ -11,7 +11,7 @@ import (
 )
 
 func CacheDirectory(dirs ...string) string {
-	return egenv.CacheDirectory("eg.cargo", filepath.Join(dirs...))
+	return egenv.CacheDirectory(".eg", "cargo", filepath.Join(dirs...))
 }
 
 // attempt to build the rust environment that sets up

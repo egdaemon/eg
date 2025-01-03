@@ -78,11 +78,7 @@ func PodmanRun(ctx context.Context, cmdctx func(*exec.Cmd) *exec.Cmd, image, cna
 }
 
 func PodmanPrune(ctx context.Context, cmdctx func(*exec.Cmd) *exec.Cmd) (err error) {
-	var (
-		cmd *exec.Cmd
-	)
-
-	cmd = exec.CommandContext(
+	cmd := exec.CommandContext(
 		ctx, "podman", "system", "prune", "-f",
 	)
 
@@ -103,7 +99,7 @@ func PodmanModule(ctx context.Context, cmdctx func(*exec.Cmd) *exec.Cmd, image, 
 	cmd = cmdctx(exec.CommandContext(
 		ctx,
 		"podman",
-		PodmanModuleRunCmd(image, cname, moduledir, options...)...,
+		PodmanModuleRunCmd(image, cname, options...)...,
 	))
 
 	if err = execx.MaybeRun(cmd); err != nil {
@@ -123,11 +119,10 @@ func PodmanModule(ctx context.Context, cmdctx func(*exec.Cmd) *exec.Cmd, image, 
 	return nil
 }
 
-func PodmanModuleRunCmd(image, cname, moduledir string, options ...string) []string {
+func PodmanModuleRunCmd(image, cname string, options ...string) []string {
 	options = append([]string{
 		"run",
 		"--name", cname,
-		"--pids-limit", "-1", // this can probably be removed now that we have it in the runner.go file.
 		"--detach",
 		"--env", "CI",
 		"--env", "EG_CI",

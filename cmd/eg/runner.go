@@ -122,8 +122,8 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 			runners.AgentOptionVolumes(
 				runners.AgentMountReadWrite("/root", "/root"),
 				runners.AgentMountReadWrite(eg.DefaultCacheDirectory(), eg.DefaultCacheDirectory()),
+				runners.AgentMountReadWrite(eg.DefaultTempDirectory(), eg.DefaultTempDirectory()),
 				runners.AgentMountReadWrite(eg.DefaultRuntimeDirectory(), eg.DefaultRuntimeDirectory()),
-				runners.AgentMountReadWrite(eg.DefaultRuntimeDirectory(), eg.DefaultTempDirectory()),
 				runners.AgentMountReadWrite("/var/lib/containers", "/var/lib/containers"),
 			),
 			runners.AgentOptionEGBin(errorsx.Must(exec.LookPath("/opt/egbin"))),

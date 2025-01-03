@@ -16,6 +16,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/internal/debugx"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/numericx"
@@ -420,4 +421,10 @@ func Dirty(b bool) []string {
 	}
 
 	return nil
+}
+
+// not bound by compatibility guarantees. do not use.
+func UnsafeIsLocalCompute() bool {
+	const niluid = "00000000-0000-0000-0000-000000000000"
+	return String(niluid, eg.EnvComputeAccountID) == niluid
 }

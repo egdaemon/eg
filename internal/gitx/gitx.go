@@ -98,7 +98,11 @@ func Clone(ctx context.Context, auth transport.AuthMethod, dir, uri, remote, tre
 		SingleBranch:      true,
 	})
 
-	return errorsx.Wrapf(err, "unable to clone: %s - %s", uri, treeish)
+	if err = errorsx.Wrapf(err, "unable to clone: %s - %s", uri, treeish); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // return the clone uri handling quirks of specific forges.

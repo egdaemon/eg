@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"unsafe"
@@ -12,14 +14,19 @@ import (
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/runtime/wasi/egunsafe/ffiegcontainer"
 	"github.com/egdaemon/eg/runtime/wasi/egunsafe/ffigraph"
+	"github.com/egdaemon/eg/runtime/wasi/env"
 )
+
+func runtimeDirectory(paths ...string) string {
+	return filepath.Join(env.String(os.TempDir(), eg.EnvComputeRuntimeDirectory), filepath.Join(paths...))
+}
 
 // Generally unsafe predefined runner for modules useful
 // for providing a base line environment but has no long term
 // stability promises.
 func DefaultModule() ContainerRunner {
 	path := "eg.default.module"
-	errorsx.MaybePanic(eg.PrepareRootContainer(path))
+	errorsx.MaybePanic(eg.PrepareRootContainer(runtimeDirectory(path)))
 	return Container("eg").BuildFromFile(path)
 }
 

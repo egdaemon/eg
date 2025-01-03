@@ -4,6 +4,8 @@ github.com/egdaemon/eg v0.0.0-20241230131023-68622a5e7b2a h1:O0KzkBRXFzKUyKxT7lz
 github.com/egdaemon/eg v0.0.0-20241230131023-68622a5e7b2a/go.mod h1:mBnxuNCD/zoUo4G1Cub69uIppx/IioEe0SHkw7oFNHA=
 github.com/egdaemon/eg v0.0.0-20250103185700-40fa6f7cd593 h1:gxKlR712q7oZcbi8IwMJKDJe86qNIS4t7RuRPhsuvfA=
 github.com/egdaemon/eg v0.0.0-20250103185700-40fa6f7cd593/go.mod h1:mBnxuNCD/zoUo4G1Cub69uIppx/IioEe0SHkw7oFNHA=
+github.com/egdaemon/eg v0.0.0-20250103201251-b9e4315be027 h1:ZuYagJnaJ1OiBqzX+XEZTIOtatGaPxvbT+M9azlEyc4=
+github.com/egdaemon/eg v0.0.0-20250103201251-b9e4315be027/go.mod h1:mBnxuNCD/zoUo4G1Cub69uIppx/IioEe0SHkw7oFNHA=
 github.com/egdaemon/wasinet/wasinet v0.0.0-20241230124507-2a54ddc9c245 h1:RrfQTjB6qcdQEhd+O2ftHIJn23waQTsBcVBBlQaJX4Y=
 github.com/egdaemon/wasinet/wasinet v0.0.0-20241230124507-2a54ddc9c245/go.mod h1:vPVQ3HHYTa9Fe7lz+ZBqI49kw76LSTQfvKZlO8QpWsY=
 github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=

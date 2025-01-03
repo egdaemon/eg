@@ -23,14 +23,5 @@ RUN apt-get -y install golang-1.23 eg duckdb
 # RUN apt-get -y install gh
 RUN ln -s /usr/lib/go-1.23/bin/go /usr/local/bin/go
 
-# until next deb is published
-RUN printf "g eg  -\nu egd - \"eg daemon user\" /home/egd /bin/bash\nm egd eg\nm egd root\n" > /usr/lib/sysusers.d/00-eg-daemon.conf
-RUN printf "d /etc/eg                        0600 root root - -\nC /home/egd                      0700 egd  egd  - /etc/skel\nf /var/lib/systemd/linger/eg     0611 root root - -\nR /var/cache/eg-daemon/spool/t/* -    -    -    - -\n" > /usr/lib/tmpfiles.d/00-eg-daemon.conf
-RUN cat /usr/lib/sysusers.d/00-eg-daemon.conf
-RUN cat /usr/lib/tmpfiles.d/00-eg-daemon.conf
 RUN systemd-sysusers
 RUN systemd-tmpfiles --create
-
-# due to the mismatch in root user owning /opt/eg and the default user we run as mark the /opt/eg directory as safe
-RUN su - egd -c 'git config --global --add safe.directory /opt/eg'
-RUN git config --global --add safe.directory /opt/eg

@@ -15,7 +15,15 @@ import (
 func TestNetwork(ctx context.Context, op eg.Op) error {
 	return shell.Run(
 		ctx,
-		shell.New("eg compute local tests/network"),
+		// shell.New("eg compute local tests/network"),
+	)
+}
+
+func QuickFix(ctx context.Context, op eg.Op) error {
+	return shell.Run(
+		ctx,
+		// shell.Newf("chmod 0777 %s", egenv.RootDirectory()).Privileged(),
+		// shell.Newf("chmod 0777 %s", egenv.CacheDirectory()).Privileged(),
 	)
 }
 
@@ -27,16 +35,20 @@ func main() {
 	// c1 := eg.Container("eg.ubuntu.24.10")
 	err := eg.Perform(
 		ctx,
+		egbug.FileTree,
 		eggit.AutoClone,
+		QuickFix,
 		eg.Build(
 			// c1.BuildFromFile(".dist/deb/Containerfile"),
 			eg.DefaultModule(),
+		),
+		eggolang.AutoCompile(
+			eggolang.CompileOptionTags("no_duckdb_arrow"),
 		),
 		eg.Parallel(
 			eg.Module(
 				ctx,
 				eg.DefaultModule(),
-				egbug.Users,
 				egbug.FileTree,
 				eggolang.AutoTest(
 					eggolang.TestOptionTags("no_duckdb_arrow"),

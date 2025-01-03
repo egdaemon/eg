@@ -63,9 +63,7 @@ func Builder(name string, distro string) eg.ContainerRunner {
 		OptionEnv("DEBEMAIL", maintainer.Email).
 		OptionEnv("DEBFULLNAME", maintainer.Name).
 		OptionEnv("DISTRO", distro).
-		OptionEnv("CHANGELOG_DATE", c.Committer.When.Format(time.RFC1123Z)).
-		OptionEnv("GOCACHE", egenv.CacheDirectory("golang")).
-		OptionEnv("GOMODCACHE", egenv.CacheDirectory("golang", "mod"))
+		OptionEnv("CHANGELOG_DATE", c.Committer.When.Format(time.RFC1123Z))
 }
 
 func Build(ctx context.Context, _ eg.Op) error {

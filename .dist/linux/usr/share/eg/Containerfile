@@ -16,7 +16,7 @@ RUN apt-get -y install eg
 RUN systemd-sysusers
 RUN systemd-tmpfiles --create
 RUN systemd-tmpfiles --remove
-RUN usermod --add-subuids 100000-165535 --add-subgids 100000-165535 eg
+RUN usermod --add-subuids 100000-165535 --add-subgids 100000-165535 egd
 RUN systemctl disable eg-runner-build.service
 RUN systemctl disable eg-runner.service
 RUN systemctl enable eg-daemon.service eg-daily-reload.service eg-disk-usage.service

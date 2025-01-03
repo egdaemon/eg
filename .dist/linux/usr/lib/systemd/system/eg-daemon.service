@@ -16,7 +16,7 @@ RuntimeDirectory=%p
 RuntimeDirectoryMode=0700
 EnvironmentFile=-/etc/eg/daemon.env
 PermissionsStartOnly=true
-ExecStartPre=/usr/bin/loginctl enable-linger eg
+ExecStartPre=/usr/bin/loginctl enable-linger egd
 ExecStart=/usr/bin/eg daemon --sshknownhostspath=/etc/ssh/ssh_known_hosts
 
 [Install]

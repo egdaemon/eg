@@ -332,7 +332,7 @@ func beginwork(ctx context.Context, md metadata, dir string) state {
 	tmpdir = filepath.Join(dir, "work")
 	// fsx.PrintDir(os.DirFS(dir))
 
-	if err = os.MkdirAll(tmpdir, 0700); err != nil {
+	if err = os.MkdirAll(tmpdir, 0770); err != nil {
 		return failure(err, idle(md))
 	}
 

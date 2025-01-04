@@ -5,6 +5,6 @@ COPY rootfs /
 RUN systemd-sysusers
 RUN systemd-tmpfiles --create
 RUN pacman --noconfirm -Syu podman netavark pacman-contrib pkgfile foot sudo bash-completion tree base base-devel git go openssh rsync github-cli
-RUN printf 'build ALL=(ALL) ALL\n' | tee -a /etc/sudoers
+# RUN printf 'egd ALL=(ALL) ALL\n' | tee -a /etc/sudoers.d/egd
 
 CMD /usr/sbin/init

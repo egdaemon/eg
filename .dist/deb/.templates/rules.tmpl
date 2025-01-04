@@ -26,3 +26,7 @@ override_dh_auto_build:
 override_dh_auto_test:
 	echo "DH AUTO TEST OVERRIDE"
 	CACHE_DIRECTORY="$(CURDIR)" $(CURDIR)/bin/eg version
+
+
+override_dh_dwz:
+    # Do nothing - this effectively disables dwz. golang does its own thing.

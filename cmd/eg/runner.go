@@ -43,7 +43,7 @@ import (
 
 type module struct {
 	Dir        string `name:"directory" help:"root directory of the repository" default:"${vars_git_directory}"`
-	ModuleDir  string `name:"moduledir" help:"deprecated removed once infrastructure is updated" hidden:"true" default:".eg"`
+	ModuleDir  string `name:"moduledir" help:"deprecated removed once infrastructure is updated" hidden:"true" default:"${vars_workload_directory}"`
 	RuntimeDir string `name:"runtimedir" help:"runtime directory" hidden:"true" default:"${vars_eg_runtime_directory}"`
 	Module     string `arg:"" help:"name of the module to run"`
 }
@@ -219,7 +219,7 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 type wasiCmd struct {
 	Dir       string `name:"directory" help:"root directory of the repository" default:"${vars_git_directory}"`
 	Module    string `arg:"" help:"name of the module to run"`
-	ModuleDir string `name:"moduledir" help:"deprecated removed once infrastructure is updated" hidden:"true" default:".eg"`
+	ModuleDir string `name:"moduledir" help:"deprecated removed once infrastructure is updated" hidden:"true" default:"${vars_workload_directory}"`
 }
 
 func (t wasiCmd) Run(gctx *cmdopts.Global) (err error) {

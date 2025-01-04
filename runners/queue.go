@@ -361,7 +361,7 @@ func beginwork(ctx context.Context, md metadata, dir string) state {
 
 	errorsx.Log(tarx.Inspect(archive))
 
-	if ws, err = workspaces.New(ctx, tmpdir, ".eg", "eg"); err != nil {
+	if ws, err = workspaces.New(ctx, tmpdir, eg.DefaultModuleDirectory(), "eg"); err != nil {
 		return discard(uid, md, failure(errorsx.Wrap(err, "unable to setup workspace"), idle(md)))
 	}
 

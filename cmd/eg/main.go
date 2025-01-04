@@ -18,6 +18,7 @@ import (
 	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/cmd/cmderrors"
 	"github.com/egdaemon/eg/cmd/cmdopts"
+	"github.com/egdaemon/eg/cmd/cmdplete"
 	"github.com/egdaemon/eg/cmd/eg/accountcmds"
 	"github.com/egdaemon/eg/cmd/eg/compute"
 	"github.com/egdaemon/eg/cmd/eg/daemons"
@@ -97,6 +98,7 @@ func main() {
 	}, os.Kill, os.Interrupt)
 
 	user := userx.CurrentUserOrDefault(userx.Root())
+	gitdir := envx.String(gitx.DetectRoot(), "EG_GIT_REPOSITORY")
 
 	parser := kong.Must(
 		&shellcli,
@@ -108,7 +110,7 @@ func main() {
 			"vars_console_endpoint":          eg.EnvConsoleHostDefault(),
 			"vars_tls_insecure_default":      eg.EnvTLSInsecure(),
 			"vars_cwd":                       osx.Getwd("."),
-			"vars_git_directory":             envx.String(gitx.DetectRoot(), "EG_GIT_REPOSITORY"),
+			"vars_git_directory":             gitdir,
 			"vars_runtime_directory":         userx.DefaultRuntimeDirectory(),
 			"vars_cache_directory":           userx.DefaultCacheDirectory(),
 			"vars_container_cache_directory": filepath.Join(userx.DefaultCacheDirectory(), "containers"),
@@ -135,6 +137,7 @@ func main() {
 			"vars_git_default_remote_name": git.DefaultRemoteName,
 			"vars_git_default_reference":   "main",
 			"vars_git_head_reference":      "HEAD",
+			"vars_workload_directory":      eg.DefaultModuleDirectory(),
 		},
 		kong.UsageOnError(),
 		kong.Bind(
@@ -146,9 +149,15 @@ func main() {
 		kong.TypeMapper(reflect.TypeOf([]*net.TCPAddr(nil)), kong.MapperFunc(cmdopts.ParseTCPAddrArray)),
 	)
 
+	pw := cmdplete.NewWorkload(filepath.Join(gitdir, eg.DefaultModuleDirectory()))
+
 	// Run kongplete.Complete to handle completion requests
 	kongplete.Complete(
 		parser,
+		kongplete.WithPredictor(
+			"eg.workload",
+			pw,
+		),
 	)
 
 	if ctx, err = parser.Parse(os.Args[1:]); err != nil {

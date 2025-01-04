@@ -4,7 +4,7 @@ After=network.target
 
 [Service]
 User=egd
-Group=eg
+Group=egd
 IOSchedulingClass=idle
 IOSchedulingPriority=7
 PrivateMounts=yes

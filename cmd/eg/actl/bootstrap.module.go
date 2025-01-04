@@ -15,8 +15,8 @@ import (
 var embeddedbootstrapmodule embed.FS
 
 type BootstrapModule struct {
-	Dir      string `name:"directory" help:"root directory to use" default:"${vars_cwd}"`
-	Relative string `name:"relative" help:"relative path from the directory to create the module within" default:".${vars_workload_directory}"`
+	Dir      string `name:"directory" help:"root directory to use" default:"${vars_git_directory}"`
+	Relative string `name:"relative" help:"relative path from the directory to create the module within" default:"${vars_workload_directory}"`
 }
 
 func (t BootstrapModule) Run(gctx *cmdopts.Global) (err error) {

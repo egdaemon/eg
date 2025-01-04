@@ -88,6 +88,10 @@ const (
 	EnvUnsafeGitCloneEnabled = "EG_UNSAFE_GIT_CLONE_ENABLED"
 )
 
+func DefaultModuleDirectory() string {
+	return ".eg"
+}
+
 func DefaultCacheDirectory(rel ...string) string {
 	return filepath.Join("/", "opt", "eg.cache", filepath.Join(rel...))
 }

@@ -2,11 +2,13 @@ package egenv
 
 import (
 	"os"
+	"os/user"
 	"path/filepath"
 	"time"
 
 	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/internal/envx"
+	"github.com/egdaemon/eg/internal/userx"
 	"github.com/egdaemon/eg/runtime/wasi/env"
 )
 
@@ -19,6 +21,11 @@ func TTL() time.Duration {
 // Read the run ID from the environment
 func RunID() string {
 	return env.String("00000000-0000-0000-0000-000000000000", eg.EnvComputeRunID)
+}
+
+// returns the current user.
+func User() *user.User {
+	return userx.CurrentUserOrDefault(userx.Root())
 }
 
 // returns the absolute path to the cache directory, when arguments are provided they are joined

@@ -83,7 +83,7 @@ func (t c8sUpload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error
 		errorsx.Log(errorsx.Wrap(os.RemoveAll(tmpdir), "unable to remove temp directory"))
 	}()
 
-	egdir := filepath.Join(tmpdir, ".eg")
+	egdir := filepath.Join(tmpdir, eg.DefaultModuleDirectory())
 	if err = fsx.MkDirs(0700, egdir, filepath.Join(tmpdir, buildir, "workspace")); err != nil {
 		return err
 	}
@@ -106,7 +106,7 @@ func (t c8sUpload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error
 		return err
 	}
 
-	if ws, err = workspaces.New(gctx.Context, tmpdir, ".eg", ""); err != nil {
+	if ws, err = workspaces.New(gctx.Context, tmpdir, eg.DefaultModuleDirectory(), ""); err != nil {
 		return err
 	}
 

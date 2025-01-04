@@ -30,8 +30,8 @@ import (
 type local struct {
 	cmdopts.RuntimeResources
 	Dir              string   `name:"directory" help:"root directory of the repository" default:"${vars_git_directory}"`
-	ModuleDir        string   `name:"moduledir" help:"must be a subdirectory in the provided directory" default:".eg"`
-	Name             string   `arg:"" name:"module" help:"name of the module to run, i.e. the folder name within moduledir" default:""`
+	ModuleDir        string   `name:"moduledir" help:"must be a subdirectory in the provided directory" default:"${vars_workload_directory}"`
+	Name             string   `arg:"" name:"module" help:"name of the module to run, i.e. the folder name within moduledir" default:"" predictor:"eg.workload"`
 	Privileged       bool     `name:"privileged" help:"run the initial container in privileged mode"`
 	Dirty            bool     `name:"dirty" help:"include user directories and environment variables" hidden:"true"`
 	EnvironmentPaths string   `name:"envpath" help:"environment files to pass to the module" default:""`

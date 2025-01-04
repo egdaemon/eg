@@ -3,6 +3,7 @@ package backoff
 import (
 	"crypto/md5"
 	"encoding/binary"
+	"log"
 	"math"
 	"math/bits"
 	"math/rand"
@@ -63,6 +64,14 @@ func JitterRandWindow(d time.Duration) Option {
 			return x + delta
 		})
 	}
+}
+
+func Debug(s Strategy) Strategy {
+	return StrategyFunc(func(attempt int64) time.Duration {
+		delay := s.Backoff(attempt)
+		log.Println("backoff", attempt, delay)
+		return delay
+	})
 }
 
 // New backoff
@@ -164,7 +173,7 @@ func (t *awaiter) Await(d Strategy) <-chan time.Time {
 	return time.After(delay)
 }
 
-func Waiter() Awaiter {
+func Chan() Awaiter {
 	return &awaiter{attempts: -1}
 }
 

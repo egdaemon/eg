@@ -32,9 +32,9 @@ func Build(ctx context.Context, _ eg.Op) error {
 	return shell.Run(
 		ctx,
 		mkpkgruntime.Newf("mkdir -p %s", cdir),
-		mkpkgruntime.New("sudo --preserve-env=PKGDEST,PACKAGER,BUILDDIR -u build env"),
-		mkpkgruntime.Directory(templatedir).New("sudo --preserve-env=PKGDEST,PACKAGER,BUILDDIR,SRCDEST -g root -u build pwd"),
-		mkpkgruntime.Directory(templatedir).New("sudo --preserve-env=PKGDEST,PACKAGER,BUILDDIR,SRCDEST -g root -u build makepkg -f"),
+		mkpkgruntime.New("sudo --preserve-env=PKGDEST,PACKAGER,BUILDDIR -u egd env"),
+		mkpkgruntime.Directory(templatedir).New("sudo --preserve-env=PKGDEST,PACKAGER,BUILDDIR,SRCDEST -g root -u egd pwd"),
+		mkpkgruntime.Directory(templatedir).New("sudo --preserve-env=PKGDEST,PACKAGER,BUILDDIR,SRCDEST -g root -u egd makepkg -f"),
 		mkpkgruntime.Newf("rsync --recursive %s/ %s", pkgdest, cdir),
 		mkpkgruntime.Newf("paccache -c %s -rk2", cdir),
 	)

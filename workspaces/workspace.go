@@ -104,12 +104,13 @@ func ensuredirs(c Context) (_ Context, err error) {
 	// the 4 caching/tmp directories are given 0777 permissions
 	// because unprivileged users may need to access them.
 	err1 := fsx.MkDirs(
-		0770,
+		0777,
 		filepath.Join(c.Root, c.TemporaryDir),
 		filepath.Join(c.Root, c.GenModDir),
 		filepath.Join(c.Root, c.BuildDir, c.Module, "main.wasm.d"),
 		filepath.Join(c.Root, c.CacheDir),
 	)
+
 	// need to ensure that certain directories and files exists
 	// since they're mounted into containers.
 	return c, errorsx.Compact(err1, fsx.MkDirs(

@@ -24,6 +24,7 @@ import (
 	"github.com/egdaemon/eg/internal/gitx"
 	"github.com/egdaemon/eg/internal/iox"
 	"github.com/egdaemon/eg/internal/langx"
+	"github.com/egdaemon/eg/internal/md5x"
 	"github.com/egdaemon/eg/internal/tarx"
 	"github.com/egdaemon/eg/internal/userx"
 	"github.com/egdaemon/eg/internal/wasix"
@@ -331,7 +332,7 @@ func beginwork(ctx context.Context, md metadata, dir string) state {
 	tmpdir = filepath.Join(dir, "work")
 	// fsx.PrintDir(os.DirFS(dir))
 
-	if err = os.MkdirAll(tmpdir, 0700); err != nil {
+	if err = os.MkdirAll(tmpdir, 0770); err != nil {
 		return failure(err, idle(md))
 	}
 
@@ -454,12 +455,12 @@ func (t staterunning) Update(ctx context.Context) state {
 		var (
 			err          error
 			logdst       *os.File
-			containerdir = filepath.Join(userx.DefaultCacheDirectory(), "accounts", t.enqueued.AccountId, "containers")
-			cachedir     = filepath.Join(userx.DefaultCacheDirectory(), "accounts", t.enqueued.AccountId, "workloadcache")
+			containerdir = filepath.Join(userx.DefaultCacheDirectory(), "accounts", t.enqueued.AccountId, md5x.String(t.enqueued.Vcsuri), "containers")
+			cachedir     = filepath.Join(userx.DefaultCacheDirectory(), "accounts", t.enqueued.AccountId, md5x.String(t.enqueued.Vcsuri), "workloadcache")
 			logpath      = filepath.Join(t.ws.Root, t.ws.RuntimeDir, "daemon.log")
 		)
 
-		if err = fsx.MkDirs(0700, containerdir, cachedir); err != nil {
+		if err = fsx.MkDirs(0770, containerdir, cachedir); err != nil {
 			return terminate(errorsx.Wrap(err, "unable to setup container and cache directories"))
 		}
 

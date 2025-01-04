@@ -19,6 +19,7 @@ func CacheDirectory(dirs ...string) string {
 // attempt to build the yarn environment that properly
 func Env() ([]string, error) {
 	return envx.Build().FromEnv(os.Environ()...).
+		Var("COREPACK_HOME", egenv.CacheDirectory(".eg", "corepack")).
 		Var("YARN_CACHE_FOLDER", CacheDirectory()).
 		Var("YARN_ENABLE_GLOBAL_CACHE", envx.VarBool(false)).
 		Environ()

@@ -60,15 +60,15 @@ func DefaultDirLocation(rel string) string {
 }
 
 // DefaultCacheDirectory cache directory for storing data.
-func DefaultCacheDirectory() string {
+func DefaultCacheDirectory(rel ...string) string {
 	user := CurrentUserOrDefault(Root())
 	if user.Uid == Root().Uid {
-		return envx.String(filepath.Join("/", "var", "cache", DefaultDir), "CACHE_DIRECTORY")
+		return filepath.Join(envx.String(filepath.Join("/", "var", "cache", DefaultDir), "CACHE_DIRECTORY"), filepath.Join(rel...))
 	}
 
 	root := filepath.Join(user.HomeDir, ".cache", DefaultDir)
 
-	return envx.String(root, "CACHE_DIRECTORY", "XDG_CACHE_HOME")
+	return filepath.Join(envx.String(root, "CACHE_DIRECTORY", "XDG_CACHE_HOME"), filepath.Join(rel...))
 }
 
 // DefaultRuntimeDirectory runtime directory for storing data.

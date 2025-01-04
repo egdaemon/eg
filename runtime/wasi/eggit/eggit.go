@@ -156,10 +156,10 @@ func (t *modified) detect(ctx context.Context) error {
 		err := shell.Run(
 			ctx,
 			shell.Newf(
-				"git show --name-only %s | tee /dev/null", bcommit,
+				"git show --name-only %s > /dev/null 2>&1", bcommit,
 			).Directory(egenv.RootDirectory()),
 			shell.Newf(
-				"git show --name-only %s | tee /dev/null", hcommit,
+				"git show --name-only %s > /dev/null 2>&1", hcommit,
 			).Directory(egenv.RootDirectory()),
 		)
 		if err != nil {
@@ -169,7 +169,7 @@ func (t *modified) detect(ctx context.Context) error {
 		err = shell.Run(
 			ctx,
 			shell.Newf(
-				"git diff --name-only %s..%s | tee %s > /dev/null", bcommit, hcommit, path,
+				"git diff --name-only %s..%s | tee %s > /dev/null 2>&1", bcommit, hcommit, path,
 			).Directory(egenv.RootDirectory()),
 		)
 		if err != nil {

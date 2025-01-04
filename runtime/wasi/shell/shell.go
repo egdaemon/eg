@@ -175,13 +175,12 @@ func run(ctx context.Context, c Command) (err error) {
 	cctx, done := context.WithTimeout(ctx, c.timeout)
 	defer done()
 
-	environ := append(c.environ, fmt.Sprintf("HOME=%s", c.home))
-	cmd := []string{"-c", stringsx.Join(" ", "sudo", "-E", "-u", c.user, c.cmd)}
+	cmd := []string{"-c", stringsx.Join(" ", "sudo", "-H", "-g", "root", "-E", "-u", c.user, c.cmd)}
 	if c.user == "" {
-		cmd = []string{"-c", stringsx.Join(" ", "sudo", "-E", c.cmd)}
+		cmd = []string{"-c", stringsx.Join(" ", "sudo", "-H", "-E", c.cmd)}
 	}
 
-	err = ffiexec.Command(cctx, c.directory, environ, "bash", cmd)
+	err = ffiexec.Command(cctx, c.directory, c.environ, "bash", cmd)
 	if c.lenient && err != nil {
 		log.Println("command failed, but lenient mode enable", err)
 		return nil

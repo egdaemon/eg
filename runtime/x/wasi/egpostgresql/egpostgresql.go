@@ -20,6 +20,7 @@ func Auto(ctx context.Context, _ eg.Op) (err error) {
 		runtime.New("echo \"local all all trust\nhost all all 127.0.0.1/32 trust\" > \"$(su postgres -l -c \"psql --no-psqlrc -U postgres -d postgres -q -At -c 'SHOW hba_file;'\")\""),
 		runtime.New("su postgres -l -c 'psql --no-psqlrc -U postgres -d postgres -q -At -c \"SELECT pg_reload_conf();\"'"),
 		runtime.New("su postgres -l -c 'psql --no-psqlrc -U postgres -d postgres -c \"CREATE ROLE root WITH SUPERUSER LOGIN\"'"),
+		runtime.Newf("su postgres -l -c 'psql --no-psqlrc -U postgres -d postgres -c \"CREATE ROLE egd WITH SUPERUSER LOGIN\"'"),
 	)
 }
 

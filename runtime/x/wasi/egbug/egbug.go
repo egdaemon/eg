@@ -34,9 +34,7 @@ func Users(ctx context.Context, op eg.Op) error {
 		privileged.New("groups"),
 		privileged.New("cat /proc/self/uid_map"),
 		privileged.New("cat /proc/self/gid_map"),
-		privileged.New("ls -lha /usr/lib/tmpfiles.d"),
-		privileged.New("cat /usr/lib/tmpfiles.d/00-eg-daemon.conf"),
-		privileged.New("cat /usr/lib/tmpfiles.d/*"),
+		shell.New("groups"),
 	)
 }
 

@@ -116,7 +116,10 @@ func AutoClone(ctx context.Context, _ eg.Op) error {
 		// fix for permissions until we are running as a unprivileged user by default.
 		return shell.Run(
 			ctx,
-			shell.Newf("chmod -R 0770 %s", egenv.RootDirectory(".git")).Privileged(),
+			shell.Newf(
+				"chmod -R 0770 %s",
+				egenv.RootDirectory(),
+			).Privileged(),
 		)
 	}
 
@@ -153,9 +156,21 @@ func (t *modified) detect(ctx context.Context) error {
 		err := shell.Run(
 			ctx,
 			shell.Newf(
+				"git show --name-only %s | tee /dev/null", bcommit,
+			).Directory(egenv.RootDirectory()),
+			shell.Newf(
+				"git show --name-only %s | tee /dev/null", hcommit,
+			).Directory(egenv.RootDirectory()),
+		)
+		if err != nil {
+			return nil
+		}
+
+		err = shell.Run(
+			ctx,
+			shell.Newf(
 				"git diff --name-only %s..%s | tee %s", bcommit, hcommit, path,
 			).Directory(egenv.RootDirectory()),
-			shell.Newf("cat %s", path),
 		)
 		if err != nil {
 			return err

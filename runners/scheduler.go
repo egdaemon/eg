@@ -11,13 +11,14 @@ import (
 	"github.com/egdaemon/eg/backoff"
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
+	"github.com/egdaemon/eg/internal/tracex"
 )
 
 func AutoDownload(ctx context.Context, authedclient *http.Client) {
-	w := backoff.Waiter()
+	w := backoff.Chan()
 	s := backoff.New(
-		backoff.Exponential(envx.Duration(200*time.Millisecond, eg.EnvScheduleMaximumDelay)),
-		backoff.Maximum(1*time.Minute),
+		backoff.Exponential(200*time.Millisecond),
+		backoff.Maximum(envx.Duration(time.Minute, eg.EnvScheduleMaximumDelay)),
 		backoff.Jitter(0.02),
 	)
 
@@ -34,7 +35,7 @@ func AutoDownload(ctx context.Context, authedclient *http.Client) {
 			log.Println(errorsx.Wrap(err, "unable to read spool running directory"))
 			continue
 		} else if len(dent) > 0 {
-			log.Println("current tasks are in the running queue, not downloading any new tasks", len(dent))
+			tracex.Println("current tasks are in the running queue, not downloading any new tasks", len(dent))
 			continue
 		}
 
@@ -42,7 +43,7 @@ func AutoDownload(ctx context.Context, authedclient *http.Client) {
 			log.Println(errorsx.Wrap(err, "unable to read spool queued directory"))
 			continue
 		} else if len(dent) > 0 {
-			log.Println("current tasks are queued, not downloading any new tasks", len(dent))
+			tracex.Println("current tasks are queued, not downloading any new tasks", len(dent))
 			continue
 		}
 

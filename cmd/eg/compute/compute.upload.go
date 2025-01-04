@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"runtime"
 
 	"github.com/egdaemon/eg/authn"
 	"github.com/egdaemon/eg/cmd/cmdopts"
@@ -87,7 +88,7 @@ func (t upload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 	}
 
 	if tmpdir, err = os.MkdirTemp("", "eg.upload.*"); err != nil {
-		return errorsx.Wrap(err, "unable to  create temporary directory")
+		return errorsx.Wrap(err, "unable to create temporary directory")
 	}
 
 	defer func() {
@@ -178,9 +179,11 @@ func (t upload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 	}
 	req.Header.Set("Content-Type", mimetype)
 
-	log.Println("uploading", t.Endpoint)
+	log.Println("upload initiated", t.Endpoint)
 	resp, err := httpx.AsError(chttp.Do(req)) //nolint:golint,bodyclose
 	defer httpx.TryClose(resp)
+	defer runtime.KeepAlive(resp) // guess
+	log.Println("upload completed", t.Endpoint)
 
 	if err != nil {
 		return errorsx.Wrap(err, "unable to upload kernel for processing")

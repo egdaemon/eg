@@ -18,6 +18,7 @@ import (
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/httpx"
+	"github.com/egdaemon/eg/internal/runtimex"
 	"github.com/egdaemon/eg/internal/sshx"
 	"github.com/egdaemon/eg/runners"
 	"golang.org/x/crypto/ssh"
@@ -47,9 +48,12 @@ func (t daemon) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 		grpcl      net.Listener
 		authclient *http.Client
 	)
-
 	log.Println("running daemon initiated")
 	defer log.Println("running daemon completed")
+
+	// we want to set the umask to 0002 to ensure that the cache (and other) directory are readable by the group.
+	runtimex.Umask(0002)
+
 	log.Println("cache directory", t.CacheDir)
 	log.Println("detected runtime configuration", spew.Sdump(t.runtimecfg))
 

@@ -76,7 +76,7 @@ func (t c8sUpload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error
 	}
 
 	if tmpdir, err = os.MkdirTemp("", "eg.c8s.upload.*"); err != nil {
-		return errorsx.Wrap(err, "unable to  create temporary directory")
+		return errorsx.Wrap(err, "unable to create temporary directory")
 	}
 
 	defer func() {

@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/runtime/wasi/egenv"
@@ -11,7 +12,7 @@ import (
 )
 
 func CacheDirectory(dirs ...string) string {
-	return egenv.CacheDirectory(".eg", "cargo", filepath.Join(dirs...))
+	return egenv.CacheDirectory(eg.DefaultModuleDirectory(), "cargo", filepath.Join(dirs...))
 }
 
 // attempt to build the rust environment that sets up

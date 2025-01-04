@@ -60,7 +60,7 @@ func (t c8sLocal) Run(gctx *cmdopts.Global) (err error) {
 		errorsx.Log(errorsx.Wrap(os.RemoveAll(tmpdir), "unable to remove temp directory"))
 	}()
 
-	if ws, err = workspaces.New(gctx.Context, tmpdir, ".eg", ""); err != nil {
+	if ws, err = workspaces.New(gctx.Context, tmpdir, eg.DefaultModuleDirectory(), ""); err != nil {
 		return errorsx.Wrap(err, "unable to initialize workspace")
 	}
 

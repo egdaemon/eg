@@ -96,7 +96,6 @@ func Clone(ctx context.Context, uri, remote, commit string) error {
 func AutoClone(ctx context.Context, _ eg.Op) error {
 	// hack to deal with local development and the fact we can't run as an unprivileged user by default
 	if !envx.UnsafeIsLocalCompute() {
-		log.Println("------------------------- derp -------------------------")
 		// fix for permissions until we are running as a unprivileged user by default.
 		err := shell.Run(
 			ctx,
@@ -106,8 +105,6 @@ func AutoClone(ctx context.Context, _ eg.Op) error {
 		if err != nil {
 			return err
 		}
-	} else {
-		log.Println("------------------------- dorp -------------------------")
 	}
 
 	if err := Clone(ctx, env.String("", "EG_GIT_HEAD_URI"), env.String("origin", "EG_GIT_HEAD_REMOTE"), env.String("main", "EG_GIT_HEAD_REF")); err != nil {
@@ -116,18 +113,11 @@ func AutoClone(ctx context.Context, _ eg.Op) error {
 
 	// hack to deal with local development and the fact we can't run as an unprivileged user by default
 	if !envx.UnsafeIsLocalCompute() {
-		log.Println("------------------------- derp -------------------------")
 		// fix for permissions until we are running as a unprivileged user by default.
 		return shell.Run(
 			ctx,
-			shell.New("id").Privileged(),
-			shell.Newf("chmod 0770 %s", egenv.RootDirectory()).Privileged(),
 			shell.Newf("chmod -R 0770 %s", egenv.RootDirectory(".git")).Privileged(),
-			shell.New("ls -lha .").Privileged(),
-			// shell.Newf("sudo chown -R egd:root %s", egenv.RootDirectory(".git")).Privileged(),
 		)
-	} else {
-		log.Println("------------------------- dorp -------------------------")
 	}
 
 	return nil

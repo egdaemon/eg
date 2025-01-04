@@ -30,4 +30,4 @@ RUN systemctl enable ssh
 RUN systemd-sysusers
 RUN systemd-tmpfiles --create
 
-RUN printf '%wheel ALL=(ALL:ALL) NOPASSWD: ALL\n' | tee -a /etc/sudoers.d/egd
+RUN printf '%%wheel ALL=(ALL:ALL) NOPASSWD: ALL\n' | tee -a /etc/sudoers.d/egd

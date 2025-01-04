@@ -16,7 +16,6 @@ import (
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/fsx"
 	"github.com/egdaemon/eg/internal/md5x"
-	"github.com/egdaemon/eg/internal/userx"
 	"github.com/egdaemon/eg/internal/wasix"
 	"github.com/egdaemon/eg/interp/c8s"
 	"github.com/egdaemon/eg/interp/events"
@@ -212,9 +211,6 @@ func (t runner) perform(ctx context.Context, runid, path string, rtb runtimefn) 
 	debugx.Println("cache dir", hostcachedir, "->", eg.DefaultCacheDirectory())
 	debugx.Println("runtime dir", t.runtimedir, "->", eg.DefaultRuntimeDirectory())
 
-	u := userx.CurrentUserOrDefault(userx.Root())
-	log.Println("DERP DERP", u.Name)
-
 	mcfg := wazero.NewModuleConfig().WithEnv(
 		"CI", envx.String("false", "EG_CI", "CI"),
 	).WithEnv(
@@ -237,8 +233,6 @@ func (t runner) perform(ctx context.Context, runid, path string, rtb runtimefn) 
 		"RUNTIME_DIRECTORY", eg.DefaultRuntimeDirectory(),
 	).WithEnv(
 		"PATH", os.Getenv("PATH"),
-	// ).WithEnv(
-	// 	"HOME", userx.HomeDirectoryOrDefault("/root"),
 	).WithEnv(
 		"TERM", envx.String("", "TERM"),
 	).WithEnv(

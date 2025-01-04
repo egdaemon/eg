@@ -32,6 +32,7 @@ func prepare(ctx context.Context, _ eg.Op) error {
 		runtime.Newf("cat .dist/deb/.templates/changelog.tmpl | envsubst | tee %s/debian/changelog", debdir),
 		runtime.Newf("cat .dist/deb/.templates/control.tmpl | envsubst | tee %s/debian/control", debdir),
 		runtime.Newf("cat .dist/deb/.templates/rules.tmpl | envsubst | tee %s/debian/rules", debdir),
+		runtime.Newf("rm -rf %s/src", debdir), // this shouldn't be necessary
 		runtime.Newf("git clone --depth 1 file://${PWD} %s/src", debdir),
 	)
 }
@@ -47,7 +48,7 @@ func build(ctx context.Context, _ eg.Op) error {
 	return shell.Run(
 		ctx,
 		runtime.New("go version"),
-		runtime.Newf("go -C src build  -tags \"no_duckdb_arrow\" -buildvcs ./cmd/...").Directory(debdir),
+		runtime.Newf("go -C src build -tags \"no_duckdb_arrow\" -buildvcs ./cmd/...").Directory(debdir),
 		// shell.New("echo ${GPG_PASSPHRASE} | gpg-preset-passphrase --present {key}").Environ("GPG_PASSPHRASE", env.String("", "GPG_PASSPHRASE")),
 		runtime.Newf("debuild -S -k%s", maintainer.GPGFingerprint).Directory(debdir),
 		runtime.Newf("dput -f -c %s eg eg_${VERSION}_source.changes", egenv.RootDirectory(".dist", "deb", "dput.config")).Directory(filepath.Dir(debdir)),

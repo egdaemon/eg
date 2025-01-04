@@ -169,7 +169,7 @@ func (t *modified) detect(ctx context.Context) error {
 		err = shell.Run(
 			ctx,
 			shell.Newf(
-				"git diff --name-only %s..%s | tee %s", bcommit, hcommit, path,
+				"git diff --name-only %s..%s | tee %s > /dev/null", bcommit, hcommit, path,
 			).Directory(egenv.RootDirectory()),
 		)
 		if err != nil {

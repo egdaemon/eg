@@ -105,7 +105,6 @@ func New(cmd string) Command {
 		u = ""
 	}
 
-	log.Println("default shell user", u)
 	return Command{
 		user:    u, // default user to execute commands as
 		home:    "/home/egd",

@@ -333,8 +333,8 @@ func easyjson61363d27DecodeGithubComEgdaemonEgRunners3(in *jlexer.Lexer, out *En
 			out.Vram = uint64(in.Uint64())
 		case "cluster_id":
 			out.ClusterId = string(in.String())
-		case "vcsuri":
-			out.Vcsuri = string(in.String())
+		case "vcs_uri":
+			out.VcsUri = string(in.String())
 		case "labels":
 			if in.IsNull() {
 				in.Skip()
@@ -458,15 +458,15 @@ func easyjson61363d27EncodeGithubComEgdaemonEgRunners3(out *jwriter.Writer, in E
 		}
 		out.String(string(in.ClusterId))
 	}
-	if in.Vcsuri != "" {
-		const prefix string = ",\"vcsuri\":"
+	if in.VcsUri != "" {
+		const prefix string = ",\"vcs_uri\":"
 		if first {
 			first = false
 			out.RawString(prefix[1:])
 		} else {
 			out.RawString(prefix)
 		}
-		out.String(string(in.Vcsuri))
+		out.String(string(in.VcsUri))
 	}
 	if len(in.Labels) != 0 {
 		const prefix string = ",\"labels\":"
@@ -1140,8 +1140,8 @@ func easyjson61363d27DecodeGithubComEgdaemonEgRunners12(in *jlexer.Lexer, out *E
 			out.CompletedAt = string(in.String())
 		case "description":
 			out.Description = string(in.String())
-		case "vcsuri":
-			out.Vcsuri = string(in.String())
+		case "vcs_uri":
+			out.VcsUri = string(in.String())
 		case "allow_shared":
 			out.AllowShared = bool(in.Bool())
 		case "account_id":
@@ -1319,15 +1319,15 @@ func easyjson61363d27EncodeGithubComEgdaemonEgRunners12(out *jwriter.Writer, in 
 		}
 		out.String(string(in.Description))
 	}
-	if in.Vcsuri != "" {
-		const prefix string = ",\"vcsuri\":"
+	if in.VcsUri != "" {
+		const prefix string = ",\"vcs_uri\":"
 		if first {
 			first = false
 			out.RawString(prefix[1:])
 		} else {
 			out.RawString(prefix)
 		}
-		out.String(string(in.Vcsuri))
+		out.String(string(in.VcsUri))
 	}
 	if in.AllowShared {
 		const prefix string = ",\"allow_shared\":"

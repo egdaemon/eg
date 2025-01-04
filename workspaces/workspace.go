@@ -15,6 +15,7 @@ import (
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/fsx"
+	"github.com/egdaemon/eg/internal/tracex"
 	"github.com/gofrs/uuid"
 )
 
@@ -111,10 +112,14 @@ func ensuredirs(c Context) (_ Context, err error) {
 		filepath.Join(c.Root, c.CacheDir),
 	)
 
+	perms := rdir.Mode() & (fs.ModePerm)
+
+	tracex.Println("------------ ensuredirs", perms, "------------")
+
 	// need to ensure that certain directories and files exists
 	// since they're mounted into containers.
 	return c, errorsx.Compact(err1, fsx.MkDirs(
-		rdir.Mode(),
+		perms,
 		filepath.Join(c.Root, c.RuntimeDir),
 		filepath.Join(c.Root, c.WorkingDir),
 	))

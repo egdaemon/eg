@@ -5,10 +5,10 @@ import (
 	"database/sql"
 	"time"
 
-	"github.com/egdaemon/eg/internal/debugx"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/slicesx"
 	"github.com/egdaemon/eg/internal/timex"
+	"github.com/egdaemon/eg/internal/tracex"
 	"github.com/gofrs/uuid"
 	"github.com/shirou/gopsutil/v4/cpu"
 	"github.com/shirou/gopsutil/v4/disk"
@@ -56,7 +56,7 @@ func sampledisk(ctx context.Context, analytics *sql.DB) error {
 		return err
 	}
 
-	debugx.Println("eg.metrics.disk", usage.Path, usage.UsedPercent)
+	tracex.Println("eg.metrics.disk", usage.Path, usage.UsedPercent)
 
 	return nil
 }
@@ -77,7 +77,7 @@ func samplecompute(ctx context.Context, analytics *sql.DB) error {
 		return err
 	}
 
-	debugx.Println("eg.metrics.compute", load)
+	tracex.Println("eg.metrics.compute", load)
 	return nil
 }
 
@@ -107,7 +107,7 @@ func samplememory(ctx context.Context, analytics *sql.DB) error {
 		return err
 	}
 
-	debugx.Println("eg.metrics.memory.percent", percent)
+	tracex.Println("eg.metrics.memory.percent", percent)
 	return nil
 }
 

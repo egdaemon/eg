@@ -12,6 +12,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
@@ -330,9 +331,8 @@ func beginwork(ctx context.Context, md metadata, dir string) state {
 
 	log.Println("initializing runner", uid, dir)
 	tmpdir = filepath.Join(dir, "work")
-	// fsx.PrintDir(os.DirFS(dir))
 
-	if err = os.MkdirAll(tmpdir, 0770); err != nil {
+	if err = fsx.MkDirs(0770, tmpdir); err != nil {
 		return failure(err, idle(md))
 	}
 
@@ -345,6 +345,7 @@ func beginwork(ctx context.Context, md metadata, dir string) state {
 	}
 
 	log.Println("metadata", spew.Sdump(metadata.Enqueued))
+
 	defer func() {
 		if err == nil {
 			return
@@ -399,7 +400,7 @@ func beginwork(ctx context.Context, md metadata, dir string) state {
 		Var(gitx.EnvAuthEGAccessToken, metadata.AccessToken).
 		Var(eg.EnvComputeRunID, uid).
 		Var(eg.EnvComputeAccountID, metadata.Enqueued.AccountId).
-		Var(eg.EnvComputeVCS, metadata.Enqueued.Vcsuri).
+		Var(eg.EnvComputeVCS, metadata.Enqueued.VcsUri).
 		Var(eg.EnvComputeTTL, time.Duration(metadata.Enqueued.Ttl).String()).
 		Var(eg.EnvComputeLoggingVerbosity, envx.String(strconv.Itoa(md.logVerbosity), eg.EnvComputeLoggingVerbosity))
 
@@ -436,6 +437,18 @@ func beginwork(ctx context.Context, md metadata, dir string) state {
 	return staterunning{metadata: md, enqueued: metadata.Enqueued, ws: ws, ragent: ragent, dir: dir, tmpdir: tmpdir, entry: metadata.Enqueued.Entry}
 }
 
+func cacheprefix(enq *Enqueued) string {
+	if prefix, _, ok := strings.Cut(enq.AccountId, "-"); ok {
+		return prefix
+	}
+
+	return enq.AccountId
+}
+
+func cachebucket(enq *Enqueued) string {
+	return md5x.String(enq.AccountId + enq.VcsUri)
+}
+
 type staterunning struct {
 	metadata
 	enqueued *Enqueued
@@ -455,8 +468,8 @@ func (t staterunning) Update(ctx context.Context) state {
 		var (
 			err          error
 			logdst       *os.File
-			containerdir = filepath.Join(userx.DefaultCacheDirectory(), "accounts", t.enqueued.AccountId, md5x.String(t.enqueued.Vcsuri), "containers")
-			cachedir     = filepath.Join(userx.DefaultCacheDirectory(), "accounts", t.enqueued.AccountId, md5x.String(t.enqueued.Vcsuri), "workloadcache")
+			containerdir = userx.DefaultCacheDirectory("wcache", cacheprefix(t.enqueued), cachebucket(t.enqueued), "containers")
+			cachedir     = userx.DefaultCacheDirectory("wcache", cacheprefix(t.enqueued), cachebucket(t.enqueued), "workloadcache")
 			logpath      = filepath.Join(t.ws.Root, t.ws.RuntimeDir, "daemon.log")
 		)
 
@@ -467,6 +480,7 @@ func (t staterunning) Update(ctx context.Context) state {
 		if logdst, err = os.Create(logpath); err != nil {
 			return completed(t.metadata, t.tmpdir, t.ws, t.ragent.id, 0, err)
 		}
+
 		defer logdst.Close()
 		options := append(
 			t.ragent.Options(),

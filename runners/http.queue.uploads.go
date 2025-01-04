@@ -41,7 +41,7 @@ func NewEnqueueUpload(enq *Enqueued, archive io.Reader) (mimetype string, body *
 			return errorsx.Wrap(err, "unable to set operating system")
 		}
 
-		if err = w.WriteField("vcsuri", enq.Vcsuri); err != nil {
+		if err = w.WriteField("vcs_uri", enq.VcsUri); err != nil {
 			return errorsx.Wrap(err, "unable to set vcsuri")
 		}
 

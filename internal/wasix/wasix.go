@@ -3,12 +3,12 @@ package wasix
 import (
 	"context"
 	"io/fs"
-	"log"
 	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/egdaemon/eg/internal/errorsx"
+	"github.com/egdaemon/eg/internal/tracex"
 	"github.com/tetratelabs/wazero"
 )
 
@@ -42,8 +42,8 @@ func WarmCacheFromDirectoryTree(ctx context.Context, root string, cache wazero.C
 			return nil
 		}
 
-		log.Println("compiling module initiated", path)
-		defer log.Println("compiling module completed", path)
+		tracex.Println("compiling module initiated", path)
+		defer tracex.Println("compiling module completed", path)
 
 		if wasi, err = os.ReadFile(filepath.Join(root, path)); err != nil {
 			return errorsx.Wrap(err, "unable to open wasi")

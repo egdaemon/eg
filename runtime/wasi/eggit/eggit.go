@@ -128,7 +128,7 @@ func AutoClone(ctx context.Context, _ eg.Op) error {
 }
 
 type modified struct {
-	derp    sync.Once
+	o       sync.Once
 	changed []string
 }
 
@@ -194,7 +194,7 @@ func (t *modified) detect(ctx context.Context) error {
 
 func (t *modified) Changed(paths ...string) func(context.Context) bool {
 	return func(ctx context.Context) bool {
-		t.derp.Do(func() {
+		t.o.Do(func() {
 			errorsx.Log(t.detect(ctx))
 		})
 
@@ -216,7 +216,7 @@ func (t *modified) Changed(paths ...string) func(context.Context) bool {
 }
 
 func NewModified() modified {
-	return modified{derp: sync.Once{}}
+	return modified{o: sync.Once{}}
 }
 
 // ensures the workspace has not been modified. useful for detecting

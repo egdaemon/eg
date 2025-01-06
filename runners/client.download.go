@@ -44,7 +44,7 @@ func (t DownloadClient) Download(ctx context.Context) (err error) {
 		return err
 	}
 
-	httpreq, err := http.NewRequestWithContext(ctx, http.MethodPost, fmt.Sprintf("%s/c/manager/dequeue", t.host), bytes.NewReader(encoded))
+	httpreq, err := http.NewRequestWithContext(ctx, http.MethodPost, fmt.Sprintf("%s/c/q/dequeue", t.host), bytes.NewReader(encoded))
 	if err != nil {
 		return err
 	}
@@ -59,7 +59,7 @@ func (t DownloadClient) Download(ctx context.Context) (err error) {
 		return err
 	}
 
-	httpreq, err = http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/c/manager/download/%s", t.host, resp.Enqueued.Id), bytes.NewReader(encoded))
+	httpreq, err = http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/c/q/%s/download", t.host, resp.Enqueued.Id), bytes.NewReader(encoded))
 	if err != nil {
 		return err
 	}

@@ -32,7 +32,8 @@ var _ = Describe("FromTranspiled", func() {
 		Expect(err).To(Succeed())
 		roots, err := transpile.Autodetect(transpile.New(ws)).Run(ctx)
 		Expect(err).To(Succeed())
-
+		err = compile.EnsureRequiredPackages(ctx, filepath.Join(ws.Root, ws.TransDir))
+		Expect(err).To(Succeed())
 		modules, err := compile.FromTranspiled(ctx, ws, roots...)
 		Expect(err).To(Succeed())
 		Expect(modules).To(HaveLen(1))
@@ -52,6 +53,8 @@ var _ = Describe("FromTranspiled", func() {
 		ws, err = workspaces.New(ctx, tmpdir, eg.DefaultModuleDirectory(), "")
 		Expect(err).To(Succeed())
 		roots, err := transpile.Autodetect(transpile.New(ws)).Run(ctx)
+		Expect(err).To(Succeed())
+		err = compile.EnsureRequiredPackages(ctx, filepath.Join(ws.Root, ws.TransDir))
 		Expect(err).To(Succeed())
 
 		modules, err := compile.FromTranspiled(ctx, ws, roots...)
@@ -81,6 +84,8 @@ var _ = Describe("wasix warm cache", func() {
 		ws, err = workspaces.New(ctx, tmpdir, eg.DefaultModuleDirectory(), "")
 		Expect(err).To(Succeed())
 		roots, err := transpile.Autodetect(transpile.New(ws)).Run(ctx)
+		Expect(err).To(Succeed())
+		err = compile.EnsureRequiredPackages(ctx, filepath.Join(ws.Root, ws.TransDir))
 		Expect(err).To(Succeed())
 
 		_, err = compile.FromTranspiled(ctx, ws, roots...)

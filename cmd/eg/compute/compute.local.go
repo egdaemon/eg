@@ -132,6 +132,10 @@ func (t local) Run(gctx *cmdopts.Global) (err error) {
 		return err
 	}
 
+	if err = compile.EnsureRequiredPackages(gctx.Context, filepath.Join(ws.Root, ws.TransDir)); err != nil {
+		return err
+	}
+
 	modules, err := compile.FromTranspiled(gctx.Context, ws, roots...)
 	if err != nil {
 		return err

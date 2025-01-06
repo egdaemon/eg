@@ -46,6 +46,21 @@ func InitGolangTidy(ctx context.Context, dir string) error {
 	return nil
 }
 
+func EnsureRequiredPackages(ctx context.Context, dir string, packages ...string) error {
+	defaultPackages := []string{
+		"get", // yeah we know.
+		"github.com/egdaemon/eg/runtime/autowasinet",
+	}
+
+	cmd := exec.CommandContext(ctx, "go", append(defaultPackages, packages...)...)
+	cmd.Dir = dir
+	if err := cmd.Run(); err != nil {
+		return errorsx.Wrapf(err, "unable to download default packages: %s", cmd.String())
+	}
+
+	return nil
+}
+
 func FromTranspiled(ctx context.Context, ws workspaces.Context, m ...transpile.Compiled) (modules []transpile.Compiled, err error) {
 	modules = make([]transpile.Compiled, 0, len(m))
 

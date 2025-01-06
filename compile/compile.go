@@ -21,8 +21,12 @@ func InitGolang(ctx context.Context, dir string, packages ...string) error {
 		return errorsx.Wrapf(err, "unable to initialize go.mod: %s", cmd.Dir)
 	}
 
+	return InitPackages(ctx, dir, "-u", packages...)
+}
+
+func InitPackages(ctx context.Context, dir string, update string, packages ...string) error {
 	for _, pkg := range packages {
-		cmd = exec.CommandContext(ctx, "go", "get", "-u", pkg)
+		cmd := exec.CommandContext(ctx, "go", "get", update, pkg)
 		cmd.Dir = dir
 		if err := cmd.Run(); err != nil {
 			return errorsx.Wrapf(err, "unable to download default packages: %s", cmd.String())

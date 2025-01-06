@@ -344,7 +344,7 @@ func beginwork(ctx context.Context, md metadata, dir string) state {
 		return failure(err, idle(md))
 	}
 
-	log.Println("metadata", spew.Sdump(metadata.Enqueued))
+	debugx.Println("metadata", spew.Sdump(metadata.Enqueued))
 
 	defer func() {
 		if err == nil {
@@ -365,7 +365,7 @@ func beginwork(ctx context.Context, md metadata, dir string) state {
 		return discard(uid, md, failure(errorsx.Wrap(err, "unable to setup workspace"), idle(md)))
 	}
 
-	log.Println("workspace", spew.Sdump(ws))
+	debugx.Println("workspace", spew.Sdump(ws))
 
 	if err = tarx.Unpack(filepath.Join(ws.Root, ws.RuntimeDir), archive); err != nil {
 		return completed(md, tmpdir, ws, uid, 0, errorsx.Wrap(err, "unable to unpack archive"))

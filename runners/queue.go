@@ -477,6 +477,8 @@ func (t staterunning) Update(ctx context.Context) state {
 			return terminate(errorsx.Wrap(err, "unable to setup container and cache directories"))
 		}
 
+		log.Println("workload root cachedir", cachedir)
+
 		if logdst, err = os.Create(logpath); err != nil {
 			return completed(t.metadata, t.tmpdir, t.ws, t.ragent.id, 0, err)
 		}

@@ -13,6 +13,7 @@ import (
 
 	_eg "github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/internal/debugx"
+	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/iox"
 	"github.com/egdaemon/eg/internal/slicesx"
@@ -104,6 +105,20 @@ func AutoClone(ctx context.Context, _ eg.Op) error {
 
 	if err := Clone(ctx, env.String("", "EG_GIT_HEAD_URI"), env.String("origin", "EG_GIT_HEAD_REMOTE"), env.String("main", "EG_GIT_HEAD_REF")); err != nil {
 		return err
+	}
+
+	// hack to deal with local development and the fact we can't run as an unprivileged user by default
+	// fix for permissions until we are running as a unprivileged user by default.
+	if !envx.UnsafeIsLocalCompute() {
+		return shell.Run(
+			ctx,
+			// shell.Newf("chown -R egd:root %s", egenv.RootDirectory(".git")).Privileged(),
+			// shell.Newf("ls -lha %s", egenv.RootDirectory()),
+			shell.Newf(
+				"chmod -R 0770 %s",
+				egenv.RootDirectory(),
+			).Privileged(),
+		)
 	}
 
 	return nil

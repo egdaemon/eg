@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 
 	"github.com/egdaemon/eg/cmd/cmdopts"
+	"github.com/egdaemon/eg/internal/debugx"
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/fsx"
@@ -54,7 +55,7 @@ func MaybeAgentListener() (n net.Listener, err error) {
 
 func DefaultRunnerClient(ctx context.Context) (cc *grpc.ClientConn, err error) {
 	daemonpath := runners.DefaultRunnerSocketPath()
-	log.Println("connecting", daemonpath, fsx.FileExists(daemonpath))
+	debugx.Println("connecting", daemonpath, fsx.FileExists(daemonpath))
 	if _, err := os.Stat(daemonpath); os.IsNotExist(err) {
 		return nil, fmt.Errorf("agent not running at %s", daemonpath)
 	}
@@ -70,7 +71,7 @@ func AutoRunnerClient(global *cmdopts.Global, ws workspaces.Context, uid string,
 		return cc, nil
 	}
 
-	log.Println("initializing runner", uid)
+	debugx.Println("initializing runner", uid)
 	m := runners.NewManager(
 		global.Context,
 	)

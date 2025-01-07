@@ -30,6 +30,7 @@ import (
 	"github.com/egdaemon/eg/internal/gitx"
 	"github.com/egdaemon/eg/internal/osx"
 	"github.com/egdaemon/eg/internal/stringsx"
+	"github.com/egdaemon/eg/internal/tracex"
 	"github.com/egdaemon/eg/internal/userx"
 	"github.com/go-git/go-git/v5"
 	"github.com/gofrs/uuid"
@@ -177,7 +178,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	debugx.Println("shutting down")
+	tracex.Println("shutting down")
 	shellcli.Shutdown(nil)
 	shellcli.Cleanup.Wait()
 }

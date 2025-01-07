@@ -7,7 +7,6 @@ import (
 	"math"
 	"time"
 
-	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/stringsx"
 	"github.com/egdaemon/eg/runtime/wasi/egunsafe/ffiexec"
@@ -15,6 +14,7 @@ import (
 
 type Command struct {
 	user      string
+	group     string
 	cmd       string
 	home      string
 	directory string
@@ -66,9 +66,16 @@ func (t Command) As(u string) Command {
 	return t
 }
 
+// group to run the command as
+func (t Command) Group(g string) Command {
+	t.group = g
+	return t
+}
+
 // shorthand for As("") which runs the command as root.
 func (t Command) Privileged() Command {
-	t.user = ""
+	t.user = "root"
+	t.group = "root"
 	t.home = "/root"
 	return t
 }
@@ -98,15 +105,9 @@ func (t Command) Newf(cmd string, options ...any) Command {
 //
 //	timeout: 5 minutes.
 func New(cmd string) Command {
-	u := "egd"
-	// when in local mode always run as privileged user. hack until we can get
-	// podman to run as an unprivileged user and *still* have systemd working.
-	if envx.UnsafeIsLocalCompute() {
-		u = ""
-	}
-
 	return Command{
-		user:    u, // default user to execute commands as
+		user:    "egd",  // default user to execute commands as
+		group:   "root", // default group to the root group.
 		home:    "/home/egd",
 		cmd:     cmd,
 		timeout: 5 * time.Minute,
@@ -175,10 +176,7 @@ func run(ctx context.Context, c Command) (err error) {
 	cctx, done := context.WithTimeout(ctx, c.timeout)
 	defer done()
 
-	cmd := []string{"-c", stringsx.Join(" ", "sudo", "-H", "-g", "root", "-E", "-u", c.user, c.cmd)}
-	if c.user == "" {
-		cmd = []string{"-c", stringsx.Join(" ", "sudo", "-H", "-E", c.cmd)}
-	}
+	cmd := []string{"-c", stringsx.Join(" ", "sudo", "-E", "-H", "-g", c.group, "-u", c.user, c.cmd)}
 
 	err = ffiexec.Command(cctx, c.directory, c.environ, "bash", cmd)
 	if c.lenient && err != nil {

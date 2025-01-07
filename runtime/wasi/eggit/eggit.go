@@ -98,6 +98,7 @@ func AutoClone(ctx context.Context, _ eg.Op) error {
 	err := shell.Run(
 		ctx,
 		shell.Newf("git config --global --add safe.directory /opt/eg"),
+		shell.Newf("git config --global core.sharedRepository group"),
 	)
 	if err != nil {
 		return err

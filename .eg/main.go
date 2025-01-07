@@ -15,22 +15,22 @@ func Test(ctx context.Context, _ eg.Op) error {
 	return shell.Run(
 		ctx,
 		shell.New("ls -lha /opt/eg"),
-		shell.Newf(
-			"chmod -R 0770 %s",
-			egenv.RootDirectory(),
-		).Privileged(),
-		shell.New("ls -lha /opt/eg"),
-		shell.New("git fsck --full | head -25").Privileged(),
-		shell.New("git fsck --full | head -25"),
-		shell.New("git status --porcelain"),
+		// shell.Newf(
+		// 	"chmod -R 0770 %s",
+		// 	egenv.RootDirectory(),
+		// ).Privileged(),
+		// shell.New("ls -lha /opt/eg"),
+		// shell.New("git fsck --full | head -25").Privileged(),
+		// shell.New("git fsck --full | head -25"),
+		// shell.New("git status --porcelain | head -5"),
+		// shell.New("false"),
 	)
 }
 
 func Prepare(ctx context.Context, _ eg.Op) error {
 	return shell.Run(
 		ctx,
-		shell.Newf("git config safe.directory"),
-		shell.Newf("git config --global core.sharedRepository group"),
+		// shell.Newf("git config safe.directory"),
 	)
 }
 
@@ -57,11 +57,11 @@ func main() {
 			Test,
 			eggolang.AutoCompile(
 				eggolang.CompileOption.Tags("no_duckdb_arrow"),
-				eggolang.CompileOption.Debug(true),
+				// eggolang.CompileOption.Debug(true),
 			),
-			// eggolang.AutoTest(
-			// 	eggolang.TestOption.Tags("no_duckdb_arrow"),
-			// ),
+			eggolang.AutoTest(
+				eggolang.TestOption.Tags("no_duckdb_arrow"),
+			),
 		),
 	)
 

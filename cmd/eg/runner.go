@@ -23,6 +23,7 @@ import (
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/gitx"
+	"github.com/egdaemon/eg/internal/runtimex"
 	"github.com/egdaemon/eg/internal/wasix"
 	"github.com/egdaemon/eg/interp"
 	"github.com/egdaemon/eg/interp/c8s"
@@ -57,6 +58,9 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 		ebuf  = make(chan *ffigraph.EventInfo)
 		cc    grpc.ClientConnInterface
 	)
+
+	// ensure when we run modules our umask is set to allow git clones to work properly
+	runtimex.Umask(0002)
 
 	if ws, err = workspaces.FromEnv(gctx.Context, t.Dir, t.Module); err != nil {
 		return err

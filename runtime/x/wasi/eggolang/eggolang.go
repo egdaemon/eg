@@ -18,23 +18,37 @@ import (
 	"github.com/egdaemon/eg/runtime/wasi/shell"
 )
 
-type CompileOption func(*compileOption)
+var CompileOption = coption(nil)
 
-func CompileOptionTags(tags ...string) CompileOption {
+type coption func(*compileOption)
+
+func (coption) Debug(b bool) coption {
+	return func(co *compileOption) {
+		if b {
+			co.debug = "-x"
+		} else {
+			co.debug = ""
+		}
+	}
+}
+
+func (coption) Tags(tags ...string) coption {
 	return func(c *compileOption) {
 		c.bctx.BuildTags = tags
 	}
 }
 
 type compileOption struct {
-	bctx build.Context
+	debug string
+	bctx  build.Context
 }
 
-func AutoCompile(options ...CompileOption) eg.OpFn {
+func AutoCompile(options ...coption) eg.OpFn {
 	var (
 		tags  string
 		copts compileOption
 	)
+
 	copts = langx.Clone(copts, options...)
 	if len(copts.bctx.BuildTags) > 0 {
 		tags = fmt.Sprintf("-tags=%s", strings.Join(copts.bctx.BuildTags, ","))
@@ -53,7 +67,7 @@ func AutoCompile(options ...CompileOption) eg.OpFn {
 
 		// golang's wasm implementation doesn't have a reasonable default in place. it defaults to returning not found.
 		for gomod := range modfilex.FindModules(egenv.RootDirectory()) {
-			cmd := stringsx.Join(" ", "go", "build", tags, fmt.Sprintf("%s/...", filepath.Dir(gomod)))
+			cmd := stringsx.Join(" ", "go", "build", copts.debug, tags, fmt.Sprintf("%s/...", filepath.Dir(gomod)))
 			if err := shell.Run(ctx, runtime.New(cmd)); err != nil {
 				return errorsx.Wrap(err, "unable to compile")
 			}
@@ -63,19 +77,32 @@ func AutoCompile(options ...CompileOption) eg.OpFn {
 	})
 }
 
-type TestOption func(*testOption)
+var TestOption = toption(nil)
 
-func TestOptionTags(tags ...string) TestOption {
+type toption func(*testOption)
+
+func (toption) Tags(tags ...string) toption {
 	return func(c *testOption) {
 		c.bctx.BuildTags = tags
 	}
 }
 
-type testOption struct {
-	bctx build.Context
+func (toption) Debug(b bool) toption {
+	return func(co *testOption) {
+		if b {
+			co.debug = "-x"
+		} else {
+			co.debug = ""
+		}
+	}
 }
 
-func AutoTest(options ...TestOption) eg.OpFn {
+type testOption struct {
+	debug string
+	bctx  build.Context
+}
+
+func AutoTest(options ...toption) eg.OpFn {
 	var (
 		tags string
 		opts testOption
@@ -99,7 +126,7 @@ func AutoTest(options ...TestOption) eg.OpFn {
 
 		// golang's wasm implementation doesn't have a reasonable default in place. it defaults to returning not found.
 		for gomod := range modfilex.FindModules(egenv.RootDirectory()) {
-			cmd := stringsx.Join(" ", "go", "test", tags, fmt.Sprintf("%s/...", filepath.Dir(gomod)))
+			cmd := stringsx.Join(" ", "go", "test", opts.debug, tags, fmt.Sprintf("%s/...", filepath.Dir(gomod)))
 			if err := shell.Run(ctx, runtime.New(cmd)); err != nil {
 				return errorsx.Wrap(err, "unable to run tests")
 			}

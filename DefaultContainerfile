@@ -30,4 +30,8 @@ RUN systemctl enable ssh
 RUN systemd-sysusers
 RUN systemd-tmpfiles --create
 
+# ensure the clone directory is marked as safe to deal with permissioning issues.
+# until we can identify a way to resolve the problem holistically.
+RUN sudo -E -H -u egd git config --global --add safe.directory /opt/eg
+
 RUN printf '%%wheel ALL=(ALL:ALL) NOPASSWD: ALL\n' | tee -a /etc/sudoers.d/egd

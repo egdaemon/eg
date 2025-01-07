@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"time"
 
+	"github.com/egdaemon/eg/internal/contextx"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/slicesx"
 	"github.com/egdaemon/eg/internal/timex"
@@ -17,7 +18,7 @@ import (
 
 func BackgroundSystemLoad(ctx context.Context, analytics *sql.DB) {
 	report := func(do func(ctx context.Context, analytics *sql.DB) error) {
-		errorsx.Log(do(ctx, analytics))
+		errorsx.Log(contextx.IgnoreCancelled(do(ctx, analytics)))
 	}
 
 	go report(systemcpu)

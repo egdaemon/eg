@@ -47,3 +47,10 @@ func IgnoreDeadlineExceeded(err error) error {
 	}
 	return err
 }
+
+func IgnoreCancelled(err error) error {
+	if errors.Is(err, context.Canceled) {
+		return nil
+	}
+	return err
+}

@@ -13,6 +13,7 @@ import (
 
 	_eg "github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/internal/debugx"
+	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/iox"
 	"github.com/egdaemon/eg/internal/slicesx"
@@ -93,34 +94,22 @@ func Clone(ctx context.Context, uri, remote, commit string) error {
 
 // clone the repository specified by the eg environment variables into the working directory.
 func AutoClone(ctx context.Context, _ eg.Op) error {
-	// hack to deal with git dubious permissions.
-	// err := shell.Run(
-	// 	ctx,
-	// 	shell.Newf("git config --global --add safe.directory /opt/eg"),
-	// 	shell.Newf("git config --global core.sharedRepository group"),
-	// )
-	// if err != nil {
-	// 	return err
-	// }
-
 	if err := Clone(ctx, env.String("", "EG_GIT_HEAD_URI"), env.String("origin", "EG_GIT_HEAD_REMOTE"), env.String("main", "EG_GIT_HEAD_REF")); err != nil {
 		return err
 	}
 
-	// log.Println("WOOOP WOOP")
-	// // hack to deal with local development and the fact we can't run as an unprivileged user by default
-	// // fix for permissions until we are running as a unprivileged user by default.
-	// if !envx.UnsafeIsLocalCompute() {
-	// 	return shell.Run(
-	// 		ctx,
-	// 		// shell.Newf("chown -R egd:root %s", egenv.RootDirectory(".git")).Privileged(),
-	// 		// shell.Newf("ls -lha %s", egenv.RootDirectory()),
-	// 		shell.Newf(
-	// 			"chmod -R 0770 %s",
-	// 			egenv.RootDirectory(),
-	// 		).Privileged(),
-	// 	)
-	// }
+	// hack to deal with local development and the fact we can't run as an unprivileged user by default
+	// fix for permissions until we are running as a unprivileged user by default.
+	// also see: https://github.com/go-git/go-git/issues/1371
+	if !envx.UnsafeIsLocalCompute() {
+		return shell.Run(
+			ctx,
+			shell.Newf(
+				"chmod -R 0770 %s",
+				egenv.RootDirectory(),
+			).Privileged(),
+		)
+	}
 
 	return nil
 

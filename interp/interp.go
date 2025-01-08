@@ -48,7 +48,7 @@ type runtimefn func(r runner, cmdenv []string, host wazero.HostModuleBuilder) wa
 
 // Remote uses the api to implement particular actions like building and running containers.
 // may not be necessary.
-func Remote(ctx context.Context, aid string, runid string, g ffigraph.Eventer, svc grpc.ClientConnInterface, dir string, module string, options ...Option) error {
+func Remote(ctx context.Context, aid string, runid string, svc grpc.ClientConnInterface, dir string, module string, options ...Option) error {
 	var (
 		r = runner{
 			root:       dir,
@@ -64,9 +64,11 @@ func Remote(ctx context.Context, aid string, runid string, g ffigraph.Eventer, s
 	evtclient := events.NewEventsClient(svc)
 
 	runtimeenv := func(r runner, cmdenv []string, host wazero.HostModuleBuilder) wazero.HostModuleBuilder {
-		return host.NewFunctionBuilder().WithFunc(ffigraph.Analysing(false)).Export("github.com/egdaemon/eg/runtime/wasi/runtime/graph.Analysing").
-			NewFunctionBuilder().WithFunc(g.Pusher()).Export("github.com/egdaemon/eg/runtime/wasi/runtime/graph.Push").
-			NewFunctionBuilder().WithFunc(g.Popper()).Export("github.com/egdaemon/eg/runtime/wasi/runtime/graph.Pop").
+		return host.
+			NewFunctionBuilder().WithFunc(ffigraph.Trace(evtclient)).Export("github.com/egdaemon/eg/runtime/wasi/runtime/graph.Trace").
+			NewFunctionBuilder().WithFunc(ffigraph.Analysing(false)).Export("github.com/egdaemon/eg/runtime/wasi/runtime/graph.Analysing").
+			NewFunctionBuilder().WithFunc(ffigraph.NoopTraceEventPush).Export("github.com/egdaemon/eg/runtime/wasi/runtime/graph.Push").
+			NewFunctionBuilder().WithFunc(ffigraph.NoopTraceEventPop).Export("github.com/egdaemon/eg/runtime/wasi/runtime/graph.Pop").
 			NewFunctionBuilder().WithFunc(ffiegcontainer.Pull(func(ctx context.Context, name, wdir string, options ...string) (err error) {
 			_, err = containers.Pull(ctx, &c8s.PullRequest{
 				Name:    name,

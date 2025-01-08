@@ -3,12 +3,15 @@ package events
 import (
 	context "context"
 	"database/sql"
+	"log"
 	"time"
 
+	"github.com/davecgh/go-spew/spew"
+	"github.com/egdaemon/eg/internal/debugx"
 	"github.com/egdaemon/eg/internal/langx"
 )
 
-func PrepareMetrics(ctx context.Context, db *sql.DB) error {
+func PrepareDB(ctx context.Context, db *sql.DB) error {
 	if _, err := db.ExecContext(ctx, "INSTALL json"); err != nil {
 		return err
 	}
@@ -17,7 +20,11 @@ func PrepareMetrics(ctx context.Context, db *sql.DB) error {
 		return err
 	}
 
-	if _, err := db.ExecContext(ctx, "CREATE TABLE IF NOT EXISTS metrics (id UUID PRIMARY KEY, name TEXT NOT NULL, name_md5 uuid GENERATED ALWAYS AS (md5(name)), ts TIMESTAMP NOT NULL, metric JSON NOT NULL)"); err != nil {
+	if _, err := db.ExecContext(ctx, "CREATE TABLE IF NOT EXISTS 'eg.metrics.custom' (id UUID PRIMARY KEY, name TEXT NOT NULL, name_md5 uuid GENERATED ALWAYS AS (md5(name)), ts TIMESTAMP NOT NULL, metric JSON NOT NULL)"); err != nil {
+		return err
+	}
+
+	if _, err := db.ExecContext(ctx, "CREATE TABLE IF NOT EXISTS 'eg.metrics.operation' (id UUID PRIMARY KEY, name TEXT NOT NULL, name_md5 uuid GENERATED ALWAYS AS (md5(name)), ts TIMESTAMP NOT NULL, module TEXT NOT NULL, op TEXT NOT NULL, milliseconds INTERVAL NOT NULL)"); err != nil {
 		return err
 	}
 
@@ -26,9 +33,20 @@ func PrepareMetrics(ctx context.Context, db *sql.DB) error {
 
 func RecordMetric(ctx context.Context, db *sql.DB, msgs ...*Message) error {
 	for _, m := range msgs {
-		mz := langx.Autoderef(m.GetMetric())
-		if err := db.QueryRowContext(ctx, "INSERT INTO metrics (id, name, ts, metric) VALUES (?, ?, ?, ?)", m.Id, mz.Name, time.UnixMicro(m.Ts), mz.FieldsJSON).Err(); err != nil {
-			return err
+		switch evt := m.Event.(type) {
+		case *Message_Metric:
+			mz := langx.Autoderef(evt.Metric)
+			if err := db.QueryRowContext(ctx, "INSERT INTO 'eg.metrics.custom' (id, name, ts, metric) VALUES (?, ?, ?, ?)", m.Id, mz.Name, time.UnixMicro(m.Ts), mz.FieldsJSON).Err(); err != nil {
+				return err
+			}
+		case *Message_Op:
+			mz := langx.Autoderef(evt.Op)
+			debugx.Println("op", spew.Sdump(&mz))
+			if err := db.QueryRowContext(ctx, "INSERT INTO 'eg.metrics.operation' (id, name, ts, module, op, milliseconds) VALUES (?, ?, ?, ?, ?, INTERVAL (?) MILLISECONDS)", m.Id, mz.Name, time.UnixMicro(m.Ts), mz.Module, mz.Op, mz.Milliseconds).Err(); err != nil {
+				return err
+			}
+		default:
+			log.Printf("unknown message received %T\n", evt)
 		}
 	}
 	return nil

@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/rand"
 	"database/sql"
-	"fmt"
 	"log"
 	"net"
 	"os"
@@ -13,7 +12,6 @@ import (
 	"runtime"
 	"strconv"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/cmd/cmdopts"
 	"github.com/egdaemon/eg/cmd/eg/daemons"
@@ -28,7 +26,6 @@ import (
 	"github.com/egdaemon/eg/interp"
 	"github.com/egdaemon/eg/interp/c8s"
 	"github.com/egdaemon/eg/interp/events"
-	"github.com/egdaemon/eg/interp/runtime/wasi/ffigraph"
 	"github.com/egdaemon/eg/interp/runtime/wasi/ffiwasinet"
 	"github.com/egdaemon/eg/runners"
 	"github.com/egdaemon/eg/workspaces"
@@ -55,7 +52,6 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 		aid   = envx.String(uuid.Nil.String(), eg.EnvComputeAccountID)
 		uid   = envx.String(uuid.Nil.String(), eg.EnvComputeRunID)
 		descr = envx.String("", eg.EnvComputeVCS)
-		ebuf  = make(chan *ffigraph.EventInfo)
 		cc    grpc.ClientConnInterface
 	)
 
@@ -107,7 +103,7 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 			return errorsx.Wrap(err, "unable to create analytics.db")
 		}
 		defer db.Close()
-		if err = events.PrepareMetrics(gctx.Context, db); err != nil {
+		if err = events.PrepareDB(gctx.Context, db); err != nil {
 			return errorsx.Wrap(err, "unable to prepare analytics.db")
 		}
 		// periodic sampling of system metrics
@@ -182,37 +178,10 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 		return err
 	}
 
-	go func() {
-		makeevt := func(e *ffigraph.EventInfo) *events.Message {
-			switch e.State {
-			case ffigraph.Popped:
-				return events.NewTaskCompleted(e.Parent, e.ID, "completed")
-			case ffigraph.Pushed:
-				return events.NewTaskInitiated(e.Parent, e.ID, "initiated")
-			default:
-				return events.NewTaskErrored(e.ID, fmt.Sprintf("unknown %d", e.State))
-			}
-		}
-
-		c := events.NewEventsClient(cc)
-		for {
-			select {
-			case <-gctx.Context.Done():
-				return
-			case evt := <-ebuf:
-				if _, err := c.Dispatch(gctx.Context, events.NewDispatch(makeevt(evt))); err != nil {
-					log.Println("unable to dispatch event", err, spew.Sdump(evt))
-					continue
-				}
-			}
-		}
-	}()
-
 	return interp.Remote(
 		gctx.Context,
 		aid,
 		uid,
-		ffigraph.NewListener(ebuf),
 		cc,
 		t.Dir,
 		t.Module,

@@ -492,8 +492,6 @@ func (t staterunning) Update(ctx context.Context) state {
 			"--volume", AgentMountReadWrite(filepath.Join(t.ws.Root, t.ws.WorkingDir), eg.DefaultRootDirectory()),
 			"--volume", AgentMountReadWrite(filepath.Join(t.ws.Root, t.ws.TemporaryDir), eg.DefaultTempDirectory()),
 			"--volume", AgentMountReadWrite(cachedir, eg.DefaultCacheDirectory()),
-			"--env", envx.FormatBool(eg.EnvComputeRootModule, true),
-			"--env", envx.FormatInt(eg.EnvComputeModuleNestedLevel, 0),
 		)
 
 		logger := log.New(io.MultiWriter(os.Stderr, logdst), t.ragent.id, log.Flags())

@@ -59,8 +59,8 @@ func Ignore(err error, ignore ...error) error {
 	return err
 }
 
-// MaybePanic panic when error is seen.
-func MaybePanic(err error) {
+// Never panic when error is seen.
+func Never(err error) {
 	if err == nil {
 		return
 	}

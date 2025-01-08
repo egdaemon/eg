@@ -15,18 +15,19 @@ message LogHeader {
 // heartbeat event
 message Heartbeat {}
 
-message Task {
+message Op {
   enum State {
-    Pending = 0;
-    Initiated = 1;
-    Completed = 2;
+    Initiated = 0;
+    Completed = 1;
     Error = 1000;
   }
-  string id = 1;
-  string pid = 2;
-  string description = 3;
-  State state = 4;
-  int64 deadline = 5; // unix timestamp.
+  State state = 1 [json_name = "state"];
+  int64 milliseconds = 2 [json_name = "millisecond"]; // duration milliseconds.
+  string name = 3 [json_name = "name"];
+  string module = 4 [json_name = "module"];
+  string op = 5 [json_name = "op"];
+  reserved 6 to 999;
+  repeated string path = 1000 [json_name = "path"];
 }
 
 // metric event contains a json set of fields
@@ -44,7 +45,7 @@ message Message {
   oneof Event {
     LogHeader preamble = 100;
     Heartbeat heartbeat = 101;
-    Task task = 102;
+    Op op = 102;
     Metric metric = 103;
   }
 }

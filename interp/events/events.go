@@ -7,7 +7,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
-	sync "sync"
+	"sync"
 	"time"
 
 	"github.com/egdaemon/eg/internal/errorsx"
@@ -46,12 +46,6 @@ func NewHeartbeat() *Message {
 	})
 }
 
-func NewTask(t *Task) *Message {
-	return NewMessage(&Message_Task{
-		Task: t,
-	})
-}
-
 func NewMetric(name string, encoded []byte) *Message {
 	return NewMessage(&Message_Metric{
 		Metric: &Metric{
@@ -61,37 +55,17 @@ func NewMetric(name string, encoded []byte) *Message {
 	})
 }
 
-func NewTaskPending(id, desc string) *Message {
-	return NewTask(&Task{
-		Id:          id,
-		Description: desc,
-		State:       Task_Pending,
-	})
+func OpState(err error) Op_State {
+	if err == nil {
+		return Op_Completed
+	}
+
+	return Op_Error
 }
 
-func NewTaskInitiated(pid, id, desc string) *Message {
-	return NewTask(&Task{
-		Id:          id,
-		Pid:         pid,
-		Description: desc,
-		State:       Task_Initiated,
-	})
-}
-
-func NewTaskCompleted(pid, id, desc string) *Message {
-	return NewTask(&Task{
-		Id:          id,
-		Pid:         pid,
-		Description: desc,
-		State:       Task_Completed,
-	})
-}
-
-func NewTaskErrored(id, desc string) *Message {
-	return NewTask(&Task{
-		Id:          id,
-		Description: desc,
-		State:       Task_Error,
+func NewOp(t *Op) *Message {
+	return NewMessage(&Message_Op{
+		Op: t,
 	})
 }
 

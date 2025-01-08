@@ -26,7 +26,7 @@ func runtimeDirectory(paths ...string) string {
 // stability promises.
 func DefaultModule() ContainerRunner {
 	path := runtimeDirectory("eg.default.module")
-	errorsx.MaybePanic(eg.PrepareRootContainer(path))
+	errorsx.Never(eg.PrepareRootContainer(path))
 	return Container("eg").BuildFromFile(path)
 }
 
@@ -85,29 +85,31 @@ func UnsafeTranspiledRef(name string, o OpFn) Reference {
 	}
 }
 
-// execute the provided tasks in sequential order.
-func Perform(ctx context.Context, tasks ...OpFn) error {
-	return ffigraph.WrapErr(nil, namedop("perform"), func() error {
-		for _, t := range tasks {
-			if err := t(ctx, ref(t)); err != nil {
-				return err
-			}
-		}
+func traceOp(op OpFn, r Reference) func(ctx context.Context) error {
+	return func(ctx context.Context) error {
+		return op(ctx, r)
+	}
+}
 
-		return nil
-	})
+// execute the provided tasks in sequential order.
+func Perform(octx context.Context, operations ...OpFn) error {
+	for _, op := range operations {
+		r := ref(op)
+		if err := ffigraph.TraceErr(octx, r, traceOp(op, r)); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func Sequential(operations ...OpFn) OpFn {
-	return func(ctx context.Context, o Op) error {
+	return func(octx context.Context, o Op) error {
 		parent := prefixedop("seq", o)
-		return ffigraph.WrapErr(nil, parent, func() error {
+		return ffigraph.TraceErr(octx, parent, func(mctx context.Context) error {
 			for _, op := range operations {
 				r := ref(op)
-				err := ffigraph.WrapErr(parent, r, func() error {
-					return op(ctx, r)
-				})
-				if err != nil {
+				if err := ffigraph.TraceErr(mctx, r, traceOp(op, r)); err != nil {
 					return err
 				}
 			}
@@ -126,38 +128,38 @@ func Sequential(operations ...OpFn) OpFn {
 // in parallel natively. to prevent issues in the future we shuffle
 // operations to ensure callers are not implicitly relying on order.
 func Parallel(operations ...OpFn) OpFn {
-	return func(ctx context.Context, o Op) (err error) {
+	return func(octx context.Context, o Op) (err error) {
 		parent := prefixedop("par", o)
-		return ffigraph.WrapErr(nil, parent, func() error {
-			errs := make(chan error, len(operations))
-			defer close(errs)
+		errs := make(chan error, len(operations))
+		defer close(errs)
 
-			rand.Shuffle(len(operations), func(i, j int) {
-				operations[i], operations[j] = operations[j], operations[i]
-			})
+		rand.Shuffle(len(operations), func(i, j int) {
+			operations[i], operations[j] = operations[j], operations[i]
+		})
 
+		ffigraph.Wrap(octx, parent, func(mctx context.Context) {
 			for _, o := range operations {
 				go func(iop OpFn) {
 					r := ref(iop)
 					select {
-					case <-ctx.Done():
-						errs <- ctx.Err()
-					case errs <- ffigraph.WrapErr(parent, r, func() error { return iop(ctx, r) }):
+					case <-octx.Done():
+						errs <- octx.Err()
+					case errs <- ffigraph.TraceErr(mctx, r, traceOp(iop, r)):
 					}
 				}(o)
 			}
-
-			for i := 0; i < len(operations); i++ {
-				select {
-				case <-ctx.Done():
-					return ctx.Err()
-				case cause := <-errs:
-					err = errorsx.Compact(err, cause)
-				}
-			}
-
-			return err
 		})
+
+		for i := 0; i < len(operations); i++ {
+			select {
+			case <-octx.Done():
+				return octx.Err()
+			case cause := <-errs:
+				err = errorsx.Compact(err, cause)
+			}
+		}
+
+		return err
 	}
 }
 
@@ -246,10 +248,6 @@ func (t ContainerRunner) Command(s string) ContainerRunner {
 
 // CompileWith builds the container and
 func (t ContainerRunner) CompileWith(ctx context.Context) (err error) {
-	if ffigraph.Analysing() {
-		return nil
-	}
-
 	var opts []string
 	for _, o := range t.options {
 		opts = append(opts, o...)
@@ -257,11 +255,15 @@ func (t ContainerRunner) CompileWith(ctx context.Context) (err error) {
 
 	t.built.Do(func() {
 		if t.pull != "" {
-			err = errorsx.Wrapf(ffiegcontainer.Pull(ctx, t.pull, opts), "unable to pull the container: %s", t.name)
+			if err = errorsx.Wrapf(ffiegcontainer.Pull(ctx, t.pull, opts), "unable to pull the container: %s", t.name); err != nil {
+				return
+			}
 		}
 
 		if t.definition != "" {
-			err = errorsx.Wrapf(ffiegcontainer.Build(ctx, t.name, t.definition, opts), "unable to build the container: %s", t.name)
+			if err = errorsx.Wrapf(ffiegcontainer.Build(ctx, t.name, t.definition, opts), "unable to build the container: %s", t.name); err != nil {
+				return
+			}
 		}
 	})
 
@@ -306,25 +308,6 @@ func (t ContainerRunner) OptionEnvVar(k string) ContainerRunner {
 
 func (t ContainerRunner) OptionEnv(k, v string) ContainerRunner {
 	t.options = append(t.options, (coption{}).envvar(k, v))
-	return t
-}
-
-// Mount a directory into the container at the provided host, guest paths as immutable.
-// this allows the container to active as if its writing but not to have any of the changes persisted
-func (t ContainerRunner) OptionVolume(host, guest string) ContainerRunner {
-	t.options = append(t.options, (coption{}).volume(host, guest, "O"))
-	return t
-}
-
-// Mount a directory into the container at the provided host, guest paths as read only.
-func (t ContainerRunner) OptionVolumeReadOnly(host, guest string) ContainerRunner {
-	t.options = append(t.options, (coption{}).volume(host, guest, "ro"))
-	return t
-}
-
-// Mount a directory into the container at the provided the host, guest paths as mutable
-func (t ContainerRunner) OptionVolumeWritable(host, guest string) ContainerRunner {
-	t.options = append(t.options, (coption{}).volume(host, guest, "rw"))
 	return t
 }
 

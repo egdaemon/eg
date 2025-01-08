@@ -18,7 +18,9 @@ import (
 
 func BackgroundSystemLoad(ctx context.Context, analytics *sql.DB) {
 	report := func(do func(ctx context.Context, analytics *sql.DB) error) {
-		errorsx.Log(contextx.IgnoreCancelled(do(ctx, analytics)))
+		errorsx.Log(
+			contextx.IgnoreCancelled(do(ctx, analytics)),
+		)
 	}
 
 	go report(systemcpu)

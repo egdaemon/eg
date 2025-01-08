@@ -1,3 +1,5 @@
+// Package egbug is an internal package and not under the compatiability promises of EG.
+// its used for debugging and analysis.
 package egbug
 
 import (

@@ -157,8 +157,6 @@ func (t c8sLocal) Run(gctx *cmdopts.Global) (err error) {
 		runners.AgentOptionCommandLine("--cap-add", "SYS_ADMIN"),  // required for rootless container building https://github.com/containers/podman/issues/4056#issuecomment-612893749
 		runners.AgentOptionCommandLine("--device", "/dev/fuse"),   //
 		runners.AgentOptionCommandLine("--pids-limit", "-1"),      // more bullshit. without this we get "Error: OCI runtime error: crun: the requested cgroup controller `pids` is not available"
-		runners.AgentOptionEnv(eg.EnvComputeRootModule, strconv.FormatBool(true)),
-		runners.AgentOptionEnv(eg.EnvComputeModuleNestedLevel, strconv.Itoa(envx.Int(0, eg.EnvComputeModuleNestedLevel))),
 		runners.AgentOptionEnv(eg.EnvComputeRunID, uid.String()),
 		runners.AgentOptionEnv(eg.EnvComputeLoggingVerbosity, strconv.Itoa(gctx.Verbosity)),
 	)

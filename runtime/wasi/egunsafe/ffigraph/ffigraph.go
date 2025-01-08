@@ -14,10 +14,24 @@ type node interface {
 	ID() string
 }
 
-type root struct{}
+type Traceable interface {
+	Tracer() Eventer
+}
 
-func (root) ID() string {
-	return ""
+func tracer(n node) Eventer {
+	if t, ok := n.(Traceable); ok {
+		return t.Tracer()
+	}
+
+	if t, ok := n.(Eventer); ok {
+		return t
+	}
+
+	return nil
+}
+
+type Eventer interface {
+	OpInfo(ts time.Time, cause error, path []string) *events.Op
 }
 
 type path []string
@@ -29,17 +43,18 @@ const (
 )
 
 func pushv0(ctx context.Context, n node, fn func(ctx context.Context) error) (err error) {
+	np := tracer(n)
+	if np == nil {
+		// nothing to trace
+		return fn(ctx)
+	}
+
 	current, _ := ctx.Value(contextkey).(path)
 	latest := append(current, n.ID())
 	dctx := context.WithValue(ctx, contextkey, latest)
 	ts := time.Now()
 	defer func() {
-		recordevt(ctx, &events.Op{
-			State:        events.OpState(err),
-			Milliseconds: int64(time.Since(ts) / time.Millisecond),
-			Name:         n.ID(),
-			Path:         current,
-		})
+		recordevt(ctx, np.OpInfo(ts, err, current))
 	}()
 	return fn(dctx)
 }
@@ -60,10 +75,15 @@ func recordevt(ctx context.Context, op *events.Op) (err error) {
 		encoded []byte
 	)
 
+	if op == nil {
+		return nil
+	}
+
 	if encoded, err = json.Marshal(op); err != nil {
 		return err
 	}
 
+	// log.Println("recording", spew.Sdump(op))
 	deadline := ffiguest.ContextDeadline(ctx)
 	opptr, oplen := ffiguest.Bytes(encoded)
 	return ffiguest.Error(_recordevt(deadline, opptr, oplen), fmt.Errorf("unable to record op event"))

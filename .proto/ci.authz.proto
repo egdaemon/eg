@@ -10,6 +10,7 @@ message Authorization {
   bool repository_read = 5 [ json_name = "repository_read" ];
   bool repository_modify = 6 [ json_name = "repository_modify" ];
   bool compute_shared = 7 [ json_name = "compute_shared" ];
+  uint64 compute_remaining = 8 [ json_name = "compute_remaining" ];
 }
 
 message Token {
@@ -30,7 +31,11 @@ message Token {
   bool quota_modify = 1004 [ json_name = "quota_modify" ];
   bool repository_read = 1005 [ json_name = "repository_read" ];
   bool repository_modify = 1006 [ json_name = "repository_modify" ];
+  // compute_shared is a highly sensitive field used to authorize access to any
+  // workload task. should never be *written* to in the code base, only manually
+  // changed in the DB.
   bool compute_shared = 1007 [ json_name = "compute_shared" ];
+  uint64 compute_remaining = 1008 [ json_name = "compute_remaining" ];
 }
 
 message AuthzRequest {}

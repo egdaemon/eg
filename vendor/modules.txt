@@ -1,8 +1,9 @@
+## workspace
 # dario.cat/mergo v1.0.0
 ## explicit; go 1.13
 dario.cat/mergo
-# github.com/KimMachineGun/automemlimit v0.6.1
-## explicit; go 1.21
+# github.com/KimMachineGun/automemlimit v0.7.0
+## explicit; go 1.22.0
 github.com/KimMachineGun/automemlimit/memlimit
 # github.com/Microsoft/go-winio v0.6.2
 ## explicit; go 1.21
@@ -35,7 +36,7 @@ github.com/ProtonMail/go-crypto/openpgp/packet
 github.com/ProtonMail/go-crypto/openpgp/s2k
 github.com/ProtonMail/go-crypto/openpgp/x25519
 github.com/ProtonMail/go-crypto/openpgp/x448
-# github.com/alecthomas/kong v1.6.0
+# github.com/alecthomas/kong v1.6.1
 ## explicit; go 1.20
 github.com/alecthomas/kong
 # github.com/apache/arrow-go/v18 v18.0.0
@@ -65,17 +66,6 @@ github.com/apache/arrow-go/v18/internal/json
 github.com/apache/arrow-go/v18/internal/utils
 # github.com/cilium/ebpf v0.16.0
 ## explicit; go 1.21
-github.com/cilium/ebpf
-github.com/cilium/ebpf/asm
-github.com/cilium/ebpf/btf
-github.com/cilium/ebpf/internal
-github.com/cilium/ebpf/internal/kallsyms
-github.com/cilium/ebpf/internal/kconfig
-github.com/cilium/ebpf/internal/sys
-github.com/cilium/ebpf/internal/sysenc
-github.com/cilium/ebpf/internal/tracefs
-github.com/cilium/ebpf/internal/unix
-github.com/cilium/ebpf/link
 # github.com/cloudflare/circl v1.3.9
 ## explicit; go 1.21
 github.com/cloudflare/circl/dh/x25519
@@ -92,11 +82,6 @@ github.com/cloudflare/circl/sign/ed25519
 github.com/cloudflare/circl/sign/ed448
 # github.com/containerd/cgroups/v3 v3.0.3
 ## explicit; go 1.18
-github.com/containerd/cgroups/v3
-github.com/containerd/cgroups/v3/cgroup1
-github.com/containerd/cgroups/v3/cgroup1/stats
-github.com/containerd/cgroups/v3/cgroup2
-github.com/containerd/cgroups/v3/cgroup2/stats
 # github.com/coreos/go-systemd/v22 v22.5.0
 ## explicit; go 1.12
 github.com/coreos/go-systemd/v22/dbus
@@ -111,7 +96,6 @@ github.com/dave/jennifer/jen
 github.com/davecgh/go-spew/spew
 # github.com/docker/go-units v0.5.0
 ## explicit
-github.com/docker/go-units
 # github.com/dominikbraun/graph v0.23.0
 ## explicit; go 1.18
 github.com/dominikbraun/graph
@@ -121,7 +105,11 @@ github.com/ebitengine/purego
 github.com/ebitengine/purego/internal/cgo
 github.com/ebitengine/purego/internal/fakecgo
 github.com/ebitengine/purego/internal/strings
+# github.com/egdaemon/eg v0.0.0-20250107185921-e96186e9d67e
+## explicit; go 1.23.4
 # github.com/egdaemon/wasinet/wasinet v0.0.0-20241230124507-2a54ddc9c245
+## explicit; go 1.23.4
+# github.com/egdaemon/wasinet/wasinet v0.0.0-20250107020126-be17492ab34e
 ## explicit; go 1.23.4
 github.com/egdaemon/wasinet/wasinet
 github.com/egdaemon/wasinet/wasinet/autohijack
@@ -133,7 +121,7 @@ github.com/egdaemon/wasinet/wasinet/internal/langx
 github.com/egdaemon/wasinet/wasinet/stdlib/wasip1net
 github.com/egdaemon/wasinet/wasinet/stdlib/wasip1syscall
 github.com/egdaemon/wasinet/wasinet/wnetruntime
-# github.com/egdaemon/wasinet/wazeronet v0.0.0-20241230124507-2a54ddc9c245
+# github.com/egdaemon/wasinet/wazeronet v0.0.0-20250107020126-be17492ab34e
 ## explicit; go 1.23.4
 github.com/egdaemon/wasinet/wazeronet
 # github.com/emirpasic/gods v1.18.1
@@ -314,7 +302,7 @@ github.com/mattn/go-isatty
 # github.com/mitchellh/mapstructure v1.5.0
 ## explicit; go 1.14
 github.com/mitchellh/mapstructure
-# github.com/onsi/ginkgo/v2 v2.22.1
+# github.com/onsi/ginkgo/v2 v2.22.2
 ## explicit; go 1.22.0
 github.com/onsi/ginkgo/v2
 github.com/onsi/ginkgo/v2/config
@@ -351,7 +339,6 @@ github.com/onsi/gomega/matchers/support/goraph/util
 github.com/onsi/gomega/types
 # github.com/opencontainers/runtime-spec v1.2.0
 ## explicit
-github.com/opencontainers/runtime-spec/specs-go
 # github.com/pbnjay/memory v0.0.0-20210728143218-7b4eea64cf58
 ## explicit; go 1.16
 github.com/pbnjay/memory
@@ -393,7 +380,6 @@ github.com/shirou/gopsutil/v4/internal/common
 github.com/shirou/gopsutil/v4/mem
 # github.com/sirupsen/logrus v1.9.3
 ## explicit; go 1.13
-github.com/sirupsen/logrus
 # github.com/skeema/knownhosts v1.3.0
 ## explicit; go 1.17
 github.com/skeema/knownhosts
@@ -538,7 +524,7 @@ golang.org/x/text/secure/bidirule
 golang.org/x/text/transform
 golang.org/x/text/unicode/bidi
 golang.org/x/text/unicode/norm
-# golang.org/x/time v0.8.0
+# golang.org/x/time v0.9.0
 ## explicit; go 1.18
 golang.org/x/time/rate
 # golang.org/x/tools v0.29.0

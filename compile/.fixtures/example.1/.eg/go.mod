@@ -2,9 +2,9 @@ module eg/compute
 
 go 1.23.4
 
-require github.com/egdaemon/eg v0.0.0-20241224192656-b849cdf0dea0
+require github.com/egdaemon/eg v0.0.0-20250108202646-c106b543aa64
 
 require (
-	github.com/egdaemon/wasinet v0.0.0-20241224191200-8de558ef4d51 // indirect
-	golang.org/x/sys v0.28.0 // indirect
+	github.com/egdaemon/wasinet v0.0.0-20250107020126-be17492ab34e // indirect
+	golang.org/x/sys v0.29.0 // indirect
 )

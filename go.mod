@@ -3,26 +3,26 @@ module github.com/egdaemon/eg
 go 1.23.4
 
 require (
-	github.com/KimMachineGun/automemlimit v0.6.1
-	github.com/alecthomas/kong v1.6.0
+	github.com/KimMachineGun/automemlimit v0.7.0
+	github.com/alecthomas/kong v1.6.1
 	github.com/coreos/go-systemd/v22 v22.5.0
 	github.com/davecgh/go-spew v1.1.1
 	github.com/dominikbraun/graph v0.23.0
-	github.com/egdaemon/wasinet/wasinet v0.0.0-20241230124507-2a54ddc9c245
-	github.com/egdaemon/wasinet/wazeronet v0.0.0-20241230124507-2a54ddc9c245
+	github.com/egdaemon/wasinet/wasinet v0.0.0-20250107020126-be17492ab34e
+	github.com/egdaemon/wasinet/wazeronet v0.0.0-20250107020126-be17492ab34e
 	github.com/fsnotify/fsnotify v1.8.0
 	github.com/gorilla/websocket v1.5.3
 	github.com/logrusorgru/aurora v2.0.3+incompatible
 	github.com/marcboeker/go-duckdb v1.8.3
 	github.com/mattn/go-isatty v0.0.20
-	github.com/onsi/ginkgo/v2 v2.22.1
+	github.com/onsi/ginkgo/v2 v2.22.2
 	github.com/onsi/gomega v1.36.2
 	github.com/pbnjay/memory v0.0.0-20210728143218-7b4eea64cf58
 	github.com/pkg/errors v0.9.1
 	github.com/willabides/kongplete v0.4.0
 	go.uber.org/automaxprocs v1.6.0
 	golang.org/x/crypto v0.32.0
-	golang.org/x/time v0.8.0
+	golang.org/x/time v0.9.0
 	google.golang.org/grpc v1.68.0
 )
 
@@ -31,11 +31,8 @@ require (
 	github.com/Microsoft/go-winio v0.6.2 // indirect
 	github.com/ProtonMail/go-crypto v1.1.3 // indirect
 	github.com/apache/arrow-go/v18 v18.0.0 // indirect
-	github.com/cilium/ebpf v0.16.0 // indirect
 	github.com/cloudflare/circl v1.3.9 // indirect
-	github.com/containerd/cgroups/v3 v3.0.3 // indirect
 	github.com/cyphar/filepath-securejoin v0.3.6 // indirect
-	github.com/docker/go-units v0.5.0 // indirect
 	github.com/ebitengine/purego v0.8.1 // indirect; indirect // indirect
 	github.com/emirpasic/gods v1.18.1 // indirect
 	github.com/go-git/gcfg v1.5.1-0.20230307220236-3a3c6141e376 // indirect
@@ -53,12 +50,10 @@ require (
 	github.com/klauspost/cpuid/v2 v2.2.8 // indirect
 	github.com/lufia/plan9stats v0.0.0-20211012122336-39d0f177ccd0 // indirect
 	github.com/mitchellh/mapstructure v1.5.0 // indirect
-	github.com/opencontainers/runtime-spec v1.2.0 // indirect
 	github.com/pierrec/lz4/v4 v4.1.21 // indirect
 	github.com/pjbgf/sha1cd v0.3.0 // indirect
 	github.com/power-devops/perfstat v0.0.0-20210106213030-5aafc221ea8c // indirect
 	github.com/sergi/go-diff v1.3.2-0.20230802210424-5b0b94c5c0d3 // indirect
-	github.com/sirupsen/logrus v1.9.3 // indirect
 	github.com/skeema/knownhosts v1.3.0 // indirect
 	github.com/tklauser/go-sysconf v0.3.14 // indirect
 	github.com/tklauser/numcpus v0.9.0 // indirect

@@ -52,10 +52,9 @@ func Autodetect(tctx Context) Transpiler {
 }
 
 type module struct {
-	fname    string
-	original *bytes.Buffer
-	main     *bytes.Buffer
-	pos      token.Position
+	fname string
+	main  *bytes.Buffer
+	pos   token.Position
 }
 
 type golang struct {
@@ -84,6 +83,7 @@ func (t golang) Run(ctx context.Context) (roots []Compiled, err error) {
 	if pset, err = packages.Load(pkgc, "./..."); err != nil {
 		return nil, err
 	}
+
 	for _, pkg := range pset {
 		target := filepath.Join(langx.Autoderef(pkg.Module).Path, t.Workspace.Module)
 		for _, c := range pkg.Syntax {
@@ -123,7 +123,12 @@ func (t golang) Run(ctx context.Context) (roots []Compiled, err error) {
 	}
 
 	for _, m := range generatedmodules {
-		o, err := parser.ParseFile(pkgc.Fset, m.fname, m.original, 0)
+		osrc, err := os.ReadFile(filepath.Join(t.Context.Workspace.Root, m.pos.Filename))
+		if err != nil {
+			return roots, err
+		}
+
+		o, err := parser.ParseFile(pkgc.Fset, m.fname, osrc, 0)
 		if err != nil {
 			return roots, err
 		}
@@ -209,20 +214,6 @@ func transform(ws workspaces.Context, fset *token.FileSet, gendir string, c *ast
 					jen.Qual(egenvident, "TTL").Call(),
 				),
 			),
-			// jen.Defer().Add(jen.Func().Params().Block(
-			// 	jen.Qual("log", "Println").Call(
-			// 		jen.Lit("POST MODULE"),
-			// 	),
-			// 	jen.If(
-			// 		jen.Id("cause").Op(":=").Add(jen.Id("recover").Call()),
-			// 		jen.Id("cause").Op("!=").Id("nil"),
-			// 	).Block(
-			// 		jen.Qual("log", "Println").Call(
-			// 			jen.Lit("le sigh recovered"),
-			// 			jen.Id("cause"),
-			// 		),
-			// 	),
-			// ).Call()),
 			jen.Defer().Add(jen.Id("done").Call()),
 			jen.If(
 				jen.Id("err").Op(":=").Add(jen.Qual(egident, "Perform").Call(
@@ -244,10 +235,9 @@ func transform(ws workspaces.Context, fset *token.FileSet, gendir string, c *ast
 
 		genwasm := filepath.Join(gendir, fmt.Sprintf("module.%d.%d.wasm", pos.Line, pos.Column))
 		m := &module{
-			fname:    filepath.Join(ws.GenModDir, gendir, fmt.Sprintf("module.%d.%d.go", pos.Line, pos.Column)),
-			original: buf,
-			main:     mainbuf,
-			pos:      pos,
+			fname: filepath.Join(ws.GenModDir, gendir, fmt.Sprintf("module.%d.%d.go", pos.Line, pos.Column)),
+			main:  mainbuf,
+			pos:   pos,
 		}
 		generatedmodules = append(generatedmodules, m)
 		return astbuild.CallExpr(astbuild.SelExpr(egident, "UnsafeRunner"), ctxarg, astbuild.CallExpr(astbuild.SelExpr(types.ExprString(rarg), "ToModuleRunner")), astbuild.StringLiteral(genwasm))

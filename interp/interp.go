@@ -4,10 +4,10 @@ import (
 	"context"
 	"crypto/rand"
 	"fmt"
-	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"sync"
 
 	"github.com/egdaemon/eg"
@@ -223,7 +223,7 @@ func (t runner) perform(ctx context.Context, runid, path string, rtb runtimefn) 
 	).WithEnv(
 		eg.EnvComputeAccountID, envx.String(uuid.Nil.String(), eg.EnvComputeAccountID),
 	).WithEnv(
-		eg.EnvComputeModuleNestedLevel, envx.String("-1", eg.EnvComputeModuleNestedLevel),
+		eg.EnvComputeModuleNestedLevel, strconv.Itoa(envx.Int(0, eg.EnvComputeModuleNestedLevel)),
 	).WithEnv(
 		eg.EnvComputeLoggingVerbosity, envx.String("-1", eg.EnvComputeLoggingVerbosity),
 	).WithEnv(
@@ -288,8 +288,8 @@ func (t runner) perform(ctx context.Context, runid, path string, rtb runtimefn) 
 		wasidebug.Host(hostenv)
 	}
 
-	log.Println("interp initiated", path)
-	defer log.Println("interp completed", path)
+	debugx.Println("interp initiated", path)
+	defer debugx.Println("interp completed", path)
 	wasi, err := os.ReadFile(path)
 	if err != nil {
 		return err

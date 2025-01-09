@@ -9,6 +9,7 @@ import (
 	"github.com/egdaemon/eg/runtime/wasi/egenv"
 	"github.com/egdaemon/eg/runtime/wasi/egmetrics"
 	"github.com/egdaemon/eg/runtime/wasi/shell"
+	"github.com/egdaemon/eg/runtime/x/wasi/egbug"
 )
 
 type MetricCPU struct {
@@ -20,19 +21,16 @@ func automcpu() MetricCPU {
 		Load: rand.Float32(),
 	}
 }
+
 func Debug(ctx context.Context, op eg.Op) error {
 	log.Println("debug initiated")
 	defer log.Println("debug completed")
 
 	return shell.Run(
 		ctx,
-		shell.New("env"),
-		shell.New("pwd"),
 		shell.Newf("truncate --size 0 %s", egenv.RuntimeDirectory("environ.env")).Lenient(true),
-		shell.Newf("tree -L 2 %s", egenv.RootDirectory()),
 		shell.Newf("apt-get install stress").Privileged(),
 		shell.Newf("stress -t 5 -c %d", 24),
-		// shell.Newf("stress -t 5 -m %d", 24), // requires 6GB of ram
 	)
 }
 
@@ -44,6 +42,9 @@ func main() {
 	err := eg.Perform(
 		ctx,
 		Debug,
+		egbug.Users,
+		eg.When(true, Debug),
+		eg.When(true, egbug.Users),
 	)
 
 	if err != nil {

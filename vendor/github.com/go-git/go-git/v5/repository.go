@@ -166,7 +166,7 @@ func createDotGitFile(worktree, storage billy.Filesystem) error {
 		return nil
 	}
 
-	f, err := worktree.Create(GitDirName)
+	f, err := worktree.OpenFile(GitDirName, os.O_CREATE|os.O_SYNC|os.O_RDWR, 0777)
 	if err != nil {
 		return err
 	}

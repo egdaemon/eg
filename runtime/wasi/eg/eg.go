@@ -6,12 +6,16 @@ import (
 	"math/rand"
 	"os"
 	"path/filepath"
+	"reflect"
+	"runtime"
 	"strings"
 	"sync"
-	"unsafe"
+	"time"
 
 	"github.com/egdaemon/eg"
+	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
+	"github.com/egdaemon/eg/interp/events"
 	"github.com/egdaemon/eg/runtime/wasi/egunsafe/ffiegcontainer"
 	"github.com/egdaemon/eg/runtime/wasi/egunsafe/ffigraph"
 	"github.com/egdaemon/eg/runtime/wasi/env"
@@ -38,6 +42,7 @@ type Reference interface {
 type Op interface {
 	ID() string
 }
+
 type OpFn func(context.Context, Op) error
 
 type runtimeref struct {
@@ -47,6 +52,23 @@ type runtimeref struct {
 
 func (t runtimeref) ID() string {
 	return fmt.Sprintf("ref%x", t.ptr)
+}
+
+func (t runtimeref) OpInfo(ts time.Time, cause error, path []string) *events.Op {
+	fninfo := runtime.FuncForPC(t.ptr)
+	file, _ := fninfo.FileLine(t.ptr)
+	name := fninfo.Name()
+
+	if strings.HasPrefix(file, "github.com/egdaemon/eg/runtime/wasi/eg") {
+		return nil
+	}
+	return &events.Op{
+		State:        events.OpState(cause),
+		Milliseconds: int64(time.Since(ts) / time.Millisecond),
+		Name:         name,
+		Module:       file,
+		Path:         path,
+	}
 }
 
 type namedop string
@@ -63,8 +85,8 @@ func prefixedop(p string, o Op) namedop {
 // if executed directly will use the memory location of the function.
 // Important: this method acts as an instrumentation point by the runtime.
 func ref(o OpFn) Reference {
-	addr := *(*uintptr)(unsafe.Pointer(&o))
-	return runtimeref{ptr: addr, do: o}
+	addr := reflect.ValueOf(o).Pointer()
+	return runtimeref{ptr: addr, do: OpFn(o)}
 }
 
 type transpiledref struct {
@@ -76,18 +98,18 @@ func (t transpiledref) ID() string {
 	return t.name
 }
 
+func traceOp(op OpFn, r Reference) func(ctx context.Context) error {
+	return func(ctx context.Context) error {
+		return op(ctx, r)
+	}
+}
+
 // Deprecated: this is intended for internal use only. do not use.
 // its use may prevent future builds from executing.
 func UnsafeTranspiledRef(name string, o OpFn) Reference {
 	return transpiledref{
 		name: name,
 		do:   o,
-	}
-}
-
-func traceOp(op OpFn, r Reference) func(ctx context.Context) error {
-	return func(ctx context.Context) error {
-		return op(ctx, r)
 	}
 }
 
@@ -175,7 +197,8 @@ func WhenFn(b func(ctx context.Context) bool, o OpFn) OpFn {
 			return nil
 		}
 
-		return o(ctx, ref(o))
+		r := ref(o)
+		return ffigraph.TraceErr(ctx, r, traceOp(o, r))
 	}
 }
 
@@ -194,18 +217,6 @@ func Container(name string) ContainerRunner {
 }
 
 type coption []string
-
-func (t coption) volume(host, guest, opts string) coption {
-	return []string{"--volume", fmt.Sprintf("%s:%s:%s", host, guest, opts)}
-}
-
-func (t coption) privileged() coption {
-	return []string{"--privileged"}
-}
-
-func (t coption) user(user string) coption {
-	return []string{"--user", user}
-}
 
 func (t coption) workdir(dir string) coption {
 	return []string{"-w", dir}
@@ -284,18 +295,6 @@ func (t ContainerRunner) ToModuleRunner() ContainerModuleRunner {
 	return ContainerModuleRunner{ContainerRunner: t}
 }
 
-// unsafe not recommended for use.
-func (t ContainerRunner) OptionPrivileged() ContainerRunner {
-	t.options = append(t.options, (coption{}).privileged())
-	return t
-}
-
-// experimental not recommended for use.
-func (t ContainerRunner) OptionUser(username string) ContainerRunner {
-	t.options = append(t.options, (coption{}).user(username))
-	return t
-}
-
 func (t ContainerRunner) OptionWorkingDirectory(dir string) ContainerRunner {
 	t.options = append(t.options, (coption{}).workdir(dir))
 	return t
@@ -320,6 +319,8 @@ func (t ContainerModuleRunner) RunWith(ctx context.Context, mpath string) (err e
 	for _, o := range t.options {
 		opts = append(opts, o...)
 	}
+
+	opts = append(opts, "-e", fmt.Sprintf("%s=%d", eg.EnvComputeModuleNestedLevel, envx.Int(-1, eg.EnvComputeModuleNestedLevel)+1))
 
 	return errorsx.Wrapf(ffiegcontainer.Module(ctx, t.name, mpath, opts), "unable to run the module: %s", t.name)
 }

@@ -2,7 +2,6 @@ package compile
 
 import (
 	"context"
-	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -10,6 +9,7 @@ import (
 
 	"github.com/egdaemon/eg/internal/debugx"
 	"github.com/egdaemon/eg/internal/errorsx"
+	"github.com/egdaemon/eg/internal/tracex"
 	"github.com/egdaemon/eg/transpile"
 	"github.com/egdaemon/eg/workspaces"
 )
@@ -50,6 +50,7 @@ func EnsureRequiredPackages(ctx context.Context, dir string, packages ...string)
 	defaultPackages := []string{
 		"get", // yeah we know.
 		"github.com/egdaemon/eg/runtime/autowasinet",
+		"github.com/egdaemon/eg/interp/events",
 	}
 
 	cmd := exec.CommandContext(ctx, "go", append(defaultPackages, packages...)...)
@@ -90,7 +91,7 @@ func FromTranspiled(ctx context.Context, ws workspaces.Context, m ...transpile.C
 
 		// fsx.PrintDir(os.DirFS(filepath.Join(ws.Root, ws.TransDir)))
 
-		log.Println("compiling module", root.Path, mpath)
+		tracex.Println("compiling module", root.Path, mpath)
 		if err = Run(ctx, filepath.Join(ws.Root, ws.TransDir), mpath, path); err != nil {
 			return modules, err
 		}

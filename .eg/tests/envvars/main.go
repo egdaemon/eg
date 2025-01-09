@@ -21,7 +21,7 @@ func Test(depth int) eg.OpFn {
 }
 
 func Level0(ctx context.Context, op eg.Op) error {
-	return eg.Perform(ctx, egbug.Module, egbug.Images, Test(0), eg.Module(ctx, eg.DefaultModule(), Level1))
+	return eg.Perform(ctx, egbug.Module, Test(0), eg.Module(ctx, eg.DefaultModule(), Level1))
 }
 
 func Level1(ctx context.Context, op eg.Op) error {
@@ -33,6 +33,7 @@ func Level2(ctx context.Context, op eg.Op) error {
 }
 
 func main() {
+	log.SetFlags(log.Lshortfile)
 	ctx, done := context.WithTimeout(context.Background(), egenv.TTL())
 	defer done()
 

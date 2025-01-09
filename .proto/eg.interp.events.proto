@@ -21,13 +21,14 @@ message Op {
     Completed = 1;
     Error = 1000;
   }
-  State state = 1 [json_name = "state"];
-  int64 milliseconds = 2 [json_name = "millisecond"]; // duration milliseconds.
-  string name = 3 [json_name = "name"];
-  string module = 4 [json_name = "module"];
-  string op = 5 [json_name = "op"];
+  State state = 1 [ json_name = "state" ];
+  int64 milliseconds = 2
+      [ json_name = "millisecond" ]; // duration milliseconds.
+  string name = 3 [ json_name = "name" ];
+  string module = 4 [ json_name = "module" ];
+  string op = 5 [ json_name = "op" ];
   reserved 6 to 999;
-  repeated string path = 1000 [json_name = "path"];
+  repeated string path = 1000 [ json_name = "path" ];
 }
 
 // metric event contains a json set of fields

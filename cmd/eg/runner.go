@@ -164,14 +164,14 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 		}()
 		defer srv.GracefulStop()
 	} else {
-		log.Printf("---------------------------- MODULE INITIATED %d ----------------------------\n", mlevel)
+		debugx.Printf("---------------------------- MODULE INITIATED %d ----------------------------\n", mlevel)
 		// env.Debug(os.Environ()...)
 		debugx.Println("account", aid)
 		debugx.Println("run id", uid)
 		debugx.Println("repository", descr)
 		debugx.Println("number of cores", runtime.GOMAXPROCS(-1))
 		debugx.Println("logging level", gctx.Verbosity)
-		defer log.Printf("---------------------------- MODULE COMPLETED %d ----------------------------\n", mlevel)
+		defer debugx.Printf("---------------------------- MODULE COMPLETED %d ----------------------------\n", mlevel)
 	}
 
 	if cc, err = daemons.AutoRunnerClient(gctx, ws, uid, runners.AgentOptionAutoEGBin()); err != nil {

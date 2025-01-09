@@ -8,9 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/internal/debugx"
-	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/execx"
 	"github.com/egdaemon/eg/internal/langx"
@@ -121,7 +119,6 @@ func (t *ProxyService) Run(ctx context.Context, req *RunRequest) (_ *RunResponse
 	options := append(t.containeropts, req.Options...)
 	options = append(
 		options,
-		"--env", envx.FormatInt(eg.EnvComputeModuleNestedLevel, envx.Int(0, eg.EnvComputeModuleNestedLevel)+1), // increment level
 		"--volume", "/opt/eg:/opt/eg:rw",
 	)
 
@@ -141,7 +138,6 @@ func (t *ProxyService) Module(ctx context.Context, req *ModuleRequest) (_ *Modul
 	options := append(t.containeropts, req.Options...)
 	options = append(
 		options,
-		"--env", envx.FormatInt(eg.EnvComputeModuleNestedLevel, envx.Int(0, eg.EnvComputeModuleNestedLevel)+1), // increment level
 		"--volume", "/opt/eg:/opt/eg:rw",
 	)
 

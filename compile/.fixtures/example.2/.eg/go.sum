@@ -1,6 +1,11 @@
 github.com/egdaemon/eg v0.0.0-20241224192656-b849cdf0dea0 h1:k7TE/l/I26Zf/AqM1bMaoK+MwoVtEaF4xK48vqDrr7M=
 github.com/egdaemon/eg v0.0.0-20241224192656-b849cdf0dea0/go.mod h1:bv7aNgm9u3l2dhlhLcib/F2db9qaHU2OsMisWSL6Bok=
+github.com/egdaemon/eg v0.0.0-20250108202646-c106b543aa64 h1:eJ10Jl1t029sZiZAARgBUQc7yx5cdBi9+m07wyLFSSY=
+github.com/egdaemon/eg v0.0.0-20250108202646-c106b543aa64/go.mod h1:ySMz6j9Lk8T3QFH/Oh2IJYtgZevt5aGV7UGuw+Og61U=
 github.com/egdaemon/wasinet v0.0.0-20241224191200-8de558ef4d51 h1:bI/MiFP51HGI0CrmHQJvQdOb8lXAalEOaCd/vgPVCFg=
 github.com/egdaemon/wasinet v0.0.0-20241224191200-8de558ef4d51/go.mod h1:Vrshfq2KHg5uxoEQ9/78v43gG+SSnOBU6vi3OHaa2EA=
+github.com/egdaemon/wasinet v0.0.0-20250107020126-be17492ab34e h1:rKkFzgZzyN2GJIncCcYsWj1Zz6827jfrrdNRVKVWKd0=
+github.com/egdaemon/wasinet v0.0.0-20250107020126-be17492ab34e/go.mod h1:uRNi0/bT9BlwEUy7GBbIDcUAzxhfqida/BjNTBMIxqo=
 golang.org/x/sys v0.28.0 h1:Fksou7UEQUWlKvIdsqzJmUmCX3cZuD2+P3XyyzwMhlA=
 golang.org/x/sys v0.28.0/go.mod h1:/VUhepiaJMQUp4+oa/7Zr1D23ma6VTLIYjOOTFZPUcA=
+golang.org/x/sys v0.29.0/go.mod h1:/VUhepiaJMQUp4+oa/7Zr1D23ma6VTLIYjOOTFZPUcA=

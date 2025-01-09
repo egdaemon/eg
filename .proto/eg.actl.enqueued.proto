@@ -20,7 +20,9 @@ message Enqueued {
   string vcs_uri = 15 [ json_name = "vcs_uri" ];
   bool allow_shared = 16 [ json_name = "allow_shared" ];
   string account_id = 17 [ json_name = "account_id" ];
-  reserved 18 to 999;
+  string mimetype = 18 [ json_name = "mimetype" ];
+  string uploaded_by = 19 [ json_name = "uploaded_by" ];
+  reserved 20 to 999;
   repeated string labels = 1000 [ json_name = "labels" ];
 }
 

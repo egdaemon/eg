@@ -52,9 +52,10 @@ func Autodetect(tctx Context) Transpiler {
 }
 
 type module struct {
-	fname string
-	main  *bytes.Buffer
-	pos   token.Position
+	imported []*ast.ImportSpec
+	fname    string
+	main     *bytes.Buffer
+	pos      token.Position
 }
 
 type golang struct {
@@ -142,6 +143,15 @@ func (t golang) Run(ctx context.Context) (roots []Compiled, err error) {
 		main.Type.Func = token.NoPos
 		main.Type.Params.Opening = token.NoPos
 
+		// readd imports because they get stripped out during the transformation process
+		// resulting in missing imports during this the module generation.
+		for _, i := range m.imported {
+			path := strings.Trim(i.Path.Value, "\"")
+			name := langx.Autoderef(i.Name).Name
+			if ok := astutil.AddNamedImport(pkgc.Fset, o, name, path); !ok {
+				tracex.Printf("unable to readd import %s \"%s\"", name, path)
+			}
+		}
 		result := astcodec.ReplaceFunction(o, main, astcodec.FindFunctionsByName("main"))
 		tracex.Println("original", m.fname)
 
@@ -172,6 +182,7 @@ func transform(ws workspaces.Context, fset *token.FileSet, gendir string, c *ast
 	refexpr := astbuild.SelExpr(egident, "Ref")
 	refmodule := astbuild.SelExpr(egident, "Module")
 	refexec := astbuild.SelExpr(egident, "Exec")
+	imported := astcodec.SearchImports(c)
 
 	// make a clone of the buffer
 	buf := bytes.NewBuffer(nil)
@@ -231,13 +242,15 @@ func transform(ws workspaces.Context, fset *token.FileSet, gendir string, c *ast
 		mainbuf := bytes.NewBuffer(nil)
 		if cause := main.Render(mainbuf); cause != nil {
 			generr = errors.Join(generr, cause)
+			return ce
 		}
 
 		genwasm := filepath.Join(gendir, fmt.Sprintf("module.%d.%d.wasm", pos.Line, pos.Column))
 		m := &module{
-			fname: filepath.Join(ws.GenModDir, gendir, fmt.Sprintf("module.%d.%d.go", pos.Line, pos.Column)),
-			main:  mainbuf,
-			pos:   pos,
+			imported: imported,
+			fname:    filepath.Join(ws.GenModDir, gendir, fmt.Sprintf("module.%d.%d.go", pos.Line, pos.Column)),
+			main:     mainbuf,
+			pos:      pos,
 		}
 		generatedmodules = append(generatedmodules, m)
 		return astbuild.CallExpr(astbuild.SelExpr(egident, "UnsafeRunner"), ctxarg, astbuild.CallExpr(astbuild.SelExpr(types.ExprString(rarg), "ToModuleRunner")), astbuild.StringLiteral(genwasm))
@@ -259,16 +272,16 @@ func transform(ws workspaces.Context, fset *token.FileSet, gendir string, c *ast
 		return astbuild.CallExpr(astbuild.SelExpr(egident, "UnsafeExec"), ctxarg, rarg, astbuild.StringLiteral(genwasm))
 	}, execExpr)
 
+	if ok := astutil.AddNamedImport(fset, c, "_", "github.com/egdaemon/eg/runtime/autowasinet"); !ok {
+		log.Println("did not add wasinet")
+	}
+
 	v := astcodec.Multivisit(
 		replaceRef(egident, refexpr),
 		genmod,
 		genexec,
 	)
 	ast.Walk(v, c)
-
-	if ok := astutil.AddNamedImport(fset, c, "_", "github.com/egdaemon/eg/runtime/autowasinet"); !ok {
-		log.Println("did not add wasinet")
-	}
 
 	return generatedmodules, generr
 }

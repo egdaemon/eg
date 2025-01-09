@@ -227,15 +227,16 @@ func (t *findimports) Visit(node ast.Node) (w ast.Visitor) {
 	}
 
 	switch x := node.(type) {
+	case *ast.File:
+		return t
 	case *ast.GenDecl:
 		return t
 	case *ast.ImportSpec:
 		t.found = append(t.found, x)
 		return nil
 	default:
+		return nil
 	}
-
-	return nil
 }
 
 func Printer() ast.Visitor {

@@ -32,6 +32,7 @@ var _ = Describe("FromTranspiled", func() {
 		Expect(err).To(Succeed())
 		roots, err := transpile.Autodetect(transpile.New(ws)).Run(ctx)
 		Expect(err).To(Succeed())
+
 		err = compile.EnsureRequiredPackages(ctx, filepath.Join(ws.Root, ws.TransDir))
 		Expect(err).To(Succeed())
 		modules, err := compile.FromTranspiled(ctx, ws, roots...)

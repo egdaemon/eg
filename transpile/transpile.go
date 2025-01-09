@@ -123,7 +123,7 @@ func (t golang) Run(ctx context.Context) (roots []Compiled, err error) {
 	}
 
 	for _, m := range generatedmodules {
-		osrc, err := os.ReadFile(m.pos.Filename)
+		osrc, err := os.ReadFile(filepath.Join(t.Context.Workspace.Root, m.pos.Filename))
 		if err != nil {
 			return roots, err
 		}

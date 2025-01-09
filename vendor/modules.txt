@@ -1,4 +1,3 @@
-## workspace
 # dario.cat/mergo v1.0.0
 ## explicit; go 1.13
 dario.cat/mergo
@@ -64,8 +63,6 @@ github.com/apache/arrow-go/v18/internal/bitutils
 github.com/apache/arrow-go/v18/internal/hashing
 github.com/apache/arrow-go/v18/internal/json
 github.com/apache/arrow-go/v18/internal/utils
-# github.com/cilium/ebpf v0.16.0
-## explicit; go 1.21
 # github.com/cloudflare/circl v1.3.9
 ## explicit; go 1.21
 github.com/cloudflare/circl/dh/x25519
@@ -80,8 +77,6 @@ github.com/cloudflare/circl/math/mlsbset
 github.com/cloudflare/circl/sign
 github.com/cloudflare/circl/sign/ed25519
 github.com/cloudflare/circl/sign/ed448
-# github.com/containerd/cgroups/v3 v3.0.3
-## explicit; go 1.18
 # github.com/coreos/go-systemd/v22 v22.5.0
 ## explicit; go 1.12
 github.com/coreos/go-systemd/v22/dbus
@@ -94,8 +89,6 @@ github.com/dave/jennifer/jen
 # github.com/davecgh/go-spew v1.1.1
 ## explicit
 github.com/davecgh/go-spew/spew
-# github.com/docker/go-units v0.5.0
-## explicit
 # github.com/dominikbraun/graph v0.23.0
 ## explicit; go 1.18
 github.com/dominikbraun/graph
@@ -105,10 +98,6 @@ github.com/ebitengine/purego
 github.com/ebitengine/purego/internal/cgo
 github.com/ebitengine/purego/internal/fakecgo
 github.com/ebitengine/purego/internal/strings
-# github.com/egdaemon/eg v0.0.0-20250107185921-e96186e9d67e
-## explicit; go 1.23.4
-# github.com/egdaemon/wasinet/wasinet v0.0.0-20241230124507-2a54ddc9c245
-## explicit; go 1.23.4
 # github.com/egdaemon/wasinet/wasinet v0.0.0-20250107020126-be17492ab34e
 ## explicit; go 1.23.4
 github.com/egdaemon/wasinet/wasinet
@@ -337,8 +326,6 @@ github.com/onsi/gomega/matchers/support/goraph/edge
 github.com/onsi/gomega/matchers/support/goraph/node
 github.com/onsi/gomega/matchers/support/goraph/util
 github.com/onsi/gomega/types
-# github.com/opencontainers/runtime-spec v1.2.0
-## explicit
 # github.com/pbnjay/memory v0.0.0-20210728143218-7b4eea64cf58
 ## explicit; go 1.16
 github.com/pbnjay/memory
@@ -378,8 +365,6 @@ github.com/shirou/gopsutil/v4/cpu
 github.com/shirou/gopsutil/v4/disk
 github.com/shirou/gopsutil/v4/internal/common
 github.com/shirou/gopsutil/v4/mem
-# github.com/sirupsen/logrus v1.9.3
-## explicit; go 1.13
 # github.com/skeema/knownhosts v1.3.0
 ## explicit; go 1.17
 github.com/skeema/knownhosts

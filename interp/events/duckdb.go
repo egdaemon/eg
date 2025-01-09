@@ -6,8 +6,6 @@ import (
 	"log"
 	"time"
 
-	"github.com/davecgh/go-spew/spew"
-	"github.com/egdaemon/eg/internal/debugx"
 	"github.com/egdaemon/eg/internal/langx"
 )
 
@@ -41,7 +39,6 @@ func RecordMetric(ctx context.Context, db *sql.DB, msgs ...*Message) error {
 			}
 		case *Message_Op:
 			mz := langx.Autoderef(evt.Op)
-			debugx.Println("op", spew.Sdump(&mz))
 			if err := db.QueryRowContext(ctx, "INSERT INTO 'eg.metrics.operation' (id, name, ts, module, op, milliseconds) VALUES (?, ?, ?, ?, ?, INTERVAL (?) MILLISECONDS)", m.Id, mz.Name, time.UnixMicro(m.Ts), mz.Module, mz.Op, mz.Milliseconds).Err(); err != nil {
 				return err
 			}

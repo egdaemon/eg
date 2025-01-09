@@ -1146,6 +1146,10 @@ func easyjson61363d27DecodeGithubComEgdaemonEgRunners12(in *jlexer.Lexer, out *E
 			out.AllowShared = bool(in.Bool())
 		case "account_id":
 			out.AccountId = string(in.String())
+		case "mimetype":
+			out.Mimetype = string(in.String())
+		case "uploaded_by":
+			out.UploadedBy = string(in.String())
 		case "labels":
 			if in.IsNull() {
 				in.Skip()
@@ -1348,6 +1352,26 @@ func easyjson61363d27EncodeGithubComEgdaemonEgRunners12(out *jwriter.Writer, in 
 			out.RawString(prefix)
 		}
 		out.String(string(in.AccountId))
+	}
+	if in.Mimetype != "" {
+		const prefix string = ",\"mimetype\":"
+		if first {
+			first = false
+			out.RawString(prefix[1:])
+		} else {
+			out.RawString(prefix)
+		}
+		out.String(string(in.Mimetype))
+	}
+	if in.UploadedBy != "" {
+		const prefix string = ",\"uploaded_by\":"
+		if first {
+			first = false
+			out.RawString(prefix[1:])
+		} else {
+			out.RawString(prefix)
+		}
+		out.String(string(in.UploadedBy))
 	}
 	if len(in.Labels) != 0 {
 		const prefix string = ",\"labels\":"

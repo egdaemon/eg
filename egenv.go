@@ -102,25 +102,25 @@ func DefaultModuleDirectory() string {
 }
 
 func DefaultCacheDirectory(rel ...string) string {
-	return filepath.Join("/", "opt", CacheDirectory, filepath.Join(rel...))
+	return filepath.Join("/", "workload", CacheDirectory, filepath.Join(rel...))
 }
 
 func DefaultRuntimeDirectory(rel ...string) string {
-	return filepath.Join("/", "opt", RuntimeDirectory, filepath.Join(rel...))
+	return filepath.Join("/", "workload", RuntimeDirectory, filepath.Join(rel...))
 }
 
 func DefaultWorkingDirectory(rel ...string) string {
-	return filepath.Join("/", "opt", WorkingDirectory, filepath.Join(rel...))
+	return filepath.Join("/", "workload", WorkingDirectory, filepath.Join(rel...))
 }
 
 func DefaultTempDirectory(rel ...string) string {
-	return filepath.Join("/", "opt", TempDirectory, filepath.Join(rel...))
+	return filepath.Join("/", "workload", TempDirectory, filepath.Join(rel...))
 }
 
 // root mount location, all volumes are initially mounted here.
 // then they're rebound to grant the unprivileged users access.
 func DefaultMountRoot(rel ...string) string {
-	return filepath.Join("/", "opt", filepath.Join(rel...))
+	return filepath.Join("/", "eg.mnt", filepath.Join(rel...))
 }
 
 //go:embed DefaultContainerfile

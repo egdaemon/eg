@@ -112,7 +112,7 @@ func (t Command) Newf(cmd string, options ...any) Command {
 func New(cmd string) Command {
 	return Command{
 		user:    "egd", // default user to execute commands as
-		group:   "root",
+		group:   "egd",
 		cmd:     cmd,
 		timeout: 5 * time.Minute,
 	}

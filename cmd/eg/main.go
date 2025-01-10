@@ -114,6 +114,7 @@ func main() {
 			"vars_cwd":                       osx.Getwd("."),
 			"vars_git_directory":             gitdir,
 			"vars_cache_directory":           userx.DefaultCacheDirectory(),
+			"vars_runtime_directory":         userx.DefaultRuntimeDirectory(),
 			"vars_container_cache_directory": filepath.Join(userx.DefaultCacheDirectory(), "containers"),
 			"vars_eg_runtime_directory":      eg.DefaultMountRoot(eg.RuntimeDirectory),
 			"vars_account_id":                envx.String("", "EG_ACCOUNT"),

@@ -2,18 +2,43 @@ package fsx
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"io/fs"
 	"log"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
+	"time"
 
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/systemx"
 	"github.com/egdaemon/eg/internal/tracex"
 )
+
+func Wait(ctx context.Context, d time.Duration, path string) error {
+	ctx, done := context.WithTimeout(ctx, d)
+	defer done()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(100 * time.Millisecond):
+		}
+
+		if _, err := os.Stat(path); errors.Is(err, fs.ErrNotExist) {
+			runtime.Gosched()
+			continue
+		} else if err != nil {
+			return err
+		} else {
+			return nil
+		}
+	}
+}
 
 // Locate - looks for the provided filename up the file tree.
 // and returns the path once found, if no path is found then it returns

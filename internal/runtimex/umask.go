@@ -3,12 +3,13 @@
 package runtimex
 
 import (
-	"log"
 	"syscall"
+
+	"github.com/egdaemon/eg/internal/debugx"
 )
 
 func Umask(m int) int {
 	newm := syscall.Umask(m)
-	log.Println("umask set to", newm)
+	debugx.Println("umask set to", newm)
 	return newm
 }

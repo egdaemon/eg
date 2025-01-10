@@ -20,7 +20,7 @@ import (
 )
 
 func DefaultRunnerSocketPath() string {
-	return eg.DefaultRuntimeDirectory("control.socket")
+	return eg.DefaultMountRoot(eg.RuntimeDirectory, "control.socket")
 }
 
 type AgentOption func(*Agent)
@@ -70,7 +70,7 @@ func AgentOptionEGBin(egbin string) AgentOption {
 }
 
 func AgentOptionEnviron(environpath string) AgentOption {
-	return AgentOptionVolumes(AgentMountReadOnly(environpath, eg.DefaultRuntimeDirectory("environ.env")))
+	return AgentOptionVolumes(AgentMountReadOnly(environpath, eg.DefaultMountRoot(eg.RuntimeDirectory, "environ.env")))
 }
 
 func AgentOptionVolumeSpecs(desc ...string) []string {

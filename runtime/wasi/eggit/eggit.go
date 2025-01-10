@@ -13,7 +13,6 @@ import (
 
 	_eg "github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/internal/debugx"
-	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/iox"
 	"github.com/egdaemon/eg/internal/slicesx"
@@ -96,19 +95,6 @@ func Clone(ctx context.Context, uri, remote, commit string) error {
 func AutoClone(ctx context.Context, _ eg.Op) error {
 	if err := Clone(ctx, env.String("", "EG_GIT_HEAD_URI"), env.String("origin", "EG_GIT_HEAD_REMOTE"), env.String("main", "EG_GIT_HEAD_REF")); err != nil {
 		return err
-	}
-
-	// hack to deal with local development and the fact we can't run as an unprivileged user by default
-	// fix for permissions until we are running as a unprivileged user by default.
-	// also see: https://github.com/go-git/go-git/issues/1371
-	if !envx.UnsafeIsLocalCompute() {
-		return shell.Run(
-			ctx,
-			shell.Newf(
-				"chmod -R 0770 %s",
-				egenv.WorkingDirectory(),
-			).Privileged(),
-		)
 	}
 
 	return nil

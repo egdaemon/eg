@@ -51,7 +51,7 @@ func AutoTest() eg.OpFn {
 
 		runtime := shell.Runtime().EnvironFrom(cenv...)
 
-		for croot := range findroot(egenv.RootDirectory()) {
+		for croot := range findroot(egenv.WorkingDirectory()) {
 			cmd := stringsx.Join(" ", "cargo", "test")
 			if err := shell.Run(ctx, runtime.New(cmd).Directory(croot)); err != nil {
 				return errorsx.Wrap(err, "unable to run tests")

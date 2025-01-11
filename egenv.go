@@ -4,12 +4,12 @@ import (
 	"embed"
 	"io"
 	"io/fs"
-	"log"
 	"os"
 	"path/filepath"
 
 	"github.com/egdaemon/eg/internal/slicesx"
 	"github.com/egdaemon/eg/internal/stringsx"
+	"github.com/egdaemon/eg/internal/tracex"
 )
 
 var (
@@ -60,7 +60,7 @@ const (
 	EnvComputeVCS               = "EG_COMPUTE_VCS_URI"       // vcs uri for the compute workload
 	EnvComputeTTL               = "EG_COMPUTE_TTL"           // deadline for compute workload
 	EnvComputeContainerExec     = "EG_COMPUTE_EXEC_OPTIONS"  // CLI options for podman exec
-	EnvComputeRootDirectory     = "EG_COMPUTE_ROOT_DIRECTORY"
+	EnvComputeWorkingDirectory  = "EG_COMPUTE_ROOT_DIRECTORY"
 	EnvComputeCacheDirectory    = "EG_COMPUTE_CACHE_DIRECTORY"
 	EnvComputeRuntimeDirectory  = "EG_COMPUTE_RUNTIME_DIRECTORY"
 	EnvComputeBin               = "EG_BIN"
@@ -88,24 +88,39 @@ const (
 	EnvUnsafeGitCloneEnabled = "EG_UNSAFE_GIT_CLONE_ENABLED"
 )
 
+const (
+	WorkingDirectory = "eg"
+	CacheDirectory   = ".eg.cache"
+	RuntimeDirectory = ".eg.runtime"
+	TempDirectory    = ".eg.tmp"
+	ModuleBin        = ".eg.module.wasm"
+	BinaryBin        = "egbin"
+)
+
 func DefaultModuleDirectory() string {
 	return ".eg"
 }
 
 func DefaultCacheDirectory(rel ...string) string {
-	return filepath.Join("/", "opt", "eg.cache", filepath.Join(rel...))
+	return filepath.Join("/", "opt", CacheDirectory, filepath.Join(rel...))
 }
 
 func DefaultRuntimeDirectory(rel ...string) string {
-	return filepath.Join("/", "opt", "eg.runtime", filepath.Join(rel...))
+	return filepath.Join("/", "opt", RuntimeDirectory, filepath.Join(rel...))
 }
 
-func DefaultRootDirectory(rel ...string) string {
-	return filepath.Join("/", "opt", "eg", filepath.Join(rel...))
+func DefaultWorkingDirectory(rel ...string) string {
+	return filepath.Join("/", "opt", WorkingDirectory, filepath.Join(rel...))
 }
 
 func DefaultTempDirectory(rel ...string) string {
-	return filepath.Join("/", "opt", "eg.tmp", filepath.Join(rel...))
+	return filepath.Join("/", "opt", TempDirectory, filepath.Join(rel...))
+}
+
+// root mount location, all volumes are initially mounted here.
+// then they're rebound to grant the unprivileged users access.
+func DefaultMountRoot(rel ...string) string {
+	return filepath.Join("/", "opt", filepath.Join(rel...))
 }
 
 //go:embed DefaultContainerfile
@@ -117,10 +132,9 @@ func PrepareRootContainer(cpath string) (err error) {
 		dst *os.File
 	)
 
-	// log.Println("---------------------- Prepare Root Container Initiated ----------------------")
-	// defer log.Println("---------------------- Prepare Root Container Completed ----------------------")
-
-	log.Println("default container path", cpath)
+	tracex.Println("---------------------- Prepare Root Container Initiated ----------------------")
+	tracex.Println("default container path", cpath)
+	defer tracex.Println("---------------------- Prepare Root Container Completed ----------------------")
 	if c, err = Embedded.Open("DefaultContainerfile"); err != nil {
 		return err
 	}

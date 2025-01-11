@@ -66,7 +66,7 @@ func AutoCompile(options ...coption) eg.OpFn {
 		runtime := shell.Runtime().EnvironFrom(goenv...)
 
 		// golang's wasm implementation doesn't have a reasonable default in place. it defaults to returning not found.
-		for gomod := range modfilex.FindModules(egenv.RootDirectory()) {
+		for gomod := range modfilex.FindModules(egenv.WorkingDirectory()) {
 			cmd := stringsx.Join(" ", "go", "build", copts.debug, tags, fmt.Sprintf("%s/...", filepath.Dir(gomod)))
 			if err := shell.Run(ctx, runtime.New(cmd)); err != nil {
 				return errorsx.Wrap(err, "unable to compile")
@@ -125,7 +125,7 @@ func AutoTest(options ...toption) eg.OpFn {
 		runtime := shell.Runtime().EnvironFrom(goenv...)
 
 		// golang's wasm implementation doesn't have a reasonable default in place. it defaults to returning not found.
-		for gomod := range modfilex.FindModules(egenv.RootDirectory()) {
+		for gomod := range modfilex.FindModules(egenv.WorkingDirectory()) {
 			cmd := stringsx.Join(" ", "go", "test", opts.debug, tags, fmt.Sprintf("%s/...", filepath.Dir(gomod)))
 			if err := shell.Run(ctx, runtime.New(cmd)); err != nil {
 				return errorsx.Wrap(err, "unable to run tests")

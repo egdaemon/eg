@@ -57,10 +57,15 @@ func FileTree(ctx context.Context, op eg.Op) error {
 	privileged := shell.Runtime().Privileged()
 	return shell.Run(
 		ctx,
-		privileged.New("ls -lhan /opt"),
-		privileged.New("tree -a -L 1 /opt"),
-		privileged.Newf("tree -a -L 1 %s", egenv.CacheDirectory()),
+		privileged.Newf("echo 'runtime directory:' && ls -lhan %s", egenv.RuntimeDirectory()),
+		privileged.Newf("echo 'cache directory:' && ls -lhan %s", egenv.CacheDirectory()),
+		privileged.Newf("echo 'ephemeral directory:' && ls -lhan %s", egenv.EphemeralDirectory()),
+		privileged.Newf("echo 'working directory:' && ls -lhan %s", egenv.WorkingDirectory()),
 		privileged.Newf("tree -a -L 2 %s", egenv.RuntimeDirectory()),
+		privileged.Newf("tree -a -L 1 %s", egenv.CacheDirectory()),
+		privileged.Newf("tree -a -L 1 %s", egenv.EphemeralDirectory()),
+		privileged.Newf("tree -a -L 1 %s", egenv.WorkingDirectory()),
+		privileged.New("systemctl status eg-bindfs.service").Lenient(true),
 	)
 }
 

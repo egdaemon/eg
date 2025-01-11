@@ -31,7 +31,7 @@ type daemon struct {
 	MachineID     string   `name:"machine" help:"unique id for this particular machine" default:"${vars_machine_id}" required:"true"`
 	Seed          string   `name:"seed" help:"seed for generating ssh credentials in a consistent manner" default:"${vars_entropy_seed}"`
 	SSHKeyPath    string   `name:"sshkeypath" help:"path to ssh key to use" default:"${vars_ssh_key_path}"`
-	SSHAgentPath  string   `name:"sshagentpath" help:"ssh agent socket path" default:"${vars_runtime_directory}/ssh.agent.socket"`
+	SSHAgentPath  string   `name:"sshagentpath" help:"ssh agent socket path" default:"${vars_eg_runtime_directory}/ssh.agent.socket"`
 	SSHKnownHosts string   `name:"sshknownhostspath" help:"ssh known hosts path" default:"${vars_ssh_known_hosts_path}"`
 	Autodownload  bool     `name:"autodownload" help:"enable/disable the basic download scheduler" default:"true"`
 	CacheDir      string   `name:"directory" help:"local cache directory" default:"${vars_cache_directory}"`

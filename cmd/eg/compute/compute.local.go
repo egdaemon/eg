@@ -42,10 +42,12 @@ type local struct {
 	GitReference     string   `name:"git-ref" help:"name of the branch or commit to checkout" default:"${vars_git_head_reference}"`
 	ContainerCache   string   `name:"croot" help:"container storage, ideally we'd be able to share with the host but for now" hidden:"true" default:"${vars_container_cache_directory}"`
 	Impure           bool     `name:"impure" help:"clone the repository before building and executing the container"`
+	Hotswap          bool     `name:"hotswap" help:"replace the eg binary in containers with the version used to run the command" hidden:"true" default:"false"`
 }
 
 func (t local) Run(gctx *cmdopts.Global) (err error) {
 	var (
+		hotswapbin = eg.DefaultMountRoot("egbin")
 		homedir    = userx.HomeDirectoryOrDefault("/root")
 		ws         workspaces.Context
 		repo       *git.Repository
@@ -96,6 +98,11 @@ func (t local) Run(gctx *cmdopts.Global) (err error) {
 		FromEnviron(errorsx.Zero(gitx.LocalEnv(repo, t.GitRemote, t.GitReference))...).
 		Var(eg.EnvUnsafeCacheID, ws.CachedID).
 		Var(eg.EnvUnsafeGitCloneEnabled, strconv.FormatBool(false)) // hack to disable cloning
+
+	if t.Hotswap {
+		os.Setenv(eg.EnvComputeBin, hotswapbin)
+		envb.Var(eg.EnvComputeBin, hotswapbin)
+	}
 
 	if t.Dirty {
 		mounthome = runners.AgentOptionAutoMountHome(homedir)
@@ -160,7 +167,8 @@ func (t local) Run(gctx *cmdopts.Global) (err error) {
 
 	debugx.Println("container cache", t.ContainerCache)
 
-	// envx.Debug(os.Environ()...)
+	// envx.Debug(errorsx.Must(envb.Environ())...)
+
 	ragent := runners.NewRunner(
 		gctx.Context,
 		ws,
@@ -173,9 +181,9 @@ func (t local) Run(gctx *cmdopts.Global) (err error) {
 		gpgmount,
 		mountegbin,
 		runners.AgentOptionVolumes(
-			runners.AgentMountReadWrite(filepath.Join(ws.Root, ws.CacheDir), eg.DefaultCacheDirectory()),
-			runners.AgentMountReadWrite(filepath.Join(ws.Root, ws.RuntimeDir), eg.DefaultRuntimeDirectory()),
-			runners.AgentMountReadWrite(filepath.Join(ws.Root, ws.TemporaryDir), eg.DefaultTempDirectory()),
+			runners.AgentMountReadWrite(filepath.Join(ws.Root, ws.CacheDir), eg.DefaultMountRoot(eg.CacheDirectory)),
+			runners.AgentMountReadWrite(filepath.Join(ws.Root, ws.RuntimeDir), eg.DefaultMountRoot(eg.RuntimeDirectory)),
+			runners.AgentMountReadWrite(filepath.Join(ws.Root, ws.TemporaryDir), eg.DefaultMountRoot(eg.TempDirectory)),
 			runners.AgentMountReadWrite(t.ContainerCache, "/var/lib/containers"),
 		),
 		runners.AgentOptionEnviron(environpath),
@@ -194,10 +202,10 @@ func (t local) Run(gctx *cmdopts.Global) (err error) {
 			runners.AgentOptionVolumeSpecs(
 				runners.AgentMountReadOnly(
 					filepath.Join(ws.Root, ws.BuildDir, ws.Module, "main.wasm.d"),
-					eg.DefaultRuntimeDirectory(ws.Module, "main.wasm.d"),
+					eg.DefaultMountRoot(eg.RuntimeDirectory, ws.Module, "main.wasm.d"),
 				),
-				runners.AgentMountReadOnly(m.Path, "/opt/egmodule.wasm"),
-				runners.AgentMountReadWrite(filepath.Join(ws.Root, ws.WorkingDir), eg.DefaultRootDirectory()),
+				runners.AgentMountReadOnly(m.Path, eg.DefaultMountRoot(eg.ModuleBin)),
+				runners.AgentMountReadWrite(filepath.Join(ws.Root, ws.WorkingDir), eg.DefaultMountRoot(eg.WorkingDirectory)),
 			)...)
 
 		prepcmd := func(cmd *exec.Cmd) *exec.Cmd {

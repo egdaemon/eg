@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"eg/ci/archlinux"
 	"eg/ci/debian"
 	"log"
 
@@ -16,8 +15,6 @@ import (
 func Prepare(ctx context.Context, op eg.Op) error {
 	return shell.Run(
 		ctx,
-		shell.New("ls -lha /opt"),
-		shell.Newf("ls -lha %s", egenv.CacheDirectory()),
 		shell.Newf("mkdir -p %s", egenv.CacheDirectory(".dist")),
 		shell.Newf("ls -lha %s", egenv.CacheDirectory(".dist")),
 	)
@@ -37,7 +34,7 @@ func main() {
 		Prepare,
 		eg.Parallel(
 			eg.Build(eg.Container(debian.ContainerName).BuildFromFile(".dist/deb/Containerfile")),
-			eg.Build(eg.Container(archlinux.ContainerName).BuildFromFile(".dist/archlinux/Containerfile")),
+			// eg.Build(eg.Container(archlinux.ContainerName).BuildFromFile(".dist/archlinux/Containerfile")),
 		),
 		eg.Parallel(
 			eg.Module(ctx, debian.Builder(debian.ContainerName, "jammy"), debian.Build),

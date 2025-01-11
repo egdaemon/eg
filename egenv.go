@@ -65,6 +65,7 @@ const (
 	EnvComputeRuntimeDirectory  = "EG_COMPUTE_RUNTIME_DIRECTORY"
 	EnvComputeBin               = "EG_BIN"
 	EnvScheduleMaximumDelay     = "EG_COMPUTE_SCHEDULER_MAXIMUM_DELAY"
+	EnvScheduleSystemLoadFreq   = "EG_COMPUTE_SCHEDULER_SYSTEM_LOAD_FREQUENCY" // how frequently we measure system load, small enough we can saturate, high enough its not a burden.
 	EnvPingMinimumDelay         = "EG_COMPUTE_PING_MINIMUM_DELAY"
 	EnvComputeContainerImpure   = "EG_C8S_IMPURE"
 )

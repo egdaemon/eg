@@ -132,6 +132,29 @@ func (t daemon) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 		return err
 	}
 
+	go func() {
+		runners.LoadQueue(
+			gctx.Context,
+			runners.QueueOptionCompletion(
+				runners.NewCompletionClient(authclient),
+			),
+			runners.QueueOptionAgentOptions(
+				runners.AgentOptionVolumes(
+					runners.AgentMountReadWrite(
+						envx.String(t.SSHAgentPath, "SSH_AUTH_SOCK"),
+						eg.DefaultRuntimeDirectory("ssh.agent.socket"),
+					),
+					runners.AgentMountReadOnly(t.SSHKnownHosts, "/etc/ssh/ssh_known_hosts"),
+				),
+				runners.AgentOptionEnv("SSH_AUTH_SOCK", eg.DefaultRuntimeDirectory("ssh.agent.socket")),
+				runners.AgentOptionVolumes(t.MountDirs...),
+				runners.AgentOptionEnvKeys(t.EnvVars...),
+				runners.AgentOptionEnv(eg.EnvComputeTLSInsecure, strconv.FormatBool(tlsc.Insecure)),
+			),
+			runners.QueueOptionLogVerbosity(gctx.Verbosity),
+		)
+	}()
+
 	return runners.Queue(
 		gctx.Context,
 		runners.QueueOptionCompletion(

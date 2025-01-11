@@ -52,7 +52,7 @@ func sampledisk(ctx context.Context, analytics *sql.DB) error {
 	)
 
 	if usage, err = disk.UsageWithContext(ctx, "/"); err != nil {
-		return errorsx.Wrap(err, "unable to retrieve compute")
+		return errorsx.Wrap(err, "unable to retrieve disk")
 	}
 
 	if err := analytics.QueryRowContext(ctx, "INSERT INTO 'eg.metrics.disk' (id, name, ts, path, percent) VALUES (?, 'disk', ?, ?, ?) RETURNING percent", uuid.Must(uuid.NewV7()).String(), time.Now().UTC(), usage.Path, usage.UsedPercent).Scan(&usage.UsedPercent); err != nil {

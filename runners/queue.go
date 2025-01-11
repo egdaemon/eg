@@ -175,6 +175,30 @@ func Queue(ctx context.Context, options ...func(*metadata)) (err error) {
 	}
 }
 
+// func LoadQueue(ctx context.Context, options ...func(*metadata)) (err error) {
+// 	// monitor for reload signals, can't use the context because we
+// 	// dont want to interrupt running work but only want to stop after a run.
+// 	reload := make(chan error, 1)
+// 	go debugx.OnSignal(func() error {
+// 		reload <- errorsx.String("reload daemon signal received")
+// 		close(reload)
+// 		return nil
+// 	})(ctx, syscall.SIGHUP)
+
+// 	if err = BuildRootContainer(ctx); err != nil {
+// 		return err
+// 	}
+
+// 	for {
+// 		current, err := determineload(ctx)
+// 		if err != nil {
+// 			log.Println("unable to determine load deferring", err)
+// 		}
+
+// 		log.Println("queue2", spew.Sdump(current))
+// 	}
+// }
+
 type state interface {
 	Update(context.Context) state
 }

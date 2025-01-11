@@ -12,7 +12,6 @@ import (
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/httpx"
 	"github.com/gofrs/uuid"
-	"github.com/pbnjay/memory"
 )
 
 // Downloads work from control plane.
@@ -28,14 +27,14 @@ type DownloadClient struct {
 	host string
 }
 
-func (t DownloadClient) Download(ctx context.Context) (err error) {
+func (t DownloadClient) Download(ctx context.Context, available *RuntimeResources) (err error) {
 	var (
 		encoded []byte
 		req     = EnqueuedSearchRequest{
 			Os:     runtime.GOOS,
 			Arch:   runtime.GOARCH,
-			Cores:  uint64(runtime.NumCPU()),
-			Memory: memory.TotalMemory(),
+			Cores:  available.Cores,
+			Memory: available.Memory,
 		}
 		resp EnqueuedDequeueResponse
 	)
@@ -58,6 +57,7 @@ func (t DownloadClient) Download(ctx context.Context) (err error) {
 	if err = json.NewDecoder(dhttpresp.Body).Decode(&resp); err != nil {
 		return err
 	}
+	defer available.Reserve(NewRuntimeResourcesFromDequeued(resp.Enqueued))
 
 	httpreq, err = http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/c/q/%s/download", t.host, resp.Enqueued.Id), bytes.NewReader(encoded))
 	if err != nil {

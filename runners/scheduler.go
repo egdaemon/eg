@@ -22,7 +22,9 @@ func AutoDownload(ctx context.Context, authedclient *http.Client) {
 		backoff.Jitter(0.02),
 	)
 
+	auto := NewRuntimeResources()
 	spool := DefaultSpoolDirs()
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -47,7 +49,7 @@ func AutoDownload(ctx context.Context, authedclient *http.Client) {
 			continue
 		}
 
-		if err := NewDownloadClient(authedclient).Download(ctx); err != nil {
+		if err := NewDownloadClient(authedclient).Download(ctx, auto); err != nil {
 			log.Println(errorsx.Wrap(err, "unable to download work"))
 			continue
 		}

@@ -16,7 +16,6 @@ type Command struct {
 	user      string
 	group     string
 	cmd       string
-	home      string
 	directory string
 	environ   []string
 	timeout   time.Duration
@@ -55,13 +54,20 @@ func (t Command) EnvironFrom(environ ...string) Command {
 }
 
 // append a specific key/value environment variable.
-func (t Command) Environ(k, v string) Command {
-	t.environ = append(t.environ, fmt.Sprintf("%s=%s", k, v))
+func (t Command) Environ(k string, v any) Command {
+	switch _v := v.(type) {
+	case string:
+		t.environ = append(t.environ, fmt.Sprintf("%s=%s", k, _v))
+	case int8, int16, int32, int64, int:
+		t.environ = append(t.environ, fmt.Sprintf("%s=%d", k, _v))
+	default:
+		t.environ = append(t.environ, fmt.Sprintf("%s=%v", k, _v))
+	}
 	return t
 }
 
 // user to run the command as
-func (t Command) As(u string) Command {
+func (t Command) User(u string) Command {
 	t.user = u
 	return t
 }
@@ -76,7 +82,6 @@ func (t Command) Group(g string) Command {
 func (t Command) Privileged() Command {
 	t.user = "root"
 	t.group = "root"
-	t.home = "/root"
 	return t
 }
 
@@ -106,9 +111,8 @@ func (t Command) Newf(cmd string, options ...any) Command {
 //	timeout: 5 minutes.
 func New(cmd string) Command {
 	return Command{
-		user:    "egd",  // default user to execute commands as
-		group:   "root", // default group to the root group.
-		home:    "/home/egd",
+		user:    "egd", // default user to execute commands as
+		group:   "root",
 		cmd:     cmd,
 		timeout: 5 * time.Minute,
 	}

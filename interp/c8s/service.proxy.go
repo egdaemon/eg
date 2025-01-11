@@ -2,12 +2,14 @@ package c8s
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 
+	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/internal/debugx"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/execx"
@@ -119,7 +121,7 @@ func (t *ProxyService) Run(ctx context.Context, req *RunRequest) (_ *RunResponse
 	options := append(t.containeropts, req.Options...)
 	options = append(
 		options,
-		"--volume", "/opt/eg:/opt/eg:rw",
+		"--volume", fmt.Sprintf("%s:%s:rw", eg.DefaultMountRoot(eg.WorkingDirectory), eg.DefaultMountRoot(eg.WorkingDirectory)),
 	)
 
 	if err = PodmanRun(ctx, t.prepcmd, req.Image, req.Name, req.Command, options...); err != nil {
@@ -138,7 +140,7 @@ func (t *ProxyService) Module(ctx context.Context, req *ModuleRequest) (_ *Modul
 	options := append(t.containeropts, req.Options...)
 	options = append(
 		options,
-		"--volume", "/opt/eg:/opt/eg:rw",
+		"--volume", fmt.Sprintf("%s:%s:rw", eg.DefaultMountRoot(eg.WorkingDirectory), eg.DefaultMountRoot(eg.WorkingDirectory)),
 	)
 
 	if err = PodmanModule(ctx, t.prepcmd, req.Image, req.Name, req.Mdir, options...); err != nil {

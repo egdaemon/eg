@@ -63,8 +63,13 @@ func EphemeralDirectory(paths ...string) string {
 
 // returns the absolute path to the working directory of the module. this directory is the
 // initial working directory of the workload and is used for cloning git repositories etc.
+func WorkingDirectory(paths ...string) string {
+	return filepath.Join(env.String(eg.DefaultWorkingDirectory(), eg.EnvComputeWorkingDirectory), filepath.Join(paths...))
+}
+
+// Deprecated: use WorkingDirectory
 func RootDirectory(paths ...string) string {
-	return filepath.Join(env.String(eg.DefaultRootDirectory(), eg.EnvComputeRootDirectory), filepath.Join(paths...))
+	return WorkingDirectory(paths...)
 }
 
 // Extract a boolean formatted environment variable from the given keys

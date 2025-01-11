@@ -66,7 +66,7 @@ func AgentOptionAutoEGBin() AgentOption {
 }
 
 func AgentOptionEGBin(egbin string) AgentOption {
-	return AgentOptionVolumes(AgentMountReadOnly(egbin, "/opt/egbin"))
+	return AgentOptionVolumes(AgentMountReadOnly(egbin, eg.DefaultMountRoot(eg.BinaryBin)))
 }
 
 func AgentOptionEnviron(environpath string) AgentOption {

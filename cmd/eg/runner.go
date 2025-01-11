@@ -89,6 +89,7 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 		log.Println("number of cores", runtime.GOMAXPROCS(-1))
 		log.Println("ram available", bytesx.Unit(vmemlimit))
 		log.Println("logging level", gctx.Verbosity)
+		// fsx.PrintDir(os.DirFS(t.RuntimeDir))
 		defer log.Println("---------------------------- ROOT MODULE COMPLETED ----------------------------")
 
 		cspath := filepath.Join(t.RuntimeDir, "control.socket")
@@ -121,12 +122,12 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 			runners.AgentOptionEnv(eg.EnvComputeTLSInsecure, strconv.FormatBool(tlsc.Insecure)),
 			runners.AgentOptionVolumes(
 				runners.AgentMountReadWrite("/root", "/root"),
-				runners.AgentMountReadWrite(eg.DefaultCacheDirectory(), eg.DefaultCacheDirectory()),
-				runners.AgentMountReadWrite(eg.DefaultTempDirectory(), eg.DefaultTempDirectory()),
-				runners.AgentMountReadWrite(eg.DefaultRuntimeDirectory(), eg.DefaultRuntimeDirectory()),
+				runners.AgentMountReadWrite(eg.DefaultMountRoot(eg.CacheDirectory), eg.DefaultMountRoot(eg.CacheDirectory)),
+				runners.AgentMountReadWrite(eg.DefaultMountRoot(eg.RuntimeDirectory), eg.DefaultMountRoot(eg.RuntimeDirectory)),
+				runners.AgentMountReadWrite(eg.DefaultMountRoot(eg.TempDirectory), eg.DefaultMountRoot(eg.TempDirectory)),
 				runners.AgentMountReadWrite("/var/lib/containers", "/var/lib/containers"),
 			),
-			runners.AgentOptionEGBin(errorsx.Must(exec.LookPath("/opt/egbin"))),
+			runners.AgentOptionEGBin(errorsx.Must(exec.LookPath(eg.DefaultMountRoot(eg.BinaryBin)))),
 			runners.AgentOptionCommandLine("--userns", "host"),       // properly map host user into containers.
 			runners.AgentOptionCommandLine("--cap-add", "NET_ADMIN"), // required for loopback device creation inside the container
 			runners.AgentOptionCommandLine("--cap-add", "SYS_ADMIN"), // required for rootless container building https://github.com/containers/podman/issues/4056#issuecomment-612893749

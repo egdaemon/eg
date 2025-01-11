@@ -20,7 +20,7 @@ func Debug(ctx context.Context, op eg.Op) error {
 		ctx,
 		shell.New("pwd"),
 		shell.Newf("tree -a --gitignore %s", egenv.RuntimeDirectory()),
-		shell.New("ls -lha /opt/eg/.test/Containerfile"),
+		shell.Newf("ls -lha %s", egenv.WorkingDirectory(".test", "Containerfile")),
 		shell.New("ssh -T git@github.com").Lenient(true),
 	)
 }

@@ -67,6 +67,7 @@ func machineID() string {
 
 func main() {
 	var shellcli struct {
+		cmdopts.Hotswap
 		cmdopts.Global
 		cmdopts.TLSConfig
 		Version            cmdopts.Version              `cmd:"" help:"display versioning information"`
@@ -112,10 +113,9 @@ func main() {
 			"vars_tls_insecure_default":      eg.EnvTLSInsecure(),
 			"vars_cwd":                       osx.Getwd("."),
 			"vars_git_directory":             gitdir,
-			"vars_runtime_directory":         userx.DefaultRuntimeDirectory(),
 			"vars_cache_directory":           userx.DefaultCacheDirectory(),
 			"vars_container_cache_directory": filepath.Join(userx.DefaultCacheDirectory(), "containers"),
-			"vars_eg_runtime_directory":      eg.DefaultRuntimeDirectory(),
+			"vars_eg_runtime_directory":      eg.DefaultMountRoot(eg.RuntimeDirectory),
 			"vars_account_id":                envx.String("", "EG_ACCOUNT"),
 			"vars_machine_id":                envx.String(machineID(), "EG_MACHINE_ID"),
 			"vars_entropy_seed":              envx.String(errorsx.Must(uuid.NewV4()).String(), "EG_ENTROPY_SEED"),
@@ -144,6 +144,7 @@ func main() {
 		kong.Bind(
 			&shellcli.Global,
 			&shellcli.TLSConfig,
+			new(cmdopts.HotswapPath),
 		),
 		kong.TypeMapper(reflect.TypeOf(&net.IP{}), kong.MapperFunc(cmdopts.ParseIP)),
 		kong.TypeMapper(reflect.TypeOf(&net.TCPAddr{}), kong.MapperFunc(cmdopts.ParseTCPAddr)),

@@ -248,16 +248,16 @@ func FromPath(n string) (environ []string, err error) {
 	return FromReader(env)
 }
 
-func Build() *builder {
-	return &builder{}
+func Build() *Builder {
+	return &Builder{}
 }
 
-type builder struct {
+type Builder struct {
 	environ []string
 	failed  error
 }
 
-func (t builder) CopyTo(w io.Writer) error {
+func (t Builder) CopyTo(w io.Writer) error {
 	if t.failed != nil {
 		return t.failed
 	}
@@ -271,7 +271,7 @@ func (t builder) CopyTo(w io.Writer) error {
 	return nil
 }
 
-func (t builder) WriteTo(path string) error {
+func (t Builder) WriteTo(path string) error {
 	var (
 		buf bytes.Buffer
 	)
@@ -290,12 +290,12 @@ func (t builder) WriteTo(path string) error {
 	return nil
 }
 
-func (t builder) Environ() ([]string, error) {
+func (t Builder) Environ() ([]string, error) {
 	return t.environ, t.failed
 }
 
 // set a single variable to a value.
-func (t *builder) Var(k, v string) *builder {
+func (t *Builder) Var(k, v string) *Builder {
 	if encoded := Format(k, v); encoded != "" {
 		t.environ = append(t.environ, fmt.Sprintf("%s=%s", k, v))
 	}
@@ -304,7 +304,7 @@ func (t *builder) Var(k, v string) *builder {
 
 // extract environment variables from a file on disk.
 // missing files are treated as noops.
-func (t *builder) FromPath(p ...string) *builder {
+func (t *Builder) FromPath(p ...string) *Builder {
 	for _, n := range p {
 		tmp, err := FromPath(n)
 		t.environ = append(t.environ, tmp...)
@@ -315,21 +315,21 @@ func (t *builder) FromPath(p ...string) *builder {
 
 // extract environment variables from an io.Reader.
 // the format is the standard .env file formats.
-func (t *builder) FromReader(r io.Reader) *builder {
+func (t *Builder) FromReader(r io.Reader) *Builder {
 	tmp, err := FromReader(r)
 	t.environ = append(t.environ, tmp...)
 	t.failed = errors.Join(t.failed, err)
 	return t
 }
 
-func (t *builder) FromEnviron(environ ...string) *builder {
+func (t *Builder) FromEnviron(environ ...string) *Builder {
 	t.environ = append(t.environ, environ...)
 	return t
 }
 
 // extract the key/value pairs from the os.Environ.
 // empty keys are passed as k=
-func (t *builder) FromEnv(keys ...string) *builder {
+func (t *Builder) FromEnv(keys ...string) *Builder {
 	vars := make([]string, 0, len(keys))
 
 	for _, k := range keys {

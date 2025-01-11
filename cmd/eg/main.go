@@ -67,6 +67,7 @@ func machineID() string {
 
 func main() {
 	var shellcli struct {
+		cmdopts.Hotswap
 		cmdopts.Global
 		cmdopts.TLSConfig
 		Version            cmdopts.Version              `cmd:"" help:"display versioning information"`
@@ -143,6 +144,7 @@ func main() {
 		kong.Bind(
 			&shellcli.Global,
 			&shellcli.TLSConfig,
+			new(cmdopts.HotswapPath),
 		),
 		kong.TypeMapper(reflect.TypeOf(&net.IP{}), kong.MapperFunc(cmdopts.ParseIP)),
 		kong.TypeMapper(reflect.TypeOf(&net.TCPAddr{}), kong.MapperFunc(cmdopts.ParseTCPAddr)),

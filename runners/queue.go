@@ -487,7 +487,7 @@ func (t staterunning) Update(ctx context.Context) state {
 		options := append(
 			t.ragent.Options(),
 			"--volume", AgentMountReadWrite(containerdir, "/var/lib/containers"),
-			"--volume", AgentMountReadOnly(filepath.Join(t.ws.Root, t.ws.RuntimeDir, t.entry), "/opt/egmodule.wasm"),
+			"--volume", AgentMountReadOnly(filepath.Join(t.ws.Root, t.ws.RuntimeDir, t.entry), eg.DefaultMountRoot(eg.ModuleBin)),
 			"--volume", AgentMountReadWrite(filepath.Join(t.ws.Root, t.ws.RuntimeDir), eg.DefaultMountRoot(eg.RuntimeDirectory)),
 			"--volume", AgentMountReadWrite(filepath.Join(t.ws.Root, t.ws.WorkingDir), eg.DefaultMountRoot(eg.WorkingDirectory)),
 			"--volume", AgentMountReadWrite(filepath.Join(t.ws.Root, t.ws.TemporaryDir), eg.DefaultMountRoot(eg.TempDirectory)),

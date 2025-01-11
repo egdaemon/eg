@@ -42,12 +42,10 @@ type local struct {
 	GitReference     string   `name:"git-ref" help:"name of the branch or commit to checkout" default:"${vars_git_head_reference}"`
 	ContainerCache   string   `name:"croot" help:"container storage, ideally we'd be able to share with the host but for now" hidden:"true" default:"${vars_container_cache_directory}"`
 	Impure           bool     `name:"impure" help:"clone the repository before building and executing the container"`
-	Hotswap          bool     `name:"hotswap" help:"replace the eg binary in containers with the version used to run the command" hidden:"true" default:"false"`
 }
 
-func (t local) Run(gctx *cmdopts.Global) (err error) {
+func (t local) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err error) {
 	var (
-		hotswapbin = eg.DefaultMountRoot("egbin")
 		homedir    = userx.HomeDirectoryOrDefault("/root")
 		ws         workspaces.Context
 		repo       *git.Repository
@@ -96,13 +94,9 @@ func (t local) Run(gctx *cmdopts.Global) (err error) {
 		FromEnv(os.Environ()...).
 		FromEnv(eg.EnvComputeContainerExec).
 		FromEnviron(errorsx.Zero(gitx.LocalEnv(repo, t.GitRemote, t.GitReference))...).
+		Var(eg.EnvComputeBin, hotswapbin.String()).
 		Var(eg.EnvUnsafeCacheID, ws.CachedID).
 		Var(eg.EnvUnsafeGitCloneEnabled, strconv.FormatBool(false)) // hack to disable cloning
-
-	if t.Hotswap {
-		os.Setenv(eg.EnvComputeBin, hotswapbin)
-		envb.Var(eg.EnvComputeBin, hotswapbin)
-	}
 
 	if t.Dirty {
 		mounthome = runners.AgentOptionAutoMountHome(homedir)

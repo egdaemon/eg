@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strconv"
+	"time"
 
 	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/cmd/cmdopts"
@@ -20,6 +21,7 @@ import (
 	"github.com/egdaemon/eg/internal/debugx"
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
+	"github.com/egdaemon/eg/internal/fsx"
 	"github.com/egdaemon/eg/internal/gitx"
 	"github.com/egdaemon/eg/internal/runtimex"
 	"github.com/egdaemon/eg/internal/wasix"
@@ -60,6 +62,10 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 
 	if ws, err = workspaces.FromEnv(gctx.Context, t.Dir, t.Module); err != nil {
 		return err
+	}
+
+	if err = fsx.Wait(gctx.Context, 30*time.Second, ws.Root); err != nil {
+		return errorsx.Wrapf(err, "expected working directory (%s) did not appear, this is a known issue", ws.Root)
 	}
 
 	if err = gitx.AutomaticCredentialRefresh(gctx.Context, tlsc.DefaultClient(), t.RuntimeDir, envx.String("", gitx.EnvAuthEGAccessToken)); err != nil {

@@ -22,7 +22,7 @@ func FindModules(root string) iter.Seq[string] {
 	return func(yield func(string) bool) {
 		err := fs.WalkDir(tree, ".", func(path string, d fs.DirEntry, err error) error {
 			if err != nil {
-				return err
+				return errorsx.Wrapf(err, "erroring walking tree: %s", filepath.Join(root, path))
 			}
 
 			// ignore vendor directory.
@@ -51,7 +51,7 @@ func FindModules(root string) iter.Seq[string] {
 			return nil
 		})
 
-		errorsx.Log(errorsx.Wrap(err, "unable to yield path"))
+		errorsx.Log(errorsx.Wrap(err, "unable to find modules"))
 	}
 }
 

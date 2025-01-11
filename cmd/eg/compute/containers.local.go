@@ -39,7 +39,7 @@ type c8sLocal struct {
 	ContainerCache   string   `name:"croot" help:"container storage, ideally we'd be able to share with the host but for now" hidden:"true" default:"${vars_container_cache_directory}"`
 }
 
-func (t c8sLocal) Run(gctx *cmdopts.Global) (err error) {
+func (t c8sLocal) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err error) {
 	var (
 		tmpdir     string
 		ws         workspaces.Context
@@ -125,6 +125,7 @@ func (t c8sLocal) Run(gctx *cmdopts.Global) (err error) {
 		FromEnv(os.Environ()...).
 		FromEnv(eg.EnvComputeContainerExec).
 		FromEnviron(errorsx.Zero(gitx.LocalEnv(repo, t.GitRemote, t.GitReference))...).
+		Var(eg.EnvComputeBin, hotswapbin.String()).
 		Var(eg.EnvUnsafeGitCloneEnabled, strconv.FormatBool(false)) // hack to disable cloning
 
 	if err = envb.CopyTo(environio); err != nil {
@@ -173,7 +174,7 @@ func (t c8sLocal) Run(gctx *cmdopts.Global) (err error) {
 		options := append(
 			ragent.Options(),
 			runners.AgentOptionVolumeSpecs(
-				runners.AgentMountReadOnly(m.Path, "/opt/egmodule.wasm"),
+				runners.AgentMountReadOnly(m.Path, eg.DefaultMountRoot(eg.ModuleBin)),
 				runners.AgentMountReadWrite(filepath.Join(ws.Root, ws.WorkingDir), eg.DefaultWorkingDirectory()),
 			)...)
 

@@ -51,7 +51,7 @@ func build(ctx context.Context, _ eg.Op) error {
 		runtime.Newf("go -C src build -tags \"no_duckdb_arrow\" -buildvcs ./cmd/...").Directory(debdir),
 		// shell.New("echo ${GPG_PASSPHRASE} | gpg-preset-passphrase --present {key}").Environ("GPG_PASSPHRASE", env.String("", "GPG_PASSPHRASE")),
 		runtime.Newf("debuild -S -k%s", maintainer.GPGFingerprint).Directory(debdir),
-		runtime.Newf("dput -f -c %s eg eg_${VERSION}_source.changes", egenv.RootDirectory(".dist", "deb", "dput.config")).Directory(filepath.Dir(debdir)),
+		runtime.Newf("dput -f -c %s eg eg_${VERSION}_source.changes", egenv.WorkingDirectory(".dist", "deb", "dput.config")).Directory(filepath.Dir(debdir)),
 	)
 }
 

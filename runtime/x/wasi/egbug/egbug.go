@@ -30,8 +30,8 @@ func Users(ctx context.Context, op eg.Op) error {
 	privileged := shell.Runtime().Privileged()
 	return shell.Run(
 		ctx,
+		shell.New("id"),
 		privileged.New("id"),
-		privileged.New("id -u egd"),
 		privileged.New("users"),
 		privileged.New("groups"),
 		privileged.New("cat /proc/self/uid_map"),

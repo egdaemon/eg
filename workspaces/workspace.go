@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/fsx"
@@ -68,8 +69,8 @@ func FromEnv(ctx context.Context, root, name string) (zero Context, err error) {
 
 func New(ctx context.Context, root string, mdir string, name string) (zero Context, err error) {
 	cidmd5 := md5.New()
-	cdir := filepath.Join(".eg.cache")
-	runtimedir := filepath.Join(".eg.runtime")
+	cdir := filepath.Join(eg.CacheDirectory)
+	runtimedir := filepath.Join(eg.RuntimeDirectory)
 	ignore := ignoredir{path: cdir, reason: "cache directory"}
 
 	if err = cacheid(ctx, root, mdir, cidmd5, ignore); err != nil {

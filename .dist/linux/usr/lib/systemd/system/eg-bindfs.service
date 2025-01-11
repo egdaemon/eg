@@ -5,7 +5,7 @@ After=network.target
 [Service]
 Type=oneshot
 RemainAfterExit=true
-ExecStart=/usr/bin/bindfs --create-as-mounter -m egd --map=root/egd:@root/@egd /eg.mnt /workload
+ExecStart=/usr/bin/bindfs --multithreaded --map=root/egd:@root/@egd /eg.mnt /workload
 
 [Install]
 WantedBy=default.target

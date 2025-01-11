@@ -2,6 +2,8 @@ github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/egdaemon/eg v0.0.0-20250109001826-79c71c508fc8 h1:4n1Q9TBl397yPmG+FdqUW25vmu0XYtOKKeuGJA2e7xg=
 github.com/egdaemon/eg v0.0.0-20250109001826-79c71c508fc8/go.mod h1:JvI8qxHWWwtFpjWYSQ66AG7Bkyptmu9+ezx+upOjHpQ=
+github.com/egdaemon/eg v0.0.0-20250111232237-04867088670c h1:cVZ6J4dZJp3AOnS2a6c9I6Gl3yfrBF5Gz5H7if17z70=
+github.com/egdaemon/eg v0.0.0-20250111232237-04867088670c/go.mod h1:JvI8qxHWWwtFpjWYSQ66AG7Bkyptmu9+ezx+upOjHpQ=
 github.com/egdaemon/wasinet/wasinet v0.0.0-20250107020126-be17492ab34e h1:aoMAeztwxFoiyN69p0/1aSb80IXKOfj/zUO8jiTeWAI=
 github.com/egdaemon/wasinet/wasinet v0.0.0-20250107020126-be17492ab34e/go.mod h1:vPVQ3HHYTa9Fe7lz+ZBqI49kw76LSTQfvKZlO8QpWsY=
 github.com/gofrs/uuid v4.4.0+incompatible h1:3qXRTX8/NbyulANqlc0lchS1gqAVxRgsuW1YrTJupqA=

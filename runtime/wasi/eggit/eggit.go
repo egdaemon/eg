@@ -106,7 +106,7 @@ func AutoClone(ctx context.Context, _ eg.Op) error {
 			ctx,
 			shell.Newf(
 				"chmod -R 0770 %s",
-				egenv.RootDirectory(),
+				egenv.WorkingDirectory(),
 			).Privileged(),
 		)
 	}
@@ -145,10 +145,10 @@ func (t *modified) detect(ctx context.Context) error {
 			ctx,
 			shell.Newf(
 				"git show --name-only %s > /dev/null 2>&1", bcommit,
-			).Directory(egenv.RootDirectory()),
+			).Directory(egenv.WorkingDirectory()),
 			shell.Newf(
 				"git show --name-only %s > /dev/null 2>&1", hcommit,
-			).Directory(egenv.RootDirectory()),
+			).Directory(egenv.WorkingDirectory()),
 		)
 		if err != nil {
 			return nil
@@ -158,7 +158,7 @@ func (t *modified) detect(ctx context.Context) error {
 			ctx,
 			shell.Newf(
 				"git diff --name-only %s..%s | tee %s > /dev/null 2>&1", bcommit, hcommit, path,
-			).Directory(egenv.RootDirectory()),
+			).Directory(egenv.WorkingDirectory()),
 		)
 		if err != nil {
 			return err

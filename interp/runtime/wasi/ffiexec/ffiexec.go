@@ -52,7 +52,7 @@ func Exec(op func(*exec.Cmd) *exec.Cmd) func(
 		defer debugx.Println("completed", cmd.String())
 
 		if err = mayberun(cmd); err != nil {
-			log.Println("failed to execute shell command", cmd.String(), err)
+			log.Println("failed to execute shell command", cmd.Dir, cmd.String(), err)
 			return 128
 		}
 

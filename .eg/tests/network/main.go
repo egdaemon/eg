@@ -5,12 +5,14 @@ import (
 	"context"
 	"crypto/md5"
 	"crypto/rand"
+	"crypto/tls"
 	"encoding/hex"
 	"fmt"
 	"io"
 	"log"
 	"net"
 	"net/http"
+	"time"
 
 	"github.com/egdaemon/eg/runtime/wasi/eg"
 	"github.com/egdaemon/eg/runtime/wasi/egenv"
@@ -184,7 +186,7 @@ func HTTPServerTest(ctx context.Context, op eg.Op) (err error) {
 
 func init() {
 	wasinet.Hijack()
-	http.DefaultTransport = wasinet.InsecureHTTP()
+	http.DefaultTransport = InsecureHTTP()
 }
 
 func main() {
@@ -205,5 +207,22 @@ func main() {
 
 	if err != nil {
 		log.Fatalln(err)
+	}
+}
+
+func InsecureHTTP() *http.Transport {
+	return &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		Proxy:           http.ProxyFromEnvironment,
+		DialContext: (&wasinet.Dialer{
+			Timeout: 2 * time.Second,
+		}).DialContext,
+		ForceAttemptHTTP2: true,
+
+		MaxIdleConns:          10,
+		ResponseHeaderTimeout: 5 * time.Second,
+		IdleConnTimeout:       5 * time.Second,
+		TLSHandshakeTimeout:   5 * time.Second,
+		ExpectContinueTimeout: 5 * time.Second,
 	}
 }

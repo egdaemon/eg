@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
-	"os"
 	"path/filepath"
 	"reflect"
 	"runtime"
@@ -18,11 +17,10 @@ import (
 	"github.com/egdaemon/eg/interp/events"
 	"github.com/egdaemon/eg/runtime/wasi/egunsafe/ffiegcontainer"
 	"github.com/egdaemon/eg/runtime/wasi/egunsafe/ffigraph"
-	"github.com/egdaemon/eg/runtime/wasi/env"
 )
 
 func runtimeDirectory(paths ...string) string {
-	return filepath.Join(env.String(os.TempDir(), eg.EnvComputeRuntimeDirectory), filepath.Join(paths...))
+	return eg.DefaultMountRoot(eg.RuntimeDirectory, filepath.Join(paths...))
 }
 
 // Generally unsafe predefined runner for modules. useful

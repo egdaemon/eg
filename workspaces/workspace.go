@@ -101,20 +101,19 @@ func ensuredirs(c Context) (_ Context, err error) {
 		return c, err
 	}
 
+	perms := rdir.Mode() & (fs.ModePerm)
+
 	// need to ensure that certain directories and files exists
 	// since they're mounted into containers.
 	// the 4 caching/tmp directories are given 0777 permissions
 	// because unprivileged users may need to access them.
 	err1 := fsx.MkDirs(
-		0777,
+		perms,
 		filepath.Join(c.Root, c.TemporaryDir),
 		filepath.Join(c.Root, c.GenModDir),
 		filepath.Join(c.Root, c.BuildDir, c.Module, "main.wasm.d"),
 		filepath.Join(c.Root, c.CacheDir),
 	)
-
-	perms := rdir.Mode() & (fs.ModePerm)
-
 	tracex.Println("------------ ensuredirs", perms, "------------")
 
 	// need to ensure that certain directories and files exists

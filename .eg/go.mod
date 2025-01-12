@@ -3,12 +3,11 @@ module eg/ci
 go 1.23.4
 
 require (
-	github.com/egdaemon/eg v0.0.0-20250112045402-823ecd907f74
+	github.com/egdaemon/eg v0.0.0-20250112050016-78b5dfce3a7d
 	github.com/egdaemon/wasinet/wasinet v0.0.0-20250107020126-be17492ab34e
 )
 
 require (
-	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/gofrs/uuid v4.4.0+incompatible // indirect
 	golang.org/x/net v0.34.0 // indirect
 	golang.org/x/sys v0.29.0 // indirect

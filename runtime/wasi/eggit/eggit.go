@@ -127,27 +127,27 @@ func (t *modified) detect(ctx context.Context) error {
 	if hcommit == bcommit {
 		return nil
 	} else {
-		err := shell.Run(
-			ctx,
-			shell.Newf(
-				"git show --name-only %s > /dev/null 2>&1", bcommit,
-			).Directory(egenv.WorkingDirectory()),
-			shell.Newf(
-				"git show --name-only %s > /dev/null 2>&1", hcommit,
-			).Directory(egenv.WorkingDirectory()),
-		)
-		if err != nil {
-			return nil
-		}
+		// err := shell.Run(
+		// 	ctx,
+		// 	shell.Newf(
+		// 		"git show --name-only %s > /dev/null 2>&1", bcommit,
+		// 	).Directory(egenv.WorkingDirectory()),
+		// 	shell.Newf(
+		// 		"git show --name-only %s > /dev/null 2>&1", hcommit,
+		// 	).Directory(egenv.WorkingDirectory()),
+		// )
+		// if err != nil {
+		// 	return nil
+		// }
 
-		err = shell.Run(
+		err := shell.Run(
 			ctx,
 			shell.Newf(
 				"git diff --name-only %s..%s | tee %s > /dev/null 2>&1", bcommit, hcommit, path,
 			).Directory(egenv.WorkingDirectory()),
 		)
 		if err != nil {
-			return err
+			return errorsx.Wrap(err, "git diff failed")
 		}
 	}
 

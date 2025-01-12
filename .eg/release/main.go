@@ -9,6 +9,7 @@ import (
 	"github.com/egdaemon/eg/runtime/wasi/egenv"
 	"github.com/egdaemon/eg/runtime/wasi/eggit"
 	"github.com/egdaemon/eg/runtime/wasi/shell"
+	"github.com/egdaemon/eg/runtime/x/wasi/egbug"
 	"github.com/egdaemon/eg/runtime/x/wasi/execx"
 )
 
@@ -31,6 +32,7 @@ func main() {
 	err := eg.Perform(
 		ctx,
 		eggit.AutoClone,
+		egbug.FileTree,
 		Prepare,
 		eg.Parallel(
 			eg.Build(eg.Container(debian.ContainerName).BuildFromFile(".dist/deb/Containerfile")),

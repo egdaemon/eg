@@ -21,6 +21,7 @@ import (
 	"github.com/egdaemon/eg/internal/debugx"
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
+	"github.com/egdaemon/eg/internal/execx"
 	"github.com/egdaemon/eg/internal/fsx"
 	"github.com/egdaemon/eg/internal/gitx"
 	"github.com/egdaemon/eg/internal/runtimex"
@@ -48,6 +49,61 @@ type module struct {
 	Module     string `arg:"" help:"name of the module to run"`
 }
 
+func (t module) mounthack(ctx context.Context, ws workspaces.Context) (err error) {
+	var (
+		// binname = "fuse-overlayfs"
+		binname = "bindfs"
+		mbin    string
+	)
+
+	if mbin, err = exec.LookPath(binname); err != nil {
+		log.Println(errorsx.Wrap(err, "unable to locate bindfs, skipping"))
+
+		// symlink fallback?
+		if err = os.Symlink(eg.DefaultMountRoot(), eg.DefaultWorkloadRoot()); err != nil {
+			log.Println("unable to symlink", err)
+		}
+
+		return nil
+	}
+
+	remap := func(from, to string) error {
+		mcmd := exec.CommandContext(ctx, mbin, "--map=root/egd:@root/@egd", from, to)
+		if err = execx.MaybeRun(mcmd); err != nil {
+			return errorsx.Wrapf(err, "unable to run bindfs: %s", from)
+		}
+
+		return nil
+	}
+
+	err = fsx.MkDirs(
+		0770,
+		eg.DefaultRuntimeDirectory(),
+		eg.DefaultTempDirectory(),
+		eg.DefaultWorkingDirectory(),
+		eg.DefaultCacheDirectory(),
+	)
+	if err != nil {
+		return err
+	}
+
+	err = errorsx.Compact(
+		remap(eg.DefaultMountRoot(eg.RuntimeDirectory), eg.DefaultRuntimeDirectory()),
+		remap(eg.DefaultMountRoot(eg.TempDirectory), eg.DefaultTempDirectory()),
+		remap(eg.DefaultMountRoot(eg.WorkingDirectory), eg.DefaultWorkingDirectory()),
+		remap(eg.DefaultMountRoot(eg.CacheDirectory), eg.DefaultCacheDirectory()),
+	)
+	if err != nil {
+		return err
+	}
+
+	if err = fsx.Wait(ctx, 3*time.Second, ws.Root); err != nil {
+		return errorsx.Wrapf(err, "expected working directory (%s) did not appear, this is a known issue", ws.Root)
+	}
+
+	return nil
+}
+
 func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 	var (
 		ws    workspaces.Context
@@ -64,15 +120,11 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 		return err
 	}
 
-	if err = fsx.Wait(gctx.Context, 30*time.Second, ws.Root); err != nil {
-		log.Println(errorsx.Wrapf(err, "expected working directory (%s) did not appear, this is a known issue", ws.Root))
-	}
-
 	if err = gitx.AutomaticCredentialRefresh(gctx.Context, tlsc.DefaultClient(), t.RuntimeDir, envx.String("", gitx.EnvAuthEGAccessToken)); err != nil {
 		return err
 	}
 
-	if mlevel := envx.Int(0, eg.EnvComputeModuleNestedLevel); mlevel == 0 || envx.Boolean(false, eg.EnvComputeRootModule) {
+	if mlevel := envx.Int(0, eg.EnvComputeModuleNestedLevel); mlevel == 0 {
 		var (
 			control   net.Listener
 			db        *sql.DB
@@ -102,23 +154,27 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 		if control, err = net.Listen("unix", cspath); err != nil {
 			return errorsx.Wrap(err, "unable to create control.socket")
 		}
-		srv := grpc.NewServer(
-			grpc.Creds(insecure.NewCredentials()), // this is a local socket
-		)
+		defer control.Close()
 
 		if db, err = sql.Open("duckdb", filepath.Join(t.RuntimeDir, "analytics.db")); err != nil {
 			return errorsx.Wrap(err, "unable to create analytics.db")
 		}
 		defer db.Close()
+
 		if err = events.PrepareDB(gctx.Context, db); err != nil {
 			return errorsx.Wrap(err, "unable to prepare analytics.db")
 		}
+
 		// periodic sampling of system metrics
 		go runners.BackgroundSystemLoad(gctx.Context, db)
 		// final sample
 		defer func() {
 			errorsx.Log(runners.SampleSystemLoad(gctx.Context, db))
 		}()
+		srv := grpc.NewServer(
+			grpc.Creds(insecure.NewCredentials()), // this is a local socket
+		)
+		defer srv.GracefulStop()
 
 		events.NewServiceDispatch(db).Bind(srv)
 		ragent := runners.NewRunner(
@@ -169,7 +225,6 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 		go func() {
 			errorsx.Log(errorsx.Wrap(srv.Serve(control), "unable to create control socket"))
 		}()
-		defer srv.GracefulStop()
 	} else {
 		debugx.Printf("---------------------------- MODULE INITIATED %d ----------------------------\n", mlevel)
 		// env.Debug(os.Environ()...)
@@ -183,6 +238,14 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 
 	if cc, err = daemons.AutoRunnerClient(gctx, ws, uid, runners.AgentOptionAutoEGBin()); err != nil {
 		return err
+	}
+
+	// IMPORTANT: duckdb play well with bindfs mounting the folders before
+	// creating extensions/tables, it would nuke the working directory. it *mostly* worked once we moved this mount
+	// call here. we're leaving the call here for now but it shouldn't matter.
+	// and we're keen to remove it.
+	if err = t.mounthack(gctx.Context, ws); err != nil {
+		log.Println("unable to mount with correct permissions", err)
 	}
 
 	return interp.Remote(

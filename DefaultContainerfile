@@ -29,4 +29,6 @@ RUN systemd-tmpfiles --create
 RUN printf '%%wheel ALL=(ALL:ALL) NOPASSWD: ALL\n' | tee -a /etc/sudoers.d/egd
 
 RUN systemctl enable eg-bindfs.service
+RUN cat /usr/lib/tmpfiles.d/00-eg-daemon.conf
 RUN mkdir -p /workload
+RUN ls -lha /

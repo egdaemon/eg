@@ -54,10 +54,11 @@ func Module(ctx context.Context, op eg.Op) error {
 
 // prints debugging information about the environment workspaces.
 func FileTree(ctx context.Context, op eg.Op) error {
-	privileged := shell.Runtime().Privileged().Directory("/")
+	privileged := shell.Runtime().Privileged().Lenient(true).Directory("/")
 	return shell.Run(
 		ctx,
-		privileged.New("systemctl status eg-bindfs.service"),
+		privileged.Newf("echo 'mount directory:' && ls -lhan %s", _eg.DefaultMountRoot()),
+		privileged.Newf("echo 'workload directory:' && ls -lhan %s", _eg.DefaultWorkloadRoot()),
 		privileged.Newf("echo 'runtime directory:' && ls -lhan %s", egenv.RuntimeDirectory()),
 		privileged.Newf("echo 'cache directory:' && ls -lhan %s", egenv.CacheDirectory()),
 		privileged.Newf("echo 'ephemeral directory:' && ls -lhan %s", egenv.EphemeralDirectory()),

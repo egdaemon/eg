@@ -102,19 +102,23 @@ func DefaultModuleDirectory() string {
 }
 
 func DefaultCacheDirectory(rel ...string) string {
-	return filepath.Join("/", "workload", CacheDirectory, filepath.Join(rel...))
+	return DefaultWorkloadRoot(CacheDirectory, filepath.Join(rel...))
 }
 
 func DefaultRuntimeDirectory(rel ...string) string {
-	return filepath.Join("/", "workload", RuntimeDirectory, filepath.Join(rel...))
+	return DefaultWorkloadRoot(RuntimeDirectory, filepath.Join(rel...))
 }
 
 func DefaultWorkingDirectory(rel ...string) string {
-	return filepath.Join("/", "workload", WorkingDirectory, filepath.Join(rel...))
+	return DefaultWorkloadRoot(WorkingDirectory, filepath.Join(rel...))
 }
 
 func DefaultTempDirectory(rel ...string) string {
-	return filepath.Join("/", "workload", TempDirectory, filepath.Join(rel...))
+	return DefaultWorkloadRoot(TempDirectory, filepath.Join(rel...))
+}
+
+func DefaultWorkloadRoot(rel ...string) string {
+	return filepath.Join("/", "workload", filepath.Join(rel...))
 }
 
 // root mount location, all volumes are initially mounted here.

@@ -160,14 +160,6 @@ type runner struct {
 func (t runner) perform(ctx context.Context, runid, path string, rtb runtimefn) (err error) {
 	tracedebug := envx.Boolean(false, eg.EnvLogsTrace)
 	hostcachedir := filepath.Join(t.runtimedir, "cache")
-	tmpdir, err := os.MkdirTemp(t.runtimedir, ".tmp.*")
-	if err != nil {
-		return errorsx.Wrap(err, "unable to create tmp directory")
-	}
-	defer os.RemoveAll(tmpdir)
-	if err = os.Chmod(tmpdir, 0770); err != nil {
-		return errorsx.Wrap(err, "unable to adjust tmp directory permissions")
-	}
 	if err = fsx.MkDirs(0770, hostcachedir); err != nil {
 		return errorsx.Wrap(err, "unable to ensure host cache directory")
 	}
@@ -213,8 +205,6 @@ func (t runner) perform(ctx context.Context, runid, path string, rtb runtimefn) 
 
 	debugx.Println("cache dir", hostcachedir, "->", eg.DefaultCacheDirectory())
 	debugx.Println("runtime dir", t.runtimedir, "->", eg.DefaultMountRoot(eg.RuntimeDirectory))
-	debugx.Println("tmp dir", tmpdir, "->", eg.DefaultTempDirectory())
-
 	mcfg := wazero.NewModuleConfig().WithEnv(
 		"CI", envx.String("false", "EG_CI", "CI"),
 	).WithEnv(
@@ -250,11 +240,9 @@ func (t runner) perform(ctx context.Context, runid, path string, rtb runtimefn) 
 	).WithFSConfig(
 		wazero.NewFSConfig().
 			WithDirMount(t.runtimedir, eg.DefaultRuntimeDirectory()).
-			WithDirMount(tmpdir, eg.DefaultTempDirectory()).
 			WithDirMount(hostcachedir, eg.DefaultCacheDirectory()).
 			WithDirMount(t.root, eg.DefaultWorkingDirectory()). // ensure we mount the working directory so pwd works correctly.
 			WithDirMount(t.runtimedir, eg.DefaultMountRoot(eg.RuntimeDirectory)).
-			WithDirMount(tmpdir, eg.DefaultMountRoot(eg.TempDirectory)).
 			WithDirMount(hostcachedir, eg.DefaultMountRoot(eg.CacheDirectory)).
 			WithDirMount(t.root, eg.DefaultMountRoot(eg.WorkingDirectory)), // ensure we mount the working directory so pwd works correctly.
 

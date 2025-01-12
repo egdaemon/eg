@@ -177,7 +177,6 @@ func (t local) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err e
 		runners.AgentOptionVolumes(
 			runners.AgentMountReadWrite(filepath.Join(ws.Root, ws.CacheDir), eg.DefaultMountRoot(eg.CacheDirectory)),
 			runners.AgentMountReadWrite(filepath.Join(ws.Root, ws.RuntimeDir), eg.DefaultMountRoot(eg.RuntimeDirectory)),
-			runners.AgentMountReadWrite(filepath.Join(ws.Root, ws.TemporaryDir), eg.DefaultMountRoot(eg.TempDirectory)),
 			runners.AgentMountReadWrite(t.ContainerCache, "/var/lib/containers"),
 		),
 		runners.AgentOptionEnviron(environpath),

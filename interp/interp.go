@@ -241,8 +241,6 @@ func (t runner) perform(ctx context.Context, runid, path string, rtb runtimefn) 
 		"TERM", envx.String("", "TERM"),
 	).WithEnv(
 		"PWD", eg.DefaultWorkingDirectory(),
-	).WithEnv(
-		"TMPDIR", eg.DefaultTempDirectory(),
 	).WithStdin(
 		os.Stdin,
 	).WithStderr(

@@ -368,7 +368,7 @@ func beginwork(ctx context.Context, md metadata, dir string) state {
 	debugx.Println("workspace", spew.Sdump(ws))
 
 	if err = tarx.Unpack(filepath.Join(ws.Root, ws.RuntimeDir), archive); err != nil {
-		return completed(md, tmpdir, ws, uid, 0, errorsx.Wrap(err, "unable to unpack archive"))
+		return completed(metadata.Enqueued, md, tmpdir, ws, uid, 0, errorsx.Wrap(err, "unable to unpack archive"))
 	}
 
 	if err = wasix.WarmCacheDirectory(ctx, filepath.Join(ws.Root, ws.BuildDir), wasix.WazCacheDir(filepath.Join(ws.Root, ws.RuntimeDir))); err != nil {
@@ -381,7 +381,7 @@ func beginwork(ctx context.Context, md metadata, dir string) state {
 		rootc := filepath.Join(filepath.Join(ws.Root, ws.RuntimeDir), "Containerfile")
 
 		if err = eg.PrepareRootContainer(rootc); err != nil {
-			return completed(md, tmpdir, ws, uid, 0, errorsx.Wrap(err, "preparing root container failed"))
+			return completed(metadata.Enqueued, md, tmpdir, ws, uid, 0, errorsx.Wrap(err, "preparing root container failed"))
 		}
 
 		cmd := exec.CommandContext(ctx, "podman", "build", "-t", "eg", "-f", rootc, tmpdir)
@@ -390,7 +390,7 @@ func beginwork(ctx context.Context, md metadata, dir string) state {
 		cmd.Stdout = os.Stdout
 
 		if err = cmd.Run(); err != nil {
-			return completed(md, tmpdir, ws, uid, 0, errorsx.Wrap(err, "build failed"))
+			return completed(metadata.Enqueued, md, tmpdir, ws, uid, 0, errorsx.Wrap(err, "build failed"))
 		}
 	}
 
@@ -407,7 +407,7 @@ func beginwork(ctx context.Context, md metadata, dir string) state {
 	// envx.Debug(errorsx.Zero(envb.Environ())...)
 
 	if err = envb.WriteTo(environpath); err != nil {
-		return completed(md, tmpdir, ws, uid, 0, errorsx.Wrap(err, "failed to update environment file"))
+		return completed(metadata.Enqueued, md, tmpdir, ws, uid, 0, errorsx.Wrap(err, "failed to update environment file"))
 	}
 
 	aopts := make([]AgentOption, 0, len(md.agentopts)+32)
@@ -431,10 +431,10 @@ func beginwork(ctx context.Context, md metadata, dir string) state {
 	)
 
 	if ragent, err = m.NewRun(ctx, ws, uid, aopts...); err != nil {
-		return completed(md, tmpdir, ws, uid, 0, errorsx.Wrap(err, "run failure"))
+		return completed(metadata.Enqueued, md, tmpdir, ws, uid, 0, errorsx.Wrap(err, "run failure"))
 	}
 
-	return staterunning{metadata: md, enqueued: metadata.Enqueued, ws: ws, ragent: ragent, dir: dir, tmpdir: tmpdir, entry: metadata.Enqueued.Entry}
+	return staterunning{metadata: md, workload: metadata.Enqueued, ws: ws, ragent: ragent, dir: dir, tmpdir: tmpdir, entry: metadata.Enqueued.Entry}
 }
 
 func cacheprefix(enq *Enqueued) string {
@@ -451,7 +451,7 @@ func cachebucket(enq *Enqueued) string {
 
 type staterunning struct {
 	metadata
-	enqueued *Enqueued
+	workload *Enqueued
 	ws       workspaces.Context
 	ragent   *Agent
 	dir      string
@@ -468,8 +468,8 @@ func (t staterunning) Update(ctx context.Context) state {
 		var (
 			err          error
 			logdst       *os.File
-			containerdir = userx.DefaultCacheDirectory("wcache", cacheprefix(t.enqueued), cachebucket(t.enqueued), "containers")
-			cachedir     = userx.DefaultCacheDirectory("wcache", cacheprefix(t.enqueued), cachebucket(t.enqueued), "workloadcache")
+			containerdir = userx.DefaultCacheDirectory("wcache", cacheprefix(t.workload), cachebucket(t.workload), "containers")
+			cachedir     = userx.DefaultCacheDirectory("wcache", cacheprefix(t.workload), cachebucket(t.workload), "workloadcache")
 			logpath      = filepath.Join(t.ws.Root, t.ws.RuntimeDir, "daemon.log")
 		)
 
@@ -480,7 +480,7 @@ func (t staterunning) Update(ctx context.Context) state {
 		log.Println("workload root cachedir", cachedir)
 
 		if logdst, err = os.Create(logpath); err != nil {
-			return completed(t.metadata, t.tmpdir, t.ws, t.ragent.id, 0, err)
+			return completed(t.workload, t.metadata, t.tmpdir, t.ws, t.ragent.id, 0, err)
 		}
 
 		defer logdst.Close()
@@ -505,12 +505,13 @@ func (t staterunning) Update(ctx context.Context) state {
 		ts := time.Now()
 		// TODO REVISIT using t.ws.RuntimeDir as moduledir.
 		err = c8s.PodmanModule(ctx, prepcmd, "eg", fmt.Sprintf("eg-%s", t.ragent.id), t.ws.RuntimeDir, options...)
-		return completed(t.metadata, t.tmpdir, t.ws, t.ragent.id, time.Since(ts), err)
+		return completed(t.workload, t.metadata, t.tmpdir, t.ws, t.ragent.id, time.Since(ts), err)
 	}
 }
 
-func completed(md metadata, tmpdir string, ws workspaces.Context, id string, duration time.Duration, cause error) statecompleted {
+func completed(workload *Enqueued, md metadata, tmpdir string, ws workspaces.Context, id string, duration time.Duration, cause error) statecompleted {
 	return statecompleted{
+		workload: workload,
 		ws:       ws,
 		metadata: md,
 		tmpdir:   tmpdir,
@@ -522,6 +523,7 @@ func completed(md metadata, tmpdir string, ws workspaces.Context, id string, dur
 
 type statecompleted struct {
 	metadata
+	workload *Enqueued
 	ws       workspaces.Context
 	tmpdir   string
 	id       string
@@ -536,7 +538,7 @@ func (t statecompleted) Update(ctx context.Context) state {
 	)
 
 	dirs := DefaultSpoolDirs()
-	log.Println("completed", t.id, filepath.Join(dirs.Running, t.id), t.cause)
+	log.Println("completed", t.workload.AccountId, t.workload.VcsUri, filepath.Join(dirs.Running, t.id), t.cause)
 
 	// fsx.PrintDir(os.DirFS(filepath.Join(t.ws.Root, t.ws.RuntimeDir)))
 

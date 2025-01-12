@@ -65,7 +65,7 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 	}
 
 	if err = fsx.Wait(gctx.Context, 30*time.Second, ws.Root); err != nil {
-		return errorsx.Wrapf(err, "expected working directory (%s) did not appear, this is a known issue", ws.Root)
+		log.Println(errorsx.Wrapf(err, "expected working directory (%s) did not appear, this is a known issue", ws.Root))
 	}
 
 	if err = gitx.AutomaticCredentialRefresh(gctx.Context, tlsc.DefaultClient(), t.RuntimeDir, envx.String("", gitx.EnvAuthEGAccessToken)); err != nil {

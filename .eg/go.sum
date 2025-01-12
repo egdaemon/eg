@@ -4,6 +4,8 @@ github.com/egdaemon/eg v0.0.0-20250109001826-79c71c508fc8 h1:4n1Q9TBl397yPmG+Fdq
 github.com/egdaemon/eg v0.0.0-20250109001826-79c71c508fc8/go.mod h1:JvI8qxHWWwtFpjWYSQ66AG7Bkyptmu9+ezx+upOjHpQ=
 github.com/egdaemon/eg v0.0.0-20250111232237-04867088670c h1:cVZ6J4dZJp3AOnS2a6c9I6Gl3yfrBF5Gz5H7if17z70=
 github.com/egdaemon/eg v0.0.0-20250111232237-04867088670c/go.mod h1:JvI8qxHWWwtFpjWYSQ66AG7Bkyptmu9+ezx+upOjHpQ=
+github.com/egdaemon/eg v0.0.0-20250112045402-823ecd907f74 h1:t/MzPz+2lnSUa9aRq+VEzOShabLD3EZSUEYtYvQA9ng=
+github.com/egdaemon/eg v0.0.0-20250112045402-823ecd907f74/go.mod h1:JvI8qxHWWwtFpjWYSQ66AG7Bkyptmu9+ezx+upOjHpQ=
 github.com/egdaemon/wasinet/wasinet v0.0.0-20250107020126-be17492ab34e h1:aoMAeztwxFoiyN69p0/1aSb80IXKOfj/zUO8jiTeWAI=
 github.com/egdaemon/wasinet/wasinet v0.0.0-20250107020126-be17492ab34e/go.mod h1:vPVQ3HHYTa9Fe7lz+ZBqI49kw76LSTQfvKZlO8QpWsY=
 github.com/gofrs/uuid v4.4.0+incompatible h1:3qXRTX8/NbyulANqlc0lchS1gqAVxRgsuW1YrTJupqA=

@@ -51,6 +51,8 @@ func (t daemon) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 	log.Println("running daemon initiated")
 	defer log.Println("running daemon completed")
 
+	rm := runners.NewResourceManager(runners.NewRuntimeResources())
+
 	// we want to set the umask to 0002 to ensure that the cache (and other) directory are readable by the group.
 	runtimex.Umask(0002)
 
@@ -119,7 +121,7 @@ func (t daemon) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 	}()
 
 	if t.Autodownload {
-		go runners.AutoDownload(gctx.Context, authclient)
+		go runners.AutoDownload(gctx.Context, authclient, rm)
 	}
 
 	if _, found := os.LookupEnv("SSH_AUTH_SOCK"); !found {
@@ -134,6 +136,7 @@ func (t daemon) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 
 	return runners.Queue(
 		gctx.Context,
+		rm,
 		runners.QueueOptionCompletion(
 			runners.NewCompletionClient(authclient),
 		),

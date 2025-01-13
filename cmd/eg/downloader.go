@@ -57,7 +57,7 @@ func (t downloader) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err erro
 		tokensrc,
 	)
 
-	go runners.AutoDownload(gctx.Context, authclient)
+	go runners.AutoDownload(gctx.Context, authclient, runners.NewResourceManager(runners.NewRuntimeResources()))
 
 	return nil
 }

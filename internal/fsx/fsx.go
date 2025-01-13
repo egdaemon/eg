@@ -220,3 +220,11 @@ func MkDirs(perm fs.FileMode, paths ...string) (err error) {
 
 	return nil
 }
+
+func ErrIsNotExist(err error) error {
+	if errors.Is(err, os.ErrNotExist) {
+		return err
+	}
+
+	return nil
+}

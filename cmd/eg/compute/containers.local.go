@@ -179,7 +179,7 @@ func (t c8sLocal) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (er
 			)...)
 
 		// TODO REVISIT using t.ws.RuntimeDir as moduledir.
-		err := c8s.PodmanModule(gctx.Context, prepcmd, "eg", fmt.Sprintf("eg-%s", uid.String()), ws.Root, options...)
+		err := c8s.PodmanModule(gctx.Context, prepcmd, eg.WorkingDirectory, fmt.Sprintf("eg-%s", uid.String()), ws.Root, options...)
 		if err != nil {
 			return errorsx.Wrap(err, "module execution failed")
 		}

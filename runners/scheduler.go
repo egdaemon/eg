@@ -11,10 +11,10 @@ import (
 	"github.com/egdaemon/eg/backoff"
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
-	"github.com/egdaemon/eg/internal/tracex"
+	"github.com/egdaemon/eg/internal/numericx"
 )
 
-func AutoDownload(ctx context.Context, authedclient *http.Client) {
+func AutoDownload(ctx context.Context, authedclient *http.Client, m *ResourceManager) {
 	w := backoff.Chan()
 	s := backoff.New(
 		backoff.Exponential(200*time.Millisecond),
@@ -22,22 +22,30 @@ func AutoDownload(ctx context.Context, authedclient *http.Client) {
 		backoff.Jitter(0.02),
 	)
 
-	auto := NewRuntimeResources()
 	spool := DefaultSpoolDirs()
 
+	determineload := func(limits, consumed RuntimeResources) float64 {
+		cores := float64(consumed.Cores) / float64(limits.Cores)
+		memory := float64(consumed.Memory) / float64(limits.Memory)
+		log.Println("load", cores, memory, numericx.Max(cores, memory))
+		return numericx.Max(cores, memory)
+	}
+
+	capacity := workloadcapacity()
 	for {
 		select {
 		case <-ctx.Done():
 			log.Println("auto enqueue done", ctx.Err())
 			return
 		case <-w.Await(s):
+		case <-m.Completed():
 		}
 
 		if dent, err := os.ReadDir(spool.Running); err != nil {
 			log.Println(errorsx.Wrap(err, "unable to read spool running directory"))
 			continue
-		} else if len(dent) > 0 {
-			tracex.Println("current tasks are in the running queue, not downloading any new tasks", len(dent))
+		} else if len(dent) >= capacity {
+			log.Println("current tasks are in the running queue, not downloading any new tasks", len(dent), ">=", capacity)
 			continue
 		}
 
@@ -45,12 +53,32 @@ func AutoDownload(ctx context.Context, authedclient *http.Client) {
 			log.Println(errorsx.Wrap(err, "unable to read spool queued directory"))
 			continue
 		} else if len(dent) > 0 {
-			tracex.Println("current tasks are queued, not downloading any new tasks", len(dent))
+			log.Println("current tasks are queued, not downloading any new tasks", len(dent))
 			continue
 		}
 
-		if err := NewDownloadClient(authedclient).Download(ctx, auto); err != nil {
-			log.Println(errorsx.Wrap(err, "unable to download work"))
+		var (
+			err      error
+			workload *EnqueuedDequeueResponse
+			c        = m.Snapshot()
+		)
+
+		if workload, err = NewWorkloadClient(authedclient, m).Download(ctx, c); err != nil {
+			log.Println(errorsx.Wrap(err, "unable to locate workload"))
+			continue
+		}
+
+		wants := NewRuntimeResourcesFromDequeued(workload.Enqueued)
+		if determineload(m.Limit, c.Reserve(wants)) > 0.8 {
+			continue
+		}
+
+		if err = NewDownloadClient(authedclient).Download(ctx, workload); err != nil {
+			log.Println(errorsx.Wrap(err, "unable to download workload"))
+			continue
+		}
+
+		if currentload := determineload(m.Limit, c.Reserve(wants)); currentload > 0.4 {
 			continue
 		}
 

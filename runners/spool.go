@@ -43,18 +43,6 @@ func iddirname(uid uuid.UUID) string {
 	return hex.EncodeToString(uid.Bytes()[:6])
 }
 
-func uidfrompath(path string) (uid uuid.UUID, err error) {
-	var (
-		encodedid []byte
-	)
-	if encodedid, err = os.ReadFile(path); err != nil {
-		return uid, errorsx.Wrapf(err, "unable read uuid from disk: %s", path)
-	}
-
-	uid, err = uuid.FromBytes(encodedid)
-	return uid, errorsx.Wrapf(err, "unable read uuid from disk: %s", path)
-}
-
 func (t SpoolDirs) Download(uid uuid.UUID, name string, content io.Reader) (err error) {
 	var (
 		dst *os.File
@@ -62,10 +50,6 @@ func (t SpoolDirs) Download(uid uuid.UUID, name string, content io.Reader) (err 
 
 	if err = os.MkdirAll(filepath.Join(t.Downloading, iddirname(uid)), defaultPerms); err != nil {
 		return err
-	}
-
-	if err = os.WriteFile(filepath.Join(t.Downloading, iddirname(uid), "uuid"), uid.Bytes(), 0600); err != nil {
-		return errorsx.Wrap(err, "unable to write run id to disk")
 	}
 
 	if dst, err = os.Create(filepath.Join(t.Downloading, iddirname(uid), name)); err != nil {
@@ -81,24 +65,24 @@ func (t SpoolDirs) Download(uid uuid.UUID, name string, content io.Reader) (err 
 }
 
 func (t SpoolDirs) Enqueue(uid uuid.UUID) (err error) {
-	if err = os.MkdirAll(t.Queued, defaultPerms); err != nil {
-		return err
-	}
-
 	return os.Rename(filepath.Join(t.Downloading, iddirname(uid)), filepath.Join(t.Queued, iddirname(uid)))
 }
 
 func (t SpoolDirs) Dequeue() (_ string, err error) {
-	if err = os.MkdirAll(t.Running, defaultPerms); err != nil {
-		return "", err
-	}
+	for {
+		dir, err := pop(t.Queued)
+		if err != nil {
+			return "", err
+		}
 
-	dir, err := pop(t.Queued)
-	if err != nil {
-		return "", err
-	}
+		if err = os.Rename(filepath.Join(t.Queued, dir.Name()), filepath.Join(t.Running, dir.Name())); fsx.ErrIsNotExist(err) != nil {
+			continue
+		} else if err != nil {
+			return "", err
+		}
 
-	return filepath.Join(t.Running, dir.Name()), os.Rename(filepath.Join(t.Queued, dir.Name()), filepath.Join(t.Running, dir.Name()))
+		return filepath.Join(t.Running, dir.Name()), nil
+	}
 }
 
 func (t SpoolDirs) Completed(uid uuid.UUID) (err error) {

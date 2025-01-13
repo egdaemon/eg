@@ -125,7 +125,7 @@ func main() {
 					filepath.Join(userx.HomeDirectoryOrDefault(user.HomeDir), ".ssh"),
 					"CONFIGURATION_DIRECTORY",
 				),
-				"eg",
+				userx.DefaultDir,
 			),
 			"vars_ssh_known_hosts_path":    filepath.Join(userx.HomeDirectoryOrDefault(user.HomeDir), ".ssh", "known_hosts"),
 			"vars_user_name":               stringsx.DefaultIfBlank(user.Name, user.Username),

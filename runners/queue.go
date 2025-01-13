@@ -30,9 +30,12 @@ import (
 	"github.com/egdaemon/eg/internal/userx"
 	"github.com/egdaemon/eg/internal/wasix"
 	"github.com/egdaemon/eg/interp/c8s"
+	"github.com/egdaemon/eg/interp/events"
 	"github.com/egdaemon/eg/workspaces"
 	"github.com/fsnotify/fsnotify"
 	"github.com/gofrs/uuid"
+
+	"github.com/alitto/pond/v2"
 )
 
 type downloader interface {
@@ -81,6 +84,7 @@ type metadata struct {
 	reload       chan error
 	downloader
 	completion
+	rm        *ResourceManager
 	agentopts []AgentOption
 }
 
@@ -133,21 +137,12 @@ func BuildRootContainerPath(ctx context.Context, dir, path string) (err error) {
 	return nil
 }
 
-// runs the scheduler until the context is cancelled.
-func Queue(ctx context.Context, options ...func(*metadata)) (err error) {
-	// monitor for reload signals, can't use the context because we
-	// dont want to interrupt running work but only want to stop after a run.
-	reload := make(chan error, 1)
-	go debugx.OnSignal(func() error {
-		reload <- errorsx.String("reload daemon signal received")
-		close(reload)
-		return nil
-	})(ctx, syscall.SIGHUP)
-
+func workload(ctx context.Context, rm *ResourceManager, reload chan error, options ...func(*metadata)) error {
 	var (
 		s state = staterecover{
 			metadata: langx.Clone(
 				metadata{
+					rm:         rm,
 					reload:     reload,
 					completion: noopcompletion{},
 					downloader: localdownloader{},
@@ -156,10 +151,6 @@ func Queue(ctx context.Context, options ...func(*metadata)) (err error) {
 			),
 		}
 	)
-
-	if err = BuildRootContainer(ctx); err != nil {
-		return err
-	}
 
 	for {
 		select {
@@ -175,29 +166,44 @@ func Queue(ctx context.Context, options ...func(*metadata)) (err error) {
 	}
 }
 
-// func LoadQueue(ctx context.Context, options ...func(*metadata)) (err error) {
-// 	// monitor for reload signals, can't use the context because we
-// 	// dont want to interrupt running work but only want to stop after a run.
-// 	reload := make(chan error, 1)
-// 	go debugx.OnSignal(func() error {
-// 		reload <- errorsx.String("reload daemon signal received")
-// 		close(reload)
-// 		return nil
-// 	})(ctx, syscall.SIGHUP)
+func workloadcapacity() int {
+	return envx.Int(1, eg.EnvComputeMaximumWorkloads)
+}
 
-// 	if err = BuildRootContainer(ctx); err != nil {
-// 		return err
-// 	}
+// runs the scheduler until the context is cancelled.
+func Queue(ctx context.Context, rm *ResourceManager, options ...func(*metadata)) (err error) {
+	// monitor for reload signals, can't use the context because we
+	// dont want to interrupt running work but only want to stop after a run.
+	reload := make(chan error, 1)
+	go debugx.OnSignal(func() error {
+		reload <- errorsx.String("reload daemon signal received")
+		close(reload)
+		return nil
+	})(ctx, syscall.SIGHUP)
 
-// 	for {
-// 		current, err := determineload(ctx)
-// 		if err != nil {
-// 			log.Println("unable to determine load deferring", err)
-// 		}
+	if err = BuildRootContainer(ctx); err != nil {
+		return err
+	}
 
-// 		log.Println("queue2", spew.Sdump(current))
-// 	}
-// }
+	pool := pond.NewPool(workloadcapacity())
+	workers := make([]pond.Task, 0, pool.MaxConcurrency())
+
+	for i := 0; i < pool.MaxConcurrency(); i++ {
+		workers = append(workers, pool.SubmitErr(func() error {
+			return workload(ctx, rm, reload, options...)
+		}))
+	}
+
+	pool.StopAndWait()
+
+	for _, t := range workers {
+		if err := t.Wait(); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
 
 type state interface {
 	Update(context.Context) state
@@ -288,12 +294,6 @@ func (t stateidle) Update(ctx context.Context) state {
 		log.Println("unable to dequeue", err)
 	}
 
-	// otherwise wait for work.
-	if err = os.MkdirAll(dirs.Queued, 0700); err != nil {
-		log.Println(errorsx.Wrap(err, "unable to create queued directory"))
-		return newdelay(time.Second, t)
-	}
-
 	// check upstream....
 	if err = t.metadata.Download(ctx); errors.Is(err, context.DeadlineExceeded) {
 		return terminate(err)
@@ -338,61 +338,42 @@ func beginwork(ctx context.Context, md metadata, dir string) state {
 	var (
 		err      error
 		ws       workspaces.Context
-		tmpdir   string
 		ragent   *Agent
 		archive  *os.File
-		_uid     uuid.UUID
 		encoded  []byte
-		metadata = &EnqueuedDequeueResponse{
+		workload = &EnqueuedDequeueResponse{
 			Enqueued: &Enqueued{Entry: "main.wasm"},
 		}
 	)
 
-	if _uid, err = uidfrompath(filepath.Join(dir, "uuid")); err != nil {
-		return failure(err, idle(md))
-	}
-	uid := _uid.String()
-
-	log.Println("initializing runner", uid, dir)
-	tmpdir = filepath.Join(dir, "work")
-
-	if err = fsx.MkDirs(0770, tmpdir); err != nil {
-		return failure(err, idle(md))
-	}
+	log.Println("initializing runner", dir)
 
 	if encoded, err = os.ReadFile(filepath.Join(dir, "metadata.json")); err != nil {
 		return failure(err, idle(md))
 	}
 
-	if err = json.Unmarshal(encoded, metadata); err != nil {
+	if err = json.Unmarshal(encoded, workload); err != nil {
 		return failure(err, idle(md))
 	}
 
-	debugx.Println("metadata", spew.Sdump(metadata.Enqueued))
+	debugx.Println("metadata", spew.Sdump(workload.Enqueued))
 
-	defer func() {
-		if err == nil {
-			return
-		}
-
-		log.Println("error detected clearing tmp directory", tmpdir)
-		errorsx.Log(errorsx.Wrap(os.RemoveAll(tmpdir), "unable to remove tmpdir"))
-	}()
+	md.rm.Reserve(NewRuntimeResourcesFromDequeued(workload.Enqueued))
 
 	if archive, err = os.Open(filepath.Join(dir, "archive.tar.gz")); err != nil {
-		return discard(uid, md, failure(errorsx.Wrap(err, "unable to read archive"), idle(md)))
+		return completed(workload.Enqueued, md, ws, 0, errorsx.Wrap(err, "unable to read archive"))
 	}
 
 	errorsx.Log(tarx.Inspect(archive))
 
-	if ws, err = workspaces.New(ctx, tmpdir, eg.DefaultModuleDirectory(), "eg"); err != nil {
-		return discard(uid, md, failure(errorsx.Wrap(err, "unable to setup workspace"), idle(md)))
+	if ws, err = workspaces.New(ctx, filepath.Join(dir, "work"), eg.DefaultModuleDirectory(), eg.WorkingDirectory); err != nil {
+		return completed(workload.Enqueued, md, ws, 0, errorsx.Wrap(err, "unable to setup workspace"))
 	}
 
-	debugx.Println("workspace", spew.Sdump(ws))
+	// debugx.Println("workspace", spew.Sdump(ws))
 
 	if err = tarx.Unpack(filepath.Join(ws.Root, ws.RuntimeDir), archive); err != nil {
-		return completed(metadata.Enqueued, md, tmpdir, ws, uid, 0, errorsx.Wrap(err, "unable to unpack archive"))
+		return completed(workload.Enqueued, md, ws, 0, errorsx.Wrap(err, "unable to unpack archive"))
 	}
 
 	if err = wasix.WarmCacheDirectory(ctx, filepath.Join(ws.Root, ws.BuildDir), wasix.WazCacheDir(filepath.Join(ws.Root, ws.RuntimeDir))); err != nil {
@@ -405,33 +386,33 @@ func beginwork(ctx context.Context, md metadata, dir string) state {
 		rootc := filepath.Join(filepath.Join(ws.Root, ws.RuntimeDir), "Containerfile")
 
 		if err = eg.PrepareRootContainer(rootc); err != nil {
-			return completed(metadata.Enqueued, md, tmpdir, ws, uid, 0, errorsx.Wrap(err, "preparing root container failed"))
+			return completed(workload.Enqueued, md, ws, 0, errorsx.Wrap(err, "preparing root container failed"))
 		}
 
-		cmd := exec.CommandContext(ctx, "podman", "build", "-t", "eg", "-f", rootc, tmpdir)
+		cmd := exec.CommandContext(ctx, "podman", "build", "-t", "eg", "-f", rootc, ws.Root)
 		cmd.Stderr = os.Stderr
 		cmd.Stdin = os.Stdin
 		cmd.Stdout = os.Stdout
 
 		if err = cmd.Run(); err != nil {
-			return completed(metadata.Enqueued, md, tmpdir, ws, uid, 0, errorsx.Wrap(err, "build failed"))
+			return completed(workload.Enqueued, md, ws, 0, errorsx.Wrap(err, "build failed"))
 		}
 	}
 
 	environpath := filepath.Join(ws.Root, ws.RuntimeDir, "environ.env")
 
 	envb := envx.Build().FromPath(environpath).
-		Var(gitx.EnvAuthEGAccessToken, metadata.AccessToken).
-		Var(eg.EnvComputeRunID, uid).
-		Var(eg.EnvComputeAccountID, metadata.Enqueued.AccountId).
-		Var(eg.EnvComputeVCS, metadata.Enqueued.VcsUri).
-		Var(eg.EnvComputeTTL, time.Duration(metadata.Enqueued.Ttl).String()).
+		Var(gitx.EnvAuthEGAccessToken, workload.AccessToken).
+		Var(eg.EnvComputeRunID, workload.Enqueued.Id).
+		Var(eg.EnvComputeAccountID, workload.Enqueued.AccountId).
+		Var(eg.EnvComputeVCS, workload.Enqueued.VcsUri).
+		Var(eg.EnvComputeTTL, time.Duration(workload.Enqueued.Ttl).String()).
 		Var(eg.EnvComputeLoggingVerbosity, envx.String(strconv.Itoa(md.logVerbosity), eg.EnvComputeLoggingVerbosity))
 
 	// envx.Debug(errorsx.Zero(envb.Environ())...)
 
 	if err = envb.WriteTo(environpath); err != nil {
-		return completed(metadata.Enqueued, md, tmpdir, ws, uid, 0, errorsx.Wrap(err, "failed to update environment file"))
+		return completed(workload.Enqueued, md, ws, 0, errorsx.Wrap(err, "failed to update environment file"))
 	}
 
 	aopts := make([]AgentOption, 0, len(md.agentopts)+32)
@@ -441,8 +422,8 @@ func beginwork(ctx context.Context, md metadata, dir string) state {
 		AgentOptionEGBin(errorsx.Zero(exec.LookPath(os.Args[0]))),
 		AgentOptionEnviron(environpath),
 		AgentOptionCommandLine("--env-file", environpath),
-		AgentOptionCores(metadata.Enqueued.Cores),
-		AgentOptionMemory(metadata.Enqueued.Memory),
+		AgentOptionCores(workload.Enqueued.Cores),
+		AgentOptionMemory(workload.Enqueued.Memory),
 		AgentOptionCommandLine("--userns", "host"),       // properly map host user into containers.
 		AgentOptionCommandLine("--cap-add", "NET_ADMIN"), // required for loopback device creation inside the container
 		AgentOptionCommandLine("--cap-add", "SYS_ADMIN"), // required for rootless container building https://github.com/containers/podman/issues/4056#issuecomment-612893749
@@ -454,11 +435,11 @@ func beginwork(ctx context.Context, md metadata, dir string) state {
 		ctx,
 	)
 
-	if ragent, err = m.NewRun(ctx, ws, uid, aopts...); err != nil {
-		return completed(metadata.Enqueued, md, tmpdir, ws, uid, 0, errorsx.Wrap(err, "run failure"))
+	if ragent, err = m.NewRun(ctx, ws, workload.Enqueued.Id, aopts...); err != nil {
+		return completed(workload.Enqueued, md, ws, 0, errorsx.Wrap(err, "run failure"))
 	}
 
-	return staterunning{metadata: md, workload: metadata.Enqueued, ws: ws, ragent: ragent, dir: dir, tmpdir: tmpdir, entry: metadata.Enqueued.Entry}
+	return staterunning{metadata: md, workload: workload.Enqueued, ws: ws, ragent: ragent, dir: dir}
 }
 
 func cacheprefix(enq *Enqueued) string {
@@ -479,8 +460,6 @@ type staterunning struct {
 	ws       workspaces.Context
 	ragent   *Agent
 	dir      string
-	tmpdir   string
-	entry    string
 }
 
 func (t staterunning) Update(ctx context.Context) state {
@@ -490,28 +469,33 @@ func (t staterunning) Update(ctx context.Context) state {
 		return terminate(ctx.Err())
 	default:
 		var (
-			err          error
-			logdst       *os.File
-			containerdir = userx.DefaultCacheDirectory("wcache", cacheprefix(t.workload), cachebucket(t.workload), "containers")
-			cachedir     = userx.DefaultCacheDirectory("wcache", cacheprefix(t.workload), cachebucket(t.workload), "workloadcache")
-			logpath      = filepath.Join(t.ws.Root, t.ws.RuntimeDir, "daemon.log")
+			err           error
+			logdst        *os.File
+			containerdir  = userx.DefaultCacheDirectory("wcache", cacheprefix(t.workload), cachebucket(t.workload), "containers")
+			cachedir      = userx.DefaultCacheDirectory("wcache", cacheprefix(t.workload), cachebucket(t.workload), "workloadcache")
+			logpath       = filepath.Join(t.ws.Root, t.ws.RuntimeDir, "daemon.log")
+			analyticspath = filepath.Join(t.ws.Root, t.ws.RuntimeDir, "analytics.db")
 		)
 
 		if err = fsx.MkDirs(0770, containerdir, cachedir); err != nil {
-			return terminate(errorsx.Wrap(err, "unable to setup container and cache directories"))
+			return completed(t.workload, t.metadata, t.ws, 0, errorsx.Wrap(err, "unable to setup container and cache directories"))
 		}
 
 		log.Println("workload root cachedir", cachedir)
 
 		if logdst, err = os.Create(logpath); err != nil {
-			return completed(t.workload, t.metadata, t.tmpdir, t.ws, t.ragent.id, 0, err)
+			return completed(t.workload, t.metadata, t.ws, 0, err)
+		}
+		defer logdst.Close()
+
+		if err = events.InitializeDB(ctx, analyticspath); err != nil {
+			return completed(t.workload, t.metadata, t.ws, 0, err)
 		}
 
-		defer logdst.Close()
 		options := append(
 			t.ragent.Options(),
 			"--volume", AgentMountReadWrite(containerdir, "/var/lib/containers"),
-			"--volume", AgentMountReadOnly(filepath.Join(t.ws.Root, t.ws.RuntimeDir, t.entry), eg.DefaultMountRoot(eg.ModuleBin)),
+			"--volume", AgentMountReadOnly(filepath.Join(t.ws.Root, t.ws.RuntimeDir, t.workload.Entry), eg.DefaultMountRoot(eg.ModuleBin)),
 			"--volume", AgentMountReadWrite(filepath.Join(t.ws.Root, t.ws.RuntimeDir), eg.DefaultMountRoot(eg.RuntimeDirectory)),
 			"--volume", AgentMountReadWrite(filepath.Join(t.ws.Root, t.ws.WorkingDir), eg.DefaultMountRoot(eg.WorkingDirectory)),
 			"--volume", AgentMountReadWrite(filepath.Join(t.ws.Root, t.ws.TemporaryDir), eg.DefaultMountRoot(eg.TempDirectory)),
@@ -527,19 +511,18 @@ func (t staterunning) Update(ctx context.Context) state {
 		}
 
 		ts := time.Now()
+
 		// TODO REVISIT using t.ws.RuntimeDir as moduledir.
 		err = c8s.PodmanModule(ctx, prepcmd, "eg", fmt.Sprintf("eg-%s", t.ragent.id), t.ws.RuntimeDir, options...)
-		return completed(t.workload, t.metadata, t.tmpdir, t.ws, t.ragent.id, time.Since(ts), err)
+		return completed(t.workload, t.metadata, t.ws, time.Since(ts), err)
 	}
 }
 
-func completed(workload *Enqueued, md metadata, tmpdir string, ws workspaces.Context, id string, duration time.Duration, cause error) statecompleted {
+func completed(workload *Enqueued, md metadata, ws workspaces.Context, duration time.Duration, cause error) statecompleted {
 	return statecompleted{
 		workload: workload,
 		ws:       ws,
 		metadata: md,
-		tmpdir:   tmpdir,
-		id:       id,
 		cause:    cause,
 		duration: duration,
 	}
@@ -549,8 +532,6 @@ type statecompleted struct {
 	metadata
 	workload *Enqueued
 	ws       workspaces.Context
-	tmpdir   string
-	id       string
 	cause    error
 	duration time.Duration
 }
@@ -561,37 +542,34 @@ func (t statecompleted) Update(ctx context.Context) state {
 		analyticspath = filepath.Join(t.ws.Root, t.ws.RuntimeDir, "analytics.db")
 	)
 
-	dirs := DefaultSpoolDirs()
-	log.Println("completed", t.workload.AccountId, t.workload.VcsUri, filepath.Join(dirs.Running, t.id), t.cause)
-
-	// fsx.PrintDir(os.DirFS(filepath.Join(t.ws.Root, t.ws.RuntimeDir)))
+	log.Println("completed", t.workload.AccountId, t.workload.VcsUri, t.ws.Root, t.cause)
 
 	logs, err := os.Open(logpath)
 	if err != nil {
-		return discard(t.id, t.metadata, failure(errorsx.Wrap(err, "unable open logs for upload"), idle(t.metadata)))
+		return discard(t.workload, t.metadata, failure(errorsx.Wrap(err, "unable open logs for upload"), idle(t.metadata)))
 	}
 	defer logs.Close()
 
 	analytics, err := os.Open(analyticspath)
 	if err != nil {
-		return discard(t.id, t.metadata, failure(errorsx.Wrap(err, "unable open analytics for upload"), idle(t.metadata)))
+		return discard(t.workload, t.metadata, failure(errorsx.Wrap(err, "unable open analytics for upload"), idle(t.metadata)))
 	}
 	defer analytics.Close()
 
-	if err = t.metadata.completion.Upload(ctx, t.id, t.duration, t.cause, logs, analytics); err != nil {
-		return discard(t.id, t.metadata, failure(errorsx.Wrapf(err, "unable to upload completion: %s", t.id), idle(t.metadata)))
+	if err = t.metadata.completion.Upload(ctx, t.workload.Id, t.duration, t.cause, logs, analytics); err != nil {
+		return discard(t.workload, t.metadata, failure(errorsx.Wrapf(err, "unable to upload completion: %s", t.workload.Id), idle(t.metadata)))
 	}
 
 	if t.cause != nil {
-		return discard(t.id, t.metadata, failure(errorsx.Wrap(t.cause, "work failed"), idle(t.metadata)))
+		return discard(t.workload, t.metadata, failure(errorsx.Wrap(t.cause, "work failed"), idle(t.metadata)))
 	}
 
-	return discard(t.id, t.metadata, idle(t.metadata))
+	return discard(t.workload, t.metadata, idle(t.metadata))
 }
 
-func discard(id string, md metadata, next state) statediscard {
+func discard(workload *Enqueued, md metadata, next state) statediscard {
 	return statediscard{
-		id:       id,
+		workload: workload,
 		metadata: md,
 		n:        next,
 	}
@@ -599,13 +577,17 @@ func discard(id string, md metadata, next state) statediscard {
 
 type statediscard struct {
 	metadata
-	id string
-	n  state
+	workload *Enqueued
+	n        state
 }
 
 func (t statediscard) Update(ctx context.Context) state {
+	defer func() {
+		t.metadata.rm.Release(NewRuntimeResourcesFromDequeued(t.workload))
+	}()
+
 	dirs := DefaultSpoolDirs()
-	if err := dirs.Completed(uuid.FromStringOrNil(t.id)); err != nil {
+	if err := dirs.Completed(uuid.FromStringOrNil(t.workload.Id)); err != nil {
 		return failure(errorsx.Wrap(err, "completion failed"), t.n)
 	}
 

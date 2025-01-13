@@ -1,13 +1,15 @@
 package runners
 
 import (
-	"encoding/hex"
+	"encoding/base64"
 	"fmt"
 	"io"
 	"io/fs"
 	"log"
+	"math/rand/v2"
 	"os"
 	"path/filepath"
+	"sync"
 
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/fsx"
@@ -19,6 +21,7 @@ import (
 const defaultPerms = 0700 | os.ModeSetgid
 
 type SpoolDirs struct {
+	renamemux   *sync.Mutex
 	Downloading string
 	Queued      string
 	Running     string
@@ -28,6 +31,7 @@ type SpoolDirs struct {
 func DefaultSpoolDirs() SpoolDirs {
 	root := filepath.Join(userx.DefaultCacheDirectory(), "spool")
 	dirs := SpoolDirs{
+		renamemux:   &sync.Mutex{},
 		Downloading: filepath.Join(root, "d"),
 		Queued:      filepath.Join(root, "q"),
 		Running:     filepath.Join(root, "r"),
@@ -40,7 +44,7 @@ func DefaultSpoolDirs() SpoolDirs {
 }
 
 func iddirname(uid uuid.UUID) string {
-	return hex.EncodeToString(uid.Bytes()[:6])
+	return base64.URLEncoding.WithPadding(base64.NoPadding).EncodeToString(uid.Bytes())
 }
 
 func (t SpoolDirs) Download(uid uuid.UUID, name string, content io.Reader) (err error) {
@@ -75,7 +79,7 @@ func (t SpoolDirs) Dequeue() (_ string, err error) {
 			return "", err
 		}
 
-		if err = os.Rename(filepath.Join(t.Queued, dir.Name()), filepath.Join(t.Running, dir.Name())); fsx.ErrIsNotExist(err) != nil {
+		if err = t.dequeueRename(dir); fsx.ErrIsNotExist(err) != nil {
 			continue
 		} else if err != nil {
 			return "", err
@@ -83,6 +87,12 @@ func (t SpoolDirs) Dequeue() (_ string, err error) {
 
 		return filepath.Join(t.Running, dir.Name()), nil
 	}
+}
+
+func (t SpoolDirs) dequeueRename(dir fs.DirEntry) error {
+	t.renamemux.Lock()
+	defer t.renamemux.Unlock()
+	return os.Rename(filepath.Join(t.Queued, dir.Name()), filepath.Join(t.Running, dir.Name()))
 }
 
 func (t SpoolDirs) Completed(uid uuid.UUID) (err error) {
@@ -115,10 +125,10 @@ func pop(dir string) (popped fs.DirEntry, err error) {
 	}
 	defer dirfs.Close()
 
-	entries, err := dirfs.ReadDir(1)
+	entries, err := dirfs.ReadDir(100)
 	if err != nil {
 		return nil, err
 	}
 
-	return entries[0], nil
+	return entries[rand.IntN(len(entries))], nil
 }

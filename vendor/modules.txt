@@ -38,6 +38,12 @@ github.com/ProtonMail/go-crypto/openpgp/x448
 # github.com/alecthomas/kong v1.6.1
 ## explicit; go 1.20
 github.com/alecthomas/kong
+# github.com/alitto/pond/v2 v2.1.6
+## explicit; go 1.20
+github.com/alitto/pond/v2
+github.com/alitto/pond/v2/internal/dispatcher
+github.com/alitto/pond/v2/internal/future
+github.com/alitto/pond/v2/internal/linkedbuffer
 # github.com/apache/arrow-go/v18 v18.0.0
 ## explicit; go 1.22.0
 github.com/apache/arrow-go/v18/arrow

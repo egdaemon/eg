@@ -26,6 +26,8 @@ require (
 	google.golang.org/grpc v1.68.0
 )
 
+require github.com/alitto/pond/v2 v2.1.6 // indirect
+
 require (
 	dario.cat/mergo v1.0.0 // indirect
 	github.com/Microsoft/go-winio v0.6.2 // indirect

@@ -6,8 +6,26 @@ import (
 	"log"
 	"time"
 
+	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/langx"
 )
+
+func InitializeDB(ctx context.Context, path string) (err error) {
+	var (
+		db *sql.DB
+	)
+
+	if db, err = sql.Open("duckdb", path); err != nil {
+		return errorsx.Wrap(err, "unable to create analytics.db")
+	}
+	defer db.Close()
+
+	if err = PrepareDB(ctx, db); err != nil {
+		return errorsx.Wrap(err, "unable to prepare analytics.db")
+	}
+
+	return nil
+}
 
 func PrepareDB(ctx context.Context, db *sql.DB) error {
 	if _, err := db.ExecContext(ctx, "INSTALL json"); err != nil {

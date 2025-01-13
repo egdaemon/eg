@@ -14,6 +14,10 @@ import (
 	"github.com/egdaemon/eg/internal/numericx"
 )
 
+func workloadtarget() float64 {
+	return envx.Float64(0.8, eg.EnvComputeWorkloadTargetLoad)
+}
+
 func AutoDownload(ctx context.Context, authedclient *http.Client, m *ResourceManager) {
 	w := backoff.Chan()
 	s := backoff.New(
@@ -32,6 +36,8 @@ func AutoDownload(ctx context.Context, authedclient *http.Client, m *ResourceMan
 	}
 
 	capacity := workloadcapacity()
+	targetload := workloadtarget()
+	targetlower := targetload / 2
 	for {
 		select {
 		case <-ctx.Done():
@@ -69,7 +75,7 @@ func AutoDownload(ctx context.Context, authedclient *http.Client, m *ResourceMan
 		}
 
 		wants := NewRuntimeResourcesFromDequeued(workload.Enqueued)
-		if determineload(m.Limit, c.Reserve(wants)) > 0.8 {
+		if determineload(m.Limit, c.Reserve(wants)) > targetload {
 			continue
 		}
 
@@ -78,7 +84,7 @@ func AutoDownload(ctx context.Context, authedclient *http.Client, m *ResourceMan
 			continue
 		}
 
-		if currentload := determineload(m.Limit, c.Reserve(wants)); currentload > 0.4 {
+		if currentload := determineload(m.Limit, c.Reserve(wants)); currentload > targetlower {
 			continue
 		}
 

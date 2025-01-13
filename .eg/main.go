@@ -7,7 +7,6 @@ import (
 	"github.com/egdaemon/eg/runtime/wasi/eg"
 	"github.com/egdaemon/eg/runtime/wasi/egenv"
 	"github.com/egdaemon/eg/runtime/wasi/eggit"
-	"github.com/egdaemon/eg/runtime/x/wasi/egbug"
 	"github.com/egdaemon/eg/runtime/x/wasi/eggolang"
 )
 
@@ -18,9 +17,7 @@ func main() {
 
 	err := eg.Perform(
 		ctx,
-		egbug.FileTree,
 		eggit.AutoClone,
-		egbug.FileTree,
 		eg.Build(
 			eg.DefaultModule(),
 		),

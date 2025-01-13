@@ -51,22 +51,23 @@ const (
 )
 
 const (
-	EnvComputeTLSInsecure       = "EG_COMPUTE_TLS_INSECURE"  // used to pass TLS insecure flag to container.
-	EnvComputeLoggingVerbosity  = "EG_COMPUTE_LOG_VERBOSITY" // logging verbosity.
-	EnvComputeModuleNestedLevel = "EG_COMPUTE_MODULE_LEVEL"  // number of nested levels the current module is running in.
-	EnvComputeRootModule        = "EG_COMPUTE_ROOT_MODULE"   // default is always false, but is set to true for the root module to bootstrap services
-	EnvComputeRunID             = "EG_COMPUTE_RUN_ID"        // run id for the compute workload
-	EnvComputeAccountID         = "EG_COMPUTE_ACCOUNT_ID"    // account id of the compute workload
-	EnvComputeVCS               = "EG_COMPUTE_VCS_URI"       // vcs uri for the compute workload
-	EnvComputeTTL               = "EG_COMPUTE_TTL"           // deadline for compute workload
-	EnvComputeContainerExec     = "EG_COMPUTE_EXEC_OPTIONS"  // CLI options for podman exec
-	EnvComputeWorkingDirectory  = "EG_COMPUTE_ROOT_DIRECTORY"
-	EnvComputeCacheDirectory    = "EG_COMPUTE_CACHE_DIRECTORY"
-	EnvComputeRuntimeDirectory  = "EG_COMPUTE_RUNTIME_DIRECTORY"
-	EnvComputeBin               = "EG_BIN"
-	EnvScheduleMaximumDelay     = "EG_COMPUTE_SCHEDULER_MAXIMUM_DELAY"
+	EnvComputeTLSInsecure       = "EG_COMPUTE_TLS_INSECURE"                    // used to pass TLS insecure flag to container.
+	EnvComputeLoggingVerbosity  = "EG_COMPUTE_LOG_VERBOSITY"                   // logging verbosity.
+	EnvComputeModuleNestedLevel = "EG_COMPUTE_MODULE_LEVEL"                    // number of nested levels the current module is running in.
+	EnvComputeRootModule        = "EG_COMPUTE_ROOT_MODULE"                     // default is always false, but is set to true for the root module to bootstrap services
+	EnvComputeRunID             = "EG_COMPUTE_RUN_ID"                          // run id for the compute workload
+	EnvComputeAccountID         = "EG_COMPUTE_ACCOUNT_ID"                      // account id of the compute workload
+	EnvComputeVCS               = "EG_COMPUTE_VCS_URI"                         // vcs uri for the compute workload
+	EnvComputeTTL               = "EG_COMPUTE_TTL"                             // deadline for compute workload
+	EnvComputeContainerExec     = "EG_COMPUTE_EXEC_OPTIONS"                    // CLI options for podman exec
+	EnvComputeWorkingDirectory  = "EG_COMPUTE_ROOT_DIRECTORY"                  // root working directory for workloads
+	EnvComputeCacheDirectory    = "EG_COMPUTE_CACHE_DIRECTORY"                 // cache directory for workloads
+	EnvComputeRuntimeDirectory  = "EG_COMPUTE_RUNTIME_DIRECTORY"               // runtime directory for workloads
+	EnvComputeMaximumWorkloads  = "EG_COMPUTE_WORKLOAD_MAXIMUM"                // upper bound for the maximum number of workloads that can be run concurrently
+	EnvScheduleMaximumDelay     = "EG_COMPUTE_SCHEDULER_MAXIMUM_DELAY"         // maximum delay between scans for workloads
 	EnvScheduleSystemLoadFreq   = "EG_COMPUTE_SCHEDULER_SYSTEM_LOAD_FREQUENCY" // how frequently we measure system load, small enough we can saturate, high enough its not a burden.
-	EnvPingMinimumDelay         = "EG_COMPUTE_PING_MINIMUM_DELAY"
+	EnvPingMinimumDelay         = "EG_COMPUTE_PING_MINIMUM_DELAY"              // minimum delay for pings
+	EnvComputeBin               = "EG_BIN"
 	EnvComputeContainerImpure   = "EG_C8S_IMPURE"
 )
 

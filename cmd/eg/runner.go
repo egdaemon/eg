@@ -167,9 +167,12 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 
 		// periodic sampling of system metrics
 		go runners.BackgroundSystemLoad(gctx.Context, db)
+
 		// final sample
 		defer func() {
-			errorsx.Log(runners.SampleSystemLoad(gctx.Context, db))
+			fctx, done := context.WithTimeout(context.Background(), 10*time.Second)
+			defer done()
+			errorsx.Log(runners.SampleSystemLoad(fctx, db))
 		}()
 		srv := grpc.NewServer(
 			grpc.Creds(insecure.NewCredentials()), // this is a local socket

@@ -74,7 +74,7 @@ func (t TLSConfig) DefaultClient() *http.Client {
 	}
 
 	defaultclient := &http.Client{Transport: ctransport, Timeout: 20 * time.Second}
-	defaultclient = httpx.BindRetryTransport(defaultclient, http.StatusTooManyRequests, http.StatusBadGateway, http.StatusInternalServerError)
+	defaultclient = httpx.BindRetryTransport(defaultclient, http.StatusTooManyRequests, http.StatusBadGateway, http.StatusInternalServerError, http.StatusRequestTimeout)
 
 	if env.Boolean(false, eg.EnvLogsNetwork) {
 		return httpx.DebugClient(defaultclient)

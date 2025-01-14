@@ -510,8 +510,7 @@ func (t staterunning) Update(ctx context.Context) state {
 
 		options := append(
 			t.ragent.Options(),
-			// revisit.
-			// "--replace", // during recovery we might have a container already running.
+			"--replace", // during recovery we might have a container already running.
 			"--volume", AgentMountReadWrite(containerdir, "/var/lib/containers"),
 			"--volume", AgentMountReadOnly(filepath.Join(t.ws.Root, t.ws.RuntimeDir, t.workload.Entry), eg.DefaultMountRoot(eg.ModuleBin)),
 			"--volume", AgentMountReadWrite(filepath.Join(t.ws.Root, t.ws.RuntimeDir), eg.DefaultMountRoot(eg.RuntimeDirectory)),

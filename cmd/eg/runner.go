@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"database/sql"
+	"errors"
 	"log"
 	"net"
 	"os"
@@ -86,8 +87,8 @@ func (t module) mounthack(ctx context.Context, ws workspaces.Context) (err error
 		return err
 	}
 
-	err = errorsx.Compact(
-		// remap(eg.DefaultMountRoot(eg.RuntimeDirectory), eg.DefaultRuntimeDirectory()),
+	err = errors.Join(
+		remap(eg.DefaultMountRoot(eg.RuntimeDirectory), eg.DefaultRuntimeDirectory()),
 		// remap(eg.DefaultMountRoot(eg.TempDirectory), eg.DefaultTempDirectory()),
 		remap(eg.DefaultMountRoot(eg.WorkingDirectory), eg.DefaultWorkingDirectory()),
 		remap(eg.DefaultMountRoot(eg.CacheDirectory), eg.DefaultCacheDirectory()),
@@ -229,6 +230,14 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 		go func() {
 			errorsx.Log(errorsx.Wrap(srv.Serve(control), "unable to create control socket"))
 		}()
+
+		// IMPORTANT: duckdb play well with bindfs mounting the folders before
+		// creating extensions/tables, it would nuke the working directory. it *mostly* worked once we moved this mount
+		// call here. we're leaving the call here for now but it shouldn't matter.
+		// and we're keen to remove it.
+		if err = t.mounthack(gctx.Context, ws); err != nil {
+			log.Println("unable to mount with correct permissions", err)
+		}
 	} else {
 		debugx.Printf("---------------------------- MODULE INITIATED %d ----------------------------\n", mlevel)
 		// env.Debug(os.Environ()...)
@@ -246,14 +255,6 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 
 	if cc, err = daemons.AutoRunnerClient(gctx, ws, uid, runners.AgentOptionAutoEGBin()); err != nil {
 		return err
-	}
-
-	// IMPORTANT: duckdb play well with bindfs mounting the folders before
-	// creating extensions/tables, it would nuke the working directory. it *mostly* worked once we moved this mount
-	// call here. we're leaving the call here for now but it shouldn't matter.
-	// and we're keen to remove it.
-	if err = t.mounthack(gctx.Context, ws); err != nil {
-		log.Println("unable to mount with correct permissions", err)
 	}
 
 	return interp.Remote(

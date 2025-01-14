@@ -108,7 +108,7 @@ func PodmanModule(ctx context.Context, cmdctx func(*exec.Cmd) *exec.Cmd, image, 
 		PodmanModuleRunCmd(image, cname, options...)...,
 	))
 
-	if err = execx.MaybeRun(cmd); err == nil {
+	if err = execx.MaybeRun(cmd); err != nil {
 		return errorsx.Wrap(err, "unable to run container")
 	}
 
@@ -169,6 +169,7 @@ func moduleExec(ctx context.Context, cname, moduledir string, stdin io.Reader, s
 	}()
 
 	time.Sleep(3 * time.Second)
+
 	err = containers.ExecStartAndAttach(ctx, id, &containers.ExecStartAndAttachOptions{
 		OutputStream: langx.Autoptr(io.Writer(stdout)),
 		ErrorStream:  langx.Autoptr(io.Writer(stderr)),

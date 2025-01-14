@@ -24,6 +24,7 @@ import (
 	"github.com/egdaemon/eg/internal/execx"
 	"github.com/egdaemon/eg/internal/fsx"
 	"github.com/egdaemon/eg/internal/gitx"
+	"github.com/egdaemon/eg/internal/podmanx"
 	"github.com/egdaemon/eg/internal/runtimex"
 	"github.com/egdaemon/eg/internal/wasix"
 	"github.com/egdaemon/eg/interp"
@@ -51,7 +52,6 @@ type module struct {
 
 func (t module) mounthack(ctx context.Context, ws workspaces.Context) (err error) {
 	var (
-		// binname = "fuse-overlayfs"
 		binname = "bindfs"
 		mbin    string
 	)
@@ -59,7 +59,7 @@ func (t module) mounthack(ctx context.Context, ws workspaces.Context) (err error
 	if mbin, err = exec.LookPath(binname); err != nil {
 		log.Println(errorsx.Wrap(err, "unable to locate bindfs, skipping"))
 
-		// symlink fallback?
+		// symlink fallback hack wont work in practice most likely.
 		if err = os.Symlink(eg.DefaultMountRoot(), eg.DefaultWorkloadRoot()); err != nil {
 			log.Println("unable to symlink", err)
 		}
@@ -87,7 +87,8 @@ func (t module) mounthack(ctx context.Context, ws workspaces.Context) (err error
 	}
 
 	err = errorsx.Compact(
-		remap(eg.DefaultMountRoot(eg.RuntimeDirectory), eg.DefaultRuntimeDirectory()),
+		// remap(eg.DefaultMountRoot(eg.RuntimeDirectory), eg.DefaultRuntimeDirectory()),
+		// remap(eg.DefaultMountRoot(eg.TempDirectory), eg.DefaultTempDirectory()),
 		remap(eg.DefaultMountRoot(eg.WorkingDirectory), eg.DefaultWorkingDirectory()),
 		remap(eg.DefaultMountRoot(eg.CacheDirectory), eg.DefaultCacheDirectory()),
 	)
@@ -124,6 +125,10 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 			db        *sql.DB
 			vmemlimit int64
 		)
+
+		if err = gitx.AutomaticCredentialRefresh(gctx.Context, tlsc.DefaultClient(), t.RuntimeDir, envx.String("", gitx.EnvAuthEGAccessToken)); err != nil {
+			return err
+		}
 
 		// automatically detect the correct number of max procs for the module
 		if _, err = maxprocs.Set(maxprocs.Logger(log.Printf)); err != nil {
@@ -170,6 +175,9 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 		}()
 		srv := grpc.NewServer(
 			grpc.Creds(insecure.NewCredentials()), // this is a local socket
+			grpc.ChainUnaryInterceptor(
+				podmanx.GrpcClient,
+			),
 		)
 		defer srv.GracefulStop()
 

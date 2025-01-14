@@ -7,3 +7,4 @@ disable eg-runner.service
 disable eg-schedule-15m.timer
 disable eg-schedule-15m.target
 disable eg-bindfs.service
+enable podman.socket

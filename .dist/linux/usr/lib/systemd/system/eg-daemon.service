@@ -21,4 +21,5 @@ ExecStartPre=/usr/bin/loginctl enable-linger egd
 ExecStart=/usr/bin/eg daemon --sshknownhostspath=/etc/ssh/ssh_known_hosts
 
 [Install]
+Also=podman.socket
 WantedBy=default.target

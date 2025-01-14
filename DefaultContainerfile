@@ -29,6 +29,7 @@ RUN ssh-keyscan -H gitlab.com >> /etc/ssh/ssh_known_hosts
 
 RUN systemd-sysusers
 RUN systemd-tmpfiles --create
+RUN systemctl enable podman.socket
 
 RUN printf '%%wheel ALL=(ALL:ALL) NOPASSWD: ALL\n' | tee -a /etc/sudoers.d/egd
 

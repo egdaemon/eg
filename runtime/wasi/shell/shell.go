@@ -9,6 +9,7 @@ import (
 
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/stringsx"
+	"github.com/egdaemon/eg/runtime/wasi/eg"
 	"github.com/egdaemon/eg/runtime/wasi/egunsafe/ffiexec"
 )
 
@@ -138,6 +139,14 @@ func Runtime() Command {
 	return New("")
 }
 
+// Convience function for running a set of commands as an operation.
+func Op(cmds ...Command) eg.OpFn {
+	return func(ctx context.Context, o eg.Op) error {
+		return Run(ctx, cmds...)
+	}
+}
+
+// Run the provided commands using the operation.
 func Run(ctx context.Context, cmds ...Command) (err error) {
 	for _, cmd := range cmds {
 		if err = retry(ctx, cmd, func() error { return run(ctx, cmd) }); err != nil {

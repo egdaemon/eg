@@ -13,6 +13,8 @@ import (
 	"github.com/egdaemon/eg/runtime/wasi/egunsafe/ffiexec"
 )
 
+type entrypoint func(ctx context.Context, c Command) (err error)
+
 type Command struct {
 	user      string
 	group     string
@@ -22,6 +24,7 @@ type Command struct {
 	timeout   time.Duration
 	attempts  int16
 	lenient   bool
+	entry     entrypoint
 }
 
 // number of attempts to make before giving up.
@@ -86,6 +89,11 @@ func (t Command) Privileged() Command {
 	return t
 }
 
+func (t Command) UnsafeEntrypoint(e entrypoint) Command {
+	t.entry = e
+	return t
+}
+
 // New clone the current command configuration and replace the command
 // that will be executed.
 func (t Command) New(cmd string) Command {
@@ -116,6 +124,7 @@ func New(cmd string) Command {
 		group:   "egd",
 		cmd:     cmd,
 		timeout: 5 * time.Minute,
+		entry:   run,
 	}
 }
 
@@ -149,7 +158,7 @@ func Op(cmds ...Command) eg.OpFn {
 // Run the provided commands using the operation.
 func Run(ctx context.Context, cmds ...Command) (err error) {
 	for _, cmd := range cmds {
-		if err = retry(ctx, cmd, func() error { return run(ctx, cmd) }); err != nil {
+		if err = retry(ctx, cmd, func() error { return cmd.entry(ctx, cmd) }); err != nil {
 			return err
 		}
 	}

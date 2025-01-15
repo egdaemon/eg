@@ -158,7 +158,11 @@ func Op(cmds ...Command) eg.OpFn {
 // Run the provided commands using the operation.
 func Run(ctx context.Context, cmds ...Command) (err error) {
 	for _, cmd := range cmds {
-		if err = retry(ctx, cmd, func() error { return cmd.entry(ctx, cmd) }); err != nil {
+		if err = retry(ctx, cmd, func() error {
+			cctx, done := context.WithTimeout(ctx, cmd.timeout)
+			defer done()
+			return cmd.entry(cctx, cmd)
+		}); err != nil {
 			return err
 		}
 	}
@@ -195,12 +199,9 @@ func retry(ctx context.Context, c Command, do func() error) (err error) {
 }
 
 func run(ctx context.Context, c Command) (err error) {
-	cctx, done := context.WithTimeout(ctx, c.timeout)
-	defer done()
-
 	cmd := []string{"-c", stringsx.Join(" ", "sudo", "-E", "-H", "-g", c.group, "-u", c.user, c.cmd)}
 
-	err = ffiexec.Command(cctx, c.directory, c.environ, "bash", cmd)
+	err = ffiexec.Command(ctx, c.directory, c.environ, "bash", cmd)
 	if c.lenient && err != nil {
 		log.Println("command failed, but lenient mode enable", err)
 		return nil

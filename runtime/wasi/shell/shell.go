@@ -8,12 +8,11 @@ import (
 	"time"
 
 	"github.com/egdaemon/eg/internal/errorsx"
-	"github.com/egdaemon/eg/internal/stringsx"
 	"github.com/egdaemon/eg/runtime/wasi/eg"
 	"github.com/egdaemon/eg/runtime/wasi/egunsafe/ffiexec"
 )
 
-type entrypoint func(ctx context.Context, c Command) (err error)
+type entrypoint func(ctx context.Context, user string, group string, cmd string, directory string, environ []string) (err error)
 
 type Command struct {
 	user      string
@@ -161,7 +160,15 @@ func Run(ctx context.Context, cmds ...Command) (err error) {
 		if err = retry(ctx, cmd, func() error {
 			cctx, done := context.WithTimeout(ctx, cmd.timeout)
 			defer done()
-			return cmd.entry(cctx, cmd)
+
+			if cause := cmd.entry(cctx, cmd.user, cmd.group, cmd.cmd, cmd.directory, cmd.environ); cmd.lenient && cause != nil {
+				log.Println("command failed, but lenient mode enable, ignoring", err)
+				return nil
+			} else if cause != nil {
+				return cause
+			}
+
+			return nil
 		}); err != nil {
 			return err
 		}
@@ -198,14 +205,7 @@ func retry(ctx context.Context, c Command, do func() error) (err error) {
 	return err
 }
 
-func run(ctx context.Context, c Command) (err error) {
-	cmd := []string{"-c", stringsx.Join(" ", "sudo", "-E", "-H", "-g", c.group, "-u", c.user, c.cmd)}
-
-	err = ffiexec.Command(ctx, c.directory, c.environ, "bash", cmd)
-	if c.lenient && err != nil {
-		log.Println("command failed, but lenient mode enable", err)
-		return nil
-	}
-
-	return err
+func run(ctx context.Context, user string, group string, cmd string, directory string, environ []string) (err error) {
+	scmd := []string{"-E", "-H", "-u", user, "-g", group, "bash", "-c", cmd}
+	return ffiexec.Command(ctx, directory, environ, "sudo", scmd)
 }

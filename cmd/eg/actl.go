@@ -6,5 +6,5 @@ import (
 
 type actlcmd struct {
 	Authorize actl.AuthorizeAgent `cmd:"" help:"authorize agents"`
-	Bootstrap actl.Bootstrap      `cmd:"" help:"helpful functions for bootstrapping the system"`
+	Bootstrap actl.Bootstrap      `cmd:"" help:"functions for bootstrapping the eg both locally and on workload runners"`
 }

@@ -18,41 +18,77 @@ import (
 	"github.com/egdaemon/eg/runtime/wasi/shell"
 )
 
-var CompileOption = coption(nil)
+var BuildOption = boption(nil)
 
-type coption func(*compileOption)
+type buildOption struct {
+	flags   []string
+	environ []string
+	bctx    build.Context
+}
 
-func (coption) Debug(b bool) coption {
-	return func(co *compileOption) {
-		if b {
-			co.debug = "-x"
-		} else {
-			co.debug = ""
+type boption func(*buildOption)
+
+func (boption) Debug(b bool) boption {
+	return func(o *buildOption) {
+		if !b {
+			return
 		}
+		o.flags = append(o.flags, "-x")
 	}
 }
 
-func (coption) Tags(tags ...string) coption {
-	return func(c *compileOption) {
-		c.bctx.BuildTags = tags
+func (boption) Tags(tags ...string) boption {
+	return func(o *buildOption) {
+		o.bctx.BuildTags = tags
 	}
 }
 
-type compileOption struct {
-	debug string
-	bctx  build.Context
+// escape hatch for setting command line flags.
+// useful for flags not explicitly implemented by this package.
+func (boption) Flags(flags ...string) boption {
+	return func(o *buildOption) {
+		o.flags = append(o.flags, flags...)
+	}
 }
 
-func AutoCompile(options ...coption) eg.OpFn {
+// escape hatch for setting command environment variables.
+// useful for flags not explicitly implemented by this package.
+func (boption) Environ(envvars ...string) boption {
+	return func(o *buildOption) {
+		o.environ = append(o.environ, envvars...)
+	}
+}
+
+func (t buildOption) options() (opts []string) {
+	copy(opts, t.flags)
+	if len(t.bctx.BuildTags) > 0 {
+		opts = append(opts, fmt.Sprintf("-tags=%s", strings.Join(t.bctx.BuildTags, ",")))
+	}
+
+	return opts
+}
+
+var InstallOption = ioption(nil)
+
+type ioption func(*installOption)
+
+type installOption struct {
+	buildOption
+}
+
+func (ioption) BuildOptions(b buildOption) ioption {
+	return func(o *installOption) {
+		o.buildOption = b
+	}
+}
+
+func AutoInstall(options ...toption) eg.OpFn {
 	var (
-		tags  string
-		copts compileOption
+		opts testOption
 	)
 
-	copts = langx.Clone(copts, options...)
-	if len(copts.bctx.BuildTags) > 0 {
-		tags = fmt.Sprintf("-tags=%s", strings.Join(copts.bctx.BuildTags, ","))
-	}
+	opts = langx.Clone(opts, options...)
+	flags := stringsx.Join(" ", opts.buildOption.options()...)
 
 	return eg.OpFn(func(ctx context.Context, _ eg.Op) (err error) {
 		var (
@@ -65,9 +101,52 @@ func AutoCompile(options ...coption) eg.OpFn {
 
 		runtime := shell.Runtime().EnvironFrom(goenv...)
 
-		// golang's wasm implementation doesn't have a reasonable default in place. it defaults to returning not found.
 		for gomod := range modfilex.FindModules(egenv.WorkingDirectory()) {
-			cmd := stringsx.Join(" ", "go", "build", copts.debug, tags, fmt.Sprintf("%s/...", filepath.Dir(gomod)))
+			cmd := stringsx.Join(" ", "go", "install", flags, fmt.Sprintf("%s/...", filepath.Dir(gomod)))
+			if err := shell.Run(ctx, runtime.New(cmd)); err != nil {
+				return errorsx.Wrap(err, "unable to run tests")
+			}
+		}
+
+		return nil
+	})
+}
+
+var CompileOption = coption(nil)
+
+type coption func(*compileOption)
+
+func (coption) BuildOptions(b buildOption) coption {
+	return func(o *compileOption) {
+		o.buildOption = b
+	}
+}
+
+type compileOption struct {
+	buildOption
+}
+
+func AutoCompile(options ...coption) eg.OpFn {
+	var (
+		opts compileOption
+	)
+
+	opts = langx.Clone(opts, options...)
+	flags := stringsx.Join(" ", opts.buildOption.options()...)
+
+	return eg.OpFn(func(ctx context.Context, _ eg.Op) (err error) {
+		var (
+			goenv []string
+		)
+
+		if goenv, err = Env(); err != nil {
+			return err
+		}
+
+		runtime := shell.Runtime().EnvironFrom(goenv...).EnvironFrom(opts.buildOption.environ...)
+
+		for gomod := range modfilex.FindModules(egenv.WorkingDirectory()) {
+			cmd := stringsx.Join(" ", "go", "build", flags, fmt.Sprintf("%s/...", filepath.Dir(gomod)))
 			if err := shell.Run(ctx, runtime.New(cmd)); err != nil {
 				return errorsx.Wrap(err, "unable to compile")
 			}
@@ -81,37 +160,17 @@ var TestOption = toption(nil)
 
 type toption func(*testOption)
 
-func (toption) Tags(tags ...string) toption {
-	return func(c *testOption) {
-		c.bctx.BuildTags = tags
-	}
-}
-
-func (toption) Debug(b bool) toption {
-	return func(co *testOption) {
-		if b {
-			co.debug = "-x"
-		} else {
-			co.debug = ""
-		}
-	}
-}
-
 type testOption struct {
-	debug string
-	bctx  build.Context
+	buildOption
 }
 
 func AutoTest(options ...toption) eg.OpFn {
 	var (
-		tags string
 		opts testOption
 	)
 
 	opts = langx.Clone(opts, options...)
-	if len(opts.bctx.BuildTags) > 0 {
-		tags = fmt.Sprintf("-tags=%s", strings.Join(opts.bctx.BuildTags, ","))
-	}
+	flags := stringsx.Join(" ", opts.buildOption.options()...)
 
 	return eg.OpFn(func(ctx context.Context, _ eg.Op) (err error) {
 		var (
@@ -124,9 +183,8 @@ func AutoTest(options ...toption) eg.OpFn {
 
 		runtime := shell.Runtime().EnvironFrom(goenv...)
 
-		// golang's wasm implementation doesn't have a reasonable default in place. it defaults to returning not found.
 		for gomod := range modfilex.FindModules(egenv.WorkingDirectory()) {
-			cmd := stringsx.Join(" ", "go", "test", opts.debug, tags, fmt.Sprintf("%s/...", filepath.Dir(gomod)))
+			cmd := stringsx.Join(" ", "go", "test", flags, fmt.Sprintf("%s/...", filepath.Dir(gomod)))
 			if err := shell.Run(ctx, runtime.New(cmd)); err != nil {
 				return errorsx.Wrap(err, "unable to run tests")
 			}

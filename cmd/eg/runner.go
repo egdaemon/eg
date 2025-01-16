@@ -88,8 +88,6 @@ func (t module) mounthack(ctx context.Context, ws workspaces.Context) (err error
 	}
 
 	err = errors.Join(
-		remap(eg.DefaultMountRoot(eg.RuntimeDirectory), eg.DefaultRuntimeDirectory()),
-		// remap(eg.DefaultMountRoot(eg.TempDirectory), eg.DefaultTempDirectory()),
 		remap(eg.DefaultMountRoot(eg.WorkingDirectory), eg.DefaultWorkingDirectory()),
 		remap(eg.DefaultMountRoot(eg.CacheDirectory), eg.DefaultCacheDirectory()),
 	)
@@ -126,10 +124,6 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 			db        *sql.DB
 			vmemlimit int64
 		)
-
-		if err = gitx.AutomaticCredentialRefresh(gctx.Context, tlsc.DefaultClient(), t.RuntimeDir, envx.String("", gitx.EnvAuthEGAccessToken)); err != nil {
-			return err
-		}
 
 		// automatically detect the correct number of max procs for the module
 		if _, err = maxprocs.Set(maxprocs.Logger(log.Printf)); err != nil {
@@ -230,6 +224,10 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 		go func() {
 			errorsx.Log(errorsx.Wrap(srv.Serve(control), "unable to create control socket"))
 		}()
+
+		if err = gitx.AutomaticCredentialRefresh(gctx.Context, tlsc.DefaultClient(), t.RuntimeDir, envx.String("", gitx.EnvAuthEGAccessToken)); err != nil {
+			return err
+		}
 
 		// IMPORTANT: duckdb play well with bindfs mounting the folders before
 		// creating extensions/tables, it would nuke the working directory. it *mostly* worked once we moved this mount

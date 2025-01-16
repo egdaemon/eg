@@ -33,7 +33,7 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/posener/complete v1.2.3
 	github.com/shirou/gopsutil/v4 v4.24.12
-	github.com/tetratelabs/wazero v1.8.2
+	github.com/tetratelabs/wazero v1.8.3-0.20250115223256-c6e819e6aff0
 	github.com/willabides/kongplete v0.4.0
 	go.uber.org/automaxprocs v1.6.0
 	golang.org/x/crypto v0.32.0

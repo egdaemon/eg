@@ -15,6 +15,10 @@ func main() {
 	ctx, done := context.WithTimeout(context.Background(), egenv.TTL())
 	defer done()
 
+	bopts := eggolang.Build(
+		eggolang.BuildOption.Tags("no_duckdb_arrow"),
+		// eggolang.BuildOption.Debug(true),
+	)
 	err := eg.Perform(
 		ctx,
 		eggit.AutoClone,
@@ -25,11 +29,10 @@ func main() {
 			ctx,
 			eg.DefaultModule(),
 			eggolang.AutoCompile(
-				eggolang.CompileOption.Tags("no_duckdb_arrow"),
-				// eggolang.CompileOption.Debug(true),
+				eggolang.CompileOption.BuildOptions(bopts),
 			),
 			eggolang.AutoTest(
-				eggolang.TestOption.Tags("no_duckdb_arrow"),
+				eggolang.TestOption.BuildOptions(bopts),
 			),
 		),
 	)

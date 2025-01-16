@@ -168,8 +168,6 @@ func moduleExec(ctx context.Context, cname, moduledir string, stdin io.Reader, s
 		errorsx.Log(errorsx.Wrap(containers.ExecRemove(ctx, id, &containers.ExecRemoveOptions{Force: langx.Autoptr(true)}), "failed to remove exec session"))
 	}()
 
-	time.Sleep(3 * time.Second)
-
 	err = containers.ExecStartAndAttach(ctx, id, &containers.ExecStartAndAttachOptions{
 		OutputStream: langx.Autoptr(io.Writer(stdout)),
 		ErrorStream:  langx.Autoptr(io.Writer(stderr)),

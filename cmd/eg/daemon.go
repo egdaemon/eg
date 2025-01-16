@@ -51,11 +51,6 @@ func (t daemon) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 	log.Println("running daemon initiated")
 	defer log.Println("running daemon completed")
 
-	ctx, err := cmdopts.WithPodman(gctx.Context)
-	if err != nil {
-		return err
-	}
-
 	rm := runners.NewResourceManager(runners.NewRuntimeResources())
 
 	// we want to set the umask to 0002 to ensure that the cache (and other) directory are readable by the group.
@@ -136,6 +131,11 @@ func (t daemon) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 	}
 
 	if err = runners.BuildRootContainer(gctx.Context); err != nil {
+		return err
+	}
+
+	ctx, err := cmdopts.WithPodman(gctx.Context)
+	if err != nil {
 		return err
 	}
 

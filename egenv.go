@@ -59,7 +59,6 @@ const (
 	EnvComputeAccountID          = "EG_COMPUTE_ACCOUNT_ID"                      // account id of the compute workload
 	EnvComputeVCS                = "EG_COMPUTE_VCS_URI"                         // vcs uri for the compute workload
 	EnvComputeTTL                = "EG_COMPUTE_TTL"                             // deadline for compute workload
-	EnvComputeContainerExec      = "EG_COMPUTE_EXEC_OPTIONS"                    // CLI options for podman exec
 	EnvComputeWorkingDirectory   = "EG_COMPUTE_ROOT_DIRECTORY"                  // root working directory for workloads
 	EnvComputeCacheDirectory     = "EG_COMPUTE_CACHE_DIRECTORY"                 // cache directory for workloads
 	EnvComputeRuntimeDirectory   = "EG_COMPUTE_RUNTIME_DIRECTORY"               // runtime directory for workloads
@@ -68,8 +67,8 @@ const (
 	EnvScheduleMaximumDelay      = "EG_COMPUTE_SCHEDULER_MAXIMUM_DELAY"         // maximum delay between scans for workloads
 	EnvScheduleSystemLoadFreq    = "EG_COMPUTE_SCHEDULER_SYSTEM_LOAD_FREQUENCY" // how frequently we measure system load, small enough we can saturate, high enough its not a burden.
 	EnvPingMinimumDelay          = "EG_COMPUTE_PING_MINIMUM_DELAY"              // minimum delay for pings
-	EnvComputeBin                = "EG_BIN"
-	EnvComputeContainerImpure    = "EG_C8S_IMPURE"
+	EnvComputeBin                = "EG_COMPUTE_BIN"                             // hotswap the binary, used for development testing
+	EnvComputeContainerImpure    = "EG_COMPUTE_C8S_IMPURE"                      // informs the container runner that the container depends on the repository being present.
 )
 
 const (

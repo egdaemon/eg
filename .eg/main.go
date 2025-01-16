@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"eg/ci/debian"
 	"log"
 
 	"github.com/egdaemon/eg/runtime/wasi/eg"
@@ -15,15 +16,18 @@ func main() {
 	ctx, done := context.WithTimeout(context.Background(), egenv.TTL())
 	defer done()
 
+	deb := eg.Container(debian.ContainerName)
 	err := eg.Perform(
 		ctx,
 		eggit.AutoClone,
-		eg.Build(
-			eg.DefaultModule(),
+		eg.Parallel(
+			eg.Build(eg.DefaultModule()),
+			eg.Build(deb.BuildFromFile(".dist/deb/Containerfile")),
 		),
 		eg.Module(
 			ctx,
-			eg.DefaultModule(),
+			deb,
+			// egbug.FileTree,
 			eggolang.AutoCompile(
 				eggolang.CompileOption.BuildOptions(
 					eggolang.Build(

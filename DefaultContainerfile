@@ -11,7 +11,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 RUN apt update
 
 # general utilities
-RUN apt-get install -y software-properties-common build-essential ca-certificates curl sudo
+RUN apt-get install -y software-properties-common build-essential ca-certificates curl sudo apt-utils
 RUN add-apt-repository -n ppa:longsleep/golang-backports
 RUN add-apt-repository -n ppa:egdaemon/eg
 RUN add-apt-repository -n ppa:egdaemon/duckdb

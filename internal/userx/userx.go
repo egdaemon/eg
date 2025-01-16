@@ -1,7 +1,6 @@
 package userx
 
 import (
-	"fmt"
 	"log"
 	"os"
 	"os/user"
@@ -79,7 +78,7 @@ func DefaultRuntimeDirectory(rel ...string) string {
 		return filepath.Join(envx.String(filepath.Join("/", "run"), "RUNTIME_DIRECTORY", "XDG_RUNTIME_DIR"), filepath.Join(rel...))
 	}
 
-	defaultdir := filepath.Join(os.TempDir(), fmt.Sprintf("%s-%s", DefaultDir, "runtime"))
+	defaultdir := filepath.Join("/", "var", "run", "user", user.Uid)
 
 	return filepath.Join(envx.String(defaultdir, "RUNTIME_DIRECTORY", "XDG_RUNTIME_DIR"), filepath.Join(rel...))
 }
@@ -110,4 +109,14 @@ func HomeDirectoryOrDefault(fallback string) (dir string) {
 	}
 
 	return dir
+}
+
+// HomeDirectory loads the user home directory or fallsback to the provided
+// path when an error occurs.
+func HomeDirectory(rel ...string) (dir string, err error) {
+	if dir, err = os.UserHomeDir(); err != nil {
+		return "", err
+	}
+
+	return filepath.Join(dir, filepath.Join(rel...)), nil
 }

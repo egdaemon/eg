@@ -95,7 +95,6 @@ const (
 	WorkingDirectory = "eg"
 	CacheDirectory   = ".eg.cache"
 	RuntimeDirectory = ".eg.runtime"
-	TempDirectory    = ".eg.tmp"
 	ModuleBin        = ".eg.module.wasm"
 	BinaryBin        = "egbin"
 )
@@ -114,10 +113,6 @@ func DefaultRuntimeDirectory(rel ...string) string {
 
 func DefaultWorkingDirectory(rel ...string) string {
 	return DefaultWorkloadRoot(WorkingDirectory, filepath.Join(rel...))
-}
-
-func DefaultTempDirectory(rel ...string) string {
-	return DefaultWorkloadRoot(TempDirectory, filepath.Join(rel...))
 }
 
 func DefaultWorkloadRoot(rel ...string) string {

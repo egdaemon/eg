@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"database/sql"
+	"errors"
 	"log"
 	"net"
 	"os"
@@ -24,6 +25,7 @@ import (
 	"github.com/egdaemon/eg/internal/execx"
 	"github.com/egdaemon/eg/internal/fsx"
 	"github.com/egdaemon/eg/internal/gitx"
+	"github.com/egdaemon/eg/internal/podmanx"
 	"github.com/egdaemon/eg/internal/runtimex"
 	"github.com/egdaemon/eg/internal/wasix"
 	"github.com/egdaemon/eg/interp"
@@ -51,7 +53,6 @@ type module struct {
 
 func (t module) mounthack(ctx context.Context, ws workspaces.Context) (err error) {
 	var (
-		// binname = "fuse-overlayfs"
 		binname = "bindfs"
 		mbin    string
 	)
@@ -59,7 +60,7 @@ func (t module) mounthack(ctx context.Context, ws workspaces.Context) (err error
 	if mbin, err = exec.LookPath(binname); err != nil {
 		log.Println(errorsx.Wrap(err, "unable to locate bindfs, skipping"))
 
-		// symlink fallback?
+		// symlink fallback hack wont work in practice most likely.
 		if err = os.Symlink(eg.DefaultMountRoot(), eg.DefaultWorkloadRoot()); err != nil {
 			log.Println("unable to symlink", err)
 		}
@@ -86,8 +87,7 @@ func (t module) mounthack(ctx context.Context, ws workspaces.Context) (err error
 		return err
 	}
 
-	err = errorsx.Compact(
-		remap(eg.DefaultMountRoot(eg.RuntimeDirectory), eg.DefaultRuntimeDirectory()),
+	err = errors.Join(
 		remap(eg.DefaultMountRoot(eg.WorkingDirectory), eg.DefaultWorkingDirectory()),
 		remap(eg.DefaultMountRoot(eg.CacheDirectory), eg.DefaultCacheDirectory()),
 	)
@@ -170,6 +170,9 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 		}()
 		srv := grpc.NewServer(
 			grpc.Creds(insecure.NewCredentials()), // this is a local socket
+			grpc.ChainUnaryInterceptor(
+				podmanx.GrpcClient,
+			),
 		)
 		defer srv.GracefulStop()
 
@@ -221,6 +224,18 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 		go func() {
 			errorsx.Log(errorsx.Wrap(srv.Serve(control), "unable to create control socket"))
 		}()
+
+		if err = gitx.AutomaticCredentialRefresh(gctx.Context, tlsc.DefaultClient(), t.RuntimeDir, envx.String("", gitx.EnvAuthEGAccessToken)); err != nil {
+			return err
+		}
+
+		// IMPORTANT: duckdb play well with bindfs mounting the folders before
+		// creating extensions/tables, it would nuke the working directory. it *mostly* worked once we moved this mount
+		// call here. we're leaving the call here for now but it shouldn't matter.
+		// and we're keen to remove it.
+		if err = t.mounthack(gctx.Context, ws); err != nil {
+			log.Println("unable to mount with correct permissions", err)
+		}
 	} else {
 		debugx.Printf("---------------------------- MODULE INITIATED %d ----------------------------\n", mlevel)
 		// env.Debug(os.Environ()...)
@@ -238,14 +253,6 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 
 	if cc, err = daemons.AutoRunnerClient(gctx, ws, uid, runners.AgentOptionAutoEGBin()); err != nil {
 		return err
-	}
-
-	// IMPORTANT: duckdb play well with bindfs mounting the folders before
-	// creating extensions/tables, it would nuke the working directory. it *mostly* worked once we moved this mount
-	// call here. we're leaving the call here for now but it shouldn't matter.
-	// and we're keen to remove it.
-	if err = t.mounthack(gctx.Context, ws); err != nil {
-		log.Println("unable to mount with correct permissions", err)
 	}
 
 	return interp.Remote(

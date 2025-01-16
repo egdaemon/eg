@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/containers/podman/v5/pkg/bindings/containers"
 	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/internal/debugx"
 	"github.com/egdaemon/eg/internal/errorsx"
@@ -76,6 +77,10 @@ func (t *ProxyService) Build(ctx context.Context, req *BuildRequest) (_ *BuildRe
 	abspath := req.Definition
 	if !filepath.IsAbs(abspath) {
 		abspath = filepath.Join(t.ws.Root, t.ws.WorkingDir, req.Definition)
+	}
+
+	if ok, err := containers.Exists(ctx, req.Name, nil); ok && err == nil {
+		return &BuildResponse{}, nil
 	}
 
 	// determine the working directory from the request if specified or the definition file's path.

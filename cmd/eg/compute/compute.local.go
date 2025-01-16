@@ -60,6 +60,11 @@ func (t local) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err e
 		mountegbin runners.AgentOption = runners.AgentOptionEGBin(errorsx.Must(exec.LookPath(os.Args[0])))
 	)
 
+	ctx, err := cmdopts.WithPodman(gctx.Context)
+	if err != nil {
+		return errorsx.Wrap(err, "unable to connect to podman")
+	}
+
 	// TODO: create a kong bind variable to do this automatically and inject as needed.
 	if err = fsx.MkDirs(0700, t.ContainerCache); err != nil {
 		return errorsx.Wrap(err, "unable to setup container cache")
@@ -210,8 +215,7 @@ func (t local) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err e
 		}
 
 		// TODO REVISIT using t.ws.RuntimeDir as moduledir.
-		err := c8s.PodmanModule(gctx.Context, prepcmd, eg.WorkingDirectory, fmt.Sprintf("eg-%s", uid.String()), ws.RuntimeDir, options...)
-		if err != nil {
+		if err := c8s.PodmanModule(ctx, prepcmd, eg.WorkingDirectory, fmt.Sprintf("eg-%s", uid.String()), ws.RuntimeDir, options...); err != nil {
 			return errorsx.Wrap(err, "module execution failed")
 		}
 	}

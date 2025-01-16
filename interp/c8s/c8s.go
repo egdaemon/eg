@@ -1,16 +1,22 @@
 package c8s
 
 import (
+	"bufio"
 	"context"
 	"io"
-	"log"
 	"os/exec"
 	"time"
 
+	"github.com/containers/podman/v5/libpod/define"
+	"github.com/containers/podman/v5/pkg/api/handlers"
+	"github.com/containers/podman/v5/pkg/bindings/containers"
+	"github.com/docker/docker/api/types/container"
 	"github.com/egdaemon/eg"
+	"github.com/egdaemon/eg/internal/debugx"
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/execx"
+	"github.com/egdaemon/eg/internal/langx"
 )
 
 func silence(c *exec.Cmd) *exec.Cmd {
@@ -25,14 +31,14 @@ func cleanup(ctx context.Context, cmdctx func(*exec.Cmd) *exec.Cmd, cname string
 	// don't care about this error; if the container doesn't exist its fine; if something
 	// actually prevented it from being stopped then our startup command will fail.
 	if err := execx.MaybeRun(silence(cmdctx(exec.CommandContext(cctx, "podman", "stop", cname)))); err != nil {
-		log.Println(err)
+		debugx.Println(errorsx.Wrap(err, "container stop failed"))
 		return
 	}
 
 	// don't care about this error; if the container doesn't exist its fine; if something
 	// actually prevented it from being removed then our startup command will fail.
 	if err := execx.MaybeRun(silence(cmdctx(exec.CommandContext(cctx, "podman", "rm", cname)))); err != nil {
-		log.Println(err)
+		debugx.Println(errorsx.Wrap(err, "container rm failed"))
 		return
 	}
 }
@@ -48,7 +54,7 @@ func PodmanPull(ctx context.Context, name string, options ...string) (cmd *exec.
 
 func PodmanBuild(ctx context.Context, name string, dir string, definition string, options ...string) (cmd *exec.Cmd, err error) {
 	args := []string{
-		"build", "--stdin", "-t", name, "-f", definition,
+		"build", "-q", "--stdin", "-t", name, "-f", definition,
 	}
 	args = append(args, options...)
 	args = append(args, dir)
@@ -106,13 +112,7 @@ func PodmanModule(ctx context.Context, cmdctx func(*exec.Cmd) *exec.Cmd, image, 
 		return errorsx.Wrap(err, "unable to run container")
 	}
 
-	cmd = cmdctx(exec.CommandContext(
-		ctx,
-		"podman",
-		PodmanModuleExecCmd(cname, moduledir)...,
-	))
-
-	if err = execx.MaybeRun(cmd); err != nil {
+	if err = moduleExec(ctx, cname, moduledir, cmd.Stdin, cmd.Stdout, cmd.Stderr); err != nil {
 		return errorsx.Wrap(err, "unable to exec module")
 	}
 
@@ -124,6 +124,7 @@ func PodmanModuleRunCmd(image, cname string, options ...string) []string {
 		"run",
 		"--name", cname,
 		"--detach",
+		"--replace",
 		"--env", "CI",
 		"--env", "EG_CI",
 		"--env", eg.EnvComputeRunID,
@@ -140,15 +141,52 @@ func PodmanModuleRunCmd(image, cname string, options ...string) []string {
 	)
 }
 
-func PodmanModuleExecCmd(cname, moduledir string) []string {
-	return []string{
-		"exec",
-		envx.String("-i", eg.EnvComputeContainerExec),
-		cname,
-		envx.String("eg", eg.EnvComputeBin),
-		"module",
-		"--directory", eg.DefaultWorkingDirectory(),
-		"--moduledir", moduledir,
-		eg.DefaultMountRoot(eg.ModuleBin),
+func moduleExec(ctx context.Context, cname, moduledir string, stdin io.Reader, stdout io.Writer, stderr io.Writer) (err error) {
+	var (
+		result *define.InspectExecSession
+	)
+
+	id, err := containers.ExecCreate(ctx, cname, &handlers.ExecCreateConfig{
+		ExecConfig: container.ExecOptions{
+			Tty:          stdin != nil,
+			AttachStdin:  stdin != nil,
+			AttachStderr: true,
+			AttachStdout: true,
+			Cmd: []string{
+				envx.String("eg", eg.EnvComputeBin),
+				"module",
+				"--directory", eg.DefaultWorkingDirectory(),
+				"--moduledir", moduledir,
+				eg.DefaultMountRoot(eg.ModuleBin),
+			},
+		},
+	})
+	if err != nil {
+		return errorsx.Wrap(err, "unable prepare exec session")
 	}
+	defer func() {
+		errorsx.Log(errorsx.Wrap(containers.ExecRemove(ctx, id, &containers.ExecRemoveOptions{Force: langx.Autoptr(true)}), "failed to remove exec session"))
+	}()
+
+	time.Sleep(3 * time.Second)
+
+	err = containers.ExecStartAndAttach(ctx, id, &containers.ExecStartAndAttachOptions{
+		OutputStream: langx.Autoptr(io.Writer(stdout)),
+		ErrorStream:  langx.Autoptr(io.Writer(stderr)),
+		InputStream:  bufio.NewReader(stdin),
+		AttachOutput: langx.Autoptr(true),
+		AttachError:  langx.Autoptr(true),
+		AttachInput:  langx.Autoptr(stdin != nil),
+	})
+	if err != nil {
+		return errorsx.Wrap(err, "podman exec start failed")
+	}
+
+	if result, err = containers.ExecInspect(ctx, id, nil); err != nil {
+		return err
+	} else if result.ExitCode > 0 {
+		return errorsx.Errorf("module failed with exit code: %d", result.ExitCode)
+	}
+
+	return nil
 }

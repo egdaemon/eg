@@ -53,6 +53,11 @@ func (t c8sLocal) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (er
 		mountegbin runners.AgentOption = runners.AgentOptionEGBin(errorsx.Must(exec.LookPath(os.Args[0])))
 	)
 
+	ctx, err := cmdopts.WithPodman(gctx.Context)
+	if err != nil {
+		return errorsx.Wrap(err, "unable to connect to podman")
+	}
+
 	if tmpdir, err = os.MkdirTemp("", "eg.c8s.upload.*"); err != nil {
 		return errorsx.Wrap(err, "unable to create temporary directory")
 	}
@@ -178,7 +183,7 @@ func (t c8sLocal) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (er
 			)...)
 
 		// TODO REVISIT using t.ws.RuntimeDir as moduledir.
-		err := c8s.PodmanModule(gctx.Context, prepcmd, eg.WorkingDirectory, fmt.Sprintf("eg-%s", uid.String()), ws.Root, options...)
+		err := c8s.PodmanModule(ctx, prepcmd, eg.WorkingDirectory, fmt.Sprintf("eg-%s", uid.String()), ws.Root, options...)
 		if err != nil {
 			return errorsx.Wrap(err, "module execution failed")
 		}

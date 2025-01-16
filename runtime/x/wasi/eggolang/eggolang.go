@@ -43,6 +43,10 @@ func (boption) Tags(tags ...string) boption {
 	}
 }
 
+func Build(opts ...boption) (b buildOption) {
+	return langx.Clone(b, opts...)
+}
+
 // escape hatch for setting command line flags.
 // useful for flags not explicitly implemented by this package.
 func (boption) Flags(flags ...string) boption {
@@ -159,6 +163,12 @@ func AutoCompile(options ...coption) eg.OpFn {
 var TestOption = toption(nil)
 
 type toption func(*testOption)
+
+func (toption) BuildOptions(b buildOption) toption {
+	return func(o *testOption) {
+		o.buildOption = b
+	}
+}
 
 type testOption struct {
 	buildOption

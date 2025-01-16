@@ -527,8 +527,6 @@ func (t staterunning) Update(ctx context.Context) state {
 		}
 
 		ts := time.Now()
-
-		// TODO: replace "eg" with tagged version for run id.
 		// TODO REVISIT using t.ws.RuntimeDir as moduledir.
 		err = c8s.PodmanModule(ctx, prepcmd, "eg", fmt.Sprintf("eg-%s", t.ragent.id), t.ws.RuntimeDir, options...)
 		return completed(t.workload, t.metadata, t.ws, time.Since(ts), err)
@@ -559,7 +557,7 @@ func (t statecompleted) Update(ctx context.Context) state {
 		analyticspath = filepath.Join(t.ws.Root, t.ws.RuntimeDir, "analytics.db")
 	)
 
-	log.Println("completed", t.workload.Id, t.workload.AccountId, t.workload.VcsUri, t.ws.Root, t.cause)
+	log.Println("completed", t.workload.Id, t.workload.AccountId, t.workload.VcsUri, t.ws.Root, t.duration, t.cause)
 
 	logs, err := os.Open(logpath)
 	if err != nil {

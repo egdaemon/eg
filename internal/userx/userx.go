@@ -66,22 +66,22 @@ func DefaultCacheDirectory(rel ...string) string {
 		return filepath.Join(envx.String(filepath.Join("/", "var", "cache", DefaultDir), "CACHE_DIRECTORY"), filepath.Join(rel...))
 	}
 
-	root := filepath.Join(user.HomeDir, ".cache", DefaultDir)
-
-	return filepath.Join(envx.String(root, "CACHE_DIRECTORY", "XDG_CACHE_HOME"), filepath.Join(rel...))
+	// if no directory is specified
+	defaultdir := filepath.Join(user.HomeDir, ".cache", DefaultDir)
+	return filepath.Join(envx.String(defaultdir, "CACHE_DIRECTORY", "XDG_CACHE_HOME"), filepath.Join(rel...))
 }
 
 // DefaultRuntimeDirectory runtime directory for storing data.
-func DefaultRuntimeDirectory() string {
+func DefaultRuntimeDirectory(rel ...string) string {
 	user := CurrentUserOrDefault(Root())
 
 	if user.Uid == Root().Uid {
-		return envx.String(filepath.Join("/", "run", DefaultDir), "RUNTIME_DIRECTORY", "XDG_RUNTIME_DIR")
+		return filepath.Join(envx.String(filepath.Join("/", "run"), "RUNTIME_DIRECTORY", "XDG_RUNTIME_DIR"), filepath.Join(rel...))
 	}
 
 	defaultdir := filepath.Join(os.TempDir(), fmt.Sprintf("%s-%s", DefaultDir, "runtime"))
 
-	return envx.String(defaultdir, "RUNTIME_DIRECTORY", "XDG_RUNTIME_DIR")
+	return filepath.Join(envx.String(defaultdir, "RUNTIME_DIRECTORY", "XDG_RUNTIME_DIR"), filepath.Join(rel...))
 }
 
 // DefaultDirectory finds the first directory root that exists and then returns

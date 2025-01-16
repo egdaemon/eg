@@ -2,6 +2,8 @@ module github.com/egdaemon/eg
 
 go 1.23.4
 
+exclude google.golang.org/genproto v0.0.0-20220822174746-9e6da59bd2fc
+
 require (
 	github.com/KimMachineGun/automemlimit v0.7.0
 	github.com/alecthomas/kong v1.6.1

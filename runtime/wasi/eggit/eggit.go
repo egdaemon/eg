@@ -14,6 +14,7 @@ import (
 	_eg "github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/internal/debugx"
 	"github.com/egdaemon/eg/internal/errorsx"
+	"github.com/egdaemon/eg/internal/fsx"
 	"github.com/egdaemon/eg/internal/iox"
 	"github.com/egdaemon/eg/internal/slicesx"
 	"github.com/egdaemon/eg/internal/stringsx"
@@ -156,7 +157,10 @@ func (t *modified) detect(ctx context.Context) error {
 	}
 
 	mods, err := os.Open(path)
-	if err != nil {
+	// if we didnt generate the changeset then no changes occurred.
+	if fsx.ErrIsNotExist(err) != nil {
+		return nil
+	} else if err != nil {
 		return err
 	}
 

@@ -5,6 +5,7 @@ go 1.23.4
 require (
 	github.com/KimMachineGun/automemlimit v0.7.0
 	github.com/alecthomas/kong v1.6.1
+	github.com/alitto/pond/v2 v2.1.6
 	github.com/coreos/go-systemd/v22 v22.5.0
 	github.com/davecgh/go-spew v1.1.1
 	github.com/dominikbraun/graph v0.23.0
@@ -23,10 +24,10 @@ require (
 	go.uber.org/automaxprocs v1.6.0
 	golang.org/x/crypto v0.32.0
 	golang.org/x/time v0.9.0
-	google.golang.org/grpc v1.68.0
+	google.golang.org/grpc v1.69.4
 )
 
-require github.com/alitto/pond/v2 v2.1.6 // indirect
+require google.golang.org/genproto/googleapis/rpc v0.0.0-20250102185135-69823020774d // indirect
 
 require (
 	dario.cat/mergo v1.0.0 // indirect
@@ -43,13 +44,13 @@ require (
 	github.com/go-task/slim-sprig/v3 v3.0.0 // indirect
 	github.com/goccy/go-json v0.10.3 // indirect
 	github.com/godbus/dbus/v5 v5.1.0 // indirect
-	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
-	github.com/google/flatbuffers v24.3.25+incompatible // indirect
+	github.com/golang/groupcache v0.0.0-20241129210726-2c02b8208cf8 // indirect
+	github.com/google/flatbuffers v24.12.23+incompatible // indirect
 	github.com/google/pprof v0.0.0-20241210010833-40e02aabc2ad // indirect
 	github.com/jbenet/go-context v0.0.0-20150711004518-d14ea06fba99 // indirect
 	github.com/kevinburke/ssh_config v1.2.0 // indirect
 	github.com/klauspost/compress v1.17.11 // indirect
-	github.com/klauspost/cpuid/v2 v2.2.8 // indirect
+	github.com/klauspost/cpuid/v2 v2.2.9 // indirect
 	github.com/lufia/plan9stats v0.0.0-20211012122336-39d0f177ccd0 // indirect
 	github.com/mitchellh/mapstructure v1.5.0 // indirect
 	github.com/pierrec/lz4/v4 v4.1.21 // indirect
@@ -63,8 +64,7 @@ require (
 	github.com/yusufpapurcu/wmi v1.2.4 // indirect
 	github.com/zeebo/xxh3 v1.0.2 // indirect
 	golang.org/x/sync v0.10.0 // indirect
-	golang.org/x/xerrors v0.0.0-20240716161551-93cc26a95ae9 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20240903143218-8af14fe29dc1 // indirect
+	golang.org/x/xerrors v0.0.0-20240903120638-7835f813f4da // indirect
 	gopkg.in/warnings.v0 v0.1.2 // indirect
 )
 
@@ -78,7 +78,7 @@ require (
 	golang.org/x/mod v0.22.0 // indirect
 	golang.org/x/net v0.34.0 // indirect
 	golang.org/x/text v0.21.0 // indirect
-	google.golang.org/protobuf v1.36.1
+	google.golang.org/protobuf v1.36.2
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
@@ -93,7 +93,7 @@ require (
 	github.com/mailru/easyjson v0.9.0
 	github.com/shirou/gopsutil/v4 v4.24.12
 	github.com/tetratelabs/wazero v1.8.2
-	golang.org/x/exp v0.0.0-20241217172543-b2144cdd0a67
+	golang.org/x/exp v0.0.0-20250106191152-7588d65b2ba8
 	golang.org/x/oauth2 v0.25.0
 	golang.org/x/sys v0.29.0 // indirect
 	golang.org/x/tools v0.29.0

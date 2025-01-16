@@ -79,7 +79,6 @@ func (t module) mounthack(ctx context.Context, ws workspaces.Context) (err error
 	err = fsx.MkDirs(
 		0770,
 		eg.DefaultRuntimeDirectory(),
-		eg.DefaultTempDirectory(),
 		eg.DefaultWorkingDirectory(),
 		eg.DefaultCacheDirectory(),
 	)
@@ -89,7 +88,6 @@ func (t module) mounthack(ctx context.Context, ws workspaces.Context) (err error
 
 	err = errorsx.Compact(
 		remap(eg.DefaultMountRoot(eg.RuntimeDirectory), eg.DefaultRuntimeDirectory()),
-		remap(eg.DefaultMountRoot(eg.TempDirectory), eg.DefaultTempDirectory()),
 		remap(eg.DefaultMountRoot(eg.WorkingDirectory), eg.DefaultWorkingDirectory()),
 		remap(eg.DefaultMountRoot(eg.CacheDirectory), eg.DefaultCacheDirectory()),
 	)
@@ -117,10 +115,6 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 	runtimex.Umask(0002)
 
 	if ws, err = workspaces.FromEnv(gctx.Context, t.Dir, t.Module); err != nil {
-		return err
-	}
-
-	if err = gitx.AutomaticCredentialRefresh(gctx.Context, tlsc.DefaultClient(), t.RuntimeDir, envx.String("", gitx.EnvAuthEGAccessToken)); err != nil {
 		return err
 	}
 
@@ -189,7 +183,6 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 				runners.AgentMountReadWrite("/root", "/root"),
 				runners.AgentMountReadWrite(eg.DefaultMountRoot(eg.CacheDirectory), eg.DefaultMountRoot(eg.CacheDirectory)),
 				runners.AgentMountReadWrite(eg.DefaultMountRoot(eg.RuntimeDirectory), eg.DefaultMountRoot(eg.RuntimeDirectory)),
-				runners.AgentMountReadWrite(eg.DefaultMountRoot(eg.TempDirectory), eg.DefaultMountRoot(eg.TempDirectory)),
 				runners.AgentMountReadWrite("/var/lib/containers", "/var/lib/containers"),
 			),
 			runners.AgentOptionEGBin(errorsx.Must(exec.LookPath(eg.DefaultMountRoot(eg.BinaryBin)))),
@@ -239,6 +232,10 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 		defer debugx.Printf("---------------------------- MODULE COMPLETED %d ----------------------------\n", mlevel)
 	}
 
+	if err = gitx.AutomaticCredentialRefresh(gctx.Context, tlsc.DefaultClient(), t.RuntimeDir, envx.String("", gitx.EnvAuthEGAccessToken)); err != nil {
+		return err
+	}
+
 	if cc, err = daemons.AutoRunnerClient(gctx, ws, uid, runners.AgentOptionAutoEGBin()); err != nil {
 		return err
 	}
@@ -280,8 +277,8 @@ func (t wasiCmd) Run(gctx *cmdopts.Global) (err error) {
 		return err
 	}
 
-	mpath := ws.Temporary("test.wasm")
-	log.Println("wasipath", ws.TemporaryDir, mpath)
+	mpath := filepath.Join(ws.RuntimeDir, "test.wasm")
+	log.Println("wasipath", ws.RuntimeDir, mpath)
 	if err = compile.Run(ctx, t.Dir, t.Module, mpath); err != nil {
 		return err
 	}

@@ -126,29 +126,33 @@ func (t *modified) detect(ctx context.Context) error {
 
 	if hcommit == bcommit {
 		return nil
-	} else {
-		// err := shell.Run(
-		// 	ctx,
-		// 	shell.Newf(
-		// 		"git show --name-only %s > /dev/null 2>&1", bcommit,
-		// 	).Directory(egenv.WorkingDirectory()),
-		// 	shell.Newf(
-		// 		"git show --name-only %s > /dev/null 2>&1", hcommit,
-		// 	).Directory(egenv.WorkingDirectory()),
-		// )
-		// if err != nil {
-		// 	return nil
-		// }
+	}
 
-		err := shell.Run(
-			ctx,
-			shell.Newf(
-				"git diff --name-only %s..%s | tee %s > /dev/null 2>&1", bcommit, hcommit, path,
-			).Directory(egenv.WorkingDirectory()),
-		)
-		if err != nil {
-			return errorsx.Wrap(err, "git diff failed")
-		}
+	// handle detecting missing commits
+	// if we can't find one of the commits
+	// then we treat it as if the commits were identical
+	// resulting everything being treated as changed.
+	err := shell.Run(
+		ctx,
+		shell.Newf(
+			"git show --name-only %s > /dev/null 2>&1", bcommit,
+		).Directory(egenv.WorkingDirectory()),
+		shell.Newf(
+			"git show --name-only %s > /dev/null 2>&1", hcommit,
+		).Directory(egenv.WorkingDirectory()),
+	)
+	if err != nil {
+		return nil
+	}
+
+	err = shell.Run(
+		ctx,
+		shell.Newf(
+			"git diff --name-only %s..%s | tee %s > /dev/null 2>&1", bcommit, hcommit, path,
+		).Directory(egenv.WorkingDirectory()),
+	)
+	if err != nil {
+		return errorsx.Wrap(err, "git diff failed")
 	}
 
 	mods, err := os.Open(path)

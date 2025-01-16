@@ -169,6 +169,8 @@ func (t upload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 	if err != nil {
 		return errorsx.Wrap(err, "unable to generate multipart upload")
 	}
+	defer os.RemoveAll(buf.Name())
+	defer buf.Close()
 
 	c := httpx.BindRetryTransport(tlsc.DefaultClient(), http.StatusTooManyRequests, http.StatusBadGateway)
 	tokensrc := compute.NewAuthzTokenSource(c, signer, authn.EndpointCompute())

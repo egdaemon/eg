@@ -18,7 +18,8 @@ func WithPodman(ctx context.Context) (rctx context.Context, err error) {
 		socket = fmt.Sprintf("unix:///var/run/user/%s/podman/podman.sock", u.Uid)
 	}
 
-	if rctx, err = bindings.NewConnection(ctx, envx.String(socket, eg.EnvPodmanSocket)); err != nil {
+	socket = envx.String(socket, eg.EnvPodmanSocket)
+	if rctx, err = bindings.NewConnection(ctx, socket); err != nil {
 		return ctx, errorsx.Wrapf(err, "unable to connect to podman: %s", socket)
 	}
 

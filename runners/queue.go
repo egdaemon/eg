@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"syscall"
@@ -170,8 +171,7 @@ func workload(ctx context.Context, rm *ResourceManager, dirs *SpoolDirs, reload 
 }
 
 func workloadcapacity() int {
-	// return envx.Int(runtime.NumCPU(), eg.EnvComputeWorkloadCapacity)
-	return envx.Int(1, eg.EnvComputeWorkloadCapacity)
+	return envx.Int(runtime.NumCPU(), eg.EnvComputeWorkloadCapacity)
 }
 
 // runs the scheduler until the context is cancelled.

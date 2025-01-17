@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"encoding/hex"
 	"log"
 	"net"
 	"net/http"
@@ -78,17 +77,6 @@ func (t daemon) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 		tokensrc,
 	)
 
-	config := &ssh.ClientConfig{
-		User: t.MachineID,
-		Auth: []ssh.AuthMethod{
-			ssh.PublicKeys(signer),
-		},
-		HostKeyCallback: func(hostname string, remote net.Addr, key ssh.PublicKey) error {
-			log.Println("hostkey", hostname, remote.String(), hex.EncodeToString(key.Marshal()))
-			return nil
-		},
-	}
-
 	if err = daemons.HTTP(gctx, httpl); err != nil {
 		return err
 	}
@@ -100,10 +88,6 @@ func (t daemon) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 
 	if err = daemons.Agent(gctx, grpcl); err != nil {
 		return errorsx.Wrap(err, "unable to initialize daemon")
-	}
-
-	if err = daemons.SSHProxy(gctx, config, signer, httpl); err != nil {
-		return errorsx.Wrap(err, "unable to enable ssh proxy")
 	}
 
 	go func() {

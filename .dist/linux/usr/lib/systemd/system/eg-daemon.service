@@ -5,8 +5,8 @@ After=network.target
 [Service]
 User=egd
 Group=egd
-IOSchedulingClass=idle
-IOSchedulingPriority=7
+IOSchedulingClass=best-effort
+IOSchedulingPriority=5
 PrivateMounts=yes
 IPAddressDeny=link-local
 IPAddressDeny=multicast

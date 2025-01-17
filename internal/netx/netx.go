@@ -1,7 +1,9 @@
 package netx
 
 import (
+	"context"
 	"fmt"
+	"io"
 	"log"
 	"net"
 	"syscall"
@@ -140,4 +142,38 @@ func (t debugpacketconn) WriteTo(b []byte, addr net.Addr) (n int, err error) {
 		log.Println("net.PacketConn.WriteTo", result, addr, n, fmt.Sprintf(t.format, bytesx.Debug(b)))
 	}()
 	return t.PacketConn.WriteTo(b, addr)
+}
+
+func Proxy(ctx context.Context, src, dst net.Conn) error {
+	var (
+		errors chan error
+	)
+
+	ctx, done := context.WithCancel(ctx)
+	go func() {
+		select {
+		case errors <- proxyConn(done, src, dst):
+		case <-ctx.Done():
+			errors <- ctx.Err()
+		}
+	}()
+	go func() {
+		select {
+		case errors <- proxyConn(done, dst, src):
+		case <-ctx.Done():
+			errors <- ctx.Err()
+		}
+	}()
+
+	return errorsx.Compact(<-errors, <-errors)
+}
+
+func proxyConn(done context.CancelFunc, from, to net.Conn) (err error) {
+	defer done()
+
+	if _, err = io.Copy(to, from); err != nil {
+		return err
+	}
+
+	return nil
 }

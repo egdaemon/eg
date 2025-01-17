@@ -6,6 +6,7 @@ import (
 	"eg/ci/maintainer"
 	"encoding/binary"
 	"fmt"
+	"os"
 	"path/filepath"
 	"time"
 
@@ -44,13 +45,11 @@ func build(ctx context.Context, _ eg.Op) error {
 		return err
 	}
 
-	runtime := shell.Runtime().EnvironFrom(genv...)
+	runtime := shell.Runtime().EnvironFrom(os.Environ()...).EnvironFrom(genv...)
 	return shell.Run(
 		ctx,
 		runtime.New("go version"),
 		runtime.Newf("go -C src build -tags \"no_duckdb_arrow\" -buildvcs ./cmd/...").Directory(debdir),
-		// shell.New("echo ${GPG_PASSPHRASE} | gpg-preset-passphrase --present {key}").Environ("GPG_PASSPHRASE", env.String("", "GPG_PASSPHRASE")),
-		// runtime.Newf("gpg --keyserver hkps://keyserver.ubuntu.com --search-keys %s", maintainer.Email).Privileged(),
 		runtime.Newf("debuild -S -k%s", maintainer.GPGFingerprint).Privileged().Directory(debdir),
 		runtime.Newf("dput -f -c %s eg eg_${VERSION}_source.changes", egenv.WorkingDirectory(".dist", "deb", "dput.config")).Privileged().Directory(filepath.Dir(debdir)),
 	)

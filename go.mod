@@ -30,6 +30,7 @@ require (
 	github.com/onsi/ginkgo/v2 v2.22.2
 	github.com/onsi/gomega v1.36.2
 	github.com/pbnjay/memory v0.0.0-20210728143218-7b4eea64cf58
+	github.com/pion/ice/v4 v4.0.5
 	github.com/pkg/errors v0.9.1
 	github.com/posener/complete v1.2.3
 	github.com/shirou/gopsutil/v4 v4.24.12
@@ -151,6 +152,13 @@ require (
 	github.com/opencontainers/selinux v1.11.1 // indirect
 	github.com/ostreedev/ostree-go v0.0.0-20210805093236-719684c64e4f // indirect
 	github.com/pierrec/lz4/v4 v4.1.21 // indirect
+	github.com/pion/dtls/v3 v3.0.4 // indirect
+	github.com/pion/logging v0.2.2 // indirect
+	github.com/pion/mdns/v2 v2.0.7 // indirect
+	github.com/pion/randutil v0.1.0 // indirect
+	github.com/pion/stun/v3 v3.0.0 // indirect
+	github.com/pion/transport/v3 v3.0.7 // indirect
+	github.com/pion/turn/v4 v4.0.0 // indirect
 	github.com/pjbgf/sha1cd v0.3.0 // indirect
 	github.com/pkg/sftp v1.13.7 // indirect
 	github.com/power-devops/perfstat v0.0.0-20210106213030-5aafc221ea8c // indirect
@@ -175,6 +183,7 @@ require (
 	github.com/ulikunitz/xz v0.5.12 // indirect
 	github.com/vbatts/tar-split v0.11.6 // indirect
 	github.com/vbauerster/mpb/v8 v8.8.3 // indirect
+	github.com/wlynxg/anet v0.0.5 // indirect
 	github.com/xanzy/ssh-agent v0.3.3 // indirect
 	github.com/yusufpapurcu/wmi v1.2.4 // indirect
 	github.com/zeebo/xxh3 v1.0.2 // indirect
@@ -191,7 +200,7 @@ require (
 	golang.org/x/sys v0.29.0 // indirect
 	golang.org/x/term v0.28.0 // indirect
 	golang.org/x/text v0.21.0 // indirect
-	golang.org/x/xerrors v0.0.0-20231012003039-104605ab7028 // indirect
+	golang.org/x/xerrors v0.0.0-20240903120638-7835f813f4da // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20241015192408-796eee8c2d53 // indirect
 	gopkg.in/tomb.v1 v1.0.0-20141024135613-dd632973f1e7 // indirect
 	gopkg.in/warnings.v0 v0.1.2 // indirect

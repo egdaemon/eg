@@ -102,6 +102,10 @@ func (t daemon) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 		return errorsx.Wrap(err, "unable to initialize daemon")
 	}
 
+	if err = daemons.P2PProxy(gctx.Context, signer, httpl); err != nil {
+		return errorsx.Wrap(err, "unable to initialize ice proxy")
+	}
+
 	if err = daemons.SSHProxy(gctx, config, signer, httpl); err != nil {
 		return errorsx.Wrap(err, "unable to enable ssh proxy")
 	}

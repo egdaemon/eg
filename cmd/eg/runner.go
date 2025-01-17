@@ -210,7 +210,6 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 						"CI",
 						"EG_CI",
 						eg.EnvComputeBin,
-						eg.EnvComputeContainerExec,
 						eg.EnvComputeRunID,
 						eg.EnvComputeAccountID,
 					).Environ(),
@@ -228,14 +227,6 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 		if err = gitx.AutomaticCredentialRefresh(gctx.Context, tlsc.DefaultClient(), t.RuntimeDir, envx.String("", gitx.EnvAuthEGAccessToken)); err != nil {
 			return err
 		}
-
-		// IMPORTANT: duckdb play well with bindfs mounting the folders before
-		// creating extensions/tables, it would nuke the working directory. it *mostly* worked once we moved this mount
-		// call here. we're leaving the call here for now but it shouldn't matter.
-		// and we're keen to remove it.
-		if err = t.mounthack(gctx.Context, ws); err != nil {
-			log.Println("unable to mount with correct permissions", err)
-		}
 	} else {
 		debugx.Printf("---------------------------- MODULE INITIATED %d ----------------------------\n", mlevel)
 		// env.Debug(os.Environ()...)
@@ -247,8 +238,12 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 		defer debugx.Printf("---------------------------- MODULE COMPLETED %d ----------------------------\n", mlevel)
 	}
 
-	if err = gitx.AutomaticCredentialRefresh(gctx.Context, tlsc.DefaultClient(), t.RuntimeDir, envx.String("", gitx.EnvAuthEGAccessToken)); err != nil {
-		return err
+	// IMPORTANT: duckdb does not play well with bindfs mounting the folders before
+	// creating extensions/tables, it would nuke the working directory. it *mostly* worked once we moved this mount
+	// call after duckdb. we're leaving the call here for now but it shouldn't matter.
+	// and we're keen to remove it.
+	if err = t.mounthack(gctx.Context, ws); err != nil {
+		log.Println("unable to mount with correct permissions", err)
 	}
 
 	if cc, err = daemons.AutoRunnerClient(gctx, ws, uid, runners.AgentOptionAutoEGBin()); err != nil {

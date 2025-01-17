@@ -3,7 +3,7 @@ Section: misc
 Maintainer: ${DEBFULLNAME} <${DEBEMAIL}>
 Standards-Version: 4.6.2
 Priority: extra
-Build-Depends: golang-1.23, dh-make, debhelper, duckdb
+Build-Depends: golang-1.23, dh-make, debhelper, duckdb, libc6-dev (>= 2.35), libbtrfs-dev, libassuan-dev, libdevmapper-dev, libglib2.0-dev, libgpgme-dev, libgpg-error-dev, libprotobuf-dev, libprotobuf-c-dev, libseccomp-dev, libselinux1-dev, libsystemd-dev
 
 Package: eg
 Section: misc

@@ -16,6 +16,9 @@ RUN add-apt-repository -n ppa:egdaemon/duckdb
 RUN echo "cache buster 32cf44c8-3258-4dc8-ae5d-8487003baa41"
 RUN apt-get update
 RUN apt-get -y install podman netavark rsync vim dput devscripts dh-make dput git uidmap dbus-user-session pinentry-tty tree python3 python3.12-venv
+
+# dependencies for podman library. https://podman.io/docs/installation#build-and-run-dependencies
+RUN apt-get -y install libbtrfs-dev libassuan-dev libc6-dev libdevmapper-dev libglib2.0-dev libgpgme-dev libgpg-error-dev libprotobuf-dev libprotobuf-c-dev libseccomp-dev libselinux1-dev libsystemd-dev
 RUN apt-get -y install golang-1.23 eg
 
 RUN ln -s /usr/lib/go-1.23/bin/go /usr/local/bin/go

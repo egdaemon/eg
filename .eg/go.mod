@@ -3,7 +3,7 @@ module eg/ci
 go 1.23.4
 
 require (
-	github.com/egdaemon/eg v0.0.0-20250116203235-b1eff2d7c40c
+	github.com/egdaemon/eg v0.0.0-20250116220655-6ec3ee590c22
 	github.com/egdaemon/wasinet/wasinet v0.0.0-20250107020126-be17492ab34e
 )
 

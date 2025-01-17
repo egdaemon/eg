@@ -36,8 +36,6 @@ type local struct {
 	Dirty            bool     `name:"dirty" help:"include user directories and environment variables" hidden:"true"`
 	EnvironmentPaths string   `name:"envpath" help:"environment files to pass to the module" default:""`
 	Environment      []string `name:"env" short:"e" help:"define environment variables and their values to be included"`
-	SSHAgent         bool     `name:"sshagent" help:"enable ssh agent" hidden:"true"`
-	GPGAgent         bool     `name:"gpgagent" help:"enable gpg agent" hidden:"true"`
 	GitRemote        string   `name:"git-remote" help:"name of the git remote to use" default:"${vars_git_default_remote_name}"`
 	GitReference     string   `name:"git-ref" help:"name of the branch or commit to checkout" default:"${vars_git_head_reference}"`
 	ContainerCache   string   `name:"croot" help:"container storage, ideally we'd be able to share with the host but for now" hidden:"true" default:"${vars_container_cache_directory}"`
@@ -56,7 +54,7 @@ func (t local) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err e
 		envvar     runners.AgentOption = runners.AgentOptionNoop
 		mounthome  runners.AgentOption = runners.AgentOptionNoop
 		privileged runners.AgentOption = runners.AgentOptionNoop
-		gpgmount   runners.AgentOption = runners.AgentOptionNoop
+		gnupghome  runners.AgentOption = runners.AgentOptionNoop
 		mountegbin runners.AgentOption = runners.AgentOptionEGBin(errorsx.Must(exec.LookPath(os.Args[0])))
 	)
 
@@ -97,7 +95,6 @@ func (t local) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err e
 		FromPath(t.EnvironmentPaths).
 		FromEnv(t.Environment...).
 		FromEnv(os.Environ()...).
-		FromEnv(eg.EnvComputeContainerExec).
 		FromEnviron(errorsx.Zero(gitx.LocalEnv(repo, t.GitRemote, t.GitReference))...).
 		Var(eg.EnvComputeBin, hotswapbin.String()).
 		Var(eg.EnvUnsafeCacheID, ws.CachedID).
@@ -105,27 +102,9 @@ func (t local) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err e
 
 	if t.Dirty {
 		mounthome = runners.AgentOptionAutoMountHome(homedir)
-	} else if t.GPGAgent {
-		gpgmount = runners.AgentOptionVolumes(
-			runners.AgentMountOverlay(filepath.Join(homedir, ".gnupg"), "/root/.gnupg"),
-		)
 	}
 
-	if t.SSHAgent {
-		sshmount = runners.AgentOptionVolumes(
-			runners.AgentMountOverlay(
-				filepath.Join(homedir, ".ssh"),
-				"/root/.ssh",
-			),
-			runners.AgentMountReadWrite(
-				envx.String("", "SSH_AUTH_SOCK"),
-				eg.DefaultRuntimeDirectory("ssh.agent.socket"),
-			),
-		)
-
-		sshenvvar = runners.AgentOptionEnv("SSH_AUTH_SOCK", eg.DefaultRuntimeDirectory("ssh.agent.socket"))
-		envb.Var("SSH_AUTH_SOCK", eg.DefaultRuntimeDirectory("ssh.agent.socket"))
-	}
+	gnupghome = runners.AgentOptionLocalGPGAgent(gctx.Context, envb)
 
 	if err = envb.CopyTo(environio); err != nil {
 		return errorsx.Wrap(err, "unable to generate environment")
@@ -177,7 +156,7 @@ func (t local) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err e
 		envvar,
 		sshmount,
 		sshenvvar,
-		gpgmount,
+		gnupghome,
 		mountegbin,
 		runners.AgentOptionVolumes(
 			runners.AgentMountReadWrite(filepath.Join(ws.Root, ws.CacheDir), eg.DefaultMountRoot(eg.CacheDirectory)),

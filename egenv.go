@@ -36,6 +36,7 @@ func EnvContainerAPIHostDefault() string {
 }
 
 const (
+	EnvPodmanSocket       = "EG_PODMAN_SOCKET"
 	EnvContainerHost      = "CONTAINER_HOST"
 	EnvEGSSHHost          = "EG_SSH_REVERSE_PROXY_HOST"
 	EnvEGSSHProxyDisabled = "EG_SSH_REVERSE_PROXY_DISABLED"

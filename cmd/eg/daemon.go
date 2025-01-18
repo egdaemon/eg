@@ -22,6 +22,8 @@ import (
 	"github.com/egdaemon/eg/runners"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/oauth2"
+
+	"github.com/libp2p/go-libp2p/core/peer"
 )
 
 type daemon struct {
@@ -46,6 +48,7 @@ func (t daemon) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 		httpl      net.Listener
 		grpcl      net.Listener
 		authclient *http.Client
+		p2pid      peer.ID
 	)
 	log.Println("running daemon initiated")
 	defer log.Println("running daemon completed")
@@ -66,7 +69,11 @@ func (t daemon) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 		return errorsx.Wrap(err, "unable to retrieve identity credentials")
 	}
 
-	if err = daemons.Register(gctx, tlsc, &t.runtimecfg, t.AccountID, t.MachineID, signer); err != nil {
+	if p2pid, err = daemons.P2PProxy(gctx.Context, append([]byte(machineID()), signer.PublicKey().Marshal()...), httpl); err != nil {
+		return errorsx.Wrap(err, "unable to initialize p2p")
+	}
+
+	if err = daemons.Register(gctx, tlsc, &t.runtimecfg, t.AccountID, t.MachineID, p2pid, signer); err != nil {
 		return err
 	}
 
@@ -92,7 +99,7 @@ func (t daemon) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 
 	go func() {
 		for {
-			if cause := daemons.Ping(gctx, tlsc, &t.runtimecfg, t.AccountID, t.MachineID, signer); cause != nil {
+			if cause := daemons.Ping(gctx, tlsc, &t.runtimecfg, t.AccountID, t.MachineID, p2pid, signer); cause != nil {
 				log.Println("ping failed", cause)
 			}
 

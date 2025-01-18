@@ -18,7 +18,7 @@ import (
 
 // configure the locally running instance of postgresql for use by local users.
 func Auto(ctx context.Context, _ eg.Op) (err error) {
-	runtime := shell.Runtime().Privileged()
+	runtime := shell.Runtime().Privileged().Timeout(5 * time.Second)
 	return shell.Run(
 		ctx,
 		runtime.New("pg_isready").Attempts(15), // 15 attempts = ~3seconds
@@ -44,7 +44,7 @@ func RecreateDatabase(name string) eg.OpFn {
 // Create a superuser with the provided name. Should be run after Auto has initialized the default user.
 func InsertSuperuser(name string) eg.OpFn {
 	return func(ctx context.Context, _ eg.Op) (err error) {
-		runtime := shell.Runtime().Privileged()
+		runtime := shell.Runtime().Privileged().Timeout(5 * time.Second)
 		return shell.Run(
 			ctx,
 			runtime.Newf("psql --no-psqlrc -d postgres -c \"CREATE ROLE \"%s\" WITH SUPERUSER LOGIN\"", name),
@@ -79,7 +79,7 @@ func AutoLocatePort(ctx context.Context) int {
 // if it can't determine the port it returns the default pg port 5432.
 func LocatePort(ctx context.Context, begin, end int) int {
 	for i := begin; i < end; i++ {
-		if err := shell.Run(ctx, shell.Newf("psql --no-psqlrc -U postgres -d postgres -p %d -q -At -c 'SELECT 1;' > /dev/null 2>&1", i)); err == nil {
+		if err := shell.Run(ctx, shell.Newf("psql --no-psqlrc -U postgres -d postgres -p %d -q -At -c 'SELECT 1;' > /dev/null 2>&1", i).Timeout(5*time.Second)); err == nil {
 			return i
 		}
 	}

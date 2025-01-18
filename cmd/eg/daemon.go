@@ -27,7 +27,7 @@ import (
 )
 
 type daemon struct {
-	runtimecfg    cmdopts.RuntimeResources
+	cmdopts.RuntimeResources
 	AccountID     string   `name:"account" help:"account to register runner with" default:"${vars_account_id}" required:"true"`
 	MachineID     string   `name:"machine" help:"unique id for this particular machine" default:"${vars_machine_id}" required:"true"`
 	Seed          string   `name:"seed" help:"seed for generating ssh credentials in a consistent manner" default:"${vars_entropy_seed}"`
@@ -59,7 +59,7 @@ func (t daemon) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 	runtimex.Umask(0002)
 
 	log.Println("cache directory", t.CacheDir)
-	log.Println("detected runtime configuration", spew.Sdump(t.runtimecfg))
+	log.Println("detected runtime configuration", spew.Sdump(t.RuntimeResources))
 
 	if httpl, err = net.Listen("tcp", "127.0.1.1:8093"); err != nil {
 		return err
@@ -73,7 +73,7 @@ func (t daemon) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 		return errorsx.Wrap(err, "unable to initialize p2p")
 	}
 
-	if err = daemons.Register(gctx, tlsc, &t.runtimecfg, t.AccountID, t.MachineID, p2pid, signer); err != nil {
+	if err = daemons.Register(gctx, tlsc, &t.RuntimeResources, t.AccountID, t.MachineID, p2pid, signer); err != nil {
 		return err
 	}
 
@@ -99,7 +99,7 @@ func (t daemon) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 
 	go func() {
 		for {
-			if cause := daemons.Ping(gctx, tlsc, &t.runtimecfg, t.AccountID, t.MachineID, p2pid, signer); cause != nil {
+			if cause := daemons.Ping(gctx, tlsc, &t.RuntimeResources, t.AccountID, t.MachineID, p2pid, signer); cause != nil {
 				log.Println("ping failed", cause)
 			}
 

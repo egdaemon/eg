@@ -42,7 +42,6 @@ type upload struct {
 	Environment   []string `name:"env" short:"e" help:"define environment variables and their values to be included"`
 	Dirty         bool     `name:"dirty" help:"include all environment variables"`
 	Endpoint      string   `name:"endpoint" help:"specify the endpoint to upload to" default:"${vars_endpoint}/c/q/" hidden:"true"`
-	Labels        []string `name:"labels" help:"custom labels required"`
 	GitRemote     string   `name:"git-remote" help:"name of the git remote to use" default:"${vars_git_default_remote_name}"`
 	GitReference  string   `name:"git-ref" help:"name of the branch or commit to checkout" default:"${vars_git_default_reference}"`
 	GitClone      string   `name:"git-clone-uri" help:"clone uri"`
@@ -165,6 +164,7 @@ func (t upload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 		Os:          t.RuntimeResources.OS,
 		AllowShared: t.HostedCompute,
 		VcsUri:      errorsx.Zero(gitx.CanonicalURI(repo, t.GitRemote)), // optionally set the vcsuri if we're inside a repository.
+		Labels:      append([]string{}, t.RuntimeResources.Labels...),
 	}, archiveio)
 	if err != nil {
 		return errorsx.Wrap(err, "unable to generate multipart upload")

@@ -1,0 +1,32 @@
+syntax = "proto3";
+
+package eg.compute;
+
+message Compute {
+  string id = 1 [ json_name = "id" ];
+  string cluster_id = 14 [ json_name = "cid" ];
+  string description = 3 [ json_name = "description" ];
+  string created_at = 5 [ json_name = "created_at" ];
+  string updated_at = 6 [ json_name = "updated_at" ];
+  string authzed_at = 7 [ json_name = "authzed_at" ];
+}
+
+message SearchRequest {
+  string query = 1 [ json_name = "query" ];
+  bool global = 2 [ json_name = "global" ];
+  string arch = 3 [ json_name = "arch" ];
+  string os = 4 [ json_name = "os" ];
+  uint64 cores = 5 [ json_name = "cores" ];
+  uint64 memory = 6 [ json_name = "memory" ];
+  uint64 vram = 7 [ json_name = "vram" ];
+  reserved 8 to 899;
+  uint64 offset = 900 [ json_name = "offset" ];
+  uint64 limit = 901 [ json_name = "limit" ];
+  reserved 902 to 999;
+  repeated string labels = 1000 [ json_name = "labels" ];
+}
+
+message SearchResponse {
+  SearchRequest next = 1 [ json_name = "next" ];
+  repeated Compute items = 2 [ json_name = "items" ];
+}

@@ -18,29 +18,43 @@ import (
 	"github.com/pkg/errors"
 )
 
-const defaultPerms = 0700 | os.ModeSetgid
+type SpoolOption func(*SpoolDirs)
 
-type SpoolDirs struct {
-	renamemux   *sync.Mutex
-	Downloading string
-	Queued      string
-	Running     string
-	Tombstoned  string
+func SpoolOptionPopLimit(n int) SpoolOption {
+	return func(sd *SpoolDirs) {
+		sd.poplimit = n
+	}
 }
 
-func DefaultSpoolDirs() SpoolDirs {
-	root := filepath.Join(userx.DefaultCacheDirectory(), "spool")
+type SpoolDirs struct {
+	defaultPerms fs.FileMode
+	renamemux    *sync.Mutex
+	Downloading  string
+	Queued       string
+	Running      string
+	Tombstoned   string
+	poplimit     int
+}
+
+func NewSpoolDir(root string) SpoolDirs {
+	const defaultPerms = 0700 | os.ModeSetgid
 	dirs := SpoolDirs{
-		renamemux:   &sync.Mutex{},
-		Downloading: filepath.Join(root, "d"),
-		Queued:      filepath.Join(root, "q"),
-		Running:     filepath.Join(root, "r"),
-		Tombstoned:  filepath.Join(root, "t"),
+		defaultPerms: defaultPerms,
+		renamemux:    &sync.Mutex{},
+		Downloading:  filepath.Join(root, "d"),
+		Queued:       filepath.Join(root, "q"),
+		Running:      filepath.Join(root, "r"),
+		Tombstoned:   filepath.Join(root, "t"),
+		poplimit:     100,
 	}
 
 	errorsx.Log(errors.Wrap(fsx.MkDirs(defaultPerms, dirs.Downloading, dirs.Queued, dirs.Running, dirs.Tombstoned), "unable to make spool directories"))
 
 	return dirs
+}
+
+func DefaultSpoolDirs() SpoolDirs {
+	return NewSpoolDir(userx.DefaultCacheDirectory("spool"))
 }
 
 func iddirname(uid uuid.UUID) string {
@@ -52,7 +66,7 @@ func (t SpoolDirs) Download(uid uuid.UUID, name string, content io.Reader) (err 
 		dst *os.File
 	)
 
-	if err = os.MkdirAll(filepath.Join(t.Downloading, iddirname(uid)), defaultPerms); err != nil {
+	if err = os.MkdirAll(filepath.Join(t.Downloading, iddirname(uid)), t.defaultPerms); err != nil {
 		return err
 	}
 
@@ -73,13 +87,13 @@ func (t SpoolDirs) Enqueue(uid uuid.UUID) (err error) {
 }
 
 func (t SpoolDirs) Dequeue() (_ string, err error) {
-	for {
-		dir, err := pop(t.Queued)
+	for i := 0; i < 100; i++ {
+		dir, err := pop(t.Queued, t.poplimit)
 		if err != nil {
 			return "", err
 		}
 
-		if err = t.dequeueRename(dir); fsx.ErrIsNotExist(err) != nil {
+		if err = t.dequeueRename(dir); fsx.ErrIsNotExist(err) != nil || os.IsExist(err) {
 			continue
 		} else if err != nil {
 			return "", err
@@ -87,6 +101,8 @@ func (t SpoolDirs) Dequeue() (_ string, err error) {
 
 		return filepath.Join(t.Running, dir.Name()), nil
 	}
+
+	return "", errors.Errorf("exhausted dequeue attempts, try later")
 }
 
 func (t SpoolDirs) dequeueRename(dir fs.DirEntry) error {
@@ -118,14 +134,14 @@ func (t SpoolDirs) Completed(uid uuid.UUID) (err error) {
 	)
 }
 
-func pop(dir string) (popped fs.DirEntry, err error) {
+func pop(dir string, n int) (popped fs.DirEntry, err error) {
 	dirfs, err := os.Open(dir)
 	if err != nil {
 		return nil, err
 	}
 	defer dirfs.Close()
 
-	entries, err := dirfs.ReadDir(100)
+	entries, err := dirfs.ReadDir(n)
 	if err != nil {
 		return nil, err
 	}

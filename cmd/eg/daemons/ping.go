@@ -16,9 +16,11 @@ import (
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/oauth2"
 	"golang.org/x/time/rate"
+
+	"github.com/libp2p/go-libp2p/core/peer"
 )
 
-func Ping(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, runtimecfg *cmdopts.RuntimeResources, aid, machineid string, s ssh.Signer) (err error) {
+func Ping(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, runtimecfg *cmdopts.RuntimeResources, aid, machineid string, p2pid peer.ID, s ssh.Signer) (err error) {
 	fingerprint := ssh.FingerprintSHA256(s.PublicKey())
 	log.Println("periodic ping initiated", aid, machineid, fingerprint)
 	defer log.Println("periodic ping completed", aid, machineid, fingerprint)
@@ -38,7 +40,7 @@ func Ping(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, runtimecfg *cmdopts.Run
 	r := rate.NewLimiter(rate.Every(envx.Duration(5*time.Minute, eg.EnvPingMinimumDelay)), 1)
 
 	req := registration.PingRequest{
-		Registration: genregistration(s, runtimecfg),
+		Registration: genregistration(s, p2pid, runtimecfg),
 	}
 
 	for err := r.Wait(gctx.Context); err == nil; err = r.Wait(gctx.Context) {

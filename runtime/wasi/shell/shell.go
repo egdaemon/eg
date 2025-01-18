@@ -187,17 +187,16 @@ func Run(ctx context.Context, cmds ...Command) (err error) {
 }
 
 func retry(ctx context.Context, c Command, do func() error) (err error) {
-	retries := c.attempts
-	switch retries {
-	case 1:
+	attempts := c.attempts
+	switch attempts {
+	case 0, 1: // handle zero and single attempt case. 0 attempts makes no sense, so assume 1.
 		return do()
-	case 0:
-		return do()
-	case -1:
-		retries = math.MaxInt16
+	case -1: // unlimited attempts.
+		attempts = math.MaxInt16
+	default:
 	}
 
-	for i := int16(0); i < retries; i++ {
+	for i := int16(0); i < attempts; i++ {
 		if cause := do(); cause == nil {
 			return nil
 		} else {

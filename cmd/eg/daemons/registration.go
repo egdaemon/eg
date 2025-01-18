@@ -25,19 +25,20 @@ import (
 
 func genregistration(s ssh.Signer, p2pid peer.ID, runtimecfg *cmdopts.RuntimeResources) *registration.Registration {
 	return &registration.Registration{
+		P2Pid:       p2pid.String(),
 		Description: fmt.Sprintf("%s - %s", systemx.HostnameOrDefault("unknown.eg.lan"), ssh.FingerprintSHA256(s.PublicKey())),
 		Os:          runtimecfg.OS,
 		Arch:        runtimecfg.Arch,
 		Cores:       runtimecfg.Cores,
 		Memory:      runtimecfg.Memory,
 		Publickey:   s.PublicKey().Marshal(),
-		Labels:      []string{},
+		Labels:      append([]string{}, runtimecfg.Labels...),
 	}
 }
 
 func Register(global *cmdopts.Global, tlsc *cmdopts.TLSConfig, runtimecfg *cmdopts.RuntimeResources, aid, machineid string, p2pid peer.ID, s ssh.Signer) (err error) {
 	fingerprint := ssh.FingerprintSHA256(s.PublicKey())
-	log.Println("registering daemon with control plane initiated", aid, machineid, fingerprint)
+	log.Println("registering daemon with control plane initiated", aid, machineid, fingerprint, p2pid.String())
 	defer log.Println("registering daemon with control plane completed", aid, machineid, fingerprint)
 
 	if stringsx.Blank(aid) {

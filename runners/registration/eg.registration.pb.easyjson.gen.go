@@ -543,6 +543,8 @@ func easyjsonDabade4DecodeGithubComEgdaemonEgRunnersRegistration6(in *jlexer.Lex
 			out.AuthzedAt = string(in.String())
 		case "expires_at":
 			out.ExpiresAt = string(in.String())
+		case "p2pid":
+			out.P2Pid = string(in.String())
 		case "os":
 			out.Os = string(in.String())
 		case "arch":
@@ -633,6 +635,16 @@ func easyjsonDabade4EncodeGithubComEgdaemonEgRunnersRegistration6(out *jwriter.W
 			out.RawString(prefix)
 		}
 		out.String(string(in.ExpiresAt))
+	}
+	if in.P2Pid != "" {
+		const prefix string = ",\"p2pid\":"
+		if first {
+			first = false
+			out.RawString(prefix[1:])
+		} else {
+			out.RawString(prefix)
+		}
+		out.String(string(in.P2Pid))
 	}
 	if in.Os != "" {
 		const prefix string = ",\"os\":"

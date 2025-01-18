@@ -8,7 +8,8 @@ message Registration {
   bytes publickey = 3 [ json_name = "pkey" ];
   string authzed_at = 4 [ json_name = "authzed_at" ];
   string expires_at = 5 [ json_name = "expires_at" ];
-  reserved 6 to 899;
+  string p2pid = 6 [ json_name = "p2pid" ];
+  reserved 7 to 899;
   string os = 900 [ json_name = "os" ];
   string arch = 901 [ json_name = "arch" ]; // the native architecture.
   uint64 cores = 902 [ json_name = "cores" ];

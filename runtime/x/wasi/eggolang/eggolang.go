@@ -170,17 +170,88 @@ func (toption) BuildOptions(b buildOption) toption {
 	}
 }
 
+// Randomize execution order of the tests using the provided seed value.
+// defaults to on.
+// 0 = off
+// 1 = on
+// N = seed
+func (toption) Randomize(seed int) toption {
+	return func(o *testOption) {
+		switch seed {
+		case 0:
+			o.randomize = "-shuffle off"
+		case 1:
+			o.randomize = "-shuffle on"
+		default:
+			o.randomize = fmt.Sprintf("-shuffle %d", seed)
+		}
+	}
+}
+
+// The number of times to run the test suite.
+// 0 uses go test default.
+func (toption) Count(n int) toption {
+	return func(o *testOption) {
+		switch n {
+		case 0:
+			o.count = ""
+		default:
+			o.count = fmt.Sprintf("-count %d", n)
+		}
+	}
+}
+
+// used to disable golang test caching.
+// short for Count(1) see go help test.
+// will only be applied if count is unset.
+func (t toption) NoCache(o *testOption) {
+	if stringsx.Present(o.count) {
+		return
+	}
+
+	t.Count(1)(o)
+}
+
+func (toption) Verbose(b bool) toption {
+	return func(o *testOption) {
+		if b {
+			o.verbose = "-v"
+		} else {
+			o.verbose = ""
+		}
+	}
+}
+
 type testOption struct {
 	buildOption
+	count     string
+	randomize string
+	verbose   string
+}
+
+func (t testOption) options() (dst []string) {
+	ignoreEmpty := func(dst []string, o string) []string {
+		if stringsx.Blank(o) {
+			return dst
+		}
+
+		return append(dst, o)
+	}
+	dst = t.buildOption.options()
+	dst = ignoreEmpty(dst, t.randomize)
+	dst = ignoreEmpty(dst, t.count)
+	dst = ignoreEmpty(dst, t.verbose)
+
+	return dst
 }
 
 func AutoTest(options ...toption) eg.OpFn {
 	var (
-		opts testOption
+		opts = testOption{}
 	)
 
 	opts = langx.Clone(opts, options...)
-	flags := stringsx.Join(" ", opts.buildOption.options()...)
+	flags := stringsx.Join(" ", opts.options()...)
 
 	return eg.OpFn(func(ctx context.Context, _ eg.Op) (err error) {
 		var (

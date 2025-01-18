@@ -20,6 +20,6 @@ func Command(ctx context.Context, dir string, environ []string, cmd string, args
 			cmdptr, cmdlen,
 			argsptr, argslen, argssize,
 		),
-		fmt.Errorf("unable to execute command"),
+		fmt.Errorf("unable to execute command: %s", cmd),
 	)
 }

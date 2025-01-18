@@ -12,7 +12,8 @@ import (
 	"github.com/egdaemon/eg/runtime/wasi/egunsafe/ffiexec"
 )
 
-type entrypoint func(ctx context.Context, user string, group string, cmd string, directory string, environ []string) (err error)
+type execer func(ctx context.Context, dir string, environ []string, cmd string, args []string) error
+type entrypoint func(ctx context.Context, user string, group string, cmd string, directory string, environ []string, do execer) (err error)
 
 type Command struct {
 	user      string
@@ -24,6 +25,7 @@ type Command struct {
 	attempts  int16
 	lenient   bool
 	entry     entrypoint
+	exec      execer
 }
 
 // number of attempts to make before giving up.
@@ -81,13 +83,19 @@ func (t Command) Group(g string) Command {
 	return t
 }
 
-// shorthand for As("") which runs the command as root.
-func (t Command) Privileged() Command {
-	t.user = "root"
-	t.group = "root"
+// convience function that sets both user and group to the provided value.
+func (t Command) As(u string) Command {
+	t.user = u
+	t.group = u
 	return t
 }
 
+// specialized for As("root") which runs the command as root.
+func (t Command) Privileged() Command {
+	return t.As("root")
+}
+
+// Internal use only not under compatability promises.
 func (t Command) UnsafeEntrypoint(e entrypoint) Command {
 	t.entry = e
 	return t
@@ -124,6 +132,7 @@ func New(cmd string) Command {
 		cmd:     cmd,
 		timeout: 5 * time.Minute,
 		entry:   run,
+		exec:    ffiexec.Command,
 	}
 }
 
@@ -161,7 +170,7 @@ func Run(ctx context.Context, cmds ...Command) (err error) {
 			cctx, done := context.WithTimeout(ctx, cmd.timeout)
 			defer done()
 
-			if cause := cmd.entry(cctx, cmd.user, cmd.group, cmd.cmd, cmd.directory, cmd.environ); cmd.lenient && cause != nil {
+			if cause := cmd.entry(cctx, cmd.user, cmd.group, cmd.cmd, cmd.directory, cmd.environ, cmd.exec); cmd.lenient && cause != nil {
 				log.Println("command failed, but lenient mode enable, ignoring", err)
 				return nil
 			} else if cause != nil {
@@ -205,7 +214,7 @@ func retry(ctx context.Context, c Command, do func() error) (err error) {
 	return err
 }
 
-func run(ctx context.Context, user string, group string, cmd string, directory string, environ []string) (err error) {
+func run(ctx context.Context, user string, group string, cmd string, directory string, environ []string, exec execer) (err error) {
 	scmd := []string{"-E", "-H", "-u", user, "-g", group, "bash", "-c", cmd}
-	return ffiexec.Command(ctx, directory, environ, "sudo", scmd)
+	return exec(ctx, directory, environ, "sudo", scmd)
 }

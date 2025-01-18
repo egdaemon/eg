@@ -43,6 +43,10 @@ const (
 	EnvEGSSHHostDefault   = "api.egdaemon.com:8090"
 )
 
+const (
+	EnvP2PProxyDisabled = "EG_P2P_PROXY_DISABLED"
+)
+
 // Logging settings
 const (
 	EnvLogsInfo    = "EG_LOGS_INFO"    // enable logging for info statements. boolean, see strconv.ParseBool for valid values.

@@ -19,9 +19,11 @@ import (
 	"github.com/golang-jwt/jwt/v4"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/time/rate"
+
+	"github.com/libp2p/go-libp2p/core/peer"
 )
 
-func genregistration(s ssh.Signer, runtimecfg *cmdopts.RuntimeResources) *registration.Registration {
+func genregistration(s ssh.Signer, p2pid peer.ID, runtimecfg *cmdopts.RuntimeResources) *registration.Registration {
 	return &registration.Registration{
 		Description: fmt.Sprintf("%s - %s", systemx.HostnameOrDefault("unknown.eg.lan"), ssh.FingerprintSHA256(s.PublicKey())),
 		Os:          runtimecfg.OS,
@@ -33,7 +35,7 @@ func genregistration(s ssh.Signer, runtimecfg *cmdopts.RuntimeResources) *regist
 	}
 }
 
-func Register(global *cmdopts.Global, tlsc *cmdopts.TLSConfig, runtimecfg *cmdopts.RuntimeResources, aid, machineid string, s ssh.Signer) (err error) {
+func Register(global *cmdopts.Global, tlsc *cmdopts.TLSConfig, runtimecfg *cmdopts.RuntimeResources, aid, machineid string, p2pid peer.ID, s ssh.Signer) (err error) {
 	fingerprint := ssh.FingerprintSHA256(s.PublicKey())
 	log.Println("registering daemon with control plane initiated", aid, machineid, fingerprint)
 	defer log.Println("registering daemon with control plane completed", aid, machineid, fingerprint)
@@ -71,7 +73,7 @@ func Register(global *cmdopts.Global, tlsc *cmdopts.TLSConfig, runtimecfg *cmdop
 		)
 
 		regreq := &registration.RegistrationRequest{
-			Registration: genregistration(s, runtimecfg),
+			Registration: genregistration(s, p2pid, runtimecfg),
 		}
 
 		reg, err := rc.Registration(global.Context, regreq)

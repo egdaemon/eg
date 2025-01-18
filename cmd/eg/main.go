@@ -71,7 +71,6 @@ func main() {
 		cmdopts.Global
 		cmdopts.TLSConfig
 		Version            cmdopts.Version              `cmd:"" help:"display versioning information"`
-		Downloader         downloader                   `cmd:"" help:"downloader and command and control process for decoupling the daemon from the controller" hidden:"true"`
 		Compute            compute.Cmd                  `cmd:"" help:"commands for running compute workloads"`
 		Module             module                       `cmd:"" help:"executes a compiled module directly" hidden:"true"`
 		Wasi               wasiCmd                      `cmd:"" help:"run a standalone wasi module" hidden:"true"`

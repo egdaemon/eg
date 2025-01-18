@@ -2,10 +2,12 @@ package testx
 
 import (
 	"bytes"
+	"context"
 	"crypto/md5"
 	"io"
 	"os"
 	"path/filepath"
+	"testing"
 
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/gofrs/uuid"
@@ -66,4 +68,12 @@ func IOString(in io.Reader) string {
 
 func IOBytes(in io.Reader) []byte {
 	return errorsx.Must(io.ReadAll(in))
+}
+
+func Context(t *testing.T) (context.Context, context.CancelFunc) {
+	if deadline, ok := t.Deadline(); ok {
+		return context.WithDeadline(context.Background(), deadline)
+	}
+
+	return context.WithCancel(context.Background())
 }

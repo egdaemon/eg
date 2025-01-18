@@ -202,7 +202,9 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 			ws,
 			c8s.ServiceProxyOptionCommandEnviron(
 				errorsx.Zero(
-					envx.Build().FromEnv(
+					envx.Build().Var(
+						"PAGER", "", // no paging in this environmenet.
+					).FromEnv(
 						"PATH",
 						"TERM",
 						"COLORTERM",

@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"io"
+	"log"
 	"os/exec"
 	"time"
 
@@ -17,6 +18,8 @@ import (
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/execx"
 	"github.com/egdaemon/eg/internal/langx"
+
+	"github.com/mattn/go-tty"
 )
 
 func silence(c *exec.Cmd) *exec.Cmd {
@@ -146,6 +149,12 @@ func moduleExec(ctx context.Context, cname, moduledir string, stdin io.Reader, s
 		result *define.InspectExecSession
 	)
 
+	pty, err := tty.Open()
+	if err != nil {
+		return err
+	}
+	defer pty.Close()
+
 	id, err := containers.ExecCreate(ctx, cname, &handlers.ExecCreateConfig{
 		ExecConfig: container.ExecOptions{
 			Tty:          stdin != nil,
@@ -168,10 +177,26 @@ func moduleExec(ctx context.Context, cname, moduledir string, stdin io.Reader, s
 		errorsx.Log(errorsx.Wrap(containers.ExecRemove(ctx, id, &containers.ExecRemoveOptions{Force: langx.Autoptr(true)}), "failed to remove exec session"))
 	}()
 
+	go func() {
+		var buf [1024]byte
+		if _, err = io.CopyBuffer(stdout, pty.Output(), buf[:]); err != nil {
+			log.Println("pty copy output failed", err)
+		}
+	}()
+
+	if stdin != nil {
+		go func() {
+			var buf [1024]byte
+			if _, err = io.CopyBuffer(pty.Input(), stdin, buf[:]); err != nil {
+				log.Println("pty copy output failed", err)
+			}
+		}()
+	}
+
 	err = containers.ExecStartAndAttach(ctx, id, &containers.ExecStartAndAttachOptions{
-		OutputStream: langx.Autoptr(io.Writer(stdout)),
+		OutputStream: langx.Autoptr(io.Writer(pty.Output())),
 		ErrorStream:  langx.Autoptr(io.Writer(stderr)),
-		InputStream:  bufio.NewReader(stdin),
+		InputStream:  bufio.NewReader(pty.Input()),
 		AttachOutput: langx.Autoptr(true),
 		AttachError:  langx.Autoptr(true),
 		AttachInput:  langx.Autoptr(stdin != nil),

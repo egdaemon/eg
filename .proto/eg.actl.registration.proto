@@ -20,7 +20,9 @@ message Registration {
 message PingRequest {
   Registration registration = 1 [ json_name = "registration" ];
 }
-message PingResponse {}
+message PingResponse {
+  repeated string bootstrap = 1000 [ json_name = "bootstrap" ];
+}
 
 message RegistrationRequest {
   Registration registration = 1 [ json_name = "registration" ];
@@ -28,6 +30,7 @@ message RegistrationRequest {
 
 message RegistrationResponse {
   Registration registration = 1 [ json_name = "registration" ];
+  repeated string bootstrap = 1000 [ json_name = "bootstrap" ];
 }
 
 message RegistrationGrantRequest {

@@ -214,6 +214,29 @@ func easyjsonDabade4DecodeGithubComEgdaemonEgRunnersRegistration2(in *jlexer.Lex
 				}
 				(*out.Registration).UnmarshalEasyJSON(in)
 			}
+		case "bootstrap":
+			if in.IsNull() {
+				in.Skip()
+				out.Bootstrap = nil
+			} else {
+				in.Delim('[')
+				if out.Bootstrap == nil {
+					if !in.IsDelim(']') {
+						out.Bootstrap = make([]string, 0, 4)
+					} else {
+						out.Bootstrap = []string{}
+					}
+				} else {
+					out.Bootstrap = (out.Bootstrap)[:0]
+				}
+				for !in.IsDelim(']') {
+					var v4 string
+					v4 = string(in.String())
+					out.Bootstrap = append(out.Bootstrap, v4)
+					in.WantComma()
+				}
+				in.Delim(']')
+			}
 		default:
 			in.SkipRecursive()
 		}
@@ -233,6 +256,25 @@ func easyjsonDabade4EncodeGithubComEgdaemonEgRunnersRegistration2(out *jwriter.W
 		first = false
 		out.RawString(prefix[1:])
 		(*in.Registration).MarshalEasyJSON(out)
+	}
+	if len(in.Bootstrap) != 0 {
+		const prefix string = ",\"bootstrap\":"
+		if first {
+			first = false
+			out.RawString(prefix[1:])
+		} else {
+			out.RawString(prefix)
+		}
+		{
+			out.RawByte('[')
+			for v5, v6 := range in.Bootstrap {
+				if v5 > 0 {
+					out.RawByte(',')
+				}
+				out.String(string(v6))
+			}
+			out.RawByte(']')
+		}
 	}
 	out.RawByte('}')
 }
@@ -569,9 +611,9 @@ func easyjsonDabade4DecodeGithubComEgdaemonEgRunnersRegistration6(in *jlexer.Lex
 					out.Labels = (out.Labels)[:0]
 				}
 				for !in.IsDelim(']') {
-					var v5 string
-					v5 = string(in.String())
-					out.Labels = append(out.Labels, v5)
+					var v8 string
+					v8 = string(in.String())
+					out.Labels = append(out.Labels, v8)
 					in.WantComma()
 				}
 				in.Delim(']')
@@ -696,11 +738,11 @@ func easyjsonDabade4EncodeGithubComEgdaemonEgRunnersRegistration6(out *jwriter.W
 		}
 		{
 			out.RawByte('[')
-			for v8, v9 := range in.Labels {
-				if v8 > 0 {
+			for v11, v12 := range in.Labels {
+				if v11 > 0 {
 					out.RawByte(',')
 				}
-				out.String(string(v9))
+				out.String(string(v12))
 			}
 			out.RawByte(']')
 		}
@@ -750,6 +792,29 @@ func easyjsonDabade4DecodeGithubComEgdaemonEgRunnersRegistration7(in *jlexer.Lex
 			continue
 		}
 		switch key {
+		case "bootstrap":
+			if in.IsNull() {
+				in.Skip()
+				out.Bootstrap = nil
+			} else {
+				in.Delim('[')
+				if out.Bootstrap == nil {
+					if !in.IsDelim(']') {
+						out.Bootstrap = make([]string, 0, 4)
+					} else {
+						out.Bootstrap = []string{}
+					}
+				} else {
+					out.Bootstrap = (out.Bootstrap)[:0]
+				}
+				for !in.IsDelim(']') {
+					var v13 string
+					v13 = string(in.String())
+					out.Bootstrap = append(out.Bootstrap, v13)
+					in.WantComma()
+				}
+				in.Delim(']')
+			}
 		default:
 			in.SkipRecursive()
 		}
@@ -764,6 +829,21 @@ func easyjsonDabade4EncodeGithubComEgdaemonEgRunnersRegistration7(out *jwriter.W
 	out.RawByte('{')
 	first := true
 	_ = first
+	if len(in.Bootstrap) != 0 {
+		const prefix string = ",\"bootstrap\":"
+		first = false
+		out.RawString(prefix[1:])
+		{
+			out.RawByte('[')
+			for v14, v15 := range in.Bootstrap {
+				if v14 > 0 {
+					out.RawByte(',')
+				}
+				out.String(string(v15))
+			}
+			out.RawByte(']')
+		}
+	}
 	out.RawByte('}')
 }
 

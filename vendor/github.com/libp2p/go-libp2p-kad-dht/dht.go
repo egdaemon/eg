@@ -496,14 +496,11 @@ func (dht *IpfsDHT) fixLowPeers() {
 		return
 	}
 
-	logger.Warn("CHECKPOINT 0")
 	// we try to add all peers we are connected to to the Routing Table
 	// in case they aren't already there.
 	for _, p := range dht.host.Network().Peers() {
-		logger.Warn("ADDING", p)
 		dht.peerFound(p)
 	}
-	logger.Warn("CHECKPOINT 2")
 
 	// TODO Active Bootstrapping
 	// We should first use non-bootstrap peers we knew of from previous

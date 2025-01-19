@@ -11,16 +11,16 @@ import (
 	"github.com/egdaemon/eg/compute"
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
+	"github.com/egdaemon/eg/internal/libp2px"
 	"github.com/egdaemon/eg/internal/stringsx"
 	"github.com/egdaemon/eg/runners/registration"
+	"github.com/libp2p/go-libp2p/core/host"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/oauth2"
 	"golang.org/x/time/rate"
-
-	"github.com/libp2p/go-libp2p/core/peer"
 )
 
-func Ping(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, runtimecfg *cmdopts.RuntimeResources, aid, machineid string, p2pid peer.ID, s ssh.Signer) (err error) {
+func Ping(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, runtimecfg *cmdopts.RuntimeResources, aid, machineid string, p2p host.Host, s ssh.Signer) (err error) {
 	fingerprint := ssh.FingerprintSHA256(s.PublicKey())
 	log.Println("periodic ping initiated", aid, machineid, fingerprint)
 	defer log.Println("periodic ping completed", aid, machineid, fingerprint)
@@ -40,13 +40,21 @@ func Ping(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, runtimecfg *cmdopts.Run
 	r := rate.NewLimiter(rate.Every(envx.Duration(5*time.Minute, eg.EnvPingMinimumDelay)), 1)
 
 	req := registration.PingRequest{
-		Registration: genregistration(s, p2pid, runtimecfg),
+		Registration: genregistration(s, p2p.ID(), runtimecfg),
 	}
 
 	for err := r.Wait(gctx.Context); err == nil; err = r.Wait(gctx.Context) {
-		if _, cause := rc.Request(gctx.Context, machineid, &req); cause != nil {
+		if resp, cause := rc.Request(gctx.Context, machineid, &req); cause != nil {
 			log.Println("ping failed", cause)
 			continue
+		} else {
+			// connect to new bootstrapping servers when detected
+			errorsx.Log(
+				errorsx.Wrap(
+					libp2px.Connect(gctx.Context, p2p, libp2px.StringsToPeers(resp.Bootstrap...)...),
+					"unable to connect to bootstrap node",
+				),
+			)
 		}
 	}
 

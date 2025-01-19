@@ -144,7 +144,7 @@ func (t debugpacketconn) WriteTo(b []byte, addr net.Addr) (n int, err error) {
 	return t.PacketConn.WriteTo(b, addr)
 }
 
-func Proxy(ctx context.Context, src, dst net.Conn) error {
+func Proxy(ctx context.Context, src, dst io.ReadWriter) error {
 	var (
 		errors chan error
 	)
@@ -168,7 +168,7 @@ func Proxy(ctx context.Context, src, dst net.Conn) error {
 	return errorsx.Compact(<-errors, <-errors)
 }
 
-func proxyConn(done context.CancelFunc, from, to net.Conn) (err error) {
+func proxyConn(done context.CancelFunc, from io.Reader, to io.Writer) (err error) {
 	defer done()
 
 	if _, err = io.Copy(to, from); err != nil {

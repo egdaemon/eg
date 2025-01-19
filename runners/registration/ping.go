@@ -48,5 +48,9 @@ func (t PingClient) Request(ctx context.Context, id string, req *PingRequest) (_
 		return nil, err
 	}
 
+	if err = json.NewDecoder(httpresp.Body).Decode(&resp); err != nil {
+		return nil, err
+	}
+
 	return &resp, nil
 }

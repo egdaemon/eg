@@ -1,4 +1,4 @@
-//go:build !wasip1
+//go:build !wasip1 && (linux || darwin)
 
 package wasip1syscall
 
@@ -12,10 +12,6 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-var (
-	afmap = _AFFamilyMap{}
-)
-
 func init() {
 	afmap.UNSPEC = syscall.AF_UNSPEC
 	afmap.UNIX = syscall.AF_UNIX
@@ -23,13 +19,11 @@ func init() {
 	afmap.INET6 = syscall.AF_INET6
 }
 
-func AF() _AFFamilyMap {
-	return afmap
-}
+type NativeSocket = unix.Sockaddr
 
 func ReadSockaddr(
 	m ffi.Memory, addr unsafe.Pointer, addrlen uint32,
-) (unix.Sockaddr, error) {
+) (NativeSocket, error) {
 	var wsa RawSocketAddress
 	wsaptr, _ := ffi.Pointer(&wsa)
 	if err := ffi.RawRead(m, ffi.Native{}, wsaptr, addr, addrlen); err != nil {
@@ -39,7 +33,7 @@ func ReadSockaddr(
 	return UnixSockaddr(wsa)
 }
 
-func UnixSockaddr(v RawSocketAddress) (sa unix.Sockaddr, err error) {
+func UnixSockaddr(v RawSocketAddress) (sa NativeSocket, err error) {
 	wsa, err := rawtosockaddr(&v)
 	if err != nil {
 		return nil, err
@@ -57,7 +51,7 @@ func UnixSockaddr(v RawSocketAddress) (sa unix.Sockaddr, err error) {
 	}
 }
 
-func Sockaddr(sa unix.Sockaddr) (zero *RawSocketAddress, error error) {
+func Sockaddr(sa NativeSocket) (zero *RawSocketAddress, error error) {
 	switch t := sa.(type) {
 	case *unix.SockaddrInet4:
 		a := addressany[addrip4]{

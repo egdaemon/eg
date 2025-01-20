@@ -1,4 +1,4 @@
-//go:build !wasip1
+//go:build !wasip1 && !windows
 
 package wnetruntime
 
@@ -6,10 +6,7 @@ import (
 	"context"
 	"net"
 	"net/netip"
-	"syscall"
 
-	"github.com/egdaemon/wasinet/wasinet/ffi"
-	"github.com/egdaemon/wasinet/wasinet/internal/errorsx"
 	"github.com/egdaemon/wasinet/wasinet/internal/langx"
 	"golang.org/x/sys/unix"
 )
@@ -73,13 +70,6 @@ type network struct {
 	allow []netip.Prefix
 }
 
-func (t network) Open(ctx context.Context, af, socktype, protocol int) (fd int, err error) {
-	// slog.Log(ctx, slog.LevelDebug, "sock_open", slog.Int("af", af), slog.Int("socktype", socktype), slog.Int("protocol", protocol))
-	// syscall.SOCK_NONBLOCK|syscall.SOCK_CLOEXEC are required by golang's runtime for the pollfd to operate correctly.
-	// as a result we unconditionally set them here.
-	return unix.Socket(af, socktype|syscall.SOCK_NONBLOCK|syscall.SOCK_CLOEXEC, protocol)
-}
-
 func (t network) Bind(ctx context.Context, fd int, sa unix.Sockaddr) error {
 	// slog.Log(ctx, slog.LevelDebug, "sock_bind", slog.Int("fd", fd), slog.String("addr", fmt.Sprintf("%v", sa)))
 	return unix.Bind(fd, sa)
@@ -108,40 +98,6 @@ func (t network) LocalAddr(ctx context.Context, fd int) (unix.Sockaddr, error) {
 func (t network) PeerAddr(ctx context.Context, fd int) (_ unix.Sockaddr, err error) {
 	// slog.Log(ctx, slog.LevelDebug, "sock_peeraddr", slog.Int("fd", fd))
 	return unix.Getpeername(fd)
-}
-
-func (t network) SetSocketOption(ctx context.Context, fd int, level, name int, value []byte) error {
-	switch name {
-	case syscall.SO_LINGER, syscall.SO_RCVTIMEO, syscall.SO_SNDTIMEO:
-		v := &unix.Timeval{}
-		vptr, vlen := ffi.Slice(value)
-		tvptr, _ := ffi.Pointer(v)
-		if err := ffi.RawRead(ffi.Native{}, ffi.Native{}, tvptr, vptr, vlen); err != nil {
-			return err
-		}
-		errno := unix.SetsockoptTimeval(fd, level, name, v)
-		// slog.Log(ctx, slog.LevelDebug, "sock_setsockopt_timeval", slog.Int("fd", fd), slog.Int("level", level), slog.Int("name", name), slog.Any("value", v), slog.Int("errno", int(ffierrors.Errno(errno))))
-		return errno
-	case syscall.SO_BINDTODEVICE: // this is untested.
-		value := errorsx.Must(ffi.StringReadNative(ffi.Slice(value)))
-		// slog.Log(ctx, slog.LevelDebug, "sock_setsockopt_string", slog.Int("fd", fd), slog.Int("level", level), slog.Int("name", name), slog.String("value", value))
-		return unix.SetsockoptString(fd, level, name, string(value))
-	default:
-		value := errorsx.Must(ffi.Uint32ReadNative(ffi.Slice(value)))
-		// slog.Log(ctx, slog.LevelDebug, "sock_setsockopt_int", slog.Int("fd", fd), slog.Int("level", level), slog.Int("name", name), slog.Uint64("value", uint64(value)))
-		return unix.SetsockoptInt(fd, level, name, int(value))
-	}
-}
-
-func (t network) GetSocketOption(ctx context.Context, fd int, level, name int, value []byte) (any, error) {
-	switch name {
-	case syscall.SO_LINGER:
-		return unix.Timeval{}, syscall.ENOTSUP
-	case syscall.SO_BINDTODEVICE:
-		return "", syscall.ENOTSUP
-	default:
-		return unix.GetsockoptInt(int(fd), int(level), int(name))
-	}
 }
 
 func (t network) Shutdown(ctx context.Context, fd, how int) error {

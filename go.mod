@@ -10,12 +10,11 @@ require (
 	github.com/alitto/pond/v2 v2.1.6
 	github.com/containers/podman/v5 v5.3.1
 	github.com/coreos/go-systemd/v22 v22.5.1-0.20231103132048-7d375ecc2b09
-	github.com/creack/pty v1.1.24
 	github.com/dave/jennifer v1.7.1
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
 	github.com/docker/docker v27.5.0+incompatible
 	github.com/dominikbraun/graph v0.23.0
-	github.com/egdaemon/wasinet/wasinet v0.0.0-20250107020126-be17492ab34e
+	github.com/egdaemon/wasinet/wasinet v0.0.0-20250120175550-4106c2611afa
 	github.com/egdaemon/wasinet/wazeronet v0.0.0-20250107020126-be17492ab34e
 	github.com/fsnotify/fsnotify v1.8.0
 	github.com/go-git/go-git/v5 v5.13.1
@@ -50,6 +49,7 @@ require (
 )
 
 require (
+	github.com/creack/pty v1.1.24 // indirect
 	github.com/hashicorp/golang-lru v1.0.2 // indirect
 	github.com/ipfs/boxo v0.26.0 // indirect
 	github.com/ipld/go-ipld-prime v0.21.0 // indirect

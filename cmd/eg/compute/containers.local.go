@@ -155,12 +155,9 @@ func (t c8sLocal) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (er
 			runners.AgentMountReadWrite(t.ContainerCache, "/var/lib/containers"),
 		),
 		runners.AgentOptionEnviron(environpath),
-		runners.AgentOptionCommandLine("--userns", "host"),        // properly map host user into containers.
 		runners.AgentOptionCommandLine("--env-file", environpath), // required for tty to work correctly in local mode.
-		runners.AgentOptionCommandLine("--cap-add", "NET_ADMIN"),  // required for loopback device creation inside the container
-		runners.AgentOptionCommandLine("--cap-add", "SYS_ADMIN"),  // required for rootless container building https://github.com/containers/podman/issues/4056#issuecomment-612893749
-		runners.AgentOptionCommandLine("--device", "/dev/fuse"),   //
-		runners.AgentOptionCommandLine("--pids-limit", "-1"),      // more bullshit. without this we get "Error: OCI runtime error: crun: the requested cgroup controller `pids` is not available"
+		runners.AgentOptionHostOS(),
+		runners.AgentOptionCommandLine("--pids-limit", "-1"), // more bullshit. without this we get "Error: OCI runtime error: crun: the requested cgroup controller `pids` is not available"
 		runners.AgentOptionEnv(eg.EnvComputeRunID, uid.String()),
 		runners.AgentOptionEnv(eg.EnvComputeLoggingVerbosity, strconv.Itoa(gctx.Verbosity)),
 	)

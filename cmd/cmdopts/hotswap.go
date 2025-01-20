@@ -1,7 +1,9 @@
 package cmdopts
 
 import (
+	"log"
 	"os"
+	"runtime"
 
 	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/internal/langx"
@@ -22,6 +24,11 @@ type Hotswap struct {
 
 func (t Hotswap) AfterApply(dst *HotswapPath) error {
 	if !t.Hotswap {
+		return nil
+	}
+
+	if runtime.GOOS == "darwin" {
+		log.Println("hotswapping the binary is not supported on darwin, results in permission denied errors when executing the binary.")
 		return nil
 	}
 

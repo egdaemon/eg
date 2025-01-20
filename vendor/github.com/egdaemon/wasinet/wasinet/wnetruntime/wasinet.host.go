@@ -1,4 +1,4 @@
-//go:build !wasip1
+//go:build !wasip1 && !windows
 
 package wnetruntime
 
@@ -13,7 +13,6 @@ import (
 	"github.com/egdaemon/wasinet/wasinet/ffierrors"
 	"github.com/egdaemon/wasinet/wasinet/ffiguest"
 	"github.com/egdaemon/wasinet/wasinet/stdlib/wasip1syscall"
-	"golang.org/x/sys/unix"
 )
 
 func TranslateErrno(err error) syscall.Errno {
@@ -55,7 +54,7 @@ func SocketOpen(open OpenFn) OpenHostFn {
 	}
 }
 
-type BindFn func(ctx context.Context, fd int, sa unix.Sockaddr) error
+type BindFn func(ctx context.Context, fd int, sa wasip1syscall.NativeSocket) error
 type BindHostFn func(ctx context.Context, m ffi.Memory, fd uint32, addr uintptr, addrlen uint32) syscall.Errno
 
 func SocketBind(bind BindFn) BindHostFn {
@@ -74,7 +73,7 @@ func SocketBind(bind BindFn) BindHostFn {
 	}
 }
 
-type ConnectFn func(ctx context.Context, fd int, sa unix.Sockaddr) error
+type ConnectFn func(ctx context.Context, fd int, sa wasip1syscall.NativeSocket) error
 type ConnectHostFn func(ctx context.Context, m ffi.Memory, fd int32, addr uintptr, addrlen uint32) syscall.Errno
 
 func SocketConnect(fn ConnectFn) ConnectHostFn {
@@ -116,7 +115,7 @@ func vectorread[T any](m ffi.Memory, iovs uintptr, iovslen uint32) ([][]T, error
 	return ffi.VectorRead[T](m, vec...)
 }
 
-type SendToFn func(ctx context.Context, fd int, sa unix.Sockaddr, vecs [][]byte, oob []byte, flags int) (int, error)
+type SendToFn func(ctx context.Context, fd int, sa wasip1syscall.NativeSocket, vecs [][]byte, oob []byte, flags int) (int, error)
 type SendToHostFn func(
 	ctx context.Context,
 	m ffi.Memory,
@@ -163,7 +162,7 @@ func SocketSendTo(fn SendToFn) SendToHostFn {
 	}
 }
 
-type RecvFromFn func(ctx context.Context, fd int, buf [][]byte, oob []byte, flags int) (int, int, unix.Sockaddr, error)
+type RecvFromFn func(ctx context.Context, fd int, buf [][]byte, oob []byte, flags int) (int, int, wasip1syscall.NativeSocket, error)
 type RecvFromHostFn func(
 	ctx context.Context,
 	m ffi.Memory,
@@ -274,7 +273,7 @@ func SocketGetOpt(fn GetOptFn) GetOptHostFn {
 	}
 }
 
-type LocalAddrFn func(ctx context.Context, fd int) (unix.Sockaddr, error)
+type LocalAddrFn func(ctx context.Context, fd int) (wasip1syscall.NativeSocket, error)
 type LocalAddrHostFn func(ctx context.Context, m ffi.Memory, fd int32, addr uintptr, addrlen uint32) syscall.Errno
 
 func SocketLocalAddr(fn LocalAddrFn) LocalAddrHostFn {
@@ -303,7 +302,7 @@ func SocketLocalAddr(fn LocalAddrFn) LocalAddrHostFn {
 	}
 }
 
-type PeerAddrFn func(ctx context.Context, fd int) (unix.Sockaddr, error)
+type PeerAddrFn func(ctx context.Context, fd int) (wasip1syscall.NativeSocket, error)
 type PeerAddrHostFn func(ctx context.Context, m ffi.Memory, fd int32, addr uintptr, addrlen uint32) syscall.Errno
 
 func SocketPeerAddr(fn PeerAddrFn) PeerAddrHostFn {
@@ -328,7 +327,7 @@ func SocketPeerAddr(fn PeerAddrFn) PeerAddrHostFn {
 }
 
 // (fd int32, nfd unsafe.Pointer, addressptr unsafe.Pointer, addresslen uint32) (errno syscall.Errno)
-type AcceptFn func(ctx context.Context, fd int) (int, unix.Sockaddr, error)
+type AcceptFn func(ctx context.Context, fd int) (int, wasip1syscall.NativeSocket, error)
 type AcceptHostFn func(ctx context.Context, m ffi.Memory, fd int32, nfd uintptr, addr uintptr, addrlen uint32) syscall.Errno
 
 func SocketAccept(fn AcceptFn) AcceptHostFn {

@@ -380,7 +380,6 @@ github.com/coreos/go-systemd/v22/journal
 github.com/coreos/go-systemd/v22/sdjournal
 # github.com/creack/pty v1.1.24
 ## explicit; go 1.18
-github.com/creack/pty
 # github.com/cyberphone/json-canonicalization v0.0.0-20231217050601-ba74d44ecf5f
 ## explicit
 github.com/cyberphone/json-canonicalization/go/src/webpki.org/jsoncanonicalizer
@@ -460,7 +459,7 @@ github.com/ebitengine/purego
 github.com/ebitengine/purego/internal/cgo
 github.com/ebitengine/purego/internal/fakecgo
 github.com/ebitengine/purego/internal/strings
-# github.com/egdaemon/wasinet/wasinet v0.0.0-20250107020126-be17492ab34e
+# github.com/egdaemon/wasinet/wasinet v0.0.0-20250120175550-4106c2611afa
 ## explicit; go 1.23.4
 github.com/egdaemon/wasinet/wasinet
 github.com/egdaemon/wasinet/wasinet/autohijack
@@ -817,7 +816,6 @@ github.com/libp2p/go-libp2p/core/connmgr
 github.com/libp2p/go-libp2p/core/control
 github.com/libp2p/go-libp2p/core/crypto
 github.com/libp2p/go-libp2p/core/crypto/pb
-github.com/libp2p/go-libp2p/core/discovery
 github.com/libp2p/go-libp2p/core/event
 github.com/libp2p/go-libp2p/core/host
 github.com/libp2p/go-libp2p/core/internal/catch
@@ -835,8 +833,6 @@ github.com/libp2p/go-libp2p/core/sec
 github.com/libp2p/go-libp2p/core/sec/insecure
 github.com/libp2p/go-libp2p/core/sec/insecure/pb
 github.com/libp2p/go-libp2p/core/transport
-github.com/libp2p/go-libp2p/p2p/discovery/routing
-github.com/libp2p/go-libp2p/p2p/discovery/util
 github.com/libp2p/go-libp2p/p2p/host/autonat
 github.com/libp2p/go-libp2p/p2p/host/autonat/pb
 github.com/libp2p/go-libp2p/p2p/host/autorelay

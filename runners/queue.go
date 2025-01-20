@@ -442,11 +442,8 @@ func beginwork(ctx context.Context, md metadata, dir string) state {
 		AgentOptionCommandLine("--env-file", environpath),
 		AgentOptionCores(workload.Enqueued.Cores),
 		AgentOptionMemory(workload.Enqueued.Memory),
-		AgentOptionCommandLine("--userns", "host"),       // properly map host user into containers.
-		AgentOptionCommandLine("--cap-add", "NET_ADMIN"), // required for loopback device creation inside the container
-		AgentOptionCommandLine("--cap-add", "SYS_ADMIN"), // required for rootless container building https://github.com/containers/podman/issues/4056#issuecomment-612893749
-		AgentOptionCommandLine("--device", "/dev/fuse"),  // required for rootless container building https://github.com/containers/podman/issues/4056#issuecomment-612893749
-		AgentOptionCommandLine("--pids-limit", "-1"),     // more bullshit. without this we get "Error: OCI runtime error: crun: the requested cgroup controller `pids` is not available"
+		AgentOptionHostOS(),
+		AgentOptionCommandLine("--pids-limit", "-1"), // more bullshit. without this we get "Error: OCI runtime error: crun: the requested cgroup controller `pids` is not available"
 	)
 
 	m := NewManager(

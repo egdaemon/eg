@@ -189,12 +189,9 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 				runners.AgentMountReadWrite("/var/lib/containers", "/var/lib/containers"),
 			),
 			runners.AgentOptionEGBin(errorsx.Must(exec.LookPath(eg.DefaultMountRoot(eg.BinaryBin)))),
-			runners.AgentOptionCommandLine("--userns", "host"),       // properly map host user into containers.
-			runners.AgentOptionCommandLine("--cap-add", "NET_ADMIN"), // required for loopback device creation inside the container
-			runners.AgentOptionCommandLine("--cap-add", "SYS_ADMIN"), // required for rootless container building https://github.com/containers/podman/issues/4056#issuecomment-612893749
-			runners.AgentOptionCommandLine("--device", "/dev/fuse"),  // required for rootless container building https://github.com/containers/podman/issues/4056#issuecomment-612893749
-			runners.AgentOptionCommandLine("--network", "host"),      // ipv4 group bullshit. pretty sure its a podman 4 issue that was resolved in podman 5. this is 'safe' to do because we are already in a container.
-			runners.AgentOptionCommandLine("--pids-limit", "-1"),     // more bullshit. without this we get "Error: OCI runtime error: crun: the requested cgroup controller `pids` is not available"
+			runners.AgentOptionHostOS(),
+			runners.AgentOptionCommandLine("--network", "host"),  // ipv4 group bullshit. pretty sure its a podman 4 issue that was resolved in podman 5. this is 'safe' to do because we are already in a container.
+			runners.AgentOptionCommandLine("--pids-limit", "-1"), // more bullshit. without this we get "Error: OCI runtime error: crun: the requested cgroup controller `pids` is not available"
 		)
 
 		c8s.NewServiceProxy(

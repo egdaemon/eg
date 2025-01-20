@@ -19,11 +19,12 @@ import (
 	"github.com/egdaemon/eg/internal/httpx"
 	"github.com/egdaemon/eg/internal/runtimex"
 	"github.com/egdaemon/eg/internal/sshx"
+	"github.com/egdaemon/eg/internal/userx"
 	"github.com/egdaemon/eg/runners"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/oauth2"
 
-	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/core/host"
 )
 
 type daemon struct {
@@ -48,7 +49,7 @@ func (t daemon) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 		httpl      net.Listener
 		grpcl      net.Listener
 		authclient *http.Client
-		p2pid      peer.ID
+		p2p        host.Host
 	)
 	log.Println("running daemon initiated")
 	defer log.Println("running daemon completed")
@@ -61,7 +62,7 @@ func (t daemon) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 	log.Println("cache directory", t.CacheDir)
 	log.Println("detected runtime configuration", spew.Sdump(t.RuntimeResources))
 
-	if httpl, err = net.Listen("tcp", "127.0.1.1:8093"); err != nil {
+	if httpl, err = net.Listen("unix", userx.DefaultRuntimeDirectory("main.socket")); err != nil {
 		return err
 	}
 
@@ -69,11 +70,11 @@ func (t daemon) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 		return errorsx.Wrap(err, "unable to retrieve identity credentials")
 	}
 
-	if p2pid, err = daemons.P2PProxy(gctx.Context, append([]byte(machineID()), signer.PublicKey().Marshal()...), httpl); err != nil {
+	if p2p, err = daemons.P2PProxy(gctx.Context, t.Seed, append([]byte(machineID()), signer.PublicKey().Marshal()...), httpl); err != nil {
 		return errorsx.Wrap(err, "unable to initialize p2p")
 	}
 
-	if err = daemons.Register(gctx, tlsc, &t.RuntimeResources, t.AccountID, t.MachineID, p2pid, signer); err != nil {
+	if err = daemons.Register(gctx, tlsc, &t.RuntimeResources, t.AccountID, t.MachineID, p2p, signer); err != nil {
 		return err
 	}
 
@@ -99,7 +100,7 @@ func (t daemon) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 
 	go func() {
 		for {
-			if cause := daemons.Ping(gctx, tlsc, &t.RuntimeResources, t.AccountID, t.MachineID, p2pid, signer); cause != nil {
+			if cause := daemons.Ping(gctx, tlsc, &t.RuntimeResources, t.AccountID, t.MachineID, p2p, signer); cause != nil {
 				log.Println("ping failed", cause)
 			}
 

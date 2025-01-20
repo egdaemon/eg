@@ -317,6 +317,8 @@ func (t stateidle) Update(ctx context.Context) state {
 	// check upstream....
 	if err = t.metadata.Download(ctx); errors.Is(err, context.DeadlineExceeded) {
 		return terminate(err)
+	} else if errors.Is(err, context.Canceled) {
+		return terminate(err)
 	} else if err != nil {
 		log.Println(err)
 		return newdelay(time.Second, t)

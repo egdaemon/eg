@@ -2,20 +2,16 @@ package podmanx
 
 import (
 	"context"
-	"fmt"
+	"log"
 
 	"github.com/containers/podman/v5/pkg/bindings"
 	"github.com/egdaemon/eg/internal/errorsx"
-	"github.com/egdaemon/eg/internal/userx"
 	"google.golang.org/grpc"
 )
 
-func DefaultSocket() string {
-	return fmt.Sprintf("unix://%s", userx.DefaultRuntimeDirectory("podman", "podman.sock"))
-}
-
 func WithClient(ctx context.Context) (rctx context.Context, err error) {
 	socket := DefaultSocket()
+	log.Println("WAAAT", socket)
 	if rctx, err = bindings.NewConnection(ctx, socket); err != nil {
 		return ctx, errorsx.Wrapf(err, "unable to connect to podman: %s", socket)
 	}

@@ -73,14 +73,7 @@ func DefaultCacheDirectory(rel ...string) string {
 // DefaultRuntimeDirectory runtime directory for storing data.
 func DefaultRuntimeDirectory(rel ...string) string {
 	user := CurrentUserOrDefault(Root())
-
-	if user.Uid == Root().Uid {
-		return filepath.Join(envx.String(filepath.Join("/", "run"), "RUNTIME_DIRECTORY", "XDG_RUNTIME_DIR"), filepath.Join(rel...))
-	}
-
-	defaultdir := filepath.Join("/", "var", "run", "user", user.Uid)
-
-	return filepath.Join(envx.String(defaultdir, "RUNTIME_DIRECTORY", "XDG_RUNTIME_DIR"), filepath.Join(rel...))
+	return filepath.Join(defaultRuntimeDirectory(user), filepath.Join(rel...))
 }
 
 // DefaultDirectory finds the first directory root that exists and then returns

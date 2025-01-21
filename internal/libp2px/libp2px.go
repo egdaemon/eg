@@ -8,6 +8,7 @@ import (
 	"math/rand"
 	"sync"
 
+	"github.com/egdaemon/eg/internal/debugx"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/langx"
 	"github.com/egdaemon/eg/internal/numericx"
@@ -49,19 +50,16 @@ func Connect(ctx context.Context, p2p host.Host, peers ...peer.AddrInfo) error {
 		wg.Add(1)
 		go func(p peer.AddrInfo) {
 			defer wg.Done()
-			defer log.Println("bootstrapDial", p2p.ID(), p.ID)
-			log.Printf("%s bootstrapping to %s", p2p.ID(), p.ID)
+			debugx.Printf("%s bootstrapping with %s", p2p.ID(), p.ID)
 
 			p2p.Peerstore().AddAddrs(p.ID, p.Addrs, peerstore.PermanentAddrTTL)
 			if err := p2p.Connect(ctx, p); err != nil {
-				log.Println("bootstrapDialFailed", p.ID)
-				log.Printf("failed to bootstrap with %v: %s", p.ID, err)
+				debugx.Printf("failed to bootstrap with %v: %s", p.ID, err)
 				errs <- err
 				return
 			}
 
-			log.Println(ctx, "bootstrapDialSuccess", p.ID)
-			log.Printf("bootstrapped with %v", p.ID)
+			debugx.Printf("bootstrapped with %v", p.ID)
 		}(p)
 	}
 	wg.Wait()

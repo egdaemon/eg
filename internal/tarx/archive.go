@@ -83,7 +83,7 @@ func Unpack(root string, r io.Reader) (err error) {
 		}
 
 		// the target location where the dir/file should be created
-		target := filepath.Join(root, header.Name)
+		target := filepath.Join(root, filepath.Clean(header.Name))
 
 		// check the file type
 		switch header.Typeflag {

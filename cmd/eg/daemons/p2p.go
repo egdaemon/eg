@@ -64,8 +64,8 @@ func P2PProxy(ctx context.Context, rendezvous string, seed []byte, httpl net.Lis
 		log.Fatalln(err)
 	}
 
-	go timex.Every(10*time.Second, func() {
-		log.Println("peers", len(p2p.Peerstore().Peers()))
+	go timex.Every(10*time.Minute, func() {
+		libp2px.SampledPeers(p2p)
 	})
 
 	// Set a stream handler on host A. /echo/1.0.0 is

@@ -2,6 +2,7 @@ package timex
 
 import (
 	"context"
+	"log"
 	"math"
 	"time"
 )
@@ -14,6 +15,16 @@ func Inf() time.Time {
 
 func NegInf() time.Time {
 	return time.Unix(math.MinInt64, math.MinInt64)
+}
+
+// Run the provided function after the duration.
+func After(d time.Duration, do func()) {
+	go func() {
+		log.Println("sleepy")
+		time.Sleep(d)
+		log.Println("awake")
+		do()
+	}()
 }
 
 // Every executes the provided function every duration.

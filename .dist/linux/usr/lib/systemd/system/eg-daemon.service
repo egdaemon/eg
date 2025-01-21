@@ -15,12 +15,13 @@ CacheDirectory=%p
 ConfigurationDirectory=%p
 RuntimeDirectory=%p
 RuntimeDirectoryMode=0700
-// cap workload capacity to 1 until tty issues are resolved.
+# cap workload capacity to 1 until tty issues are resolved.
 Environment=EG_COMPUTE_WORKLOAD_CAPACITY=1
+# Environment=EG_PODMAN_SOCKET="unix:///var/run/user/992/podman/podman.sock"
 EnvironmentFile=-/etc/eg/daemon.env
 PermissionsStartOnly=true
 ExecStartPre=/usr/bin/loginctl enable-linger egd
-ExecStart=/usr/bin/eg daemon --sshknownhostspath=/etc/ssh/ssh_known_hosts
+ExecStart=/usr/bin/eg daemon --sshknownhostspath=/etc/ssh/ssh_known_hosts --sshkeypath=%C/%p/priv.key
 
 [Install]
 WantedBy=default.target

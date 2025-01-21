@@ -213,3 +213,8 @@ func DynamicHashWindow(i string, n uint64) uint64 {
 	digest := md5.Sum([]byte(i))
 	return binary.LittleEndian.Uint64(digest[:]) % n
 }
+
+// generates a random duration from the provided range.
+func RandomFromRange(r time.Duration) time.Duration {
+	return time.Duration(rand.Intn(int(r)))
+}

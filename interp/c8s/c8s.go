@@ -4,12 +4,15 @@ import (
 	"bufio"
 	"context"
 	"io"
+	"os"
 	"os/exec"
 	"time"
 
 	"github.com/containers/podman/v5/libpod/define"
 	"github.com/containers/podman/v5/pkg/api/handlers"
 	"github.com/containers/podman/v5/pkg/bindings/containers"
+	"github.com/containers/podman/v5/pkg/errorhandling"
+	"github.com/creack/pty"
 	"github.com/docker/docker/api/types/container"
 	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/internal/debugx"
@@ -146,9 +149,33 @@ func moduleExec(ctx context.Context, cname, moduledir string, stdin io.Reader, s
 		result *define.InspectExecSession
 	)
 
+	// we don't close tty because ostensibly podman handles it.... this is probably
+	// a bad assumption and a memory leak.
+	ppty, tty, err := pty.Open()
+	if err != nil {
+		return err
+	}
+
+	// log.Println("moduleExec initiated", ppty.Name(), tty.Name())
+	// defer log.Println("moduleExec completed", ppty.Name(), tty.Name())
+	defer func() {
+		errorsx.Log(
+			errorsx.Wrap(
+				errorsx.Compact(tty.Close(), ppty.Close()),
+				"failed to close pty",
+			),
+		)
+	}()
+
+	rtty, wtty, err := os.Pipe()
+	if err != nil {
+		return errorsx.Wrap(err, "unable prepare pipe")
+	}
+	defer wtty.Close()
+
 	id, err := containers.ExecCreate(ctx, cname, &handlers.ExecCreateConfig{
 		ExecConfig: container.ExecOptions{
-			Tty:          stdin != nil,
+			Tty:          false,
 			AttachStdin:  stdin != nil,
 			AttachStderr: true,
 			AttachStdout: true,
@@ -165,16 +192,35 @@ func moduleExec(ctx context.Context, cname, moduledir string, stdin io.Reader, s
 		return errorsx.Wrap(err, "unable prepare exec session")
 	}
 	defer func() {
+		// only attempt a force removal if we encountered an error
+		if err == nil {
+			return
+		}
+
 		errorsx.Log(errorsx.Wrap(containers.ExecRemove(ctx, id, &containers.ExecRemoveOptions{Force: langx.Autoptr(true)}), "failed to remove exec session"))
 	}()
 
+	go func() {
+		debugx.Println("stdout copy initiated", ppty.Name())
+		defer debugx.Println("stdout copy completed", ppty.Name())
+		_, _ = io.Copy(stdout, ppty) // not important
+	}()
+
+	if stdin != nil {
+		go func() {
+			debugx.Println("stdin copy initiated", tty.Name())
+			defer debugx.Println("stdin copy completed", tty.Name())
+			_, _ = io.Copy(wtty, stdin) // not important
+		}()
+	}
+
 	err = containers.ExecStartAndAttach(ctx, id, &containers.ExecStartAndAttachOptions{
-		OutputStream: langx.Autoptr(io.Writer(stdout)),
+		InputStream:  bufio.NewReader(rtty),
+		OutputStream: langx.Autoptr(io.Writer(tty)),
 		ErrorStream:  langx.Autoptr(io.Writer(stderr)),
-		InputStream:  bufio.NewReader(stdin),
 		AttachOutput: langx.Autoptr(true),
 		AttachError:  langx.Autoptr(true),
-		AttachInput:  langx.Autoptr(stdin != nil),
+		AttachInput:  langx.Autoptr(true),
 	})
 	if err != nil {
 		return errorsx.Wrap(err, "podman exec start failed")
@@ -186,5 +232,22 @@ func moduleExec(ctx context.Context, cname, moduledir string, stdin io.Reader, s
 		return errorsx.Errorf("module failed with exit code: %d", result.ExitCode)
 	}
 
-	return nil
+	// soft removal.
+	errorsx.Log(errorsx.Wrap(containers.ExecRemove(ctx, id, &containers.ExecRemoveOptions{}), "failed to remove exec session"))
+
+	// wait for the exec session to disappear
+	for {
+		if _, err = containers.ExecInspect(ctx, id, nil); err != nil {
+			if errm, ok := err.(*errorhandling.ErrorModel); ok && errm.Code() == 404 {
+				return nil
+			}
+			return err
+		}
+
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(100 * time.Millisecond):
+		}
+	}
 }

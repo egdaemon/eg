@@ -8,6 +8,7 @@ require (
 	github.com/alitto/pond/v2 v2.1.6
 	github.com/containers/podman/v5 v5.3.1
 	github.com/coreos/go-systemd/v22 v22.5.1-0.20231103132048-7d375ecc2b09
+	github.com/creack/pty v1.1.24
 	github.com/dave/jennifer v1.7.1
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
 	github.com/docker/docker v27.5.0+incompatible
@@ -47,7 +48,6 @@ require (
 )
 
 require (
-	github.com/creack/pty v1.1.24 // indirect
 	github.com/hashicorp/golang-lru v1.0.2 // indirect
 	github.com/ipfs/boxo v0.26.0 // indirect
 	github.com/ipld/go-ipld-prime v0.21.0 // indirect

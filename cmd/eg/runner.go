@@ -134,13 +134,13 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 			return errorsx.Wrap(err, "unable to set max limits")
 		}
 
-		log.Println("---------------------------- ROOT MODULE INITIATED ----------------------------")
-		log.Println("account", aid)
-		log.Println("run id", uid)
-		log.Println("repository", descr)
-		log.Println("number of cores", runtime.GOMAXPROCS(-1))
-		log.Println("ram available", bytesx.Unit(vmemlimit))
-		log.Println("logging level", gctx.Verbosity)
+		debugx.Println("---------------------------- ROOT MODULE INITIATED ----------------------------")
+		debugx.Println("account", aid)
+		debugx.Println("run id", uid)
+		debugx.Println("repository", descr)
+		debugx.Println("number of cores", runtime.GOMAXPROCS(-1))
+		debugx.Println("ram available", bytesx.Unit(vmemlimit))
+		debugx.Println("logging level", gctx.Verbosity)
 		// fsx.PrintDir(os.DirFS(t.RuntimeDir))
 		defer log.Println("---------------------------- ROOT MODULE COMPLETED ----------------------------")
 

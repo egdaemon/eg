@@ -13,3 +13,7 @@ func AgentOptionHostOS() AgentOption {
 	log.Println(aurora.NewAurora(true).Red("you're using an unknown host operating system, many things may not work correctly"))
 	return AgentOptionNoop
 }
+
+func AgentOptionContainerCache(dir string) string {
+	return ""
+}

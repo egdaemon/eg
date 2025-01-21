@@ -160,3 +160,7 @@ func PrepareRootContainer(cpath string) (err error) {
 
 	return nil
 }
+
+const (
+	EnvExperimentalContainerCache = "EG_EXPERIMENTAL_CONTAINER_CACHE"
+)

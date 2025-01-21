@@ -10,3 +10,7 @@ func AgentOptionHostOS() AgentOption {
 		AgentOptionCommandLine("--device", "/dev/fuse"),  // required for rootless container building https://github.com/containers/podman/issues/4056#issuecomment-612893749
 	)
 }
+
+func AgentOptionContainerCache(dir string) string {
+	return AgentMountReadWrite(dir, "/var/lib/containers")
+}

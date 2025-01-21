@@ -3,7 +3,6 @@ package runners
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"io/fs"
@@ -18,6 +17,7 @@ import (
 	"time"
 
 	"github.com/egdaemon/eg"
+	"github.com/egdaemon/eg/backoff"
 	"github.com/egdaemon/eg/internal/debugx"
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
@@ -295,9 +295,9 @@ type stateidle struct {
 }
 
 func (t stateidle) Update(ctx context.Context) state {
-	var (
-		err error
-	)
+	// var (
+	// 	err error
+	// )
 
 	select {
 	case <-ctx.Done():
@@ -315,16 +315,17 @@ func (t stateidle) Update(ctx context.Context) state {
 	}
 
 	// check upstream....
-	if err = t.metadata.Download(ctx); errors.Is(err, context.DeadlineExceeded) {
-		return terminate(err)
-	} else if errors.Is(err, context.Canceled) {
-		return terminate(err)
-	} else if err != nil {
-		log.Println(err)
-		return newdelay(time.Second, t)
-	}
+	// if err = t.metadata.Download(ctx); errors.Is(err, context.DeadlineExceeded) {
+	// 	return terminate(err)
+	// } else if errors.Is(err, context.Canceled) {
+	// 	return terminate(err)
+	// } else if err != nil {
+	// 	log.Println(err)
+	// 	return newdelay(backoff.RandomFromRange(time.Second), t)
+	// }
+	// return t
 
-	return t
+	return newdelay(backoff.RandomFromRange(time.Second), t)
 }
 
 func recover(_ context.Context, md metadata) error {

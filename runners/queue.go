@@ -269,6 +269,27 @@ func (t statefailure) Update(ctx context.Context) state {
 	return t.next
 }
 
+func newdelay(d time.Duration, next state) state {
+	return statedelay{
+		d:    d,
+		next: next,
+	}
+}
+
+type statedelay struct {
+	d    time.Duration
+	next state
+}
+
+func (t statedelay) Update(ctx context.Context) state {
+	select {
+	case <-ctx.Done():
+		return terminate(ctx.Err())
+	case <-time.After(t.d):
+		return t.next
+	}
+}
+
 func idle(md metadata) stateidle {
 	return stateidle{
 		metadata: md,
@@ -503,27 +524,6 @@ func completed(workload *Enqueued, md metadata, ws workspaces.Context, duration 
 		metadata: md,
 		cause:    cause,
 		duration: duration,
-	}
-}
-
-func newdelay(d time.Duration, next state) state {
-	return statedelay{
-		d:    d,
-		next: next,
-	}
-}
-
-type statedelay struct {
-	d    time.Duration
-	next state
-}
-
-func (t statedelay) Update(ctx context.Context) state {
-	select {
-	case <-ctx.Done():
-		return terminate(ctx.Err())
-	case <-time.After(t.d):
-		return t.next
 	}
 }
 

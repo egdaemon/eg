@@ -112,7 +112,7 @@ func DefaultCacheDirectory(rel ...string) string {
 }
 
 func DefaultRuntimeDirectory(rel ...string) string {
-	return DefaultWorkloadRoot(RuntimeDirectory, filepath.Join(rel...))
+	return DefaultMountRoot(RuntimeDirectory, filepath.Join(rel...))
 }
 
 func DefaultWorkingDirectory(rel ...string) string {

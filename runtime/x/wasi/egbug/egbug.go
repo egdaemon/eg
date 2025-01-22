@@ -58,6 +58,7 @@ func FileTree(ctx context.Context, op eg.Op) error {
 	privileged := shell.Runtime().Privileged().Lenient(true).Directory("/")
 	return shell.Run(
 		ctx,
+		privileged.Newf("echo 'runtime directory:' && ls -lhan %s", _eg.DefaultMountRoot(_eg.RuntimeDirectory)),
 		privileged.Newf("echo 'mount directory:' && ls -lhan %s", _eg.DefaultMountRoot()),
 		privileged.Newf("echo 'workload directory:' && ls -lhan %s", _eg.DefaultWorkloadRoot()),
 		privileged.Newf("echo 'cache directory:' && ls -lhan %s", egenv.CacheDirectory()),

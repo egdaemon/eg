@@ -170,7 +170,7 @@ func workload(ctx context.Context, rm *ResourceManager, dirs *SpoolDirs, reload 
 		case <-ctx.Done():
 			return ctx.Err()
 		default:
-			log.Printf("running %T\n", s)
+			debugx.Printf("running %T\n", s)
 			s = s.Update(ctx)
 		}
 

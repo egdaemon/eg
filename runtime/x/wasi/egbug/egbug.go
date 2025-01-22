@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"sync/atomic"
+	"time"
 
 	_eg "github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/internal/langx"
@@ -72,7 +73,16 @@ func FileTree(ctx context.Context, op eg.Op) error {
 func Env(ctx context.Context, op eg.Op) error {
 	return shell.Run(
 		ctx,
-		shell.New("env"),
+		shell.New("env | sort"),
+		shell.New("env | sort | md5sum"),
+	)
+}
+
+// debugging information for system initialization
+func SystemInit(ctx context.Context, op eg.Op) error {
+	return shell.Run(
+		ctx,
+		shell.New("systemctl list-units --failed").Privileged().Timeout(time.Second),
 	)
 }
 

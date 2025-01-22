@@ -27,7 +27,6 @@ func main() {
 		eg.Module(
 			ctx,
 			deb,
-			// egbug.FileTree,
 			eggolang.AutoCompile(
 				eggolang.CompileOption.BuildOptions(
 					eggolang.Build(

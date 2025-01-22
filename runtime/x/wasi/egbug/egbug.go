@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"sync/atomic"
+	"time"
 
 	_eg "github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/internal/langx"
@@ -57,6 +58,7 @@ func FileTree(ctx context.Context, op eg.Op) error {
 	privileged := shell.Runtime().Privileged().Lenient(true).Directory("/")
 	return shell.Run(
 		ctx,
+		privileged.Newf("echo 'runtime directory:' && ls -lhan %s", _eg.DefaultMountRoot(_eg.RuntimeDirectory)),
 		privileged.Newf("echo 'mount directory:' && ls -lhan %s", _eg.DefaultMountRoot()),
 		privileged.Newf("echo 'workload directory:' && ls -lhan %s", _eg.DefaultWorkloadRoot()),
 		privileged.Newf("echo 'cache directory:' && ls -lhan %s", egenv.CacheDirectory()),
@@ -72,7 +74,16 @@ func FileTree(ctx context.Context, op eg.Op) error {
 func Env(ctx context.Context, op eg.Op) error {
 	return shell.Run(
 		ctx,
-		shell.New("env"),
+		shell.New("env | sort"),
+		shell.New("env | sort | md5sum"),
+	)
+}
+
+// debugging information for system initialization
+func SystemInit(ctx context.Context, op eg.Op) error {
+	return shell.Run(
+		ctx,
+		shell.New("systemctl list-units --failed").Privileged().Timeout(time.Second),
 	)
 }
 

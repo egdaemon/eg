@@ -396,9 +396,10 @@ func Format[T ~string](k string, v T, options ...func(*formatopts)) string {
 	opts := slicesx.Reduce(&formatopts{
 		transformer: ignoreEmptyVariables,
 	}, options...)
+
 	evar := strings.TrimSpace(opts.transformer(fmt.Sprintf("%s=%s", k, v)))
 	if evar == "" {
-		debugx.Println("ignoring variable", k, "transform was empty")
+		debugx.Println("ignoring variable", k, "empty")
 	}
 
 	return fmt.Sprintf("%s=%s", k, v)

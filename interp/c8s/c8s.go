@@ -236,8 +236,9 @@ func moduleExec(ctx context.Context, cname, moduledir string, stdin io.Reader, s
 		if _, err = containers.ExecInspect(ctx, id, nil); err != nil {
 			if errm, ok := err.(*errorhandling.ErrorModel); ok && errm.Code() == 404 {
 				return nil
+			} else {
+				return errorsx.Wrapf(err, "unknown exec session error: %d %s", errm.Code(), errm.Error())
 			}
-			return err
 		}
 
 		select {

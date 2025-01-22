@@ -57,7 +57,7 @@ func PodmanPull(ctx context.Context, name string, options ...string) (cmd *exec.
 
 func PodmanBuild(ctx context.Context, name string, dir string, definition string, options ...string) (cmd *exec.Cmd, err error) {
 	args := []string{
-		"build", "-q", "--stdin", "-t", name, "-f", definition,
+		"build", "--stdin", "-t", name, "-f", definition,
 	}
 	args = append(args, options...)
 	args = append(args, dir)
@@ -123,27 +123,23 @@ func PodmanModule(ctx context.Context, cmdctx func(*exec.Cmd) *exec.Cmd, image, 
 }
 
 func PodmanModuleRunCmd(image, cname string, options ...string) []string {
-	options = append([]string{
+	args := make([]string, 0, len(options)+11)
+	args = append(args,
 		"run",
 		"--name", cname,
 		"--detach",
 		"--replace",
 		"--env", "CI",
-		"--env", "EG_CI",
 		"--env", eg.EnvComputeRunID,
 		"--env", eg.EnvComputeBin,
 		"--env", eg.EnvComputeAccountID,
-	},
-		options...,
 	)
-
-	return append(
-		options,
-		image,
-		"/usr/sbin/init",
-	)
+	args = append(args, options...)
+	args = append(args, image, "/usr/sbin/init")
+	return args
 }
 
+// runcmd is md5 of the command that generated the container.
 func moduleExec(ctx context.Context, cname, moduledir string, stdin io.Reader, stdout io.Writer, stderr io.Writer) (err error) {
 	var (
 		result *define.InspectExecSession

@@ -1,22 +1,28 @@
 FROM ubuntu:oracular
 
+ARG GOBIN="/usr/bin"
+ARG GOMODCACHE="/tmp/gomod"
+ARG GOCACHE="/tmp/gocache"
+
+RUN echo "cache buster 059a9a06-1686-4f49-9a7f-a30535886d59"
 # put apt in non-interactive mode
 ENV DEBIAN_FRONTEND=noninteractive
 
 RUN apt-get update
 
 # general utilities
-RUN apt-get install -y software-properties-common build-essential ca-certificates curl sudo gnupg2 lsb-release iproute2 git apt-file uidmap dbus-user-session fuse-overlayfs rsync vim tree podman netavark ssh
+RUN apt-get install -y software-properties-common build-essential ca-certificates curl sudo gnupg2 lsb-release iproute2 git apt-file uidmap dbus-user-session fuse-overlayfs rsync vim
 RUN add-apt-repository -n ppa:longsleep/golang-backports
 RUN add-apt-repository -n ppa:egdaemon/eg
 RUN add-apt-repository -n ppa:egdaemon/duckdb
 RUN apt-get update
 
-RUN apt-get install -y --no-install-recommends golang-1.23 eg
+RUN apt-get install -y --no-install-recommends ssh podman netavark golang-1.23 eg tree
 
 # properly link golang into the path.
 RUN ln -s /usr/lib/go-1.23/bin/go /usr/local/bin/go
 
+# preload some well known hosts
 RUN ssh-keyscan -H github.com >> /etc/ssh/ssh_known_hosts
 RUN ssh-keyscan -H gitlab.com >> /etc/ssh/ssh_known_hosts
 
@@ -24,4 +30,5 @@ RUN systemd-sysusers
 RUN systemd-tmpfiles --create
 RUN systemctl enable podman.socket
 
+RUN usermod --add-subuids 100000-165535 --add-subgids 100000-165535 egd
 RUN printf '%%wheel ALL=(ALL:ALL) NOPASSWD: ALL\n' | tee -a /etc/sudoers.d/egd

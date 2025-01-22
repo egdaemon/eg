@@ -14,6 +14,7 @@ import (
 	"github.com/egdaemon/eg/authn"
 	"github.com/egdaemon/eg/cmd/cmdopts"
 	"github.com/egdaemon/eg/compile"
+	"github.com/egdaemon/eg/compute"
 	"github.com/egdaemon/eg/internal/debugx"
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
@@ -199,14 +200,12 @@ func (t c8sUpload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error
 	defer os.RemoveAll(buf.Name())
 	defer buf.Close()
 
-	chttp, err := authn.OAuth2SSHHTTPClient(
-		context.WithValue(gctx.Context, oauth2.HTTPClient, tlsc.DefaultClient()),
-		signer,
-		authn.EndpointSSHAuth(),
+	c := httpx.BindRetryTransport(tlsc.DefaultClient(), http.StatusTooManyRequests, http.StatusBadGateway)
+	tokensrc := compute.NewAuthzTokenSource(c, signer, authn.EndpointCompute())
+	chttp := oauth2.NewClient(
+		context.WithValue(gctx.Context, oauth2.HTTPClient, c),
+		tokensrc,
 	)
-	if err != nil {
-		return err
-	}
 
 	req, err := http.NewRequestWithContext(gctx.Context, http.MethodPost, t.Endpoint, buf)
 	if err != nil {

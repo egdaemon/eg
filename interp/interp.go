@@ -206,9 +206,7 @@ func (t runner) perform(ctx context.Context, runid, path string, rtb runtimefn) 
 	debugx.Println("cache dir", hostcachedir, "->", eg.DefaultCacheDirectory())
 	debugx.Println("runtime dir", t.runtimedir, "->", eg.DefaultMountRoot(eg.RuntimeDirectory))
 	mcfg := wazero.NewModuleConfig().WithEnv(
-		"CI", envx.String("false", "EG_CI", "CI"),
-	).WithEnv(
-		"EG_CI", envx.String("false", "EG_CI", "CI"),
+		"CI", envx.String("true", "CI"),
 	).WithEnv(
 		eg.EnvComputeRunID, runid,
 	).WithEnv(

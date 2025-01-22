@@ -8,6 +8,7 @@ import (
 	"io"
 	"io/fs"
 	"log"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -25,6 +26,7 @@ import (
 	"github.com/egdaemon/eg/internal/execx"
 	"github.com/egdaemon/eg/internal/fsx"
 	"github.com/egdaemon/eg/internal/gitx"
+	"github.com/egdaemon/eg/internal/httpx"
 	"github.com/egdaemon/eg/internal/iox"
 	"github.com/egdaemon/eg/internal/langx"
 	"github.com/egdaemon/eg/internal/md5x"
@@ -90,6 +92,7 @@ func (t localdownloader) Download(ctx context.Context) (err error) {
 }
 
 type metadata struct {
+	id           int
 	logVerbosity int
 	reload       chan error
 	downloader
@@ -151,18 +154,22 @@ func BuildRootContainerPath(ctx context.Context, dir, path string) (err error) {
 	return nil
 }
 
-func workload(ctx context.Context, rm *ResourceManager, dirs *SpoolDirs, reload chan error, options ...func(*metadata)) error {
+func workload(ctx context.Context, id int, delay time.Duration, rm *ResourceManager, dirs *SpoolDirs, reload chan error, options ...func(*metadata)) error {
 	var (
-		s state = idle(langx.Clone(
-			metadata{
-				rm:         rm,
-				reload:     reload,
-				completion: noopcompletion{},
-				downloader: localdownloader{},
-				dirs:       dirs,
-			},
-			options...,
-		))
+		s state = newdelay(
+			delay,
+			idle(langx.Clone(
+				metadata{
+					id:         id,
+					rm:         rm,
+					reload:     reload,
+					completion: noopcompletion{},
+					downloader: localdownloader{},
+					dirs:       dirs,
+				},
+				options...,
+			)),
+		)
 	)
 
 	for {
@@ -170,7 +177,7 @@ func workload(ctx context.Context, rm *ResourceManager, dirs *SpoolDirs, reload 
 		case <-ctx.Done():
 			return ctx.Err()
 		default:
-			debugx.Printf("running %T\n", s)
+			debugx.Printf("running %d - %T\n", id, s)
 			s = s.Update(ctx)
 		}
 
@@ -199,6 +206,7 @@ func Queue(ctx context.Context, rm *ResourceManager, options ...func(*metadata))
 	var (
 		md = langx.Clone(
 			metadata{
+				id:         0,
 				rm:         rm,
 				reload:     reload,
 				completion: noopcompletion{},
@@ -217,8 +225,11 @@ func Queue(ctx context.Context, rm *ResourceManager, options ...func(*metadata))
 	workers := make([]pond.Task, 0, pool.MaxConcurrency())
 
 	for i := 0; i < pool.MaxConcurrency(); i++ {
+		// we defer startup of workloads to avoid thundering herd and synchronization
+		delay := backoff.DynamicHashDuration(time.Second, strconv.FormatInt(int64(i), 36))
+		log.Println("workload", i, "deferred", delay)
 		workers = append(workers, pool.SubmitErr(func() error {
-			return workload(ctx, rm, &dirs, reload, options...)
+			return workload(ctx, i, delay, rm, &dirs, reload, options...)
 		}))
 	}
 
@@ -427,7 +438,6 @@ func beginwork(ctx context.Context, md metadata, dir string) state {
 		AgentOptionCores(workload.Enqueued.Cores),
 		AgentOptionMemory(workload.Enqueued.Memory),
 		AgentOptionHostOS(),
-		AgentOptionCommandLine("--network", "host"),
 		AgentOptionCommandLine("--pids-limit", "-1"), // more bullshit. without this we get "Error: OCI runtime error: crun: the requested cgroup controller `pids` is not available"
 	)
 
@@ -554,8 +564,10 @@ func (t statecompleted) Update(ctx context.Context) state {
 		return discard(t.workload, t.metadata, failure(errorsx.Wrap(err, "unable open analytics for upload"), idle(t.metadata)))
 	}
 	defer analytics.Close()
-
-	if err = t.metadata.completion.Upload(ctx, t.workload.Id, t.duration, t.cause, logs, analytics); err != nil {
+	if err = t.metadata.completion.Upload(ctx, t.workload.Id, t.duration, t.cause, logs, analytics); httpx.IsStatusError(err, http.StatusNotFound) != nil {
+		// means we already uploaded the results.
+		return discard(t.workload, t.metadata, idle(t.metadata))
+	} else if err != nil {
 		return failure(errorsx.Wrapf(err, "unable to upload completion: %s", t.workload.Id), newdelay(backoff.RandomFromRange(time.Second), t))
 	}
 
@@ -589,5 +601,6 @@ func (t statediscard) Update(ctx context.Context) state {
 		return failure(errorsx.Wrap(err, "completion failed"), t.n)
 	}
 
-	return t.n
+	// strictly probably not necessary, but ensure the workloads dont sync up by introducing a small randomized delay between workloads.
+	return newdelay(backoff.DynamicHashDuration(100*time.Millisecond, strconv.FormatInt(int64(t.metadata.id), 36)), t.n)
 }

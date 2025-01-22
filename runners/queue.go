@@ -3,6 +3,7 @@ package runners
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"io/fs"
@@ -21,6 +22,7 @@ import (
 	"github.com/egdaemon/eg/internal/debugx"
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
+	"github.com/egdaemon/eg/internal/execx"
 	"github.com/egdaemon/eg/internal/fsx"
 	"github.com/egdaemon/eg/internal/gitx"
 	"github.com/egdaemon/eg/internal/iox"
@@ -75,11 +77,15 @@ func (t localdownloader) Download(ctx context.Context) (err error) {
 		return errorsx.Wrap(err, "failed to watch queued directory")
 	}
 
-	select {
-	case <-pending.Events:
-		return nil
-	case <-ctx.Done():
-		return ctx.Err()
+	for {
+		select {
+		case evt := <-pending.Events:
+			if evt.Op == fsnotify.Create {
+				return nil
+			}
+		case <-ctx.Done():
+			return ctx.Err()
+		}
 	}
 }
 
@@ -126,6 +132,9 @@ func BuildRootContainer(ctx context.Context) error {
 }
 
 func BuildRootContainerPath(ctx context.Context, dir, path string) (err error) {
+	debugx.Println("building root container initiated")
+	defer debugx.Println("building root container completed")
+
 	if err = eg.PrepareRootContainer(path); err != nil {
 		return errorsx.Wrapf(err, "preparing root container failed: %s", path)
 	}
@@ -135,7 +144,7 @@ func BuildRootContainerPath(ctx context.Context, dir, path string) (err error) {
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 
-	if err = cmd.Run(); err != nil {
+	if err = execx.MaybeRun(cmd); err != nil {
 		return errorsx.Wrap(err, "build failed")
 	}
 
@@ -161,6 +170,7 @@ func workload(ctx context.Context, rm *ResourceManager, dirs *SpoolDirs, reload 
 		case <-ctx.Done():
 			return ctx.Err()
 		default:
+			log.Printf("running %T\n", s)
 			s = s.Update(ctx)
 		}
 
@@ -184,10 +194,6 @@ func Queue(ctx context.Context, rm *ResourceManager, options ...func(*metadata))
 		close(reload)
 		return nil
 	})(ctx, syscall.SIGHUP)
-
-	if err = BuildRootContainer(ctx); err != nil {
-		return err
-	}
 
 	dirs := DefaultSpoolDirs()
 	var (
@@ -263,27 +269,6 @@ func (t statefailure) Update(ctx context.Context) state {
 	return t.next
 }
 
-func newdelay(d time.Duration, next state) state {
-	return statedelay{
-		d:    d,
-		next: next,
-	}
-}
-
-type statedelay struct {
-	d    time.Duration
-	next state
-}
-
-func (t statedelay) Update(ctx context.Context) state {
-	select {
-	case <-ctx.Done():
-		return terminate(ctx.Err())
-	case <-time.After(t.d):
-		return t.next
-	}
-}
-
 func idle(md metadata) stateidle {
 	return stateidle{
 		metadata: md,
@@ -295,10 +280,6 @@ type stateidle struct {
 }
 
 func (t stateidle) Update(ctx context.Context) state {
-	// var (
-	// 	err error
-	// )
-
 	select {
 	case <-ctx.Done():
 		return failure(ctx.Err(), nil)
@@ -314,18 +295,16 @@ func (t stateidle) Update(ctx context.Context) state {
 		log.Println("unable to dequeue", err)
 	}
 
-	// check upstream....
-	// if err = t.metadata.Download(ctx); errors.Is(err, context.DeadlineExceeded) {
-	// 	return terminate(err)
-	// } else if errors.Is(err, context.Canceled) {
-	// 	return terminate(err)
-	// } else if err != nil {
-	// 	log.Println(err)
-	// 	return newdelay(backoff.RandomFromRange(time.Second), t)
-	// }
-	// return t
+	// check the spool directory....
+	if err := t.metadata.Download(ctx); errors.Is(err, context.DeadlineExceeded) {
+		return terminate(err)
+	} else if errors.Is(err, context.Canceled) {
+		return nil
+	} else if err != nil {
+		return failure(err, t)
+	}
 
-	return newdelay(backoff.RandomFromRange(time.Second), t)
+	return t
 }
 
 func recover(_ context.Context, md metadata) error {
@@ -401,23 +380,6 @@ func beginwork(ctx context.Context, md metadata, dir string) state {
 		log.Println("wasi cache prewarmed", wasix.WazCacheDir(filepath.Join(ws.Root, ws.RuntimeDir)))
 	}
 
-	{
-		rootc := filepath.Join(filepath.Join(ws.Root, ws.RuntimeDir), "Containerfile")
-
-		if err = eg.PrepareRootContainer(rootc); err != nil {
-			return completed(workload.Enqueued, md, ws, 0, errorsx.Wrap(err, "preparing root container failed"))
-		}
-
-		cmd := exec.CommandContext(ctx, "podman", "build", "-t", "eg", "-f", rootc, ws.Root)
-		cmd.Stderr = os.Stderr
-		cmd.Stdin = os.Stdin
-		cmd.Stdout = os.Stdout
-
-		if err = cmd.Run(); err != nil {
-			return completed(workload.Enqueued, md, ws, 0, errorsx.Wrap(err, "build failed"))
-		}
-	}
-
 	environpath := filepath.Join(ws.Root, ws.RuntimeDir, "environ.env")
 
 	envb := envx.Build().FromPath(environpath).
@@ -444,6 +406,7 @@ func beginwork(ctx context.Context, md metadata, dir string) state {
 		AgentOptionCores(workload.Enqueued.Cores),
 		AgentOptionMemory(workload.Enqueued.Memory),
 		AgentOptionHostOS(),
+		AgentOptionCommandLine("--network", "host"),
 		AgentOptionCommandLine("--pids-limit", "-1"), // more bullshit. without this we get "Error: OCI runtime error: crun: the requested cgroup controller `pids` is not available"
 	)
 
@@ -479,58 +442,58 @@ type staterunning struct {
 }
 
 func (t staterunning) Update(ctx context.Context) state {
-	log.Println("work initiated", t.dir)
 	select {
 	case <-ctx.Done():
 		return terminate(ctx.Err())
 	default:
-		var (
-			err           error
-			logdst        *os.File
-			containerdir  = userx.DefaultCacheDirectory("wcache", cacheprefix(t.workload), cachebucket(t.workload), "containers")
-			cachedir      = userx.DefaultCacheDirectory("wcache", cacheprefix(t.workload), cachebucket(t.workload), "workloadcache")
-			logpath       = filepath.Join(t.ws.Root, t.ws.RuntimeDir, "daemon.log")
-			analyticspath = filepath.Join(t.ws.Root, t.ws.RuntimeDir, "analytics.db")
-		)
-
-		if err = fsx.MkDirs(0770, containerdir, cachedir); err != nil {
-			return completed(t.workload, t.metadata, t.ws, 0, errorsx.Wrap(err, "unable to setup container and cache directories"))
-		}
-
-		log.Println("workload root cachedir", cachedir)
-
-		if logdst, err = os.Create(logpath); err != nil {
-			return completed(t.workload, t.metadata, t.ws, 0, err)
-		}
-		defer logdst.Close()
-
-		if err = events.InitializeDB(ctx, analyticspath); err != nil {
-			return completed(t.workload, t.metadata, t.ws, 0, err)
-		}
-
-		options := append(
-			t.ragent.Options(),
-			"--replace", // during recovery we might have a container already running.
-			"--volume", AgentMountReadWrite(containerdir, "/var/lib/containers"),
-			"--volume", AgentMountReadOnly(filepath.Join(t.ws.Root, t.ws.RuntimeDir, t.workload.Entry), eg.DefaultMountRoot(eg.ModuleBin)),
-			"--volume", AgentMountReadWrite(filepath.Join(t.ws.Root, t.ws.RuntimeDir), eg.DefaultMountRoot(eg.RuntimeDirectory)),
-			"--volume", AgentMountReadWrite(filepath.Join(t.ws.Root, t.ws.WorkingDir), eg.DefaultMountRoot(eg.WorkingDirectory)),
-			"--volume", AgentMountReadWrite(cachedir, eg.DefaultMountRoot(eg.CacheDirectory)),
-		)
-
-		logger := log.New(io.MultiWriter(os.Stderr, logdst), t.ragent.id, log.Flags())
-		prepcmd := func(cmd *exec.Cmd) *exec.Cmd {
-			cmd.Dir = t.ws.Root
-			cmd.Stdout = logger.Writer()
-			cmd.Stderr = logger.Writer()
-			return cmd
-		}
-
-		ts := time.Now()
-		// TODO REVISIT using t.ws.RuntimeDir as moduledir.
-		err = c8s.PodmanModule(ctx, prepcmd, "eg", fmt.Sprintf("eg-%s", t.ragent.id), t.ws.RuntimeDir, options...)
-		return completed(t.workload, t.metadata, t.ws, time.Since(ts), err)
 	}
+
+	var (
+		err           error
+		logdst        *os.File
+		containerdir  = userx.DefaultCacheDirectory("wcache", cacheprefix(t.workload), cachebucket(t.workload), "containers")
+		cachedir      = userx.DefaultCacheDirectory("wcache", cacheprefix(t.workload), cachebucket(t.workload), "workloadcache")
+		logpath       = filepath.Join(t.ws.Root, t.ws.RuntimeDir, "daemon.log")
+		analyticspath = filepath.Join(t.ws.Root, t.ws.RuntimeDir, "analytics.db")
+	)
+
+	if err = fsx.MkDirs(0770, containerdir, cachedir); err != nil {
+		return completed(t.workload, t.metadata, t.ws, 0, errorsx.Wrap(err, "unable to setup container and cache directories"))
+	}
+
+	log.Println("workload root cachedir", cachedir)
+
+	if logdst, err = os.Create(logpath); err != nil {
+		return completed(t.workload, t.metadata, t.ws, 0, err)
+	}
+	defer logdst.Close()
+
+	if err = events.InitializeDB(ctx, analyticspath); err != nil {
+		return completed(t.workload, t.metadata, t.ws, 0, err)
+	}
+
+	options := append(
+		t.ragent.Options(),
+		"--replace", // during recovery we might have a container already running.
+		"--volume", AgentMountReadWrite(containerdir, "/var/lib/containers"),
+		"--volume", AgentMountReadOnly(filepath.Join(t.ws.Root, t.ws.RuntimeDir, t.workload.Entry), eg.DefaultMountRoot(eg.ModuleBin)),
+		"--volume", AgentMountReadWrite(filepath.Join(t.ws.Root, t.ws.RuntimeDir), eg.DefaultMountRoot(eg.RuntimeDirectory)),
+		"--volume", AgentMountReadWrite(filepath.Join(t.ws.Root, t.ws.WorkingDir), eg.DefaultMountRoot(eg.WorkingDirectory)),
+		"--volume", AgentMountReadWrite(cachedir, eg.DefaultMountRoot(eg.CacheDirectory)),
+	)
+
+	logger := log.New(io.MultiWriter(os.Stderr, logdst), t.ragent.id, log.Flags())
+	prepcmd := func(cmd *exec.Cmd) *exec.Cmd {
+		cmd.Dir = t.ws.Root
+		cmd.Stdout = logger.Writer()
+		cmd.Stderr = logger.Writer()
+		return cmd
+	}
+
+	ts := time.Now()
+	// TODO REVISIT using t.ws.RuntimeDir as moduledir.
+	err = c8s.PodmanModule(ctx, prepcmd, "eg", fmt.Sprintf("eg-%s", t.ragent.id), t.ws.RuntimeDir, options...)
+	return completed(t.workload, t.metadata, t.ws, time.Since(ts), err)
 }
 
 func completed(workload *Enqueued, md metadata, ws workspaces.Context, duration time.Duration, cause error) statecompleted {
@@ -540,6 +503,27 @@ func completed(workload *Enqueued, md metadata, ws workspaces.Context, duration 
 		metadata: md,
 		cause:    cause,
 		duration: duration,
+	}
+}
+
+func newdelay(d time.Duration, next state) state {
+	return statedelay{
+		d:    d,
+		next: next,
+	}
+}
+
+type statedelay struct {
+	d    time.Duration
+	next state
+}
+
+func (t statedelay) Update(ctx context.Context) state {
+	select {
+	case <-ctx.Done():
+		return terminate(ctx.Err())
+	case <-time.After(t.d):
+		return t.next
 	}
 }
 
@@ -572,7 +556,7 @@ func (t statecompleted) Update(ctx context.Context) state {
 	defer analytics.Close()
 
 	if err = t.metadata.completion.Upload(ctx, t.workload.Id, t.duration, t.cause, logs, analytics); err != nil {
-		return discard(t.workload, t.metadata, failure(errorsx.Wrapf(err, "unable to upload completion: %s", t.workload.Id), idle(t.metadata)))
+		return failure(errorsx.Wrapf(err, "unable to upload completion: %s", t.workload.Id), newdelay(backoff.RandomFromRange(time.Second), t))
 	}
 
 	if t.cause != nil {

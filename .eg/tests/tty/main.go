@@ -7,7 +7,6 @@ import (
 	"os"
 	"sort"
 	"strings"
-	"time"
 
 	"github.com/egdaemon/eg/runtime/wasi/eg"
 	"github.com/egdaemon/eg/runtime/wasi/egenv"
@@ -39,7 +38,7 @@ func main() {
 		egbug.Users,
 		egbug.FileTree,
 		eg.Build(eg.DefaultModule()),
-		eg.Module(ctx, eg.DefaultModule(), shell.Op(shell.New("systemctl status systemd-resolved.service").Privileged().Timeout(time.Second))),
+		eg.Module(ctx, eg.DefaultModule(), egbug.SystemInit),
 	)
 
 	if err != nil {

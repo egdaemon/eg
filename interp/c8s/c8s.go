@@ -1,18 +1,28 @@
 package c8s
 
 import (
-	"bufio"
+	"bytes"
 	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
 	"io"
+	"log"
+	"net"
+	"net/http"
 	"os"
 	"os/exec"
+	"os/signal"
+	"reflect"
+	"syscall"
 	"time"
 
+	"github.com/containers/common/pkg/detach"
 	"github.com/containers/podman/v5/libpod/define"
 	"github.com/containers/podman/v5/pkg/api/handlers"
+	"github.com/containers/podman/v5/pkg/bindings"
 	"github.com/containers/podman/v5/pkg/bindings/containers"
 	"github.com/containers/podman/v5/pkg/errorhandling"
-	"github.com/creack/pty"
 	"github.com/docker/docker/api/types/container"
 	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/internal/debugx"
@@ -20,6 +30,8 @@ import (
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/execx"
 	"github.com/egdaemon/eg/internal/langx"
+
+	xterm "golang.org/x/term"
 )
 
 func silence(c *exec.Cmd) *exec.Cmd {
@@ -142,32 +154,9 @@ func PodmanModuleRunCmd(image, cname string, options ...string) []string {
 // runcmd is md5 of the command that generated the container.
 func moduleExec(ctx context.Context, cname, moduledir string, stdin io.Reader, stdout io.Writer, stderr io.Writer) (err error) {
 	var (
-		result *define.InspectExecSession
+		result     *define.InspectExecSession
+		rtty, wtty *os.File
 	)
-
-	// we don't close tty because ostensibly podman handles it.... this is probably
-	// a bad assumption and a memory leak.
-	ppty, tty, err := pty.Open()
-	if err != nil {
-		return err
-	}
-
-	// log.Println("moduleExec initiated", ppty.Name(), tty.Name())
-	// defer log.Println("moduleExec completed", ppty.Name(), tty.Name())
-	defer func() {
-		errorsx.Log(
-			errorsx.Wrap(
-				errorsx.Compact(tty.Close(), ppty.Close()),
-				"failed to close pty",
-			),
-		)
-	}()
-
-	rtty, wtty, err := os.Pipe()
-	if err != nil {
-		return errorsx.Wrap(err, "unable prepare pipe")
-	}
-	defer wtty.Close()
 
 	id, err := containers.ExecCreate(ctx, cname, &handlers.ExecCreateConfig{
 		ExecConfig: container.ExecOptions{
@@ -196,49 +185,37 @@ func moduleExec(ctx context.Context, cname, moduledir string, stdin io.Reader, s
 		errorsx.Log(errorsx.Wrap(containers.ExecRemove(ctx, id, &containers.ExecRemoveOptions{Force: langx.Autoptr(true)}), "failed to remove exec session"))
 	}()
 
-	go func() {
-		debugx.Println("stdout copy initiated", ppty.Name())
-		defer debugx.Println("stdout copy completed", ppty.Name())
-		_, _ = io.Copy(stdout, ppty) // not important
-	}()
-
 	if stdin != nil {
+		rtty, wtty, err = os.Pipe()
+		if err != nil {
+			return errorsx.Wrap(err, "unable prepare pipe")
+		}
+		defer wtty.Close()
+		defer rtty.Close()
+
 		go func() {
-			debugx.Println("stdin copy initiated", tty.Name())
-			defer debugx.Println("stdin copy completed", tty.Name())
 			_, _ = io.Copy(wtty, stdin) // not important
 		}()
 	}
-
-	err = containers.ExecStartAndAttach(ctx, id, &containers.ExecStartAndAttachOptions{
-		InputStream:  bufio.NewReader(rtty),
-		OutputStream: langx.Autoptr(io.Writer(tty)),
-		ErrorStream:  langx.Autoptr(io.Writer(stderr)),
-		AttachOutput: langx.Autoptr(true),
-		AttachError:  langx.Autoptr(true),
-		AttachInput:  langx.Autoptr(true),
-	})
+	err = execAttach(ctx, id, rtty, stdout, stderr)
 	if err != nil {
-		return errorsx.Wrap(err, "podman exec start failed")
+		return errorsx.Wrap(err, "podman exec attach failed")
 	}
-
-	if result, err = containers.ExecInspect(ctx, id, nil); err != nil {
-		return err
-	} else if result.ExitCode > 0 {
-		return errorsx.Errorf("module failed with exit code: %d", result.ExitCode)
-	}
-
-	// soft removal.
-	errorsx.Log(errorsx.Wrap(containers.ExecRemove(ctx, id, &containers.ExecRemoveOptions{}), "failed to remove exec session"))
 
 	// wait for the exec session to disappear
 	for {
-		if _, err = containers.ExecInspect(ctx, id, nil); err != nil {
+		if result, err = containers.ExecInspect(ctx, id, nil); err != nil {
 			if errm, ok := err.(*errorhandling.ErrorModel); ok && errm.Code() == 404 {
 				return nil
 			} else {
 				return errorsx.Wrapf(err, "unknown exec session error: %d %s", errm.Code(), errm.Error())
 			}
+		} else if result.ExitCode > 0 {
+			return errorsx.Errorf("module failed with exit code: %d", result.ExitCode)
+		} else if !result.Running {
+			// soft removal.
+			errorsx.Log(errorsx.Wrap(containers.ExecRemove(ctx, id, &containers.ExecRemoveOptions{}), "failed to remove exec session"))
+			continue
 		}
 
 		select {
@@ -247,4 +224,215 @@ func moduleExec(ctx context.Context, cname, moduledir string, stdin io.Reader, s
 		case <-time.After(100 * time.Millisecond):
 		}
 	}
+}
+
+func execAttach(ctx context.Context, sessionID string, stdin io.Reader, stdout io.Writer, stderr io.Writer) error {
+	isSet := struct {
+		stdin  bool
+		stdout bool
+		stderr bool
+	}{
+		stdin:  !(stdin == nil || reflect.ValueOf(stdin).IsNil()),
+		stdout: !(stdout == nil || reflect.ValueOf(stdout).IsNil()),
+		stderr: !(stderr == nil || reflect.ValueOf(stderr).IsNil()),
+	}
+	// Ensure golang can determine that interfaces are "really" nil
+	if !isSet.stdin {
+		stdin = (io.Reader)(nil)
+	}
+	if !isSet.stdout {
+		stdout = (io.Writer)(nil)
+	}
+	if !isSet.stderr {
+		stderr = (io.Writer)(nil)
+	}
+
+	conn, err := bindings.GetClient(ctx)
+	if err != nil {
+		return err
+	}
+
+	// Unless all requirements are met, don't use "stdin" is a terminal
+	file, ok := stdin.(*os.File)
+	_, outOk := stdout.(*os.File)
+	needTTY := ok && outOk && xterm.IsTerminal(int(file.Fd()))
+	if needTTY {
+		state, err := xterm.MakeRaw(int(file.Fd()))
+		if err != nil {
+			return err
+		}
+		defer func() {
+			if err := xterm.Restore(int(file.Fd()), state); err != nil {
+				log.Println("unable to restore terminal state", err)
+			}
+		}()
+	}
+
+	body := struct {
+		Detach bool   `json:"Detach"`
+		TTY    bool   `json:"Tty"`
+		Height uint16 `json:"h"`
+		Width  uint16 `json:"w"`
+	}{
+		Detach: false,
+		TTY:    needTTY,
+	}
+	bodyJSON, err := json.Marshal(body)
+	if err != nil {
+		return err
+	}
+
+	var socket net.Conn
+	socketSet := false
+	dialContext := conn.Client.Transport.(*http.Transport).DialContext
+	t := &http.Transport{
+		DialContext: func(ctx context.Context, network, address string) (net.Conn, error) {
+			c, err := dialContext(ctx, network, address)
+			if err != nil {
+				return nil, err
+			}
+			if !socketSet {
+				socket = c
+				socketSet = true
+			}
+			return c, err
+		},
+		IdleConnTimeout: time.Duration(0),
+	}
+	conn.Client.Transport = t
+	// We need to inspect the exec session first to determine whether to use
+	// -t.
+	resp, err := conn.DoRequest(ctx, bytes.NewReader(bodyJSON), http.MethodPost, "/exec/%s/start", nil, nil, sessionID)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if !(resp.IsSuccess() || resp.IsInformational()) {
+		defer resp.Body.Close()
+		return resp.Process(nil)
+	}
+
+	if needTTY {
+		winChange := make(chan os.Signal, 1)
+		winCtx, winCancel := context.WithCancel(ctx)
+		defer winCancel()
+		signal.Notify(winChange, syscall.SIGWINCH)
+		attachHandleResize(ctx, winCtx, winChange, sessionID, file)
+	}
+
+	stdoutChan := make(chan error)
+	stdinChan := make(chan error, 1) // stdin channel should not block
+
+	if isSet.stdin {
+		go func() {
+			_, err := detach.Copy(socket, stdin, []byte{})
+			if err != nil && err != define.ErrDetach {
+				log.Println("failed to write input to service:", err)
+			}
+			if err == nil {
+				if closeWrite, ok := socket.(containers.CloseWriter); ok {
+					if err := closeWrite.CloseWrite(); err != nil {
+						debugx.Printf("Failed to close STDIN for writing: %v", err)
+					}
+				}
+			}
+			stdinChan <- err
+		}()
+	}
+
+	buffer := make([]byte, 1024)
+	if needTTY {
+		go func() {
+			// If not multiplex'ed, read from server and write to stdout
+			_, err := io.Copy(stdout, socket)
+			stdoutChan <- err
+		}()
+
+		for {
+			select {
+			case err := <-stdoutChan:
+				if err != nil {
+					return err
+				}
+
+				return nil
+			case err := <-stdinChan:
+				if err != nil {
+					return err
+				}
+
+				return nil
+			}
+		}
+	} else {
+		for {
+			// Read multiplexed channels and write to appropriate stream
+			fd, l, err := containers.DemuxHeader(socket, buffer)
+			if err != nil {
+				if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
+					return nil
+				}
+				return err
+			}
+			frame, err := containers.DemuxFrame(socket, buffer, l)
+			if err != nil {
+				return err
+			}
+
+			switch {
+			case fd == 0:
+				if isSet.stdout {
+					if _, err := stdout.Write(frame[0:l]); err != nil {
+						return err
+					}
+				}
+			case fd == 1:
+				if isSet.stdout {
+					if _, err := stdout.Write(frame[0:l]); err != nil {
+						return err
+					}
+				}
+			case fd == 2:
+				if isSet.stderr {
+					if _, err := stderr.Write(frame[0:l]); err != nil {
+						return err
+					}
+				}
+			case fd == 3:
+				return fmt.Errorf("from service from stream: %s", frame)
+			default:
+				return fmt.Errorf("unrecognized channel '%d' in header, 0-3 supported", fd)
+			}
+		}
+	}
+}
+
+// This is intended to not be run as a goroutine, handling resizing for a container
+// or exec session. It will call resize once and then starts a goroutine which calls resize on winChange
+func attachHandleResize(ctx, winCtx context.Context, winChange chan os.Signal, id string, file *os.File) {
+	resize := func() {
+		w, h, err := xterm.GetSize(int(file.Fd()))
+		if err != nil {
+			debugx.Println("Failed to obtain TTY size:", err)
+		}
+
+		err = containers.ResizeExecTTY(ctx, id, new(containers.ResizeExecTTYOptions).WithHeight(h).WithWidth(w))
+		if err != nil {
+			debugx.Println("unable to resize tty", err)
+		}
+	}
+
+	resize()
+
+	go func() {
+		for {
+			select {
+			case <-winCtx.Done():
+				return
+			case <-winChange:
+				resize()
+			}
+		}
+	}()
 }

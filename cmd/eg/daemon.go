@@ -122,12 +122,12 @@ func (t daemon) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 		}
 	}
 
-	if err = runners.BuildRootContainer(gctx.Context); err != nil {
+	ctx, err := cmdopts.WithPodman(gctx.Context)
+	if err != nil {
 		return err
 	}
 
-	ctx, err := cmdopts.WithPodman(gctx.Context)
-	if err != nil {
+	if err = runners.BuildRootContainer(ctx); err != nil {
 		return err
 	}
 

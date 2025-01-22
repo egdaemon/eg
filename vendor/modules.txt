@@ -1,3 +1,4 @@
+## workspace
 # dario.cat/mergo v1.0.1
 ## explicit; go 1.13
 dario.cat/mergo
@@ -380,7 +381,6 @@ github.com/coreos/go-systemd/v22/journal
 github.com/coreos/go-systemd/v22/sdjournal
 # github.com/creack/pty v1.1.24
 ## explicit; go 1.18
-github.com/creack/pty
 # github.com/cyberphone/json-canonicalization v0.0.0-20231217050601-ba74d44ecf5f
 ## explicit
 github.com/cyberphone/json-canonicalization/go/src/webpki.org/jsoncanonicalizer
@@ -460,6 +460,8 @@ github.com/ebitengine/purego
 github.com/ebitengine/purego/internal/cgo
 github.com/ebitengine/purego/internal/fakecgo
 github.com/ebitengine/purego/internal/strings
+# github.com/egdaemon/eg v0.0.0-20250121181156-b9cd1a1685ea
+## explicit; go 1.23.4
 # github.com/egdaemon/wasinet/wasinet v0.0.0-20250120175550-4106c2611afa
 ## explicit; go 1.23.4
 github.com/egdaemon/wasinet/wasinet
@@ -1710,7 +1712,9 @@ gonum.org/v1/gonum/mathext/internal/amos
 gonum.org/v1/gonum/mathext/internal/cephes
 gonum.org/v1/gonum/mathext/internal/gonum
 # google.golang.org/genproto/googleapis/rpc v0.0.0-20241015192408-796eee8c2d53
-## explicit; go 1.21
+## explicit; go 1.22
+# google.golang.org/genproto/googleapis/rpc v0.0.0-20250115164207-1a7da9e5054f
+## explicit; go 1.22
 google.golang.org/genproto/googleapis/rpc/status
 # google.golang.org/grpc v1.69.4
 ## explicit; go 1.22

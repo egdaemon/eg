@@ -13,7 +13,7 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
-	reflect "reflect"
+	"reflect"
 	"syscall"
 	"time"
 
@@ -197,9 +197,8 @@ func moduleExec(ctx context.Context, cname, moduledir string, stdin io.Reader, s
 			_, _ = io.Copy(wtty, stdin) // not important
 		}()
 	}
-	err = execAttach(ctx, id, rtty, stdout, stderr, nil)
+	err = execAttach(ctx, id, rtty, stdout, stderr)
 	if err != nil {
-		log.Println("CHECKPOINT", err)
 		return errorsx.Wrap(err, "podman exec attach failed")
 	}
 
@@ -209,7 +208,6 @@ func moduleExec(ctx context.Context, cname, moduledir string, stdin io.Reader, s
 			if errm, ok := err.(*errorhandling.ErrorModel); ok && errm.Code() == 404 {
 				return nil
 			} else {
-				log.Println("CHECKPOINT", err)
 				return errorsx.Wrapf(err, "unknown exec session error: %d %s", errm.Code(), errm.Error())
 			}
 		} else if result.ExitCode > 0 {
@@ -228,7 +226,7 @@ func moduleExec(ctx context.Context, cname, moduledir string, stdin io.Reader, s
 	}
 }
 
-func execAttach(ctx context.Context, sessionID string, stdin io.Reader, stdout io.Writer, stderr io.Writer, attachReady chan bool) error {
+func execAttach(ctx context.Context, sessionID string, stdin io.Reader, stdout io.Writer, stderr io.Writer) error {
 	isSet := struct {
 		stdin  bool
 		stdout bool

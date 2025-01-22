@@ -565,20 +565,16 @@ func (t statecompleted) Update(ctx context.Context) state {
 	}
 	defer analytics.Close()
 	if err = t.metadata.completion.Upload(ctx, t.workload.Id, t.duration, t.cause, logs, analytics); httpx.IsStatusError(err, http.StatusNotFound) != nil {
-		log.Println("checkpoint")
 		// means we already uploaded the results.
 		return discard(t.workload, t.metadata, idle(t.metadata))
 	} else if err != nil {
-		log.Println("checkpoint")
 		return failure(errorsx.Wrapf(err, "unable to upload completion: %s", t.workload.Id), newdelay(backoff.RandomFromRange(time.Second), t))
 	}
 
 	if t.cause != nil {
-		log.Println("checkpoint")
 		return discard(t.workload, t.metadata, failure(errorsx.Wrap(t.cause, "work failed"), idle(t.metadata)))
 	}
 
-	log.Println("checkpoint")
 	return discard(t.workload, t.metadata, idle(t.metadata))
 }
 

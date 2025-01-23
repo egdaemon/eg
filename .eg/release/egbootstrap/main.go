@@ -4,7 +4,7 @@ import (
 	"context"
 	"log"
 
-	"github.com/egdaemon/eg/.eg/debuild/egbootstrap"
+	"eg/compute/debuild/egbootstrap"
 
 	"github.com/egdaemon/eg/runtime/wasi/eg"
 	"github.com/egdaemon/eg/runtime/wasi/egenv"

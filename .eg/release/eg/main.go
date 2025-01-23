@@ -4,7 +4,7 @@ import (
 	"context"
 	"log"
 
-	debian "github.com/egdaemon/eg/.eg/debuild/eg"
+	debian "eg/compute/debuild/eg"
 
 	"github.com/egdaemon/eg/runtime/wasi/eg"
 	"github.com/egdaemon/eg/runtime/wasi/egenv"

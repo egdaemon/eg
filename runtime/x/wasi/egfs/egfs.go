@@ -65,15 +65,28 @@ func CloneFS(ctx context.Context, dstdir string, rootdir string, archive fs.FS) 
 			return nil
 		}
 
-		dst := filepath.Join(dstdir, strings.TrimPrefix(path, rootdir))
+		rel := strings.TrimPrefix(path, rootdir)
 		if rootdir == path {
-			dst = path
+			rel = path
 		}
 
-		debugx.Println("cloning", rootdir, path, "->", dst, os.FileMode(0755), os.FileMode(0600))
+		dst := filepath.Join(dstdir, rel)
+
+		info, err := d.Info()
+		if err != nil {
+			return err
+		}
+
+		debugx.Println("cloning", rootdir, path, "->", dst, info.Mode().Perm())
 
 		if d.IsDir() {
-			return os.MkdirAll(dst, 0755)
+			return os.MkdirAll(dst, info.Mode().Perm())
+		}
+
+		if !d.IsDir() && rootdir == path {
+			if err = os.MkdirAll(filepath.Dir(dst), 0777); err != nil {
+				return err
+			}
 		}
 
 		c, err := archive.Open(path)
@@ -82,7 +95,7 @@ func CloneFS(ctx context.Context, dstdir string, rootdir string, archive fs.FS) 
 		}
 		defer c.Close()
 
-		df, err := os.OpenFile(dst, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0600)
+		df, err := os.OpenFile(dst, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, info.Mode().Perm())
 		if err != nil {
 			return err
 		}

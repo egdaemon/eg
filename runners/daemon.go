@@ -70,7 +70,7 @@ func AgentOptionEGBin(egbin string) AgentOption {
 }
 
 func AgentOptionEnviron(environpath string) AgentOption {
-	return AgentOptionVolumes(AgentMountReadOnly(environpath, eg.DefaultMountRoot(eg.RuntimeDirectory, "environ.env")))
+	return AgentOptionVolumes(AgentMountReadOnly(environpath, eg.DefaultMountRoot(eg.RuntimeDirectory, eg.EnvironFile)))
 }
 
 func AgentOptionVolumeSpecs(desc ...string) []string {

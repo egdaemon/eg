@@ -67,6 +67,7 @@ func FileTree(ctx context.Context, op eg.Op) error {
 		privileged.Newf("tree -a -L 1 %s", egenv.CacheDirectory()),
 		privileged.Newf("tree -a -L 1 %s", egenv.EphemeralDirectory()),
 		privileged.Newf("tree -a -L 1 %s", egenv.WorkingDirectory()),
+		privileged.Newf("tree -a -L 1 %s", _eg.DefaultMountRoot()),
 	)
 }
 

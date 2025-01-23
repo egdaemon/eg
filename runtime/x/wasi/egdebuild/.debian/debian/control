@@ -1,0 +1,12 @@
+Source: ${DEB_PACKAGE_NAME}
+Section: misc
+Maintainer: ${DEB_MAINTAINER_FULLNAME} <${DEB_MAINTAINER_EMAIL}>
+Standards-Version: 4.6.0.1
+Priority: extra
+Build-Depends: ${DEB_DEPENDS_BUILD}
+
+Package: ${DEB_PACKAGE_NAME}
+Section: misc
+Architecture: ${DEB_ARCHITECTURE}
+Description: ${DEB_DESCRIPTION}
+Depends: ${DEB_DEPENDS_RUNTIME}

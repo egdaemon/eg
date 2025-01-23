@@ -5,13 +5,11 @@ import (
 	"io"
 	"log"
 	"net"
-	"time"
 
 	"github.com/egdaemon/eg/internal/cryptox"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/libp2px"
 	"github.com/egdaemon/eg/internal/netx"
-	"github.com/egdaemon/eg/internal/timex"
 
 	"github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p/core/crypto"
@@ -28,8 +26,8 @@ import (
 	dsync "github.com/ipfs/go-datastore/sync"
 )
 
-func P2PProxy(ctx context.Context, rendezvous string, seed []byte, httpl net.Listener) (zero host.Host, err error) {
-	logging.SetAllLoggers(logging.LevelInfo)
+func P2PProxy(ctx context.Context, seed []byte, httpl net.Listener) (zero host.Host, err error) {
+	logging.SetAllLoggers(logging.LevelError)
 	priv, _, err := crypto.GenerateEd25519Key(cryptox.NewPRNGSHA512(seed))
 	if err != nil {
 		return zero, errorsx.Wrap(err, "unable to generate p2p credentials")
@@ -64,9 +62,9 @@ func P2PProxy(ctx context.Context, rendezvous string, seed []byte, httpl net.Lis
 		log.Fatalln(err)
 	}
 
-	go timex.Every(10*time.Minute, func() {
-		libp2px.SampledPeers(p2p)
-	})
+	// go timex.Every(10*time.Minute, func() {
+	// 	libp2px.SampledPeers(p2p)
+	// })
 
 	// Set a stream handler on host A. /echo/1.0.0 is
 	// a user-defined protocol name.
@@ -99,7 +97,7 @@ func P2PProxy(ctx context.Context, rendezvous string, seed []byte, httpl net.Lis
 	})
 
 	// go libp2px.DebugEvents(p2p)
-	log.Println("p2p identity", p2p.ID(), libp2px.Address(p2p), rendezvous)
+	log.Println("p2p identity", p2p.ID(), libp2px.Address(p2p))
 
 	return p2p, nil
 }

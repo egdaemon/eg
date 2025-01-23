@@ -71,7 +71,7 @@ func (t daemon) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 		return errorsx.Wrap(err, "unable to retrieve identity credentials")
 	}
 
-	if p2p, err = daemons.P2PProxy(gctx.Context, t.Seed, append([]byte(machineID()), signer.PublicKey().Marshal()...), httpl); err != nil {
+	if p2p, err = daemons.P2PProxy(gctx.Context, append([]byte(machineID()), signer.PublicKey().Marshal()...), httpl); err != nil {
 		return errorsx.Wrap(err, "unable to initialize p2p")
 	}
 

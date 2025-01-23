@@ -21,7 +21,7 @@ override_dh_auto_build:
 	mkdir $(CURDIR)/bin
 	# need to set gocache otherwise it'll error out on launchpad builders
 	GOBIN="$(CURDIR)/bin" GOCACHE="$(CURDIR)/.gocache" /usr/lib/go-1.23/bin/go env
-	GOWORK="off" GOPROXY="direct" GOCACHE="$(CURDIR)/.gocache" GOBIN="$(CURDIR)/bin" /usr/lib/go-1.23/bin/go build -C src -mod=vendor -ldflags="-X 'github.com/egdaemon/eg/cmd/cmdopts.Treeish=${VCS_REVISION}'" -tags "no_duckdb_arrow" -o "$(CURDIR)/bin" -buildvcs=false ./cmd/...
+	GOPROXY="direct" GOCACHE="$(CURDIR)/.gocache" GOBIN="$(CURDIR)/bin" /usr/lib/go-1.23/bin/go build -C src -mod=vendor -ldflags="-X 'github.com/egdaemon/eg/cmd/cmdopts.Treeish=${VCS_REVISION}'" -tags "no_duckdb_arrow" -o "$(CURDIR)/bin" -buildvcs=false ./cmd/...
 
 override_dh_auto_test:
 	echo "DH AUTO TEST OVERRIDE"

@@ -165,9 +165,8 @@ func (t local) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err e
 			runners.AgentMountReadWrite(filepath.Join(ws.Root, ws.RuntimeDir), eg.DefaultMountRoot(eg.RuntimeDirectory)),
 			runners.AgentOptionContainerCache(t.ContainerCache),
 		),
-		gnupghome, // must come after the runtime directory mount to ensure correct mounting order.
-		runners.AgentOptionEnviron(environpath),
-		runners.AgentOptionCommandLine("--env-file", environpath), // required for tty to work correct in local mode.
+		gnupghome,                               // must come after the runtime directory mount to ensure correct mounting order.
+		runners.AgentOptionEnviron(environpath), // ensure we pick up the environment file with the container.
 		runners.AgentOptionHostOS(),
 	)
 

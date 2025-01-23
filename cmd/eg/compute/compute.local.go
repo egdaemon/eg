@@ -97,6 +97,8 @@ func (t local) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err e
 		FromEnv(t.Environment...).
 		FromEnv(os.Environ()...).
 		FromEnviron(errorsx.Zero(gitx.LocalEnv(repo, t.GitRemote, t.GitReference))...).
+		Var(eg.EnvComputeRunID, uid.String()).
+		Var(eg.EnvComputeLoggingVerbosity, strconv.Itoa(gctx.Verbosity)).
 		Var(eg.EnvComputeBin, hotswapbin.String()).
 		Var(eg.EnvUnsafeCacheID, ws.CachedID).
 		Var(eg.EnvUnsafeGitCloneEnabled, strconv.FormatBool(false)) // hack to disable cloning
@@ -157,18 +159,16 @@ func (t local) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err e
 		envvar,
 		sshmount,
 		sshenvvar,
-		gnupghome,
 		mountegbin,
 		runners.AgentOptionVolumes(
 			runners.AgentMountReadWrite(filepath.Join(ws.Root, ws.CacheDir), eg.DefaultMountRoot(eg.CacheDirectory)),
 			runners.AgentMountReadWrite(filepath.Join(ws.Root, ws.RuntimeDir), eg.DefaultMountRoot(eg.RuntimeDirectory)),
 			runners.AgentOptionContainerCache(t.ContainerCache),
 		),
+		gnupghome, // must come after the runtime directory mount to ensure correct mounting order.
 		runners.AgentOptionEnviron(environpath),
 		runners.AgentOptionCommandLine("--env-file", environpath), // required for tty to work correct in local mode.
 		runners.AgentOptionHostOS(),
-		runners.AgentOptionEnv(eg.EnvComputeRunID, uid.String()),
-		runners.AgentOptionEnv(eg.EnvComputeLoggingVerbosity, strconv.Itoa(gctx.Verbosity)),
 	)
 
 	for _, m := range modules {

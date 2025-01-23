@@ -142,9 +142,7 @@ func PodmanModuleRunCmd(image, cname string, options ...string) []string {
 		"--detach",
 		"--replace",
 		"--env", "CI",
-		"--env", eg.EnvComputeRunID,
 		"--env", eg.EnvComputeBin,
-		"--env", eg.EnvComputeAccountID,
 	)
 	args = append(args, options...)
 	args = append(args, image, "/usr/sbin/init")

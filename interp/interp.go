@@ -237,13 +237,13 @@ func (t runner) perform(ctx context.Context, runid, path string, rtb runtimefn) 
 		os.Stdout,
 	).WithFSConfig(
 		wazero.NewFSConfig().
+			WithDirMount(os.TempDir(), os.TempDir()).
 			WithDirMount(t.runtimedir, eg.DefaultRuntimeDirectory()).
 			WithDirMount(hostcachedir, eg.DefaultCacheDirectory()).
 			WithDirMount(t.root, eg.DefaultWorkingDirectory()). // ensure we mount the working directory so pwd works correctly.
 			WithDirMount(t.runtimedir, eg.DefaultMountRoot(eg.RuntimeDirectory)).
 			WithDirMount(hostcachedir, eg.DefaultMountRoot(eg.CacheDirectory)).
 			WithDirMount(t.root, eg.DefaultMountRoot(eg.WorkingDirectory)), // ensure we mount the working directory so pwd works correctly.
-
 	).WithSysNanotime().WithSysWalltime().WithRandSource(rand.Reader)
 
 	environ := errorsx.Zero(envx.FromPath(eg.DefaultMountRoot(eg.RuntimeDirectory, "environ.env")))

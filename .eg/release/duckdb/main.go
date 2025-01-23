@@ -4,7 +4,8 @@ import (
 	"context"
 	"log"
 
-	"github.com/egdaemon/eg/.eg/debuild/egbootstrap"
+	"github.com/egdaemon/eg/.eg/debuild/duckdb"
+	debian "github.com/egdaemon/eg/.eg/debuild/eg"
 
 	"github.com/egdaemon/eg/runtime/wasi/eg"
 	"github.com/egdaemon/eg/runtime/wasi/egenv"
@@ -18,11 +19,10 @@ func main() {
 	err := eg.Perform(
 		ctx,
 		eggit.AutoClone,
-		egbootstrap.Prepare,
-		// eg.Build(eg.Container(debian.ContainerName).BuildFromFile(".dist/deb/Containerfile")),
-		// eg.Parallel(
-		// 	duckdb.Build(),
-		// ),
+		eg.Build(eg.Container(debian.ContainerName).BuildFromFile(".dist/deb/Containerfile")),
+		eg.Parallel(
+			duckdb.Build(),
+		),
 	)
 
 	if err != nil {

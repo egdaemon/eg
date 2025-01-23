@@ -8,7 +8,12 @@ DH_VERBOSE=1
 
 override_dh_auto_build:
 	echo "DH AUTO BUILD OVERRIDE ${CMAKE_BUILD_PARALLEL_LEVEL}"
-	rsync --recursive src .dist/linux
+	echo "$(CURDIR)"
+
+	# install various useful repositories into apt, this allows us to speed up builds
+	# with minimal overhead.
+
+	rsync --recursive --progress src/ linux
 
 override_dh_usrlocal:
 	echo "DH usrlocal override due to over restrict rules"

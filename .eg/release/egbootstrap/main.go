@@ -2,25 +2,33 @@ package main
 
 import (
 	"context"
-	"eg/ci/debbuild/duckdb"
-	"eg/ci/debian"
 	"log"
+
+	"github.com/egdaemon/eg/.eg/debuild/egbootstrap"
 
 	"github.com/egdaemon/eg/runtime/wasi/eg"
 	"github.com/egdaemon/eg/runtime/wasi/egenv"
 	"github.com/egdaemon/eg/runtime/wasi/eggit"
 )
 
+func init() {
+	log.SetFlags(log.Flags() | log.Lshortfile | log.LUTC)
+}
+
 func main() {
+
 	ctx, done := context.WithTimeout(context.Background(), egenv.TTL())
 	defer done()
 
 	err := eg.Perform(
 		ctx,
 		eggit.AutoClone,
-		eg.Build(eg.Container(debian.ContainerName).BuildFromFile(".dist/deb/Containerfile")),
-		eg.Parallel(
-			duckdb.Build(),
+		egbootstrap.Prepare,
+		eg.Module(
+			ctx,
+			egbootstrap.Runner(),
+			egbootstrap.Build,
+			egbootstrap.Upload,
 		),
 	)
 

@@ -1,12 +1,12 @@
 Source: ${DEB_PACKAGE_NAME}
 Section: misc
-Maintainer: ${DEB_FULLNAME} <${DEB_EMAIL}>
+Maintainer: ${DEB_MAINTAINER_FULLNAME} <${DEB_MAINTAINER_EMAIL}>
 Standards-Version: 4.6.0.1
 Priority: extra
-Build-Depends: dh-make, debhelper, git, g++, cmake, ninja-build, libssl-dev, tree
+Build-Depends: ${DEB_DEPENDS_BUILD}
 
 Package: ${DEB_PACKAGE_NAME}
 Section: misc
-Architecture: any
-Description: columnar inprocess database
-Depends: ${misc:Depends} ${shlibs:Depends}
+Architecture: ${DEB_ARCHITECTURE}
+Description: ${DEB_DESCRIPTION}
+Depends: ${DEB_DEPENDS_RUNTIME}

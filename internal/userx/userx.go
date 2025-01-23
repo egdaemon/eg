@@ -14,6 +14,10 @@ const (
 	DefaultDir = "eg"
 )
 
+func IsRoot(u *user.User) bool {
+	return u.Uid == Root().Uid
+}
+
 func Root() user.User {
 	return user.User{
 		Gid:     "0",

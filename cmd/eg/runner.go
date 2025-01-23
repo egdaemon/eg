@@ -181,11 +181,11 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 			gctx.Context,
 			ws,
 			uid,
+			runners.AgentOptionCommandLine("--env-file", eg.DefaultRuntimeDirectory(eg.EnvironFile)), // required for tty to work correct in local mode.
 			runners.AgentOptionEnv(eg.EnvComputeTLSInsecure, strconv.FormatBool(tlsc.Insecure)),
 			runners.AgentOptionVolumes(
 				runners.AgentMountReadWrite("/root", "/root"),
-				runners.AgentMountReadWrite(eg.DefaultMountRoot(eg.CacheDirectory), eg.DefaultMountRoot(eg.CacheDirectory)),
-				runners.AgentMountReadWrite(eg.DefaultMountRoot(eg.RuntimeDirectory), eg.DefaultMountRoot(eg.RuntimeDirectory)),
+				runners.AgentMountReadWrite(eg.DefaultMountRoot(), eg.DefaultMountRoot()),
 				runners.AgentMountReadWrite("/var/lib/containers", "/var/lib/containers"),
 			),
 			runners.AgentOptionEGBin(errorsx.Must(exec.LookPath(eg.DefaultMountRoot(eg.BinaryBin)))),
@@ -226,13 +226,13 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 			return err
 		}
 	} else {
-		debugx.Printf("---------------------------- MODULE INITIATED %d ----------------------------\n", mlevel)
+		log.Printf("---------------------------- MODULE INITIATED %d ----------------------------\n", mlevel)
 		// env.Debug(os.Environ()...)
-		debugx.Println("account", aid)
-		debugx.Println("run id", uid)
-		debugx.Println("repository", descr)
-		debugx.Println("number of cores", runtime.GOMAXPROCS(-1))
-		debugx.Println("logging level", gctx.Verbosity)
+		log.Println("account", aid)
+		log.Println("run id", uid)
+		log.Println("repository", descr)
+		log.Println("number of cores", runtime.GOMAXPROCS(-1))
+		log.Println("logging level", gctx.Verbosity)
 		defer debugx.Printf("---------------------------- MODULE COMPLETED %d ----------------------------\n", mlevel)
 	}
 

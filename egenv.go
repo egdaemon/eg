@@ -101,6 +101,7 @@ const (
 	RuntimeDirectory = ".eg.runtime"
 	ModuleBin        = ".eg.module.wasm"
 	BinaryBin        = "egbin"
+	EnvironFile      = "environ.env"
 )
 
 func DefaultModuleDirectory() string {

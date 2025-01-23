@@ -32,23 +32,23 @@ func AgentOptionLocalGPGAgent(ctx context.Context, envb *envx.Builder) AgentOpti
 		return AgentOptionNoop
 	}
 
-	envb.Var("GNUPGHOME", eg.DefaultMountRoot(eg.RuntimeDirectory, ".gnupg"))
+	envb.Var("GNUPGHOME", eg.DefaultMountRoot(".gnupg"))
 	return AgentOptionVolumes(
 		AgentMountOverlay(
 			gnupghome,
-			eg.DefaultMountRoot(eg.RuntimeDirectory, ".gnupg"),
+			eg.DefaultMountRoot(".gnupg"),
 		),
 		AgentMountReadWrite(
 			userx.DefaultRuntimeDirectory("gnupg", "S.gpg-agent"),
-			eg.DefaultMountRoot(eg.RuntimeDirectory, ".gnupg", "S.gpg-agent"),
+			eg.DefaultMountRoot(".gnupg", "S.gpg-agent"),
 		),
 		AgentMountReadWrite(
 			userx.DefaultRuntimeDirectory("gnupg", "S.dirmngr"),
-			eg.DefaultMountRoot(eg.RuntimeDirectory, ".gnupg", "S.dirmngr"),
+			eg.DefaultMountRoot(".gnupg", "S.dirmngr"),
 		),
 		AgentMountReadWrite(
 			userx.DefaultRuntimeDirectory("gnupg", "S.keyboxd"),
-			eg.DefaultMountRoot(eg.RuntimeDirectory, ".gnupg", "S.keyboxd"),
+			eg.DefaultMountRoot(".gnupg", "S.keyboxd"),
 		),
 	)
 }

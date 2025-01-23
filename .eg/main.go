@@ -2,8 +2,9 @@ package main
 
 import (
 	"context"
-	"eg/ci/debian"
 	"log"
+
+	"github.com/egdaemon/eg/.eg/debian"
 
 	"github.com/egdaemon/eg/runtime/wasi/eg"
 	"github.com/egdaemon/eg/runtime/wasi/egenv"

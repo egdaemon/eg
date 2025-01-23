@@ -3,7 +3,6 @@ package duckdb
 import (
 	"context"
 	"crypto/md5"
-	"eg/ci/maintainer"
 	"embed"
 	"encoding/binary"
 	"fmt"
@@ -11,6 +10,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/egdaemon/eg/.eg/maintainer"
 	"github.com/egdaemon/eg/runtime/wasi/eg"
 	"github.com/egdaemon/eg/runtime/wasi/egenv"
 	"github.com/egdaemon/eg/runtime/wasi/eggit"

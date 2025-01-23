@@ -154,7 +154,6 @@ func PodmanModuleRunCmd(image, cname string, options ...string) []string {
 // runcmd is md5 of the command that generated the container.
 func moduleExec(ctx context.Context, cname, moduledir string, stdin io.Reader, stdout io.Writer, stderr io.Writer) (err error) {
 	var (
-		result     *define.InspectExecSession
 		rtty, wtty *os.File
 	)
 
@@ -197,18 +196,18 @@ func moduleExec(ctx context.Context, cname, moduledir string, stdin io.Reader, s
 			_, _ = io.Copy(wtty, stdin) // not important
 		}()
 	}
-	err = execAttach(ctx, id, rtty, stdout, stderr)
-	if err != nil {
+
+	if err = execAttach(ctx, id, rtty, stdout, stderr); err != nil {
 		return errorsx.Wrap(err, "podman exec attach failed")
 	}
 
 	// wait for the exec session to disappear
 	for {
-		if result, err = containers.ExecInspect(ctx, id, nil); err != nil {
-			if errm, ok := err.(*errorhandling.ErrorModel); ok && errm.Code() == 404 {
+		if result, cause := containers.ExecInspect(ctx, id, nil); cause != nil {
+			if errm, ok := cause.(*errorhandling.ErrorModel); ok && errm.Code() == 404 {
 				return nil
 			} else {
-				return errorsx.Wrapf(err, "unknown exec session error: %d %s", errm.Code(), errm.Error())
+				return errorsx.Wrapf(cause, "unknown exec session error: %d %s", errm.Code(), errm.Error())
 			}
 		} else if result.ExitCode > 0 {
 			return errorsx.Errorf("module failed with exit code: %d", result.ExitCode)

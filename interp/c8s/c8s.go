@@ -175,6 +175,7 @@ func moduleExec(ctx context.Context, cname, moduledir string, stdin io.Reader, s
 	if err != nil {
 		return errorsx.Wrap(err, "unable prepare exec session")
 	}
+
 	defer func() {
 		// only attempt a force removal if we encountered an error
 		if err == nil {
@@ -189,8 +190,8 @@ func moduleExec(ctx context.Context, cname, moduledir string, stdin io.Reader, s
 		if err != nil {
 			return errorsx.Wrap(err, "unable prepare pipe")
 		}
-		defer wtty.Close()
 		defer rtty.Close()
+		defer wtty.Close()
 
 		go func() {
 			_, _ = io.Copy(wtty, stdin) // not important

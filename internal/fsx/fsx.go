@@ -67,6 +67,17 @@ func LocateFirstInDir(dir string, names ...string) (result string) {
 	return result
 }
 
+// LocateFirstlocates the first path that exists, or an empty string if none.
+func LocateFirst(paths ...string) (result string) {
+	for _, path := range paths {
+		if _, err := os.Stat(path); err == nil {
+			return path
+		}
+	}
+
+	return result
+}
+
 // FileExists returns true IFF a non-directory file exists at the provided path.
 func FileExists(path string) bool {
 	info, err := os.Stat(path)

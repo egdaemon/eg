@@ -17,6 +17,7 @@ import (
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/httpx"
+	"github.com/egdaemon/eg/internal/podmanx"
 	"github.com/egdaemon/eg/internal/runtimex"
 	"github.com/egdaemon/eg/internal/sshx"
 	"github.com/egdaemon/eg/internal/userx"
@@ -122,7 +123,7 @@ func (t daemon) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 		}
 	}
 
-	ctx, err := cmdopts.WithPodman(gctx.Context)
+	ctx, err := podmanx.WithClient(gctx.Context)
 	if err != nil {
 		return err
 	}

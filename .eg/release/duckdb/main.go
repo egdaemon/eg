@@ -4,8 +4,8 @@ import (
 	"context"
 	"log"
 
-	"github.com/egdaemon/eg/.eg/debuild/duckdb"
-	debian "github.com/egdaemon/eg/.eg/debuild/eg"
+	"eg/compute/debuild/duckdb"
+	debian "eg/compute/debuild/eg"
 
 	"github.com/egdaemon/eg/runtime/wasi/eg"
 	"github.com/egdaemon/eg/runtime/wasi/egenv"

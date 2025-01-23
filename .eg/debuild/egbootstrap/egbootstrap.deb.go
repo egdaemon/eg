@@ -8,8 +8,8 @@ import (
 	"io/fs"
 	"path/filepath"
 
-	"github.com/egdaemon/eg/.eg/maintainer"
-	"github.com/egdaemon/eg/internal/errorsx"
+	"eg/compute/errorsx"
+	"eg/compute/maintainer"
 
 	"github.com/egdaemon/eg/runtime/wasi/eg"
 	"github.com/egdaemon/eg/runtime/wasi/egenv"

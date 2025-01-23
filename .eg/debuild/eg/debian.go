@@ -3,12 +3,13 @@ package debian
 import (
 	"context"
 	"crypto/md5"
-	"eg/ci/maintainer"
 	"encoding/binary"
 	"fmt"
 	"os"
 	"path/filepath"
 	"time"
+
+	"github.com/egdaemon/eg/.eg/maintainer"
 
 	"github.com/egdaemon/eg/runtime/wasi/eg"
 	"github.com/egdaemon/eg/runtime/wasi/egenv"

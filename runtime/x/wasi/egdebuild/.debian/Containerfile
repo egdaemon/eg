@@ -8,7 +8,7 @@ RUN add-apt-repository -n ppa:egdaemon/eg
 RUN add-apt-repository -n ppa:egdaemon/duckdb
 
 RUN apt-get update
-RUN apt-get -y install golang-1.23 eg
+RUN apt-get -y install golang-1.23 eg pinentry-tty
 
 RUN ln -s /usr/lib/go-1.23/bin/go /usr/local/bin/go
 

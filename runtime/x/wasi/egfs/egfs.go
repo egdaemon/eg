@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 	"io/fs"
+	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -48,6 +49,31 @@ func MkDirs(perm fs.FileMode, paths ...string) (err error) {
 	return nil
 }
 
+// print the list of files an directories contained within the FS.
+func Inspect(ctx context.Context, archive fs.FS) (err error) {
+	return fs.WalkDir(archive, ".", func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+
+		info, err := d.Info()
+		if err != nil {
+			return err
+		}
+
+		// allow clone tree to be cancellable.
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
+
+		log.Println(path, "->", info.Mode().Perm())
+
+		return nil
+	})
+}
+
 func CloneFS(ctx context.Context, dstdir string, rootdir string, archive fs.FS) (err error) {
 	return fs.WalkDir(archive, rootdir, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
@@ -62,7 +88,11 @@ func CloneFS(ctx context.Context, dstdir string, rootdir string, archive fs.FS) 
 		}
 
 		if d.IsDir() && rootdir == path {
-			return nil
+			info, err := d.Info()
+			if err != nil {
+				return err
+			}
+			return os.MkdirAll(dstdir, info.Mode().Perm())
 		}
 
 		rel := strings.TrimPrefix(path, rootdir)

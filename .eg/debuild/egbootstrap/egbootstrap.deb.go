@@ -1,4 +1,6 @@
-// Package egbootstrap builds a debian with base system settings for eg workloads
+// Package egbootstrap builds a debian with base system settings for eg compute systems.
+// primarily provides basic configuration settings like available package repositories
+// and system configuration.
 package egbootstrap
 
 import (

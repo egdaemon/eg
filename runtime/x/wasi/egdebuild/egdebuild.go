@@ -137,7 +137,7 @@ func Prepare(c eg.ContainerRunner, archive fs.FS) eg.OpFn {
 				err error
 			)
 
-			if archive, err = fs.Sub(debskel, ".debskel"); err != nil {
+			if archive, err = fs.Sub(debskel, ".debian"); err != nil {
 				return err
 			}
 		}

@@ -127,16 +127,30 @@ func New(pkg string, distro string, src string, opts ...option) (c Config) {
 	}, opts...)
 }
 
-func Prepare(ctx context.Context, o eg.Op) error {
-	relpath := filepath.Join(".debian", "Containerfile")
+// Basic container for building debian packages. the archive must provide the container file
+// to use. if you provide nil archive a default container will be provided but likely wont have dependencies needed.
+func Prepare(c eg.ContainerRunner, archive fs.FS) eg.OpFn {
+	return func(ctx context.Context, o eg.Op) error {
+		const relpath = "Containerfile"
+		if archive == nil {
+			var (
+				err error
+			)
 
-	if err := egfs.CloneFS(ctx, egenv.EphemeralDirectory(), relpath, debskel); err != nil {
-		return err
+			if archive, err = fs.Sub(debskel, ".debskel"); err != nil {
+				return err
+			}
+		}
+
+		if err := egfs.CloneFS(ctx, egenv.EphemeralDirectory(), relpath, archive); err != nil {
+			return err
+		}
+
+		return eg.Build(c.BuildFromFile(filepath.Join(egenv.EphemeralDirectory(), relpath)))(ctx, o)
 	}
-
-	return eg.Build(Runner().BuildFromFile(filepath.Join(egenv.EphemeralDirectory(), relpath)))(ctx, o)
 }
 
+// container for this package.
 func Runner() eg.ContainerRunner {
 	return eg.Container(ContainerName)
 }
@@ -153,7 +167,7 @@ func Runtime(cfg Config, opts ...option) shell.Command {
 		Environ("DEB_CHANGELOG_DATE", cfg.ChangeLog.When.Format(time.RFC1123Z)).
 		Environ("DEB_MAINTAINER_EMAIL", cfg.Maintainer.Email).
 		Environ("DEB_MAINTAINER_FULLNAME", cfg.Maintainer.Name).
-		Environ("DEB_DEPENDS_BUILD", strings.Join(append(cfg.Dependency.Build, "dh-make", "debhelper"), ", ")).
+		Environ("DEB_DEPENDS_BUILD", strings.Join(append(cfg.Dependency.Build, "dh-make", "debhelper", "software-properties-common"), ", ")).
 		Environ("DEB_DEPENDS_RUNTIME", strings.Join(append(cfg.Dependency.Runtime, "${misc:Depends}", "${shlibs:Depends}"), ", ")).
 		EnvironFrom(cfg.Environ...)
 }
@@ -198,6 +212,23 @@ func Build(cfg Config, opts ...option) eg.OpFn {
 			runtime.New("cat debian/control | envsubst | tee debian/control"),
 			runtime.New("cat debian/rules | envsubst | tee debian/rules"),
 			runtime.Newf("debuild -S -k%s", cfg.SignatureKeyID).Privileged(),
+		)
+	}
+}
+
+// uploads the generated deb packages using a dput configuration.
+func UploadDPut(gcfg Config, dput fs.FS) eg.OpFn {
+	return func(ctx context.Context, o eg.Op) error {
+		if err := egfs.CloneFS(ctx, egenv.EphemeralDirectory(), "dput.config", dput); err != nil {
+			return err
+		}
+		root := fmt.Sprintf("deb.%s", gcfg.Name)
+		bdir := egenv.EphemeralDirectory(root)
+		runtime := Runtime(gcfg)
+		return shell.Run(
+			ctx,
+			// runtime.New("ls *.tar.xz | xargs -I {} tar -tvf {}").Directory(bdir),
+			runtime.Newf("ls %s/*_source.changes | xargs -I {} dput -f -c %s %s {}", bdir, egenv.EphemeralDirectory("dput.config"), gcfg.Name).Privileged(),
 		)
 	}
 }

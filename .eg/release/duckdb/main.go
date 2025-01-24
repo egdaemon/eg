@@ -5,11 +5,9 @@ import (
 	"log"
 
 	"eg/compute/debuild/duckdb"
-	debian "eg/compute/debuild/eg"
 
 	"github.com/egdaemon/eg/runtime/wasi/eg"
 	"github.com/egdaemon/eg/runtime/wasi/egenv"
-	"github.com/egdaemon/eg/runtime/wasi/eggit"
 )
 
 func main() {
@@ -18,10 +16,12 @@ func main() {
 
 	err := eg.Perform(
 		ctx,
-		eggit.AutoClone,
-		eg.Build(eg.Container(debian.ContainerName).BuildFromFile(".dist/deb/Containerfile")),
-		eg.Parallel(
-			duckdb.Build(),
+		duckdb.Prepare,
+		eg.Module(
+			ctx,
+			duckdb.Runner(),
+			duckdb.Build,
+			duckdb.Upload,
 		),
 	)
 

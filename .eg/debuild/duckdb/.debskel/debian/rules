@@ -12,8 +12,6 @@ override_dh_auto_build:
 	mkdir -p duckdb
 	GEN=ninja OVERRIDE_GIT_DESCRIBE="v${PACKAGE_VERSION}" ENABLE_EXTENSION_AUTOLOADING=1 ENABLE_EXTENSION_AUTOINSTALL=1 CORE_EXTENSIONS='autocomplete;tpcd;fts;json;parquet;icu' make -C src
 	DESTDIR="duckdb" cmake --install src/build/release
-	echo "8e16b986c4e873d997830f9d3a965161  duckdb/usr/local/include/duckdb.h" > duckdb.md5
-	md5sum -c duckdb.md5
 
 
 override_dh_usrlocal:

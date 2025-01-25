@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"log"
 
-	"eg/ci/debian"
+	"eg/compute/debian"
 
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/runtime/wasi/eg"

@@ -26,13 +26,13 @@ func main() {
 		),
 		eg.Parallel(
 			eg.Build(eg.Container(debian.ContainerName).BuildFromFile(".dist/deb/Containerfile")),
-		// eg.Build(eg.Container(archlinux.ContainerName).BuildFromFile(".dist/archlinux/Containerfile")),
+			// eg.Build(eg.Container(archlinux.ContainerName).BuildFromFile(".dist/archlinux/Containerfile")),
 		),
 		eg.Parallel(
 			eg.Module(ctx, debian.Builder(debian.ContainerName, "jammy"), debian.Build),
 			eg.Module(ctx, debian.Builder(debian.ContainerName, "noble"), debian.Build),
 			eg.Module(ctx, debian.Builder(debian.ContainerName, "oracular"), debian.Build),
-		// eg.Module(ctx, archlinux.Builder(archlinux.ContainerName), archlinux.Build),
+			// eg.Module(ctx, archlinux.Builder(archlinux.ContainerName), archlinux.Build),
 		),
 	)
 

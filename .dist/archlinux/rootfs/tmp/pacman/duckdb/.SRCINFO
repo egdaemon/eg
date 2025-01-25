@@ -1,0 +1,33 @@
+pkgbase = duckdb
+	pkgdesc = An in-process SQL OLAP database management system
+	pkgver = 1.1.3
+	pkgrel = 2
+	url = https://duckdb.org
+	arch = x86_64
+	arch = aarch64
+	license = MIT
+	makedepends = git
+	makedepends = cmake
+	makedepends = python-setuptools
+	makedepends = pybind11
+	makedepends = python-numpy
+	makedepends = python-pandas
+	makedepends = libutf8proc
+	makedepends = python-pip
+	makedepends = python-wheel
+	makedepends = python-setuptools-scm
+	depends = gcc-libs
+	depends = openssl
+	source = duckdb-1.1.3.tar.gz::https://github.com/duckdb/duckdb/archive/refs/tags/v1.1.3.tar.gz
+	b2sums = a6ca077a1c564abac629ce1ec148f5d6907f797398366bbcf1edb65fadfe3405b3d0a02c57c49b7e1ad890f06f6e7833d5cb7fd63dc728c8498c35eeefe0d901
+
+pkgname = duckdb
+	conflicts = duckdb-git
+
+pkgname = python-duckdb
+	pkgdesc = An in-process SQL OLAP database management system (Python API)
+	depends = python
+	depends = gcc-libs
+	optdepends = python-numpy
+	optdepends = python-pandas
+	conflicts = python-duckdb-git

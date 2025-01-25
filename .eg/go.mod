@@ -1,9 +1,9 @@
 module eg/compute
 
-go 1.23.5
+go 1.23.4
 
 require (
-	github.com/egdaemon/eg v0.0.0-20250123211059-ac858e1950db
+	github.com/egdaemon/eg v0.0.0-20250125124849-a893ccd7c48c
 	github.com/egdaemon/wasinet/wasinet v0.0.0-20250120175550-4106c2611afa
 )
 

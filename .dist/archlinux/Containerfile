@@ -7,14 +7,24 @@ ARG PKGDEST=/tmp
 
 RUN systemd-sysusers
 RUN systemd-tmpfiles --create
-RUN pacman --noconfirm -Syu podman netavark pacman-contrib pkgfile foot sudo bash-completion tree base base-devel git go openssh rsync github-cli
-# RUN useradd -m -G wheel -s /usr/bin/bash egd
-# RUN printf '%%wheel ALL=(ALL:ALL) NOPASSWD: ALL\n' | tee -a /etc/sudoers.d/egd
-RUN sudo -H -S -u egd git -C /tmp clone https://aur.archlinux.org/yay.git
-RUN sudo -u egd makepkg -D /tmp/yay -Cs
-RUN pacman --noconfirm -U /tmp/yay/*.pkg.tar.zst
+RUN pacman --noconfirm -Syu podman netavark pacman-contrib pkgfile foot sudo bash-completion tree base base-devel git go openssh rsync github-cli btrfs-progs fuse3
+# duckdb build dependencies.
+RUN pacman --noconfirm -Syu git cmake python-setuptools pybind11 python-numpy python-pandas libutf8proc python-pip python-wheel python-setuptools-scm
+# duckdb runtime time dependencies.
+RUN pacman --noconfirm -Syu gcc-libs openssl
 
-# RUN sudo -H -P -S -u egd yay --noconfirm -S duckdb-bin bindfs
-# RUN ls -d /home/nobody/.cache/yay/*/ | xargs -I {} sudo -E -u nobody makepkg -D {} -Cs
-# RUN pacman --noconfirm -U /tmp/*.pkg.tar.zst
+# these commands are run manually with -C /tmp/pacman replaced with the rootfs pah.
+RUN sudo -H -S -u egd git -C /tmp/pacman clone https://aur.archlinux.org/yay.git
+# RUN sudo -H -S -u egd git -C .dist/archlinux/rootfs/tmp/pacman clone --depth 1 https://aur.archlinux.org/bindfs.git
+# RUN sudo -H -S -u egd git -C .dist/archlinux/rootfs/tmp/pacman clone --depth 1 https://aur.archlinux.org/duckdb.git # upstream is broken.
+
+RUN ls -d /tmp/pacman/*/ | xargs -I {} sudo -H -P -E -S -u egd makepkg -D {} -Cs
+# RUN ls -lha /tmp
+# RUN ls -lha /tmp/pacman
+RUN pacman --noconfirm -U /tmp/*.pkg.tar.zst
+
+RUN systemctl enable podman.socket
+# ensure r/w permissions
+RUN chmod -R ug+rw /tmp/pacman/
+
 CMD /usr/sbin/init

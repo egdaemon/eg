@@ -15,7 +15,7 @@ RUN pacman --noconfirm -Syu gcc-libs openssl
 
 # these commands are run manually with -C /tmp/pacman replaced with the rootfs pah.
 RUN sudo -H -S -u egd git -C /tmp/pacman clone https://aur.archlinux.org/yay.git
-# RUN sudo -H -S -u egd git -C .dist/archlinux/rootfs/tmp/pacman clone --depth 1 https://aur.archlinux.org/bindfs.git
+RUN sudo -H -S -u egd git -C /tmp/pacman clone --depth 1 https://aur.archlinux.org/bindfs.git
 # RUN sudo -H -S -u egd git -C .dist/archlinux/rootfs/tmp/pacman clone --depth 1 https://aur.archlinux.org/duckdb.git # upstream is broken.
 
 RUN ls -d /tmp/pacman/*/ | xargs -I {} sudo -H -P -E -S -u egd makepkg -D {} -Cs

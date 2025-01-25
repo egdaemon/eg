@@ -9,6 +9,7 @@ import (
 	"github.com/egdaemon/eg/runtime/wasi/eg"
 	"github.com/egdaemon/eg/runtime/wasi/egenv"
 	"github.com/egdaemon/eg/runtime/wasi/shell"
+	"github.com/egdaemon/eg/runtime/x/wasi/eggolang"
 )
 
 const (
@@ -21,22 +22,19 @@ func Builder(name string) eg.ContainerRunner {
 
 func Build(ctx context.Context, _ eg.Op) error {
 	cdir := egenv.CacheDirectory(".dist", "pacman")
-	templatedir := egenv.RootDirectory(".dist", "archlinux")
-	pkgdest := filepath.Join("/", "tmp", "pacman")
-	mkpkgruntime := shell.Runtime().
-		Environ("PKGDEST", pkgdest).
+	templatedir := egenv.WorkingDirectory(".dist", "archlinux")
+	runtime := eggolang.Runtime().
+		Environ("PKGDEST", cdir).
 		Environ("BUILDDIR", filepath.Join("/", "tmp", "build")).
 		Environ("SRCDEST", filepath.Join("/", "tmp", "src")).
 		Environ("PACKAGER", fmt.Sprintf("%s <%s>", maintainer.Name, maintainer.Email))
 
 	return shell.Run(
 		ctx,
-		mkpkgruntime.New("yay --noconfirm -S duckdb-bin bindfs"),
-		mkpkgruntime.Newf("mkdir -p %s", cdir),
-		mkpkgruntime.New("sudo --preserve-env=PKGDEST,PACKAGER,BUILDDIR -u egd env"),
-		mkpkgruntime.Directory(templatedir).New("sudo --preserve-env=PKGDEST,PACKAGER,BUILDDIR,SRCDEST -g root -u egd pwd"),
-		mkpkgruntime.Directory(templatedir).New("sudo --preserve-env=PKGDEST,PACKAGER,BUILDDIR,SRCDEST -g root -u egd makepkg -f"),
-		mkpkgruntime.Newf("rsync --recursive %s/ %s", pkgdest, cdir),
-		mkpkgruntime.Newf("paccache -c %s -rk2", cdir),
+		runtime.New("cat /etc/sudoers.d/egd"),
+		runtime.Newf("mkdir -p %s", cdir),
+		runtime.New("env"),
+		runtime.New("makepkg -f").Directory(templatedir),
+		runtime.Newf("paccache -c %s -rk2", cdir),
 	)
 }

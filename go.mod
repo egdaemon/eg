@@ -1,6 +1,6 @@
 module github.com/egdaemon/eg
 
-go 1.23.5
+go 1.23.4
 
 require (
 	github.com/KimMachineGun/automemlimit v0.7.0

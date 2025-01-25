@@ -1,14 +1,19 @@
 pkgname=eg
-pkgver=v0.0.1715357600
+pkgver=v0.0.1737773138
 pkgrel=1
 pkgdesc='eg ci/cd/batch processing tooling'
 arch=('x86_64')
 license=('AGPL')
 provides=('eg')
 conflicts=('eg')
-depends=('podman' 'aardvark-dns')
+depends=(
+  'podman'
+  'aardvark-dns'
+  'duckdb'
+)
 makedepends=(
   'go'
+  'btrfs-progs'
 )
 
 source=("${pkgname}::git+https://github.com/egdaemon/eg.git")
@@ -19,20 +24,18 @@ pkgver() {
   printf "v0.0.%s" "$(git show -s --format=%ct)"
 }
 
-prepare() {
-  rm -rf bin
-  cd "${pkgname}"
-}
-
 build() {
   echo "BUILD INITIATED eg ${PWD} -- ${srcdir} ${BUILDDIR}"
   echo "USER: $(whoami)"
-  GOBIN="${srcdir}/../bin" go install -C ${pkgname} ./cmd/eg
+
+  install -d -m 755 ${srcdir}/${pkgname}/.dist/linux/ ${srcdir}/.dist
+  cp -r ${srcdir}/${pkgname}/.dist/linux/* ${srcdir}/.dist
+
+  GOBIN="${srcdir}/.dist/usr/bin" go install -C ${pkgname} -tags "no_duckdb_arrow" ./cmd/eg
 }
 
 package() {
   echo "PACKAGE INITIATED ${pkgdir} ${PWD} ${bindir}"
-  mkdir -p ${pkgdir}/usr/bin
-  rsync --verbose --progress --recursive --checksum --perms ${srcdir}/../bin/ ${pkgdir}/usr/bin
-  rsync --verbose --progress --recursive --checksum --perms ${srcdir}/${pkgname}/.dist/linux/ ${pkgdir}
+  cp -r ${srcdir}/${pkgname}/.dist/linux/* ${pkgdir}
+  # tree ${pkgdir}
 }

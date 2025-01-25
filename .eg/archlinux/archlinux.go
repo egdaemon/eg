@@ -2,7 +2,7 @@ package archlinux
 
 import (
 	"context"
-	"eg/ci/maintainer"
+	"eg/compute/maintainer"
 	"fmt"
 	"path/filepath"
 
@@ -31,6 +31,7 @@ func Build(ctx context.Context, _ eg.Op) error {
 
 	return shell.Run(
 		ctx,
+		mkpkgruntime.New("yay --noconfirm -S duckdb-bin bindfs"),
 		mkpkgruntime.Newf("mkdir -p %s", cdir),
 		mkpkgruntime.New("sudo --preserve-env=PKGDEST,PACKAGER,BUILDDIR -u egd env"),
 		mkpkgruntime.Directory(templatedir).New("sudo --preserve-env=PKGDEST,PACKAGER,BUILDDIR,SRCDEST -g root -u egd pwd"),

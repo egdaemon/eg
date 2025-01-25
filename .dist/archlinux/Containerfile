@@ -2,8 +2,19 @@ FROM docker.io/library/archlinux:latest
 
 COPY rootfs /
 
+# output directory for makepkg
+ARG PKGDEST=/tmp
+
 RUN systemd-sysusers
 RUN systemd-tmpfiles --create
 RUN pacman --noconfirm -Syu podman netavark pacman-contrib pkgfile foot sudo bash-completion tree base base-devel git go openssh rsync github-cli
+# RUN useradd -m -G wheel -s /usr/bin/bash egd
+# RUN printf '%%wheel ALL=(ALL:ALL) NOPASSWD: ALL\n' | tee -a /etc/sudoers.d/egd
+RUN sudo -H -S -u egd git -C /tmp clone https://aur.archlinux.org/yay.git
+RUN sudo -u egd makepkg -D /tmp/yay -Cs
+RUN pacman --noconfirm -U /tmp/yay/*.pkg.tar.zst
 
+# RUN sudo -H -P -S -u egd yay --noconfirm -S duckdb-bin bindfs
+# RUN ls -d /home/nobody/.cache/yay/*/ | xargs -I {} sudo -E -u nobody makepkg -D {} -Cs
+# RUN pacman --noconfirm -U /tmp/*.pkg.tar.zst
 CMD /usr/sbin/init

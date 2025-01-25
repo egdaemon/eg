@@ -2,7 +2,7 @@ package main
 
 import (
 	"context"
-	"eg/ci/archlinux"
+	"eg/compute/archlinux"
 	"log"
 
 	"github.com/egdaemon/eg/runtime/wasi/eg"

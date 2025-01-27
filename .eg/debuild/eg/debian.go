@@ -52,7 +52,7 @@ func build(ctx context.Context, _ eg.Op) error {
 		runtime.New("go version"),
 		runtime.Newf("go -C src build -tags \"no_duckdb_arrow\" -buildvcs ./cmd/...").Directory(debdir),
 		runtime.Newf("debuild -S -k%s", maintainer.GPGFingerprint).Privileged().Directory(debdir),
-		runtime.Newf("dput -f -c %s eg eg_${VERSION}_source.changes", egenv.WorkingDirectory(".dist", "deb", "dput.config")).Privileged().Directory(filepath.Dir(debdir)),
+		runtime.Newf("dput -f -c %s eg eg_${VERSION}_source.changes", egenv.WorkingDirectory(".dist", "deb", "dput.config")).Attempts(3).Privileged().Directory(filepath.Dir(debdir)),
 	)
 }
 

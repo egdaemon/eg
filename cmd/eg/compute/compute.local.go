@@ -132,7 +132,8 @@ func (t local) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err e
 		return errors.New("no usable modules detected")
 	}
 
-	log.Println("modules", modules)
+	debugx.Println("modules", modules)
+
 	if err = runners.BuildRootContainerPath(gctx.Context, t.Dir, filepath.Join(ws.RuntimeDir, "Containerfile")); err != nil {
 		return err
 	}

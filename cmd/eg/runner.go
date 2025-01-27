@@ -142,7 +142,7 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 		debugx.Println("ram available", bytesx.Unit(vmemlimit))
 		debugx.Println("logging level", gctx.Verbosity)
 		// fsx.PrintDir(os.DirFS(t.RuntimeDir))
-		defer log.Println("---------------------------- ROOT MODULE COMPLETED ----------------------------")
+		defer debugx.Println("---------------------------- ROOT MODULE COMPLETED ----------------------------")
 
 		cspath := filepath.Join(t.RuntimeDir, "control.socket")
 		if control, err = net.Listen("unix", cspath); err != nil {

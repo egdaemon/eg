@@ -15,8 +15,8 @@ func main() {
 
 	err := eg.Perform(
 		ctx,
-		shell.Op(shell.New("apt-get install stress")),
-		shell.Op(shell.Newf("stress -t 5 -c %d", 24)),
+		shell.Op(shell.New("apt-get install stress").Privileged()),
+		shell.Op(shell.Newf("stress -t 15 -c %d", 24)),
 	)
 
 	if err != nil {

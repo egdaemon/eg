@@ -32,7 +32,6 @@ type local struct {
 	cmdopts.RuntimeResources
 	Dir              string   `name:"directory" help:"root directory of the repository" default:"${vars_git_directory}"`
 	ModuleDir        string   `name:"moduledir" help:"must be a subdirectory in the provided directory" default:"${vars_workload_directory}"`
-	Name             string   `arg:"" name:"module" help:"name of the module to run, i.e. the folder name within moduledir" default:"" predictor:"eg.workload"`
 	Privileged       bool     `name:"privileged" help:"run the initial container in privileged mode"`
 	Dirty            bool     `name:"dirty" help:"include user directories and environment variables" hidden:"true"`
 	EnvironmentPaths string   `name:"envpath" help:"environment files to pass to the module" default:""`
@@ -40,7 +39,7 @@ type local struct {
 	GitRemote        string   `name:"git-remote" help:"name of the git remote to use" default:"${vars_git_default_remote_name}"`
 	GitReference     string   `name:"git-ref" help:"name of the branch or commit to checkout" default:"${vars_git_head_reference}"`
 	ContainerCache   string   `name:"croot" help:"container storage, ideally we'd be able to share with the host but for now" hidden:"true" default:"${vars_container_cache_directory}"`
-	Impure           bool     `name:"impure" help:"clone the repository before building and executing the container"`
+	Name             string   `arg:"" name:"module" help:"name of the module to run, i.e. the folder name within moduledir" default:"" predictor:"eg.workload"`
 }
 
 func (t local) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err error) {

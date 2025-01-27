@@ -33,6 +33,7 @@ func AgentOptionLocalGPGAgent(ctx context.Context, envb *envx.Builder) AgentOpti
 	}
 
 	envb.Var("GNUPGHOME", eg.DefaultMountRoot(".gnupg"))
+
 	return AgentOptionVolumes(
 		AgentMountOverlay(
 			gnupghome,

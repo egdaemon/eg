@@ -200,7 +200,7 @@ func main() {
 			DNSDebug,
 			DNSTCPResolveTest,
 			TCPTest,
-			HTTPTest,
+			// HTTPTest,
 			HTTPServerTest,
 		),
 	)

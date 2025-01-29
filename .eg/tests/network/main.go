@@ -87,11 +87,11 @@ func checkTransfer(ctx context.Context, li net.Listener, amount int64) error {
 	}
 
 	if amount != n {
-		return fmt.Errorf("didnt receive all data", amount, "!=", n)
+		return fmt.Errorf("didnt receive all data %d != %d", amount, n)
 	}
 
 	if amount != amountsent {
-		return fmt.Errorf("didnt receive all data", amount, "!=", amountsent)
+		return fmt.Errorf("didnt receive all data %d != %d", amount, amountsent)
 	}
 
 	if !bytes.Equal(digestsent.Sum(nil), digestrecv.Sum(nil)) {
@@ -127,6 +127,7 @@ func HTTPTest(ctx context.Context, op eg.Op) error {
 		return fmt.Errorf("unexpected status code: %d", rsp.StatusCode)
 	}
 
+	log.Println("successfully requested a website")
 	return nil
 }
 
@@ -200,8 +201,8 @@ func main() {
 			DNSDebug,
 			DNSTCPResolveTest,
 			TCPTest,
-			// HTTPTest,
 			HTTPServerTest,
+			HTTPTest,
 		),
 	)
 
@@ -215,14 +216,13 @@ func InsecureHTTP() *http.Transport {
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 		Proxy:           http.ProxyFromEnvironment,
 		DialContext: (&wasinet.Dialer{
-			Timeout: 2 * time.Second,
+			Timeout: 20 * time.Second,
 		}).DialContext,
-		ForceAttemptHTTP2: true,
-
+		ForceAttemptHTTP2:     true,
 		MaxIdleConns:          10,
-		ResponseHeaderTimeout: 5 * time.Second,
-		IdleConnTimeout:       5 * time.Second,
-		TLSHandshakeTimeout:   5 * time.Second,
-		ExpectContinueTimeout: 5 * time.Second,
+		ResponseHeaderTimeout: 20 * time.Second,
+		IdleConnTimeout:       20 * time.Second,
+		TLSHandshakeTimeout:   20 * time.Second,
+		ExpectContinueTimeout: 20 * time.Second,
 	}
 }

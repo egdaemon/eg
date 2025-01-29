@@ -1,4 +1,4 @@
-package c8s
+package c8sproxy
 
 import (
 	"bytes"

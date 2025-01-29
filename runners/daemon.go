@@ -20,7 +20,7 @@ import (
 )
 
 func DefaultRunnerSocketPath() string {
-	return eg.DefaultMountRoot(eg.RuntimeDirectory, "control.socket")
+	return eg.DefaultMountRoot(eg.RuntimeDirectory, eg.SocketControl)
 }
 
 type AgentOption func(*Agent)
@@ -205,6 +205,6 @@ func (t Agent) Options() []string {
 }
 
 func (t Agent) Dial(ctx context.Context) (conn *grpc.ClientConn, err error) {
-	cspath := filepath.Join(t.ws.Root, t.ws.RuntimeDir, "control.socket")
+	cspath := filepath.Join(t.ws.Root, t.ws.RuntimeDir, eg.SocketControl)
 	return grpc.DialContext(ctx, fmt.Sprintf("unix://%s", cspath), grpc.WithInsecure())
 }

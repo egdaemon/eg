@@ -33,7 +33,7 @@ import (
 	"github.com/egdaemon/eg/internal/tarx"
 	"github.com/egdaemon/eg/internal/userx"
 	"github.com/egdaemon/eg/internal/wasix"
-	"github.com/egdaemon/eg/interp/c8s"
+	"github.com/egdaemon/eg/interp/c8sproxy"
 	"github.com/egdaemon/eg/interp/events"
 	"github.com/egdaemon/eg/workspaces"
 	"github.com/fsnotify/fsnotify"
@@ -523,7 +523,7 @@ func (t staterunning) Update(ctx context.Context) state {
 
 	ts := time.Now()
 	// TODO REVISIT using t.ws.RuntimeDir as moduledir.
-	err = c8s.PodmanModule(ctx, prepcmd, "eg", fmt.Sprintf("eg-%s", t.ragent.id), t.ws.RuntimeDir, options...)
+	err = c8sproxy.PodmanModule(ctx, prepcmd, "eg", fmt.Sprintf("eg-%s", t.ragent.id), t.ws.RuntimeDir, options...)
 	return completed(t.workload, t.metadata, t.ws, time.Since(ts), err)
 }
 

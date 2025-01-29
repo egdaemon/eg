@@ -5,6 +5,7 @@ package egbug
 import (
 	"context"
 	"fmt"
+	"log"
 	"sync/atomic"
 	"time"
 
@@ -116,6 +117,21 @@ func (t *counter) Assert(v uint64) eg.OpFn {
 			return fmt.Errorf("expected counter to have %d, actual: %d", v, c)
 		}
 
+		return nil
+	}
+}
+
+// utility function for prototyping.
+func Sleep(d time.Duration) eg.OpFn {
+	return func(ctx context.Context, op eg.Op) error {
+		time.Sleep(d)
+		return nil
+	}
+}
+
+func Log(m ...any) eg.OpFn {
+	return func(ctx context.Context, op eg.Op) error {
+		log.Println(m...)
 		return nil
 	}
 }

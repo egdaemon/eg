@@ -117,7 +117,9 @@ func PodmanModule(ctx context.Context, cmdctx func(*exec.Cmd) *exec.Cmd, image, 
 		cmd *exec.Cmd
 	)
 
-	defer cleanup(ctx, cmdctx, cname)
+	// cleanup has its own timeout we want to ensure the commands at least
+	// attempt to cleanup.
+	defer cleanup(context.Background(), cmdctx, cname)
 
 	cmd = cmdctx(exec.CommandContext(
 		ctx,

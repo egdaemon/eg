@@ -22,7 +22,7 @@ import (
 	"github.com/egdaemon/eg/internal/podmanx"
 	"github.com/egdaemon/eg/internal/userx"
 	"github.com/egdaemon/eg/internal/wasix"
-	"github.com/egdaemon/eg/interp/c8s"
+	"github.com/egdaemon/eg/interp/c8sproxy"
 	"github.com/egdaemon/eg/runners"
 	"github.com/egdaemon/eg/transpile"
 	"github.com/egdaemon/eg/workspaces"
@@ -201,7 +201,7 @@ func (t local) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err e
 		}
 
 		// TODO REVISIT using t.ws.RuntimeDir as moduledir.
-		if err := c8s.PodmanModule(ctx, prepcmd, eg.WorkingDirectory, fmt.Sprintf("eg-%s", uid.String()), ws.RuntimeDir, options...); err != nil {
+		if err := c8sproxy.PodmanModule(ctx, prepcmd, eg.WorkingDirectory, fmt.Sprintf("eg-%s", uid.String()), ws.RuntimeDir, options...); err != nil {
 			return errorsx.Wrap(err, "module execution failed")
 		}
 	}

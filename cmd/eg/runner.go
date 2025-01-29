@@ -29,7 +29,7 @@ import (
 	"github.com/egdaemon/eg/internal/runtimex"
 	"github.com/egdaemon/eg/internal/wasix"
 	"github.com/egdaemon/eg/interp"
-	"github.com/egdaemon/eg/interp/c8s"
+	"github.com/egdaemon/eg/interp/c8sproxy"
 	"github.com/egdaemon/eg/interp/events"
 	"github.com/egdaemon/eg/interp/runtime/wasi/ffiwasinet"
 	"github.com/egdaemon/eg/runners"
@@ -145,9 +145,9 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 		// fsx.PrintDir(os.DirFS(t.RuntimeDir))
 		defer debugx.Println("---------------------------- ROOT MODULE COMPLETED ----------------------------")
 
-		cspath := filepath.Join(t.RuntimeDir, "control.socket")
+		cspath := filepath.Join(t.RuntimeDir, eg.SocketControl)
 		if control, err = net.Listen("unix", cspath); err != nil {
-			return errorsx.Wrap(err, "unable to create control.socket")
+			return errorsx.Wrapf(err, "unable to create %s", cspath)
 		}
 		defer control.Close()
 
@@ -195,10 +195,10 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 			hostnet,
 		)
 
-		c8s.NewServiceProxy(
+		c8sproxy.NewServiceProxy(
 			log.Default(),
 			ws,
-			c8s.ServiceProxyOptionCommandEnviron(
+			c8sproxy.ServiceProxyOptionCommandEnviron(
 				errorsx.Zero(
 					envx.Build().Var(
 						"PAGER", "cat", // no paging in this environmenet.
@@ -214,13 +214,13 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 					).Environ(),
 				)...,
 			),
-			c8s.ServiceProxyOptionContainerOptions(
+			c8sproxy.ServiceProxyOptionContainerOptions(
 				ragent.Options()...,
 			),
 		).Bind(srv)
 
 		go func() {
-			errorsx.Log(errorsx.Wrap(srv.Serve(control), "unable to create control socket"))
+			errorsx.Log(errorsx.Wrap(srv.Serve(control), "unable to serve control socket"))
 		}()
 
 		if err = gitx.AutomaticCredentialRefresh(gctx.Context, tlsc.DefaultClient(), t.RuntimeDir, envx.String("", gitx.EnvAuthEGAccessToken)); err != nil {

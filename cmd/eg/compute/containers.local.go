@@ -19,7 +19,7 @@ import (
 	"github.com/egdaemon/eg/internal/iox"
 	"github.com/egdaemon/eg/internal/podmanx"
 	"github.com/egdaemon/eg/internal/wasix"
-	"github.com/egdaemon/eg/interp/c8s"
+	"github.com/egdaemon/eg/interp/c8sproxy"
 	"github.com/egdaemon/eg/runners"
 	"github.com/egdaemon/eg/transpile"
 	"github.com/egdaemon/eg/workspaces"
@@ -180,7 +180,7 @@ func (t c8sLocal) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (er
 			)...)
 
 		// TODO REVISIT using t.ws.RuntimeDir as moduledir.
-		err := c8s.PodmanModule(ctx, prepcmd, eg.WorkingDirectory, fmt.Sprintf("eg-%s", uid.String()), ws.Root, options...)
+		err := c8sproxy.PodmanModule(ctx, prepcmd, eg.WorkingDirectory, fmt.Sprintf("eg-%s", uid.String()), ws.Root, options...)
 		if err != nil {
 			return errorsx.Wrap(err, "module execution failed")
 		}

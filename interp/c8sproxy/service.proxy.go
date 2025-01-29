@@ -1,4 +1,4 @@
-package c8s
+package c8sproxy
 
 import (
 	"context"
@@ -9,7 +9,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/containers/podman/v5/pkg/bindings/containers"
 	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/internal/debugx"
 	"github.com/egdaemon/eg/internal/errorsx"
@@ -17,6 +16,7 @@ import (
 	"github.com/egdaemon/eg/internal/langx"
 	"github.com/egdaemon/eg/internal/slicesx"
 	"github.com/egdaemon/eg/internal/stringsx"
+	"github.com/egdaemon/eg/interp/c8s"
 	"github.com/egdaemon/eg/workspaces"
 	"google.golang.org/grpc"
 )
@@ -45,7 +45,7 @@ func NewServiceProxy(l *log.Logger, ws workspaces.Context, options ...ServicePro
 }
 
 type ProxyService struct {
-	UnimplementedProxyServer
+	c8s.UnimplementedProxyServer
 	log           *log.Logger
 	ws            workspaces.Context
 	cmdenv        []string
@@ -53,7 +53,7 @@ type ProxyService struct {
 }
 
 func (t *ProxyService) Bind(host grpc.ServiceRegistrar) {
-	RegisterProxyServer(host, t)
+	c8s.RegisterProxyServer(host, t)
 }
 
 func (t *ProxyService) prepcmd(cmd *exec.Cmd) *exec.Cmd {
@@ -66,7 +66,7 @@ func (t *ProxyService) prepcmd(cmd *exec.Cmd) *exec.Cmd {
 }
 
 // Build implements ProxyServer.
-func (t *ProxyService) Build(ctx context.Context, req *BuildRequest) (_ *BuildResponse, err error) {
+func (t *ProxyService) Build(ctx context.Context, req *c8s.BuildRequest) (_ *c8s.BuildResponse, err error) {
 	debugx.Println("PROXY CONTAINER BUILD INITIATED", errorsx.Zero(os.Getwd()), t.ws.Root)
 	defer debugx.Println("PROXY CONTAINER BUILD COMPLETED", errorsx.Zero(os.Getwd()), t.ws.Root)
 
@@ -79,9 +79,9 @@ func (t *ProxyService) Build(ctx context.Context, req *BuildRequest) (_ *BuildRe
 		abspath = filepath.Join(t.ws.Root, t.ws.WorkingDir, req.Definition)
 	}
 
-	if ok, err := containers.Exists(ctx, req.Name, nil); ok && err == nil {
-		return &BuildResponse{}, nil
-	}
+	// if ok, err := containers.Exists(ctx, req.Name, nil); ok && err == nil {
+	// 	return &BuildResponse{}, nil
+	// }
 
 	// determine the working directory from the request if specified or the definition file's path.
 	wdir := slicesx.FindOrZero(func(s string) bool { return !stringsx.Blank(s) }, req.Directory, filepath.Dir(abspath))
@@ -95,11 +95,11 @@ func (t *ProxyService) Build(ctx context.Context, req *BuildRequest) (_ *BuildRe
 		return nil, err
 	}
 
-	return &BuildResponse{}, nil
+	return &c8s.BuildResponse{}, nil
 }
 
 // Pull implements ProxyServer.
-func (t *ProxyService) Pull(ctx context.Context, req *PullRequest) (resp *PullResponse, err error) {
+func (t *ProxyService) Pull(ctx context.Context, req *c8s.PullRequest) (resp *c8s.PullResponse, err error) {
 	debugx.Println("PROXY CONTAINER PULL INITIATED")
 	defer debugx.Println("PROXY CONTAINER PULL COMPLETED")
 
@@ -115,11 +115,11 @@ func (t *ProxyService) Pull(ctx context.Context, req *PullRequest) (resp *PullRe
 		return nil, err
 	}
 
-	return &PullResponse{}, nil
+	return &c8s.PullResponse{}, nil
 }
 
 // Run implements ProxyServer.
-func (t *ProxyService) Run(ctx context.Context, req *RunRequest) (_ *RunResponse, err error) {
+func (t *ProxyService) Run(ctx context.Context, req *c8s.RunRequest) (_ *c8s.RunResponse, err error) {
 	debugx.Println("PROXY CONTAINER RUN INITIATED", errorsx.Zero(os.Getwd()))
 	defer debugx.Println("PROXY CONTAINER RUN COMPLETED", errorsx.Zero(os.Getwd()))
 
@@ -134,11 +134,11 @@ func (t *ProxyService) Run(ctx context.Context, req *RunRequest) (_ *RunResponse
 		return nil, err
 	}
 
-	return &RunResponse{}, nil
+	return &c8s.RunResponse{}, nil
 }
 
 // Module implements ProxyServer.
-func (t *ProxyService) Module(ctx context.Context, req *ModuleRequest) (_ *ModuleResponse, err error) {
+func (t *ProxyService) Module(ctx context.Context, req *c8s.ModuleRequest) (_ *c8s.ModuleResponse, err error) {
 	debugx.Println("PROXY CONTAINER MODULE INITIATED", errorsx.Zero(os.Getwd()))
 	defer debugx.Println("PROXY CONTAINER MODULE COMPLETED", errorsx.Zero(os.Getwd()))
 
@@ -152,5 +152,5 @@ func (t *ProxyService) Module(ctx context.Context, req *ModuleRequest) (_ *Modul
 		return nil, err
 	}
 
-	return &ModuleResponse{}, nil
+	return &c8s.ModuleResponse{}, nil
 }

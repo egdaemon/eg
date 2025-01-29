@@ -102,6 +102,7 @@ const (
 	ModuleBin        = ".eg.module.wasm"
 	BinaryBin        = "egbin"
 	EnvironFile      = "environ.env"
+	SocketControl    = "control.socket"
 )
 
 func DefaultModuleDirectory() string {

@@ -52,10 +52,10 @@ func Run(ctx context.Context, name, modulepath string, cmd []string, args []stri
 	)
 }
 
-func Module(ctx context.Context, name, modulepath string, args []string) error {
+func Module(ctx context.Context, name, modulepath string, options []string) error {
 	nameptr, namelen := ffiguest.String(name)
 	mpathptr, mpathlen := ffiguest.String(modulepath)
-	argsptr, argslen, argssize := ffiguest.StringArray(args...)
+	argsptr, argslen, argssize := ffiguest.StringArray(options...)
 
 	return ffiguest.Error(
 		module(
@@ -66,4 +66,27 @@ func Module(ctx context.Context, name, modulepath string, args []string) error {
 		),
 		fmt.Errorf("module failed"),
 	)
+	// cc, err := egunsafe.DialControlSocket(ctx)
+	// if err != nil {
+	// 	return err
+	// }
+	// containers := c8s.NewProxyClient(cc)
+
+	// cname := fmt.Sprintf("%s.%s", name, md5x.String(modulepath+envx.String(eg.EnvComputeRunID)))
+	// options = append(
+	// 	options,
+	// 	"--volume", fmt.Sprintf("%s:%s:ro", filepath.Join(eg.DefaultMountRoot(eg.RuntimeDirectory), modulepath), eg.DefaultMountRoot(eg.ModuleBin)),
+	// )
+
+	// _, err = containers.Module(ctx, &c8s.ModuleRequest{
+	// 	Image:   name,
+	// 	Name:    cname,
+	// 	Mdir:    eg.DefaultMountRoot(eg.RuntimeDirectory),
+	// 	Options: options,
+	// })
+	// if err != nil {
+	// 	return err
+	// }
+
+	// return nil
 }

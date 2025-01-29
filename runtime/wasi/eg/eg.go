@@ -3,8 +3,7 @@ package eg
 import (
 	"context"
 	"fmt"
-	"math/rand"
-	"path/filepath"
+	"math/rand/v2"
 	"reflect"
 	"runtime"
 	"strings"
@@ -15,19 +14,16 @@ import (
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/interp/events"
+	"github.com/egdaemon/eg/runtime/wasi/egunsafe"
 	"github.com/egdaemon/eg/runtime/wasi/egunsafe/ffiegcontainer"
 	"github.com/egdaemon/eg/runtime/wasi/egunsafe/ffigraph"
 )
-
-func runtimeDirectory(paths ...string) string {
-	return eg.DefaultMountRoot(eg.RuntimeDirectory, filepath.Join(paths...))
-}
 
 // Generally unsafe predefined runner for modules. useful
 // for providing a base line environment but has no long term
 // stability promises.
 func DefaultModule() ContainerRunner {
-	path := runtimeDirectory("eg.default.module")
+	path := egunsafe.RuntimeDirectory("eg.default.module")
 	errorsx.Never(eg.PrepareRootContainer(path))
 	return Container("eg").BuildFromFile(path)
 }

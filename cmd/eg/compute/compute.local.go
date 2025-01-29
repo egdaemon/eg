@@ -4,10 +4,12 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"math"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strconv"
+	"time"
 
 	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/cmd/cmdopts"
@@ -40,6 +42,8 @@ type local struct {
 	GitReference     string   `name:"git-ref" help:"name of the branch or commit to checkout" default:"${vars_git_head_reference}"`
 	ContainerCache   string   `name:"croot" help:"container storage, ideally we'd be able to share with the host but for now" hidden:"true" default:"${vars_container_cache_directory}"`
 	Name             string   `arg:"" name:"module" help:"name of the module to run, i.e. the folder name within moduledir" default:"" predictor:"eg.workload"`
+	Infinite         bool     `name:"infinite" help:"allow this module to run forever, used for running a workload like a webserver" hidden:"true"`
+	Ports            []int    `name:"ports" help:"list of ports to publish to the host system" hidden:"true"`
 }
 
 func (t local) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err error) {
@@ -91,6 +95,10 @@ func (t local) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err e
 		return errorsx.Wrap(err, "unable to open git repository")
 	}
 
+	if t.Infinite {
+		t.RuntimeResources.TTL = time.Duration(math.MaxInt)
+	}
+
 	envb := envx.Build().
 		FromPath(t.EnvironmentPaths).
 		FromEnv(t.Environment...).
@@ -100,6 +108,7 @@ func (t local) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err e
 		Var(eg.EnvComputeLoggingVerbosity, strconv.Itoa(gctx.Verbosity)).
 		Var(eg.EnvComputeBin, hotswapbin.String()).
 		Var(eg.EnvUnsafeCacheID, ws.CachedID).
+		Var(eg.EnvComputeTTL, t.RuntimeResources.TTL.String()).
 		Var(eg.EnvUnsafeGitCloneEnabled, strconv.FormatBool(false)) // hack to disable cloning
 
 	if t.Dirty {
@@ -138,7 +147,7 @@ func (t local) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err e
 		return err
 	}
 
-	if err = wasix.WarmCacheDirectory(gctx.Context, filepath.Join(ws.Root, ws.BuildDir), wasix.WazCacheDir(filepath.Join(ws.Root, ws.RuntimeDir))); err != nil {
+	if err = wasix.WarmCacheDirectory(gctx.Context, filepath.Join(ws.Root, ws.BuildDir), wasix.WazCacheDir(filepath.Join(ws.Root, ws.CacheDir, eg.DefaultModuleDirectory()))); err != nil {
 		log.Println("unable to prewarm wasi directory cache", err)
 	}
 
@@ -168,6 +177,7 @@ func (t local) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err e
 		gnupghome,                               // must come after the runtime directory mount to ensure correct mounting order.
 		runners.AgentOptionEnviron(environpath), // ensure we pick up the environment file with the container.
 		runners.AgentOptionHostOS(),
+		runners.AgentOptionPublish(t.Ports...),
 	)
 
 	for _, m := range modules {

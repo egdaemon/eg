@@ -82,7 +82,9 @@ func PodmanRun(ctx context.Context, cmdctx func(*exec.Cmd) *exec.Cmd, image, cna
 		cmd *exec.Cmd
 	)
 
-	defer cleanup(ctx, cmdctx, cname)
+	// cleanup has its own timeout we want to ensure the commands at least
+	// attempt to cleanup.
+	defer cleanup(context.Background(), cmdctx, cname)
 
 	cmd = exec.CommandContext(
 		ctx, "podman", "run", "-i", "--name", cname,

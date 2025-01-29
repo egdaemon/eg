@@ -228,6 +228,10 @@ func (t coption) envvar(k, v string) coption {
 	return []string{"-e", fmt.Sprintf("%s=%s", k, v)}
 }
 
+func (t coption) literal(options ...string) coption {
+	return options
+}
+
 type ContainerRunner struct {
 	name       string
 	definition string
@@ -235,6 +239,11 @@ type ContainerRunner struct {
 	cmd        []string
 	options    []coption
 	built      *sync.Once
+}
+
+func (t ContainerRunner) OptionLiteral(args ...string) ContainerRunner {
+	t.options = append(t.options, coption(nil).literal(args...))
+	return t
 }
 
 // specifies the location of the container file on disk.

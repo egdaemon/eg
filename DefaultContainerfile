@@ -4,7 +4,7 @@ ARG GOBIN="/usr/bin"
 ARG GOMODCACHE="/tmp/gomod"
 ARG GOCACHE="/tmp/gocache"
 
-RUN echo "cache buster 059a9a06-1686-4f49-9a7f-a30535886d59"
+RUN echo "cache buster 059a9a06-1686-4f49-9a7f-a30535886d58"
 # put apt in non-interactive mode
 ENV DEBIAN_FRONTEND=noninteractive
 

@@ -59,6 +59,15 @@ func String(fallback string, keys ...string) string {
 	return NewEnviron(os.Getenv).String(fallback, keys...)
 }
 
+// Toggle based on environment keys.
+func Toggle[T any](off, on T, keys ...string) T {
+	if Boolean(false, keys...) {
+		return on
+	}
+
+	return off
+}
+
 // Duration retrieves a time.Duration from the environment, checks each key in order
 // first successful parse to a duration is returned.
 func Duration(fallback time.Duration, keys ...string) time.Duration {

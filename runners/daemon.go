@@ -161,6 +161,15 @@ func AgentOptionCommandLine(literal ...string) AgentOption {
 	}
 }
 
+// Only should be used for local compute.
+func AgentOptionPublish(ports ...int) AgentOption {
+	return func(a *Agent) {
+		for _, p := range ports {
+			a.literals = append(a.literals, "--publish", fmt.Sprintf("%d:%d", p, p))
+		}
+	}
+}
+
 func DefaultRunnerClient(ctx context.Context) (cc *grpc.ClientConn, err error) {
 	daemonpath := DefaultRunnerSocketPath()
 	log.Println("connecting", daemonpath)

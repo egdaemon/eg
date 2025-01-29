@@ -104,11 +104,12 @@ func (t module) mounthack(ctx context.Context, ws workspaces.Context) (err error
 
 func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 	var (
-		ws    workspaces.Context
-		aid   = envx.String(uuid.Nil.String(), eg.EnvComputeAccountID)
-		uid   = envx.String(uuid.Nil.String(), eg.EnvComputeRunID)
-		descr = envx.String("", eg.EnvComputeVCS)
-		cc    grpc.ClientConnInterface
+		ws      workspaces.Context
+		aid     = envx.String(uuid.Nil.String(), eg.EnvComputeAccountID)
+		uid     = envx.String(uuid.Nil.String(), eg.EnvComputeRunID)
+		descr   = envx.String("", eg.EnvComputeVCS)
+		hostnet = envx.Toggle(runners.AgentOptionCommandLine("--network", "host"), runners.AgentOptionNoop, eg.EnvExperimentalDisableHostNetwork) // ipv4 group bullshit. pretty sure its a podman 4 issue that was resolved in podman 5. this is 'safe' to do because we are already in a container.
+		cc      grpc.ClientConnInterface
 	)
 
 	// ensure when we run modules our umask is set to allow git clones to work properly
@@ -190,8 +191,8 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 			),
 			runners.AgentOptionEGBin(errorsx.Must(exec.LookPath(eg.DefaultMountRoot(eg.BinaryBin)))),
 			runners.AgentOptionHostOS(),
-			runners.AgentOptionCommandLine("--network", "host"),  // ipv4 group bullshit. pretty sure its a podman 4 issue that was resolved in podman 5. this is 'safe' to do because we are already in a container.
 			runners.AgentOptionCommandLine("--pids-limit", "-1"), // more bullshit. without this we get "Error: OCI runtime error: crun: the requested cgroup controller `pids` is not available"
+			hostnet,
 		)
 
 		c8s.NewServiceProxy(

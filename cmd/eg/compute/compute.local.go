@@ -43,6 +43,7 @@ type local struct {
 	ContainerCache   string   `name:"croot" help:"container storage, ideally we'd be able to share with the host but for now" hidden:"true" default:"${vars_container_cache_directory}"`
 	Name             string   `arg:"" name:"module" help:"name of the module to run, i.e. the folder name within moduledir" default:"" predictor:"eg.workload"`
 	Infinite         bool     `name:"infinite" help:"allow this module to run forever, used for running a workload like a webserver" hidden:"true"`
+	Ports            []int    `name:"ports" help:"list of ports to publish to the host system" hidden:"true"`
 }
 
 func (t local) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err error) {
@@ -176,6 +177,7 @@ func (t local) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err e
 		gnupghome,                               // must come after the runtime directory mount to ensure correct mounting order.
 		runners.AgentOptionEnviron(environpath), // ensure we pick up the environment file with the container.
 		runners.AgentOptionHostOS(),
+		runners.AgentOptionPublish(t.Ports...),
 	)
 
 	for _, m := range modules {

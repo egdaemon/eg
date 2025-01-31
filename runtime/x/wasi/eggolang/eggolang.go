@@ -150,7 +150,7 @@ func AutoCompile(options ...coption) eg.OpFn {
 		runtime := shell.Runtime().EnvironFrom(goenv...).EnvironFrom(opts.buildOption.environ...)
 
 		for gomod := range modfilex.FindModules(egenv.WorkingDirectory()) {
-			cmd := stringsx.Join(" ", "go", "build", flags, fmt.Sprintf("%s/...", filepath.Dir(gomod)))
+			cmd := stringsx.Join(" ", "go", "-C", filepath.Dir(gomod), "build", flags, "./...")
 			if err := shell.Run(ctx, runtime.New(cmd)); err != nil {
 				return errorsx.Wrap(err, "unable to compile")
 			}
@@ -265,7 +265,7 @@ func AutoTest(options ...toption) eg.OpFn {
 		runtime := shell.Runtime().EnvironFrom(goenv...)
 
 		for gomod := range modfilex.FindModules(egenv.WorkingDirectory()) {
-			cmd := stringsx.Join(" ", "go", "test", flags, fmt.Sprintf("%s/...", filepath.Dir(gomod)))
+			cmd := stringsx.Join(" ", "go", "-C", filepath.Dir(gomod), "test", flags, "./...")
 			if err := shell.Run(ctx, runtime.New(cmd)); err != nil {
 				return errorsx.Wrap(err, "unable to run tests")
 			}

@@ -44,6 +44,10 @@ func PrepareDB(ctx context.Context, db *sql.DB) error {
 		return err
 	}
 
+	if _, err := db.ExecContext(ctx, "CREATE TABLE IF NOT EXISTS 'eg.metrics.coverage' (id UUID PRIMARY KEY, path TEXT NOT NULL, path_md5 uuid GENERATED ALWAYS AS (md5(path)), coverage FLOAT4 NOT NULL)"); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -59,6 +63,14 @@ func RecordMetric(ctx context.Context, db *sql.DB, msgs ...*Message) error {
 			mz := langx.Autoderef(evt.Op)
 			if err := db.QueryRowContext(ctx, "INSERT INTO 'eg.metrics.operation' (id, name, ts, module, op, milliseconds) VALUES (?, ?, ?, ?, ?, INTERVAL (?) MILLISECONDS)", m.Id, mz.Name, time.UnixMicro(m.Ts), mz.Module, mz.Op, mz.Milliseconds).Err(); err != nil {
 				return err
+			}
+		case *Message_Coverage:
+			log.Println("DERP DERP COVERAGE")
+			mz := langx.Autoderef(evt.Coverage)
+			for _, report := range mz.Reports {
+				if err := db.QueryRowContext(ctx, "INSERT INTO 'eg.metrics.coverage' (id, path, coverage) VALUES (?, ?, ?)", m.Id, report.Path, report.Coverage).Err(); err != nil {
+					return err
+				}
 			}
 		default:
 			log.Printf("unknown message received %T\n", evt)

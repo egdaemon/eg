@@ -38,6 +38,14 @@ message Metric {
   bytes fieldsJSON = 1000;
 }
 
+message Coverage {
+  message Report {
+    string path = 1;
+    float coverage = 2;
+  }
+  repeated Report reports = 1;
+}
+
 // Represents every message recorded when executing a job
 message Message {
   string id = 1; // uuid v7
@@ -48,6 +56,7 @@ message Message {
     Heartbeat heartbeat = 101;
     Op op = 102;
     Metric metric = 103;
+    Coverage coverage = 104;
   }
 }
 

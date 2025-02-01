@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/egdaemon/eg/internal/coverage"
 	"github.com/egdaemon/eg/internal/coverage/golangcov"
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
@@ -16,9 +15,10 @@ import (
 	"github.com/egdaemon/eg/internal/md5x"
 	"github.com/egdaemon/eg/internal/modfilex"
 	"github.com/egdaemon/eg/internal/stringsx"
+	"github.com/egdaemon/eg/interp/events"
 	"github.com/egdaemon/eg/runtime/wasi/eg"
 	"github.com/egdaemon/eg/runtime/wasi/egenv"
-	"github.com/egdaemon/eg/runtime/wasi/egunsafe/ffimetric"
+	"github.com/egdaemon/eg/runtime/wasi/egunsafe/fficoverage"
 	"github.com/egdaemon/eg/runtime/wasi/shell"
 )
 
@@ -261,13 +261,12 @@ func AutoTest(options ...toption) eg.OpFn {
 	opts = langx.Clone(opts, options...)
 	flags := stringsx.Join(" ", opts.options()...)
 
-	covpath := egenv.EphemeralDirectory(".eg.coverage")
-
 	return eg.OpFn(func(ctx context.Context, _ eg.Op) (err error) {
 		var (
 			goenv []string
 		)
 
+		covpath := coveragedir()
 		if err := shell.Run(ctx, shell.Newf("mkdir -p %s", covpath)); err != nil {
 			return errorsx.Wrap(err, "unable to run tests")
 		}
@@ -285,29 +284,36 @@ func AutoTest(options ...toption) eg.OpFn {
 			}
 		}
 
-		// recover metrics
-		batch := make([]*coverage.Report, 0, 128)
-		for rep, err := range golangcov.Coverage(ctx, covpath) {
-			if err != nil {
-				return err
-			}
+		return nil
+	})
+}
 
-			batch = append(batch, rep)
+// Record the coverage profile into the duckdb database.
+func RecordCoverage(ctx context.Context, _ eg.Op) (err error) {
+	covpath := coveragedir()
 
-			if len(batch) == cap(batch) {
-				if err := ffimetric.Record(ctx, coverage.Metric, coverage.Batch(batch...)); err != nil {
-					return err
-				}
-				batch = batch[:0]
-			}
-		}
-
-		if err := ffimetric.Record(ctx, coverage.Metric, coverage.Batch(batch...)); err != nil {
+	// recover metrics
+	batch := make([]*events.Coverage, 0, 128)
+	for rep, err := range golangcov.Coverage(ctx, covpath) {
+		if err != nil {
 			return err
 		}
 
-		return nil
-	})
+		batch = append(batch, rep)
+
+		if len(batch) == cap(batch) {
+			if err := fficoverage.Report(ctx, batch...); err != nil {
+				return err
+			}
+			batch = batch[:0]
+		}
+	}
+
+	if err := fficoverage.Report(ctx, batch...); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func CacheDirectory(dirs ...string) string {
@@ -338,4 +344,8 @@ func Runtime() shell.Command {
 		EnvironFrom(
 			errorsx.Must(Env())...,
 		)
+}
+
+func coveragedir() string {
+	return egenv.EphemeralDirectory(".eg.coverage")
 }

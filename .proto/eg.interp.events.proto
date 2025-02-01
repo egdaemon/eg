@@ -39,11 +39,8 @@ message Metric {
 }
 
 message Coverage {
-  message Report {
-    string path = 1;
-    float coverage = 2;
-  }
-  repeated Report reports = 1;
+  string path = 1;
+  float coverage = 2;
 }
 
 // Represents every message recorded when executing a job

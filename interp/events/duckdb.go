@@ -65,13 +65,11 @@ func RecordMetric(ctx context.Context, db *sql.DB, msgs ...*Message) error {
 				return err
 			}
 		case *Message_Coverage:
-			log.Println("DERP DERP COVERAGE")
 			mz := langx.Autoderef(evt.Coverage)
-			for _, report := range mz.Reports {
-				if err := db.QueryRowContext(ctx, "INSERT INTO 'eg.metrics.coverage' (id, path, coverage) VALUES (?, ?, ?)", m.Id, report.Path, report.Coverage).Err(); err != nil {
-					return err
-				}
+			if err := db.QueryRowContext(ctx, "INSERT INTO 'eg.metrics.coverage' (id, path, coverage) VALUES (?, ?, ?)", m.Id, mz.Path, mz.Coverage).Err(); err != nil {
+				return err
 			}
+
 		default:
 			log.Printf("unknown message received %T\n", evt)
 		}

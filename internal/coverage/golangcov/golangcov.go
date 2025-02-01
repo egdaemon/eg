@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"io/fs"
 	"iter"
-	"log"
 	"os"
 	"path/filepath"
 
@@ -27,7 +26,6 @@ func Coverage(ctx context.Context, dir string) iter.Seq2[*coverage.Report, error
 				return nil
 			}
 
-			log.Println("DERP DERP", path)
 			profiles, err := cover.ParseProfiles(filepath.Join(dir, path))
 			if err != nil {
 				return err

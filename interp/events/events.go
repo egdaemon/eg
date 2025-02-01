@@ -69,6 +69,12 @@ func NewOp(t *Op) *Message {
 	})
 }
 
+func NewCoverage(t *Coverage) *Message {
+	return NewMessage(&Message_Coverage{
+		Coverage: t,
+	})
+}
+
 func NewDispatch(m ...*Message) *DispatchRequest {
 	return &DispatchRequest{Messages: m}
 }

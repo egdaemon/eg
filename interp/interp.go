@@ -19,6 +19,7 @@ import (
 	"github.com/egdaemon/eg/internal/wasix"
 	"github.com/egdaemon/eg/interp/c8s"
 	"github.com/egdaemon/eg/interp/events"
+	"github.com/egdaemon/eg/interp/runtime/wasi/fficoverage"
 	"github.com/egdaemon/eg/interp/runtime/wasi/ffiegcontainer"
 	"github.com/egdaemon/eg/interp/runtime/wasi/ffiexec"
 	"github.com/egdaemon/eg/interp/runtime/wasi/ffigit"
@@ -145,7 +146,10 @@ func Remote(ctx context.Context, aid string, runid string, svc grpc.ClientConnIn
 		).Export("github.com/egdaemon/eg/runtime/wasi/runtime/ffigit.CloneV2").
 			NewFunctionBuilder().WithFunc(
 			ffimetric.Metric(evtclient),
-		).Export("github.com/egdaemon/eg/runtime/wasi/runtime/metrics.Record")
+		).Export("github.com/egdaemon/eg/runtime/wasi/runtime/metrics.Record").
+			NewFunctionBuilder().WithFunc(
+			fficoverage.Report(evtclient),
+		).Export("github.com/egdaemon/eg/runtime/wasi/runtime/coverage.Report")
 	}
 
 	return r.perform(ctx, runid, module, runtimeenv)

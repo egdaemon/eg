@@ -8,13 +8,17 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/egdaemon/eg/internal/coverage/golangcov"
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/langx"
+	"github.com/egdaemon/eg/internal/md5x"
 	"github.com/egdaemon/eg/internal/modfilex"
 	"github.com/egdaemon/eg/internal/stringsx"
+	"github.com/egdaemon/eg/interp/events"
 	"github.com/egdaemon/eg/runtime/wasi/eg"
 	"github.com/egdaemon/eg/runtime/wasi/egenv"
+	"github.com/egdaemon/eg/runtime/wasi/egunsafe/fficoverage"
 	"github.com/egdaemon/eg/runtime/wasi/shell"
 )
 
@@ -224,6 +228,7 @@ func (toption) Verbose(b bool) toption {
 
 type testOption struct {
 	buildOption
+	coverage  string // cover mode
 	count     string
 	randomize string
 	verbose   string
@@ -241,13 +246,16 @@ func (t testOption) options() (dst []string) {
 	dst = ignoreEmpty(dst, t.randomize)
 	dst = ignoreEmpty(dst, t.count)
 	dst = ignoreEmpty(dst, t.verbose)
+	dst = append(dst, t.coverage)
 
 	return dst
 }
 
 func AutoTest(options ...toption) eg.OpFn {
 	var (
-		opts = testOption{}
+		opts = testOption{
+			coverage: "-covermode count",
+		}
 	)
 
 	opts = langx.Clone(opts, options...)
@@ -258,6 +266,11 @@ func AutoTest(options ...toption) eg.OpFn {
 			goenv []string
 		)
 
+		covpath := coveragedir()
+		if err := shell.Run(ctx, shell.Newf("mkdir -p %s", covpath)); err != nil {
+			return errorsx.Wrap(err, "unable to run tests")
+		}
+
 		if goenv, err = Env(); err != nil {
 			return err
 		}
@@ -265,7 +278,7 @@ func AutoTest(options ...toption) eg.OpFn {
 		runtime := shell.Runtime().EnvironFrom(goenv...)
 
 		for gomod := range modfilex.FindModules(egenv.WorkingDirectory()) {
-			cmd := stringsx.Join(" ", "go", "-C", filepath.Dir(gomod), "test", flags, "./...")
+			cmd := stringsx.Join(" ", "go", "-C", filepath.Dir(gomod), "test", flags, fmt.Sprintf("-coverprofile %s", filepath.Join(covpath, md5x.String(gomod))), "./...")
 			if err := shell.Run(ctx, runtime.New(cmd)); err != nil {
 				return errorsx.Wrap(err, "unable to run tests")
 			}
@@ -273,6 +286,34 @@ func AutoTest(options ...toption) eg.OpFn {
 
 		return nil
 	})
+}
+
+// Record the coverage profile into the duckdb database.
+func RecordCoverage(ctx context.Context, _ eg.Op) (err error) {
+	covpath := coveragedir()
+
+	// recover metrics
+	batch := make([]*events.Coverage, 0, 128)
+	for rep, err := range golangcov.Coverage(ctx, covpath) {
+		if err != nil {
+			return err
+		}
+
+		batch = append(batch, rep)
+
+		if len(batch) == cap(batch) {
+			if err := fficoverage.Report(ctx, batch...); err != nil {
+				return err
+			}
+			batch = batch[:0]
+		}
+	}
+
+	if err := fficoverage.Report(ctx, batch...); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func CacheDirectory(dirs ...string) string {
@@ -303,4 +344,8 @@ func Runtime() shell.Command {
 		EnvironFrom(
 			errorsx.Must(Env())...,
 		)
+}
+
+func coveragedir() string {
+	return egenv.EphemeralDirectory(".eg.coverage")
 }

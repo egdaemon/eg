@@ -3,9 +3,11 @@ package fficoverage
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/interp/events"
+	"github.com/egdaemon/eg/interp/runtime/wasi/ffiguest"
 )
 
 func Report(ctx context.Context, batch ...*events.Coverage) (err error) {
@@ -18,8 +20,7 @@ func Report(ctx context.Context, batch ...*events.Coverage) (err error) {
 	}
 	_ = encoded
 
-	// payloadoffset, payloadlen := ffiguest.Bytes(encoded)
+	payloadoffset, payloadlen := ffiguest.Bytes(encoded)
 
-	// return ffiguest.Error(record(ffiguest.ContextDeadline(ctx), payloadoffset, payloadlen), fmt.Errorf("unable to record coverage"))
-	return nil
+	return ffiguest.Error(record(ffiguest.ContextDeadline(ctx), payloadoffset, payloadlen), fmt.Errorf("unable to record coverage"))
 }

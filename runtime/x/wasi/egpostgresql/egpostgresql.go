@@ -1,7 +1,7 @@
-// Package egpostgresql provide functionality for setting up
+// Package egpostgresql provides functionality for setting up
 // a postgresql service within eg environments. Specifically
-// allows for waiting for postgresql to be available,
-// and configuring local access.
+// allows for waiting for the postgresql service to become
+// available and configuring local access.
 package egpostgresql
 
 import (
@@ -16,7 +16,7 @@ import (
 	"github.com/egdaemon/eg/runtime/wasi/shell"
 )
 
-// configure the locally running instance of postgresql for use by root and egd users.
+// Wait for postgresql to become available and then configure the instance for use by root and egd users.
 func Auto(ctx context.Context, _ eg.Op) (err error) {
 	runtime := shell.Runtime().As("postgres").Timeout(5*time.Second).Environ("PAGER", "")
 
@@ -30,7 +30,7 @@ func Auto(ctx context.Context, _ eg.Op) (err error) {
 	)
 }
 
-// Forcibly creates and destroys a database.
+// Forcibly recreate a database.
 func RecreateDatabase(name string) eg.OpFn {
 	return func(ctx context.Context, _ eg.Op) (err error) {
 		runtime := Runtime().As("postgres")
@@ -53,8 +53,7 @@ func InsertSuperuser(name string) eg.OpFn {
 	}
 }
 
-// attempt to build a environment that sets up
-// the postgresql.
+// build a environment that sets up postgresql the standard postgresql variables.
 func Environ() []string {
 	ctx, done := context.WithTimeout(context.Background(), 3*time.Second)
 	defer done()

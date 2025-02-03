@@ -56,6 +56,7 @@ const (
 )
 
 const (
+	EnvCI                        = "CI"                                         // standard ci/cd environment variable flag
 	EnvComputeTLSInsecure        = "EG_COMPUTE_TLS_INSECURE"                    // used to pass TLS insecure flag to container.
 	EnvComputeLoggingVerbosity   = "EG_COMPUTE_LOG_VERBOSITY"                   // logging verbosity.
 	EnvComputeModuleNestedLevel  = "EG_COMPUTE_MODULE_LEVEL"                    // number of nested levels the current module is running in.

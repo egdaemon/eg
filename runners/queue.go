@@ -416,6 +416,7 @@ func beginwork(ctx context.Context, md metadata, dir string) state {
 
 	envb := envx.Build().FromPath(environpath).
 		Var(gitx.EnvAuthEGAccessToken, workload.AccessToken).
+		Var(eg.EnvCI, "true").
 		Var(eg.EnvComputeRunID, workload.Enqueued.Id).
 		Var(eg.EnvComputeAccountID, workload.Enqueued.AccountId).
 		Var(eg.EnvComputeVCS, workload.Enqueued.VcsUri).

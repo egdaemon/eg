@@ -106,7 +106,7 @@ func Coverage(ctx context.Context, dir string) iter.Seq2[*coverage.Report, error
 
 		err := fs.WalkDir(os.DirFS(dir), ".", func(path string, d fs.DirEntry, err error) error {
 			if err != nil {
-				return err
+				return errorsx.Wrapf(err, "failed: %s", filepath.Join(dir, path))
 			}
 
 			if d.IsDir() {

@@ -1,5 +1,5 @@
 // Package eglcov provides the functionality to report test coverage from lcov files within a directory.
-package egvitest
+package eglcov
 
 import (
 	"context"

@@ -1,5 +1,7 @@
 package coverage
 
-import "github.com/egdaemon/eg/interp/events"
+import (
+	"github.com/egdaemon/eg/interp/events"
+)
 
 type Report = events.Coverage

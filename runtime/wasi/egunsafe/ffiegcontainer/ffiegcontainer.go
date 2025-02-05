@@ -3,8 +3,14 @@ package ffiegcontainer
 import (
 	"context"
 	"fmt"
+	"path/filepath"
 
+	"github.com/egdaemon/eg"
+	"github.com/egdaemon/eg/internal/envx"
+	"github.com/egdaemon/eg/internal/md5x"
+	"github.com/egdaemon/eg/interp/c8s"
 	"github.com/egdaemon/eg/interp/runtime/wasi/ffiguest"
+	"github.com/egdaemon/eg/runtime/wasi/egunsafe"
 )
 
 func Pull(ctx context.Context, name string, args []string) error {
@@ -53,40 +59,27 @@ func Run(ctx context.Context, name, modulepath string, cmd []string, args []stri
 }
 
 func Module(ctx context.Context, name, modulepath string, options []string) error {
-	nameptr, namelen := ffiguest.String(name)
-	mpathptr, mpathlen := ffiguest.String(modulepath)
-	argsptr, argslen, argssize := ffiguest.StringArray(options...)
+	cc, err := egunsafe.DialControlSocket(ctx)
+	if err != nil {
+		return err
+	}
+	containers := c8s.NewProxyClient(cc)
 
-	return ffiguest.Error(
-		module(
-			ffiguest.ContextDeadline(ctx),
-			nameptr, namelen,
-			mpathptr, mpathlen,
-			argsptr, argslen, argssize,
-		),
-		fmt.Errorf("module failed"),
+	cname := fmt.Sprintf("%s.%s", name, md5x.String(modulepath+envx.String(eg.EnvComputeRunID)))
+	options = append(
+		options,
+		"--volume", fmt.Sprintf("%s:%s:ro", filepath.Join(eg.DefaultMountRoot(eg.RuntimeDirectory), modulepath), eg.DefaultMountRoot(eg.ModuleBin)),
 	)
-	// cc, err := egunsafe.DialControlSocket(ctx)
-	// if err != nil {
-	// 	return err
-	// }
-	// containers := c8s.NewProxyClient(cc)
 
-	// cname := fmt.Sprintf("%s.%s", name, md5x.String(modulepath+envx.String(eg.EnvComputeRunID)))
-	// options = append(
-	// 	options,
-	// 	"--volume", fmt.Sprintf("%s:%s:ro", filepath.Join(eg.DefaultMountRoot(eg.RuntimeDirectory), modulepath), eg.DefaultMountRoot(eg.ModuleBin)),
-	// )
+	_, err = containers.Module(ctx, &c8s.ModuleRequest{
+		Image:   name,
+		Name:    cname,
+		Mdir:    eg.DefaultMountRoot(eg.RuntimeDirectory),
+		Options: options,
+	})
+	if err != nil {
+		return err
+	}
 
-	// _, err = containers.Module(ctx, &c8s.ModuleRequest{
-	// 	Image:   name,
-	// 	Name:    cname,
-	// 	Mdir:    eg.DefaultMountRoot(eg.RuntimeDirectory),
-	// 	Options: options,
-	// })
-	// if err != nil {
-	// 	return err
-	// }
-
-	// return nil
+	return nil
 }

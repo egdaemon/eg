@@ -31,6 +31,7 @@ import (
 	"github.com/egdaemon/eg/interp"
 	"github.com/egdaemon/eg/interp/c8sproxy"
 	"github.com/egdaemon/eg/interp/events"
+	execproxy "github.com/egdaemon/eg/interp/exec"
 	"github.com/egdaemon/eg/interp/runtime/wasi/ffiwasinet"
 	"github.com/egdaemon/eg/runners"
 	"github.com/egdaemon/eg/workspaces"
@@ -119,6 +120,33 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 		return err
 	}
 
+	cmdenv, err := envx.Build().FromEnviron(
+		os.Environ()...,
+	).FromEnv(
+		"PATH",
+		"TERM",
+		"COLORTERM",
+		"LANG",
+		"CI",
+		eg.EnvComputeBin,
+		eg.EnvComputeRunID,
+		eg.EnvComputeAccountID,
+	).Var(
+		eg.EnvComputeWorkingDirectory, eg.DefaultWorkingDirectory(),
+	).Var(
+		eg.EnvComputeCacheDirectory, envx.String(eg.DefaultCacheDirectory(), eg.EnvComputeCacheDirectory, "CACHE_DIRECTORY"),
+	).Var(
+		eg.EnvComputeRuntimeDirectory, eg.DefaultRuntimeDirectory(),
+	).Var(
+		"RUNTIME_DIRECTORY", eg.DefaultRuntimeDirectory(),
+	).Var(
+		"PAGER", "cat", // no paging in this environmenet.
+	).Environ()
+
+	if err != nil {
+		return err
+	}
+
 	if mlevel := envx.Int(0, eg.EnvComputeModuleNestedLevel); mlevel == 0 {
 		var (
 			control   net.Listener
@@ -178,6 +206,8 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 		defer srv.GracefulStop()
 
 		events.NewServiceDispatch(db).Bind(srv)
+		execproxy.NewExecProxy(t.Dir).Bind(srv)
+
 		ragent := runners.NewRunner(
 			gctx.Context,
 			ws,
@@ -198,22 +228,7 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 		c8sproxy.NewServiceProxy(
 			log.Default(),
 			ws,
-			c8sproxy.ServiceProxyOptionCommandEnviron(
-				errorsx.Zero(
-					envx.Build().Var(
-						"PAGER", "cat", // no paging in this environmenet.
-					).FromEnv(
-						"PATH",
-						"TERM",
-						"COLORTERM",
-						"LANG",
-						"CI",
-						eg.EnvComputeBin,
-						eg.EnvComputeRunID,
-						eg.EnvComputeAccountID,
-					).Environ(),
-				)...,
-			),
+			c8sproxy.ServiceProxyOptionCommandEnviron(cmdenv...),
 			c8sproxy.ServiceProxyOptionContainerOptions(
 				ragent.Options()...,
 			),
@@ -257,6 +272,7 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 		t.Dir,
 		t.Module,
 		interp.OptionRuntimeDir(t.RuntimeDir),
+		interp.OptionEnviron(cmdenv...),
 	)
 }
 

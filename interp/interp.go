@@ -28,6 +28,7 @@ import (
 	"github.com/egdaemon/eg/interp/runtime/wasi/ffiwasinet"
 	"github.com/egdaemon/eg/interp/wasidebug"
 	"github.com/egdaemon/eg/runners"
+	"github.com/egdaemon/wasinet/wasinet/wnetruntime"
 	"github.com/gofrs/uuid"
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/experimental"
@@ -45,7 +46,13 @@ func OptionRuntimeDir(s string) Option {
 	}
 }
 
-type runtimefn func(r runner, cmdenv []string, host wazero.HostModuleBuilder) wazero.HostModuleBuilder
+func OptionEnviron(s ...string) Option {
+	return func(r *runner) {
+		r.environ = s
+	}
+}
+
+type runtimefn func(r runner, host wazero.HostModuleBuilder) wazero.HostModuleBuilder
 
 // Remote uses the api to implement particular actions like building and running containers.
 // may not be necessary.
@@ -64,7 +71,7 @@ func Remote(ctx context.Context, aid string, runid string, svc grpc.ClientConnIn
 	containers := c8s.NewProxyClient(svc)
 	evtclient := events.NewEventsClient(svc)
 
-	runtimeenv := func(r runner, cmdenv []string, host wazero.HostModuleBuilder) wazero.HostModuleBuilder {
+	runtimeenv := func(r runner, host wazero.HostModuleBuilder) wazero.HostModuleBuilder {
 		return host.
 			NewFunctionBuilder().WithFunc(ffigraph.Trace(evtclient)).Export("github.com/egdaemon/eg/runtime/wasi/runtime/graph.Trace").
 			NewFunctionBuilder().WithFunc(ffigraph.Analysing(false)).Export("github.com/egdaemon/eg/runtime/wasi/runtime/graph.Analysing").
@@ -128,7 +135,7 @@ func Remote(ctx context.Context, aid string, runid string, svc grpc.ClientConnIn
 			if !filepath.IsAbs(cmd.Dir) {
 				cmd.Dir = filepath.Join(r.root, cmd.Dir)
 			}
-			cmd.Env = append(cmdenv, cmd.Env...)
+			cmd.Env = append(r.environ, cmd.Env...)
 			cmd.Stdin = os.Stdin
 			cmd.Stdout = os.Stdout
 			cmd.Stderr = os.Stderr
@@ -158,6 +165,7 @@ func Remote(ctx context.Context, aid string, runid string, svc grpc.ClientConnIn
 type runner struct {
 	root       string
 	runtimedir string
+	environ    []string
 	initonce   *sync.Once
 }
 
@@ -187,25 +195,6 @@ func (t runner) perform(ctx context.Context, runid, path string, rtb runtimefn) 
 		ctx,
 		wazero.NewRuntimeConfig().WithCompilationCache(cache),
 	)
-
-	cmdenv, err := envx.Build().FromEnviron(
-		os.Environ()...,
-	).FromEnv(
-		"CI",
-		eg.EnvComputeRunID,
-		eg.EnvComputeAccountID,
-	).Var(
-		eg.EnvComputeWorkingDirectory, eg.DefaultWorkingDirectory(),
-	).Var(
-		eg.EnvComputeCacheDirectory, envx.String(eg.DefaultCacheDirectory(), eg.EnvComputeCacheDirectory, "CACHE_DIRECTORY"),
-	).Var(
-		eg.EnvComputeRuntimeDirectory, eg.DefaultRuntimeDirectory(),
-	).Var(
-		"RUNTIME_DIRECTORY", eg.DefaultRuntimeDirectory(),
-	).Environ()
-	if err != nil {
-		return err
-	}
 
 	debugx.Println("cache dir", hostcachedir, "->", eg.DefaultCacheDirectory())
 	debugx.Println("runtime dir", t.runtimedir, "->", eg.DefaultMountRoot(eg.RuntimeDirectory))
@@ -260,7 +249,14 @@ func (t runner) perform(ctx context.Context, runid, path string, rtb runtimefn) 
 	}
 	defer wasienv.Close(ctx)
 
-	wasinet, err := ffiwasinet.Wazero(runtime).Instantiate(ctx)
+	wasinet, err := ffiwasinet.Wazero(
+		runtime,
+		wnetruntime.OptionFSPrefixes(
+			wnetruntime.FSPrefix{Host: t.runtimedir, Guest: eg.DefaultRuntimeDirectory()},
+			wnetruntime.FSPrefix{Host: hostcachedir, Guest: eg.DefaultMountRoot(eg.CacheDirectory)},
+			wnetruntime.FSPrefix{Host: t.root, Guest: eg.DefaultMountRoot(eg.WorkingDirectory)},
+		),
+	).Instantiate(ctx)
 	if err != nil {
 		return err
 	}
@@ -270,7 +266,7 @@ func (t runner) perform(ctx context.Context, runid, path string, rtb runtimefn) 
 		wasidebug.Host(wasinet)
 	}
 
-	hostenv, err := rtb(t, cmdenv, runtime.NewHostModuleBuilder("env")).
+	hostenv, err := rtb(t, runtime.NewHostModuleBuilder("env")).
 		Instantiate(ctx)
 	if err != nil {
 		return err

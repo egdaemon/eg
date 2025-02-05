@@ -1,0 +1,15 @@
+syntax = "proto3";
+
+package eg.interp.exec;
+
+message ExecRequest {
+  string dir = 1;
+  string cmd = 2;
+  repeated string arguments = 3;
+  repeated string environment = 4;
+}
+message ExecResponse {}
+
+service Proxy {
+  rpc Exec(ExecRequest) returns (ExecResponse) {}
+}

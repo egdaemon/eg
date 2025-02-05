@@ -3,7 +3,6 @@ package eg
 import (
 	"context"
 	"fmt"
-	"math/rand/v2"
 	"reflect"
 	"runtime"
 	"strings"
@@ -149,9 +148,9 @@ func Parallel(operations ...OpFn) OpFn {
 		errs := make(chan error, len(operations))
 		defer close(errs)
 
-		rand.Shuffle(len(operations), func(i, j int) {
-			operations[i], operations[j] = operations[j], operations[i]
-		})
+		// rand.Shuffle(len(operations), func(i, j int) {
+		// 	operations[i], operations[j] = operations[j], operations[i]
+		// })
 
 		ffigraph.Wrap(octx, parent, func(mctx context.Context) {
 			for _, o := range operations {

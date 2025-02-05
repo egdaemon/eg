@@ -24,14 +24,26 @@ func net_fd_fdstat_get_type(fd int) (uint8, error) {
 	return uint8(ftype_socket_stream), nil
 }
 
-func fileConnNet(sotype int) (string, error) {
-	switch sotype {
-	case syscall.SOCK_STREAM:
-		return "tcp", nil
-	case syscall.SOCK_DGRAM:
-		return "udp", nil
+func fileConnNet(family, sotype int) (string, error) {
+	switch family {
+	case syscall.AF_UNIX:
+		switch sotype {
+		case syscall.SOCK_STREAM:
+			return "unix", nil
+		case syscall.SOCK_DGRAM:
+			return "unixgram", nil
+		default:
+			return "", syscall.ENOTSOCK
+		}
 	default:
-		return "", syscall.ENOTSOCK
+		switch sotype {
+		case syscall.SOCK_STREAM:
+			return "tcp", nil
+		case syscall.SOCK_DGRAM:
+			return "udp", nil
+		default:
+			return "", syscall.ENOTSOCK
+		}
 	}
 }
 
@@ -39,7 +51,7 @@ func fileConnNet(sotype int) (string, error) {
 func newFile(fd int, name string) *os.File
 
 func newFD(family, sotype int, f *os.File, ifn func(*netFD) error) (*netFD, error) {
-	net, err := fileConnNet(sotype)
+	net, err := fileConnNet(family, sotype)
 	if err != nil {
 		return nil, err
 	}
@@ -68,8 +80,10 @@ func newFdConn(fd *netFD) (net.Conn, error) {
 		return &TCPConn{conn{fd: fd}}, nil
 	case "udp":
 		return &UDPConn{conn{fd: fd}}, nil
+	case "unix":
+		return &UnixConn{conn{fd: fd}}, nil
 	default:
-		return nil, fmt.Errorf("unsupported network for file connection: " + fd.net)
+		return nil, fmt.Errorf("unsupported network for file connection: %s", fd.net)
 	}
 }
 

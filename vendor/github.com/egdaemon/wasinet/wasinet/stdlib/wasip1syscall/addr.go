@@ -35,7 +35,7 @@ func InitializeSocketAddresses(fd int, sotype int, dst addressable) (err error) 
 		)
 
 		if v, err = Getpeername(int(fd)); err != nil {
-			log.Printf("peername %T - %v\n", addrdst, err)
+			log.Printf("peername %T - %s - %v\n", addrdst, addrdst.String(), err)
 			return err
 		}
 
@@ -119,7 +119,7 @@ func unixNetAddr(sa sockaddr) *net.UnixAddr {
 	}
 	switch proto := sa.(type) {
 	case *addressany[addrunix]:
-		return &net.UnixAddr{Name: proto.addr.name, Net: "unix"}
+		return &net.UnixAddr{Name: proto.addr.Path(), Net: "unix"}
 	default:
 		return nil
 	}
@@ -131,7 +131,7 @@ func unixgramNetAddr(sa sockaddr) *net.UnixAddr {
 	}
 	switch proto := sa.(type) {
 	case *addressany[addrunix]:
-		return &net.UnixAddr{Name: proto.addr.name, Net: "unixgram"}
+		return &net.UnixAddr{Name: proto.addr.Path(), Net: "unixgram"}
 	default:
 		return nil
 	}
@@ -143,7 +143,7 @@ func unixpacketNetAddr(sa sockaddr) *net.UnixAddr {
 	}
 	switch proto := sa.(type) {
 	case *addressany[addrunix]:
-		return &net.UnixAddr{Name: proto.addr.name, Net: "unixpacket"}
+		return &net.UnixAddr{Name: proto.addr.Path(), Net: "unixpacket"}
 	}
 	return nil
 }
@@ -186,7 +186,7 @@ func ipNetAddr(sa sockaddr) *net.IPAddr {
 	case *addressany[addrip4]:
 		return &net.IPAddr{IP: proto.addr.ip[0:]}
 	case *addressany[addrip6]:
-		return &net.IPAddr{IP: proto.addr.ip[0:], Zone: ""}
+		return &net.IPAddr{IP: proto.addr.ip[0:]}
 	default:
 		return nil
 	}

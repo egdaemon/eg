@@ -12,8 +12,8 @@ require (
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
 	github.com/docker/docker v27.5.1+incompatible
 	github.com/dominikbraun/graph v0.23.0
-	github.com/egdaemon/wasinet/wasinet v0.0.0-20250120175550-4106c2611afa
-	github.com/egdaemon/wasinet/wazeronet v0.0.0-20250120175550-4106c2611afa
+	github.com/egdaemon/wasinet/wasinet v0.0.0-20250205011224-d5f0e1da96d7
+	github.com/egdaemon/wasinet/wazeronet v0.0.0-20250205011224-d5f0e1da96d7
 	github.com/fsnotify/fsnotify v1.8.0
 	github.com/go-git/go-git/v5 v5.13.2
 	github.com/gofrs/uuid v4.4.0+incompatible
@@ -34,7 +34,7 @@ require (
 	github.com/posener/complete v1.2.3
 	github.com/shirou/gopsutil/v4 v4.24.12
 	github.com/stretchr/testify v1.10.0
-	github.com/tetratelabs/wazero v1.8.3-0.20250115223256-c6e819e6aff0
+	github.com/tetratelabs/wazero v1.8.3-0.20250121181248-4231c48a9c9a
 	github.com/willabides/kongplete v0.4.0
 	go.uber.org/automaxprocs v1.6.0
 	golang.org/x/crypto v0.32.0
@@ -280,7 +280,7 @@ require (
 	golang.org/x/mod v0.22.0 // indirect
 	golang.org/x/net v0.34.0 // indirect
 	golang.org/x/sync v0.10.0 // indirect
-	golang.org/x/sys v0.29.0 // indirect
+	golang.org/x/sys v0.30.0 // indirect
 	golang.org/x/term v0.28.0
 	golang.org/x/text v0.21.0 // indirect
 	golang.org/x/xerrors v0.0.0-20240903120638-7835f813f4da // indirect

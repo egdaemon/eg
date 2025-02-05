@@ -4,7 +4,6 @@ package wasip1syscall
 
 import (
 	"log"
-	"strconv"
 	"syscall"
 	"unsafe"
 
@@ -45,7 +44,7 @@ func UnixSockaddr(v RawSocketAddress) (sa NativeSocket, err error) {
 	case *addressany[addrip6]:
 		return &unix.SockaddrInet6{Port: int(t.addr.port), Addr: t.addr.ip, ZoneId: 0}, nil
 	case *addressany[addrunix]:
-		return &unix.SockaddrUnix{Name: t.addr.name}, nil
+		return &unix.SockaddrUnix{Name: t.addr.Path()}, nil
 	default:
 		return nil, syscall.ENOTSUP
 	}
@@ -59,11 +58,10 @@ func Sockaddr(sa NativeSocket) (zero *RawSocketAddress, error error) {
 			addr:   addrip4{ip: t.Addr, port: uint32(t.Port)},
 		}
 		return a.Sockaddr(), nil
-
 	case *unix.SockaddrInet6:
 		a := addressany[addrip6]{
 			family: syscall.AF_INET6,
-			addr:   addrip6{ip: t.Addr, port: uint32(t.Port), zone: strconv.FormatUint(uint64(t.ZoneId), 10)},
+			addr:   addrip6{ip: t.Addr, port: uint32(t.Port), zone: t.ZoneId},
 		}
 		return a.Sockaddr(), nil
 	case *unix.SockaddrUnix:
@@ -75,7 +73,9 @@ func Sockaddr(sa NativeSocket) (zero *RawSocketAddress, error error) {
 			// byte is replaced with @.
 			name = "@"
 		}
-		return (&addressany[addrunix]{addr: addrunix{name: name}}).Sockaddr(), nil
+		var buf addrunix
+		copy(buf.name[:], name)
+		return (&addressany[addrunix]{family: syscall.AF_UNIX, addr: buf}).Sockaddr(), nil
 	default:
 		log.Println("unsupported unix.Sockaddr", sa)
 		return zero, syscall.EINVAL
@@ -94,7 +94,6 @@ func rawtosockaddr(rsa *RawSocketAddress) (sockaddr, error) {
 		addr := (*addressany[addrunix])(unsafe.Pointer(&rsa.Addr))
 		return addr, nil
 	default:
-		log.Println("PANIC")
 		return nil, syscall.ENOTSUP
 	}
 }

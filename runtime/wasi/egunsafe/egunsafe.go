@@ -13,6 +13,7 @@ import (
 	"google.golang.org/grpc"
 )
 
+// dial the control socket for executing various functionality that is too slow or impedes concurrency.
 func DialControlSocket(ctx context.Context) (conn *grpc.ClientConn, err error) {
 	cspath := RuntimeDirectory(eg.SocketControl)
 	return grpc.DialContext(ctx, fmt.Sprintf("unix://%s", cspath), grpc.WithInsecure(), grpc.WithDialer(func(s string, d time.Duration) (net.Conn, error) {

@@ -8,6 +8,20 @@ import (
 )
 
 func Command(ctx context.Context, dir string, environ []string, cmd string, args []string) error {
+	// cc, err := egunsafe.DialControlSocket(ctx)
+	// if err != nil {
+	// 	return err
+	// }
+	// svc := exec.NewProxyClient(cc)
+
+	// _, err = svc.Exec(ctx, &exec.ExecRequest{
+	// 	Cmd:         cmd,
+	// 	Dir:         dir,
+	// 	Arguments:   args,
+	// 	Environment: environ,
+	// })
+
+	// return err
 	dirptr, dirlen := ffiguest.String(dir)
 	cmdptr, cmdlen := ffiguest.String(cmd)
 	argsptr, argslen, argssize := ffiguest.StringArray(args...)

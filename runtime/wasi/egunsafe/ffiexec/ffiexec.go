@@ -2,24 +2,29 @@ package ffiexec
 
 import (
 	"context"
-	"fmt"
 
-	"github.com/egdaemon/eg/interp/runtime/wasi/ffiguest"
+	"github.com/egdaemon/eg/internal/errorsx"
+	"github.com/egdaemon/eg/interp/exec"
+	"github.com/egdaemon/eg/runtime/wasi/egunsafe"
 )
 
 func Command(ctx context.Context, dir string, environ []string, cmd string, args []string) error {
-	dirptr, dirlen := ffiguest.String(dir)
-	cmdptr, cmdlen := ffiguest.String(cmd)
-	argsptr, argslen, argssize := ffiguest.StringArray(args...)
-	envoffset, envlen, envsize := ffiguest.StringArray(environ...)
-	return ffiguest.Error(
-		command(
-			ffiguest.ContextDeadline(ctx),
-			dirptr, dirlen,
-			envoffset, envlen, envsize,
-			cmdptr, cmdlen,
-			argsptr, argslen, argssize,
-		),
-		fmt.Errorf("unable to execute command: %s", cmd),
-	)
+	cc, err := egunsafe.DialControlSocket(ctx)
+	if err != nil {
+		return err
+	}
+	svc := exec.NewProxyClient(cc)
+
+	resp, err := svc.Exec(ctx, &exec.ExecRequest{
+		Dir: dir,
+	})
+	if err != nil {
+		return err
+	}
+
+	if resp.Errcode != 0 {
+		return errorsx.Errorf("unable to exec command: %d - %s", resp.Errcode, cmd)
+	}
+
+	return nil
 }

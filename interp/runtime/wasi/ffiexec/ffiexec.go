@@ -5,19 +5,11 @@ import (
 	"log"
 	"os/exec"
 
-	"github.com/egdaemon/eg/internal/debugx"
 	"github.com/egdaemon/eg/internal/errorsx"
+	"github.com/egdaemon/eg/internal/execx"
 	"github.com/egdaemon/eg/interp/runtime/wasi/ffi"
 	"github.com/tetratelabs/wazero/api"
 )
-
-func mayberun(c *exec.Cmd) error {
-	if c == nil {
-		return nil
-	}
-
-	return c.Run()
-}
 
 func Exec(op func(*exec.Cmd) *exec.Cmd) func(
 	ctx context.Context,
@@ -42,16 +34,13 @@ func Exec(op func(*exec.Cmd) *exec.Cmd) func(
 
 		cmd, err := Command(ictx, m, diroffset, dirlen, envoffset, envlen, envsize, nameoffset, namelen, argsoffset, argslen, argssize)
 		if err != nil {
-			log.Println("unable to build command", err)
+			log.Println("unable to create command", err)
 			return 127
 		}
 
 		cmd = op(cmd)
 
-		debugx.Println("initiated", cmd.String())
-		defer debugx.Println("completed", cmd.String())
-
-		if err = mayberun(cmd); err != nil {
+		if err = execx.MaybeRun(cmd); err != nil {
 			log.Println("failed to execute shell command", cmd.Dir, cmd.String(), err)
 			return 128
 		}

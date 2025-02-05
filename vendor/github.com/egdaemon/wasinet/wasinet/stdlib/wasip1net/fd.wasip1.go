@@ -72,6 +72,7 @@ func newPollFD(network string, family, sotype int, sysfd int, pfd pollfd) *netFD
 		laddr net.Addr
 		raddr net.Addr
 	)
+
 	// WASI preview 1 does not have functions like getsockname/getpeername,
 	// so we cannot get access to the underlying IP address used by connections.
 	//
@@ -86,6 +87,9 @@ func newPollFD(network string, family, sotype int, sysfd int, pfd pollfd) *netFD
 	case "udp":
 		laddr = new(net.UDPAddr)
 		raddr = new(net.UDPAddr)
+	case "unix":
+		laddr = new(net.UnixAddr)
+		raddr = new(net.UnixAddr)
 	default:
 		laddr = unknownAddr{}
 		raddr = unknownAddr{}

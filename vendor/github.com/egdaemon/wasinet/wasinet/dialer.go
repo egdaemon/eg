@@ -152,63 +152,68 @@ func dialAddr(ctx context.Context, addr net.Addr) (_ net.Conn, err error) {
 	}
 
 	sconn := wasip1net.Socket(uintptr(fd))
-	fd = -1 // now the *netFD owns the file descriptor
+	fd = -1 // now the sconn owns the file descriptor
 	defer func() {
 		if err == nil {
 			return
 		}
+
 		_ = sconn.Close()
 	}()
-	if inProgress {
-		rawConn, err := sconn.SyscallConn()
-		if err != nil {
-			return nil, err
-		}
-		errch := make(chan error)
-		go func() {
-			var err error
-			cerr := rawConn.Write(func(fd uintptr) bool {
-				var value int
-				value, err = wasip1syscall.GetSockoptInt(int(fd), SOL_SOCKET, wasip1syscall.SO_ERROR)
-				if err != nil {
-					return true // done
-				}
 
-				switch ffierrors.Errno(err) {
-				case syscall.EINPROGRESS, syscall.EINTR:
-					return false // continue
-				case syscall.EISCONN:
-					err = nil
-					return true
-				case ffierrors.ErrnoSuccess():
-					// The net poller can wake up spuriously. Check that we are
-					// are really connected.
-					_, err := wasip1syscall.Getpeername(int(fd))
-					return err == nil
-				default:
-					err = syscall.Errno(value)
-					return true
-				}
-			})
-			errch <- errorsx.Compact(err, cerr)
-		}()
+	if !inProgress {
+		return wasip1net.Conn(af, sotype, sconn)
+	}
 
-		select {
-		case err := <-errch:
+	rawConn, err := sconn.SyscallConn()
+	if err != nil {
+		return nil, err
+	}
+
+	errch := make(chan error)
+	go func() {
+		var err error
+		cerr := rawConn.Write(func(fd uintptr) bool {
+			var value int
+			value, err = wasip1syscall.GetSockoptInt(int(fd), SOL_SOCKET, wasip1syscall.SO_ERROR)
 			if err != nil {
-				sconn.Close()
-				return nil, os.NewSyscallError("connect", err)
+				return true // done
 			}
-		case <-ctx.Done():
-			// This should interrupt the async connect operation handled by the
-			// goroutine.
-			sconn.Close()
-			// Wait for the goroutine to complete, we can safely discard the
-			// error here because we don't care about the socket anymore.
-			<-errch
 
-			return nil, context.Cause(ctx)
+			switch ffierrors.Errno(err) {
+			case syscall.EINPROGRESS, syscall.EINTR:
+				return false // continue
+			case syscall.EISCONN:
+				err = nil
+				return true
+			case ffierrors.ErrnoSuccess():
+				// The net poller can wake up spuriously. Check that we are
+				// are really connected.
+				_, err := wasip1syscall.Getpeername(int(fd))
+				return err == nil
+			default:
+				err = syscall.Errno(value)
+				return true
+			}
+		})
+		errch <- errorsx.Compact(err, cerr)
+	}()
+
+	select {
+	case err := <-errch:
+		if err != nil {
+			sconn.Close()
+			return nil, os.NewSyscallError("connect", err)
 		}
+	case <-ctx.Done():
+		// This should interrupt the async connect operation handled by the
+		// goroutine.
+		sconn.Close()
+		// Wait for the goroutine to complete, we can safely discard the
+		// error here because we don't care about the socket anymore.
+		<-errch
+
+		return nil, context.Cause(ctx)
 	}
 
 	return wasip1net.Conn(af, sotype, sconn)

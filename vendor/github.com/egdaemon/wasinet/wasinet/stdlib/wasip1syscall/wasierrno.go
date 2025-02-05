@@ -8,19 +8,21 @@ import (
 )
 
 const (
-	EAGAIN       syscall.Errno = 0x6
-	ECANCELED    syscall.Errno = 0xB
-	EDOM         syscall.Errno = 0x12
-	EINPROGRESS  syscall.Errno = 0x1A
-	EINTR        syscall.Errno = 0x1B
-	EINVAL       syscall.Errno = 0x1C
-	EIO          syscall.Errno = 0x1D
-	EISCONN      syscall.Errno = 0x1E
-	EMFILE       syscall.Errno = 0x21
-	ENOPROTOOPT  syscall.Errno = 0x32
-	ENOTCONN     syscall.Errno = 0x35
-	ETIMEDOUT    syscall.Errno = 0x49
-	ECONNREFUSED syscall.Errno = 0xE
+	EAGAIN        syscall.Errno = 0x6
+	ECANCELED     syscall.Errno = 0xB
+	EDOM          syscall.Errno = 0x12
+	EINPROGRESS   syscall.Errno = 0x1A
+	EINTR         syscall.Errno = 0x1B
+	EINVAL        syscall.Errno = 0x1C
+	EIO           syscall.Errno = 0x1D
+	EISCONN       syscall.Errno = 0x1E
+	EMFILE        syscall.Errno = 0x21
+	ENOPROTOOPT   syscall.Errno = 0x32
+	ENOTCONN      syscall.Errno = 0x35
+	ETIMEDOUT     syscall.Errno = 0x49
+	EADDRNOTAVAIL syscall.Errno = 0x63
+	ECONNREFUSED  syscall.Errno = 0xE
+	ENOENT        syscall.Errno = 0x2C
 )
 
 var mapped = map[syscall.Errno]syscall.Errno{
@@ -38,6 +40,8 @@ var mapped = map[syscall.Errno]syscall.Errno{
 	syscall.EMFILE:           EMFILE,
 	syscall.ENOPROTOOPT:      ENOPROTOOPT,
 	syscall.ECONNREFUSED:     ECONNREFUSED,
+	syscall.ENOENT:           ENOENT,
+	syscall.EADDRNOTAVAIL:    EADDRNOTAVAIL,
 }
 
 // maps native codes to wasi codes.

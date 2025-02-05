@@ -1,9 +1,11 @@
 package wasip1syscall
 
 import (
+	"bytes"
 	"log"
 	"net"
 	"net/netip"
+	"strconv"
 	"syscall"
 
 	"github.com/egdaemon/wasinet/wasinet/ffi"
@@ -45,6 +47,7 @@ func (s addressany[T]) Sockaddr() (raddr *RawSocketAddress) {
 	raddr = new(RawSocketAddress)
 	raddr.Family = s.family
 	raddr.Soctype = s.soctype
+
 	copy(raddr.Addr[:], buf)
 	return raddr
 }
@@ -57,11 +60,21 @@ type addrip4 struct {
 type addrip6 struct {
 	port uint32
 	ip   [16]byte
-	zone string
+	zone uint32
 }
 
 type addrunix struct {
-	name string
+	name [126]byte
+}
+
+func (t addrunix) Path() string {
+	end := bytes.IndexByte(t.name[:], 0)
+	if end == -1 {
+		return string(t.name[:])
+	}
+
+	trimmed := string(t.name[:end])
+	return string(trimmed)
 }
 
 func NetaddrToRaw(family, soctype int, addr net.Addr) (*RawSocketAddress, error) {
@@ -69,7 +82,12 @@ func NetaddrToRaw(family, soctype int, addr net.Addr) (*RawSocketAddress, error)
 		if ipv4 := ip.To4(); ipv4 != nil {
 			return addressany[addrip4]{family: uint16(family), soctype: uint16(soctype), addr: addrip4{ip: ([4]byte)(ipv4), port: uint32(port)}}.Sockaddr(), nil
 		} else if len(ip) == net.IPv6len {
-			return addressany[addrip6]{family: uint16(family), soctype: uint16(soctype), addr: addrip6{ip: ([16]byte)(ip), zone: zone, port: uint32(port)}}.Sockaddr(), nil
+			zone, _ := strconv.Atoi(zone)
+			var addr = addrip6{
+				ip: ([16]byte)(ip), port: uint32(port),
+				zone: uint32(zone),
+			}
+			return addressany[addrip6]{family: uint16(family), soctype: uint16(soctype), addr: addr}.Sockaddr(), nil
 		} else {
 			return nil, &net.AddrError{
 				Err:  "unsupported address type",
@@ -86,7 +104,9 @@ func NetaddrToRaw(family, soctype int, addr net.Addr) (*RawSocketAddress, error)
 	case *net.UDPAddr:
 		return ipaddr(a.IP, a.Zone, a.Port)
 	case *net.UnixAddr:
-		return addressany[addrunix]{family: uint16(family), soctype: uint16(soctype), addr: addrunix{name: a.Name}}.Sockaddr(), nil
+		var buf [126]byte
+		copy(buf[:], a.Name)
+		return addressany[addrunix]{family: uint16(family), soctype: uint16(soctype), addr: addrunix{name: buf}}.Sockaddr(), nil
 	}
 
 	return nil, &net.AddrError{
@@ -96,6 +116,7 @@ func NetaddrToRaw(family, soctype int, addr net.Addr) (*RawSocketAddress, error)
 }
 
 func NetUnixToRaw(sa *net.UnixAddr) (zero *RawSocketAddress) {
+	var buf [126]byte
 	name := sa.Name
 	if len(name) == 0 {
 		// For consistency across platforms, replace empty unix socket
@@ -104,7 +125,8 @@ func NetUnixToRaw(sa *net.UnixAddr) (zero *RawSocketAddress) {
 		// byte is replaced with @.
 		name = "@"
 	}
-	return (&addressany[addrunix]{family: 99, soctype: 99, addr: addrunix{name: name}}).Sockaddr()
+	copy(buf[:], name)
+	return (&addressany[addrunix]{family: 99, soctype: 99, addr: addrunix{name: buf}}).Sockaddr()
 }
 
 func NetUnix(v RawSocketAddress) (addrPort *net.UnixAddr, err error) {
@@ -115,7 +137,7 @@ func NetUnix(v RawSocketAddress) (addrPort *net.UnixAddr, err error) {
 
 	switch unknown := sockaddr.(type) {
 	case *addressany[addrunix]:
-		return &net.UnixAddr{Name: unknown.addr.name}, nil
+		return &net.UnixAddr{Name: unknown.addr.Path()}, nil
 	default:
 		log.Printf("unsupported address %T\n", unknown)
 		return addrPort, syscall.EINVAL

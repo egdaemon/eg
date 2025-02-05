@@ -88,6 +88,7 @@ func SocketConnect(fn ConnectFn) ConnectHostFn {
 		if err != nil {
 			return TranslateErrno(err)
 		}
+
 		return TranslateErrno(fn(ctx, int(fd), sa))
 	}
 }
@@ -317,6 +318,7 @@ func SocketPeerAddr(fn PeerAddrFn) PeerAddrHostFn {
 		if err != nil {
 			return TranslateErrno(err)
 		}
+
 		addr, err := wasip1syscall.Sockaddr(sa)
 		if err != nil {
 			return TranslateErrno(err)

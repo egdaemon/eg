@@ -6,6 +6,8 @@ import (
 	"context"
 	"net"
 	"net/netip"
+	"path/filepath"
+	"strings"
 
 	"github.com/egdaemon/wasinet/wasinet/internal/langx"
 	"golang.org/x/sys/unix"
@@ -42,11 +44,44 @@ type IP interface {
 	Allow(...netip.Prefix) IP
 }
 
+type FSPrefix struct {
+	Host  string
+	Guest string
+}
+
+type fsremap []FSPrefix
+
+func (t fsremap) Remap(s string) (r string) {
+	var (
+		best FSPrefix
+	)
+
+	for _, m := range t {
+		if !strings.HasPrefix(s, m.Guest) {
+			continue
+		}
+
+		if len(m.Guest) < len(best.Guest) {
+			continue
+		}
+
+		best = m
+	}
+
+	return filepath.Join(best.Host, strings.TrimPrefix(s, best.Guest))
+}
+
 type Option func(*network)
 
 func OptionAllow(cidrs ...netip.Prefix) Option {
 	return func(s *network) {
 		s.allow = append(s.allow, cidrs...)
+	}
+}
+
+func OptionFSPrefixes(prefixes ...FSPrefix) Option {
+	return func(n *network) {
+		n.fsmap = prefixes
 	}
 }
 
@@ -68,6 +103,7 @@ func New(opts ...Option) Socket {
 
 type network struct {
 	allow []netip.Prefix
+	fsmap []FSPrefix
 }
 
 func (t network) Bind(ctx context.Context, fd int, sa unix.Sockaddr) error {
@@ -76,8 +112,21 @@ func (t network) Bind(ctx context.Context, fd int, sa unix.Sockaddr) error {
 }
 
 func (t network) Connect(ctx context.Context, fd int, sa unix.Sockaddr) (err error) {
-	// slog.Log(ctx, slog.LevelDebug, "sock_connect", slog.Int("fd", fd), slog.String("addr", fmt.Sprintf("%v", sa)))
-	return unix.Connect(fd, sa)
+	switch actual := sa.(type) {
+	case *unix.SockaddrUnix:
+		remapped := fsremap(t.fsmap).Remap(actual.Name)
+		if p, err := unix.Getsockname(fd); err != nil {
+			return err
+		} else {
+			*actual = *p.(*unix.SockaddrUnix)
+			actual.Name = remapped
+		}
+
+		return unix.Connect(fd, actual)
+	default:
+		// slog.Log(ctx, slog.LevelDebug, "sock_connect", slog.Int("fd", fd), slog.String("addr", fmt.Sprintf("%v", sa)))
+		return unix.Connect(fd, sa)
+	}
 }
 
 func (t network) Listen(ctx context.Context, fd, backlog int) error {
@@ -124,5 +173,12 @@ func (t network) SendTo(ctx context.Context, fd int, sa unix.Sockaddr, vecs [][]
 	// dispatch-run/wasi-go has linux special cased here.
 	// did not faithfully follow it because it might be caused by other complexity.
 	// https://github.com/dispatchrun/wasi-go/blob/038d5104aacbb966c25af43797473f03c5da3e4f/systems/unix/system.go#L640
-	return unix.SendmsgBuffers(int(fd), vecs, oob, sa, int(flags))
+	switch sa.(type) {
+	case *unix.SockaddrUnix:
+		// apparently its fine to send the sock address to a tcp stream
+		// but for unix sockets it'll return syscall.EISCONN
+		return unix.SendmsgBuffers(int(fd), vecs, oob, nil, int(flags))
+	default:
+		return unix.SendmsgBuffers(int(fd), vecs, oob, sa, int(flags))
+	}
 }

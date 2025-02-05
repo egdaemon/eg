@@ -18,14 +18,14 @@ func main() {
 	err := eg.Perform(
 		ctx,
 		eg.Parallel(
-			eg.Sequential(egbug.Log("pre1"), egbug.Sleep(time.Second), egbug.Log("post1")),
-			eg.Sequential(egbug.Log("pre2"), egbug.Sleep(time.Second), egbug.Log("post2")),
-			eg.Sequential(egbug.Log("pre3"), egbug.Sleep(time.Second), egbug.Log("post3")),
-			eg.Sequential(egbug.Log("pre4"), egbug.Sleep(time.Second), egbug.Log("post4")),
-			eg.Sequential(egbug.Log("pre5"), egbug.Sleep(time.Second), egbug.Log("post5")),
-			eg.Sequential(egbug.Log("pre6"), egbug.Sleep(time.Second), egbug.Log("post6")),
-			eg.Sequential(egbug.Log("pre7"), egbug.Sleep(time.Second), egbug.Log("post7")),
-			eg.Sequential(egbug.Log("pre8"), egbug.Sleep(time.Second), egbug.Log("post8")),
+			eg.Sequential(egbug.Log("pre1"), egbug.Sleep(8*time.Second), egbug.Log("post1")),
+			eg.Sequential(egbug.Log("pre2"), egbug.Sleep(7*time.Second), egbug.Log("post2")),
+			eg.Sequential(egbug.Log("pre3"), egbug.Sleep(6*time.Second), egbug.Log("post3")),
+			eg.Sequential(egbug.Log("pre4"), egbug.Sleep(5*time.Second), egbug.Log("post4")),
+			eg.Sequential(egbug.Log("pre5"), egbug.Sleep(4*time.Second), egbug.Log("post5")),
+			eg.Sequential(egbug.Log("pre6"), egbug.Sleep(3*time.Second), egbug.Log("post6")),
+			eg.Sequential(egbug.Log("pre7"), egbug.Sleep(2*time.Second), egbug.Log("post7")),
+			eg.Sequential(egbug.Log("pre8"), egbug.Sleep(1*time.Second), egbug.Log("post8")),
 		),
 	)
 

@@ -15,7 +15,10 @@ func Command(ctx context.Context, dir string, environ []string, cmd string, args
 	// svc := exec.NewProxyClient(cc)
 
 	// _, err = svc.Exec(ctx, &exec.ExecRequest{
-	// 	Dir: dir,
+	// 	Cmd:         cmd,
+	// 	Dir:         dir,
+	// 	Arguments:   args,
+	// 	Environment: environ,
 	// })
 
 	// return err

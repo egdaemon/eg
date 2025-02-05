@@ -4,8 +4,13 @@ package egbug
 
 import (
 	"context"
+	"crypto/md5"
+	"encoding/hex"
 	"fmt"
 	"log"
+	"os"
+	"sort"
+	"strings"
 	"sync/atomic"
 	"time"
 
@@ -15,6 +20,7 @@ import (
 	"github.com/egdaemon/eg/runtime/wasi/egenv"
 	"github.com/egdaemon/eg/runtime/wasi/env"
 	"github.com/egdaemon/eg/runtime/wasi/shell"
+	"github.com/gofrs/uuid"
 )
 
 const nilUUID = "00000000-0000-0000-0000-000000000000"
@@ -94,6 +100,37 @@ func Images(ctx context.Context, op eg.Op) error {
 		ctx,
 		shell.New("podman images"),
 	)
+}
+
+// Ensures the environment is stable between releases.
+func EnsureEnv(ctx context.Context, op eg.Op) error {
+	// expected hash with normalized values.
+	// if this needs to change it means we might be breaking
+	// existing builds.
+	const expected = "3f5b87f5beb80d39b28fc00297e1ecda"
+	// zero out some dynamic environment variables for consistent results
+	os.Setenv(_eg.EnvComputeAccountID, uuid.Nil.String())
+	os.Setenv(_eg.EnvComputeRunID, uuid.Nil.String())
+	os.Setenv(_eg.EnvGitHeadCommitTimestamp, "0000-00-00T00:00:00-00:00")
+	os.Setenv(_eg.EnvGitHeadCommit, "0000000000000000000000000000000000000000")
+	os.Setenv(_eg.EnvGitBaseCommit, "0000000000000000000000000000000000000000")
+	os.Setenv(_eg.EnvUnsafeCacheID, uuid.Nil.String())
+
+	environ := os.Environ()
+	sort.Strings(environ)
+
+	digest := md5.New()
+	for _, v := range environ {
+		if _, err := digest.Write([]byte(v)); err != nil {
+			return err
+		}
+	}
+
+	if d := hex.EncodeToString(digest.Sum(nil)); d != expected {
+		return fmt.Errorf("unexpected environment digest: %s != %s:\n%s", d, expected, strings.Join(environ, "\n"))
+	}
+
+	return nil
 }
 
 func NewCounter() *counter {

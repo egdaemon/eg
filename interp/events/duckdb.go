@@ -44,7 +44,7 @@ func PrepareDB(ctx context.Context, db *sql.DB) error {
 		return err
 	}
 
-	if _, err := db.ExecContext(ctx, "CREATE TABLE IF NOT EXISTS 'eg.metrics.coverage' (id UUID PRIMARY KEY, path TEXT NOT NULL, path_md5 uuid GENERATED ALWAYS AS (md5(path)), coverage FLOAT4 NOT NULL)"); err != nil {
+	if _, err := db.ExecContext(ctx, "CREATE TABLE IF NOT EXISTS 'eg.metrics.coverage' (id UUID PRIMARY KEY, path TEXT NOT NULL, path_md5 uuid GENERATED ALWAYS AS (md5(path)), statements FLOAT4 NOT NULL, branches FLOAT4 NOT NULL)"); err != nil {
 		return err
 	}
 
@@ -66,7 +66,7 @@ func RecordMetric(ctx context.Context, db *sql.DB, msgs ...*Message) error {
 			}
 		case *Message_Coverage:
 			mz := langx.Autoderef(evt.Coverage)
-			if err := db.QueryRowContext(ctx, "INSERT INTO 'eg.metrics.coverage' (id, path, coverage) VALUES (?, ?, ?)", m.Id, mz.Path, mz.Coverage).Err(); err != nil {
+			if err := db.QueryRowContext(ctx, "INSERT INTO 'eg.metrics.coverage' (id, path, statements, branches) VALUES (?, ?, ?, ?)", m.Id, mz.Path, mz.Statements, mz.Branches).Err(); err != nil {
 				return err
 			}
 

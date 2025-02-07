@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"runtime"
 
+	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/authn"
 	"github.com/egdaemon/eg/cmd/cmdopts"
 	"github.com/egdaemon/eg/compile"
@@ -99,7 +100,7 @@ func (t upload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 		errorsx.Log(errorsx.Wrap(os.RemoveAll(tmpdir), "unable to remove temp directory"))
 	}()
 
-	if environio, err = os.Create(filepath.Join(tmpdir, "environ.env")); err != nil {
+	if environio, err = os.Create(filepath.Join(tmpdir, eg.EnvironFile)); err != nil {
 		return errorsx.Wrap(err, "unable to open the kernel archive")
 	}
 	defer environio.Close()

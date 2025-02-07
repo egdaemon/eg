@@ -239,8 +239,10 @@ func (t runner) perform(ctx context.Context, runid, path string, rtb runtimefn) 
 			WithDirMount(t.root, eg.DefaultMountRoot(eg.WorkingDirectory)), // ensure we mount the working directory so pwd works correctly.
 	).WithSysNanotime().WithSysWalltime().WithRandSource(rand.Reader)
 
-	environ := errorsx.Zero(envx.FromPath(eg.DefaultMountRoot(eg.RuntimeDirectory, "environ.env")))
+	environ := errorsx.Zero(envx.FromPath(eg.DefaultMountRoot(eg.RuntimeDirectory, eg.EnvironFile)))
+	// envx.Debug(t.environ...)
 	// envx.Debug(environ...)
+	mcfg = wasix.Environ(mcfg, t.environ...)
 	mcfg = wasix.Environ(mcfg, environ...)
 
 	wasienv, err := wasi_snapshot_preview1.NewBuilder(runtime).Instantiate(ctx)

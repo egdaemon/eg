@@ -133,7 +133,7 @@ func (t c8sUpload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error
 		return errors.New("unable to locate entry point")
 	}
 
-	if environio, err = os.Create(filepath.Join(tmpdir, "environ.env")); err != nil {
+	if environio, err = os.Create(filepath.Join(tmpdir, eg.EnvironFile)); err != nil {
 		return errorsx.Wrap(err, "unable to open the kernel archive")
 	}
 	defer environio.Close()

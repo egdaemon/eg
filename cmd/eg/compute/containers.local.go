@@ -119,7 +119,7 @@ func (t c8sLocal) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (er
 		return errorsx.Wrap(err, "unable to open git repository")
 	}
 
-	environpath := filepath.Join(ws.Root, ws.RuntimeDir, "environ.env")
+	environpath := filepath.Join(ws.Root, ws.RuntimeDir, eg.EnvironFile)
 	if environio, err = os.Create(environpath); err != nil {
 		return errorsx.Wrap(err, "unable to open the environment variable file")
 	}

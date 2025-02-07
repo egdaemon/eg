@@ -412,7 +412,7 @@ func beginwork(ctx context.Context, md metadata, dir string) state {
 		log.Println("wasi cache prewarmed", wasix.WazCacheDir(filepath.Join(ws.Root, ws.CacheDir, eg.DefaultModuleDirectory())))
 	}
 
-	environpath := filepath.Join(ws.Root, ws.RuntimeDir, "environ.env")
+	environpath := filepath.Join(ws.Root, ws.RuntimeDir, eg.EnvironFile)
 
 	envb := envx.Build().FromPath(environpath).
 		Var(gitx.EnvAuthEGAccessToken, workload.AccessToken).

@@ -33,8 +33,8 @@ func Coverage(ctx context.Context, dir string) iter.Seq2[*coverage.Report, error
 
 			for _, profile := range profiles {
 				ok := yield(&coverage.Report{
-					Path:     profile.FileName,
-					Coverage: percentCovered(profile),
+					Path:       profile.FileName,
+					Statements: percentCovered(profile),
 				}, nil)
 				if !ok {
 					return fmt.Errorf("yield failed")

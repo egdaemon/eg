@@ -20,6 +20,8 @@ const (
 	prefixSourceFile         = "SF:"
 	prefixExecutableLines    = "LF:"
 	prefixExecutableLinesHit = "LH:"
+	prefixBranches           = "BRF:"
+	prefixBranchesHit        = "BRH:"
 	prefixEnd                = "end_of_record"
 )
 
@@ -39,8 +41,9 @@ func (t HitCount) Coverage() float32 {
 func Parse(ctx context.Context, src io.Reader) iter.Seq2[*coverage.Report, error] {
 	return func(yield func(*coverage.Report, error) bool) {
 		var (
-			path     string
-			linesHit HitCount
+			path        string
+			linesHit    HitCount
+			branceshHit HitCount
 		)
 
 		scanner := bufio.NewScanner(src)
@@ -73,10 +76,31 @@ func Parse(ctx context.Context, src io.Reader) iter.Seq2[*coverage.Report, error
 				}
 			}
 
+			if strings.HasPrefix(line, prefixBranches) {
+				if nLine, err := strconv.Atoi(strings.TrimSpace(strings.TrimPrefix(line, prefixBranches))); err != nil {
+					yield(nil, errorsx.Wrapf(err, "invalid line %s", line))
+					return
+				} else {
+					branceshHit.Total = nLine
+					continue
+				}
+			}
+
+			if strings.HasPrefix(line, prefixBranchesHit) {
+				if nLine, err := strconv.Atoi(strings.TrimSpace(strings.TrimPrefix(line, prefixBranchesHit))); err != nil {
+					yield(nil, errorsx.Wrapf(err, "invalid line %s", line))
+					return
+				} else {
+					branceshHit.Hit = nLine
+					continue
+				}
+			}
+
 			if strings.HasPrefix(line, prefixEnd) {
 				ok := yield(&events.Coverage{
-					Path:     path,
-					Coverage: linesHit.Coverage(),
+					Path:       path,
+					Statements: linesHit.Coverage(),
+					Branches:   branceshHit.Coverage(),
 				}, nil)
 				if !ok {
 					return

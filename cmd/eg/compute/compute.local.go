@@ -85,7 +85,7 @@ func (t local) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err e
 		return errorsx.Wrap(err, "unable to symlink working directory")
 	}
 
-	environpath := filepath.Join(ws.Root, ws.RuntimeDir, "environ.env")
+	environpath := filepath.Join(ws.Root, ws.RuntimeDir, eg.EnvironFile)
 	if environio, err = os.Create(environpath); err != nil {
 		return errorsx.Wrap(err, "unable to open the environment variable file")
 	}

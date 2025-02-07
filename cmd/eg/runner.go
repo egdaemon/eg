@@ -111,6 +111,7 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 		descr   = envx.String("", eg.EnvComputeVCS)
 		hostnet = envx.Toggle(runners.AgentOptionCommandLine("--network", "host"), runners.AgentOptionNoop, eg.EnvExperimentalDisableHostNetwork) // ipv4 group bullshit. pretty sure its a podman 4 issue that was resolved in podman 5. this is 'safe' to do because we are already in a container.
 		cc      grpc.ClientConnInterface
+		cmdenv  []string
 	)
 
 	// ensure when we run modules our umask is set to allow git clones to work properly
@@ -120,9 +121,7 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 		return err
 	}
 
-	cmdenv, err := envx.Build().FromEnviron(
-		os.Environ()...,
-	).FromEnv(
+	cmdenvb := envx.Build().FromEnv(
 		"PATH",
 		"TERM",
 		"COLORTERM",
@@ -141,11 +140,7 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 		"RUNTIME_DIRECTORY", eg.DefaultRuntimeDirectory(),
 	).Var(
 		"PAGER", "cat", // no paging in this environmenet.
-	).Environ()
-
-	if err != nil {
-		return err
-	}
+	)
 
 	if mlevel := envx.Int(0, eg.EnvComputeModuleNestedLevel); mlevel == 0 {
 		var (
@@ -164,6 +159,7 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 		}
 
 		debugx.Println("---------------------------- ROOT MODULE INITIATED ----------------------------")
+		debugx.Println("module pid", os.Getpid())
 		debugx.Println("account", aid)
 		debugx.Println("run id", uid)
 		debugx.Println("repository", descr)
@@ -186,6 +182,15 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 
 		if err = events.PrepareDB(gctx.Context, db); err != nil {
 			return errorsx.Wrap(err, "unable to prepare analytics.db")
+		}
+
+		cmdenvb = cmdenvb.Var(
+			eg.EnvComputeModuleSocket, eg.DefaultMountRoot(eg.RuntimeDirectory, filepath.Base(cspath)),
+		).FromEnviron(
+			os.Environ()...,
+		)
+		if cmdenv, err = cmdenvb.Environ(); err != nil {
+			return err
 		}
 
 		// periodic sampling of system metrics
@@ -242,14 +247,54 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 			return err
 		}
 	} else {
-		log.Printf("---------------------------- MODULE INITIATED %d ----------------------------\n", mlevel)
+		var (
+			control net.Listener
+		)
+
+		debugx.Printf("---------------------------- MODULE INITIATED %d ----------------------------\n", mlevel)
 		// env.Debug(os.Environ()...)
-		log.Println("account", aid)
-		log.Println("run id", uid)
-		log.Println("repository", descr)
-		log.Println("number of cores", runtime.GOMAXPROCS(-1))
-		log.Println("logging level", gctx.Verbosity)
+		debugx.Println("module pid", os.Getpid())
+		debugx.Println("account", aid)
+		debugx.Println("run id", uid)
+		debugx.Println("repository", descr)
+		debugx.Println("number of cores", runtime.GOMAXPROCS(-1))
+		debugx.Println("logging level", gctx.Verbosity)
+		debugx.Println("module pid", os.Getpid())
 		defer debugx.Printf("---------------------------- MODULE COMPLETED %d ----------------------------\n", mlevel)
+
+		moddir, err := os.MkdirTemp(t.RuntimeDir, "egmod.*")
+		if err != nil {
+			return err
+		}
+
+		cspath := filepath.Join(moddir, eg.SocketControl)
+		if control, err = net.Listen("unix", cspath); err != nil {
+			return errorsx.Wrapf(err, "unable to create %s", cspath)
+		}
+		defer control.Close()
+
+		srv := grpc.NewServer(
+			grpc.Creds(insecure.NewCredentials()), // this is a local socket
+			grpc.ChainUnaryInterceptor(
+				podmanx.GrpcClient,
+			),
+		)
+		defer srv.GracefulStop()
+
+		execproxy.NewExecProxy(t.Dir).Bind(srv)
+		go func() {
+			errorsx.Log(errorsx.Wrap(srv.Serve(control), "unable to serve control socket"))
+		}()
+
+		cmdenvb = cmdenvb.Var(
+			eg.EnvComputeModuleSocket, eg.DefaultMountRoot(eg.RuntimeDirectory, filepath.Base(moddir), filepath.Base(cspath)),
+		).FromEnviron(
+			os.Environ()...,
+		)
+
+		if cmdenv, err = cmdenvb.Environ(); err != nil {
+			return err
+		}
 	}
 
 	// IMPORTANT: duckdb does not play well with bindfs mounting the folders before

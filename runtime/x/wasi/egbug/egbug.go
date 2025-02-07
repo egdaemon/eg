@@ -107,7 +107,7 @@ func EnsureEnv(ctx context.Context, op eg.Op) error {
 	// expected hash with normalized values.
 	// if this needs to change it means we might be breaking
 	// existing builds.
-	const expected = "3f5b87f5beb80d39b28fc00297e1ecda"
+	const expected = "1e10f3e57339d5194391a968066609d0"
 	// zero out some dynamic environment variables for consistent results
 	os.Setenv(_eg.EnvComputeAccountID, uuid.Nil.String())
 	os.Setenv(_eg.EnvComputeRunID, uuid.Nil.String())

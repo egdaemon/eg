@@ -8,7 +8,7 @@ import (
 )
 
 func Command(ctx context.Context, dir string, environ []string, cmd string, args []string) error {
-	// cc, err := egunsafe.DialControlSocket(ctx)
+	// cc, err := egunsafe.DialModuleControlSocket(ctx)
 	// if err != nil {
 	// 	return err
 	// }

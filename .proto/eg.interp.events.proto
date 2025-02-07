@@ -40,7 +40,8 @@ message Metric {
 
 message Coverage {
   string path = 1;
-  float coverage = 2;
+  float statements = 2;
+  float branches = 3;
 }
 
 // Represents every message recorded when executing a job

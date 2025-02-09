@@ -127,7 +127,6 @@ func Parse(ctx context.Context, src io.Reader) iter.Seq2[*coverage.Report, error
 
 func Coverage(ctx context.Context, dir string) iter.Seq2[*coverage.Report, error] {
 	return func(yield func(*coverage.Report, error) bool) {
-
 		err := fs.WalkDir(os.DirFS(dir), ".", func(path string, d fs.DirEntry, err error) error {
 			if err != nil {
 				return errorsx.Wrapf(err, "failed: %s", filepath.Join(dir, path))
@@ -149,7 +148,9 @@ func Coverage(ctx context.Context, dir string) iter.Seq2[*coverage.Report, error
 			defer info.Close()
 
 			for rep, err := range Parse(ctx, info) {
-				yield(rep, err)
+				if !yield(rep, err) {
+					return nil
+				}
 			}
 
 			return nil

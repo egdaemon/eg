@@ -1,3 +1,4 @@
+// Package egflatpak provides utilities for build and publishing software using flatpak.
 package egflatpak
 
 import (

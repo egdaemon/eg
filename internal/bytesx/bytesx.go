@@ -4,9 +4,21 @@ import (
 	"crypto/md5"
 	"encoding/hex"
 	"fmt"
+
+	"github.com/dustin/go-humanize"
 )
 
-type Unit int64
+type Unit uint64
+
+func (t Unit) MarshalText() (text []byte, err error) {
+	return []byte(humanize.Bytes(uint64(t))), nil
+}
+
+func (t *Unit) UnmarshalText(text []byte) (err error) {
+	tmp, err := humanize.ParseBytes(string(text))
+	*t = Unit(tmp)
+	return err
+}
 
 func (t Unit) Format(f fmt.State, verb rune) {
 	div := int64(1)

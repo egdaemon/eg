@@ -8,23 +8,27 @@ import (
 	"github.com/gofrs/uuid"
 )
 
-// DigestHex to md5 hex encoded string
-func DigestHex(b []byte) string {
-	d := md5.Sum(b)
-	return hex.EncodeToString(d[:])
+// digest the provided contents and return the resulting hash.
+// if an error occurs during hashing then a nil value is returned.
+func Digest[T string | []byte](b T) hash.Hash {
+	v := md5.New()
+	y := []byte(b)
+	if n, err := v.Write(y); err != nil || n < len(y) {
+		return nil
+	}
+
+	return v
 }
 
-// String to md5 hex encoded string
+// String to md5 uuid encoded string
 func String(s string) string {
-	return DigestHex([]byte(s))
-}
-
-// DigestX digest byte slice
-func DigestX(b []byte) []byte {
-	d := md5.Sum(b)
-	return d[:]
+	return FormatString(Digest(s))
 }
 
 func FormatString(m hash.Hash) string {
 	return uuid.FromBytesOrNil(m.Sum(nil)).String()
+}
+
+func FormatHex(m hash.Hash) string {
+	return hex.EncodeToString(m.Sum(nil))
 }

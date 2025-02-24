@@ -46,7 +46,7 @@ func (t *AgentService) Upload(s Agent_UploadServer) (err error) {
 	}
 
 	metadata := chunk.GetMetadata()
-	dst, err := os.Create(filepath.Join(t.dir, md5x.DigestHex(metadata.Checksum)))
+	dst, err := os.Create(filepath.Join(t.dir, md5x.FormatHex(md5x.Digest(metadata.Checksum))))
 	if err != nil {
 		return errorsx.WithStack(err)
 	}

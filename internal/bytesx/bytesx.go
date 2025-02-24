@@ -11,7 +11,7 @@ import (
 type Unit uint64
 
 func (t Unit) MarshalText() (text []byte, err error) {
-	return []byte(humanize.Bytes(uint64(t))), nil
+	return []byte(humanize.IBytes(uint64(t))), nil
 }
 
 func (t *Unit) UnmarshalText(text []byte) (err error) {

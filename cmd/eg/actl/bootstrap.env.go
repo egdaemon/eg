@@ -6,6 +6,7 @@ import (
 	"runtime"
 	"strconv"
 
+	"github.com/dustin/go-humanize"
 	"github.com/egdaemon/eg/cmd/cmdopts"
 	"github.com/egdaemon/eg/internal/bytesx"
 	"github.com/egdaemon/eg/internal/envx"
@@ -26,7 +27,7 @@ type BootstrapEnvRunner struct {
 }
 
 func (t BootstrapEnvRunner) Run(gctx *cmdopts.Global) (err error) {
-	memory := bytesx.Unit(numericx.Max(t.runtimecfg.Memory, uint64(float64(memory.TotalMemory())*0.9)))
+	memory := bytesx.Unit(numericx.Max(uint64(t.runtimecfg.Memory), uint64(float64(memory.TotalMemory())*0.9)))
 
 	return envx.Build().Var(
 		"EG_RUNNER_CPU", strconv.FormatUint(numericx.Max(uint64(runtime.NumCPU()), t.runtimecfg.Cores), 10),
@@ -42,7 +43,7 @@ type BootstrapEnvDaemon struct {
 }
 
 func (t BootstrapEnvDaemon) Run(gctx *cmdopts.Global) (err error) {
-	memory := numericx.Max(t.runtimecfg.Memory, uint64(float64(memory.TotalMemory())*0.9))
+	memory := numericx.Max(uint64(t.runtimecfg.Memory), uint64(float64(memory.TotalMemory())*0.9))
 
 	return envx.Build().Var(
 		"EG_ACCOUNT", t.AccountID,
@@ -53,6 +54,6 @@ func (t BootstrapEnvDaemon) Run(gctx *cmdopts.Global) (err error) {
 	).Var(
 		"EG_RESOURCES_MEMORY", strconv.FormatUint(memory, 10),
 	).Var(
-		"EG_RESOURCES_DISK", strconv.FormatUint(t.runtimecfg.Disk, 10),
+		"EG_RESOURCES_DISK", humanize.Bytes(uint64(t.runtimecfg.Disk)),
 	).CopyTo(os.Stdout)
 }

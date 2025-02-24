@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/alecthomas/kong"
+	"github.com/dustin/go-humanize"
 	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/cmd/cmderrors"
 	"github.com/egdaemon/eg/cmd/cmdopts"
@@ -133,8 +134,9 @@ func main() {
 			"vars_os":                      runtime.GOOS,
 			"vars_arch":                    runtime.GOARCH,
 			"vars_cores_minimum_default":   strconv.FormatUint(envx.Uint64(4, "EG_RESOURCES_CORES"), 10),
-			"vars_memory_minimum_default":  strconv.FormatUint(envx.Uint64(4*bytesx.GiB, "EG_RESOURCES_MEMORY"), 10),
-			"vars_disk_minimum_default":    strconv.FormatUint(envx.Uint64(2*bytesx.GiB, "EG_RESOURCES_DISK"), 10),
+			"vars_memory_minimum_default":  humanize.Bytes(envx.Uint64(4*bytesx.GiB, "EG_RESOURCES_MEMORY")),
+			"vars_disk_minimum_default":    humanize.Bytes(envx.Uint64(2*bytesx.GiB, "EG_RESOURCES_DISK")),
+			"vars_vram_minimum_default":    humanize.Bytes(envx.Uint64(0*bytesx.GiB, "EG_RESOURCES_VRAM")),
 			"vars_git_default_remote_name": git.DefaultRemoteName,
 			"vars_git_default_reference":   "main",
 			"vars_git_head_reference":      "HEAD",

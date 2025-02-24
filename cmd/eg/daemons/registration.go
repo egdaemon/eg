@@ -31,7 +31,7 @@ func genregistration(s ssh.Signer, p2pid peer.ID, runtimecfg *cmdopts.RuntimeRes
 		Os:          runtimecfg.OS,
 		Arch:        runtimecfg.Arch,
 		Cores:       runtimecfg.Cores,
-		Memory:      runtimecfg.Memory,
+		Memory:      uint64(runtimecfg.Memory),
 		Publickey:   s.PublicKey().Marshal(),
 		Labels:      append([]string{}, runtimecfg.Labels...),
 	}

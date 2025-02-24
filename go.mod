@@ -48,6 +48,7 @@ require (
 
 require (
 	github.com/creack/pty v1.1.24 // indirect
+	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/hashicorp/golang-lru v1.0.2 // indirect
 	github.com/ipfs/boxo v0.26.0 // indirect
 	github.com/ipld/go-ipld-prime v0.21.0 // indirect

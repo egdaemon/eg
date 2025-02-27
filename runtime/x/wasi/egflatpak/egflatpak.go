@@ -21,7 +21,8 @@ type Manifest struct {
 	ID      string `yaml:"id"`
 	Runtime `yaml:",inline"`
 	SDK     `yaml:",inline"`
-	Command string `yaml:"command"`
+	Command string   `yaml:"command"`
+	Modules []Module `yaml:"module"`
 }
 
 type SDK struct {
@@ -33,30 +34,51 @@ type Runtime struct {
 	Version string `yaml:"runtime-version"`
 }
 
-type Option = func(*Builder)
+type Module struct {
+	Name     string   `yaml:"name"`
+	System   string   `yaml:"buildsystem"`
+	Commands []string `yaml:"commands"`
+}
 
-func New(id string, options ...Option) *Builder {
+type options []option
+
+var Option = options(nil)
+
+func (t options) Runtime(id, version string) options {
+	return append(t, func(b *Builder) {
+		b.Runtime = Runtime{ID: id, Version: version}
+	})
+}
+
+type option = func(*Builder)
+
+func New(id string, options ...option) *Builder {
 	return langx.Autoptr(langx.Clone(Builder{
 		Manifest: Manifest{
 			ID:      id,
 			Runtime: Runtime{ID: "org.freedesktop.Platform", Version: "23.08"},
 			SDK:     SDK{ID: "org.freedesktop.Sdk"},
+			Command: "egflatpak.app",
 		},
 	}, options...))
 }
 
+func Build(ctx context.Context, runtime shell.Command, b *Builder) error {
+	manifestpath, err := b.writeManifest()
+	if err != nil {
+		return err
+	}
+
+	return shell.Run(
+		ctx,
+		runtime.New("which flatpak-build"),
+		runtime.Newf("flatpak-builder . %s", manifestpath),
+	)
+}
+
 func BuildOp(runtime shell.Command, b *Builder) eg.OpFn {
 	return func(ctx context.Context, o eg.Op) error {
-		manifestpath, err := b.writeManifest()
-		if err != nil {
-			return err
-		}
-
-		return shell.Run(
-			ctx,
-			runtime.New("which flatpak-build"),
-			runtime.Newf("flatpak-builder . %s", manifestpath),
-		)
+		return Build(ctx, runtime, b)
 	}
 }
 

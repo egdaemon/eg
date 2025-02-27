@@ -2,16 +2,50 @@ package egfs
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"io/fs"
+	"iter"
 	"log"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 
 	"github.com/egdaemon/eg/internal/debugx"
 	"github.com/egdaemon/eg/internal/errorsx"
 )
+
+func Find(tree fs.FS, pattern string) iter.Seq[string] {
+	// tree := os.DirFS(root)
+
+	return func(yield func(string) bool) {
+		err := fs.WalkDir(tree, ".", func(current string, d fs.DirEntry, err error) error {
+			if err != nil {
+				return errorsx.Wrapf(err, "erroring walking tree: %s", current)
+			}
+
+			// recurse into directories.
+			if d.IsDir() {
+				return nil
+			}
+
+			if ok, err := path.Match(pattern, d.Name()); err != nil {
+				return err
+			} else if !ok {
+				return nil
+			}
+
+			if !yield(current) {
+				return fmt.Errorf("failed to yield module path: %s", current)
+			}
+
+			return nil
+		})
+
+		errorsx.Log(errorsx.Wrap(err, "unable to find modules"))
+	}
+}
 
 // FileExists returns true IFF a non-directory file exists at the provided path.
 func FileExists(path string) bool {

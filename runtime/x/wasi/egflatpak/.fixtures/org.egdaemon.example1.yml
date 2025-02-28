@@ -1,14 +1,14 @@
 id: org.egdaemon.example1
 runtime: org.freedesktop.Platform
-runtime-version: freedesktop-sdk-23.08.28
+runtime-version: "24.08"
 sdk: org.freedesktop.Sdk
-command: egflatpak.app
+command: example
 modules:
     - name: copy
       buildsystem: simple
       build-commands:
-        - ls -lha .
-        - cp -r /dne .
-        - ls -lha .
-        - echo copy done
-      sources: []
+        - cp -r . /app/bin
+      sources:
+        - type: dir
+          path: /dne
+finish-args: []

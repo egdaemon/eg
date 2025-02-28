@@ -4,3 +4,4 @@ runtime-version: "45"
 sdk: org.gnome.Sdk
 command: echo hello world
 modules: []
+finish-args: []

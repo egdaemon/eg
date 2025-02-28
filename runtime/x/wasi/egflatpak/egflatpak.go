@@ -63,13 +63,19 @@ func (t options) CopyModule(dir string) options {
 	})
 }
 
+func (t options) Runtime(name, version string) options {
+	return append(t, func(b *Builder) {
+		b.Runtime = Runtime{ID: name, Version: version}
+	})
+}
+
 // configure the manifest for building the flatpak, but default it'll copy everything in the current
 // directory in an rsync like manner.
 func New(id string, options ...option) *Builder {
 	return langx.Autoptr(langx.Clone(Builder{
 		Manifest: Manifest{
 			ID:      id,
-			Runtime: Runtime{ID: "org.freedesktop.Platform", Version: "23.08"},
+			Runtime: Runtime{ID: "org.freedesktop.Platform", Version: "freedesktop-sdk-23.08.28"},
 			SDK:     SDK{ID: "org.freedesktop.Sdk"},
 			Command: "egflatpak.app",
 			Modules: []Module{},

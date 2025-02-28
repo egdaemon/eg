@@ -102,7 +102,7 @@ func (t Builder) writeManifest() (string, error) {
 	}
 
 	path := egenv.EphemeralDirectory(fmt.Sprintf("%s.yml", errorsx.Must(uuid.NewV7())))
-	if err = os.WriteFile(path, encoded, 0600); err != nil {
+	if err = os.WriteFile(path, encoded, 0660); err != nil {
 		return "", err
 	}
 

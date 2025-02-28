@@ -1,6 +1,6 @@
 id: org.egdaemon.example1
 runtime: org.freedesktop.Platform
-runtime-version: "23.08"
+runtime-version: freedesktop-sdk-23.08.28
 sdk: org.freedesktop.Sdk
 command: egflatpak.app
 modules:

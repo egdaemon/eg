@@ -48,9 +48,20 @@ type Module struct {
 }
 
 type option = func(*Builder)
-type options = []option
+type options []option
 
 var Option = options(nil)
+
+func (t options) CopyModule(dir string) options {
+	return append(t, func(b *Builder) {
+		b.Modules = append(b.Modules, Module{Name: "copy", BuildSystem: "simple", Commands: []string{
+			"ls -lha .",
+			fmt.Sprintf("cp -r %s .", dir),
+			"ls -lha .",
+			"echo copy done",
+		}})
+	})
+}
 
 // configure the manifest for building the flatpak, but default it'll copy everything in the current
 // directory in an rsync like manner.
@@ -61,12 +72,7 @@ func New(id string, options ...option) *Builder {
 			Runtime: Runtime{ID: "org.freedesktop.Platform", Version: "23.08"},
 			SDK:     SDK{ID: "org.freedesktop.Sdk"},
 			Command: "egflatpak.app",
-			Modules: []Module{
-				{Name: "copy", BuildSystem: "simple", Commands: []string{
-					"ls -lha .",
-					"cp -r .",
-				}},
-			},
+			Modules: []Module{},
 		},
 	}, options...))
 }
@@ -80,7 +86,10 @@ func Build(ctx context.Context, runtime shell.Command, b *Builder) error {
 
 	return shell.Run(
 		ctx,
+		runtime.New("id"),
+		runtime.Newf("chown egd:egd %s", manifestpath).Privileged(),
 		runtime.New("which flatpak-builder"),
+		runtime.Newf("ls -lha %s", manifestpath),
 		runtime.Newf("flatpak-builder . %s", manifestpath),
 	)
 }

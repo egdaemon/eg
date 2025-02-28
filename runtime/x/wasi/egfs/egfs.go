@@ -16,18 +16,19 @@ import (
 	"github.com/egdaemon/eg/internal/errorsx"
 )
 
-func Find(tree fs.FS, pattern string) iter.Seq[string] {
-	// tree := os.DirFS(root)
+func FindFirst(tree fs.FS, pattern string) string {
+	for p := range Find(tree, pattern) {
+		return p
+	}
 
+	return ""
+}
+
+func Find(tree fs.FS, pattern string) iter.Seq[string] {
 	return func(yield func(string) bool) {
 		err := fs.WalkDir(tree, ".", func(current string, d fs.DirEntry, err error) error {
 			if err != nil {
 				return errorsx.Wrapf(err, "erroring walking tree: %s", current)
-			}
-
-			// recurse into directories.
-			if d.IsDir() {
-				return nil
 			}
 
 			if ok, err := path.Match(pattern, d.Name()); err != nil {

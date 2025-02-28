@@ -3,3 +3,4 @@ runtime: org.gnome.Platform
 runtime-version: "45"
 sdk: org.gnome.Sdk
 command: echo hello world
+modules: []

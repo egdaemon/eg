@@ -5,11 +5,11 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/langx"
 	"github.com/egdaemon/eg/runtime/wasi/eg"
-	"github.com/egdaemon/eg/runtime/wasi/egenv"
 	"github.com/egdaemon/eg/runtime/wasi/shell"
 	"github.com/google/uuid"
 	"gopkg.in/yaml.v3"
@@ -79,7 +79,13 @@ func New(id string, options ...option) *Builder {
 
 // Build the flatpak
 func Build(ctx context.Context, runtime shell.Command, b *Builder) error {
-	manifestpath, err := b.writeManifest()
+	dir, err := os.MkdirTemp(".", "flatpak.build.*")
+	if err != nil {
+		return err
+	}
+	defer os.RemoveAll(dir)
+
+	manifestpath, err := b.writeManifest(dir)
 	if err != nil {
 		return err
 	}
@@ -87,12 +93,13 @@ func Build(ctx context.Context, runtime shell.Command, b *Builder) error {
 	return shell.Run(
 		ctx,
 		runtime.New("id"),
-		runtime.New("tree -L 2 ."),
 		runtime.New("chown -R egd:egd .").Privileged(),
 		runtime.Newf("chown egd:egd %s", manifestpath).Privileged(),
-		runtime.New("which flatpak-builder"),
+		runtime.New("tree -L 2 ."),
+		runtime.New("pwd"),
+		// runtime.New("which flatpak-builder"),
 		runtime.Newf("ls -lha %s", manifestpath),
-		runtime.Newf("flatpak-builder . %s", manifestpath),
+		runtime.Newf("flatpak-builder --force-clean %s %s", dir, manifestpath),
 	)
 }
 
@@ -106,13 +113,13 @@ type Builder struct {
 	Manifest
 }
 
-func (t Builder) writeManifest() (string, error) {
+func (t Builder) writeManifest(d string) (string, error) {
 	encoded, err := yaml.Marshal(t.Manifest)
 	if err != nil {
 		return "", err
 	}
 
-	path := egenv.EphemeralDirectory(fmt.Sprintf("%s.yml", errorsx.Must(uuid.NewV7())))
+	path := filepath.Join(d, fmt.Sprintf("%s.yml", errorsx.Must(uuid.NewV7())))
 	if err = os.WriteFile(path, encoded, 0660); err != nil {
 		return "", err
 	}

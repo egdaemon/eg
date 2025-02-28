@@ -22,7 +22,7 @@ type Manifest struct {
 	Runtime `yaml:",inline"`
 	SDK     `yaml:",inline"`
 	Command string   `yaml:"command"`
-	Modules []Module `yaml:"module"`
+	Modules []Module `yaml:"modules"`
 }
 
 type SDK struct {
@@ -34,24 +34,26 @@ type Runtime struct {
 	Version string `yaml:"runtime-version"`
 }
 
-type Module struct {
-	Name     string   `yaml:"name"`
-	System   string   `yaml:"buildsystem"`
-	Commands []string `yaml:"commands"`
+type Source struct {
+	Type        string   `yaml:"type"`
+	Destination string   `yaml:"dest-filename"`
+	Commands    []string `yaml:"commands"`
 }
 
-type options []option
-
-var Option = options(nil)
-
-func (t options) Runtime(id, version string) options {
-	return append(t, func(b *Builder) {
-		b.Runtime = Runtime{ID: id, Version: version}
-	})
+type Module struct {
+	Name        string   `yaml:"name"`
+	BuildSystem string   `yaml:"buildsystem"`
+	Commands    []string `yaml:"build-commands"`
+	Sources     []Source `yaml:"sources"`
 }
 
 type option = func(*Builder)
+type options = []option
 
+var Option = options(nil)
+
+// configure the manifest for building the flatpak, but default it'll copy everything in the current
+// directory in an rsync like manner.
 func New(id string, options ...option) *Builder {
 	return langx.Autoptr(langx.Clone(Builder{
 		Manifest: Manifest{
@@ -59,10 +61,17 @@ func New(id string, options ...option) *Builder {
 			Runtime: Runtime{ID: "org.freedesktop.Platform", Version: "23.08"},
 			SDK:     SDK{ID: "org.freedesktop.Sdk"},
 			Command: "egflatpak.app",
+			Modules: []Module{
+				{Name: "copy", BuildSystem: "simple", Commands: []string{
+					"ls -lha .",
+					"cp -r .",
+				}},
+			},
 		},
 	}, options...))
 }
 
+// Build the flatpak
 func Build(ctx context.Context, runtime shell.Command, b *Builder) error {
 	manifestpath, err := b.writeManifest()
 	if err != nil {
@@ -71,7 +80,7 @@ func Build(ctx context.Context, runtime shell.Command, b *Builder) error {
 
 	return shell.Run(
 		ctx,
-		runtime.New("which flatpak-build"),
+		runtime.New("which flatpak-builder"),
 		runtime.Newf("flatpak-builder . %s", manifestpath),
 	)
 }

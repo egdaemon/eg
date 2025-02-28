@@ -8,5 +8,7 @@ modules:
       buildsystem: simple
       build-commands:
         - ls -lha .
-        - cp -r .
+        - cp -r /dne .
+        - ls -lha .
+        - echo copy done
       sources: []

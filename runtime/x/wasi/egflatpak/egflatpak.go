@@ -87,6 +87,8 @@ func Build(ctx context.Context, runtime shell.Command, b *Builder) error {
 	return shell.Run(
 		ctx,
 		runtime.New("id"),
+		runtime.New("tree -L 2 ."),
+		runtime.New("chown -R egd:egd .").Privileged(),
 		runtime.Newf("chown egd:egd %s", manifestpath).Privileged(),
 		runtime.New("which flatpak-builder"),
 		runtime.Newf("ls -lha %s", manifestpath),

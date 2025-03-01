@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -76,6 +77,31 @@ type commit struct {
 	// Committer is the one performing the commit, might be different from
 	// Author.
 	Committer signature
+}
+
+// Replace patterns in a string with their values from information in a git commit.
+// %git.hash%            -> the full hex encoded commit id.
+// %git.hash.short%      -> the first 7 characters of the hex encoded commit id.
+// %git.commit.year%     -> year of the commit.
+// %git.commit.month%    -> month of the commit.
+// %git.commit.day%      -> day of the commit.
+// %git.commit.unix.milli% -> UnixMilli of the commit.
+func (c commit) StringReplace(pattern string) string {
+	cwhen := c.Committer.When
+	s := strings.ReplaceAll(pattern, "%git.hash%", c.Hash.String())
+	s = strings.ReplaceAll(s, "%git.hash.short%", fmt.Sprintf("%7s", c.Hash))
+	s = strings.ReplaceAll(s, "%git.commit.year%", strconv.Itoa(cwhen.Year()))
+	s = strings.ReplaceAll(s, "%git.commit.month%", strconv.Itoa(int(cwhen.Month())))
+	s = strings.ReplaceAll(s, "%git.commit.day%", strconv.Itoa(cwhen.Day()))
+	s = strings.ReplaceAll(s, "%git.commit.unix.milli%", strconv.Itoa(int(cwhen.UnixMilli())))
+	return s
+}
+
+// substitute values in the provided pattern using the environment variable commit.
+// see commit.StringReplace for more details.
+func StringReplace(pattern string) string {
+	c := EnvCommit()
+	return c.StringReplace(pattern)
 }
 
 // retrieve the commit metadata from from the environment.

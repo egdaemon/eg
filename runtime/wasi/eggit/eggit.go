@@ -80,20 +80,24 @@ type commit struct {
 }
 
 // Replace patterns in a string with their values from information in a git commit.
-// %git.hash%            -> the full hex encoded commit id.
-// %git.hash.short%      -> the first 7 characters of the hex encoded commit id.
-// %git.commit.year%     -> year of the commit.
-// %git.commit.month%    -> month of the commit.
-// %git.commit.day%      -> day of the commit.
+// %git.hash%              -> the full hex encoded commit id.
+// %git.hash.short%        -> the first 7 characters of the hex encoded commit id.
+// %git.commit.year%       -> year of the commit.
+// %git.commit.month%      -> month of the commit.
+// %git.commit.day%        -> day of the commit.
 // %git.commit.unix.milli% -> UnixMilli of the commit.
+// %eg.git.canonical.uri%  -> the uri of the repository that eg considers to be the canonical uri.
 func (c commit) StringReplace(pattern string) string {
 	cwhen := c.Committer.When
+
 	s := strings.ReplaceAll(pattern, "%git.hash%", c.Hash.String())
 	s = strings.ReplaceAll(s, "%git.hash.short%", fmt.Sprintf("%7s", c.Hash))
 	s = strings.ReplaceAll(s, "%git.commit.year%", strconv.Itoa(cwhen.Year()))
 	s = strings.ReplaceAll(s, "%git.commit.month%", strconv.Itoa(int(cwhen.Month())))
 	s = strings.ReplaceAll(s, "%git.commit.day%", strconv.Itoa(cwhen.Day()))
 	s = strings.ReplaceAll(s, "%git.commit.unix.milli%", strconv.Itoa(int(cwhen.UnixMilli())))
+	s = strings.ReplaceAll(s, "%eg.git.canonical.uri%", EnvCanonicalURI())
+
 	return s
 }
 
@@ -102,6 +106,10 @@ func (c commit) StringReplace(pattern string) string {
 func StringReplace(pattern string) string {
 	c := EnvCommit()
 	return c.StringReplace(pattern)
+}
+
+func EnvCanonicalURI() string {
+	return os.Getenv(_eg.EnvComputeVCS)
 }
 
 // retrieve the commit metadata from from the environment.

@@ -14,7 +14,6 @@ import (
 	"github.com/egdaemon/eg/internal/debugx"
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
-	"github.com/egdaemon/eg/internal/fsx"
 	"github.com/egdaemon/eg/internal/md5x"
 	"github.com/egdaemon/eg/internal/wasix"
 	"github.com/egdaemon/eg/interp/c8s"
@@ -171,13 +170,6 @@ type runner struct {
 
 func (t runner) perform(ctx context.Context, runid, path string, rtb runtimefn) (err error) {
 	tracedebug := envx.Boolean(false, eg.EnvLogsTrace)
-	hostcachedir := filepath.Join(t.runtimedir, "cache")
-	if err = fsx.MkDirs(0770, hostcachedir); err != nil {
-		return errorsx.Wrap(err, "unable to ensure host cache directory")
-	}
-
-	debugx.Println("wazero cache", wasix.WazCacheDir(t.runtimedir))
-	// fsx.PrintFS(os.DirFS(wasix.WazCacheDir(t.runtimedir)))
 
 	cache, err := wazero.NewCompilationCacheWithDir(wasix.WazCacheDir(t.runtimedir))
 	if err != nil {
@@ -196,8 +188,9 @@ func (t runner) perform(ctx context.Context, runid, path string, rtb runtimefn) 
 		wazero.NewRuntimeConfig().WithCompilationCache(cache),
 	)
 
-	debugx.Println("cache dir", hostcachedir, "->", eg.DefaultCacheDirectory())
+	debugx.Println("cache dir", eg.DefaultCacheDirectory(), "->", eg.DefaultCacheDirectory())
 	debugx.Println("runtime dir", t.runtimedir, "->", eg.DefaultMountRoot(eg.RuntimeDirectory))
+	debugx.Println("wazero cache", wasix.WazCacheDir(t.runtimedir))
 	mcfg := wazero.NewModuleConfig().WithEnv(
 		"CI", envx.String("true", "CI"),
 	).WithEnv(
@@ -211,7 +204,7 @@ func (t runner) perform(ctx context.Context, runid, path string, rtb runtimefn) 
 	).WithEnv(
 		eg.EnvComputeWorkingDirectory, eg.DefaultWorkingDirectory(),
 	).WithEnv(
-		eg.EnvComputeCacheDirectory, envx.String(eg.DefaultCacheDirectory(), eg.EnvComputeCacheDirectory, "CACHE_DIRECTORY"),
+		eg.EnvComputeCacheDirectory, eg.DefaultCacheDirectory(),
 	).WithEnv(
 		eg.EnvComputeRuntimeDirectory, eg.DefaultRuntimeDirectory(),
 	).WithEnv(
@@ -232,10 +225,10 @@ func (t runner) perform(ctx context.Context, runid, path string, rtb runtimefn) 
 		wazero.NewFSConfig().
 			WithDirMount(os.TempDir(), os.TempDir()).
 			WithDirMount(t.runtimedir, eg.DefaultRuntimeDirectory()).
-			WithDirMount(hostcachedir, eg.DefaultCacheDirectory()).
+			WithDirMount(eg.DefaultCacheDirectory(), eg.DefaultCacheDirectory()).
 			WithDirMount(t.root, eg.DefaultWorkingDirectory()). // ensure we mount the working directory so pwd works correctly.
 			WithDirMount(t.runtimedir, eg.DefaultMountRoot(eg.RuntimeDirectory)).
-			WithDirMount(hostcachedir, eg.DefaultMountRoot(eg.CacheDirectory)).
+			WithDirMount(eg.DefaultCacheDirectory(), eg.DefaultMountRoot(eg.CacheDirectory)).
 			WithDirMount(t.root, eg.DefaultMountRoot(eg.WorkingDirectory)), // ensure we mount the working directory so pwd works correctly.
 	).WithSysNanotime().WithSysWalltime().WithRandSource(rand.Reader)
 
@@ -255,7 +248,7 @@ func (t runner) perform(ctx context.Context, runid, path string, rtb runtimefn) 
 		runtime,
 		wnetruntime.OptionFSPrefixes(
 			wnetruntime.FSPrefix{Host: t.runtimedir, Guest: eg.DefaultRuntimeDirectory()},
-			wnetruntime.FSPrefix{Host: hostcachedir, Guest: eg.DefaultMountRoot(eg.CacheDirectory)},
+			wnetruntime.FSPrefix{Host: eg.DefaultCacheDirectory(), Guest: eg.DefaultMountRoot(eg.CacheDirectory)},
 			wnetruntime.FSPrefix{Host: t.root, Guest: eg.DefaultMountRoot(eg.WorkingDirectory)},
 		),
 	).Instantiate(ctx)

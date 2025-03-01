@@ -111,6 +111,12 @@ func (option) Depends(deps ...string) option {
 	}
 }
 
+func (option) Environ(k, v string) option {
+	return func(c *Config) {
+		c.Environ = append(c.Environ, fmt.Sprintf("%s=%s", k, v))
+	}
+}
+
 var Option = option(nil)
 
 func From(c Config, opts ...option) Config {
@@ -207,7 +213,7 @@ func Build(cfg Config, opts ...option) eg.OpFn {
 		return shell.Run(
 			ctx,
 			runtime.Newf("chown -R egd:egd %s", root).Privileged(),
-			runtime.Newf("rsync --verbose --progress --recursive --perms %s/ src/", cfg.SourceDir),
+			runtime.Newf("rsync --recursive --perms %s/ src/", cfg.SourceDir),
 			runtime.New("cat debian/changelog | envsubst | tee debian/changelog"),
 			runtime.New("cat debian/control | envsubst | tee debian/control"),
 			runtime.New("cat debian/rules | envsubst | tee debian/rules"),

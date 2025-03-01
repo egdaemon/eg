@@ -40,6 +40,7 @@ func init() {
 		egdebuild.Option.Version(fmt.Sprintf("%s.:autopatch:", version)),
 		egdebuild.Option.Debian(errorsx.Must(fs.Sub(debskel, ".debskel"))),
 		egdebuild.Option.DependsBuild("rsync", "curl", "tree", "ca-certificates", "cmake", "ninja-build", "libssl-dev"),
+		egdebuild.Option.Environ("PACKAGE_VERSION", version),
 	)
 }
 

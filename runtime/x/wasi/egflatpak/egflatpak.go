@@ -195,7 +195,7 @@ func Build(ctx context.Context, runtime shell.Command, b *Builder) error {
 	}
 	defer os.RemoveAll(dir)
 
-	manifestpath, err := b.writeManifest(dir)
+	manifestpath, err := b.writeManifest(filepath.Join(dir, fmt.Sprintf("%s.yml", errorsx.Must(uuid.NewV7()))))
 	if err != nil {
 		return err
 	}
@@ -214,9 +214,18 @@ func Build(ctx context.Context, runtime shell.Command, b *Builder) error {
 	)
 }
 
+// eg op for running flatpka-builder
 func BuildOp(runtime shell.Command, b *Builder) eg.OpFn {
 	return func(ctx context.Context, o eg.Op) error {
 		return Build(ctx, runtime, b)
+	}
+}
+
+// write the manifest to the specified path.
+func ManifestOp(path string, b *Builder) eg.OpFn {
+	return func(ctx context.Context, o eg.Op) error {
+		_, err := b.writeManifest(path)
+		return err
 	}
 }
 
@@ -224,13 +233,12 @@ type Builder struct {
 	Manifest
 }
 
-func (t Builder) writeManifest(d string) (string, error) {
+func (t Builder) writeManifest(path string) (string, error) {
 	encoded, err := yaml.Marshal(t.Manifest)
 	if err != nil {
 		return "", err
 	}
 
-	path := filepath.Join(d, fmt.Sprintf("%s.yml", errorsx.Must(uuid.NewV7())))
 	if err = os.WriteFile(path, encoded, 0660); err != nil {
 		return "", err
 	}

@@ -25,7 +25,9 @@ import (
 	"github.com/egdaemon/eg/runtime/wasi/shell"
 )
 
-type hash [20]byte
+const hashSize = 20
+
+type hash [hashSize]byte
 
 // NewHash return a new Hash from a hexadecimal hash representation
 func nhash(s string) hash {
@@ -44,6 +46,20 @@ func (h hash) IsZero() bool {
 
 func (h hash) String() string {
 	return hex.EncodeToString(h[:])
+}
+
+func (h hash) Format(s fmt.State, verb rune) {
+	switch verb {
+	case 's':
+		w := hashSize * 2
+		if cw, ok := s.Width(); ok {
+			w = cw
+		}
+		encoded := []rune(hex.EncodeToString(h[:]))
+		_ = errorsx.Must(s.Write([]byte(string(encoded[:w]))))
+	default:
+		_ = errorsx.Must(s.Write([]byte(h.String())))
+	}
 }
 
 type signature struct {

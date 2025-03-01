@@ -88,6 +88,7 @@ func (t options) Tarball(url, sha256d string) options {
 				BuildSystem: "simple",
 				Commands: []string{
 					"ls -lha .",
+					"cp -r . /app/bin",
 				},
 				Sources: []Source{
 					{

@@ -25,10 +25,12 @@ func String(s string) string {
 	return FormatString(Digest(s))
 }
 
+// format md5 hash to a uuid encoded string
 func FormatString(m hash.Hash) string {
 	return uuid.FromBytesOrNil(m.Sum(nil)).String()
 }
 
+// format md5 hash to a hex encoded string
 func FormatHex(m hash.Hash) string {
 	return hex.EncodeToString(m.Sum(nil))
 }

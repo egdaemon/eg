@@ -39,10 +39,13 @@ type Runtime struct {
 }
 
 type Source struct {
-	Type        string   `yaml:"type"`
-	Destination string   `yaml:"dest-filename,omitempty"`
-	Path        string   `yaml:"path,omitempty"` // used by directory source.
-	Commands    []string `yaml:"commands,omitempty"`
+	Type            string   `yaml:"type"`
+	Destination     string   `yaml:"dest-filename,omitempty"`    // used by archive source(s).
+	Path            string   `yaml:"path,omitempty"`             // used by directory source.
+	URL             string   `yaml:"url,omitempty"`              // used by archive source.
+	SHA256          string   `yaml:"sha256,omitempty"`           // used by archive source(s).
+	StripComponents int      `yaml:"strip-components,omitempty"` // used by archive source(s).
+	Commands        []string `yaml:"commands,omitempty"`
 }
 
 type Module struct {
@@ -57,6 +60,7 @@ type options []option
 
 var Option = options(nil)
 
+// Not recommended, here for testing: build a module directly from a directory.
 func (t options) CopyModule(dir string) options {
 	return append(t, func(b *Builder) {
 		b.Modules = append(
@@ -69,6 +73,29 @@ func (t options) CopyModule(dir string) options {
 				},
 				Sources: []Source{
 					{Type: "dir", Path: dir},
+				},
+			})
+	})
+}
+
+// build a module from a binary tarball.
+func (t options) Tarball(url, sha256d string) options {
+	return append(t, func(b *Builder) {
+		b.Modules = append(
+			b.Modules,
+			Module{
+				Name:        "tarball",
+				BuildSystem: "simple",
+				Commands: []string{
+					"ls -lha .",
+				},
+				Sources: []Source{
+					{
+						Type:        "archive",
+						URL:         url,
+						Destination: filepath.Base(url),
+						SHA256:      sha256d,
+					},
 				},
 			})
 	})

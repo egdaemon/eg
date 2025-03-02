@@ -17,13 +17,13 @@ func main() {
 	ctx, done := context.WithTimeout(context.Background(), egenv.TTL())
 	defer done()
 
-	deb := eg.Container(debian.ContainerName)
+	deb := debian.Runner()
 	err := eg.Perform(
 		ctx,
 		eggit.AutoClone,
 		eg.Parallel(
 			eg.Build(eg.DefaultModule()),
-			eg.Build(deb.BuildFromFile(".dist/deb/Containerfile")),
+			eg.Build(deb.BuildFromFile(".eg/debuild/eg/.debskel/Containerfile")),
 		),
 		eg.Module(
 			ctx,

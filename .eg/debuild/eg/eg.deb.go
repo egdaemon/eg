@@ -39,6 +39,7 @@ func init() {
 		egdebuild.Option.Debian(errorsx.Must(fs.Sub(debskel, ".debskel"))),
 		egdebuild.Option.DependsBuild("golang-1.23", "dh-make", "debhelper", "duckdb", "libc6-dev (>= 2.35)", "libbtrfs-dev", "libassuan-dev", "libdevmapper-dev", "libglib2.0-dev", "libgpgme-dev", "libgpg-error-dev", "libprotobuf-dev", "libprotobuf-c-dev", "libseccomp-dev", "libselinux1-dev", "libsystemd-dev"),
 		egdebuild.Option.Depends("podman", "duckdb", "bindfs"),
+		egdebuild.Option.Environ("VCS_REVISION", c.Hash.String()),
 	)
 }
 
@@ -49,8 +50,9 @@ func Prepare(ctx context.Context, o eg.Op) error {
 		shell.Op(
 			sruntime.Newf("rm -rf %s", debdir),
 			sruntime.Newf("mkdir -p %s", debdir),
-			sruntime.Newf("git clone --depth 1 file://${PWD} %s/src", debdir),
-			sruntime.Newf("tree -L 2 %s", debdir),
+			sruntime.Newf("git clone --depth 1 file://${PWD}/ %s", debdir),
+			sruntime.Newf("tree -L 2 %s/.dist", debdir),
+			sruntime.Newf("ls -lha %s", debdir),
 		),
 		egdebuild.Prepare(Runner(), errorsx.Must(fs.Sub(debskel, ".debskel"))),
 	)(ctx, o)
@@ -63,12 +65,13 @@ func Runner() eg.ContainerRunner {
 
 func Build(ctx context.Context, o eg.Op) error {
 	return eg.Parallel(
-		// egdebuild.Build(gcfg, egdebuild.Option.Distro("jammy")),
-		// egdebuild.Build(gcfg, egdebuild.Option.Distro("noble")),
+		egdebuild.Build(gcfg, egdebuild.Option.Distro("jammy")),
+		egdebuild.Build(gcfg, egdebuild.Option.Distro("noble")),
 		egdebuild.Build(gcfg, egdebuild.Option.Distro("oracular")),
 	)(ctx, o)
 }
 
 func Upload(ctx context.Context, o eg.Op) error {
 	return egdebuild.UploadDPut(gcfg, errorsx.Must(fs.Sub(debskel, ".debskel")))(ctx, o)
+	// return nil
 }

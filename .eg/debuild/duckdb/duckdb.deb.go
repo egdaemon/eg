@@ -5,7 +5,6 @@ import (
 	"embed"
 	"fmt"
 	"io/fs"
-	"path/filepath"
 
 	"eg/compute/errorsx"
 	"eg/compute/maintainer"
@@ -40,9 +39,9 @@ func init() {
 		egdebuild.Option.ChangeLogDate(c.Committer.When),
 		egdebuild.Option.Version(fmt.Sprintf("%s.:autopatch:", version)),
 		egdebuild.Option.Debian(errorsx.Must(fs.Sub(debskel, ".debskel"))),
-		egdebuild.Option.DependsBuild("rsync", "curl", "tree", "ca-certificates", "cmake", "ninja-build", "libssl-dev", "ccache"),
+		egdebuild.Option.DependsBuild("rsync", "curl", "tree", "ca-certificates", "cmake", "ninja-build", "libssl-dev"),
 		egdebuild.Option.Environ("PACKAGE_VERSION", version),
-		egdebuild.Option.Environ("CCACHE_DIR", filepath.Join("src", "build", "ccache")),
+		// egdebuild.Option.Environ("CCACHE_DIR", filepath.Join("src", "build", "ccache")),
 		egdebuild.Option.Environ("GIT_COMMIT_HASH", c.Hash.String()),
 	)
 }

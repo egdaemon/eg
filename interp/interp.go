@@ -208,8 +208,6 @@ func (t runner) perform(ctx context.Context, runid, path string, rtb runtimefn) 
 	).WithEnv(
 		eg.EnvComputeRuntimeDirectory, eg.DefaultRuntimeDirectory(),
 	).WithEnv(
-		"RUNTIME_DIRECTORY", eg.DefaultRuntimeDirectory(),
-	).WithEnv(
 		"PATH", os.Getenv("PATH"),
 	).WithEnv(
 		"TERM", envx.String("", "TERM"),

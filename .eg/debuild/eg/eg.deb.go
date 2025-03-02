@@ -1,9 +1,8 @@
-package duckdb
+package eg
 
 import (
 	"context"
 	"embed"
-	"fmt"
 	"io/fs"
 
 	"eg/compute/errorsx"
@@ -16,13 +15,12 @@ import (
 	"github.com/egdaemon/eg/runtime/x/wasi/egdebuild"
 )
 
+const (
+	container = "eg.ubuntu.24.04"
+)
+
 //go:embed .debskel
 var debskel embed.FS
-
-const (
-	container = "eg.deb.duckdb"
-	version   = "1.1.3"
-)
 
 var (
 	gcfg egdebuild.Config
@@ -31,26 +29,28 @@ var (
 func init() {
 	c := eggit.EnvCommit()
 	gcfg = egdebuild.New(
-		"duckdb",
+		"eg",
 		"",
-		egenv.CacheDirectory("duckdb"),
+		egenv.CacheDirectory(".dist", "eg"),
 		egdebuild.Option.Maintainer(maintainer.Name, maintainer.Email),
 		egdebuild.Option.SigningKeyID(maintainer.GPGFingerprint),
 		egdebuild.Option.ChangeLogDate(c.Committer.When),
-		egdebuild.Option.Version(fmt.Sprintf("%s.:autopatch:", version)),
+		egdebuild.Option.Version("0.0.:autopatch:"),
 		egdebuild.Option.Debian(errorsx.Must(fs.Sub(debskel, ".debskel"))),
-		egdebuild.Option.DependsBuild("rsync", "curl", "tree", "ca-certificates", "cmake", "ninja-build", "libssl-dev"),
-		egdebuild.Option.Environ("PACKAGE_VERSION", version),
+		egdebuild.Option.DependsBuild("golang-1.23", "dh-make", "debhelper", "duckdb", "libc6-dev (>= 2.35)", "libbtrfs-dev", "libassuan-dev", "libdevmapper-dev", "libglib2.0-dev", "libgpgme-dev", "libgpg-error-dev", "libprotobuf-dev", "libprotobuf-c-dev", "libseccomp-dev", "libselinux1-dev", "libsystemd-dev"),
+		egdebuild.Option.Depends("podman", "duckdb", "bindfs"),
 	)
 }
 
 func Prepare(ctx context.Context, o eg.Op) error {
-	sruntime := shell.Runtime().Directory(egenv.CacheDirectory())
-	return eg.Parallel(
+	debdir := egenv.CacheDirectory(".dist", "eg")
+	sruntime := shell.Runtime()
+	return eg.Sequential(
 		shell.Op(
-			sruntime.Newf("test -d duckdb || git clone -b v%s --depth 1 https://github.com/duckdb/duckdb.git duckdb", version),
-			sruntime.New("echo \"8e16b986c4e873d997830f9d3a965161  duckdb/src/include/duckdb.h\" > duckdb.md5"),
-			sruntime.New("md5sum -c duckdb.md5"),
+			sruntime.Newf("rm -rf %s", debdir),
+			sruntime.Newf("mkdir -p %s", debdir),
+			sruntime.Newf("git clone --depth 1 file://${PWD} %s/src", debdir),
+			sruntime.Newf("tree -L 2 %s", debdir),
 		),
 		egdebuild.Prepare(Runner(), errorsx.Must(fs.Sub(debskel, ".debskel"))),
 	)(ctx, o)
@@ -70,6 +70,5 @@ func Build(ctx context.Context, o eg.Op) error {
 }
 
 func Upload(ctx context.Context, o eg.Op) error {
-	// return egdebuild.UploadDPut(gcfg, errorsx.Must(fs.Sub(debskel, ".debskel")))(ctx, o)
-	return nil
+	return egdebuild.UploadDPut(gcfg, errorsx.Must(fs.Sub(debskel, ".debskel")))(ctx, o)
 }

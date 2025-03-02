@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
+	_eg "github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/runtime/wasi/egenv"
@@ -13,14 +14,14 @@ import (
 )
 
 func CacheDirectory(dirs ...string) string {
-	return egenv.CacheDirectory(".eg", "yarn", filepath.Join(dirs...))
+	return egenv.CacheDirectory(_eg.DefaultModuleDirectory(), "yarn", filepath.Join(dirs...))
 }
 
 // attempt to build the yarn environment that properly
 func Env() ([]string, error) {
 	return envx.Build().FromEnv(os.Environ()...).
 		Var("COREPACK_ENABLE_DOWNLOAD_PROMPT", "0").
-		Var("COREPACK_HOME", egenv.CacheDirectory(".eg", "corepack")).
+		Var("COREPACK_HOME", egenv.CacheDirectory(_eg.DefaultModuleDirectory(), "corepack")).
 		Var("YARN_CACHE_FOLDER", CacheDirectory()).
 		Var("YARN_ENABLE_GLOBAL_CACHE", envx.VarBool(false)).
 		Environ()

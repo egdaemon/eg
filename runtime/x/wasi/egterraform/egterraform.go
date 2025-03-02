@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
+	_eg "github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/runtime/wasi/egenv"
@@ -13,7 +14,7 @@ import (
 )
 
 func CacheDirectory(dirs ...string) string {
-	return egenv.CacheDirectory(".eg", "terraform", filepath.Join(dirs...))
+	return egenv.CacheDirectory(_eg.DefaultModuleDirectory(), "terraform", filepath.Join(dirs...))
 }
 
 // attempt to build the yarn environment that properly

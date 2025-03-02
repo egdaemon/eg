@@ -4,14 +4,15 @@
 DH_VERBOSE=1
 
 %:
-	dh $@
+	CCACHE_COMPILERCHECK=content CCACHE_DEBUG=1 CCACHE_DEBUGDIR=ccache-debug-1 dh $@
 
 override_dh_auto_build:
 	echo "DH AUTO BUILD OVERRIDE ${CMAKE_BUILD_PARALLEL_LEVEL}"
-	export CMAKE_BUILD_PARALLEL_LEVEL="$(nproc)"
-	ls -lha $(CURDIR)
-	GEN=ninja OVERRIDE_GIT_DESCRIBE="v${PACKAGE_VERSION}" ENABLE_EXTENSION_AUTOLOADING=1 ENABLE_EXTENSION_AUTOINSTALL=1 CORE_EXTENSIONS='autocomplete;tpcd;fts;json;parquet;icu' make -C src
-	DESTDIR="linux" cmake --install src/build/release
+	env | sort
+	CCACHE_DIR="$(CURDIR)/${CCACHE_DIR}" ccache -s
+	GEN=ninja OVERRIDE_GIT_DESCRIBE="v${PACKAGE_VERSION}" ENABLE_EXTENSION_AUTOLOADING=1 ENABLE_EXTENSION_AUTOINSTALL=1 CORE_EXTENSIONS='autocomplete;tpcd;fts;json;parquet;icu' DUCKDB_BUILD=Static make -C src
+	DESTDIR="linux" cmake --install src/build/release --prefix="/usr"
+	ls -lha linux
 
 
 override_dh_usrlocal:

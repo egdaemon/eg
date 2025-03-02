@@ -12,7 +12,13 @@ import (
 )
 
 func TestManifestExample1(t *testing.T) {
-	m := egflatpak.New("org.egdaemon.example1", "example", egflatpak.Option.CopyModule("/dne")...).Manifest
+	m := egflatpak.New(
+		"org.egdaemon.example1",
+		"example",
+		egflatpak.Option.Modules(
+			egflatpak.ModuleCopy("/dne"),
+		)...,
+	).Manifest
 	encoded, err := yaml.Marshal(m)
 	require.NoError(t, err)
 	// log.Println("content", string(encoded))

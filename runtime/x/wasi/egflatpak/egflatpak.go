@@ -46,6 +46,7 @@ type Source struct {
 	URL             string   `yaml:"url,omitempty"`              // used by archive source.
 	SHA256          string   `yaml:"sha256,omitempty"`           // used by archive source(s).
 	StripComponents int      `yaml:"strip-components,omitempty"` // used by archive source(s).
+	Commit          string   `yaml:"commit,omitempty"`           // used by git source(s).
 	Commands        []string `yaml:"commands,omitempty"`
 }
 
@@ -61,45 +62,10 @@ type options []option
 
 var Option = options(nil)
 
-// Not recommended, here for testing: build a module directly from a directory.
-func (t options) CopyModule(dir string) options {
+// assign modules to the builder.
+func (t options) Modules(m ...Module) options {
 	return append(t, func(b *Builder) {
-		b.Modules = append(
-			b.Modules,
-			Module{
-				Name:        "copy",
-				BuildSystem: "simple",
-				Commands: []string{
-					"cp -r . /app/bin",
-				},
-				Sources: []Source{
-					{Type: "dir", Path: dir},
-				},
-			})
-	})
-}
-
-// build a module from a binary tarball.
-func (t options) Tarball(url, sha256d string) options {
-	return append(t, func(b *Builder) {
-		b.Modules = append(
-			b.Modules,
-			Module{
-				Name:        "tarball",
-				BuildSystem: "simple",
-				Commands: []string{
-					"ls -lha .",
-					"cp -r . /app/bin",
-				},
-				Sources: []Source{
-					{
-						Type:        "archive",
-						URL:         url,
-						Destination: filepath.Base(url),
-						SHA256:      sha256d,
-					},
-				},
-			})
+		b.Modules = m
 	})
 }
 

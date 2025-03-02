@@ -59,14 +59,7 @@ func (t module) mounthack(ctx context.Context, ws workspaces.Context) (err error
 	)
 
 	if mbin, err = exec.LookPath(binname); err != nil {
-		log.Println(errorsx.Wrap(err, "unable to locate bindfs, skipping"))
-
-		// symlink fallback hack wont work in practice most likely.
-		if err = os.Symlink(eg.DefaultMountRoot(), eg.DefaultWorkloadRoot()); err != nil {
-			log.Println("unable to symlink", err)
-		}
-
-		return nil
+		return errorsx.Wrap(err, "unable to locate bindfs, failing")
 	}
 
 	remap := func(from, to string) error {
@@ -80,7 +73,6 @@ func (t module) mounthack(ctx context.Context, ws workspaces.Context) (err error
 
 	err = fsx.MkDirs(
 		0770,
-		eg.DefaultRuntimeDirectory(),
 		eg.DefaultWorkingDirectory(),
 		eg.DefaultCacheDirectory(),
 	)
@@ -136,8 +128,6 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 		eg.EnvComputeCacheDirectory, envx.String(eg.DefaultCacheDirectory(), eg.EnvComputeCacheDirectory, "CACHE_DIRECTORY"),
 	).Var(
 		eg.EnvComputeRuntimeDirectory, eg.DefaultRuntimeDirectory(),
-	).Var(
-		"RUNTIME_DIRECTORY", eg.DefaultRuntimeDirectory(),
 	).Var(
 		"PAGER", "cat", // no paging in this environmenet.
 	)

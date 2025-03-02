@@ -157,8 +157,6 @@ func (t local) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err e
 
 	debugx.Println("container cache", t.ContainerCache)
 
-	// envx.Debug(errorsx.Must(envb.Environ())...)
-
 	ragent := runners.NewRunner(
 		gctx.Context,
 		ws,

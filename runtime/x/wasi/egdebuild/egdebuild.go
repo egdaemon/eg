@@ -202,7 +202,6 @@ func Build(cfg Config, opts ...option) eg.OpFn {
 		}
 
 		if cfg.Debian != nil {
-			egfs.Inspect(ctx, cfg.Debian)
 			if err = egfs.CloneFS(ctx, filepath.Join(bdir, "debian"), "debian", cfg.Debian); err != nil {
 				return err
 			}

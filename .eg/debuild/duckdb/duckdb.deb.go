@@ -63,12 +63,13 @@ func Runner() eg.ContainerRunner {
 
 func Build(ctx context.Context, o eg.Op) error {
 	return eg.Parallel(
-		egdebuild.Build(gcfg, egdebuild.Option.Distro("jammy")),
-		egdebuild.Build(gcfg, egdebuild.Option.Distro("noble")),
+		// egdebuild.Build(gcfg, egdebuild.Option.Distro("jammy")),
+		// egdebuild.Build(gcfg, egdebuild.Option.Distro("noble")),
 		egdebuild.Build(gcfg, egdebuild.Option.Distro("oracular")),
 	)(ctx, o)
 }
 
 func Upload(ctx context.Context, o eg.Op) error {
-	return egdebuild.UploadDPut(gcfg, errorsx.Must(fs.Sub(debskel, ".debskel")))(ctx, o)
+	// return egdebuild.UploadDPut(gcfg, errorsx.Must(fs.Sub(debskel, ".debskel")))(ctx, o)
+	return nil
 }

@@ -68,6 +68,7 @@ const (
 	EnvComputeWorkingDirectory   = "EG_COMPUTE_ROOT_DIRECTORY"                  // root working directory for workloads
 	EnvComputeCacheDirectory     = "EG_COMPUTE_CACHE_DIRECTORY"                 // cache directory for workloads
 	EnvComputeRuntimeDirectory   = "EG_COMPUTE_RUNTIME_DIRECTORY"               // runtime directory for workloads
+	EnvComputeWorkloadDirectory  = "EG_COMPUTE_WORKLOAD_DIRECTORY"              // workload directory for workloads
 	EnvComputeWorkloadCapacity   = "EG_COMPUTE_WORKLOAD_CAPACITY"               // upper bound for the maximum number of workloads that can be run concurrently
 	EnvComputeWorkloadTargetLoad = "EG_COMPUTE_WORKLOAD_TARGET_LOAD"            // upper bound for the maximum cpu load to target.
 	EnvScheduleMaximumDelay      = "EG_COMPUTE_SCHEDULER_MAXIMUM_DELAY"         // maximum delay between checks for workloads.

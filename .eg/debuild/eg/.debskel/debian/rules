@@ -1,0 +1,32 @@
+#!/usr/bin/make -f
+# See debhelper(7) (uncomment to enable)
+# output every command that modifies files on the build system.
+# DH_VERBOSE = 1
+
+# see FEATURE AREAS in dpkg-buildflags(1)
+#export DEB_BUILD_MAINT_OPTIONS = hardening=+all
+
+# see ENVIRONMENT in dpkg-buildflags(1)
+# package maintainers to append CFLAGS
+#export DEB_CFLAGS_MAINT_APPEND  = -Wall -pedantic
+# package maintainers to append LDFLAGS
+#export DEB_LDFLAGS_MAINT_APPEND = -Wl,--as-needed
+
+%:
+	dh $@
+
+override_dh_auto_build:
+	echo "DH AUTO BUILD OVERRIDE"
+	echo "$(CURDIR)"
+	ls -lha $(CURDIR)
+	# need to set gocache otherwise it'll error out on launchpad builders
+	GOBIN="$(CURDIR)/linux/usr/bin" GOCACHE="$(CURDIR)/.gocache" GOMODCACHE="$(CURDIR)/.gomod" /usr/lib/go-1.23/bin/go env
+	GOPROXY="direct" GOCACHE="$(CURDIR)/.gocache" GOMODCACHE="$(CURDIR)/.gomod" GOBIN="$(CURDIR)/linux/usr/bin" /usr/lib/go-1.23/bin/go build -C src -mod=vendor -ldflags="-X 'github.com/egdaemon/eg/cmd/cmdopts.Treeish=${VCS_REVISION}'" -tags "no_duckdb_arrow" -buildvcs=false ./cmd/...
+
+override_dh_auto_test:
+	echo "DH AUTO TEST OVERRIDE"
+	CACHE_DIRECTORY="$(CURDIR)" $(CURDIR)/linux/usr/bin/eg version
+
+
+override_dh_dwz:
+    # Do nothing - this effectively disables dwz. golang does its own thing.

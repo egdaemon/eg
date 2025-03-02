@@ -250,7 +250,7 @@ func UploadDPut(gcfg Config, dput fs.FS) eg.OpFn {
 		runtime := Runtime(gcfg)
 		return shell.Run(
 			ctx,
-			runtime.New("ls *.tar.xz | xargs -I {} tar -tvf {}").Directory(bdir),
+			// runtime.New("ls *.tar.xz | xargs -I {} tar -tvf {}").Directory(bdir),
 			runtime.Newf("ls %s/*_source.changes | xargs -I {} dput -f -c %s %s {}", bdir, egenv.EphemeralDirectory("dput.config"), gcfg.Name).Privileged(),
 		)
 	}

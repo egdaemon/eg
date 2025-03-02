@@ -78,6 +78,21 @@ func FileTree(ctx context.Context, op eg.Op) error {
 	)
 }
 
+// prints the directory tree of the provided path.
+func DirectoryTree(dir string) eg.OpFn {
+	return func(ctx context.Context, op eg.Op) error {
+		privileged := shell.Runtime().Privileged().Lenient(true).Directory("/")
+		return shell.Run(
+			ctx,
+			privileged.Newf("tree -a %s", dir),
+		)
+	}
+}
+
+func Fail(ctx context.Context, op eg.Op) error {
+	return fmt.Errorf("explicitly failing due to egbug.Fail being invoked")
+}
+
 // prints current environment variables.
 func Env(ctx context.Context, op eg.Op) error {
 	return shell.Run(

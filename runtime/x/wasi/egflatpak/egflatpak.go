@@ -47,6 +47,7 @@ type Source struct {
 	SHA256          string   `yaml:"sha256,omitempty"`           // used by archive source(s).
 	StripComponents int      `yaml:"strip-components,omitempty"` // used by archive source(s).
 	Commit          string   `yaml:"commit,omitempty"`           // used by git source(s).
+	Architectures   []string `yaml:"only-arches,omitempty"`      // used by archive source(s).
 	Commands        []string `yaml:"commands,omitempty"`
 }
 
@@ -60,7 +61,9 @@ type Module struct {
 type option = func(*Builder)
 type options []option
 
-var Option = options(nil)
+func Option() options {
+	return options(nil)
+}
 
 // assign modules to the builder.
 func (t options) Modules(m ...Module) options {

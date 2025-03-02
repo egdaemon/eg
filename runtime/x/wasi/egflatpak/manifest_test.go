@@ -15,7 +15,7 @@ func TestManifestExample1(t *testing.T) {
 	m := egflatpak.New(
 		"org.egdaemon.example1",
 		"example",
-		egflatpak.Option.Modules(
+		egflatpak.Option().Modules(
 			egflatpak.ModuleCopy("/dne"),
 		)...,
 	).Manifest

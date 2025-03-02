@@ -51,8 +51,6 @@ func Prepare(ctx context.Context, o eg.Op) error {
 			sruntime.Newf("rm -rf %s", debdir),
 			sruntime.Newf("mkdir -p %s", debdir),
 			sruntime.Newf("git clone --depth 1 file://${PWD}/ %s", debdir),
-			sruntime.Newf("tree -L 2 %s/.dist", debdir),
-			sruntime.Newf("ls -lha %s", debdir),
 		),
 		egdebuild.Prepare(Runner(), errorsx.Must(fs.Sub(debskel, ".debskel"))),
 	)(ctx, o)
@@ -73,5 +71,4 @@ func Build(ctx context.Context, o eg.Op) error {
 
 func Upload(ctx context.Context, o eg.Op) error {
 	return egdebuild.UploadDPut(gcfg, errorsx.Must(fs.Sub(debskel, ".debskel")))(ctx, o)
-	// return nil
 }

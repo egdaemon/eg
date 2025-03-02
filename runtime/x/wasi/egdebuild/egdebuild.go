@@ -56,6 +56,7 @@ type Config struct {
 	SourceDir      string   // absolute path to the source files to use for building the package.
 	Debian         fs.FS    // debian package files to use for building the package. generally only the rules file needs to be provided. the 'debian' directory is cloned from the fs.FS
 	Environ        []string // additional environment variables to pass to the build process.
+	buildCommand   func(*Config, shell.Command) shell.Command
 }
 
 type option func(*Config)
@@ -111,6 +112,20 @@ func (option) Depends(deps ...string) option {
 	}
 }
 
+func (option) BuildCommand(d func(c1 *Config, c2 shell.Command) shell.Command) option {
+	return func(c *Config) {
+		c.buildCommand = d
+	}
+}
+
+func (option) BuildBinary(d time.Duration) option {
+	return func(c *Config) {
+		c.buildCommand = func(cfg *Config, runtime shell.Command) shell.Command {
+			return runtime.Newf("debuild -b").Timeout(d)
+		}
+	}
+}
+
 func (option) Environ(k, v string) option {
 	return func(c *Config) {
 		c.Environ = append(c.Environ, fmt.Sprintf("%s=%s", k, v))
@@ -130,6 +145,9 @@ func New(pkg string, distro string, src string, opts ...option) (c Config) {
 		SourceDir:    src,
 		Architecture: "any",
 		Description:  "package build by egdebuild",
+		buildCommand: func(cfg *Config, runtime shell.Command) shell.Command {
+			return runtime.Newf("debuild -S -k%s", cfg.SignatureKeyID).Privileged()
+		},
 	}, opts...)
 }
 
@@ -213,12 +231,10 @@ func Build(cfg Config, opts ...option) eg.OpFn {
 			ctx,
 			runtime.Newf("chown -R egd:egd %s", root).Privileged(),
 			runtime.Newf("rsync --recursive --perms %s/ src/", cfg.SourceDir),
-			// runtime.Newf("tree -L 2 ."),
-			// runtime.New("cat debian/install"),
 			runtime.New("cat debian/changelog | envsubst | tee debian/changelog"),
 			runtime.New("cat debian/control | envsubst | tee debian/control"),
 			runtime.New("cat debian/rules | envsubst | tee debian/rules"),
-			runtime.Newf("debuild -S -k%s", cfg.SignatureKeyID).Privileged(),
+			cfg.buildCommand(&cfg, runtime),
 		)
 	}
 }
@@ -234,7 +250,7 @@ func UploadDPut(gcfg Config, dput fs.FS) eg.OpFn {
 		runtime := Runtime(gcfg)
 		return shell.Run(
 			ctx,
-			// runtime.New("ls *.tar.xz | xargs -I {} tar -tvf {}").Directory(bdir),
+			runtime.New("ls *.tar.xz | xargs -I {} tar -tvf {}").Directory(bdir),
 			runtime.Newf("ls %s/*_source.changes | xargs -I {} dput -f -c %s %s {}", bdir, egenv.EphemeralDirectory("dput.config"), gcfg.Name).Privileged(),
 		)
 	}

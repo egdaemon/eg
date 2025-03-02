@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	_eg "github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/internal/coverage/golangcov"
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
@@ -317,7 +318,7 @@ func RecordCoverage(ctx context.Context, _ eg.Op) (err error) {
 }
 
 func CacheDirectory(dirs ...string) string {
-	return egenv.CacheDirectory(".eg", "golang", filepath.Join(dirs...))
+	return egenv.CacheDirectory(_eg.DefaultModuleDirectory(), "golang", filepath.Join(dirs...))
 }
 
 func CacheBuildDirectory() string {

@@ -1,6 +1,4 @@
-// Package egterraform has supporting functions for configuring the environment for running terraform commands
-// within eg.
-package egterraform
+package egccache
 
 import (
 	"os"
@@ -14,19 +12,19 @@ import (
 )
 
 func CacheDirectory(dirs ...string) string {
-	return egenv.CacheDirectory(_eg.DefaultModuleDirectory(), "terraform", filepath.Join(dirs...))
+	return egenv.CacheDirectory(_eg.DefaultModuleDirectory(), "ccache", filepath.Join(dirs...))
 }
 
-// attempt to build the yarn environment that properly
+// attempt to build the rust environment that sets up
+// the cargo environment for caching.
 func Env() ([]string, error) {
 	return envx.Build().FromEnv(os.Environ()...).
-		Var("TF_PLUGIN_CACHE_DIR", CacheDirectory("plugins")).
-		Var("TF_IN_AUTOMATION", envx.VarBool(true)).
+		Var("CCACHE_DIR", CacheDirectory()).
 		Environ()
 }
 
 // Create a shell runtime that properly
-// sets up the yarn environment for caching.
+// sets up the cargo environment for caching.
 func Runtime() shell.Command {
 	return shell.Runtime().
 		EnvironFrom(

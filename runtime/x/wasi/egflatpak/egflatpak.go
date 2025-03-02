@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 
+	_eg "github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/langx"
 	"github.com/egdaemon/eg/runtime/wasi/eg"
@@ -182,8 +183,8 @@ func New(id string, command string, options ...option) *Builder {
 // Build the flatpak
 func Build(ctx context.Context, runtime shell.Command, b *Builder) error {
 	var (
-		sysdir  = egenv.CacheDirectory(".eg", "flatpak-system")
-		userdir = egenv.CacheDirectory(".eg", "flatpak-user")
+		sysdir  = egenv.CacheDirectory(_eg.DefaultModuleDirectory(), "flatpak-system")
+		userdir = egenv.CacheDirectory(_eg.DefaultModuleDirectory(), "flatpak-user")
 	)
 
 	if err := egfs.MkDirs(0755, sysdir, userdir); err != nil {

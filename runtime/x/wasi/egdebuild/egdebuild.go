@@ -213,6 +213,8 @@ func Build(cfg Config, opts ...option) eg.OpFn {
 			ctx,
 			runtime.Newf("chown -R egd:egd %s", root).Privileged(),
 			runtime.Newf("rsync --recursive --perms %s/ src/", cfg.SourceDir),
+			// runtime.Newf("tree -L 2 ."),
+			// runtime.New("cat debian/install"),
 			runtime.New("cat debian/changelog | envsubst | tee debian/changelog"),
 			runtime.New("cat debian/control | envsubst | tee debian/control"),
 			runtime.New("cat debian/rules | envsubst | tee debian/rules"),

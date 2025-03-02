@@ -1,5 +1,5 @@
 pkgname=eg
-pkgver=v0.0.1740880217
+pkgver=v0.0.1740881049
 pkgrel=1
 pkgdesc='eg ci/cd/batch processing tooling'
 arch=('x86_64')

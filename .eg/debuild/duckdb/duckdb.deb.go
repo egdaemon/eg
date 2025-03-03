@@ -76,8 +76,8 @@ func Build(ctx context.Context, o eg.Op) error {
 		// 	shell.New("false"),
 		// ),
 		eg.Parallel(
-			// egdebuild.Build(gcfg, egdebuild.Option.Distro("jammy")),
-			// egdebuild.Build(gcfg, egdebuild.Option.Distro("noble")),
+			egdebuild.Build(gcfg, egdebuild.Option.Distro("jammy")),
+			egdebuild.Build(gcfg, egdebuild.Option.Distro("noble")),
 			egdebuild.Build(gcfg, egdebuild.Option.Distro("oracular")),
 		),
 	)(ctx, o)

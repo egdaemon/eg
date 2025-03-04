@@ -65,16 +65,6 @@ func Runner() eg.ContainerRunner {
 
 func Build(ctx context.Context, o eg.Op) error {
 	return eg.Sequential(
-		// shell.Op(
-		// 	shell.New("ccache -s"),
-		// 	shell.Newf("rm -rf %s", egenv.CacheDirectory("duckdb", "build", "release")),
-		// ),
-		// egdebuild.Build(gcfg, egdebuild.Option.Distro("oracular"), egdebuild.Option.BuildBinary(time.Hour)),
-		// shell.Op(
-		// 	shell.New("ccache -s"),
-		// 	shell.Newf("rm -rf %s", egenv.CacheDirectory("duckdb", "build", "release")),
-		// 	shell.New("false"),
-		// ),
 		eg.Parallel(
 			egdebuild.Build(gcfg, egdebuild.Option.Distro("jammy")),
 			egdebuild.Build(gcfg, egdebuild.Option.Distro("noble")),

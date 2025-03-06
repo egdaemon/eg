@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/cmd/cmdopts"
 	"github.com/egdaemon/eg/compile"
@@ -156,6 +157,7 @@ func (t local) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err e
 	}
 
 	debugx.Println("container cache", t.ContainerCache)
+	debugx.Println("runtime resources", spew.Sdump(t.RuntimeResources))
 
 	ragent := runners.NewRunner(
 		gctx.Context,
@@ -176,6 +178,8 @@ func (t local) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err e
 		runners.AgentOptionEnviron(environpath), // ensure we pick up the environment file with the container.
 		runners.AgentOptionHostOS(),
 		runners.AgentOptionPublish(t.Ports...),
+		runners.AgentOptionCores(t.RuntimeResources.Cores),
+		runners.AgentOptionMemory(uint64(t.RuntimeResources.Memory)),
 	)
 
 	for _, m := range modules {

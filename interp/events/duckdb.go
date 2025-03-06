@@ -38,10 +38,6 @@ func PrepareDB(ctx context.Context, db *sql.DB) error {
 	dctx, done := context.WithTimeout(ctx, 15*time.Second)
 	defer done()
 
-	if _, err := db.ExecContext(dctx, "INSTALL json"); err != nil {
-		return err
-	}
-
 	if _, err := db.ExecContext(dctx, "LOAD json"); err != nil {
 		return err
 	}

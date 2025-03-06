@@ -34,7 +34,7 @@ require (
 	github.com/posener/complete v1.2.3
 	github.com/shirou/gopsutil/v4 v4.24.12
 	github.com/stretchr/testify v1.10.0
-	github.com/tetratelabs/wazero v1.8.3-0.20250121181248-4231c48a9c9a
+	github.com/tetratelabs/wazero v1.9.0
 	github.com/willabides/kongplete v0.4.0
 	go.uber.org/automaxprocs v1.6.0
 	golang.org/x/crypto v0.32.0

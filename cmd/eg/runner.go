@@ -153,7 +153,7 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 		debugx.Println("account", aid)
 		debugx.Println("run id", uid)
 		debugx.Println("repository", descr)
-		debugx.Println("number of cores", runtime.GOMAXPROCS(-1))
+		debugx.Println("number of cores (GOMAXPROCS - inaccurate)", runtime.GOMAXPROCS(-1))
 		debugx.Println("ram available", bytesx.Unit(vmemlimit))
 		debugx.Println("logging level", gctx.Verbosity)
 		// fsx.PrintDir(os.DirFS(t.RuntimeDir))

@@ -6,11 +6,15 @@ import (
 	"log"
 	"time"
 
+	"github.com/egdaemon/eg/internal/debugx"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/langx"
 )
 
 func InitializeDB(ctx context.Context, path string) (err error) {
+	debugx.Println("initialize analytics database initiated")
+	defer debugx.Println("initialize analytics database completed")
+
 	var (
 		db *sql.DB
 	)
@@ -28,26 +32,29 @@ func InitializeDB(ctx context.Context, path string) (err error) {
 }
 
 func PrepareDB(ctx context.Context, db *sql.DB) error {
-	ctx, done := context.WithTimeout(ctx, 15*time.Second)
+	debugx.Println("prepare analytics database initiated")
+	defer debugx.Println("prepare analytics database completed")
+
+	dctx, done := context.WithTimeout(ctx, 15*time.Second)
 	defer done()
 
-	if _, err := db.ExecContext(ctx, "INSTALL json"); err != nil {
+	if _, err := db.ExecContext(dctx, "INSTALL json"); err != nil {
 		return err
 	}
 
-	if _, err := db.ExecContext(ctx, "LOAD json"); err != nil {
+	if _, err := db.ExecContext(dctx, "LOAD json"); err != nil {
 		return err
 	}
 
-	if _, err := db.ExecContext(ctx, "CREATE TABLE IF NOT EXISTS 'eg.metrics.custom' (id UUID PRIMARY KEY, name TEXT NOT NULL, name_md5 uuid GENERATED ALWAYS AS (md5(name)), ts TIMESTAMP NOT NULL, metric JSON NOT NULL)"); err != nil {
+	if _, err := db.ExecContext(dctx, "CREATE TABLE IF NOT EXISTS 'eg.metrics.custom' (id UUID PRIMARY KEY, name TEXT NOT NULL, name_md5 uuid GENERATED ALWAYS AS (md5(name)), ts TIMESTAMP NOT NULL, metric JSON NOT NULL)"); err != nil {
 		return err
 	}
 
-	if _, err := db.ExecContext(ctx, "CREATE TABLE IF NOT EXISTS 'eg.metrics.operation' (id UUID PRIMARY KEY, name TEXT NOT NULL, name_md5 uuid GENERATED ALWAYS AS (md5(name)), ts TIMESTAMP NOT NULL, module TEXT NOT NULL, op TEXT NOT NULL, milliseconds INTERVAL NOT NULL)"); err != nil {
+	if _, err := db.ExecContext(dctx, "CREATE TABLE IF NOT EXISTS 'eg.metrics.operation' (id UUID PRIMARY KEY, name TEXT NOT NULL, name_md5 uuid GENERATED ALWAYS AS (md5(name)), ts TIMESTAMP NOT NULL, module TEXT NOT NULL, op TEXT NOT NULL, milliseconds INTERVAL NOT NULL)"); err != nil {
 		return err
 	}
 
-	if _, err := db.ExecContext(ctx, "CREATE TABLE IF NOT EXISTS 'eg.metrics.coverage' (id UUID PRIMARY KEY, path TEXT NOT NULL, path_md5 uuid GENERATED ALWAYS AS (md5(path)), statements FLOAT4 NOT NULL, branches FLOAT4 NOT NULL)"); err != nil {
+	if _, err := db.ExecContext(dctx, "CREATE TABLE IF NOT EXISTS 'eg.metrics.coverage' (id UUID PRIMARY KEY, path TEXT NOT NULL, path_md5 uuid GENERATED ALWAYS AS (md5(path)), statements FLOAT4 NOT NULL, branches FLOAT4 NOT NULL)"); err != nil {
 		return err
 	}
 

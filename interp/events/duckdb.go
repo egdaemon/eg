@@ -28,6 +28,9 @@ func InitializeDB(ctx context.Context, path string) (err error) {
 }
 
 func PrepareDB(ctx context.Context, db *sql.DB) error {
+	ctx, done := context.WithTimeout(ctx, 15*time.Second)
+	defer done()
+
 	if _, err := db.ExecContext(ctx, "INSTALL json"); err != nil {
 		return err
 	}

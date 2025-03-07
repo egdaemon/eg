@@ -18,7 +18,6 @@ import (
 	"github.com/egdaemon/eg/internal/debugx"
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
-	"github.com/egdaemon/eg/internal/fsx"
 	"github.com/egdaemon/eg/internal/gitx"
 	"github.com/egdaemon/eg/internal/podmanx"
 	"github.com/egdaemon/eg/internal/userx"
@@ -41,7 +40,6 @@ type local struct {
 	Environment      []string `name:"env" short:"e" help:"define environment variables and their values to be included"`
 	GitRemote        string   `name:"git-remote" help:"name of the git remote to use" default:"${vars_git_default_remote_name}"`
 	GitReference     string   `name:"git-ref" help:"name of the branch or commit to checkout" default:"${vars_git_head_reference}"`
-	ContainerCache   string   `name:"croot" help:"container storage, ideally we'd be able to share with the host but for now" hidden:"true" default:"${vars_container_cache_directory}"`
 	Name             string   `arg:"" name:"module" help:"name of the module to run, i.e. the folder name within moduledir" default:"" predictor:"eg.workload"`
 	Infinite         bool     `name:"infinite" help:"allow this module to run forever, used for running a workload like a webserver" hidden:"true"`
 	Ports            []int    `name:"ports" help:"list of ports to publish to the host system" hidden:"true"`
@@ -66,11 +64,6 @@ func (t local) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err e
 	ctx, err := podmanx.WithClient(gctx.Context)
 	if err != nil {
 		return errorsx.Wrap(err, "unable to connect to podman")
-	}
-
-	// TODO: create a kong bind variable to do this automatically and inject as needed.
-	if err = fsx.MkDirs(0700, t.ContainerCache); err != nil {
-		return errorsx.Wrap(err, "unable to setup container cache")
 	}
 
 	if ws, err = workspaces.New(gctx.Context, t.Dir, t.ModuleDir, t.Name); err != nil {
@@ -156,9 +149,9 @@ func (t local) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err e
 		privileged = runners.AgentOptionCommandLine("--privileged")
 	}
 
-	debugx.Println("container cache", t.ContainerCache)
 	debugx.Println("runtime resources", spew.Sdump(t.RuntimeResources))
 
+	canonicaluri := errorsx.Zero(gitx.CanonicalURI(repo, t.GitRemote))
 	ragent := runners.NewRunner(
 		gctx.Context,
 		ws,
@@ -170,10 +163,9 @@ func (t local) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err e
 		sshenvvar,
 		mountegbin,
 		runners.AgentOptionVolumes(
-			runners.AgentMountReadWrite(filepath.Join(ws.Root, ws.CacheDir), eg.DefaultMountRoot(eg.CacheDirectory)),
 			runners.AgentMountReadWrite(filepath.Join(ws.Root, ws.RuntimeDir), eg.DefaultMountRoot(eg.RuntimeDirectory)),
-			runners.AgentOptionContainerCache(t.ContainerCache),
 		),
+		runners.AgentOptionLocalComputeCachingVolumes(canonicaluri),
 		gnupghome,                               // must come after the runtime directory mount to ensure correct mounting order.
 		runners.AgentOptionEnviron(environpath), // ensure we pick up the environment file with the container.
 		runners.AgentOptionHostOS(),

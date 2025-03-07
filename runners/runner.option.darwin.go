@@ -3,27 +3,16 @@
 package runners
 
 import (
-	"fmt"
 	"log"
 
-	"github.com/egdaemon/eg"
-	"github.com/egdaemon/eg/internal/envx"
 	"github.com/logrusorgru/aurora"
 )
 
 func AgentOptionHostOS() AgentOption {
-	log.Println(aurora.NewAurora(true).Red("darwin is an experimental host, many features do not yet work."))
+	log.Println(aurora.NewAurora(true).Red("darwin is currently in alpha host, you may experience some functionality issues, please report your findings to us for support/fixes."))
 	return AgentOptionCompose(
-		AgentOptionCommandLine("--userns", "host"), // properly map host user into containers.
-		AgentOptionCommandLine("--privileged"),     // darwin permission issues.
+		AgentOptionCommandLine("--userns", "host"),   // properly map host user into containers.
+		AgentOptionCommandLine("--privileged"),       // darwin permission issues.
+		AgentOptionCommandLine("--pids-limit", "-1"), // ensure we dont run into pid limits.
 	)
-}
-
-func AgentOptionContainerCache(dir string) string {
-	if envx.Boolean(false, eg.EnvExperimentalContainerCache) {
-		return AgentMountReadWrite(dir, "/var/lib/containers")
-	}
-
-	log.Println(aurora.NewAurora(true).Red(fmt.Sprintf("container cache is disabled on darwin %s=true to enable", eg.EnvExperimentalContainerCache)))
-	return ""
 }

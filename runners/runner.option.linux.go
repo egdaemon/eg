@@ -11,7 +11,3 @@ func AgentOptionHostOS() AgentOption {
 		AgentOptionCommandLine("--pids-limit", "-1"),     // ensure we dont run into pid limits.
 	)
 }
-
-func AgentOptionContainerCache(dir string) string {
-	return AgentMountReadWrite(dir, "/var/lib/containers")
-}

@@ -10,10 +10,6 @@ import (
 
 // Provide a noop option for unknown os
 func AgentOptionHostOS() AgentOption {
-	log.Println(aurora.NewAurora(true).Red("you're using an unknown host operating system, many things may not work correctly"))
+	log.Println(aurora.NewAurora(true).Red("you're using an unknown host operating system, many things may not work correctly. feel free to report your findings to us for improvements."))
 	return AgentOptionNoop
-}
-
-func AgentOptionContainerCache(dir string) string {
-	return ""
 }

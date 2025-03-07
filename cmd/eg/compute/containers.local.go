@@ -37,7 +37,6 @@ type c8sLocal struct {
 	GitRemote        string   `name:"git-remote" help:"name of the git remote to use" default:"${vars_git_default_remote_name}"`
 	GitReference     string   `name:"git-ref" help:"name of the branch or commit to checkout" default:"${vars_git_default_reference}"`
 	Endpoint         string   `name:"endpoint" help:"specify the endpoint to upload to" default:"${vars_endpoint}/c/q/" hidden:"true"`
-	ContainerCache   string   `name:"croot" help:"container storage, ideally we'd be able to share with the host but for now" hidden:"true" default:"${vars_container_cache_directory}"`
 }
 
 func (t c8sLocal) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err error) {
@@ -125,6 +124,8 @@ func (t c8sLocal) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (er
 	}
 	defer environio.Close()
 
+	canonicaluri := errorsx.Zero(gitx.CanonicalURI(repo, t.GitRemote))
+
 	envb := envx.Build().
 		FromPath(t.EnvironmentPaths...).
 		FromEnv(t.Environment...).
@@ -151,14 +152,12 @@ func (t c8sLocal) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (er
 		sshmount,
 		sshenvvar,
 		runners.AgentOptionVolumes(
-			runners.AgentMountReadWrite(filepath.Join(ws.Root, ws.CacheDir), eg.DefaultCacheDirectory()),
 			runners.AgentMountReadWrite(filepath.Join(ws.Root, ws.RuntimeDir), eg.DefaultRuntimeDirectory()),
-			runners.AgentOptionContainerCache(t.ContainerCache),
 		),
+		runners.AgentOptionLocalComputeCachingVolumes(canonicaluri),
 		runners.AgentOptionEnviron(environpath),
 		runners.AgentOptionCommandLine("--env-file", environpath), // required for tty to work correctly in local mode.
 		runners.AgentOptionHostOS(),
-		runners.AgentOptionCommandLine("--pids-limit", "-1"), // more bullshit. without this we get "Error: OCI runtime error: crun: the requested cgroup controller `pids` is not available"
 		runners.AgentOptionEnv(eg.EnvComputeRunID, uid.String()),
 		runners.AgentOptionEnv(eg.EnvComputeLoggingVerbosity, strconv.Itoa(gctx.Verbosity)),
 	)

@@ -96,6 +96,24 @@ func AgentOptionVolumes(desc ...string) AgentOption {
 	}
 }
 
+func AgentOptionContainerCache(dir string) string {
+	return AgentMountReadWrite(dir, "/var/lib/containers")
+}
+
+// standard caching mounts across host environments for local compute, let podman deal with the issues.
+// since they cant seem to figure out how to make host direcctory mounts function identically.
+func AgentOptionLocalComputeCachingVolumes(canonicaluri string) AgentOption {
+	_, path, _ := strings.Cut(canonicaluri, ":")
+	path = strings.ReplaceAll(path, "/", ".")
+	path = strings.ReplaceAll(path, ".git", "")
+	return AgentOptionCompose(
+		AgentOptionVolumes(
+			AgentMountReadWrite(fmt.Sprintf("%s.eg.containers", path), "/var/lib/containers"),
+			AgentMountReadWrite(fmt.Sprintf("%s.eg.cache", path), eg.DefaultMountRoot(eg.CacheDirectory)),
+		),
+	)
+}
+
 func AgentOptionEnv(key, value string) AgentOption {
 	return func(a *Agent) {
 		a.environ = append(a.environ, "--env", fmt.Sprintf("%s=%s", key, value))

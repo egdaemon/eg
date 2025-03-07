@@ -167,6 +167,5 @@ func PrepareRootContainer(cpath string) (err error) {
 }
 
 const (
-	EnvExperimentalContainerCache     = "EG_EXPERIMENTAL_CONTAINER_CACHE"
 	EnvExperimentalDisableHostNetwork = "EG_EXPERIMENTAL_DISABLE_HOST_NETWORK"
 )

@@ -2,6 +2,7 @@ package md5x
 
 import (
 	"crypto/md5"
+	"encoding/base64"
 	"encoding/hex"
 	"hash"
 
@@ -33,4 +34,9 @@ func FormatString(m hash.Hash) string {
 // format md5 hash to a hex encoded string
 func FormatHex(m hash.Hash) string {
 	return hex.EncodeToString(m.Sum(nil))
+}
+
+// format hash to a base64 encoded string
+func FormatBase64(m hash.Hash) string {
+	return base64.RawURLEncoding.EncodeToString(m.Sum(nil))
 }

@@ -439,7 +439,6 @@ func beginwork(ctx context.Context, md metadata, dir string) state {
 		AgentOptionCores(workload.Enqueued.Cores),
 		AgentOptionMemory(workload.Enqueued.Memory),
 		AgentOptionHostOS(),
-		AgentOptionCommandLine("--pids-limit", "-1"), // more bullshit. without this we get "Error: OCI runtime error: crun: the requested cgroup controller `pids` is not available"
 	)
 
 	m := NewManager(

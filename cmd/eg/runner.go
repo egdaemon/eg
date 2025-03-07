@@ -216,7 +216,6 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 			),
 			runners.AgentOptionEGBin(errorsx.Must(exec.LookPath(eg.DefaultMountRoot(eg.BinaryBin)))),
 			runners.AgentOptionHostOS(),
-			runners.AgentOptionCommandLine("--pids-limit", "-1"), // more bullshit. without this we get "Error: OCI runtime error: crun: the requested cgroup controller `pids` is not available"
 			hostnet,
 		)
 

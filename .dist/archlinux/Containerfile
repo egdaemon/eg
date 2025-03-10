@@ -21,6 +21,7 @@ RUN sudo -H -S -u egd -g egd git -C /tmp/pacman clone --depth 1 https://aur.arch
 # RUN sudo -H -S -u egd git -C .dist/archlinux/rootfs/tmp/pacman clone --depth 1 https://aur.archlinux.org/duckdb.git # upstream is broken.
 
 RUN ls -d /tmp/pacman/*/ | xargs -I {} sudo -H -P -E -S -u egd -g egd makepkg -D {} -Cs
+RUN go install -tags no_duckdb_arrow github.com/egdaemon/eg/cmd/...@latest
 
 RUN pacman --noconfirm -U /tmp/*.pkg.tar.zst
 RUN systemctl enable podman.socket

@@ -163,6 +163,7 @@ func (t local) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err e
 		sshenvvar,
 		mountegbin,
 		runners.AgentOptionVolumes(
+			runners.AgentMountReadWrite(filepath.Join(ws.Root, ws.CacheDir), eg.DefaultMountRoot(eg.CacheDirectory)),
 			runners.AgentMountReadWrite(filepath.Join(ws.Root, ws.RuntimeDir), eg.DefaultMountRoot(eg.RuntimeDirectory)),
 		),
 		runners.AgentOptionLocalComputeCachingVolumes(canonicaluri),

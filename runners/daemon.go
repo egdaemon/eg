@@ -109,7 +109,6 @@ func AgentOptionLocalComputeCachingVolumes(canonicaluri string) AgentOption {
 	return AgentOptionCompose(
 		AgentOptionVolumes(
 			AgentMountReadWrite(fmt.Sprintf("%s.eg.containers", path), "/var/lib/containers"),
-			AgentMountReadWrite(fmt.Sprintf("%s.eg.cache", path), eg.DefaultMountRoot(eg.CacheDirectory)),
 		),
 	)
 }

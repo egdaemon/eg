@@ -152,7 +152,8 @@ func (t c8sLocal) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (er
 		sshmount,
 		sshenvvar,
 		runners.AgentOptionVolumes(
-			runners.AgentMountReadWrite(filepath.Join(ws.Root, ws.RuntimeDir), eg.DefaultRuntimeDirectory()),
+			runners.AgentMountReadWrite(filepath.Join(ws.Root, ws.CacheDir), eg.DefaultMountRoot(eg.CacheDirectory)),
+			runners.AgentMountReadWrite(filepath.Join(ws.Root, ws.RuntimeDir), eg.DefaultMountRoot(eg.RuntimeDirectory)),
 		),
 		runners.AgentOptionLocalComputeCachingVolumes(canonicaluri),
 		runners.AgentOptionEnviron(environpath),

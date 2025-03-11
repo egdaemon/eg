@@ -46,7 +46,9 @@ type Source struct {
 	URL             string   `yaml:"url,omitempty"`              // used by archive source.
 	SHA256          string   `yaml:"sha256,omitempty"`           // used by archive source(s).
 	StripComponents int      `yaml:"strip-components,omitempty"` // used by archive source(s).
+	Tag             string   `yaml:"tag,omitempty"`              // used by git sources(s).
 	Commit          string   `yaml:"commit,omitempty"`           // used by git source(s).
+	Mirrors         []string `yaml:"mirror-urls,omitempty"`      // used by git source(s).
 	Architectures   []string `yaml:"only-arches,omitempty"`      // used by archive source(s).
 	Commands        []string `yaml:"commands,omitempty"`
 }

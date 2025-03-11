@@ -25,6 +25,18 @@ func (t soptions) Destination(a string) soptions {
 	})
 }
 
+func (t soptions) Mirrors(a ...string) soptions {
+	return append(t, func(s *Source) {
+		s.Mirrors = a
+	})
+}
+
+func (t soptions) Tag(a string) soptions {
+	return append(t, func(s *Source) {
+		s.Tag = a
+	})
+}
+
 func SourceDir(dir string, options ...soption) Source {
 	return langx.Clone(Source{Type: "dir", Path: dir}, options...)
 }
@@ -35,5 +47,13 @@ func SourceTarball(url, sha256d string, options ...soption) Source {
 		URL:         url,
 		Destination: filepath.Base(url),
 		SHA256:      sha256d,
+	}, options...)
+}
+
+func SourceGit(url, commit string, options ...soption) Source {
+	return langx.Clone(Source{
+		Type:   "git",
+		URL:    url,
+		Commit: commit,
 	}, options...)
 }

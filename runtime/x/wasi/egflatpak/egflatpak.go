@@ -154,7 +154,24 @@ func New(id string, command string, options ...option) *Builder {
 	}, options...))
 }
 
-// Build the flatpak
+// Build the flatpak, requires that the container is run with --privileged option.
+// due to kernel/bwrap issues.
+// e.g.)
+//
+//	func main() {
+//		ctx, done := context.WithTimeout(context.Background(), egenv.TTL())
+//		defer done()
+//		err := eg.Perform(
+//			ctx,
+//			eg.Build(eg.DefaultModule()),
+//			eg.Module(
+//				ctx, eg.DefaultModule().OptionLiteral("--privileged"),
+//			),
+//		)
+//		if err != nil {
+//			log.Fatalln(err)
+//		}
+//	}
 func Build(ctx context.Context, runtime shell.Command, b *Builder) error {
 	var (
 		sysdir  = egenv.CacheDirectory(_eg.DefaultModuleDirectory(), "flatpak-system")
@@ -177,16 +194,14 @@ func Build(ctx context.Context, runtime shell.Command, b *Builder) error {
 	}
 
 	runtime = runtime.Environ("FLATPAK_SYSTEM_DIR", sysdir).
-		Environ("FLATPAK_USER_DIR", userdir).
-		Privileged()
+		Environ("FLATPAK_USER_DIR", userdir)
 
 	return shell.Run(
 		ctx,
-		runtime.Newf("cat %s", manifestpath),
-		runtime.New("flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo"),
-		runtime.Newf("flatpak install --system --assumeyes --include-sdk flathub %s//%s", b.Runtime.ID, b.Runtime.Version),
-		runtime.Newf("flatpak install --system --assumeyes flathub %s//%s", b.SDK.ID, b.SDK.Version),
-		runtime.Newf("flatpak-builder --system --install-deps-from=flathub --install --force-clean %s %s", dir, manifestpath),
+		runtime.New("flatpak --user remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo"),
+		runtime.Newf("flatpak install --user --assumeyes --include-sdk flathub %s//%s", b.Runtime.ID, b.Runtime.Version),
+		runtime.Newf("flatpak install --user --assumeyes flathub %s//%s", b.SDK.ID, b.SDK.Version),
+		runtime.Newf("flatpak-builder --user --install-deps-from=flathub --install --sandbox --force-clean %s %s", dir, manifestpath),
 	)
 }
 

@@ -57,3 +57,9 @@ func SourceGit(url, commit string, options ...soption) Source {
 		Commit: commit,
 	}, options...)
 }
+
+func SourceShell(options ...soption) Source {
+	return langx.Clone(Source{
+		Type: "shell",
+	}, options...)
+}

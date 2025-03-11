@@ -14,8 +14,8 @@ func NewModule(name, system string, options ...moption) Module {
 	}, options...)
 }
 
-func ModuleOptions() moptions {
-	return moptions(nil)
+func ModuleOptions(options ...moption) moptions {
+	return moptions(options)
 }
 
 // shell commands to execute during the build

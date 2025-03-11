@@ -32,6 +32,20 @@ func (t moptions) Sources(sources ...Source) moptions {
 	})
 }
 
+// configuration options for the build system.
+func (t moptions) ConfigOptions(options ...string) moptions {
+	return append(t, func(m *Module) {
+		m.ConfigOptions = options
+	})
+}
+
+// directories to remove once done.
+func (t moptions) Cleanup(dirs ...string) moptions {
+	return append(t, func(m *Module) {
+		m.Cleanup = dirs
+	})
+}
+
 // Not recommended, here for testing: build a module directly from a directory.
 func ModuleCopy(dir string) Module {
 	return NewModule("copy", "simple", ModuleOptions().Commands(

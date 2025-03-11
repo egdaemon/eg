@@ -13,6 +13,7 @@ import (
 	"github.com/egdaemon/eg/runtime/wasi/eg"
 	"github.com/egdaemon/eg/runtime/wasi/egenv"
 	"github.com/egdaemon/eg/runtime/wasi/shell"
+	"github.com/egdaemon/eg/runtime/x/wasi/egccache"
 	"github.com/egdaemon/eg/runtime/x/wasi/egfs"
 	"github.com/google/uuid"
 	"gopkg.in/yaml.v3"
@@ -163,6 +164,8 @@ func New(id string, command string, options ...option) *Builder {
 //		defer done()
 //		err := eg.Perform(
 //			ctx,
+//			// not eg.DefaultModule() does not have flatpak installed by default, you'll
+//			// have to provide a container with flatpak installed.
 //			eg.Build(eg.DefaultModule()),
 //			eg.Module(
 //				ctx, eg.DefaultModule().OptionLiteral("--privileged"),
@@ -174,11 +177,10 @@ func New(id string, command string, options ...option) *Builder {
 //	}
 func Build(ctx context.Context, runtime shell.Command, b *Builder) error {
 	var (
-		sysdir  = egenv.CacheDirectory(_eg.DefaultModuleDirectory(), "flatpak-system")
 		userdir = egenv.CacheDirectory(_eg.DefaultModuleDirectory(), "flatpak-user")
 	)
 
-	if err := egfs.MkDirs(0755, sysdir, userdir); err != nil {
+	if err := egfs.MkDirs(0755, userdir); err != nil {
 		return err
 	}
 
@@ -193,15 +195,17 @@ func Build(ctx context.Context, runtime shell.Command, b *Builder) error {
 		return err
 	}
 
-	runtime = runtime.Environ("FLATPAK_SYSTEM_DIR", sysdir).
-		Environ("FLATPAK_USER_DIR", userdir)
+	// enable ccache
+	runtime = runtime.EnvironFrom(
+		errorsx.Must(egccache.Env())...,
+	).Environ("FLATPAK_USER_DIR", userdir)
 
 	return shell.Run(
 		ctx,
 		runtime.New("flatpak --user remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo"),
 		runtime.Newf("flatpak install --user --assumeyes --include-sdk flathub %s//%s", b.Runtime.ID, b.Runtime.Version),
 		runtime.Newf("flatpak install --user --assumeyes flathub %s//%s", b.SDK.ID, b.SDK.Version),
-		runtime.Newf("flatpak-builder --user --install-deps-from=flathub --install --sandbox --force-clean %s %s", dir, manifestpath),
+		runtime.Newf("flatpak-builder --user --install-deps-from=flathub --install --ccache --force-clean %s %s", dir, manifestpath),
 	)
 }
 

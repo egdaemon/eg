@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/egdaemon/eg/internal/errorsx"
+	"github.com/egdaemon/eg/internal/stringsx"
 	"github.com/egdaemon/eg/runtime/wasi/eg"
 	"github.com/egdaemon/eg/runtime/wasi/egunsafe/ffiexec"
 )
@@ -46,7 +47,7 @@ func (t Command) Lenient(d bool) Command {
 	return t
 }
 
-// maximum duration for a command to run.
+// maximum duration for a command to run. default is 5 minutes.
 func (t Command) Timeout(d time.Duration) Command {
 	t.timeout = d
 	return t
@@ -216,4 +217,29 @@ func retry(ctx context.Context, c Command, do func() error) (err error) {
 func run(ctx context.Context, user string, group string, cmd string, directory string, environ []string, exec execer) (err error) {
 	scmd := []string{"-E", "-H", "-u", user, "-g", group, "bash", "-c", cmd}
 	return exec(ctx, directory, environ, "sudo", scmd)
+}
+
+// creates a recorder that allows for generating string representations of commands for tests.
+func NewRecorder(cmd *Command) *Recorder {
+	rec := Recorder{}
+	rec.Hijack(cmd)
+	return &rec
+}
+
+type Recorder struct {
+	command string
+}
+
+func (t *Recorder) Hijack(cmd *Command) error {
+	cmd.exec = t.Record
+	return nil
+}
+
+func (t *Recorder) Record(ctx context.Context, dir string, environ []string, cmd string, args []string) error {
+	t.command = stringsx.Join(":", dir, stringsx.Join(":", environ...), cmd, stringsx.Join(" ", args...))
+	return nil
+}
+
+func (t *Recorder) Result() string {
+	return t.command
 }

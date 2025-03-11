@@ -13,6 +13,12 @@ func SourceOptions() soptions {
 	return soptions(nil)
 }
 
+func (t soptions) Commands(a ...string) soptions {
+	return append(t, func(s *Source) {
+		s.Commands = a
+	})
+}
+
 func (t soptions) Arch(a ...string) soptions {
 	return append(t, func(s *Source) {
 		s.Architectures = a

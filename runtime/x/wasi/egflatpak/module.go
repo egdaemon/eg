@@ -46,6 +46,13 @@ func (t moptions) Cleanup(dirs ...string) moptions {
 	})
 }
 
+// directories to remove once done.
+func (t moptions) PostInstall(cmds ...string) moptions {
+	return append(t, func(m *Module) {
+		m.PostInstall = cmds
+	})
+}
+
 // Not recommended, here for testing: build a module directly from a directory.
 func ModuleCopy(dir string) Module {
 	return NewModule("copy", "simple", ModuleOptions().Commands(

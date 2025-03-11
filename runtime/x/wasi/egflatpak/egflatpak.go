@@ -57,6 +57,7 @@ type Source struct {
 type Module struct {
 	Name          string   `yaml:"name"`
 	BuildSystem   string   `yaml:"buildsystem"`
+	SubDirectory  string   `yaml:"subdir,omitempty"` // build inside the specified sub directory.
 	ConfigOptions []string `yaml:"config-opts"`
 	Cleanup       []string `yaml:"cleanup"`      // files/directories to remove once done.
 	PostInstall   []string `yaml:"post-install"` // commands to execute post installation.

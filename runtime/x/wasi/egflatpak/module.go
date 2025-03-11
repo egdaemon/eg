@@ -18,6 +18,13 @@ func ModuleOptions(options ...moption) moptions {
 	return moptions(options)
 }
 
+// directory to execute build within for the module.
+func (t moptions) SubDirectory(d string) moptions {
+	return append(t, func(m *Module) {
+		m.SubDirectory = d
+	})
+}
+
 // shell commands to execute during the build
 func (t moptions) Commands(cmds ...string) moptions {
 	return append(t, func(m *Module) {

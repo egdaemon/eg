@@ -52,10 +52,12 @@ type Source struct {
 }
 
 type Module struct {
-	Name        string   `yaml:"name"`
-	BuildSystem string   `yaml:"buildsystem"`
-	Commands    []string `yaml:"build-commands"`
-	Sources     []Source `yaml:"sources"`
+	Name          string   `yaml:"name"`
+	BuildSystem   string   `yaml:"buildsystem"`
+	ConfigOptions []string `yaml:"config-opts"`
+	Cleanup       []string `yaml:"cleanup"`
+	Commands      []string `yaml:"build-commands"`
+	Sources       []Source `yaml:"sources"`
 }
 
 type option = func(*Builder)

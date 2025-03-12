@@ -15,6 +15,7 @@ import (
 	"time"
 
 	_eg "github.com/egdaemon/eg"
+	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/langx"
 	"github.com/egdaemon/eg/runtime/wasi/eg"
 	"github.com/egdaemon/eg/runtime/wasi/egenv"
@@ -91,6 +92,18 @@ func DirectoryTree(dir string) eg.OpFn {
 
 func Fail(ctx context.Context, op eg.Op) error {
 	return fmt.Errorf("explicitly failing due to egbug.Fail being invoked")
+}
+
+// Utility operation for debugging failures
+func DebugFailure(op, debug eg.OpFn) eg.OpFn {
+	return func(ctx context.Context, o eg.Op) error {
+		if err := op(ctx, o); err != nil {
+			errorsx.Log(errorsx.Wrap(debug(ctx, o), "debug operation failed"))
+			return err
+		}
+
+		return nil
+	}
 }
 
 // prints current environment variables.

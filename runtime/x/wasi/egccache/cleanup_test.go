@@ -1,6 +1,7 @@
 package egccache_test
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/egdaemon/eg/internal/bytesx"
@@ -18,5 +19,5 @@ func TestCleanup(t *testing.T) {
 	runtime := egccache.Runtime()
 	rec := shell.NewRecorder(&runtime)
 	require.NoError(t, egccache.Cleanup(egccache.CleanupOption().DiskLimit(bytesx.GiB).UnsafeRuntime(runtime)...)(ctx, egtest.Op()))
-	require.Equal(t, rec.Result(), ":CCACHE_DIR=/tmp/.eg/ccache:sudo:-E -H -u egd -g egd bash -c echo ccache -M 1024m")
+	require.Equal(t, rec.Result(), fmt.Sprintf(":CCACHE_DIR=%s:sudo:-E -H -u egd -g egd bash -c echo ccache -M 1024m", egccache.CacheDirectory()))
 }

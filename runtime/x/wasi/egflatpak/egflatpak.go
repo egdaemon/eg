@@ -56,13 +56,13 @@ type Source struct {
 
 type Module struct {
 	Name          string   `yaml:"name"`
-	BuildSystem   string   `yaml:"buildsystem"`
+	BuildSystem   string   `yaml:"buildsystem,omitempty"`
 	SubDirectory  string   `yaml:"subdir,omitempty"` // build inside the specified sub directory.
-	ConfigOptions []string `yaml:"config-opts"`
-	Cleanup       []string `yaml:"cleanup"`      // files/directories to remove once done.
-	PostInstall   []string `yaml:"post-install"` // commands to execute post installation.
-	Commands      []string `yaml:"build-commands"`
-	Sources       []Source `yaml:"sources"`
+	ConfigOptions []string `yaml:"config-opts,omitempty"`
+	Cleanup       []string `yaml:"cleanup,omitempty"`      // files/directories to remove once done.
+	PostInstall   []string `yaml:"post-install,omitempty"` // commands to execute post installation.
+	Commands      []string `yaml:"build-commands,omitempty"`
+	Sources       []Source `yaml:"sources,omitempty"`
 }
 
 type option = func(*Builder)

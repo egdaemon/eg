@@ -10,15 +10,17 @@ import (
 	"google.golang.org/grpc"
 )
 
-func NewExecProxy(root string) *ExecProxy {
+func NewExecProxy(root string, environ []string) *ExecProxy {
 	return &ExecProxy{
-		dir: root,
+		dir:     root,
+		environ: environ,
 	}
 }
 
 type ExecProxy struct {
 	UnimplementedProxyServer
-	dir string
+	dir     string
+	environ []string
 }
 
 func (t *ExecProxy) Bind(host grpc.ServiceRegistrar) {
@@ -31,12 +33,12 @@ func (t *ExecProxy) Exec(ctx context.Context, req *ExecRequest) (resp *ExecRespo
 		cmd *exec.Cmd = exec.CommandContext(ctx, req.Cmd, req.Arguments...)
 	)
 
-	cmd.Dir = t.dir
-	if !filepath.IsAbs(req.Dir) {
-		cmd.Dir = filepath.Join(t.dir, req.Dir)
+	cmd.Dir = req.Dir
+	if !filepath.IsAbs(cmd.Dir) {
+		cmd.Dir = filepath.Join(t.dir, cmd.Dir)
 	}
 
-	cmd.Env = append(req.Environment, cmd.Env...)
+	cmd.Env = append(t.environ, req.Environment...)
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr

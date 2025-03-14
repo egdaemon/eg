@@ -201,7 +201,7 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 		defer srv.GracefulStop()
 
 		events.NewServiceDispatch(db).Bind(srv)
-		execproxy.NewExecProxy(t.Dir).Bind(srv)
+		execproxy.NewExecProxy(t.Dir, cmdenv).Bind(srv)
 
 		ragent := runners.NewRunner(
 			gctx.Context,
@@ -266,11 +266,6 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 		)
 		defer srv.GracefulStop()
 
-		execproxy.NewExecProxy(t.Dir).Bind(srv)
-		go func() {
-			errorsx.Log(errorsx.Wrap(srv.Serve(control), "unable to serve control socket"))
-		}()
-
 		cmdenvb = cmdenvb.Var(
 			eg.EnvComputeModuleSocket, eg.DefaultMountRoot(eg.RuntimeDirectory, filepath.Base(mspath)),
 		).FromEnviron(
@@ -280,6 +275,11 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 		if cmdenv, err = cmdenvb.Environ(); err != nil {
 			return err
 		}
+
+		execproxy.NewExecProxy(t.Dir, cmdenv).Bind(srv)
+		go func() {
+			errorsx.Log(errorsx.Wrap(srv.Serve(control), "unable to serve control socket"))
+		}()
 	}
 
 	// IMPORTANT: duckdb does not play well with bindfs mounting the folders before

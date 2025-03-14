@@ -240,6 +240,12 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 			control net.Listener
 		)
 
+		mspath := filepath.Join(t.RuntimeDir, eg.SocketModule())
+		if control, err = net.Listen("unix", mspath); err != nil {
+			return errorsx.Wrapf(err, "unable to create %s", mspath)
+		}
+		defer control.Close()
+
 		debugx.Printf("---------------------------- MODULE INITIATED %d ----------------------------\n", mlevel)
 		// env.Debug(os.Environ()...)
 		debugx.Println("module pid", os.Getpid())
@@ -249,18 +255,8 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 		debugx.Println("number of cores", runtime.GOMAXPROCS(-1))
 		debugx.Println("logging level", gctx.Verbosity)
 		debugx.Println("module pid", os.Getpid())
+		debugx.Println("mspath", mspath)
 		defer debugx.Printf("---------------------------- MODULE COMPLETED %d ----------------------------\n", mlevel)
-
-		moddir, err := os.MkdirTemp(t.RuntimeDir, "egmod.*")
-		if err != nil {
-			return err
-		}
-
-		cspath := filepath.Join(moddir, eg.SocketControl)
-		if control, err = net.Listen("unix", cspath); err != nil {
-			return errorsx.Wrapf(err, "unable to create %s", cspath)
-		}
-		defer control.Close()
 
 		srv := grpc.NewServer(
 			grpc.Creds(insecure.NewCredentials()), // this is a local socket
@@ -276,7 +272,7 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 		}()
 
 		cmdenvb = cmdenvb.Var(
-			eg.EnvComputeModuleSocket, eg.DefaultMountRoot(eg.RuntimeDirectory, filepath.Base(moddir), filepath.Base(cspath)),
+			eg.EnvComputeModuleSocket, eg.DefaultMountRoot(eg.RuntimeDirectory, filepath.Base(mspath)),
 		).FromEnviron(
 			os.Environ()...,
 		)

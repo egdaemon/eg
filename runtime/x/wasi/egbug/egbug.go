@@ -135,7 +135,7 @@ func EnsureEnv(ctx context.Context, op eg.Op) error {
 	// expected hash with normalized values.
 	// if this needs to change it means we might be breaking
 	// existing builds.
-	const expected = "1e10f3e57339d5194391a968066609d0"
+	const expected = "166edecb15fd621ae2bc9d11f122f2ed"
 	// zero out some dynamic environment variables for consistent results
 	os.Setenv(_eg.EnvComputeAccountID, uuid.Nil.String())
 	os.Setenv(_eg.EnvComputeRunID, uuid.Nil.String())
@@ -143,6 +143,11 @@ func EnsureEnv(ctx context.Context, op eg.Op) error {
 	os.Setenv(_eg.EnvGitHeadCommit, "0000000000000000000000000000000000000000")
 	os.Setenv(_eg.EnvGitBaseCommit, "0000000000000000000000000000000000000000")
 	os.Setenv(_eg.EnvUnsafeCacheID, uuid.Nil.String())
+	// always ignore compute bin. its development tooling.
+	os.Unsetenv(_eg.EnvComputeBin)
+	os.Unsetenv("DEBIAN_FRONTEND")
+	// we plan to make this value static in the future. so ignore it for now.
+	os.Unsetenv(_eg.EnvComputeModuleSocket)
 
 	environ := os.Environ()
 	sort.Strings(environ)

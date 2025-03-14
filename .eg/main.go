@@ -35,6 +35,7 @@ func main() {
 					),
 				),
 			),
+			// egbug.EnsureEnv,
 			eggolang.AutoTest(
 				eggolang.TestOption.BuildOptions(
 					eggolang.Build(

@@ -35,7 +35,7 @@ func init() {
 		egdebuild.Option.ChangeLogDate(c.Committer.When),
 		egdebuild.Option.Version("0.0.:autopatch:"),
 		egdebuild.Option.Debian(errorsx.Must(fs.Sub(debskel, ".debskel"))),
-		egdebuild.Option.DependsBuild("rsync", "curl", "tree", "software-properties-common", "build-essential", "ca-certificates"),
+		egdebuild.Option.DependsBuild("rsync", "curl", "tree", "software-properties-common", "ca-certificates"),
 		egdebuild.Option.Depends("software-properties-common"),
 	)
 }

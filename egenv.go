@@ -2,14 +2,17 @@ package eg
 
 import (
 	"embed"
+	"fmt"
 	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
 
+	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/slicesx"
 	"github.com/egdaemon/eg/internal/stringsx"
 	"github.com/egdaemon/eg/internal/tracex"
+	"github.com/gofrs/uuid"
 )
 
 var (
@@ -108,6 +111,11 @@ const (
 	SocketControl    = "control.socket"
 )
 
+// generate unique module socket
+func SocketModule() string {
+	return fmt.Sprintf("module.%s.socket", errorsx.Must(uuid.NewV7()).String())
+}
+
 func DefaultModuleDirectory() string {
 	return ".eg"
 }
@@ -133,6 +141,11 @@ func DefaultWorkloadRoot(rel ...string) string {
 func DefaultMountRoot(rel ...string) string {
 	return filepath.Join("/", "eg.mnt", filepath.Join(rel...))
 }
+
+// // isolated module directory, each module will have a private directory.
+// func DefaultMountModule(rel ...string) string {
+// 	return filepath.Join("/", "eg.mod", filepath.Join(rel...))
+// }
 
 //go:embed DefaultContainerfile
 var Embedded embed.FS

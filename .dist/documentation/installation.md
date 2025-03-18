@@ -7,7 +7,7 @@ index: 0
 
 ## Installation
 
-This document assumes you understand your local package manager/host environment and have duckdb, git, podman, gpgme, and golang toolchain 1.23 (or later) installed.
+This document assumes you understand your local package manager/host environment and have duckdb, git, podman, gpgme, btrfs-progs and golang toolchain 1.23 (or later) installed.
 
 ### ubuntu
 

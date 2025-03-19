@@ -1719,8 +1719,6 @@ gonum.org/v1/gonum/mathext
 gonum.org/v1/gonum/mathext/internal/amos
 gonum.org/v1/gonum/mathext/internal/cephes
 gonum.org/v1/gonum/mathext/internal/gonum
-# google.golang.org/api v0.226.0
-## explicit; go 1.23.0
 # google.golang.org/genproto/googleapis/rpc v0.0.0-20250313205543-e70fdf4c4cb4
 ## explicit; go 1.23.0
 google.golang.org/genproto/googleapis/rpc/status

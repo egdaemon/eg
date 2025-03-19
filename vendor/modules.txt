@@ -465,7 +465,7 @@ github.com/ebitengine/purego
 github.com/ebitengine/purego/internal/cgo
 github.com/ebitengine/purego/internal/fakecgo
 github.com/ebitengine/purego/internal/strings
-# github.com/egdaemon/eg v0.0.0-20250314130453-c01e096256c0
+# github.com/egdaemon/eg v0.0.0-20250319125346-cc80006ad67a
 ## explicit; go 1.23.4
 # github.com/egdaemon/wasinet/wasinet v0.0.0-20250205011224-d5f0e1da96d7
 ## explicit; go 1.23.4
@@ -1503,8 +1503,8 @@ go.opencensus.io/trace/tracestate
 ## explicit; go 1.22.0
 go.opentelemetry.io/auto/sdk
 go.opentelemetry.io/auto/sdk/internal/telemetry
-# go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.56.0
-## explicit; go 1.22
+# go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.59.0
+## explicit; go 1.22.0
 go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp
 go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp/internal/request
 go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp/internal/semconv
@@ -1680,8 +1680,6 @@ golang.org/x/text/unicode/norm
 # golang.org/x/time v0.11.0
 ## explicit; go 1.23.0
 golang.org/x/time/rate
-# golang.org/x/tools v0.29.0
-## explicit; go 1.23.0
 # golang.org/x/tools v0.31.0
 ## explicit; go 1.23.0
 golang.org/x/tools/cmd/goimports
@@ -1721,13 +1719,11 @@ gonum.org/v1/gonum/mathext
 gonum.org/v1/gonum/mathext/internal/amos
 gonum.org/v1/gonum/mathext/internal/cephes
 gonum.org/v1/gonum/mathext/internal/gonum
-# google.golang.org/genproto/googleapis/rpc v0.0.0-20250122153221-138b5a5a4fd4
+# google.golang.org/api v0.226.0
 ## explicit; go 1.23.0
 # google.golang.org/genproto/googleapis/rpc v0.0.0-20250313205543-e70fdf4c4cb4
 ## explicit; go 1.23.0
 google.golang.org/genproto/googleapis/rpc/status
-# google.golang.org/grpc v1.69.4
-## explicit; go 1.22.0
 # google.golang.org/grpc v1.71.0
 ## explicit; go 1.22.0
 google.golang.org/grpc
@@ -1790,8 +1786,6 @@ google.golang.org/grpc/serviceconfig
 google.golang.org/grpc/stats
 google.golang.org/grpc/status
 google.golang.org/grpc/tap
-# google.golang.org/protobuf v1.36.3
-## explicit; go 1.21
 # google.golang.org/protobuf v1.36.5
 ## explicit; go 1.21
 google.golang.org/protobuf/cmd/protoc-gen-go

@@ -49,6 +49,9 @@ require (
 
 exclude (
 	github.com/google/pprof v0.0.0-20181206194817-3ea8567a2e57
+	google.golang.org/api v0.0.0-20180910000450-7ca32eb868bf
+	google.golang.org/api v0.0.0-20181030000543-1d582fd0359e
+	google.golang.org/api v0.1.0
 	google.golang.org/genproto v0.0.0-20180817151627-c66870c02cf8
 	google.golang.org/genproto v0.0.0-20180831171423-11092d34479b
 	google.golang.org/genproto v0.0.0-20181029155118-b69ba1387ce2
@@ -57,11 +60,22 @@ exclude (
 	google.golang.org/genproto v0.0.0-20190425155659-357c62f0e4bb
 	google.golang.org/genproto v0.0.0-20190819201941-24fa4b261c55
 	google.golang.org/genproto v0.0.0-20200526211855-cb27e3aa2013
+	google.golang.org/genproto v0.0.0-20230410155749-daa745c078e1
+	google.golang.org/genproto v0.0.0-20240123012728-ef4313101c80
+	google.golang.org/genproto v0.0.0-20240823204242-4ba0660f739c
 	google.golang.org/genproto v0.0.0-20241118233622-e639e219e697
+	google.golang.org/grpc v1.14.0
+	google.golang.org/grpc v1.16.0
+	google.golang.org/grpc v1.19.0
+	google.golang.org/grpc v1.23.0
+	google.golang.org/grpc v1.25.1
+	google.golang.org/grpc v1.33.2
+	google.golang.org/protobuf v0.0.0-20200109180630-ec00e32a8dfd
+	google.golang.org/protobuf v0.0.0-20200221191635-4d8936d0db64
+	google.golang.org/protobuf v0.0.0-20200228230310-ab0ca4ff8a60
 )
 
 require (
-	google.golang.org/api v0.226.0 // indirect
 	dario.cat/mergo v1.0.1 // indirect
 	github.com/Azure/go-ansiterm v0.0.0-20250102033503-faa5f7b0171c // indirect
 	github.com/BurntSushi/toml v1.4.0 // indirect

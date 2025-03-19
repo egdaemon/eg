@@ -57,6 +57,7 @@ exclude (
 	google.golang.org/genproto v0.0.0-20181029155118-b69ba1387ce2
 	google.golang.org/genproto v0.0.0-20181202183823-bd91e49a0898
 	google.golang.org/genproto v0.0.0-20190306203927-b5d61aea6440
+	google.golang.org/genproto v0.0.0-20190307195333-5fe7a883aa19
 	google.golang.org/genproto v0.0.0-20190425155659-357c62f0e4bb
 	google.golang.org/genproto v0.0.0-20190819201941-24fa4b261c55
 	google.golang.org/genproto v0.0.0-20200526211855-cb27e3aa2013

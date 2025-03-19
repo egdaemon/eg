@@ -465,7 +465,7 @@ github.com/ebitengine/purego
 github.com/ebitengine/purego/internal/cgo
 github.com/ebitengine/purego/internal/fakecgo
 github.com/ebitengine/purego/internal/strings
-# github.com/egdaemon/eg v0.0.0-20250319125346-cc80006ad67a
+# github.com/egdaemon/eg v0.0.0-20250319131017-60d7fbe5a8da
 ## explicit; go 1.23.4
 # github.com/egdaemon/wasinet/wasinet v0.0.0-20250205011224-d5f0e1da96d7
 ## explicit; go 1.23.4

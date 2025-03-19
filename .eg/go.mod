@@ -3,7 +3,7 @@ module eg/compute
 go 1.23.4
 
 require (
-	github.com/egdaemon/eg v0.0.0-20250319131017-60d7fbe5a8da
+	github.com/egdaemon/eg v0.0.0-20250319134050-77df2b2139ac
 	github.com/egdaemon/wasinet/wasinet v0.0.0-20250205011224-d5f0e1da96d7
 )
 

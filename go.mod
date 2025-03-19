@@ -47,6 +47,11 @@ require (
 	google.golang.org/protobuf v1.36.5
 )
 
+exclude (
+	github.com/google/pprof v0.0.0-20181206194817-3ea8567a2e57
+	google.golang.org/genproto v0.0.0-20190425155659-357c62f0e4bb
+)
+
 require (
 	github.com/creack/pty v1.1.24 // indirect
 	github.com/hashicorp/golang-lru v1.0.2 // indirect
@@ -62,9 +67,6 @@ require (
 	github.com/whyrusleeping/go-keyspace v0.0.0-20160322163242-5b898ac5add1 // indirect
 	go.opentelemetry.io/auto/sdk v1.1.0 // indirect
 	gonum.org/v1/gonum v0.15.1 // indirect
-)
-
-require (
 	dario.cat/mergo v1.0.1 // indirect
 	github.com/Azure/go-ansiterm v0.0.0-20250102033503-faa5f7b0171c // indirect
 	github.com/BurntSushi/toml v1.4.0 // indirect
@@ -139,7 +141,7 @@ require (
 	github.com/google/go-containerregistry v0.20.2 // indirect
 	github.com/google/go-intervals v0.0.2 // indirect
 	github.com/google/gopacket v1.1.19 // indirect
-	github.com/google/pprof v0.0.0-20241210010833-40e02aabc2ad // indirect
+	github.com/google/pprof v0.0.0-20250317173921-a4b03ec1a45e // indirect
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/schema v1.4.1 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect

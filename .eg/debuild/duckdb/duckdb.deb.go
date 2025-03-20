@@ -53,8 +53,6 @@ func Prepare(ctx context.Context, o eg.Op) error {
 			sruntime.Newf("test -d duckdb || git clone -b v%s --depth 1 https://github.com/duckdb/duckdb.git duckdb", version),
 			sruntime.New("md5sum duckdb/src/include/duckdb.h"),
 			sruntime.New("echo \"3311085c31f77f843c2d2dd045a8bbe6  duckdb/src/include/duckdb.h\" > duckdb.md5"),
-			sruntime.New("test -d duckdb/build/release/_deps/fts_extension_fc-src || git clone --depth 1 https://github.com/duckdb/duckdb-fts.git duckdb/build/release/_deps/fts_extension_fc-src"),
-			sruntime.Newf("git -C duckdb/build/release/_deps/fts_extension_fc-src checkout %s", "3aa6a18"),
 			sruntime.New("md5sum -c duckdb.md5"),
 		),
 		egdebuild.Prepare(Runner(), errorsx.Must(fs.Sub(debskel, ".debskel"))),

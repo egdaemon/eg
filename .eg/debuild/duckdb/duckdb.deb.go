@@ -39,7 +39,7 @@ func init() {
 		egdebuild.Option.ChangeLogDate(c.Committer.When),
 		egdebuild.Option.Version(fmt.Sprintf("%s.:autopatch:", version)),
 		egdebuild.Option.Debian(errorsx.Must(fs.Sub(debskel, ".debskel"))),
-		egdebuild.Option.DependsBuild("rsync", "curl", "tree", "ca-certificates", "cmake", "ninja-build", "libssl-dev"),
+		egdebuild.Option.DependsBuild("rsync", "curl", "tree", "ca-certificates", "cmake", "ninja-build", "libssl-dev", "git"),
 		egdebuild.Option.Environ("PACKAGE_VERSION", version),
 		// egdebuild.Option.Environ("CCACHE_DIR", filepath.Join("src", "build", "ccache")),
 		egdebuild.Option.Environ("GIT_COMMIT_HASH", c.Hash.String()),

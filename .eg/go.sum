@@ -1,7 +1,7 @@
 github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc h1:U9qPSI2PIWSS1VwoXQT9A3Wy9MM3WgvqSxFWenqJduM=
 github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
-github.com/egdaemon/eg v0.0.0-20250319135153-1d3773679913 h1:I7F83+g+DkDr7eDVWXGgLUppl4zvVh1hq3T2QzRDRBk=
-github.com/egdaemon/eg v0.0.0-20250319135153-1d3773679913/go.mod h1:1eJ7CQXn9t4Re0YWJLYKwwOShemDJWrUhxGJtJjYvP8=
+github.com/egdaemon/eg v0.0.0-20250319140032-3eba9f9ef637 h1:1jzysXYMWAJ6ACqDRzT01cBmvabHXjBwVHQNNZtSJE4=
+github.com/egdaemon/eg v0.0.0-20250319140032-3eba9f9ef637/go.mod h1:1eJ7CQXn9t4Re0YWJLYKwwOShemDJWrUhxGJtJjYvP8=
 github.com/egdaemon/wasinet/wasinet v0.0.0-20250205011224-d5f0e1da96d7 h1:tmVfnQM80Qxn3DgwcRqoq0r54rpL6VhOyGfvcT/B0FU=
 github.com/egdaemon/wasinet/wasinet v0.0.0-20250205011224-d5f0e1da96d7/go.mod h1:vPVQ3HHYTa9Fe7lz+ZBqI49kw76LSTQfvKZlO8QpWsY=
 github.com/go-logr/logr v1.4.2 h1:6pFjapn8bFcIbiKo3XT4j/BhANplGihG6tvd+8rYgrY=

@@ -114,7 +114,7 @@ func (option) Depends(deps ...string) option {
 
 func (option) Description(short, long string) option {
 	return func(c *Config) {
-		c.Description = fmt.Sprintf("%s\n%s", short, long)
+		c.Description = fmt.Sprintf("%s\n %s", short, long)
 	}
 }
 
@@ -150,7 +150,7 @@ func New(pkg string, distro string, src string, opts ...option) (c Config) {
 		Distro:       distro,
 		SourceDir:    src,
 		Architecture: "any",
-		Description:  "package built by egdebuild\nA package should provide its own description",
+		Description:  "package built by egdebuild\n A package should provide its own description",
 		buildCommand: func(cfg *Config, runtime shell.Command) shell.Command {
 			return runtime.Newf("debuild -S -k%s", cfg.SignatureKeyID).Privileged()
 		},

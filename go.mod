@@ -1,6 +1,8 @@
 module github.com/egdaemon/eg
 
-go 1.23.4
+go 1.24
+
+toolchain go1.24.1
 
 require (
 	github.com/KimMachineGun/automemlimit v0.7.1
@@ -26,7 +28,7 @@ require (
 	github.com/libp2p/go-libp2p-kad-dht v0.28.2
 	github.com/logrusorgru/aurora v2.0.3+incompatible
 	github.com/mailru/easyjson v0.9.0
-	github.com/marcboeker/go-duckdb v1.8.3
+	github.com/marcboeker/go-duckdb/v2 v2.0.2
 	github.com/mattn/go-isatty v0.0.20
 	github.com/onsi/ginkgo/v2 v2.23.0
 	github.com/onsi/gomega v1.36.2
@@ -45,6 +47,18 @@ require (
 	golang.org/x/tools v0.31.0
 	google.golang.org/grpc v1.71.0
 	google.golang.org/protobuf v1.36.5
+)
+
+require (
+	github.com/duckdb/duckdb-go-bindings v0.1.12 // indirect
+	github.com/duckdb/duckdb-go-bindings/darwin-amd64 v0.1.7 // indirect
+	github.com/duckdb/duckdb-go-bindings/darwin-arm64 v0.1.7 // indirect
+	github.com/duckdb/duckdb-go-bindings/linux-amd64 v0.1.7 // indirect
+	github.com/duckdb/duckdb-go-bindings/linux-arm64 v0.1.7 // indirect
+	github.com/duckdb/duckdb-go-bindings/windows-amd64 v0.1.7 // indirect
+	github.com/go-viper/mapstructure/v2 v2.2.1 // indirect
+	github.com/marcboeker/go-duckdb/arrowmapping v0.0.4 // indirect
+	github.com/marcboeker/go-duckdb/mapping v0.0.4 // indirect
 )
 
 exclude (
@@ -85,7 +99,7 @@ require (
 	github.com/ProtonMail/go-crypto v1.1.5 // indirect
 	github.com/VividCortex/ewma v1.2.0 // indirect
 	github.com/acarl005/stripansi v0.0.0-20180116102854-5a71ef0e047d // indirect
-	github.com/apache/arrow-go/v18 v18.0.0 // indirect
+	github.com/apache/arrow-go/v18 v18.1.0 // indirect
 	github.com/asaskevich/govalidator v0.0.0-20230301143203-a9d515a09cc2 // indirect
 	github.com/benbjohnson/clock v1.3.5 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
@@ -142,12 +156,12 @@ require (
 	github.com/go-openapi/swag v0.23.0 // indirect
 	github.com/go-openapi/validate v0.24.0 // indirect
 	github.com/go-task/slim-sprig/v3 v3.0.0 // indirect
-	github.com/goccy/go-json v0.10.3 // indirect
+	github.com/goccy/go-json v0.10.5 // indirect
 	github.com/godbus/dbus/v5 v5.1.1-0.20241109141217-c266b19b28e9 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang/groupcache v0.0.0-20241129210726-2c02b8208cf8 // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
-	github.com/google/flatbuffers v24.3.25+incompatible // indirect
+	github.com/google/flatbuffers v25.1.24+incompatible // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
 	github.com/google/go-containerregistry v0.20.2 // indirect
 	github.com/google/go-intervals v0.0.2 // indirect
@@ -232,7 +246,7 @@ require (
 	github.com/opencontainers/runtime-tools v0.9.1-0.20241108202711-f7e3563b0271 // indirect
 	github.com/opencontainers/selinux v1.11.1 // indirect
 	github.com/ostreedev/ostree-go v0.0.0-20210805093236-719684c64e4f // indirect
-	github.com/pierrec/lz4/v4 v4.1.21 // indirect
+	github.com/pierrec/lz4/v4 v4.1.22 // indirect
 	github.com/pion/datachannel v1.5.10 // indirect
 	github.com/pion/dtls/v2 v2.2.12 // indirect
 	github.com/pion/ice/v2 v2.3.37 // indirect

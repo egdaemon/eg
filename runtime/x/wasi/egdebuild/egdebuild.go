@@ -127,7 +127,7 @@ func (option) BuildCommand(d func(c1 *Config, c2 shell.Command) shell.Command) o
 func (option) BuildBinary(d time.Duration) option {
 	return func(c *Config) {
 		c.buildCommand = func(cfg *Config, runtime shell.Command) shell.Command {
-			return runtime.Newf("debuild -b").Timeout(d)
+			return runtime.Newf("debuild -b -k%s", cfg.SignatureKeyID).Timeout(d)
 		}
 	}
 }

@@ -48,6 +48,12 @@ func (boption) Tags(tags ...string) boption {
 	}
 }
 
+func (boption) WorkingDirectory(s string) boption {
+	return func(o *buildOption) {
+		o.bctx.Dir = s
+	}
+}
+
 func Build(opts ...boption) (b buildOption) {
 	return langx.Clone(b, opts...)
 }
@@ -110,7 +116,7 @@ func AutoInstall(options ...toption) eg.OpFn {
 
 		runtime := shell.Runtime().EnvironFrom(goenv...)
 
-		for gomod := range modfilex.FindModules(egenv.WorkingDirectory()) {
+		for gomod := range modfilex.FindModules(stringsx.DefaultIfBlank(opts.bctx.Dir, egenv.WorkingDirectory())) {
 			cmd := stringsx.Join(" ", "go", "install", flags, fmt.Sprintf("%s/...", filepath.Dir(gomod)))
 			if err := shell.Run(ctx, runtime.New(cmd)); err != nil {
 				return errorsx.Wrap(err, "unable to run tests")
@@ -154,7 +160,7 @@ func AutoCompile(options ...coption) eg.OpFn {
 
 		runtime := shell.Runtime().EnvironFrom(goenv...).EnvironFrom(opts.buildOption.environ...)
 
-		for gomod := range modfilex.FindModules(egenv.WorkingDirectory()) {
+		for gomod := range modfilex.FindModules(stringsx.DefaultIfBlank(opts.bctx.Dir, egenv.WorkingDirectory())) {
 			cmd := stringsx.Join(" ", "go", "-C", filepath.Dir(gomod), "build", flags, "./...")
 			if err := shell.Run(ctx, runtime.New(cmd)); err != nil {
 				return errorsx.Wrap(err, "unable to compile")

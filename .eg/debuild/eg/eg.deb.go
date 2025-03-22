@@ -62,10 +62,14 @@ func Runner() eg.ContainerRunner {
 }
 
 func Build(ctx context.Context, o eg.Op) error {
-	return eg.Parallel(
-		egdebuild.Build(gcfg, egdebuild.Option.Distro("jammy")),
-		egdebuild.Build(gcfg, egdebuild.Option.Distro("noble")),
-		egdebuild.Build(gcfg, egdebuild.Option.Distro("oracular")),
+	return eg.Sequential(
+		// egdebuild.Build(gcfg, egdebuild.Option.Distro("oracular"), egdebuild.Option.BuildBinary(10*time.Minute)),
+		// shell.Op(shell.New("false")),
+		eg.Parallel(
+			egdebuild.Build(gcfg, egdebuild.Option.Distro("jammy")),
+			egdebuild.Build(gcfg, egdebuild.Option.Distro("noble")),
+			egdebuild.Build(gcfg, egdebuild.Option.Distro("oracular")),
+		),
 	)(ctx, o)
 }
 

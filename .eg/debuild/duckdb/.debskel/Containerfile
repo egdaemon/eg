@@ -14,5 +14,3 @@ RUN ln -s /usr/lib/go-1.23/bin/go /usr/local/bin/go
 
 RUN systemd-sysusers
 RUN systemd-tmpfiles --create
-
-RUN printf '%%wheel ALL=(ALL:ALL) NOPASSWD: ALL\n' | tee -a /etc/sudoers.d/egd

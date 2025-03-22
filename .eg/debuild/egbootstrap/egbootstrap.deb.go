@@ -37,6 +37,7 @@ func init() {
 		egdebuild.Option.Debian(errorsx.Must(fs.Sub(debskel, ".debskel"))),
 		egdebuild.Option.DependsBuild("rsync", "curl", "tree", "software-properties-common", "ca-certificates"),
 		egdebuild.Option.Depends("software-properties-common"),
+		egdebuild.Option.Description("configures the machine for running as a eg module", "performs various changes to the system for running as an eg module. makes egd a privileged user and adds scripts for setting up apt repositories"),
 	)
 }
 

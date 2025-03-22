@@ -19,9 +19,10 @@ override_dh_auto_build:
 	echo "DH AUTO BUILD OVERRIDE"
 	echo "$(CURDIR)"
 	mkdir -p $(CURDIR)/linux/usr/bin
+	cp -R $(CURDIR)/src/.dist/linux/* $(CURDIR)/linux
 	# need to set gocache otherwise it'll error out on launchpad builders
-	GOBIN="$(CURDIR)/linux/usr/bin" GOCACHE="$(CURDIR)/.gocache" GOMODCACHE="$(CURDIR)/.gomod" /usr/lib/go-1.23/bin/go env
-	GOPROXY="direct" GOCACHE="$(CURDIR)/.gocache" GOMODCACHE="$(CURDIR)/.gomod" GOBIN="$(CURDIR)/linux/usr/bin" /usr/lib/go-1.23/bin/go build -C src -mod=vendor -ldflags="-X 'github.com/egdaemon/eg/cmd/cmdopts.Treeish=${VCS_REVISION}'" -tags "no_duckdb_arrow" -buildvcs=false -o "$(CURDIR)/linux/usr/bin" ./cmd/...
+	GOPROXY="direct" GOCACHE="$(CURDIR)/.gocache" GOMODCACHE="$(CURDIR)/.gomod" GOBIN="$(CURDIR)/linux/usr/bin" /usr/lib/go-1.23/bin/go build -C src -mod=vendor -ldflags="-X 'github.com/egdaemon/eg/cmd/cmdopts.Treeish=${VCS_REVISION}'" -tags "no_duckdb_arrow" -buildmode=pie -buildvcs=false -o "$(CURDIR)/linux/usr/bin" ./cmd/...
+	tree $(CURDIR)/linux
 
 override_dh_auto_test:
 	echo "DH AUTO TEST OVERRIDE"

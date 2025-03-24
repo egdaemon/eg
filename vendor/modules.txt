@@ -82,7 +82,7 @@ github.com/acarl005/stripansi
 # github.com/alecthomas/kong v1.9.0
 ## explicit; go 1.20
 github.com/alecthomas/kong
-# github.com/alitto/pond/v2 v2.2.0
+# github.com/alitto/pond/v2 v2.3.0
 ## explicit; go 1.20
 github.com/alitto/pond/v2
 github.com/alitto/pond/v2/internal/future
@@ -669,7 +669,7 @@ github.com/gofrs/uuid
 github.com/gogo/protobuf/gogoproto
 github.com/gogo/protobuf/proto
 github.com/gogo/protobuf/protoc-gen-gogo/descriptor
-# github.com/golang-jwt/jwt/v4 v4.5.1
+# github.com/golang-jwt/jwt/v4 v4.5.2
 ## explicit; go 1.16
 github.com/golang-jwt/jwt/v4
 # github.com/golang/groupcache v0.0.0-20241129210726-2c02b8208cf8
@@ -971,10 +971,10 @@ github.com/mailru/easyjson/jwriter
 github.com/manifoldco/promptui
 github.com/manifoldco/promptui/list
 github.com/manifoldco/promptui/screenbuf
-# github.com/marcboeker/go-duckdb/arrowmapping v0.0.4
+# github.com/marcboeker/go-duckdb/arrowmapping v0.0.5
 ## explicit; go 1.24
 github.com/marcboeker/go-duckdb/arrowmapping
-# github.com/marcboeker/go-duckdb/mapping v0.0.4
+# github.com/marcboeker/go-duckdb/mapping v0.0.5
 ## explicit; go 1.24
 github.com/marcboeker/go-duckdb/mapping
 # github.com/marcboeker/go-duckdb/v2 v2.0.2
@@ -1096,7 +1096,7 @@ github.com/nxadm/tail/winfile
 # github.com/oklog/ulid v1.3.1
 ## explicit
 github.com/oklog/ulid
-# github.com/onsi/ginkgo/v2 v2.23.0
+# github.com/onsi/ginkgo/v2 v2.23.3
 ## explicit; go 1.23.0
 github.com/onsi/ginkgo/v2
 github.com/onsi/ginkgo/v2/config
@@ -1118,8 +1118,8 @@ github.com/onsi/ginkgo/v2/internal/parallel_support
 github.com/onsi/ginkgo/v2/internal/testingtproxy
 github.com/onsi/ginkgo/v2/reporters
 github.com/onsi/ginkgo/v2/types
-# github.com/onsi/gomega v1.36.2
-## explicit; go 1.22.0
+# github.com/onsi/gomega v1.36.3
+## explicit; go 1.23.0
 github.com/onsi/gomega
 github.com/onsi/gomega/format
 github.com/onsi/gomega/internal

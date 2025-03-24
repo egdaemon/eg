@@ -28,21 +28,8 @@ func main() {
 		eg.Module(
 			ctx,
 			deb,
-			eggolang.AutoCompile(
-				eggolang.CompileOption.BuildOptions(
-					eggolang.Build(
-						eggolang.BuildOption.Tags("no_duckdb_arrow"),
-					),
-				),
-			),
-			// egbug.EnsureEnv,
-			eggolang.AutoTest(
-				eggolang.TestOption.BuildOptions(
-					eggolang.Build(
-						eggolang.BuildOption.Tags("no_duckdb_arrow"),
-					),
-				),
-			),
+			eggolang.AutoCompile(),
+			eggolang.AutoTest(),
 			eggolang.RecordCoverage,
 		),
 	)

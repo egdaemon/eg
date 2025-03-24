@@ -82,13 +82,13 @@ github.com/acarl005/stripansi
 # github.com/alecthomas/kong v1.9.0
 ## explicit; go 1.20
 github.com/alecthomas/kong
-# github.com/alitto/pond/v2 v2.2.0
+# github.com/alitto/pond/v2 v2.3.0
 ## explicit; go 1.20
 github.com/alitto/pond/v2
 github.com/alitto/pond/v2/internal/future
 github.com/alitto/pond/v2/internal/linkedbuffer
-# github.com/apache/arrow-go/v18 v18.0.0
-## explicit; go 1.22.0
+# github.com/apache/arrow-go/v18 v18.1.0
+## explicit; go 1.22.7
 github.com/apache/arrow-go/v18/arrow
 github.com/apache/arrow-go/v18/arrow/array
 github.com/apache/arrow-go/v18/arrow/arrio
@@ -456,6 +456,24 @@ github.com/docker/go-units
 # github.com/dominikbraun/graph v0.23.0
 ## explicit; go 1.18
 github.com/dominikbraun/graph
+# github.com/duckdb/duckdb-go-bindings v0.1.12
+## explicit; go 1.24
+github.com/duckdb/duckdb-go-bindings
+# github.com/duckdb/duckdb-go-bindings/darwin-amd64 v0.1.7
+## explicit; go 1.24
+github.com/duckdb/duckdb-go-bindings/darwin-amd64
+# github.com/duckdb/duckdb-go-bindings/darwin-arm64 v0.1.7
+## explicit; go 1.24
+github.com/duckdb/duckdb-go-bindings/darwin-arm64
+# github.com/duckdb/duckdb-go-bindings/linux-amd64 v0.1.7
+## explicit; go 1.24
+github.com/duckdb/duckdb-go-bindings/linux-amd64
+# github.com/duckdb/duckdb-go-bindings/linux-arm64 v0.1.7
+## explicit; go 1.24
+github.com/duckdb/duckdb-go-bindings/linux-arm64
+# github.com/duckdb/duckdb-go-bindings/windows-amd64 v0.1.7
+## explicit; go 1.24
+github.com/duckdb/duckdb-go-bindings/windows-amd64
 # github.com/dustin/go-humanize v1.0.1
 ## explicit; go 1.16
 github.com/dustin/go-humanize
@@ -466,7 +484,7 @@ github.com/ebitengine/purego/internal/cgo
 github.com/ebitengine/purego/internal/fakecgo
 github.com/ebitengine/purego/internal/strings
 # github.com/egdaemon/eg v0.0.0-20250319140032-3eba9f9ef637
-## explicit; go 1.23.4
+## explicit; go 1.24
 # github.com/egdaemon/wasinet/wasinet v0.0.0-20250205011224-d5f0e1da96d7
 ## explicit; go 1.23.4
 github.com/egdaemon/wasinet/wasinet
@@ -625,7 +643,11 @@ github.com/go-openapi/validate
 # github.com/go-task/slim-sprig/v3 v3.0.0
 ## explicit; go 1.20
 github.com/go-task/slim-sprig/v3
-# github.com/goccy/go-json v0.10.3
+# github.com/go-viper/mapstructure/v2 v2.2.1
+## explicit; go 1.18
+github.com/go-viper/mapstructure/v2
+github.com/go-viper/mapstructure/v2/internal/errors
+# github.com/goccy/go-json v0.10.5
 ## explicit; go 1.19
 github.com/goccy/go-json
 github.com/goccy/go-json/internal/decoder
@@ -656,7 +678,7 @@ github.com/golang/groupcache/lru
 # github.com/golang/protobuf v1.5.4
 ## explicit; go 1.17
 github.com/golang/protobuf/proto
-# github.com/google/flatbuffers v24.3.25+incompatible
+# github.com/google/flatbuffers v25.1.24+incompatible
 ## explicit
 github.com/google/flatbuffers/go
 # github.com/google/go-cmp v0.7.0
@@ -949,9 +971,15 @@ github.com/mailru/easyjson/jwriter
 github.com/manifoldco/promptui
 github.com/manifoldco/promptui/list
 github.com/manifoldco/promptui/screenbuf
-# github.com/marcboeker/go-duckdb v1.8.3
-## explicit; go 1.23
-github.com/marcboeker/go-duckdb
+# github.com/marcboeker/go-duckdb/arrowmapping v0.0.5
+## explicit; go 1.24
+github.com/marcboeker/go-duckdb/arrowmapping
+# github.com/marcboeker/go-duckdb/mapping v0.0.5
+## explicit; go 1.24
+github.com/marcboeker/go-duckdb/mapping
+# github.com/marcboeker/go-duckdb/v2 v2.0.2
+## explicit; go 1.24
+github.com/marcboeker/go-duckdb/v2
 # github.com/marten-seemann/tcp v0.0.0-20210406111302-dfbc87cc63fd
 ## explicit; go 1.15
 github.com/marten-seemann/tcp
@@ -1141,7 +1169,7 @@ github.com/ostreedev/ostree-go/pkg/otbuiltin
 # github.com/pbnjay/memory v0.0.0-20210728143218-7b4eea64cf58
 ## explicit; go 1.16
 github.com/pbnjay/memory
-# github.com/pierrec/lz4/v4 v4.1.21
+# github.com/pierrec/lz4/v4 v4.1.22
 ## explicit; go 1.14
 github.com/pierrec/lz4/v4
 github.com/pierrec/lz4/v4/internal/lz4block

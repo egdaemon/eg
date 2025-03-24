@@ -483,7 +483,7 @@ github.com/ebitengine/purego
 github.com/ebitengine/purego/internal/cgo
 github.com/ebitengine/purego/internal/fakecgo
 github.com/ebitengine/purego/internal/strings
-# github.com/egdaemon/eg v0.0.0-20250324204005-afb6bc4b6f25
+# github.com/egdaemon/eg v0.0.0-20250324215450-1ca02e0a8b3c
 ## explicit; go 1.24
 # github.com/egdaemon/wasinet/wasinet v0.0.0-20250205011224-d5f0e1da96d7
 ## explicit; go 1.23.4

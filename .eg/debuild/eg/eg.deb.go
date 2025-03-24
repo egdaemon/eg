@@ -52,6 +52,8 @@ func Prepare(ctx context.Context, o eg.Op) error {
 			sruntime.Newf("rm -rf %s", debdir),
 			sruntime.Newf("mkdir -p %s", debdir),
 			sruntime.Newf("git clone --depth 1 file://${PWD}/ %s", debdir),
+			sruntime.Newf("ls -lha %s", debdir),
+			sruntime.Newf("ls -lha %s/vendor/github.com/duckdb/duckdb-go-bindings/linux-amd64", debdir),
 		),
 		egdebuild.Prepare(Runner(), errorsx.Must(fs.Sub(debskel, ".debskel"))),
 	)(ctx, o)

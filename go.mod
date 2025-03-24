@@ -7,7 +7,7 @@ toolchain go1.24.1
 require (
 	github.com/KimMachineGun/automemlimit v0.7.1
 	github.com/alecthomas/kong v1.9.0
-	github.com/alitto/pond/v2 v2.2.0
+	github.com/alitto/pond/v2 v2.3.0
 	github.com/containers/podman/v5 v5.4.1
 	github.com/coreos/go-systemd/v22 v22.5.1-0.20231103132048-7d375ecc2b09
 	github.com/dave/jennifer v1.7.1
@@ -20,7 +20,7 @@ require (
 	github.com/fsnotify/fsnotify v1.8.0
 	github.com/go-git/go-git/v5 v5.13.2
 	github.com/gofrs/uuid v4.4.0+incompatible
-	github.com/golang-jwt/jwt/v4 v4.5.1
+	github.com/golang-jwt/jwt/v4 v4.5.2
 	github.com/gorilla/mux v1.8.1
 	github.com/gorilla/websocket v1.5.3
 	github.com/ipfs/go-datastore v0.6.0
@@ -30,8 +30,8 @@ require (
 	github.com/mailru/easyjson v0.9.0
 	github.com/marcboeker/go-duckdb/v2 v2.0.2
 	github.com/mattn/go-isatty v0.0.20
-	github.com/onsi/ginkgo/v2 v2.23.0
-	github.com/onsi/gomega v1.36.2
+	github.com/onsi/ginkgo/v2 v2.23.3
+	github.com/onsi/gomega v1.36.3
 	github.com/pbnjay/memory v0.0.0-20210728143218-7b4eea64cf58
 	github.com/pkg/errors v0.9.1
 	github.com/posener/complete v1.2.3
@@ -57,8 +57,8 @@ require (
 	github.com/duckdb/duckdb-go-bindings/linux-arm64 v0.1.7 // indirect
 	github.com/duckdb/duckdb-go-bindings/windows-amd64 v0.1.7 // indirect
 	github.com/go-viper/mapstructure/v2 v2.2.1 // indirect
-	github.com/marcboeker/go-duckdb/arrowmapping v0.0.4 // indirect
-	github.com/marcboeker/go-duckdb/mapping v0.0.4 // indirect
+	github.com/marcboeker/go-duckdb/arrowmapping v0.0.5 // indirect
+	github.com/marcboeker/go-duckdb/mapping v0.0.5 // indirect
 )
 
 exclude (

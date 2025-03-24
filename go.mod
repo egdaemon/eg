@@ -28,7 +28,7 @@ require (
 	github.com/libp2p/go-libp2p-kad-dht v0.28.2
 	github.com/logrusorgru/aurora v2.0.3+incompatible
 	github.com/mailru/easyjson v0.9.0
-	github.com/marcboeker/go-duckdb/v2 v2.0.2
+	github.com/marcboeker/go-duckdb/v2 v2.0.3
 	github.com/mattn/go-isatty v0.0.20
 	github.com/onsi/ginkgo/v2 v2.23.3
 	github.com/onsi/gomega v1.36.3

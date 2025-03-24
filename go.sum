@@ -446,8 +446,8 @@ github.com/marcboeker/go-duckdb/arrowmapping v0.0.5 h1:Ac5lwJzJ0XsGzjfZCENRgPmzG
 github.com/marcboeker/go-duckdb/arrowmapping v0.0.5/go.mod h1:sATRMjONVF2gnhyYJEp+3+EiWkXQqiGLp0E+szvz5Go=
 github.com/marcboeker/go-duckdb/mapping v0.0.5 h1:DSJaYKdI+qqfxfzPyOVEpPehRfQL3AY7jJbRPPP/GUw=
 github.com/marcboeker/go-duckdb/mapping v0.0.5/go.mod h1:V7GgU5GUAww6jptPcJC0pbHJ8wswHehaqLV1i+HFI4g=
-github.com/marcboeker/go-duckdb/v2 v2.0.2 h1:/0DK8GrNlTmljVKR6q5mWu5kV0DT2ks2aBcV+bSaBtg=
-github.com/marcboeker/go-duckdb/v2 v2.0.2/go.mod h1:u4yJOo1UoJg5vK07RzD4HN5GZTPZPLywIj7xI+pVKSk=
+github.com/marcboeker/go-duckdb/v2 v2.0.3 h1:zhdm9g8ulLR7JLRejVtyIwNr11qWxt+P+ORw0oUwV24=
+github.com/marcboeker/go-duckdb/v2 v2.0.3/go.mod h1:7pUV/nRbb0Sr0NGR0rmV67a+INoWthojmNICAaA4L4Q=
 github.com/marten-seemann/tcp v0.0.0-20210406111302-dfbc87cc63fd h1:br0buuQ854V8u83wA0rVZ8ttrq5CpaPZdvrK0LP2lOk=
 github.com/marten-seemann/tcp v0.0.0-20210406111302-dfbc87cc63fd/go.mod h1:QuCEs1Nt24+FYQEqAAncTDPJIuGs+LxK1MCiFL25pMU=
 github.com/mattn/go-isatty v0.0.14/go.mod h1:7GGIvUiUoEMVVmxf/4nioHXj79iQHKdU27kJ6hsGG94=

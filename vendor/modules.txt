@@ -483,7 +483,7 @@ github.com/ebitengine/purego
 github.com/ebitengine/purego/internal/cgo
 github.com/ebitengine/purego/internal/fakecgo
 github.com/ebitengine/purego/internal/strings
-# github.com/egdaemon/eg v0.0.0-20250319140032-3eba9f9ef637
+# github.com/egdaemon/eg v0.0.0-20250324204005-afb6bc4b6f25
 ## explicit; go 1.24
 # github.com/egdaemon/wasinet/wasinet v0.0.0-20250205011224-d5f0e1da96d7
 ## explicit; go 1.23.4
@@ -977,7 +977,7 @@ github.com/marcboeker/go-duckdb/arrowmapping
 # github.com/marcboeker/go-duckdb/mapping v0.0.5
 ## explicit; go 1.24
 github.com/marcboeker/go-duckdb/mapping
-# github.com/marcboeker/go-duckdb/v2 v2.0.2
+# github.com/marcboeker/go-duckdb/v2 v2.0.3
 ## explicit; go 1.24
 github.com/marcboeker/go-duckdb/v2
 # github.com/marten-seemann/tcp v0.0.0-20210406111302-dfbc87cc63fd

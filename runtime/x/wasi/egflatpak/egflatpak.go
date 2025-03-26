@@ -198,7 +198,7 @@ func Build(ctx context.Context, runtime shell.Command, b *Builder) error {
 
 	// enable ccache
 	runtime = runtime.EnvironFrom(
-		errorsx.Must(egccache.Env())...,
+		egccache.Env()...,
 	).Environ("FLATPAK_USER_DIR", userdir)
 
 	return shell.Run(

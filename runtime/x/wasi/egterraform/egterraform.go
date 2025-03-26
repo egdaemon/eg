@@ -17,19 +17,21 @@ func CacheDirectory(dirs ...string) string {
 	return egenv.CacheDirectory(_eg.DefaultModuleDirectory(), "terraform", filepath.Join(dirs...))
 }
 
-// attempt to build the yarn environment that properly
-func Env() ([]string, error) {
+// attempt to build the terraform environment that properly
+func env() ([]string, error) {
 	return envx.Build().FromEnv(os.Environ()...).
 		Var("TF_PLUGIN_CACHE_DIR", CacheDirectory("plugins")).
 		Var("TF_IN_AUTOMATION", envx.VarBool(true)).
 		Environ()
 }
 
+// attempt to build the terraform environment that properly
+func Env() []string {
+	return errorsx.Must(env())
+}
+
 // Create a shell runtime that properly
 // sets up the yarn environment for caching.
 func Runtime() shell.Command {
-	return shell.Runtime().
-		EnvironFrom(
-			errorsx.Must(Env())...,
-		)
+	return shell.Runtime().EnvironFrom(Env()...)
 }

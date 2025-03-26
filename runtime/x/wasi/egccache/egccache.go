@@ -15,19 +15,22 @@ func CacheDirectory(dirs ...string) string {
 	return egenv.CacheDirectory(_eg.DefaultModuleDirectory(), "ccache", filepath.Join(dirs...))
 }
 
-// attempt to build the rust environment that sets up
+// attempt to build the ccache environment that sets up
 // the cargo environment for caching.
-func Env() ([]string, error) {
+func env() ([]string, error) {
 	return envx.Build().FromEnv(os.Environ()...).
 		Var("CCACHE_DIR", CacheDirectory()).
 		Environ()
 }
 
+// attempt to build the ccache environment that sets up
+// the ccache environment for caching.
+func Env() []string {
+	return errorsx.Must(env())
+}
+
 // Create a shell runtime that properly
-// sets up the cargo environment for caching.
+// sets up the ccache environment for caching.
 func Runtime() shell.Command {
-	return shell.Runtime().
-		EnvironFrom(
-			errorsx.Must(Env())...,
-		)
+	return shell.Runtime().EnvironFrom(Env()...)
 }

@@ -102,6 +102,16 @@ func (t Command) UnsafeEntrypoint(e entrypoint) Command {
 	return t
 }
 
+// debug a command
+func (t Command) Debug() Command {
+	original := t.entry
+	t.entry = func(ctx context.Context, user, group, cmd, directory string, environ []string, do execer) (err error) {
+		log.Println("running command", directory, user, group, cmd, environ)
+		return original(ctx, user, group, cmd, directory, environ, execer)
+	}
+	return t
+}
+
 // New clone the current command configuration and replace the command
 // that will be executed.
 func (t Command) New(cmd string) Command {
@@ -128,12 +138,13 @@ func (t Command) Newf(cmd string, options ...any) Command {
 //	timeout: 5 minutes.
 func New(cmd string) Command {
 	return Command{
-		user:    "egd", // default user to execute commands as
-		group:   "egd",
-		cmd:     cmd,
-		timeout: 5 * time.Minute,
-		entry:   run,
-		exec:    ffiexec.Command,
+		user:     "egd", // default user to execute commands as
+		group:    "egd",
+		cmd:      cmd,
+		timeout:  5 * time.Minute,
+		entry:    run,
+		exec:     ffiexec.Command,
+		attempts: 1,
 	}
 }
 

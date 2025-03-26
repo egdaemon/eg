@@ -107,7 +107,7 @@ func (t Command) Debug() Command {
 	original := t.entry
 	t.entry = func(ctx context.Context, user, group, cmd, directory string, environ []string, do execer) (err error) {
 		log.Println("running command", directory, user, group, cmd, environ)
-		return original(ctx, user, group, cmd, directory, environ, execer)
+		return original(ctx, user, group, cmd, directory, environ, do)
 	}
 	return t
 }

@@ -18,7 +18,7 @@ func CacheDirectory(dirs ...string) string {
 }
 
 // attempt to build the yarn environment that properly
-func Env() ([]string, error) {
+func env() ([]string, error) {
 	return envx.Build().FromEnv(os.Environ()...).
 		Var("COREPACK_ENABLE_DOWNLOAD_PROMPT", "0").
 		Var("COREPACK_HOME", egenv.CacheDirectory(_eg.DefaultModuleDirectory(), "corepack")).
@@ -27,11 +27,13 @@ func Env() ([]string, error) {
 		Environ()
 }
 
+// attempt to build the yarn environment that properly
+func Env() []string {
+	return errorsx.Must(env())
+}
+
 // Create a shell runtime that properly
 // sets up the yarn environment for caching.
 func Runtime() shell.Command {
-	return shell.Runtime().
-		EnvironFrom(
-			errorsx.Must(Env())...,
-		)
+	return shell.Runtime().EnvironFrom(Env()...)
 }

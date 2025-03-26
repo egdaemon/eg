@@ -110,7 +110,7 @@ func AutoInstall(options ...toption) eg.OpFn {
 			goenv []string
 		)
 
-		if goenv, err = Env(); err != nil {
+		if goenv, err = env(); err != nil {
 			return err
 		}
 
@@ -154,7 +154,7 @@ func AutoCompile(options ...coption) eg.OpFn {
 			goenv []string
 		)
 
-		if goenv, err = Env(); err != nil {
+		if goenv, err = env(); err != nil {
 			return err
 		}
 
@@ -278,7 +278,7 @@ func AutoTest(options ...toption) eg.OpFn {
 			return errorsx.Wrap(err, "unable to run tests")
 		}
 
-		if goenv, err = Env(); err != nil {
+		if goenv, err = env(); err != nil {
 			return err
 		}
 
@@ -337,11 +337,17 @@ func CacheModuleDirectory() string {
 
 // attempt to build the golang environment that sets up
 // the golang environment for caching.
-func Env() ([]string, error) {
+func env() ([]string, error) {
 	return envx.Build().FromEnv(os.Environ()...).
 		Var("GOCACHE", CacheBuildDirectory()).
 		Var("GOMODCACHE", CacheModuleDirectory()).
 		Environ()
+}
+
+// attempt to build the golang environment that sets up
+// the golang environment for caching.
+func Env() []string {
+	return errorsx.Must(env())
 }
 
 // Create a shell runtime that properly
@@ -349,7 +355,7 @@ func Env() ([]string, error) {
 func Runtime() shell.Command {
 	return shell.Runtime().
 		EnvironFrom(
-			errorsx.Must(Env())...,
+			Env()...,
 		)
 }
 

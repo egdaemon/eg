@@ -24,10 +24,16 @@ func CacheDirectory(dirs ...string) string {
 
 // attempt to build the rust environment that sets up
 // the cargo environment for caching.
-func Env() ([]string, error) {
+func env() ([]string, error) {
 	return envx.Build().FromEnv(os.Environ()...).
 		Var("CARGO_HOME", CacheDirectory()).
 		Environ()
+}
+
+// attempt to build the rust environment that sets up
+// the cargo environment for caching.
+func Env() []string {
+	return errorsx.Must(env())
 }
 
 // Create a shell runtime that properly
@@ -35,7 +41,7 @@ func Env() ([]string, error) {
 func Runtime() shell.Command {
 	return shell.Runtime().
 		EnvironFrom(
-			errorsx.Must(Env())...,
+			errorsx.Must(env())...,
 		)
 }
 
@@ -45,7 +51,7 @@ func AutoTest() eg.OpFn {
 			cenv []string
 		)
 
-		if cenv, err = Env(); err != nil {
+		if cenv, err = env(); err != nil {
 			return err
 		}
 

@@ -8,8 +8,7 @@ RUN add-apt-repository -n ppa:egdaemon/eg
 RUN add-apt-repository -n ppa:egdaemon/duckdb
 
 RUN apt-get update
-RUN apt-get -y install golang-1.23 eg egbootstrap libbtrfs-dev libassuan-dev libc6-dev libdevmapper-dev libglib2.0-dev libgpgme-dev libgpg-error-dev libprotobuf-dev libprotobuf-c-dev libseccomp-dev libselinux1-dev libsystemd-dev
-RUN apt-get -y install golang-1.24
+RUN apt-get -y install golang-1.24 eg egbootstrap libbtrfs-dev libassuan-dev libc6-dev libdevmapper-dev libglib2.0-dev libgpgme-dev libgpg-error-dev libprotobuf-dev libprotobuf-c-dev libseccomp-dev libselinux1-dev libsystemd-dev
 
 RUN ln -s /usr/lib/go-1.24/bin/go /usr/local/bin/go
 

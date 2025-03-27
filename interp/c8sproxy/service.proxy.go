@@ -142,7 +142,9 @@ func (t *ProxyService) Module(ctx context.Context, req *c8s.ModuleRequest) (_ *c
 	debugx.Println("PROXY CONTAINER MODULE INITIATED", errorsx.Zero(os.Getwd()))
 	defer debugx.Println("PROXY CONTAINER MODULE COMPLETED", errorsx.Zero(os.Getwd()))
 
-	options := append(t.containeropts, req.Options...)
+	options := make([]string, 0, len(t.containeropts)+len(req.Options)+1)
+	options = append(options, t.containeropts...)
+	options = append(options, req.Options...)
 	options = append(
 		options,
 		"--volume", fmt.Sprintf("%s:%s:rw", eg.DefaultMountRoot(eg.WorkingDirectory), eg.DefaultMountRoot(eg.WorkingDirectory)),

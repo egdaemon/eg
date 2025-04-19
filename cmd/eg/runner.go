@@ -263,6 +263,17 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 			grpc.ChainUnaryInterceptor(
 				podmanx.GrpcClient,
 			),
+			// grpc.KeepaliveParams(keepalive.ServerParameters{
+			// 	MaxConnectionIdle:     365 * 24 * time.Hour,
+			// 	MaxConnectionAge:      365 * 24 * time.Hour,
+			// 	MaxConnectionAgeGrace: 365 * 24 * time.Hour,
+			// 	Time:                  365 * 24 * time.Hour,
+			// 	Timeout:               time.Second,
+			// }),
+			// grpc.KeepaliveEnforcementPolicy(keepalive.EnforcementPolicy{
+			// 	MinTime:             365 * 24 * time.Hour,
+			// 	PermitWithoutStream: true,
+			// }),
 		)
 		defer srv.GracefulStop()
 

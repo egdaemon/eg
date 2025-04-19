@@ -6,9 +6,10 @@ import (
 	"encoding/hex"
 	"hash"
 	"io"
-	"log"
 	"os"
 	"path/filepath"
+
+	"github.com/egdaemon/eg/internal/debugx"
 )
 
 // digest the provided contents and return the resulting hash.
@@ -30,7 +31,7 @@ func DigestIO(r io.Reader) hash.Hash {
 
 	v := sha256.New()
 	if _, err := io.CopyBuffer(v, r, buf[:]); err != nil {
-		log.Println("DERPED 0", err)
+		debugx.Println("failed to digest from reader", err)
 		return nil
 	}
 
@@ -42,7 +43,7 @@ func DigestIO(r io.Reader) hash.Hash {
 func DigestFile(path ...string) hash.Hash {
 	src, err := os.Open(filepath.Join(path...))
 	if err != nil {
-		log.Println("DERPED 1", err)
+		debugx.Println("failed to digest file", err)
 		return nil
 	}
 	defer src.Close()

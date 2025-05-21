@@ -103,45 +103,6 @@ func Pack(pattern string) eg.OpFn {
 	}
 }
 
-// provides the value that
-func GithubRelease() string {
-	c := eggit.EnvCommit()
-	return c.StringReplace("r%git.commit.year%.%git.commit.month%.%git.commit.day%%git.hash.short%")
-}
-
-// generate the github download url
-func GithubDownloadURL(pattern string) string {
-	version := GithubRelease()
-	archive := Name(pattern)
-	canon := eggit.EnvCanonicalURI()                                                                     // git@github.com:james-lawrence/deeppool.git
-	canon = strings.ReplaceAll(canon, ".git", fmt.Sprintf("/releases/download/%s/%s", version, archive)) // git@github.com:james-lawrence/deeppool/releases/download/%release%/%archive%
-	canon = strings.ReplaceAll(canon, ":", "/")                                                          // git@github.com/james-lawrence/deeppool/releases/download/%release%/%archive%
-	canon = strings.ReplaceAll(canon, "git@", "https://")                                                // https://github.com:james-lawrence/deeppool/releases/download/%release%/%archive%
-
-	return canon
-}
-
-// Release to github, this is very experimental.
-// WARNING: for local environments this assumes you've provided the token to the eg command.
-// e.g.) GH_TOKEN="$(gh auth token)" eg compute local -e GH_TOKEN
-// WARNING: for hosted environments: we've assumed the git auth access token for pulling the repository
-// will work. this has not yet been validated. and likely needs permission updates.
-func Github(patterns ...string) eg.OpFn {
-	return func(ctx context.Context, o eg.Op) error {
-		c := eggit.EnvCommit()
-		version := GithubRelease()
-
-		runtime := shell.Runtime().Environ(
-			"GH_TOKEN", egenv.String("", "EG_GIT_AUTH_ACCESS_TOKEN", "GH_TOKEN"),
-		)
-
-		return shell.Run(
-			ctx,
-			runtime.Newf("gh release create --target %s %s %s", c.Hash.String(), version, strings.Join(patterns, " ")),
-		)
-	}
-}
-
 // deprecated: force a clean tarball directory
 func Clean(operations ...eg.OpFn) eg.OpFn {
 	return eg.Sequential(

@@ -52,7 +52,7 @@ func Release(patterns ...string) eg.OpFn {
 
 		return shell.Run(
 			ctx,
-			runtime.Newf("gh release delete -y %s", version),
+			runtime.Newf("gh release delete -y %s", version).Lenient(true),
 			runtime.Newf("gh release create --target %s %s %s", c.Hash.String(), version, strings.Join(patterns, " ")),
 		)
 	}

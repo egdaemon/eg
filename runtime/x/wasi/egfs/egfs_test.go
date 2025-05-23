@@ -30,3 +30,8 @@ func TestCloneFile(t *testing.T) {
 	require.NoError(t, egfs.CloneFS(ctx, tmpdir, filepath.Join("dir1", "example.txt"), os.DirFS(testx.Fixture())))
 	require.Equal(t, testx.ReadMD5(testx.Fixture("dir1", "example.txt")), testx.ReadMD5(tmpdir, "dir1", "example.txt"))
 }
+
+func TestFindFirst(t *testing.T) {
+	require.Equal(t, "dir1/dir2/example.txt", egfs.FindFirst(os.DirFS(testx.Fixture()), "example.txt"))
+	require.Equal(t, "dir1/dir2", egfs.FindFirst(os.DirFS(testx.Fixture()), "dir2"))
+}

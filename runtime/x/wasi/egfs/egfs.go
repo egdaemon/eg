@@ -34,6 +34,7 @@ func Find(tree fs.FS, pattern string) iter.Seq[string] {
 			if ok, err := path.Match(pattern, d.Name()); err != nil {
 				return err
 			} else if !ok {
+				log.Println("DERP DERP", pattern, current, d.Name())
 				return nil
 			}
 

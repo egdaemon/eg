@@ -21,7 +21,7 @@ var debskel embed.FS
 
 const (
 	container = "eg.deb.duckdb"
-	version   = "1.2.1"
+	version   = "1.2.2"
 )
 
 var (
@@ -38,6 +38,7 @@ func init() {
 		egdebuild.Option.SigningKeyID(maintainer.GPGFingerprint),
 		egdebuild.Option.ChangeLogDate(c.Committer.When),
 		egdebuild.Option.Version(fmt.Sprintf("%s.:autopatch:", version)),
+		egdebuild.Option.Description("duckdb", "embeddable columnar database"),
 		egdebuild.Option.Debian(errorsx.Must(fs.Sub(debskel, ".debskel"))),
 		egdebuild.Option.DependsBuild("rsync", "curl", "tree", "ca-certificates", "cmake", "ninja-build", "libssl-dev", "git"),
 		egdebuild.Option.Environ("PACKAGE_VERSION", version),
@@ -56,6 +57,9 @@ func Prepare(ctx context.Context, o eg.Op) error {
 			sruntime.New("md5sum -c duckdb.md5"),
 		),
 		egdebuild.Prepare(Runner(), errorsx.Must(fs.Sub(debskel, ".debskel"))),
+		shell.Op(
+			sruntime.Newf("tree -L 2 %s", egenv.EphemeralDirectory()),
+		),
 	)(ctx, o)
 }
 

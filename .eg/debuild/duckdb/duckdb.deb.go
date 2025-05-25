@@ -57,9 +57,6 @@ func Prepare(ctx context.Context, o eg.Op) error {
 			sruntime.New("md5sum -c duckdb.md5"),
 		),
 		egdebuild.Prepare(Runner(), errorsx.Must(fs.Sub(debskel, ".debskel"))),
-		shell.Op(
-			sruntime.Newf("tree -L 2 %s", egenv.EphemeralDirectory()),
-		),
 	)(ctx, o)
 }
 

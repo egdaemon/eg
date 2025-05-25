@@ -197,7 +197,7 @@ func Runtime(cfg Config, opts ...option) shell.Command {
 		Environ("DEB_CHANGELOG_DATE", cfg.ChangeLog.When.Format(time.RFC1123Z)).
 		Environ("DEB_MAINTAINER_EMAIL", cfg.Maintainer.Email).
 		Environ("DEB_MAINTAINER_FULLNAME", cfg.Maintainer.Name).
-		Environ("DEB_DEPENDS_BUILD", strings.Join(append(cfg.Dependency.Build, "dh-make", "debhelper", "software-properties-common"), ", ")).
+		Environ("DEB_DEPENDS_BUILD", strings.Join(append(cfg.Dependency.Build, "dh-make", "debhelper (>= 10)", "software-properties-common"), ", ")).
 		Environ("DEB_DEPENDS_RUNTIME", strings.Join(append(cfg.Dependency.Runtime, "${misc:Depends}", "${shlibs:Depends}"), ", ")).
 		EnvironFrom(cfg.Environ...)
 }

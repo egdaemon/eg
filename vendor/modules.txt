@@ -483,7 +483,7 @@ github.com/ebitengine/purego
 github.com/ebitengine/purego/internal/cgo
 github.com/ebitengine/purego/internal/fakecgo
 github.com/ebitengine/purego/internal/strings
-# github.com/egdaemon/eg v0.0.0-20250325122758-8710d1e252ae
+# github.com/egdaemon/eg v0.0.0-20250523231708-62c76a647469
 ## explicit; go 1.24
 # github.com/egdaemon/wasinet/wasinet v0.0.0-20250205011224-d5f0e1da96d7
 ## explicit; go 1.23.4
@@ -1642,7 +1642,7 @@ golang.org/x/mod/internal/lazyregexp
 golang.org/x/mod/modfile
 golang.org/x/mod/module
 golang.org/x/mod/semver
-# golang.org/x/net v0.37.0
+# golang.org/x/net v0.38.0
 ## explicit; go 1.23.0
 golang.org/x/net/bpf
 golang.org/x/net/context

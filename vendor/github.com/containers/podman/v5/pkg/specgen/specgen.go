@@ -305,6 +305,8 @@ type ContainerStorageConfig struct {
 	// Image volumes bind-mount a container-image mount into the container.
 	// Optional.
 	ImageVolumes []*ImageVolume `json:"image_volumes,omitempty"`
+	// ArtifactVolumes volumes based on an existing artifact.
+	ArtifactVolumes []*ArtifactVolume `json:"artifact_volumes,omitempty"`
 	// Devices are devices that will be added to the container.
 	// Optional.
 	Devices []spec.LinuxDevice `json:"devices,omitempty"`
@@ -602,14 +604,17 @@ type ContainerHealthCheckConfig struct {
 	// Requires that HealthConfig be set.
 	// Optional.
 	StartupHealthConfig *define.StartupHealthCheck `json:"startupHealthConfig,omitempty"`
-	// HealthLogDestination defines the destination where the log is stored
-	HealthLogDestination string `json:"healthLogDestination,omitempty"`
+	// HealthLogDestination defines the destination where the log is stored.
+	// TODO (6.0): In next major release convert it to pointer and use omitempty
+	HealthLogDestination string `json:"healthLogDestination"`
 	// HealthMaxLogCount is maximum number of attempts in the HealthCheck log file.
-	// ('0' value means an infinite number of attempts in the log file)
-	HealthMaxLogCount uint `json:"healthMaxLogCount,omitempty"`
+	// ('0' value means an infinite number of attempts in the log file).
+	// TODO (6.0): In next major release convert it to pointer and use omitempty
+	HealthMaxLogCount uint `json:"healthMaxLogCount"`
 	// HealthMaxLogSize is the maximum length in characters of stored HealthCheck log
-	// ("0" value means an infinite log length)
-	HealthMaxLogSize uint `json:"healthMaxLogSize,omitempty"`
+	// ("0" value means an infinite log length).
+	// TODO (6.0): In next major release convert it to pointer and use omitempty
+	HealthMaxLogSize uint `json:"healthMaxLogSize"`
 }
 
 // SpecGenerator creates an OCI spec and Libpod configuration options to create
@@ -624,8 +629,7 @@ type SpecGenerator struct {
 	ContainerResourceConfig
 	ContainerHealthCheckConfig
 
-	//nolint:unused // this is needed for the local client but golangci-lint
-	// does not seems to happy when we test the remote stub
+	//nolint:nolintlint,unused // "unused" complains when remote build tag is used, "nolintlint" complains otherwise.
 	cacheLibImage
 }
 

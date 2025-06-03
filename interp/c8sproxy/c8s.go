@@ -160,7 +160,7 @@ func moduleExec(ctx context.Context, cname, moduledir string, stdin io.Reader, s
 	)
 
 	id, err := containers.ExecCreate(ctx, cname, &handlers.ExecCreateConfig{
-		ExecConfig: container.ExecOptions{
+		ExecOptions: container.ExecOptions{
 			Tty:          false,
 			AttachStdin:  stdin != nil,
 			AttachStderr: true,

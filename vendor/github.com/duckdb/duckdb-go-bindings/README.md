@@ -15,8 +15,10 @@ Tested Go versions: 1.23, 1.24.
 This module's *first* official release contains DuckDB's v1.2.0 release.
 
 | duckdb version | main module | darwin amd | darwin arm | linux amd | linux arm | windows amd |
-| ----------- | ----------- | ----------- | ----------- | ----------- | ----------- | ----------- |
-| v1.2.0      | v0.1.10 | v0.1.5 | v0.1.5 | v0.1.5 | v0.1.5 | v0.1.5 |
+|----------------|-------------|------------|------------|-----------|-----------|-------------|
+| v1.2.2         | v0.1.14     | v0.1.9     | v0.1.9     | v0.1.9    | v0.1.9    | v0.1.9      |
+| v1.2.1         | v0.1.13     | v0.1.8     | v0.1.8     | v0.1.8    | v0.1.8    | v0.1.8      |
+| v1.2.0         | v0.1.10     | v0.1.5     | v0.1.5     | v0.1.5    | v0.1.5    | v0.1.5      |
 
 The main module (`github.com/duckdb/duckdb-go-bindings`) does not link any pre-built static library.
 
@@ -38,7 +40,7 @@ Here's a list:
 
 Note that the lib(s) name must match the name provided in the `CGO_LDFLAGS`.
 
-On darwin. 
+On Darwin. 
 ```
 CGO_ENABLED=1 CPPFLAGS="-DDUCKDB_STATIC_BUILD" CGO_LDFLAGS="-lduckdb -lc++ -L/path/to/lib" go build -tags=duckdb_use_static_lib
 ```
@@ -55,7 +57,7 @@ CGO_ENABLED=1 CPPFLAGS="-DDUCKDB_STATIC_BUILD" CGO_LDFLAGS="-lduckdb -lws2_32 -l
 
 ## Dynamic linking
 
-On darwin.
+On Darwin.
 ```
 CGO_ENABLED=1 CGO_LDFLAGS="-lduckdb -L/path/to/dir" DYLD_LIBRARY_PATH=/path/to/dir go build -tags=duckdb_use_lib
 ```

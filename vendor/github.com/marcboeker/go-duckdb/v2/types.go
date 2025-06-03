@@ -1,6 +1,7 @@
 package duckdb
 
 import (
+	"database/sql/driver"
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
@@ -151,7 +152,7 @@ type Decimal struct {
 	Value *big.Int
 }
 
-func (d *Decimal) Float64() float64 {
+func (d Decimal) Float64() float64 {
 	scale := big.NewInt(int64(d.Scale))
 	factor := new(big.Float).SetInt(new(big.Int).Exp(big.NewInt(10), scale, nil))
 	value := new(big.Float).SetInt(d.Value)
@@ -160,7 +161,7 @@ func (d *Decimal) Float64() float64 {
 	return f
 }
 
-func (d *Decimal) String() string {
+func (d Decimal) String() string {
 	// Get the sign, and return early, if zero.
 	if d.Value.Sign() == 0 {
 		return "0"
@@ -190,7 +191,12 @@ func (d *Decimal) String() string {
 	return signStr + zeroTrimmed[:len(zeroTrimmed)-scale] + "." + zeroTrimmed[len(zeroTrimmed)-scale:]
 }
 
-func castToTime[T any](val T) (time.Time, error) {
+type Union struct {
+	Value driver.Value `json:"value"`
+	Tag   string       `json:"tag"`
+}
+
+func castToTime(val any) (time.Time, error) {
 	var ti time.Time
 	switch v := any(val).(type) {
 	case time.Time:
@@ -201,7 +207,7 @@ func castToTime[T any](val T) (time.Time, error) {
 	return ti.UTC(), nil
 }
 
-func getTSTicks[T any](t Type, val T) (int64, error) {
+func getTSTicks(t Type, val any) (int64, error) {
 	ti, err := castToTime(val)
 	if err != nil {
 		return 0, err
@@ -229,13 +235,36 @@ func getTSTicks[T any](t Type, val T) (int64, error) {
 	return ti.UnixNano(), nil
 }
 
-func getMappedTimestamp[T any](t Type, val T) (*mapping.Timestamp, error) {
-	ticks, err := getTSTicks(t, val)
+func getMappedTimestamp(val any) (*mapping.Timestamp, error) {
+	ticks, err := getTSTicks(TYPE_TIMESTAMP, val)
 	if err != nil {
 		return nil, err
 	}
-
 	return mapping.NewTimestamp(ticks), nil
+}
+
+func getMappedTimestampS(val any) (*mapping.TimestampS, error) {
+	ticks, err := getTSTicks(TYPE_TIMESTAMP_S, val)
+	if err != nil {
+		return nil, err
+	}
+	return mapping.NewTimestampS(ticks), nil
+}
+
+func getMappedTimestampMS(val any) (*mapping.TimestampMS, error) {
+	ticks, err := getTSTicks(TYPE_TIMESTAMP_MS, val)
+	if err != nil {
+		return nil, err
+	}
+	return mapping.NewTimestampMS(ticks), nil
+}
+
+func getMappedTimestampNS(val any) (*mapping.TimestampNS, error) {
+	ticks, err := getTSTicks(TYPE_TIMESTAMP_NS, val)
+	if err != nil {
+		return nil, err
+	}
+	return mapping.NewTimestampNS(ticks), nil
 }
 
 func getMappedDate[T any](val T) (*mapping.Date, error) {

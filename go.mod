@@ -28,7 +28,7 @@ require (
 	github.com/libp2p/go-libp2p-kad-dht v0.28.2
 	github.com/logrusorgru/aurora v2.0.3+incompatible
 	github.com/mailru/easyjson v0.9.0
-	github.com/marcboeker/go-duckdb/v2 v2.0.3
+	github.com/marcboeker/go-duckdb/v2 v2.3.0
 	github.com/mattn/go-isatty v0.0.20
 	github.com/onsi/ginkgo/v2 v2.23.3
 	github.com/onsi/gomega v1.36.3
@@ -50,15 +50,15 @@ require (
 )
 
 require (
-	github.com/duckdb/duckdb-go-bindings v0.1.12 // indirect
-	github.com/duckdb/duckdb-go-bindings/darwin-amd64 v0.1.7 // indirect
-	github.com/duckdb/duckdb-go-bindings/darwin-arm64 v0.1.7 // indirect
-	github.com/duckdb/duckdb-go-bindings/linux-amd64 v0.1.7 // indirect
-	github.com/duckdb/duckdb-go-bindings/linux-arm64 v0.1.7 // indirect
-	github.com/duckdb/duckdb-go-bindings/windows-amd64 v0.1.7 // indirect
+	github.com/duckdb/duckdb-go-bindings v0.1.15 // indirect
+	github.com/duckdb/duckdb-go-bindings/darwin-amd64 v0.1.10 // indirect
+	github.com/duckdb/duckdb-go-bindings/darwin-arm64 v0.1.10 // indirect
+	github.com/duckdb/duckdb-go-bindings/linux-amd64 v0.1.10 // indirect
+	github.com/duckdb/duckdb-go-bindings/linux-arm64 v0.1.10 // indirect
+	github.com/duckdb/duckdb-go-bindings/windows-amd64 v0.1.10 // indirect
 	github.com/go-viper/mapstructure/v2 v2.2.1 // indirect
-	github.com/marcboeker/go-duckdb/arrowmapping v0.0.5 // indirect
-	github.com/marcboeker/go-duckdb/mapping v0.0.5 // indirect
+	github.com/marcboeker/go-duckdb/arrowmapping v0.0.8 // indirect
+	github.com/marcboeker/go-duckdb/mapping v0.0.9 // indirect
 )
 
 exclude (

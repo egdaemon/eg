@@ -16,22 +16,13 @@ func main() {
 	ctx, done := context.WithTimeout(context.Background(), egenv.TTL())
 	defer done()
 
-	c1 := eg.DefaultModule()
 	err := eg.Perform(
 		ctx,
 		eggit.AutoClone,
 		shell.Op(
-			shell.New("apt-get install -y iptables").Privileged(),
-		),
-		eg.Build(c1),
-		eg.Module(
-			ctx,
-			c1.OptionLiteral("--publish", "3000"),
-			shell.Op(
-				shell.New("apt-get install -y nmap socat").Privileged(),
-				shell.New("echo -----------------------------------------"),
-				shell.New("socat -v tcp-l:3000,fork exec:'/bin/cat'").Timeout(egenv.TTL()),
-			),
+			shell.New("apt-get install -y iptables nmap socat").Privileged(),
+			shell.New("echo -----------------------------------------"),
+			shell.New("socat -v tcp-l:3000,fork exec:'/bin/cat'").Timeout(egenv.TTL()),
 		),
 	)
 

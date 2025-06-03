@@ -142,7 +142,14 @@ func BuildRootContainerPath(ctx context.Context, dir, path string) (err error) {
 		return errorsx.Wrapf(err, "preparing root container failed: %s", path)
 	}
 
-	cmd := exec.CommandContext(ctx, "podman", "build", "-t", "eg", "-f", path, dir)
+	return BuildContainer(ctx, "eg", dir, path)
+}
+
+func BuildContainer(ctx context.Context, name, dir, path string) (err error) {
+	debugx.Println("building container initiated")
+	defer debugx.Println("building container completed")
+
+	cmd := exec.CommandContext(ctx, "podman", "build", "-t", name, "-f", path, dir)
 	cmd.Stderr = os.Stderr
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout

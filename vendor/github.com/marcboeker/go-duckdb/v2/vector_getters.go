@@ -24,24 +24,42 @@ func getPrimitive[T any](vec *vector, rowIdx mapping.IdxT) T {
 }
 
 func (vec *vector) getTS(t Type, rowIdx mapping.IdxT) time.Time {
-	val := getPrimitive[mapping.Timestamp](vec, rowIdx)
-	return getTS(t, &val)
+	switch t {
+	case TYPE_TIMESTAMP, TYPE_TIMESTAMP_TZ:
+		val := getPrimitive[mapping.Timestamp](vec, rowIdx)
+		return getTS(t, &val)
+	case TYPE_TIMESTAMP_S:
+		val := getPrimitive[mapping.TimestampS](vec, rowIdx)
+		return getTSS(&val)
+	case TYPE_TIMESTAMP_MS:
+		val := getPrimitive[mapping.TimestampMS](vec, rowIdx)
+		return getTSMS(&val)
+	case TYPE_TIMESTAMP_NS:
+		val := getPrimitive[mapping.TimestampNS](vec, rowIdx)
+		return getTSNS(&val)
+	default:
+		return time.Time{}
+	}
 }
 
 func getTS(t Type, ts *mapping.Timestamp) time.Time {
 	switch t {
-	case TYPE_TIMESTAMP:
-		return time.UnixMicro(mapping.TimestampMembers(ts)).UTC()
-	case TYPE_TIMESTAMP_S:
-		return time.Unix(mapping.TimestampMembers(ts), 0).UTC()
-	case TYPE_TIMESTAMP_MS:
-		return time.UnixMilli(mapping.TimestampMembers(ts)).UTC()
-	case TYPE_TIMESTAMP_NS:
-		return time.Unix(0, mapping.TimestampMembers(ts)).UTC()
-	case TYPE_TIMESTAMP_TZ:
+	case TYPE_TIMESTAMP, TYPE_TIMESTAMP_TZ:
 		return time.UnixMicro(mapping.TimestampMembers(ts)).UTC()
 	}
 	return time.Time{}
+}
+
+func getTSS(ts *mapping.TimestampS) time.Time {
+	return time.Unix(mapping.TimestampSMembers(ts), 0).UTC()
+}
+
+func getTSMS(ts *mapping.TimestampMS) time.Time {
+	return time.UnixMilli(mapping.TimestampMSMembers(ts)).UTC()
+}
+
+func getTSNS(ts *mapping.TimestampNS) time.Time {
+	return time.Unix(0, mapping.TimestampNSMembers(ts)).UTC()
 }
 
 func (vec *vector) getDate(rowIdx mapping.IdxT) time.Time {
@@ -200,4 +218,15 @@ func (vec *vector) getSliceChild(offset uint64, length uint64) []any {
 		slice = append(slice, val)
 	}
 	return slice
+}
+
+func (vec *vector) getUnion(rowIdx mapping.IdxT) any {
+	tag := getPrimitive[uint8](&vec.childVectors[0], rowIdx)
+	child := &vec.childVectors[tag+1]
+	value := child.getFn(child, rowIdx)
+
+	return Union{
+		Tag:   vec.tagDict[uint32(tag)],
+		Value: value,
+	}
 }

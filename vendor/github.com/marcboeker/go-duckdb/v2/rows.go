@@ -86,6 +86,15 @@ func (r *rows) Next(dst []driver.Value) error {
 
 // ColumnTypeScanType implements driver.RowsColumnTypeScanType.
 func (r *rows) ColumnTypeScanType(index int) reflect.Type {
+	logicalType := mapping.ColumnLogicalType(&r.res, mapping.IdxT(index))
+	defer mapping.DestroyLogicalType(&logicalType)
+
+	alias := mapping.LogicalTypeGetAlias(logicalType)
+	switch alias {
+	case aliasJSON:
+		return reflect.TypeFor[any]()
+	}
+
 	t := Type(mapping.ColumnType(&r.res, mapping.IdxT(index)))
 	switch t {
 	case TYPE_INVALID:
@@ -132,6 +141,8 @@ func (r *rows) ColumnTypeScanType(index int) reflect.Type {
 		return reflect.TypeOf(Map{})
 	case TYPE_ARRAY:
 		return reflect.TypeOf([]any{})
+	case TYPE_UNION:
+		return reflect.TypeOf(Union{})
 	case TYPE_UUID:
 		return reflect.TypeOf([]byte{})
 	default:
@@ -141,12 +152,18 @@ func (r *rows) ColumnTypeScanType(index int) reflect.Type {
 
 // ColumnTypeDatabaseTypeName implements driver.RowsColumnTypeScanType.
 func (r *rows) ColumnTypeDatabaseTypeName(index int) string {
+	logicalType := mapping.ColumnLogicalType(&r.res, mapping.IdxT(index))
+	defer mapping.DestroyLogicalType(&logicalType)
+
+	alias := mapping.LogicalTypeGetAlias(logicalType)
+	switch alias {
+	case aliasJSON:
+		return aliasJSON
+	}
+
 	t := Type(mapping.ColumnType(&r.res, mapping.IdxT(index)))
 	switch t {
-	case TYPE_DECIMAL, TYPE_ENUM, TYPE_LIST, TYPE_STRUCT, TYPE_MAP, TYPE_ARRAY:
-		// Only allocate the logical type if necessary.
-		logicalType := mapping.ColumnLogicalType(&r.res, mapping.IdxT(index))
-		defer mapping.DestroyLogicalType(&logicalType)
+	case TYPE_DECIMAL, TYPE_ENUM, TYPE_LIST, TYPE_STRUCT, TYPE_MAP, TYPE_ARRAY, TYPE_UNION:
 		return logicalTypeName(logicalType)
 	default:
 		return typeToStringMap[t]
@@ -187,6 +204,8 @@ func logicalTypeName(logicalType mapping.LogicalType) string {
 		return logicalTypeNameMap(logicalType)
 	case TYPE_ARRAY:
 		return logicalTypeNameArray(logicalType)
+	case TYPE_UNION:
+		return logicalTypeNameUnion(logicalType)
 	default:
 		return typeToStringMap[t]
 	}
@@ -241,6 +260,25 @@ func logicalTypeNameArray(logicalType mapping.LogicalType) string {
 	childName := logicalTypeName(childType)
 
 	return fmt.Sprintf("%s[%d]", childName, int(size))
+}
+
+func logicalTypeNameUnion(logicalType mapping.LogicalType) string {
+	count := int(mapping.UnionTypeMemberCount(logicalType))
+	name := "UNION("
+
+	for i := 0; i < count; i++ {
+		memberName := mapping.UnionTypeMemberName(logicalType, mapping.IdxT(i))
+		memberType := mapping.UnionTypeMemberType(logicalType, mapping.IdxT(i))
+
+		// Add comma if not at the end of the list
+		name += memberName + " " + logicalTypeName(memberType)
+		if i != count-1 {
+			name += ", "
+		}
+
+		mapping.DestroyLogicalType(&memberType)
+	}
+	return name + ")"
 }
 
 func escapeStructFieldName(s string) string {

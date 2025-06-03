@@ -17,7 +17,7 @@ type fnSetVectorValue func(vec *vector, rowIdx mapping.IdxT, val any) error
 
 func (vec *vector) setNull(rowIdx mapping.IdxT) {
 	mapping.ValiditySetRowInvalid(vec.maskPtr, rowIdx)
-	if vec.Type == TYPE_STRUCT {
+	if vec.Type == TYPE_STRUCT || vec.Type == TYPE_UNION {
 		for i := 0; i < len(vec.childVectors); i++ {
 			vec.childVectors[i].setNull(rowIdx)
 		}
@@ -84,12 +84,35 @@ func setBool[S any](vec *vector, rowIdx mapping.IdxT, val S) error {
 	return nil
 }
 
-func setTS[S any](vec *vector, rowIdx mapping.IdxT, val S) error {
-	ts, err := getMappedTimestamp(vec.Type, val)
-	if err != nil {
-		return err
+func setTS(vec *vector, rowIdx mapping.IdxT, val any) error {
+	switch vec.Type {
+	case TYPE_TIMESTAMP, TYPE_TIMESTAMP_TZ:
+		ts, err := getMappedTimestamp(val)
+		if err != nil {
+			return err
+		}
+		setPrimitive(vec, rowIdx, *ts)
+	case TYPE_TIMESTAMP_S:
+		ts, err := getMappedTimestampS(val)
+		if err != nil {
+			return err
+		}
+		setPrimitive(vec, rowIdx, *ts)
+	case TYPE_TIMESTAMP_MS:
+		ts, err := getMappedTimestampMS(val)
+		if err != nil {
+			return err
+		}
+		setPrimitive(vec, rowIdx, *ts)
+	case TYPE_TIMESTAMP_NS:
+		ts, err := getMappedTimestampNS(val)
+		if err != nil {
+			return err
+		}
+		setPrimitive(vec, rowIdx, *ts)
+	default:
+		return castError(reflect.TypeOf(val).String(), "")
 	}
-	setPrimitive(vec, rowIdx, *ts)
 	return nil
 }
 
@@ -237,7 +260,7 @@ func setEnum[S any](vec *vector, rowIdx mapping.IdxT, val S) error {
 		return castError(reflect.TypeOf(val).String(), reflect.TypeOf(str).String())
 	}
 
-	if v, ok := vec.dict[str]; ok {
+	if v, ok := vec.namesDict[str]; ok {
 		switch vec.internalType {
 		case TYPE_UTINYINT:
 			return setNumeric[uint32, int8](vec, rowIdx, v)
@@ -255,7 +278,7 @@ func setEnum[S any](vec *vector, rowIdx mapping.IdxT, val S) error {
 }
 
 func setList[S any](vec *vector, rowIdx mapping.IdxT, val S) error {
-	list, err := extractSlice(vec, val)
+	list, err := extractSlice(val)
 	if err != nil {
 		return err
 	}
@@ -339,7 +362,7 @@ func setMap[S any](vec *vector, rowIdx mapping.IdxT, val S) error {
 }
 
 func setArray[S any](vec *vector, rowIdx mapping.IdxT, val S) error {
-	array, err := extractSlice(vec, val)
+	array, err := extractSlice(val)
 	if err != nil {
 		return err
 	}
@@ -347,33 +370,6 @@ func setArray[S any](vec *vector, rowIdx mapping.IdxT, val S) error {
 		return invalidInputError(strconv.Itoa(len(array)), strconv.Itoa(int(vec.arrayLength)))
 	}
 	return setSliceChildren(vec, array, rowIdx*vec.arrayLength)
-}
-
-func extractSlice[S any](vec *vector, val S) ([]any, error) {
-	var s []any
-	switch v := any(val).(type) {
-	case []any:
-		s = v
-	default:
-		kind := reflect.TypeOf(val).Kind()
-		if kind != reflect.Array && kind != reflect.Slice {
-			return nil, castError(reflect.TypeOf(val).String(), reflect.TypeOf(s).String())
-		}
-		// Insert the values into the child vector.
-		rv := reflect.ValueOf(val)
-		s = make([]any, rv.Len())
-
-		for i := 0; i < rv.Len(); i++ {
-			idx := rv.Index(i)
-			if vec.canNil(idx) && idx.IsNil() {
-				s[i] = nil
-				continue
-			}
-
-			s[i] = idx.Interface()
-		}
-	}
-	return s, nil
 }
 
 func setSliceChildren(vec *vector, s []any, offset mapping.IdxT) error {
@@ -410,6 +406,70 @@ func setUUID[S any](vec *vector, rowIdx mapping.IdxT, val S) error {
 	return nil
 }
 
+func setUnion[S any](vec *vector, rowIdx mapping.IdxT, val S) error {
+	switch v := any(val).(type) {
+	case Union:
+		// Get the tag index.
+		tag, found := vec.namesDict[v.Tag]
+		if !found {
+			return invalidInputError("tag", v.Tag)
+		}
+
+		// Set the tag in the tag vector.
+		setPrimitive(&vec.childVectors[0], rowIdx, uint8(tag))
+
+		// Set the value in the tagged member vector, and set all other members to NULL.
+		for i := 1; i < len(vec.childVectors); i++ {
+			child := &vec.childVectors[i]
+			if uint32(i) == tag+1 {
+				if err := child.setFn(child, rowIdx, v.Value); err != nil {
+					return err
+				}
+				continue
+			}
+			if err := child.setFn(child, rowIdx, nil); err != nil {
+				return err
+			}
+		}
+
+		return nil
+
+	default:
+		// Try to match the type with a UNION member.
+		anyVal := any(val)
+
+		// Try each member until we find one accepting the value.
+		match := 0
+		for i := 1; i < len(vec.childVectors); i++ {
+			childVec := &vec.childVectors[i]
+			err := childVec.setFn(childVec, rowIdx, anyVal)
+			if err == nil {
+				// The member accepted the value.
+				match = i
+				// Set the tag.
+				setPrimitive(&vec.childVectors[0], rowIdx, uint8(i-1))
+				break
+			}
+		}
+		if match != 0 {
+			// Set all other members to NULL.
+			for i := 1; i < len(vec.childVectors); i++ {
+				child := &vec.childVectors[i]
+				if i == match {
+					continue
+				}
+				if err := child.setFn(child, rowIdx, nil); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+
+		// No member accepted the value.
+		return castError(reflect.TypeOf(val).String(), "UNION member")
+	}
+}
+
 func setVectorVal[S any](vec *vector, rowIdx mapping.IdxT, val S) error {
 	name, inMap := unsupportedTypeToStringMap[vec.Type]
 	if inMap {
@@ -440,7 +500,7 @@ func setVectorVal[S any](vec *vector, rowIdx mapping.IdxT, val S) error {
 	case TYPE_DOUBLE:
 		return setNumeric[S, float64](vec, rowIdx, val)
 	case TYPE_TIMESTAMP, TYPE_TIMESTAMP_S, TYPE_TIMESTAMP_MS, TYPE_TIMESTAMP_NS, TYPE_TIMESTAMP_TZ:
-		return setTS[S](vec, rowIdx, val)
+		return setTS(vec, rowIdx, val)
 	case TYPE_DATE:
 		return setDate[S](vec, rowIdx, val)
 	case TYPE_TIME, TYPE_TIME_TZ:
@@ -466,6 +526,8 @@ func setVectorVal[S any](vec *vector, rowIdx mapping.IdxT, val S) error {
 		return unsupportedTypeError(unsupportedTypeToStringMap[vec.Type])
 	case TYPE_UUID:
 		return setUUID[S](vec, rowIdx, val)
+	case TYPE_UNION:
+		return setUnion[S](vec, rowIdx, val)
 	default:
 		return unsupportedTypeError(unknownTypeErrMsg)
 	}

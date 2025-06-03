@@ -82,3 +82,9 @@ func Boolean(fallback bool, keys ...string) bool {
 func String(fallback string, keys ...string) string {
 	return envx.String(fallback, keys...)
 }
+
+// Int retrieve a integer flag from the environment, checks each key in order
+// first to parse successfully is returned.
+func Int(fallback int, keys ...string) int {
+	return envx.Int(fallback, keys...)
+}

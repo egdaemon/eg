@@ -1,4 +1,4 @@
-// Package echoservice run a
+// Package echoservice run a webservice locally
 package main
 
 import (
@@ -20,9 +20,9 @@ func main() {
 		ctx,
 		eggit.AutoClone,
 		shell.Op(
-			shell.New("apt-get install -y iptables nmap socat").Privileged(),
 			shell.New("echo -----------------------------------------"),
-			shell.New("socat -v tcp-l:3000,fork exec:'/bin/cat'").Timeout(egenv.TTL()),
+			shell.New("env"),
+			shell.Newf("socat -v tcp-l:%d,fork exec:'/bin/cat'", egenv.Int(3000, "EG_COMPUTE_PORT_0")).Timeout(egenv.TTL()),
 		),
 	)
 

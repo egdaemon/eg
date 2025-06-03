@@ -107,6 +107,10 @@ func (t serve) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err e
 		Var(eg.EnvComputeTTL, t.RuntimeResources.TTL.String()).
 		Var(eg.EnvUnsafeGitCloneEnabled, strconv.FormatBool(false)) // hack to disable cloning
 
+	for idx, p := range t.Ports {
+		envb = envb.Var(fmt.Sprintf("EG_COMPUTE_PORT_%d", idx), strconv.Itoa(p))
+	}
+
 	if t.Dirty {
 		mounthome = runners.AgentOptionAutoMountHome(homedir)
 	}
@@ -139,7 +143,8 @@ func (t serve) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err e
 
 	debugx.Println("modules", modules)
 
-	if err = runners.BuildContainer(gctx.Context, stringsx.Join(".", "eg.serve", strings.ReplaceAll(t.Name, string(filepath.Separator), ".")), t.Dir, filepath.Join(t.Dir, t.ModuleDir, t.Name, "Containerfile")); err != nil {
+	imagename := stringsx.Join(".", "eg.serve", strings.ReplaceAll(t.Name, string(filepath.Separator), "."))
+	if err = runners.BuildContainer(gctx.Context, imagename, t.Dir, filepath.Join(t.Dir, t.ModuleDir, t.Name, "Containerfile")); err != nil {
 		return errorsx.Wrap(err, "serve requires a containerfile to run")
 	}
 
@@ -198,7 +203,7 @@ func (t serve) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err e
 		}
 
 		// TODO REVISIT using t.ws.RuntimeDir as moduledir.
-		if err := c8sproxy.PodmanModule(ctx, prepcmd, eg.WorkingDirectory, fmt.Sprintf("eg-%s", uid.String()), ws.RuntimeDir, options...); err != nil {
+		if err := c8sproxy.PodmanModule(ctx, prepcmd, imagename, fmt.Sprintf("eg-%s", uid.String()), ws.RuntimeDir, options...); err != nil {
 			return errorsx.Wrap(err, "module execution failed")
 		}
 	}

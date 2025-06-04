@@ -1,0 +1,13 @@
+syntax = "proto3";
+
+package eg.interp.filesystem;
+
+message FileNotifyRequest {
+  string op = 1;
+  string path = 2;
+}
+message FileNotifyResponse {}
+
+service Proxy {
+  rpc Events(stream FileNotifyRequest) returns (FileNotifyResponse) {}
+}

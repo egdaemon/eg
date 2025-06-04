@@ -28,8 +28,10 @@ import (
 	"github.com/egdaemon/eg/runners"
 	"github.com/egdaemon/eg/transpile"
 	"github.com/egdaemon/eg/workspaces"
+	"github.com/fsnotify/fsnotify"
 	"github.com/go-git/go-git/v5"
 	"github.com/gofrs/uuid"
+	"google.golang.org/grpc"
 )
 
 type serve struct {
@@ -42,7 +44,6 @@ type serve struct {
 	Environment      []string `name:"env" short:"e" help:"define environment variables and their values to be included"`
 	GitRemote        string   `name:"git-remote" help:"name of the git remote to use" default:"${vars_git_default_remote_name}"`
 	GitReference     string   `name:"git-ref" help:"name of the branch or commit to checkout" default:"${vars_git_head_reference}"`
-	Infinite         bool     `name:"infinite" help:"allow this module to run forever, used for running a workload like a webserver" hidden:"true"`
 	Ports            []int    `name:"ports" help:"list of ports to publish to the host system"`
 	Name             string   `arg:"" name:"module" help:"name of the module to run, i.e. the folder name within moduledir" default:"" predictor:"eg.workload"`
 }
@@ -62,6 +63,9 @@ func (t serve) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err e
 		gnupghome  runners.AgentOption = runners.AgentOptionNoop
 		mountegbin runners.AgentOption = runners.AgentOptionEGBin(errorsx.Must(exec.LookPath(os.Args[0])))
 	)
+
+	// serve runs until cancelled.
+	t.RuntimeResources.TTL = time.Duration(math.MaxInt)
 
 	ctx, err := podmanx.WithClient(gctx.Context)
 	if err != nil {
@@ -89,10 +93,6 @@ func (t serve) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err e
 
 	if repo, err = git.PlainOpen(ws.Root); err != nil {
 		return errorsx.Wrap(err, "unable to open git repository")
-	}
-
-	if t.Infinite {
-		t.RuntimeResources.TTL = time.Duration(math.MaxInt)
 	}
 
 	envb := envx.Build().
@@ -181,6 +181,36 @@ func (t serve) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err e
 		runners.AgentOptionCores(t.RuntimeResources.Cores),
 		runners.AgentOptionMemory(uint64(t.RuntimeResources.Memory)),
 	)
+
+	{
+		w, err := fsnotify.NewBufferedWatcher(128)
+		if err != nil {
+			return errorsx.Wrap(err, "unable to setup file watch")
+		}
+
+		log.Println("DERP DERP", ws.Root)
+		w.Add(ws.Root)
+
+		go func() {
+			var (
+				cause error
+				conn  grpc.ClientConnInterface
+			)
+			for evt := range w.Events {
+				log.Println("derp", evt.Op, evt.Name, eg.DefaultMountRoot())
+				if conn == nil {
+					conn, cause = ragent.Dial(ctx)
+					if cause != nil {
+						log.Println("dropping event, unable to connect to control socket", cause)
+						continue
+					}
+
+					_ = conn
+				}
+
+			}
+		}()
+	}
 
 	for _, m := range modules {
 		options := append(

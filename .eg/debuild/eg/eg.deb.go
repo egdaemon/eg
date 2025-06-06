@@ -72,6 +72,7 @@ func Build(ctx context.Context, o eg.Op) error {
 			egdebuild.Build(gcfg, egdebuild.Option.Distro("jammy")),
 			egdebuild.Build(gcfg, egdebuild.Option.Distro("noble")),
 			egdebuild.Build(gcfg, egdebuild.Option.Distro("oracular")),
+			egdebuild.Build(gcfg, egdebuild.Option.Distro("plucky")),
 		),
 	)(ctx, o)
 }

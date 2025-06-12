@@ -1,3 +1,4 @@
 .cache
 .temp
 .eg.runtime
+.eg.env

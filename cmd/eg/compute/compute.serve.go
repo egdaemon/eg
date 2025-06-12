@@ -47,6 +47,10 @@ type serve struct {
 	Name             string   `arg:"" name:"module" help:"name of the module to run, i.e. the folder name within moduledir" default:"" predictor:"eg.workload"`
 }
 
+func (t serve) datadir(rels ...string) string {
+	return filepath.Join(t.Dir, t.ModuleDir, t.Name, filepath.Join(rels...))
+}
+
 func (t serve) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err error) {
 	var (
 		homedir    = userx.HomeDirectoryOrDefault("/root")
@@ -97,6 +101,7 @@ func (t serve) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err e
 
 	envb := envx.Build().
 		FromPath(t.EnvironmentPaths).
+		FromPath(t.datadir(".eg.env")).
 		FromEnv(t.Environment...).
 		FromEnv(os.Environ()...).
 		FromEnviron(errorsx.Zero(gitx.LocalEnv(repo, t.GitRemote, t.GitReference))...).
@@ -144,7 +149,7 @@ func (t serve) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err e
 	debugx.Println("modules", modules)
 
 	imagename := stringsx.Join(".", "eg.serve", strings.ReplaceAll(t.Name, string(filepath.Separator), "."))
-	if err = runners.BuildContainer(gctx.Context, imagename, t.Dir, filepath.Join(t.Dir, t.ModuleDir, t.Name, "Containerfile")); err != nil {
+	if err = runners.BuildContainer(gctx.Context, imagename, t.Dir, t.datadir("Containerfile")); err != nil {
 		return errorsx.Wrap(err, "serve requires a containerfile to run")
 	}
 

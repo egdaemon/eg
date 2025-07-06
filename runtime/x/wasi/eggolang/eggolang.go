@@ -233,12 +233,20 @@ func (toption) Verbose(b bool) toption {
 	}
 }
 
+// set environment variables for this test specifically.
+func (toption) Environ(envvars ...string) toption {
+	return func(o *testOption) {
+		o.environ = append(o.environ, envvars...)
+	}
+}
+
 type testOption struct {
 	buildOption
-	coverage  string // cover mode
+	coverage  string // coverage mode
 	count     string
 	randomize string
 	verbose   string
+	environ   []string
 }
 
 func (t testOption) options() (dst []string) {
@@ -282,7 +290,7 @@ func AutoTest(options ...toption) eg.OpFn {
 			return err
 		}
 
-		runtime := shell.Runtime().EnvironFrom(goenv...)
+		runtime := shell.Runtime().EnvironFrom(goenv...).EnvironFrom(opts.environ...)
 
 		for gomod := range modfilex.FindModules(egenv.WorkingDirectory()) {
 			cmd := stringsx.Join(" ", "go", "-C", filepath.Dir(gomod), "test", flags, fmt.Sprintf("-coverprofile %s", filepath.Join(covpath, md5x.String(gomod))), "./...")

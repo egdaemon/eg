@@ -224,6 +224,15 @@ type ContainerRunner struct {
 	built      *sync.Once
 }
 
+func (t ContainerRunner) Clone() ContainerRunner {
+	dup := t
+	dup.cmd = make([]string, 0, len(t.cmd))
+	dup.options = make([]coption, 0, len(t.options))
+	copy(dup.cmd, t.cmd)
+	copy(dup.options, t.options)
+	return t
+}
+
 func (t ContainerRunner) OptionLiteral(args ...string) ContainerRunner {
 	t.options = append(t.options, coption(nil).literal(args...))
 	return t

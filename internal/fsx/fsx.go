@@ -93,15 +93,35 @@ func FileExists(path string) bool {
 	return true
 }
 
-// FileExists returns true IFF a non-directory file exists at the provided path.
-func DirExists(path string) bool {
-	info, err := os.Stat(path)
-
-	if os.IsNotExist(err) {
-		return false
+// SymlinkExists returns true IFF a file exists and is a symlink to another file at the provided path.
+func SymlinkExists(path string) error {
+	info, err := os.Lstat(path)
+	if err != nil {
+		return errorsx.Wrapf(err, "unable to stat: %s", path)
 	}
 
-	return info.IsDir()
+	// Check if the file's mode indicates it is a symbolic link.
+	// os.ModeSymlink is a bitmask for the file type.
+	if info.Mode()&os.ModeSymlink == 0 {
+		return errorsx.Errorf("not a symlink %v: %s", info.Mode(), path)
+	}
+
+	return nil
+}
+
+// FileExists returns true IFF a non-directory file exists at the provided path.
+func DirExists(path string) error {
+	info, err := os.Stat(path)
+
+	if err != nil {
+		return err
+	}
+
+	if !info.IsDir() {
+		return errorsx.Errorf("not a directory %v: %s", info.Mode(), path)
+	}
+
+	return nil
 }
 
 func PrintFS(d fs.FS) {

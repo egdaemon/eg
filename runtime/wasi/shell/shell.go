@@ -102,6 +102,11 @@ func (t Command) UnsafeEntrypoint(e entrypoint) Command {
 	return t
 }
 
+func (t Command) UnsafeExec(e execer) Command {
+	t.exec = e
+	return t
+}
+
 // debug a command
 func (t Command) Debug() Command {
 	original := t.entry

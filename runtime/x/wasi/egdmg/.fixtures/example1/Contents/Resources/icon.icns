@@ -1,0 +1,19 @@
+<svg width="12" height="12" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="playGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#000000"/> <stop offset="100%" stop-color="#FF4500"/> </linearGradient>
+    <linearGradient id="networkGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#000000"/> <stop offset="100%" stop-color="#FF8C00"/> </linearGradient>
+  </defs>
+
+  <path d="M75 65 Q75 60 80 60 L135 95 Q140 100 135 105 L80 140 Q75 140 75 135 Z" fill="url(#playGradient)"/>
+
+  <path d="M145 55 C160 70, 160 130, 145 145" stroke="url(#networkGradient)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" opacity="0.7"/>
+  <path d="M55 55 C40 70, 40 130, 55 145" stroke="url(#networkGradient)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" opacity="0.7"/>
+
+  <circle cx="145" cy="55" r="3" fill="#FF8C00" opacity="0.8"/>
+  <circle cx="145" cy="145" r="3" fill="#FF8C00" opacity="0.8"/>
+
+  <circle cx="55" cy="55" r="3" fill="#FF8C00" opacity="0.8"/>
+  <circle cx="55" cy="145" r="3" fill="#FF8C00" opacity="0.8"/>
+</svg>

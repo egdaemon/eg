@@ -4,6 +4,7 @@ import (
 	"io"
 	"log"
 	"os"
+	"testing"
 
 	"github.com/mattn/go-isatty"
 )
@@ -19,4 +20,8 @@ func Logging() {
 	}
 
 	log.SetOutput(io.Discard)
+}
+
+func PrivateTemp(t testing.TB) {
+	t.Setenv("TMPDIR", t.TempDir())
 }

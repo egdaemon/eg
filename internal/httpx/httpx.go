@@ -20,7 +20,6 @@ import (
 	"time"
 
 	"github.com/egdaemon/eg/internal/debugx"
-	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/iox"
 	"github.com/egdaemon/eg/internal/stringsx"
@@ -317,28 +316,22 @@ func NotFound(resp http.ResponseWriter, req *http.Request) {
 	resp.WriteHeader(http.StatusNotFound)
 }
 
-func Multipart(do func(*multipart.Writer) error) (_ string, _ *os.File, err error) {
-	buffer, err := os.CreateTemp(envx.String("", "CACHE_DIRECTORY"), "multipart.upload.bin.")
-	if err != nil {
-		return "", nil, errorsx.Wrap(err, "unable to create tmpfile buffer")
-	}
+func Multipart(do func(*multipart.Writer) error) (contentType string, _ io.ReadCloser, err error) {
+	r, w := io.Pipe()
 
-	mw := multipart.NewWriter(buffer)
+	mw := multipart.NewWriter(w)
 
-	if err = do(mw); err != nil {
-		return "", nil, err
-	}
+	ctx, done := context.WithCancelCause(context.Background())
+	go func() {
+		if err = errorsx.Compact(do(mw), mw.Close()); err != nil {
+			w.CloseWithError(err)
+		}
+		done(nil)
+	}()
 
-	// Close the form
-	if err = mw.Close(); err != nil {
-		return "", nil, errorsx.Wrap(err, "unable to close writer request")
-	}
-
-	if err = iox.Rewind(buffer); err != nil {
-		return "", nil, errorsx.Wrap(err, "rewind buffer")
-	}
-
-	return mw.FormDataContentType(), buffer, nil
+	return mw.FormDataContentType(), iox.ReaderCompositeCloser(r, func() error {
+		return errorsx.Ignore(context.Cause(ctx), context.Canceled)
+	}, r.Close), nil
 }
 
 func escapeQuotes(s string) string {

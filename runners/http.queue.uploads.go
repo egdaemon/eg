@@ -3,7 +3,6 @@ package runners
 import (
 	"io"
 	"mime/multipart"
-	"os"
 	"strconv"
 	"time"
 
@@ -11,7 +10,7 @@ import (
 	"github.com/egdaemon/eg/internal/httpx"
 )
 
-func NewEnqueueUpload(enq *Enqueued, archive io.Reader) (mimetype string, body *os.File, err error) {
+func NewEnqueueUpload(enq *Enqueued, archive io.Reader) (mimetype string, body io.ReadCloser, err error) {
 	return httpx.Multipart(func(w *multipart.Writer) error {
 		if err = w.WriteField("entry", enq.Entry); err != nil {
 			return errorsx.Wrap(err, "unable to copy entry point")
@@ -58,7 +57,7 @@ func NewEnqueueUpload(enq *Enqueued, archive io.Reader) (mimetype string, body *
 	})
 }
 
-func NewEnqueueCompletion(cause error, duration time.Duration, logs io.Reader, analytics io.Reader) (mimetype string, body *os.File, err error) {
+func NewEnqueueCompletion(cause error, duration time.Duration, logs io.Reader, analytics io.Reader) (mimetype string, body io.ReadCloser, err error) {
 	return httpx.Multipart(func(w *multipart.Writer) error {
 		if err = w.WriteField("duration", strconv.FormatUint(uint64(duration.Milliseconds()), 10)); err != nil {
 			return errorsx.Wrap(err, "unable to write duration")

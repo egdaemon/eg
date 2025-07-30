@@ -30,6 +30,7 @@ message ModuleRequest {
   string name = 2;
   string mdir = 3;
   repeated string options = 4;
+  string module = 5;
 }
 message ModuleResponse {}
 

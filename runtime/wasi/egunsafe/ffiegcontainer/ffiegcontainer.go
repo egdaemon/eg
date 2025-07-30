@@ -74,6 +74,7 @@ func Module(ctx context.Context, name, modulepath string, options []string) erro
 	_, err = containers.Module(ctx, &c8s.ModuleRequest{
 		Image:   name,
 		Name:    cname,
+		Module:  modulepath,
 		Mdir:    eg.DefaultMountRoot(eg.RuntimeDirectory),
 		Options: options,
 	})

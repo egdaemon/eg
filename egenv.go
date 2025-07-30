@@ -181,4 +181,5 @@ func PrepareRootContainer(cpath string) (err error) {
 
 const (
 	EnvExperimentalDisableHostNetwork = "EG_EXPERIMENTAL_DISABLE_HOST_NETWORK"
+	EnvExperimentalBaremetal          = "EG_EXPERIMENTAL_BAREMETAL"
 )

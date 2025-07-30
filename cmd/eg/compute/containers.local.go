@@ -156,7 +156,7 @@ func (t c8sLocal) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (er
 			runners.AgentMountReadWrite(filepath.Join(ws.Root, ws.RuntimeDir), eg.DefaultMountRoot(eg.RuntimeDirectory)),
 		),
 		runners.AgentOptionLocalComputeCachingVolumes(canonicaluri),
-		runners.AgentOptionEnviron(environpath),
+		runners.AgentOptionEnvironFile(environpath),
 		runners.AgentOptionCommandLine("--env-file", environpath), // required for tty to work correctly in local mode.
 		runners.AgentOptionHostOS(),
 		runners.AgentOptionEnv(eg.EnvComputeRunID, uid.String()),

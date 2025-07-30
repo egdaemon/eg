@@ -448,7 +448,7 @@ func beginwork(ctx context.Context, md metadata, dir string) state {
 	aopts = append(
 		aopts,
 		AgentOptionEGBin(errorsx.Zero(exec.LookPath(os.Args[0]))),
-		AgentOptionEnviron(environpath),
+		AgentOptionEnvironFile(environpath),
 		AgentOptionCommandLine("--env-file", environpath),
 		AgentOptionCores(workload.Enqueued.Cores),
 		AgentOptionMemory(workload.Enqueued.Memory),

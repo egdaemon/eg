@@ -31,7 +31,7 @@ import (
 	"github.com/egdaemon/eg/interp"
 	"github.com/egdaemon/eg/interp/c8sproxy"
 	"github.com/egdaemon/eg/interp/events"
-	execproxy "github.com/egdaemon/eg/interp/exec"
+	"github.com/egdaemon/eg/interp/execproxy"
 	"github.com/egdaemon/eg/interp/runtime/wasi/ffiwasinet"
 	"github.com/egdaemon/eg/runners"
 	"github.com/egdaemon/eg/workspaces"

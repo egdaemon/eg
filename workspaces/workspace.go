@@ -68,8 +68,8 @@ func FromEnv(ctx context.Context, root, name string) (zero Context, err error) {
 
 func New(ctx context.Context, root string, mdir string, name string) (zero Context, err error) {
 	cidmd5 := md5.New()
-	cdir := filepath.Join(eg.CacheDirectory)
-	runtimedir := filepath.Join(eg.RuntimeDirectory)
+	cdir := eg.CacheDirectory
+	runtimedir := eg.RuntimeDirectory
 	ignore := ignoredir{path: cdir, reason: "cache directory"}
 
 	if err = cacheid(ctx, root, mdir, cidmd5, ignore); err != nil {
@@ -86,9 +86,9 @@ func New(ctx context.Context, root string, mdir string, name string) (zero Conte
 		CacheDir:   cdir,
 		RuntimeDir: runtimedir,
 		WorkingDir: filepath.Join(runtimedir, "mounted"),
-		BuildDir:   filepath.Join(runtimedir, "gen", cid, "build"),
-		TransDir:   filepath.Join(runtimedir, "gen", cid, "trans"),
-		GenModDir:  filepath.Join(runtimedir, "gen", cid, "trans", ".genmod"),
+		BuildDir:   filepath.Join(cdir, eg.DefaultModuleDirectory(), ".gen", cid, "build"),
+		TransDir:   filepath.Join(cdir, eg.DefaultModuleDirectory(), ".gen", cid, "trans"),
+		GenModDir:  filepath.Join(cdir, eg.DefaultModuleDirectory(), ".gen", cid, "trans", ".genmod"),
 		Ignore:     ignore,
 	})
 }

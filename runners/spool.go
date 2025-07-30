@@ -88,7 +88,7 @@ func (t SpoolDirs) Enqueue(uid uuid.UUID) (err error) {
 
 func (t SpoolDirs) Dequeue() (_ string, err error) {
 	for i := 0; i < 100; i++ {
-		dir, err := pop(t.Queued, t.poplimit)
+		dir, err := peek(t.Queued, t.poplimit)
 		if err != nil {
 			return "", err
 		}
@@ -134,7 +134,7 @@ func (t SpoolDirs) Completed(uid uuid.UUID) (err error) {
 	)
 }
 
-func pop(dir string, n int) (popped fs.DirEntry, err error) {
+func peek(dir string, n int) (popped fs.DirEntry, err error) {
 	dirfs, err := os.Open(dir)
 	if err != nil {
 		return nil, err

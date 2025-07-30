@@ -24,6 +24,7 @@ const uuidLength = 16
 
 type UUID [uuidLength]byte
 
+// Scan implements the sql.Scanner interface.
 func (u *UUID) Scan(v any) error {
 	switch val := v.(type) {
 	case []byte:
@@ -43,6 +44,7 @@ func (u *UUID) Scan(v any) error {
 	return nil
 }
 
+// String implements the fmt.Stringer interface.
 func (u *UUID) String() string {
 	buf := make([]byte, 36)
 
@@ -57,6 +59,11 @@ func (u *UUID) String() string {
 	hex.Encode(buf[24:], u[10:])
 
 	return string(buf)
+}
+
+// Value implements the driver.Valuer interface.
+func (u *UUID) Value() (driver.Value, error) {
+	return u.String(), nil
 }
 
 // duckdb_hugeint is composed of (lower, upper) components.
@@ -198,7 +205,7 @@ type Union struct {
 
 func castToTime(val any) (time.Time, error) {
 	var ti time.Time
-	switch v := any(val).(type) {
+	switch v := val.(type) {
 	case time.Time:
 		ti = v
 	default:
@@ -235,8 +242,8 @@ func getTSTicks(t Type, val any) (int64, error) {
 	return ti.UnixNano(), nil
 }
 
-func getMappedTimestamp(val any) (*mapping.Timestamp, error) {
-	ticks, err := getTSTicks(TYPE_TIMESTAMP, val)
+func getMappedTimestamp(t Type, val any) (*mapping.Timestamp, error) {
+	ticks, err := getTSTicks(t, val)
 	if err != nil {
 		return nil, err
 	}

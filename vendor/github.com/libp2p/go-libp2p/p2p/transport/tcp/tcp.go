@@ -3,6 +3,7 @@ package tcp
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net"
 	"os"
 	"runtime"
@@ -40,7 +41,7 @@ var ReuseportIsAvailable = tcpreuse.ReuseportIsAvailable
 func tryKeepAlive(conn net.Conn, keepAlive bool) {
 	keepAliveConn, ok := conn.(canKeepAlive)
 	if !ok {
-		log.Errorf("Can't set TCP keepalives.")
+		log.Errorf("can't set TCP keepalives. net.Conn of type %T doesn't support SetKeepAlive", conn)
 		return
 	}
 	if err := keepAliveConn.SetKeepAlive(keepAlive); err != nil {
@@ -75,23 +76,23 @@ func tryLinger(conn net.Conn, sec int) {
 	}
 }
 
-type tcpListener struct {
-	manet.Listener
+type tcpGatedMaListener struct {
+	transport.GatedMaListener
 	sec int
 }
 
-func (ll *tcpListener) Accept() (manet.Conn, error) {
-	c, err := ll.Listener.Accept()
+func (ll *tcpGatedMaListener) Accept() (manet.Conn, network.ConnManagementScope, error) {
+	c, scope, err := ll.GatedMaListener.Accept()
 	if err != nil {
-		return nil, err
+		if scope != nil {
+			log.Errorf("BUG: got non-nil scope but also an error: %s", err)
+			scope.Done()
+		}
+		return nil, nil, err
 	}
 	tryLinger(c, ll.sec)
 	tryKeepAlive(c, true)
-	// We're not calling OpenConnection in the resource manager here,
-	// since the manet.Conn doesn't allow us to save the scope.
-	// It's the caller's (usually the p2p/net/upgrader) responsibility
-	// to call the resource manager.
-	return c, nil
+	return c, scope, nil
 }
 
 type Option func(*TcpTransport) error
@@ -117,11 +118,34 @@ func WithMetrics() Option {
 	}
 }
 
+// WithDialerForAddr sets a custom dialer for the given address.
+// If set, it will be the *ONLY* dialer used.
+func WithDialerForAddr(d DialerForAddr) Option {
+	return func(tr *TcpTransport) error {
+		tr.overrideDialerForAddr = d
+		return nil
+	}
+}
+
+type ContextDialer interface {
+	DialContext(ctx context.Context, network, address string) (net.Conn, error)
+}
+
+// DialerForAddr is a function that returns a dialer for a given address.
+// Implementations must return either a ContextDialer or an error. It is
+// invalid to return nil, nil.
+type DialerForAddr func(raddr ma.Multiaddr) (ContextDialer, error)
+
 // TcpTransport is the TCP transport.
 type TcpTransport struct {
 	// Connection upgrader for upgrading insecure stream connections to
 	// secure multiplex connections.
 	upgrader transport.Upgrader
+
+	// optional custom dialer to use for dialing. If set, it will be the *ONLY* dialer
+	// used. The transport will not attempt to reuse the listen port to
+	// dial or the shared TCP transport for dialing.
+	overrideDialerForAddr DialerForAddr
 
 	disableReuseport bool // Explicitly disable reuseport.
 	enableMetrics    bool
@@ -170,12 +194,45 @@ func (t *TcpTransport) CanDial(addr ma.Multiaddr) bool {
 	return dialMatcher.Matches(addr)
 }
 
+func (t *TcpTransport) customDial(ctx context.Context, raddr ma.Multiaddr) (manet.Conn, error) {
+	// get the net.Dial friendly arguments from the remote addr
+	rnet, rnaddr, err := manet.DialArgs(raddr)
+	if err != nil {
+		return nil, err
+	}
+	dialer, err := t.overrideDialerForAddr(raddr)
+	if err != nil {
+		return nil, err
+	}
+	if dialer == nil {
+		return nil, fmt.Errorf("dialer for address %s is nil", raddr)
+	}
+
+	// ok, Dial!
+	var nconn net.Conn
+	switch rnet {
+	case "tcp", "tcp4", "tcp6", "udp", "udp4", "udp6", "unix":
+		nconn, err = dialer.DialContext(ctx, rnet, rnaddr)
+		if err != nil {
+			return nil, err
+		}
+	default:
+		return nil, fmt.Errorf("unrecognized network: %s", rnet)
+	}
+
+	return manet.WrapNetConn(nconn)
+}
+
 func (t *TcpTransport) maDial(ctx context.Context, raddr ma.Multiaddr) (manet.Conn, error) {
 	// Apply the deadline iff applicable
 	if t.connectTimeout > 0 {
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithTimeout(ctx, t.connectTimeout)
 		defer cancel()
+	}
+
+	if t.overrideDialerForAddr != nil {
+		return t.customDial(ctx, raddr)
 	}
 
 	if t.sharedTcp != nil {
@@ -259,22 +316,31 @@ func (t *TcpTransport) unsharedMAListen(laddr ma.Multiaddr) (manet.Listener, err
 
 // Listen listens on the given multiaddr.
 func (t *TcpTransport) Listen(laddr ma.Multiaddr) (transport.Listener, error) {
-	var list manet.Listener
+	var list transport.GatedMaListener
 	var err error
-
-	if t.sharedTcp == nil {
-		list, err = t.unsharedMAListen(laddr)
-	} else {
+	if t.sharedTcp != nil {
 		list, err = t.sharedTcp.DemultiplexedListen(laddr, tcpreuse.DemultiplexedConnType_MultistreamSelect)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		mal, err := t.unsharedMAListen(laddr)
+		if err != nil {
+			return nil, err
+		}
+		list = t.upgrader.GateMaListener(mal)
 	}
-	if err != nil {
-		return nil, err
-	}
+
+	// Always wrap the listener with tcpGatedMaListener to apply TCP-specific configurations
+	tcpList := &tcpGatedMaListener{list, 0}
 
 	if t.enableMetrics {
-		list = newTracingListener(&tcpListener{list, 0}, t.metricsCollector)
+		// Wrap with tracing listener if metrics are enabled
+		return t.upgrader.UpgradeGatedMaListener(t, newTracingListener(tcpList, t.metricsCollector)), nil
 	}
-	return t.upgrader.UpgradeListener(t, list), nil
+
+	// Regular path without metrics
+	return t.upgrader.UpgradeGatedMaListener(t, tcpList), nil
 }
 
 // Protocols returns the list of terminal protocols this transport can dial.

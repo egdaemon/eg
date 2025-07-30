@@ -79,6 +79,13 @@ func (t localdownloader) Download(ctx context.Context) (err error) {
 		return errorsx.Wrap(err, "failed to watch queued directory")
 	}
 
+	// take a final peek after we've added the directory.
+	// there is a chance between the first call to dequeue
+	// and pending.Add that a directory was created.
+	if _, err := peek(dirs.Queued, 1); err == nil {
+		return nil
+	}
+
 	for {
 		select {
 		case evt := <-pending.Events:

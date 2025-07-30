@@ -4,11 +4,12 @@ import (
 	"context"
 	"errors"
 	"io"
+	"sync"
 
 	"github.com/quic-go/quic-go"
 )
 
-// A Hijacker allows hijacking of the stream creating part of a quic.Session from a http.Response.Body.
+// A Hijacker allows hijacking of the stream creating part of a quic.Connection from a http.ResponseWriter.
 // It is used by WebTransport to create WebTransport streams after a session has been established.
 type Hijacker interface {
 	Connection() Connection
@@ -95,8 +96,8 @@ type hijackableBody struct {
 	// only set for the http.Response
 	// The channel is closed when the user is done with this response:
 	// either when Read() errors, or when Close() is called.
-	reqDone       chan<- struct{}
-	reqDoneClosed bool
+	reqDone     chan<- struct{}
+	reqDoneOnce sync.Once
 }
 
 var _ io.ReadCloser = &hijackableBody{}
@@ -117,13 +118,11 @@ func (r *hijackableBody) Read(b []byte) (int, error) {
 }
 
 func (r *hijackableBody) requestDone() {
-	if r.reqDoneClosed || r.reqDone == nil {
-		return
-	}
 	if r.reqDone != nil {
-		close(r.reqDone)
+		r.reqDoneOnce.Do(func() {
+			close(r.reqDone)
+		})
 	}
-	r.reqDoneClosed = true
 }
 
 func (r *hijackableBody) Close() error {

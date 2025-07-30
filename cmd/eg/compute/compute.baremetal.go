@@ -1,10 +1,8 @@
-package main
+package compute
 
 import (
 	"context"
-	"crypto/rand"
 	"database/sql"
-	"errors"
 	"log"
 	"net"
 	"os"
@@ -17,85 +15,33 @@ import (
 	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/cmd/cmdopts"
 	"github.com/egdaemon/eg/cmd/eg/daemons"
-	"github.com/egdaemon/eg/compile"
 	"github.com/egdaemon/eg/internal/bytesx"
 	"github.com/egdaemon/eg/internal/debugx"
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
-	"github.com/egdaemon/eg/internal/execx"
-	"github.com/egdaemon/eg/internal/fsx"
 	"github.com/egdaemon/eg/internal/gitx"
 	"github.com/egdaemon/eg/internal/podmanx"
 	"github.com/egdaemon/eg/internal/runtimex"
-	"github.com/egdaemon/eg/internal/wasix"
 	"github.com/egdaemon/eg/interp"
 	"github.com/egdaemon/eg/interp/c8sproxy"
 	"github.com/egdaemon/eg/interp/events"
 	"github.com/egdaemon/eg/interp/execproxy"
-	"github.com/egdaemon/eg/interp/runtime/wasi/ffiwasinet"
 	"github.com/egdaemon/eg/runners"
 	"github.com/egdaemon/eg/workspaces"
 	"github.com/gofrs/uuid"
-	"github.com/tetratelabs/wazero"
-	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 
 	"github.com/KimMachineGun/automemlimit/memlimit"
-	"go.uber.org/automaxprocs/maxprocs"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
-type module struct {
+type baremetal struct {
 	Dir        string `name:"directory" help:"root directory of the repository" default:"${vars_git_directory}"`
-	ModuleDir  string `name:"moduledir" help:"deprecated removed once infrastructure is updated" hidden:"true" default:"${vars_workload_directory}"`
 	RuntimeDir string `name:"runtimedir" help:"runtime directory" hidden:"true" default:"${vars_eg_runtime_directory}"`
 	Module     string `arg:"" help:"name of the module to run"`
 }
 
-func (t module) mounthack(ctx context.Context, ws workspaces.Context) (err error) {
-	var (
-		binname = "bindfs"
-		mbin    string
-	)
-
-	if mbin, err = exec.LookPath(binname); err != nil {
-		return errorsx.Wrap(err, "unable to locate bindfs, failing")
-	}
-
-	remap := func(from, to string) error {
-		mcmd := exec.CommandContext(ctx, mbin, "--map=root/egd:@root/@egd", from, to)
-		if err = execx.MaybeRun(mcmd); err != nil {
-			return errorsx.Wrapf(err, "unable to run bindfs: %s", from)
-		}
-
-		return nil
-	}
-
-	err = fsx.MkDirs(
-		0770,
-		eg.DefaultWorkingDirectory(),
-		eg.DefaultCacheDirectory(),
-	)
-	if err != nil {
-		return err
-	}
-
-	err = errors.Join(
-		remap(eg.DefaultMountRoot(eg.WorkingDirectory), eg.DefaultWorkingDirectory()),
-		remap(eg.DefaultMountRoot(eg.CacheDirectory), eg.DefaultCacheDirectory()),
-	)
-	if err != nil {
-		return err
-	}
-
-	if err = fsx.Wait(ctx, 3*time.Second, ws.Root); err != nil {
-		return errorsx.Wrapf(err, "expected working directory (%s) did not appear, this is a known issue", ws.Root)
-	}
-
-	return nil
-}
-
-func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
+func (t baremetal) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 	var (
 		ws      workspaces.Context
 		aid     = envx.String(uuid.Nil.String(), eg.EnvComputeAccountID)
@@ -138,11 +84,6 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 			db        *sql.DB
 			vmemlimit int64
 		)
-
-		// automatically detect the correct number of max procs for the module
-		if _, err = maxprocs.Set(maxprocs.Logger(log.Printf)); err != nil {
-			return errorsx.Wrap(err, "unable to set cpu limits")
-		}
 
 		if vmemlimit, err = memlimit.SetGoMemLimitWithOpts(memlimit.WithProvider(memlimit.FromCgroup)); err != nil {
 			return errorsx.Wrap(err, "unable to set max limits")
@@ -263,17 +204,6 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 			grpc.ChainUnaryInterceptor(
 				podmanx.GrpcClient,
 			),
-			// grpc.KeepaliveParams(keepalive.ServerParameters{
-			// 	MaxConnectionIdle:     365 * 24 * time.Hour,
-			// 	MaxConnectionAge:      365 * 24 * time.Hour,
-			// 	MaxConnectionAgeGrace: 365 * 24 * time.Hour,
-			// 	Time:                  365 * 24 * time.Hour,
-			// 	Timeout:               time.Second,
-			// }),
-			// grpc.KeepaliveEnforcementPolicy(keepalive.EnforcementPolicy{
-			// 	MinTime:             365 * 24 * time.Hour,
-			// 	PermitWithoutStream: true,
-			// }),
 		)
 		defer srv.GracefulStop()
 
@@ -293,14 +223,6 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 		}()
 	}
 
-	// IMPORTANT: duckdb does not play well with bindfs mounting the folders before
-	// creating extensions/tables, it would nuke the working directory. it *mostly* worked once we moved this mount
-	// call after duckdb. we're leaving the call here for now but it shouldn't matter.
-	// and we're keen to remove it.
-	if err = t.mounthack(gctx.Context, ws); err != nil {
-		log.Println("unable to mount with correct permissions", err)
-	}
-
 	if cc, err = daemons.AutoRunnerClient(gctx, ws, uid, runners.AgentOptionAutoEGBin()); err != nil {
 		return err
 	}
@@ -315,91 +237,4 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 		interp.OptionRuntimeDir(t.RuntimeDir),
 		interp.OptionEnviron(cmdenv...),
 	)
-}
-
-type wasiCmd struct {
-	Dir       string `name:"directory" help:"root directory of the repository" default:"${vars_git_directory}"`
-	Module    string `arg:"" help:"name of the module to run"`
-	ModuleDir string `name:"moduledir" help:"deprecated removed once infrastructure is updated" hidden:"true" default:"${vars_workload_directory}"`
-}
-
-func (t wasiCmd) Run(gctx *cmdopts.Global) (err error) {
-	var (
-		ws workspaces.Context
-	)
-
-	ctx, done := context.WithCancel(gctx.Context)
-	defer done()
-
-	if ws, err = workspaces.FromEnv(gctx.Context, t.Dir, t.Module); err != nil {
-		return err
-	}
-
-	mpath := filepath.Join(ws.RuntimeDir, "test.wasm")
-	log.Println("wasipath", ws.RuntimeDir, mpath)
-	if err = compile.Run(ctx, t.Dir, t.Module, mpath); err != nil {
-		return err
-	}
-	runtime := wazero.NewRuntimeWithConfig(
-		ctx,
-		wazero.NewRuntimeConfigInterpreter(),
-	)
-
-	mcfg := wazero.NewModuleConfig().WithStdin(
-		os.Stdin,
-	).WithStderr(
-		os.Stderr,
-	).WithStdout(
-		os.Stdout,
-	).WithFSConfig(
-		wazero.NewFSConfig().
-			WithDirMount("/etc/resolv.conf", "/etc/resolv.conf"),
-	).WithSysNanotime().WithSysWalltime().WithRandSource(rand.Reader)
-
-	environ := errorsx.Zero(envx.Build().FromEnviron(os.Environ()...).Environ())
-	// envx.Debug(environ...)
-	mcfg = wasix.Environ(mcfg, environ...)
-
-	wasienv, err := wasi_snapshot_preview1.NewBuilder(runtime).Instantiate(ctx)
-	if err != nil {
-		return err
-	}
-	defer wasienv.Close(ctx)
-
-	wasinet, err := ffiwasinet.Wazero(runtime).Instantiate(ctx)
-	if err != nil {
-		return err
-	}
-	defer wasinet.Close(ctx)
-
-	hostenv, err := runtime.
-		NewHostModuleBuilder("env").
-		Instantiate(ctx)
-	if err != nil {
-		return err
-	}
-	defer hostenv.Close(ctx)
-
-	log.Println("interp initiated", mpath)
-	defer log.Println("interp completed", mpath)
-	wasi, err := os.ReadFile(mpath)
-	if err != nil {
-		return err
-	}
-
-	c, err := runtime.CompileModule(ctx, wasi)
-	if err != nil {
-		return err
-	}
-	defer c.Close(ctx)
-
-	// wasidebug.Module(c)
-
-	m, err := runtime.InstantiateModule(ctx, c, mcfg.WithName(mpath))
-	if err != nil {
-		return err
-	}
-	defer m.Close(ctx)
-
-	return nil
 }

@@ -25,7 +25,7 @@ NOTE: currently macosx support for local workloads is in beta, remote workloads 
 # install podman via https://podman.io/, brew unfortunately failed during initial testing.
 brew install duckdb git gpgme
 podman machine init --now
-CGO_ENABLED=1 CGO_LDFLAGS="-L/opt/homebrew/lib" go install -tags no_duckdb_arrow,duckdb_use_lib github.com/egdaemon/eg/cmd/...@latest
+CGO_ENABLED=1 CGO_LDFLAGS="-L/opt/homebrew/lib" go install -tags duckdb_use_lib github.com/egdaemon/eg/cmd/...@latest
 ```
 
 ### nixos
@@ -49,5 +49,5 @@ in
 ### linux from source
 
 ```bash
-go install -tags no_duckdb_arrow github.com/egdaemon/eg/cmd/...@latest
+go install github.com/egdaemon/eg/cmd/...@latest
 ```

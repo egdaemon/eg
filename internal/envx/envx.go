@@ -12,6 +12,7 @@ import (
 	"log"
 	"net/url"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -115,6 +116,68 @@ func NewEnvironFromStrings(environ ...string) environ {
 
 func (t environ) Map(s string) string {
 	return t.m(s)
+}
+
+type expandreader struct {
+	s       *bufio.Scanner
+	current *bytes.Buffer
+	mapping func(string) string
+}
+
+func (t expandreader) Read(b []byte) (n int, err error) {
+	// If the current internal buffer is empty, we need to scan the next line from the source.
+	if t.current.Len() == 0 {
+		if !t.s.Scan() { // we're done, return either the scanner's error or io.EOF.
+			return 0, errorsx.Compact(t.s.Err(), io.EOF)
+		}
+
+		// Get the raw text of the scanned line (bufio.Scanner.Text() strips the delimiter).
+		rawLine := t.s.Text()
+
+		// Expand variables in the line using the provided mapping function.
+		expanded := os.Expand(rawLine, t.mapping)
+
+		// Append the expanded line to the internal buffer.
+		// We explicitly add a newline here because bufio.Scanner.Text() removes it.
+		// This ensures line integrity in the output.
+		if n, err := t.current.WriteString(expanded + "\n"); err != nil {
+			return n, errorsx.Wrap(err, "failed to write to buffer")
+		}
+	}
+
+	// Read bytes from the internal buffer into the consumer's provided buffer 'b'.
+	// This handles the case where 'b' is smaller than the current expanded line.
+	return t.current.Read(b)
+}
+
+func ExpandInplace(path string, mapping func(string) string) error {
+	dst, err := os.CreateTemp(filepath.Dir(path), "expanding.*")
+	if err != nil {
+		return errorsx.Wrap(err, "unable to create tmp")
+	}
+	defer os.RemoveAll(dst.Name())
+	defer dst.Close()
+
+	src, err := os.Open(path)
+	if err != nil {
+		return errorsx.Wrapf(err, "unable to open file: %s", path)
+	}
+	defer src.Close()
+
+	if _, err := io.Copy(dst, ExpandReader(src, mapping)); err != nil {
+		return err
+	}
+
+	return os.Rename(dst.Name(), path)
+}
+
+// ExpandReader
+func ExpandReader(r io.Reader, mapping func(string) string) io.Reader {
+	return expandreader{
+		s:       bufio.NewScanner(r),
+		current: bytes.NewBuffer(nil),
+		mapping: mapping,
+	}
 }
 
 // Int retrieve a integer flag from the environment, checks each key in order

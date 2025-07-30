@@ -56,11 +56,17 @@ func RuntimeDirectory(paths ...string) string {
 // files stored in the ephemeral directory are maintained for the duration of a single module's execution.
 // and is unique to that module.
 //
-// e.g.) RuntimeDirectory("foo", "bar") -> "/ephemeral/foo/bar"
+// e.g.) EphemeralDirectory("foo", "bar") -> "/ephemeral/foo/bar"
 func EphemeralDirectory(paths ...string) string {
 	return filepath.Join(os.TempDir(), filepath.Join(paths...))
 }
 
+// returns the absolute path to the workload directory, when arguments are provided they are joined
+// joined with the workload directory.
+//
+// experimental directory
+//
+// e.g.) WorkloadDirectory("foo", "bar") -> "/workload/foo/bar"
 func WorkloadDirectory(paths ...string) string {
 	return eg.DefaultWorkloadRoot(RunID(), filepath.Join(paths...))
 }

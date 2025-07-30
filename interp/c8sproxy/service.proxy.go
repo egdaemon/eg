@@ -9,8 +9,11 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/containers/podman/v5/pkg/bindings/images"
+	"github.com/davecgh/go-spew/spew"
 	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/internal/debugx"
+	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/execx"
 	"github.com/egdaemon/eg/internal/langx"
@@ -35,10 +38,21 @@ func ServiceProxyOptionContainerOptions(v ...string) ServiceProxyOption {
 	}
 }
 
+func ServiceProxyOptionBaremetal(ps *ProxyService) {
+	ps.remap = func(s string) string {
+		if after, ok := strings.CutPrefix(s, "/eg.mnt/"); ok {
+			return filepath.Join(ps.ws.Root, after)
+		}
+
+		return s
+	}
+}
+
 func NewServiceProxy(l *log.Logger, ws workspaces.Context, options ...ServiceProxyOption) *ProxyService {
 	svc := langx.Clone(ProxyService{
-		log: l,
-		ws:  ws,
+		log:   l,
+		ws:    ws,
+		remap: func(s string) string { return s }, // noop default
 	}, options...)
 
 	return &svc
@@ -48,6 +62,7 @@ type ProxyService struct {
 	c8s.UnimplementedProxyServer
 	log           *log.Logger
 	ws            workspaces.Context
+	remap         func(s string) string
 	cmdenv        []string
 	containeropts []string
 }
@@ -74,14 +89,16 @@ func (t *ProxyService) Build(ctx context.Context, req *c8s.BuildRequest) (_ *c8s
 		cmd *exec.Cmd
 	)
 
-	abspath := req.Definition
+	abspath := t.remap(req.Definition)
 	if !filepath.IsAbs(abspath) {
 		abspath = filepath.Join(t.ws.Root, t.ws.WorkingDir, req.Definition)
 	}
 
-	// if ok, err := containers.Exists(ctx, req.Name, nil); ok && err == nil {
-	// 	return &BuildResponse{}, nil
-	// }
+	if ok, err := images.Exists(ctx, req.Name, nil); ok && err == nil {
+		return &c8s.BuildResponse{}, nil
+	} else {
+		log.Println("DERP", spew.Sdump(req))
+	}
 
 	// determine the working directory from the request if specified or the definition file's path.
 	wdir := slicesx.FindOrZero(func(s string) bool { return !stringsx.Blank(s) }, req.Directory, filepath.Dir(abspath))
@@ -142,15 +159,28 @@ func (t *ProxyService) Module(ctx context.Context, req *c8s.ModuleRequest) (_ *c
 	debugx.Println("PROXY CONTAINER MODULE INITIATED", errorsx.Zero(os.Getwd()))
 	defer debugx.Println("PROXY CONTAINER MODULE COMPLETED", errorsx.Zero(os.Getwd()))
 
+	log.Println("reqopts", req.Options)
+	log.Println("image", req.Image)
+	log.Println("name", req.Name)
+	log.Println("module", req.Module)
+	log.Println("mdir", req.Mdir)
+
 	options := make([]string, 0, len(t.containeropts)+len(req.Options)+1)
 	options = append(options, t.containeropts...)
 	options = append(options, req.Options...)
 	options = append(
 		options,
-		"--volume", fmt.Sprintf("%s:%s:rw", eg.DefaultMountRoot(eg.WorkingDirectory), eg.DefaultMountRoot(eg.WorkingDirectory)),
+		"--volume", fmt.Sprintf("%s:%s:rw", t.ws.Root, eg.DefaultMountRoot(eg.WorkingDirectory)),
 	)
+	// conditionally add this volume for backwards compatibility.
+	// REMOVE: 2026
+	if envx.Boolean(false, eg.EnvExperimentalBaremetal) && stringsx.Present(req.Module) {
+		options = append(options, "--volume", fmt.Sprintf("%s:%s:ro", filepath.Join(t.ws.Root, t.ws.BuildDir, req.Module), eg.DefaultMountRoot(eg.ModuleBin)))
+	}
 
-	if err = PodmanModule(ctx, t.prepcmd, req.Image, req.Name, req.Mdir, options...); err != nil {
+	// envx.Debug(options...)
+
+	if err = PodmanModule(ctx, t.prepcmd, req.Image, req.Name, t.remap(req.Mdir), options...); err != nil {
 		return nil, err
 	}
 

@@ -4,16 +4,14 @@ import (
 	"context"
 	"net"
 	"time"
-
-	"github.com/quic-go/quic-go"
 )
 
 // nonQUICPacketConn is a net.PacketConn that can be used to read and write
 // non-QUIC packets on a quic.Transport. This lets us reuse this UDP port for
 // other transports like WebRTC.
 type nonQUICPacketConn struct {
-	owningTransport refCountedQuicTransport
-	tr              *quic.Transport
+	owningTransport RefCountedQUICTransport
+	tr              QUICTransport
 	ctx             context.Context
 	ctxCancel       context.CancelFunc
 	readCtx         context.Context
@@ -32,7 +30,7 @@ func (n *nonQUICPacketConn) Close() error {
 
 // LocalAddr implements net.PacketConn.
 func (n *nonQUICPacketConn) LocalAddr() net.Addr {
-	return n.tr.Conn.LocalAddr()
+	return n.owningTransport.LocalAddr()
 }
 
 // ReadFrom implements net.PacketConn.
@@ -61,7 +59,7 @@ func (n *nonQUICPacketConn) SetReadDeadline(t time.Time) error {
 }
 
 // SetWriteDeadline implements net.PacketConn.
-func (n *nonQUICPacketConn) SetWriteDeadline(t time.Time) error {
+func (n *nonQUICPacketConn) SetWriteDeadline(_ time.Time) error {
 	// Unused. quic-go doesn't support deadlines for writes.
 	return nil
 }

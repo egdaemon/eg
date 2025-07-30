@@ -22,8 +22,8 @@ package cdata
 // #include <stdlib.h>
 // #include <stdint.h>
 // #include <string.h>
-// #include "arrow/c/abi.h"
-// #include "arrow/c/helpers.h"
+// #include "abi.h"
+// #include "helpers.h"
 //
 // void setup_array_stream_test(const int n_batches, struct ArrowArrayStream* out);
 // static struct ArrowArray* get_test_arr() {
@@ -96,10 +96,6 @@ func exportInt32TypeSchema() CArrowSchema {
 	var s CArrowSchema
 	C.export_int32_type(&s)
 	return s
-}
-
-func releaseStream(s *CArrowArrayStream) {
-	C.ArrowArrayStreamRelease(s)
 }
 
 func schemaIsReleased(s *CArrowSchema) bool {

@@ -124,7 +124,6 @@ func (e eventConnectionClosed) MarshalJSONObject(enc *gojay.Encoder) {
 	case errors.As(e.e, &statelessResetErr):
 		enc.StringKey("owner", ownerRemote.String())
 		enc.StringKey("trigger", "stateless_reset")
-		enc.StringKey("stateless_reset_token", fmt.Sprintf("%x", statelessResetErr.Token))
 	case errors.As(e.e, &handshakeTimeoutErr):
 		enc.StringKey("owner", ownerLocal.String())
 		enc.StringKey("trigger", "handshake_timeout")
@@ -337,7 +336,7 @@ func (e eventMetricsUpdated) MarshalJSONObject(enc *gojay.Encoder) {
 		enc.Uint64Key("bytes_in_flight", uint64(e.Current.BytesInFlight))
 	}
 	if e.Last == nil || e.Last.PacketsInFlight != e.Current.PacketsInFlight {
-		enc.Uint64KeyOmitEmpty("packets_in_flight", uint64(e.Current.PacketsInFlight))
+		enc.Uint64Key("packets_in_flight", uint64(e.Current.PacketsInFlight))
 	}
 }
 
@@ -493,10 +492,14 @@ var _ gojay.MarshalerJSONObject = &preferredAddress{}
 
 func (a preferredAddress) IsNil() bool { return false }
 func (a preferredAddress) MarshalJSONObject(enc *gojay.Encoder) {
-	enc.StringKey("ip_v4", a.IPv4.Addr().String())
-	enc.Uint16Key("port_v4", a.IPv4.Port())
-	enc.StringKey("ip_v6", a.IPv6.Addr().String())
-	enc.Uint16Key("port_v6", a.IPv6.Port())
+	if a.IPv4.IsValid() {
+		enc.StringKey("ip_v4", a.IPv4.Addr().String())
+		enc.Uint16Key("port_v4", a.IPv4.Port())
+	}
+	if a.IPv6.IsValid() {
+		enc.StringKey("ip_v6", a.IPv6.Addr().String())
+		enc.Uint16Key("port_v6", a.IPv6.Port())
+	}
 	enc.StringKey("connection_id", a.ConnectionID.String())
 	enc.StringKey("stateless_reset_token", fmt.Sprintf("%x", a.StatelessResetToken))
 }

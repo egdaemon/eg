@@ -10,14 +10,15 @@ import (
 
 type connWithScope struct {
 	sampledconn.ManetTCPConnInterface
-	scope network.ConnManagementScope
+	ConnScope network.ConnManagementScope
 }
 
-func (c connWithScope) Scope() network.ConnManagementScope {
-	return c.scope
+func (c *connWithScope) Close() error {
+	defer c.ConnScope.Done()
+	return c.ManetTCPConnInterface.Close()
 }
 
-func manetConnWithScope(c manet.Conn, scope network.ConnManagementScope) (manet.Conn, error) {
+func manetConnWithScope(c manet.Conn, scope network.ConnManagementScope) (*connWithScope, error) {
 	if tcpconn, ok := c.(sampledconn.ManetTCPConnInterface); ok {
 		return &connWithScope{tcpconn, scope}, nil
 	}

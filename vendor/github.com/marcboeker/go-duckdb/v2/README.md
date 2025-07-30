@@ -1,17 +1,20 @@
 # Go SQL Driver For [DuckDB](https://github.com/duckdb/duckdb)
 ![Tests status](https://github.com/marcboeker/go-duckdb/actions/workflows/tests.yaml/badge.svg)
-[![GoDoc](https://godoc.org/github.com/marcboeker/go-duckdb?status.svg)](https://pkg.go.dev/github.com/marcboeker/go-duckdb)
+[![GoDoc](https://godoc.org/github.com/marcboeker/go-duckdb/v2?status.svg)](https://pkg.go.dev/github.com/marcboeker/go-duckdb/v2)
 
 The DuckDB driver conforms to the built-in `database/sql` interface.
 
-**Current DuckDB version: `v1.3.0`.**
+**Current DuckDB version: `v1.3.2`.**
 
-The first go-duckdb tag with that version is `v2.3.0`.
+The first go-duckdb tag with that version is `v2.3.3`.
 
 Previous DuckDB versions:
 
 | DuckDB   | go-duckdb |
 |----------|-----------|
+| `v1.3.2` | `v2.3.3`  |
+| `v1.3.1` | `v2.3.2`  |
+| `v1.3.0` | `v2.3.0`  |
 | `v1.2.2` | `v2.2.0`  |
 | `v1.2.1` | `v2.1.0`  |
 | `v1.2.0` | `v2.0.3`  |
@@ -235,10 +238,10 @@ rows, err := conn.QueryContext(context.Background(), "SELECT 42")
 // Alternatively, rows.Next() has to return false.
 rows.Close()
 
-appender, err := NewAppenderFromConn(conn, "", "test")
+appender, err := duckdb.NewAppenderFromConn(conn, "", "test")
 defer appender.Close()
 
-c, err := NewConnector("", nil)
+c, err := duckdb.NewConnector("", nil)
 // Optional, if passed to sql.OpenDB.
 defer c.Close()
 ```
@@ -330,3 +333,32 @@ for rdr.Next() {
 `go-duckdb` relies on the [`duckdb-go-bindings` module](https://github.com/duckdb/duckdb-go-bindings).
 Any pre-built library in `duckdb-go-bindings` statically links the default extensions: ICU, JSON, Parquet, and Autocomplete.
 Additionally, automatic extension loading is enabled.
+
+## Releasing a New DuckDB Version
+
+#### Update the Mappings
+
+1. Create a new branch.
+2. Update the `duckdb-go-bindings` dependencies in `mapping/mod.go` and `arrowmapping/mod.go`.
+3. Run `go mod tidy` inside `mapping` and inside `arrowmapping`.
+4. Commit and PR changes.
+5. Push two new tagged releases, `mapping/vx.x.x` and `arrowmapping/vx.x.x`.
+
+#### Update the Main Module
+
+1. Create a new branch.
+2. Update the `mapping` and `arrowmapping` dependencies in `mod.go`.
+3. Run `go mod tidy`.
+4. Update `VERSION=` in `tests.yaml`.
+5. Update the latest version in `README.md`.
+6. Commit and PR changes.
+7. Push a new tagged release, `vx.x.x`.
+
+```
+git tag <tagname>
+git push origin <tagname>
+```
+
+Example PRs: 
+- Update the Mappings: https://github.com/marcboeker/go-duckdb/pull/473
+- Update the Main Module: https://github.com/marcboeker/go-duckdb/pull/474

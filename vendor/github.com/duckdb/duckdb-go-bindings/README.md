@@ -16,11 +16,28 @@ This module's *first* official release contains DuckDB's v1.2.0 release.
 
 | duckdb version | main module | darwin amd | darwin arm | linux amd | linux arm | windows amd |
 |----------------|-------------|------------|------------|-----------|-----------|-------------|
+| v1.3.2         | v0.1.17     | v0.1.12    | v0.1.12    | v0.1.12   | v0.1.12   | v0.1.12     |
+| v1.3.1         | v0.1.16     | v0.1.11    | v0.1.11    | v0.1.11   | v0.1.11   | v0.1.11     |
+| v1.3.0         | v0.1.15     | v0.1.10    | v0.1.10    | v0.1.10   | v0.1.10   | v0.1.10     |
 | v1.2.2         | v0.1.14     | v0.1.9     | v0.1.9     | v0.1.9    | v0.1.9    | v0.1.9      |
 | v1.2.1         | v0.1.13     | v0.1.8     | v0.1.8     | v0.1.8    | v0.1.8    | v0.1.8      |
 | v1.2.0         | v0.1.10     | v0.1.5     | v0.1.5     | v0.1.5    | v0.1.5    | v0.1.5      |
 
 The main module (`github.com/duckdb/duckdb-go-bindings`) does not link any pre-built static library.
+
+## Releasing a new duckdb version
+
+1. Create a new branch and update the `DUCKDB_VERSION` in the `Makefile`.
+2. Invoke the `Fetch and Push Libs` workflow on the new branch.
+3. Update the `Releases` table in the `README.md`.
+4. Open a PR, wait for all tests to pass, and then merge the PR into `main`.
+5. Publish the tags by incrementing the latest tagged release for the main module, and for each OS+architecture combination.
+```
+git tag <tagname>
+git push origin <tagname>
+```
+
+Example PR: https://github.com/duckdb/duckdb-go-bindings/pull/19.
 
 ## Using a pre-built static library
 

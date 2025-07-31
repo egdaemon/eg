@@ -202,7 +202,6 @@ func (t baremetal) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error
 			runners.AgentMountReadWrite(filepath.Join(ws.Root, ws.CacheDir), eg.DefaultMountRoot(eg.CacheDirectory)),
 			runners.AgentMountReadWrite(filepath.Join(ws.Root, ws.RuntimeDir), eg.DefaultMountRoot(eg.RuntimeDirectory)),
 		),
-		runners.AgentOptionEGBin(errorsx.Must(exec.LookPath(os.Args[0]))),
 		runners.AgentOptionHostOS(),
 		hostnet,
 		mountegbin,
@@ -238,7 +237,6 @@ func (t baremetal) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error
 			interp.OptionEnviron(cmdenv...),
 		)
 		if err != nil {
-			time.Sleep(time.Minute)
 			return err
 		}
 	}

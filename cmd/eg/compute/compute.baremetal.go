@@ -121,6 +121,8 @@ func (t baremetal) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error
 	).Var(
 		eg.EnvComputeRuntimeDirectory, eg.DefaultRuntimeDirectory(),
 	).Var(
+		eg.EnvComputeDefaultGroup, defaultgroup(),
+	).Var(
 		"PAGER", "cat", // no paging in this environmenet.
 	).Var(
 		eg.EnvComputeModuleNestedLevel, strconv.Itoa(0),

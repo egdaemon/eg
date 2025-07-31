@@ -80,6 +80,7 @@ const (
 	EnvComputeBin                = "EG_COMPUTE_BIN"                             // hotswap the binary, used for development testing
 	EnvComputeContainerImpure    = "EG_COMPUTE_C8S_IMPURE"                      // informs the container runner that the container depends on the repository being present.
 	EnvComputeModuleSocket       = "EG_COMPUTE_MODULE_SOCKET"                   // socket providing functionality that is scoped to an individual module. primarily command execution.
+	EnvComputeDefaultGroup       = "EG_COMPUTE_DEFAULT_GROUP"                   // override the group assigned to the user. mainly used by baremetal.
 )
 
 const (

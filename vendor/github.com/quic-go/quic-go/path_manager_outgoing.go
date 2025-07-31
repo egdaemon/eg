@@ -50,7 +50,6 @@ func (p *Path) Probe(ctx context.Context) error {
 			p.validated.Store(true)
 			return nil
 		case <-timerChan:
-			nextProbeDur *= 2 // exponential backoff
 			p.pathManager.enqueueProbe(p)
 		case <-path.ProbeSent():
 		case <-p.abandon:
@@ -62,6 +61,7 @@ func (p *Path) Probe(ctx context.Context) error {
 		}
 		timer = time.NewTimer(nextProbeDur)
 		timerChan = timer.C
+		nextProbeDur *= 2 // exponential backoff
 	}
 }
 

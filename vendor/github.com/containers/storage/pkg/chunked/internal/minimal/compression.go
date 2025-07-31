@@ -20,15 +20,6 @@ import (
 	"github.com/vbatts/tar-split/archive/tar"
 )
 
-// ZstdWriter is an interface that wraps standard io.WriteCloser and Reset() to reuse the compressor with a new writer.
-type ZstdWriter interface {
-	io.WriteCloser
-	Reset(dest io.Writer)
-}
-
-// CreateZstdWriterFunc is a function that creates a ZstdWriter for the provided destination writer.
-type CreateZstdWriterFunc func(dest io.Writer) (ZstdWriter, error)
-
 // TOC is short for Table of Contents and is used by the zstd:chunked
 // file format to effectively add an overall index into the contents
 // of a tarball; it also includes file metadata.
@@ -188,7 +179,7 @@ type TarSplitData struct {
 	UncompressedSize int64
 }
 
-func WriteZstdChunkedManifest(dest io.Writer, outMetadata map[string]string, offset uint64, tarSplitData *TarSplitData, metadata []FileMetadata, createZstdWriter CreateZstdWriterFunc) error {
+func WriteZstdChunkedManifest(dest io.Writer, outMetadata map[string]string, offset uint64, tarSplitData *TarSplitData, metadata []FileMetadata, level int) error {
 	// 8 is the size of the zstd skippable frame header + the frame size
 	const zstdSkippableFrameHeader = 8
 	manifestOffset := offset + zstdSkippableFrameHeader
@@ -207,7 +198,7 @@ func WriteZstdChunkedManifest(dest io.Writer, outMetadata map[string]string, off
 	}
 
 	var compressedBuffer bytes.Buffer
-	zstdWriter, err := createZstdWriter(&compressedBuffer)
+	zstdWriter, err := ZstdWriterWithLevel(&compressedBuffer, level)
 	if err != nil {
 		return err
 	}
@@ -253,7 +244,7 @@ func WriteZstdChunkedManifest(dest io.Writer, outMetadata map[string]string, off
 	return appendZstdSkippableFrame(dest, manifestDataLE)
 }
 
-func ZstdWriterWithLevel(dest io.Writer, level int) (ZstdWriter, error) {
+func ZstdWriterWithLevel(dest io.Writer, level int) (*zstd.Encoder, error) {
 	el := zstd.EncoderLevelFromZstd(level)
 	return zstd.NewWriter(dest, zstd.WithEncoderLevel(el))
 }

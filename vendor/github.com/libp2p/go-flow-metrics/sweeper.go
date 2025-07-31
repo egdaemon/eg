@@ -5,7 +5,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/filecoin-project/go-clock"
+	"github.com/benbjohnson/clock"
 )
 
 // IdleRate the rate at which we declare a meter idle (and stop tracking it

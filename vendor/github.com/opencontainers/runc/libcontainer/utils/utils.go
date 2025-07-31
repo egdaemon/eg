@@ -50,19 +50,19 @@ func CleanPath(path string) string {
 
 	// Ensure that all paths are cleaned (especially problematic ones like
 	// "/../../../../../" which can cause lots of issues).
-
-	if filepath.IsAbs(path) {
-		return filepath.Clean(path)
-	}
+	path = filepath.Clean(path)
 
 	// If the path isn't absolute, we need to do more processing to fix paths
 	// such as "../../../../<etc>/some/path". We also shouldn't convert absolute
 	// paths to relative ones.
-	path = filepath.Clean(string(os.PathSeparator) + path)
-	// This can't fail, as (by definition) all paths are relative to root.
-	path, _ = filepath.Rel(string(os.PathSeparator), path)
+	if !filepath.IsAbs(path) {
+		path = filepath.Clean(string(os.PathSeparator) + path)
+		// This can't fail, as (by definition) all paths are relative to root.
+		path, _ = filepath.Rel(string(os.PathSeparator), path)
+	}
 
-	return path
+	// Clean the path again for good measure.
+	return filepath.Clean(path)
 }
 
 // stripRoot returns the passed path, stripping the root path if it was
@@ -77,7 +77,7 @@ func stripRoot(root, path string) string {
 		path = "/"
 	case root == "/":
 		// do nothing
-	default:
+	case strings.HasPrefix(path, root+"/"):
 		path = strings.TrimPrefix(path, root+"/")
 	}
 	return CleanPath("/" + path)
@@ -88,8 +88,8 @@ func stripRoot(root, path string) string {
 func SearchLabels(labels []string, key string) (string, bool) {
 	key += "="
 	for _, s := range labels {
-		if val, ok := strings.CutPrefix(s, key); ok {
-			return val, true
+		if strings.HasPrefix(s, key) {
+			return s[len(key):], true
 		}
 	}
 	return "", false

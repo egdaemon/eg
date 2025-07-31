@@ -10,15 +10,15 @@ import (
 
 const (
 	iLbound = iota
+	iRbound
 	iRefiller
 	iFiller
 	iTip
 	iPadding
-	iRbound
-	iLen
+	components
 )
 
-var defaultBarStyle = [iLen]string{"[", "+", "=", ">", "-", "]"}
+var defaultBarStyle = [components]string{"[", "]", "+", "=", ">", "-"}
 
 // BarStyleComposer interface.
 type BarStyleComposer interface {
@@ -44,17 +44,15 @@ type component struct {
 	bytes []byte
 }
 
-type barSection struct {
-	meta  func(string) string
+type flushSection struct {
+	meta  func(io.Writer, []byte) error
 	bytes []byte
 }
 
-type barSections [iLen]barSection
-
-type barFiller struct {
-	components [iLen]component
-	metas      [iLen]func(string) string
-	flushOp    func(barSections, io.Writer) error
+type bFiller struct {
+	components [components]component
+	meta       [components]func(io.Writer, []byte) error
+	flush      func(io.Writer, ...flushSection) error
 	tip        struct {
 		onComplete bool
 		count      uint
@@ -63,8 +61,8 @@ type barFiller struct {
 }
 
 type barStyle struct {
-	style         [iLen]string
-	metas         [iLen]func(string) string
+	style         [components]string
+	metaFuncs     [components]func(io.Writer, []byte) error
 	tipFrames     []string
 	tipOnComplete bool
 	rev           bool
@@ -77,6 +75,9 @@ func BarStyle() BarStyleComposer {
 		style:     defaultBarStyle,
 		tipFrames: []string{defaultBarStyle[iTip]},
 	}
+	for i := range bs.metaFuncs {
+		bs.metaFuncs[i] = defaultMeta
+	}
 	return bs
 }
 
@@ -86,7 +87,7 @@ func (s barStyle) Lbound(bound string) BarStyleComposer {
 }
 
 func (s barStyle) LboundMeta(fn func(string) string) BarStyleComposer {
-	s.metas[iLbound] = fn
+	s.metaFuncs[iLbound] = makeMetaFunc(fn)
 	return s
 }
 
@@ -96,7 +97,7 @@ func (s barStyle) Rbound(bound string) BarStyleComposer {
 }
 
 func (s barStyle) RboundMeta(fn func(string) string) BarStyleComposer {
-	s.metas[iRbound] = fn
+	s.metaFuncs[iRbound] = makeMetaFunc(fn)
 	return s
 }
 
@@ -106,7 +107,7 @@ func (s barStyle) Filler(filler string) BarStyleComposer {
 }
 
 func (s barStyle) FillerMeta(fn func(string) string) BarStyleComposer {
-	s.metas[iFiller] = fn
+	s.metaFuncs[iFiller] = makeMetaFunc(fn)
 	return s
 }
 
@@ -116,7 +117,7 @@ func (s barStyle) Refiller(refiller string) BarStyleComposer {
 }
 
 func (s barStyle) RefillerMeta(fn func(string) string) BarStyleComposer {
-	s.metas[iRefiller] = fn
+	s.metaFuncs[iRefiller] = makeMetaFunc(fn)
 	return s
 }
 
@@ -126,7 +127,7 @@ func (s barStyle) Padding(padding string) BarStyleComposer {
 }
 
 func (s barStyle) PaddingMeta(fn func(string) string) BarStyleComposer {
-	s.metas[iPadding] = fn
+	s.metaFuncs[iPadding] = makeMetaFunc(fn)
 	return s
 }
 
@@ -138,7 +139,7 @@ func (s barStyle) Tip(frames ...string) BarStyleComposer {
 }
 
 func (s barStyle) TipMeta(fn func(string) string) BarStyleComposer {
-	s.metas[iTip] = fn
+	s.metaFuncs[iTip] = makeMetaFunc(fn)
 	return s
 }
 
@@ -153,7 +154,9 @@ func (s barStyle) Reverse() BarStyleComposer {
 }
 
 func (s barStyle) Build() BarFiller {
-	bf := &barFiller{metas: s.metas}
+	bf := &bFiller{
+		meta: s.metaFuncs,
+	}
 	bf.components[iLbound] = component{
 		width: runewidth.StringWidth(s.style[iLbound]),
 		bytes: []byte(s.style[iLbound]),
@@ -175,27 +178,56 @@ func (s barStyle) Build() BarFiller {
 		bytes: []byte(s.style[iPadding]),
 	}
 	bf.tip.onComplete = s.tipOnComplete
-	bf.tip.frames = make([]component, 0, len(s.tipFrames))
-	for _, t := range s.tipFrames {
-		bf.tip.frames = append(bf.tip.frames, component{
+	bf.tip.frames = make([]component, len(s.tipFrames))
+	for i, t := range s.tipFrames {
+		bf.tip.frames[i] = component{
 			width: runewidth.StringWidth(t),
 			bytes: []byte(t),
-		})
+		}
 	}
 	if s.rev {
-		bf.flushOp = barSections.flushRev
+		bf.flush = func(w io.Writer, sections ...flushSection) error {
+			for i := len(sections) - 1; i >= 0; i-- {
+				if s := sections[i]; len(s.bytes) != 0 {
+					err := s.meta(w, s.bytes)
+					if err != nil {
+						return err
+					}
+				}
+			}
+			return nil
+		}
 	} else {
-		bf.flushOp = barSections.flush
+		bf.flush = func(w io.Writer, sections ...flushSection) error {
+			for _, s := range sections {
+				if len(s.bytes) != 0 {
+					err := s.meta(w, s.bytes)
+					if err != nil {
+						return err
+					}
+				}
+			}
+			return nil
+		}
 	}
 	return bf
 }
 
-func (s *barFiller) Fill(w io.Writer, stat decor.Statistics) error {
+func (s *bFiller) Fill(w io.Writer, stat decor.Statistics) error {
 	width := internal.CheckRequestedWidth(stat.RequestedWidth, stat.AvailableWidth)
 	// don't count brackets as progress
 	width -= (s.components[iLbound].width + s.components[iRbound].width)
 	if width < 0 {
 		return nil
+	}
+
+	err := s.meta[iLbound](w, s.components[iLbound].bytes)
+	if err != nil {
+		return err
+	}
+
+	if width == 0 {
+		return s.meta[iRbound](w, s.components[iRbound].bytes)
 	}
 
 	var tip component
@@ -233,42 +265,26 @@ func (s *barFiller) Fill(w io.Writer, stat decor.Statistics) error {
 		padding = append(padding, "…"...)
 	}
 
-	return s.flushOp(barSections{
-		{s.metas[iLbound], s.components[iLbound].bytes},
-		{s.metas[iRefiller], refilling},
-		{s.metas[iFiller], filling},
-		{s.metas[iTip], tip.bytes},
-		{s.metas[iPadding], padding},
-		{s.metas[iRbound], s.components[iRbound].bytes},
-	}, w)
+	err = s.flush(w,
+		flushSection{s.meta[iRefiller], refilling},
+		flushSection{s.meta[iFiller], filling},
+		flushSection{s.meta[iTip], tip.bytes},
+		flushSection{s.meta[iPadding], padding},
+	)
+	if err != nil {
+		return err
+	}
+	return s.meta[iRbound](w, s.components[iRbound].bytes)
 }
 
-func (s barSection) flush(w io.Writer) (err error) {
-	if s.meta != nil {
-		_, err = io.WriteString(w, s.meta(string(s.bytes)))
-	} else {
-		_, err = w.Write(s.bytes)
+func makeMetaFunc(fn func(string) string) func(io.Writer, []byte) error {
+	return func(w io.Writer, p []byte) (err error) {
+		_, err = io.WriteString(w, fn(string(p)))
+		return err
 	}
+}
+
+func defaultMeta(w io.Writer, p []byte) (err error) {
+	_, err = w.Write(p)
 	return err
-}
-
-func (bb barSections) flush(w io.Writer) error {
-	for _, s := range bb {
-		err := s.flush(w)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (bb barSections) flushRev(w io.Writer) error {
-	bb[0], bb[len(bb)-1] = bb[len(bb)-1], bb[0]
-	for i := len(bb) - 1; i >= 0; i-- {
-		err := bb[i].flush(w)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
 }

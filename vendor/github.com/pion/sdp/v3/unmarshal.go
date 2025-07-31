@@ -21,7 +21,7 @@ var (
 
 	//nolint: gochecknoglobals
 	unmarshalCachePool = sync.Pool{
-		New: func() any {
+		New: func() interface{} {
 			return &unmarshalCache{}
 		},
 	}
@@ -465,8 +465,7 @@ func unmarshalOrigin(lex *lexer) (stateFn, error) {
 		return nil, fmt.Errorf("%w `%v`", errSDPInvalidValue, lex.desc.Origin.NetworkType)
 	}
 
-	// Handle potentially missing AddressType field
-	err = handleAddressType(lex)
+	lex.desc.Origin.AddressType, err = lex.readField()
 	if err != nil {
 		return nil, err
 	}
@@ -477,8 +476,7 @@ func unmarshalOrigin(lex *lexer) (stateFn, error) {
 		return nil, fmt.Errorf("%w `%v`", errSDPInvalidValue, lex.desc.Origin.AddressType)
 	}
 
-	// Handle potentially missing UnicastAddress field
-	err = handleUnicastAddress(lex)
+	lex.desc.Origin.UnicastAddress, err = lex.readField()
 	if err != nil {
 		return nil, err
 	}
@@ -488,49 +486,6 @@ func unmarshalOrigin(lex *lexer) (stateFn, error) {
 	}
 
 	return s3, nil
-}
-
-// handleAddressType processes AddressType field with graceful handling for missing fields.
-func handleAddressType(lex *lexer) error {
-	addressType, err := lex.readRequiredField()
-	if err != nil {
-		if errors.Is(err, errFieldMissing) {
-			// Field missing - use defaults for camera compatibility
-			lex.desc.Origin.AddressType = "IP4"
-			lex.desc.Origin.UnicastAddress = "0.0.0.0"
-
-			return nil
-		}
-
-		return err
-	}
-
-	lex.desc.Origin.AddressType = addressType
-
-	return nil
-}
-
-// handleUnicastAddress processes UnicastAddress field with graceful handling for missing fields.
-func handleUnicastAddress(lex *lexer) error {
-	unicastAddress, err := lex.readRequiredField()
-	if err != nil {
-		if errors.Is(err, errFieldMissing) {
-			// Use appropriate default based on address type
-			if lex.desc.Origin.AddressType == "IP6" {
-				lex.desc.Origin.UnicastAddress = "::"
-			} else {
-				lex.desc.Origin.UnicastAddress = "0.0.0.0"
-			}
-
-			return nil
-		}
-
-		return err
-	}
-
-	lex.desc.Origin.UnicastAddress = unicastAddress
-
-	return nil
 }
 
 func unmarshalSessionName(l *lexer) (stateFn, error) {

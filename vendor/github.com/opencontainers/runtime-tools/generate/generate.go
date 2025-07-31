@@ -8,10 +8,10 @@ import (
 	"os"
 	"strings"
 
-	"github.com/moby/sys/capability"
 	rspec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/opencontainers/runtime-tools/generate/seccomp"
 	capsCheck "github.com/opencontainers/runtime-tools/validate/capabilities"
+	"github.com/syndtr/gocapability/capability"
 )
 
 var (
@@ -1135,11 +1135,10 @@ func (g *Generator) ClearMounts() {
 func (g *Generator) SetupPrivileged(privileged bool) {
 	if privileged { // Add all capabilities in privileged mode.
 		var finalCapList []string
-		capList := capability.ListKnown()
-		if g.HostSpecific {
-			capList, _ = capability.ListSupported()
-		}
-		for _, cap := range capList {
+		for _, cap := range capability.List() {
+			if g.HostSpecific && cap > capsCheck.LastCap() {
+				continue
+			}
 			finalCapList = append(finalCapList, fmt.Sprintf("CAP_%s", strings.ToUpper(cap.String())))
 		}
 		g.initConfigLinux()

@@ -45,8 +45,6 @@ const (
 	retrySourceConnectionIDParameterID         transportParameterID = 0x10
 	// RFC 9221
 	maxDatagramFrameSizeParameterID transportParameterID = 0x20
-	// https://datatracker.ietf.org/doc/draft-ietf-quic-reliable-stream-reset/06/
-	resetStreamAtParameterID transportParameterID = 0x17f7586d2cb571
 )
 
 // PreferredAddress is the value encoding in the preferred_address transport parameter
@@ -84,8 +82,7 @@ type TransportParameters struct {
 	StatelessResetToken     *protocol.StatelessResetToken
 	ActiveConnectionIDLimit uint64
 
-	MaxDatagramFrameSize protocol.ByteCount // RFC 9221
-	EnableResetStreamAt  bool               // https://datatracker.ietf.org/doc/draft-ietf-quic-reliable-stream-reset/06/
+	MaxDatagramFrameSize protocol.ByteCount
 }
 
 // Unmarshal the transport parameters
@@ -202,11 +199,6 @@ func (p *TransportParameters) unmarshal(b []byte, sentBy protocol.Perspective, f
 			connID := protocol.ParseConnectionID(b[:paramLen])
 			b = b[paramLen:]
 			p.RetrySourceConnectionID = &connID
-		case resetStreamAtParameterID:
-			if paramLen != 0 {
-				return fmt.Errorf("wrong length for reset_stream_at: %d (expected empty)", paramLen)
-			}
-			p.EnableResetStreamAt = true
 		default:
 			b = b[paramLen:]
 		}
@@ -436,14 +428,8 @@ func (p *TransportParameters) Marshal(pers protocol.Perspective) []byte {
 		b = quicvarint.Append(b, uint64(p.RetrySourceConnectionID.Len()))
 		b = append(b, p.RetrySourceConnectionID.Bytes()...)
 	}
-	// QUIC datagrams
 	if p.MaxDatagramFrameSize != protocol.InvalidByteCount {
 		b = p.marshalVarintParam(b, maxDatagramFrameSizeParameterID, uint64(p.MaxDatagramFrameSize))
-	}
-	// QUIC Stream Resets with Partial Delivery
-	if p.EnableResetStreamAt {
-		b = quicvarint.Append(b, uint64(resetStreamAtParameterID))
-		b = quicvarint.Append(b, 0)
 	}
 
 	if pers == protocol.PerspectiveClient && len(AdditionalTransportParametersClient) > 0 {
@@ -486,18 +472,12 @@ func (p *TransportParameters) MarshalForSessionTicket(b []byte) []byte {
 	b = p.marshalVarintParam(b, initialMaxStreamsBidiParameterID, uint64(p.MaxBidiStreamNum))
 	// initial_max_uni_streams
 	b = p.marshalVarintParam(b, initialMaxStreamsUniParameterID, uint64(p.MaxUniStreamNum))
-	// active_connection_id_limit
-	b = p.marshalVarintParam(b, activeConnectionIDLimitParameterID, p.ActiveConnectionIDLimit)
 	// max_datagram_frame_size
 	if p.MaxDatagramFrameSize != protocol.InvalidByteCount {
 		b = p.marshalVarintParam(b, maxDatagramFrameSizeParameterID, uint64(p.MaxDatagramFrameSize))
 	}
-	// reset_stream_at
-	if p.EnableResetStreamAt {
-		b = quicvarint.Append(b, uint64(resetStreamAtParameterID))
-		b = quicvarint.Append(b, 0)
-	}
-	return b
+	// active_connection_id_limit
+	return p.marshalVarintParam(b, activeConnectionIDLimitParameterID, p.ActiveConnectionIDLimit)
 }
 
 // UnmarshalFromSessionTicket unmarshals transport parameters from a session ticket.
@@ -544,13 +524,13 @@ func (p *TransportParameters) ValidForUpdate(saved *TransportParameters) bool {
 // String returns a string representation, intended for logging.
 func (p *TransportParameters) String() string {
 	logString := "&wire.TransportParameters{OriginalDestinationConnectionID: %s, InitialSourceConnectionID: %s, "
-	logParams := []any{p.OriginalDestinationConnectionID, p.InitialSourceConnectionID}
+	logParams := []interface{}{p.OriginalDestinationConnectionID, p.InitialSourceConnectionID}
 	if p.RetrySourceConnectionID != nil {
 		logString += "RetrySourceConnectionID: %s, "
 		logParams = append(logParams, p.RetrySourceConnectionID)
 	}
 	logString += "InitialMaxStreamDataBidiLocal: %d, InitialMaxStreamDataBidiRemote: %d, InitialMaxStreamDataUni: %d, InitialMaxData: %d, MaxBidiStreamNum: %d, MaxUniStreamNum: %d, MaxIdleTimeout: %s, AckDelayExponent: %d, MaxAckDelay: %s, ActiveConnectionIDLimit: %d"
-	logParams = append(logParams, []any{p.InitialMaxStreamDataBidiLocal, p.InitialMaxStreamDataBidiRemote, p.InitialMaxStreamDataUni, p.InitialMaxData, p.MaxBidiStreamNum, p.MaxUniStreamNum, p.MaxIdleTimeout, p.AckDelayExponent, p.MaxAckDelay, p.ActiveConnectionIDLimit}...)
+	logParams = append(logParams, []interface{}{p.InitialMaxStreamDataBidiLocal, p.InitialMaxStreamDataBidiRemote, p.InitialMaxStreamDataUni, p.InitialMaxData, p.MaxBidiStreamNum, p.MaxUniStreamNum, p.MaxIdleTimeout, p.AckDelayExponent, p.MaxAckDelay, p.ActiveConnectionIDLimit}...)
 	if p.StatelessResetToken != nil { // the client never sends a stateless reset token
 		logString += ", StatelessResetToken: %#x"
 		logParams = append(logParams, *p.StatelessResetToken)
@@ -559,8 +539,6 @@ func (p *TransportParameters) String() string {
 		logString += ", MaxDatagramFrameSize: %d"
 		logParams = append(logParams, p.MaxDatagramFrameSize)
 	}
-	logString += ", EnableResetStreamAt: %t"
-	logParams = append(logParams, p.EnableResetStreamAt)
 	logString += "}"
 	return fmt.Sprintf(logString, logParams...)
 }

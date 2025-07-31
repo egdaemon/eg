@@ -17,7 +17,7 @@ type Sample struct {
 	Duration           time.Duration
 	PacketTimestamp    uint32
 	PrevDroppedPackets uint16
-	Metadata           any
+	Metadata           interface{}
 
 	// RTP headers of RTP packets forming this Sample. (Optional)
 	// Useful for accessing RTP extensions associated to the Sample.

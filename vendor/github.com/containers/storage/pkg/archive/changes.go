@@ -481,14 +481,8 @@ func ExportChanges(dir string, changes []Change, uidMaps, gidMaps []idtools.IDMa
 				}
 			} else {
 				path := filepath.Join(dir, change.Path)
-				headers, err := ta.prepareAddFile(path, change.Path[1:])
-				if err != nil {
+				if err := ta.addFile(path, change.Path[1:]); err != nil {
 					logrus.Debugf("Can't add file %s to tar: %s", path, err)
-				} else if headers != nil {
-					if err := ta.addFile(headers); err != nil {
-						writer.CloseWithError(err)
-						return
-					}
 				}
 			}
 		}

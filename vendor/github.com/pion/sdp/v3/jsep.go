@@ -32,7 +32,6 @@ const (
 	AttrKeySendRecv         = "sendrecv"
 	AttrKeyExtMap           = "extmap"
 	AttrKeyExtMapAllowMixed = "extmap-allow-mixed"
-	AttrKeyCryptex          = "cryptex"
 )
 
 // Constants for semantic tokens used in JSEP.

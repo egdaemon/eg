@@ -22,8 +22,9 @@ import (
 // of the job and a mutex for synchronized handle access.
 type JobObject struct {
 	handle windows.Handle
-	// silo signifies that this job is currently a silo.
-	silo       atomic.Bool
+	// All accesses to this MUST be done atomically except in `Open` as the object
+	// is being created in the function. 1 signifies that this job is currently a silo.
+	silo       uint32
 	mq         *queue.MessageQueue
 	handleLock sync.RWMutex
 }
@@ -203,7 +204,9 @@ func Open(ctx context.Context, options *Options) (_ *JobObject, err error) {
 		handle: jobHandle,
 	}
 
-	job.silo.Store(isJobSilo(jobHandle))
+	if isJobSilo(jobHandle) {
+		job.silo = 1
+	}
 
 	// If the IOCP we'll be using to receive messages for all jobs hasn't been
 	// created, create it and start polling.
@@ -476,7 +479,7 @@ func (job *JobObject) ApplyFileBinding(root, target string, readOnly bool) error
 		return ErrAlreadyClosed
 	}
 
-	if !job.silo.Load() {
+	if !job.isSilo() {
 		return ErrNotSilo
 	}
 
@@ -543,7 +546,7 @@ func (job *JobObject) PromoteToSilo() error {
 		return ErrAlreadyClosed
 	}
 
-	if job.silo.Load() {
+	if job.isSilo() {
 		return nil
 	}
 
@@ -566,8 +569,13 @@ func (job *JobObject) PromoteToSilo() error {
 		return fmt.Errorf("failed to promote job to silo: %w", err)
 	}
 
-	job.silo.Store(true)
+	atomic.StoreUint32(&job.silo, 1)
 	return nil
+}
+
+// isSilo returns if the job object is a silo.
+func (job *JobObject) isSilo() bool {
+	return atomic.LoadUint32(&job.silo) == 1
 }
 
 // QueryPrivateWorkingSet returns the private working set size for the job. This is calculated by adding up the

@@ -1,3 +1,5 @@
+//go:build !containers_image_fulcio_stub
+
 package signature
 
 import (

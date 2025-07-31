@@ -26,8 +26,6 @@ type Properties struct {
 
 	RuntimeId string `json:"RuntimeId,omitempty"`
 
-	SystemGUID string `json:"SystemGUID,omitempty"`
-
 	RuntimeTemplateId string `json:"RuntimeTemplateId,omitempty"`
 
 	State string `json:"State,omitempty"`

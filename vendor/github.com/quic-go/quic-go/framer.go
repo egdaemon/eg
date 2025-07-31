@@ -22,10 +22,6 @@ const (
 // (which is the RESET_STREAM frame).
 const maxStreamControlFrameSize = 25
 
-type streamFrameGetter interface {
-	popStreamFrame(protocol.ByteCount, protocol.Version) (ackhandler.StreamFrame, *wire.StreamDataBlockedFrame, bool)
-}
-
 type streamControlFrameGetter interface {
 	getControlFrame(time.Time) (_ ackhandler.Frame, ok, hasMore bool)
 }
@@ -33,7 +29,7 @@ type streamControlFrameGetter interface {
 type framer struct {
 	mutex sync.Mutex
 
-	activeStreams            map[protocol.StreamID]streamFrameGetter
+	activeStreams            map[protocol.StreamID]sendStreamI
 	streamQueue              ringbuffer.RingBuffer[protocol.StreamID]
 	streamsWithControlFrames map[protocol.StreamID]streamControlFrameGetter
 
@@ -46,7 +42,7 @@ type framer struct {
 
 func newFramer(connFlowController flowcontrol.ConnectionFlowController) *framer {
 	return &framer{
-		activeStreams:            make(map[protocol.StreamID]streamFrameGetter),
+		activeStreams:            make(map[protocol.StreamID]sendStreamI),
 		streamsWithControlFrames: make(map[protocol.StreamID]streamControlFrameGetter),
 		connFlowController:       connFlowController,
 	}
@@ -218,7 +214,7 @@ func (f *framer) QueuedTooManyControlFrames() bool {
 	return f.queuedTooManyControlFrames
 }
 
-func (f *framer) AddActiveStream(id protocol.StreamID, str streamFrameGetter) {
+func (f *framer) AddActiveStream(id protocol.StreamID, str sendStreamI) {
 	f.mutex.Lock()
 	if _, ok := f.activeStreams[id]; !ok {
 		f.streamQueue.PushBack(id)

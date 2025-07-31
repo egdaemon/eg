@@ -61,7 +61,7 @@ type RTPReceiver struct {
 
 	tracks []trackStreams
 
-	closed, received chan any
+	closed, received chan interface{}
 	mu               sync.RWMutex
 
 	tr *RTPTransceiver
@@ -82,10 +82,10 @@ func (api *API) NewRTPReceiver(kind RTPCodecType, transport *DTLSTransport) (*RT
 		kind:      kind,
 		transport: transport,
 		api:       api,
-		closed:    make(chan any),
-		received:  make(chan any),
+		closed:    make(chan interface{}),
+		received:  make(chan interface{}),
 		tracks:    []trackStreams{},
-		rtxPool: sync.Pool{New: func() any {
+		rtxPool: sync.Pool{New: func() interface{} {
 			return make([]byte, api.settingEngine.getReceiveMTU())
 		}},
 	}

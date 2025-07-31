@@ -32,6 +32,15 @@ type packetHandler interface {
 	closeWithTransportError(qerr.TransportErrorCode)
 }
 
+type quicConn interface {
+	EarlyConnection
+	earlyConnReady() <-chan struct{}
+	handlePacket(receivedPacket)
+	run() error
+	destroy(error)
+	closeWithTransportError(TransportErrorCode)
+}
+
 type zeroRTTQueue struct {
 	packets    []receivedPacket
 	expiration time.Time
@@ -88,7 +97,7 @@ type baseServer struct {
 		*logging.ConnectionTracer,
 		utils.Logger,
 		protocol.Version,
-	) *wrappedConn
+	) quicConn
 
 	closeMx sync.Mutex
 	// errorChan is closed when Close is called. This has two effects:
@@ -111,7 +120,7 @@ type baseServer struct {
 
 	verifySourceAddress func(net.Addr) bool
 
-	connQueue chan *Conn
+	connQueue chan quicConn
 
 	tracer *logging.Tracer
 
@@ -125,7 +134,7 @@ type Listener struct {
 }
 
 // Accept returns new connections. It should be called in a loop.
-func (l *Listener) Accept(ctx context.Context) (*Conn, error) {
+func (l *Listener) Accept(ctx context.Context) (Connection, error) {
 	return l.baseServer.Accept(ctx)
 }
 
@@ -153,12 +162,8 @@ type EarlyListener struct {
 }
 
 // Accept returns a new connections. It should be called in a loop.
-func (l *EarlyListener) Accept(ctx context.Context) (*Conn, error) {
-	conn, err := l.baseServer.accept(ctx)
-	if err != nil {
-		return nil, err
-	}
-	return conn, nil
+func (l *EarlyListener) Accept(ctx context.Context) (EarlyConnection, error) {
+	return l.baseServer.accept(ctx)
 }
 
 // Close the server. All active connections will be closed.
@@ -258,7 +263,7 @@ func newServer(
 		verifySourceAddress:       verifySourceAddress,
 		connIDGenerator:           connIDGenerator,
 		statelessResetter:         statelessResetter,
-		connQueue:                 make(chan *Conn, protocol.MaxAcceptQueueSize),
+		connQueue:                 make(chan quicConn, protocol.MaxAcceptQueueSize),
 		errorChan:                 make(chan struct{}),
 		stopAccepting:             make(chan struct{}),
 		running:                   make(chan struct{}),
@@ -321,11 +326,11 @@ func (s *baseServer) runSendQueue() {
 
 // Accept returns connections that already completed the handshake.
 // It is only valid if acceptEarlyConns is false.
-func (s *baseServer) Accept(ctx context.Context) (*Conn, error) {
+func (s *baseServer) Accept(ctx context.Context) (Connection, error) {
 	return s.accept(ctx)
 }
 
-func (s *baseServer) accept(ctx context.Context) (*Conn, error) {
+func (s *baseServer) accept(ctx context.Context) (quicConn, error) {
 	select {
 	case <-ctx.Done():
 		return nil, ctx.Err()
@@ -343,13 +348,11 @@ func (s *baseServer) accept(ctx context.Context) (*Conn, error) {
 }
 
 func (s *baseServer) Close() error {
-	s.close(ErrServerClosed, false)
+	s.close(ErrServerClosed, true)
 	return nil
 }
 
-// close closes the server. The Transport mutex must not be held while calling this method.
-// This method closes any handshaking connections which requires the tranpsort mutex.
-func (s *baseServer) close(e error, transportClose bool) {
+func (s *baseServer) close(e error, notifyOnClose bool) {
 	s.closeMx.Lock()
 	if s.closeErr != nil {
 		s.closeMx.Unlock()
@@ -360,25 +363,12 @@ func (s *baseServer) close(e error, transportClose bool) {
 	<-s.running
 	s.closeMx.Unlock()
 
-	if !transportClose {
+	if notifyOnClose {
 		s.onClose()
 	}
-
 	// wait until all handshakes in flight have terminated
 	s.handshakingCount.Wait()
 	close(s.stopAccepting)
-
-	if transportClose {
-		// if the transport is closing, drain the connQueue. All connections in the queue
-		// will be closed by the transport.
-		for {
-			select {
-			case <-s.connQueue:
-			default:
-				return
-			}
-		}
-	}
 }
 
 // Addr returns the server's network address
@@ -669,7 +659,7 @@ func (s *baseServer) handleInitialImpl(p receivedPacket, hdr *wire.Header) error
 		config = populateConfig(conf)
 	}
 
-	var conn *wrappedConn
+	var conn quicConn
 	var cancel context.CancelCauseFunc
 	ctx, cancel1 := context.WithCancelCause(context.Background())
 	if s.connContext != nil {
@@ -769,7 +759,7 @@ func (s *baseServer) refuseNewConn(p receivedPacket, hdr *wire.Header) {
 	}
 }
 
-func (s *baseServer) handleNewConn(conn *wrappedConn) {
+func (s *baseServer) handleNewConn(conn quicConn) {
 	if s.acceptEarlyConns {
 		// wait until the early connection is ready, the handshake fails, or the server is closed
 		select {
@@ -793,7 +783,7 @@ func (s *baseServer) handleNewConn(conn *wrappedConn) {
 	}
 
 	select {
-	case s.connQueue <- conn.Conn:
+	case s.connQueue <- conn:
 	default:
 		conn.closeWithTransportError(ConnectionRefused)
 	}

@@ -22,14 +22,23 @@ var (
 	// case sensitive keywords, so "env" is not a substring on "Environment"
 	_scrubKeywords = [][]byte{[]byte("env"), []byte("Environment")}
 
-	_scrub atomic.Bool
+	_scrub int32
 )
 
 // SetScrubbing enables scrubbing
-func SetScrubbing(enable bool) { _scrub.Store(enable) }
+func SetScrubbing(enable bool) {
+	v := int32(0) // cant convert from bool to int32 directly
+	if enable {
+		v = 1
+	}
+	atomic.StoreInt32(&_scrub, v)
+}
 
 // IsScrubbingEnabled checks if scrubbing is enabled
-func IsScrubbingEnabled() bool { return _scrub.Load() }
+func IsScrubbingEnabled() bool {
+	v := atomic.LoadInt32(&_scrub)
+	return v != 0
+}
 
 // ScrubProcessParameters scrubs HCS Create Process requests with config parameters of
 // type internal/hcs/schema2.ScrubProcessParameters (aka hcsshema.ScrubProcessParameters)

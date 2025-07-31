@@ -9,7 +9,7 @@ import (
 	"github.com/quic-go/quic-go"
 )
 
-const streamDatagramQueueLen = 32
+var _ quic.Stream = &stateTrackingStream{}
 
 // stateTrackingStream is an implementation of quic.Stream that delegates
 // to an underlying stream
@@ -19,31 +19,30 @@ const streamDatagramQueueLen = 32
 // parent connection, this is done through the streamClearer interface when
 // both the send and receive sides are closed
 type stateTrackingStream struct {
-	*quic.Stream
-
-	sendDatagram func([]byte) error
-	hasData      chan struct{}
-	queue        [][]byte // TODO: use a ring buffer
+	quic.Stream
 
 	mx      sync.Mutex
 	sendErr error
 	recvErr error
 
 	clearer streamClearer
+	setter  errorSetter
 }
-
-var _ datagramStream = &stateTrackingStream{}
 
 type streamClearer interface {
 	clearStream(quic.StreamID)
 }
 
-func newStateTrackingStream(s *quic.Stream, clearer streamClearer, sendDatagram func([]byte) error) *stateTrackingStream {
+type errorSetter interface {
+	SetSendError(error)
+	SetReceiveError(error)
+}
+
+func newStateTrackingStream(s quic.Stream, clearer streamClearer, setter errorSetter) *stateTrackingStream {
 	t := &stateTrackingStream{
-		Stream:       s,
-		clearer:      clearer,
-		sendDatagram: sendDatagram,
-		hasData:      make(chan struct{}, 1),
+		Stream:  s,
+		clearer: clearer,
+		setter:  setter,
 	}
 
 	context.AfterFunc(s.Context(), func() {
@@ -63,6 +62,8 @@ func (s *stateTrackingStream) closeSend(e error) {
 		if s.recvErr != nil {
 			s.clearer.clearStream(s.StreamID())
 		}
+
+		s.setter.SetSendError(e)
 		s.sendErr = e
 	}
 }
@@ -77,8 +78,9 @@ func (s *stateTrackingStream) closeReceive(e error) {
 		if s.sendErr != nil {
 			s.clearer.clearStream(s.StreamID())
 		}
+
+		s.setter.SetReceiveError(e)
 		s.recvErr = e
-		s.signalHasDatagram()
 	}
 }
 
@@ -111,63 +113,4 @@ func (s *stateTrackingStream) Read(b []byte) (int, error) {
 		s.closeReceive(err)
 	}
 	return n, err
-}
-
-func (s *stateTrackingStream) SendDatagram(b []byte) error {
-	s.mx.Lock()
-	sendErr := s.sendErr
-	s.mx.Unlock()
-	if sendErr != nil {
-		return sendErr
-	}
-
-	return s.sendDatagram(b)
-}
-
-func (s *stateTrackingStream) signalHasDatagram() {
-	select {
-	case s.hasData <- struct{}{}:
-	default:
-	}
-}
-
-func (s *stateTrackingStream) enqueueDatagram(data []byte) {
-	s.mx.Lock()
-	defer s.mx.Unlock()
-
-	if s.recvErr != nil {
-		return
-	}
-	if len(s.queue) >= streamDatagramQueueLen {
-		return
-	}
-	s.queue = append(s.queue, data)
-	s.signalHasDatagram()
-}
-
-func (s *stateTrackingStream) ReceiveDatagram(ctx context.Context) ([]byte, error) {
-start:
-	s.mx.Lock()
-	if len(s.queue) > 0 {
-		data := s.queue[0]
-		s.queue = s.queue[1:]
-		s.mx.Unlock()
-		return data, nil
-	}
-	if receiveErr := s.recvErr; receiveErr != nil {
-		s.mx.Unlock()
-		return nil, receiveErr
-	}
-	s.mx.Unlock()
-
-	select {
-	case <-ctx.Done():
-		return nil, context.Cause(ctx)
-	case <-s.hasData:
-	}
-	goto start
-}
-
-func (s *stateTrackingStream) QUICStream() *quic.Stream {
-	return s.Stream
 }

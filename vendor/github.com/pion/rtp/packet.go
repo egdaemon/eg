@@ -337,16 +337,12 @@ func (h Header) MarshalTo(buf []byte) (n int, err error) { //nolint:cyclop
 				n += copy(buf[n:], extension.payload)
 			}
 		default: // RFC3550 Extension
-			// Zero length extension is valid per the RFC3550 spec
-			// https://www.rfc-editor.org/rfc/rfc3550#section-5.3.1
-			if len(h.Extensions) > 0 {
-				extlen := len(h.Extensions[0].payload)
-				if extlen%4 != 0 {
-					// the payload must be in 32-bit words.
-					return 0, io.ErrShortBuffer
-				}
-				n += copy(buf[n:], h.Extensions[0].payload)
+			extlen := len(h.Extensions[0].payload)
+			if extlen%4 != 0 {
+				// the payload must be in 32-bit words.
+				return 0, io.ErrShortBuffer
 			}
+			n += copy(buf[n:], h.Extensions[0].payload)
 		}
 
 		// calculate extensions size and round to 4 bytes boundaries
@@ -386,9 +382,7 @@ func (h Header) MarshalSize() int {
 				extSize += 2 + len(extension.payload)
 			}
 		default:
-			if len(h.Extensions) > 0 {
-				extSize += len(h.Extensions[0].payload)
-			}
+			extSize += len(h.Extensions[0].payload)
 		}
 
 		// extensions size must have 4 bytes boundaries

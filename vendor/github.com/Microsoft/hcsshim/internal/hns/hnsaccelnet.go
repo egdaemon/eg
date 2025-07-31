@@ -47,7 +47,7 @@ func (nnvManagementMacList *HNSNnvManagementMacList) Set() (*HNSNnvManagementMac
 func GetNnvManagementMacAddressList() (*HNSNnvManagementMacList, error) {
 	operation := "Get"
 	title := "hcsshim::nnvManagementMacList::" + operation
-	logrus.Debug(title)
+	logrus.Debugf(title)
 	return HNSNnvManagementMacRequest("GET", "", "")
 }
 
@@ -55,6 +55,6 @@ func GetNnvManagementMacAddressList() (*HNSNnvManagementMacList, error) {
 func DeleteNnvManagementMacAddressList() (*HNSNnvManagementMacList, error) {
 	operation := "Delete"
 	title := "hcsshim::nnvManagementMacList::" + operation
-	logrus.Debug(title)
+	logrus.Debugf(title)
 	return HNSNnvManagementMacRequest("DELETE", "", "")
 }

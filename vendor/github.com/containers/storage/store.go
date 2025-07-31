@@ -22,7 +22,6 @@ import (
 
 	drivers "github.com/containers/storage/drivers"
 	"github.com/containers/storage/internal/dedup"
-	"github.com/containers/storage/internal/tempdir"
 	"github.com/containers/storage/pkg/archive"
 	"github.com/containers/storage/pkg/directory"
 	"github.com/containers/storage/pkg/idtools"
@@ -363,11 +362,15 @@ type Store interface {
 	//   }
 	ApplyDiff(to string, diff io.Reader) (int64, error)
 
+	// ApplyDiffWithDiffer applies a diff to a layer.
+	// It is the caller responsibility to clean the staging directory if it is not
+	// successfully applied with ApplyStagedLayer.
+	// Deprecated: Use PrepareStagedLayer instead.  ApplyDiffWithDiffer is going to be removed in a future release
+	ApplyDiffWithDiffer(to string, options *drivers.ApplyDiffWithDifferOpts, differ drivers.Differ) (*drivers.DriverWithDifferOutput, error)
+
 	// PrepareStagedLayer applies a diff to a layer.
 	// It is the caller responsibility to clean the staging directory if it is not
 	// successfully applied with ApplyStagedLayer.
-	// The caller must ensure [Store.ApplyStagedLayer] or [Store.CleanupStagedLayer] is called eventually
-	// with the returned [drivers.DriverWithDifferOutput] object.
 	PrepareStagedLayer(options *drivers.ApplyDiffWithDifferOpts, differ drivers.Differ) (*drivers.DriverWithDifferOutput, error)
 
 	// ApplyStagedLayer combines the functions of creating a layer and using the staging
@@ -1446,7 +1449,16 @@ func (s *store) writeToAllStores(fn func(rlstore rwLayerStore) error) error {
 // On entry:
 // - rlstore must be locked for writing
 func (s *store) canUseShifting(uidmap, gidmap []idtools.IDMap) bool {
-	return s.graphDriver.SupportsShifting(uidmap, gidmap)
+	if !s.graphDriver.SupportsShifting() {
+		return false
+	}
+	if uidmap != nil && !idtools.IsContiguous(uidmap) {
+		return false
+	}
+	if gidmap != nil && !idtools.IsContiguous(gidmap) {
+		return false
+	}
+	return true
 }
 
 // On entry:
@@ -1759,7 +1771,7 @@ func (s *store) imageTopLayerForMapping(image *Image, ristore roImageStore, rlst
 	}
 	// By construction, createMappedLayer can only be true if ristore == s.imageStore.
 	if err = s.imageStore.addMappedTopLayer(image.ID, mappedLayer.ID); err != nil {
-		if err2 := rlstore.deleteWhileHoldingLock(mappedLayer.ID); err2 != nil {
+		if err2 := rlstore.Delete(mappedLayer.ID); err2 != nil {
 			err = fmt.Errorf("deleting layer %q: %v: %w", mappedLayer.ID, err2, err)
 		}
 		return nil, fmt.Errorf("registering ID-mapped layer with image %q: %w", image.ID, err)
@@ -1944,7 +1956,7 @@ func (s *store) CreateContainer(id string, names []string, image, layer, metadat
 		}
 		container, err := s.containerStore.create(id, names, imageID, layer, &options)
 		if err != nil || container == nil {
-			if err2 := rlstore.deleteWhileHoldingLock(layer); err2 != nil {
+			if err2 := rlstore.Delete(layer); err2 != nil {
 				if err == nil {
 					err = fmt.Errorf("deleting layer %#v: %w", layer, err2)
 				} else {
@@ -2541,13 +2553,7 @@ func (s *store) Lookup(name string) (string, error) {
 	return "", ErrLayerUnknown
 }
 
-func (s *store) DeleteLayer(id string) (retErr error) {
-	cleanupFunctions := []tempdir.CleanupTempDirFunc{}
-	defer func() {
-		if cleanupErr := tempdir.CleanupTemporaryDirectories(cleanupFunctions...); cleanupErr != nil {
-			retErr = errors.Join(cleanupErr, retErr)
-		}
-	}()
+func (s *store) DeleteLayer(id string) error {
 	return s.writeToAllStores(func(rlstore rwLayerStore) error {
 		if rlstore.Exists(id) {
 			if l, err := rlstore.Get(id); err != nil {
@@ -2581,9 +2587,7 @@ func (s *store) DeleteLayer(id string) (retErr error) {
 					return fmt.Errorf("layer %v used by container %v: %w", id, container.ID, ErrLayerUsedByContainer)
 				}
 			}
-			cf, err := rlstore.deferredDelete(id)
-			cleanupFunctions = append(cleanupFunctions, cf...)
-			if err != nil {
+			if err := rlstore.Delete(id); err != nil {
 				return fmt.Errorf("delete layer %v: %w", id, err)
 			}
 
@@ -2600,14 +2604,8 @@ func (s *store) DeleteLayer(id string) (retErr error) {
 	})
 }
 
-func (s *store) DeleteImage(id string, commit bool) (layers []string, retErr error) {
+func (s *store) DeleteImage(id string, commit bool) (layers []string, err error) {
 	layersToRemove := []string{}
-	cleanupFunctions := []tempdir.CleanupTempDirFunc{}
-	defer func() {
-		if cleanupErr := tempdir.CleanupTemporaryDirectories(cleanupFunctions...); cleanupErr != nil {
-			retErr = errors.Join(cleanupErr, retErr)
-		}
-	}()
 	if err := s.writeToAllStores(func(rlstore rwLayerStore) error {
 		// Delete image from all available imagestores configured to be used.
 		imageFound := false
@@ -2713,9 +2711,7 @@ func (s *store) DeleteImage(id string, commit bool) (layers []string, retErr err
 		}
 		if commit {
 			for _, layer := range layersToRemove {
-				cf, err := rlstore.deferredDelete(layer)
-				cleanupFunctions = append(cleanupFunctions, cf...)
-				if err != nil {
+				if err = rlstore.Delete(layer); err != nil {
 					return err
 				}
 			}
@@ -2727,13 +2723,7 @@ func (s *store) DeleteImage(id string, commit bool) (layers []string, retErr err
 	return layersToRemove, nil
 }
 
-func (s *store) DeleteContainer(id string) (retErr error) {
-	cleanupFunctions := []tempdir.CleanupTempDirFunc{}
-	defer func() {
-		if cleanupErr := tempdir.CleanupTemporaryDirectories(cleanupFunctions...); cleanupErr != nil {
-			retErr = errors.Join(cleanupErr, retErr)
-		}
-	}()
+func (s *store) DeleteContainer(id string) error {
 	return s.writeToAllStores(func(rlstore rwLayerStore) error {
 		if !s.containerStore.Exists(id) {
 			return ErrNotAContainer
@@ -2749,9 +2739,7 @@ func (s *store) DeleteContainer(id string) (retErr error) {
 		// the container record that refers to it, effectively losing
 		// track of it
 		if rlstore.Exists(container.LayerID) {
-			cf, err := rlstore.deferredDelete(container.LayerID)
-			cleanupFunctions = append(cleanupFunctions, cf...)
-			if err != nil {
+			if err := rlstore.Delete(container.LayerID); err != nil {
 				return err
 			}
 		}
@@ -2777,20 +2765,12 @@ func (s *store) DeleteContainer(id string) (retErr error) {
 	})
 }
 
-func (s *store) Delete(id string) (retErr error) {
-	cleanupFunctions := []tempdir.CleanupTempDirFunc{}
-	defer func() {
-		if cleanupErr := tempdir.CleanupTemporaryDirectories(cleanupFunctions...); cleanupErr != nil {
-			retErr = errors.Join(cleanupErr, retErr)
-		}
-	}()
+func (s *store) Delete(id string) error {
 	return s.writeToAllStores(func(rlstore rwLayerStore) error {
 		if s.containerStore.Exists(id) {
 			if container, err := s.containerStore.Get(id); err == nil {
 				if rlstore.Exists(container.LayerID) {
-					cf, err := rlstore.deferredDelete(container.LayerID)
-					cleanupFunctions = append(cleanupFunctions, cf...)
-					if err != nil {
+					if err = rlstore.Delete(container.LayerID); err != nil {
 						return err
 					}
 					if err = s.containerStore.Delete(id); err != nil {
@@ -2814,9 +2794,7 @@ func (s *store) Delete(id string) (retErr error) {
 			return s.imageStore.Delete(id)
 		}
 		if rlstore.Exists(id) {
-			cf, err := rlstore.deferredDelete(id)
-			cleanupFunctions = append(cleanupFunctions, cf...)
-			return err
+			return rlstore.Delete(id)
 		}
 		return ErrLayerUnknown
 	})
@@ -3154,12 +3132,6 @@ func (s *store) Diff(from, to string, options *DiffOptions) (io.ReadCloser, erro
 }
 
 func (s *store) ApplyStagedLayer(args ApplyStagedLayerOptions) (*Layer, error) {
-	defer func() {
-		if args.DiffOutput.TarSplit != nil {
-			args.DiffOutput.TarSplit.Close()
-			args.DiffOutput.TarSplit = nil
-		}
-	}()
 	rlstore, rlstores, err := s.bothLayerStoreKinds()
 	if err != nil {
 		return nil, err
@@ -3191,10 +3163,6 @@ func (s *store) ApplyStagedLayer(args ApplyStagedLayerOptions) (*Layer, error) {
 }
 
 func (s *store) CleanupStagedLayer(diffOutput *drivers.DriverWithDifferOutput) error {
-	if diffOutput.TarSplit != nil {
-		diffOutput.TarSplit.Close()
-		diffOutput.TarSplit = nil
-	}
 	_, err := writeToLayerStore(s, func(rlstore rwLayerStore) (struct{}, error) {
 		return struct{}{}, rlstore.CleanupStagingDirectory(diffOutput.Target)
 	})
@@ -3207,6 +3175,13 @@ func (s *store) PrepareStagedLayer(options *drivers.ApplyDiffWithDifferOpts, dif
 		return nil, err
 	}
 	return rlstore.applyDiffWithDifferNoLock(options, differ)
+}
+
+func (s *store) ApplyDiffWithDiffer(to string, options *drivers.ApplyDiffWithDifferOpts, differ drivers.Differ) (*drivers.DriverWithDifferOutput, error) {
+	if to != "" {
+		return nil, fmt.Errorf("ApplyDiffWithDiffer does not support non-empty 'layer' parameter")
+	}
+	return s.PrepareStagedLayer(options, differ)
 }
 
 func (s *store) DifferTarget(id string) (string, error) {

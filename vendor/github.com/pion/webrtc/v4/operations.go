@@ -6,7 +6,6 @@ package webrtc
 import (
 	"container/list"
 	"sync"
-	"sync/atomic"
 )
 
 // Operation is a function.
@@ -18,13 +17,13 @@ type operations struct {
 	busyCh chan struct{}
 	ops    *list.List
 
-	updateNegotiationNeededFlagOnEmptyChain *atomic.Bool
+	updateNegotiationNeededFlagOnEmptyChain *atomicBool
 	onNegotiationNeeded                     func()
 	isClosed                                bool
 }
 
 func newOperations(
-	updateNegotiationNeededFlagOnEmptyChain *atomic.Bool,
+	updateNegotiationNeededFlagOnEmptyChain *atomicBool,
 	onNegotiationNeeded func(),
 ) *operations {
 	return &operations{
@@ -151,9 +150,9 @@ func (o *operations) start() {
 		fn()
 		fn = o.pop()
 	}
-	if !o.updateNegotiationNeededFlagOnEmptyChain.Load() {
+	if !o.updateNegotiationNeededFlagOnEmptyChain.get() {
 		return
 	}
-	o.updateNegotiationNeededFlagOnEmptyChain.Store(false)
+	o.updateNegotiationNeededFlagOnEmptyChain.set(false)
 	o.onNegotiationNeeded()
 }

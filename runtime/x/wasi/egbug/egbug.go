@@ -66,16 +66,16 @@ func FileTree(ctx context.Context, op eg.Op) error {
 	privileged := shell.Runtime().Privileged().Lenient(true).Directory("/")
 	return shell.Run(
 		ctx,
-		privileged.Newf("echo 'runtime directory:' && ls -lhan %s", _eg.DefaultMountRoot(_eg.RuntimeDirectory)),
-		privileged.Newf("echo 'mount directory:' && ls -lhan %s", _eg.DefaultMountRoot()),
-		privileged.Newf("echo 'workload directory:' && ls -lhan %s", _eg.DefaultWorkloadRoot()),
-		privileged.Newf("echo 'cache directory:' && ls -lhan %s", egenv.CacheDirectory()),
-		privileged.Newf("echo 'ephemeral directory:' && ls -lhan %s", egenv.EphemeralDirectory()),
-		privileged.Newf("echo 'working directory:' && ls -lhan %s", egenv.WorkingDirectory()),
-		privileged.Newf("tree -a -L 1 %s", egenv.CacheDirectory()),
-		privileged.Newf("tree -a -L 1 %s", egenv.EphemeralDirectory()),
-		privileged.Newf("tree -a -L 1 %s", egenv.WorkingDirectory()),
-		privileged.Newf("tree -a -L 1 %s", _eg.DefaultMountRoot()),
+		privileged.Newf("echo 'runtime directory: %s' && ls -lhan %s", _eg.DefaultMountRoot(_eg.RuntimeDirectory), _eg.DefaultMountRoot(_eg.RuntimeDirectory)),
+		privileged.Newf("echo 'mount directory: %s' && ls -lhan %s", _eg.DefaultMountRoot(), _eg.DefaultMountRoot()),
+		privileged.Newf("echo 'workload directory: %s' && ls -lhan %s", _eg.DefaultWorkloadRoot(), _eg.DefaultWorkloadRoot()),
+		privileged.Newf("echo 'cache directory: %s' && ls -lhan %s", egenv.CacheDirectory(), egenv.CacheDirectory()),
+		privileged.Newf("echo 'ephemeral directory: %s' && ls -lhan %s", egenv.EphemeralDirectory(), egenv.EphemeralDirectory()),
+		privileged.Newf("echo 'working directory: %s' && ls -lhan %s", egenv.WorkingDirectory(), egenv.WorkingDirectory()),
+		// privileged.Newf("tree -a -L 1 %s", egenv.CacheDirectory()),
+		// privileged.Newf("tree -a -L 1 %s", egenv.EphemeralDirectory()),
+		// privileged.Newf("tree -a -L 1 %s", egenv.WorkingDirectory()),
+		// privileged.Newf("tree -a -L 1 %s", _eg.DefaultMountRoot()),
 	)
 }
 

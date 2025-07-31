@@ -1,5 +1,3 @@
-//go:build !darwin
-
 package shell
 
 import (
@@ -7,9 +5,11 @@ import (
 	"os/user"
 
 	"github.com/davecgh/go-spew/spew"
+	"github.com/egdaemon/eg"
+	"github.com/egdaemon/eg/internal/envx"
 )
 
 func defaultgroup(u *user.User) string {
-	log.Println("defaultgroup unix", spew.Sdump(u))
-	return u.Username
+	log.Println("defaultgroup unix", spew.Sdump(u), envx.String(u.Username, eg.EnvComputeDefaultGroup))
+	return envx.String(u.Username, eg.EnvComputeDefaultGroup)
 }

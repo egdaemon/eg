@@ -21,6 +21,7 @@ import (
 	"github.com/egdaemon/eg/internal/stringsx"
 	"github.com/egdaemon/eg/interp/c8s"
 	"github.com/egdaemon/eg/workspaces"
+	"golang.org/x/exp/slices"
 	"google.golang.org/grpc"
 )
 
@@ -165,6 +166,18 @@ func (t *ProxyService) Module(ctx context.Context, req *c8s.ModuleRequest) (_ *c
 	log.Println("module", req.Module)
 	log.Println("mdir", req.Mdir)
 
+	// conditionally add this volume for backwards compatibility.
+	// REMOVE: 2026
+	if envx.Boolean(false, eg.EnvExperimentalBaremetal) && stringsx.Present(req.Module) {
+		idx := slices.IndexFunc(req.Options, func(s string) bool {
+			return strings.HasSuffix(s, ":/eg.mnt/.eg.module.wasm:ro")
+		})
+		if idx > -1 {
+			req.Options = slices.Delete(req.Options, idx-1, idx+1)
+		}
+		req.Options = append(req.Options, "--volume", fmt.Sprintf("%s:%s:ro", filepath.Join(t.ws.Root, t.ws.BuildDir, req.Module), eg.DefaultMountRoot(eg.ModuleBin)))
+	}
+
 	options := make([]string, 0, len(t.containeropts)+len(req.Options)+1)
 	options = append(options, t.containeropts...)
 	options = append(options, req.Options...)
@@ -172,11 +185,6 @@ func (t *ProxyService) Module(ctx context.Context, req *c8s.ModuleRequest) (_ *c
 		options,
 		"--volume", fmt.Sprintf("%s:%s:rw", t.ws.Root, eg.DefaultMountRoot(eg.WorkingDirectory)),
 	)
-	// conditionally add this volume for backwards compatibility.
-	// REMOVE: 2026
-	if envx.Boolean(false, eg.EnvExperimentalBaremetal) && stringsx.Present(req.Module) {
-		options = append(options, "--volume", fmt.Sprintf("%s:%s:ro", filepath.Join(t.ws.Root, t.ws.BuildDir, req.Module), eg.DefaultMountRoot(eg.ModuleBin)))
-	}
 
 	// envx.Debug(options...)
 

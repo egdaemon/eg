@@ -4,6 +4,7 @@ package wnetruntime
 
 import (
 	"context"
+	"fmt"
 	"syscall"
 
 	"github.com/egdaemon/wasinet/wasinet/ffi"
@@ -12,7 +13,34 @@ import (
 )
 
 func (t network) Open(ctx context.Context, af, socktype, protocol int) (fd int, err error) {
-	return unix.Socket(af, socktype, protocol)
+	fd, err = unix.Socket(af, socktype, protocol)
+	if err != nil {
+		return fd, err
+	}
+	defer func() {
+		if err == nil {
+			return
+		}
+
+		unix.Close(fd)
+	}()
+
+	// syscall.SOCK_NONBLOCK|syscall.SOCK_CLOEXEC are required by golang's runtime for the pollfd to operate correctly.
+	// as a result we unconditionally set them here.
+
+	if err := unix.SetNonblock(fd, true); err != nil {
+		return -1, fmt.Errorf("failed to set non-blocking: %w", err)
+	}
+
+	flags, err := unix.FcntlInt(uintptr(fd), unix.F_GETFD, 0)
+	if err != nil {
+		return -1, fmt.Errorf("failed to get FD flags for CLOEXEC: %w", err)
+	}
+	if _, err := unix.FcntlInt(uintptr(fd), unix.F_SETFD, flags|unix.FD_CLOEXEC); err != nil {
+		return -1, fmt.Errorf("failed to set CLOEXEC: %w", err)
+	}
+
+	return fd, nil
 }
 
 func (t network) SetSocketOption(ctx context.Context, fd int, level, name int, value []byte) error {

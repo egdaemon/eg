@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"math"
+	"os/user"
 	"time"
 
 	"github.com/egdaemon/eg/internal/errorsx"
@@ -142,9 +143,10 @@ func (t Command) Newf(cmd string, options ...any) Command {
 //
 //	timeout: 5 minutes.
 func New(cmd string) Command {
+	u := errorsx.Zero(user.Current())
 	return Command{
-		user:     "egd", // default user to execute commands as
-		group:    "egd",
+		user:     stringsx.First(u.Username, "egd"), // default user to execute commands as
+		group:    stringsx.First(defaultgroup(u), "egd"),
 		cmd:      cmd,
 		timeout:  5 * time.Minute,
 		entry:    run,

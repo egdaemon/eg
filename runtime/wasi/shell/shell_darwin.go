@@ -1,7 +1,15 @@
 package shell
 
-import "os/user"
+import (
+	"os/user"
+
+	"github.com/egdaemon/eg/internal/stringsx"
+)
 
 func defaultgroup(u *user.User) string {
-	return "staff"
+	if stringsx.Present(u.Username) {
+		return "staff"
+	}
+
+	return ""
 }

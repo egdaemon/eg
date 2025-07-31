@@ -691,8 +691,8 @@ github.com/huin/goupnp/httpu
 github.com/huin/goupnp/scpd
 github.com/huin/goupnp/soap
 github.com/huin/goupnp/ssdp
-# github.com/ipfs/boxo v0.33.1
-## explicit; go 1.23.10
+# github.com/ipfs/boxo v0.30.0
+## explicit; go 1.23.0
 github.com/ipfs/boxo/ipns
 github.com/ipfs/boxo/ipns/pb
 github.com/ipfs/boxo/path
@@ -794,7 +794,7 @@ github.com/libp2p/go-cidranger/net
 # github.com/libp2p/go-flow-metrics v0.3.0
 ## explicit; go 1.23
 github.com/libp2p/go-flow-metrics
-# github.com/libp2p/go-libp2p v0.42.1
+# github.com/libp2p/go-libp2p v0.42.0
 ## explicit; go 1.23.8
 github.com/libp2p/go-libp2p
 github.com/libp2p/go-libp2p/config

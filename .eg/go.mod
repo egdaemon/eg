@@ -5,15 +5,12 @@ go 1.24.0
 toolchain go1.24.5
 
 require (
-	github.com/egdaemon/eg v0.0.0-20250730213825-8801248c6e4c
+	github.com/egdaemon/eg v0.0.0-20250801154812-20a9949a96c6
 	github.com/egdaemon/wasinet/wasinet v0.0.0-20250731121320-3287a738a635
 )
 
 require (
 	github.com/gofrs/uuid v4.4.0+incompatible // indirect
-	github.com/google/pprof v0.0.0-20250630185457-6e76a2b096b5 // indirect
-	go.opentelemetry.io/otel v1.37.0 // indirect
-	go.opentelemetry.io/otel/sdk/metric v1.37.0 // indirect
 	golang.org/x/net v0.42.0 // indirect
 	golang.org/x/sys v0.34.0 // indirect
 	golang.org/x/text v0.27.0 // indirect

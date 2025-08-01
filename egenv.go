@@ -143,11 +143,6 @@ func DefaultMountRoot(rel ...string) string {
 	return filepath.Join("/", "eg.mnt", filepath.Join(rel...))
 }
 
-// // isolated module directory, each module will have a private directory.
-// func DefaultMountModule(rel ...string) string {
-// 	return filepath.Join("/", "eg.mod", filepath.Join(rel...))
-// }
-
 //go:embed DefaultContainerfile
 var Embedded embed.FS
 

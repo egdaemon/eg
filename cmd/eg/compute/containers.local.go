@@ -65,7 +65,7 @@ func (t c8sLocal) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (er
 		errorsx.Log(errorsx.Wrap(os.RemoveAll(tmpdir), "unable to remove temp directory"))
 	}()
 
-	if ws, err = workspaces.New(gctx.Context, tmpdir, eg.DefaultModuleDirectory(), ""); err != nil {
+	if ws, err = workspaces.New(gctx.Context, tmpdir, eg.DefaultModuleDirectory(), "", false); err != nil {
 		return errorsx.Wrap(err, "unable to initialize workspace")
 	}
 
@@ -110,7 +110,7 @@ func (t c8sLocal) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (er
 	}
 
 	log.Println("modules", modules)
-	if err = runners.BuildRootContainerPath(gctx.Context, t.Dir, filepath.Join(ws.RuntimeDir, "Containerfile")); err != nil {
+	if err = runners.BuildRootContainerPath(gctx.Context, t.Dir, filepath.Join(ws.Root, ws.RuntimeDir, "Containerfile")); err != nil {
 		return err
 	}
 

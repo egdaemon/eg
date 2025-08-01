@@ -107,7 +107,7 @@ func (t c8sUpload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error
 		return err
 	}
 
-	if ws, err = workspaces.New(gctx.Context, tmpdir, eg.DefaultModuleDirectory(), ""); err != nil {
+	if ws, err = workspaces.New(gctx.Context, tmpdir, eg.DefaultModuleDirectory(), "", false); err != nil {
 		return err
 	}
 

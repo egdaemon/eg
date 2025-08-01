@@ -13,7 +13,6 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/internal/debugx"
-	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/execx"
 	"github.com/egdaemon/eg/internal/langx"
@@ -160,15 +159,15 @@ func (t *ProxyService) Module(ctx context.Context, req *c8s.ModuleRequest) (_ *c
 	debugx.Println("PROXY CONTAINER MODULE INITIATED", errorsx.Zero(os.Getwd()))
 	defer debugx.Println("PROXY CONTAINER MODULE COMPLETED", errorsx.Zero(os.Getwd()))
 
-	log.Println("reqopts", req.Options)
-	log.Println("image", req.Image)
-	log.Println("name", req.Name)
-	log.Println("module", req.Module)
-	log.Println("mdir", req.Mdir)
+	// log.Println("reqopts", req.Options)
+	// log.Println("image", req.Image)
+	// log.Println("name", req.Name)
+	// log.Println("module", req.Module)
+	// log.Println("mdir", req.Mdir)
 
 	// conditionally add this volume for backwards compatibility.
 	// REMOVE: 2026
-	if envx.Boolean(false, eg.EnvExperimentalBaremetal) && stringsx.Present(req.Module) {
+	if stringsx.Present(req.Module) {
 		idx := slices.IndexFunc(req.Options, func(s string) bool {
 			return strings.HasSuffix(s, ":/eg.mnt/.eg.module.wasm:ro")
 		})

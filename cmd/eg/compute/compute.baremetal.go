@@ -62,17 +62,20 @@ func (t baremetal) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error
 		cmdenv     []string
 	)
 
-	// ctx, err := podmanx.WithClient(gctx.Context)
-	// if err != nil {
-	// 	return errorsx.Wrap(err, "unable to connect to podman")
-	// }
+	ctx, err := podmanx.WithClient(gctx.Context)
+	if err != nil {
+		return errorsx.Wrap(err, "unable to connect to podman")
+	}
 
 	// ensure when we run modules our umask is set to allow git clones to work properly
 	runtimex.Umask(0002)
 
-	if ws, err = workspaces.New(gctx.Context, t.Dir, t.RuntimeDir, t.Workload); err != nil {
+	if ws, err = workspaces.New(gctx.Context, t.Dir, t.RuntimeDir, t.Workload, true); err != nil {
 		return err
 	}
+	defer func() {
+		log.Println("done")
+	}()
 	defer os.RemoveAll(filepath.Join(ws.Root, ws.RuntimeDir))
 
 	if repo, err = git.PlainOpen(ws.Root); err != nil {
@@ -115,11 +118,11 @@ func (t baremetal) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error
 	).Var(
 		eg.EnvUnsafeGitCloneEnabled, strconv.FormatBool(t.Clone), // hack to disable cloning
 	).Var(
-		eg.EnvComputeWorkingDirectory, eg.DefaultWorkingDirectory(),
+		eg.EnvComputeWorkingDirectory, ws.Root,
 	).Var(
-		eg.EnvComputeCacheDirectory, envx.String(eg.DefaultCacheDirectory(), eg.EnvComputeCacheDirectory, "CACHE_DIRECTORY"),
+		eg.EnvComputeCacheDirectory, filepath.Join(ws.Root, ws.CacheDir),
 	).Var(
-		eg.EnvComputeRuntimeDirectory, eg.DefaultRuntimeDirectory(),
+		eg.EnvComputeRuntimeDirectory, filepath.Join(ws.Root, ws.RuntimeDir),
 	).Var(
 		eg.EnvComputeDefaultGroup, defaultgroup(),
 	).Var(
@@ -177,7 +180,7 @@ func (t baremetal) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error
 
 	// final sample
 	defer func() {
-		fctx, done := context.WithTimeout(context.Background(), 10*time.Second)
+		fctx, done := context.WithTimeout(ctx, 10*time.Second)
 		defer done()
 		errorsx.Log(runners.SampleSystemLoad(fctx, db))
 	}()
@@ -235,7 +238,7 @@ func (t baremetal) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error
 			cc,
 			ws.Root,
 			m.Path,
-			interp.OptionRuntimeDir(ws.RuntimeDir),
+			interp.OptionRuntimeDir(filepath.Join(ws.Root, ws.RuntimeDir)),
 			interp.OptionEnviron(cmdenv...),
 		)
 		if err != nil {

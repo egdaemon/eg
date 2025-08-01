@@ -62,7 +62,7 @@ func (t upload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 		return err
 	}
 
-	if ws, err = workspaces.New(gctx.Context, t.Dir, t.ModuleDir, t.Name); err != nil {
+	if ws, err = workspaces.New(gctx.Context, t.Dir, t.ModuleDir, t.Name, false); err != nil {
 		return err
 	}
 	defer os.RemoveAll(filepath.Join(ws.Root, ws.RuntimeDir))

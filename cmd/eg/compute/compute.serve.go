@@ -72,7 +72,7 @@ func (t serve) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err e
 		return errorsx.Wrap(err, "unable to connect to podman")
 	}
 
-	if ws, err = workspaces.New(gctx.Context, t.Dir, t.ModuleDir, t.Name); err != nil {
+	if ws, err = workspaces.New(gctx.Context, t.Dir, t.ModuleDir, t.Name, false); err != nil {
 		return errorsx.Wrap(err, "unable to setup workspace")
 	}
 	defer os.RemoveAll(filepath.Join(ws.Root, ws.RuntimeDir))

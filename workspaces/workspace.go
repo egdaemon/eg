@@ -4,6 +4,7 @@ package workspaces
 import (
 	"context"
 	"crypto/md5"
+	"encoding/hex"
 	"hash"
 	"io"
 	"io/fs"
@@ -62,14 +63,17 @@ func FromEnv(ctx context.Context, root, name string) (zero Context, err error) {
 	return Context{
 		Module:     name,
 		Root:       root,
-		RuntimeDir: "eg.runtime",
+		RuntimeDir: eg.RuntimeDirectory,
 	}, nil
 }
 
-func New(ctx context.Context, root string, mdir string, name string) (zero Context, err error) {
+func New(ctx context.Context, root string, mdir string, name string, private bool) (zero Context, err error) {
 	cidmd5 := md5.New()
 	cdir := eg.CacheDirectory
 	runtimedir := eg.RuntimeDirectory
+	if private {
+		runtimedir = filepath.Join(eg.RuntimeDirectory, hex.EncodeToString(errorsx.Must(uuid.NewV7()).Bytes()[:3]))
+	}
 	ignore := ignoredir{path: cdir, reason: "cache directory"}
 
 	if err = cacheid(ctx, root, mdir, cidmd5, ignore); err != nil {

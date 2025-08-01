@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/egdaemon/eg/internal/debugx"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/systemx"
 	"github.com/egdaemon/eg/internal/tracex"
@@ -83,6 +84,11 @@ func FileExists(path string) bool {
 	info, err := os.Stat(path)
 
 	if os.IsNotExist(err) {
+		return false
+	}
+
+	if err != nil {
+		debugx.Println(errorsx.Wrap(err, "failed to state file"))
 		return false
 	}
 

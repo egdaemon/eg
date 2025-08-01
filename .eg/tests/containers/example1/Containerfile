@@ -1,3 +1,3 @@
-FROM ubuntu:oracular
+FROM ubuntu:plucky
 
 CMD /usr/bin/echo hello world

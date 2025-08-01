@@ -16,14 +16,14 @@ RUN add-apt-repository -n ppa:longsleep/golang-backports
 RUN add-apt-repository -n ppa:egdaemon/eg
 RUN add-apt-repository -n ppa:egdaemon/duckdb
 RUN apt-get update
-RUN apt-get install -y --no-install-recommends ssh podman netavark golang-1.23 eg egbootstrap tree nftables iptables
+RUN apt-get install -y --no-install-recommends ssh podman netavark golang-1.24 eg egbootstrap tree nftables iptables
 
 RUN sh /usr/share/eg/install/github.sh
 RUN apt-get update
 RUN apt-get install -y gh
 
 # properly link golang into the path.
-RUN ln -s /usr/lib/go-1.23/bin/go /usr/local/bin/go
+RUN ln -s /usr/lib/go-1.24/bin/go /usr/local/bin/go
 
 # preload some well known hosts
 RUN ssh-keyscan -H github.com >> /etc/ssh/ssh_known_hosts

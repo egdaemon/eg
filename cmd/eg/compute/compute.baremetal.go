@@ -46,6 +46,7 @@ type baremetal struct {
 	GitRemote    string `name:"git-remote" help:"name of the git remote to use" default:"${vars_git_default_remote_name}"`
 	GitReference string `name:"git-ref" help:"name of the branch or commit to checkout" default:"${vars_git_head_reference}"`
 	Clone        bool   `name:"git-clone" help:"allow cloning via git"`
+	NoCache      bool   `name:"no-cache" help:"removes workload build cache"`
 	Workload     string `arg:"" help:"name of the workload to run"`
 }
 
@@ -72,6 +73,10 @@ func (t baremetal) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error
 	}
 
 	defer os.RemoveAll(filepath.Join(ws.Root, ws.RuntimeDir))
+
+	if t.NoCache {
+		os.RemoveAll(filepath.Join(ws.Root, ws.GenModDir))
+	}
 
 	if repo, err = git.PlainOpen(ws.Root); err != nil {
 		return errorsx.Wrap(err, "unable to open git repository")

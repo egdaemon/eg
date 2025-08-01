@@ -4,7 +4,7 @@ package workspaces
 import (
 	"context"
 	"crypto/md5"
-	"encoding/hex"
+	"fmt"
 	"hash"
 	"io"
 	"io/fs"
@@ -72,7 +72,7 @@ func New(ctx context.Context, root string, mdir string, name string, private boo
 	cdir := eg.CacheDirectory
 	runtimedir := eg.RuntimeDirectory
 	if private {
-		runtimedir = filepath.Join(eg.RuntimeDirectory, hex.EncodeToString(errorsx.Must(uuid.NewV7()).Bytes()[:3]))
+		runtimedir = filepath.Join(eg.RuntimeDirectory, fmt.Sprintf(".eg.runtime.%x", errorsx.Must(uuid.NewV7()).Bytes()[12:16]))
 	}
 	ignore := ignoredir{path: cdir, reason: "cache directory"}
 

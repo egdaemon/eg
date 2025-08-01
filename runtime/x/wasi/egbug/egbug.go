@@ -15,6 +15,7 @@ import (
 	"time"
 
 	_eg "github.com/egdaemon/eg"
+	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/langx"
 	"github.com/egdaemon/eg/runtime/wasi/eg"
@@ -130,12 +131,21 @@ func Images(ctx context.Context, op eg.Op) error {
 	)
 }
 
+const (
+	EnvUnsafeDigest = "EG_UNSAFE_ENVVARS_DIGEST"
+	defaultDigest   = "b182a8f5e5bb48a4ead75efa7e74184b"
+)
+
 // Ensures the environment is stable between releases.
 func EnsureEnv(ctx context.Context, op eg.Op) error {
 	// expected hash with normalized values.
 	// if this needs to change it means we might be breaking
 	// existing builds.
-	const expected = "166edecb15fd621ae2bc9d11f122f2ed"
+	expected := envx.String(defaultDigest, EnvUnsafeDigest)
+
+	old := os.Environ()
+	sort.Strings(old)
+
 	// zero out some dynamic environment variables for consistent results
 	os.Setenv(_eg.EnvComputeAccountID, uuid.Nil.String())
 	os.Setenv(_eg.EnvComputeRunID, uuid.Nil.String())
@@ -143,11 +153,14 @@ func EnsureEnv(ctx context.Context, op eg.Op) error {
 	os.Setenv(_eg.EnvGitHeadCommit, "0000000000000000000000000000000000000000")
 	os.Setenv(_eg.EnvGitBaseCommit, "0000000000000000000000000000000000000000")
 	os.Setenv(_eg.EnvUnsafeCacheID, uuid.Nil.String())
+	os.Setenv(_eg.EnvComputeLoggingVerbosity, "0")
+
 	// always ignore compute bin. its development tooling.
 	os.Unsetenv(_eg.EnvComputeBin)
 	os.Unsetenv("DEBIAN_FRONTEND")
 	// we plan to make this value static in the future. so ignore it for now.
 	os.Unsetenv(_eg.EnvComputeModuleSocket)
+	os.Unsetenv(EnvUnsafeDigest)
 
 	environ := os.Environ()
 	sort.Strings(environ)
@@ -160,7 +173,7 @@ func EnsureEnv(ctx context.Context, op eg.Op) error {
 	}
 
 	if d := hex.EncodeToString(digest.Sum(nil)); d != expected {
-		return fmt.Errorf("unexpected environment digest: %s != %s:\n%s", d, expected, strings.Join(environ, "\n"))
+		return fmt.Errorf("unexpected environment digest: %s != %s:\n%s\n-----------------------------------------\n%s", d, expected, strings.Join(old, "\n"), strings.Join(environ, "\n"))
 	}
 
 	return nil

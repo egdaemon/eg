@@ -1,13 +1,13 @@
 package userx
 
 import (
-	"log"
 	"os"
 	"os/user"
 	"path/filepath"
 
 	"github.com/egdaemon/eg/internal/debugx"
 	"github.com/egdaemon/eg/internal/envx"
+	"github.com/egdaemon/eg/internal/tracex"
 )
 
 const (
@@ -33,7 +33,7 @@ func CurrentUserOrDefault(d user.User) (result *user.User) {
 	)
 
 	if result, err = user.Current(); err != nil {
-		log.Println("failed to retrieve current user, using default", err)
+		tracex.Println("failed to retrieve current user, using default", err)
 		tmp := d
 		return &tmp
 	}

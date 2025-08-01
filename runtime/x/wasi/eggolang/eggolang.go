@@ -15,6 +15,7 @@ import (
 	"github.com/egdaemon/eg/internal/langx"
 	"github.com/egdaemon/eg/internal/md5x"
 	"github.com/egdaemon/eg/internal/modfilex"
+	"github.com/egdaemon/eg/internal/slicesx"
 	"github.com/egdaemon/eg/internal/stringsx"
 	"github.com/egdaemon/eg/interp/events"
 	"github.com/egdaemon/eg/runtime/wasi/eg"
@@ -117,7 +118,7 @@ func AutoInstall(options ...toption) eg.OpFn {
 		runtime := shell.Runtime().EnvironFrom(goenv...)
 
 		for gomod := range modfilex.FindModules(stringsx.DefaultIfBlank(opts.bctx.Dir, egenv.WorkingDirectory())) {
-			cmd := stringsx.Join(" ", "go", "install", flags, fmt.Sprintf("%s/...", filepath.Dir(gomod)))
+			cmd := stringsx.Join(" ", slicesx.Filter(func(s string) bool { return stringsx.Present(s) }, "go", "install", flags, fmt.Sprintf("%s/...", filepath.Dir(gomod)))...)
 			if err := shell.Run(ctx, runtime.New(cmd)); err != nil {
 				return errorsx.Wrap(err, "unable to run tests")
 			}

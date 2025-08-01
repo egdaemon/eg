@@ -62,36 +62,31 @@ func (t baremetal) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error
 		cmdenv     []string
 	)
 
-	ctx, err := podmanx.WithClient(gctx.Context)
-	if err != nil {
-		return errorsx.Wrap(err, "unable to connect to podman")
-	}
+	ctx := gctx.Context
 
 	// ensure when we run modules our umask is set to allow git clones to work properly
 	runtimex.Umask(0002)
 
-	if ws, err = workspaces.New(gctx.Context, t.Dir, t.RuntimeDir, t.Workload, true); err != nil {
+	if ws, err = workspaces.New(ctx, t.Dir, t.RuntimeDir, t.Workload, true); err != nil {
 		return err
 	}
-	defer func() {
-		log.Println("done")
-	}()
+
 	defer os.RemoveAll(filepath.Join(ws.Root, ws.RuntimeDir))
 
 	if repo, err = git.PlainOpen(ws.Root); err != nil {
 		return errorsx.Wrap(err, "unable to open git repository")
 	}
 
-	roots, err := transpile.Autodetect(transpile.New(ws)).Run(gctx.Context)
+	roots, err := transpile.Autodetect(transpile.New(ws)).Run(ctx)
 	if err != nil {
 		return err
 	}
 
-	if err = compile.EnsureRequiredPackages(gctx.Context, filepath.Join(ws.Root, ws.TransDir)); err != nil {
+	if err = compile.EnsureRequiredPackages(ctx, filepath.Join(ws.Root, ws.TransDir)); err != nil {
 		return err
 	}
 
-	modules, err := compile.FromTranspiled(gctx.Context, ws, roots...)
+	modules, err := compile.FromTranspiled(ctx, ws, roots...)
 	if err != nil {
 		return err
 	}
@@ -102,34 +97,9 @@ func (t baremetal) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error
 
 	debugx.Println("modules", modules)
 
-	if err = wasix.WarmCacheDirectory(gctx.Context, filepath.Join(ws.Root, ws.BuildDir), wasix.WazCacheDir(filepath.Join(ws.Root, ws.CacheDir, eg.DefaultModuleDirectory()))); err != nil {
+	if err = wasix.WarmCacheDirectory(ctx, filepath.Join(ws.Root, ws.BuildDir), wasix.WazCacheDir(filepath.Join(ws.Root, ws.CacheDir, eg.DefaultModuleDirectory()))); err != nil {
 		log.Println("unable to prewarm wasi directory cache", err)
 	}
-
-	cmdenvb := envx.Build().FromEnv(
-		"PATH",
-		"TERM",
-		"COLORTERM",
-		"LANG",
-		"CI",
-		eg.EnvComputeBin,
-		eg.EnvComputeRunID,
-		eg.EnvComputeAccountID,
-	).Var(
-		eg.EnvUnsafeGitCloneEnabled, strconv.FormatBool(t.Clone), // hack to disable cloning
-	).Var(
-		eg.EnvComputeWorkingDirectory, ws.Root,
-	).Var(
-		eg.EnvComputeCacheDirectory, filepath.Join(ws.Root, ws.CacheDir),
-	).Var(
-		eg.EnvComputeRuntimeDirectory, filepath.Join(ws.Root, ws.RuntimeDir),
-	).Var(
-		eg.EnvComputeDefaultGroup, defaultgroup(),
-	).Var(
-		"PAGER", "cat", // no paging in this environmenet.
-	).Var(
-		eg.EnvComputeModuleNestedLevel, strconv.Itoa(0),
-	).FromEnviron(errorsx.Zero(gitx.LocalEnv(repo, t.GitRemote, t.GitReference))...)
 
 	var (
 		control   net.Listener
@@ -162,21 +132,45 @@ func (t baremetal) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error
 	}
 	defer db.Close()
 
-	if err = events.PrepareDB(gctx.Context, db); err != nil {
+	if err = events.PrepareDB(ctx, db); err != nil {
 		return errorsx.Wrap(err, "unable to prepare analytics.db")
 	}
 
-	cmdenvb = cmdenvb.Var(
+	cmdenvb := envx.Build().FromEnv(
+		"PATH",
+		"TERM",
+		"COLORTERM",
+		"LANG",
+		"CI",
+		eg.EnvComputeBin,
+		eg.EnvComputeRunID,
+		eg.EnvComputeAccountID,
+	).Var(
+		eg.EnvUnsafeGitCloneEnabled, strconv.FormatBool(t.Clone), // hack to disable cloning
+	).Var(
+		eg.EnvComputeWorkingDirectory, ws.Root,
+	).Var(
+		eg.EnvComputeCacheDirectory, filepath.Join(ws.Root, ws.CacheDir),
+	).Var(
+		eg.EnvComputeRuntimeDirectory, filepath.Join(ws.Root, ws.RuntimeDir),
+	).Var(
+		eg.EnvComputeDefaultGroup, defaultgroup(),
+	).Var(
 		eg.EnvComputeModuleSocket, eg.DefaultMountRoot(eg.RuntimeDirectory, filepath.Base(cspath)),
+	).Var(
+		eg.EnvComputeModuleNestedLevel, strconv.Itoa(0),
+	).FromEnviron(
+		errorsx.Zero(gitx.LocalEnv(repo, t.GitRemote, t.GitReference))...,
 	).FromEnviron(
 		os.Environ()...,
 	)
+
 	if cmdenv, err = cmdenvb.Environ(); err != nil {
 		return err
 	}
 
 	// periodic sampling of system metrics
-	go runners.BackgroundSystemLoad(gctx.Context, db)
+	go runners.BackgroundSystemLoad(ctx, db)
 
 	// final sample
 	defer func() {
@@ -197,7 +191,7 @@ func (t baremetal) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error
 
 	canonicaluri := errorsx.Zero(gitx.CanonicalURI(repo, t.GitRemote))
 	ragent := runners.NewRunner(
-		gctx.Context,
+		ctx,
 		ws,
 		uid.String(),
 		runners.AgentOptionLocalComputeCachingVolumes(canonicaluri),
@@ -226,13 +220,13 @@ func (t baremetal) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error
 		errorsx.Log(errorsx.Wrap(srv.Serve(control), "unable to serve control socket"))
 	}()
 
-	if cc, err = grpc.DialContext(gctx.Context, fmt.Sprintf("unix://%s", cspath), grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithBlock()); err != nil {
+	if cc, err = grpc.DialContext(ctx, fmt.Sprintf("unix://%s", cspath), grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithBlock()); err != nil {
 		return err
 	}
 
 	for _, m := range modules {
 		err := interp.Remote(
-			gctx.Context,
+			ctx,
 			aid,
 			uid.String(),
 			cc,

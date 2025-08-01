@@ -54,7 +54,7 @@ func IntegrationTests(ctx context.Context, op eg.Op) error {
 	return eg.Perform(
 		ctx,
 		eg.Parallel(
-		// shell.Op(runtime.New("/home/egd/go/bin/eg compute baremetal tests/concurrent")),
+			shell.Op(runtime.New("/home/egd/go/bin/eg compute baremetal tests/concurrent")),
 		// shell.Op(runtime.New("/home/egd/go/bin/eg compute baremetal tests/containers")),
 		// shell.Op(runtime.New("/home/egd/go/bin/eg compute baremetal tests/echoservice")),
 		// shell.Op(runtime.New("/home/egd/go/bin/eg compute baremetal tests/metrics")),

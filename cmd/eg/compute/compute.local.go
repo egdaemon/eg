@@ -36,6 +36,7 @@ type local struct {
 	ModuleDir        string   `name:"moduledir" help:"must be a subdirectory in the provided directory" default:"${vars_workload_directory}"`
 	Privileged       bool     `name:"privileged" help:"run the initial container in privileged mode"`
 	Dirty            bool     `name:"dirty" help:"include user directories and environment variables" hidden:"true"`
+	InvalidateCache  bool     `name:"invalidate-cache" help:"removes workload build cache"`
 	EnvironmentPaths string   `name:"envpath" help:"environment files to pass to the module" default:""`
 	Environment      []string `name:"env" short:"e" help:"define environment variables and their values to be included"`
 	GitRemote        string   `name:"git-remote" help:"name of the git remote to use" default:"${vars_git_default_remote_name}"`
@@ -70,6 +71,11 @@ func (t local) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err e
 		return errorsx.Wrap(err, "unable to setup workspace")
 	}
 	defer os.RemoveAll(filepath.Join(ws.Root, ws.RuntimeDir))
+	if t.InvalidateCache {
+		log.Println("removing", filepath.Join(ws.Root, ws.BuildDir))
+		os.RemoveAll(filepath.Join(ws.Root, ws.BuildDir))
+		os.RemoveAll(filepath.Join(ws.Root, ws.TransDir))
+	}
 
 	if err = os.Remove(filepath.Join(ws.Root, ws.WorkingDir)); err != nil {
 		return errorsx.Wrap(err, "unable to remove working directory")
@@ -98,6 +104,8 @@ func (t local) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err e
 		FromEnv(t.Environment...).
 		FromEnv(os.Environ()...).
 		FromEnviron(errorsx.Zero(gitx.LocalEnv(repo, t.GitRemote, t.GitReference))...).
+		Var(eg.EnvComputeCacheDirectory, eg.DefaultCacheDirectory()).
+		Var(eg.EnvComputeRuntimeDirectory, eg.DefaultRuntimeDirectory()).
 		Var(eg.EnvComputeRunID, uid.String()).
 		Var(eg.EnvComputeLoggingVerbosity, strconv.Itoa(gctx.Verbosity)).
 		Var(eg.EnvComputeBin, hotswapbin.String()).
@@ -136,6 +144,7 @@ func (t local) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err e
 	}
 
 	debugx.Println("modules", modules)
+	debugx.Println("runtime resources", spew.Sdump(t.RuntimeResources))
 
 	if err = runners.BuildRootContainerPath(gctx.Context, t.Dir, filepath.Join(ws.RuntimeDir, "Containerfile")); err != nil {
 		return err
@@ -148,8 +157,6 @@ func (t local) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err e
 	if t.Privileged {
 		privileged = runners.AgentOptionCommandLine("--privileged")
 	}
-
-	debugx.Println("runtime resources", spew.Sdump(t.RuntimeResources))
 
 	canonicaluri := errorsx.Zero(gitx.CanonicalURI(repo, t.GitRemote))
 	ragent := runners.NewRunner(

@@ -14,6 +14,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/cmd/cmdopts"
 	"github.com/egdaemon/eg/cmd/eg/daemons"
@@ -112,6 +113,8 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 	if ws, err = workspaces.FromEnv(gctx.Context, t.Dir, t.Module); err != nil {
 		return err
 	}
+
+	debugx.Println(spew.Sdump(ws))
 
 	cmdenvb := envx.Build().FromEnv(
 		"PATH",
@@ -263,17 +266,6 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 			grpc.ChainUnaryInterceptor(
 				podmanx.GrpcClient,
 			),
-			// grpc.KeepaliveParams(keepalive.ServerParameters{
-			// 	MaxConnectionIdle:     365 * 24 * time.Hour,
-			// 	MaxConnectionAge:      365 * 24 * time.Hour,
-			// 	MaxConnectionAgeGrace: 365 * 24 * time.Hour,
-			// 	Time:                  365 * 24 * time.Hour,
-			// 	Timeout:               time.Second,
-			// }),
-			// grpc.KeepaliveEnforcementPolicy(keepalive.EnforcementPolicy{
-			// 	MinTime:             365 * 24 * time.Hour,
-			// 	PermitWithoutStream: true,
-			// }),
 		)
 		defer srv.GracefulStop()
 

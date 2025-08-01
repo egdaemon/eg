@@ -3,7 +3,7 @@ ARG DEBIAN_FRONTEND=noninteractive
 
 RUN echo "cache buster 059a9a06-1686-4f49-9a7f-a30535886d55"
 RUN apt-get update
-RUN apt-get install -y software-properties-common build-essential ca-certificates curl sudo podman netavark rsync vim dput devscripts dh-make dput git uidmap dbus-user-session tree python3 python3.12-venv cmake ninja-build libssl-dev
+RUN apt-get install -y software-properties-common build-essential ca-certificates curl sudo podman netavark rsync vim dput devscripts dh-make dput git uidmap dbus-user-session tree python3 python3-venv cmake ninja-build libssl-dev
 RUN add-apt-repository -n ppa:longsleep/golang-backports
 RUN add-apt-repository -n ppa:egdaemon/eg
 RUN add-apt-repository -n ppa:egdaemon/duckdb
@@ -15,3 +15,6 @@ RUN ln -s /usr/lib/go-1.24/bin/go /usr/local/bin/go
 
 RUN systemd-sysusers
 RUN systemd-tmpfiles --create
+
+RUN systemctl enable podman.socket
+RUN podman version

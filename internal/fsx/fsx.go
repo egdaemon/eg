@@ -82,13 +82,8 @@ func LocateFirst(paths ...string) (result string) {
 // FileExists returns true IFF a non-directory file exists at the provided path.
 func FileExists(path string) bool {
 	info, err := os.Stat(path)
-
-	if os.IsNotExist(err) {
-		return false
-	}
-
 	if err != nil {
-		debugx.Println(errorsx.Wrap(err, "failed to state file"))
+		debugx.Println(errorsx.Wrapf(err, "failed to stat path: %s", path))
 		return false
 	}
 
@@ -118,8 +113,8 @@ func SymlinkExists(path string) error {
 // FileExists returns true IFF a non-directory file exists at the provided path.
 func DirExists(path string) error {
 	info, err := os.Stat(path)
-
 	if err != nil {
+		debugx.Println(errorsx.Wrapf(err, "failed to stat path: %s", path))
 		return err
 	}
 

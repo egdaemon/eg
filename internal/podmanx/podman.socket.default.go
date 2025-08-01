@@ -17,6 +17,5 @@ func DefaultSocket() string {
 		upath,
 		filepath.Join("/run", "podman", "podman.sock"),
 	)
-
 	return fmt.Sprintf("unix://%s", socketpath)
 }

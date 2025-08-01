@@ -14,6 +14,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/cmd/cmdopts"
 	"github.com/egdaemon/eg/compile"
@@ -41,16 +42,16 @@ import (
 )
 
 type baremetal struct {
-	Dir          string `name:"directory" help:"root directory of the repository" default:"${vars_git_directory}"`
-	RuntimeDir   string `name:"runtimedir" help:"runtime directory" hidden:"true" default:"${vars_workload_directory}"`
-	GitRemote    string `name:"git-remote" help:"name of the git remote to use" default:"${vars_git_default_remote_name}"`
-	GitReference string `name:"git-ref" help:"name of the branch or commit to checkout" default:"${vars_git_head_reference}"`
-	Clone        bool   `name:"git-clone" help:"allow cloning via git"`
-	NoCache      bool   `name:"no-cache" help:"removes workload build cache"`
-	Workload     string `arg:"" help:"name of the workload to run"`
+	Dir             string `name:"directory" help:"root directory of the repository" default:"${vars_git_directory}"`
+	RuntimeDir      string `name:"runtimedir" help:"runtime directory" hidden:"true" default:"${vars_workload_directory}"`
+	GitRemote       string `name:"git-remote" help:"name of the git remote to use" default:"${vars_git_default_remote_name}"`
+	GitReference    string `name:"git-ref" help:"name of the branch or commit to checkout" default:"${vars_git_head_reference}"`
+	Clone           bool   `name:"git-clone" help:"allow cloning via git"`
+	InvalidateCache bool   `name:"invalidate-cache" help:"removes workload build cache"`
+	Workload        string `arg:"" help:"name of the workload to run"`
 }
 
-func (t baremetal) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
+func (t baremetal) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, hotswapbin *cmdopts.HotswapPath) (err error) {
 	var (
 		ws         workspaces.Context
 		repo       *git.Repository
@@ -74,8 +75,10 @@ func (t baremetal) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error
 
 	defer os.RemoveAll(filepath.Join(ws.Root, ws.RuntimeDir))
 
-	if t.NoCache {
-		os.RemoveAll(filepath.Join(ws.Root, ws.GenModDir))
+	if t.InvalidateCache {
+		log.Println("removing", filepath.Join(ws.Root, ws.BuildDir), spew.Sdump(ws))
+		os.RemoveAll(filepath.Join(ws.Root, ws.BuildDir))
+		os.RemoveAll(filepath.Join(ws.Root, ws.TransDir))
 	}
 
 	if repo, err = git.PlainOpen(ws.Root); err != nil {
@@ -147,9 +150,12 @@ func (t baremetal) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error
 		"COLORTERM",
 		"LANG",
 		"CI",
-		eg.EnvComputeBin,
 		eg.EnvComputeRunID,
 		eg.EnvComputeAccountID,
+	).Var(
+		eg.EnvComputeBin, hotswapbin.String(),
+	).Var(
+		eg.EnvExperimentalBaremetal, strconv.FormatBool(true), // temporary while we flesh out the needed changes
 	).Var(
 		eg.EnvUnsafeGitCloneEnabled, strconv.FormatBool(t.Clone), // hack to disable cloning
 	).Var(

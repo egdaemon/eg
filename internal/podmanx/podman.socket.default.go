@@ -12,9 +12,11 @@ import (
 
 func DefaultSocket() string {
 	u := userx.CurrentUserOrDefault(userx.Root())
+	upath := filepath.Join("/var", "run", "user", u.Uid, "podman", "podman.sock")
 	socketpath := fsx.LocateFirst(
-		filepath.Join("/var", "run", "user", u.Uid, "podman", "podman.sock"),
+		upath,
 		filepath.Join("/run", "podman", "podman.sock"),
 	)
+
 	return fmt.Sprintf("unix://%s", socketpath)
 }

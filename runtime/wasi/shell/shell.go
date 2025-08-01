@@ -10,6 +10,7 @@ import (
 
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/stringsx"
+	"github.com/egdaemon/eg/internal/userx"
 	"github.com/egdaemon/eg/runtime/wasi/eg"
 	"github.com/egdaemon/eg/runtime/wasi/egunsafe/ffiexec"
 )
@@ -143,7 +144,7 @@ func (t Command) Newf(cmd string, options ...any) Command {
 //
 //	timeout: 5 minutes.
 func New(cmd string) Command {
-	u := errorsx.Zero(user.Current())
+	u := userx.CurrentUserOrDefault(user.User{})
 	return Command{
 		user:     stringsx.First(u.Username, "egd"), // default user to execute commands as
 		group:    stringsx.First(defaultgroup(u), "egd"),

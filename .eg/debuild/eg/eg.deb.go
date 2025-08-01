@@ -66,7 +66,7 @@ func Runner() eg.ContainerRunner {
 
 func Build(ctx context.Context, o eg.Op) error {
 	return eg.Sequential(
-		egdebuild.Build(gcfg, egdebuild.Option.Distro("oracular"), egdebuild.Option.BuildBinary(10*time.Minute)),
+		egdebuild.Build(gcfg, egdebuild.Option.Distro("plucky"), egdebuild.Option.BuildBinary(10*time.Minute)),
 		// shell.Op(shell.New("false")),
 		eg.Parallel(
 			egdebuild.Build(gcfg, egdebuild.Option.Distro("jammy")),

@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"net"
 	"os"
@@ -94,6 +95,7 @@ func main() {
 	shellcli.Context = contextx.WithWaitGroup(context.Background(), shellcli.Cleanup)
 	shellcli.Context, shellcli.Shutdown = context.WithCancelCause(shellcli.Context)
 	log.SetFlags(log.Lshortfile | log.LUTC | log.Ltime)
+	log.SetPrefix(fmt.Sprintf("[%d]", os.Getpid()))
 	go debugx.DumpOnSignal(shellcli.Context, syscall.SIGUSR2)
 	go cmdopts.Cleanup(shellcli.Context, shellcli.Shutdown, shellcli.Cleanup, func() {
 		log.Println("waiting for systems to shutdown")

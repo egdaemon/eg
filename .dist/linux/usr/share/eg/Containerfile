@@ -1,4 +1,4 @@
-FROM ubuntu:oracular
+FROM ubuntu:plucky
 
 ARG DEBIAN_FRONTEND=noninteractive
 ARG EG_RUNNER_OVERRIDE_DIR=/usr/share/eg/rootfs

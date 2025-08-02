@@ -215,5 +215,5 @@ func (t Agent) Options() []string {
 func (t Agent) Dial(ctx context.Context) (conn *grpc.ClientConn, err error) {
 	cspath := filepath.Join(envx.String(filepath.Join(t.ws.Root, t.ws.RuntimeDir), eg.EnvComputeRuntimeDirectory), eg.SocketControl)
 	debugx.Println("agent dialing", cspath)
-	return grpc.DialContext(ctx, fmt.Sprintf("unix://%s", cspath), grpc.WithInsecure(), grpc.WithBlock())
+	return grpc.DialContext(ctx, fmt.Sprintf("unix://%s", cspath), grpc.WithInsecure())
 }

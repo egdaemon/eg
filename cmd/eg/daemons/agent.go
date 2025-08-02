@@ -68,6 +68,8 @@ func AutoRunnerClient(global *cmdopts.Global, ws workspaces.Context, uid string,
 	var (
 		ragent *runners.Agent
 	)
+	debugx.Println("connecting to runner socket initiated")
+	defer debugx.Println("connecting to runner socket completed")
 
 	if cc, err = DefaultRunnerClient(global.Context); err == nil {
 		return cc, nil
@@ -81,12 +83,6 @@ func AutoRunnerClient(global *cmdopts.Global, ws workspaces.Context, uid string,
 	if ragent, err = m.NewRun(global.Context, ws, uid, options...); err != nil {
 		return nil, err
 	}
-
-	global.Cleanup.Add(1)
-	go func() {
-		defer global.Cleanup.Done()
-		<-global.Context.Done()
-	}()
 
 	return ragent.Dial(global.Context)
 }

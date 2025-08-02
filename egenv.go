@@ -95,6 +95,8 @@ const (
 	EnvGitHeadCommitAuthor    = "EG_GIT_HEAD_COMMIT_AUTHOR"
 	EnvGitHeadCommitEmail     = "EG_GIT_HEAD_COMMIT_EMAIL"
 	EnvGitHeadCommitTimestamp = "EG_GIT_HEAD_COMMIT_TIMESTAMP"
+	EnvGitAuthHTTPPassword    = "EG_GIT_AUTH_HTTP_PASSWORD"
+	EnvGitAuthHTTPUsername    = "EG_GIT_AUTH_HTTP_USERNAME"
 )
 
 const (

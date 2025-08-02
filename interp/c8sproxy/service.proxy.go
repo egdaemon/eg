@@ -15,6 +15,7 @@ import (
 	"github.com/egdaemon/eg/internal/debugx"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/execx"
+	"github.com/egdaemon/eg/internal/fsx"
 	"github.com/egdaemon/eg/internal/langx"
 	"github.com/egdaemon/eg/internal/slicesx"
 	"github.com/egdaemon/eg/internal/stringsx"
@@ -39,7 +40,12 @@ func ServiceProxyOptionContainerOptions(v ...string) ServiceProxyOption {
 }
 
 func ServiceProxyOptionBaremetal(ps *ProxyService) {
-	ps.remap = func(s string) string {
+	ps.remap = func(s string) (n string) {
+		old := s
+		defer func() {
+			debugx.Println("remapped", ps.ws.RuntimeDir, old, "->", n)
+		}()
+		s = strings.ReplaceAll(s, eg.RuntimeDirectory, ps.ws.RuntimeDir)
 		if after, ok := strings.CutPrefix(s, "/eg.mnt/"); ok {
 			return filepath.Join(ps.ws.Root, after)
 		}
@@ -97,7 +103,7 @@ func (t *ProxyService) Build(ctx context.Context, req *c8s.BuildRequest) (_ *c8s
 	if ok, err := images.Exists(ctx, req.Name, nil); ok && err == nil {
 		return &c8s.BuildResponse{}, nil
 	} else {
-		log.Println("DERP", spew.Sdump(req))
+		debugx.Println("building image", spew.Sdump(req), abspath, spew.Sdump(t.ws))
 	}
 
 	// determine the working directory from the request if specified or the definition file's path.
@@ -165,16 +171,21 @@ func (t *ProxyService) Module(ctx context.Context, req *c8s.ModuleRequest) (_ *c
 	// log.Println("module", req.Module)
 	// log.Println("mdir", req.Mdir)
 
-	// conditionally add this volume for backwards compatibility.
-	// REMOVE: 2026
-	if stringsx.Present(req.Module) {
+	{
+		// handle the wasi module volume for backwards compatibility.
 		idx := slices.IndexFunc(req.Options, func(s string) bool {
 			return strings.HasSuffix(s, ":/eg.mnt/.eg.module.wasm:ro")
 		})
 		if idx > -1 {
 			req.Options = slices.Delete(req.Options, idx-1, idx+1)
 		}
-		req.Options = append(req.Options, "--volume", fmt.Sprintf("%s:%s:ro", filepath.Join(t.ws.Root, t.ws.BuildDir, req.Module), eg.DefaultMountRoot(eg.ModuleBin)))
+
+		path := fsx.LocateFirst(
+			filepath.Join(t.ws.Root, t.ws.BuildDir, req.Module),
+			eg.DefaultMountRoot(eg.RuntimeDirectory, req.Module),
+		)
+		// log.Println("resolved\n", filepath.Join(t.ws.Root, t.ws.BuildDir, req.Module), "\n", eg.DefaultMountRoot(eg.RuntimeDirectory, req.Module), "->", path)
+		req.Options = append(req.Options, "--volume", fmt.Sprintf("%s:%s:ro", path, eg.DefaultMountRoot(eg.ModuleBin)))
 	}
 
 	options := make([]string, 0, len(t.containeropts)+len(req.Options)+1)
@@ -184,7 +195,7 @@ func (t *ProxyService) Module(ctx context.Context, req *c8s.ModuleRequest) (_ *c
 		options,
 		"--volume", fmt.Sprintf("%s:%s:rw", t.ws.Root, eg.DefaultMountRoot(eg.WorkingDirectory)),
 	)
-
+	// log.Println("module options", options)
 	// envx.Debug(options...)
 
 	if err = PodmanModule(ctx, t.prepcmd, req.Image, req.Name, t.remap(req.Mdir), options...); err != nil {

@@ -46,7 +46,7 @@ func Metric(d events.EventsClient) metricfnv0 {
 		}
 
 		if _, err = d.Dispatch(ctx, events.NewDispatch(events.NewMetric(name, fields))); err != nil {
-			log.Println(errorsx.Wrap(err, "unable to write metric"))
+			log.Println(errorsx.Wrap(err, "unable to write custom metric"))
 			return 1
 		}
 

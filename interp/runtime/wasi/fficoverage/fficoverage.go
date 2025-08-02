@@ -45,7 +45,7 @@ func Report(d events.EventsClient) tracefnv0 {
 		}
 
 		if _, err = d.Dispatch(ctx, events.NewDispatch(slicesx.MapTransform(func(rep *events.Coverage) *events.Message { return events.NewCoverage(rep) }, op...)...)); err != nil {
-			log.Println(errorsx.Wrap(err, "unable to write metric"))
+			log.Println(errorsx.Wrap(err, "unable to write coverage"))
 			return 1
 		}
 

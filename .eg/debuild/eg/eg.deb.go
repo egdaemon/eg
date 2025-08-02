@@ -4,7 +4,6 @@ import (
 	"context"
 	"embed"
 	"io/fs"
-	"time"
 
 	"eg/compute/errorsx"
 	"eg/compute/maintainer"
@@ -49,11 +48,7 @@ func Prepare(ctx context.Context, o eg.Op) error {
 	sruntime := shell.Runtime()
 	return eg.Sequential(
 		shell.Op(
-			sruntime.Newf("rm -rf %s", debdir),
-			sruntime.Newf("mkdir -p %s", debdir),
-			sruntime.Newf("git clone --depth 1 file://${PWD}/ %s", debdir),
-			sruntime.Newf("ls -lha %s", debdir),
-			sruntime.Newf("ls -lha %s/vendor/github.com/duckdb/duckdb-go-bindings/linux-amd64", debdir),
+			sruntime.Newf("test -d \"%s\" && git -C \"%s\" pull --rebase file://${PWD}/ || git clone --depth 2 file://${PWD}/ %s", debdir, debdir, debdir),
 		),
 		egdebuild.Prepare(Runner(), errorsx.Must(fs.Sub(debskel, ".debskel"))),
 	)(ctx, o)
@@ -65,15 +60,10 @@ func Runner() eg.ContainerRunner {
 }
 
 func Build(ctx context.Context, o eg.Op) error {
-	return eg.Sequential(
-		egdebuild.Build(gcfg, egdebuild.Option.Distro("oracular"), egdebuild.Option.BuildBinary(10*time.Minute)),
-		// shell.Op(shell.New("false")),
-		eg.Parallel(
-			egdebuild.Build(gcfg, egdebuild.Option.Distro("jammy")),
-			egdebuild.Build(gcfg, egdebuild.Option.Distro("noble")),
-			egdebuild.Build(gcfg, egdebuild.Option.Distro("oracular")),
-			egdebuild.Build(gcfg, egdebuild.Option.Distro("plucky")),
-		),
+	return eg.Parallel(
+		egdebuild.Build(gcfg, egdebuild.Option.Distro("jammy")),
+		egdebuild.Build(gcfg, egdebuild.Option.Distro("noble")),
+		egdebuild.Build(gcfg, egdebuild.Option.Distro("plucky")),
 	)(ctx, o)
 }
 

@@ -5,7 +5,7 @@ go 1.24.0
 toolchain go1.24.5
 
 require (
-	github.com/egdaemon/eg v0.0.0-20250801154812-20a9949a96c6
+	github.com/egdaemon/eg v0.0.0-20250801210955-743291f6d98f
 	github.com/egdaemon/wasinet/wasinet v0.0.0-20250731121320-3287a738a635
 )
 

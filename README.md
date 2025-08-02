@@ -11,3 +11,9 @@ the only developer productivity focused compute (ci/cd) platform. It focus' on d
 [Read](https://www.egdaemon.com/posts/2025.01.30.introducing.egd/index.html) the release announcement for a detailed overview of functionality and roadmap.
 
 [Documentation](https://www.egdaemon.com/docs/index.html) for installation/setup guides and package api documentation.
+
+### useful debugging commands
+```bash
+# setup container that matches deployed environment for building/testing.
+podman run -it --volume ~/go/bin:/root/go/bin:rw --volume .:/workload eg:latest /bin/bash
+```

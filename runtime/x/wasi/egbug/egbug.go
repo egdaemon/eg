@@ -133,7 +133,7 @@ func Images(ctx context.Context, op eg.Op) error {
 
 const (
 	EnvUnsafeDigest = "EG_UNSAFE_ENVVARS_DIGEST"
-	defaultDigest   = "b182a8f5e5bb48a4ead75efa7e74184b"
+	defaultDigest   = "0f97608c45f33d206dcd9d0cffac83f6"
 )
 
 // Ensures the environment is stable between releases.

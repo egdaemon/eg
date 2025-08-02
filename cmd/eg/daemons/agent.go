@@ -55,8 +55,10 @@ func MaybeAgentListener() (n net.Listener, err error) {
 
 func DefaultRunnerClient(ctx context.Context) (cc *grpc.ClientConn, err error) {
 	daemonpath := runners.DefaultRunnerSocketPath()
-	debugx.Println("connecting", daemonpath, fsx.FileExists(daemonpath))
-	if _, err := os.Stat(daemonpath); os.IsNotExist(err) {
+	exists := fsx.FileExists(daemonpath)
+	debugx.Println("connect initiated", daemonpath)
+	defer debugx.Println("connect completed", daemonpath, exists)
+	if !exists {
 		return nil, fmt.Errorf("agent not running at %s", daemonpath)
 	}
 	return grpc.DialContext(ctx, fmt.Sprintf("unix://%s", daemonpath), grpc.WithInsecure(), grpc.WithBlock())

@@ -48,7 +48,8 @@ func Prepare(ctx context.Context, o eg.Op) error {
 	sruntime := shell.Runtime()
 	return eg.Sequential(
 		shell.Op(
-			sruntime.Newf("test -d \"%s\" && git -C \"%s\" pull --rebase file://${PWD}/ || git clone --depth 2 file://${PWD}/ %s", debdir, debdir, debdir),
+			sruntime.Newf("rm -rf %s"),
+			sruntime.Newf("git clone --depth 1 file://${PWD}/ %s", debdir),
 		),
 		egdebuild.Prepare(Runner(), errorsx.Must(fs.Sub(debskel, ".debskel"))),
 	)(ctx, o)

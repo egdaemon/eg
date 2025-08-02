@@ -132,7 +132,7 @@ func main() {
 			"vars_user_home":               userx.HomeDirectoryOrDefault(user.HomeDir),
 			"vars_os":                      runtime.GOOS,
 			"vars_arch":                    runtime.GOARCH,
-			"vars_cores_minimum_default":   strconv.FormatUint(envx.Uint64(0, "EG_RESOURCES_CORES"), 10),
+			"vars_cores_minimum_default":   strconv.FormatUint(envx.Uint64(uint64(float64(runtime.NumCPU())*0.8), "EG_RESOURCES_CORES"), 10),
 			"vars_memory_minimum_default":  humanize.IBytes(envx.Uint64(0, "EG_RESOURCES_MEMORY")),
 			"vars_disk_minimum_default":    humanize.IBytes(envx.Uint64(0, "EG_RESOURCES_DISK")),
 			"vars_vram_minimum_default":    humanize.IBytes(envx.Uint64(0*bytesx.GiB, "EG_RESOURCES_VRAM")),

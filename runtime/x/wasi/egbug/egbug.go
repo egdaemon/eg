@@ -158,6 +158,7 @@ func EnsureEnv(ctx context.Context, op eg.Op) error {
 	// always ignore compute bin. its development tooling.
 	os.Unsetenv(_eg.EnvComputeBin)
 	os.Unsetenv("DEBIAN_FRONTEND")
+
 	// we plan to make this value static in the future. so ignore it for now.
 	os.Unsetenv(_eg.EnvComputeModuleSocket)
 	os.Unsetenv(EnvUnsafeDigest)

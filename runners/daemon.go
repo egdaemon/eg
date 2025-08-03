@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/internal/debugx"
 	"github.com/egdaemon/eg/internal/envx"
@@ -101,7 +102,7 @@ func AgentOptionContainerCache(dir string) string {
 }
 
 // standard caching mounts across host environments for local compute, let podman deal with the issues.
-// since they cant seem to figure out how to make host direcctory mounts function identically.
+// since they cant seem to figure out how to make host directory mounts function identically.
 func AgentOptionLocalComputeCachingVolumes(canonicaluri string) AgentOption {
 	_, path, _ := strings.Cut(canonicaluri, ":")
 	path = strings.ReplaceAll(path, "/", ".")
@@ -214,6 +215,6 @@ func (t Agent) Options() []string {
 
 func (t Agent) Dial(ctx context.Context) (conn *grpc.ClientConn, err error) {
 	cspath := filepath.Join(envx.String(filepath.Join(t.ws.Root, t.ws.RuntimeDir), eg.EnvComputeRuntimeDirectory), eg.SocketControl)
-	debugx.Println("agent dialing", cspath)
+	debugx.Println("agent dialing", spew.Sdump(t.ws), cspath)
 	return grpc.DialContext(ctx, fmt.Sprintf("unix://%s", cspath), grpc.WithInsecure())
 }

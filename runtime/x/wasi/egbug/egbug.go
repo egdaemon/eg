@@ -149,7 +149,7 @@ func EgEnviron() []string {
 		_eg.EnvComputeTTL,
 		_eg.EnvComputeWorkingDirectory,
 		_eg.EnvComputeCacheDirectory,
-		// _eg.EnvComputeRuntimeDirectory,
+		// _eg.EnvComputeRuntimeDirectory, // intentionally ignore this because its entirely random.
 		_eg.EnvComputeWorkloadDirectory,
 		_eg.EnvComputeWorkloadCapacity,
 		_eg.EnvComputeWorkloadTargetLoad,
@@ -172,13 +172,12 @@ func normalizeEnv() {
 	os.Setenv(_eg.EnvGitBaseCommit, "0000000000000000000000000000000000000000")
 	os.Setenv(_eg.EnvUnsafeCacheID, uuid.Nil.String())
 	os.Setenv(_eg.EnvComputeLoggingVerbosity, "0")
+	os.Setenv(_eg.EnvComputeModuleSocket, _eg.DefaultRuntimeDirectory("module.socket"))
 
 	// always ignore compute bin. its development tooling.
 	os.Unsetenv(_eg.EnvComputeBin)
 	os.Unsetenv("DEBIAN_FRONTEND")
 
-	// we plan to make this value static in the future. so ignore it for now.
-	os.Unsetenv(_eg.EnvComputeModuleSocket)
 	os.Unsetenv(EnvUnsafeDigest)
 }
 
@@ -211,7 +210,7 @@ func EnsureEnvAuto(ctx context.Context, op eg.Op) error {
 	return nil
 }
 
-func EnsureEnvFixed(expected string, keys ...string) eg.OpFn {
+func EnsureEnv(expected string, keys ...string) eg.OpFn {
 	return func(ctx context.Context, op eg.Op) error {
 		normalizeEnv()
 

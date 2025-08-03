@@ -14,7 +14,7 @@ func Debug(runtime shell.Command) eg.OpFn {
 	return eg.Sequential(
 		egbug.Log("---------------------------- failed inspection initiated ----------------------------"),
 		shell.Op(
-			runtime.New("env"),
+			runtime.New("env | sort"),
 			runtime.New("id"),
 		),
 		egbug.Log("---------------------------- failed inspection completed ----------------------------"),
@@ -25,7 +25,7 @@ func Debug(runtime shell.Command) eg.OpFn {
 func Test(ctx context.Context, op eg.Op) error {
 	return eg.Sequential(
 		// ensure a stable environment.
-		egbug.EnsureEnv("d706bb599e81b24b903cf034d724b7e3", egbug.EnsureEnviron()...),
+		egbug.EnsureEnvFixed("66f880d898cb3144bbd429877f9f27a3", egbug.EgEnviron()...),
 	)(ctx, op)
 }
 
@@ -47,8 +47,16 @@ func main() {
 		eg.Module(
 			ctx,
 			eg.DefaultModule(),
+			Test, // test will modify the environment needs its own container.
 			eg.Sequential(
-				Test,
+				egbug.DebugFailure(
+					// ensure that the user isnt egd
+					shell.Op(
+						shell.New("test $(id -nu) = egd"),
+						shell.New("test $(id -ng) = egd"),
+					),
+					Debug(shell.Runtime()),
+				),
 			),
 		),
 	)

@@ -33,6 +33,10 @@ func init() {
 		"",
 		egenv.CacheDirectory(".dist", "eg"),
 		egdebuild.Option.Maintainer(maintainer.Name, maintainer.Email),
+		// egdebuild.Option.BuildCommand(func(cfg *egdebuild.Config, runtime shell.Command) shell.Command {
+		// 	return runtime.Newf("debuild --no-lintian -us -uc -S -k%s", cfg.SignatureKeyID).Privileged()
+		// }),
+		// egdebuild.Option.NoLint(),
 		egdebuild.Option.SigningKeyID(maintainer.GPGFingerprint),
 		egdebuild.Option.ChangeLogDate(c.Committer.When),
 		egdebuild.Option.Version("0.0.:autopatch:"),
@@ -48,8 +52,7 @@ func Prepare(ctx context.Context, o eg.Op) error {
 	sruntime := shell.Runtime()
 	return eg.Sequential(
 		shell.Op(
-			sruntime.Newf("rm -rf %s", debdir),
-			sruntime.Newf("git clone --depth 1 file://${PWD}/ %s", debdir),
+			sruntime.Newf("git -C \"%s\" pull --rebase -X theirs file://${PWD}/ || (rm -rf %s && git clone --depth 1 file://${PWD}/ %s)", debdir, debdir, debdir),
 		),
 		egdebuild.Prepare(Runner(), errorsx.Must(fs.Sub(debskel, ".debskel"))),
 	)(ctx, o)

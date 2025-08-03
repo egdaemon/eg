@@ -54,7 +54,7 @@ func AgentOptionLocalGPGAgent(ctx context.Context, envb *envx.Builder) AgentOpti
 	)
 }
 
-// NotImplemented, but pan is to connect a runner to upstream services for gpg signing.
+// NotImplemented, but plan is to connect a runner to upstream services for gpg signing.
 func AgentOptionGPGAgent(desc ...string) AgentOption {
 	return AgentOptionNoop
 }

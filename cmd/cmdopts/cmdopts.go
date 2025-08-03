@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strconv"
 	"sync"
 	"time"
 
@@ -29,8 +30,9 @@ type Global struct {
 }
 
 func (t Global) AfterApply() error {
+	v := envx.Int(t.Verbosity, eg.EnvComputeLoggingVerbosity)
 	log.SetFlags(log.Flags() | log.Lshortfile)
-	switch envx.Int(t.Verbosity, eg.EnvComputeLoggingVerbosity) {
+	switch v {
 	case 4: // NETWORK
 		os.Setenv(eg.EnvLogsNetwork, "1")
 		fallthrough
@@ -56,6 +58,9 @@ func (t Global) AfterApply() error {
 		os.Setenv("GRPC_GO_LOG_SEVERITY_LEVEL", "info")
 		grpclog.SetLoggerV2(grpcx.NewLogger())
 	}
+
+	// ensure its available
+	os.Setenv(eg.EnvComputeLoggingVerbosity, strconv.Itoa(v))
 
 	return nil
 }

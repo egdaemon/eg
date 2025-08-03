@@ -178,12 +178,12 @@ func (t local) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err e
 			runners.AgentMountReadWrite(filepath.Join(ws.Root, ws.RuntimeDir), eg.DefaultMountRoot(eg.RuntimeDirectory)),
 		),
 		runners.AgentOptionLocalComputeCachingVolumes(canonicaluri),
-		gnupghome, // must come after the runtime directory mount to ensure correct mounting order.
 		runners.AgentOptionEnvironFile(environpath), // ensure we pick up the environment file with the container.
 		runners.AgentOptionHostOS(),
 		runners.AgentOptionPublish(t.Ports...),
 		runners.AgentOptionCores(t.RuntimeResources.Cores),
 		runners.AgentOptionMemory(uint64(t.RuntimeResources.Memory)),
+		gnupghome, // must come after the runtime directory mount to ensure correct mounting order.
 	)
 
 	for _, m := range modules {

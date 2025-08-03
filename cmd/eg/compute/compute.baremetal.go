@@ -198,7 +198,7 @@ func (t baremetal) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, hotswapbin
 	defer srv.GracefulStop()
 
 	events.NewServiceDispatch(db).Bind(srv)
-	execproxy.NewExecProxy(t.Dir, cmdenv).Bind(srv)
+	execproxy.NewExecProxy(t.Dir, errorsx.Must(envx.Build().FromEnviron(os.Environ()...).Environ())).Bind(srv)
 
 	canonicaluri := errorsx.Zero(gitx.CanonicalURI(repo, t.GitRemote))
 	ragent := runners.NewRunner(
@@ -206,7 +206,6 @@ func (t baremetal) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, hotswapbin
 		ws,
 		uid.String(),
 		runners.AgentOptionLocalComputeCachingVolumes(canonicaluri),
-		runners.AgentOptionEnvKeys(cmdenv...),
 		runners.AgentOptionEnv(eg.EnvComputeTLSInsecure, strconv.FormatBool(tlsc.Insecure)),
 		runners.AgentOptionVolumes(
 			runners.AgentMountReadWrite(filepath.Join(ws.Root, ws.CacheDir), eg.DefaultMountRoot(eg.CacheDirectory)),
@@ -214,13 +213,12 @@ func (t baremetal) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, hotswapbin
 		),
 		runners.AgentOptionHostOS(),
 		hostnet,
-		mountegbin,
 	)
 
 	c8sproxy.NewServiceProxy(
 		log.Default(),
 		ws,
-		c8sproxy.ServiceProxyOptionCommandEnviron(cmdenv...),
+		// c8sproxy.ServiceProxyOptionCommandEnviron(cmdenv...),
 		c8sproxy.ServiceProxyOptionContainerOptions(
 			ragent.Options()...,
 		),

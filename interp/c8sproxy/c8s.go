@@ -153,7 +153,6 @@ func PodmanModuleRunCmd(image, cname string, options ...string) []string {
 	return args
 }
 
-// runcmd is md5 of the command that generated the container.
 func moduleExec(ctx context.Context, cname, moduledir string, stdin io.Reader, stdout io.Writer, stderr io.Writer) (err error) {
 	var (
 		rtty, wtty *os.File
@@ -167,6 +166,7 @@ func moduleExec(ctx context.Context, cname, moduledir string, stdin io.Reader, s
 			AttachStdout: true,
 			Cmd: []string{
 				envx.String("eg", eg.EnvComputeBin),
+				"-vv",
 				"module",
 				"--directory", eg.DefaultWorkingDirectory(),
 				"--moduledir", moduledir,

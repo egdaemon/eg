@@ -56,6 +56,7 @@ type Config struct {
 	SourceDir      string   // absolute path to the source files to use for building the package.
 	Debian         fs.FS    // debian package files to use for building the package. generally only the rules file needs to be provided. the 'debian' directory is cloned from the fs.FS
 	Environ        []string // additional environment variables to pass to the build process.
+	lintian        string   // lintian flag
 	buildCommand   func(*Config, shell.Command) shell.Command
 }
 
@@ -138,6 +139,12 @@ func (option) Environ(k, v string) option {
 	}
 }
 
+func (option) NoLint() option {
+	return func(c *Config) {
+		c.lintian = "--no-lintian "
+	}
+}
+
 var Option = option(nil)
 
 func From(c Config, opts ...option) Config {
@@ -152,7 +159,7 @@ func New(pkg string, distro string, src string, opts ...option) (c Config) {
 		Architecture: "any",
 		Description:  "package built by egdebuild\n A package should provide its own description",
 		buildCommand: func(cfg *Config, runtime shell.Command) shell.Command {
-			return runtime.Newf("debuild -S -k%s", cfg.SignatureKeyID).Privileged()
+			return runtime.Newf("debuild %s-S -k%s", cfg.lintian, cfg.SignatureKeyID).Privileged()
 		},
 	}, opts...)
 }
@@ -236,7 +243,7 @@ func Build(cfg Config, opts ...option) eg.OpFn {
 		return shell.Run(
 			ctx,
 			runtime.Newf("chown -R egd:egd %s", root).Privileged(),
-			runtime.Newf("rsync --recursive --perms %s/ src/", cfg.SourceDir),
+			runtime.Newf("rsync --recursive --perms --links %s/ src/", cfg.SourceDir),
 			runtime.New("cat debian/control | envsubst | tee debian/control.new && mv debian/control.new debian/control"),
 			runtime.New("cat debian/changelog | envsubst | tee debian/changelog.new && mv debian/changelog.new debian/changelog"),
 			runtime.New("cat debian/rules | envsubst | tee debian/rules.new && mv debian/rules.new debian/rules"),

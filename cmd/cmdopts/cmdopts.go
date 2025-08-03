@@ -18,6 +18,7 @@ import (
 	"github.com/egdaemon/eg/internal/httpx"
 	"github.com/egdaemon/eg/internal/tracex"
 	"github.com/egdaemon/eg/runtime/wasi/env"
+	"github.com/sirupsen/logrus"
 )
 
 type Global struct {
@@ -37,6 +38,7 @@ func (t Global) AfterApply() error {
 		tracex.SetOutput(os.Stderr)
 		tracex.SetFlags(log.Flags())
 		os.Setenv(eg.EnvLogsTrace, "1")
+		logrus.SetLevel(logrus.TraceLevel)
 		fallthrough
 	case 2: // DEBUG
 		debugx.SetOutput(os.Stderr)

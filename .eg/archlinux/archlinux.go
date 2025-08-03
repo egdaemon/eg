@@ -32,8 +32,7 @@ func Build(ctx context.Context, _ eg.Op) error {
 	return shell.Run(
 		ctx,
 		runtime.Newf("mkdir -p %s", cdir),
-		// runtime.New("env"),
-		runtime.New("makepkg -f").Directory(templatedir),
+		runtime.New("pwd; ls -lha .; makepkg -f").Directory(templatedir),
 		runtime.Newf("paccache -c %s -rk2", cdir),
 	)
 }

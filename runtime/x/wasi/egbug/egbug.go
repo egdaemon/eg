@@ -136,48 +136,64 @@ const (
 	defaultDigest   = "0f97608c45f33d206dcd9d0cffac83f6"
 )
 
-// Ensures the environment is stable between releases.
-func EnsureEnv(ctx context.Context, op eg.Op) error {
+func EnsureEnviron() []string {
+	return errorsx.Zero(envx.Build().FromEnv(
+		_eg.EnvComputeAccountID,
+		_eg.EnvComputeRunID,
+		_eg.EnvGitHeadCommitTimestamp,
+		_eg.EnvGitHeadCommit,
+		_eg.EnvGitBaseCommit,
+		_eg.EnvUnsafeCacheID,
+		_eg.EnvComputeLoggingVerbosity,
+	).Environ())
+}
+
+// see EnsureEnv
+func EnsureEnvAuto(ctx context.Context, op eg.Op) error {
 	// expected hash with normalized values.
 	// if this needs to change it means we might be breaking
 	// existing builds.
-	expected := envx.String(defaultDigest, EnvUnsafeDigest)
+	return EnsureEnv(envx.String(defaultDigest, EnvUnsafeDigest), os.Environ()...)(ctx, op)
+}
 
-	old := os.Environ()
-	sort.Strings(old)
+// Ensures the environment is stable between releases.
+func EnsureEnv(expected string, old ...string) eg.OpFn {
+	return func(ctx context.Context, op eg.Op) error {
+		sort.Strings(old)
 
-	// zero out some dynamic environment variables for consistent results
-	os.Setenv(_eg.EnvComputeAccountID, uuid.Nil.String())
-	os.Setenv(_eg.EnvComputeRunID, uuid.Nil.String())
-	os.Setenv(_eg.EnvGitHeadCommitTimestamp, "0000-00-00T00:00:00-00:00")
-	os.Setenv(_eg.EnvGitHeadCommit, "0000000000000000000000000000000000000000")
-	os.Setenv(_eg.EnvGitBaseCommit, "0000000000000000000000000000000000000000")
-	os.Setenv(_eg.EnvUnsafeCacheID, uuid.Nil.String())
-	os.Setenv(_eg.EnvComputeLoggingVerbosity, "0")
+		// zero out some dynamic environment variables for consistent results
+		os.Setenv(_eg.EnvComputeAccountID, uuid.Nil.String())
+		os.Setenv(_eg.EnvComputeRunID, uuid.Nil.String())
+		os.Setenv(_eg.EnvGitHeadCommitTimestamp, "0000-00-00T00:00:00-00:00")
+		os.Setenv(_eg.EnvGitHeadCommit, "0000000000000000000000000000000000000000")
+		os.Setenv(_eg.EnvGitBaseCommit, "0000000000000000000000000000000000000000")
+		os.Setenv(_eg.EnvUnsafeCacheID, uuid.Nil.String())
+		os.Setenv(_eg.EnvComputeLoggingVerbosity, "0")
 
-	// always ignore compute bin. its development tooling.
-	os.Unsetenv(_eg.EnvComputeBin)
-	os.Unsetenv("DEBIAN_FRONTEND")
+		// always ignore compute bin. its development tooling.
+		os.Unsetenv(_eg.EnvComputeBin)
+		os.Unsetenv("DEBIAN_FRONTEND")
 
-	// we plan to make this value static in the future. so ignore it for now.
-	os.Unsetenv(_eg.EnvComputeModuleSocket)
-	os.Unsetenv(EnvUnsafeDigest)
+		// we plan to make this value static in the future. so ignore it for now.
+		os.Unsetenv(_eg.EnvComputeModuleSocket)
+		os.Unsetenv(EnvUnsafeDigest)
 
-	environ := os.Environ()
-	sort.Strings(environ)
+		environ := os.Environ()
+		sort.Strings(environ)
 
-	digest := md5.New()
-	for _, v := range environ {
-		if _, err := digest.Write([]byte(v)); err != nil {
-			return err
+		digest := md5.New()
+		for _, v := range environ {
+			if _, err := digest.Write([]byte(v)); err != nil {
+				return err
+			}
 		}
-	}
 
-	if d := hex.EncodeToString(digest.Sum(nil)); d != expected {
-		return fmt.Errorf("unexpected environment digest: %s != %s:\n%s\n-----------------------------------------\n%s", d, expected, strings.Join(old, "\n"), strings.Join(environ, "\n"))
-	}
+		if d := hex.EncodeToString(digest.Sum(nil)); d != expected {
+			return fmt.Errorf("unexpected environment digest: %s != %s:\n%s\n-----------------------------------------\n%s", d, expected, strings.Join(old, "\n"), strings.Join(environ, "\n"))
+		}
 
-	return nil
+		return nil
+	}
 }
 
 func NewCounter() *counter {
@@ -218,4 +234,12 @@ func Log(m ...any) eg.OpFn {
 		log.Println(m...)
 		return nil
 	}
+}
+
+func Zero[T any](v T, err error) T {
+	return errorsx.Zero(v, err)
+}
+
+func Must[T any](v T, err error) T {
+	return errorsx.Zero(v, err)
 }

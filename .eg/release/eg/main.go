@@ -9,6 +9,7 @@ import (
 	"github.com/egdaemon/eg/runtime/wasi/eg"
 	"github.com/egdaemon/eg/runtime/wasi/egenv"
 	"github.com/egdaemon/eg/runtime/wasi/eggit"
+	"github.com/egdaemon/eg/runtime/wasi/shell"
 )
 
 func main() {
@@ -20,11 +21,21 @@ func main() {
 		eggit.AutoClone,
 		// egbug.FileTree,
 		// eg.Parallel(
-		// 	eg.Build(eg.Container(archlinux.ContainerName).BuildFromFile(".dist/archlinux/Containerfile")),
+		//      eg.Build(eg.Container(archlinux.ContainerName).BuildFromFile(".dist/archlinux/Containerfile")),
 		// ),
+		shell.Op(
+			shell.New("ls -lha /eg.mnt"),
+		),
 		debeg.Prepare,
 		eg.Parallel(
-			eg.Module(ctx, debeg.Runner(), debeg.Build, debeg.Upload),
+			eg.Module(
+				ctx,
+				debeg.Runner(),
+				eg.Sequential(
+					debeg.Build,
+					debeg.Upload,
+				),
+			),
 			// eg.Module(ctx, archlinux.Builder(archlinux.ContainerName), archlinux.Build),
 		),
 	)

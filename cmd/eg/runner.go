@@ -35,6 +35,7 @@ import (
 	"github.com/egdaemon/eg/interp/execproxy"
 	"github.com/egdaemon/eg/interp/runtime/wasi/ffiwasinet"
 	"github.com/egdaemon/eg/runners"
+	"github.com/egdaemon/eg/runtime/wasi/env"
 	"github.com/egdaemon/eg/workspaces"
 	"github.com/gofrs/uuid"
 	"github.com/tetratelabs/wazero"
@@ -86,6 +87,11 @@ func (t module) mounthack(ctx context.Context, ws workspaces.Context) (err error
 		remap(eg.DefaultMountRoot(eg.CacheDirectory), eg.DefaultCacheDirectory()),
 	)
 	if err != nil {
+		return err
+	}
+
+	// HACK: gpg no longer obeys GNUPGHOME for the root user.
+	if err = errorsx.Compact(fsx.MkDirs(0700, "/run/user/0/gnupg"), os.Symlink("/eg.mnt/.gnupg", "/run/user/0/gnupg/d.3uqafziaitu1mwy9asijecpi")); err != nil {
 		return err
 	}
 
@@ -214,6 +220,7 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 			runners.AgentOptionEnv(eg.EnvComputeTLSInsecure, strconv.FormatBool(tlsc.Insecure)),
 			runners.AgentOptionVolumes(
 				runners.AgentMountReadWrite("/root", "/root"),
+				// runners.AgentMountReadWrite("/run/user/0", "/run/user/0"), // ensure runtimes are maintained
 				runners.AgentMountReadWrite(eg.DefaultMountRoot(), eg.DefaultMountRoot()),
 				runners.AgentMountReadWrite("/var/lib/containers", "/var/lib/containers"),
 			),
@@ -250,7 +257,7 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 		defer control.Close()
 
 		debugx.Printf("---------------------------- MODULE INITIATED %d ----------------------------\n", mlevel)
-		// env.Debug(os.Environ()...)
+		env.Debug(os.Environ()...)
 		debugx.Println("module pid", os.Getpid())
 		debugx.Println("account", aid)
 		debugx.Println("run id", uid)
@@ -290,7 +297,7 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 	// call after duckdb. we're leaving the call here for now but it shouldn't matter.
 	// and we're keen to remove it.
 	if err = t.mounthack(gctx.Context, ws); err != nil {
-		log.Println("unable to mount with correct permissions", err)
+		return errorsx.Wrap(err, "unable to mount with correct permissions - this is a transient error that happens occassional liekly due to bindfs bugs")
 	}
 
 	if cc, err = daemons.AutoRunnerClient(gctx, ws, uid, runners.AgentOptionAutoEGBin()); err != nil {

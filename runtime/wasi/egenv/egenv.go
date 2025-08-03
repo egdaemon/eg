@@ -94,3 +94,7 @@ func String(fallback string, keys ...string) string {
 func Int(fallback int, keys ...string) int {
 	return envx.Int(fallback, keys...)
 }
+
+func Build() *envx.Builder {
+	return envx.Build()
+}

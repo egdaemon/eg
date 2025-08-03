@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strconv"
 	"sync"
 	"time"
 
@@ -18,6 +19,7 @@ import (
 	"github.com/egdaemon/eg/internal/httpx"
 	"github.com/egdaemon/eg/internal/tracex"
 	"github.com/egdaemon/eg/runtime/wasi/env"
+	"github.com/sirupsen/logrus"
 )
 
 type Global struct {
@@ -28,8 +30,9 @@ type Global struct {
 }
 
 func (t Global) AfterApply() error {
+	v := envx.Int(t.Verbosity, eg.EnvComputeLoggingVerbosity)
 	log.SetFlags(log.Flags() | log.Lshortfile)
-	switch envx.Int(t.Verbosity, eg.EnvComputeLoggingVerbosity) {
+	switch v {
 	case 4: // NETWORK
 		os.Setenv(eg.EnvLogsNetwork, "1")
 		fallthrough
@@ -37,6 +40,7 @@ func (t Global) AfterApply() error {
 		tracex.SetOutput(os.Stderr)
 		tracex.SetFlags(log.Flags())
 		os.Setenv(eg.EnvLogsTrace, "1")
+		logrus.SetLevel(logrus.TraceLevel)
 		fallthrough
 	case 2: // DEBUG
 		debugx.SetOutput(os.Stderr)
@@ -54,6 +58,9 @@ func (t Global) AfterApply() error {
 		os.Setenv("GRPC_GO_LOG_SEVERITY_LEVEL", "info")
 		grpclog.SetLoggerV2(grpcx.NewLogger())
 	}
+
+	// ensure its available
+	os.Setenv(eg.EnvComputeLoggingVerbosity, strconv.Itoa(v))
 
 	return nil
 }

@@ -136,16 +136,34 @@ const (
 	defaultDigest   = "0f97608c45f33d206dcd9d0cffac83f6"
 )
 
-// Ensures the environment is stable between releases.
-func EnsureEnv(ctx context.Context, op eg.Op) error {
-	// expected hash with normalized values.
-	// if this needs to change it means we might be breaking
-	// existing builds.
-	expected := envx.String(defaultDigest, EnvUnsafeDigest)
+func EgEnviron() []string {
+	return []string{
+		_eg.EnvCI,
+		_eg.EnvComputeTLSInsecure,
+		_eg.EnvComputeLoggingVerbosity,
+		_eg.EnvComputeModuleNestedLevel,
+		_eg.EnvComputeRootModule,
+		_eg.EnvComputeRunID,
+		_eg.EnvComputeAccountID,
+		_eg.EnvComputeVCS,
+		_eg.EnvComputeTTL,
+		_eg.EnvComputeWorkingDirectory,
+		_eg.EnvComputeCacheDirectory,
+		// _eg.EnvComputeRuntimeDirectory, // intentionally ignore this because its entirely random.
+		_eg.EnvComputeWorkloadDirectory,
+		_eg.EnvComputeWorkloadCapacity,
+		_eg.EnvComputeWorkloadTargetLoad,
+		_eg.EnvScheduleMaximumDelay,
+		_eg.EnvScheduleSystemLoadFreq,
+		_eg.EnvPingMinimumDelay,
+		_eg.EnvComputeBin,
+		_eg.EnvComputeContainerImpure,
+		_eg.EnvComputeModuleSocket,
+		_eg.EnvComputeDefaultGroup,
+	}
+}
 
-	old := os.Environ()
-	sort.Strings(old)
-
+func normalizeEnv() {
 	// zero out some dynamic environment variables for consistent results
 	os.Setenv(_eg.EnvComputeAccountID, uuid.Nil.String())
 	os.Setenv(_eg.EnvComputeRunID, uuid.Nil.String())
@@ -154,14 +172,26 @@ func EnsureEnv(ctx context.Context, op eg.Op) error {
 	os.Setenv(_eg.EnvGitBaseCommit, "0000000000000000000000000000000000000000")
 	os.Setenv(_eg.EnvUnsafeCacheID, uuid.Nil.String())
 	os.Setenv(_eg.EnvComputeLoggingVerbosity, "0")
+	os.Setenv(_eg.EnvComputeModuleSocket, _eg.DefaultRuntimeDirectory("module.socket"))
 
 	// always ignore compute bin. its development tooling.
 	os.Unsetenv(_eg.EnvComputeBin)
 	os.Unsetenv("DEBIAN_FRONTEND")
 
-	// we plan to make this value static in the future. so ignore it for now.
-	os.Unsetenv(_eg.EnvComputeModuleSocket)
 	os.Unsetenv(EnvUnsafeDigest)
+}
+
+// Ensures the environment is stable between releases. only usable for standard compute.
+// baremetal is too variable. use EnsureEnvSubset for baremetal.
+func EnsureEnvAuto(ctx context.Context, op eg.Op) error {
+	expected := envx.String(defaultDigest, EnvUnsafeDigest)
+	// expected hash with normalized values.
+	// if this needs to change it means we might be breaking
+	// existing builds.
+	old := os.Environ()
+	sort.Strings(old)
+
+	normalizeEnv()
 
 	environ := os.Environ()
 	sort.Strings(environ)
@@ -178,6 +208,26 @@ func EnsureEnv(ctx context.Context, op eg.Op) error {
 	}
 
 	return nil
+}
+
+func EnsureEnv(expected string, keys ...string) eg.OpFn {
+	return func(ctx context.Context, op eg.Op) error {
+		normalizeEnv()
+
+		vars := errorsx.Zero(envx.Build().FromEnv(keys...).Environ())
+		digest := md5.New()
+		for _, v := range vars {
+			if _, err := digest.Write([]byte(v)); err != nil {
+				return err
+			}
+		}
+
+		if d := hex.EncodeToString(digest.Sum(nil)); d != expected {
+			return fmt.Errorf("unexpected environment digest: %s != %s:\n%s\n-----------------------------------------\n%s", d, expected, strings.Join(keys, "\n"), strings.Join(vars, "\n"))
+		}
+
+		return nil
+	}
 }
 
 func NewCounter() *counter {
@@ -218,4 +268,12 @@ func Log(m ...any) eg.OpFn {
 		log.Println(m...)
 		return nil
 	}
+}
+
+func Zero[T any](v T, err error) T {
+	return errorsx.Zero(v, err)
+}
+
+func Must[T any](v T, err error) T {
+	return errorsx.Zero(v, err)
 }

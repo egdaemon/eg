@@ -55,6 +55,7 @@ func (t baremetal) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, hotswapbin
 	var (
 		ws         workspaces.Context
 		repo       *git.Repository
+		environio  *os.File
 		aid        = envx.String(uuid.Nil.String(), eg.EnvComputeAccountID)
 		uid        = uuid.Must(uuid.NewV7())
 		descr      = envx.String("", eg.EnvComputeVCS)
@@ -76,7 +77,7 @@ func (t baremetal) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, hotswapbin
 	defer os.RemoveAll(filepath.Join(ws.Root, ws.RuntimeDir))
 
 	if t.InvalidateCache {
-		log.Println("removing", filepath.Join(ws.Root, ws.BuildDir), spew.Sdump(ws))
+		debugx.Println("removing", filepath.Join(ws.Root, ws.BuildDir), spew.Sdump(ws))
 		os.RemoveAll(filepath.Join(ws.Root, ws.BuildDir))
 		os.RemoveAll(filepath.Join(ws.Root, ws.TransDir))
 	}
@@ -161,17 +162,38 @@ func (t baremetal) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, hotswapbin
 	).Var(
 		eg.EnvComputeWorkingDirectory, ws.Root,
 	).Var(
+		eg.EnvComputeLoggingVerbosity, strconv.Itoa(gctx.Verbosity),
+	).Var(
+		eg.EnvComputeModuleNestedLevel, strconv.Itoa(0),
+	).Var(
+		eg.EnvComputeBin, hotswapbin.String(),
+	).FromEnviron(
+		errorsx.Zero(gitx.LocalEnv(repo, t.GitRemote, t.GitReference))...,
+	)
+
+	environpath := filepath.Join(ws.Root, ws.RuntimeDir, eg.EnvironFile)
+	if environio, err = os.Create(environpath); err != nil {
+		return errorsx.Wrap(err, "unable to open the environment variable file")
+	}
+	defer environio.Close()
+
+	modulesenv := envx.Build().FromEnviron(errorsx.Must(cmdenvb.Environ())...).Var(
+		eg.EnvComputeCacheDirectory, eg.DefaultCacheDirectory(),
+	).Var(
+		eg.EnvComputeRuntimeDirectory, eg.DefaultRuntimeDirectory(),
+	)
+
+	if err = modulesenv.CopyTo(environio); err != nil {
+		return errorsx.Wrap(err, "unable to generate environment")
+	}
+
+	// tune bare metal environment.
+	cmdenvb.Var(
 		eg.EnvComputeCacheDirectory, filepath.Join(ws.Root, ws.CacheDir),
 	).Var(
 		eg.EnvComputeRuntimeDirectory, filepath.Join(ws.Root, ws.RuntimeDir),
 	).Var(
 		eg.EnvComputeDefaultGroup, defaultgroup(),
-	).Var(
-		eg.EnvComputeModuleSocket, eg.DefaultMountRoot(eg.RuntimeDirectory, filepath.Base(cspath)),
-	).Var(
-		eg.EnvComputeModuleNestedLevel, strconv.Itoa(0),
-	).FromEnviron(
-		errorsx.Zero(gitx.LocalEnv(repo, t.GitRemote, t.GitReference))...,
 	).FromEnviron(
 		os.Environ()...,
 	)
@@ -198,29 +220,35 @@ func (t baremetal) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, hotswapbin
 	defer srv.GracefulStop()
 
 	events.NewServiceDispatch(db).Bind(srv)
-	execproxy.NewExecProxy(t.Dir, cmdenv).Bind(srv)
+	execproxy.NewExecProxy(
+		t.Dir,
+		errorsx.Must(
+			envx.Build().
+				FromEnviron(errorsx.Zero(gitx.LocalEnv(repo, t.GitRemote, t.GitReference))...).
+				FromEnviron(os.Environ()...).Environ(),
+		),
+	).Bind(srv)
 
 	canonicaluri := errorsx.Zero(gitx.CanonicalURI(repo, t.GitRemote))
 	ragent := runners.NewRunner(
 		ctx,
 		ws,
 		uid.String(),
+		runners.AgentOptionEnvironFile(environpath), // ensure we pick up the environment file with the container.
 		runners.AgentOptionLocalComputeCachingVolumes(canonicaluri),
-		runners.AgentOptionEnvKeys(cmdenv...),
 		runners.AgentOptionEnv(eg.EnvComputeTLSInsecure, strconv.FormatBool(tlsc.Insecure)),
 		runners.AgentOptionVolumes(
 			runners.AgentMountReadWrite(filepath.Join(ws.Root, ws.CacheDir), eg.DefaultMountRoot(eg.CacheDirectory)),
 			runners.AgentMountReadWrite(filepath.Join(ws.Root, ws.RuntimeDir), eg.DefaultMountRoot(eg.RuntimeDirectory)),
 		),
 		runners.AgentOptionHostOS(),
-		hostnet,
 		mountegbin,
+		hostnet,
 	)
 
 	c8sproxy.NewServiceProxy(
 		log.Default(),
 		ws,
-		c8sproxy.ServiceProxyOptionCommandEnviron(cmdenv...),
 		c8sproxy.ServiceProxyOptionContainerOptions(
 			ragent.Options()...,
 		),

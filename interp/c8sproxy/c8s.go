@@ -14,6 +14,7 @@ import (
 	"os/exec"
 	"os/signal"
 	"reflect"
+	"strings"
 	"syscall"
 	"time"
 
@@ -30,6 +31,8 @@ import (
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/execx"
 	"github.com/egdaemon/eg/internal/langx"
+	"github.com/egdaemon/eg/internal/slicesx"
+	"github.com/egdaemon/eg/internal/stringsx"
 
 	xterm "golang.org/x/term"
 )
@@ -153,11 +156,17 @@ func PodmanModuleRunCmd(image, cname string, options ...string) []string {
 	return args
 }
 
-// runcmd is md5 of the command that generated the container.
 func moduleExec(ctx context.Context, cname, moduledir string, stdin io.Reader, stdout io.Writer, stderr io.Writer) (err error) {
 	var (
 		rtty, wtty *os.File
 	)
+
+	verbosity := ""
+	switch x := envx.Int(0, eg.EnvComputeLoggingVerbosity); x {
+	case 0:
+	default:
+		verbosity = fmt.Sprintf("-%s", strings.Repeat("v", x))
+	}
 
 	id, err := containers.ExecCreate(ctx, cname, &handlers.ExecCreateConfig{
 		ExecOptions: container.ExecOptions{
@@ -165,13 +174,14 @@ func moduleExec(ctx context.Context, cname, moduledir string, stdin io.Reader, s
 			AttachStdin:  stdin != nil,
 			AttachStderr: true,
 			AttachStdout: true,
-			Cmd: []string{
+			Cmd: slicesx.Filter(stringsx.Present, []string{
 				envx.String("eg", eg.EnvComputeBin),
+				verbosity,
 				"module",
 				"--directory", eg.DefaultWorkingDirectory(),
 				"--moduledir", moduledir,
 				eg.DefaultMountRoot(eg.ModuleBin),
-			},
+			}...),
 		},
 	})
 	if err != nil {
@@ -196,7 +206,9 @@ func moduleExec(ctx context.Context, cname, moduledir string, stdin io.Reader, s
 		defer wtty.Close()
 
 		go func() {
-			_, _ = io.Copy(wtty, stdin) // not important
+			_, cause := io.Copy(wtty, stdin)
+			debugx.Println("unable to copy stdin", cause)
+			wtty.Close()
 		}()
 	}
 

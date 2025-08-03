@@ -35,7 +35,6 @@ import (
 	"github.com/egdaemon/eg/interp/execproxy"
 	"github.com/egdaemon/eg/interp/runtime/wasi/ffiwasinet"
 	"github.com/egdaemon/eg/runners"
-	"github.com/egdaemon/eg/runtime/wasi/env"
 	"github.com/egdaemon/eg/workspaces"
 	"github.com/gofrs/uuid"
 	"github.com/tetratelabs/wazero"
@@ -257,7 +256,7 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 		defer control.Close()
 
 		debugx.Printf("---------------------------- MODULE INITIATED %d ----------------------------\n", mlevel)
-		env.Debug(os.Environ()...)
+		// envx.Debug(os.Environ()...)
 		debugx.Println("module pid", os.Getpid())
 		debugx.Println("account", aid)
 		debugx.Println("run id", uid)

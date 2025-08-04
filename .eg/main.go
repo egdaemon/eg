@@ -57,8 +57,9 @@ func IntegrationTests(ctx context.Context, op eg.Op) error {
 		eg.Sequential(
 			shell.Op(runtime.New("/home/egd/go/bin/eg compute baremetal tests/concurrent")),
 			// shell.Op(runtime.New("/home/egd/go/bin/eg compute baremetal tests/containers")),
-			// shell.Op(runtime.New("/home/egd/go/bin/eg compute baremetal tests/metrics")),
-			// shell.Op(runtime.New("/home/egd/go/bin/eg compute baremetal tests/stress")),
+			shell.Op(runtime.New("/home/egd/go/bin/eg compute baremetal tests/metrics")),
+			shell.Op(runtime.New("/home/egd/go/bin/eg compute baremetal tests/stress")),
+			shell.Op(runtime.New("/home/egd/go/bin/eg compute baremetal tests/gpgagent")),
 			// shell.Op(runtime.New("/home/egd/go/bin/eg compute baremetal tests/tty")),
 			shell.Op(
 				runtime.New("/home/egd/go/bin/eg compute baremetal tests/envvars").

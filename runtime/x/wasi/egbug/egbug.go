@@ -133,7 +133,7 @@ func Images(ctx context.Context, op eg.Op) error {
 
 const (
 	EnvUnsafeDigest = "EG_UNSAFE_ENVVARS_DIGEST"
-	defaultDigest   = "2e2bff2f6caf30bd4229dd70b9c09cef"
+	defaultDigest   = "3b7a9c279c58032a046aa980dd38cb8b"
 )
 
 func EgEnviron() []string {

@@ -4,6 +4,8 @@ import (
 	"context"
 	"crypto/rand"
 	"fmt"
+	"io"
+	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -169,6 +171,12 @@ type runner struct {
 }
 
 func (t runner) perform(ctx context.Context, runid, path string, rtb runtimefn) (err error) {
+	defer func(before bool) {
+		// strictly speaking stdin should remain blocking at all times but using before
+		if nonBlocking(os.Stdin.Fd()) == before {
+			log.Println("---------------------------------------------- stdin was munged ----------------------------------------------")
+		}
+	}(nonBlocking(os.Stdin.Fd()))
 	tracedebug := envx.Boolean(false, eg.EnvLogsTrace)
 
 	cache, err := wazero.NewCompilationCacheWithDir(wasix.WazCacheDir(t.runtimedir))
@@ -187,6 +195,33 @@ func (t runner) perform(ctx context.Context, runid, path string, rtb runtimefn) 
 		ctx,
 		wazero.NewRuntimeConfig().WithCompilationCache(cache),
 	)
+
+	inpr, inpw := io.Pipe()
+	defer inpr.Close()
+	defer inpw.CloseWithError(io.EOF)
+	go func() {
+		_, _err := io.Copy(inpw, os.Stdin)
+		debugx.Println(errorsx.Wrap(_err, "failed copying stdin"))
+		inpw.CloseWithError(_err)
+	}()
+
+	errpr, errpw := io.Pipe()
+	defer errpr.Close()
+	defer errpw.CloseWithError(io.EOF)
+	go func() {
+		_, _err := io.Copy(os.Stderr, errpr)
+		debugx.Println(errorsx.Wrap(_err, "failed copying to stderr"))
+		inpw.CloseWithError(_err)
+	}()
+
+	outpr, outpw := io.Pipe()
+	defer outpr.Close()
+	defer outpw.CloseWithError(io.EOF)
+	go func() {
+		_, _err := io.Copy(os.Stdout, outpr)
+		debugx.Println(errorsx.Wrap(_err, "failed copying to stderr"))
+		inpw.CloseWithError(_err)
+	}()
 
 	debugx.Println("cache dir", eg.DefaultCacheDirectory(), "->", eg.DefaultCacheDirectory())
 	debugx.Println("runtime dir", t.runtimedir, "->", eg.DefaultMountRoot(eg.RuntimeDirectory))
@@ -214,11 +249,11 @@ func (t runner) perform(ctx context.Context, runid, path string, rtb runtimefn) 
 	).WithEnv(
 		"PWD", eg.DefaultWorkingDirectory(),
 	).WithStdin(
-		os.Stdin,
+		inpr,
 	).WithStderr(
-		os.Stderr,
+		errpw,
 	).WithStdout(
-		os.Stdout,
+		outpw,
 	).WithFSConfig(
 		wazero.NewFSConfig().
 			WithDirMount(os.TempDir(), os.TempDir()).

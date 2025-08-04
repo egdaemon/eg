@@ -435,7 +435,6 @@ type eventTransportParameters struct {
 	PreferredAddress *preferredAddress
 
 	MaxDatagramFrameSize protocol.ByteCount
-	EnableResetStreamAt  bool
 }
 
 func (e eventTransportParameters) Category() category { return categoryTransport }
@@ -481,9 +480,6 @@ func (e eventTransportParameters) MarshalJSONObject(enc *gojay.Encoder) {
 	if e.MaxDatagramFrameSize != protocol.InvalidByteCount {
 		enc.Int64Key("max_datagram_frame_size", int64(e.MaxDatagramFrameSize))
 	}
-	if e.EnableResetStreamAt {
-		enc.BoolKey("reset_stream_at", true)
-	}
 }
 
 type preferredAddress struct {
@@ -496,14 +492,10 @@ var _ gojay.MarshalerJSONObject = &preferredAddress{}
 
 func (a preferredAddress) IsNil() bool { return false }
 func (a preferredAddress) MarshalJSONObject(enc *gojay.Encoder) {
-	if a.IPv4.IsValid() {
-		enc.StringKey("ip_v4", a.IPv4.Addr().String())
-		enc.Uint16Key("port_v4", a.IPv4.Port())
-	}
-	if a.IPv6.IsValid() {
-		enc.StringKey("ip_v6", a.IPv6.Addr().String())
-		enc.Uint16Key("port_v6", a.IPv6.Port())
-	}
+	enc.StringKey("ip_v4", a.IPv4.Addr().String())
+	enc.Uint16Key("port_v4", a.IPv4.Port())
+	enc.StringKey("ip_v6", a.IPv6.Addr().String())
+	enc.Uint16Key("port_v6", a.IPv6.Port())
 	enc.StringKey("connection_id", a.ConnectionID.String())
 	enc.StringKey("stateless_reset_token", fmt.Sprintf("%x", a.StatelessResetToken))
 }

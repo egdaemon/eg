@@ -584,15 +584,14 @@ func (h *sentPacketHandler) setLossDetectionTimer(now time.Time) {
 	newAlarm := h.lossDetectionTime(now)
 	h.alarm = newAlarm
 
-	hasAlarm := !newAlarm.Time.IsZero()
-	if !hasAlarm && !oldAlarm.Time.IsZero() {
+	if newAlarm.Time.IsZero() && !oldAlarm.Time.IsZero() {
 		h.logger.Debugf("Canceling loss detection timer.")
 		if h.tracer != nil && h.tracer.LossTimerCanceled != nil {
 			h.tracer.LossTimerCanceled()
 		}
 	}
 
-	if hasAlarm && h.tracer != nil && h.tracer.SetLossTimer != nil && newAlarm != oldAlarm {
+	if h.tracer != nil && h.tracer.SetLossTimer != nil && newAlarm != oldAlarm {
 		h.tracer.SetLossTimer(newAlarm.TimerType, newAlarm.EncryptionLevel, newAlarm.Time)
 	}
 }
@@ -637,7 +636,7 @@ func (h *sentPacketHandler) lossDetectionTime(now time.Time) alarmTimer {
 		return alarmTimer{
 			Time:            pathProbeLossTime,
 			TimerType:       logging.TimerTypePathProbe,
-			EncryptionLevel: protocol.Encryption1RTT,
+			EncryptionLevel: encLevel,
 		}
 	}
 	return alarmTimer{}

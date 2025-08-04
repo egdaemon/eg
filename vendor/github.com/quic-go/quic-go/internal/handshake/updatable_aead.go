@@ -6,7 +6,6 @@ import (
 	"crypto/tls"
 	"encoding/binary"
 	"fmt"
-	"sync/atomic"
 	"time"
 
 	"github.com/quic-go/quic-go/internal/protocol"
@@ -15,16 +14,9 @@ import (
 	"github.com/quic-go/quic-go/logging"
 )
 
-var keyUpdateInterval atomic.Uint64
-
-func init() {
-	keyUpdateInterval.Store(protocol.KeyUpdateInterval)
-}
-
-func SetKeyUpdateInterval(v uint64) (reset func()) {
-	old := keyUpdateInterval.Swap(v)
-	return func() { keyUpdateInterval.Store(old) }
-}
+// KeyUpdateInterval is the maximum number of packets we send or receive before initiating a key update.
+// It's a package-level variable to allow modifying it for testing purposes.
+var KeyUpdateInterval uint64 = protocol.KeyUpdateInterval
 
 // FirstKeyUpdateInterval is the maximum number of packets we send or receive before initiating the first key update.
 // It's a package-level variable to allow modifying it for testing purposes.
@@ -301,11 +293,11 @@ func (a *updatableAEAD) shouldInitiateKeyUpdate() bool {
 			return true
 		}
 	}
-	if a.numRcvdWithCurrentKey >= keyUpdateInterval.Load() {
+	if a.numRcvdWithCurrentKey >= KeyUpdateInterval {
 		a.logger.Debugf("Received %d packets with current key phase. Initiating key update to the next key phase: %d", a.numRcvdWithCurrentKey, a.keyPhase+1)
 		return true
 	}
-	if a.numSentWithCurrentKey >= keyUpdateInterval.Load() {
+	if a.numSentWithCurrentKey >= KeyUpdateInterval {
 		a.logger.Debugf("Sent %d packets with current key phase. Initiating key update to the next key phase: %d", a.numSentWithCurrentKey, a.keyPhase+1)
 		return true
 	}

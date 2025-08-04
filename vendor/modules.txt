@@ -487,7 +487,7 @@ github.com/ebitengine/purego
 github.com/ebitengine/purego/internal/cgo
 github.com/ebitengine/purego/internal/fakecgo
 github.com/ebitengine/purego/internal/strings
-# github.com/egdaemon/eg v0.0.0-20250804162625-b52c6641d5e3
+# github.com/egdaemon/eg v0.0.0-20250804163823-f528b683e38d
 ## explicit; go 1.24.0
 # github.com/egdaemon/wasinet/wasinet v0.0.0-20250731121320-3287a738a635
 ## explicit; go 1.23.4
@@ -1373,7 +1373,7 @@ github.com/prometheus/procfs/internal/util
 # github.com/quic-go/qpack v0.5.1
 ## explicit; go 1.22
 github.com/quic-go/qpack
-# github.com/quic-go/quic-go v0.54.0
+# github.com/quic-go/quic-go v0.50.1
 ## explicit; go 1.23
 github.com/quic-go/quic-go
 github.com/quic-go/quic-go/http3
@@ -1391,8 +1391,8 @@ github.com/quic-go/quic-go/logging
 github.com/quic-go/quic-go/metrics
 github.com/quic-go/quic-go/qlog
 github.com/quic-go/quic-go/quicvarint
-# github.com/quic-go/webtransport-go v0.9.0
-## explicit; go 1.23
+# github.com/quic-go/webtransport-go v0.8.1-0.20241018022711-4ac2c9250e66
+## explicit; go 1.22
 github.com/quic-go/webtransport-go
 # github.com/raulk/go-watchdog v1.3.0
 ## explicit; go 1.15
@@ -1680,6 +1680,7 @@ golang.org/x/crypto/ssh/knownhosts
 ## explicit; go 1.23.0
 golang.org/x/exp/constraints
 golang.org/x/exp/maps
+golang.org/x/exp/rand
 golang.org/x/exp/slices
 # golang.org/x/mod v0.26.0
 ## explicit; go 1.23.0

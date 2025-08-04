@@ -71,11 +71,10 @@ func NewTracerWithRegisterer(registerer prometheus.Registerer) *logging.Tracer {
 			defer putStringSlice(tags)
 
 			var reason string
-			//nolint:exhaustive // we only care about Retry and Initial packets here
-			switch hdr.Type {
-			case protocol.PacketTypeRetry:
+			switch {
+			case hdr.Type == protocol.PacketTypeRetry:
 				reason = "retry"
-			case protocol.PacketTypeInitial:
+			case hdr.Type == protocol.PacketTypeInitial:
 				var ccf *logging.ConnectionCloseFrame
 				for _, f := range frames {
 					cc, ok := f.(*logging.ConnectionCloseFrame)

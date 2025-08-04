@@ -1,13 +1,13 @@
 package protocol
 
 import (
-	"crypto/rand"
 	"encoding/binary"
 	"fmt"
 	"math"
-	mrand "math/rand/v2"
-	"slices"
 	"sync"
+	"time"
+
+	"golang.org/x/exp/rand"
 )
 
 // Version is a version number as int
@@ -37,6 +37,7 @@ func IsValidVersion(v Version) bool {
 }
 
 func (vn Version) String() string {
+	//nolint:exhaustive
 	switch vn {
 	case VersionUnknown:
 		return "unknown"
@@ -64,7 +65,12 @@ func (vn Version) toGQUICVersion() int {
 
 // IsSupportedVersion returns true if the server supports this version
 func IsSupportedVersion(supported []Version, v Version) bool {
-	return slices.Contains(supported, v)
+	for _, t := range supported {
+		if t == v {
+			return true
+		}
+	}
+	return false
 }
 
 // ChooseSupportedVersion finds the best version in the overlap of ours and theirs
@@ -73,8 +79,10 @@ func IsSupportedVersion(supported []Version, v Version) bool {
 // The bool returned indicates if a matching version was found.
 func ChooseSupportedVersion(ours, theirs []Version) (Version, bool) {
 	for _, ourVer := range ours {
-		if slices.Contains(theirs, ourVer) {
-			return ourVer, true
+		for _, theirVer := range theirs {
+			if ourVer == theirVer {
+				return ourVer, true
+			}
 		}
 	}
 	return 0, false
@@ -82,22 +90,13 @@ func ChooseSupportedVersion(ours, theirs []Version) (Version, bool) {
 
 var (
 	versionNegotiationMx   sync.Mutex
-	versionNegotiationRand mrand.Rand
+	versionNegotiationRand = rand.New(rand.NewSource(uint64(time.Now().UnixNano())))
 )
-
-func init() {
-	var seed [16]byte
-	rand.Read(seed[:])
-	versionNegotiationRand = *mrand.New(mrand.NewPCG(
-		binary.BigEndian.Uint64(seed[:8]),
-		binary.BigEndian.Uint64(seed[8:]),
-	))
-}
 
 // generateReservedVersion generates a reserved version (v & 0x0f0f0f0f == 0x0a0a0a0a)
 func generateReservedVersion() Version {
 	var b [4]byte
-	binary.BigEndian.PutUint32(b[:], versionNegotiationRand.Uint32())
+	_, _ = versionNegotiationRand.Read(b[:]) // ignore the error here. Failure to read random data doesn't break anything
 	return Version((binary.BigEndian.Uint32(b[:]) | 0x0a0a0a0a) & 0xfafafafa)
 }
 
@@ -106,7 +105,7 @@ func generateReservedVersion() Version {
 func GetGreasedVersions(supported []Version) []Version {
 	versionNegotiationMx.Lock()
 	defer versionNegotiationMx.Unlock()
-	randPos := versionNegotiationRand.IntN(len(supported) + 1)
+	randPos := rand.Intn(len(supported) + 1)
 	greased := make([]Version, len(supported)+1)
 	copy(greased, supported[:randPos])
 	greased[randPos] = generateReservedVersion()

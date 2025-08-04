@@ -50,23 +50,23 @@ func toLoggingAckFrame(f *wire.AckFrame) *logging.AckFrame {
 	return ack
 }
 
-func (c *Conn) logLongHeaderPacket(p *longHeaderPacket, ecn protocol.ECN) {
+func (s *connection) logLongHeaderPacket(p *longHeaderPacket, ecn protocol.ECN) {
 	// quic-go logging
-	if c.logger.Debug() {
-		p.header.Log(c.logger)
+	if s.logger.Debug() {
+		p.header.Log(s.logger)
 		if p.ack != nil {
-			wire.LogFrame(c.logger, p.ack, true)
+			wire.LogFrame(s.logger, p.ack, true)
 		}
 		for _, frame := range p.frames {
-			wire.LogFrame(c.logger, frame.Frame, true)
+			wire.LogFrame(s.logger, frame.Frame, true)
 		}
 		for _, frame := range p.streamFrames {
-			wire.LogFrame(c.logger, frame.Frame, true)
+			wire.LogFrame(s.logger, frame.Frame, true)
 		}
 	}
 
 	// tracing
-	if c.tracer != nil && c.tracer.SentLongHeaderPacket != nil {
+	if s.tracer != nil && s.tracer.SentLongHeaderPacket != nil {
 		frames := make([]logging.Frame, 0, len(p.frames))
 		for _, f := range p.frames {
 			frames = append(frames, toLoggingFrame(f.Frame))
@@ -78,11 +78,11 @@ func (c *Conn) logLongHeaderPacket(p *longHeaderPacket, ecn protocol.ECN) {
 		if p.ack != nil {
 			ack = toLoggingAckFrame(p.ack)
 		}
-		c.tracer.SentLongHeaderPacket(p.header, p.length, ecn, ack, frames)
+		s.tracer.SentLongHeaderPacket(p.header, p.length, ecn, ack, frames)
 	}
 }
 
-func (c *Conn) logShortHeaderPacket(
+func (s *connection) logShortHeaderPacket(
 	destConnID protocol.ConnectionID,
 	ackFrame *wire.AckFrame,
 	frames []ackhandler.Frame,
@@ -94,25 +94,25 @@ func (c *Conn) logShortHeaderPacket(
 	size protocol.ByteCount,
 	isCoalesced bool,
 ) {
-	if c.logger.Debug() && !isCoalesced {
-		c.logger.Debugf("-> Sending packet %d (%d bytes) for connection %s, 1-RTT (ECN: %s)", pn, size, c.logID, ecn)
+	if s.logger.Debug() && !isCoalesced {
+		s.logger.Debugf("-> Sending packet %d (%d bytes) for connection %s, 1-RTT (ECN: %s)", pn, size, s.logID, ecn)
 	}
 	// quic-go logging
-	if c.logger.Debug() {
-		wire.LogShortHeader(c.logger, destConnID, pn, pnLen, kp)
+	if s.logger.Debug() {
+		wire.LogShortHeader(s.logger, destConnID, pn, pnLen, kp)
 		if ackFrame != nil {
-			wire.LogFrame(c.logger, ackFrame, true)
+			wire.LogFrame(s.logger, ackFrame, true)
 		}
 		for _, f := range frames {
-			wire.LogFrame(c.logger, f.Frame, true)
+			wire.LogFrame(s.logger, f.Frame, true)
 		}
 		for _, f := range streamFrames {
-			wire.LogFrame(c.logger, f.Frame, true)
+			wire.LogFrame(s.logger, f.Frame, true)
 		}
 	}
 
 	// tracing
-	if c.tracer != nil && c.tracer.SentShortHeaderPacket != nil {
+	if s.tracer != nil && s.tracer.SentShortHeaderPacket != nil {
 		fs := make([]logging.Frame, 0, len(frames)+len(streamFrames))
 		for _, f := range frames {
 			fs = append(fs, toLoggingFrame(f.Frame))
@@ -124,7 +124,7 @@ func (c *Conn) logShortHeaderPacket(
 		if ackFrame != nil {
 			ack = toLoggingAckFrame(ackFrame)
 		}
-		c.tracer.SentShortHeaderPacket(
+		s.tracer.SentShortHeaderPacket(
 			&logging.ShortHeader{DestConnectionID: destConnID, PacketNumber: pn, PacketNumberLen: pnLen, KeyPhase: kp},
 			size,
 			ecn,
@@ -134,12 +134,12 @@ func (c *Conn) logShortHeaderPacket(
 	}
 }
 
-func (c *Conn) logCoalescedPacket(packet *coalescedPacket, ecn protocol.ECN) {
-	if c.logger.Debug() {
+func (s *connection) logCoalescedPacket(packet *coalescedPacket, ecn protocol.ECN) {
+	if s.logger.Debug() {
 		// There's a short period between dropping both Initial and Handshake keys and completion of the handshake,
 		// during which we might call PackCoalescedPacket but just pack a short header packet.
 		if len(packet.longHdrPackets) == 0 && packet.shortHdrPacket != nil {
-			c.logShortHeaderPacket(
+			s.logShortHeaderPacket(
 				packet.shortHdrPacket.DestConnID,
 				packet.shortHdrPacket.Ack,
 				packet.shortHdrPacket.Frames,
@@ -154,15 +154,15 @@ func (c *Conn) logCoalescedPacket(packet *coalescedPacket, ecn protocol.ECN) {
 			return
 		}
 		if len(packet.longHdrPackets) > 1 {
-			c.logger.Debugf("-> Sending coalesced packet (%d parts, %d bytes) for connection %s", len(packet.longHdrPackets), packet.buffer.Len(), c.logID)
+			s.logger.Debugf("-> Sending coalesced packet (%d parts, %d bytes) for connection %s", len(packet.longHdrPackets), packet.buffer.Len(), s.logID)
 		} else {
-			c.logger.Debugf("-> Sending packet %d (%d bytes) for connection %s, %s", packet.longHdrPackets[0].header.PacketNumber, packet.buffer.Len(), c.logID, packet.longHdrPackets[0].EncryptionLevel())
+			s.logger.Debugf("-> Sending packet %d (%d bytes) for connection %s, %s", packet.longHdrPackets[0].header.PacketNumber, packet.buffer.Len(), s.logID, packet.longHdrPackets[0].EncryptionLevel())
 		}
 	}
 	for _, p := range packet.longHdrPackets {
-		c.logLongHeaderPacket(p, ecn)
+		s.logLongHeaderPacket(p, ecn)
 	}
 	if p := packet.shortHdrPacket; p != nil {
-		c.logShortHeaderPacket(p.DestConnID, p.Ack, p.Frames, p.StreamFrames, p.PacketNumber, p.PacketNumberLen, p.KeyPhase, ecn, p.Length, true)
+		s.logShortHeaderPacket(p.DestConnID, p.Ack, p.Frames, p.StreamFrames, p.PacketNumber, p.PacketNumberLen, p.KeyPhase, ecn, p.Length, true)
 	}
 }

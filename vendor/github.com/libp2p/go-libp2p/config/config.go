@@ -33,7 +33,6 @@ import (
 	routed "github.com/libp2p/go-libp2p/p2p/host/routed"
 	"github.com/libp2p/go-libp2p/p2p/net/swarm"
 	tptu "github.com/libp2p/go-libp2p/p2p/net/upgrader"
-	"github.com/libp2p/go-libp2p/p2p/protocol/autonatv2"
 	circuitv2 "github.com/libp2p/go-libp2p/p2p/protocol/circuitv2/client"
 	relayv2 "github.com/libp2p/go-libp2p/p2p/protocol/circuitv2/relay"
 	"github.com/libp2p/go-libp2p/p2p/protocol/holepunch"
@@ -293,11 +292,11 @@ func (cfg *Config) addTransports() ([]fx.Option, error) {
 		fx.Provide(func() connmgr.ConnectionGater { return cfg.ConnectionGater }),
 		fx.Provide(func() pnet.PSK { return cfg.PSK }),
 		fx.Provide(func() network.ResourceManager { return cfg.ResourceManager }),
-		fx.Provide(func(upgrader transport.Upgrader) *tcpreuse.ConnMgr {
+		fx.Provide(func(gater connmgr.ConnectionGater, rcmgr network.ResourceManager) *tcpreuse.ConnMgr {
 			if !cfg.ShareTCPListener {
 				return nil
 			}
-			return tcpreuse.NewConnMgr(tcpreuse.EnvReuseportVal, upgrader)
+			return tcpreuse.NewConnMgr(tcpreuse.EnvReuseportVal, gater, rcmgr)
 		}),
 		fx.Provide(func(cm *quicreuse.ConnManager, sw *swarm.Swarm) libp2pwebrtc.ListenUDPFn {
 			hasQuicAddrPortFor := func(network string, laddr *net.UDPAddr) bool {
@@ -380,28 +379,8 @@ func (cfg *Config) addTransports() ([]fx.Option, error) {
 		fxopts = append(fxopts, cfg.QUICReuse...)
 	} else {
 		fxopts = append(fxopts,
-			fx.Provide(func(key quic.StatelessResetKey, tokenGenerator quic.TokenGeneratorKey, rcmgr network.ResourceManager, lifecycle fx.Lifecycle) (*quicreuse.ConnManager, error) {
-				opts := []quicreuse.Option{
-					quicreuse.ConnContext(func(ctx context.Context, clientInfo *quic.ClientInfo) (context.Context, error) {
-						// even if creating the quic maddr fails, let the rcmgr decide what to do with the connection
-						addr, err := quicreuse.ToQuicMultiaddr(clientInfo.RemoteAddr, quic.Version1)
-						if err != nil {
-							addr = nil
-						}
-						scope, err := rcmgr.OpenConnection(network.DirInbound, false, addr)
-						if err != nil {
-							return ctx, err
-						}
-						ctx = network.WithConnManagementScope(ctx, scope)
-						context.AfterFunc(ctx, func() {
-							scope.Done()
-						})
-						return ctx, nil
-					}),
-					quicreuse.VerifySourceAddress(func(addr net.Addr) bool {
-						return rcmgr.VerifySourceAddress(addr)
-					}),
-				}
+			fx.Provide(func(key quic.StatelessResetKey, tokenGenerator quic.TokenGeneratorKey, lifecycle fx.Lifecycle) (*quicreuse.ConnManager, error) {
+				var opts []quicreuse.Option
 				if !cfg.DisableMetrics {
 					opts = append(opts, quicreuse.EnableMetrics(cfg.PrometheusRegisterer))
 				}
@@ -434,7 +413,15 @@ func (cfg *Config) addTransports() ([]fx.Option, error) {
 	return fxopts, nil
 }
 
-func (cfg *Config) newBasicHost(swrm *swarm.Swarm, eventBus event.Bus, an *autonatv2.AutoNAT) (*bhost.BasicHost, error) {
+func (cfg *Config) newBasicHost(swrm *swarm.Swarm, eventBus event.Bus) (*bhost.BasicHost, error) {
+	var autonatv2Dialer host.Host
+	if cfg.EnableAutoNATv2 {
+		ah, err := cfg.makeAutoNATV2Host()
+		if err != nil {
+			return nil, err
+		}
+		autonatv2Dialer = ah
+	}
 	h, err := bhost.NewHost(swrm, &bhost.HostOpts{
 		EventBus:                        eventBus,
 		ConnManager:                     cfg.ConnManager,
@@ -450,7 +437,8 @@ func (cfg *Config) newBasicHost(swrm *swarm.Swarm, eventBus event.Bus, an *auton
 		EnableMetrics:                   !cfg.DisableMetrics,
 		PrometheusRegisterer:            cfg.PrometheusRegisterer,
 		DisableIdentifyAddressDiscovery: cfg.DisableIdentifyAddressDiscovery,
-		AutoNATv2:                       an,
+		EnableAutoNATv2:                 cfg.EnableAutoNATv2,
+		AutoNATv2Dialer:                 autonatv2Dialer,
 	})
 	if err != nil {
 		return nil, err
@@ -528,24 +516,6 @@ func (cfg *Config) NewNode() (host.Host, error) {
 				},
 			})
 			return sw, nil
-		}),
-		fx.Provide(func() (*autonatv2.AutoNAT, error) {
-			if !cfg.EnableAutoNATv2 {
-				return nil, nil
-			}
-			ah, err := cfg.makeAutoNATV2Host()
-			if err != nil {
-				return nil, err
-			}
-			var mt autonatv2.MetricsTracer
-			if !cfg.DisableMetrics {
-				mt = autonatv2.NewMetricsTracer(cfg.PrometheusRegisterer)
-			}
-			autoNATv2, err := autonatv2.New(ah, autonatv2.WithMetricsTracer(mt))
-			if err != nil {
-				return nil, fmt.Errorf("failed to create autonatv2: %w", err)
-			}
-			return autoNATv2, nil
 		}),
 		fx.Provide(cfg.newBasicHost),
 		fx.Provide(func(bh *bhost.BasicHost) identify.IDService {

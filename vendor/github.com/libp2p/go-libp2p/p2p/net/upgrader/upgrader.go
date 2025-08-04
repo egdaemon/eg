@@ -105,32 +105,19 @@ func New(security []sec.SecureTransport, muxers []StreamMuxer, psk ipnet.PSK, rc
 
 // UpgradeListener upgrades the passed multiaddr-net listener into a full libp2p-transport listener.
 func (u *upgrader) UpgradeListener(t transport.Transport, list manet.Listener) transport.Listener {
-	return u.UpgradeGatedMaListener(t, u.GateMaListener(list))
-}
-
-func (u *upgrader) GateMaListener(l manet.Listener) transport.GatedMaListener {
-	return &gatedMaListener{
-		Listener:  l,
-		rcmgr:     u.rcmgr,
-		connGater: u.connGater,
-	}
-}
-
-// UpgradeGatedMaListener upgrades the passed multiaddr-net listener into a full libp2p-transport listener.
-func (u *upgrader) UpgradeGatedMaListener(t transport.Transport, l transport.GatedMaListener) transport.Listener {
 	ctx, cancel := context.WithCancel(context.Background())
-	list := &listener{
-		GatedMaListener: l,
-		upgrader:        u,
-		transport:       t,
-		rcmgr:           u.rcmgr,
-		threshold:       newThreshold(AcceptQueueLength),
-		incoming:        make(chan transport.CapableConn),
-		cancel:          cancel,
-		ctx:             ctx,
+	l := &listener{
+		Listener:  list,
+		upgrader:  u,
+		transport: t,
+		rcmgr:     u.rcmgr,
+		threshold: newThreshold(AcceptQueueLength),
+		incoming:  make(chan transport.CapableConn),
+		cancel:    cancel,
+		ctx:       ctx,
 	}
-	go list.handleIncoming()
-	return list
+	go l.handleIncoming()
+	return l
 }
 
 // Upgrade upgrades the multiaddr/net connection into a full libp2p-transport connection.

@@ -4,17 +4,18 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"iter"
-	"math/rand/v2"
 	"slices"
 	"sync"
 	"time"
+
+	"math/rand/v2"
 
 	logging "github.com/ipfs/go-log/v2"
 	"github.com/libp2p/go-libp2p/core/event"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/p2p/protocol/autonatv2/pb"
 	ma "github.com/multiformats/go-multiaddr"
 	manet "github.com/multiformats/go-multiaddr/net"
 )
@@ -34,15 +35,11 @@ const (
 	// maxPeerAddresses is the number of addresses in a dial request the server
 	// will inspect, rest are ignored.
 	maxPeerAddresses = 50
-
-	defaultThrottlePeerDuration = 2 * time.Minute
 )
 
 var (
-	// ErrNoPeers is returned when the client knows no autonatv2 servers.
-	ErrNoPeers = errors.New("no peers for autonat v2")
-	// ErrPrivateAddrs is returned when the request has private IP addresses.
-	ErrPrivateAddrs = errors.New("private addresses cannot be verified with autonatv2")
+	ErrNoValidPeers = errors.New("no valid peers for autonat v2")
+	ErrDialRefused  = errors.New("dial refused")
 
 	log = logging.Logger("autonatv2")
 )
@@ -59,12 +56,10 @@ type Request struct {
 type Result struct {
 	// Addr is the dialed address
 	Addr ma.Multiaddr
-	// Idx is the index of the address that was dialed
-	Idx int
-	// Reachability is the reachability for `Addr`
+	// Reachability of the dialed address
 	Reachability network.Reachability
-	// AllAddrsRefused is true when the server refused to dial all the addresses in the request.
-	AllAddrsRefused bool
+	// Status is the outcome of the dialback
+	Status pb.DialStatus
 }
 
 // AutoNAT implements the AutoNAT v2 client and server.
@@ -81,12 +76,8 @@ type AutoNAT struct {
 	srv *server
 	cli *client
 
-	mx           sync.Mutex
-	peers        *peersMap
-	throttlePeer map[peer.ID]time.Time
-	// throttlePeerDuration is the duration to wait before making another dial request to the
-	// same server.
-	throttlePeerDuration time.Duration
+	mx    sync.Mutex
+	peers *peersMap
 	// allowPrivateAddrs enables using private and localhost addresses for reachability checks.
 	// This is only useful for testing.
 	allowPrivateAddrs bool
@@ -95,7 +86,7 @@ type AutoNAT struct {
 // New returns a new AutoNAT instance.
 // host and dialerHost should have the same dialing capabilities. In case the host doesn't support
 // a transport, dial back requests for address for that transport will be ignored.
-func New(dialerHost host.Host, opts ...AutoNATOption) (*AutoNAT, error) {
+func New(host host.Host, dialerHost host.Host, opts ...AutoNATOption) (*AutoNAT, error) {
 	s := defaultSettings()
 	for _, o := range opts {
 		if err := o(s); err != nil {
@@ -105,20 +96,18 @@ func New(dialerHost host.Host, opts ...AutoNATOption) (*AutoNAT, error) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	an := &AutoNAT{
-		ctx:                  ctx,
-		cancel:               cancel,
-		srv:                  newServer(dialerHost, s),
-		cli:                  newClient(s),
-		allowPrivateAddrs:    s.allowPrivateAddrs,
-		peers:                newPeersMap(),
-		throttlePeer:         make(map[peer.ID]time.Time),
-		throttlePeerDuration: s.throttlePeerDuration,
+		host:              host,
+		ctx:               ctx,
+		cancel:            cancel,
+		srv:               newServer(host, dialerHost, s),
+		cli:               newClient(host),
+		allowPrivateAddrs: s.allowPrivateAddrs,
+		peers:             newPeersMap(),
 	}
 	return an, nil
 }
 
 func (an *AutoNAT) background(sub event.Subscription) {
-	ticker := time.NewTicker(10 * time.Minute)
 	for {
 		select {
 		case <-an.ctx.Done():
@@ -133,24 +122,12 @@ func (an *AutoNAT) background(sub event.Subscription) {
 				an.updatePeer(evt.Peer)
 			case event.EvtPeerIdentificationCompleted:
 				an.updatePeer(evt.Peer)
-			default:
-				log.Errorf("unexpected event: %T", e)
 			}
-		case <-ticker.C:
-			now := time.Now()
-			an.mx.Lock()
-			for p, t := range an.throttlePeer {
-				if t.Before(now) {
-					delete(an.throttlePeer, p)
-				}
-			}
-			an.mx.Unlock()
 		}
 	}
 }
 
-func (an *AutoNAT) Start(h host.Host) error {
-	an.host = h
+func (an *AutoNAT) Start() error {
 	// Listen on event.EvtPeerProtocolsUpdated, event.EvtPeerConnectednessChanged
 	// event.EvtPeerIdentificationCompleted to maintain our set of autonat supporting peers.
 	sub, err := an.host.EventBus().Subscribe([]interface{}{
@@ -161,8 +138,8 @@ func (an *AutoNAT) Start(h host.Host) error {
 	if err != nil {
 		return fmt.Errorf("event subscription failed: %w", err)
 	}
-	an.cli.Start(h)
-	an.srv.Start(h)
+	an.cli.Start()
+	an.srv.Start()
 
 	an.wg.Add(1)
 	go an.background(sub)
@@ -179,48 +156,24 @@ func (an *AutoNAT) Close() {
 
 // GetReachability makes a single dial request for checking reachability for requested addresses
 func (an *AutoNAT) GetReachability(ctx context.Context, reqs []Request) (Result, error) {
-	var filteredReqs []Request
 	if !an.allowPrivateAddrs {
-		filteredReqs = make([]Request, 0, len(reqs))
 		for _, r := range reqs {
-			if manet.IsPublicAddr(r.Addr) {
-				filteredReqs = append(filteredReqs, r)
-			} else {
-				log.Errorf("private address in reachability check: %s", r.Addr)
+			if !manet.IsPublicAddr(r.Addr) {
+				return Result{}, fmt.Errorf("private address cannot be verified by autonatv2: %s", r.Addr)
 			}
 		}
-		if len(filteredReqs) == 0 {
-			return Result{}, ErrPrivateAddrs
-		}
-	} else {
-		filteredReqs = reqs
 	}
 	an.mx.Lock()
-	now := time.Now()
-	var p peer.ID
-	for pr := range an.peers.Shuffled() {
-		if t := an.throttlePeer[pr]; t.After(now) {
-			continue
-		}
-		p = pr
-		an.throttlePeer[p] = time.Now().Add(an.throttlePeerDuration)
-		break
-	}
+	p := an.peers.GetRand()
 	an.mx.Unlock()
 	if p == "" {
-		return Result{}, ErrNoPeers
+		return Result{}, ErrNoValidPeers
 	}
-	res, err := an.cli.GetReachability(ctx, p, filteredReqs)
+
+	res, err := an.cli.GetReachability(ctx, p, reqs)
 	if err != nil {
 		log.Debugf("reachability check with %s failed, err: %s", p, err)
-		return res, fmt.Errorf("reachability check with %s failed: %w", p, err)
-	}
-	// restore the correct index in case we'd filtered private addresses
-	for i, r := range reqs {
-		if r.Addr.Equal(res.Addr) {
-			res.Idx = i
-			break
-		}
+		return Result{}, fmt.Errorf("reachability check with %s failed: %w", p, err)
 	}
 	log.Debugf("reachability check with %s successful", p)
 	return res, nil
@@ -234,7 +187,7 @@ func (an *AutoNAT) updatePeer(p peer.ID) {
 	// and swarm for the current state
 	protos, err := an.host.Peerstore().SupportsProtocols(p, DialProtocol)
 	connectedness := an.host.Network().Connectedness(p)
-	if err == nil && connectedness == network.Connected && slices.Contains(protos, DialProtocol) {
+	if err == nil && slices.Contains(protos, DialProtocol) && connectedness == network.Connected {
 		an.peers.Put(p)
 	} else {
 		an.peers.Delete(p)
@@ -255,40 +208,28 @@ func newPeersMap() *peersMap {
 	}
 }
 
-// Shuffled iterates over the map in random order
-func (p *peersMap) Shuffled() iter.Seq[peer.ID] {
-	n := len(p.peers)
-	start := 0
-	if n > 0 {
-		start = rand.IntN(n)
+func (p *peersMap) GetRand() peer.ID {
+	if len(p.peers) == 0 {
+		return ""
 	}
-	return func(yield func(peer.ID) bool) {
-		for i := range n {
-			if !yield(p.peers[(i+start)%n]) {
-				return
-			}
-		}
-	}
+	return p.peers[rand.IntN(len(p.peers))]
 }
 
-func (p *peersMap) Put(id peer.ID) {
-	if _, ok := p.peerIdx[id]; ok {
+func (p *peersMap) Put(pid peer.ID) {
+	if _, ok := p.peerIdx[pid]; ok {
 		return
 	}
-	p.peers = append(p.peers, id)
-	p.peerIdx[id] = len(p.peers) - 1
+	p.peers = append(p.peers, pid)
+	p.peerIdx[pid] = len(p.peers) - 1
 }
 
-func (p *peersMap) Delete(id peer.ID) {
-	idx, ok := p.peerIdx[id]
+func (p *peersMap) Delete(pid peer.ID) {
+	idx, ok := p.peerIdx[pid]
 	if !ok {
 		return
 	}
-	n := len(p.peers)
-	lastPeer := p.peers[n-1]
-	p.peers[idx] = lastPeer
-	p.peerIdx[lastPeer] = idx
-	p.peers[n-1] = ""
-	p.peers = p.peers[:n-1]
-	delete(p.peerIdx, id)
+	p.peers[idx] = p.peers[len(p.peers)-1]
+	p.peerIdx[p.peers[idx]] = idx
+	p.peers = p.peers[:len(p.peers)-1]
+	delete(p.peerIdx, pid)
 }

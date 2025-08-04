@@ -9,6 +9,7 @@ import (
 	"time"
 
 	logging "github.com/ipfs/go-log/v2"
+	"github.com/libp2p/go-libp2p/core/connmgr"
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/transport"
 	"github.com/libp2p/go-libp2p/p2p/net/reuseport"
@@ -27,36 +28,32 @@ var log = logging.Logger("tcp-demultiplex")
 type ConnMgr struct {
 	enableReuseport bool
 	reuse           reuseport.Transport
-	upgrader        transport.Upgrader
+	connGater       connmgr.ConnectionGater
+	rcmgr           network.ResourceManager
 
 	mx        sync.Mutex
 	listeners map[string]*multiplexedListener
 }
 
-func NewConnMgr(enableReuseport bool, upgrader transport.Upgrader) *ConnMgr {
+func NewConnMgr(enableReuseport bool, gater connmgr.ConnectionGater, rcmgr network.ResourceManager) *ConnMgr {
+	if rcmgr == nil {
+		rcmgr = &network.NullResourceManager{}
+	}
 	return &ConnMgr{
 		enableReuseport: enableReuseport,
 		reuse:           reuseport.Transport{},
-		upgrader:        upgrader,
+		connGater:       gater,
+		rcmgr:           rcmgr,
 		listeners:       make(map[string]*multiplexedListener),
 	}
 }
 
-func (t *ConnMgr) gatedMaListen(listenAddr ma.Multiaddr) (transport.GatedMaListener, error) {
-	var mal manet.Listener
-	var err error
+func (t *ConnMgr) maListen(listenAddr ma.Multiaddr) (manet.Listener, error) {
 	if t.useReuseport() {
-		mal, err = t.reuse.Listen(listenAddr)
-		if err != nil {
-			return nil, err
-		}
+		return t.reuse.Listen(listenAddr)
 	} else {
-		mal, err = manet.Listen(listenAddr)
-		if err != nil {
-			return nil, err
-		}
+		return manet.Listen(listenAddr)
 	}
-	return t.upgrader.GateMaListener(mal), nil
 }
 
 func (t *ConnMgr) useReuseport() bool {
@@ -83,7 +80,7 @@ func getTCPAddr(listenAddr ma.Multiaddr) (ma.Multiaddr, error) {
 // DemultiplexedListen returns a listener for laddr listening for `connType` connections. The connections
 // accepted from returned listeners need to be upgraded with a `transport.Upgrader`.
 // NOTE: All listeners for port 0 share the same underlying socket, so they have the same specific port.
-func (t *ConnMgr) DemultiplexedListen(laddr ma.Multiaddr, connType DemultiplexedConnType) (transport.GatedMaListener, error) {
+func (t *ConnMgr) DemultiplexedListen(laddr ma.Multiaddr, connType DemultiplexedConnType) (manet.Listener, error) {
 	if !connType.IsKnown() {
 		return nil, fmt.Errorf("unknown connection type: %s", connType)
 	}
@@ -103,7 +100,7 @@ func (t *ConnMgr) DemultiplexedListen(laddr ma.Multiaddr, connType Demultiplexed
 		return dl, nil
 	}
 
-	gmal, err := t.gatedMaListen(laddr)
+	l, err := t.maListen(laddr)
 	if err != nil {
 		return nil, err
 	}
@@ -114,17 +111,19 @@ func (t *ConnMgr) DemultiplexedListen(laddr ma.Multiaddr, connType Demultiplexed
 		t.mx.Lock()
 		defer t.mx.Unlock()
 		delete(t.listeners, laddr.String())
-		delete(t.listeners, gmal.Multiaddr().String())
-		return gmal.Close()
+		delete(t.listeners, l.Multiaddr().String())
+		return l.Close()
 	}
 	ml = &multiplexedListener{
-		GatedMaListener: gmal,
-		listeners:       make(map[DemultiplexedConnType]*demultiplexedListener),
-		ctx:             ctx,
-		closeFn:         cancelFunc,
+		Listener:  l,
+		listeners: make(map[DemultiplexedConnType]*demultiplexedListener),
+		ctx:       ctx,
+		closeFn:   cancelFunc,
+		connGater: t.connGater,
+		rcmgr:     t.rcmgr,
 	}
 	t.listeners[laddr.String()] = ml
-	t.listeners[gmal.Multiaddr().String()] = ml
+	t.listeners[l.Multiaddr().String()] = ml
 
 	dl, err := ml.DemultiplexedListen(connType)
 	if err != nil {
@@ -138,21 +137,23 @@ func (t *ConnMgr) DemultiplexedListen(laddr ma.Multiaddr, connType Demultiplexed
 	return dl, nil
 }
 
-var _ transport.GatedMaListener = &demultiplexedListener{}
+var _ manet.Listener = &demultiplexedListener{}
 
 type multiplexedListener struct {
-	transport.GatedMaListener
+	manet.Listener
 	listeners map[DemultiplexedConnType]*demultiplexedListener
 	mx        sync.RWMutex
 
-	ctx     context.Context
-	closeFn func() error
-	wg      sync.WaitGroup
+	connGater connmgr.ConnectionGater
+	rcmgr     network.ResourceManager
+	ctx       context.Context
+	closeFn   func() error
+	wg        sync.WaitGroup
 }
 
 var ErrListenerExists = errors.New("listener already exists for this conn type on this address")
 
-func (m *multiplexedListener) DemultiplexedListen(connType DemultiplexedConnType) (transport.GatedMaListener, error) {
+func (m *multiplexedListener) DemultiplexedListen(connType DemultiplexedConnType) (manet.Listener, error) {
 	if !connType.IsKnown() {
 		return nil, fmt.Errorf("unknown connection type: %s", connType)
 	}
@@ -165,8 +166,8 @@ func (m *multiplexedListener) DemultiplexedListen(connType DemultiplexedConnType
 
 	ctx, cancel := context.WithCancel(m.ctx)
 	l := &demultiplexedListener{
-		buffer:     make(chan *connWithScope),
-		inner:      m.GatedMaListener,
+		buffer:     make(chan manet.Conn),
+		inner:      m.Listener,
 		ctx:        ctx,
 		cancelFunc: cancel,
 		closeFn:    func() error { m.removeDemultiplexedListener(connType); return nil },
@@ -182,35 +183,53 @@ func (m *multiplexedListener) run() error {
 	defer m.wg.Done()
 	acceptQueue := make(chan struct{}, acceptQueueSize)
 	for {
-		c, connScope, err := m.GatedMaListener.Accept()
+		c, err := m.Listener.Accept()
 		if err != nil {
 			return err
 		}
-		ctx, cancelCtx := context.WithTimeout(m.ctx, acceptTimeout)
+
+		// Gate and resource limit the connection here.
+		// If done after sampling the connection, we'll be vulnerable to DOS attacks by a single peer
+		// which clogs up our entire connection queue.
+		// This duplicates the responsibility of gating and resource limiting between here and the upgrader. The
+		// alternative without duplication requires moving the process of upgrading the connection here, which forces
+		// us to establish the websocket connection here. That is more duplication, or a significant breaking change.
+		//
+		// Bugs around multiple calls to OpenConnection or InterceptAccept are prevented by the transport
+		// integration tests.
+		if m.connGater != nil && !m.connGater.InterceptAccept(c) {
+			log.Debugf("gater blocked incoming connection on local addr %s from %s",
+				c.LocalMultiaddr(), c.RemoteMultiaddr())
+			if err := c.Close(); err != nil {
+				log.Warnf("failed to close incoming connection rejected by gater: %s", err)
+			}
+			continue
+		}
+		connScope, err := m.rcmgr.OpenConnection(network.DirInbound, true, c.RemoteMultiaddr())
+		if err != nil {
+			log.Debugw("resource manager blocked accept of new connection", "error", err)
+			if err := c.Close(); err != nil {
+				log.Warnf("failed to open incoming connection. Rejected by resource manager: %s", err)
+			}
+			continue
+		}
+
 		select {
 		case acceptQueue <- struct{}{}:
-		case <-ctx.Done():
-			cancelCtx()
-			connScope.Done()
+		// NOTE: We can drop the connection, but this is similar to the behaviour in the upgrader.
+		case <-m.ctx.Done():
 			c.Close()
 			log.Debugf("accept queue full, dropping connection: %s", c.RemoteMultiaddr())
-			continue
-		case <-m.ctx.Done():
-			cancelCtx()
-			connScope.Done()
-			c.Close()
-			log.Debugf("listener closed; dropping connection from: %s", c.RemoteMultiaddr())
-			continue
 		}
 
 		m.wg.Add(1)
 		go func() {
 			defer func() { <-acceptQueue }()
 			defer m.wg.Done()
+			ctx, cancelCtx := context.WithTimeout(m.ctx, acceptTimeout)
 			defer cancelCtx()
 			t, c, err := identifyConnType(c)
 			if err != nil {
-				// conn closed by identifyConnType
 				connScope.Done()
 				log.Debugf("error demultiplexing connection: %s", err.Error())
 				return
@@ -260,7 +279,7 @@ func (m *multiplexedListener) Close() error {
 }
 
 func (m *multiplexedListener) closeListener() error {
-	lerr := m.GatedMaListener.Close()
+	lerr := m.Listener.Close()
 	cerr := m.closeFn()
 	return errors.Join(lerr, cerr)
 }
@@ -279,19 +298,19 @@ func (m *multiplexedListener) removeDemultiplexedListener(c DemultiplexedConnTyp
 }
 
 type demultiplexedListener struct {
-	buffer     chan *connWithScope
-	inner      transport.GatedMaListener
+	buffer     chan manet.Conn
+	inner      manet.Listener
 	ctx        context.Context
 	cancelFunc context.CancelFunc
 	closeFn    func() error
 }
 
-func (m *demultiplexedListener) Accept() (manet.Conn, network.ConnManagementScope, error) {
+func (m *demultiplexedListener) Accept() (manet.Conn, error) {
 	select {
 	case c := <-m.buffer:
-		return c.ManetTCPConnInterface, c.ConnScope, nil
+		return c, nil
 	case <-m.ctx.Done():
-		return nil, nil, transport.ErrListenerClosed
+		return nil, transport.ErrListenerClosed
 	}
 }
 

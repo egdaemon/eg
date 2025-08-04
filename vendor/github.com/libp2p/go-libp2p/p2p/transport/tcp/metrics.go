@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/libp2p/go-libp2p/core/network"
-	"github.com/libp2p/go-libp2p/core/transport"
 	"github.com/marten-seemann/tcp"
 	"github.com/mikioh/tcpinfo"
 	manet "github.com/multiformats/go-multiaddr/net"
@@ -254,6 +253,16 @@ func (c *tracingConn) Close() error {
 	return c.closeErr
 }
 
+func (c *tracingConn) Scope() network.ConnManagementScope {
+	if cs, ok := c.Conn.(interface {
+		Scope() network.ConnManagementScope
+	}); ok {
+		return cs.Scope()
+	}
+	// upgrader is expected to handle this
+	return nil
+}
+
 func (c *tracingConn) getTCPInfo() (*tcpinfo.Info, error) {
 	var o tcpinfo.Info
 	var b [256]byte
@@ -266,31 +275,19 @@ func (c *tracingConn) getTCPInfo() (*tcpinfo.Info, error) {
 }
 
 type tracingListener struct {
-	transport.GatedMaListener
+	manet.Listener
 	collector *aggregatingCollector
 }
 
 // newTracingListener wraps a manet.Listener with a tracingListener. A nil collector will use the default collector.
-func newTracingListener(l transport.GatedMaListener, collector *aggregatingCollector) *tracingListener {
-	return &tracingListener{GatedMaListener: l, collector: collector}
+func newTracingListener(l manet.Listener, collector *aggregatingCollector) *tracingListener {
+	return &tracingListener{Listener: l, collector: collector}
 }
 
-func (l *tracingListener) Accept() (manet.Conn, network.ConnManagementScope, error) {
-	conn, scope, err := l.GatedMaListener.Accept()
+func (l *tracingListener) Accept() (manet.Conn, error) {
+	conn, err := l.Listener.Accept()
 	if err != nil {
-		if scope != nil {
-			scope.Done()
-			log.Errorf("BUG: got non-nil scope but also an error: %s", err)
-		}
-		return nil, nil, err
+		return nil, err
 	}
-
-	tc, err := newTracingConn(conn, l.collector, false)
-	if err != nil {
-		log.Errorf("failed to create tracingConn from %T: %s", conn, err)
-		conn.Close()
-		scope.Done()
-		return nil, nil, err
-	}
-	return tc, scope, nil
+	return newTracingConn(conn, l.collector, false)
 }

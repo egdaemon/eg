@@ -110,7 +110,7 @@ func newListener(reuseListener quicreuse.Listener, t *transport, isStaticTLSConf
 					return context.WithValue(ctx, connKey{}, c)
 				},
 			},
-			CheckOrigin: func(_ *http.Request) bool { return true },
+			CheckOrigin: func(r *http.Request) bool { return true },
 		},
 	}
 	ln.ctx, ln.ctxCancel = context.WithCancel(context.Background())
@@ -149,21 +149,12 @@ func (l *listener) httpHandler(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusForbidden)
 		return
 	}
-	connScope, err := network.UnwrapConnManagementScope(r.Context())
+
+	connScope, err := l.transport.rcmgr.OpenConnection(network.DirInbound, false, remoteMultiaddr)
 	if err != nil {
-		connScope = nil
-		// Don't error here.
-		// Setup scope if we don't have scope from quicreuse.
-		// This is better than failing so that users that don't use quicreuse.ConnContext option with the resource
-		// manager still work correctly.
-	}
-	if connScope == nil {
-		connScope, err = l.transport.rcmgr.OpenConnection(network.DirInbound, false, remoteMultiaddr)
-		if err != nil {
-			log.Debugw("resource manager blocked incoming connection", "addr", r.RemoteAddr, "error", err)
-			w.WriteHeader(http.StatusServiceUnavailable)
-			return
-		}
+		log.Debugw("resource manager blocked incoming connection", "addr", r.RemoteAddr, "error", err)
+		w.WriteHeader(http.StatusServiceUnavailable)
+		return
 	}
 	err = l.httpHandlerWithConnScope(w, r, connScope)
 	if err != nil {
@@ -221,7 +212,7 @@ func (l *listener) httpHandlerWithConnScope(w http.ResponseWriter, r *http.Reque
 	}
 
 	conn := newConn(l.transport, sess, sconn, connScope, qconn)
-	l.transport.addConn(qconn, conn)
+	l.transport.addConn(sess, conn)
 	select {
 	case l.queue <- conn:
 	default:

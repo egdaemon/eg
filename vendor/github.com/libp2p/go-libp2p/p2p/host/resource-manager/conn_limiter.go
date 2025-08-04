@@ -5,9 +5,6 @@ import (
 	"net/netip"
 	"slices"
 	"sync"
-	"time"
-
-	"github.com/libp2p/go-libp2p/x/rate"
 )
 
 type ConnLimitPerSubnet struct {
@@ -117,8 +114,8 @@ type connLimiter struct {
 	// Subnet limits.
 	connLimitPerSubnetV4 []ConnLimitPerSubnet
 	connLimitPerSubnetV6 []ConnLimitPerSubnet
-	ip4connsPerLimit     []map[netip.Prefix]int
-	ip6connsPerLimit     []map[netip.Prefix]int
+	ip4connsPerLimit     []map[string]int
+	ip6connsPerLimit     []map[string]int
 }
 
 func newConnLimiter() *connLimiter {
@@ -183,7 +180,7 @@ func (cl *connLimiter) addConn(ip netip.Addr) bool {
 	}
 
 	if len(connsPerLimit) == 0 && len(limits) > 0 {
-		connsPerLimit = make([]map[netip.Prefix]int, len(limits))
+		connsPerLimit = make([]map[string]int, len(limits))
 		if isIP6 {
 			cl.ip6connsPerLimit = connsPerLimit
 		} else {
@@ -196,12 +193,13 @@ func (cl *connLimiter) addConn(ip netip.Addr) bool {
 		if err != nil {
 			return false
 		}
-		counts, ok := connsPerLimit[i][prefix]
+		masked := prefix.String()
+		counts, ok := connsPerLimit[i][masked]
 		if !ok {
 			if connsPerLimit[i] == nil {
-				connsPerLimit[i] = make(map[netip.Prefix]int)
+				connsPerLimit[i] = make(map[string]int)
 			}
-			connsPerLimit[i][prefix] = 0
+			connsPerLimit[i][masked] = 0
 		}
 		if counts+1 > limit.ConnCount {
 			return false
@@ -211,7 +209,8 @@ func (cl *connLimiter) addConn(ip netip.Addr) bool {
 	// All limit checks passed, now we update the counts
 	for i, limit := range limits {
 		prefix, _ := ip.Prefix(limit.PrefixLength)
-		connsPerLimit[i][prefix]++
+		masked := prefix.String()
+		connsPerLimit[i][masked]++
 	}
 
 	return true
@@ -259,7 +258,7 @@ func (cl *connLimiter) rmConn(ip netip.Addr) {
 	if len(connsPerLimit) == 0 && len(limits) > 0 {
 		// Initialize just in case. We should have already initialized in
 		// addConn, but if the callers calls rmConn first we don't want to panic
-		connsPerLimit = make([]map[netip.Prefix]int, len(limits))
+		connsPerLimit = make([]map[string]int, len(limits))
 		if isIP6 {
 			cl.ip6connsPerLimit = connsPerLimit
 		} else {
@@ -274,70 +273,16 @@ func (cl *connLimiter) rmConn(ip netip.Addr) {
 			log.Errorf("unexpected error getting prefix: %v", err)
 			continue
 		}
-		counts, ok := connsPerLimit[i][prefix]
+		masked := prefix.String()
+		counts, ok := connsPerLimit[i][masked]
 		if !ok || counts == 0 {
 			// Unexpected, but don't panic
-			log.Errorf("unexpected conn count for %s ok=%v count=%v", prefix, ok, counts)
+			log.Errorf("unexpected conn count for %s ok=%v count=%v", masked, ok, counts)
 			continue
 		}
-		connsPerLimit[i][prefix]--
-		if connsPerLimit[i][prefix] <= 0 {
-			delete(connsPerLimit[i], prefix)
+		connsPerLimit[i][masked]--
+		if connsPerLimit[i][masked] <= 0 {
+			delete(connsPerLimit[i], masked)
 		}
-	}
-}
-
-// handshakeDuration is a higher end estimate of QUIC handshake time
-const handshakeDuration = 5 * time.Second
-
-// sourceAddressRPS is the refill rate for the source address verification rate limiter.
-// A spoofed address if not verified will take a connLimiter token for handshakeDuration.
-// Slow refill rate here favours increasing latency(because of address verification) in
-// exchange for reducing the chances of spoofing successfully causing a DoS.
-const sourceAddressRPS = float64(1.0*time.Second) / (2 * float64(handshakeDuration))
-
-// newVerifySourceAddressRateLimiter returns a rate limiter for verifying source addresses.
-// The returned limiter allows maxAllowedConns / 2 unverified addresses to begin handshake.
-// This ensures that in the event someone is spoofing IPs, 1/2 the maximum allowed connections
-// will be able to connect, although they will have increased latency because of address
-// verification.
-func newVerifySourceAddressRateLimiter(cl *connLimiter) *rate.Limiter {
-	networkPrefixLimits := make([]rate.PrefixLimit, 0, len(cl.networkPrefixLimitV4)+len(cl.networkPrefixLimitV6))
-	for _, l := range cl.networkPrefixLimitV4 {
-		networkPrefixLimits = append(networkPrefixLimits, rate.PrefixLimit{
-			Prefix: l.Network,
-			Limit:  rate.Limit{RPS: sourceAddressRPS, Burst: l.ConnCount / 2},
-		})
-	}
-	for _, l := range cl.networkPrefixLimitV6 {
-		networkPrefixLimits = append(networkPrefixLimits, rate.PrefixLimit{
-			Prefix: l.Network,
-			Limit:  rate.Limit{RPS: sourceAddressRPS, Burst: l.ConnCount / 2},
-		})
-	}
-
-	ipv4SubnetLimits := make([]rate.SubnetLimit, 0, len(cl.connLimitPerSubnetV4))
-	for _, l := range cl.connLimitPerSubnetV4 {
-		ipv4SubnetLimits = append(ipv4SubnetLimits, rate.SubnetLimit{
-			PrefixLength: l.PrefixLength,
-			Limit:        rate.Limit{RPS: sourceAddressRPS, Burst: l.ConnCount / 2},
-		})
-	}
-
-	ipv6SubnetLimits := make([]rate.SubnetLimit, 0, len(cl.connLimitPerSubnetV6))
-	for _, l := range cl.connLimitPerSubnetV6 {
-		ipv6SubnetLimits = append(ipv6SubnetLimits, rate.SubnetLimit{
-			PrefixLength: l.PrefixLength,
-			Limit:        rate.Limit{RPS: sourceAddressRPS, Burst: l.ConnCount / 2},
-		})
-	}
-
-	return &rate.Limiter{
-		NetworkPrefixLimits: networkPrefixLimits,
-		SubnetRateLimiter: rate.SubnetLimiter{
-			IPv4SubnetLimits: ipv4SubnetLimits,
-			IPv6SubnetLimits: ipv6SubnetLimits,
-			GracePeriod:      1 * time.Minute,
-		},
 	}
 }

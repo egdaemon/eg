@@ -144,6 +144,10 @@ github.com/cloudflare/circl/math/mlsbset
 github.com/cloudflare/circl/sign
 github.com/cloudflare/circl/sign/ed25519
 github.com/cloudflare/circl/sign/ed448
+# github.com/containerd/cgroups v1.1.0
+## explicit; go 1.17
+github.com/containerd/cgroups
+github.com/containerd/cgroups/stats/v1
 # github.com/containerd/cgroups/v3 v3.0.5
 ## explicit; go 1.22.0
 github.com/containerd/cgroups/v3/cgroup1/stats
@@ -483,8 +487,6 @@ github.com/ebitengine/purego
 github.com/ebitengine/purego/internal/cgo
 github.com/ebitengine/purego/internal/fakecgo
 github.com/ebitengine/purego/internal/strings
-# github.com/egdaemon/eg v0.0.0-20250801210955-743291f6d98f
-## explicit; go 1.24.0
 # github.com/egdaemon/wasinet/wasinet v0.0.0-20250731121320-3287a738a635
 ## explicit; go 1.23.4
 github.com/egdaemon/wasinet/wasinet
@@ -500,6 +502,10 @@ github.com/egdaemon/wasinet/wasinet/wnetruntime
 # github.com/egdaemon/wasinet/wazeronet v0.0.0-20250731121320-3287a738a635
 ## explicit; go 1.23.4
 github.com/egdaemon/wasinet/wazeronet
+# github.com/elastic/gosigar v0.14.3
+## explicit; go 1.14
+github.com/elastic/gosigar
+github.com/elastic/gosigar/sys/windows
 # github.com/emirpasic/gods v1.18.1
 ## explicit; go 1.2
 github.com/emirpasic/gods/containers
@@ -511,6 +517,9 @@ github.com/emirpasic/gods/utils
 # github.com/felixge/httpsnoop v1.0.4
 ## explicit; go 1.13
 github.com/felixge/httpsnoop
+# github.com/filecoin-project/go-clock v0.1.0
+## explicit; go 1.21
+github.com/filecoin-project/go-clock
 # github.com/flynn/noise v1.1.0
 ## explicit; go 1.16
 github.com/flynn/noise
@@ -662,7 +671,9 @@ github.com/godbus/dbus/v5
 github.com/gofrs/uuid
 # github.com/gogo/protobuf v1.3.2
 ## explicit; go 1.15
+github.com/gogo/protobuf/gogoproto
 github.com/gogo/protobuf/proto
+github.com/gogo/protobuf/protoc-gen-gogo/descriptor
 # github.com/golang-jwt/jwt/v4 v4.5.2
 ## explicit; go 1.16
 github.com/golang-jwt/jwt/v4
@@ -741,7 +752,7 @@ github.com/ipfs/go-datastore
 github.com/ipfs/go-datastore/autobatch
 github.com/ipfs/go-datastore/query
 github.com/ipfs/go-datastore/sync
-# github.com/ipfs/go-log/v2 v2.6.0
+# github.com/ipfs/go-log/v2 v2.8.0
 ## explicit; go 1.23.8
 github.com/ipfs/go-log/v2
 # github.com/ipld/go-ipld-prime v0.21.0
@@ -797,7 +808,7 @@ github.com/klauspost/compress/internal/le
 github.com/klauspost/compress/internal/snapref
 github.com/klauspost/compress/zstd
 github.com/klauspost/compress/zstd/internal/xxhash
-# github.com/klauspost/cpuid/v2 v2.2.11
+# github.com/klauspost/cpuid/v2 v2.3.0
 ## explicit; go 1.22
 github.com/klauspost/cpuid/v2
 # github.com/klauspost/pgzip v1.2.6
@@ -826,11 +837,11 @@ github.com/libp2p/go-buffer-pool
 ## explicit; go 1.14
 github.com/libp2p/go-cidranger
 github.com/libp2p/go-cidranger/net
-# github.com/libp2p/go-flow-metrics v0.2.0
-## explicit; go 1.22
+# github.com/libp2p/go-flow-metrics v0.3.0
+## explicit; go 1.23
 github.com/libp2p/go-flow-metrics
-# github.com/libp2p/go-libp2p v0.42.0
-## explicit; go 1.23.8
+# github.com/libp2p/go-libp2p v0.41.1
+## explicit; go 1.23.0
 github.com/libp2p/go-libp2p
 github.com/libp2p/go-libp2p/config
 github.com/libp2p/go-libp2p/core/canonicallog
@@ -903,7 +914,6 @@ github.com/libp2p/go-libp2p/p2p/transport/webrtc/pb
 github.com/libp2p/go-libp2p/p2p/transport/webrtc/udpmux
 github.com/libp2p/go-libp2p/p2p/transport/websocket
 github.com/libp2p/go-libp2p/p2p/transport/webtransport
-github.com/libp2p/go-libp2p/x/rate
 # github.com/libp2p/go-libp2p-asn-util v0.4.1
 ## explicit; go 1.19
 github.com/libp2p/go-libp2p-asn-util
@@ -942,8 +952,8 @@ github.com/libp2p/go-netroute
 # github.com/libp2p/go-reuseport v0.4.0
 ## explicit; go 1.20
 github.com/libp2p/go-reuseport
-# github.com/libp2p/go-yamux/v5 v5.0.1
-## explicit; go 1.22
+# github.com/libp2p/go-yamux/v5 v5.1.0
+## explicit; go 1.23
 github.com/libp2p/go-yamux/v5
 # github.com/logrusorgru/aurora v2.0.3+incompatible
 ## explicit
@@ -983,7 +993,7 @@ github.com/mattn/go-runewidth
 # github.com/mattn/go-sqlite3 v1.14.28
 ## explicit; go 1.19
 github.com/mattn/go-sqlite3
-# github.com/miekg/dns v1.1.66
+# github.com/miekg/dns v1.1.68
 ## explicit; go 1.23.0
 github.com/miekg/dns
 # github.com/miekg/pkcs11 v1.1.1
@@ -1055,7 +1065,7 @@ github.com/multiformats/go-multiaddr-fmt
 # github.com/multiformats/go-multibase v0.2.0
 ## explicit; go 1.19
 github.com/multiformats/go-multibase
-# github.com/multiformats/go-multicodec v0.9.1
+# github.com/multiformats/go-multicodec v0.9.2
 ## explicit; go 1.23
 github.com/multiformats/go-multicodec
 # github.com/multiformats/go-multihash v0.2.3
@@ -1249,7 +1259,7 @@ github.com/pion/randutil
 # github.com/pion/rtcp v1.2.15
 ## explicit; go 1.20
 github.com/pion/rtcp
-# github.com/pion/rtp v1.8.19
+# github.com/pion/rtp v1.8.21
 ## explicit; go 1.20
 github.com/pion/rtp
 github.com/pion/rtp/codecs
@@ -1258,7 +1268,7 @@ github.com/pion/rtp/codecs/vp9
 # github.com/pion/sctp v1.8.39
 ## explicit; go 1.20
 github.com/pion/sctp
-# github.com/pion/sdp/v3 v3.0.13
+# github.com/pion/sdp/v3 v3.0.15
 ## explicit; go 1.20
 github.com/pion/sdp/v3
 # github.com/pion/srtp/v3 v3.0.6
@@ -1300,7 +1310,7 @@ github.com/pion/turn/v4/internal/client
 github.com/pion/turn/v4/internal/ipnet
 github.com/pion/turn/v4/internal/proto
 github.com/pion/turn/v4/internal/server
-# github.com/pion/webrtc/v4 v4.1.2
+# github.com/pion/webrtc/v4 v4.1.3
 ## explicit; go 1.20
 github.com/pion/webrtc/v4
 github.com/pion/webrtc/v4/internal/fmtp
@@ -1342,18 +1352,18 @@ github.com/power-devops/perfstat
 # github.com/proglottis/gpgme v0.1.4
 ## explicit; go 1.17
 github.com/proglottis/gpgme
-# github.com/prometheus/client_golang v1.22.0
-## explicit; go 1.22
+# github.com/prometheus/client_golang v1.23.0
+## explicit; go 1.23.0
 github.com/prometheus/client_golang/prometheus
 github.com/prometheus/client_golang/prometheus/internal
 # github.com/prometheus/client_model v0.6.2
 ## explicit; go 1.22.0
 github.com/prometheus/client_model/go
-# github.com/prometheus/common v0.64.0
+# github.com/prometheus/common v0.65.0
 ## explicit; go 1.23.0
 github.com/prometheus/common/expfmt
 github.com/prometheus/common/model
-# github.com/prometheus/procfs v0.16.1
+# github.com/prometheus/procfs v0.17.0
 ## explicit; go 1.23.0
 github.com/prometheus/procfs
 github.com/prometheus/procfs/internal/fs
@@ -1361,7 +1371,7 @@ github.com/prometheus/procfs/internal/util
 # github.com/quic-go/qpack v0.5.1
 ## explicit; go 1.22
 github.com/quic-go/qpack
-# github.com/quic-go/quic-go v0.52.0
+# github.com/quic-go/quic-go v0.54.0
 ## explicit; go 1.23
 github.com/quic-go/quic-go
 github.com/quic-go/quic-go/http3
@@ -1379,9 +1389,12 @@ github.com/quic-go/quic-go/logging
 github.com/quic-go/quic-go/metrics
 github.com/quic-go/quic-go/qlog
 github.com/quic-go/quic-go/quicvarint
-# github.com/quic-go/webtransport-go v0.8.1-0.20241018022711-4ac2c9250e66
-## explicit; go 1.22
+# github.com/quic-go/webtransport-go v0.9.0
+## explicit; go 1.23
 github.com/quic-go/webtransport-go
+# github.com/raulk/go-watchdog v1.3.0
+## explicit; go 1.15
+github.com/raulk/go-watchdog
 # github.com/rivo/uniseg v0.4.7
 ## explicit; go 1.18
 github.com/rivo/uniseg

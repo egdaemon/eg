@@ -14,6 +14,7 @@ type config struct {
 	gracePeriod   time.Duration
 	silencePeriod time.Duration
 	decayer       *DecayerCfg
+	emergencyTrim bool
 	clock         clock.Clock
 }
 

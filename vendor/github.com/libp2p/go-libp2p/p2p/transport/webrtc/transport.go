@@ -68,13 +68,7 @@ const (
 	DefaultFailedTimeout       = 30 * time.Second
 	DefaultKeepaliveTimeout    = 15 * time.Second
 
-	// sctpReceiveBufferSize is the size of the buffer for incoming messages.
-	//
-	// This is enough space for enqueuing 10 full sized messages.
-	// Besides throughput, this only matters if an application is using multiple dependent
-	// streams, say streams 1 & 2. It reads from stream 1 only after receiving message from
-	// stream 2. A buffer of 10 messages should serve all such situations.
-	sctpReceiveBufferSize = 10 * maxReceiveMessageSize
+	sctpReceiveBufferSize = 100_000
 )
 
 type WebRTCTransport struct {
@@ -373,7 +367,7 @@ func (t *WebRTCTransport) dial(ctx context.Context, scope network.ConnManagement
 	if err != nil {
 		return nil, err
 	}
-	channel := newStream(w.HandshakeDataChannel, detached, maxSendMessageSize, nil)
+	channel := newStream(w.HandshakeDataChannel, detached, func() {})
 
 	remotePubKey, err := t.noiseHandshake(ctx, w.PeerConnection, channel, p, remoteHashFunction, false)
 	if err != nil {
@@ -624,7 +618,7 @@ func newWebRTCConnection(settings webrtc.SettingEngine, config webrtc.Configurat
 	})
 
 	connectionClosedCh := make(chan struct{}, 1)
-	pc.SCTP().OnClose(func(_ error) {
+	pc.SCTP().OnClose(func(err error) {
 		// We only need one message. Closing a connection is a problem as pion might invoke the callback more than once.
 		select {
 		case connectionClosedCh <- struct{}{}:

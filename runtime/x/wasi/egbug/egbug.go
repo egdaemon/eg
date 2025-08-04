@@ -216,6 +216,7 @@ func EnsureEnvAuto(ctx context.Context, op eg.Op) error {
 
 func EnsureEnv(expected string, keys ...string) eg.OpFn {
 	return func(ctx context.Context, op eg.Op) error {
+		old := errorsx.Zero(envx.Build().FromEnv(keys...).Environ())
 		vars := errorsx.Zero(normalizeEnv(envx.Build().FromEnv(keys...)).Environ())
 		digest := md5.New()
 		for _, v := range vars {
@@ -225,7 +226,7 @@ func EnsureEnv(expected string, keys ...string) eg.OpFn {
 		}
 
 		if d := hex.EncodeToString(digest.Sum(nil)); d != expected {
-			return fmt.Errorf("unexpected environment digest: %s != %s:\n%s\n-----------------------------------------\n%s", d, expected, strings.Join(keys, "\n"), strings.Join(vars, "\n"))
+			return fmt.Errorf("unexpected environment digest: %s != %s:\n%s\n-----------------------------------------\n%s", d, expected, strings.Join(old, "\n"), strings.Join(vars, "\n"))
 		}
 
 		return nil

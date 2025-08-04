@@ -196,13 +196,33 @@ func (t runner) perform(ctx context.Context, runid, path string, rtb runtimefn) 
 		wazero.NewRuntimeConfig().WithCompilationCache(cache),
 	)
 
-	inpr, inpw := io.Pipe()
+	defer log.Println("INTERP DONE")
+	inpr, inpw, err := os.Pipe()
+	if err != nil {
+		return errorsx.Wrap(err, "failed to open pipe for stdin")
+	}
 	defer inpr.Close()
-	defer inpw.CloseWithError(io.EOF)
+	defer inpw.Close()
+	// defer inpw.CloseWithError(io.EOF)
 	go func() {
 		_, _err := io.Copy(inpw, os.Stdin)
 		debugx.Println(errorsx.Wrap(_err, "failed copying stdin"))
-		inpw.CloseWithError(_err)
+		inpw.Close()
+		// inpw.CloseWithError(_err)
+	}()
+
+	outpr, outpw, err := os.Pipe()
+	if err != nil {
+		return errorsx.Wrap(err, "failed to open pipe for stdout")
+	}
+	defer outpr.Close()
+	defer outpw.Close()
+	// defer outpw.CloseWithError(io.EOF)
+	go func() {
+		_, _err := io.Copy(os.Stdout, outpr)
+		debugx.Println(errorsx.Wrap(_err, "failed copying to stdout"))
+		outpr.Close()
+		// outpw.CloseWithError(_err)
 	}()
 
 	errpr, errpw := io.Pipe()
@@ -211,16 +231,7 @@ func (t runner) perform(ctx context.Context, runid, path string, rtb runtimefn) 
 	go func() {
 		_, _err := io.Copy(os.Stderr, errpr)
 		debugx.Println(errorsx.Wrap(_err, "failed copying to stderr"))
-		inpw.CloseWithError(_err)
-	}()
-
-	outpr, outpw := io.Pipe()
-	defer outpr.Close()
-	defer outpw.CloseWithError(io.EOF)
-	go func() {
-		_, _err := io.Copy(os.Stdout, outpr)
-		debugx.Println(errorsx.Wrap(_err, "failed copying to stderr"))
-		inpw.CloseWithError(_err)
+		errpw.CloseWithError(_err)
 	}()
 
 	debugx.Println("cache dir", eg.DefaultCacheDirectory(), "->", eg.DefaultCacheDirectory())

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -12,6 +13,7 @@ import (
 	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/internal/debugx"
 	"github.com/egdaemon/eg/internal/envx"
+	"github.com/egdaemon/eg/internal/fsx"
 	"github.com/egdaemon/eg/internal/langx"
 	"github.com/egdaemon/eg/internal/stringsx"
 	"github.com/egdaemon/eg/workspaces"
@@ -214,7 +216,13 @@ func (t Agent) Options() []string {
 }
 
 func (t Agent) Dial(ctx context.Context) (conn *grpc.ClientConn, err error) {
-	cspath := filepath.Join(envx.String(filepath.Join(t.ws.Root, t.ws.RuntimeDir), eg.EnvComputeRuntimeDirectory), eg.SocketControl)
-	debugx.Println("agent dialing", spew.Sdump(t.ws), cspath)
+	p1 := envx.String(eg.DefaultMountRoot(eg.SocketControl), eg.EnvComputeModuleSocket)
+	p2 := filepath.Join(t.ws.Root, t.ws.RuntimeDir, eg.SocketControl)
+	cspath := fsx.LocateFirst(
+		p1,
+		p2,
+	)
+	envx.Debug(os.Environ()...)
+	debugx.Println("agent dialing", spew.Sdump(t.ws), p1, p2, "->", cspath)
 	return grpc.DialContext(ctx, fmt.Sprintf("unix://%s", cspath), grpc.WithInsecure())
 }

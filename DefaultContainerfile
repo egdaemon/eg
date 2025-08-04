@@ -11,7 +11,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update
 
 # general utilities
-RUN apt-get install -y software-properties-common build-essential ca-certificates curl sudo gnupg2 lsb-release iproute2 git apt-file uidmap dbus-user-session fuse-overlayfs rsync vim
+RUN apt-get install -y software-properties-common build-essential ca-certificates curl sudo gnupg2 lsb-release iproute2 git apt-file uidmap dbus-user-session fuse-overlayfs rsync vim genisoimage
 RUN add-apt-repository -n ppa:longsleep/golang-backports
 RUN add-apt-repository -n ppa:egdaemon/eg
 RUN add-apt-repository -n ppa:egdaemon/duckdb

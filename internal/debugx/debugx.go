@@ -2,18 +2,21 @@ package debugx
 
 import (
 	"context"
+	"crypto/md5"
 	"fmt"
 	"io"
 	"log"
 	"os"
 	"os/signal"
 	"path/filepath"
+	"runtime/debug"
 	"runtime/pprof"
 	"strconv"
 	"time"
 
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/iox"
+	"github.com/egdaemon/eg/internal/md5x"
 	"github.com/egdaemon/eg/internal/stringsx"
 )
 
@@ -83,4 +86,16 @@ func OnSignal(do func() error) func(context.Context, ...os.Signal) {
 			}
 		}
 	}
+}
+
+func BuildID() string {
+	info, _ := debug.ReadBuildInfo()
+	d := md5.New()
+	for _, v := range info.Settings {
+		if _, err := d.Write([]byte(v.Value)); err != nil {
+			panic(err)
+		}
+	}
+
+	return md5x.FormatString(d)
 }

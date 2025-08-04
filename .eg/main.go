@@ -22,15 +22,6 @@ func main() {
 	deb := debian.Runner()
 	err := eg.Perform(
 		ctx,
-		// shell.Op(
-		// 	shell.New("uname -r"),
-		// 	shell.New("cat /proc/cgroups"),
-		// 	shell.New("cat /etc/systemd/system.conf").Privileged(),
-		// 	shell.New("cat /sys/fs/cgroup/user.slice/user-$(id -u).slice/user@$(id -u).service/cgroup.controllers").Privileged().Lenient(true),
-		// 	shell.New("cat /sys/fs/cgroup/user.slice/user-$(id -u).slice/user@$(id -u).service/cgroup.controllers").Lenient(true),
-		// 	shell.New("ls -lha /sys/fs/"),
-		// ),
-		egbug.Fail,
 		eggit.AutoClone,
 		eg.Parallel(
 			eg.Build(eg.DefaultModule()),

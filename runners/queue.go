@@ -2,6 +2,7 @@ package runners
 
 import (
 	"context"
+	"crypto/md5"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -410,7 +411,7 @@ func beginwork(ctx context.Context, md metadata, dir string) state {
 
 	errorsx.Log(tarx.Inspect(archive))
 
-	if ws, err = workspaces.New(ctx, filepath.Join(dir, workdirname), eg.DefaultModuleDirectory(), eg.WorkingDirectory, false); err != nil {
+	if ws, err = workspaces.New(ctx, md5.New(), filepath.Join(dir, workdirname), eg.DefaultModuleDirectory(), eg.WorkingDirectory, false); err != nil {
 		return completed(workload.Enqueued, md, ws, 0, errorsx.Wrap(err, "unable to setup workspace"))
 	}
 

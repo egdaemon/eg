@@ -22,15 +22,6 @@ func main() {
 	deb := debian.Runner()
 	err := eg.Perform(
 		ctx,
-		// shell.Op(
-		// 	shell.New("uname -r"),
-		// 	shell.New("cat /proc/cgroups"),
-		// 	shell.New("cat /etc/systemd/system.conf").Privileged(),
-		// 	shell.New("cat /sys/fs/cgroup/user.slice/user-$(id -u).slice/user@$(id -u).service/cgroup.controllers").Privileged().Lenient(true),
-		// 	shell.New("cat /sys/fs/cgroup/user.slice/user-$(id -u).slice/user@$(id -u).service/cgroup.controllers").Lenient(true),
-		// 	shell.New("ls -lha /sys/fs/"),
-		// ),
-		egbug.Fail,
 		eggit.AutoClone,
 		eg.Parallel(
 			eg.Build(eg.DefaultModule()),
@@ -63,7 +54,7 @@ func IntegrationTests(ctx context.Context, op eg.Op) error {
 	runtime := shell.Runtime().Privileged()
 	return eg.Perform(
 		ctx,
-		eg.Parallel(
+		eg.Sequential(
 			shell.Op(runtime.New("/home/egd/go/bin/eg compute baremetal tests/concurrent")),
 			// shell.Op(runtime.New("/home/egd/go/bin/eg compute baremetal tests/containers")),
 			// shell.Op(runtime.New("/home/egd/go/bin/eg compute baremetal tests/metrics")),
@@ -71,7 +62,7 @@ func IntegrationTests(ctx context.Context, op eg.Op) error {
 			// shell.Op(runtime.New("/home/egd/go/bin/eg compute baremetal tests/tty")),
 			shell.Op(
 				runtime.New("/home/egd/go/bin/eg compute baremetal tests/envvars").
-					Environ(egbug.EnvUnsafeDigest, "a1cd2e94ecaae6bb5cb1d850484c33db").
+					Environ(egbug.EnvUnsafeDigest, "c0e35915f19b6c0d2d12db84c6e98c74").
 					Environ("EG_COMPUTE_MODULE_LEVEL", "0"),
 			),
 		),

@@ -14,7 +14,7 @@ func Remove[T any](remove func(T) bool, items ...T) []T {
 	return result
 }
 
-// Filter the element that do not return true
+// Filter remove the elements that do not return true
 func Filter[T any](match func(T) bool, items ...T) (results []T) {
 	results = make([]T, 0, len(items))
 
@@ -118,10 +118,10 @@ func MapTransformErr[T, X any](m func(T) (X, error), items ...T) (zero []X, err 
 	return results, nil
 }
 
-func Reduce[T any](v *T, options ...func(*T)) *T {
-	for _, opt := range options {
-		opt(v)
+func Reduce[T any, Y any](tx func(T, Y) T, accum T, values ...Y) T {
+	for _, v := range values {
+		accum = tx(accum, v)
 	}
 
-	return v
+	return accum
 }

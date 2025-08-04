@@ -20,6 +20,7 @@ import (
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/gitx"
+	"github.com/egdaemon/eg/internal/md5x"
 	"github.com/egdaemon/eg/internal/podmanx"
 	"github.com/egdaemon/eg/internal/stringsx"
 	"github.com/egdaemon/eg/internal/userx"
@@ -72,7 +73,7 @@ func (t serve) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err e
 		return errorsx.Wrap(err, "unable to connect to podman")
 	}
 
-	if ws, err = workspaces.New(gctx.Context, t.Dir, t.ModuleDir, t.Name, false); err != nil {
+	if ws, err = workspaces.New(gctx.Context, md5x.Digest(errorsx.Zero(cmdopts.BuildInfo())), t.Dir, t.ModuleDir, t.Name, false); err != nil {
 		return errorsx.Wrap(err, "unable to setup workspace")
 	}
 	defer os.RemoveAll(filepath.Join(ws.Root, ws.RuntimeDir))

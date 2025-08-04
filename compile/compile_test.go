@@ -2,6 +2,7 @@ package compile_test
 
 import (
 	"context"
+	"crypto/md5"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -28,7 +29,7 @@ var _ = Describe("FromTranspiled", func() {
 		tmpdir := testx.TempDir()
 
 		Expect(fsx.CloneTree(ctx, tmpdir, "example.1", os.DirFS(testx.Fixture()))).To(Succeed())
-		ws, err = workspaces.New(ctx, tmpdir, eg.DefaultModuleDirectory(), "", false)
+		ws, err = workspaces.New(ctx, md5.New(), tmpdir, eg.DefaultModuleDirectory(), "", false)
 		Expect(err).To(Succeed())
 		roots, err := transpile.Autodetect(transpile.New(ws)).Run(ctx)
 		Expect(err).To(Succeed())
@@ -51,7 +52,7 @@ var _ = Describe("FromTranspiled", func() {
 		tmpdir := testx.TempDir()
 
 		Expect(fsx.CloneTree(ctx, tmpdir, "example.2", os.DirFS(testx.Fixture()))).To(Succeed())
-		ws, err = workspaces.New(ctx, tmpdir, eg.DefaultModuleDirectory(), "", false)
+		ws, err = workspaces.New(ctx, md5.New(), tmpdir, eg.DefaultModuleDirectory(), "", false)
 		Expect(err).To(Succeed())
 		roots, err := transpile.Autodetect(transpile.New(ws)).Run(ctx)
 		Expect(err).To(Succeed())
@@ -82,7 +83,7 @@ var _ = Describe("wasix warm cache", func() {
 		Expect(err).To(Succeed())
 
 		Expect(fsx.CloneTree(ctx, tmpdir, "example.1", os.DirFS(testx.Fixture()))).To(Succeed())
-		ws, err = workspaces.New(ctx, tmpdir, eg.DefaultModuleDirectory(), "", false)
+		ws, err = workspaces.New(ctx, md5.New(), tmpdir, eg.DefaultModuleDirectory(), "", false)
 		Expect(err).To(Succeed())
 		roots, err := transpile.Autodetect(transpile.New(ws)).Run(ctx)
 		Expect(err).To(Succeed())

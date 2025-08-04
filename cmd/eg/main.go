@@ -100,7 +100,10 @@ func main() {
 	go cmdopts.Cleanup(shellcli.Context, shellcli.Shutdown, shellcli.Cleanup, func() {
 		log.Println("waiting for systems to shutdown")
 	}, os.Kill, os.Interrupt)
-
+	// go timex.NowAndEvery(shellcli.Context, 200*time.Millisecond, func(ctx context.Context) error {
+	// 	log.Println("$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$ STDIN NON BLOCKING:", debugx.NonBlocking(os.Stdin.Fd()))
+	// 	return nil
+	// })
 	user := userx.CurrentUserOrDefault(userx.Root())
 	gitdir := envx.String(gitx.DetectRoot(), "EG_GIT_REPOSITORY")
 

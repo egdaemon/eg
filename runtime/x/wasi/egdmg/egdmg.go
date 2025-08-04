@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io/fs"
+	"log"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -48,11 +49,8 @@ type Specification struct {
 
 func Build(b Specification, archive fs.FS) eg.OpFn {
 	return func(ctx context.Context, o eg.Op) error {
-		if err := os.Symlink("/Applications", filepath.Join(b.builddir, "Applications")); err != nil {
-			return err
-		}
-
 		root := fmt.Sprintf("%s.app", b.name)
+		log.Println("DERP DERP", filepath.Join(b.builddir, root))
 		if err := egfs.CloneFS(ctx, filepath.Join(b.builddir, root), ".", archive); err != nil {
 			return err
 		}
@@ -66,6 +64,8 @@ func Build(b Specification, archive fs.FS) eg.OpFn {
 			Environ("DMG_OUTPUT", stringsx.DefaultIfBlank(b.outputpath, fmt.Sprintf("%s.%s.dmg", b.name, runtime.GOARCH)))
 		return shell.Run(
 			ctx,
+			runtime.Newf("ls -lha %s", b.builddir),
+			runtime.Newf("ln -fs /Applications %s", filepath.Join(b.builddir, "Applications")),
 			runtime.Newf("mkisofs -V ${DMG_VOLUME_NAME} -D -R -apple -no-pad -o ${DMG_OUTPUT} %s", filepath.Join(b.builddir, root)),
 		)
 	}

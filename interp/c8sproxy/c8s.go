@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -158,7 +157,9 @@ func PodmanModuleRunCmd(image, cname string, options ...string) []string {
 
 func moduleExec(ctx context.Context, cname, moduledir string, stdin io.Reader, stdout io.Writer, stderr io.Writer) (err error) {
 	var (
-		rtty, wtty *os.File
+		rtty *io.PipeReader
+		wtty *io.PipeWriter
+		// rtty, wtty *os.File
 	)
 
 	verbosity := ""
@@ -198,17 +199,19 @@ func moduleExec(ctx context.Context, cname, moduledir string, stdin io.Reader, s
 	}()
 
 	if stdin != nil {
-		rtty, wtty, err = os.Pipe()
-		if err != nil {
-			return errorsx.Wrap(err, "unable prepare pipe")
-		}
+		rtty, wtty = io.Pipe()
+		// rtty, wtty, err = os.Pipe()
+		// if err != nil {
+		// 	return errorsx.Wrap(err, "unable prepare pipe")
+		// }
 		defer rtty.Close()
 		defer wtty.Close()
 
 		go func() {
 			_, cause := io.Copy(wtty, stdin)
 			debugx.Println("unable to copy stdin", cause)
-			wtty.Close()
+			wtty.CloseWithError(cause)
+			// wtty.Close()
 		}()
 	}
 
@@ -260,6 +263,9 @@ func execAttach(ctx context.Context, sessionID string, stdin io.Reader, stdout i
 	if !isSet.stderr {
 		stderr = (io.Writer)(nil)
 	}
+
+	log.Println("ZZZZZZZZZZZZZZZZZ 0")
+	defer log.Println("ZZZZZZZZZZZZZZZZZ 1")
 
 	conn, err := bindings.GetClient(ctx)
 	if err != nil {
@@ -384,10 +390,7 @@ func execAttach(ctx context.Context, sessionID string, stdin io.Reader, stdout i
 			// Read multiplexed channels and write to appropriate stream
 			fd, l, err := containers.DemuxHeader(socket, buffer)
 			if err != nil {
-				if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
-					return nil
-				}
-				return err
+				return errorsx.Ignore(err, io.EOF, io.ErrUnexpectedEOF)
 			}
 			frame, err := containers.DemuxFrame(socket, buffer, l)
 			if err != nil {

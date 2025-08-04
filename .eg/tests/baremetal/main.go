@@ -3,11 +3,13 @@ package main
 import (
 	"context"
 	"log"
+	"os"
 
 	"github.com/egdaemon/eg/runtime/wasi/eg"
 	"github.com/egdaemon/eg/runtime/wasi/egenv"
 	"github.com/egdaemon/eg/runtime/wasi/shell"
 	"github.com/egdaemon/eg/runtime/x/wasi/egbug"
+	"github.com/egdaemon/eg/runtime/x/wasi/egdmg"
 	"github.com/egdaemon/eg/runtime/x/wasi/egtarball"
 )
 
@@ -40,14 +42,24 @@ func Test(ctx context.Context, op eg.Op) error {
 		egbug.DebugFailure(
 			// ensure the tar archive has the expected files.
 			shell.Op(
-				shell.Newf("test \"$(tar tf %s | md5sum)\" = \"c900687098f86ddff70bd4e7abb9bf29  -\"", egtarball.Archive("example")),
+				shell.Newf("tar tf %s | md5sum", egtarball.Archive("example")),
+				shell.Newf("test \"$(tar tf %s | md5sum)\" = \"c22870ddb29fce64f00a4c3570644acb  -\"", egtarball.Archive("example")),
 			),
 			egbug.Log("tar archive is missing contents"),
 		),
 	)(ctx, op)
 }
 
+func TestModule(ctx context.Context, op eg.Op) error {
+	b := egdmg.New("retrovibe", egdmg.OptionBuildDir(egenv.CacheDirectory(".dist", "retrovibed.darwin.arm64")))
+	return eg.Perform(
+		ctx,
+		egdmg.Build(b, os.DirFS(egtarball.Path("example"))),
+	)
+}
+
 func main() {
+	log.SetFlags(log.Flags() | log.Lshortfile)
 	ctx, done := context.WithTimeout(context.Background(), egenv.TTL())
 	defer done()
 
@@ -68,7 +80,7 @@ func main() {
 		// test for cache directory and runtime.
 		// test for git commit details.
 		egbug.DebugFailure(
-			egbug.EnsureEnv("307c7421f028bb223c6dd928a1a5b328", egbug.EgEnviron()...),
+			egbug.EnsureEnv("e40ffcfba287b4978406fe23a6ce4030", egbug.EgEnviron()...),
 			egbug.Log("baremetal environment has drifted"),
 		),
 		eg.Module(
@@ -87,6 +99,7 @@ func main() {
 					egbug.EnsureEnv("514d01ba58d6836f55e1efdcb76ee548", egbug.EgEnviron()...),
 					egbug.Log("container module environment has drifted"),
 				),
+				TestModule,
 			),
 		),
 	)

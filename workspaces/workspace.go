@@ -3,7 +3,6 @@ package workspaces
 
 import (
 	"context"
-	"crypto/md5"
 	"fmt"
 	"hash"
 	"io"
@@ -67,8 +66,8 @@ func FromEnv(ctx context.Context, root, name string) (zero Context, err error) {
 	}, nil
 }
 
-func New(ctx context.Context, root string, mdir string, name string, private bool) (zero Context, err error) {
-	cidmd5 := md5.New()
+func New(ctx context.Context, cid hash.Hash, root string, mdir string, name string, private bool) (zero Context, err error) {
+
 	cdir := eg.CacheDirectory
 	runtimedir := eg.RuntimeDirectory
 	if private {
@@ -76,23 +75,23 @@ func New(ctx context.Context, root string, mdir string, name string, private boo
 	}
 	ignore := ignoredir{path: cdir, reason: "cache directory"}
 
-	if err = cacheid(ctx, root, mdir, cidmd5, ignore); err != nil {
+	if err = cacheid(ctx, root, mdir, cid, ignore); err != nil {
 		return zero, errorsx.Wrap(err, "unable to create cache id")
 	}
 
-	cid := uuid.FromBytesOrNil(cidmd5.Sum(nil)).String()
+	_cid := uuid.FromBytesOrNil(cid.Sum(nil)).String()
 
 	return ensuredirs(Context{
 		Module:     name,
-		CachedID:   cid,
+		CachedID:   _cid,
 		Root:       root,
 		ModuleDir:  mdir,
 		CacheDir:   cdir,
 		RuntimeDir: runtimedir,
 		WorkingDir: filepath.Join(runtimedir, "mounted"),
-		BuildDir:   filepath.Join(cdir, eg.DefaultModuleDirectory(), ".gen", cid, "build"),
-		TransDir:   filepath.Join(cdir, eg.DefaultModuleDirectory(), ".gen", cid, "trans"),
-		GenModDir:  filepath.Join(cdir, eg.DefaultModuleDirectory(), ".gen", cid, "trans", ".genmod"),
+		BuildDir:   filepath.Join(cdir, eg.DefaultModuleDirectory(), ".gen", _cid, "build"),
+		TransDir:   filepath.Join(cdir, eg.DefaultModuleDirectory(), ".gen", _cid, "trans"),
+		GenModDir:  filepath.Join(cdir, eg.DefaultModuleDirectory(), ".gen", _cid, "trans", ".genmod"),
 		Ignore:     ignore,
 	})
 }

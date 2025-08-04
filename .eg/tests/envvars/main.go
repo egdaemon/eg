@@ -37,7 +37,7 @@ func main() {
 	ctx, done := context.WithTimeout(context.Background(), egenv.TTL())
 	defer done()
 
-	if err := eg.Perform(ctx, eg.Build(eg.DefaultModule()), egbug.EnsureEnvFixed, Level0); err != nil {
+	if err := eg.Perform(ctx, eg.Build(eg.DefaultModule()), egbug.EnsureEnvAuto, Level0); err != nil {
 		log.Fatalln(err)
 	}
 }

@@ -23,6 +23,7 @@ import (
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/gitx"
+	"github.com/egdaemon/eg/internal/md5x"
 	"github.com/egdaemon/eg/internal/podmanx"
 	"github.com/egdaemon/eg/internal/runtimex"
 	"github.com/egdaemon/eg/internal/wasix"
@@ -70,7 +71,7 @@ func (t baremetal) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, hotswapbin
 	// ensure when we run modules our umask is set to allow git clones to work properly
 	runtimex.Umask(0002)
 
-	if ws, err = workspaces.New(ctx, t.Dir, t.RuntimeDir, t.Workload, true); err != nil {
+	if ws, err = workspaces.New(ctx, md5x.Digest(errorsx.Zero(cmdopts.BuildInfo())), t.Dir, t.RuntimeDir, t.Workload, true); err != nil {
 		return err
 	}
 

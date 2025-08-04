@@ -20,6 +20,7 @@ import (
 	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/internal/debugx"
 	"github.com/egdaemon/eg/internal/errorsx"
+	"github.com/egdaemon/eg/internal/langx"
 	"github.com/egdaemon/eg/internal/numericx"
 	"github.com/egdaemon/eg/internal/slicesx"
 )
@@ -415,6 +416,78 @@ func (t *Builder) FromEnv(keys ...string) *Builder {
 	return t
 }
 
+// Only keeps just the specified keys
+func (t *Builder) Only(keys ...string) *Builder {
+	vars := make([]string, 0, len(keys))
+	uniq := slicesx.Reduce(func(m map[string]string, v string) map[string]string {
+		key, _, ok := strings.Cut(v, "=")
+		if !ok {
+			return m
+		}
+
+		m[key] = v
+		return m
+	}, make(map[string]string, len(t.environ)), t.environ...)
+
+	for _, k := range keys {
+		v, ok := uniq[k]
+		if !ok {
+			continue
+		}
+		vars = append(vars, v)
+	}
+
+	t.environ = vars
+	return t
+}
+
+func (t *Builder) Drop(keys ...string) *Builder {
+	vars := make([]string, 0, len(keys))
+	uniq := slicesx.Reduce(func(m map[string]struct{}, v string) map[string]struct{} {
+		m[v] = struct{}{}
+		return m
+	}, make(map[string]struct{}, len(keys)), keys...)
+
+	for _, s := range t.environ {
+		k, _, ok := strings.Cut(s, "=")
+		if !ok {
+			debugx.Println("malformed environment variable", s)
+		}
+
+		if _, ok := uniq[k]; ok {
+			log.Println("dropping", k)
+			continue
+		}
+		vars = append(vars, s)
+	}
+
+	log.Println("wat", vars)
+	t.environ = vars
+	return t
+}
+
+func (t *Builder) Setenv(k, v string) error {
+	t.environ = slicesx.Map(func(s string) string {
+		key, _, ok := strings.Cut(s, "=")
+		if ok && key == k {
+			return fmt.Sprintf("%s=%s", k, v)
+		}
+
+		return s
+	}, t.environ...)
+
+	return nil
+}
+
+func (t *Builder) Unsetenv(k string) error {
+	t.environ = slicesx.Filter(func(s string) bool {
+		key, _, ok := strings.Cut(s, "=")
+		return !(ok && key == k)
+	}, t.environ...)
+
+	return nil
+}
+
 type formatoption func(*formatopts)
 type formatopts struct {
 	transformer func(string) string // transforms that result in empty strings are ignored.
@@ -465,7 +538,7 @@ func VarBool(b bool) string {
 // - doesn't currently escape values. it may in the future.
 // - if the key or value are an empty string it'll return an empty string. it will log if debugging is enabled.
 func Format[T ~string](k string, v T, options ...func(*formatopts)) string {
-	opts := slicesx.Reduce(&formatopts{
+	opts := langx.Clone(formatopts{
 		transformer: ignoreEmptyVariables,
 	}, options...)
 

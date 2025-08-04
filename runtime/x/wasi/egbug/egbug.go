@@ -133,7 +133,7 @@ func Images(ctx context.Context, op eg.Op) error {
 
 const (
 	EnvUnsafeDigest = "EG_UNSAFE_ENVVARS_DIGEST"
-	defaultDigest   = "0f97608c45f33d206dcd9d0cffac83f6"
+	defaultDigest   = "2e2bff2f6caf30bd4229dd70b9c09cef"
 )
 
 func EgEnviron() []string {
@@ -163,22 +163,25 @@ func EgEnviron() []string {
 	}
 }
 
-func normalizeEnv() {
+func normalizeEnv(environ *envx.Builder) *envx.Builder {
 	// zero out some dynamic environment variables for consistent results
-	os.Setenv(_eg.EnvComputeAccountID, uuid.Nil.String())
-	os.Setenv(_eg.EnvComputeRunID, uuid.Nil.String())
-	os.Setenv(_eg.EnvGitHeadCommitTimestamp, "0000-00-00T00:00:00-00:00")
-	os.Setenv(_eg.EnvGitHeadCommit, "0000000000000000000000000000000000000000")
-	os.Setenv(_eg.EnvGitBaseCommit, "0000000000000000000000000000000000000000")
-	os.Setenv(_eg.EnvUnsafeCacheID, uuid.Nil.String())
-	os.Setenv(_eg.EnvComputeLoggingVerbosity, "0")
-	os.Setenv(_eg.EnvComputeModuleSocket, _eg.DefaultRuntimeDirectory("module.socket"))
+	environ.Setenv(_eg.EnvComputeAccountID, uuid.Nil.String())
+	environ.Setenv(_eg.EnvComputeRunID, uuid.Nil.String())
+	environ.Setenv(_eg.EnvGitHeadCommitTimestamp, "0000-00-00T00:00:00-00:00")
+	environ.Setenv(_eg.EnvGitHeadCommit, "0000000000000000000000000000000000000000")
+	environ.Setenv(_eg.EnvGitBaseCommit, "0000000000000000000000000000000000000000")
+	environ.Setenv(_eg.EnvUnsafeCacheID, uuid.Nil.String())
+	environ.Setenv(_eg.EnvComputeLoggingVerbosity, "0")
+	environ.Setenv(_eg.EnvComputeModuleSocket, _eg.DefaultRuntimeDirectory("module.socket"))
 
 	// always ignore compute bin. its development tooling.
-	os.Unsetenv(_eg.EnvComputeBin)
-	os.Unsetenv("DEBIAN_FRONTEND")
+	environ.Unsetenv(_eg.EnvComputeBin)
+	// always ingore unsafe digest, its for testing.
+	environ.Unsetenv(EnvUnsafeDigest)
+	// probably shouldn't ignore this...
+	environ.Unsetenv("DEBIAN_FRONTEND")
 
-	os.Unsetenv(EnvUnsafeDigest)
+	return environ
 }
 
 // Ensures the environment is stable between releases. only usable for standard compute.
@@ -191,9 +194,10 @@ func EnsureEnvAuto(ctx context.Context, op eg.Op) error {
 	old := os.Environ()
 	sort.Strings(old)
 
-	normalizeEnv()
-
-	environ := os.Environ()
+	environ, err := normalizeEnv(envx.Build().FromEnviron(old...)).Environ()
+	if err != nil {
+		return errorsx.Wrap(err, "unable to normalize environment")
+	}
 	sort.Strings(environ)
 
 	digest := md5.New()
@@ -212,9 +216,7 @@ func EnsureEnvAuto(ctx context.Context, op eg.Op) error {
 
 func EnsureEnv(expected string, keys ...string) eg.OpFn {
 	return func(ctx context.Context, op eg.Op) error {
-		normalizeEnv()
-
-		vars := errorsx.Zero(envx.Build().FromEnv(keys...).Environ())
+		vars := errorsx.Zero(normalizeEnv(envx.Build().FromEnv(keys...)).Environ())
 		digest := md5.New()
 		for _, v := range vars {
 			if _, err := digest.Write([]byte(v)); err != nil {

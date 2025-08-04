@@ -30,15 +30,25 @@ func SetFlags(flag int) {
 
 // Println prints to log.Println
 func Println(v ...interface{}) {
-	_ = std.Output(2, fmt.Sprintln(v...))
+	if std.Writer() != io.Discard {
+		_ = std.Output(2, fmt.Sprintln(v...))
+		return
+	}
 }
 
 // Printf prints to log.Printf
 func Printf(format string, v ...interface{}) {
-	_ = std.Output(2, fmt.Sprintf(format, v...))
+	if std.Writer() != io.Discard {
+		_ = std.Output(2, fmt.Sprintf(format, v...))
+		return
+	}
+
 }
 
 // Print prints to log.Print
 func Print(v ...interface{}) {
-	_ = std.Output(2, fmt.Sprint(v...))
+	if std.Writer() != io.Discard {
+		_ = std.Output(2, fmt.Sprint(v...))
+		return
+	}
 }

@@ -43,6 +43,7 @@ func TestExpandInPlace(t *testing.T) {
 		require.Equal(t, "6551a0cd-09f3-9c1a-837a-62fa607c405c", testx.ReadMD5(path))
 	})
 }
+
 func TestExpandReader(t *testing.T) {
 	standardMapping := func(key string) string {
 		switch key {

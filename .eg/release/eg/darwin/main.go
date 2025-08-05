@@ -42,7 +42,7 @@ func main() {
 		eg.Module(
 			ctx,
 			eg.DefaultModule(),
-			eggithub.Release(
+			eggithub.ReleaseIdempotent(
 				egtarball.Archive(tarballs.EgDarwinArm64()),
 				egdmg.Path(tarballs.EgDarwinArm64()),
 			),

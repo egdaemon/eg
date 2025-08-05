@@ -93,7 +93,7 @@ func (t localdownloader) Download(ctx context.Context) (err error) {
 			if evt.Op == fsnotify.Create {
 				return nil
 			}
-		case <-time.After(time.Minute + backoff.RandomFromRange(10*time.Second)):
+		case <-time.After(10*time.Minute + backoff.RandomFromRange(10*time.Second)):
 			// periodically check
 			continue
 		case <-ctx.Done():

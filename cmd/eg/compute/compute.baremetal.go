@@ -62,8 +62,10 @@ func (t baremetal) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, hotswapbin
 		descr      = envx.String("", eg.EnvComputeVCS)
 		cc         grpc.ClientConnInterface
 		hostnet                        = envx.Toggle(runners.AgentOptionCommandLine("--network", "host"), runners.AgentOptionNoop, eg.EnvExperimentalDisableHostNetwork) // ipv4 group bullshit. pretty sure its a podman 4 issue that was resolved in podman 5. this is 'safe' to do because we are already in a container.
-		mountegbin runners.AgentOption = runners.AgentOptionEGBin(errorsx.Must(exec.LookPath(os.Args[0])))
-		cmdenv     []string
+		mountegbin runners.AgentOption = runners.AgentOptionEGBin(
+			envx.String(errorsx.Must(exec.LookPath(os.Args[0])), eg.EnvComputeBinAlt),
+		)
+		cmdenv []string
 	)
 
 	ctx := gctx.Context
@@ -166,8 +168,6 @@ func (t baremetal) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, hotswapbin
 		eg.EnvComputeLoggingVerbosity, strconv.Itoa(gctx.Verbosity),
 	).Var(
 		eg.EnvComputeModuleNestedLevel, strconv.Itoa(0),
-	).Var(
-		eg.EnvComputeBin, hotswapbin.String(),
 	).FromEnviron(
 		errorsx.Zero(gitx.LocalEnv(repo, t.GitRemote, t.GitReference))...,
 	)

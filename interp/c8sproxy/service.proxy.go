@@ -9,8 +9,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/containers/podman/v5/pkg/bindings/images"
-	"github.com/davecgh/go-spew/spew"
 	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/internal/debugx"
 	"github.com/egdaemon/eg/internal/errorsx"
@@ -100,11 +98,12 @@ func (t *ProxyService) Build(ctx context.Context, req *c8s.BuildRequest) (_ *c8s
 		abspath = filepath.Join(t.ws.Root, t.ws.WorkingDir, req.Definition)
 	}
 
-	if ok, err := images.Exists(ctx, req.Name, nil); ok && err == nil {
-		return &c8s.BuildResponse{}, nil
-	} else {
-		debugx.Println("building image", spew.Sdump(req), abspath, spew.Sdump(t.ws))
-	}
+	// need to checksum the image.
+	// if ok, err := images.Exists(ctx, req.Name, nil); ok && err == nil {
+	// 	return &c8s.BuildResponse{}, nil
+	// } else {
+	// 	debugx.Println("building image", spew.Sdump(req), abspath, spew.Sdump(t.ws))
+	// }
 
 	// determine the working directory from the request if specified or the definition file's path.
 	wdir := slicesx.FindOrZero(func(s string) bool { return !stringsx.Blank(s) }, req.Directory, filepath.Dir(abspath))

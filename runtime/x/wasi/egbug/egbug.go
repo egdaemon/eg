@@ -5,8 +5,10 @@ package egbug
 import (
 	"context"
 	"crypto/md5"
+	"embed"
 	"encoding/hex"
 	"fmt"
+	"io/fs"
 	"log"
 	"os"
 	"sort"
@@ -133,8 +135,11 @@ func Images(ctx context.Context, op eg.Op) error {
 
 const (
 	EnvUnsafeDigest = "EG_UNSAFE_ENVVARS_DIGEST"
-	defaultDigest   = "3b7a9c279c58032a046aa980dd38cb8b"
+	defaultDigest   = "2e2bff2f6caf30bd4229dd70b9c09cef"
 )
+
+//go:embed default.env
+var embedded embed.FS
 
 func EgEnviron() []string {
 	return []string{
@@ -160,6 +165,10 @@ func EgEnviron() []string {
 		_eg.EnvComputeContainerImpure,
 		_eg.EnvComputeModuleSocket,
 		_eg.EnvComputeDefaultGroup,
+		_eg.EnvLogsInfo,
+		_eg.EnvLogsDebug,
+		_eg.EnvLogsTrace,
+		_eg.EnvLogsNetwork,
 	}
 }
 
@@ -174,6 +183,14 @@ func normalizeEnv(environ *envx.Builder) *envx.Builder {
 	environ.Setenv(_eg.EnvComputeLoggingVerbosity, "0")
 	environ.Setenv(_eg.EnvComputeModuleSocket, _eg.DefaultRuntimeDirectory("module.socket"))
 
+	// always ignore logging levels.
+	environ.Unsetenv(_eg.EnvLogsInfo)
+	environ.Unsetenv(_eg.EnvLogsDebug)
+	environ.Unsetenv(_eg.EnvLogsTrace)
+	environ.Unsetenv(_eg.EnvLogsNetwork)
+	environ.Unsetenv("GRPC_GO_LOG_SEVERITY_LEVEL")
+	environ.Unsetenv("GRPC_GO_LOG_VERBOSITY_LEVEL")
+
 	// always ignore compute bin. its development tooling.
 	environ.Unsetenv(_eg.EnvComputeBin)
 	// always ingore unsafe digest, its for testing.
@@ -187,14 +204,14 @@ func normalizeEnv(environ *envx.Builder) *envx.Builder {
 // Ensures the environment is stable between releases. only usable for standard compute.
 // baremetal is too variable. use EnsureEnvSubset for baremetal.
 func EnsureEnvAuto(ctx context.Context, op eg.Op) error {
-	expected := envx.String(defaultDigest, EnvUnsafeDigest)
+
 	// expected hash with normalized values.
 	// if this needs to change it means we might be breaking
 	// existing builds.
-	old := os.Environ()
-	sort.Strings(old)
+	old := errorsx.Zero(fs.ReadFile(embedded, "default.env"))
+	expected := envx.String(defaultDigest, EnvUnsafeDigest)
 
-	environ, err := normalizeEnv(envx.Build().FromEnviron(old...)).Environ()
+	environ, err := normalizeEnv(envx.Build().FromEnviron(os.Environ()...)).Environ()
 	if err != nil {
 		return errorsx.Wrap(err, "unable to normalize environment")
 	}
@@ -208,7 +225,7 @@ func EnsureEnvAuto(ctx context.Context, op eg.Op) error {
 	}
 
 	if d := hex.EncodeToString(digest.Sum(nil)); d != expected {
-		return fmt.Errorf("unexpected environment digest: %s != %s:\n%s\n-----------------------------------------\n%s", d, expected, strings.Join(old, "\n"), strings.Join(environ, "\n"))
+		return fmt.Errorf("unexpected environment digest: %s != %s:\n%s\n-----------------------------------------\n%s", d, expected, string(old), strings.Join(environ, "\n"))
 	}
 
 	return nil
@@ -216,6 +233,7 @@ func EnsureEnvAuto(ctx context.Context, op eg.Op) error {
 
 func EnsureEnv(expected string, keys ...string) eg.OpFn {
 	return func(ctx context.Context, op eg.Op) error {
+		old := errorsx.Zero(envx.Build().FromEnv(keys...).Environ())
 		vars := errorsx.Zero(normalizeEnv(envx.Build().FromEnv(keys...)).Environ())
 		digest := md5.New()
 		for _, v := range vars {
@@ -225,7 +243,7 @@ func EnsureEnv(expected string, keys ...string) eg.OpFn {
 		}
 
 		if d := hex.EncodeToString(digest.Sum(nil)); d != expected {
-			return fmt.Errorf("unexpected environment digest: %s != %s:\n%s\n-----------------------------------------\n%s", d, expected, strings.Join(keys, "\n"), strings.Join(vars, "\n"))
+			return fmt.Errorf("unexpected environment digest: %s != %s:\n%s\n-----------------------------------------\n%s", d, expected, strings.Join(old, "\n"), strings.Join(vars, "\n"))
 		}
 
 		return nil

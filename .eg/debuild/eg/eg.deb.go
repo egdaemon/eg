@@ -4,6 +4,7 @@ import (
 	"context"
 	"embed"
 	"io/fs"
+	"time"
 
 	"eg/compute/errorsx"
 	"eg/compute/maintainer"
@@ -13,6 +14,7 @@ import (
 	"github.com/egdaemon/eg/runtime/wasi/eggit"
 	"github.com/egdaemon/eg/runtime/wasi/shell"
 	"github.com/egdaemon/eg/runtime/x/wasi/egdebuild"
+	"github.com/egdaemon/eg/runtime/x/wasi/eggolang"
 )
 
 const (
@@ -43,7 +45,7 @@ func init() {
 		egdebuild.Option.Debian(errorsx.Must(fs.Sub(debskel, ".debskel"))),
 		egdebuild.Option.DependsBuild("golang-1.24", "dh-make", "debhelper", "duckdb", "libc6-dev (>= 2.35)", "libbtrfs-dev", "libassuan-dev", "libdevmapper-dev", "libglib2.0-dev", "libgpgme-dev", "libgpg-error-dev", "libprotobuf-dev", "libprotobuf-c-dev", "libseccomp-dev", "libselinux1-dev", "libsystemd-dev"),
 		egdebuild.Option.Depends("podman", "duckdb", "bindfs"),
-		egdebuild.Option.Environ("VCS_REVISION", c.Hash.String()),
+		egdebuild.Option.Envvar("VCS_REVISION", c.Hash.String()),
 	)
 }
 
@@ -68,6 +70,12 @@ func Build(ctx context.Context, o eg.Op) error {
 		egdebuild.Build(gcfg, egdebuild.Option.Distro("jammy")),
 		egdebuild.Build(gcfg, egdebuild.Option.Distro("noble")),
 		egdebuild.Build(gcfg, egdebuild.Option.Distro("plucky")),
+		egdebuild.Build(
+			gcfg,
+			egdebuild.Option.Distro("plucky"),
+			egdebuild.Option.BuildBinary(10*time.Minute),
+			egdebuild.Option.Environ(eggolang.Env()...),
+		),
 	)(ctx, o)
 }
 

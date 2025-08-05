@@ -16,7 +16,7 @@ RUN ln -s /usr/lib/go-1.24/bin/go /usr/local/bin/go
 RUN systemd-sysusers
 RUN systemd-tmpfiles --create
 RUN usermod --add-subuids 100000-165535 --add-subgids 100000-165535 egd
-RUN echo "cache buster 059a9a06-1996-4f49-9a7f-a30535886fc7"
+RUN echo "cache buster 059a9a06-1996-4f49-9a3f-b30535886fd8"
 
 RUN systemctl enable podman.socket
 RUN podman version

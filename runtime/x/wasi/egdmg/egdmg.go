@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io/fs"
+	"log"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -13,6 +14,7 @@ import (
 	"github.com/egdaemon/eg/internal/stringsx"
 	"github.com/egdaemon/eg/runtime/wasi/eg"
 	"github.com/egdaemon/eg/runtime/wasi/egenv"
+	"github.com/egdaemon/eg/runtime/wasi/eggit"
 	"github.com/egdaemon/eg/runtime/wasi/shell"
 	"github.com/egdaemon/eg/runtime/x/wasi/egfs"
 )
@@ -48,11 +50,8 @@ type Specification struct {
 
 func Build(b Specification, archive fs.FS) eg.OpFn {
 	return func(ctx context.Context, o eg.Op) error {
-		if err := os.Symlink("/Applications", filepath.Join(b.builddir, "Applications")); err != nil {
-			return err
-		}
-
 		root := fmt.Sprintf("%s.app", b.name)
+		defer log.Println("DERP DERP", filepath.Join(b.builddir, root))
 		if err := egfs.CloneFS(ctx, filepath.Join(b.builddir, root), ".", archive); err != nil {
 			return err
 		}
@@ -66,7 +65,23 @@ func Build(b Specification, archive fs.FS) eg.OpFn {
 			Environ("DMG_OUTPUT", stringsx.DefaultIfBlank(b.outputpath, fmt.Sprintf("%s.%s.dmg", b.name, runtime.GOARCH)))
 		return shell.Run(
 			ctx,
+			runtime.Newf("ln -fs /Applications %s", filepath.Join(b.builddir, "Applications")),
 			runtime.Newf("mkisofs -V ${DMG_VOLUME_NAME} -D -R -apple -no-pad -o ${DMG_OUTPUT} %s", filepath.Join(b.builddir, root)),
 		)
 	}
+}
+
+func root(paths ...string) string {
+	return egenv.CacheDirectory(".eg", filepath.Join(paths...))
+}
+
+// Path from the given pattern
+func Path(pattern string) string {
+	return root(Name(pattern))
+}
+
+// replaces the substitution values within the pattern, resulting in the final resulting archive file's name.
+func Name(pattern string) string {
+	c := eggit.EnvCommit()
+	return fmt.Sprintf("%s.dmg", c.StringReplace(pattern))
 }

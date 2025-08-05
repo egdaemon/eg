@@ -80,19 +80,22 @@ func (t localdownloader) Download(ctx context.Context) (err error) {
 		return errorsx.Wrap(err, "failed to watch queued directory")
 	}
 
-	// take a final peek after we've added the directory.
-	// there is a chance between the first call to dequeue
-	// and pending.Add that a directory was created.
-	if _, err := peek(dirs.Queued, 1); err == nil {
-		return nil
-	}
-
 	for {
+		// take a final peek after we've added the directory.
+		// there is a chance between the first call to dequeue
+		// and pending.Add that a directory was created.
+		if _, err := peek(dirs.Queued, 1); err == nil {
+			return nil
+		}
+
 		select {
 		case evt := <-pending.Events:
 			if evt.Op == fsnotify.Create {
 				return nil
 			}
+		case <-time.After(time.Minute + backoff.RandomFromRange(10*time.Second)):
+			// periodically check
+			continue
 		case <-ctx.Done():
 			return ctx.Err()
 		}
@@ -394,10 +397,12 @@ func beginwork(ctx context.Context, md metadata, dir string) state {
 	log.Println("initializing runner", dir)
 
 	if encoded, err = os.ReadFile(filepath.Join(dir, "metadata.json")); err != nil {
+		errorsx.Log(errorsx.Wrap(md.dirs.Discard(dir), "failed to clear invalid workload"))
 		return failure(err, idle(md))
 	}
 
 	if err = json.Unmarshal(encoded, workload); err != nil {
+		errorsx.Log(errorsx.Wrap(md.dirs.Discard(dir), "failed to clear invalid workload"))
 		return failure(err, idle(md))
 	}
 
@@ -567,6 +572,7 @@ func (t statecompleted) Update(ctx context.Context) state {
 	)
 
 	log.Println("completed", t.workload.Id, t.workload.AccountId, t.workload.VcsUri, t.ws.Root, t.duration, t.cause)
+	defer log.Println("completion done")
 
 	logs, err := os.Open(logpath)
 	if err != nil {
@@ -608,6 +614,8 @@ type statediscard struct {
 }
 
 func (t statediscard) Update(ctx context.Context) state {
+	log.Println("discard initiated")
+	defer log.Println("discard completed")
 	defer func() {
 		t.metadata.rm.Release(NewRuntimeResourcesFromDequeued(t.workload))
 	}()

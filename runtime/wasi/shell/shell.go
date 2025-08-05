@@ -246,7 +246,7 @@ func NewRecorder(cmd *Command) *Recorder {
 }
 
 type Recorder struct {
-	command string
+	commands []string
 }
 
 func (t *Recorder) Hijack(cmd *Command) error {
@@ -255,10 +255,18 @@ func (t *Recorder) Hijack(cmd *Command) error {
 }
 
 func (t *Recorder) Record(ctx context.Context, dir string, environ []string, cmd string, args []string) error {
-	t.command = stringsx.Join(":", dir, stringsx.Join(":", environ...), cmd, stringsx.Join(" ", args...))
+	t.commands = append(t.commands, stringsx.Join(":", dir, stringsx.Join(":", environ...), cmd, stringsx.Join(" ", args...)))
 	return nil
 }
 
 func (t *Recorder) Result() string {
-	return t.command
+	if len(t.commands) == 0 {
+		return ""
+	}
+
+	return t.commands[0]
+}
+
+func (t *Recorder) Results() []string {
+	return t.commands
 }

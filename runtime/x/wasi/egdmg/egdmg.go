@@ -14,6 +14,7 @@ import (
 	"github.com/egdaemon/eg/internal/stringsx"
 	"github.com/egdaemon/eg/runtime/wasi/eg"
 	"github.com/egdaemon/eg/runtime/wasi/egenv"
+	"github.com/egdaemon/eg/runtime/wasi/eggit"
 	"github.com/egdaemon/eg/runtime/wasi/shell"
 	"github.com/egdaemon/eg/runtime/x/wasi/egfs"
 )
@@ -69,4 +70,19 @@ func Build(b Specification, archive fs.FS) eg.OpFn {
 			runtime.Newf("mkisofs -V ${DMG_VOLUME_NAME} -D -R -apple -no-pad -o ${DMG_OUTPUT} %s", filepath.Join(b.builddir, root)),
 		)
 	}
+}
+
+func root(paths ...string) string {
+	return egenv.CacheDirectory(".eg", filepath.Join(paths...))
+}
+
+// Path from the given pattern
+func Path(pattern string) string {
+	return root(Name(pattern))
+}
+
+// replaces the substitution values within the pattern, resulting in the final resulting archive file's name.
+func Name(pattern string) string {
+	c := eggit.EnvCommit()
+	return fmt.Sprintf("%s.dmg", c.StringReplace(pattern))
 }

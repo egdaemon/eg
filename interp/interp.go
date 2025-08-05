@@ -196,41 +196,54 @@ func (t runner) perform(ctx context.Context, runid, path string, rtb runtimefn) 
 		wazero.NewRuntimeConfig().WithCompilationCache(cache),
 	)
 
-	defer log.Println("INTERP DONE")
-	inpr, inpw, err := os.Pipe()
-	if err != nil {
-		return errorsx.Wrap(err, "failed to open pipe for stdin")
-	}
+	inpr, inpw := io.Pipe()
 	defer inpr.Close()
-	defer inpw.Close()
-	// defer inpw.CloseWithError(io.EOF)
+	defer inpw.CloseWithError(io.EOF)
 	go func() {
 		_, _err := io.Copy(inpw, os.Stdin)
-		debugx.Println(errorsx.Wrap(_err, "failed copying stdin"))
-		inpw.Close()
-		// inpw.CloseWithError(_err)
+		_err = errorsx.Ignore(_err, io.ErrClosedPipe)
+		errorsx.Log(errorsx.Wrap(_err, "failed copying stdin"))
+		inpw.CloseWithError(_err)
 	}()
+	// inpr, inpw, err := os.Pipe()
+	// if err != nil {
+	// 	return errorsx.Wrap(err, "failed to open pipe for stdin")
+	// }
+	// defer inpr.Close()
+	// defer inpw.Close()
+	// go func() {
+	// 	_, _err := io.Copy(inpw, os.Stdin)
+	// 	debugx.Println(errorsx.Wrap(_err, "failed copying stdin"))
+	// }()
 
-	outpr, outpw, err := os.Pipe()
-	if err != nil {
-		return errorsx.Wrap(err, "failed to open pipe for stdout")
-	}
+	outpr, outpw := io.Pipe()
 	defer outpr.Close()
-	defer outpw.Close()
-	// defer outpw.CloseWithError(io.EOF)
+	defer outpw.CloseWithError(io.EOF)
 	go func() {
 		_, _err := io.Copy(os.Stdout, outpr)
-		debugx.Println(errorsx.Wrap(_err, "failed copying to stdout"))
-		outpr.Close()
-		// outpw.CloseWithError(_err)
+		_err = errorsx.Ignore(_err, io.ErrClosedPipe)
+		errorsx.Log(errorsx.Wrapf(_err, "failed copying to stdout: %T", _err))
+		outpw.CloseWithError(_err)
 	}()
+
+	// outpr, outpw, err := os.Pipe()
+	// if err != nil {
+	// 	return errorsx.Wrap(err, "failed to open pipe for stdout")
+	// }
+	// defer outpr.Close()
+	// defer outpw.Close()
+	// go func() {
+	// 	_, _err := io.Copy(os.Stdout, outpr)
+	// 	debugx.Println(errorsx.Wrap(_err, "failed copying to stdout"))
+	// }()
 
 	errpr, errpw := io.Pipe()
 	defer errpr.Close()
 	defer errpw.CloseWithError(io.EOF)
 	go func() {
 		_, _err := io.Copy(os.Stderr, errpr)
-		debugx.Println(errorsx.Wrap(_err, "failed copying to stderr"))
+		_err = errorsx.Ignore(_err, io.ErrClosedPipe)
+		errorsx.Log(errorsx.Wrap(_err, "failed copying to stderr"))
 		errpw.CloseWithError(_err)
 	}()
 

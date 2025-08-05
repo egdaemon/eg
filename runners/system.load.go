@@ -6,14 +6,15 @@ import (
 	"time"
 
 	"github.com/egdaemon/eg/internal/contextx"
+	"github.com/egdaemon/eg/internal/debugx"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/slicesx"
 	"github.com/egdaemon/eg/internal/timex"
-	"github.com/egdaemon/eg/internal/tracex"
 	"github.com/gofrs/uuid"
 	"github.com/shirou/gopsutil/v4/cpu"
 	"github.com/shirou/gopsutil/v4/disk"
 	"github.com/shirou/gopsutil/v4/mem"
+	psnet "github.com/shirou/gopsutil/v4/net"
 )
 
 func BackgroundSystemLoad(ctx context.Context, analytics *sql.DB) {
@@ -26,12 +27,15 @@ func BackgroundSystemLoad(ctx context.Context, analytics *sql.DB) {
 	go report(systemcpu)
 	go report(systemmemory)
 	go report(systemdisk)
+	go report(systemnet)
 }
 
 func SampleSystemLoad(ctx context.Context, analytics *sql.DB) error {
 	return errorsx.Compact(
 		samplecompute(ctx, analytics),
 		samplememory(ctx, analytics),
+		sampledisk(ctx, analytics),
+		samplenet(ctx, analytics),
 	)
 }
 
@@ -59,7 +63,7 @@ func sampledisk(ctx context.Context, analytics *sql.DB) error {
 		return err
 	}
 
-	tracex.Println("eg.metrics.disk", usage.Path, usage.UsedPercent)
+	debugx.Println("eg.metrics.disk", usage.Path, usage.UsedPercent)
 
 	return nil
 }
@@ -80,7 +84,7 @@ func samplecompute(ctx context.Context, analytics *sql.DB) error {
 		return err
 	}
 
-	tracex.Println("eg.metrics.compute", load)
+	debugx.Println("eg.metrics.compute", load)
 	return nil
 }
 
@@ -110,7 +114,7 @@ func samplememory(ctx context.Context, analytics *sql.DB) error {
 		return err
 	}
 
-	tracex.Println("eg.metrics.memory.percent", percent)
+	debugx.Println("eg.metrics.memory.percent", percent)
 	return nil
 }
 
@@ -122,4 +126,35 @@ func systemmemory(ctx context.Context, analytics *sql.DB) error {
 	return timex.NowAndEvery(ctx, 5*time.Second, func(ctx context.Context) error {
 		return samplememory(ctx, analytics)
 	})
+}
+
+func systemnet(ctx context.Context, analytics *sql.DB) error {
+	if _, err := analytics.ExecContext(ctx, "CREATE TABLE IF NOT EXISTS 'eg.metrics.network' (id UUID PRIMARY KEY, name TEXT NOT NULL, ts TIMESTAMP NOT NULL, bytes_sent UINT64 NOT NULL, bytes_recv UINT64 NOT NULL, packets_sent UINT64 NOT NULL, packets_recv UINT64 NOT NULL, packets_sent_dropped UINT64 NOT NULL, packets_recv_dropped UINT64 NOT NULL, errors_sent UINT64 NOT NULL, errors_recv UINT64 NOT NULL, errors_fifo_sent UINT64 NOT NULL, errors_fifo_recv UINT64 NOT NULL)"); err != nil {
+		return err
+	}
+
+	return timex.NowAndEvery(ctx, 5*time.Second, func(ctx context.Context) error {
+		return samplenet(ctx, analytics)
+	})
+}
+
+func samplenet(ctx context.Context, analytics *sql.DB) error {
+	const query = "INSERT INTO 'eg.metrics.network' (id, name, ts, bytes_sent, bytes_recv, packets_sent, packets_recv, packets_sent_dropped, packets_recv_dropped, errors_sent, errors_recv, errors_fifo_sent, errors_fifo_recv) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING bytes_sent, bytes_recv, packets_sent, packets_recv, packets_sent_dropped, packets_recv_dropped, errors_sent, errors_recv, errors_fifo_sent, errors_fifo_recv"
+	var (
+		err   error
+		usage []psnet.IOCountersStat
+	)
+
+	if usage, err = psnet.IOCountersWithContext(ctx, false); err != nil {
+		return errorsx.Wrap(err, "unable to retrieve memory usage")
+	}
+
+	for _, v := range usage {
+		if err := analytics.QueryRowContext(ctx, query, uuid.Must(uuid.NewV7()).String(), v.Name, time.Now().UTC(), v.BytesSent, v.BytesRecv, v.PacketsSent, v.PacketsRecv, v.Dropout, v.Dropin, v.Errout, v.Errin, v.Fifoout, v.Fifoin).Scan(&v.BytesSent, &v.BytesRecv, &v.PacketsSent, &v.PacketsRecv, &v.Dropout, &v.Dropin, &v.Errout, &v.Errin, &v.Fifoout, &v.Fifoin); err != nil {
+			return err
+		}
+		debugx.Printf("eg.metrics.network %s v(sent,recv) bytes(%d, %d) packets(%d,%d) packets_dropped(%d,%d) total_errors(%d,%d) fifo_buff_errors(%d,%d)\n", v.Name, v.BytesSent, v.BytesRecv, v.PacketsSent, v.PacketsRecv, v.Dropout, v.Dropin, v.Errout, v.Errin, v.Fifoout, v.Fifoin)
+	}
+
+	return nil
 }

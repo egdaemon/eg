@@ -17,8 +17,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/containers/common/pkg/detach"
-	"github.com/containers/podman/v5/libpod/define"
 	"github.com/containers/podman/v5/pkg/api/handlers"
 	"github.com/containers/podman/v5/pkg/bindings"
 	"github.com/containers/podman/v5/pkg/bindings/containers"
@@ -264,9 +262,6 @@ func execAttach(ctx context.Context, sessionID string, stdin io.Reader, stdout i
 		stderr = (io.Writer)(nil)
 	}
 
-	log.Println("ZZZZZZZZZZZZZZZZZ 0")
-	defer log.Println("ZZZZZZZZZZZZZZZZZ 1")
-
 	conn, err := bindings.GetClient(ctx)
 	if err != nil {
 		return err
@@ -346,9 +341,9 @@ func execAttach(ctx context.Context, sessionID string, stdin io.Reader, stdout i
 
 	if isSet.stdin {
 		go func() {
-			_, err := detach.Copy(socket, stdin, []byte{})
-			if err != nil && err != define.ErrDetach {
-				log.Println("failed to write input to service:", err)
+			_, err := io.Copy(socket, stdin)
+			if errorsx.Ignore(err, io.ErrClosedPipe) != nil {
+				log.Printf("failed to write input to service: %T - %v\n", err, err)
 			}
 			if err == nil {
 				if closeWrite, ok := socket.(containers.CloseWriter); ok {

@@ -163,8 +163,7 @@ func (t *ProxyService) Run(ctx context.Context, req *c8s.RunRequest) (_ *c8s.Run
 func (t *ProxyService) Module(ctx context.Context, req *c8s.ModuleRequest) (_ *c8s.ModuleResponse, err error) {
 	debugx.Println("PROXY CONTAINER MODULE INITIATED", errorsx.Zero(os.Getwd()))
 	defer debugx.Println("PROXY CONTAINER MODULE COMPLETED", errorsx.Zero(os.Getwd()))
-	log.Println("WAAAAAT 0")
-	defer log.Println("WAAAAAT 1")
+
 	// log.Println("reqopts", req.Options)
 	// log.Println("image", req.Image)
 	// log.Println("name", req.Name)

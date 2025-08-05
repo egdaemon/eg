@@ -23,7 +23,7 @@ RUN systemctl disable eg-runner-build.service
 RUN systemctl disable eg-runner.service
 RUN systemctl enable eg-daemon.service eg-daily-reload.service eg-disk-usage.service
 
-# enable podman for users.
+# enable podman for users because our daemon runs as a standard user it needs to be available for the user to use.
 RUN systemctl --global enable podman.socket
 
 # preload some wellknown hosts

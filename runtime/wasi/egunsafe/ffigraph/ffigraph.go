@@ -2,12 +2,11 @@ package ffigraph
 
 import (
 	"context"
-	"encoding/json"
-	"fmt"
 	"time"
 
+	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/interp/events"
-	"github.com/egdaemon/eg/interp/runtime/wasi/ffiguest"
+	"github.com/egdaemon/eg/runtime/wasi/egunsafe"
 )
 
 type node interface {
@@ -54,7 +53,7 @@ func pushv0(ctx context.Context, n node, fn func(ctx context.Context) error) (er
 	dctx := context.WithValue(ctx, contextkey, latest)
 	ts := time.Now()
 	defer func() {
-		recordevt(ctx, np.OpInfo(ts, err, current))
+		errorsx.Log(recordevt(ctx, np.OpInfo(ts, err, current)))
 	}()
 	return fn(dctx)
 }
@@ -71,20 +70,19 @@ func Wrap(ctx context.Context, op node, fn func(ctx context.Context)) {
 }
 
 func recordevt(ctx context.Context, op *events.Op) (err error) {
-	var (
-		encoded []byte
-	)
-
 	if op == nil {
 		return nil
 	}
 
-	if encoded, err = json.Marshal(op); err != nil {
+	cc, err := egunsafe.DialControlSocket(ctx)
+	if err != nil {
 		return err
 	}
+	d := events.NewEventsClient(cc)
 
-	// log.Println("recording", spew.Sdump(op))
-	deadline := ffiguest.ContextDeadline(ctx)
-	opptr, oplen := ffiguest.Bytes(encoded)
-	return ffiguest.Error(_recordevt(deadline, opptr, oplen), fmt.Errorf("unable to record op event"))
+	if _, err = d.Dispatch(ctx, events.NewDispatch(events.NewOp(op))); err != nil {
+		return errorsx.Wrap(err, "unable to record graph metric")
+	}
+
+	return nil
 }

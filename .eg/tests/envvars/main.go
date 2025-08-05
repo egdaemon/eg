@@ -4,11 +4,13 @@ package main
 import (
 	"context"
 	"log"
+	"os"
 
 	"github.com/egdaemon/eg/runtime/wasi/eg"
 	"github.com/egdaemon/eg/runtime/wasi/egenv"
 	"github.com/egdaemon/eg/runtime/wasi/shell"
 	"github.com/egdaemon/eg/runtime/x/wasi/egbug"
+	"github.com/egdaemon/eg/runtime/x/wasi/egfs"
 )
 
 func Test(depth int) eg.OpFn {
@@ -36,8 +38,13 @@ func main() {
 	log.SetFlags(log.Lshortfile)
 	ctx, done := context.WithTimeout(context.Background(), egenv.TTL())
 	defer done()
-
-	if err := eg.Perform(ctx, eg.Build(eg.DefaultModule()), egbug.EnsureEnvAuto, Level0); err != nil {
+	egfs.Inspect(ctx, os.DirFS(egenv.RuntimeDirectory()))
+	if err := eg.Perform(
+		ctx,
+		eg.Build(eg.DefaultModule()),
+		egbug.EnsureEnvAuto,
+		Level0,
+	); err != nil {
 		log.Fatalln(err)
 	}
 }

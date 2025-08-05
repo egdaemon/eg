@@ -5,7 +5,6 @@ import (
 	"crypto/rand"
 	"fmt"
 	"io"
-	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -174,7 +173,7 @@ func (t runner) perform(ctx context.Context, runid, path string, rtb runtimefn) 
 	defer func(before bool) {
 		// strictly speaking stdin should remain blocking at all times but using before
 		if nonBlocking(os.Stdin.Fd()) == before {
-			log.Println("---------------------------------------------- stdin was munged ----------------------------------------------")
+			debugx.Println("---------------------------------------------- stdin was munged ----------------------------------------------")
 		}
 	}(nonBlocking(os.Stdin.Fd()))
 	tracedebug := envx.Boolean(false, eg.EnvLogsTrace)
@@ -201,26 +200,50 @@ func (t runner) perform(ctx context.Context, runid, path string, rtb runtimefn) 
 	defer inpw.CloseWithError(io.EOF)
 	go func() {
 		_, _err := io.Copy(inpw, os.Stdin)
-		debugx.Println(errorsx.Wrap(_err, "failed copying stdin"))
+		_err = errorsx.Ignore(_err, io.ErrClosedPipe)
+		errorsx.Log(errorsx.Wrap(_err, "failed copying stdin"))
 		inpw.CloseWithError(_err)
 	}()
-
-	errpr, errpw := io.Pipe()
-	defer errpr.Close()
-	defer errpw.CloseWithError(io.EOF)
-	go func() {
-		_, _err := io.Copy(os.Stderr, errpr)
-		debugx.Println(errorsx.Wrap(_err, "failed copying to stderr"))
-		inpw.CloseWithError(_err)
-	}()
+	// inpr, inpw, err := os.Pipe()
+	// if err != nil {
+	// 	return errorsx.Wrap(err, "failed to open pipe for stdin")
+	// }
+	// defer inpr.Close()
+	// defer inpw.Close()
+	// go func() {
+	// 	_, _err := io.Copy(inpw, os.Stdin)
+	// 	debugx.Println(errorsx.Wrap(_err, "failed copying stdin"))
+	// }()
 
 	outpr, outpw := io.Pipe()
 	defer outpr.Close()
 	defer outpw.CloseWithError(io.EOF)
 	go func() {
 		_, _err := io.Copy(os.Stdout, outpr)
-		debugx.Println(errorsx.Wrap(_err, "failed copying to stderr"))
-		inpw.CloseWithError(_err)
+		_err = errorsx.Ignore(_err, io.ErrClosedPipe)
+		errorsx.Log(errorsx.Wrapf(_err, "failed copying to stdout: %T", _err))
+		outpw.CloseWithError(_err)
+	}()
+
+	// outpr, outpw, err := os.Pipe()
+	// if err != nil {
+	// 	return errorsx.Wrap(err, "failed to open pipe for stdout")
+	// }
+	// defer outpr.Close()
+	// defer outpw.Close()
+	// go func() {
+	// 	_, _err := io.Copy(os.Stdout, outpr)
+	// 	debugx.Println(errorsx.Wrap(_err, "failed copying to stdout"))
+	// }()
+
+	errpr, errpw := io.Pipe()
+	defer errpr.Close()
+	defer errpw.CloseWithError(io.EOF)
+	go func() {
+		_, _err := io.Copy(os.Stderr, errpr)
+		_err = errorsx.Ignore(_err, io.ErrClosedPipe)
+		errorsx.Log(errorsx.Wrap(_err, "failed copying to stderr"))
+		errpw.CloseWithError(_err)
 	}()
 
 	debugx.Println("cache dir", eg.DefaultCacheDirectory(), "->", eg.DefaultCacheDirectory())

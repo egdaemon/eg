@@ -133,9 +133,15 @@ func (option) BuildBinary(d time.Duration) option {
 	}
 }
 
-func (option) Environ(k, v string) option {
+func (option) Envvar(k, v string) option {
 	return func(c *Config) {
 		c.Environ = append(c.Environ, fmt.Sprintf("%s=%s", k, v))
+	}
+}
+
+func (option) Environ(envvars ...string) option {
+	return func(c *Config) {
+		c.Environ = append(c.Environ, envvars...)
 	}
 }
 
@@ -263,7 +269,6 @@ func UploadDPut(gcfg Config, dput fs.FS) eg.OpFn {
 		runtime := Runtime(gcfg)
 		return shell.Run(
 			ctx,
-			// runtime.New("ls *.tar.xz | xargs -I {} tar -tvf {}").Directory(bdir),
 			runtime.Newf("ls %s/*_source.changes | xargs -I {} dput -f -c %s %s {}", bdir, egenv.EphemeralDirectory("dput.config"), gcfg.Name).Privileged(),
 		)
 	}

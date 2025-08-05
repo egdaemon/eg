@@ -127,6 +127,7 @@ func CloneFS(ctx context.Context, dstdir string, rootdir string, archive fs.FS) 
 			if err != nil {
 				return err
 			}
+
 			return os.MkdirAll(dstdir, info.Mode().Perm())
 		}
 

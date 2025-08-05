@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -18,8 +17,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/containers/common/pkg/detach"
-	"github.com/containers/podman/v5/libpod/define"
 	"github.com/containers/podman/v5/pkg/api/handlers"
 	"github.com/containers/podman/v5/pkg/bindings"
 	"github.com/containers/podman/v5/pkg/bindings/containers"
@@ -158,7 +155,9 @@ func PodmanModuleRunCmd(image, cname string, options ...string) []string {
 
 func moduleExec(ctx context.Context, cname, moduledir string, stdin io.Reader, stdout io.Writer, stderr io.Writer) (err error) {
 	var (
-		rtty, wtty *os.File
+		rtty *io.PipeReader
+		wtty *io.PipeWriter
+		// rtty, wtty *os.File
 	)
 
 	verbosity := ""
@@ -198,17 +197,19 @@ func moduleExec(ctx context.Context, cname, moduledir string, stdin io.Reader, s
 	}()
 
 	if stdin != nil {
-		rtty, wtty, err = os.Pipe()
-		if err != nil {
-			return errorsx.Wrap(err, "unable prepare pipe")
-		}
+		rtty, wtty = io.Pipe()
+		// rtty, wtty, err = os.Pipe()
+		// if err != nil {
+		// 	return errorsx.Wrap(err, "unable prepare pipe")
+		// }
 		defer rtty.Close()
 		defer wtty.Close()
 
 		go func() {
 			_, cause := io.Copy(wtty, stdin)
 			debugx.Println("unable to copy stdin", cause)
-			wtty.Close()
+			wtty.CloseWithError(cause)
+			// wtty.Close()
 		}()
 	}
 
@@ -340,9 +341,9 @@ func execAttach(ctx context.Context, sessionID string, stdin io.Reader, stdout i
 
 	if isSet.stdin {
 		go func() {
-			_, err := detach.Copy(socket, stdin, []byte{})
-			if err != nil && err != define.ErrDetach {
-				log.Println("failed to write input to service:", err)
+			_, err := io.Copy(socket, stdin)
+			if errorsx.Ignore(err, io.ErrClosedPipe) != nil {
+				log.Printf("failed to write input to service: %T - %v\n", err, err)
 			}
 			if err == nil {
 				if closeWrite, ok := socket.(containers.CloseWriter); ok {
@@ -384,10 +385,7 @@ func execAttach(ctx context.Context, sessionID string, stdin io.Reader, stdout i
 			// Read multiplexed channels and write to appropriate stream
 			fd, l, err := containers.DemuxHeader(socket, buffer)
 			if err != nil {
-				if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
-					return nil
-				}
-				return err
+				return errorsx.Ignore(err, io.EOF, io.ErrUnexpectedEOF)
 			}
 			frame, err := containers.DemuxFrame(socket, buffer, l)
 			if err != nil {

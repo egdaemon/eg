@@ -32,7 +32,7 @@ func main() {
 				debeg.Runner(),
 				eg.Sequential(
 					debeg.Build,
-					// debeg.Upload,
+					debeg.Upload,
 					shell.Op(
 						// shell.Newf("tree -L 2 -a %s", egenv.EphemeralDirectory("deb.eg")).Privileged(),
 						shell.Newf("cp %s/*.deb %s", egenv.EphemeralDirectory("deb.eg"), egenv.CacheDirectory(".dist")),

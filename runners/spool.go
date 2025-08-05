@@ -61,6 +61,10 @@ func iddirname(uid uuid.UUID) string {
 	return base64.URLEncoding.WithPadding(base64.NoPadding).EncodeToString(uid.Bytes())
 }
 
+func dirnameid(dir string) uuid.UUID {
+	return uuid.FromBytesOrNil(errorsx.Zero(base64.URLEncoding.WithPadding(base64.NoPadding).DecodeString(filepath.Base(dir))))
+}
+
 func (t SpoolDirs) Download(uid uuid.UUID, name string, content io.Reader) (err error) {
 	var (
 		dst *os.File
@@ -114,7 +118,7 @@ func (t SpoolDirs) dequeueRename(dir fs.DirEntry) error {
 func (t SpoolDirs) Completed(uid uuid.UUID) (err error) {
 	// we tombstone before removing. we do this because if there are permission issues within
 	// the directory structure deleting as this user running the command will not work and we need to let the OS handle it.
-	// We can fail to remove a folder due to  permission issues in files and subfolders. optimistically attempt to remove the
+	// We can fail to remove a folder due to a permission issue in files and subfolders. optimistically attempt to remove the
 	// the folder. if it succeeds, great. if it fails fall back to moving the work directory into a tombstone directory.
 	// this ensures that we can continue processing work. but since we can repeat work multiple times lets give the tombstoned
 	// folder a unique time based prefix.
@@ -131,6 +135,29 @@ func (t SpoolDirs) Completed(uid uuid.UUID) (err error) {
 		),
 		"unable to tombstone work directory: %s",
 		iddirname(uid),
+	)
+}
+
+func (t SpoolDirs) Discard(dir string) (err error) {
+	// we tombstone before removing. we do this because if there are permission issues within
+	// the directory structure deleting as this user running the command will not work and we need to let the OS handle it.
+	// We can fail to remove a folder due to a permission issue in files and subfolders. optimistically attempt to remove the
+	// the folder. if it succeeds, great. if it fails fall back to moving the work directory into a tombstone directory.
+	// this ensures that we can continue processing work. but since we can repeat work multiple times lets give the tombstoned
+	// folder a unique time based prefix.
+	if err = errorsx.Wrap(os.RemoveAll(dir), "unable to remove directory"); err == nil {
+		return nil
+	} else {
+		log.Println(err)
+	}
+
+	return errorsx.Wrapf(
+		os.Rename(
+			dir,
+			filepath.Join(t.Tombstoned, fmt.Sprintf("%s-%s", uuid.Must(uuid.NewV7()).String(), filepath.Base(dir))),
+		),
+		"unable to tombstone work directory: %s",
+		dirnameid(dir),
 	)
 }
 

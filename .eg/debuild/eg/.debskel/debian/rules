@@ -11,6 +11,7 @@
 #export DEB_CFLAGS_MAINT_APPEND  = -Wall -pedantic
 # package maintainers to append LDFLAGS
 #export DEB_LDFLAGS_MAINT_APPEND = -Wl,--as-needed
+export GOMODCACHE2="${GOMODCACHE:-$(CURDIR)/.gocache}"
 
 %:
 	dh $@
@@ -18,7 +19,8 @@
 override_dh_auto_build:
 	echo "DH AUTO BUILD OVERRIDE"
 	echo "$(CURDIR)"
-	echo "GOMODCACHE: ${GOMODCACHE}"
+	echo "GOMODCACHE0: ${GOMODCACHE}"
+	echo "GOMODCACHE2: ${GOMODCACHE2}"
 	mkdir -p $(CURDIR)/linux/usr/bin
 	cp -R $(CURDIR)/src/.dist/linux/* $(CURDIR)/linux
 	# need to set gocache otherwise it'll error out on launchpad builders

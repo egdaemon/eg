@@ -5,7 +5,6 @@ import (
 	"crypto/rand"
 	"fmt"
 	"io"
-	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -174,7 +173,7 @@ func (t runner) perform(ctx context.Context, runid, path string, rtb runtimefn) 
 	defer func(before bool) {
 		// strictly speaking stdin should remain blocking at all times but using before
 		if nonBlocking(os.Stdin.Fd()) == before {
-			log.Println("---------------------------------------------- stdin was munged ----------------------------------------------")
+			debugx.Println("---------------------------------------------- stdin was munged ----------------------------------------------")
 		}
 	}(nonBlocking(os.Stdin.Fd()))
 	tracedebug := envx.Boolean(false, eg.EnvLogsTrace)

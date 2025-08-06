@@ -5,12 +5,12 @@ go 1.24.0
 toolchain go1.24.5
 
 require (
-	github.com/egdaemon/eg v0.0.0-20250805224546-a1b440ac29a3
+	github.com/egdaemon/eg v0.0.0-20250806213121-98eefd34752d
 	github.com/egdaemon/wasinet/wasinet v0.0.0-20250806175613-49e153bd345a
 )
 
 require (
-	github.com/gofrs/uuid v4.4.0+incompatible // indirect
+	github.com/gofrs/uuid/v5 v5.3.2 // indirect
 	golang.org/x/net v0.42.0 // indirect
 	golang.org/x/sys v0.34.0 // indirect
 	golang.org/x/text v0.27.0 // indirect

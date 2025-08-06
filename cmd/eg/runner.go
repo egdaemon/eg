@@ -255,7 +255,7 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 		defer control.Close()
 
 		debugx.Printf("---------------------------- MODULE INITIATED %d ----------------------------\n", mlevel)
-		envx.Debug(os.Environ()...)
+		debugx.Fn(func() { envx.Debug(os.Environ()...) })
 		debugx.Println("module pid", os.Getpid())
 		debugx.Println("account", aid)
 		debugx.Println("run id", uid)

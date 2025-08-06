@@ -15,7 +15,7 @@ import (
 	"github.com/egdaemon/eg/internal/httpx"
 	"github.com/egdaemon/eg/internal/jwtx"
 	"github.com/egdaemon/eg/internal/userx"
-	"github.com/gofrs/uuid"
+	"github.com/gofrs/uuid/v5"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/oauth2"
 )

@@ -30,7 +30,7 @@ import (
 	"github.com/egdaemon/eg/transpile"
 	"github.com/egdaemon/eg/workspaces"
 	"github.com/go-git/go-git/v5"
-	"github.com/gofrs/uuid"
+	"github.com/gofrs/uuid/v5"
 )
 
 type serve struct {
@@ -193,8 +193,8 @@ func (t serve) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err e
 			ragent.Options(),
 			runners.AgentOptionVolumeSpecs(
 				runners.AgentMountReadOnly(
-					filepath.Join(ws.Root, ws.BuildDir, ws.Module, "main.wasm.d"),
-					eg.DefaultMountRoot(eg.RuntimeDirectory, ws.Module, "main.wasm.d"),
+					filepath.Join(ws.Root, ws.BuildDir, ws.Module, eg.ModuleDir),
+					eg.DefaultMountRoot(eg.RuntimeDirectory, ws.Module, eg.ModuleDir),
 				),
 				runners.AgentMountReadOnly(m.Path, eg.DefaultMountRoot(eg.ModuleBin)),
 				runners.AgentMountReadWrite(filepath.Join(ws.Root, ws.WorkingDir), eg.DefaultMountRoot(eg.WorkingDirectory)),

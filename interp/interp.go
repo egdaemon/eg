@@ -18,18 +18,15 @@ import (
 	"github.com/egdaemon/eg/internal/md5x"
 	"github.com/egdaemon/eg/internal/wasix"
 	"github.com/egdaemon/eg/interp/c8s"
-	"github.com/egdaemon/eg/interp/events"
-	"github.com/egdaemon/eg/interp/runtime/wasi/fficoverage"
 	"github.com/egdaemon/eg/interp/runtime/wasi/ffiegcontainer"
 	"github.com/egdaemon/eg/interp/runtime/wasi/ffiexec"
 	"github.com/egdaemon/eg/interp/runtime/wasi/ffigit"
 	"github.com/egdaemon/eg/interp/runtime/wasi/ffigraph"
-	"github.com/egdaemon/eg/interp/runtime/wasi/ffimetric"
 	"github.com/egdaemon/eg/interp/runtime/wasi/ffiwasinet"
 	"github.com/egdaemon/eg/interp/wasidebug"
 	"github.com/egdaemon/eg/runners"
 	"github.com/egdaemon/wasinet/wasinet/wnetruntime"
-	"github.com/gofrs/uuid"
+	"github.com/gofrs/uuid/v5"
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/experimental"
 	"github.com/tetratelabs/wazero/experimental/logging"
@@ -69,11 +66,10 @@ func Remote(ctx context.Context, aid string, runid string, svc grpc.ClientConnIn
 	}
 
 	containers := c8s.NewProxyClient(svc)
-	evtclient := events.NewEventsClient(svc)
 
 	runtimeenv := func(r runner, host wazero.HostModuleBuilder) wazero.HostModuleBuilder {
 		return host.
-			NewFunctionBuilder().WithFunc(ffigraph.Trace(evtclient)).Export("github.com/egdaemon/eg/runtime/wasi/runtime/graph.Trace").
+			NewFunctionBuilder().WithFunc(ffigraph.NoopTrace).Export("github.com/egdaemon/eg/runtime/wasi/runtime/graph.Trace").
 			NewFunctionBuilder().WithFunc(ffigraph.Analysing(false)).Export("github.com/egdaemon/eg/runtime/wasi/runtime/graph.Analysing").
 			NewFunctionBuilder().WithFunc(ffigraph.NoopTraceEventPush).Export("github.com/egdaemon/eg/runtime/wasi/runtime/graph.Push").
 			NewFunctionBuilder().WithFunc(ffigraph.NoopTraceEventPop).Export("github.com/egdaemon/eg/runtime/wasi/runtime/graph.Pop").
@@ -152,10 +148,11 @@ func Remote(ctx context.Context, aid string, runid string, svc grpc.ClientConnIn
 			ffigit.CloneV2(r.root, r.runtimedir),
 		).Export("github.com/egdaemon/eg/runtime/wasi/runtime/ffigit.CloneV2").
 			NewFunctionBuilder().WithFunc(
-			ffimetric.Metric(evtclient),
+			// ffimetric.Metric(evtclient),
+			ffigraph.NoopTrace,
 		).Export("github.com/egdaemon/eg/runtime/wasi/runtime/metrics.Record").
 			NewFunctionBuilder().WithFunc(
-			fficoverage.Report(evtclient),
+			ffigraph.NoopTrace,
 		).Export("github.com/egdaemon/eg/runtime/wasi/runtime/coverage.Report")
 	}
 
@@ -186,7 +183,7 @@ func (t runner) perform(ctx context.Context, runid, path string, rtb runtimefn) 
 
 	if tracedebug {
 		ctx = experimental.WithFunctionListenerFactory(ctx,
-			logging.NewHostLoggingListenerFactory(os.Stderr, logging.LogScopeAll))
+			logging.NewHostLoggingListenerFactory(os.Stderr, logging.LogScopeFilesystem))
 	}
 
 	// Create a new WebAssembly Runtime.

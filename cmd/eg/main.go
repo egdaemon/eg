@@ -35,7 +35,7 @@ import (
 	"github.com/egdaemon/eg/internal/tracex"
 	"github.com/egdaemon/eg/internal/userx"
 	"github.com/go-git/go-git/v5"
-	"github.com/gofrs/uuid"
+	"github.com/gofrs/uuid/v5"
 	"github.com/willabides/kongplete"
 
 	// ensure its a dependency.

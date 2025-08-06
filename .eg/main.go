@@ -33,7 +33,7 @@ func main() {
 			eg.Sequential(
 				eggolang.AutoInstall(),
 				eg.Parallel(
-					// eggolang.AutoTest(),
+					eggolang.AutoTest(),
 					IntegrationTests,
 				),
 				eggolang.RecordCoverage,

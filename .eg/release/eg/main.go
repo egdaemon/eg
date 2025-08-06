@@ -4,7 +4,6 @@ import (
 	"context"
 	"log"
 	"path/filepath"
-	"slices"
 
 	"eg/compute/archlinux"
 	debeg "eg/compute/debuild/eg"
@@ -22,7 +21,6 @@ func main() {
 	ctx, done := context.WithTimeout(context.Background(), egenv.TTL())
 	defer done()
 
-	slices.Backward()
 	err := eg.Perform(
 		ctx,
 		eggit.AutoClone,
@@ -47,7 +45,7 @@ func main() {
 		eggithub.Release(
 			append(
 				errorsx.Zero(filepath.Glob(egenv.CacheDirectory(".dist", "*.deb"))),
-				slicesx.Last(errorsx.Zero(filepath.Glob(egenv.CacheDirectory(".dist", "pacman")))...),
+				slicesx.LastOrZero(errorsx.Zero(filepath.Glob(egenv.CacheDirectory(".dist", "pacman")))...),
 			)...,
 		),
 	)

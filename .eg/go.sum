@@ -4,6 +4,8 @@ github.com/egdaemon/eg v0.0.0-20250804163823-f528b683e38d h1:vK4mGqoJw81/rSUArYK
 github.com/egdaemon/eg v0.0.0-20250804163823-f528b683e38d/go.mod h1:fOQFzGFC4V2hzRjYBzT/ezX+VBvV221i9CHvazHTMvo=
 github.com/egdaemon/wasinet/wasinet v0.0.0-20250731121320-3287a738a635 h1:oUAQyl92oDx09AV5XqOrlDdw/OmsGhxxFfKWspg8+kw=
 github.com/egdaemon/wasinet/wasinet v0.0.0-20250731121320-3287a738a635/go.mod h1:vPVQ3HHYTa9Fe7lz+ZBqI49kw76LSTQfvKZlO8QpWsY=
+github.com/egdaemon/wasinet/wazeronet v0.0.0-20250731121320-3287a738a635 h1:au3wEqyE4BspmHFWyVYwHjtPpBkzoCYMc3t1wSftbPY=
+github.com/egdaemon/wasinet/wazeronet v0.0.0-20250731121320-3287a738a635/go.mod h1:64MD4OgWyYuKHTji15b9N8BXtzipKtR8+uLOSMEz2Es=
 github.com/go-logr/logr v1.4.3 h1:CjnDlHq8ikf6E492q6eKboGOC0T8CDaOvkHCIg8idEI=
 github.com/go-logr/stdr v1.2.2 h1:hSWxHoqTgW2S2qGc0LTAI563KZ5YKYRhT3MFKZMbjag=
 github.com/go-task/slim-sprig/v3 v3.0.0 h1:sUs3vkvUymDpBKi3qH1YSqBQk9+9D/8M2mN1vB6EwHI=
@@ -20,6 +22,8 @@ github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 h1:Jamvg5psRI
 github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
 github.com/stretchr/testify v1.10.0 h1:Xv5erBjTwe/5IxqUQTdXv5kgmIvbHo3QQyRwhJsOfJA=
 github.com/stretchr/testify v1.10.0/go.mod h1:r2ic/lqez/lEtzL7wO/rwa5dbSLXVDPFyf8C91i36aY=
+github.com/tetratelabs/wazero v1.9.0 h1:IcZ56OuxrtaEz8UYNRHBrUa9bYeX9oVY93KspZZBf/I=
+github.com/tetratelabs/wazero v1.9.0/go.mod h1:TSbcXCfFP0L2FGkRPxHphadXPjo1T6W+CseNNY7EkjM=
 go.opentelemetry.io/auto/sdk v1.1.0 h1:cH53jehLUN6UFLY71z+NDOiNJqDdPRaXzTel0sJySYA=
 go.opentelemetry.io/otel v1.37.0 h1:9zhNfelUvx0KBfu/gb+ZgeAfAgtWrfHJZcAqFC228wQ=
 go.opentelemetry.io/otel/metric v1.37.0 h1:mvwbQS5m0tbmqML4NqK+e3aDiO02vsf/WgbsdpcPoZE=

@@ -4,9 +4,7 @@ import (
 	"context"
 	"log"
 	"path/filepath"
-	"slices"
 
-	"eg/compute/archlinux"
 	debeg "eg/compute/debuild/eg"
 
 	"github.com/egdaemon/eg/internal/errorsx"
@@ -22,19 +20,21 @@ func main() {
 	ctx, done := context.WithTimeout(context.Background(), egenv.TTL())
 	defer done()
 
-	slices.Backward()
 	err := eg.Perform(
 		ctx,
 		eggit.AutoClone,
 		eg.Parallel(
 			debeg.Prepare,
-			eg.Build(eg.Container(archlinux.ContainerName).BuildFromFile(".dist/archlinux/Containerfile")),
 		),
 		eg.Parallel(
 			eg.Module(
 				ctx,
 				debeg.Runner(),
 				eg.Sequential(
+					shell.Op(
+						// clean up old debians. remove in future version.
+						shell.Newf("rm %s", egenv.CacheDirectory(".dist", "*.deb")).Lenient(true),
+					),
 					debeg.Build,
 					debeg.Upload,
 					shell.Op(
@@ -42,12 +42,11 @@ func main() {
 					),
 				),
 			),
-			eg.Module(ctx, archlinux.Builder(archlinux.ContainerName), archlinux.Build),
 		),
 		eggithub.Release(
 			append(
 				errorsx.Zero(filepath.Glob(egenv.CacheDirectory(".dist", "*.deb"))),
-				slicesx.Last(errorsx.Zero(filepath.Glob(egenv.CacheDirectory(".dist", "pacman")))...),
+				slicesx.LastOrZero(errorsx.Zero(filepath.Glob(egenv.CacheDirectory(".dist", "pacman")))...),
 			)...,
 		),
 	)

@@ -32,6 +32,7 @@ RUN ssh-keyscan -H gitlab.com >> /etc/ssh/ssh_known_hosts
 # # temporary while we deal with launchpad slowness...
 # RUN gh release download --pattern "*.deb" -O - > /tmp/eg.deb
 # RUN apt install /tmp/eg.deb
+RUN GOPROXY=direct go install github.com/egdaemon/eg/cmd/...@v0.0.0-20250806181235-d597ffcdf6ae
 
 RUN systemd-sysusers
 RUN systemd-tmpfiles --create

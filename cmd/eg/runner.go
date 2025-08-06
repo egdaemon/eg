@@ -295,7 +295,7 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 	// call after duckdb. we're leaving the call here for now but it shouldn't matter.
 	// and we're keen to remove it.
 	if err = t.mounthack(gctx.Context, ws); err != nil {
-		return errorsx.Wrap(err, "unable to mount with correct permissions - this is a transient error that happens occassional liekly due to bindfs bugs")
+		return errorsx.Wrap(err, "unable to mount with correct permissions - this is a transient error that happens occassional likely due to bindfs/podman bugs")
 	}
 
 	if cc, err = daemons.AutoRunnerClient(gctx, ws, uid, runners.AgentOptionAutoEGBin()); err != nil {

@@ -6,13 +6,11 @@ toolchain go1.24.5
 
 require (
 	github.com/egdaemon/eg v0.0.0-20250804163823-f528b683e38d
-	github.com/egdaemon/wasinet/wasinet v0.0.0-20250731121320-3287a738a635
+	github.com/egdaemon/wasinet/wasinet v0.0.0-20250806175613-49e153bd345a
 )
 
 require (
-	github.com/egdaemon/wasinet/wazeronet v0.0.0-20250731121320-3287a738a635 // indirect
 	github.com/gofrs/uuid v4.4.0+incompatible // indirect
-	github.com/tetratelabs/wazero v1.9.0 // indirect
 	golang.org/x/net v0.42.0 // indirect
 	golang.org/x/sys v0.34.0 // indirect
 	golang.org/x/text v0.27.0 // indirect

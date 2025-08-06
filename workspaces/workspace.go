@@ -16,8 +16,9 @@ import (
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/fsx"
+	"github.com/egdaemon/eg/internal/langx"
 	"github.com/egdaemon/eg/internal/tracex"
-	"github.com/gofrs/uuid"
+	"github.com/gofrs/uuid/v5"
 )
 
 func DefaultStateDirectory() string {
@@ -66,8 +67,24 @@ func FromEnv(ctx context.Context, root, name string) (zero Context, err error) {
 	}, nil
 }
 
-func New(ctx context.Context, cid hash.Hash, root string, mdir string, name string, private bool) (zero Context, err error) {
+type Option func(*Context)
 
+func OptionEnabled(o Option, b bool) Option {
+	if !b {
+		return OptionNoop
+	}
+
+	return o
+}
+
+func OptionNoop(ctx *Context) {}
+func OptionInvalidateCache(ctx *Context) {
+	log.Println("resetting module cache", filepath.Join(ctx.Root, ctx.BuildDir))
+	os.RemoveAll(filepath.Join(ctx.Root, ctx.BuildDir))
+	os.RemoveAll(filepath.Join(ctx.Root, ctx.TransDir))
+}
+
+func New(ctx context.Context, cid hash.Hash, root string, mdir string, name string, private bool, options ...Option) (zero Context, err error) {
 	cdir := eg.CacheDirectory
 	runtimedir := eg.RuntimeDirectory
 	if private {
@@ -81,7 +98,7 @@ func New(ctx context.Context, cid hash.Hash, root string, mdir string, name stri
 
 	_cid := uuid.FromBytesOrNil(cid.Sum(nil)).String()
 
-	return ensuredirs(Context{
+	return ensuredirs(langx.Clone(Context{
 		Module:     name,
 		CachedID:   _cid,
 		Root:       root,
@@ -93,7 +110,7 @@ func New(ctx context.Context, cid hash.Hash, root string, mdir string, name stri
 		TransDir:   filepath.Join(cdir, eg.DefaultModuleDirectory(), ".gen", _cid, "trans"),
 		GenModDir:  filepath.Join(cdir, eg.DefaultModuleDirectory(), ".gen", _cid, "trans", ".genmod"),
 		Ignore:     ignore,
-	})
+	}, options...))
 }
 
 func ensuredirs(c Context) (_ Context, err error) {
@@ -111,7 +128,7 @@ func ensuredirs(c Context) (_ Context, err error) {
 	err1 := fsx.MkDirs(
 		perms,
 		filepath.Join(c.Root, c.GenModDir),
-		filepath.Join(c.Root, c.BuildDir, c.Module, "main.wasm.d"),
+		filepath.Join(c.Root, c.BuildDir, c.Module, eg.ModuleDir),
 		filepath.Join(c.Root, c.CacheDir),
 	)
 	tracex.Println("------------ ensuredirs", perms, "------------")

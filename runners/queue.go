@@ -38,7 +38,7 @@ import (
 	"github.com/egdaemon/eg/interp/events"
 	"github.com/egdaemon/eg/workspaces"
 	"github.com/fsnotify/fsnotify"
-	"github.com/gofrs/uuid"
+	"github.com/gofrs/uuid/v5"
 
 	"github.com/alitto/pond/v2"
 )

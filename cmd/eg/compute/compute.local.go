@@ -29,7 +29,7 @@ import (
 	"github.com/egdaemon/eg/transpile"
 	"github.com/egdaemon/eg/workspaces"
 	"github.com/go-git/go-git/v5"
-	"github.com/gofrs/uuid"
+	"github.com/gofrs/uuid/v5"
 )
 
 type local struct {
@@ -72,15 +72,13 @@ func (t local) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err e
 		return errorsx.Wrap(err, "unable to connect to podman")
 	}
 
-	if ws, err = workspaces.New(gctx.Context, md5x.Digest(errorsx.Zero(cmdopts.BuildInfo())), t.Dir, t.ModuleDir, t.Name, false); err != nil {
+	if ws, err = workspaces.New(
+		gctx.Context, md5x.Digest(errorsx.Zero(cmdopts.BuildInfo())), t.Dir, t.ModuleDir, t.Name, false,
+		workspaces.OptionEnabled(workspaces.OptionInvalidateCache, t.InvalidateCache),
+	); err != nil {
 		return errorsx.Wrap(err, "unable to setup workspace")
 	}
 	defer os.RemoveAll(filepath.Join(ws.Root, ws.RuntimeDir))
-	if t.InvalidateCache {
-		log.Println("removing", filepath.Join(ws.Root, ws.BuildDir))
-		os.RemoveAll(filepath.Join(ws.Root, ws.BuildDir))
-		os.RemoveAll(filepath.Join(ws.Root, ws.TransDir))
-	}
 
 	if err = os.Remove(filepath.Join(ws.Root, ws.WorkingDir)); err != nil {
 		return errorsx.Wrap(err, "unable to remove working directory")
@@ -192,8 +190,8 @@ func (t local) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err e
 			ragent.Options(),
 			runners.AgentOptionVolumeSpecs(
 				runners.AgentMountReadOnly(
-					filepath.Join(ws.Root, ws.BuildDir, ws.Module, "main.wasm.d"),
-					eg.DefaultMountRoot(eg.RuntimeDirectory, ws.Module, "main.wasm.d"),
+					filepath.Join(ws.Root, ws.BuildDir, ws.Module, eg.ModuleDir),
+					eg.DefaultMountRoot(eg.RuntimeDirectory, ws.Module, eg.ModuleDir),
 				),
 				runners.AgentMountReadOnly(m.Path, eg.DefaultMountRoot(eg.ModuleBin)),
 				runners.AgentMountReadWrite(filepath.Join(ws.Root, ws.WorkingDir), eg.DefaultMountRoot(eg.WorkingDirectory)),

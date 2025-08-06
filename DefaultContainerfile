@@ -29,10 +29,14 @@ RUN ln -s /usr/lib/go-1.24/bin/go /usr/local/bin/go
 RUN ssh-keyscan -H github.com >> /etc/ssh/ssh_known_hosts
 RUN ssh-keyscan -H gitlab.com >> /etc/ssh/ssh_known_hosts
 
+# # temporary while we deal with launchpad slowness...
+# RUN gh release download --pattern "*.deb" -O - > /tmp/eg.deb
+# RUN apt install /tmp/eg.deb
+
 RUN systemd-sysusers
 RUN systemd-tmpfiles --create
 RUN systemctl enable podman.socket
 
 RUN usermod --add-subuids 100000-165535 --add-subgids 100000-165535 egd
-RUN echo "cache buster 350a9a06-1686-4f49-9d7f-a30535886d78"
+RUN echo "cache buster 371ba006-2797-505a-ae80-b41535886d78"
 run podman version

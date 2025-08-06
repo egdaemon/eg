@@ -24,7 +24,7 @@ import (
 	"github.com/egdaemon/eg/runtime/wasi/egenv"
 	"github.com/egdaemon/eg/runtime/wasi/env"
 	"github.com/egdaemon/eg/runtime/wasi/shell"
-	"github.com/gofrs/uuid"
+	"github.com/gofrs/uuid/v5"
 )
 
 const nilUUID = "00000000-0000-0000-0000-000000000000"

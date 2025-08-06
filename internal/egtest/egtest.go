@@ -6,7 +6,7 @@ import (
 
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/runtime/wasi/eg"
-	"github.com/gofrs/uuid"
+	"github.com/gofrs/uuid/v5"
 )
 
 type op string

@@ -11,7 +11,7 @@ import (
 	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/httpx"
-	"github.com/gofrs/uuid"
+	"github.com/gofrs/uuid/v5"
 )
 
 // Downloads work from control plane.

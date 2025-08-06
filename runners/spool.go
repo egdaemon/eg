@@ -14,7 +14,7 @@ import (
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/fsx"
 	"github.com/egdaemon/eg/internal/userx"
-	"github.com/gofrs/uuid"
+	"github.com/gofrs/uuid/v5"
 	"github.com/pkg/errors"
 )
 

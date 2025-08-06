@@ -14,7 +14,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/cmd/cmdopts"
 	"github.com/egdaemon/eg/compile"
@@ -35,7 +34,7 @@ import (
 	"github.com/egdaemon/eg/transpile"
 	"github.com/egdaemon/eg/workspaces"
 	"github.com/go-git/go-git/v5"
-	"github.com/gofrs/uuid"
+	"github.com/gofrs/uuid/v5"
 
 	"github.com/KimMachineGun/automemlimit/memlimit"
 	"google.golang.org/grpc"
@@ -68,22 +67,31 @@ func (t baremetal) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, hotswapbin
 		cmdenv []string
 	)
 
+	// clean up the eg environment ensuring a clean starting state.
+	resetenv := func() error {
+		return errorsx.Compact(
+			os.Unsetenv(eg.EnvComputeModuleSocket),
+			os.Unsetenv(eg.EnvComputeModuleNestedLevel),
+		)
+	}
+
+	if err := resetenv(); err != nil {
+		return err
+	}
+
 	ctx := gctx.Context
 
 	// ensure when we run modules our umask is set to allow git clones to work properly
 	runtimex.Umask(0002)
 
-	if ws, err = workspaces.New(ctx, md5x.Digest(errorsx.Zero(cmdopts.BuildInfo())), t.Dir, t.RuntimeDir, t.Workload, true); err != nil {
+	if ws, err = workspaces.New(
+		ctx, md5x.Digest(errorsx.Zero(cmdopts.BuildInfo())), t.Dir, t.RuntimeDir, t.Workload, true,
+		workspaces.OptionEnabled(workspaces.OptionInvalidateCache, t.InvalidateCache),
+	); err != nil {
 		return err
 	}
 
 	defer os.RemoveAll(filepath.Join(ws.Root, ws.RuntimeDir))
-
-	if t.InvalidateCache {
-		debugx.Println("removing", filepath.Join(ws.Root, ws.BuildDir), spew.Sdump(ws))
-		os.RemoveAll(filepath.Join(ws.Root, ws.BuildDir))
-		os.RemoveAll(filepath.Join(ws.Root, ws.TransDir))
-	}
 
 	if repo, err = git.PlainOpen(ws.Root); err != nil {
 		return errorsx.Wrap(err, "unable to open git repository")

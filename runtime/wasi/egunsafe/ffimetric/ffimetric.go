@@ -3,10 +3,10 @@ package ffimetric
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 
 	"github.com/egdaemon/eg/internal/errorsx"
-	"github.com/egdaemon/eg/interp/runtime/wasi/ffiguest"
+	"github.com/egdaemon/eg/interp/events"
+	"github.com/egdaemon/eg/runtime/wasi/egunsafe"
 )
 
 func Record(ctx context.Context, name string, payload any) (err error) {
@@ -15,11 +15,18 @@ func Record(ctx context.Context, name string, payload any) (err error) {
 	)
 
 	if encoded, err = json.Marshal(payload); err != nil {
-		return errorsx.Wrap(err, "unable to marshal payload")
+		return errorsx.Wrap(err, "unable to marshal metric data")
 	}
 
-	nameoffset, namelen := ffiguest.String(name)
-	payloadoffset, payloadlen := ffiguest.Bytes(encoded)
+	cc, err := egunsafe.DialControlSocket(ctx)
+	if err != nil {
+		return err
+	}
+	d := events.NewEventsClient(cc)
 
-	return ffiguest.Error(record(ffiguest.ContextDeadline(ctx), nameoffset, namelen, payloadoffset, payloadlen), fmt.Errorf("unable to record metric"))
+	if _, err = d.Dispatch(ctx, events.NewDispatch(events.NewMetric(name, encoded))); err != nil {
+		return errorsx.Wrap(err, "unable to record graph metric")
+	}
+
+	return nil
 }

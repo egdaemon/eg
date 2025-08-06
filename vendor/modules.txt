@@ -670,7 +670,9 @@ github.com/goccy/go-json/internal/runtime
 github.com/godbus/dbus/v5
 # github.com/gofrs/uuid v4.4.0+incompatible
 ## explicit
-github.com/gofrs/uuid
+# github.com/gofrs/uuid/v5 v5.3.2
+## explicit; go 1.19
+github.com/gofrs/uuid/v5
 # github.com/gogo/protobuf v1.3.2
 ## explicit; go 1.15
 github.com/gogo/protobuf/gogoproto

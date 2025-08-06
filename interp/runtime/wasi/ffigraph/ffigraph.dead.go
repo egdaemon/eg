@@ -29,3 +29,8 @@ func NoopTraceEventPop(ctx context.Context, m api.Module, pidoffset uint32, pidl
 	log.Println("removed pop method invoked")
 	return 0
 }
+
+func NoopTrace(ctx context.Context, m api.Module, deadline int64, jsonoffset uint32, jsonlen uint32) uint32 {
+	log.Println("removed trace method invoked")
+	return 0
+}

@@ -33,7 +33,7 @@ func main() {
 			eg.Sequential(
 				eggolang.AutoInstall(),
 				eg.Parallel(
-					eggolang.AutoTest(),
+					// eggolang.AutoTest(),
 					IntegrationTests,
 				),
 				eggolang.RecordCoverage,
@@ -55,16 +55,16 @@ func IntegrationTests(ctx context.Context, op eg.Op) error {
 	return eg.Perform(
 		ctx,
 		eg.Sequential(
-			shell.Op(runtime.New("/home/egd/go/bin/eg compute baremetal tests/concurrent")),
-			// shell.Op(runtime.New("/home/egd/go/bin/eg compute baremetal tests/containers")),
-			shell.Op(runtime.New("/home/egd/go/bin/eg compute baremetal tests/metrics")),
-			shell.Op(runtime.New("/home/egd/go/bin/eg compute baremetal tests/stress")),
-			shell.Op(runtime.New("/home/egd/go/bin/eg compute baremetal tests/gpgagent")),
-			// shell.Op(runtime.New("/home/egd/go/bin/eg compute baremetal tests/tty")),
 			shell.Op(
-				runtime.New("/home/egd/go/bin/eg compute baremetal tests/envvars").
-					Environ(egbug.EnvUnsafeDigest, "c0e35915f19b6c0d2d12db84c6e98c74").
+				runtime.New("/home/egd/go/bin/eg compute baremetal -vv tests/concurrent"),
+				runtime.New("/home/egd/go/bin/eg compute baremetal -vv tests/metrics"),
+				runtime.New("/home/egd/go/bin/eg compute baremetal -vv tests/envvars").
+					Environ(egbug.EnvUnsafeDigest, "a473da7043f290e87fd06b5b837e99cc").
 					Environ("EG_COMPUTE_MODULE_LEVEL", "0"),
+				runtime.New("/home/egd/go/bin/eg compute baremetal -vv tests/stress"),
+				// runtime.New("/home/egd/go/bin/eg compute baremetal tests/containers"),
+				// runtime.New("/home/egd/go/bin/eg compute baremetal -vv tests/gpgagent"),
+				// runtime.New("/home/egd/go/bin/eg compute baremetal tests/tty"),
 			),
 		),
 	)

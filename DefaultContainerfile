@@ -32,11 +32,13 @@ RUN ssh-keyscan -H gitlab.com >> /etc/ssh/ssh_known_hosts
 # # temporary while we deal with launchpad slowness...
 # RUN gh release download --pattern "*.deb" -O - > /tmp/eg.deb
 # RUN apt install /tmp/eg.deb
-# RUN apt-get install -y --no-install-recommends libbtrfs-dev libassuan-dev libc6-dev libdevmapper-dev libglib2.0-dev libgpgme-dev libgpg-error-dev libprotobuf-dev libprotobuf-c-dev libseccomp-dev libselinux1-dev libsystemd-dev
-# RUN GOPROXY=direct go install github.com/egdaemon/eg/cmd/...@v0.0.0-20250806183335-8a2dad3fc603
+RUN apt-get install -y --no-install-recommends libbtrfs-dev libassuan-dev libc6-dev libdevmapper-dev libglib2.0-dev libgpgme-dev libgpg-error-dev libprotobuf-dev libprotobuf-c-dev libseccomp-dev libselinux1-dev libsystemd-dev
+RUN GOPROXY=direct go install github.com/egdaemon/eg/cmd/...@v0.0.0-20250806183335-8a2dad3fc603
 
 RUN systemd-sysusers
 RUN systemd-tmpfiles --create
+RUN systemd-tmpfiles --clean
+RUN rm -rf /tmp/gomod /tmp/gocache
 RUN systemctl enable podman.socket
 
 RUN usermod --add-subuids 100000-165535 --add-subgids 100000-165535 egd

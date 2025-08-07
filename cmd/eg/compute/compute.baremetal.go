@@ -21,10 +21,12 @@ import (
 	"github.com/egdaemon/eg/internal/debugx"
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
+	"github.com/egdaemon/eg/internal/fsx"
 	"github.com/egdaemon/eg/internal/gitx"
 	"github.com/egdaemon/eg/internal/md5x"
 	"github.com/egdaemon/eg/internal/podmanx"
 	"github.com/egdaemon/eg/internal/runtimex"
+	"github.com/egdaemon/eg/internal/stringsx"
 	"github.com/egdaemon/eg/internal/wasix"
 	"github.com/egdaemon/eg/interp"
 	"github.com/egdaemon/eg/interp/c8sproxy"
@@ -41,9 +43,19 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 )
 
+// /podman run --name eg.5f5e0662-32ff-87ba-ed44-187e61b55864 --detach --replace --env CI --env EG_COMPUTE_BIN --env-file /home/jatone/development/egd/eg/.eg.workload.ad856be5/.eg.runtime/environ.env --userns host
+// --cap-add NET_ADMIN --cap-add SYS_ADMIN --device /dev/fuse --pids-limit -1 --cgroupns host --network host
+// --volume /home/jatone/development/egd/eg/.eg.workload.ad856be5/.eg.runtime/environ.env:/eg.mnt/.eg.runtime/environ.env:ro
+// --volume egdaemon.eg.eg.containers:/var/lib/containers:rw
+// --volume /home/jatone/development/egd/eg/.eg.workload.ad856be5/.eg.cache:/eg.mnt/.eg.cache:rw
+// --volume /home/jatone/development/egd/eg/.eg.workload.ad856be5/.eg.runtime:/eg.mnt/.eg.runtime:rw
+// --volume /home/jatone/go/bin/eg:/eg.mnt/egbin:ro
+// --volume /home/jatone/development/egd/eg/.eg.workload.ad856be5/.eg.cache/.eg/.gen/949ea2b4-0dbd-f6f0-5040-f7220c641a39/build/tests/baremetal/main.wasm.d/module.38.3.wasm:/eg.mnt/.eg.module.wasm:ro
+// --volume /home/jatone/development/egd/eg/.eg.workload.ad856be5:/eg.mnt/eg:rw eg
+// /usr/sbin/init
+
 type baremetal struct {
-	Dir             string `name:"directory" help:"root directory of the repository" default:"${vars_git_directory}"`
-	RuntimeDir      string `name:"runtimedir" help:"runtime directory" hidden:"true" default:"${vars_workload_directory}"`
+	Dir             string `name:"directory" help:"root directory of the repository" default:"${vars_eg_root_directory}"`
 	GitRemote       string `name:"git-remote" help:"name of the git remote to use" default:"${vars_git_default_remote_name}"`
 	GitReference    string `name:"git-ref" help:"name of the branch or commit to checkout" default:"${vars_git_head_reference}"`
 	Clone           bool   `name:"git-clone" help:"allow cloning via git"`
@@ -70,8 +82,8 @@ func (t baremetal) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, hotswapbin
 	// clean up the eg environment ensuring a clean starting state.
 	resetenv := func() error {
 		unsetlog := func(s string) error {
-			log.Println("baremetal unsetting envvar", s, os.Getenv(s))
-			return os.Unsetenv(eg.EnvComputeModuleSocket)
+			log.Printf("baremetal unsetting envvar %s %s", s, stringsx.DefaultIfBlank(os.Getenv(s), "(empty)"))
+			return os.Unsetenv(s)
 		}
 
 		return errorsx.Compact(
@@ -89,20 +101,30 @@ func (t baremetal) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, hotswapbin
 	// ensure when we run modules our umask is set to allow git clones to work properly
 	runtimex.Umask(0002)
 
-	if ws, err = workspaces.New(
-		ctx, md5x.Digest(errorsx.Zero(cmdopts.BuildInfo())), t.Dir, t.RuntimeDir, t.Workload, true,
+	if ws, err = workspaces.NewLocal(
+		ctx, md5x.Digest(errorsx.Zero(cmdopts.BuildInfo())), t.Dir, t.Workload,
 		workspaces.OptionEnabled(workspaces.OptionInvalidateCache, t.InvalidateCache),
 	); err != nil {
 		return err
 	}
 
-	defer os.RemoveAll(filepath.Join(ws.Root, ws.RuntimeDir))
+	// defer os.RemoveAll(ws.Root)
 
-	if repo, err = git.PlainOpen(ws.Root); err != nil {
+	fsx.PrintFS(os.DirFS(ws.Root))
+
+	if err = os.Symlink(t.Dir, ws.WorkingDir); err != nil {
+		return errorsx.Wrap(err, "unable to symlink working directory to workspace")
+	}
+
+	if err = os.Symlink(filepath.Join(t.Dir, eg.CacheDirectory), ws.CacheDir); err != nil {
+		return errorsx.Wrap(err, "unable to symlink cache to workspace")
+	}
+
+	if repo, err = git.PlainOpen(t.Dir); err != nil {
 		return errorsx.Wrap(err, "unable to open git repository")
 	}
 
-	roots, err := transpile.Autodetect(transpile.New(ws)).Run(ctx)
+	roots, err := transpile.Autodetect(transpile.New(eg.DefaultModuleDirectory(t.Dir), ws)).Run(ctx)
 	if err != nil {
 		return err
 	}
@@ -122,7 +144,7 @@ func (t baremetal) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, hotswapbin
 
 	debugx.Println("modules", modules)
 
-	if err = wasix.WarmCacheDirectory(ctx, filepath.Join(ws.Root, ws.BuildDir), wasix.WazCacheDir(filepath.Join(ws.Root, ws.CacheDir, eg.DefaultModuleDirectory()))); err != nil {
+	if err = wasix.WarmCacheDirectory(ctx, filepath.Join(ws.Root, ws.BuildDir), wasix.WazCacheDir(filepath.Join(ws.CacheDir, eg.DefaultModuleDirectory()))); err != nil {
 		log.Println("unable to prewarm wasi directory cache", err)
 	}
 
@@ -145,14 +167,14 @@ func (t baremetal) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, hotswapbin
 	debugx.Println("ram available", bytesx.Unit(vmemlimit))
 	debugx.Println("logging level", gctx.Verbosity)
 	defer debugx.Println("---------------------------- BAREMETAL COMPLETED ----------------------------")
-
-	cspath := filepath.Join(ws.Root, ws.RuntimeDir, eg.SocketControl)
+	errorsx.Never(fsx.DirExists(ws.RuntimeDir))
+	cspath := filepath.Join(ws.RuntimeDir, eg.SocketControl)
 	if control, err = net.Listen("unix", cspath); err != nil {
 		return errorsx.Wrapf(err, "unable to create socket %s", cspath)
 	}
 	defer control.Close()
 
-	if db, err = sql.Open("duckdb", filepath.Join(ws.Root, ws.RuntimeDir, "analytics.db")); err != nil {
+	if db, err = sql.Open("duckdb", filepath.Join(ws.RuntimeDir, "analytics.db")); err != nil {
 		return errorsx.Wrap(err, "unable to create analytics.db")
 	}
 	defer db.Close()
@@ -185,16 +207,20 @@ func (t baremetal) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, hotswapbin
 		errorsx.Zero(gitx.LocalEnv(repo, t.GitRemote, t.GitReference))...,
 	)
 
-	environpath := filepath.Join(ws.Root, ws.RuntimeDir, eg.EnvironFile)
+	environpath := filepath.Join(ws.RuntimeDir, eg.EnvironFile)
 	if environio, err = os.Create(environpath); err != nil {
 		return errorsx.Wrap(err, "unable to open the environment variable file")
 	}
 	defer environio.Close()
 
 	modulesenv := envx.Build().FromEnviron(errorsx.Must(cmdenvb.Environ())...).Var(
+		eg.EnvComputeRootDirectory, eg.DefaultRootDirectory(),
+	).Var(
 		eg.EnvComputeCacheDirectory, eg.DefaultCacheDirectory(),
 	).Var(
 		eg.EnvComputeRuntimeDirectory, eg.DefaultRuntimeDirectory(),
+	).Var(
+		eg.EnvComputeWorkloadDirectory, eg.DefaultWorkloadDirectory(),
 	)
 
 	if err = modulesenv.CopyTo(environio); err != nil {
@@ -203,9 +229,13 @@ func (t baremetal) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, hotswapbin
 
 	// tune bare metal environment.
 	cmdenvb.Var(
-		eg.EnvComputeCacheDirectory, filepath.Join(ws.Root, ws.CacheDir),
+		eg.EnvComputeRootDirectory, ws.Root,
 	).Var(
-		eg.EnvComputeRuntimeDirectory, filepath.Join(ws.Root, ws.RuntimeDir),
+		eg.EnvComputeCacheDirectory, filepath.Join(ws.CacheDir),
+	).Var(
+		eg.EnvComputeRuntimeDirectory, filepath.Join(ws.RuntimeDir),
+	).Var(
+		eg.EnvComputeWorkloadDirectory, filepath.Join(ws.WorkloadDir),
 	).Var(
 		eg.EnvComputeDefaultGroup, defaultgroup(),
 	).FromEnviron(
@@ -252,8 +282,9 @@ func (t baremetal) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, hotswapbin
 		runners.AgentOptionLocalComputeCachingVolumes(canonicaluri),
 		runners.AgentOptionEnv(eg.EnvComputeTLSInsecure, strconv.FormatBool(tlsc.Insecure)),
 		runners.AgentOptionVolumes(
-			runners.AgentMountReadWrite(filepath.Join(ws.Root, ws.CacheDir), eg.DefaultMountRoot(eg.CacheDirectory)),
-			runners.AgentMountReadWrite(filepath.Join(ws.Root, ws.RuntimeDir), eg.DefaultMountRoot(eg.RuntimeDirectory)),
+			runners.AgentMountReadWrite(ws.CacheDir, eg.DefaultMountRoot(eg.CacheDirectory)),
+			runners.AgentMountReadWrite(ws.RuntimeDir, eg.DefaultMountRoot(eg.RuntimeDirectory)),
+			runners.AgentMountReadWrite(ws.WorkloadDir, eg.DefaultMountRoot(eg.WorkloadDirectory)),
 		),
 		runners.AgentOptionHostOS(),
 		mountegbin,
@@ -280,12 +311,11 @@ func (t baremetal) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, hotswapbin
 	for _, m := range modules {
 		err := interp.Remote(
 			ctx,
+			ws,
 			aid,
 			uid.String(),
 			cc,
-			ws.Root,
 			m.Path,
-			interp.OptionRuntimeDir(filepath.Join(ws.Root, ws.RuntimeDir)),
 			interp.OptionEnviron(cmdenv...),
 		)
 		if err != nil {

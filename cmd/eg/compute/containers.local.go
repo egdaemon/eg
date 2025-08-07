@@ -30,7 +30,7 @@ import (
 
 type c8sLocal struct {
 	cmdopts.RuntimeResources
-	Dir              string   `name:"directory" help:"root directory of the repository" default:"${vars_git_directory}"`
+	Dir              string   `name:"directory" help:"root directory of the repository" default:"${vars_eg_root_directory}"`
 	Containerfile    string   `arg:"" help:"path to the container file to run" default:"Containerfile"`
 	SSHKeyPath       string   `name:"sshkeypath" help:"path to ssh key to use" default:"${vars_ssh_key_path}"`
 	EnvironmentPaths []string `name:"envpath" help:"environment files to pass to the module" default:""`
@@ -66,7 +66,7 @@ func (t c8sLocal) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (er
 		errorsx.Log(errorsx.Wrap(os.RemoveAll(tmpdir), "unable to remove temp directory"))
 	}()
 
-	if ws, err = workspaces.New(gctx.Context, md5x.Digest(errorsx.Zero(cmdopts.BuildInfo())), tmpdir, eg.DefaultModuleDirectory(), "", false); err != nil {
+	if ws, err = workspaces.New(gctx.Context, md5x.Digest(errorsx.Zero(cmdopts.BuildInfo())), tmpdir, eg.DefaultModuleDirectory()); err != nil {
 		return errorsx.Wrap(err, "unable to initialize workspace")
 	}
 
@@ -92,7 +92,7 @@ func (t c8sLocal) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (er
 		return err
 	}
 
-	roots, err := transpile.Autodetect(transpile.New(ws)).Run(gctx.Context)
+	roots, err := transpile.Autodetect(transpile.New(eg.DefaultModuleDirectory(t.Dir), ws)).Run(gctx.Context)
 	if err != nil {
 		return err
 	}

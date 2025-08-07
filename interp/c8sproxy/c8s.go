@@ -177,7 +177,7 @@ func moduleExec(ctx context.Context, cname, moduledir string, stdin io.Reader, s
 				envx.String("eg", eg.EnvComputeBin),
 				verbosity,
 				"module",
-				"--directory", eg.DefaultWorkingDirectory(),
+				"--directory", eg.DefaultRootDirectory(),
 				"--moduledir", moduledir,
 				eg.DefaultMountRoot(eg.ModuleBin),
 			}...),

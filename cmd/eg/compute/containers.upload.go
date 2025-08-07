@@ -108,11 +108,11 @@ func (t c8sUpload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error
 		return err
 	}
 
-	if ws, err = workspaces.New(gctx.Context, md5x.Digest(errorsx.Zero(cmdopts.BuildInfo())), tmpdir, eg.DefaultModuleDirectory(), "", false); err != nil {
+	if ws, err = workspaces.New(gctx.Context, md5x.Digest(errorsx.Zero(cmdopts.BuildInfo())), tmpdir, eg.DefaultModuleDirectory()); err != nil {
 		return err
 	}
 
-	roots, err := transpile.Autodetect(transpile.New(ws)).Run(gctx.Context)
+	roots, err := transpile.Autodetect(transpile.New(eg.DefaultModuleDirectory(tmpdir), ws)).Run(gctx.Context)
 	if err != nil {
 		return err
 	}

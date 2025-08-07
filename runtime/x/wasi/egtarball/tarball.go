@@ -26,7 +26,7 @@ import (
 )
 
 func root(paths ...string) string {
-	return egenv.CacheDirectory(".eg", "tarball", filepath.Join(paths...))
+	return egenv.WorkloadDirectory(filepath.Join(paths...))
 }
 
 // Path generate a unique directory for the contents that will be inside the archive can be
@@ -36,7 +36,7 @@ func Path(pattern string) string {
 	// create a uuid from the git repository and the paths provided.
 	// this will scope the paths to within a single repository in the cache.
 	// longer term we'll move this into a 'run scratch pad directory'
-	return root(egmd5x.String(filepath.Join(eggit.EnvCanonicalURI(), pattern)))
+	return root(fmt.Sprintf(".eg.tarball.%s", egmd5x.String(filepath.Join(eggit.EnvCanonicalURI(), pattern))))
 }
 
 // replaces the substitution values within the pattern, resulting in the final resulting archive file's name.
@@ -70,7 +70,7 @@ func SHA256(pattern string) string {
 	}
 	digesthex := egsha256x.FormatHex(digest)
 	if strings.TrimSpace(digesthex) == "" {
-		panic(fmt.Errorf("unable to compute the sha256 for %s", path))
+		panic(fmt.Errorf("unable to format the sha256 for %s", path))
 	}
 
 	if err := os.WriteFile(sha, []byte(digesthex), 0644); err != nil {

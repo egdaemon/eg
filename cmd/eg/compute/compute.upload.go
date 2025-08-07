@@ -39,8 +39,7 @@ type upload struct {
 	cmdopts.RuntimeResources
 	HostedCompute bool     `name:"shared-compute" help:"allow hosted compute" default:"true"`
 	SSHKeyPath    string   `name:"sshkeypath" help:"path to ssh key to use" default:"${vars_ssh_key_path}"`
-	Dir           string   `name:"directory" help:"root directory of the repository" default:"${vars_git_directory}"`
-	ModuleDir     string   `name:"moduledir" help:"must be a subdirectory in the provided directory" default:"${vars_workload_directory}"`
+	Dir           string   `name:"directory" help:"root directory of the repository" default:"${vars_eg_root_directory}"`
 	Name          string   `arg:"" name:"module" help:"name of the module to run, i.e. the folder name within moduledir" default:"" predictor:"eg.workload"`
 	Environment   []string `name:"env" short:"e" help:"define environment variables and their values to be included"`
 	Dirty         bool     `name:"dirty" help:"include all environment variables"`
@@ -63,12 +62,12 @@ func (t upload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 		return err
 	}
 
-	if ws, err = workspaces.New(gctx.Context, md5x.Digest(errorsx.Zero(cmdopts.BuildInfo())), t.Dir, t.ModuleDir, t.Name, false); err != nil {
+	if ws, err = workspaces.New(gctx.Context, md5x.Digest(errorsx.Zero(cmdopts.BuildInfo())), t.Dir, t.Name); err != nil {
 		return err
 	}
 	defer os.RemoveAll(filepath.Join(ws.Root, ws.RuntimeDir))
 
-	roots, err := transpile.Autodetect(transpile.New(ws)).Run(gctx.Context)
+	roots, err := transpile.Autodetect(transpile.New(eg.DefaultModuleDirectory(t.Dir), ws)).Run(gctx.Context)
 	if err != nil {
 		return err
 	}

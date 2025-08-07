@@ -34,7 +34,7 @@ func User() *user.User {
 // files stored in the cache directory are maintained between runs on a best effort basis.
 // files prefixed with .eg are reserved for system use.
 //
-// e.g.) CacheDirectory("foo", "bar") -> "/cache/foo/bar"
+// e.g.) CacheDirectory("foo", "bar") -> "/{eg.cache}/foo/bar"
 func CacheDirectory(paths ...string) string {
 	return filepath.Join(env.String(os.TempDir(), eg.EnvComputeCacheDirectory, "CACHE_DIRECTORY"), filepath.Join(paths...))
 }
@@ -45,9 +45,25 @@ func CacheDirectory(paths ...string) string {
 // files stored in the runtime directory are maintained for the duration of a workload. every module
 // will be able to read the data stored in the runtime folder.
 //
-// e.g.) RuntimeDirectory("foo", "bar") -> "/runtime/foo/bar"
+// e.g.) RuntimeDirectory("foo", "bar") -> "/{eg.runtime}/foo/bar"
 func RuntimeDirectory(paths ...string) string {
 	return filepath.Join(env.String(os.TempDir(), eg.EnvComputeRuntimeDirectory), filepath.Join(paths...))
+}
+
+// returns the absolute path to the workload directory, when arguments are provided they are joined
+// joined with the workload directory.
+//
+// experimental directory
+//
+// e.g.) WorkloadDirectory("foo", "bar") -> "/{eg.workload}/foo/bar"
+func WorkloadDirectory(paths ...string) string {
+	return filepath.Join(env.String(eg.DefaultWorkloadDirectory(), eg.EnvComputeWorkloadDirectory), filepath.Join(paths...))
+}
+
+// returns the absolute path to the working directory of the module. this directory is the
+// initial working directory of the workload and is used for cloning git repositories etc.
+func WorkingDirectory(paths ...string) string {
+	return filepath.Join(env.String(eg.DefaultWorkingDirectory(), eg.EnvComputeWorkingDirectory), filepath.Join(paths...))
 }
 
 // returns the absolute path to the ephemeral directory, when arguments are provided they are joined
@@ -56,25 +72,9 @@ func RuntimeDirectory(paths ...string) string {
 // files stored in the ephemeral directory are maintained for the duration of a single module's execution.
 // and is unique to that module.
 //
-// e.g.) EphemeralDirectory("foo", "bar") -> "/ephemeral/foo/bar"
+// e.g.) EphemeralDirectory("foo", "bar") -> "/{eg.ephemeral}/foo/bar"
 func EphemeralDirectory(paths ...string) string {
 	return filepath.Join(os.TempDir(), filepath.Join(paths...))
-}
-
-// returns the absolute path to the workload directory, when arguments are provided they are joined
-// joined with the workload directory.
-//
-// experimental directory
-//
-// e.g.) WorkloadDirectory("foo", "bar") -> "/workload/foo/bar"
-func WorkloadDirectory(paths ...string) string {
-	return eg.DefaultWorkloadRoot(RunID(), filepath.Join(paths...))
-}
-
-// returns the absolute path to the working directory of the module. this directory is the
-// initial working directory of the workload and is used for cloning git repositories etc.
-func WorkingDirectory(paths ...string) string {
-	return filepath.Join(env.String(eg.DefaultWorkingDirectory(), eg.EnvComputeWorkingDirectory), filepath.Join(paths...))
 }
 
 // Extract a boolean formatted environment variable from the given keys

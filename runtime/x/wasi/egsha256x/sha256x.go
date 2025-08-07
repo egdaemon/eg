@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"hash"
 	"io"
+	"log"
 	"os"
 	"path/filepath"
 
@@ -43,7 +44,7 @@ func DigestIO(r io.Reader) hash.Hash {
 func DigestFile(path ...string) hash.Hash {
 	src, err := os.Open(filepath.Join(path...))
 	if err != nil {
-		debugx.Println("failed to digest file", err)
+		log.Println("failed to digest file", err)
 		return nil
 	}
 	defer src.Close()

@@ -28,6 +28,7 @@ import (
 )
 
 type Context struct {
+	root      string
 	Workspace workspaces.Context
 }
 
@@ -40,8 +41,9 @@ type Transpiler interface {
 	Run(ctx context.Context) (roots []Compiled, err error)
 }
 
-func New(ws workspaces.Context) Context {
+func New(root string, ws workspaces.Context) Context {
 	return Context{
+		root:      root,
 		Workspace: ws,
 	}
 }
@@ -69,7 +71,7 @@ func (t golang) Run(ctx context.Context) (roots []Compiled, err error) {
 	)
 	transdir := filepath.Join(t.Context.Workspace.Root, t.Context.Workspace.TransDir)
 
-	err = fsx.CloneTree(ctx, transdir, ".", os.DirFS(filepath.Join(t.Context.Workspace.Root, t.Context.Workspace.ModuleDir)))
+	err = fsx.CloneTree(ctx, transdir, ".", os.DirFS(t.Context.root))
 	if err != nil {
 		return roots, err
 	}

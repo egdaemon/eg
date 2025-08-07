@@ -19,7 +19,7 @@ func TestSpoolDequeueShouldHandleConflicts(t *testing.T) {
 
 		require.NoError(t, dirs.Download(uid, "archive.tar.gz", bytes.NewBufferString("")))
 		require.NoError(t, dirs.Enqueue(uid))
-		require.NoError(t, os.Mkdir(filepath.Join(sdir, "r", iddirname(uid)), 0700))
+		require.NoError(t, os.Mkdir(filepath.Join(sdir, "r", Queued().Dirname(uid)), 0700))
 	}
 
 	uid := uuid.Must(uuid.NewV7())
@@ -28,5 +28,5 @@ func TestSpoolDequeueShouldHandleConflicts(t *testing.T) {
 
 	ruid, err := dirs.Dequeue()
 	require.NoError(t, err)
-	require.Equal(t, filepath.Join(sdir, "r", iddirname(uid)), ruid)
+	require.Equal(t, filepath.Join(sdir, "r", Queued().Dirname(uid)), ruid)
 }

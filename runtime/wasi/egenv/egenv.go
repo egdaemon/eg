@@ -28,6 +28,14 @@ func User() *user.User {
 	return userx.CurrentUserOrDefault(userx.Root())
 }
 
+// returns the absolute path to the workload directory of the module. this directory is the
+// root directory of the workload.
+//
+// e.g.) WorkloadDirectory("foo", "bar") -> "/{eg.workload}/foo/bar"
+func WorkloadDirectory(paths ...string) string {
+	return filepath.Join(env.String(eg.DefaultWorkloadDirectory(), eg.EnvComputeWorkloadDirectory), filepath.Join(paths...))
+}
+
 // returns the absolute path to the cache directory, when arguments are provided they are joined
 // joined with the cache directory.
 //
@@ -50,14 +58,14 @@ func RuntimeDirectory(paths ...string) string {
 	return filepath.Join(env.String(os.TempDir(), eg.EnvComputeRuntimeDirectory), filepath.Join(paths...))
 }
 
-// returns the absolute path to the workload directory, when arguments are provided they are joined
-// joined with the workload directory.
+// returns the absolute path to the workspace directory, when arguments are provided they are joined
+// joined with the workspace directory.
 //
-// experimental directory
+// experimental directory - intended to be a directory for maintaining data for the lifetime of the workload.
 //
-// e.g.) WorkloadDirectory("foo", "bar") -> "/{eg.workload}/foo/bar"
-func WorkloadDirectory(paths ...string) string {
-	return filepath.Join(env.String(eg.DefaultWorkloadDirectory(), eg.EnvComputeWorkloadDirectory), filepath.Join(paths...))
+// e.g.) WorkspaceDirectory("foo", "bar") -> "/{eg.workspace}/foo/bar"
+func WorkspaceDirectory(paths ...string) string {
+	return filepath.Join(env.String(eg.DefaultWorkspaceDirectory(), eg.EnvComputeWorkspaceDirectory), filepath.Join(paths...))
 }
 
 // returns the absolute path to the working directory of the module. this directory is the

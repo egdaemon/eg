@@ -55,12 +55,17 @@ func NowAndEvery(ctx context.Context, d time.Duration, do func(context.Context) 
 	}
 }
 
-// DurationOrDefault ...
-func DurationOrDefault(a, b time.Duration) time.Duration {
-	if a == 0 {
-		return b
+// DurationFirstNonZero ...
+func DurationFirstNonZero(d ...time.Duration) time.Duration {
+	for _, a := range d {
+		if a == 0 {
+			continue
+		}
+
+		return a
 	}
-	return a
+
+	return 0
 }
 
 // DurationMax select the maximum duration from the set.

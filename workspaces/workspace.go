@@ -43,71 +43,33 @@ func (t ignoredir) Ignore(path string, d fs.DirEntry) error {
 }
 
 type Context struct {
-	Module      string // name of the module
-	CachedID    string // unique id generated from the content of the module.
-	Root        string // workspace root directory.
-	WorkingDir  string // working directory for modules.
-	ModuleDir   string // eg module directory; relative to the root
-	CacheDir    string // cache directory. relative to the module directory.
-	RuntimeDir  string // eg internal directory
-	WorkloadDir string // shared directory between modules within a single workload.
-	BuildDir    string // directory for built wasm modules; relative to the cache directory.
-	TransDir    string // root directory for the transpiled code; relative to the cache directory.
-	GenModDir   string // root directory for generated modules; relative to the cache directory.
-	Ignore      ignorable
+	Module       string // name of the module
+	CachedID     string // unique id generated from the content of the module.
+	Root         string // workspace root directory.
+	WorkingDir   string // working directory for modules.
+	ModuleDir    string // eg module directory; relative to the root
+	CacheDir     string // cache directory. relative to the module directory.
+	RuntimeDir   string // eg internal directory
+	WorkspaceDir string // shared directory between modules within a single workload.
+	BuildDir     string // directory for built wasm modules; relative to the cache directory.
+	TransDir     string // root directory for the transpiled code; relative to the cache directory.
+	GenModDir    string // root directory for generated modules; relative to the cache directory.
+	Ignore       ignorable
 }
 
 func (t Context) FS() fs.FS {
 	return os.DirFS(t.Root)
 }
 
-// 14:18:01 interp.go:227: workspace (workspaces.Context) {
-//  Module: (string) (len=15) "tests/baremetal",
-//  CachedID: (string) (len=36) "64b892ee-de11-5e8d-61db-8e7f4ff28c21",
-//  Root: (string) (len=31) "/home/jatone/development/egd/eg",
-//  WorkingDir: (string) (len=40) ".eg.runtime/.eg.runtime.941b9af4/mounted",
-//  ModuleDir: (string) (len=3) ".eg",
-//  CacheDir: (string) (len=9) ".eg.cache",
-//  RuntimeDir: (string) (len=32) ".eg.runtime/.eg.runtime.941b9af4",
-//  WorkloadDir: (string) (len=45) ".eg.runtime/.eg.runtime.941b9af4/.eg.workload",
-//  BuildDir: (string) (len=61) ".eg.cache/.eg/.gen/64b892ee-de11-5e8d-61db-8e7f4ff28c21/build",
-//  TransDir: (string) (len=61) ".eg.cache/.eg/.gen/64b892ee-de11-5e8d-61db-8e7f4ff28c21/trans",
-//  GenModDir: (string) (len=69) ".eg.cache/.eg/.gen/64b892ee-de11-5e8d-61db-8e7f4ff28c21/trans/.genmod",
-//  Ignore: (workspaces.ignoredir) {
-//   path: (string) (len=9) ".eg.cache",
-//   reason: (string) (len=15) "cache directory"
-//  }
-// }
-
-// [25]14:18:06 workspace.go:68: WAKA (workspaces.Context) {
-//  Module: (string) (len=23) "/eg.mnt/.eg.module.wasm",
-//  CachedID: (string) "",
-//  Root: (string) (len=9) "/workload",
-//  WorkingDir: (string) "",
-//  ModuleDir: (string) "",
-//  CacheDir: (string) "",
-//  RuntimeDir: (string) (len=11) ".eg.runtime",
-//  WorkloadDir: (string) (len=24) ".eg.runtime/.eg.workload",
-//  BuildDir: (string) "",
-//  TransDir: (string) "",
-//  GenModDir: (string) "",
-//  Ignore: (workspaces.ignorable) <nil>
-// }
-
 func FromEnv(ctx context.Context, root, name string) (zero Context, err error) {
-	log.Println("TROLOLOLO")
-	envx.Debug(os.Environ()...)
-	defer func() {
-		log.Println("WAKA", spew.Sdump(zero))
-	}()
 	return Context{
-		Module:      name,
-		Root:        root,
-		ModuleDir:   eg.ModuleDir,
-		CacheDir:    eg.DefaultCacheDirectory(),
-		RuntimeDir:  eg.DefaultRuntimeDirectory(),
-		WorkingDir:  eg.DefaultWorkingDirectory(),
-		WorkloadDir: eg.DefaultWorkloadDirectory(),
+		Module:       name,
+		Root:         root,
+		ModuleDir:    eg.ModuleDir,
+		CacheDir:     eg.DefaultCacheDirectory(),
+		RuntimeDir:   eg.DefaultRuntimeDirectory(),
+		WorkingDir:   eg.DefaultWorkingDirectory(),
+		WorkspaceDir: eg.DefaultWorkspaceDirectory(),
 	}, nil
 }
 
@@ -123,7 +85,30 @@ func OptionEnabled(o Option, b bool) Option {
 
 func OptionNoop(ctx *Context) {}
 
-func OptionInvalidateCache(ctx *Context) {
+func OptionSymlinkCache(cache string) Option {
+	return func(ctx *Context) {
+		symlinkDir(0770&fs.ModePerm, cache, filepath.Join(ctx.Root, eg.CacheDirectory))
+	}
+}
+
+func OptionSymlinkWorking(working string) Option {
+	return func(ctx *Context) {
+		symlinkDir(0770&fs.ModePerm, working, filepath.Join(ctx.Root, eg.WorkingDirectory))
+	}
+}
+
+func symlinkDir(perm fs.FileMode, oldname, newname string) {
+	errorsx.Never(errorsx.Compact(
+		fsx.MkDirs(perm, oldname), // ensure the directory exists before symlinking
+		os.Symlink(oldname, newname),
+	))
+}
+
+func OptionEnsureWorkingDirectory(ctx *Context) {
+	errorsx.Never(fsx.MkDirs(0700, ctx.WorkingDir))
+}
+
+func OptionInvalidateModuleCache(ctx *Context) {
 	log.Println("resetting module cache", filepath.Join(ctx.Root, ctx.BuildDir))
 	os.RemoveAll(filepath.Join(ctx.Root, ctx.BuildDir))
 	os.RemoveAll(filepath.Join(ctx.Root, ctx.TransDir))
@@ -145,18 +130,18 @@ func New(ctx context.Context, cid hash.Hash, root string, name string, options .
 	_cid := uuid.FromBytesOrNil(cid.Sum(nil)).String()
 
 	return ensuredirs(langx.Clone(Context{
-		Module:      name,
-		CachedID:    _cid,
-		Root:        root,
-		ModuleDir:   filepath.Join(root, eg.ModuleDir),
-		CacheDir:    filepath.Join(root, eg.CacheDirectory),
-		RuntimeDir:  filepath.Join(root, eg.RuntimeDirectory),
-		WorkingDir:  filepath.Join(root, "mounted"),
-		WorkloadDir: filepath.Join(root, eg.WorkloadDirectory),
-		BuildDir:    filepath.Join(root, eg.CacheDirectory, eg.DefaultModuleDirectory(), ".gen", _cid, "build"),
-		TransDir:    filepath.Join(root, eg.CacheDirectory, eg.DefaultModuleDirectory(), ".gen", _cid, "trans"),
-		GenModDir:   filepath.Join(root, eg.CacheDirectory, eg.DefaultModuleDirectory(), ".gen", _cid, "trans", ".genmod"),
-		Ignore:      ignore,
+		Module:       name,
+		CachedID:     _cid,
+		Root:         root,
+		ModuleDir:    filepath.Join(root, eg.ModuleDir),
+		CacheDir:     filepath.Join(root, eg.CacheDirectory),
+		RuntimeDir:   filepath.Join(root, eg.RuntimeDirectory),
+		WorkingDir:   filepath.Join(root, eg.WorkingDirectory),
+		WorkspaceDir: filepath.Join(root, eg.WorkspaceDirectory),
+		BuildDir:     filepath.Join(eg.CacheDirectory, eg.DefaultModuleDirectory(), ".gen", _cid, "build"),
+		TransDir:     filepath.Join(eg.CacheDirectory, eg.DefaultModuleDirectory(), ".gen", _cid, "trans"),
+		GenModDir:    filepath.Join(eg.CacheDirectory, eg.DefaultModuleDirectory(), ".gen", _cid, "trans", ".genmod"),
+		Ignore:       ignore,
 	}, options...))
 }
 
@@ -168,20 +153,21 @@ func ensuredirs(c Context) (_ Context, err error) {
 
 	perms := rdir.Mode() & (fs.ModePerm)
 
-	debugx.Println("------------ ensuredirs initiated ------------")
-	defer debugx.Println("------------ ensuredirs completed ------------")
-	debugx.Println("perms", perms)
-	debugx.Println(spew.Sdump(c))
+	debugx.Println("------------ ensuredirs", perms, "initiated ------------")
+	defer debugx.Println("------------ ensuredirs", perms, "completed ------------")
+	defer func() {
+		debugx.Println(spew.Sdump(c))
+	}()
 
 	// need to ensure that certain directories and files exists
 	// since they're mounted into the virtualized systems.
-	return c, fsx.MkDirs(
+	return c, errorsx.Wrap(fsx.MkDirs(
 		perms,
 		filepath.Join(c.Root, c.GenModDir),
 		filepath.Join(c.Root, c.BuildDir, c.Module, eg.ModuleDir),
-		c.WorkloadDir,
+		c.WorkspaceDir,
 		c.RuntimeDir,
-	)
+	), "failed to create workspace directories")
 }
 
 func cacheid(ctx context.Context, root string, mdir string, cacheid hash.Hash, ignore ignorable) error {

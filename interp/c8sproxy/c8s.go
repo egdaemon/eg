@@ -141,6 +141,7 @@ func PodmanModule(ctx context.Context, cmdctx func(*exec.Cmd) *exec.Cmd, image, 
 func PodmanModuleRunCmd(image, cname string, options ...string) []string {
 	args := make([]string, 0, len(options)+11)
 	args = append(args,
+		// "--log-level", "debug",
 		"run",
 		"--name", cname,
 		"--detach",
@@ -157,7 +158,6 @@ func moduleExec(ctx context.Context, cname, moduledir string, stdin io.Reader, s
 	var (
 		rtty *io.PipeReader
 		wtty *io.PipeWriter
-		// rtty, wtty *os.File
 	)
 
 	verbosity := ""
@@ -177,9 +177,9 @@ func moduleExec(ctx context.Context, cname, moduledir string, stdin io.Reader, s
 				envx.String("eg", eg.EnvComputeBin),
 				verbosity,
 				"module",
-				"--directory", eg.DefaultRootDirectory(),
+				"--directory", eg.DefaultWorkloadDirectory(),
 				"--moduledir", moduledir,
-				eg.DefaultMountRoot(eg.ModuleBin),
+				eg.ModuleMount(),
 			}...),
 		},
 	})
@@ -198,10 +198,6 @@ func moduleExec(ctx context.Context, cname, moduledir string, stdin io.Reader, s
 
 	if stdin != nil {
 		rtty, wtty = io.Pipe()
-		// rtty, wtty, err = os.Pipe()
-		// if err != nil {
-		// 	return errorsx.Wrap(err, "unable prepare pipe")
-		// }
 		defer rtty.Close()
 		defer wtty.Close()
 
@@ -209,7 +205,6 @@ func moduleExec(ctx context.Context, cname, moduledir string, stdin io.Reader, s
 			_, cause := io.Copy(wtty, stdin)
 			debugx.Println("unable to copy stdin", cause)
 			wtty.CloseWithError(cause)
-			// wtty.Close()
 		}()
 	}
 

@@ -9,7 +9,6 @@ import (
 	"github.com/egdaemon/eg/runtime/wasi/eg"
 	"github.com/egdaemon/eg/runtime/wasi/egenv"
 	"github.com/egdaemon/eg/runtime/wasi/shell"
-	"github.com/egdaemon/eg/runtime/x/wasi/egbug"
 	"github.com/egdaemon/eg/runtime/x/wasi/egdmg"
 	"github.com/egdaemon/eg/runtime/x/wasi/egtarball"
 )
@@ -22,11 +21,9 @@ const (
 func Archive(ctx context.Context, op eg.Op) error {
 	return eg.Sequential(
 		shell.Op(
-			shell.Newf("ls -lha %s", egenv.WorkloadDirectory()),
 			shell.Newf("mkdir -p %s", filepath.Join(egtarball.Path(tarball), "Contents")),
 			shell.Newf("echo \"derp\" | tee %s/Info.plist", filepath.Join(egtarball.Path(tarball), "Contents")),
 		),
-
 		egtarball.Pack(tarball),
 		egtarball.SHA256Op(tarball),
 	)(ctx, op)
@@ -37,7 +34,6 @@ func Dmg(ctx context.Context, op eg.Op) error {
 	b := egdmg.New("retrovibe", egdmg.OptionBuildDir(egenv.CacheDirectory(".dist", "retrovibed.darwin.arm64")))
 	return eg.Perform(
 		ctx,
-		egbug.DirectoryTree(egtarball.Path(tarball)),
 		egdmg.Build(b, os.DirFS(egtarball.Path(tarball))),
 	)
 }

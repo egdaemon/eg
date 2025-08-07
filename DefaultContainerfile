@@ -29,9 +29,7 @@ RUN ln -s /usr/lib/go-1.24/bin/go /usr/local/bin/go
 RUN ssh-keyscan -H github.com >> /etc/ssh/ssh_known_hosts
 RUN ssh-keyscan -H gitlab.com >> /etc/ssh/ssh_known_hosts
 
-# # temporary while we deal with launchpad slowness...
-# RUN gh release download --pattern "*.deb" -O - > /tmp/eg.deb
-# RUN apt install /tmp/eg.deb
+# temporary while we deal with launchpad slowness...
 RUN apt-get install -y --no-install-recommends libbtrfs-dev libassuan-dev libc6-dev libdevmapper-dev libglib2.0-dev libgpgme-dev libgpg-error-dev libprotobuf-dev libprotobuf-c-dev libseccomp-dev libselinux1-dev libsystemd-dev
 RUN GOPROXY=direct go install github.com/egdaemon/eg/cmd/...@v0.0.0-20250806213121-98eefd34752d
 
@@ -44,8 +42,9 @@ RUN setfacl -d -m u:egd:rwx /workload
 RUN setfacl -d -m g:egd:rwx /workload
 
 RUN rm -rf /tmp/gomod /tmp/gocache
-RUN systemctl enable podman.socket
 
 RUN usermod --add-subuids 100000-165535 --add-subgids 100000-165535 egd
-RUN echo "cache buster 472ba006-2797-505a-ae80-b41535886d78"
+RUN echo "cache buster 574ba506-2797-505a-ae80-b41535886d78"
+
+RUN systemctl enable podman.socket
 RUN podman version

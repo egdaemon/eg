@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io/fs"
+	"log"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -54,7 +55,7 @@ func New(name string, options ...Option) Specification {
 		name:       name,
 		runtime:    shell.Runtime(),
 		builddir:   egenv.EphemeralDirectory(),
-		outputpath: egenv.WorkloadDirectory(),
+		outputpath: egenv.WorkspaceDirectory(),
 		outputname: fmt.Sprintf("%s.dmg", name),
 	}, options...)
 }
@@ -74,6 +75,7 @@ func Build(b Specification, archive fs.FS) eg.OpFn {
 			return err
 		}
 
+		log.Println("dmg source dir")
 		fsx.PrintFS(os.DirFS(filepath.Join(b.builddir, root)))
 
 		if err := envx.ExpandInplace(filepath.Join(b.builddir, root, "Contents", "Info.plist"), os.Getenv); err != nil {
@@ -83,8 +85,6 @@ func Build(b Specification, archive fs.FS) eg.OpFn {
 		sruntime := b.runtime
 		return shell.Run(
 			ctx,
-			sruntime.Newf("tree -L 2 /workload"),
-			sruntime.Newf("ls -lha /workload"),
 			sruntime.Newf("ln -fs /Applications %s", filepath.Join(b.builddir, "Applications")),
 			sruntime.Newf(
 				"mkisofs -V %s -D -R -apple -no-pad -o %s %s",

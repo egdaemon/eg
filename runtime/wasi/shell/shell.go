@@ -15,6 +15,10 @@ import (
 	"github.com/egdaemon/eg/runtime/wasi/egunsafe/ffiexec"
 )
 
+const (
+	DefaultTimeout = 5 * time.Minute
+)
+
 type execer func(ctx context.Context, dir string, environ []string, cmd string, args []string) error
 type entrypoint func(ctx context.Context, user string, group string, cmd string, directory string, environ []string, do execer) (err error)
 
@@ -149,7 +153,7 @@ func New(cmd string) Command {
 		user:     stringsx.First(u.Username, "egd"), // default user to execute commands as
 		group:    stringsx.First(defaultgroup(u), "egd"),
 		cmd:      cmd,
-		timeout:  5 * time.Minute,
+		timeout:  DefaultTimeout,
 		entry:    run,
 		exec:     ffiexec.Command,
 		attempts: 1,
@@ -184,14 +188,14 @@ func Op(cmds ...Command) eg.OpFn {
 }
 
 // Run the provided commands using the operation.
-func Run(ctx context.Context, cmds ...Command) (err error) {
+func Run(ctx context.Context, cmds ...Command) error {
 	for _, cmd := range cmds {
-		if err = retry(ctx, cmd, func() error {
+		if err := retry(ctx, cmd, func() error {
 			cctx, done := context.WithTimeout(ctx, cmd.timeout)
 			defer done()
 
 			if cause := cmd.entry(cctx, cmd.user, cmd.group, cmd.cmd, cmd.directory, cmd.environ, cmd.exec); cmd.lenient && cause != nil {
-				log.Println("command failed, but lenient mode enable, ignoring", err)
+				log.Println("command failed, but lenient mode enable, ignoring", cause)
 				return nil
 			} else if cause != nil {
 				return cause
@@ -199,7 +203,7 @@ func Run(ctx context.Context, cmds ...Command) (err error) {
 
 			return nil
 		}); err != nil {
-			return err
+			return errorsx.Wrapf(err, "shell command failed: %s", cmd.cmd)
 		}
 	}
 

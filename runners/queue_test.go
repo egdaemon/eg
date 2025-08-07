@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/egdaemon/eg/internal/debugx"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/fsx"
 	"github.com/egdaemon/eg/internal/testx"
@@ -39,7 +40,7 @@ func TestQueue(t *testing.T) {
 			dirs := runners.NewSpoolDir(t.TempDir())
 			createTestWorkload(t, dirs.Queued, errorsx.Must(uuid.NewV4()), "entry.wasm", testx.Read(testx.Fixture("example.1.wasm")))
 			rm := runners.NewResourceManager(runners.NewRuntimeResources())
-
+			debugx.SetOutput(os.Stderr)
 			reload := make(chan error, 1)
 			ctx, done := context.WithCancelCause(t.Context())
 			c := completion{done: done}

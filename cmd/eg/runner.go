@@ -76,7 +76,7 @@ func (t module) mounthack(ctx context.Context, runid string, ws workspaces.Conte
 		0770,
 		eg.DefaultWorkingDirectory(),
 		eg.DefaultCacheDirectory(),
-		eg.DefaultWorkloadDirectory(),
+		eg.DefaultWorkspaceDirectory(),
 	)
 	if err != nil {
 		return err
@@ -85,7 +85,7 @@ func (t module) mounthack(ctx context.Context, runid string, ws workspaces.Conte
 	err = errors.Join(
 		remap(eg.DefaultMountRoot(eg.WorkingDirectory), eg.DefaultWorkingDirectory()),
 		remap(eg.DefaultMountRoot(eg.CacheDirectory), eg.DefaultCacheDirectory()),
-		remap(eg.DefaultMountRoot(eg.WorkloadDirectory), eg.DefaultWorkloadDirectory()),
+		remap(eg.DefaultMountRoot(eg.WorkspaceDirectory), eg.DefaultWorkspaceDirectory()),
 	)
 	if err != nil {
 		return err
@@ -139,7 +139,7 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 	).Var(
 		eg.EnvComputeRuntimeDirectory, eg.DefaultRuntimeDirectory(),
 	).Var(
-		eg.EnvComputeWorkloadDirectory, eg.DefaultWorkloadDirectory(),
+		eg.EnvComputeWorkloadDirectory, eg.DefaultWorkspaceDirectory(),
 	).Var(
 		"PAGER", "cat", // no paging in this environmenet.
 	)
@@ -226,7 +226,7 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 				runners.AgentMountReadWrite(eg.DefaultMountRoot(), eg.DefaultMountRoot()),
 				runners.AgentMountReadWrite("/var/lib/containers", "/var/lib/containers"),
 			),
-			runners.AgentOptionEGBin(errorsx.Must(exec.LookPath(eg.DefaultMountRoot(eg.BinaryBin)))),
+			runners.AgentOptionEGBin(errorsx.Must(exec.LookPath(eg.DefaultMountRoot(eg.RuntimeDirectory, eg.BinaryBin)))),
 			runners.AgentOptionHostOS(),
 			hostnet,
 		)
@@ -272,9 +272,6 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 
 		srv := grpc.NewServer(
 			grpc.Creds(insecure.NewCredentials()), // this is a local socket
-			grpc.ChainUnaryInterceptor(
-				podmanx.GrpcClient,
-			),
 		)
 		defer srv.GracefulStop()
 

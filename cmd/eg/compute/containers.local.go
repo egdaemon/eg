@@ -71,7 +71,7 @@ func (t c8sLocal) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (er
 	}
 
 	egdir := filepath.Join(ws.Root, ws.ModuleDir)
-	autoruncontainer := filepath.Join(ws.Root, ws.RuntimeDir, "workspace", "Containerfile")
+	autoruncontainer := filepath.Join(ws.RuntimeDir, "workspace", "Containerfile")
 	if err = fsx.MkDirs(0700, filepath.Dir(autoruncontainer)); err != nil {
 		return errorsx.Wrap(err, "unable to write autorunnable containerfil")
 	}
@@ -111,7 +111,7 @@ func (t c8sLocal) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (er
 	}
 
 	log.Println("modules", modules)
-	if err = runners.BuildRootContainerPath(gctx.Context, t.Dir, filepath.Join(ws.Root, ws.RuntimeDir, "Containerfile")); err != nil {
+	if err = runners.BuildRootContainerPath(gctx.Context, t.Dir, filepath.Join(ws.RuntimeDir, "Containerfile")); err != nil {
 		return err
 	}
 
@@ -119,7 +119,7 @@ func (t c8sLocal) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (er
 		return errorsx.Wrap(err, "unable to open git repository")
 	}
 
-	environpath := filepath.Join(ws.Root, ws.RuntimeDir, eg.EnvironFile)
+	environpath := filepath.Join(ws.RuntimeDir, eg.EnvironFile)
 	if environio, err = os.Create(environpath); err != nil {
 		return errorsx.Wrap(err, "unable to open the environment variable file")
 	}
@@ -139,7 +139,7 @@ func (t c8sLocal) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (er
 		return errorsx.Wrap(err, "unable to generate environment")
 	}
 
-	if err = wasix.WarmCacheDirectory(gctx.Context, filepath.Join(ws.Root, ws.BuildDir), wasix.WazCacheDir(filepath.Join(ws.Root, ws.RuntimeDir))); err != nil {
+	if err = wasix.WarmCacheDirectory(gctx.Context, filepath.Join(ws.Root, ws.BuildDir), wasix.WazCacheDir(filepath.Join(ws.CacheDir, eg.DefaultModuleDirectory()))); err != nil {
 		log.Println("unable to prewarm wasi directory cache", err)
 	}
 
@@ -176,7 +176,7 @@ func (t c8sLocal) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (er
 		options := append(
 			ragent.Options(),
 			runners.AgentOptionVolumeSpecs(
-				runners.AgentMountReadOnly(m.Path, eg.DefaultMountRoot(eg.ModuleBin)),
+				runners.AgentMountReadOnly(m.Path, eg.ModuleMount()),
 				runners.AgentMountReadWrite(filepath.Join(ws.Root, ws.WorkingDir), eg.DefaultWorkingDirectory()),
 			)...)
 

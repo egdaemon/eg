@@ -22,7 +22,7 @@ func WithClient(ctx context.Context) (rctx context.Context, err error) {
 }
 
 // Create a unary server interceptor that adds the root context to the request context
-func GrpcClient(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
+func GrpcClient(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
 	pctx, err := bindings.NewConnection(ctx, DefaultSocket())
 	if err != nil {
 		return nil, err

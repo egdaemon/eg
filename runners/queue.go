@@ -18,6 +18,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/backoff"
 	"github.com/egdaemon/eg/internal/debugx"
@@ -432,23 +433,32 @@ func beginwork(ctx context.Context, md metadata, dir string) state {
 
 	errorsx.Log(tarx.Inspect(archive))
 
-	if ws, err = workspaces.New(ctx, md5.New(), filepath.Join(dir, workdirname), eg.DefaultModuleDirectory()); err != nil {
+	cachedir := userx.DefaultCacheDirectory("wcache", cacheprefix(workload.Enqueued), cachebucket(workload.Enqueued), "workloadcache")
+	log.Println("workload cachedir", cachedir)
+
+	if ws, err = workspaces.New(
+		ctx, md5.New(), filepath.Join(dir, workdirname), eg.DefaultModuleDirectory(),
+		workspaces.OptionSymlinkCache(cachedir),
+		workspaces.OptionEnsureWorkingDirectory,
+	); err != nil {
 		return completed(workload.Enqueued, md, ws, 0, errorsx.Wrap(err, "unable to setup workspace"))
 	}
 
 	// debugx.Println("workspace", spew.Sdump(ws))
 
-	if err = tarx.Unpack(filepath.Join(ws.Root, ws.RuntimeDir), archive); err != nil {
+	if err = tarx.Unpack(ws.RuntimeDir, archive); err != nil {
 		return completed(workload.Enqueued, md, ws, 0, errorsx.Wrap(err, "unable to unpack archive"))
 	}
 
-	if err = wasix.WarmCacheDirectory(ctx, filepath.Join(ws.Root, ws.BuildDir), wasix.WazCacheDir(filepath.Join(ws.Root, ws.CacheDir, eg.DefaultModuleDirectory()))); err != nil {
+	fsx.PrintFS(os.DirFS(ws.RuntimeDir))
+
+	if err = wasix.WarmCacheDirectory(ctx, filepath.Join(ws.Root, ws.BuildDir), wasix.WazCacheDir(filepath.Join(ws.CacheDir, eg.DefaultModuleDirectory()))); err != nil {
 		log.Println("unable to prewarm wasi cache", err)
 	} else {
-		log.Println("wasi cache prewarmed", wasix.WazCacheDir(filepath.Join(ws.Root, ws.CacheDir, eg.DefaultModuleDirectory())))
+		log.Println("wasi cache prewarmed", wasix.WazCacheDir(filepath.Join(ws.CacheDir, eg.DefaultModuleDirectory())))
 	}
 
-	environpath := filepath.Join(ws.Root, ws.RuntimeDir, eg.EnvironFile)
+	environpath := filepath.Join(ws.RuntimeDir, eg.EnvironFile)
 
 	envb := envx.Build().FromPath(environpath).
 		Var(gitx.EnvAuthEGAccessToken, workload.AccessToken).
@@ -519,16 +529,13 @@ func (t staterunning) Update(ctx context.Context) state {
 		err           error
 		logdst        *os.File
 		containerdir  = userx.DefaultCacheDirectory("wcache", cacheprefix(t.workload), cachebucket(t.workload), "containers")
-		cachedir      = userx.DefaultCacheDirectory("wcache", cacheprefix(t.workload), cachebucket(t.workload), "workloadcache")
-		logpath       = filepath.Join(t.ws.Root, t.ws.RuntimeDir, "daemon.log")
-		analyticspath = filepath.Join(t.ws.Root, t.ws.RuntimeDir, "analytics.db")
+		logpath       = filepath.Join(t.ws.RuntimeDir, "daemon.log")
+		analyticspath = filepath.Join(t.ws.RuntimeDir, "analytics.db")
 	)
 
-	if err = fsx.MkDirs(0770, containerdir, cachedir); err != nil {
+	if err = fsx.MkDirs(0770, containerdir); err != nil {
 		return completed(t.workload, t.metadata, t.ws, 0, errorsx.Wrap(err, "unable to setup container and cache directories"))
 	}
-
-	log.Println("workload root cachedir", cachedir)
 
 	if logdst, err = os.Create(logpath); err != nil {
 		return completed(t.workload, t.metadata, t.ws, 0, err)
@@ -539,15 +546,19 @@ func (t staterunning) Update(ctx context.Context) state {
 		return completed(t.workload, t.metadata, t.ws, 0, err)
 	}
 
+	log.Println("DERP DERP", spew.Sdump(t.ws))
+	log.Println("log directory", logpath)
+	fsx.PrintFS(os.DirFS(t.ws.Root))
+
 	options := append(
 		t.ragent.Options(),
 		"--replace", // during recovery we might have a container already running.
 		"--volume", AgentMountReadWrite(containerdir, "/var/lib/containers"),
-		"--volume", AgentMountReadOnly(filepath.Join(t.ws.Root, t.ws.RuntimeDir, t.workload.Entry), eg.DefaultMountRoot(eg.ModuleBin)),
-		"--volume", AgentMountReadWrite(filepath.Join(t.ws.Root, t.ws.RuntimeDir), eg.DefaultMountRoot(eg.RuntimeDirectory)),
-		"--volume", AgentMountReadWrite(filepath.Join(t.ws.Root, t.ws.WorkingDir), eg.DefaultMountRoot(eg.WorkingDirectory)),
-		// "--volume", AgentMountReadWrite(filepath.Join(t.ws.Root, t.ws.WorkloadDir), eg.DefaultMountRoot(eg.WorkloadDirectory)),
-		"--volume", AgentMountReadWrite(cachedir, eg.DefaultMountRoot(eg.CacheDirectory)),
+		"--volume", AgentMountReadOnly(filepath.Join(t.ws.RuntimeDir, t.workload.Entry), eg.ModuleMount()),
+		"--volume", AgentMountReadWrite(t.ws.RuntimeDir, eg.DefaultMountRoot(eg.RuntimeDirectory)),
+		"--volume", AgentMountReadWrite(t.ws.WorkingDir, eg.DefaultMountRoot(eg.WorkingDirectory)),
+		"--volume", AgentMountReadWrite(t.ws.WorkspaceDir, eg.DefaultMountRoot(eg.WorkspaceDirectory)),
+		"--volume", AgentMountReadWrite(t.ws.CacheDir, eg.DefaultMountRoot(eg.CacheDirectory)),
 	)
 
 	logger := log.New(io.MultiWriter(os.Stderr, logdst), t.ragent.id, log.Flags())
@@ -584,8 +595,8 @@ type statecompleted struct {
 
 func (t statecompleted) Update(ctx context.Context) state {
 	var (
-		logpath       = filepath.Join(t.ws.Root, t.ws.RuntimeDir, "daemon.log")
-		analyticspath = filepath.Join(t.ws.Root, t.ws.RuntimeDir, "analytics.db")
+		logpath       = filepath.Join(t.ws.RuntimeDir, "daemon.log")
+		analyticspath = filepath.Join(t.ws.RuntimeDir, "analytics.db")
 	)
 
 	log.Println("completed", t.workload.Id, t.workload.AccountId, t.workload.VcsUri, t.ws.Root, t.duration, t.cause)

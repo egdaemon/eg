@@ -11,7 +11,6 @@ import (
 	"strconv"
 	"sync"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/internal/debugx"
 	"github.com/egdaemon/eg/internal/envx"
@@ -47,7 +46,7 @@ type runtimefn func(r runner, host wazero.HostModuleBuilder) wazero.HostModuleBu
 
 // Remote uses the api to implement particular actions like building and running containers.
 // may not be necessary.
-func Remote(ctx context.Context, ws workspaces.Context, aid string, runid string, svc grpc.ClientConnInterface, module string, options ...Option) error {
+func Remote(ctx context.Context, wshost workspaces.Context, aid string, runid string, svc grpc.ClientConnInterface, module string, options ...Option) error {
 	var (
 		r = runner{
 			initonce: &sync.Once{},
@@ -92,13 +91,13 @@ func Remote(ctx context.Context, ws workspaces.Context, aid string, runid string
 			cname := fmt.Sprintf("%s.%s", name, md5x.String(modulepath+runid))
 			options = append(
 				options,
-				"--volume", fmt.Sprintf("%s:%s:ro", filepath.Join(ws.Root, modulepath), eg.DefaultMountRoot(eg.ModuleBin)),
+				"--volume", fmt.Sprintf("%s:%s:ro", filepath.Join(wshost.Root, modulepath), eg.ModuleMount()),
 			)
 
 			_, err = containers.Module(ctx, &c8s.ModuleRequest{
 				Image:   name,
 				Name:    cname,
-				Mdir:    ws.RuntimeDir,
+				Mdir:    wshost.RuntimeDir,
 				Options: options,
 			})
 			if err != nil {
@@ -121,7 +120,7 @@ func Remote(ctx context.Context, ws workspaces.Context, aid string, runid string
 		})).Export("github.com/egdaemon/eg/runtime/wasi/runtime/ffiegcontainer.Run").
 			NewFunctionBuilder().WithFunc(ffiexec.Exec(func(cmd *exec.Cmd) *exec.Cmd {
 			if !filepath.IsAbs(cmd.Dir) {
-				cmd.Dir = filepath.Join(filepath.Join(ws.Root, ws.WorkingDir), cmd.Dir)
+				cmd.Dir = filepath.Join(filepath.Join(wshost.Root, wshost.WorkingDir), cmd.Dir)
 			}
 			cmd.Env = append(r.environ, cmd.Env...)
 			cmd.Stdin = os.Stdin
@@ -131,13 +130,13 @@ func Remote(ctx context.Context, ws workspaces.Context, aid string, runid string
 			return cmd
 		})).Export("github.com/egdaemon/eg/runtime/wasi/runtime/ffiexec.Command").
 			NewFunctionBuilder().WithFunc(
-			ffigit.Commitish(filepath.Join(ws.Root, ws.WorkingDir)),
+			ffigit.Commitish(filepath.Join(wshost.Root, wshost.WorkingDir)),
 		).Export("github.com/egdaemon/eg/runtime/wasi/runtime/ffigit.Commitish").
 			NewFunctionBuilder().WithFunc(
-			ffigit.CloneV1(filepath.Join(ws.Root, ws.WorkingDir)),
+			ffigit.CloneV1(filepath.Join(wshost.Root, wshost.WorkingDir)),
 		).Export("github.com/egdaemon/eg/runtime/wasi/runtime/ffigit.Clone").
 			NewFunctionBuilder().WithFunc(
-			ffigit.CloneV2(filepath.Join(ws.Root, ws.WorkingDir), filepath.Join(ws.Root, ws.RuntimeDir)),
+			ffigit.CloneV2(filepath.Join(wshost.Root, wshost.WorkingDir), filepath.Join(wshost.Root, wshost.RuntimeDir)),
 		).Export("github.com/egdaemon/eg/runtime/wasi/runtime/ffigit.CloneV2").
 			NewFunctionBuilder().WithFunc(
 			// ffimetric.Metric(evtclient),
@@ -148,7 +147,7 @@ func Remote(ctx context.Context, ws workspaces.Context, aid string, runid string
 		).Export("github.com/egdaemon/eg/runtime/wasi/runtime/coverage.Report")
 	}
 
-	return r.perform(ctx, ws, runid, module, runtimeenv)
+	return r.perform(ctx, wshost, runid, module, runtimeenv)
 }
 
 type runner struct {
@@ -156,7 +155,7 @@ type runner struct {
 	initonce *sync.Once
 }
 
-func (t runner) perform(ctx context.Context, ws workspaces.Context, runid, path string, rtb runtimefn) (err error) {
+func (t runner) perform(ctx context.Context, wshost workspaces.Context, runid, path string, rtb runtimefn) (err error) {
 	defer func(before bool) {
 		// strictly speaking stdin should remain blocking at all times but using before
 		if nonBlocking(os.Stdin.Fd()) == before {
@@ -165,7 +164,7 @@ func (t runner) perform(ctx context.Context, ws workspaces.Context, runid, path 
 	}(nonBlocking(os.Stdin.Fd()))
 	tracedebug := envx.Boolean(false, eg.EnvLogsTrace)
 
-	cache, err := wazero.NewCompilationCacheWithDir(wasix.WazCacheDir(ws.CacheDir))
+	cache, err := wazero.NewCompilationCacheWithDir(wasix.WazCacheDir(wshost.CacheDir, eg.DefaultModuleDirectory()))
 	if err != nil {
 		return err
 	}
@@ -212,13 +211,27 @@ func (t runner) perform(ctx context.Context, ws workspaces.Context, runid, path 
 		errpw.CloseWithError(_err)
 	}()
 
-	debugx.Println("workspace", spew.Sdump(ws))
-	debugx.Println("root dir", ws.Root, "->", eg.DefaultRootDirectory())
-	debugx.Println("cache dir", filepath.Join(ws.Root, ws.CacheDir), "->", eg.DefaultCacheDirectory())
-	debugx.Println("runtime dir", filepath.Join(ws.Root, ws.RuntimeDir), "->", eg.DefaultRuntimeDirectory())
-	debugx.Println("working dir", filepath.Join(ws.Root, ws.WorkingDir), "->", eg.DefaultWorkingDirectory())
-	debugx.Println("workload dir", filepath.Join(ws.Root, ws.WorkloadDir), "->", eg.DefaultWorkloadDirectory())
-	debugx.Println("wazero cache", wasix.WazCacheDir(ws.CacheDir))
+	debugx.Println("workload dir", wshost.Root, "->", eg.DefaultWorkloadDirectory())
+	debugx.Println("cache dir", wshost.CacheDir, "->", eg.DefaultCacheDirectory())
+	debugx.Println("runtime dir", wshost.RuntimeDir, "->", eg.DefaultRuntimeDirectory())
+	debugx.Println("working dir", wshost.WorkingDir, "->", eg.DefaultWorkingDirectory())
+	debugx.Println("workspace dir", wshost.WorkspaceDir, "->", eg.DefaultWorkspaceDirectory())
+	debugx.Println("wazero cache", wasix.WazCacheDir(wshost.CacheDir))
+
+	// we map twice so that baremetal can work. shell commands are run on the host itself so we need the host path.
+	// but inside wazero we need to be able to access the standard paths.
+	// the call decide which paths the environment variables rsolve to.
+	// we also need to ensure we mount the working directory so pwd works correctly.
+	wazerofs := wazero.NewFSConfig().
+		WithDirMount(os.TempDir(), os.TempDir()).
+		WithDirMount(wshost.RuntimeDir, eg.DefaultRuntimeDirectory()).
+		WithDirMount(wshost.RuntimeDir, wshost.RuntimeDir).
+		WithDirMount(wshost.CacheDir, eg.DefaultCacheDirectory()).
+		WithDirMount(wshost.CacheDir, wshost.CacheDir).
+		WithDirMount(wshost.WorkspaceDir, eg.DefaultWorkspaceDirectory()).
+		WithDirMount(wshost.WorkspaceDir, wshost.WorkspaceDir).
+		WithDirMount(wshost.WorkingDir, eg.DefaultWorkingDirectory()).
+		WithDirMount(wshost.WorkingDir, wshost.WorkingDir)
 
 	mcfg := wazero.NewModuleConfig().WithEnv(
 		"CI", envx.String("true", "CI"),
@@ -230,8 +243,6 @@ func (t runner) perform(ctx context.Context, ws workspaces.Context, runid, path 
 		eg.EnvComputeModuleNestedLevel, strconv.Itoa(envx.Int(0, eg.EnvComputeModuleNestedLevel)),
 	).WithEnv(
 		eg.EnvComputeLoggingVerbosity, envx.String("-1", eg.EnvComputeLoggingVerbosity),
-	).WithEnv(
-		eg.EnvComputeRootDirectory, eg.DefaultRootDirectory(),
 	).WithEnv(
 		"PATH", os.Getenv("PATH"),
 	).WithEnv(
@@ -245,11 +256,7 @@ func (t runner) perform(ctx context.Context, ws workspaces.Context, runid, path 
 	).WithStdout(
 		outpw,
 	).WithFSConfig(
-		wazero.NewFSConfig().
-			WithDirMount(os.TempDir(), os.TempDir()).
-			WithDirMount(ws.RuntimeDir, eg.DefaultRuntimeDirectory()).
-			WithDirMount(ws.CacheDir, eg.DefaultCacheDirectory()).
-			WithDirMount(ws.WorkingDir, eg.DefaultWorkingDirectory()), // ensure we mount the working directory so pwd works correctly.
+		wazerofs,
 	).WithSysNanotime().WithSysWalltime().WithRandSource(rand.Reader)
 
 	environ := errorsx.Zero(envx.FromPath(eg.DefaultMountRoot(eg.RuntimeDirectory, eg.EnvironFile)))
@@ -267,9 +274,9 @@ func (t runner) perform(ctx context.Context, ws workspaces.Context, runid, path 
 	wasinet, err := ffiwasinet.Wazero(
 		runtime,
 		wnetruntime.OptionFSPrefixes(
-			wnetruntime.FSPrefix{Host: ws.RuntimeDir, Guest: eg.DefaultRuntimeDirectory()},
-			wnetruntime.FSPrefix{Host: ws.CacheDir, Guest: eg.DefaultCacheDirectory()},
-			wnetruntime.FSPrefix{Host: ws.WorkingDir, Guest: eg.DefaultWorkingDirectory()},
+			wnetruntime.FSPrefix{Host: wshost.RuntimeDir, Guest: eg.DefaultRuntimeDirectory()},
+			wnetruntime.FSPrefix{Host: wshost.CacheDir, Guest: eg.DefaultCacheDirectory()},
+			wnetruntime.FSPrefix{Host: wshost.WorkingDir, Guest: eg.DefaultWorkingDirectory()},
 		),
 	).Instantiate(ctx)
 	if err != nil {

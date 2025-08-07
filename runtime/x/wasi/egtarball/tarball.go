@@ -26,7 +26,7 @@ import (
 )
 
 func root(paths ...string) string {
-	return egenv.WorkloadDirectory(filepath.Join(paths...))
+	return egenv.WorkspaceDirectory(filepath.Join(paths...))
 }
 
 // Path generate a unique directory for the contents that will be inside the archive can be

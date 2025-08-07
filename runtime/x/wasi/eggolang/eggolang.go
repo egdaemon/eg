@@ -7,8 +7,10 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	_eg "github.com/egdaemon/eg"
+	"github.com/egdaemon/eg/internal/contextx"
 	"github.com/egdaemon/eg/internal/coverage/golangcov"
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
@@ -17,6 +19,7 @@ import (
 	"github.com/egdaemon/eg/internal/modfilex"
 	"github.com/egdaemon/eg/internal/slicesx"
 	"github.com/egdaemon/eg/internal/stringsx"
+	"github.com/egdaemon/eg/internal/timex"
 	"github.com/egdaemon/eg/interp/events"
 	"github.com/egdaemon/eg/runtime/wasi/eg"
 	"github.com/egdaemon/eg/runtime/wasi/egenv"
@@ -30,10 +33,19 @@ type buildOption struct {
 	flags   []string
 	environ []string
 	bctx    build.Context
+	timeout time.Duration
 }
 
 type boption func(*buildOption)
 
+// provide a timeout for the command.
+func (boption) Timeout(d time.Duration) boption {
+	return func(o *buildOption) {
+		o.timeout = d
+	}
+}
+
+// enable debug flag
 func (boption) Debug(b bool) boption {
 	return func(o *buildOption) {
 		if !b {
@@ -98,9 +110,9 @@ func (ioption) BuildOptions(b buildOption) ioption {
 	}
 }
 
-func AutoInstall(options ...toption) eg.OpFn {
+func AutoInstall(options ...ioption) eg.OpFn {
 	var (
-		opts testOption
+		opts installOption
 	)
 
 	opts = langx.Clone(opts, options...)
@@ -116,10 +128,11 @@ func AutoInstall(options ...toption) eg.OpFn {
 		}
 
 		runtime := shell.Runtime().EnvironFrom(goenv...)
+		timeout := timex.DurationMin(contextx.Until(ctx), timex.DurationFirstNonZero(opts.timeout, shell.DefaultTimeout))
 
 		for gomod := range modfilex.FindModules(stringsx.DefaultIfBlank(opts.bctx.Dir, egenv.WorkingDirectory())) {
-			cmd := stringsx.Join(" ", slicesx.Filter(func(s string) bool { return stringsx.Present(s) }, "go", "install", flags, fmt.Sprintf("%s/...", filepath.Dir(gomod)))...)
-			if err := shell.Run(ctx, runtime.New(cmd)); err != nil {
+			cmd := stringsx.Join(" ", slicesx.Filter(func(s string) bool { return stringsx.Present(s) }, "go", "-C", filepath.Dir(gomod), "install", flags, "./...")...)
+			if err := shell.Run(ctx, runtime.New(cmd).Timeout(timeout)); err != nil {
 				return errorsx.Wrap(err, "unable to run tests")
 			}
 		}
@@ -160,10 +173,11 @@ func AutoCompile(options ...coption) eg.OpFn {
 		}
 
 		runtime := shell.Runtime().EnvironFrom(goenv...).EnvironFrom(opts.buildOption.environ...)
+		timeout := timex.DurationMin(contextx.Until(ctx), timex.DurationFirstNonZero(opts.timeout, shell.DefaultTimeout))
 
 		for gomod := range modfilex.FindModules(stringsx.DefaultIfBlank(opts.bctx.Dir, egenv.WorkingDirectory())) {
 			cmd := stringsx.Join(" ", "go", "-C", filepath.Dir(gomod), "build", flags, "./...")
-			if err := shell.Run(ctx, runtime.New(cmd)); err != nil {
+			if err := shell.Run(ctx, runtime.New(cmd).Timeout(timeout)); err != nil {
 				return errorsx.Wrap(err, "unable to compile")
 			}
 		}
@@ -292,10 +306,11 @@ func AutoTest(options ...toption) eg.OpFn {
 		}
 
 		runtime := shell.Runtime().EnvironFrom(goenv...).EnvironFrom(opts.environ...)
+		timeout := timex.DurationMin(contextx.Until(ctx), timex.DurationFirstNonZero(opts.timeout, shell.DefaultTimeout))
 
 		for gomod := range modfilex.FindModules(egenv.WorkingDirectory()) {
-			cmd := stringsx.Join(" ", "go", "-C", filepath.Dir(gomod), "test", flags, fmt.Sprintf("-coverprofile %s", filepath.Join(covpath, md5x.String(gomod))), "./...")
-			if err := shell.Run(ctx, runtime.New(cmd)); err != nil {
+			cmd := stringsx.Join(" ", "go", "-C", filepath.Dir(gomod), "test", fmt.Sprintf("-timeout=%s", timeout), flags, fmt.Sprintf("-coverprofile %s", filepath.Join(covpath, md5x.String(gomod))), "./...")
+			if err := shell.Run(ctx, runtime.New(cmd).Timeout(timeout+time.Second)); err != nil {
 				return errorsx.Wrap(err, "unable to run tests")
 			}
 		}

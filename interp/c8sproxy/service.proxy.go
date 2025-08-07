@@ -43,9 +43,9 @@ func ServiceProxyOptionBaremetal(ps *ProxyService) {
 		defer func() {
 			debugx.Println("remapped", ps.ws.RuntimeDir, old, "->", n)
 		}()
-		s = strings.ReplaceAll(s, eg.RuntimeDirectory, ps.ws.RuntimeDir)
+		s = strings.Replace(s, eg.RuntimeDirectory, ps.ws.RuntimeDir, 1)
 		if after, ok := strings.CutPrefix(s, "/eg.mnt/"); ok {
-			return filepath.Join(ps.ws.Root, after)
+			return filepath.Join(after)
 		}
 
 		return s
@@ -95,7 +95,7 @@ func (t *ProxyService) Build(ctx context.Context, req *c8s.BuildRequest) (_ *c8s
 
 	abspath := t.remap(req.Definition)
 	if !filepath.IsAbs(abspath) {
-		abspath = filepath.Join(t.ws.Root, t.ws.WorkingDir, req.Definition)
+		abspath = filepath.Join(t.ws.WorkingDir, req.Definition)
 	}
 
 	// need to checksum the image.
@@ -183,17 +183,16 @@ func (t *ProxyService) Module(ctx context.Context, req *c8s.ModuleRequest) (_ *c
 			filepath.Join(t.ws.Root, t.ws.BuildDir, req.Module),
 			eg.DefaultMountRoot(eg.RuntimeDirectory, req.Module),
 		)
+
+		// fsx.PrintFS(os.DirFS(path))
 		// log.Println("resolved\n", filepath.Join(t.ws.Root, t.ws.BuildDir, req.Module), "\n", eg.DefaultMountRoot(eg.RuntimeDirectory, req.Module), "->", path)
-		req.Options = append(req.Options, "--volume", fmt.Sprintf("%s:%s:ro", path, eg.DefaultMountRoot(eg.ModuleBin)))
+		req.Options = append(req.Options, "--volume", fmt.Sprintf("%s:%s:ro", path, eg.ModuleMount()))
 	}
 
 	options := make([]string, 0, len(t.containeropts)+len(req.Options)+1)
 	options = append(options, t.containeropts...)
 	options = append(options, req.Options...)
-	options = append(
-		options,
-		"--volume", fmt.Sprintf("%s:%s:rw", t.ws.Root, eg.DefaultMountRoot(eg.WorkingDirectory)),
-	)
+
 	// log.Println("module options", options)
 	// envx.Debug(options...)
 

@@ -97,7 +97,7 @@ func TestNew(t *testing.T) {
 		require.NoError(t, os.WriteFile(dummyBuildFile, []byte("old"), 0644))
 		require.NoError(t, os.WriteFile(dummyTransFile, []byte("old"), 0644))
 
-		ws, err := workspaces.New(context.Background(), sha256.New(), root, moduleName, workspaces.OptionInvalidateCache)
+		ws, err := workspaces.New(context.Background(), sha256.New(), root, moduleName, workspaces.OptionInvalidateModuleCache)
 		require.NoError(t, err)
 		require.NotNil(t, ws)
 		require.Equal(t, expectedCID, ws.CachedID)
@@ -131,7 +131,7 @@ func TestNew(t *testing.T) {
 		require.NoError(t, os.MkdirAll(oldBuildDir, 0755))
 		require.NoError(t, os.WriteFile(dummyBuildFile, []byte("old"), 0644))
 
-		ws, err := workspaces.New(context.Background(), sha256.New(), root, moduleName, workspaces.OptionEnabled(workspaces.OptionInvalidateCache, false))
+		ws, err := workspaces.New(context.Background(), sha256.New(), root, moduleName, workspaces.OptionEnabled(workspaces.OptionInvalidateModuleCache, false))
 		require.NoError(t, err)
 		require.NotNil(t, ws)
 		require.Equal(t, expectedCID, ws.CachedID)

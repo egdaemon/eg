@@ -43,17 +43,6 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 )
 
-// /podman run --name eg.5f5e0662-32ff-87ba-ed44-187e61b55864 --detach --replace --env CI --env EG_COMPUTE_BIN --env-file /home/jatone/development/egd/eg/.eg.workload.ad856be5/.eg.runtime/environ.env --userns host
-// --cap-add NET_ADMIN --cap-add SYS_ADMIN --device /dev/fuse --pids-limit -1 --cgroupns host --network host
-// --volume /home/jatone/development/egd/eg/.eg.workload.ad856be5/.eg.runtime/environ.env:/eg.mnt/.eg.runtime/environ.env:ro
-// --volume egdaemon.eg.eg.containers:/var/lib/containers:rw
-// --volume /home/jatone/development/egd/eg/.eg.workload.ad856be5/.eg.cache:/eg.mnt/.eg.cache:rw
-// --volume /home/jatone/development/egd/eg/.eg.workload.ad856be5/.eg.runtime:/eg.mnt/.eg.runtime:rw
-// --volume /home/jatone/go/bin/eg:/eg.mnt/egbin:ro
-// --volume /home/jatone/development/egd/eg/.eg.workload.ad856be5/.eg.cache/.eg/.gen/949ea2b4-0dbd-f6f0-5040-f7220c641a39/build/tests/baremetal/main.wasm.d/module.38.3.wasm:/eg.mnt/.eg.module.wasm:ro
-// --volume /home/jatone/development/egd/eg/.eg.workload.ad856be5:/eg.mnt/eg:rw eg
-// /usr/sbin/init
-
 type baremetal struct {
 	Dir             string `name:"directory" help:"root directory of the repository" default:"${vars_eg_root_directory}"`
 	GitRemote       string `name:"git-remote" help:"name of the git remote to use" default:"${vars_git_default_remote_name}"`
@@ -96,32 +85,26 @@ func (t baremetal) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, hotswapbin
 		return err
 	}
 
-	ctx := gctx.Context
-
+	ctx, err := podmanx.WithClient(gctx.Context)
+	if err != nil {
+		return errorsx.Wrap(err, "unable to connect to podman")
+	}
 	// ensure when we run modules our umask is set to allow git clones to work properly
 	runtimex.Umask(0002)
 
 	if ws, err = workspaces.NewLocal(
 		ctx, md5x.Digest(errorsx.Zero(cmdopts.BuildInfo())), t.Dir, t.Workload,
-		workspaces.OptionEnabled(workspaces.OptionInvalidateCache, t.InvalidateCache),
+		workspaces.OptionSymlinkCache(filepath.Join(t.Dir, eg.CacheDirectory)),
+		workspaces.OptionSymlinkWorking(t.Dir),
+		workspaces.OptionEnabled(workspaces.OptionInvalidateModuleCache, t.InvalidateCache),
 	); err != nil {
 		return err
 	}
 
-	// defer os.RemoveAll(ws.Root)
+	defer os.RemoveAll(ws.Root)
 
-	fsx.PrintFS(os.DirFS(ws.Root))
-
-	if err = os.Symlink(t.Dir, ws.WorkingDir); err != nil {
-		return errorsx.Wrap(err, "unable to symlink working directory to workspace")
-	}
-
-	if err = os.Symlink(filepath.Join(t.Dir, eg.CacheDirectory), ws.CacheDir); err != nil {
-		return errorsx.Wrap(err, "unable to symlink cache to workspace")
-	}
-
-	if repo, err = git.PlainOpen(t.Dir); err != nil {
-		return errorsx.Wrap(err, "unable to open git repository")
+	if repo, err = git.PlainOpen(ws.WorkingDir); err != nil {
+		return errorsx.Wrapf(err, "unable to open git repository: %s", ws.WorkingDir)
 	}
 
 	roots, err := transpile.Autodetect(transpile.New(eg.DefaultModuleDirectory(t.Dir), ws)).Run(ctx)
@@ -198,8 +181,6 @@ func (t baremetal) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, hotswapbin
 	).Var(
 		eg.EnvUnsafeGitCloneEnabled, strconv.FormatBool(t.Clone), // hack to disable cloning
 	).Var(
-		eg.EnvComputeWorkingDirectory, ws.Root,
-	).Var(
 		eg.EnvComputeLoggingVerbosity, strconv.Itoa(gctx.Verbosity),
 	).Var(
 		eg.EnvComputeModuleNestedLevel, strconv.Itoa(0),
@@ -214,13 +195,15 @@ func (t baremetal) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, hotswapbin
 	defer environio.Close()
 
 	modulesenv := envx.Build().FromEnviron(errorsx.Must(cmdenvb.Environ())...).Var(
-		eg.EnvComputeRootDirectory, eg.DefaultRootDirectory(),
+		eg.EnvComputeWorkloadDirectory, eg.DefaultWorkloadDirectory(),
+	).Var(
+		eg.EnvComputeWorkingDirectory, eg.DefaultWorkingDirectory(),
 	).Var(
 		eg.EnvComputeCacheDirectory, eg.DefaultCacheDirectory(),
 	).Var(
 		eg.EnvComputeRuntimeDirectory, eg.DefaultRuntimeDirectory(),
 	).Var(
-		eg.EnvComputeWorkloadDirectory, eg.DefaultWorkloadDirectory(),
+		eg.EnvComputeWorkspaceDirectory, eg.DefaultWorkspaceDirectory(),
 	)
 
 	if err = modulesenv.CopyTo(environio); err != nil {
@@ -229,13 +212,15 @@ func (t baremetal) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, hotswapbin
 
 	// tune bare metal environment.
 	cmdenvb.Var(
-		eg.EnvComputeRootDirectory, ws.Root,
+		eg.EnvComputeWorkloadDirectory, ws.Root,
 	).Var(
-		eg.EnvComputeCacheDirectory, filepath.Join(ws.CacheDir),
+		eg.EnvComputeRuntimeDirectory, ws.RuntimeDir,
 	).Var(
-		eg.EnvComputeRuntimeDirectory, filepath.Join(ws.RuntimeDir),
+		eg.EnvComputeCacheDirectory, ws.CacheDir,
 	).Var(
-		eg.EnvComputeWorkloadDirectory, filepath.Join(ws.WorkloadDir),
+		eg.EnvComputeWorkspaceDirectory, ws.WorkspaceDir,
+	).Var(
+		eg.EnvComputeWorkingDirectory, ws.WorkingDir,
 	).Var(
 		eg.EnvComputeDefaultGroup, defaultgroup(),
 	).FromEnviron(
@@ -282,9 +267,10 @@ func (t baremetal) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, hotswapbin
 		runners.AgentOptionLocalComputeCachingVolumes(canonicaluri),
 		runners.AgentOptionEnv(eg.EnvComputeTLSInsecure, strconv.FormatBool(tlsc.Insecure)),
 		runners.AgentOptionVolumes(
+			runners.AgentMountReadWrite(ws.WorkingDir, eg.DefaultMountRoot(eg.WorkingDirectory)),
 			runners.AgentMountReadWrite(ws.CacheDir, eg.DefaultMountRoot(eg.CacheDirectory)),
 			runners.AgentMountReadWrite(ws.RuntimeDir, eg.DefaultMountRoot(eg.RuntimeDirectory)),
-			runners.AgentMountReadWrite(ws.WorkloadDir, eg.DefaultMountRoot(eg.WorkloadDirectory)),
+			runners.AgentMountReadWrite(ws.WorkspaceDir, eg.DefaultMountRoot(eg.WorkspaceDirectory)),
 		),
 		runners.AgentOptionHostOS(),
 		mountegbin,

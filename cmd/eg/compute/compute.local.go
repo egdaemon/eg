@@ -73,24 +73,22 @@ func (t local) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err e
 
 	if ws, err = workspaces.NewLocal(
 		gctx.Context, md5x.Digest(errorsx.Zero(cmdopts.BuildInfo())), t.Dir, t.Name,
-		workspaces.OptionEnabled(workspaces.OptionInvalidateCache, t.InvalidateCache),
+		workspaces.OptionSymlinkCache(filepath.Join(t.Dir, eg.CacheDirectory)),
+		workspaces.OptionSymlinkWorking(t.Dir),
+		workspaces.OptionEnabled(workspaces.OptionInvalidateModuleCache, t.InvalidateCache),
 	); err != nil {
 		return errorsx.Wrap(err, "unable to setup workspace")
 	}
-	defer os.RemoveAll(filepath.Join(ws.Root))
+	defer os.RemoveAll(ws.Root)
 
-	if err = os.Symlink(t.Dir, filepath.Join(ws.Root, ws.WorkingDir)); err != nil {
-		return errorsx.Wrap(err, "unable to symlink working directory")
-	}
-
-	environpath := filepath.Join(ws.Root, ws.RuntimeDir, eg.EnvironFile)
+	environpath := filepath.Join(ws.RuntimeDir, eg.EnvironFile)
 	if environio, err = os.Create(environpath); err != nil {
 		return errorsx.Wrap(err, "unable to open the environment variable file")
 	}
 	defer environio.Close()
 
-	if repo, err = git.PlainOpen(ws.Root); err != nil {
-		return errorsx.Wrap(err, "unable to open git repository")
+	if repo, err = git.PlainOpen(ws.WorkingDir); err != nil {
+		return errorsx.Wrapf(err, "unable to open git repository: %s", ws.WorkingDir)
 	}
 
 	if t.Infinite {
@@ -102,8 +100,11 @@ func (t local) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err e
 		FromEnv(t.Environment...).
 		FromEnv(os.Environ()...).
 		FromEnviron(errorsx.Zero(gitx.LocalEnv(repo, t.GitRemote, t.GitReference))...).
+		Var(eg.EnvComputeWorkloadDirectory, eg.DefaultWorkloadDirectory()).
+		Var(eg.EnvComputeWorkingDirectory, eg.DefaultWorkingDirectory()).
 		Var(eg.EnvComputeCacheDirectory, eg.DefaultCacheDirectory()).
 		Var(eg.EnvComputeRuntimeDirectory, eg.DefaultRuntimeDirectory()).
+		Var(eg.EnvComputeWorkspaceDirectory, eg.DefaultWorkspaceDirectory()).
 		Var(eg.EnvComputeRunID, uid.String()).
 		Var(eg.EnvComputeLoggingVerbosity, strconv.Itoa(gctx.Verbosity)).
 		Var(eg.EnvComputeBin, hotswapbin.String()).
@@ -123,9 +124,9 @@ func (t local) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err e
 
 	log.Println("cacheid", ws.CachedID)
 
-	roots, err := transpile.Autodetect(transpile.New(t.Dir, ws)).Run(gctx.Context)
+	roots, err := transpile.Autodetect(transpile.New(eg.DefaultModuleDirectory(t.Dir), ws)).Run(gctx.Context)
 	if err != nil {
-		return err
+		return errorsx.Wrap(err, "unable to transpile")
 	}
 
 	if err = compile.EnsureRequiredPackages(gctx.Context, filepath.Join(ws.Root, ws.TransDir)); err != nil {
@@ -148,7 +149,7 @@ func (t local) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err e
 		return err
 	}
 
-	if err = wasix.WarmCacheDirectory(gctx.Context, filepath.Join(ws.Root, ws.BuildDir), wasix.WazCacheDir(filepath.Join(ws.Root, ws.CacheDir, eg.DefaultModuleDirectory()))); err != nil {
+	if err = wasix.WarmCacheDirectory(gctx.Context, filepath.Join(ws.Root, ws.BuildDir), wasix.WazCacheDir(filepath.Join(ws.CacheDir, eg.DefaultModuleDirectory()))); err != nil {
 		log.Println("unable to prewarm wasi directory cache", err)
 	}
 
@@ -168,10 +169,10 @@ func (t local) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err e
 		sshenvvar,
 		mountegbin,
 		runners.AgentOptionVolumes(
-			runners.AgentMountReadWrite(filepath.Join(ws.Root, ws.CacheDir), eg.DefaultMountRoot(eg.CacheDirectory)),
-			runners.AgentMountReadWrite(filepath.Join(ws.Root, ws.RuntimeDir), eg.DefaultMountRoot(eg.RuntimeDirectory)),
-			runners.AgentMountReadWrite(filepath.Join(ws.Root, ws.WorkingDir), eg.DefaultMountRoot(eg.WorkingDirectory)),
-			// runners.AgentMountReadWrite(filepath.Join(ws.Root, ws.WorkloadDir), eg.DefaultMountRoot(eg.WorkloadDirectory)),
+			runners.AgentMountReadWrite(ws.CacheDir, eg.DefaultMountRoot(eg.CacheDirectory)),
+			runners.AgentMountReadWrite(ws.RuntimeDir, eg.DefaultMountRoot(eg.RuntimeDirectory)),
+			runners.AgentMountReadWrite(ws.WorkingDir, eg.DefaultMountRoot(eg.WorkingDirectory)),
+			runners.AgentMountReadWrite(ws.WorkspaceDir, eg.DefaultMountRoot(eg.WorkspaceDirectory)),
 		),
 		runners.AgentOptionLocalComputeCachingVolumes(canonicaluri),
 		runners.AgentOptionEnvironFile(environpath), // ensure we pick up the environment file with the container.
@@ -190,7 +191,7 @@ func (t local) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err e
 					filepath.Join(ws.Root, ws.BuildDir, ws.Module, eg.ModuleDir),
 					eg.DefaultMountRoot(eg.RuntimeDirectory, ws.Module, eg.ModuleDir),
 				),
-				runners.AgentMountReadOnly(m.Path, eg.DefaultMountRoot(eg.ModuleBin)),
+				runners.AgentMountReadOnly(m.Path, eg.ModuleMount()),
 			)...)
 
 		prepcmd := func(cmd *exec.Cmd) *exec.Cmd {

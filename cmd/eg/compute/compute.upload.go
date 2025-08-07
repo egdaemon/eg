@@ -62,7 +62,11 @@ func (t upload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 		return err
 	}
 
-	if ws, err = workspaces.New(gctx.Context, md5x.Digest(errorsx.Zero(cmdopts.BuildInfo())), t.Dir, t.Name); err != nil {
+	if ws, err = workspaces.NewLocal(
+		gctx.Context, md5x.Digest(errorsx.Zero(cmdopts.BuildInfo())), t.Dir, t.Name,
+		workspaces.OptionSymlinkCache(filepath.Join(t.Dir, eg.CacheDirectory)),
+		workspaces.OptionSymlinkWorking(t.Dir),
+	); err != nil {
 		return err
 	}
 	defer os.RemoveAll(filepath.Join(ws.Root, ws.RuntimeDir))

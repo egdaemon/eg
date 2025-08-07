@@ -69,9 +69,14 @@ func (t baremetal) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, hotswapbin
 
 	// clean up the eg environment ensuring a clean starting state.
 	resetenv := func() error {
+		unsetlog := func(s string) error {
+			log.Println("baremetal unsetting envvar", s, os.Getenv(s))
+			return os.Unsetenv(eg.EnvComputeModuleSocket)
+		}
+
 		return errorsx.Compact(
-			os.Unsetenv(eg.EnvComputeModuleSocket),
-			os.Unsetenv(eg.EnvComputeModuleNestedLevel),
+			unsetlog(eg.EnvComputeModuleSocket),
+			unsetlog(eg.EnvComputeModuleNestedLevel),
 		)
 	}
 

@@ -13,7 +13,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"strconv"
 	"strings"
 	"syscall"
@@ -108,6 +107,7 @@ type metadata struct {
 	reload       chan error
 	downloader
 	completion
+	failure   func(cause error)
 	dirs      *SpoolDirs
 	rm        *ResourceManager
 	agentopts []AgentOption
@@ -131,6 +131,12 @@ func QueueOptionCompletion(c completion) QueueOption {
 func QueueOptionLogVerbosity(n int) QueueOption {
 	return func(m *metadata) {
 		m.logVerbosity = n
+	}
+}
+
+func QueueOptionFailure(fn func(cause error)) QueueOption {
+	return func(m *metadata) {
+		m.failure = fn
 	}
 }
 
@@ -172,7 +178,7 @@ func BuildContainer(ctx context.Context, name, dir, path string) (err error) {
 	return nil
 }
 
-func workload(ctx context.Context, id int, delay time.Duration, rm *ResourceManager, dirs *SpoolDirs, reload chan error, options ...func(*metadata)) error {
+func RunOne(ctx context.Context, id int, delay time.Duration, rm *ResourceManager, dirs *SpoolDirs, reload chan error, options ...func(*metadata)) error {
 	var (
 		s state = newdelay(
 			delay,
@@ -183,13 +189,17 @@ func workload(ctx context.Context, id int, delay time.Duration, rm *ResourceMana
 					reload:     reload,
 					completion: noopcompletion{},
 					downloader: localdownloader{},
-					dirs:       dirs,
+					failure: func(cause error) {
+						log.Println(cause)
+					},
+					dirs: dirs,
 				},
 				options...,
 			)),
 		)
 	)
 
+	defer debugx.Printf("completed %d\n", id)
 	for {
 		select {
 		case <-ctx.Done():
@@ -206,11 +216,16 @@ func workload(ctx context.Context, id int, delay time.Duration, rm *ResourceMana
 }
 
 func workloadcapacity() int {
-	return envx.Int(runtime.NumCPU(), eg.EnvComputeWorkloadCapacity)
+	return envx.Int(1, eg.EnvComputeWorkloadCapacity)
 }
 
 // runs the scheduler until the context is cancelled.
 func Queue(ctx context.Context, rm *ResourceManager, options ...func(*metadata)) (err error) {
+	return QueueN(ctx, workloadcapacity(), DefaultSpoolDirs(), rm, options...)
+}
+
+// runs the scheduler until the context is cancelled.
+func QueueN(ctx context.Context, n int, dirs SpoolDirs, rm *ResourceManager, options ...func(*metadata)) (err error) {
 	// monitor for reload signals, can't use the context because we
 	// dont want to interrupt running work but only want to stop after a run.
 	reload := make(chan error, 1)
@@ -220,7 +235,6 @@ func Queue(ctx context.Context, rm *ResourceManager, options ...func(*metadata))
 		return nil
 	})(ctx, syscall.SIGHUP)
 
-	dirs := DefaultSpoolDirs()
 	var (
 		md = langx.Clone(
 			metadata{
@@ -239,7 +253,7 @@ func Queue(ctx context.Context, rm *ResourceManager, options ...func(*metadata))
 		log.Println("recovery failed, continuing", cause)
 	}
 
-	pool := pond.NewPool(workloadcapacity())
+	pool := pond.NewPool(n)
 	workers := make([]pond.Task, 0, pool.MaxConcurrency())
 
 	for i := 0; i < pool.MaxConcurrency(); i++ {
@@ -247,7 +261,7 @@ func Queue(ctx context.Context, rm *ResourceManager, options ...func(*metadata))
 		delay := backoff.DynamicHashDuration(time.Second, strconv.FormatInt(int64(i), 36))
 		log.Println("workload", i, "deferred", delay)
 		workers = append(workers, pool.SubmitErr(func() error {
-			return workload(ctx, i, delay, rm, &dirs, reload, options...)
+			return RunOne(ctx, i, delay, rm, &dirs, reload, options...)
 		}))
 	}
 
@@ -281,20 +295,22 @@ func (t stateterminated) Update(ctx context.Context) state {
 	return nil
 }
 
-func failure(cause error, n state) state {
+func failure(md metadata, cause error, n state) state {
 	return statefailure{
-		cause: cause,
-		next:  n,
+		metadata: md,
+		cause:    cause,
+		next:     n,
 	}
 }
 
 type statefailure struct {
+	metadata
 	cause error
 	next  state
 }
 
 func (t statefailure) Update(ctx context.Context) state {
-	log.Println(t.cause)
+	t.failure(t.cause)
 	return t.next
 }
 
@@ -332,9 +348,9 @@ type stateidle struct {
 func (t stateidle) Update(ctx context.Context) state {
 	select {
 	case <-ctx.Done():
-		return failure(ctx.Err(), nil)
+		return failure(t.metadata, ctx.Err(), nil)
 	case cause := <-t.metadata.reload:
-		return failure(cause, nil)
+		return failure(t.metadata, cause, nil)
 	default:
 	}
 
@@ -351,7 +367,7 @@ func (t stateidle) Update(ctx context.Context) state {
 	} else if errors.Is(err, context.Canceled) {
 		return nil
 	} else if err != nil {
-		return failure(err, t)
+		return failure(t.metadata, err, t)
 	}
 
 	return t
@@ -398,12 +414,12 @@ func beginwork(ctx context.Context, md metadata, dir string) state {
 
 	if encoded, err = os.ReadFile(filepath.Join(dir, "metadata.json")); err != nil {
 		errorsx.Log(errorsx.Wrap(md.dirs.Discard(dir), "failed to clear invalid workload"))
-		return failure(err, idle(md))
+		return failure(md, err, idle(md))
 	}
 
 	if err = json.Unmarshal(encoded, workload); err != nil {
 		errorsx.Log(errorsx.Wrap(md.dirs.Discard(dir), "failed to clear invalid workload"))
-		return failure(err, idle(md))
+		return failure(md, err, idle(md))
 	}
 
 	log.Println("metadata", workload.Enqueued.Id)
@@ -576,24 +592,24 @@ func (t statecompleted) Update(ctx context.Context) state {
 
 	logs, err := os.Open(logpath)
 	if err != nil {
-		return discard(t.workload, t.metadata, failure(errorsx.Wrap(err, "unable open logs for upload"), idle(t.metadata)))
+		return discard(t.workload, t.metadata, failure(t.metadata, errorsx.Wrap(err, "unable open logs for upload"), idle(t.metadata)))
 	}
 	defer logs.Close()
 
 	analytics, err := os.Open(analyticspath)
 	if err != nil {
-		return discard(t.workload, t.metadata, failure(errorsx.Wrap(err, "unable open analytics for upload"), idle(t.metadata)))
+		return discard(t.workload, t.metadata, failure(t.metadata, errorsx.Wrap(err, "unable open analytics for upload"), idle(t.metadata)))
 	}
 	defer analytics.Close()
 	if err = t.metadata.completion.Upload(ctx, t.workload.Id, t.duration, t.cause, logs, analytics); httpx.IsStatusError(err, http.StatusNotFound) != nil {
 		// means we already uploaded the results.
 		return discard(t.workload, t.metadata, idle(t.metadata))
 	} else if err != nil {
-		return failure(errorsx.Wrapf(err, "unable to upload completion: %s", t.workload.Id), newdelay(backoff.RandomFromRange(time.Second), t))
+		return failure(t.metadata, errorsx.Wrapf(err, "unable to upload completion: %s", t.workload.Id), newdelay(backoff.RandomFromRange(time.Second), t))
 	}
 
 	if t.cause != nil {
-		return discard(t.workload, t.metadata, failure(errorsx.Wrap(t.cause, "work failed"), idle(t.metadata)))
+		return discard(t.workload, t.metadata, failure(t.metadata, errorsx.Wrap(t.cause, "work failed"), idle(t.metadata)))
 	}
 
 	return discard(t.workload, t.metadata, idle(t.metadata))
@@ -621,7 +637,7 @@ func (t statediscard) Update(ctx context.Context) state {
 	}()
 
 	if err := t.metadata.dirs.Completed(uuid.FromStringOrNil(t.workload.Id)); err != nil {
-		return failure(errorsx.Wrap(err, "completion failed"), t.n)
+		return failure(t.metadata, errorsx.Wrap(err, "completion failed"), t.n)
 	}
 
 	// strictly probably not necessary, but ensure the workloads dont sync up by introducing a small randomized delay between workloads.

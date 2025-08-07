@@ -175,6 +175,7 @@ github.com/dustin/go-humanize v1.0.1/go.mod h1:Mu1zIs6XwVuF/gI1OepvI0qD18qycQx+m
 github.com/ebitengine/purego v0.8.4 h1:CF7LEKg5FFOsASUj0+QwaXf8Ht6TlFxg09+S9wz0omw=
 github.com/ebitengine/purego v0.8.4/go.mod h1:iIjxzd6CiRiOG0UyXP+V1+jWqUXVjPKLAI0mRfJZTmQ=
 github.com/egdaemon/wasinet/wasinet v0.0.0-20250806175613-49e153bd345a h1:yMN/o4Z06znmJbjVcZMlA+stIXbEJPf0LWY1++zUg6Y=
+github.com/egdaemon/wasinet/wasinet v0.0.0-20250806175613-49e153bd345a/go.mod h1:vPVQ3HHYTa9Fe7lz+ZBqI49kw76LSTQfvKZlO8QpWsY=
 github.com/egdaemon/wasinet/wazeronet v0.0.0-20250731121320-3287a738a635 h1:au3wEqyE4BspmHFWyVYwHjtPpBkzoCYMc3t1wSftbPY=
 github.com/egdaemon/wasinet/wazeronet v0.0.0-20250731121320-3287a738a635/go.mod h1:64MD4OgWyYuKHTji15b9N8BXtzipKtR8+uLOSMEz2Es=
 github.com/elastic/gosigar v0.12.0/go.mod h1:iXRIGg2tLnu7LBdpqzyQfGDEidKCfWcCMS0WKyPWoMs=

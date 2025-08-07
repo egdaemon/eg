@@ -31,7 +31,7 @@ func TestNew(t *testing.T) {
 		require.NoError(t, err)
 		expectedCID := uuid.FromBytesOrNil(hasher.Sum(nil)).String()
 
-		ws, err := workspaces.New(context.Background(), sha256.New(), root, moduleDir, moduleName, false)
+		ws, err := workspaces.New(context.Background(), sha256.New(), root, moduleName)
 		require.NoError(t, err)
 		require.NotNil(t, ws)
 
@@ -61,7 +61,7 @@ func TestNew(t *testing.T) {
 		require.NoError(t, os.Mkdir(filepath.Join(root, moduleDir), 0755))
 		require.NoError(t, os.WriteFile(filepath.Join(root, moduleDir, "main.go"), []byte("package private"), 0644))
 
-		ws, err := workspaces.New(context.Background(), sha256.New(), root, moduleDir, moduleName, true)
+		ws, err := workspaces.New(context.Background(), sha256.New(), root, moduleName)
 		require.NoError(t, err)
 		require.NotNil(t, ws)
 
@@ -97,7 +97,7 @@ func TestNew(t *testing.T) {
 		require.NoError(t, os.WriteFile(dummyBuildFile, []byte("old"), 0644))
 		require.NoError(t, os.WriteFile(dummyTransFile, []byte("old"), 0644))
 
-		ws, err := workspaces.New(context.Background(), sha256.New(), root, moduleDir, moduleName, false, workspaces.OptionInvalidateCache)
+		ws, err := workspaces.New(context.Background(), sha256.New(), root, moduleName, workspaces.OptionInvalidateCache)
 		require.NoError(t, err)
 		require.NotNil(t, ws)
 		require.Equal(t, expectedCID, ws.CachedID)
@@ -115,13 +115,12 @@ func TestNew(t *testing.T) {
 
 	t.Run("success_with_option_enabled_false", func(t *testing.T) {
 		root := t.TempDir()
-		moduleDir := "somemodule"
 		moduleName := "test-no-invalidate"
-		require.NoError(t, os.Mkdir(filepath.Join(root, moduleDir), 0755))
-		require.NoError(t, os.WriteFile(filepath.Join(root, moduleDir, "lib.go"), []byte("package lib"), 0644))
+		require.NoError(t, os.Mkdir(filepath.Join(root), 0755))
+		require.NoError(t, os.WriteFile(filepath.Join(root, "lib.go"), []byte("package lib"), 0644))
 
 		hasher := sha256.New()
-		fileBytes, err := os.ReadFile(filepath.Join(root, moduleDir, "lib.go"))
+		fileBytes, err := os.ReadFile(filepath.Join(root, "lib.go"))
 		require.NoError(t, err)
 		_, err = hasher.Write(fileBytes)
 		require.NoError(t, err)
@@ -132,7 +131,7 @@ func TestNew(t *testing.T) {
 		require.NoError(t, os.MkdirAll(oldBuildDir, 0755))
 		require.NoError(t, os.WriteFile(dummyBuildFile, []byte("old"), 0644))
 
-		ws, err := workspaces.New(context.Background(), sha256.New(), root, moduleDir, moduleName, false, workspaces.OptionEnabled(workspaces.OptionInvalidateCache, false))
+		ws, err := workspaces.New(context.Background(), sha256.New(), root, moduleName, workspaces.OptionEnabled(workspaces.OptionInvalidateCache, false))
 		require.NoError(t, err)
 		require.NotNil(t, ws)
 		require.Equal(t, expectedCID, ws.CachedID)
@@ -145,10 +144,9 @@ func TestNew(t *testing.T) {
 		roottmp := t.TempDir()
 		require.NoError(t, os.Chmod(roottmp, 0444))
 		root := filepath.Join(roottmp, "nonexistent")
-		moduleDir := "mymodule"
 		moduleName := "test-module"
 
-		ws, err := workspaces.New(context.Background(), sha256.New(), root, moduleDir, moduleName, false)
+		ws, err := workspaces.New(context.Background(), sha256.New(), root, moduleName)
 
 		log.Println(spew.Sdump(ws))
 		require.Error(t, err)
@@ -176,7 +174,7 @@ func TestNew(t *testing.T) {
 		require.NoError(t, err)
 		expectedCID := uuid.FromBytesOrNil(hasher.Sum(nil)).String()
 
-		ws, err := workspaces.New(context.Background(), sha256.New(), root, moduleDir, moduleName, false)
+		ws, err := workspaces.New(context.Background(), sha256.New(), root, moduleName)
 		require.NoError(t, err)
 		require.NotNil(t, ws)
 		require.Equal(t, expectedCID, ws.CachedID)
@@ -191,7 +189,7 @@ func TestNew(t *testing.T) {
 		hasher := sha256.New()
 		expectedCID := uuid.FromBytesOrNil(hasher.Sum(nil)).String()
 
-		ws, err := workspaces.New(context.Background(), sha256.New(), root, moduleDir, moduleName, false)
+		ws, err := workspaces.New(context.Background(), sha256.New(), root, moduleName)
 		require.NoError(t, err)
 		require.NotNil(t, ws)
 		require.Equal(t, expectedCID, ws.CachedID)

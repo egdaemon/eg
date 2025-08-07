@@ -432,7 +432,7 @@ func beginwork(ctx context.Context, md metadata, dir string) state {
 
 	errorsx.Log(tarx.Inspect(archive))
 
-	if ws, err = workspaces.New(ctx, md5.New(), filepath.Join(dir, workdirname), eg.DefaultModuleDirectory(), eg.WorkingDirectory, false); err != nil {
+	if ws, err = workspaces.New(ctx, md5.New(), filepath.Join(dir, workdirname), eg.DefaultModuleDirectory()); err != nil {
 		return completed(workload.Enqueued, md, ws, 0, errorsx.Wrap(err, "unable to setup workspace"))
 	}
 
@@ -546,6 +546,7 @@ func (t staterunning) Update(ctx context.Context) state {
 		"--volume", AgentMountReadOnly(filepath.Join(t.ws.Root, t.ws.RuntimeDir, t.workload.Entry), eg.DefaultMountRoot(eg.ModuleBin)),
 		"--volume", AgentMountReadWrite(filepath.Join(t.ws.Root, t.ws.RuntimeDir), eg.DefaultMountRoot(eg.RuntimeDirectory)),
 		"--volume", AgentMountReadWrite(filepath.Join(t.ws.Root, t.ws.WorkingDir), eg.DefaultMountRoot(eg.WorkingDirectory)),
+		// "--volume", AgentMountReadWrite(filepath.Join(t.ws.Root, t.ws.WorkloadDir), eg.DefaultMountRoot(eg.WorkloadDirectory)),
 		"--volume", AgentMountReadWrite(cachedir, eg.DefaultMountRoot(eg.CacheDirectory)),
 	)
 

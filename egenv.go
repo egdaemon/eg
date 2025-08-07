@@ -68,7 +68,8 @@ const (
 	EnvComputeAccountID          = "EG_COMPUTE_ACCOUNT_ID"                      // account id of the compute workload
 	EnvComputeVCS                = "EG_COMPUTE_VCS_URI"                         // vcs uri for the compute workload
 	EnvComputeTTL                = "EG_COMPUTE_TTL"                             // deadline for compute workload
-	EnvComputeWorkingDirectory   = "EG_COMPUTE_ROOT_DIRECTORY"                  // root working directory for workloads
+	EnvComputeRootDirectory      = "EG_COMPUTE_ROOT_DIRECTORY"                  // root directory for workloads
+	EnvComputeWorkingDirectory   = "EG_COMPUTE_WORKING_DIRECTORY"               // working directory for workloads
 	EnvComputeCacheDirectory     = "EG_COMPUTE_CACHE_DIRECTORY"                 // cache directory for workloads
 	EnvComputeRuntimeDirectory   = "EG_COMPUTE_RUNTIME_DIRECTORY"               // runtime directory for workloads
 	EnvComputeWorkloadDirectory  = "EG_COMPUTE_WORKLOAD_DIRECTORY"              // workload directory for workloads
@@ -106,14 +107,15 @@ const (
 )
 
 const (
-	WorkingDirectory = "eg"
-	CacheDirectory   = ".eg.cache"
-	RuntimeDirectory = ".eg.runtime"
-	ModuleDir        = "main.wasm.d"
-	ModuleBin        = ".eg.module.wasm"
-	BinaryBin        = "egbin"
-	EnvironFile      = "environ.env"
-	SocketControl    = "control.socket"
+	WorkingDirectory  = "eg"
+	CacheDirectory    = ".eg.cache"    // persistent cache between workloads
+	RuntimeDirectory  = ".eg.runtime"  // runtime directory containing eg related files and sockets.
+	WorkloadDirectory = ".eg.workload" // persistent shared directory for the duration of a single workload.
+	ModuleDir         = "main.wasm.d"
+	ModuleBin         = ".eg.module.wasm"
+	BinaryBin         = "egbin"
+	EnvironFile       = "environ.env"
+	SocketControl     = "control.socket"
 )
 
 // generate unique module socket
@@ -121,12 +123,12 @@ func SocketModule() string {
 	return fmt.Sprintf("module.%s.socket", errorsx.Must(uuid.NewV7()).String())
 }
 
-func DefaultModuleDirectory() string {
-	return ".eg"
+func DefaultModuleDirectory(rel ...string) string {
+	return filepath.Join(filepath.Join(rel...), ".eg")
 }
 
 func DefaultCacheDirectory(rel ...string) string {
-	return DefaultWorkloadRoot(CacheDirectory, filepath.Join(rel...))
+	return DefaultRootDirectory(CacheDirectory, filepath.Join(rel...))
 }
 
 func DefaultRuntimeDirectory(rel ...string) string {
@@ -134,10 +136,16 @@ func DefaultRuntimeDirectory(rel ...string) string {
 }
 
 func DefaultWorkingDirectory(rel ...string) string {
-	return DefaultWorkloadRoot(WorkingDirectory, filepath.Join(rel...))
+	return DefaultRootDirectory(WorkingDirectory, filepath.Join(rel...))
 }
 
-func DefaultWorkloadRoot(rel ...string) string {
+// default workload directory
+func DefaultWorkloadDirectory(rel ...string) string {
+	return DefaultRootDirectory(WorkloadDirectory, filepath.Join(rel...))
+}
+
+// default egd directory root. holds the directories accessible by egd.
+func DefaultRootDirectory(rel ...string) string {
 	return filepath.Join("/", "workload", filepath.Join(rel...))
 }
 

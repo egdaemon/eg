@@ -16,7 +16,7 @@ RUN add-apt-repository -n ppa:longsleep/golang-backports
 RUN add-apt-repository -n ppa:egdaemon/eg
 RUN add-apt-repository -n ppa:egdaemon/duckdb
 RUN apt-get update
-RUN apt-get install -y --no-install-recommends ssh podman netavark golang-1.24 eg egbootstrap tree nftables iptables
+RUN apt-get install -y --no-install-recommends ssh podman netavark golang-1.24 eg egbootstrap tree nftables iptables acl
 
 RUN sh /usr/share/eg/install/github.sh
 RUN apt-get update
@@ -38,6 +38,11 @@ RUN GOPROXY=direct go install github.com/egdaemon/eg/cmd/...@v0.0.0-202508062131
 RUN systemd-sysusers
 RUN systemd-tmpfiles --create
 RUN systemd-tmpfiles --clean
+
+# ensure that any files folders within /workload can be managed by the egd user.
+RUN setfacl -d -m u:egd:rwx /workload
+RUN setfacl -d -m g:egd:rwx /workload
+
 RUN rm -rf /tmp/gomod /tmp/gocache
 RUN systemctl enable podman.socket
 

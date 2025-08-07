@@ -34,8 +34,7 @@ import (
 
 type local struct {
 	cmdopts.RuntimeResources
-	Dir              string   `name:"directory" help:"root directory of the repository" default:"${vars_git_directory}"`
-	ModuleDir        string   `name:"moduledir" help:"must be a subdirectory in the provided directory" default:"${vars_workload_directory}"`
+	Dir              string   `name:"directory" help:"root directory of the repository" default:"${vars_eg_root_directory}"`
 	Privileged       bool     `name:"privileged" help:"run the initial container in privileged mode"`
 	Dirty            bool     `name:"dirty" help:"include user directories and environment variables" hidden:"true"`
 	InvalidateCache  bool     `name:"invalidate-cache" help:"removes workload build cache"`
@@ -72,19 +71,15 @@ func (t local) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err e
 		return errorsx.Wrap(err, "unable to connect to podman")
 	}
 
-	if ws, err = workspaces.New(
-		gctx.Context, md5x.Digest(errorsx.Zero(cmdopts.BuildInfo())), t.Dir, t.ModuleDir, t.Name, false,
+	if ws, err = workspaces.NewLocal(
+		gctx.Context, md5x.Digest(errorsx.Zero(cmdopts.BuildInfo())), t.Dir, t.Name,
 		workspaces.OptionEnabled(workspaces.OptionInvalidateCache, t.InvalidateCache),
 	); err != nil {
 		return errorsx.Wrap(err, "unable to setup workspace")
 	}
-	defer os.RemoveAll(filepath.Join(ws.Root, ws.RuntimeDir))
+	defer os.RemoveAll(filepath.Join(ws.Root))
 
-	if err = os.Remove(filepath.Join(ws.Root, ws.WorkingDir)); err != nil {
-		return errorsx.Wrap(err, "unable to remove working directory")
-	}
-
-	if err = os.Symlink(ws.Root, filepath.Join(ws.Root, ws.WorkingDir)); err != nil {
+	if err = os.Symlink(t.Dir, filepath.Join(ws.Root, ws.WorkingDir)); err != nil {
 		return errorsx.Wrap(err, "unable to symlink working directory")
 	}
 
@@ -128,7 +123,7 @@ func (t local) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err e
 
 	log.Println("cacheid", ws.CachedID)
 
-	roots, err := transpile.Autodetect(transpile.New(ws)).Run(gctx.Context)
+	roots, err := transpile.Autodetect(transpile.New(t.Dir, ws)).Run(gctx.Context)
 	if err != nil {
 		return err
 	}
@@ -175,6 +170,8 @@ func (t local) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err e
 		runners.AgentOptionVolumes(
 			runners.AgentMountReadWrite(filepath.Join(ws.Root, ws.CacheDir), eg.DefaultMountRoot(eg.CacheDirectory)),
 			runners.AgentMountReadWrite(filepath.Join(ws.Root, ws.RuntimeDir), eg.DefaultMountRoot(eg.RuntimeDirectory)),
+			runners.AgentMountReadWrite(filepath.Join(ws.Root, ws.WorkingDir), eg.DefaultMountRoot(eg.WorkingDirectory)),
+			// runners.AgentMountReadWrite(filepath.Join(ws.Root, ws.WorkloadDir), eg.DefaultMountRoot(eg.WorkloadDirectory)),
 		),
 		runners.AgentOptionLocalComputeCachingVolumes(canonicaluri),
 		runners.AgentOptionEnvironFile(environpath), // ensure we pick up the environment file with the container.
@@ -194,7 +191,6 @@ func (t local) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err e
 					eg.DefaultMountRoot(eg.RuntimeDirectory, ws.Module, eg.ModuleDir),
 				),
 				runners.AgentMountReadOnly(m.Path, eg.DefaultMountRoot(eg.ModuleBin)),
-				runners.AgentMountReadWrite(filepath.Join(ws.Root, ws.WorkingDir), eg.DefaultMountRoot(eg.WorkingDirectory)),
 			)...)
 
 		prepcmd := func(cmd *exec.Cmd) *exec.Cmd {

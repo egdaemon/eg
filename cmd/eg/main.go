@@ -118,6 +118,7 @@ func main() {
 			"vars_tls_insecure_default": eg.EnvTLSInsecure(),
 			"vars_cwd":                  osx.Getwd("."),
 			"vars_git_directory":        gitdir,
+			"vars_eg_root_directory":    stringsx.FirstNonBlank(envx.String("", eg.EnvComputeRootDirectory), gitdir, eg.DefaultRootDirectory()),
 			"vars_cache_directory":      userx.DefaultCacheDirectory(),
 			"vars_runtime_directory":    userx.DefaultRuntimeDirectory(),
 			"vars_eg_runtime_directory": eg.DefaultMountRoot(eg.RuntimeDirectory),

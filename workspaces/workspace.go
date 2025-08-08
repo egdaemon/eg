@@ -14,6 +14,7 @@ import (
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/egdaemon/eg"
+	"github.com/egdaemon/eg/cmd/cmdopts"
 	"github.com/egdaemon/eg/internal/debugx"
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
@@ -173,6 +174,10 @@ func ensuredirs(c Context) (_ Context, err error) {
 func cacheid(ctx context.Context, root string, mdir string, cacheid hash.Hash, ignore ignorable) error {
 	if err := os.MkdirAll(filepath.Join(root, mdir), 0700); err != nil {
 		return errorsx.Wrapf(err, "unable to create directory: %s", root)
+	}
+
+	if _, err := cacheid.Write([]byte(cmdopts.BuildInfoSafe())); err != nil {
+		return errorsx.Wrapf(err, "unable include buildinfo: %s", root)
 	}
 
 	return fs.WalkDir(os.DirFS(root), mdir, func(path string, d fs.DirEntry, err error) error {

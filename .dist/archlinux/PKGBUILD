@@ -1,5 +1,5 @@
 pkgname=eg
-pkgver=v0.0.1741605091
+pkgver=v0.0.0
 pkgrel=1
 pkgdesc='eg ci/cd/batch processing tooling'
 arch=('x86_64')
@@ -25,13 +25,15 @@ pkgver() {
 }
 
 build() {
-  echo "BUILD INITIATED eg ${PWD} -- ${srcdir} ${BUILDDIR}"
-  echo "USER: $(whoami)"
+  echo "BUILD: eg ${pkgver} -- src(${srcdir} build(${builddir})"
+  echo "PWD  : ${PWD} -- ${srcdir} ${BUILDDIR}"
+  echo "USER : $(whoami)"
+
 
   install -d -m 755 ${srcdir}/${pkgname}/.dist/linux/ ${srcdir}/.dist
   cp -r ${srcdir}/${pkgname}/.dist/linux/* ${srcdir}/.dist
-
-  GOBIN="${srcdir}/.dist/usr/bin" go install -C ${pkgname} -tags "no_duckdb_arrow" ./cmd/eg
+  cat ${srcdir}/.dist/usr/share/eg/Containerfile | EG_VERSION=${pkgver} envsubst '$EG_VERSION' | tee ${srcdir}/.dist/usr/share/eg/Containerfile
+  GOBIN="${srcdir}/.dist/usr/bin" go install -C ${pkgname} ./cmd/eg
 }
 
 package() {

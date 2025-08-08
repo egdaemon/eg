@@ -31,12 +31,16 @@ build() {
 
   install -d -m 755 ${srcdir}/${pkgname}/.dist/linux/ ${srcdir}/.dist
   cp -r ${srcdir}/${pkgname}/.dist/linux/* ${srcdir}/.dist
-  cat ${srcdir}/.dist/usr/share/eg/Containerfile | EG_VERSION=${pkgver} envsubst '$EG_VERSION' | tee ${srcdir}/.dist/usr/share/eg/Containerfile
+  cat ${srcdir}/${pkgname}/.dist/linux/usr/share/eg/Containerfile | EG_VERSION=${pkgver} envsubst '$EG_VERSION' | tee ${srcdir}/.dist/usr/share/eg/Containerfile
+  echo "DERP DERP!"
   GOBIN="${srcdir}/.dist/usr/bin" go install -C ${pkgname} ./cmd/eg
+  echo "DERP DERP!!"
+  tree ${srcdir}/.dist/
 }
 
 package() {
   echo "PACKAGE INITIATED ${pkgdir} ${PWD} ${bindir}"
-  cp -r ${srcdir}/${pkgname}/.dist/linux/* ${pkgdir}
-  # tree ${pkgdir}
+  cp -r ${srcdir}/.dist/* ${pkgdir}
+
+  tree ${pkgdir}
 }

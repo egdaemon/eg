@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -21,8 +20,12 @@ import (
 	"google.golang.org/grpc"
 )
 
-func DefaultRunnerSocketPath() string {
-	return eg.DefaultMountRoot(eg.RuntimeDirectory, eg.SocketControl)
+func DefaultSocketPath() string {
+	return eg.DefaultRuntimeDirectory(eg.SocketControl)
+}
+
+func ModuleSocketPath() string {
+	return envx.String(DefaultSocketPath(), eg.EnvComputeModuleSocket)
 }
 
 type AgentOption func(*Agent)
@@ -215,13 +218,17 @@ func (t Agent) Options() []string {
 }
 
 func (t Agent) Dial(ctx context.Context) (conn *grpc.ClientConn, err error) {
-	p1 := envx.String(eg.DefaultMountRoot(eg.SocketControl), eg.EnvComputeModuleSocket)
-	p2 := filepath.Join(t.ws.Root, t.ws.RuntimeDir, eg.SocketControl)
+	p1 := DefaultSocketPath()
+	p2 := ModuleSocketPath()
 	cspath := fsx.LocateFirst(
 		p1,
 		p2,
 	)
+
+	log.Println("agent dialing initiated 0", spew.Sdump(t.ws), p1, p2, "->", cspath)
 	envx.Debug(os.Environ()...)
-	log.Println("agent dialing", spew.Sdump(t.ws), p1, p2, "->", cspath)
-	return grpc.DialContext(ctx, fmt.Sprintf("unix://%s", cspath), grpc.WithInsecure(), grpc.WithBlock())
+	fsx.PrintDir(os.DirFS(eg.DefaultMountRoot(eg.RuntimeDirectory)))
+	log.Println("agent dialing initiated completed", cspath)
+
+	return grpc.DialContext(ctx, fmt.Sprintf("unix://%s", cspath), grpc.WithInsecure())
 }

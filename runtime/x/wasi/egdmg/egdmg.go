@@ -97,7 +97,7 @@ func Build(b Specification, archive fs.FS) eg.OpFn {
 }
 
 func root(paths ...string) string {
-	return egenv.CacheDirectory(".eg", filepath.Join(paths...))
+	return egenv.WorkspaceDirectory(".eg", filepath.Join(paths...))
 }
 
 // Path from the given pattern

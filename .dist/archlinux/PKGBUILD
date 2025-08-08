@@ -25,10 +25,9 @@ pkgver() {
 }
 
 build() {
-  echo "BUILD: eg ${pkgver} -- src(${srcdir} build(${builddir})"
-  echo "PWD  : ${PWD} -- ${srcdir} ${BUILDDIR}"
+  echo "BUILD: eg ${pkgver} -- src(${srcdir}) build(${BUILDDIR})"
+  echo "PWD  : ${PWD}"
   echo "USER : $(whoami)"
-
 
   install -d -m 755 ${srcdir}/${pkgname}/.dist/linux/ ${srcdir}/.dist
   cp -r ${srcdir}/${pkgname}/.dist/linux/* ${srcdir}/.dist

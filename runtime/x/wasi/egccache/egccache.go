@@ -79,7 +79,9 @@ func Runtime() shell.Command {
 	return shell.Runtime().EnvironFrom(Env()...)
 }
 
-// print informational statistics about cache usage
-func PrintStatistics(ctx context.Context, o eg.Op) error {
-	return shell.Run(ctx, shell.New("ccache -sv"))
+// print informational statistics about cache usage, use the provided environment.
+func PrintStatistics(runtime shell.Command) eg.OpFn {
+	return func(ctx context.Context, o eg.Op) error {
+		return shell.Run(ctx, runtime.New("ccache -sv"))
+	}
 }

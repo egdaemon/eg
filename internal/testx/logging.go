@@ -1,7 +1,6 @@
 package testx
 
 import (
-	"io"
 	"log"
 	"os"
 	"testing"
@@ -19,7 +18,7 @@ func Logging() {
 		return
 	}
 
-	log.SetOutput(io.Discard)
+	// log.SetOutput(io.Discard)
 }
 
 func PrivateTemp(t testing.TB) {

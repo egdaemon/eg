@@ -102,13 +102,3 @@ func Pack(pattern string) eg.OpFn {
 		)
 	}
 }
-
-// deprecated: force a clean tarball directory
-func Clean(operations ...eg.OpFn) eg.OpFn {
-	return eg.Sequential(
-		func(ctx context.Context, o eg.Op) error {
-			return os.RemoveAll(root())
-		},
-		eg.Sequential(operations...),
-	)
-}

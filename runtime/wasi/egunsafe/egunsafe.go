@@ -22,7 +22,7 @@ func DialControlSocket(ctx context.Context) (conn *grpc.ClientConn, err error) {
 	// defer log.Println("DIALING CONTROL SOCKET COMPLETED")
 
 	cspath := RuntimeDirectory(eg.SocketControl)
-	return grpc.DialContext(ctx, fmt.Sprintf("unix://%s", cspath), grpc.WithInsecure(), grpc.WithBlock(), grpc.WithDialer(func(s string, d time.Duration) (net.Conn, error) {
+	return grpc.DialContext(ctx, fmt.Sprintf("unix://%s", cspath), grpc.WithInsecure(), grpc.WithDialer(func(s string, d time.Duration) (net.Conn, error) {
 		dctx, done := context.WithTimeout(ctx, d)
 		defer done()
 		proto, address, _ := strings.Cut(s, "://")
@@ -40,7 +40,7 @@ func DialModuleControlSocket(ctx context.Context) (conn *grpc.ClientConn, err er
 	// log.Println("default", RuntimeDirectory(eg.SocketControl))
 	// fsx.PrintDir(os.DirFS(RuntimeDirectory()))
 
-	return grpc.DialContext(ctx, fmt.Sprintf("unix://%s", cspath), grpc.WithInsecure(), grpc.WithBlock(), grpc.WithDialer(func(s string, d time.Duration) (net.Conn, error) {
+	return grpc.DialContext(ctx, fmt.Sprintf("unix://%s", cspath), grpc.WithInsecure(), grpc.WithDialer(func(s string, d time.Duration) (net.Conn, error) {
 		dctx, done := context.WithTimeout(ctx, d)
 		defer done()
 		proto, address, _ := strings.Cut(s, "://")

@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"os"
+	"path/filepath"
 
 	"github.com/egdaemon/eg/runtime/wasi/eg"
 	"github.com/egdaemon/eg/runtime/wasi/egenv"
@@ -28,8 +29,10 @@ func Debug(runtime shell.Command) eg.OpFn {
 func Test(ctx context.Context, op eg.Op) error {
 	return eg.Sequential(
 		shell.Op(
-			shell.Newf("mkdir -p %s", egtarball.Path("example")),
+			// shell.New("systemctl status podman.socket"),
+			shell.Newf("mkdir -p %s", filepath.Join(egtarball.Path("example"), "Contents")),
 			shell.Newf("echo \"derp\" | tee %s/hello.world.txt", egtarball.Path("example")),
+			shell.Newf("echo \"derp\" | tee %s/Info.plist", filepath.Join(egtarball.Path("example"), "Contents")),
 		),
 		eg.Module(
 			ctx,
@@ -54,6 +57,7 @@ func TestModule(ctx context.Context, op eg.Op) error {
 	b := egdmg.New("retrovibe", egdmg.OptionBuildDir(egenv.CacheDirectory(".dist", "retrovibed.darwin.arm64")))
 	return eg.Perform(
 		ctx,
+		egbug.DirectoryTree(egtarball.Path("example")),
 		egdmg.Build(b, os.DirFS(egtarball.Path("example"))),
 	)
 }
@@ -65,6 +69,7 @@ func main() {
 
 	err := eg.Perform(
 		ctx,
+		egbug.Log("init"),
 		eg.Build(eg.DefaultModule()),
 		egbug.Log("baremetal tarball"),
 		Test,
@@ -80,7 +85,7 @@ func main() {
 		// test for cache directory and runtime.
 		// test for git commit details.
 		egbug.DebugFailure(
-			egbug.EnsureEnv("e40ffcfba287b4978406fe23a6ce4030", egbug.EgEnviron()...),
+			egbug.EnsureEnv("26941e25a2adf90a2298f05ded6f1243", egbug.EgEnviron()...),
 			egbug.Log("baremetal environment has drifted"),
 		),
 		eg.Module(
@@ -96,7 +101,7 @@ func main() {
 					Debug(shell.Runtime()),
 				),
 				egbug.DebugFailure(
-					egbug.EnsureEnv("514d01ba58d6836f55e1efdcb76ee548", egbug.EgEnviron()...),
+					egbug.EnsureEnv("15dbf130e4ed546fa5b9e8799b170cdc", egbug.EgEnviron()...),
 					egbug.Log("container module environment has drifted"),
 				),
 				TestModule,

@@ -52,3 +52,10 @@ func Print(v ...interface{}) {
 		return
 	}
 }
+
+func Fn(d func()) {
+	if std.Writer() != io.Discard {
+		d()
+		return
+	}
+}

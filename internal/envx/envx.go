@@ -13,6 +13,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -286,6 +287,7 @@ func envval[T any](fallback T, m func(string) string, parse func(string) (T, err
 }
 
 func PrintEnv(envs ...string) string {
+	sort.Strings(envs)
 	s := fmt.Sprintln("DEBUG ENVIRONMENT INITIATED")
 	for _, e := range envs {
 		s += fmt.Sprintln(e)

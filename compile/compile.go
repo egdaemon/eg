@@ -55,6 +55,7 @@ func EnsureRequiredPackages(ctx context.Context, dir string, packages ...string)
 
 	cmd := exec.CommandContext(ctx, "go", append(defaultPackages, packages...)...)
 	cmd.Dir = dir
+
 	if err := cmd.Run(); err != nil {
 		return errorsx.Wrapf(err, "unable to download default packages: %s", cmd.String())
 	}

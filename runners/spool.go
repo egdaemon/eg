@@ -14,7 +14,7 @@ import (
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/fsx"
 	"github.com/egdaemon/eg/internal/userx"
-	"github.com/gofrs/uuid"
+	"github.com/gofrs/uuid/v5"
 	"github.com/pkg/errors"
 )
 
@@ -57,11 +57,17 @@ func DefaultSpoolDirs() SpoolDirs {
 	return NewSpoolDir(userx.DefaultCacheDirectory("spool"))
 }
 
-func iddirname(uid uuid.UUID) string {
+func Queued() queued {
+	return queued{}
+}
+
+type queued struct{}
+
+func (t queued) Dirname(uid uuid.UUID) string {
 	return base64.URLEncoding.WithPadding(base64.NoPadding).EncodeToString(uid.Bytes())
 }
 
-func dirnameid(dir string) uuid.UUID {
+func (t queued) Id(dir string) uuid.UUID {
 	return uuid.FromBytesOrNil(errorsx.Zero(base64.URLEncoding.WithPadding(base64.NoPadding).DecodeString(filepath.Base(dir))))
 }
 
@@ -70,11 +76,11 @@ func (t SpoolDirs) Download(uid uuid.UUID, name string, content io.Reader) (err 
 		dst *os.File
 	)
 
-	if err = os.MkdirAll(filepath.Join(t.Downloading, iddirname(uid)), t.defaultPerms); err != nil {
+	if err = os.MkdirAll(filepath.Join(t.Downloading, Queued().Dirname(uid)), t.defaultPerms); err != nil {
 		return err
 	}
 
-	if dst, err = os.Create(filepath.Join(t.Downloading, iddirname(uid), name)); err != nil {
+	if dst, err = os.Create(filepath.Join(t.Downloading, Queued().Dirname(uid), name)); err != nil {
 		return err
 	}
 	defer dst.Close()
@@ -87,7 +93,7 @@ func (t SpoolDirs) Download(uid uuid.UUID, name string, content io.Reader) (err 
 }
 
 func (t SpoolDirs) Enqueue(uid uuid.UUID) (err error) {
-	return os.Rename(filepath.Join(t.Downloading, iddirname(uid)), filepath.Join(t.Queued, iddirname(uid)))
+	return os.Rename(filepath.Join(t.Downloading, Queued().Dirname(uid)), filepath.Join(t.Queued, Queued().Dirname(uid)))
 }
 
 func (t SpoolDirs) Dequeue() (_ string, err error) {
@@ -122,7 +128,7 @@ func (t SpoolDirs) Completed(uid uuid.UUID) (err error) {
 	// the folder. if it succeeds, great. if it fails fall back to moving the work directory into a tombstone directory.
 	// this ensures that we can continue processing work. but since we can repeat work multiple times lets give the tombstoned
 	// folder a unique time based prefix.
-	if err = errorsx.Wrap(os.RemoveAll(filepath.Join(t.Running, iddirname(uid))), "unable to remove work"); err == nil {
+	if err = errorsx.Wrap(os.RemoveAll(filepath.Join(t.Running, Queued().Dirname(uid))), "unable to remove work"); err == nil {
 		return nil
 	} else {
 		log.Println(err)
@@ -130,11 +136,11 @@ func (t SpoolDirs) Completed(uid uuid.UUID) (err error) {
 
 	return errorsx.Wrapf(
 		os.Rename(
-			filepath.Join(t.Running, iddirname(uid)),
-			filepath.Join(t.Tombstoned, fmt.Sprintf("%s-%s", uuid.Must(uuid.NewV7()).String(), iddirname(uid))),
+			filepath.Join(t.Running, Queued().Dirname(uid)),
+			filepath.Join(t.Tombstoned, fmt.Sprintf("%s-%s", uuid.Must(uuid.NewV7()).String(), Queued().Dirname(uid))),
 		),
 		"unable to tombstone work directory: %s",
-		iddirname(uid),
+		Queued().Dirname(uid),
 	)
 }
 
@@ -157,7 +163,7 @@ func (t SpoolDirs) Discard(dir string) (err error) {
 			filepath.Join(t.Tombstoned, fmt.Sprintf("%s-%s", uuid.Must(uuid.NewV7()).String(), filepath.Base(dir))),
 		),
 		"unable to tombstone work directory: %s",
-		dirnameid(dir),
+		Queued().Id(dir),
 	)
 }
 

@@ -3,7 +3,9 @@ package contextx
 import (
 	"context"
 	"errors"
+	"math"
 	"sync"
+	"time"
 )
 
 type keys int
@@ -11,6 +13,14 @@ type keys int
 const (
 	contextKeyWaitgroup keys = iota
 )
+
+func Until(ctx context.Context) time.Duration {
+	if ts, ok := ctx.Deadline(); ok {
+		return time.Until(ts)
+	}
+
+	return math.MaxInt64
+}
 
 func WithWaitGroup(ctx context.Context, wg *sync.WaitGroup) context.Context {
 	return context.WithValue(ctx, contextKeyWaitgroup, wg)

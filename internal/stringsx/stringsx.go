@@ -43,3 +43,13 @@ func Blank(s string) bool {
 func Present(s string) bool {
 	return !Blank(s)
 }
+
+func FirstNonBlank(values ...string) string {
+	for _, s := range values {
+		if len(strings.TrimSpace(s)) != 0 {
+			return s
+		}
+	}
+
+	return ""
+}

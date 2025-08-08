@@ -13,12 +13,12 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"strconv"
 	"strings"
 	"syscall"
 	"time"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/backoff"
 	"github.com/egdaemon/eg/internal/debugx"
@@ -38,7 +38,7 @@ import (
 	"github.com/egdaemon/eg/interp/events"
 	"github.com/egdaemon/eg/workspaces"
 	"github.com/fsnotify/fsnotify"
-	"github.com/gofrs/uuid"
+	"github.com/gofrs/uuid/v5"
 
 	"github.com/alitto/pond/v2"
 )
@@ -93,7 +93,7 @@ func (t localdownloader) Download(ctx context.Context) (err error) {
 			if evt.Op == fsnotify.Create {
 				return nil
 			}
-		case <-time.After(time.Minute + backoff.RandomFromRange(10*time.Second)):
+		case <-time.After(10*time.Minute + backoff.RandomFromRange(10*time.Second)):
 			// periodically check
 			continue
 		case <-ctx.Done():
@@ -108,6 +108,7 @@ type metadata struct {
 	reload       chan error
 	downloader
 	completion
+	failure   func(cause error)
 	dirs      *SpoolDirs
 	rm        *ResourceManager
 	agentopts []AgentOption
@@ -131,6 +132,12 @@ func QueueOptionCompletion(c completion) QueueOption {
 func QueueOptionLogVerbosity(n int) QueueOption {
 	return func(m *metadata) {
 		m.logVerbosity = n
+	}
+}
+
+func QueueOptionFailure(fn func(cause error)) QueueOption {
+	return func(m *metadata) {
+		m.failure = fn
 	}
 }
 
@@ -172,7 +179,7 @@ func BuildContainer(ctx context.Context, name, dir, path string) (err error) {
 	return nil
 }
 
-func workload(ctx context.Context, id int, delay time.Duration, rm *ResourceManager, dirs *SpoolDirs, reload chan error, options ...func(*metadata)) error {
+func RunOne(ctx context.Context, id int, delay time.Duration, rm *ResourceManager, dirs *SpoolDirs, reload chan error, options ...func(*metadata)) error {
 	var (
 		s state = newdelay(
 			delay,
@@ -183,13 +190,17 @@ func workload(ctx context.Context, id int, delay time.Duration, rm *ResourceMana
 					reload:     reload,
 					completion: noopcompletion{},
 					downloader: localdownloader{},
-					dirs:       dirs,
+					failure: func(cause error) {
+						log.Println(cause)
+					},
+					dirs: dirs,
 				},
 				options...,
 			)),
 		)
 	)
 
+	defer debugx.Printf("completed %d\n", id)
 	for {
 		select {
 		case <-ctx.Done():
@@ -206,11 +217,16 @@ func workload(ctx context.Context, id int, delay time.Duration, rm *ResourceMana
 }
 
 func workloadcapacity() int {
-	return envx.Int(runtime.NumCPU(), eg.EnvComputeWorkloadCapacity)
+	return envx.Int(1, eg.EnvComputeWorkloadCapacity)
 }
 
 // runs the scheduler until the context is cancelled.
 func Queue(ctx context.Context, rm *ResourceManager, options ...func(*metadata)) (err error) {
+	return QueueN(ctx, workloadcapacity(), DefaultSpoolDirs(), rm, options...)
+}
+
+// runs the scheduler until the context is cancelled.
+func QueueN(ctx context.Context, n int, dirs SpoolDirs, rm *ResourceManager, options ...func(*metadata)) (err error) {
 	// monitor for reload signals, can't use the context because we
 	// dont want to interrupt running work but only want to stop after a run.
 	reload := make(chan error, 1)
@@ -220,7 +236,6 @@ func Queue(ctx context.Context, rm *ResourceManager, options ...func(*metadata))
 		return nil
 	})(ctx, syscall.SIGHUP)
 
-	dirs := DefaultSpoolDirs()
 	var (
 		md = langx.Clone(
 			metadata{
@@ -239,7 +254,7 @@ func Queue(ctx context.Context, rm *ResourceManager, options ...func(*metadata))
 		log.Println("recovery failed, continuing", cause)
 	}
 
-	pool := pond.NewPool(workloadcapacity())
+	pool := pond.NewPool(n)
 	workers := make([]pond.Task, 0, pool.MaxConcurrency())
 
 	for i := 0; i < pool.MaxConcurrency(); i++ {
@@ -247,7 +262,7 @@ func Queue(ctx context.Context, rm *ResourceManager, options ...func(*metadata))
 		delay := backoff.DynamicHashDuration(time.Second, strconv.FormatInt(int64(i), 36))
 		log.Println("workload", i, "deferred", delay)
 		workers = append(workers, pool.SubmitErr(func() error {
-			return workload(ctx, i, delay, rm, &dirs, reload, options...)
+			return RunOne(ctx, i, delay, rm, &dirs, reload, options...)
 		}))
 	}
 
@@ -281,20 +296,22 @@ func (t stateterminated) Update(ctx context.Context) state {
 	return nil
 }
 
-func failure(cause error, n state) state {
+func failure(md metadata, cause error, n state) state {
 	return statefailure{
-		cause: cause,
-		next:  n,
+		metadata: md,
+		cause:    cause,
+		next:     n,
 	}
 }
 
 type statefailure struct {
+	metadata
 	cause error
 	next  state
 }
 
 func (t statefailure) Update(ctx context.Context) state {
-	log.Println(t.cause)
+	t.failure(t.cause)
 	return t.next
 }
 
@@ -332,9 +349,9 @@ type stateidle struct {
 func (t stateidle) Update(ctx context.Context) state {
 	select {
 	case <-ctx.Done():
-		return failure(ctx.Err(), nil)
+		return failure(t.metadata, ctx.Err(), nil)
 	case cause := <-t.metadata.reload:
-		return failure(cause, nil)
+		return failure(t.metadata, cause, nil)
 	default:
 	}
 
@@ -351,7 +368,7 @@ func (t stateidle) Update(ctx context.Context) state {
 	} else if errors.Is(err, context.Canceled) {
 		return nil
 	} else if err != nil {
-		return failure(err, t)
+		return failure(t.metadata, err, t)
 	}
 
 	return t
@@ -398,12 +415,12 @@ func beginwork(ctx context.Context, md metadata, dir string) state {
 
 	if encoded, err = os.ReadFile(filepath.Join(dir, "metadata.json")); err != nil {
 		errorsx.Log(errorsx.Wrap(md.dirs.Discard(dir), "failed to clear invalid workload"))
-		return failure(err, idle(md))
+		return failure(md, err, idle(md))
 	}
 
 	if err = json.Unmarshal(encoded, workload); err != nil {
 		errorsx.Log(errorsx.Wrap(md.dirs.Discard(dir), "failed to clear invalid workload"))
-		return failure(err, idle(md))
+		return failure(md, err, idle(md))
 	}
 
 	log.Println("metadata", workload.Enqueued.Id)
@@ -416,23 +433,32 @@ func beginwork(ctx context.Context, md metadata, dir string) state {
 
 	errorsx.Log(tarx.Inspect(archive))
 
-	if ws, err = workspaces.New(ctx, md5.New(), filepath.Join(dir, workdirname), eg.DefaultModuleDirectory(), eg.WorkingDirectory, false); err != nil {
+	cachedir := userx.DefaultCacheDirectory("wcache", cacheprefix(workload.Enqueued), cachebucket(workload.Enqueued), "workloadcache")
+	log.Println("workload cachedir", cachedir)
+
+	if ws, err = workspaces.New(
+		ctx, md5.New(), filepath.Join(dir, workdirname), eg.DefaultModuleDirectory(),
+		workspaces.OptionSymlinkCache(cachedir),
+		workspaces.OptionEnsureWorkingDirectory,
+	); err != nil {
 		return completed(workload.Enqueued, md, ws, 0, errorsx.Wrap(err, "unable to setup workspace"))
 	}
 
 	// debugx.Println("workspace", spew.Sdump(ws))
 
-	if err = tarx.Unpack(filepath.Join(ws.Root, ws.RuntimeDir), archive); err != nil {
+	if err = tarx.Unpack(ws.RuntimeDir, archive); err != nil {
 		return completed(workload.Enqueued, md, ws, 0, errorsx.Wrap(err, "unable to unpack archive"))
 	}
 
-	if err = wasix.WarmCacheDirectory(ctx, filepath.Join(ws.Root, ws.BuildDir), wasix.WazCacheDir(filepath.Join(ws.Root, ws.CacheDir, eg.DefaultModuleDirectory()))); err != nil {
+	fsx.PrintFS(os.DirFS(ws.RuntimeDir))
+
+	if err = wasix.WarmCacheDirectory(ctx, filepath.Join(ws.Root, ws.BuildDir), wasix.WazCacheDir(filepath.Join(ws.CacheDir, eg.DefaultModuleDirectory()))); err != nil {
 		log.Println("unable to prewarm wasi cache", err)
 	} else {
-		log.Println("wasi cache prewarmed", wasix.WazCacheDir(filepath.Join(ws.Root, ws.CacheDir, eg.DefaultModuleDirectory())))
+		log.Println("wasi cache prewarmed", wasix.WazCacheDir(filepath.Join(ws.CacheDir, eg.DefaultModuleDirectory())))
 	}
 
-	environpath := filepath.Join(ws.Root, ws.RuntimeDir, eg.EnvironFile)
+	environpath := filepath.Join(ws.RuntimeDir, eg.EnvironFile)
 
 	envb := envx.Build().FromPath(environpath).
 		Var(gitx.EnvAuthEGAccessToken, workload.AccessToken).
@@ -503,16 +529,13 @@ func (t staterunning) Update(ctx context.Context) state {
 		err           error
 		logdst        *os.File
 		containerdir  = userx.DefaultCacheDirectory("wcache", cacheprefix(t.workload), cachebucket(t.workload), "containers")
-		cachedir      = userx.DefaultCacheDirectory("wcache", cacheprefix(t.workload), cachebucket(t.workload), "workloadcache")
-		logpath       = filepath.Join(t.ws.Root, t.ws.RuntimeDir, "daemon.log")
-		analyticspath = filepath.Join(t.ws.Root, t.ws.RuntimeDir, "analytics.db")
+		logpath       = filepath.Join(t.ws.RuntimeDir, "daemon.log")
+		analyticspath = filepath.Join(t.ws.RuntimeDir, "analytics.db")
 	)
 
-	if err = fsx.MkDirs(0770, containerdir, cachedir); err != nil {
+	if err = fsx.MkDirs(0770, containerdir); err != nil {
 		return completed(t.workload, t.metadata, t.ws, 0, errorsx.Wrap(err, "unable to setup container and cache directories"))
 	}
-
-	log.Println("workload root cachedir", cachedir)
 
 	if logdst, err = os.Create(logpath); err != nil {
 		return completed(t.workload, t.metadata, t.ws, 0, err)
@@ -523,14 +546,19 @@ func (t staterunning) Update(ctx context.Context) state {
 		return completed(t.workload, t.metadata, t.ws, 0, err)
 	}
 
+	log.Println("DERP DERP", spew.Sdump(t.ws))
+	log.Println("log directory", logpath)
+	fsx.PrintFS(os.DirFS(t.ws.Root))
+
 	options := append(
 		t.ragent.Options(),
 		"--replace", // during recovery we might have a container already running.
 		"--volume", AgentMountReadWrite(containerdir, "/var/lib/containers"),
-		"--volume", AgentMountReadOnly(filepath.Join(t.ws.Root, t.ws.RuntimeDir, t.workload.Entry), eg.DefaultMountRoot(eg.ModuleBin)),
-		"--volume", AgentMountReadWrite(filepath.Join(t.ws.Root, t.ws.RuntimeDir), eg.DefaultMountRoot(eg.RuntimeDirectory)),
-		"--volume", AgentMountReadWrite(filepath.Join(t.ws.Root, t.ws.WorkingDir), eg.DefaultMountRoot(eg.WorkingDirectory)),
-		"--volume", AgentMountReadWrite(cachedir, eg.DefaultMountRoot(eg.CacheDirectory)),
+		"--volume", AgentMountReadOnly(filepath.Join(t.ws.RuntimeDir, t.workload.Entry), eg.ModuleMount()),
+		"--volume", AgentMountReadWrite(t.ws.RuntimeDir, eg.DefaultMountRoot(eg.RuntimeDirectory)),
+		"--volume", AgentMountReadWrite(t.ws.WorkingDir, eg.DefaultMountRoot(eg.WorkingDirectory)),
+		"--volume", AgentMountReadWrite(t.ws.WorkspaceDir, eg.DefaultMountRoot(eg.WorkspaceDirectory)),
+		"--volume", AgentMountReadWrite(t.ws.CacheDir, eg.DefaultMountRoot(eg.CacheDirectory)),
 	)
 
 	logger := log.New(io.MultiWriter(os.Stderr, logdst), t.ragent.id, log.Flags())
@@ -567,8 +595,8 @@ type statecompleted struct {
 
 func (t statecompleted) Update(ctx context.Context) state {
 	var (
-		logpath       = filepath.Join(t.ws.Root, t.ws.RuntimeDir, "daemon.log")
-		analyticspath = filepath.Join(t.ws.Root, t.ws.RuntimeDir, "analytics.db")
+		logpath       = filepath.Join(t.ws.RuntimeDir, "daemon.log")
+		analyticspath = filepath.Join(t.ws.RuntimeDir, "analytics.db")
 	)
 
 	log.Println("completed", t.workload.Id, t.workload.AccountId, t.workload.VcsUri, t.ws.Root, t.duration, t.cause)
@@ -576,24 +604,24 @@ func (t statecompleted) Update(ctx context.Context) state {
 
 	logs, err := os.Open(logpath)
 	if err != nil {
-		return discard(t.workload, t.metadata, failure(errorsx.Wrap(err, "unable open logs for upload"), idle(t.metadata)))
+		return discard(t.workload, t.metadata, failure(t.metadata, errorsx.Wrap(err, "unable open logs for upload"), idle(t.metadata)))
 	}
 	defer logs.Close()
 
 	analytics, err := os.Open(analyticspath)
 	if err != nil {
-		return discard(t.workload, t.metadata, failure(errorsx.Wrap(err, "unable open analytics for upload"), idle(t.metadata)))
+		return discard(t.workload, t.metadata, failure(t.metadata, errorsx.Wrap(err, "unable open analytics for upload"), idle(t.metadata)))
 	}
 	defer analytics.Close()
 	if err = t.metadata.completion.Upload(ctx, t.workload.Id, t.duration, t.cause, logs, analytics); httpx.IsStatusError(err, http.StatusNotFound) != nil {
 		// means we already uploaded the results.
 		return discard(t.workload, t.metadata, idle(t.metadata))
 	} else if err != nil {
-		return failure(errorsx.Wrapf(err, "unable to upload completion: %s", t.workload.Id), newdelay(backoff.RandomFromRange(time.Second), t))
+		return failure(t.metadata, errorsx.Wrapf(err, "unable to upload completion: %s", t.workload.Id), newdelay(backoff.RandomFromRange(time.Second), t))
 	}
 
 	if t.cause != nil {
-		return discard(t.workload, t.metadata, failure(errorsx.Wrap(t.cause, "work failed"), idle(t.metadata)))
+		return discard(t.workload, t.metadata, failure(t.metadata, errorsx.Wrap(t.cause, "work failed"), idle(t.metadata)))
 	}
 
 	return discard(t.workload, t.metadata, idle(t.metadata))
@@ -621,7 +649,7 @@ func (t statediscard) Update(ctx context.Context) state {
 	}()
 
 	if err := t.metadata.dirs.Completed(uuid.FromStringOrNil(t.workload.Id)); err != nil {
-		return failure(errorsx.Wrap(err, "completion failed"), t.n)
+		return failure(t.metadata, errorsx.Wrap(err, "completion failed"), t.n)
 	}
 
 	// strictly probably not necessary, but ensure the workloads dont sync up by introducing a small randomized delay between workloads.

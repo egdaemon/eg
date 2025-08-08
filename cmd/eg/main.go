@@ -35,7 +35,7 @@ import (
 	"github.com/egdaemon/eg/internal/tracex"
 	"github.com/egdaemon/eg/internal/userx"
 	"github.com/go-git/go-git/v5"
-	"github.com/gofrs/uuid"
+	"github.com/gofrs/uuid/v5"
 	"github.com/willabides/kongplete"
 
 	// ensure its a dependency.
@@ -118,6 +118,7 @@ func main() {
 			"vars_tls_insecure_default": eg.EnvTLSInsecure(),
 			"vars_cwd":                  osx.Getwd("."),
 			"vars_git_directory":        gitdir,
+			"vars_eg_root_directory":    stringsx.FirstNonBlank(envx.String("", eg.EnvComputeWorkingDirectory), gitdir, eg.DefaultWorkingDirectory()),
 			"vars_cache_directory":      userx.DefaultCacheDirectory(),
 			"vars_runtime_directory":    userx.DefaultRuntimeDirectory(),
 			"vars_eg_runtime_directory": eg.DefaultMountRoot(eg.RuntimeDirectory),

@@ -15,11 +15,11 @@ require (
 	github.com/docker/docker v28.3.3+incompatible
 	github.com/dominikbraun/graph v0.23.0
 	github.com/dustin/go-humanize v1.0.1
-	github.com/egdaemon/wasinet/wasinet v0.0.0-20250731121320-3287a738a635
+	github.com/egdaemon/wasinet/wasinet v0.0.0-20250806175613-49e153bd345a
 	github.com/egdaemon/wasinet/wazeronet v0.0.0-20250731121320-3287a738a635
 	github.com/fsnotify/fsnotify v1.9.0
 	github.com/go-git/go-git/v5 v5.16.2
-	github.com/gofrs/uuid v4.4.0+incompatible
+	github.com/gofrs/uuid/v5 v5.3.2
 	github.com/golang-jwt/jwt/v4 v4.5.2
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/mux v1.8.1

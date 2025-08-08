@@ -3,11 +3,9 @@ package main
 import (
 	"context"
 	"log"
-	"path/filepath"
 
 	debeg "eg/compute/debuild/eg"
 
-	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/runtime/wasi/eg"
 	"github.com/egdaemon/eg/runtime/wasi/egenv"
 	"github.com/egdaemon/eg/runtime/wasi/eggit"
@@ -24,24 +22,29 @@ func main() {
 		eggit.AutoClone,
 		eg.Parallel(
 			debeg.Prepare,
-			//  eg.Build(eg.Container(archlinux.ContainerName).BuildFromFile(".dist/archlinux/Containerfile")),
 		),
 		eg.Parallel(
 			eg.Module(
 				ctx,
 				debeg.Runner(),
 				eg.Sequential(
+					shell.Op(
+						// clean up old debians. remove in future version.
+						shell.Newf("rm %s", egenv.CacheDirectory(".dist", "*.deb")).Lenient(true),
+					),
 					debeg.Build,
 					debeg.Upload,
 					shell.Op(
-						// shell.Newf("tree -L 2 -a %s", egenv.EphemeralDirectory("deb.eg")).Privileged(),
 						shell.Newf("cp %s/*.deb %s", egenv.EphemeralDirectory("deb.eg"), egenv.CacheDirectory(".dist")),
 					),
 				),
 			),
-			// eg.Module(ctx, archlinux.Builder(archlinux.ContainerName), archlinux.Build),
 		),
-		eggithub.Release(errorsx.Zero(filepath.Glob(egenv.CacheDirectory(".dist", "*.deb")))...),
+		func(ctx context.Context, o eg.Op) error {
+			return eggithub.Release(
+				egenv.CacheDirectory(".dist", "*.deb"),
+			)(ctx, o)
+		},
 	)
 
 	if err != nil {

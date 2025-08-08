@@ -11,7 +11,7 @@ import (
 
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/md5x"
-	"github.com/gofrs/uuid"
+	"github.com/gofrs/uuid/v5"
 	"google.golang.org/grpc"
 )
 

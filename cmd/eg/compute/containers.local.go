@@ -25,12 +25,12 @@ import (
 	"github.com/egdaemon/eg/transpile"
 	"github.com/egdaemon/eg/workspaces"
 	"github.com/go-git/go-git/v5"
-	"github.com/gofrs/uuid"
+	"github.com/gofrs/uuid/v5"
 )
 
 type c8sLocal struct {
 	cmdopts.RuntimeResources
-	Dir              string   `name:"directory" help:"root directory of the repository" default:"${vars_git_directory}"`
+	Dir              string   `name:"directory" help:"root directory of the repository" default:"${vars_eg_root_directory}"`
 	Containerfile    string   `arg:"" help:"path to the container file to run" default:"Containerfile"`
 	SSHKeyPath       string   `name:"sshkeypath" help:"path to ssh key to use" default:"${vars_ssh_key_path}"`
 	EnvironmentPaths []string `name:"envpath" help:"environment files to pass to the module" default:""`
@@ -66,12 +66,12 @@ func (t c8sLocal) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (er
 		errorsx.Log(errorsx.Wrap(os.RemoveAll(tmpdir), "unable to remove temp directory"))
 	}()
 
-	if ws, err = workspaces.New(gctx.Context, md5x.Digest(errorsx.Zero(cmdopts.BuildInfo())), tmpdir, eg.DefaultModuleDirectory(), "", false); err != nil {
+	if ws, err = workspaces.New(gctx.Context, md5x.Digest(errorsx.Zero(cmdopts.BuildInfo())), tmpdir, eg.DefaultModuleDirectory()); err != nil {
 		return errorsx.Wrap(err, "unable to initialize workspace")
 	}
 
 	egdir := filepath.Join(ws.Root, ws.ModuleDir)
-	autoruncontainer := filepath.Join(ws.Root, ws.RuntimeDir, "workspace", "Containerfile")
+	autoruncontainer := filepath.Join(ws.RuntimeDir, "workspace", "Containerfile")
 	if err = fsx.MkDirs(0700, filepath.Dir(autoruncontainer)); err != nil {
 		return errorsx.Wrap(err, "unable to write autorunnable containerfil")
 	}
@@ -92,7 +92,7 @@ func (t c8sLocal) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (er
 		return err
 	}
 
-	roots, err := transpile.Autodetect(transpile.New(ws)).Run(gctx.Context)
+	roots, err := transpile.Autodetect(transpile.New(eg.DefaultModuleDirectory(t.Dir), ws)).Run(gctx.Context)
 	if err != nil {
 		return err
 	}
@@ -111,7 +111,7 @@ func (t c8sLocal) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (er
 	}
 
 	log.Println("modules", modules)
-	if err = runners.BuildRootContainerPath(gctx.Context, t.Dir, filepath.Join(ws.Root, ws.RuntimeDir, "Containerfile")); err != nil {
+	if err = runners.BuildRootContainerPath(gctx.Context, t.Dir, filepath.Join(ws.RuntimeDir, "Containerfile")); err != nil {
 		return err
 	}
 
@@ -119,7 +119,7 @@ func (t c8sLocal) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (er
 		return errorsx.Wrap(err, "unable to open git repository")
 	}
 
-	environpath := filepath.Join(ws.Root, ws.RuntimeDir, eg.EnvironFile)
+	environpath := filepath.Join(ws.RuntimeDir, eg.EnvironFile)
 	if environio, err = os.Create(environpath); err != nil {
 		return errorsx.Wrap(err, "unable to open the environment variable file")
 	}
@@ -139,7 +139,7 @@ func (t c8sLocal) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (er
 		return errorsx.Wrap(err, "unable to generate environment")
 	}
 
-	if err = wasix.WarmCacheDirectory(gctx.Context, filepath.Join(ws.Root, ws.BuildDir), wasix.WazCacheDir(filepath.Join(ws.Root, ws.RuntimeDir))); err != nil {
+	if err = wasix.WarmCacheDirectory(gctx.Context, filepath.Join(ws.Root, ws.BuildDir), wasix.WazCacheDir(filepath.Join(ws.CacheDir, eg.DefaultModuleDirectory()))); err != nil {
 		log.Println("unable to prewarm wasi directory cache", err)
 	}
 
@@ -176,7 +176,7 @@ func (t c8sLocal) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (er
 		options := append(
 			ragent.Options(),
 			runners.AgentOptionVolumeSpecs(
-				runners.AgentMountReadOnly(m.Path, eg.DefaultMountRoot(eg.ModuleBin)),
+				runners.AgentMountReadOnly(m.Path, eg.ModuleMount()),
 				runners.AgentMountReadWrite(filepath.Join(ws.Root, ws.WorkingDir), eg.DefaultWorkingDirectory()),
 			)...)
 

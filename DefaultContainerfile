@@ -16,7 +16,7 @@ RUN add-apt-repository -n ppa:longsleep/golang-backports
 RUN add-apt-repository -n ppa:egdaemon/eg
 RUN add-apt-repository -n ppa:egdaemon/duckdb
 RUN apt-get update
-RUN apt-get install -y --no-install-recommends ssh podman netavark golang-1.24 eg egbootstrap tree nftables iptables
+RUN apt-get install -y --no-install-recommends ssh podman netavark golang-1.24 eg egbootstrap tree nftables iptables acl
 
 RUN sh /usr/share/eg/install/github.sh
 RUN apt-get update
@@ -29,10 +29,22 @@ RUN ln -s /usr/lib/go-1.24/bin/go /usr/local/bin/go
 RUN ssh-keyscan -H github.com >> /etc/ssh/ssh_known_hosts
 RUN ssh-keyscan -H gitlab.com >> /etc/ssh/ssh_known_hosts
 
+# temporary while we deal with launchpad slowness...
+RUN apt-get install -y --no-install-recommends libbtrfs-dev libassuan-dev libc6-dev libdevmapper-dev libglib2.0-dev libgpgme-dev libgpg-error-dev libprotobuf-dev libprotobuf-c-dev libseccomp-dev libselinux1-dev libsystemd-dev
+RUN GOPROXY=direct go install github.com/egdaemon/eg/cmd/...@v0.0.0-20250806213121-98eefd34752d
+
 RUN systemd-sysusers
 RUN systemd-tmpfiles --create
-RUN systemctl enable podman.socket
+RUN systemd-tmpfiles --clean
+
+# ensure that any files folders within /workload can be managed by the egd user.
+RUN setfacl -d -m u:egd:rwx /workload
+RUN setfacl -d -m g:egd:rwx /workload
+
+RUN rm -rf /tmp/gomod /tmp/gocache
 
 RUN usermod --add-subuids 100000-165535 --add-subgids 100000-165535 egd
-RUN echo "cache buster 059a9a06-1686-4f49-9d7f-a30535886d58"
-run podman version
+RUN echo "cache buster 574ba506-2797-505a-ae80-b41535886d78"
+
+RUN systemctl enable podman.socket
+RUN podman version

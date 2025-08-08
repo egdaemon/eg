@@ -24,7 +24,7 @@ import (
 	"github.com/egdaemon/eg/runtime/wasi/egenv"
 	"github.com/egdaemon/eg/runtime/wasi/env"
 	"github.com/egdaemon/eg/runtime/wasi/shell"
-	"github.com/gofrs/uuid"
+	"github.com/gofrs/uuid/v5"
 )
 
 const nilUUID = "00000000-0000-0000-0000-000000000000"
@@ -71,7 +71,7 @@ func FileTree(ctx context.Context, op eg.Op) error {
 		ctx,
 		privileged.Newf("echo 'runtime directory: %s' && ls -lhan %s", _eg.DefaultMountRoot(_eg.RuntimeDirectory), _eg.DefaultMountRoot(_eg.RuntimeDirectory)),
 		privileged.Newf("echo 'mount directory: %s' && ls -lhan %s", _eg.DefaultMountRoot(), _eg.DefaultMountRoot()),
-		privileged.Newf("echo 'workload directory: %s' && ls -lhan %s", _eg.DefaultWorkloadRoot(), _eg.DefaultWorkloadRoot()),
+		privileged.Newf("echo 'workload directory: %s' && ls -lhan %s", _eg.DefaultWorkloadDirectory(), _eg.DefaultWorkloadDirectory()),
 		privileged.Newf("echo 'cache directory: %s' && ls -lhan %s", egenv.CacheDirectory(), egenv.CacheDirectory()),
 		privileged.Newf("echo 'ephemeral directory: %s' && ls -lhan %s", egenv.EphemeralDirectory(), egenv.EphemeralDirectory()),
 		privileged.Newf("echo 'working directory: %s' && ls -lhan %s", egenv.WorkingDirectory(), egenv.WorkingDirectory()),
@@ -135,7 +135,7 @@ func Images(ctx context.Context, op eg.Op) error {
 
 const (
 	EnvUnsafeDigest = "EG_UNSAFE_ENVVARS_DIGEST"
-	defaultDigest   = "2e2bff2f6caf30bd4229dd70b9c09cef"
+	defaultDigest   = "28550586c73d13fa9967587b98a92e02"
 )
 
 //go:embed default.env
@@ -152,10 +152,11 @@ func EgEnviron() []string {
 		_eg.EnvComputeAccountID,
 		_eg.EnvComputeVCS,
 		_eg.EnvComputeTTL,
+		_eg.EnvComputeWorkloadDirectory,
 		_eg.EnvComputeWorkingDirectory,
 		_eg.EnvComputeCacheDirectory,
-		// _eg.EnvComputeRuntimeDirectory, // intentionally ignore this because its entirely random.
-		_eg.EnvComputeWorkloadDirectory,
+		_eg.EnvComputeRuntimeDirectory,
+		_eg.EnvComputeWorkspaceDirectory,
 		_eg.EnvComputeWorkloadCapacity,
 		_eg.EnvComputeWorkloadTargetLoad,
 		_eg.EnvScheduleMaximumDelay,
@@ -173,6 +174,14 @@ func EgEnviron() []string {
 }
 
 func normalizeEnv(environ *envx.Builder) *envx.Builder {
+	dirprefix := os.Getenv(_eg.EnvComputeWorkloadDirectory)
+	normalizedirprefix := func(key string) {
+		environ.Setenv(
+			key,
+			strings.Replace(os.Getenv(key), dirprefix, _eg.DefaultWorkloadDirectory(), 1),
+		)
+
+	}
 	// zero out some dynamic environment variables for consistent results
 	environ.Setenv(_eg.EnvComputeAccountID, uuid.Nil.String())
 	environ.Setenv(_eg.EnvComputeRunID, uuid.Nil.String())
@@ -182,6 +191,13 @@ func normalizeEnv(environ *envx.Builder) *envx.Builder {
 	environ.Setenv(_eg.EnvUnsafeCacheID, uuid.Nil.String())
 	environ.Setenv(_eg.EnvComputeLoggingVerbosity, "0")
 	environ.Setenv(_eg.EnvComputeModuleSocket, _eg.DefaultRuntimeDirectory("module.socket"))
+
+	// normalize standard directories.
+	normalizedirprefix(_eg.EnvComputeWorkloadDirectory)
+	normalizedirprefix(_eg.EnvComputeWorkingDirectory)
+	normalizedirprefix(_eg.EnvComputeWorkspaceDirectory)
+	normalizedirprefix(_eg.EnvComputeCacheDirectory)
+	normalizedirprefix(_eg.EnvComputeRuntimeDirectory)
 
 	// always ignore logging levels.
 	environ.Unsetenv(_eg.EnvLogsInfo)

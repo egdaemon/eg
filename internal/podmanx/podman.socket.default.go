@@ -4,7 +4,6 @@ package podmanx
 
 import (
 	"fmt"
-	"log"
 	"path/filepath"
 
 	"github.com/egdaemon/eg/internal/fsx"
@@ -16,7 +15,6 @@ func DefaultSocket() string {
 	u := userx.CurrentUserOrDefault(userx.Root())
 	upath := filepath.Join("/var", "run", "user", u.Uid, "podman", "podman.sock")
 	rpath := filepath.Join("/run", "podman", "podman.sock")
-	log.Println("DERP DERP", upath, rpath)
-	socketpath := stringsx.DefaultIfBlank(fsx.LocateFirst(upath, rpath), upath)
+	socketpath := stringsx.DefaultIfBlank(fsx.LocateFirst(upath, rpath), rpath)
 	return fmt.Sprintf("unix://%s", socketpath)
 }

@@ -5,11 +5,16 @@ import (
 	"compress/gzip"
 	"io"
 	"log"
+	"math/rand/v2"
 	"os"
 	"path/filepath"
 
+	"github.com/egdaemon/eg/internal/bytesx"
+	"github.com/egdaemon/eg/internal/cryptox"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/iox"
+	"github.com/egdaemon/eg/internal/langx"
+	"github.com/gofrs/uuid/v5"
 )
 
 // Pack the set of paths into the archive. caller is responsible for rewinding the writer.
@@ -204,6 +209,56 @@ func write(basepath, path string, tw *tar.Writer, info os.FileInfo) (err error) 
 
 	if _, err = io.Copy(tw, src); err != nil {
 		return errorsx.Wrapf(err, "failed to write contexts to tar archive: %s", path)
+	}
+
+	return nil
+}
+
+type randomized struct {
+	min  uint32
+	max  uint32
+	n    uint8
+	seed []byte
+}
+
+type option func(*randomized)
+type options []option
+
+func Randomized() options {
+	return options(nil)
+}
+
+func (opts options) Min(min uint32) options {
+	return append(opts, func(r *randomized) {
+		r.min = min
+	})
+}
+
+func (opts options) Max(max uint32) options {
+	return append(opts, func(r *randomized) {
+		r.max = max
+	})
+}
+
+func (opts options) N(n uint8) options {
+	return append(opts, func(r *randomized) {
+		r.n = n
+	})
+}
+
+func (opts options) New(tw *tar.Writer) error {
+	r := langx.Clone(randomized{
+		min:  bytesx.KiB,
+		max:  5 * bytesx.KiB,
+		n:    3,
+		seed: errorsx.Must(uuid.NewV4()).Bytes(),
+	}, opts...)
+
+	src := cryptox.NewChaCha8(r.seed)
+	for range r.n {
+		if _, err := io.Copy(tw, io.LimitReader(src, int64(r.min+uint32(rand.IntN(int(r.max-r.min)))))); err != nil {
+			return err
+		}
 	}
 
 	return nil

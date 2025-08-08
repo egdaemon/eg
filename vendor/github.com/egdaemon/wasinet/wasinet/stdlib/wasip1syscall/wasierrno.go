@@ -23,6 +23,7 @@ const (
 	EADDRNOTAVAIL syscall.Errno = 0x63
 	ECONNREFUSED  syscall.Errno = 0xE
 	ENOENT        syscall.Errno = 0x2C
+	EOPNOTSUPP    syscall.Errno = 0x3A
 )
 
 var mapped = map[syscall.Errno]syscall.Errno{
@@ -42,6 +43,7 @@ var mapped = map[syscall.Errno]syscall.Errno{
 	syscall.ECONNREFUSED:     ECONNREFUSED,
 	syscall.ENOENT:           ENOENT,
 	syscall.EADDRNOTAVAIL:    EADDRNOTAVAIL,
+	syscall.EOPNOTSUPP:       EOPNOTSUPP,
 }
 
 // maps native codes to wasi codes.

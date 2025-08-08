@@ -32,7 +32,7 @@ func (t Hotswap) AfterApply(dst *HotswapPath) error {
 		return nil
 	}
 
-	path := eg.DefaultMountRoot(eg.BinaryBin)
+	path := eg.DefaultMountRoot(eg.RuntimeDirectory, eg.BinaryBin)
 	os.Setenv(eg.EnvComputeBin, path)
 	*dst = HotswapPath(path)
 

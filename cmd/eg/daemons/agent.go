@@ -56,8 +56,8 @@ func MaybeAgentListener() (n net.Listener, err error) {
 func DefaultRunnerClient(ctx context.Context) (cc *grpc.ClientConn, err error) {
 	daemonpath := runners.DefaultRunnerSocketPath()
 	exists := fsx.FileExists(daemonpath)
-	debugx.Println("connect initiated", daemonpath)
-	defer debugx.Println("connect completed", daemonpath, exists)
+	log.Println("connect initiated", daemonpath)
+	defer log.Println("connect completed", daemonpath, exists)
 	if !exists {
 		return nil, fmt.Errorf("agent not running at %s", daemonpath)
 	}

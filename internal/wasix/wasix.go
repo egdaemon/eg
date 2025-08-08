@@ -70,6 +70,6 @@ func WarmCacheDirectory(ctx context.Context, root, cache string) error {
 	)
 }
 
-func WazCacheDir(root string) string {
-	return filepath.Join(root, "wazcache")
+func WazCacheDir(roots ...string) string {
+	return filepath.Join(filepath.Join(roots...), "wazcache")
 }

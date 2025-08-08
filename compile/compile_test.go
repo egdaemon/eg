@@ -26,12 +26,14 @@ var _ = Describe("FromTranspiled", func() {
 			ws  workspaces.Context
 		)
 
+		srcdir := testx.TempDir()
 		tmpdir := testx.TempDir()
-
-		Expect(fsx.CloneTree(ctx, tmpdir, "example.1", os.DirFS(testx.Fixture()))).To(Succeed())
-		ws, err = workspaces.New(ctx, md5.New(), tmpdir, eg.DefaultModuleDirectory(), "", false)
+		ws, err = workspaces.New(ctx, md5.New(), tmpdir, "")
 		Expect(err).To(Succeed())
-		roots, err := transpile.Autodetect(transpile.New(ws)).Run(ctx)
+
+		Expect(fsx.CloneTree(ctx, srcdir, filepath.Join("example.1", eg.DefaultModuleDirectory()), os.DirFS(testx.Fixture()))).To(Succeed())
+
+		roots, err := transpile.Autodetect(transpile.New(srcdir, ws)).Run(ctx)
 		Expect(err).To(Succeed())
 
 		err = compile.EnsureRequiredPackages(ctx, filepath.Join(ws.Root, ws.TransDir))
@@ -49,12 +51,14 @@ var _ = Describe("FromTranspiled", func() {
 			ws  workspaces.Context
 		)
 
+		srcdir := testx.TempDir()
 		tmpdir := testx.TempDir()
-
-		Expect(fsx.CloneTree(ctx, tmpdir, "example.2", os.DirFS(testx.Fixture()))).To(Succeed())
-		ws, err = workspaces.New(ctx, md5.New(), tmpdir, eg.DefaultModuleDirectory(), "", false)
+		ws, err = workspaces.New(ctx, md5.New(), tmpdir, "")
 		Expect(err).To(Succeed())
-		roots, err := transpile.Autodetect(transpile.New(ws)).Run(ctx)
+
+		Expect(fsx.CloneTree(ctx, srcdir, filepath.Join("example.2", eg.DefaultModuleDirectory()), os.DirFS(testx.Fixture()))).To(Succeed())
+
+		roots, err := transpile.Autodetect(transpile.New(srcdir, ws)).Run(ctx)
 		Expect(err).To(Succeed())
 		err = compile.EnsureRequiredPackages(ctx, filepath.Join(ws.Root, ws.TransDir))
 		Expect(err).To(Succeed())
@@ -77,15 +81,18 @@ var _ = Describe("wasix warm cache", func() {
 			ws  workspaces.Context
 		)
 
+		srcdir := testx.TempDir()
 		tmpdir := testx.TempDir()
+		ws, err = workspaces.New(ctx, md5.New(), tmpdir, "")
+		Expect(err).To(Succeed())
+
+		Expect(fsx.CloneTree(ctx, srcdir, filepath.Join("example.1", eg.DefaultModuleDirectory()), os.DirFS(testx.Fixture()))).To(Succeed())
 
 		wazcache, err := os.MkdirTemp(tmpdir, "wazcache")
 		Expect(err).To(Succeed())
 
-		Expect(fsx.CloneTree(ctx, tmpdir, "example.1", os.DirFS(testx.Fixture()))).To(Succeed())
-		ws, err = workspaces.New(ctx, md5.New(), tmpdir, eg.DefaultModuleDirectory(), "", false)
 		Expect(err).To(Succeed())
-		roots, err := transpile.Autodetect(transpile.New(ws)).Run(ctx)
+		roots, err := transpile.Autodetect(transpile.New(srcdir, ws)).Run(ctx)
 		Expect(err).To(Succeed())
 		err = compile.EnsureRequiredPackages(ctx, filepath.Join(ws.Root, ws.TransDir))
 		Expect(err).To(Succeed())

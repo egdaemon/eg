@@ -10,7 +10,7 @@ import (
 	"testing"
 
 	"github.com/egdaemon/eg/internal/errorsx"
-	"github.com/gofrs/uuid"
+	"github.com/gofrs/uuid/v5"
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	"github.com/stretchr/testify/require"

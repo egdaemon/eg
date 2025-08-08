@@ -36,7 +36,7 @@ import (
 	"github.com/egdaemon/eg/interp/runtime/wasi/ffiwasinet"
 	"github.com/egdaemon/eg/runners"
 	"github.com/egdaemon/eg/workspaces"
-	"github.com/gofrs/uuid"
+	"github.com/gofrs/uuid/v5"
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
 	"google.golang.org/grpc"
@@ -47,13 +47,13 @@ import (
 )
 
 type module struct {
-	Dir        string `name:"directory" help:"root directory of the repository" default:"${vars_git_directory}"`
+	Dir        string `name:"directory" help:"root directory of the repository" default:"${vars_eg_root_directory}"`
 	ModuleDir  string `name:"moduledir" help:"deprecated removed once infrastructure is updated" hidden:"true" default:"${vars_workload_directory}"`
 	RuntimeDir string `name:"runtimedir" help:"runtime directory" hidden:"true" default:"${vars_eg_runtime_directory}"`
 	Module     string `arg:"" help:"name of the module to run"`
 }
 
-func (t module) mounthack(ctx context.Context, ws workspaces.Context) (err error) {
+func (t module) mounthack(ctx context.Context, runid string, ws workspaces.Context) (err error) {
 	var (
 		binname = "bindfs"
 		mbin    string
@@ -76,6 +76,7 @@ func (t module) mounthack(ctx context.Context, ws workspaces.Context) (err error
 		0770,
 		eg.DefaultWorkingDirectory(),
 		eg.DefaultCacheDirectory(),
+		eg.DefaultWorkspaceDirectory(),
 	)
 	if err != nil {
 		return err
@@ -84,6 +85,7 @@ func (t module) mounthack(ctx context.Context, ws workspaces.Context) (err error
 	err = errors.Join(
 		remap(eg.DefaultMountRoot(eg.WorkingDirectory), eg.DefaultWorkingDirectory()),
 		remap(eg.DefaultMountRoot(eg.CacheDirectory), eg.DefaultCacheDirectory()),
+		remap(eg.DefaultMountRoot(eg.WorkspaceDirectory), eg.DefaultWorkspaceDirectory()),
 	)
 	if err != nil {
 		return err
@@ -136,6 +138,8 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 		eg.EnvComputeCacheDirectory, envx.String(eg.DefaultCacheDirectory(), eg.EnvComputeCacheDirectory, "CACHE_DIRECTORY"),
 	).Var(
 		eg.EnvComputeRuntimeDirectory, eg.DefaultRuntimeDirectory(),
+	).Var(
+		eg.EnvComputeWorkloadDirectory, eg.DefaultWorkspaceDirectory(),
 	).Var(
 		"PAGER", "cat", // no paging in this environmenet.
 	)
@@ -222,7 +226,7 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 				runners.AgentMountReadWrite(eg.DefaultMountRoot(), eg.DefaultMountRoot()),
 				runners.AgentMountReadWrite("/var/lib/containers", "/var/lib/containers"),
 			),
-			runners.AgentOptionEGBin(errorsx.Must(exec.LookPath(eg.DefaultMountRoot(eg.BinaryBin)))),
+			runners.AgentOptionEGBin(errorsx.Must(exec.LookPath(eg.DefaultMountRoot(eg.RuntimeDirectory, eg.BinaryBin)))),
 			runners.AgentOptionHostOS(),
 			hostnet,
 		)
@@ -255,7 +259,7 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 		defer control.Close()
 
 		debugx.Printf("---------------------------- MODULE INITIATED %d ----------------------------\n", mlevel)
-		envx.Debug(os.Environ()...)
+		debugx.Fn(func() { envx.Debug(os.Environ()...) })
 		debugx.Println("module pid", os.Getpid())
 		debugx.Println("account", aid)
 		debugx.Println("run id", uid)
@@ -268,9 +272,6 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 
 		srv := grpc.NewServer(
 			grpc.Creds(insecure.NewCredentials()), // this is a local socket
-			grpc.ChainUnaryInterceptor(
-				podmanx.GrpcClient,
-			),
 		)
 		defer srv.GracefulStop()
 
@@ -294,8 +295,8 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 	// creating extensions/tables, it would nuke the working directory. it *mostly* worked once we moved this mount
 	// call after duckdb. we're leaving the call here for now but it shouldn't matter.
 	// and we're keen to remove it.
-	if err = t.mounthack(gctx.Context, ws); err != nil {
-		return errorsx.Wrap(err, "unable to mount with correct permissions - this is a transient error that happens occassional liekly due to bindfs bugs")
+	if err = t.mounthack(gctx.Context, uid, ws); err != nil {
+		return errorsx.Wrap(err, "unable to mount with correct permissions - this is a transient error that happens occassional likely due to bindfs/podman bugs")
 	}
 
 	if cc, err = daemons.AutoRunnerClient(gctx, ws, uid, runners.AgentOptionAutoEGBin()); err != nil {
@@ -304,12 +305,11 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 
 	return interp.Remote(
 		gctx.Context,
+		ws,
 		aid,
 		uid,
 		cc,
-		t.Dir,
 		t.Module,
-		interp.OptionRuntimeDir(t.RuntimeDir),
 		interp.OptionEnviron(cmdenv...),
 	)
 }

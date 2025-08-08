@@ -11,7 +11,12 @@
 #export DEB_CFLAGS_MAINT_APPEND  = -Wall -pedantic
 # package maintainers to append LDFLAGS
 #export DEB_LDFLAGS_MAINT_APPEND = -Wl,--as-needed
-export GOMODCACHE2="${GOMODCACHE:-$(CURDIR)/.gocache}"
+
+# need to set gocache otherwise it'll error out on launchpad builders
+export GOMODCACHE ?= $(CURDIR)/.gomod
+export GOCACHE ?= $(CURDIR)/.gocache
+export GOBIN ?= $(CURDIR)/linux/usr/bin
+export GOPROXY ?= direct
 
 %:
 	dh $@
@@ -19,12 +24,14 @@ export GOMODCACHE2="${GOMODCACHE:-$(CURDIR)/.gocache}"
 override_dh_auto_build:
 	echo "DH AUTO BUILD OVERRIDE"
 	echo "$(CURDIR)"
-	echo "GOMODCACHE0: ${GOMODCACHE}"
-	echo "GOMODCACHE2: ${GOMODCACHE2}"
-	mkdir -p $(CURDIR)/linux/usr/bin
+	echo "GOCACHE: ${GOCACHE}"
+	echo "GOMODCACHE: ${GOMODCACHE}"
+
+	# copy the skeleton directory for linux distribution.
 	cp -R $(CURDIR)/src/.dist/linux/* $(CURDIR)/linux
-	# need to set gocache otherwise it'll error out on launchpad builders
-	GOPROXY="direct" GOCACHE="$(CURDIR)/.gocache" GOMODCACHE="$(CURDIR)/.gomod" GOBIN="$(CURDIR)/linux/usr/bin" /usr/lib/go-1.24/bin/go build -C src -mod=vendor -ldflags="-X 'github.com/egdaemon/eg/cmd/cmdopts.Treeish=${VCS_REVISION}'" -tags "duckdb_use_lib" -buildmode=pie -buildvcs=false -o "$(CURDIR)/linux/usr/bin" ./cmd/...
+	mkdir -p $(GOBIN)
+	GOCACHE=$(CURDIR)/.gocache GOMODCACHE=$(CURDIR)/.gomod /usr/lib/go-1.24/bin/go env
+	GOCACHE=$(CURDIR)/.gocache GOMODCACHE=$(CURDIR)/.gomod /usr/lib/go-1.24/bin/go build -C src -mod=vendor -ldflags="-X 'github.com/egdaemon/eg/cmd/cmdopts.Treeish=${VCS_REVISION}'" -tags "duckdb_use_lib" -buildmode=pie -buildvcs=false -o $(GOBIN) ./cmd/...
 	# tree $(CURDIR)/linux
 
 override_dh_auto_test:

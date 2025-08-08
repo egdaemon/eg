@@ -12,7 +12,7 @@ import (
 	"github.com/egdaemon/eg/internal/slicesx"
 	"github.com/egdaemon/eg/internal/stringsx"
 	"github.com/egdaemon/eg/internal/tracex"
-	"github.com/gofrs/uuid"
+	"github.com/gofrs/uuid/v5"
 )
 
 var (
@@ -68,10 +68,11 @@ const (
 	EnvComputeAccountID          = "EG_COMPUTE_ACCOUNT_ID"                      // account id of the compute workload
 	EnvComputeVCS                = "EG_COMPUTE_VCS_URI"                         // vcs uri for the compute workload
 	EnvComputeTTL                = "EG_COMPUTE_TTL"                             // deadline for compute workload
-	EnvComputeWorkingDirectory   = "EG_COMPUTE_ROOT_DIRECTORY"                  // root working directory for workloads
+	EnvComputeWorkloadDirectory  = "EG_COMPUTE_WORKLOAD_DIRECTORY"              // root directory for workloads
+	EnvComputeWorkingDirectory   = "EG_COMPUTE_WORKING_DIRECTORY"               // working directory for workloads
 	EnvComputeCacheDirectory     = "EG_COMPUTE_CACHE_DIRECTORY"                 // cache directory for workloads
 	EnvComputeRuntimeDirectory   = "EG_COMPUTE_RUNTIME_DIRECTORY"               // runtime directory for workloads
-	EnvComputeWorkloadDirectory  = "EG_COMPUTE_WORKLOAD_DIRECTORY"              // workload directory for workloads
+	EnvComputeWorkspaceDirectory = "EG_COMPUTE_WORKSPACE_DIRECTORY"             // workspace directory for workloads
 	EnvComputeWorkloadCapacity   = "EG_COMPUTE_WORKLOAD_CAPACITY"               // upper bound for the maximum number of workloads that can be run concurrently
 	EnvComputeWorkloadTargetLoad = "EG_COMPUTE_WORKLOAD_TARGET_LOAD"            // upper bound for the maximum cpu load to target.
 	EnvScheduleMaximumDelay      = "EG_COMPUTE_SCHEDULER_MAXIMUM_DELAY"         // maximum delay between checks for workloads.
@@ -106,13 +107,17 @@ const (
 )
 
 const (
-	WorkingDirectory = "eg"
-	CacheDirectory   = ".eg.cache"
-	RuntimeDirectory = ".eg.runtime"
-	ModuleBin        = ".eg.module.wasm"
-	BinaryBin        = "egbin"
-	EnvironFile      = "environ.env"
-	SocketControl    = "control.socket"
+	WorkingDirectory   = "eg"
+	MountDirectory     = "eg.mnt"
+	WorkloadDirectory  = ".eg.workload"
+	CacheDirectory     = ".eg.cache"     // persistent cache between workloads
+	RuntimeDirectory   = ".eg.runtime"   // runtime directory containing eg related files and sockets.
+	WorkspaceDirectory = ".eg.workspace" // persistent shared directory for the duration of a single workload.
+	ModuleDir          = "main.wasm.d"
+	ModuleBin          = ".eg.module.wasm"
+	BinaryBin          = "egbin"
+	EnvironFile        = "environ.env"
+	SocketControl      = "control.socket"
 )
 
 // generate unique module socket
@@ -120,12 +125,12 @@ func SocketModule() string {
 	return fmt.Sprintf("module.%s.socket", errorsx.Must(uuid.NewV7()).String())
 }
 
-func DefaultModuleDirectory() string {
-	return ".eg"
+func DefaultModuleDirectory(rel ...string) string {
+	return filepath.Join(filepath.Join(rel...), ".eg")
 }
 
 func DefaultCacheDirectory(rel ...string) string {
-	return DefaultWorkloadRoot(CacheDirectory, filepath.Join(rel...))
+	return DefaultWorkloadDirectory(CacheDirectory, filepath.Join(rel...))
 }
 
 func DefaultRuntimeDirectory(rel ...string) string {
@@ -133,17 +138,27 @@ func DefaultRuntimeDirectory(rel ...string) string {
 }
 
 func DefaultWorkingDirectory(rel ...string) string {
-	return DefaultWorkloadRoot(WorkingDirectory, filepath.Join(rel...))
+	return DefaultWorkloadDirectory(WorkingDirectory, filepath.Join(rel...))
 }
 
-func DefaultWorkloadRoot(rel ...string) string {
+// default workspace directory
+func DefaultWorkspaceDirectory(rel ...string) string {
+	return DefaultWorkloadDirectory(WorkspaceDirectory, filepath.Join(rel...))
+}
+
+// default egd directory root. holds the directories accessible by egd.
+func DefaultWorkloadDirectory(rel ...string) string {
 	return filepath.Join("/", "workload", filepath.Join(rel...))
 }
 
 // root mount location, all volumes are initially mounted here.
 // then they're rebound to grant the unprivileged users access.
 func DefaultMountRoot(rel ...string) string {
-	return filepath.Join("/", "eg.mnt", filepath.Join(rel...))
+	return filepath.Join("/", MountDirectory, filepath.Join(rel...))
+}
+
+func ModuleMount() string {
+	return DefaultMountRoot(RuntimeDirectory, ModuleBin)
 }
 
 //go:embed DefaultContainerfile

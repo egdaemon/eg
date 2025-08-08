@@ -13,7 +13,7 @@ import (
 	"github.com/egdaemon/eg/internal/md5x"
 	"github.com/egdaemon/eg/internal/numericx"
 	"github.com/egdaemon/eg/internal/stringsx"
-	"github.com/gofrs/uuid"
+	"github.com/gofrs/uuid/v5"
 	"github.com/pbnjay/memory"
 )
 

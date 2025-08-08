@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/cmd/cmdopts"
 	"github.com/egdaemon/eg/internal/debugx"
 	"github.com/egdaemon/eg/internal/envx"
@@ -21,7 +22,7 @@ import (
 )
 
 func DefaultAgentSocketPath() string {
-	return filepath.Join(envx.String(os.TempDir(), "RUNTIME_DIRECTORY"), "agent.socket")
+	return filepath.Join(envx.String(os.TempDir(), eg.EnvRuntimeDirectory), "agent.socket")
 }
 
 func DefaultAgentListener() (n net.Listener, err error) {
@@ -54,14 +55,15 @@ func MaybeAgentListener() (n net.Listener, err error) {
 }
 
 func DefaultRunnerClient(ctx context.Context) (cc *grpc.ClientConn, err error) {
-	daemonpath := runners.DefaultRunnerSocketPath()
+	daemonpath := runners.DefaultSocketPath()
 	exists := fsx.FileExists(daemonpath)
 	log.Println("connect initiated", daemonpath)
 	defer log.Println("connect completed", daemonpath, exists)
 	if !exists {
+		fsx.PrintDir(os.DirFS(eg.DefaultMountRoot(eg.RuntimeDirectory)))
 		return nil, fmt.Errorf("agent not running at %s", daemonpath)
 	}
-	return grpc.DialContext(ctx, fmt.Sprintf("unix://%s", daemonpath), grpc.WithInsecure(), grpc.WithBlock())
+	return grpc.DialContext(ctx, fmt.Sprintf("unix://%s", daemonpath), grpc.WithInsecure())
 }
 
 func AutoRunnerClient(global *cmdopts.Global, ws workspaces.Context, uid string, options ...runners.AgentOption) (cc *grpc.ClientConn, err error) {

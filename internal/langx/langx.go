@@ -35,6 +35,22 @@ func DefaultIfZero[T comparable](fallback T, v T) T {
 	return fallback
 }
 
+func FirstNonZero[T comparable](s ...T) T {
+	var (
+		x T
+	)
+
+	for _, v := range s {
+		if v == x {
+			continue
+		}
+
+		return v
+	}
+
+	return x
+}
+
 func Must[T any](v T, err error) T {
 	if err != nil {
 		panic(err)

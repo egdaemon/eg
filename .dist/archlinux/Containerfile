@@ -8,7 +8,7 @@ RUN mkdir -p /etc/sudoers.d/
 RUN echo "%%wheel ALL=(ALL:ALL) NOPASSWD: ALL" | tee /etc/sudoers.d/egd
 RUN systemd-sysusers
 RUN systemd-tmpfiles --create
-RUN pacman --noconfirm -Syu podman netavark pacman-contrib pkgfile foot sudo bash-completion tree base base-devel git go openssh rsync github-cli btrfs-progs fuse3
+RUN pacman --noconfirm -Syu podman netavark pacman-contrib pkgfile foot sudo bash-completion tree ccache base base-devel git go openssh rsync github-cli btrfs-progs fuse3
 # duckdb build dependencies.
 RUN pacman --noconfirm -Syu git cmake python-setuptools pybind11 python-numpy python-pandas libutf8proc python-pip python-wheel python-setuptools-scm
 # duckdb runtime time dependencies.

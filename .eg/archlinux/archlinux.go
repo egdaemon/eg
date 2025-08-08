@@ -33,6 +33,7 @@ func Build(ctx context.Context, _ eg.Op) error {
 		ctx,
 		runtime.Newf("mkdir -p %s", cdir),
 		runtime.New("pwd; ls -lha .; makepkg -f").Directory(templatedir),
+		runtime.New("git checkout -- .").Directory(templatedir), // reset PKGBUILD modifications caused by pkgver()
 		runtime.Newf("paccache -c %s -rk2", cdir),
 	)
 }

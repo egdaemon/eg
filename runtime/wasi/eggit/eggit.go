@@ -101,11 +101,23 @@ func (c commit) StringReplace(pattern string) string {
 	return s
 }
 
+// completely clean any git substitutions from the pattern.
+func PatternClean(pattern string) string {
+	s := strings.ReplaceAll(pattern, ".%", "%")
+	s = strings.ReplaceAll(s, "%git.hash%", "")
+	s = strings.ReplaceAll(s, "%git.hash.short%", "")
+	s = strings.ReplaceAll(s, "%git.commit.year%", "")
+	s = strings.ReplaceAll(s, "%git.commit.month%", "")
+	s = strings.ReplaceAll(s, "%git.commit.day%", "")
+	s = strings.ReplaceAll(s, "%git.commit.unix.milli%", "")
+	s = strings.ReplaceAll(s, "%eg.git.canonical.uri%", "")
+	return s
+}
+
 // substitute values in the provided pattern using the environment variable commit.
 // see commit.StringReplace for more details.
 func StringReplace(pattern string) string {
-	c := EnvCommit()
-	return c.StringReplace(pattern)
+	return EnvCommit().StringReplace(pattern)
 }
 
 func EnvCanonicalURI() string {

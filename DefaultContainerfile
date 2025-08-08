@@ -33,7 +33,7 @@ RUN ssh-keyscan -H gitlab.com >> /etc/ssh/ssh_known_hosts
 
 # temporary while we deal with launchpad slowness...
 RUN apt-get install -y --no-install-recommends libbtrfs-dev libassuan-dev libc6-dev libdevmapper-dev libglib2.0-dev libgpgme-dev libgpg-error-dev libprotobuf-dev libprotobuf-c-dev libseccomp-dev libselinux1-dev libsystemd-dev
-RUN GOPROXY=direct go install github.com/egdaemon/eg/cmd/...@james.lawrence/archlinux-improvements
+RUN GOPROXY=direct go install github.com/egdaemon/eg/cmd/...@latest
 
 RUN systemd-sysusers
 RUN systemd-tmpfiles --create

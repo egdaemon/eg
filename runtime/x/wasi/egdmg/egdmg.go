@@ -3,20 +3,15 @@ package egdmg
 import (
 	"context"
 	"fmt"
-	"io/fs"
 	"log"
-	"os"
 	"path/filepath"
-	"runtime"
+	"strings"
 
-	"github.com/egdaemon/eg/internal/envx"
-	"github.com/egdaemon/eg/internal/fsx"
 	"github.com/egdaemon/eg/internal/langx"
 	"github.com/egdaemon/eg/runtime/wasi/eg"
 	"github.com/egdaemon/eg/runtime/wasi/egenv"
 	"github.com/egdaemon/eg/runtime/wasi/eggit"
 	"github.com/egdaemon/eg/runtime/wasi/shell"
-	"github.com/egdaemon/eg/runtime/x/wasi/egfs"
 )
 
 type Option func(*Specification)
@@ -50,13 +45,14 @@ func OptionOutputName(s string) Option {
 	}
 }
 
-func New(name string, options ...Option) Specification {
+// New create a new dmg specification using the pattern and options.
+func New(pattern string, options ...Option) Specification {
 	return langx.Clone(Specification{
-		name:       name,
+		name:       strings.TrimSuffix(eggit.PatternClean(pattern), "."),
 		runtime:    shell.Runtime(),
 		builddir:   egenv.EphemeralDirectory(),
 		outputpath: egenv.WorkspaceDirectory(),
-		outputname: fmt.Sprintf("%s.dmg", name),
+		outputname: Name(pattern),
 	}, options...)
 }
 
@@ -68,27 +64,21 @@ type Specification struct {
 	runtime    shell.Command
 }
 
-func Build(b Specification, archive fs.FS) eg.OpFn {
+func Build(b Specification, archive string) eg.OpFn {
 	return func(ctx context.Context, o eg.Op) error {
+		log.Println("DMG BUILD INITIATED")
+		defer log.Println("DMG BUILD COMPLETED")
+
 		root := fmt.Sprintf("%s.app", b.name)
-		if err := egfs.CloneFS(ctx, filepath.Join(b.builddir, root), ".", archive); err != nil {
-			return err
-		}
-
-		log.Println("dmg source dir")
-		fsx.PrintFS(os.DirFS(filepath.Join(b.builddir, root)))
-
-		if err := envx.ExpandInplace(filepath.Join(b.builddir, root, "Contents", "Info.plist"), os.Getenv); err != nil {
-			return err
-		}
 
 		sruntime := b.runtime
 		return shell.Run(
 			ctx,
+			sruntime.Newf("rsync -avL %s/ %s/", archive, filepath.Join(b.builddir, root)),
 			sruntime.Newf("ln -fs /Applications %s", filepath.Join(b.builddir, "Applications")),
 			sruntime.Newf(
-				"mkisofs -V %s -D -R -apple -no-pad -o %s %s",
-				fmt.Sprintf("%s.%s", b.name, runtime.GOARCH),
+				"mkisofs -D -R -apple -no-pad -V %s -o %s %s",
+				root,
 				filepath.Join(b.outputpath, b.outputname),
 				filepath.Join(b.builddir, root),
 			),
@@ -97,7 +87,7 @@ func Build(b Specification, archive fs.FS) eg.OpFn {
 }
 
 func root(paths ...string) string {
-	return egenv.WorkspaceDirectory(".eg", filepath.Join(paths...))
+	return egenv.WorkspaceDirectory(filepath.Join(paths...))
 }
 
 // Path from the given pattern
@@ -107,6 +97,5 @@ func Path(pattern string) string {
 
 // replaces the substitution values within the pattern, resulting in the final resulting archive file's name.
 func Name(pattern string) string {
-	c := eggit.EnvCommit()
-	return fmt.Sprintf("%s.dmg", c.StringReplace(pattern))
+	return fmt.Sprintf("%s.dmg", eggit.StringReplace(pattern))
 }

@@ -23,7 +23,13 @@ func main() {
 			eg.Build(eg.Container(archlinux.ContainerName).BuildFromFile(".dist/archlinux/Containerfile")),
 		),
 		eg.Parallel(
-			eg.Module(ctx, archlinux.Builder(archlinux.ContainerName), archlinux.Build),
+			eg.Module(
+				ctx,
+				archlinux.Builder(archlinux.ContainerName),
+				eg.Sequential(
+					archlinux.Build,
+				),
+			),
 		),
 	)
 

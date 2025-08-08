@@ -41,7 +41,7 @@ prepare() {
 }
 
 build() {
-  cmake --build build -j $(nproc)
+  cmake --build build -j $(($(nproc) * 7 / 10))
   SETUPTOOLS_SCM_PRETEND_VERSION=$pkgver python "$pkgbase-$pkgver/tools/pythonpkg/setup.py" build
 }
 

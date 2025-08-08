@@ -18,7 +18,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/backoff"
 	"github.com/egdaemon/eg/internal/debugx"
@@ -545,10 +544,6 @@ func (t staterunning) Update(ctx context.Context) state {
 	if err = events.InitializeDB(ctx, analyticspath); err != nil {
 		return completed(t.workload, t.metadata, t.ws, 0, err)
 	}
-
-	log.Println("DERP DERP", spew.Sdump(t.ws))
-	log.Println("log directory", logpath)
-	fsx.PrintFS(os.DirFS(t.ws.Root))
 
 	options := append(
 		t.ragent.Options(),

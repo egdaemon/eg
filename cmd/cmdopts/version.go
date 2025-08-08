@@ -10,6 +10,7 @@ import (
 
 	"github.com/egdaemon/eg/internal/debugx"
 	"github.com/egdaemon/eg/internal/errorsx"
+	"github.com/egdaemon/eg/internal/langx"
 	"github.com/egdaemon/eg/internal/slicesx"
 	"github.com/egdaemon/eg/internal/stringsx"
 	"github.com/logrusorgru/aurora"
@@ -80,6 +81,10 @@ func BuildInfo() (_ string, err error) {
 	}
 
 	return stringsx.Join(".", slicesx.Filter(stringsx.Present, info.Main.Path, ts.Format("2006-01-02"), stringsx.DefaultIfBlank(id, Treeish), dirty)...), nil
+}
+
+func BuildInfoSafe() string {
+	return langx.FirstNonZero(errorsx.Zero(BuildInfo()), "(devel)")
 }
 
 func ModPath() string {

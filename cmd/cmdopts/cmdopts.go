@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/tls"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"strconv"
@@ -18,7 +19,6 @@ import (
 	"github.com/egdaemon/eg/internal/grpcx"
 	"github.com/egdaemon/eg/internal/httpx"
 	"github.com/egdaemon/eg/internal/tracex"
-	"github.com/egdaemon/eg/runtime/wasi/env"
 	"github.com/sirupsen/logrus"
 )
 
@@ -77,15 +77,25 @@ func (t TLSConfig) Config() *tls.Config {
 
 func (t TLSConfig) DefaultClient() *http.Client {
 	ctransport := &http.Transport{
-		TLSClientConfig: t.Config(),
+		Proxy: http.ProxyFromEnvironment,
+		DialContext: (&net.Dialer{
+			Timeout:   30 * time.Second,
+			KeepAlive: 30 * time.Second,
+		}).DialContext,
+		ForceAttemptHTTP2:     true,
+		MaxIdleConns:          100,
+		IdleConnTimeout:       5 * time.Second,
+		TLSHandshakeTimeout:   10 * time.Second,
+		ExpectContinueTimeout: 1 * time.Second,
+		TLSClientConfig:       t.Config(),
 	}
 
-	defaultclient := &http.Client{Transport: ctransport, Timeout: 20 * time.Second}
+	defaultclient := &http.Client{Transport: ctransport}
 	defaultclient = httpx.BindRetryTransport(defaultclient, http.StatusTooManyRequests, http.StatusBadGateway, http.StatusInternalServerError, http.StatusRequestTimeout)
 
-	if env.Boolean(false, eg.EnvLogsNetwork) {
-		return httpx.DebugClient(defaultclient)
-	}
+	// if env.Boolean(false, eg.EnvLogsNetwork) {
+	// 	return httpx.DebugClient(defaultclient)
+	// }
 
 	return defaultclient
 }

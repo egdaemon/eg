@@ -244,6 +244,7 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 			errorsx.Log(errorsx.Wrap(srv.Serve(control), "unable to serve control socket"))
 		}()
 
+		// TODO: investigate further tonight. this token might be getting clobbered by the auth client.
 		if err = gitx.AutomaticCredentialRefresh(gctx.Context, tlsc.DefaultClient(), t.RuntimeDir, envx.String("", gitx.EnvAuthEGAccessToken)); err != nil {
 			return err
 		}

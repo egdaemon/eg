@@ -10,6 +10,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/egdaemon/eg/internal/numericx"
 	"github.com/egdaemon/eg/internal/timex"
 )
 
@@ -215,6 +216,6 @@ func DynamicHashWindow(i string, n uint64) uint64 {
 }
 
 // generates a random duration from the provided range.
-func RandomFromRange(r time.Duration) time.Duration {
-	return time.Duration(rand.Intn(int(r)))
+func RandomFromRange[T numericx.Integer | time.Duration](r T) T {
+	return T(rand.Intn(int(r)))
 }

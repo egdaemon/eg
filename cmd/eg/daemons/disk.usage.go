@@ -68,7 +68,7 @@ func (t DiskUsage) perform(ctx context.Context, conn *dbus.Conn) error {
 		debugx.Println("usage below threshold", max, "<", t.Threshold)
 		return nil
 	} else {
-		log.Println("clearing disk space due to threshhold", max, "<", t.Threshold)
+		log.Println("clearing disk space due to threshhold", max, ">", t.Threshold)
 	}
 
 	for _, s := range t.Services {

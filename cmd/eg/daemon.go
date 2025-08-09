@@ -123,7 +123,10 @@ func (t daemon) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 		}
 	}
 
-	ctx, err := podmanx.WithClient(gctx.Context)
+	ctx, err := errorsx.IgnoreN[context.Context](gctx.Context, 5)(func(ctx context.Context) (context.Context, error) {
+		ctx, err = podmanx.WithClient(ctx)
+		return ctx, errorsx.Wrap(err, "podman context creation")
+	})
 	if err != nil {
 		return err
 	}

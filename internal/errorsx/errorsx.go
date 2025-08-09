@@ -1,10 +1,13 @@
 package errorsx
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log"
 	"time"
+
+	"github.com/egdaemon/eg/backoff"
 )
 
 // Compact returns the first error in the set, if any.
@@ -57,6 +60,48 @@ func Ignore(err error, ignore ...error) error {
 	}
 
 	return err
+}
+
+func NewLimitExceeded(n uint, err error) error {
+	return LimitExceeded{
+		N:     n,
+		error: err,
+	}
+}
+
+type LimitExceeded struct {
+	N uint
+	error
+}
+
+func (t LimitExceeded) LimitExceeded() bool {
+	return true
+}
+
+func (t LimitExceeded) Unwrap() error {
+	return t.error
+}
+func (t LimitExceeded) Cause() error {
+	return t.error
+}
+
+// Ignore creates a function that ignores the specified errors for N attempts.
+func IgnoreN[T any](ctx context.Context, n uint, ignore ...error) func(fn func(context.Context) (T, error)) (T, error) {
+	return func(fn func(context.Context) (T, error)) (v T, err error) {
+		_b := backoff.New(backoff.Exponential(250 * time.Millisecond))
+		for a := range n {
+			if v, err = fn(ctx); err == nil {
+				return v, nil
+			} else if Ignore(err, ignore...) == nil {
+				time.Sleep(_b.Backoff(int64(a)))
+				continue
+			} else {
+				return v, err
+			}
+		}
+
+		return v, NewLimitExceeded(n, Wrap(err, "limit exceeded"))
+	}
 }
 
 // Never panic when error is seen.

@@ -98,17 +98,13 @@ func AutoTokenState(signer ssh.Signer) (encoded string, err error) {
 	return encoded, nil
 }
 
-func AutoRefreshTokenState(ctx context.Context, signer ssh.Signer, state string) (_ *oauth2.Token, err error) {
+func RetrieveToken(ctx context.Context, signer ssh.Signer, state string) (_ *oauth2.Token, err error) {
 	var (
 		ok        bool
 		chttp     *http.Client
 		exchanged jwtx.AuthResponse
 		token     *oauth2.Token
 	)
-
-	if t, err := ReadRefreshToken(); err == nil {
-		return t, nil
-	}
 
 	if chttp, ok = ctx.Value(oauth2.HTTPClient).(*http.Client); !ok {
 		return nil, fmt.Errorf("missing http client from context")
@@ -131,6 +127,22 @@ func AutoRefreshTokenState(ctx context.Context, signer ssh.Signer, state string)
 
 	if token, err = cfg.Exchange(ctx, exchanged.Code, oauth2.AccessTypeOffline); err != nil {
 		return nil, errorsx.Wrap(err, "failed to exchange code of oauth2 token")
+	}
+
+	return token, nil
+}
+
+func AutoRefreshTokenState(ctx context.Context, signer ssh.Signer, state string) (_ *oauth2.Token, err error) {
+	var (
+		token *oauth2.Token
+	)
+
+	if t, err := ReadRefreshToken(); err == nil {
+		return t, nil
+	}
+
+	if token, err = RetrieveToken(ctx, signer, state); err != nil {
+		return nil, err
 	}
 
 	if err = WriteRefreshToken(token.RefreshToken); err != nil {

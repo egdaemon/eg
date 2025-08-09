@@ -2,13 +2,15 @@ package compute
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"log"
 	"net/http"
 	"os"
 	"path/filepath"
-	"runtime"
+	"time"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/authn"
 	"github.com/egdaemon/eg/cmd/cmdopts"
@@ -56,6 +58,7 @@ func (t upload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 		repo                 *git.Repository
 		tmpdir               string
 		archiveio, environio *os.File
+		e                    runners.EnqueuedCreateResponse
 	)
 
 	if signer, err = sshx.AutoCached(sshx.NewKeyGen(), t.SSHKeyPath); err != nil {
@@ -109,8 +112,8 @@ func (t upload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 	}
 	defer environio.Close()
 
-	if repo, err = git.PlainOpen(ws.Root); err != nil {
-		return errorsx.Wrap(err, "unable to open git repository")
+	if repo, err = git.PlainOpen(ws.WorkingDir); err != nil {
+		return errorsx.Wrapf(err, "unable to open git repository %s", ws.WorkingDir)
 	}
 
 	t.GitClone = stringsx.First(t.GitClone, errorsx.Zero(gitx.QuirkCloneURI(repo, t.GitRemote)))
@@ -177,29 +180,35 @@ func (t upload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 	}
 	defer buf.Close()
 
-	c := httpx.BindRetryTransport(tlsc.DefaultClient(), http.StatusTooManyRequests, http.StatusBadGateway)
-	tokensrc := compute.NewAuthzTokenSource(c, signer, authn.EndpointCompute())
+	c := tlsc.DefaultClient()
+	tokensrc := compute.NewAuthzTokenSource(tlsc.DefaultClient(), signer, authn.EndpointCompute())
 	chttp := oauth2.NewClient(
 		context.WithValue(gctx.Context, oauth2.HTTPClient, c),
 		tokensrc,
 	)
 
-	req, err := http.NewRequestWithContext(gctx.Context, http.MethodPost, t.Endpoint, buf)
+	ctx, done := context.WithTimeout(gctx.Context, 10*time.Second)
+	defer done()
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, t.Endpoint, buf)
 	if err != nil {
 		return errorsx.Wrap(err, "unable to create kernel upload request")
 	}
 	req.Header.Set("Content-Type", mimetype)
 
-	log.Println("upload initiated", t.Endpoint)
+	debugx.Println("upload initiated", t.Endpoint)
 	resp, err := httpx.AsError(chttp.Do(req)) //nolint:golint,bodyclose
 	defer httpx.TryClose(resp)
-	defer runtime.KeepAlive(resp) // guess
-	log.Println("upload completed", t.Endpoint)
+	debugx.Println("upload completed", t.Endpoint)
 
 	if err != nil {
 		return errorsx.Wrap(err, "unable to upload kernel for processing")
 	}
 
+	if err = json.NewDecoder(resp.Body).Decode(&e); err != nil {
+		return errorsx.Wrap(err, "unable to decode response")
+	}
+
+	log.Println("enqueued", spew.Sdump(&e))
 	// TODO: monitoring the job once its uploaded and we have a run id.
 
 	return nil

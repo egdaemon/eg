@@ -34,6 +34,13 @@ func Every(d time.Duration, do func()) {
 	}
 }
 
+func NowAndEveryVoid(ctx context.Context, d time.Duration, do func(context.Context)) {
+	NowAndEvery(ctx, d, func(ctx context.Context) error {
+		do(ctx)
+		return nil
+	})
+}
+
 // NowAndEvery executes the provided function immeditately and every duration.
 func NowAndEvery(ctx context.Context, d time.Duration, do func(context.Context) error) error {
 	if err := do(ctx); err != nil {

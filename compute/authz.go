@@ -57,6 +57,8 @@ func (t TokenSourceFromEndpoint) Token() (_ *oauth2.Token, err error) {
 		encoded string
 	)
 
+	debugx.Println("token refresh initiated")
+	defer debugx.Println("token refresh completed")
 	defer func() {
 		errorsx.Log(err)
 	}()

@@ -1,6 +1,7 @@
 package compute
 
 type Cmd struct {
+	Archive    archive   `cmd:"" help:"compiles and creates a workload tar archive from manual inspection/storage"`
 	Upload     upload    `cmd:"" help:"compiles and uploads a workload to the cluster"`
 	Containers c8scmds   `cmd:"" name:"containers" aliases:"c8s" help:"build and upload a container file workload to the cluster"`
 	Local      local     `cmd:"" help:"execute the interpreter on the given directory"`

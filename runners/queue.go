@@ -608,6 +608,11 @@ func (t statecompleted) Update(ctx context.Context) state {
 		return discard(t.workload, t.metadata, failure(t.metadata, errorsx.Wrap(err, "unable open analytics for upload"), idle(t.metadata)))
 	}
 	defer analytics.Close()
+
+	// ensure there is a timeout eventually
+	ctx, done := context.WithTimeout(ctx, 5*time.Minute)
+	defer done()
+
 	if err = t.metadata.completion.Upload(ctx, t.workload.Id, t.duration, t.cause, logs, analytics); httpx.IsStatusError(err, http.StatusNotFound) != nil {
 		// means we already uploaded the results.
 		return discard(t.workload, t.metadata, idle(t.metadata))

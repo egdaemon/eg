@@ -64,6 +64,7 @@ var cancelOnce sync.Once
 func (t *Transport) CancelRequest(req *http.Request) {
 	cancelOnce.Do(func() {
 		log.Printf("deprecated: golang.org/x/oauth2: Transport.CancelRequest no longer does anything; use contexts")
+		panic("DERP")
 	})
 }
 

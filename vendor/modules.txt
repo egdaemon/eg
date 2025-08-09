@@ -501,7 +501,7 @@ github.com/egdaemon/wasinet/wasinet/internal/langx
 github.com/egdaemon/wasinet/wasinet/stdlib/wasip1net
 github.com/egdaemon/wasinet/wasinet/stdlib/wasip1syscall
 github.com/egdaemon/wasinet/wasinet/wnetruntime
-# github.com/egdaemon/wasinet/wazeronet v0.0.0-20250731121320-3287a738a635
+# github.com/egdaemon/wasinet/wazeronet v0.0.0-20250806175613-49e153bd345a
 ## explicit; go 1.23.4
 github.com/egdaemon/wasinet/wazeronet
 # github.com/elastic/gosigar v0.14.3
@@ -1646,7 +1646,7 @@ go.uber.org/zap/internal/exit
 go.uber.org/zap/internal/pool
 go.uber.org/zap/internal/stacktrace
 go.uber.org/zap/zapcore
-# golang.org/x/crypto v0.40.0
+# golang.org/x/crypto v0.41.0
 ## explicit; go 1.23.0
 golang.org/x/crypto/argon2
 golang.org/x/crypto/blake2b
@@ -1683,13 +1683,13 @@ golang.org/x/exp/constraints
 golang.org/x/exp/maps
 golang.org/x/exp/rand
 golang.org/x/exp/slices
-# golang.org/x/mod v0.26.0
+# golang.org/x/mod v0.27.0
 ## explicit; go 1.23.0
 golang.org/x/mod/internal/lazyregexp
 golang.org/x/mod/modfile
 golang.org/x/mod/module
 golang.org/x/mod/semver
-# golang.org/x/net v0.42.0
+# golang.org/x/net v0.43.0
 ## explicit; go 1.23.0
 golang.org/x/net/bpf
 golang.org/x/net/context
@@ -1719,7 +1719,7 @@ golang.org/x/oauth2/internal
 ## explicit; go 1.23.0
 golang.org/x/sync/errgroup
 golang.org/x/sync/semaphore
-# golang.org/x/sys v0.34.0
+# golang.org/x/sys v0.35.0
 ## explicit; go 1.23.0
 golang.org/x/sys/cpu
 golang.org/x/sys/execabs
@@ -1727,10 +1727,10 @@ golang.org/x/sys/plan9
 golang.org/x/sys/unix
 golang.org/x/sys/windows
 golang.org/x/sys/windows/registry
-# golang.org/x/term v0.33.0
+# golang.org/x/term v0.34.0
 ## explicit; go 1.23.0
 golang.org/x/term
-# golang.org/x/text v0.27.0
+# golang.org/x/text v0.28.0
 ## explicit; go 1.23.0
 golang.org/x/text/encoding
 golang.org/x/text/encoding/charmap
@@ -1755,7 +1755,7 @@ golang.org/x/text/unicode/norm
 # golang.org/x/time v0.12.0
 ## explicit; go 1.23.0
 golang.org/x/time/rate
-# golang.org/x/tools v0.35.0
+# golang.org/x/tools v0.36.0
 ## explicit; go 1.23.0
 golang.org/x/tools/cmd/goimports
 golang.org/x/tools/cmd/stringer

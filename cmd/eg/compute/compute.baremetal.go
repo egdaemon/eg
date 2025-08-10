@@ -242,9 +242,9 @@ func (t baremetal) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, hotswapbin
 	}()
 	srv := grpc.NewServer(
 		grpc.Creds(insecure.NewCredentials()), // this is a local socket
-		grpc.ChainUnaryInterceptor(
-			podmanx.GrpcClient,
-		),
+		// grpc.ChainUnaryInterceptor(
+		// 	podmanx.GrpcClient,
+		// ),
 	)
 	defer srv.GracefulStop()
 

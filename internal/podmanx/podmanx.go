@@ -2,6 +2,7 @@ package podmanx
 
 import (
 	"context"
+	"log"
 
 	"github.com/containers/podman/v5/pkg/bindings"
 	"github.com/egdaemon/eg"
@@ -23,6 +24,7 @@ func WithClient(ctx context.Context) (rctx context.Context, err error) {
 
 // Create a unary server interceptor that adds the root context to the request context
 func GrpcClient(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
+	log.Println("DERP DERP")
 	pctx, err := bindings.NewConnection(ctx, DefaultSocket())
 	if err != nil {
 		return nil, err

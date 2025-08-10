@@ -15,6 +15,7 @@ import (
 	"github.com/egdaemon/eg/internal/execx"
 	"github.com/egdaemon/eg/internal/fsx"
 	"github.com/egdaemon/eg/internal/langx"
+	"github.com/egdaemon/eg/internal/podmanx"
 	"github.com/egdaemon/eg/internal/slicesx"
 	"github.com/egdaemon/eg/internal/stringsx"
 	"github.com/egdaemon/eg/interp/c8s"
@@ -169,6 +170,14 @@ func (t *ProxyService) Module(ctx context.Context, req *c8s.ModuleRequest) (_ *c
 	// log.Println("name", req.Name)
 	// log.Println("module", req.Module)
 	// log.Println("mdir", req.Mdir)
+
+	ctx, err = errorsx.IgnoreN[context.Context](ctx, 5)(func(ctx context.Context) (context.Context, error) {
+		ctx, err = podmanx.WithClient(ctx)
+		return ctx, errorsx.Wrap(err, "podman context creation")
+	})
+	if err != nil {
+		return nil, err
+	}
 
 	{
 		// handle the wasi module volume for backwards compatibility.

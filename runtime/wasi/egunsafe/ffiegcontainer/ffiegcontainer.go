@@ -9,21 +9,20 @@ import (
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/md5x"
 	"github.com/egdaemon/eg/interp/c8s"
-	"github.com/egdaemon/eg/interp/runtime/wasi/ffiguest"
 	"github.com/egdaemon/eg/runtime/wasi/egunsafe"
 )
 
 func Pull(ctx context.Context, name string, args []string) error {
-	nameptr, namelen := ffiguest.String(name)
-	argsptr, argslen, argssize := ffiguest.StringArray(args...)
-	return ffiguest.Error(
-		pull(
-			ffiguest.ContextDeadline(ctx),
-			nameptr, namelen,
-			argsptr, argslen, argssize,
-		),
-		fmt.Errorf("pull failed"),
-	)
+	cc, err := egunsafe.DialControlSocket(ctx)
+	if err != nil {
+		return err
+	}
+	containers := c8s.NewProxyClient(cc)
+	_, err = containers.Pull(ctx, &c8s.PullRequest{
+		Name:    name,
+		Options: args,
+	})
+	return errorsx.Wrap(err, "pull failed")
 }
 
 func Build(ctx context.Context, name, definition string, args []string) error {

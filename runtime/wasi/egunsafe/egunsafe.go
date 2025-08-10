@@ -5,23 +5,31 @@ package egunsafe
 import (
 	"context"
 	"fmt"
+	"log"
 	"net"
+	"os"
 	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/internal/envx"
+	"github.com/egdaemon/eg/internal/fsx"
 	"github.com/egdaemon/wasinet/wasinet"
 	"google.golang.org/grpc"
 )
 
 // dial the control socket for executing various functionality that is too slow or impedes concurrency.
 func DialControlSocket(ctx context.Context) (conn *grpc.ClientConn, err error) {
-	// log.Println("DIALING CONTROL SOCKET INITIATED")
-	// defer log.Println("DIALING CONTROL SOCKET COMPLETED")
+	log.Println("DIALING CONTROL SOCKET INITIATED")
+	defer log.Println("DIALING CONTROL SOCKET COMPLETED")
 
 	cspath := RuntimeDirectory(eg.SocketControl)
+
+	log.Println("DERP DERP", cspath)
+	log.Println("default", RuntimeDirectory(eg.SocketControl))
+	fsx.PrintDir(os.DirFS(RuntimeDirectory()))
+
 	return grpc.DialContext(ctx, fmt.Sprintf("unix://%s", cspath), grpc.WithInsecure(), grpc.WithDialer(func(s string, d time.Duration) (net.Conn, error) {
 		dctx, done := context.WithTimeout(ctx, d)
 		defer done()

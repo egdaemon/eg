@@ -26,7 +26,6 @@ import (
 	"github.com/egdaemon/eg/internal/execx"
 	"github.com/egdaemon/eg/internal/fsx"
 	"github.com/egdaemon/eg/internal/gitx"
-	"github.com/egdaemon/eg/internal/podmanx"
 	"github.com/egdaemon/eg/internal/runtimex"
 	"github.com/egdaemon/eg/internal/wasix"
 	"github.com/egdaemon/eg/interp"
@@ -206,9 +205,9 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 		}()
 		srv := grpc.NewServer(
 			grpc.Creds(insecure.NewCredentials()), // this is a local socket
-			grpc.ChainUnaryInterceptor(
-				podmanx.GrpcClient,
-			),
+			// grpc.ChainUnaryInterceptor(
+			// 	podmanx.GrpcClient,
+			// ),
 		)
 		defer srv.GracefulStop()
 

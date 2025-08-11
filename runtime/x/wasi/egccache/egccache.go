@@ -46,7 +46,7 @@ func (t options) Log(path string) options {
 
 func (t options) MaxDisk(n uint64) options {
 	return append(t, func(b *envx.Builder) {
-		b.Var("CCACHE_MAXSIZE", fmt.Sprintf("%Xs", bytesx.Unit(n)))
+		b.Var("CCACHE_MAXSIZE", fmt.Sprintf("%X", bytesx.Unit(n)))
 	})
 }
 
@@ -63,7 +63,7 @@ func (t options) Disable() options {
 // This is useful if you suspect a cache corruption.
 func (t options) Recache() options {
 	return append(t, func(b *envx.Builder) {
-		b.Var("CCACHE_RECACHE=1", "1")
+		b.Var("CCACHE_RECACHE", "1")
 	})
 }
 

@@ -6,7 +6,6 @@ import (
 	"log"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/davecgh/go-spew/spew"
@@ -37,10 +36,10 @@ func TestNew(t *testing.T) {
 
 		require.Equal(t, moduleName, ws.Module)
 		require.Equal(t, root, ws.Root)
-		require.Equal(t, moduleDir, ws.ModuleDir)
+		require.Equal(t, filepath.Join(root, eg.ModuleDir), ws.ModuleDir)
 		require.Equal(t, expectedCID, ws.CachedID)
-		require.Equal(t, eg.RuntimeDirectory, ws.RuntimeDir)
-		require.Equal(t, filepath.Join(eg.RuntimeDirectory, "mounted"), ws.WorkingDir)
+		require.Equal(t, filepath.Join(root, eg.RuntimeDirectory), ws.RuntimeDir)
+		require.Equal(t, filepath.Join(root, eg.WorkingDirectory), ws.WorkingDir)
 
 		_, err = os.Stat(filepath.Join(root, eg.CacheDirectory))
 		require.NoError(t, err, "CacheDir should be created")
@@ -48,30 +47,10 @@ func TestNew(t *testing.T) {
 		require.NoError(t, err, "GenModDir should be created")
 		_, err = os.Stat(filepath.Join(root, ws.BuildDir, ws.Module, eg.ModuleDir))
 		require.NoError(t, err, "BuildDir should be created")
-		_, err = os.Stat(filepath.Join(root, ws.RuntimeDir))
+		_, err = os.Stat(ws.RuntimeDir)
 		require.NoError(t, err, "RuntimeDir should be created")
-		_, err = os.Stat(filepath.Join(root, ws.WorkingDir))
-		require.NoError(t, err, "WorkingDir should be created")
-	})
-
-	t.Run("success_private_workspace", func(t *testing.T) {
-		root := t.TempDir()
-		moduleDir := "myprivatemodule"
-		moduleName := "test-module-private"
-		require.NoError(t, os.Mkdir(filepath.Join(root, moduleDir), 0755))
-		require.NoError(t, os.WriteFile(filepath.Join(root, moduleDir, "main.go"), []byte("package private"), 0644))
-
-		ws, err := workspaces.New(context.Background(), sha256.New(), root, moduleName)
-		require.NoError(t, err)
-		require.NotNil(t, ws)
-
-		require.True(t, strings.HasPrefix(ws.RuntimeDir, filepath.Join(eg.RuntimeDirectory, ".eg.runtime.")), "RuntimeDir should have private prefix")
-		require.Equal(t, filepath.Join(ws.RuntimeDir, "mounted"), ws.WorkingDir)
-
-		_, err = os.Stat(filepath.Join(root, ws.RuntimeDir))
-		require.NoError(t, err, "Private RuntimeDir should be created")
-		_, err = os.Stat(filepath.Join(root, ws.WorkingDir))
-		require.NoError(t, err, "Private WorkingDir should be created")
+		_, err = os.Stat(ws.WorkspaceDir)
+		require.NoError(t, err, "WorkspaceDir should be created")
 	})
 
 	t.Run("success_with_invalidate_cache_option", func(t *testing.T) {
@@ -116,7 +95,6 @@ func TestNew(t *testing.T) {
 	t.Run("success_with_option_enabled_false", func(t *testing.T) {
 		root := t.TempDir()
 		moduleName := "test-no-invalidate"
-		require.NoError(t, os.Mkdir(filepath.Join(root), 0755))
 		require.NoError(t, os.WriteFile(filepath.Join(root, "lib.go"), []byte("package lib"), 0644))
 
 		hasher := sha256.New()

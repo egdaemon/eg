@@ -36,11 +36,11 @@ func main() {
 				// ),
 				),
 				eg.Parallel(
-					// eggolang.AutoTest(
-					// // eggolang.TestOption.BuildOptions(
-					// // 	eggolang.Build(eggolang.BuildOption.Timeout(10*time.Minute)),
-					// // ),
+					eggolang.AutoTest(
+					// eggolang.TestOption.BuildOptions(
+					// 	eggolang.Build(eggolang.BuildOption.Timeout(10*time.Minute)),
 					// ),
+					),
 					IntegrationTests,
 				),
 				eggolang.RecordCoverage,

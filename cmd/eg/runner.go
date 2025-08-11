@@ -160,6 +160,10 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 			return errorsx.Wrap(err, "unable to set max limits")
 		}
 
+		if err = systemReady(gctx.Context); err != nil {
+			return errorsx.Wrap(err, "failed system ready check")
+		}
+
 		debugx.Println("---------------------------- ROOT MODULE INITIATED ----------------------------")
 		debugx.Println("module pid", os.Getpid())
 		debugx.Println("account", aid)
@@ -228,6 +232,7 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 			),
 			runners.AgentOptionEGBin(errorsx.Must(exec.LookPath(eg.DefaultMountRoot(eg.RuntimeDirectory, eg.BinaryBin)))),
 			runners.AgentOptionHostOS(),
+			runners.AgentOptionCommandLine("--cgroupns", "host"),
 			hostnet,
 		)
 

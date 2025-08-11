@@ -68,7 +68,7 @@ func TestOptions(t *testing.T) {
 			size := uint64(5 * bytesx.MiB)
 			opts := egccache.Options().MaxDisk(size)
 			env := opts.Env()
-			require.Contains(t, env, fmt.Sprintf("CCACHE_MAXSIZE=%X", bytesx.Unit(size))) // Assuming bytesx.Unit(n) results in 'Xs' format
+			require.Contains(t, env, fmt.Sprintf("CCACHE_MAXSIZE=%X", bytesx.Unit(size)))
 			require.Contains(t, env, fmt.Sprintf("CCACHE_DIR=%s", egccache.CacheDirectory()))
 		})
 

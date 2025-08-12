@@ -20,7 +20,7 @@ func TestBuild(t *testing.T) {
 		r := &shell.Recorder{}
 		rt := shell.Runtime().UnsafeExec(r.Record).As("egd")
 
-		b := egdmg.New("eg", egdmg.OptionRuntime(rt))
+		b := egdmg.New("eg", egdmg.OptionRuntime(rt), egdmg.OptionMkisofs)
 		require.Error(t, fsx.SymlinkExists(egenv.EphemeralDirectory("Applications")))
 
 		require.NoError(t, egdmg.Build(b, testx.Fixture("example1"))(t.Context(), egtest.Op()))

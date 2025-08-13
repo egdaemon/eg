@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"sync"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/internal/debugx"
 	"github.com/egdaemon/eg/internal/envx"
@@ -55,6 +56,8 @@ func Remote(ctx context.Context, wshost workspaces.Context, aid string, runid st
 	for _, opt := range options {
 		opt(&r)
 	}
+
+	debugx.Println("interp workspace context", spew.Sdump(wshost))
 
 	containers := c8s.NewProxyClient(svc)
 
@@ -120,7 +123,7 @@ func Remote(ctx context.Context, wshost workspaces.Context, aid string, runid st
 		})).Export("github.com/egdaemon/eg/runtime/wasi/runtime/ffiegcontainer.Run").
 			NewFunctionBuilder().WithFunc(ffiexec.Exec(func(cmd *exec.Cmd) *exec.Cmd {
 			if !filepath.IsAbs(cmd.Dir) {
-				cmd.Dir = filepath.Join(filepath.Join(wshost.Root, wshost.WorkingDir), cmd.Dir)
+				cmd.Dir = filepath.Join(wshost.WorkingDir, cmd.Dir)
 			}
 			cmd.Env = append(r.environ, cmd.Env...)
 			cmd.Stdin = os.Stdin
@@ -130,13 +133,10 @@ func Remote(ctx context.Context, wshost workspaces.Context, aid string, runid st
 			return cmd
 		})).Export("github.com/egdaemon/eg/runtime/wasi/runtime/ffiexec.Command").
 			NewFunctionBuilder().WithFunc(
-			ffigit.Commitish(filepath.Join(wshost.Root, wshost.WorkingDir)),
+			ffigit.Commitish(wshost.WorkingDir),
 		).Export("github.com/egdaemon/eg/runtime/wasi/runtime/ffigit.Commitish").
 			NewFunctionBuilder().WithFunc(
-			ffigit.CloneV1(filepath.Join(wshost.Root, wshost.WorkingDir)),
-		).Export("github.com/egdaemon/eg/runtime/wasi/runtime/ffigit.Clone").
-			NewFunctionBuilder().WithFunc(
-			ffigit.CloneV2(filepath.Join(wshost.Root, wshost.WorkingDir), filepath.Join(wshost.Root, wshost.RuntimeDir)),
+			ffigit.CloneV2(wshost.WorkingDir, wshost.RuntimeDir),
 		).Export("github.com/egdaemon/eg/runtime/wasi/runtime/ffigit.CloneV2").
 			NewFunctionBuilder().WithFunc(
 			// ffimetric.Metric(evtclient),

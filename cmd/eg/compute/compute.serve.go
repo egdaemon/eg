@@ -56,9 +56,9 @@ func (t serve) datadir(rels ...string) string {
 func (t serve) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err error) {
 	var (
 		homedir    = userx.HomeDirectoryOrDefault("/root")
+		uid        = uuid.Must(uuid.NewV7())
 		ws         workspaces.Context
 		repo       *git.Repository
-		uid        = uuid.Must(uuid.NewV7())
 		environio  *os.File
 		sshmount   runners.AgentOption = runners.AgentOptionNoop
 		sshenvvar  runners.AgentOption = runners.AgentOptionNoop

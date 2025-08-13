@@ -430,7 +430,7 @@ func beginwork(ctx context.Context, md metadata, dir string) state {
 		return completed(workload.Enqueued, md, ws, 0, errorsx.Wrap(err, "unable to read archive"))
 	}
 
-	errorsx.Log(tarx.Inspect(archive))
+	// errorsx.Log(tarx.Inspect(archive))
 
 	cachedir := userx.DefaultCacheDirectory("wcache", cacheprefix(workload.Enqueued), cachebucket(workload.Enqueued), "workloadcache")
 	log.Println("workload cachedir", cachedir)
@@ -449,7 +449,7 @@ func beginwork(ctx context.Context, md metadata, dir string) state {
 		return completed(workload.Enqueued, md, ws, 0, errorsx.Wrap(err, "unable to unpack archive"))
 	}
 
-	fsx.PrintFS(os.DirFS(ws.RuntimeDir))
+	// fsx.PrintFS(os.DirFS(ws.RuntimeDir))
 
 	if err = wasix.WarmCacheDirectory(ctx, filepath.Join(ws.Root, ws.BuildDir), wasix.WazCacheDir(filepath.Join(ws.CacheDir, eg.DefaultModuleDirectory()))); err != nil {
 		log.Println("unable to prewarm wasi cache", err)

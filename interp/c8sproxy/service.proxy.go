@@ -88,7 +88,6 @@ func (t *ProxyService) prepcmd(cmd *exec.Cmd) *exec.Cmd {
 func (t *ProxyService) Build(ctx context.Context, req *c8s.BuildRequest) (_ *c8s.BuildResponse, err error) {
 	debugx.Println("PROXY CONTAINER BUILD INITIATED", errorsx.Zero(os.Getwd()), t.ws.Root)
 	defer debugx.Println("PROXY CONTAINER BUILD COMPLETED", errorsx.Zero(os.Getwd()), t.ws.Root)
-
 	var (
 		cmd *exec.Cmd
 	)
@@ -107,15 +106,6 @@ func (t *ProxyService) Build(ctx context.Context, req *c8s.BuildRequest) (_ *c8s
 
 	// determine the working directory from the request if specified or the definition file's path.
 	wdir := slicesx.FindOrZero(func(s string) bool { return !stringsx.Blank(s) }, req.Directory, filepath.Dir(abspath))
-	if fsx.DirExists(wdir) != nil {
-		log.Println("directory missing", wdir, err)
-		fsx.PrintDir(os.DirFS(filepath.Dir(wdir)))
-		fsx.PrintDir(os.DirFS(filepath.Dir("/workload/eg")))
-		fsx.PrintDir(os.DirFS(filepath.Dir("/workload/eg/.eg")))
-	} else {
-		log.Println("directory exists", wdir)
-		fsx.PrintDir(os.DirFS(filepath.Dir(wdir)))
-	}
 
 	if cmd, err = PodmanBuild(ctx, req.Name, wdir, abspath, req.Options...); err != nil {
 		log.Println("unable to create build command", err)

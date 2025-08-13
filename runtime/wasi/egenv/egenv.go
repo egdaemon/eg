@@ -8,6 +8,7 @@ import (
 
 	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/internal/envx"
+	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/userx"
 	"github.com/egdaemon/eg/runtime/wasi/env"
 )
@@ -105,4 +106,8 @@ func Int(fallback int, keys ...string) int {
 
 func Build() *envx.Builder {
 	return envx.Build()
+}
+
+func MustEnviron(env *envx.Builder) []string {
+	return errorsx.Must(env.Environ())
 }

@@ -51,7 +51,7 @@ func AutoDownload(ctx context.Context, authedclient *http.Client, m *ResourceMan
 			log.Println(errorsx.Wrap(err, "unable to read spool running directory"))
 			continue
 		} else if len(dent) >= capacity {
-			log.Println("current tasks are in the running queue, not downloading any new tasks", len(dent), ">=", capacity)
+			log.Printf("current tasks are in the running queue, not downloading any new tasks r(%d) >= cap(%d)\n", len(dent), capacity)
 			continue
 		}
 

@@ -35,8 +35,9 @@ import (
 
 type serve struct {
 	cmdopts.RuntimeResources
-	Dir              string   `name:"directory" help:"root directory of the repository" default:"${vars_git_directory}"`
+	Dir              string   `name:"directory" help:"root directory of the repository" default:"${vars_eg_root_directory}"`
 	ModuleDir        string   `name:"moduledir" help:"must be a subdirectory in the provided directory" default:"${vars_workload_directory}"`
+	InvalidateCache  bool     `name:"invalidate-cache" help:"removes workload build cache"`
 	Privileged       bool     `name:"privileged" help:"run the initial container in privileged mode"`
 	Dirty            bool     `name:"dirty" help:"include user directories and environment variables" hidden:"true"`
 	EnvironmentPaths string   `name:"envpath" help:"environment files to pass to the module" default:""`
@@ -55,9 +56,9 @@ func (t serve) datadir(rels ...string) string {
 func (t serve) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err error) {
 	var (
 		homedir    = userx.HomeDirectoryOrDefault("/root")
+		uid        = uuid.Must(uuid.NewV7())
 		ws         workspaces.Context
 		repo       *git.Repository
-		uid        = uuid.Must(uuid.NewV7())
 		environio  *os.File
 		sshmount   runners.AgentOption = runners.AgentOptionNoop
 		sshenvvar  runners.AgentOption = runners.AgentOptionNoop
@@ -77,27 +78,20 @@ func (t serve) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err e
 		gctx.Context, md5x.Digest(errorsx.Zero(cmdopts.BuildInfo())), t.Dir, t.Name,
 		workspaces.OptionSymlinkCache(filepath.Join(t.Dir, eg.CacheDirectory)),
 		workspaces.OptionSymlinkWorking(t.Dir),
+		workspaces.OptionEnabled(workspaces.OptionInvalidateModuleCache, t.InvalidateCache),
 	); err != nil {
 		return errorsx.Wrap(err, "unable to setup workspace")
 	}
-	defer os.RemoveAll(filepath.Join(ws.Root, ws.RuntimeDir))
+	defer os.RemoveAll(ws.Root)
 
-	if err = os.Remove(filepath.Join(ws.Root, ws.WorkingDir)); err != nil {
-		return errorsx.Wrap(err, "unable to remove working directory")
-	}
-
-	if err = os.Symlink(ws.Root, filepath.Join(ws.Root, ws.WorkingDir)); err != nil {
-		return errorsx.Wrap(err, "unable to symlink working directory")
-	}
-
-	environpath := filepath.Join(ws.Root, ws.RuntimeDir, eg.EnvironFile)
+	environpath := filepath.Join(ws.RuntimeDir, eg.EnvironFile)
 	if environio, err = os.Create(environpath); err != nil {
 		return errorsx.Wrap(err, "unable to open the environment variable file")
 	}
 	defer environio.Close()
 
-	if repo, err = git.PlainOpen(ws.Root); err != nil {
-		return errorsx.Wrap(err, "unable to open git repository")
+	if repo, err = git.PlainOpen(ws.WorkingDir); err != nil {
+		return errorsx.Wrapf(err, "unable to open git repository: %s", ws.WorkingDir)
 	}
 
 	if t.Infinite {
@@ -105,8 +99,10 @@ func (t serve) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err e
 	}
 
 	envb := envx.Build().
-		FromPath(t.EnvironmentPaths).
-		FromPath(t.datadir(".eg.env")).
+		FromPath(
+			t.EnvironmentPaths,
+			t.datadir(".eg.env"),
+		).
 		FromEnv(t.Environment...).
 		FromEnv(os.Environ()...).
 		FromEnviron(errorsx.Zero(gitx.LocalEnv(repo, t.GitRemote, t.GitReference))...).
@@ -127,7 +123,7 @@ func (t serve) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err e
 
 	gnupghome = runners.AgentOptionLocalGPGAgent(gctx.Context, envb)
 
-	if err = envb.CopyTo(environio); err != nil {
+	if err = errorsx.Compact(envb.CopyTo(environio), environio.Close()); err != nil {
 		return errorsx.Wrap(err, "unable to generate environment")
 	}
 
@@ -180,8 +176,10 @@ func (t serve) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err e
 		sshenvvar,
 		mountegbin,
 		runners.AgentOptionVolumes(
-			runners.AgentMountReadWrite(filepath.Join(ws.Root, ws.CacheDir), eg.DefaultMountRoot(eg.CacheDirectory)),
-			runners.AgentMountReadWrite(filepath.Join(ws.Root, ws.RuntimeDir), eg.DefaultMountRoot(eg.RuntimeDirectory)),
+			runners.AgentMountReadWrite(ws.CacheDir, eg.DefaultMountRoot(eg.CacheDirectory)),
+			runners.AgentMountReadWrite(ws.RuntimeDir, eg.DefaultMountRoot(eg.RuntimeDirectory)),
+			runners.AgentMountReadWrite(ws.WorkingDir, eg.DefaultMountRoot(eg.WorkingDirectory)),
+			runners.AgentMountReadWrite(ws.WorkspaceDir, eg.DefaultMountRoot(eg.WorkspaceDirectory)),
 		),
 		runners.AgentOptionLocalComputeCachingVolumes(canonicaluri),
 		gnupghome, // must come after the runtime directory mount to ensure correct mounting order.
@@ -201,7 +199,7 @@ func (t serve) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err e
 					eg.DefaultMountRoot(eg.RuntimeDirectory, ws.Module, eg.ModuleDir),
 				),
 				runners.AgentMountReadOnly(m.Path, eg.ModuleMount()),
-				runners.AgentMountReadWrite(filepath.Join(ws.Root, ws.WorkingDir), eg.DefaultMountRoot(eg.WorkingDirectory)),
+				runners.AgentMountReadWrite(ws.WorkingDir, eg.DefaultMountRoot(eg.WorkingDirectory)),
 			)...)
 
 		prepcmd := func(cmd *exec.Cmd) *exec.Cmd {
@@ -212,7 +210,6 @@ func (t serve) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err e
 			return cmd
 		}
 
-		// TODO REVISIT using t.ws.RuntimeDir as moduledir.
 		if err := c8sproxy.PodmanModule(ctx, prepcmd, imagename, fmt.Sprintf("eg-%s", uid.String()), ws.RuntimeDir, options...); err != nil {
 			return errorsx.Wrap(err, "module execution failed")
 		}

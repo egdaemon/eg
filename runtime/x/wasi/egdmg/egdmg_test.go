@@ -1,6 +1,7 @@
 package egdmg_test
 
 import (
+	"fmt"
 	"log"
 	"strings"
 	"testing"
@@ -8,6 +9,7 @@ import (
 	"github.com/egdaemon/eg/internal/egtest"
 	"github.com/egdaemon/eg/internal/fsx"
 	"github.com/egdaemon/eg/internal/testx"
+	"github.com/egdaemon/eg/internal/unsafepretty"
 	"github.com/egdaemon/eg/runtime/wasi/egenv"
 	"github.com/egdaemon/eg/runtime/wasi/shell"
 	"github.com/egdaemon/eg/runtime/x/wasi/egdmg"
@@ -16,7 +18,7 @@ import (
 
 func TestBuild(t *testing.T) {
 	t.Run("example1", func(t *testing.T) {
-		testx.PrivateTemp(t)
+		tmpdir := testx.PrivateTemp(t)
 		r := &shell.Recorder{}
 		rt := shell.Runtime().UnsafeExec(r.Record).As("egd")
 
@@ -36,11 +38,12 @@ func TestBuild(t *testing.T) {
 		// require.Equal(t, "930df5f0-b121-133a-8d2a-51ed2a420683", testx.ReadMD5(egenv.EphemeralDirectory("eg.app", "Contents", "Info.plist")), testx.ReadString(egenv.EphemeralDirectory("eg.app", "Contents", "Info.plist")))
 		require.True(t, func(cmds ...string) bool {
 			check := func(cmd, expected string) bool {
-				return strings.HasPrefix(cmd, expected)
+
+				return strings.HasPrefix(strings.TrimSpace(cmd), strings.TrimSpace(expected))
 			}
 
 			seq := []string{
-				"::sudo:-E -H -u egd -g egd bash -c rsync -avL ",
+				fmt.Sprintf("::sudo:-E -H -u egd -g egd bash -c cp -R %s/ %s/eg.app/ ", testx.Fixture("example1"), tmpdir),
 				"::sudo:-E -H -u egd -g egd bash -c ln -fs /Applications ",
 				"::sudo:-E -H -u egd -g egd bash -c mkisofs -D -R -apple -no-pad -V eg.app -o /workload/.eg.workspace/eg.dmg ",
 			}
@@ -54,7 +57,7 @@ func TestBuild(t *testing.T) {
 
 					continue
 				}
-				log.Println("invalid command\n", v, "\n", seq[idx])
+				log.Println("invalid command", idx, "\n", unsafepretty.Print(v), "\n", unsafepretty.Print(seq[idx]))
 				return false
 			}
 

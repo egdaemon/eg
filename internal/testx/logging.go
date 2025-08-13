@@ -21,6 +21,8 @@ func Logging() {
 	// log.SetOutput(io.Discard)
 }
 
-func PrivateTemp(t testing.TB) {
-	t.Setenv("TMPDIR", t.TempDir())
+func PrivateTemp(t testing.TB) string {
+	dst := t.TempDir()
+	t.Setenv("TMPDIR", dst)
+	return dst
 }

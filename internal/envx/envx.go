@@ -304,7 +304,14 @@ func FromReader(r io.Reader) (environ []string, err error) {
 	scanner := bufio.NewScanner(r)
 
 	for scanner.Scan() {
-		environ = append(environ, scanner.Text())
+		t := scanner.Text()
+		k, v, ok := strings.Cut(t, "=")
+		if !ok {
+			debugx.Println("skipping malformed env var", t)
+			continue
+		}
+
+		environ = append(environ, Format(k, v))
 	}
 
 	return environ, nil
@@ -549,7 +556,7 @@ func Format[T ~string](k string, v T, options ...func(*formatopts)) string {
 		debugx.Println("ignoring variable", k, "empty")
 	}
 
-	return fmt.Sprintf("%s=%s", k, v)
+	return fmt.Sprintf("%s=%s", k, strings.TrimPrefix(strings.TrimSuffix(string(v), "\""), "\""))
 }
 
 // see format

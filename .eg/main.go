@@ -63,15 +63,15 @@ func IntegrationTests(ctx context.Context, op eg.Op) error {
 		ctx,
 		eg.Sequential(
 			shell.Op(
-				runtime.New("/home/egd/go/bin/eg compute baremetal -vv tests/concurrent"),
-				runtime.New("/home/egd/go/bin/eg compute baremetal -vv tests/metrics"),
-				// runtime.New("/home/egd/go/bin/eg compute baremetal -vv tests/envvars").
+				runtime.New("/home/egd/go/bin/eg compute baremetal tests/concurrent"),
+				runtime.New("/home/egd/go/bin/eg compute baremetal tests/metrics"),
+				runtime.New("/home/egd/go/bin/eg compute baremetal tests/stress"),
+				runtime.New("/home/egd/go/bin/eg compute baremetal tests/tty"),
+				// runtime.New("/home/egd/go/bin/eg compute baremetal tests/envvars").
 				// 	Environ(egbug.EnvUnsafeDigest, "a129de7dadc3fe210b9162428f93d3fe").
 				// 	Environ("EG_COMPUTE_MODULE_LEVEL", "0"),
-				runtime.New("/home/egd/go/bin/eg compute baremetal -vv tests/stress"),
 				// runtime.New("/home/egd/go/bin/eg compute baremetal tests/containers"),
 				// runtime.New("/home/egd/go/bin/eg compute baremetal -vv tests/gpgagent"),
-				// runtime.New("/home/egd/go/bin/eg compute baremetal tests/tty"),
 			),
 		),
 	)

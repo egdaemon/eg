@@ -232,7 +232,6 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 			),
 			runners.AgentOptionEGBin(errorsx.Must(exec.LookPath(eg.DefaultMountRoot(eg.RuntimeDirectory, eg.BinaryBin)))),
 			runners.AgentOptionHostOS(),
-			runners.AgentOptionCommandLine("--cgroupns", "host"),
 			hostnet,
 		)
 
@@ -339,7 +338,7 @@ func (t wasiCmd) Run(gctx *cmdopts.Global) (err error) {
 	}
 
 	mpath := filepath.Join(ws.RuntimeDir, "test.wasm")
-	log.Println("wasipath", ws.RuntimeDir, mpath)
+	debugx.Println("wasipath", ws.RuntimeDir, mpath)
 	if err = compile.Run(ctx, t.Dir, t.Module, mpath); err != nil {
 		return err
 	}

@@ -1,0 +1,17 @@
+#!/usr/bin/make -f
+# See debhelper(7) (uncomment to enable)
+# output every command that modifies files on the build system.
+DH_VERBOSE=1
+
+%:
+	CCACHE_COMPILERCHECK=content CCACHE_DEBUG=1 CCACHE_DEBUGDIR=ccache-debug-1 dh $@
+
+override_dh_auto_build:
+	echo "DH AUTO BUILD OVERRIDE ${CMAKE_BUILD_PARALLEL_LEVEL}"
+	env | sort
+	# CCACHE_DIR="$(CURDIR)/${CCACHE_DIR}" ccache -s
+	make install
+
+
+override_dh_usrlocal:
+	echo "DH usrlocal override due to overly strict rules"

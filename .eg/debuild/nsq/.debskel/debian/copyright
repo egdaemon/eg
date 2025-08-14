@@ -1,0 +1,8 @@
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: nsq
+Upstream-Contact: engineering@egdaemon.com
+Source: https://github.com/nsqio/nsq
+
+Files: *
+Copyright: 2023-2024 EG Technology <engineering@egdaemon.com> (package only)
+License: MIT

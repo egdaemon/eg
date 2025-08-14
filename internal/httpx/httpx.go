@@ -21,7 +21,6 @@ import (
 
 	"github.com/egdaemon/eg/internal/debugx"
 	"github.com/egdaemon/eg/internal/errorsx"
-	"github.com/egdaemon/eg/internal/iox"
 	"github.com/egdaemon/eg/internal/stringsx"
 	"golang.org/x/time/rate"
 )
@@ -321,17 +320,11 @@ func Multipart(do func(*multipart.Writer) error) (contentType string, _ io.ReadC
 
 	mw := multipart.NewWriter(w)
 
-	ctx, done := context.WithCancelCause(context.Background())
 	go func() {
-		if err = errorsx.Compact(do(mw), mw.Close()); err != nil {
-			w.CloseWithError(err)
-		}
-		done(nil)
+		errorsx.Log(w.CloseWithError(errorsx.Compact(do(mw), mw.Close())))
 	}()
 
-	return mw.FormDataContentType(), iox.ReaderCompositeCloser(r, func() error {
-		return errorsx.Ignore(context.Cause(ctx), context.Canceled)
-	}, r.Close), nil
+	return mw.FormDataContentType(), r, nil
 }
 
 func escapeQuotes(s string) string {

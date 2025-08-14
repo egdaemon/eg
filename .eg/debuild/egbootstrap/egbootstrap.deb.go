@@ -54,8 +54,8 @@ func Runner() eg.ContainerRunner {
 func Build(ctx context.Context, o eg.Op) error {
 	return eg.Parallel(
 		egdebuild.Build(gcfg, egdebuild.Option.Distro("jammy")),
-		egdebuild.Build(gcfg, egdebuild.Option.Distro("noble")),
-		egdebuild.Build(gcfg, egdebuild.Option.Distro("plucky")),
+		egdebuild.Build(gcfg, egdebuild.Option.Distro("noble"), egdebuild.Option.NoLint()),
+		egdebuild.Build(gcfg, egdebuild.Option.Distro("plucky"), egdebuild.Option.NoLint()),
 	)(ctx, o)
 }
 

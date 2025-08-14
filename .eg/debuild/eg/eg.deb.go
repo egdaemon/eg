@@ -73,7 +73,7 @@ func Build(ctx context.Context, o eg.Op) error {
 		egdebuild.Build(
 			gcfg,
 			egdebuild.Option.Distro("plucky"),
-			egdebuild.Option.BuildBinary(10*time.Minute),
+			egdebuild.Option.BuildBinary(20*time.Minute),
 			egdebuild.Option.Environ(eggolang.Env()...),
 			egdebuild.Option.NoLint(),
 		),

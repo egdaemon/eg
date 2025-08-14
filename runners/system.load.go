@@ -6,10 +6,10 @@ import (
 	"time"
 
 	"github.com/egdaemon/eg/internal/contextx"
-	"github.com/egdaemon/eg/internal/debugx"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/slicesx"
 	"github.com/egdaemon/eg/internal/timex"
+	"github.com/egdaemon/eg/internal/tracex"
 	"github.com/gofrs/uuid/v5"
 	"github.com/shirou/gopsutil/v4/cpu"
 	"github.com/shirou/gopsutil/v4/disk"
@@ -63,7 +63,7 @@ func sampledisk(ctx context.Context, analytics *sql.DB) error {
 		return err
 	}
 
-	debugx.Println("eg.metrics.disk", usage.Path, usage.UsedPercent)
+	tracex.Println("eg.metrics.disk", usage.Path, usage.UsedPercent)
 
 	return nil
 }
@@ -84,7 +84,7 @@ func samplecompute(ctx context.Context, analytics *sql.DB) error {
 		return err
 	}
 
-	debugx.Println("eg.metrics.compute", load)
+	tracex.Println("eg.metrics.compute", load)
 	return nil
 }
 
@@ -114,7 +114,7 @@ func samplememory(ctx context.Context, analytics *sql.DB) error {
 		return err
 	}
 
-	debugx.Println("eg.metrics.memory.percent", percent)
+	tracex.Println("eg.metrics.memory.percent", percent)
 	return nil
 }
 
@@ -153,7 +153,7 @@ func samplenet(ctx context.Context, analytics *sql.DB) error {
 		if err := analytics.QueryRowContext(ctx, query, uuid.Must(uuid.NewV7()).String(), v.Name, time.Now().UTC(), v.BytesSent, v.BytesRecv, v.PacketsSent, v.PacketsRecv, v.Dropout, v.Dropin, v.Errout, v.Errin, v.Fifoout, v.Fifoin).Scan(&v.BytesSent, &v.BytesRecv, &v.PacketsSent, &v.PacketsRecv, &v.Dropout, &v.Dropin, &v.Errout, &v.Errin, &v.Fifoout, &v.Fifoin); err != nil {
 			return err
 		}
-		debugx.Printf("eg.metrics.network %s v(sent,recv) bytes(%d, %d) packets(%d,%d) packets_dropped(%d,%d) total_errors(%d,%d) fifo_buff_errors(%d,%d)\n", v.Name, v.BytesSent, v.BytesRecv, v.PacketsSent, v.PacketsRecv, v.Dropout, v.Dropin, v.Errout, v.Errin, v.Fifoout, v.Fifoin)
+		tracex.Printf("eg.metrics.network %s v(sent,recv) bytes(%d, %d) packets(%d,%d) packets_dropped(%d,%d) total_errors(%d,%d) fifo_buff_errors(%d,%d)\n", v.Name, v.BytesSent, v.BytesRecv, v.PacketsSent, v.PacketsRecv, v.Dropout, v.Dropin, v.Errout, v.Errin, v.Fifoout, v.Fifoin)
 	}
 
 	return nil

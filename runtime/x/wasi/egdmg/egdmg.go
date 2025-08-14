@@ -84,6 +84,7 @@ func Build(b Specification, archive string) eg.OpFn {
 		cmd := strings.ReplaceAll(b.cmd, "%dmg.volume.name%", root)
 		cmd = strings.ReplaceAll(cmd, "%dmg.volume.output%", filepath.Join(b.outputpath, b.outputname))
 		cmd = strings.ReplaceAll(cmd, "%dmg.src.directory%", filepath.Join(b.builddir, root))
+
 		sruntime := b.runtime
 		return shell.Run(
 			ctx,

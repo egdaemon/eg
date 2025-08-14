@@ -232,6 +232,7 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 			),
 			runners.AgentOptionEGBin(errorsx.Must(exec.LookPath(eg.DefaultMountRoot(eg.RuntimeDirectory, eg.BinaryBin)))),
 			runners.AgentOptionHostOS(),
+			runners.AgentOptionCommandLine("--cgroups", "disabled"),
 			hostnet,
 		)
 

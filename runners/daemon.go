@@ -4,11 +4,9 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"os"
 	"strconv"
 	"strings"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/fsx"
@@ -218,17 +216,12 @@ func (t Agent) Options() []string {
 }
 
 func (t Agent) Dial(ctx context.Context) (conn *grpc.ClientConn, err error) {
-	p1 := DefaultSocketPath()
-	p2 := ModuleSocketPath()
+	p2 := DefaultSocketPath()
+	p1 := ModuleSocketPath()
 	cspath := fsx.LocateFirst(
 		p1,
 		p2,
 	)
-
-	log.Println("agent dialing initiated 0", spew.Sdump(t.ws), p1, p2, "->", cspath)
-	envx.Debug(os.Environ()...)
-	fsx.PrintDir(os.DirFS(eg.DefaultMountRoot(eg.RuntimeDirectory)))
-	log.Println("agent dialing initiated completed", cspath)
 
 	return grpc.DialContext(ctx, fmt.Sprintf("unix://%s", cspath), grpc.WithInsecure())
 }

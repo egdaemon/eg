@@ -87,11 +87,11 @@ func (t builtinUpload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err e
 	}
 
 	if err = compile.InitGolang(gctx.Context, eg.DefaultModuleDirectory(ws.Root), cmdopts.ModPath()); err != nil {
-		return err
+		return errorsx.Wrap(err, "unable to init golang module")
 	}
 
 	if err = compile.InitGolangTidy(gctx.Context, eg.DefaultModuleDirectory(ws.Root)); err != nil {
-		return err
+		return errorsx.Wrap(err, "unable to tidy up dependency")
 	}
 
 	roots, err := transpile.Autodetect(transpile.New(eg.DefaultModuleDirectory(ws.Root), ws)).Run(gctx.Context)

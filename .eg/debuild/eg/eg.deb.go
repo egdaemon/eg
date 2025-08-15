@@ -4,6 +4,7 @@ import (
 	"context"
 	"embed"
 	"io/fs"
+	"time"
 
 	"eg/compute/errorsx"
 	"eg/compute/maintainer"
@@ -13,6 +14,7 @@ import (
 	"github.com/egdaemon/eg/runtime/wasi/eggit"
 	"github.com/egdaemon/eg/runtime/wasi/shell"
 	"github.com/egdaemon/eg/runtime/x/wasi/egdebuild"
+	"github.com/egdaemon/eg/runtime/x/wasi/eggolang"
 )
 
 const (
@@ -68,13 +70,13 @@ func Build(ctx context.Context, o eg.Op) error {
 		egdebuild.Build(gcfg, egdebuild.Option.Distro("jammy")),
 		egdebuild.Build(gcfg, egdebuild.Option.Distro("noble"), egdebuild.Option.NoLint()),
 		egdebuild.Build(gcfg, egdebuild.Option.Distro("plucky"), egdebuild.Option.NoLint()),
-		// egdebuild.Build(
-		// 	gcfg,
-		// 	egdebuild.Option.Distro("plucky"),
-		// 	egdebuild.Option.BuildBinary(20*time.Minute),
-		// 	egdebuild.Option.Environ(eggolang.Env()...),
-		// 	egdebuild.Option.NoLint(),
-		// ),
+		egdebuild.Build(
+			gcfg,
+			egdebuild.Option.Distro("plucky"),
+			egdebuild.Option.BuildBinary(20*time.Minute),
+			egdebuild.Option.Environ(eggolang.Env()...),
+			egdebuild.Option.NoLint(),
+		),
 	)(ctx, o)
 }
 

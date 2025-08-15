@@ -34,10 +34,6 @@ import (
 	"golang.org/x/oauth2"
 )
 
-// eg local
-// eg compute upload // current upload...
-// eg compute c8s upload path/to/Containerfile
-
 type c8scmds struct {
 	Upload c8sUpload `cmd:"" help:"upload and run a container file"`
 	Local  c8sLocal  `cmd:"" help:"upload and run a container file"`

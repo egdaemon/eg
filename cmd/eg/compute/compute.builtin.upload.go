@@ -167,13 +167,6 @@ func (t builtinUpload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err e
 	}
 
 	log.Println("archive", archiveio.Name())
-	// if err = tarx.Inspect(archiveio); err != nil {
-	// 	log.Println(errorsx.Wrap(err, "unable to inspect archive"))
-	// }
-
-	// if err = iox.Rewind(archiveio); err != nil {
-	// 	return errorsx.Wrap(err, "unable to rewind kernel archive")
-	// }
 
 	ainfo := errorsx.Zero(os.Stat(archiveio.Name()))
 	log.Println("archive metadata", ainfo.Name(), bytesx.Unit(ainfo.Size()))

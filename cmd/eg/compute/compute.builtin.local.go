@@ -94,7 +94,6 @@ func (t builtinLocal) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath)
 	if err != nil {
 		return err
 	}
-	log.Println("DERP", roots)
 
 	if err = compile.EnsureRequiredPackages(gctx.Context, filepath.Join(ws.Root, ws.TransDir)); err != nil {
 		return err

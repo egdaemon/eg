@@ -109,7 +109,7 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 		aid     = envx.String(uuid.Nil.String(), eg.EnvComputeAccountID)
 		uid     = envx.String(uuid.Nil.String(), eg.EnvComputeRunID)
 		descr   = envx.String("", eg.EnvComputeVCS)
-		hostnet = envx.Toggle(runners.AgentOptionCommandLine("--network", "host"), runners.AgentOptionNoop, eg.EnvExperimentalDisableHostNetwork) // ipv4 group bullshit. pretty sure its a podman 4 issue that was resolved in podman 5. this is 'safe' to do because we are already in a container.
+		hostnet = envx.Toggle(runners.AgentOptionCommandLine("--network", "host"), runners.AgentOptionNoop, envx.Boolean(false, eg.EnvExperimentalDisableHostNetwork)) // ipv4 group bullshit. pretty sure its a podman 4 issue that was resolved in podman 5. this is 'safe' to do because we are already in a container.
 		cc      grpc.ClientConnInterface
 		cmdenv  []string
 	)

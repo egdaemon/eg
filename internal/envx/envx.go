@@ -63,8 +63,8 @@ func String(fallback string, keys ...string) string {
 }
 
 // Toggle based on environment keys.
-func Toggle[T any](off, on T, keys ...string) T {
-	if Boolean(false, keys...) {
+func Toggle[T any](off, on T, flag bool) T {
+	if flag {
 		return on
 	}
 

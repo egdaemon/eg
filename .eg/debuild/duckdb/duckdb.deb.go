@@ -21,7 +21,7 @@ var debskel embed.FS
 
 const (
 	container = "eg.deb.duckdb"
-	version   = "1.3.1"
+	version   = "1.3.2"
 )
 
 var (
@@ -41,9 +41,9 @@ func init() {
 		egdebuild.Option.Description("duckdb", "embeddable columnar database"),
 		egdebuild.Option.Debian(errorsx.Must(fs.Sub(debskel, ".debskel"))),
 		egdebuild.Option.DependsBuild("rsync", "curl", "tree", "ca-certificates", "cmake", "ninja-build", "libssl-dev", "git"),
-		egdebuild.Option.Environ("PACKAGE_VERSION", version),
-		// egdebuild.Option.Environ("CCACHE_DIR", filepath.Join("src", "build", "ccache")),
-		egdebuild.Option.Environ("GIT_COMMIT_HASH", c.Hash.String()),
+		egdebuild.Option.Envvar("PACKAGE_VERSION", version),
+		egdebuild.Option.Envvar("GIT_COMMIT_HASH", c.Hash.String()),
+		// egdebuild.Option.Envvar("CCACHE_DIR", filepath.Join("src", "build", "ccache")),
 	)
 }
 

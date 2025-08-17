@@ -44,12 +44,13 @@ import (
 )
 
 type baremetal struct {
-	Dir             string `name:"directory" help:"root directory of the repository" default:"${vars_eg_root_directory}"`
-	GitRemote       string `name:"git-remote" help:"name of the git remote to use" default:"${vars_git_default_remote_name}"`
-	GitReference    string `name:"git-ref" help:"name of the branch or commit to checkout" default:"${vars_git_head_reference}"`
-	Clone           bool   `name:"git-clone" help:"allow cloning via git"`
-	InvalidateCache bool   `name:"invalidate-cache" help:"removes workload build cache"`
-	Workload        string `arg:"" help:"name of the workload to run"`
+	Dir             string   `name:"directory" help:"root directory of the repository" default:"${vars_eg_root_directory}"`
+	GitRemote       string   `name:"git-remote" help:"name of the git remote to use" default:"${vars_git_default_remote_name}"`
+	GitReference    string   `name:"git-ref" help:"name of the branch or commit to checkout" default:"${vars_git_head_reference}"`
+	Environment     []string `name:"env" short:"e" help:"define environment variables and their values to be included"`
+	Clone           bool     `name:"git-clone" help:"allow cloning via git"`
+	InvalidateCache bool     `name:"invalidate-cache" help:"removes workload build cache"`
+	Workload        string   `arg:"" help:"name of the workload to run"`
 }
 
 func (t baremetal) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, hotswapbin *cmdopts.HotswapPath) (err error) {
@@ -168,6 +169,8 @@ func (t baremetal) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, hotswapbin
 	}
 
 	cmdenvb := envx.Build().FromEnv(
+		t.Environment...,
+	).FromEnv(
 		"PATH",
 		"TERM",
 		"COLORTERM",

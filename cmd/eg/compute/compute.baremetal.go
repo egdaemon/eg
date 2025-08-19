@@ -50,6 +50,7 @@ type baremetal struct {
 	Environment     []string `name:"env" short:"e" help:"define environment variables and their values to be included"`
 	Clone           bool     `name:"git-clone" help:"allow cloning via git"`
 	InvalidateCache bool     `name:"invalidate-cache" help:"removes workload build cache"`
+	Podman          bool     `name:"podman" help:"enable/disable podman" hidden:"true" negatable:"" default:"true"`
 	Workload        string   `arg:"" help:"name of the workload to run"`
 }
 
@@ -88,9 +89,13 @@ func (t baremetal) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, hotswapbin
 	}
 
 	ctx, err := podmanx.WithClient(gctx.Context)
-	if err != nil {
+	if t.Podman && err != nil {
 		return errorsx.Wrap(err, "unable to connect to podman")
+	} else {
+		ctx = gctx.Context
+		errorsx.Log(errorsx.Wrap(err, "unable to connect to podman"))
 	}
+
 	// ensure when we run modules our umask is set to allow git clones to work properly
 	runtimex.Umask(0002)
 

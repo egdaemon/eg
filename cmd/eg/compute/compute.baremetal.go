@@ -151,6 +151,7 @@ func (t baremetal) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, hotswapbin
 
 	debugx.Println("---------------------------- BAREMETAL INITIATED ----------------------------")
 	debugx.Println("module pid", os.Getpid())
+	debugx.Println("cwd", errorsx.Zero(os.Getwd()))
 	debugx.Println("account", aid)
 	debugx.Println("run id", uid)
 	debugx.Println("repository", descr)

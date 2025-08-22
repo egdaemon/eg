@@ -156,7 +156,7 @@ func LocalEnv(repo *git.Repository, remote string, branch string) (env []string,
 	}
 
 	if benv, err = BaseEnv(repo, uri, eg.DefaultWorkingDirectory(), "main"); err != nil {
-		return nil, errorsx.Wrapf(err, "base env: %T %s", err, uri)
+		return nil, errorsx.Wrapf(err, "base env: %T %s", errors.Unwrap(err), uri)
 	}
 
 	env = append(env, benv...)

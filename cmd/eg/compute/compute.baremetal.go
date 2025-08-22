@@ -178,6 +178,7 @@ func (t baremetal) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, hotswapbin
 		return errorsx.Wrap(err, "unable to prepare analytics.db")
 	}
 
+	gitenv := errorsx.Zero(gitx.LocalEnv(repo, t.GitRemote, t.GitReference))
 	cmdenvb := envx.Build().FromEnv(
 		t.Environment...,
 	).FromEnv(
@@ -199,7 +200,7 @@ func (t baremetal) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, hotswapbin
 	).Var(
 		eg.EnvComputeModuleNestedLevel, strconv.Itoa(0),
 	).FromEnviron(
-		errorsx.Zero(gitx.LocalEnv(repo, t.GitRemote, t.GitReference))...,
+		gitenv...,
 	)
 
 	environpath := filepath.Join(ws.RuntimeDir, eg.EnvironFile)
@@ -268,7 +269,7 @@ func (t baremetal) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, hotswapbin
 		t.Dir,
 		errorsx.Must(
 			envx.Build().
-				FromEnviron(errorsx.Zero(gitx.LocalEnv(repo, t.GitRemote, t.GitReference))...).
+				FromEnviron(gitenv...).
 				FromEnviron(os.Environ()...).Environ(),
 		),
 	).Bind(srv)

@@ -157,6 +157,9 @@ func (t baremetal) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, hotswapbin
 	debugx.Println("number of cores (GOMAXPROCS - inaccurate)", runtime.GOMAXPROCS(-1))
 	debugx.Println("ram available", bytesx.Unit(vmemlimit))
 	debugx.Println("logging level", gctx.Verbosity)
+	debugx.Fn(func() {
+		envx.Debug(os.Environ()...)
+	})
 	defer debugx.Println("---------------------------- BAREMETAL COMPLETED ----------------------------")
 	errorsx.Never(fsx.DirExists(ws.RuntimeDir))
 	cspath := filepath.Join(ws.RuntimeDir, eg.SocketControl)

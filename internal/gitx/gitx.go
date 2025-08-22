@@ -152,11 +152,11 @@ func LocalEnv(repo *git.Repository, remote string, branch string) (env []string,
 	}
 
 	if env, err = HeadEnv(repo, uri, eg.DefaultWorkingDirectory(), branch); err != nil {
-		return nil, errorsx.Wrapf(err, "head env: %s", uri)
+		return nil, errorsx.Wrapf(err, "head env: %s - %s", uri, branch)
 	}
 
 	if benv, err = BaseEnv(repo, uri, eg.DefaultWorkingDirectory(), "main"); err != nil {
-		return nil, errorsx.Wrapf(err, "base env: %s", uri)
+		return nil, errorsx.Wrapf(err, "base env: %T %s", err, uri)
 	}
 
 	env = append(env, benv...)

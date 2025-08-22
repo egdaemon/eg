@@ -156,7 +156,11 @@ func LocalEnv(repo *git.Repository, remote string, branch string) (env []string,
 	}
 
 	if benv, err = BaseEnv(repo, uri, eg.DefaultWorkingDirectory(), "main"); err != nil {
-		return nil, errorsx.Wrapf(err, "base env: %T %s", errors.Unwrap(err), uri)
+		if errors.Is(err, plumbing.ErrReferenceNotFound) {
+			// do nothing
+		} else {
+			return nil, errorsx.Wrapf(err, "base env: %s", uri)
+		}
 	}
 
 	env = append(env, benv...)
@@ -171,7 +175,7 @@ func HeadEnv(repo *git.Repository, vcs, uri string, treeish string) (env []strin
 	)
 
 	if hash, err = repo.ResolveRevision(plumbing.Revision(treeish)); err != nil {
-		return nil, errorsx.Wrapf(err, "unable to resolve git reference: %s", treeish)
+		return nil, errorsx.Wrapf(err, "unable to resolve git revision: %s", treeish)
 	}
 
 	if commit, err = repo.CommitObject(*hash); err != nil {
@@ -202,7 +206,7 @@ func BaseEnv(repo *git.Repository, vcs, uri string, treeish string) (env []strin
 	)
 
 	if hash, err = repo.ResolveRevision(plumbing.Revision(treeish)); err != nil {
-		return nil, errorsx.Wrapf(err, "unable to resolve git reference: %s", treeish)
+		return nil, errorsx.Wrapf(err, "unable to resolve git revision: %s", treeish)
 	}
 
 	if commit, err = repo.CommitObject(*hash); err != nil {

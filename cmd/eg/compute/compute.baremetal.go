@@ -23,6 +23,7 @@ import (
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/fsx"
 	"github.com/egdaemon/eg/internal/gitx"
+	"github.com/egdaemon/eg/internal/grpcx"
 	"github.com/egdaemon/eg/internal/md5x"
 	"github.com/egdaemon/eg/internal/podmanx"
 	"github.com/egdaemon/eg/internal/runtimex"
@@ -88,12 +89,12 @@ func (t baremetal) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, hotswapbin
 		return err
 	}
 
-	ctx, err := podmanx.WithClient(gctx.Context)
-	if t.Podman && err != nil {
-		return errorsx.Wrap(err, "unable to connect to podman")
-	} else {
-		ctx = gctx.Context
-		errorsx.Log(errorsx.Wrap(err, "unable to connect to podman"))
+	ctx := gctx.Context
+	if t.Podman {
+		ctx, err = podmanx.WithClient(gctx.Context)
+		if t.Podman && err != nil {
+			return errorsx.Wrap(err, "unable to connect to podman")
+		}
 	}
 
 	// ensure when we run modules our umask is set to allow git clones to work properly
@@ -249,10 +250,11 @@ func (t baremetal) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, hotswapbin
 		defer done()
 		errorsx.Log(runners.SampleSystemLoad(fctx, db))
 	}()
+
 	srv := grpc.NewServer(
 		grpc.Creds(insecure.NewCredentials()), // this is a local socket
 		grpc.ChainUnaryInterceptor(
-			podmanx.GrpcClient,
+			envx.Toggle(grpcx.NoopUnaryInterceptor, podmanx.GrpcClient, t.Podman),
 		),
 	)
 	defer srv.GracefulStop()

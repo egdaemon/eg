@@ -32,6 +32,7 @@ import (
 	"github.com/egdaemon/eg/internal/slicesx"
 	"github.com/egdaemon/eg/internal/stringsx"
 	"github.com/egdaemon/eg/internal/timex"
+	"github.com/egdaemon/eg/internal/tracex"
 )
 
 func DetectRoot() string {
@@ -157,7 +158,9 @@ func LocalEnv(repo *git.Repository, remote string, branch string) (env []string,
 
 	if benv, err = BaseEnv(repo, uri, eg.DefaultWorkingDirectory(), "main"); err != nil {
 		if errors.Is(err, plumbing.ErrReferenceNotFound) {
-			// do nothing
+			tracex.Println("missing base branch for local env - change added for baremetal support in github actions")
+			// do nothing, this check was added for baremetal compute.
+			// we'll see if its workable.
 		} else {
 			return nil, errorsx.Wrapf(err, "base env: %s", uri)
 		}

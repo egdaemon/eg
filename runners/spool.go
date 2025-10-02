@@ -97,7 +97,7 @@ func (t SpoolDirs) Enqueue(uid uuid.UUID) (err error) {
 }
 
 func (t SpoolDirs) Dequeue() (_ string, err error) {
-	for i := 0; i < 100; i++ {
+	for range 100 {
 		dir, err := peek(t.Queued, t.poplimit)
 		if err != nil {
 			return "", err
@@ -112,7 +112,7 @@ func (t SpoolDirs) Dequeue() (_ string, err error) {
 		return filepath.Join(t.Running, dir.Name()), nil
 	}
 
-	return "", errors.Errorf("exhausted dequeue attempts, try later")
+	return "", errorsx.Wrap(err, "exhausted dequeue attempts, try later")
 }
 
 func (t SpoolDirs) dequeueRename(dir fs.DirEntry) error {

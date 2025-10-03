@@ -103,8 +103,12 @@ func (t SpoolDirs) Dequeue() (_ string, err error) {
 			return "", err
 		}
 
-		if err = t.dequeueRename(dir); fsx.ErrIsNotExist(err) != nil || os.IsExist(err) {
+		if err = t.dequeueRename(dir); fsx.ErrIsNotExist(err) != nil {
 			continue
+		} else if os.IsExist(err) {
+			// when IsExist it means we have the job running. clear from queued.
+			errorsx.Log(errorsx.Wrap(os.RemoveAll(filepath.Join(t.Queued, dir.Name())), "failed to clear queued"))
+			return "", err
 		} else if err != nil {
 			return "", err
 		}

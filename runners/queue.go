@@ -388,6 +388,11 @@ func recover(_ context.Context, md metadata) error {
 			return err
 		}
 
+		// ensure the queue directory is available.
+		if err = os.RemoveAll(filepath.Join(md.dirs.Queued, d.Name())); err != nil {
+			return err
+		}
+
 		if cause := os.Rename(filepath.Join(md.dirs.Running, d.Name()), filepath.Join(md.dirs.Queued, d.Name())); fsx.ErrIsNotExist(cause) != nil {
 			return fs.SkipDir
 		} else if cause != nil {

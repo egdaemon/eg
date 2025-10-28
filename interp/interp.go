@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"sync"
 
@@ -163,6 +164,8 @@ func (t runner) perform(ctx context.Context, wshost workspaces.Context, runid, p
 		}
 	}(nonBlocking(os.Stdin.Fd()))
 	tracedebug := envx.Boolean(false, eg.EnvLogsTrace)
+
+	ctx = experimental.WithCompilationWorkers(ctx, runtime.GOMAXPROCS(0))
 
 	cache, err := wazero.NewCompilationCacheWithDir(wasix.WazCacheDir(wshost.CacheDir, eg.DefaultModuleDirectory()))
 	if err != nil {

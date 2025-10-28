@@ -43,6 +43,7 @@ func NewEngine(_ context.Context, enabledFeatures api.CoreFeatures, _ filecache.
 
 // Close implements the same method as documented on wasm.Engine.
 func (e *engine) Close() (err error) {
+	clear(e.compiledFunctions)
 	return
 }
 
@@ -472,6 +473,8 @@ func (e *engine) lowerIR(ir *compilationResult, ret *compiledFunction) error {
 				target := op.Us[j]
 				e.setLabelAddress(&op.Us[j], label(target), labelAddressResolutions)
 			}
+		case operationKindTailCallReturnCallIndirect:
+			e.setLabelAddress(&op.Us[1], label(op.Us[1]), labelAddressResolutions)
 		}
 	}
 	return nil
@@ -761,18 +764,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 		case operationKindCallIndirect:
 			offset := ce.popValue()
 			table := tables[op.U2]
-			if offset >= uint64(len(table.References)) {
-				panic(wasmruntime.ErrRuntimeInvalidTableAccess)
-			}
-			rawPtr := table.References[offset]
-			if rawPtr == 0 {
-				panic(wasmruntime.ErrRuntimeInvalidTableAccess)
-			}
-
-			tf := functionFromUintptr(rawPtr)
-			if tf.typeID != typeIDs[op.U1] {
-				panic(wasmruntime.ErrRuntimeIndirectCallTypeMismatch)
-			}
+			tf := ce.functionForOffset(table, offset, typeIDs[op.U1])
 
 			ce.callFunction(ctx, f.moduleInstance, tf)
 			frame.pc++
@@ -1725,12 +1717,17 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 			if fillSize+offset > uint64(len(memoryInst.Buffer)) {
 				panic(wasmruntime.ErrRuntimeOutOfBoundsMemoryAccess)
 			} else if fillSize != 0 {
-				// Uses the copy trick for faster filling buffer.
-				// https://gist.github.com/taylorza/df2f89d5f9ab3ffd06865062a4cf015d
+				// Uses the copy trick for faster filling the buffer with the value.
+				// https://github.com/golang/go/blob/go1.24.0/src/bytes/bytes.go#L664-L673
 				buf := memoryInst.Buffer[offset : offset+fillSize]
-				buf[0] = value
-				for i := 1; i < len(buf); i *= 2 {
-					copy(buf[i:], buf[:i])
+				if value == 0 {
+					clear(buf)
+				} else {
+					buf[0] = value
+					for i := 1; i < len(buf); {
+						chunk := min(i, 8192)
+						i += copy(buf[i:], buf[:chunk])
+					}
 				}
 			}
 			frame.pc++
@@ -1804,7 +1801,7 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 				panic(wasmruntime.ErrRuntimeInvalidTableAccess)
 			} else if num > 0 {
 				// Uses the copy trick for faster filling the region with the value.
-				// https://gist.github.com/taylorza/df2f89d5f9ab3ffd06865062a4cf015d
+				// https://github.com/golang/go/blob/go1.24.0/src/slices/slices.go#L514-L517
 				targetRegion := table.References[offset : offset+num]
 				targetRegion[0] = ref
 				for i := 1; i < len(targetRegion); i *= 2 {
@@ -4331,11 +4328,71 @@ func (ce *callEngine) callNativeFunc(ctx context.Context, m *wasm.ModuleInstance
 			memoryInst.Mux.Unlock()
 			ce.pushValue(uint64(old))
 			frame.pc++
+		case operationKindTailCallReturnCall:
+			f := &functions[op.U1]
+			ce.dropForTailCall(frame, f)
+			body, bodyLen = ce.resetPc(frame, f)
+
+		case operationKindTailCallReturnCallIndirect:
+			offset := ce.popValue()
+			table := tables[op.U2]
+			tf := ce.functionForOffset(table, offset, typeIDs[op.U1])
+
+			// We are allowing proper tail calls only across functions that belong to the same
+			// module; for indirect calls, we have to enforce it at run-time.
+			// For details, see internal/engine/RATIONALE.md
+			if tf.moduleInstance != f.moduleInstance {
+				// Revert to a normal call.
+				ce.callFunction(ctx, f.moduleInstance, tf)
+				// Return
+				ce.drop(op.Us[0])
+				// Jump to the function frame (return)
+				frame.pc = op.Us[1]
+				continue
+			}
+
+			ce.dropForTailCall(frame, tf)
+			body, bodyLen = ce.resetPc(frame, tf)
+
 		default:
 			frame.pc++
 		}
 	}
 	ce.popFrame()
+}
+
+func (ce *callEngine) dropForTailCall(frame *callFrame, f *function) {
+	base := frame.base - frame.f.funcType.ParamNumInUint64
+	paramCount := f.funcType.ParamNumInUint64
+	ce.stack = append(ce.stack[:base], ce.stack[len(ce.stack)-paramCount:]...)
+}
+
+func (ce *callEngine) resetPc(frame *callFrame, f *function) (body []unionOperation, bodyLen uint64) {
+	// The compiler is currently allowing proper tail call only across functions
+	// that belong to the same module; thus, we can overwrite the frame in-place.
+	// For details, see internal/engine/RATIONALE.md
+	frame.f = f
+	frame.base = len(ce.stack)
+	frame.pc = 0
+	body = frame.f.parent.body
+	bodyLen = uint64(len(body))
+	return body, bodyLen
+}
+
+func (ce *callEngine) functionForOffset(table *wasm.TableInstance, offset uint64, expectedTypeID wasm.FunctionTypeID) *function {
+	if offset >= uint64(len(table.References)) {
+		panic(wasmruntime.ErrRuntimeInvalidTableAccess)
+	}
+	rawPtr := table.References[offset]
+	if rawPtr == 0 {
+		panic(wasmruntime.ErrRuntimeInvalidTableAccess)
+	}
+
+	tf := functionFromUintptr(rawPtr)
+	if tf.typeID != expectedTypeID {
+		panic(wasmruntime.ErrRuntimeIndirectCallTypeMismatch)
+	}
+	return tf
 }
 
 func wasmCompatMax32bits(v1, v2 uint32) uint64 {

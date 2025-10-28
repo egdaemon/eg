@@ -118,6 +118,7 @@ func Perform(octx context.Context, operations ...OpFn) error {
 	return nil
 }
 
+// Run operations in sequence
 func Sequential(operations ...OpFn) OpFn {
 	return func(octx context.Context, o Op) error {
 		parent := prefixedop("seq", o)

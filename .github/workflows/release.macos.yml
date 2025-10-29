@@ -9,6 +9,8 @@ jobs:
   macos:
     name: release
     runs-on: macos-latest
+    permissions:
+      contents: read
 
     steps:
     - name: Set up Homebrew

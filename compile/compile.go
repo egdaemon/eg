@@ -49,9 +49,9 @@ func InitGolangTidy(ctx context.Context, dir string) error {
 func EnsureRequiredPackages(ctx context.Context, dir string, packages ...string) error {
 	defaultPackages := []string{
 		"get",
-		// "-v",
+		"google.golang.org/genproto@latest",
 		"github.com/egdaemon/eg/runtime/autowasinet",
-		// "github.com/egdaemon/eg/interp/events",
+		"github.com/egdaemon/eg/interp/events",
 	}
 
 	cmd := exec.CommandContext(ctx, "go", append(defaultPackages, packages...)...)

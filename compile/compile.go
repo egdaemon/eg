@@ -48,16 +48,19 @@ func InitGolangTidy(ctx context.Context, dir string) error {
 
 func EnsureRequiredPackages(ctx context.Context, dir string, packages ...string) error {
 	defaultPackages := []string{
-		"get", // yeah we know.
+		"get",
+		// "-v",
 		"github.com/egdaemon/eg/runtime/autowasinet",
-		"github.com/egdaemon/eg/interp/events",
+		// "github.com/egdaemon/eg/interp/events",
 	}
 
 	cmd := exec.CommandContext(ctx, "go", append(defaultPackages, packages...)...)
 	cmd.Dir = dir
+	cmd.Stderr = os.Stderr
+	cmd.Stdout = os.Stdout
 
 	if err := cmd.Run(); err != nil {
-		return errorsx.Wrapf(err, "unable to download default packages: %s", cmd.String())
+		return errorsx.Wrapf(err, "unable to download default packages: %s - %s", cmd.Dir, cmd.String())
 	}
 
 	return nil

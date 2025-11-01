@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 
 	"github.com/egdaemon/eg/internal/coverage"
+	"github.com/egdaemon/eg/internal/errorsx"
 	"golang.org/x/tools/cover"
 )
 
@@ -28,7 +29,7 @@ func Coverage(ctx context.Context, dir string) iter.Seq2[*coverage.Report, error
 
 			profiles, err := cover.ParseProfiles(filepath.Join(dir, path))
 			if err != nil {
-				return err
+				return errorsx.Wrapf(err, "unable to parse profiles: %s", path)
 			}
 
 			for _, profile := range profiles {

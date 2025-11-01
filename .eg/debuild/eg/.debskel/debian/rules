@@ -31,7 +31,7 @@ override_dh_auto_build:
 	cp -R $(CURDIR)/src/.dist/linux/* $(CURDIR)/linux
 	mkdir -p $(GOBIN)
 
-	GOCACHE=$(CURDIR)/.gocache GOMODCACHE=$(CURDIR)/.gomod /usr/lib/go-1.24/bin/go build -C src -mod=vendor -ldflags="-X 'github.com/egdaemon/eg/cmd/cmdopts.Treeish=${VCS_REVISION}'" -tags "duckdb_use_lib,remote,exclude_graphdriver_btrfs,containers_image_openpgp" -buildmode=pie -buildvcs=false -o $(GOBIN) ./cmd/...
+	GOCACHE=$(CURDIR)/.gocache GOMODCACHE=$(CURDIR)/.gomod /usr/lib/go-1.25/bin/go build -C src -mod=vendor -ldflags="-X 'github.com/egdaemon/eg/cmd/cmdopts.Treeish=${VCS_REVISION}'" -tags "duckdb_use_lib,remote,exclude_graphdriver_btrfs,containers_image_openpgp" -buildmode=pie -buildvcs=false -o $(GOBIN) ./cmd/...
 	# tree $(CURDIR)/linux
 
 override_dh_auto_test:

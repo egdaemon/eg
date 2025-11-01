@@ -8,9 +8,9 @@ RUN add-apt-repository -n ppa:egdaemon/eg
 RUN add-apt-repository -n ppa:egdaemon/duckdb
 
 RUN apt-get update
-RUN apt-get -y install golang-1.24 eg
+RUN apt-get -y install golang-1.25 eg
 
-RUN ln -s /usr/lib/go-1.24/bin/go /usr/local/bin/go
+RUN ln -s /usr/lib/go-1.25/bin/go /usr/local/bin/go
 
 RUN systemd-sysusers
 RUN systemd-tmpfiles --create

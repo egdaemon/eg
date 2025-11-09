@@ -13,6 +13,7 @@ import (
 	"github.com/egdaemon/eg/runtime/wasi/egenv"
 	"github.com/egdaemon/eg/runtime/wasi/eggit"
 	"github.com/egdaemon/eg/runtime/wasi/shell"
+	"github.com/egdaemon/eg/runtime/x/wasi/egccache"
 	"github.com/egdaemon/eg/runtime/x/wasi/egdebuild"
 )
 
@@ -29,6 +30,7 @@ var (
 )
 
 func init() {
+	egccache.CacheDirectory()
 	c := eggit.EnvCommit()
 	gcfg = egdebuild.New(
 		"duckdb",
@@ -43,7 +45,6 @@ func init() {
 		egdebuild.Option.DependsBuild("rsync", "curl", "tree", "ca-certificates", "cmake", "ninja-build", "libssl-dev", "git"),
 		egdebuild.Option.Envvar("PACKAGE_VERSION", version),
 		egdebuild.Option.Envvar("GIT_COMMIT_HASH", c.Hash.String()),
-		// egdebuild.Option.Envvar("CCACHE_DIR", filepath.Join("src", "build", "ccache")),
 	)
 }
 
@@ -66,11 +67,19 @@ func Runner() eg.ContainerRunner {
 }
 
 func Build(ctx context.Context, o eg.Op) error {
+	const latest = "plucky"
 	return eg.Sequential(
+		// build the package to improve the changes it'll actually build in within ubuntu launchpad.
+		// egdebuild.Build(
+		// 	gcfg,
+		// 	egdebuild.Option.Distro(latest),
+		// 	egdebuild.Option.Environ(egccache.Env()...), // load ccache env variables to leverage it if its available.
+		// 	egdebuild.Option.BuildBinary(20*time.Minute),
+		// ),
 		eg.Parallel(
-			egdebuild.Build(gcfg, egdebuild.Option.Distro("jammy")),
+			egdebuild.Build(gcfg, egdebuild.Option.Distro(latest), egdebuild.Option.NoLint()),
 			egdebuild.Build(gcfg, egdebuild.Option.Distro("noble"), egdebuild.Option.NoLint()),
-			egdebuild.Build(gcfg, egdebuild.Option.Distro("plucky"), egdebuild.Option.NoLint()),
+			egdebuild.Build(gcfg, egdebuild.Option.Distro("jammy")),
 		),
 	)(ctx, o)
 }

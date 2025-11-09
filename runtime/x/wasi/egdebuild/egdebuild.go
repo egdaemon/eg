@@ -115,7 +115,7 @@ func (option) Depends(deps ...string) option {
 
 func (option) Description(short, long string) option {
 	return func(c *Config) {
-		c.Description = fmt.Sprintf("%s\n %s", short, long)
+		c.Description = fmt.Sprintf("%s\\n %s", short, long)
 	}
 }
 

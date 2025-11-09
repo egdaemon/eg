@@ -21,7 +21,7 @@ var debskel embed.FS
 
 const (
 	container = "eg.deb.duckdb"
-	version   = "1.3.2"
+	version   = "1.4.1"
 )
 
 var (
@@ -53,7 +53,7 @@ func Prepare(ctx context.Context, o eg.Op) error {
 		shell.Op(
 			sruntime.Newf("test -d duckdb || git clone -b v%s --depth 1 https://github.com/duckdb/duckdb.git duckdb", version),
 			sruntime.New("md5sum duckdb/src/include/duckdb.h"),
-			sruntime.New("echo \"6d13054e32644ee436152e1d1c3c8828  duckdb/src/include/duckdb.h\" > duckdb.md5"),
+			sruntime.New("echo \"2a20d340931922b25919dd8a870365a9  duckdb/src/include/duckdb.h\" > duckdb.md5"),
 			sruntime.New("md5sum -c duckdb.md5"),
 		),
 		egdebuild.Prepare(Runner(), errorsx.Must(fs.Sub(debskel, ".debskel"))),

@@ -14,6 +14,7 @@ require (
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
 	github.com/docker/docker v28.3.3+incompatible
 	github.com/dominikbraun/graph v0.23.0
+	github.com/duckdb/duckdb-go/v2 v2.5.1
 	github.com/dustin/go-humanize v1.0.1
 	github.com/egdaemon/wasinet/wasinet v0.0.0-20250806175613-49e153bd345a
 	github.com/egdaemon/wasinet/wazeronet v0.0.0-20250806175613-49e153bd345a
@@ -31,7 +32,6 @@ require (
 	github.com/libp2p/go-libp2p-kad-dht v0.33.1
 	github.com/logrusorgru/aurora v2.0.3+incompatible
 	github.com/mailru/easyjson v0.9.0
-	github.com/marcboeker/go-duckdb/v2 v2.3.4
 	github.com/mattn/go-isatty v0.0.20
 	github.com/multiformats/go-multiaddr v0.16.0
 	github.com/onsi/ginkgo/v2 v2.23.4
@@ -40,7 +40,7 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/posener/complete v1.2.3
 	github.com/shirou/gopsutil/v4 v4.25.7
-	github.com/stretchr/testify v1.10.0
+	github.com/stretchr/testify v1.11.0
 	github.com/tetratelabs/wazero v1.9.1-0.20251027215902-5dd247b60ec7
 	github.com/willabides/kongplete v0.4.0
 	go.uber.org/automaxprocs v1.6.0
@@ -58,6 +58,8 @@ require (
 require (
 	github.com/containerd/cgroups v1.1.0 // indirect
 	github.com/creack/pty v1.1.24 // indirect
+	github.com/duckdb/duckdb-go/arrowmapping v0.0.24 // indirect
+	github.com/duckdb/duckdb-go/mapping v0.0.24 // indirect
 	github.com/elastic/gosigar v0.14.3 // indirect
 	github.com/filecoin-project/go-clock v0.1.0 // indirect
 	github.com/raulk/go-watchdog v1.3.0 // indirect
@@ -72,7 +74,7 @@ require (
 	github.com/ProtonMail/go-crypto v1.1.6 // indirect
 	github.com/VividCortex/ewma v1.2.0 // indirect
 	github.com/acarl005/stripansi v0.0.0-20180116102854-5a71ef0e047d // indirect
-	github.com/apache/arrow-go/v18 v18.4.0 // indirect
+	github.com/apache/arrow-go/v18 v18.4.1 // indirect
 	github.com/asaskevich/govalidator v0.0.0-20230301143203-a9d515a09cc2 // indirect
 	github.com/benbjohnson/clock v1.3.5 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
@@ -104,12 +106,12 @@ require (
 	github.com/docker/docker-credential-helpers v0.9.3 // indirect
 	github.com/docker/go-connections v0.5.0 // indirect
 	github.com/docker/go-units v0.5.0 // indirect
-	github.com/duckdb/duckdb-go-bindings v0.1.17 // indirect
-	github.com/duckdb/duckdb-go-bindings/darwin-amd64 v0.1.12 // indirect
-	github.com/duckdb/duckdb-go-bindings/darwin-arm64 v0.1.12 // indirect
-	github.com/duckdb/duckdb-go-bindings/linux-amd64 v0.1.12 // indirect
-	github.com/duckdb/duckdb-go-bindings/linux-arm64 v0.1.12 // indirect
-	github.com/duckdb/duckdb-go-bindings/windows-amd64 v0.1.12 // indirect
+	github.com/duckdb/duckdb-go-bindings v0.1.22 // indirect
+	github.com/duckdb/duckdb-go-bindings/darwin-amd64 v0.1.22 // indirect
+	github.com/duckdb/duckdb-go-bindings/darwin-arm64 v0.1.22 // indirect
+	github.com/duckdb/duckdb-go-bindings/linux-amd64 v0.1.22 // indirect
+	github.com/duckdb/duckdb-go-bindings/linux-arm64 v0.1.22 // indirect
+	github.com/duckdb/duckdb-go-bindings/windows-amd64 v0.1.22 // indirect
 	github.com/ebitengine/purego v0.8.4 // indirect
 	github.com/emirpasic/gods v1.18.1 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
@@ -132,7 +134,7 @@ require (
 	github.com/go-openapi/swag v0.23.1 // indirect
 	github.com/go-openapi/validate v0.24.0 // indirect
 	github.com/go-task/slim-sprig/v3 v3.0.0 // indirect
-	github.com/go-viper/mapstructure/v2 v2.3.0 // indirect
+	github.com/go-viper/mapstructure/v2 v2.4.0 // indirect
 	github.com/goccy/go-json v0.10.5 // indirect
 	github.com/godbus/dbus/v5 v5.1.1-0.20241109141217-c266b19b28e9 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
@@ -178,8 +180,6 @@ require (
 	github.com/libp2p/go-yamux/v5 v5.1.0 // indirect
 	github.com/lufia/plan9stats v0.0.0-20211012122336-39d0f177ccd0 // indirect
 	github.com/manifoldco/promptui v0.9.0 // indirect
-	github.com/marcboeker/go-duckdb/arrowmapping v0.0.10 // indirect
-	github.com/marcboeker/go-duckdb/mapping v0.0.11 // indirect
 	github.com/marten-seemann/tcp v0.0.0-20210406111302-dfbc87cc63fd // indirect
 	github.com/mattn/go-runewidth v0.0.16 // indirect
 	github.com/mattn/go-sqlite3 v1.14.28 // indirect

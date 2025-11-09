@@ -7,13 +7,13 @@ import (
 	"strconv"
 	"strings"
 
+	_ "github.com/duckdb/duckdb-go/v2"
 	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/fsx"
 	"github.com/egdaemon/eg/internal/langx"
 	"github.com/egdaemon/eg/internal/stringsx"
 	"github.com/egdaemon/eg/workspaces"
-	_ "github.com/marcboeker/go-duckdb/v2"
 	_ "github.com/shirou/gopsutil/v4/cpu"
 	"google.golang.org/grpc"
 )

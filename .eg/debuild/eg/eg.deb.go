@@ -35,10 +35,6 @@ func init() {
 		"",
 		egenv.CacheDirectory(".dist", "eg"),
 		egdebuild.Option.Maintainer(maintainer.Name, maintainer.Email),
-		// egdebuild.Option.BuildCommand(func(cfg *egdebuild.Config, runtime shell.Command) shell.Command {
-		// 	return runtime.Newf("debuild --no-lintian -us -uc -S -k%s", cfg.SignatureKeyID).Privileged()
-		// }),
-		// egdebuild.Option.NoLint(),
 		egdebuild.Option.SigningKeyID(maintainer.GPGFingerprint),
 		egdebuild.Option.ChangeLogDate(c.Committer.When),
 		egdebuild.Option.Version("0.0.:autopatch:"),

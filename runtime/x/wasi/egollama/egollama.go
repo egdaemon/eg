@@ -2,8 +2,10 @@ package egollama
 
 import (
 	"context"
+	"embed"
 	"errors"
 	"path/filepath"
+	"time"
 
 	_eg "github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/internal/envx"
@@ -12,7 +14,11 @@ import (
 	"github.com/egdaemon/eg/runtime/wasi/eg"
 	"github.com/egdaemon/eg/runtime/wasi/egenv"
 	"github.com/egdaemon/eg/runtime/wasi/shell"
+	"github.com/egdaemon/eg/runtime/x/wasi/egfs"
 )
+
+//go:embed Containerfile
+var skel embed.FS
 
 func CacheDirectory(dirs ...string) string {
 	return egenv.CacheDirectory(_eg.DefaultModuleDirectory(), "ollama", filepath.Join(dirs...))
@@ -46,7 +52,7 @@ func Env() []string {
 // Create a shell runtime that properly
 // sets up the ccache environment for caching.
 func Runtime() shell.Command {
-	return shell.Runtime().EnvironFrom(Env()...)
+	return shell.Runtime().EnvironFrom(Env()...).Timeout(20 * time.Minute)
 }
 
 // pull a specific model
@@ -58,14 +64,31 @@ func Pull(runtime shell.Command, model string) eg.OpFn {
 
 func Serve(runtime shell.Command) eg.OpFn {
 	return func(ctx context.Context, o eg.Op) error {
-		return shell.Run(ctx, runtime.Newf("systemd-run --user --unit=ollama.service ollama serve"))
+		return shell.Run(ctx, runtime.Newf("systemctl enable --now ollama.service").Privileged())
 	}
 }
 
 func Shutdown(runtime shell.Command) eg.OpFn {
 	return func(ctx context.Context, o eg.Op) error {
-		return shell.Run(ctx, runtime.Newf("systemctl stop --user ollama.service"))
+		return shell.Run(ctx, runtime.Newf("systemctl stop ollama.service").Privileged())
 	}
+}
+
+// build ollama container.
+func Prepare(c eg.ContainerRunner) eg.OpFn {
+	return func(ctx context.Context, o eg.Op) error {
+		const relpath = "Containerfile"
+		if err := egfs.CloneFS(ctx, egenv.EphemeralDirectory(), relpath, skel); err != nil {
+			return err
+		}
+
+		return eg.Build(c.BuildFromFile(filepath.Join(egenv.EphemeralDirectory(), relpath)))(ctx, o)
+	}
+}
+
+// container for this package.
+func Runner() eg.ContainerRunner {
+	return eg.Container("eg.ollama")
 }
 
 // run the provided operation with the given model.
@@ -75,6 +98,7 @@ func With(model string, op eg.OpFn) eg.OpFn {
 		return around(
 			Serve(rt),
 			eg.Sequential(
+				shell.Op(shell.New("systemctl status ollama.service")),
 				Pull(rt, model),
 				op,
 			),

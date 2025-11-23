@@ -22,6 +22,10 @@ func New() llm {
 	}
 }
 
+func (t llm) Host() string {
+	return t.endpoint
+}
+
 func (t llm) Do(r *http.Request) (*http.Response, error) {
 	return t.c.Do(r)
 }

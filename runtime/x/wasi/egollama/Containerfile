@@ -1,0 +1,5 @@
+FROM eg:latest
+
+RUN apt-get update
+RUN apt-get -y install pciutils
+RUN curl -fsSL https://ollama.com/install.sh | sh

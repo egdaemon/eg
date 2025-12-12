@@ -95,13 +95,17 @@ func (t builtinLocal) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath)
 		return err
 	}
 
+	modules, err := compile.FromTranspiled(gctx.Context, ws, roots...)
+	if err != nil {
+		return errorsx.Wrap(err, "unable to transpile")
+	}
+
 	if err = compile.EnsureRequiredPackages(gctx.Context, filepath.Join(ws.Root, ws.TransDir)); err != nil {
 		return err
 	}
 
-	modules, err := compile.FromTranspiled(gctx.Context, ws, roots...)
-	if err != nil {
-		return errorsx.Wrap(err, "unable to transpile")
+	if err = compile.InitGolangTidy(gctx.Context, filepath.Join(ws.Root, ws.TransDir)); err != nil {
+		return err
 	}
 
 	if len(modules) == 0 {

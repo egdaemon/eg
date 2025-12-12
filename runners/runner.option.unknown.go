@@ -9,7 +9,7 @@ import (
 )
 
 // Provide a noop option for unknown os
-func AgentOptionHostOS() AgentOption {
+func AgentOptionHostOS(cli ...string) AgentOption {
 	log.Println(aurora.NewAurora(true).Red("you're using an unknown host operating system, many things may not work correctly. feel free to report your findings to us for improvements."))
-	return AgentOptionNoop
+	return AgentOptionCommandLine(cli...) // escape hatch to allow customizing the container cli
 }

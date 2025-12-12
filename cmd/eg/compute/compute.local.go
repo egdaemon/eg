@@ -45,6 +45,7 @@ type local struct {
 	GitReference     string   `name:"git-ref" help:"name of the branch or commit to checkout" default:"${vars_git_head_reference}"`
 	Infinite         bool     `name:"infinite" help:"allow this module to run forever, used for running a workload like a webserver" hidden:"true"`
 	Ports            []int    `name:"ports" help:"list of ports to publish to the host system" hidden:"true"`
+	ContainerArgs    []string `name:"cargs" help:"list of command line arguments to pass to the root container" hidden:"true"`
 	Name             string   `arg:"" name:"module" help:"name of the workload to run, i.e. the folder name within workload directory" default:"" predictor:"eg.workload"`
 }
 
@@ -181,7 +182,7 @@ func (t local) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err e
 		),
 		runners.AgentOptionLocalComputeCachingVolumes(canonicaluri),
 		runners.AgentOptionEnvironFile(environpath), // ensure we pick up the environment file with the container.
-		runners.AgentOptionHostOS(),
+		runners.AgentOptionHostOS(t.ContainerArgs...),
 		runners.AgentOptionPublish(t.Ports...),
 		runners.AgentOptionCores(t.RuntimeResources.Cores),
 		runners.AgentOptionMemory(uint64(t.RuntimeResources.Memory)),

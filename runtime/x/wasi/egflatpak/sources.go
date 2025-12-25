@@ -69,3 +69,10 @@ func SourceShell(options ...soption) Source {
 		Type: "shell",
 	}, options...)
 }
+
+func SourcePatchFile(path string, options ...soption) Source {
+	return langx.Clone(Source{
+		Type: "patch",
+		Path: path,
+	}, options...)
+}

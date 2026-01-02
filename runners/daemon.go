@@ -46,8 +46,9 @@ func AgentMountReadOnly(src, dst string) string {
 	return AgentMountSpec(src, dst, "ro")
 }
 
+// rslave propagates mount events from parent to child containers.
 func AgentMountReadWrite(src, dst string) string {
-	return AgentMountSpec(src, dst, "rw")
+	return AgentMountSpec(src, dst, "rw,rslave")
 }
 
 // Mounts a path using a overlay FS making it mutable within the container

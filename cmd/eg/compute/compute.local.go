@@ -73,6 +73,10 @@ func (t local) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err e
 		return errorsx.Wrap(err, "unable to connect to podman")
 	}
 
+	if err := podmanx.EnsureSharedMount(ctx); err != nil {
+		return errorsx.Wrap(err, "unable to ensure shared mount propagation")
+	}
+
 	if ws, err = workspaces.NewLocal(
 		gctx.Context, md5x.Digest(cmdopts.BuildInfoSafe()), t.Dir, t.Name,
 		workspaces.OptionSymlinkCache(filepath.Join(t.Dir, eg.CacheDirectory)),

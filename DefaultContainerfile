@@ -42,19 +42,34 @@ RUN systemd-tmpfiles --clean
 RUN rm -rf /tmp/gomod /tmp/gocache
 
 RUN usermod --add-subuids 100000-165535 --add-subgids 100000-165535 egd
-RUN echo "cache buster 474ba506-2797-505a-ae80-b41535886d78"
+RUN echo "cache buster 3a7ae214-713c-47e0-843d-33590579c251"
 
+# Socket activation fails in nested containers; enable service directly.
 RUN systemctl enable podman.socket
+RUN systemctl enable podman.service
 RUN systemctl disable systemd-resolved.service
+
+# Configure podman socket to be accessible by egd user via the 'eg' group
+RUN mkdir -p /etc/systemd/system/podman.socket.d
+RUN printf '[Socket]\nSocketGroup=eg\nSocketMode=0660\n' > /etc/systemd/system/podman.socket.d/override.conf
+RUN usermod -aG eg egd
+
+# Symlink created at boot via tmpfiles.d (/run is tmpfs).
+# Outer container: resolves to local socket. Nested: parent's bind mount overwrites path.
+RUN printf 'L /run/eg-parent-podman.sock - - - - /run/podman/podman.sock\n' > /etc/tmpfiles.d/eg-podman-socket.conf
+ENV EG_PODMAN_SOCKET=/run/eg-parent-podman.sock
+
 RUN podman version
 
 # BEGIN HACKS
+# binfmt_misc automount requires kernel access unavailable in containers - mask it to prevent systemd degraded state
+RUN systemctl mask proc-sys-fs-binfmt_misc.automount
 # systemd-resolved.service causes the container to delay its startup significantly causing issues.
 RUN systemctl disable systemd-resolved.service
 # the standard dbus service doesn't work with plucky.
 RUN apt-get install -y --no-install-recommends dbus-broker
 RUN systemctl disable dbus.service
-RUN echo "cache buster 585ca506-2797-505a-ae80-b41535886d78"
+RUN echo "cache buster 686ca506-2797-505a-ae80-b41535886d79"
 RUN systemctl enable dbus-broker.service
 RUN rm -rf /run/containers/storage /run/libpod
 # END HACKS

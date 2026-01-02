@@ -13,6 +13,7 @@ import (
 	"os/exec"
 	"os/signal"
 	"reflect"
+	"runtime"
 	"strings"
 	"syscall"
 	"time"
@@ -139,6 +140,11 @@ func PodmanModule(ctx context.Context, cmdctx func(*exec.Cmd) *exec.Cmd, image, 
 }
 
 func PodmanModuleRunCmd(image, cname string, options ...string) []string {
+	const (
+		parentPodmanSocket = "/run/podman/podman.sock"
+		nestedPodmanSocket = "/run/eg-parent-podman.sock"
+	)
+
 	args := make([]string, 0, len(options)+11)
 	args = append(args,
 		// "--log-level", "debug",
@@ -149,6 +155,17 @@ func PodmanModuleRunCmd(image, cname string, options ...string) []string {
 		"--env", "CI",
 		"--env", eg.EnvComputeBin,
 	)
+
+	// Mount parent's socket only when creating nested containers (inside a container).
+	// On host (first container), let the container use its own podman via systemd.
+	// Detect "inside container" by checking if EG_PODMAN_SOCKET is already set.
+	if runtime.GOOS == "linux" && envx.String("", eg.EnvPodmanSocket) != "" {
+		args = append(args,
+			"--volume", fmt.Sprintf("%s:%s:rw", parentPodmanSocket, nestedPodmanSocket),
+			"--env", fmt.Sprintf("%s=%s", eg.EnvPodmanSocket, nestedPodmanSocket),
+		)
+	}
+
 	args = append(args, options...)
 	args = append(args, image, "/usr/sbin/init")
 	return args
@@ -167,12 +184,19 @@ func moduleExec(ctx context.Context, cname, moduledir string, stdin io.Reader, s
 		verbosity = fmt.Sprintf("-%s", strings.Repeat("v", x))
 	}
 
+	// Pass parent's socket path so nested eg commands use it instead of their own.
+	execEnv := []string{}
+	if runtime.GOOS == "linux" {
+		execEnv = append(execEnv, fmt.Sprintf("%s=/run/eg-parent-podman.sock", eg.EnvPodmanSocket))
+	}
+
 	id, err := containers.ExecCreate(ctx, cname, &handlers.ExecCreateConfig{
 		ExecOptions: container.ExecOptions{
 			Tty:          false,
 			AttachStdin:  stdin != nil,
 			AttachStderr: true,
 			AttachStdout: true,
+			Env:          execEnv,
 			Cmd: slicesx.Filter(stringsx.Present, []string{
 				envx.String("eg", eg.EnvComputeBin),
 				verbosity,

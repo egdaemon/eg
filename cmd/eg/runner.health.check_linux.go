@@ -7,7 +7,9 @@ import (
 	"log"
 	"os/exec"
 
+	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/internal/debugx"
+	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/execx"
 )
@@ -18,12 +20,15 @@ func systemReady(_ctx context.Context) error {
 		e0 = errorsx.String("container systemd status is degraded or failed - this implies there will be issues with the runtime")
 	)
 
+	// Nested containers mount the parent's socket at a different path.
+	podmanSocket := envx.String("/run/podman/podman.sock", eg.EnvPodmanSocket)
+
 	_, err := errorsx.IgnoreN[string](_ctx, 8, e0)(func(ctx context.Context) (string, error) {
 		errorsx.Zero(execx.String(ctx, "systemctl", "reset-failed", "--wait", "sys-kernel-config.mount", "sys-kernel-debug.mount", "sys-kernel-tracing.mount", "systemd-journald-dev-log.socket", "systemd-journald.socket"))
 		o, err := execx.String(ctx, "systemctl", "is-system-running", "--wait")
 		debugx.Fn(func() {
 			log.Println("systemctl is-system-running --wait")
-			log.Println("curl --unix-socket /run/podman/podman.sock http://localhost/_ping")
+			log.Println("curl --unix-socket", podmanSocket, "http://localhost/_ping")
 		})
 		switch err.(type) {
 		case *exec.ExitError:
@@ -31,7 +36,10 @@ func systemReady(_ctx context.Context) error {
 		default:
 		}
 
-		o, err = execx.String(ctx, "curl", "--unix-socket", "/run/podman/podman.sock", "http://localhost/_ping")
+		// Socket activation fails in nested containers; start explicitly.
+		errorsx.Zero(execx.String(ctx, "systemctl", "start", "podman.socket"))
+
+		o, err = execx.String(ctx, "curl", "--unix-socket", podmanSocket, "http://localhost/_ping")
 		switch err.(type) {
 		case *exec.ExitError:
 			return o, e0

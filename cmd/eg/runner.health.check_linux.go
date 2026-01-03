@@ -19,7 +19,7 @@ func systemReady(_ctx context.Context) error {
 	)
 
 	_, err := errorsx.IgnoreN[string](_ctx, 8, e0)(func(ctx context.Context) (string, error) {
-		errorsx.Zero(execx.String(ctx, "systemctl", "reset-failed", "--wait", "sys-kernel-config.mount", "sys-kernel-debug.mount", "sys-kernel-tracing.mount", "systemd-journald-dev-log.socket", "systemd-journald.socket"))
+		errorsx.Zero(execx.String(ctx, "systemctl", "reset-failed", "--wait", "sys-kernel-config.mount", "sys-kernel-debug.mount", "sys-kernel-tracing.mount", "systemd-journald-dev-log.socket", "systemd-journald.socket", "proc-sys-fs-binfmt_misc.automount"))
 		o, err := execx.String(ctx, "systemctl", "is-system-running", "--wait")
 		debugx.Fn(func() {
 			log.Println("systemctl is-system-running --wait")

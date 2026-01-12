@@ -36,8 +36,14 @@ func init() {
 		egdebuild.Option.Version("0.0.:autopatch:"),
 		egdebuild.Option.Debian(errorsx.Must(fs.Sub(debskel, ".debskel"))),
 		egdebuild.Option.DependsBuild("rsync", "curl", "tree", "software-properties-common", "ca-certificates"),
-		egdebuild.Option.Depends("software-properties-common"),
-		egdebuild.Option.Description("configures the machine for running as a eg module", "performs various changes to the system for running as an eg module. makes egd a privileged user and adds scripts for setting up apt repositories"),
+		egdebuild.Option.Depends(
+			"software-properties-common",
+			"systemd-container", // required for machinectl to be present for use within shell.New(...) commands. which allows invoking systemctl --user commands.
+		),
+		egdebuild.Option.Description(
+			"configures the machine for running as a eg module",
+			"performs various changes to the system for running as an eg module. makes egd a privileged user and adds scripts for setting up apt repositories",
+		),
 	)
 }
 

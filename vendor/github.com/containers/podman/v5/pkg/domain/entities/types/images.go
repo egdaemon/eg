@@ -16,7 +16,7 @@ type ImageSummary struct {
 	Created     int64
 	Size        int64
 	SharedSize  int
-	VirtualSize int64
+	VirtualSize int64 `json:",omitempty"`
 	Labels      map[string]string
 	Containers  int
 	ReadOnly    bool `json:",omitempty"`
@@ -125,7 +125,7 @@ type ImageRemoveReport struct {
 
 type ImageHistoryLayer struct {
 	ID        string    `json:"id"`
-	Created   time.Time `json:"created,omitempty"`
+	Created   time.Time `json:"created"`
 	CreatedBy string    `json:",omitempty"`
 	Tags      []string  `json:"tags,omitempty"`
 	Size      int64     `json:"size"`

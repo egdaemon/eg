@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"runtime"
+	"slices"
 	"sort"
 	"sync"
 	"sync/atomic"
@@ -24,11 +25,15 @@ import (
 )
 
 type (
+	compiledModuleWithCount struct {
+		*compiledModule
+		refCount int
+	}
 	// engine implements wasm.Engine.
 	engine struct {
 		wazeroVersion   string
 		fileCache       filecache.Cache
-		compiledModules map[wasm.ModuleID]*compiledModule
+		compiledModules map[wasm.ModuleID]*compiledModuleWithCount
 		// sortedCompiledModules is a list of compiled modules sorted by the initial address of the executable.
 		sortedCompiledModules []*compiledModule
 		mux                   sync.RWMutex
@@ -114,7 +119,7 @@ func NewEngine(ctx context.Context, _ api.CoreFeatures, fc filecache.Cache) wasm
 	machine := newMachine()
 	be := backend.NewCompiler(ctx, machine, ssa.NewBuilder())
 	e := &engine{
-		compiledModules: make(map[wasm.ModuleID]*compiledModule),
+		compiledModules: make(map[wasm.ModuleID]*compiledModuleWithCount),
 		setFinalizer:    runtime.SetFinalizer,
 		machine:         machine,
 		be:              be,
@@ -145,7 +150,7 @@ func (e *engine) CompileModule(ctx context.Context, module *wasm.Module, listene
 	if err != nil {
 		return err
 	}
-	if err = e.addCompiledModule(module, cm); err != nil {
+	if cm, err = e.addCompiledModule(module, cm); err != nil {
 		return err
 	}
 
@@ -186,7 +191,9 @@ func (exec *executables) compileEntryPreambles(m *wasm.Module, machine backend.M
 		be.Init()
 		buf := machine.CompileEntryPreamble(&sig)
 		preambles = append(preambles, buf...)
-		sizes[i] = len(buf)
+		align := 15 & -len(preambles) // Align 16-bytes boundary.
+		preambles = append(preambles, make([]byte, align)...)
+		sizes[i] = len(buf) + align
 	}
 
 	exec.entryPreambles = mmapExecutable(preambles)
@@ -323,8 +330,8 @@ func (e *engine) compileModule(ctx context.Context, module *wasm.Module, listene
 						fctx, i, fidx, body,
 						// These slices are internal to the backend compiler and since we are going to buffer them instead
 						// of process them immediately we need to copy the memory.
-						cloneSlice(relsPerFunc),
-						cloneSlice(be.SourceOffsetInfo()),
+						slices.Clone(relsPerFunc),
+						slices.Clone(be.SourceOffsetInfo()),
 					}
 				}
 			}()
@@ -365,7 +372,7 @@ func (e *engine) compileModule(ctx context.Context, module *wasm.Module, listene
 
 	relocator.resolveRelocations(machine, executable, importedFns)
 
-	if err = platform.MprotectRX(executable); err != nil {
+	if err = platform.MprotectCodeSegment(executable); err != nil {
 		return nil, err
 	}
 	cm.sharedFunctions = e.sharedFunctions
@@ -402,6 +409,7 @@ func newEngineRelocator(
 	// Trampoline relocation related variables.
 	r.trampolineInterval, r.callTrampolineIslandSize, err = machine.CallTrampolineIslandInfo(localFns)
 	r.refToBinaryOffset = make([]int, importedFns+localFns)
+	r.bodies = make([][]byte, 0, localFns)
 	return
 }
 
@@ -443,6 +451,7 @@ func (r *engineRelocator) appendFunction(
 
 	// At this point, relocation offsets are relative to the start of the function body,
 	// so we adjust it to the start of the executable.
+	r.rels = slices.Grow(r.rels, len(relsPerFunc))
 	for _, rel := range relsPerFunc {
 		rel.Offset += int64(r.totalSize)
 		r.rels = append(r.rels, rel)
@@ -509,7 +518,7 @@ func (e *engine) compileLocalWasmFunction(
 	}
 
 	// TODO: optimize as zero copy.
-	return cloneSlice(original), rels, nil
+	return slices.Clone(original), rels, nil
 }
 
 func (e *engine) compileHostModule(ctx context.Context, module *wasm.Module, listeners []experimental.FunctionListener) (*compiledModule, error) {
@@ -581,7 +590,7 @@ func (e *engine) compileHostModule(ctx context.Context, module *wasm.Module, lis
 		}
 
 		// TODO: optimize as zero copy.
-		bodies[i] = cloneSlice(body)
+		bodies[i] = slices.Clone(body)
 		totalSize += len(body)
 	}
 
@@ -606,7 +615,7 @@ func (e *engine) compileHostModule(ctx context.Context, module *wasm.Module, lis
 		wazevoapi.PerfMap.Flush(uintptr(unsafe.Pointer(&executable[0])), cm.functionOffsets)
 	}
 
-	if err = platform.MprotectRX(executable); err != nil {
+	if err = platform.MprotectCodeSegment(executable); err != nil {
 		return nil, err
 	}
 	e.setFinalizer(cm.executables, executablesFinalizer)
@@ -635,12 +644,17 @@ func (e *engine) DeleteCompiledModule(m *wasm.Module) {
 	e.mux.Lock()
 	defer e.mux.Unlock()
 	cm, ok := e.compiledModules[m.ID]
-	if ok {
-		if len(cm.executable) > 0 {
-			e.deleteCompiledModuleFromSortedList(cm)
-		}
-		delete(e.compiledModules, m.ID)
+	if !ok {
+		return
 	}
+	cm.refCount--
+	if cm.refCount > 0 {
+		return
+	}
+	if len(cm.executable) > 0 {
+		e.deleteCompiledModuleFromSortedList(cm.compiledModule)
+	}
+	delete(e.compiledModules, m.ID)
 }
 
 func (e *engine) addCompiledModuleToSortedList(cm *compiledModule) {
@@ -697,7 +711,7 @@ func (e *engine) NewModuleEngine(m *wasm.Module, mi *wasm.ModuleInstance) (wasm.
 	// Note: imported functions are resolved in moduleEngine.ResolveImportedFunction.
 	me.importedFunctions = make([]importedFunction, m.ImportFunctionCount)
 
-	compiled, ok := e.getCompiledModuleFromMemory(m)
+	compiled, ok := e.getCompiledModuleFromMemory(m, false)
 	if !ok {
 		return nil, errors.New("source module must be compiled before instantiation")
 	}
@@ -722,88 +736,70 @@ func (e *engine) compileSharedFunctions() {
 	var sizes [8]int
 	var trampolines []byte
 
+	addTrampoline := func(i int, buf []byte) {
+		trampolines = append(trampolines, buf...)
+		align := 15 & -len(trampolines) // Align 16-bytes boundary.
+		trampolines = append(trampolines, make([]byte, align)...)
+		sizes[i] = len(buf) + align
+	}
+
 	e.be.Init()
-	{
-		src := e.machine.CompileGoFunctionTrampoline(wazevoapi.ExitCodeGrowMemory, &ssa.Signature{
+	addTrampoline(0,
+		e.machine.CompileGoFunctionTrampoline(wazevoapi.ExitCodeGrowMemory, &ssa.Signature{
 			Params:  []ssa.Type{ssa.TypeI64 /* exec context */, ssa.TypeI32},
 			Results: []ssa.Type{ssa.TypeI32},
-		}, false)
-		trampolines = append(trampolines, src...)
-		sizes[0] = len(src)
-	}
+		}, false))
 
 	e.be.Init()
-	{
-		src := e.machine.CompileGoFunctionTrampoline(wazevoapi.ExitCodeTableGrow, &ssa.Signature{
+	addTrampoline(1,
+		e.machine.CompileGoFunctionTrampoline(wazevoapi.ExitCodeTableGrow, &ssa.Signature{
 			Params:  []ssa.Type{ssa.TypeI64 /* exec context */, ssa.TypeI32 /* table index */, ssa.TypeI32 /* num */, ssa.TypeI64 /* ref */},
 			Results: []ssa.Type{ssa.TypeI32},
-		}, false)
-		trampolines = append(trampolines, src...)
-		sizes[1] = len(src)
-	}
+		}, false))
 
 	e.be.Init()
-	{
-		src := e.machine.CompileGoFunctionTrampoline(wazevoapi.ExitCodeCheckModuleExitCode, &ssa.Signature{
+	addTrampoline(2,
+		e.machine.CompileGoFunctionTrampoline(wazevoapi.ExitCodeCheckModuleExitCode, &ssa.Signature{
 			Params:  []ssa.Type{ssa.TypeI32 /* exec context */},
 			Results: []ssa.Type{ssa.TypeI32},
-		}, false)
-		trampolines = append(trampolines, src...)
-		sizes[2] = len(src)
-	}
+		}, false))
 
 	e.be.Init()
-	{
-		src := e.machine.CompileGoFunctionTrampoline(wazevoapi.ExitCodeRefFunc, &ssa.Signature{
+	addTrampoline(3,
+		e.machine.CompileGoFunctionTrampoline(wazevoapi.ExitCodeRefFunc, &ssa.Signature{
 			Params:  []ssa.Type{ssa.TypeI64 /* exec context */, ssa.TypeI32 /* function index */},
 			Results: []ssa.Type{ssa.TypeI64}, // returns the function reference.
-		}, false)
-		trampolines = append(trampolines, src...)
-		sizes[3] = len(src)
-	}
+		}, false))
 
 	e.be.Init()
-	{
-		src := e.machine.CompileStackGrowCallSequence()
-		trampolines = append(trampolines, src...)
-		sizes[4] = len(src)
-	}
+	addTrampoline(4, e.machine.CompileStackGrowCallSequence())
 
 	e.be.Init()
-	{
-		src := e.machine.CompileGoFunctionTrampoline(wazevoapi.ExitCodeMemoryWait32, &ssa.Signature{
+	addTrampoline(5,
+		e.machine.CompileGoFunctionTrampoline(wazevoapi.ExitCodeMemoryWait32, &ssa.Signature{
 			// exec context, timeout, expected, addr
 			Params: []ssa.Type{ssa.TypeI64, ssa.TypeI64, ssa.TypeI32, ssa.TypeI64},
 			// Returns the status.
 			Results: []ssa.Type{ssa.TypeI32},
-		}, false)
-		trampolines = append(trampolines, src...)
-		sizes[5] = len(src)
-	}
+		}, false))
 
 	e.be.Init()
-	{
-		src := e.machine.CompileGoFunctionTrampoline(wazevoapi.ExitCodeMemoryWait64, &ssa.Signature{
+	addTrampoline(6,
+		e.machine.CompileGoFunctionTrampoline(wazevoapi.ExitCodeMemoryWait64, &ssa.Signature{
 			// exec context, timeout, expected, addr
 			Params: []ssa.Type{ssa.TypeI64, ssa.TypeI64, ssa.TypeI64, ssa.TypeI64},
 			// Returns the status.
 			Results: []ssa.Type{ssa.TypeI32},
-		}, false)
-		trampolines = append(trampolines, src...)
-		sizes[6] = len(src)
-	}
+		}, false))
 
 	e.be.Init()
-	{
-		src := e.machine.CompileGoFunctionTrampoline(wazevoapi.ExitCodeMemoryNotify, &ssa.Signature{
+	addTrampoline(7,
+		e.machine.CompileGoFunctionTrampoline(wazevoapi.ExitCodeMemoryNotify, &ssa.Signature{
 			// exec context, count, addr
 			Params: []ssa.Type{ssa.TypeI64, ssa.TypeI32, ssa.TypeI64},
 			// Returns the number notified.
 			Results: []ssa.Type{ssa.TypeI32},
-		}, false)
-		trampolines = append(trampolines, src...)
-		sizes[7] = len(src)
-	}
+		}, false))
 
 	fns := &sharedFunctions{
 		executable:          mmapExecutable(trampolines),
@@ -881,7 +877,7 @@ func mmapExecutable(src []byte) []byte {
 
 	copy(executable, src)
 
-	if err = platform.MprotectRX(executable); err != nil {
+	if err = platform.MprotectCodeSegment(executable); err != nil {
 		panic(err)
 	}
 	return executable
@@ -913,7 +909,9 @@ func (e *engine) getListenerTrampolineForType(functionType *wasm.FunctionType) (
 		buf := e.machine.CompileGoFunctionTrampoline(wazevoapi.ExitCodeCallListenerBefore, beforeSig, false)
 		executable = append(executable, buf...)
 
-		offset := len(buf)
+		align := 15 & -len(executable) // Align 16-bytes boundary.
+		executable = append(executable, make([]byte, align)...)
+		offset := len(executable)
 
 		e.be.Init()
 		buf = e.machine.CompileGoFunctionTrampoline(wazevoapi.ExitCodeCallListenerAfter, afterSig, false)
@@ -943,11 +941,4 @@ func (cm *compiledModule) getSourceOffset(pc uintptr) uint64 {
 		return 0
 	}
 	return cm.sourceMap.wasmBinaryOffsets[index]
-}
-
-func cloneSlice[S ~[]E, E any](s S) S {
-	if s == nil {
-		return nil
-	}
-	return append(S{}, s...)
 }

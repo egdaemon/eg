@@ -83,11 +83,11 @@ func (t builtinLocal) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath)
 	}
 
 	if err = compile.InitGolang(gctx.Context, eg.DefaultModuleDirectory(ws.Root), cmdopts.ModPath()); err != nil {
-		return err
+		return errorsx.Wrap(err, "failed to init go mod")
 	}
 
 	if err = compile.InitGolangTidy(gctx.Context, eg.DefaultModuleDirectory(ws.Root)); err != nil {
-		return err
+		return errorsx.Wrap(err, "failed to tidy packages")
 	}
 
 	roots, err := transpile.Autodetect(transpile.New(eg.DefaultModuleDirectory(ws.Root), ws)).Run(gctx.Context)
@@ -101,11 +101,11 @@ func (t builtinLocal) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath)
 	}
 
 	if err = compile.EnsureRequiredPackages(gctx.Context, filepath.Join(ws.Root, ws.TransDir)); err != nil {
-		return err
+		return errorsx.Wrap(err, "transpiled failed to ensure required packages")
 	}
 
 	if err = compile.InitGolangTidy(gctx.Context, filepath.Join(ws.Root, ws.TransDir)); err != nil {
-		return err
+		return errorsx.Wrap(err, "transpiled failed to tidy packages")
 	}
 
 	if len(modules) == 0 {

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"math"
 	"math/bits"
+	"slices"
 	"sync"
 	"unsafe"
 
@@ -27,28 +28,37 @@ import (
 // The default value should suffice for most use cases. Those wishing to change this can via `go build -ldflags`.
 var callStackCeiling = 2000
 
+type compiledFunctionWithCount struct {
+	funcs    []compiledFunction
+	refCount int
+}
+
 // engine is an interpreter implementation of wasm.Engine
 type engine struct {
 	enabledFeatures   api.CoreFeatures
-	compiledFunctions map[wasm.ModuleID][]compiledFunction // guarded by mutex.
-	mux               sync.RWMutex
+	compiledFunctions map[wasm.ModuleID]*compiledFunctionWithCount // guarded by mutex.
+	mux               sync.Mutex
 }
 
 func NewEngine(_ context.Context, enabledFeatures api.CoreFeatures, _ filecache.Cache) wasm.Engine {
 	return &engine{
 		enabledFeatures:   enabledFeatures,
-		compiledFunctions: map[wasm.ModuleID][]compiledFunction{},
+		compiledFunctions: map[wasm.ModuleID]*compiledFunctionWithCount{},
 	}
 }
 
 // Close implements the same method as documented on wasm.Engine.
 func (e *engine) Close() (err error) {
+	e.mux.Lock()
+	defer e.mux.Unlock()
 	clear(e.compiledFunctions)
 	return
 }
 
 // CompiledModuleCount implements the same method as documented on wasm.Engine.
 func (e *engine) CompiledModuleCount() uint32 {
+	e.mux.Lock()
+	defer e.mux.Unlock()
 	return uint32(len(e.compiledFunctions))
 }
 
@@ -60,19 +70,37 @@ func (e *engine) DeleteCompiledModule(m *wasm.Module) {
 func (e *engine) deleteCompiledFunctions(module *wasm.Module) {
 	e.mux.Lock()
 	defer e.mux.Unlock()
+	cf, ok := e.compiledFunctions[module.ID]
+	if !ok {
+		return
+	}
+	cf.refCount--
+	if cf.refCount > 0 {
+		return
+	}
 	delete(e.compiledFunctions, module.ID)
 }
 
 func (e *engine) addCompiledFunctions(module *wasm.Module, fs []compiledFunction) {
 	e.mux.Lock()
 	defer e.mux.Unlock()
-	e.compiledFunctions[module.ID] = fs
+	if c, ok := e.compiledFunctions[module.ID]; ok {
+		c.refCount++
+		return
+	}
+	e.compiledFunctions[module.ID] = &compiledFunctionWithCount{funcs: fs, refCount: 1}
 }
 
-func (e *engine) getCompiledFunctions(module *wasm.Module) (fs []compiledFunction, ok bool) {
-	e.mux.RLock()
-	defer e.mux.RUnlock()
-	fs, ok = e.compiledFunctions[module.ID]
+func (e *engine) getCompiledFunctions(module *wasm.Module, increaseRefCount bool) (fs []compiledFunction, ok bool) {
+	e.mux.Lock()
+	defer e.mux.Unlock()
+	cf, ok := e.compiledFunctions[module.ID]
+	if ok {
+		fs = cf.funcs
+		if increaseRefCount {
+			cf.refCount++
+		}
+	}
 	return
 }
 
@@ -226,7 +254,7 @@ func functionFromUintptr(ptr uintptr) *function {
 	//
 	// For example, if we have (*function)(unsafe.Pointer(ptr)) instead, then the race detector's "checkptr"
 	// subroutine wanrs as "checkptr: pointer arithmetic result points to invalid allocation"
-	// https://github.com/golang/go/blob/1ce7fcf139417d618c2730010ede2afb41664211/src/runtime/checkptr.go#L69
+	// https://github.com/golang/go/blob/go1.24.0/src/runtime/checkptr.go#L69
 	var wrapped *uintptr = &ptr
 	return *(**function)(unsafe.Pointer(wrapped))
 }
@@ -243,15 +271,9 @@ type snapshot struct {
 
 // Snapshot implements the same method as documented on experimental.Snapshotter.
 func (ce *callEngine) Snapshot() experimental.Snapshot {
-	stack := make([]uint64, len(ce.stack))
-	copy(stack, ce.stack)
-
-	frames := make([]*callFrame, len(ce.frames))
-	copy(frames, ce.frames)
-
 	return &snapshot{
-		stack:  stack,
-		frames: frames,
+		stack:  slices.Clone(ce.stack),
+		frames: slices.Clone(ce.frames),
 		ce:     ce,
 	}
 }
@@ -357,7 +379,7 @@ const callFrameStackSize = 0
 
 // CompileModule implements the same method as documented on wasm.Engine.
 func (e *engine) CompileModule(_ context.Context, module *wasm.Module, listeners []experimental.FunctionListener, ensureTermination bool) error {
-	if _, ok := e.getCompiledFunctions(module); ok { // cache hit!
+	if _, ok := e.getCompiledFunctions(module, true); ok { // cache hit!
 		return nil
 	}
 
@@ -406,7 +428,7 @@ func (e *engine) NewModuleEngine(module *wasm.Module, instance *wasm.ModuleInsta
 		functions:    make([]function, len(module.FunctionSection)+int(module.ImportFunctionCount)),
 	}
 
-	codes, ok := e.getCompiledFunctions(module)
+	codes, ok := e.getCompiledFunctions(module, false)
 	if !ok {
 		return nil, errors.New("source module must be compiled before instantiation")
 	}
@@ -428,12 +450,10 @@ func (e *engine) NewModuleEngine(module *wasm.Module, instance *wasm.ModuleInsta
 // lowerIR lowers the interpreterir operations to engine friendly struct.
 func (e *engine) lowerIR(ir *compilationResult, ret *compiledFunction) error {
 	// Copy the body from the result.
-	ret.body = make([]unionOperation, len(ir.Operations))
-	copy(ret.body, ir.Operations)
+	ret.body = slices.Clone(ir.Operations)
 	// Also copy the offsets if necessary.
 	if offsets := ir.IROperationSourceOffsetsInWasmBinary; len(offsets) > 0 {
-		ret.offsetsInWasmBinary = make([]uint64, len(offsets))
-		copy(ret.offsetsInWasmBinary, offsets)
+		ret.offsetsInWasmBinary = slices.Clone(offsets)
 	}
 
 	labelAddressResolutions := [labelKindNum][]uint64{}
@@ -450,9 +470,7 @@ func (e *engine) lowerIR(ir *compilationResult, ret *compiledFunction) error {
 			frameToAddresses := labelAddressResolutions[label.Kind()]
 			// Expand the slice if necessary.
 			if diff := fid - len(frameToAddresses) + 1; diff > 0 {
-				for j := 0; j < diff; j++ {
-					frameToAddresses = append(frameToAddresses, 0)
-				}
+				frameToAddresses = append(frameToAddresses, make([]uint64, diff)...)
 			}
 			frameToAddresses[fid] = address
 			labelAddressResolutions[kind] = frameToAddresses
@@ -4621,9 +4639,7 @@ func (ce *callEngine) callGoFuncWithStack(ctx context.Context, m *wasm.ModuleIns
 	// In the interpreter engine, ce.stack may only have capacity to store
 	// parameters. Grow when there are more results than parameters.
 	if growLen := resultLen - paramLen; growLen > 0 {
-		for i := 0; i < growLen; i++ {
-			ce.stack = append(ce.stack, 0)
-		}
+		ce.stack = append(ce.stack, make([]uint64, growLen)...)
 		stackLen += growLen
 	}
 

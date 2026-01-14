@@ -4,8 +4,8 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/containers/common/libnetwork/types"
-	"github.com/containers/common/pkg/detach"
+	"go.podman.io/common/libnetwork/types"
+	"go.podman.io/common/pkg/detach"
 )
 
 var (
@@ -217,4 +217,7 @@ var (
 	// ErrRemovingCtrs indicates that there was an error removing all
 	// containers from a pod.
 	ErrRemovingCtrs = errors.New("removing pod containers")
+
+	// ErrHealthCheckTimeout indicates that a HealthCheck timed out.
+	ErrHealthCheckTimeout = errors.New("healthcheck command exceeded timeout")
 )

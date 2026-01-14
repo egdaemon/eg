@@ -41,16 +41,16 @@ func fileCacheKey(m *wasm.Module) (ret filecache.Key) {
 	return
 }
 
-func (e *engine) addCompiledModule(module *wasm.Module, cm *compiledModule) (err error) {
-	e.addCompiledModuleToMemory(module, cm)
+func (e *engine) addCompiledModule(module *wasm.Module, cm *compiledModule) (c *compiledModule, err error) {
+	c = e.addCompiledModuleToMemory(module, cm)
 	if !module.IsHostModule && e.fileCache != nil {
-		err = e.addCompiledModuleToCache(module, cm)
+		err = e.addCompiledModuleToCache(module, c)
 	}
 	return
 }
 
 func (e *engine) getCompiledModule(module *wasm.Module, listeners []experimental.FunctionListener, ensureTermination bool) (cm *compiledModule, ok bool, err error) {
-	cm, ok = e.getCompiledModuleFromMemory(module)
+	cm, ok = e.getCompiledModuleFromMemory(module, true)
 	if ok {
 		return
 	}
@@ -84,19 +84,31 @@ func (e *engine) getCompiledModule(module *wasm.Module, listeners []experimental
 	return
 }
 
-func (e *engine) addCompiledModuleToMemory(m *wasm.Module, cm *compiledModule) {
+func (e *engine) addCompiledModuleToMemory(m *wasm.Module, cm *compiledModule) *compiledModule {
 	e.mux.Lock()
 	defer e.mux.Unlock()
-	e.compiledModules[m.ID] = cm
+	if c, ok := e.compiledModules[m.ID]; ok {
+		c.refCount++
+		return c.compiledModule
+	}
+	e.compiledModules[m.ID] = &compiledModuleWithCount{compiledModule: cm, refCount: 1}
 	if len(cm.executable) > 0 {
 		e.addCompiledModuleToSortedList(cm)
 	}
+	return cm
 }
 
-func (e *engine) getCompiledModuleFromMemory(module *wasm.Module) (cm *compiledModule, ok bool) {
-	e.mux.RLock()
-	defer e.mux.RUnlock()
-	cm, ok = e.compiledModules[module.ID]
+func (e *engine) getCompiledModuleFromMemory(module *wasm.Module, increaseRefCount bool) (cm *compiledModule, ok bool) {
+	e.mux.Lock()
+	defer e.mux.Unlock()
+
+	cmWithCount, ok := e.compiledModules[module.ID]
+	if ok {
+		cm = cmWithCount.compiledModule
+		if increaseRefCount {
+			cmWithCount.refCount++
+		}
+	}
 	return
 }
 
@@ -245,7 +257,7 @@ func deserializeCompiledModule(wazeroVersion string, reader io.ReadCloser) (cm *
 			return nil, false, fmt.Errorf("compilationcache: checksum mismatch (expected %d, got %d)", expected, checksum)
 		}
 
-		if err = platform.MprotectRX(executable); err != nil {
+		if err = platform.MprotectCodeSegment(executable); err != nil {
 			return nil, false, err
 		}
 		cm.executable = executable

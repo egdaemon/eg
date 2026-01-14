@@ -7,10 +7,10 @@ import (
 	"sort"
 	"sync"
 
-	"github.com/containers/storage/pkg/fileutils"
-	"github.com/containers/storage/pkg/lockfile"
 	"github.com/moby/sys/user"
 	spec "github.com/opencontainers/runtime-spec/specs-go"
+	"go.podman.io/storage/pkg/fileutils"
+	"go.podman.io/storage/pkg/lockfile"
 )
 
 // TryJoinPauseProcess attempts to join the namespaces of the pause PID via
@@ -112,17 +112,6 @@ func countAvailableIDs(mappings []user.IDMap) int64 {
 		availableUids += r.Count
 	}
 	return availableUids
-}
-
-// GetAvailableUids returns how many UIDs are available in the
-// current user namespace.
-func GetAvailableUids() (int64, error) {
-	uids, err := GetAvailableUIDMap()
-	if err != nil {
-		return -1, err
-	}
-
-	return countAvailableIDs(uids), nil
 }
 
 // GetAvailableGids returns how many GIDs are available in the

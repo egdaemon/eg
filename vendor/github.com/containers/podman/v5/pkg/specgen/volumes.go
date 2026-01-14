@@ -6,10 +6,10 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/containers/common/pkg/parse"
 	"github.com/containers/podman/v5/libpod/define"
 	spec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/sirupsen/logrus"
+	"go.podman.io/common/pkg/parse"
 )
 
 // NamedVolume holds information about a named volume that will be mounted into
@@ -78,6 +78,11 @@ type ArtifactVolume struct {
 	// the title annotation exist.
 	// Optional. Conflicts with Title.
 	Digest string `json:"digest,omitempty"`
+	// Name is the name that should be used for the path inside the container. When a single blob
+	// is mounted the name is used as is. If multiple blobs are mounted then mount them as
+	// "<name>-x" where x is a 0 indexed integer based on the layer order.
+	// Optional.
+	Name string `json:"name,omitempty"`
 }
 
 // GenVolumeMounts parses user input into mounts, volumes and overlay volumes

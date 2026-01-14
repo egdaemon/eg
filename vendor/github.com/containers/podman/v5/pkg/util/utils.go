@@ -16,22 +16,20 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/BurntSushi/toml"
-	"github.com/containers/image/v5/types"
 	"github.com/containers/podman/v5/libpod/define"
-	"github.com/containers/podman/v5/pkg/errorhandling"
 	"github.com/containers/podman/v5/pkg/namespaces"
 	"github.com/containers/podman/v5/pkg/rootless"
 	"github.com/containers/podman/v5/pkg/signal"
-	"github.com/containers/storage/pkg/directory"
-	"github.com/containers/storage/pkg/fileutils"
-	"github.com/containers/storage/pkg/idtools"
-	"github.com/containers/storage/pkg/unshare"
-	stypes "github.com/containers/storage/types"
 	securejoin "github.com/cyphar/filepath-securejoin"
 	ruser "github.com/moby/sys/user"
 	"github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/sirupsen/logrus"
+	"go.podman.io/image/v5/types"
+	"go.podman.io/storage/pkg/directory"
+	"go.podman.io/storage/pkg/fileutils"
+	"go.podman.io/storage/pkg/idtools"
+	"go.podman.io/storage/pkg/unshare"
+	stypes "go.podman.io/storage/types"
 	"golang.org/x/term"
 )
 
@@ -394,7 +392,7 @@ func parseTriple(spec []string, parentMapping []ruser.IDMap, mapSetting string) 
 
 	if hidIsParent {
 		if (mapSetting == "UID" && flags.UserMap) || (mapSetting == "GID" && flags.GroupMap) {
-			for i := uint64(0); i < sz; i++ {
+			for i := range sz {
 				cids = append(cids, cid+i)
 				mappedID, err := mapIDwithMapping(hid+i, parentMapping, mapSetting)
 				if err != nil {
@@ -846,7 +844,7 @@ func parseAutoTriple(spec []string, parentMapping []ruser.IDMap, mapSetting stri
 	}
 
 	if hidIsParent {
-		for i := uint64(0); i < sz; i++ {
+		for i := range sz {
 			cids = append(cids, cid+i)
 			mappedID, err := mapIDwithMapping(hid+i, parentMapping, mapSetting)
 			if err != nil {
@@ -922,7 +920,7 @@ func GetAutoOptions(n namespaces.UsernsMode) (*stypes.AutoUserNsOptions, error) 
 		}
 	}
 
-	for _, o := range strings.Split(opts, ",") {
+	for o := range strings.SplitSeq(opts, ",") {
 		key, val, hasVal := strings.Cut(o, "=")
 		if !hasVal {
 			return nil, fmt.Errorf("invalid option specified: %q", o)
@@ -1042,56 +1040,6 @@ func ParseIDMapping(mode namespaces.UsernsMode, uidMapSlice, gidMapSlice []strin
 	return &options, nil
 }
 
-type tomlOptionsConfig struct {
-	MountProgram string `toml:"mount_program"`
-}
-
-type tomlConfig struct {
-	Storage struct {
-		Driver    string                      `toml:"driver"`
-		RunRoot   string                      `toml:"runroot"`
-		GraphRoot string                      `toml:"graphroot"`
-		Options   struct{ tomlOptionsConfig } `toml:"options"`
-	} `toml:"storage"`
-}
-
-func getTomlStorage(storeOptions *stypes.StoreOptions) *tomlConfig {
-	config := new(tomlConfig)
-
-	config.Storage.Driver = storeOptions.GraphDriverName
-	config.Storage.RunRoot = storeOptions.RunRoot
-	config.Storage.GraphRoot = storeOptions.GraphRoot
-	for _, i := range storeOptions.GraphDriverOptions {
-		program, hasPrefix := strings.CutPrefix(i, "overlay.mount_program=")
-		if hasPrefix {
-			config.Storage.Options.MountProgram = program
-		}
-	}
-
-	return config
-}
-
-// WriteStorageConfigFile writes the configuration to a file
-func WriteStorageConfigFile(storageOpts *stypes.StoreOptions, storageConf string) error {
-	if err := os.MkdirAll(filepath.Dir(storageConf), 0755); err != nil {
-		return err
-	}
-	storageFile, err := os.OpenFile(storageConf, os.O_RDWR|os.O_TRUNC, 0600)
-	if err != nil {
-		return err
-	}
-	tomlConfiguration := getTomlStorage(storageOpts)
-	defer errorhandling.CloseQuiet(storageFile)
-	enc := toml.NewEncoder(storageFile)
-	if err := enc.Encode(tomlConfiguration); err != nil {
-		if err := os.Remove(storageConf); err != nil {
-			logrus.Error(err)
-		}
-		return err
-	}
-	return nil
-}
-
 // ParseInputTime takes the users input and to determine if it is valid and
 // returns a time format and error.  The input is compared to known time formats
 // or a duration which implies no-duration
@@ -1121,33 +1069,6 @@ func ParseInputTime(inputTime string, since bool) (time.Time, error) {
 		return time.Now().Add(-duration), nil
 	}
 	return time.Now().Add(duration), nil
-}
-
-// OpenExclusiveFile opens a file for writing and ensure it doesn't already exist
-func OpenExclusiveFile(path string) (*os.File, error) {
-	baseDir := filepath.Dir(path)
-	if baseDir != "" {
-		if err := fileutils.Exists(baseDir); err != nil {
-			return nil, err
-		}
-	}
-	return os.OpenFile(path, os.O_RDWR|os.O_CREATE|os.O_EXCL, 0666)
-}
-
-// ExitCode reads the error message when failing to executing container process
-// and then returns 0 if no error, 126 if command does not exist, or 127 for
-// all other errors
-func ExitCode(err error) int {
-	if err == nil {
-		return 0
-	}
-	e := strings.ToLower(err.Error())
-	if strings.Contains(e, "file not found") ||
-		strings.Contains(e, "no such file or directory") {
-		return 127
-	}
-
-	return 126
 }
 
 func Tmpdir() string {

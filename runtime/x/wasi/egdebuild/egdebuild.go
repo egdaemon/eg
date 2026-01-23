@@ -1,5 +1,7 @@
 // Package egdebuild for building debian packages. allowing developers to create debian packages
 // and upload them using common debian tools. currently only supported for local runs due to gpg requirements.
+// useful links:
+// - https://www.debian.org/doc/debian-policy/ch-controlfields.html
 package egdebuild
 
 import (
@@ -115,7 +117,7 @@ func (option) Depends(deps ...string) option {
 
 func (option) Description(short, long string) option {
 	return func(c *Config) {
-		c.Description = fmt.Sprintf("%s\\n %s", short, long)
+		c.Description = fmt.Sprintf("%s\n %s", short, long)
 	}
 }
 

@@ -44,7 +44,7 @@ func FindModules(root string) iter.Seq[string] {
 			}
 
 			if !yield(filepath.Join(root, path)) {
-				return nil
+				return fs.SkipAll
 			}
 
 			return nil

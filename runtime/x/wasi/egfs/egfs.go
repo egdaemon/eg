@@ -37,7 +37,7 @@ func Find(tree fs.FS, pattern string) iter.Seq[string] {
 			}
 
 			if !yield(current) {
-				return nil
+				return fs.SkipAll
 			}
 
 			return nil

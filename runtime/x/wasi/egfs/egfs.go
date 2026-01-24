@@ -2,7 +2,6 @@ package egfs
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"io/fs"
 	"iter"
@@ -38,7 +37,7 @@ func Find(tree fs.FS, pattern string) iter.Seq[string] {
 			}
 
 			if !yield(current) {
-				return fmt.Errorf("failed to yield module path: %s", current)
+				return nil
 			}
 
 			return nil

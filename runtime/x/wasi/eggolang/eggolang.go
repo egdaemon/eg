@@ -365,6 +365,7 @@ func env() ([]string, error) {
 	return envx.Build().FromEnv(os.Environ()...).
 		Var("GOCACHE", CacheBuildDirectory()).
 		Var("GOMODCACHE", CacheModuleDirectory()).
+		Var("XDG_CACHE_HOME", envx.String(CacheDirectory(), "XDG_CACHE_HOME")). // used by go module code. only set it if its unset.
 		Environ()
 }
 

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"math"
 	"net"
 	"os"
 	"os/exec"
@@ -45,12 +46,14 @@ import (
 )
 
 type baremetal struct {
+	cmdopts.RuntimeResources
 	Dir             string   `name:"directory" help:"root directory of the repository" default:"${vars_eg_root_directory}"`
 	GitRemote       string   `name:"git-remote" help:"name of the git remote to use" default:"${vars_git_default_remote_name}"`
 	GitReference    string   `name:"git-ref" help:"name of the branch or commit to checkout" default:"${vars_git_head_reference}"`
 	Environment     []string `name:"env" short:"e" help:"define environment variables and their values to be included"`
 	Clone           bool     `name:"git-clone" help:"allow cloning via git"`
 	InvalidateCache bool     `name:"invalidate-cache" help:"removes workload build cache"`
+	Infinite        bool     `name:"infinite" help:"allow this module to run forever, used for running a workload like a webserver" hidden:"true"`
 	Podman          bool     `name:"podman" help:"enable/disable podman" hidden:"true" negatable:"" default:"true"`
 	Workload        string   `arg:"" help:"name of the workload to run"`
 }
@@ -71,6 +74,10 @@ func (t baremetal) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, hotswapbin
 		)
 		cmdenv []string
 	)
+
+	if t.Infinite {
+		t.RuntimeResources.TTL = time.Duration(math.MaxInt)
+	}
 
 	// clean up the eg environment ensuring a clean starting state.
 	resetenv := func() error {
@@ -199,6 +206,8 @@ func (t baremetal) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, hotswapbin
 		eg.EnvComputeLoggingVerbosity, strconv.Itoa(gctx.Verbosity),
 	).Var(
 		eg.EnvComputeModuleNestedLevel, strconv.Itoa(0),
+	).Var(
+		eg.EnvComputeTTL, t.RuntimeResources.TTL.String(),
 	).FromEnviron(
 		gitenv...,
 	)

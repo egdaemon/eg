@@ -86,6 +86,12 @@ func EphemeralDirectory(paths ...string) string {
 	return filepath.Join(os.TempDir(), filepath.Join(paths...))
 }
 
+// Extract a time.Duration formatted environment variable from the given keys
+// returns the first valid result if none of the keys exist then the fallback is returned.
+func Duration(fallback time.Duration, keys ...string) time.Duration {
+	return envx.Duration(fallback, keys...)
+}
+
 // Extract a boolean formatted environment variable from the given keys
 // returns the first valid result if none of the keys exist then the fallback is returned.
 func Boolean(fallback bool, keys ...string) bool {

@@ -108,7 +108,11 @@ func (t baremetal) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, hotswapbin
 	runtimex.Umask(0002)
 
 	if ws, err = workspaces.NewLocal(
-		ctx, md5x.Digest(errorsx.Zero(cmdopts.BuildInfo())), t.Dir, t.Workload,
+		ctx,
+		uuid.Must(uuid.NewV7()),
+		md5x.Digest(errorsx.Zero(cmdopts.BuildInfo())),
+		t.Dir,
+		t.Workload,
 		workspaces.OptionSymlinkCache(filepath.Join(t.Dir, eg.CacheDirectory)),
 		workspaces.OptionSymlinkWorking(t.Dir),
 		workspaces.OptionEnabled(workspaces.OptionInvalidateModuleCache, t.InvalidateCache),

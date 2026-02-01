@@ -68,6 +68,7 @@ func (t builtinLocal) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath)
 
 	if ws, err = workspaces.NewLocal(
 		gctx.Context,
+		uuid.Must(uuid.NewV7()),
 		md5x.Digest(errorsx.Zero(cmdopts.BuildInfo())),
 		tmpdir,
 		t.Name,

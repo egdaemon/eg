@@ -1,7 +1,6 @@
 package workspaces_test
 
 import (
-	"context"
 	"crypto/sha256"
 	"log"
 	"os"
@@ -14,6 +13,240 @@ import (
 	"github.com/gofrs/uuid/v5"
 	"github.com/stretchr/testify/require"
 )
+
+func TestNewLocal(t *testing.T) {
+	t.Run("test compute local config - default workload", func(t *testing.T) {
+		root := t.TempDir()
+		moduleDir := ".eg"
+		moduleName := ""
+		require.NoError(t, os.Mkdir(filepath.Join(root, moduleDir), 0755))
+		require.NoError(t, os.WriteFile(filepath.Join(root, moduleDir, "main.go"), []byte("package main"), 0644))
+
+		hasher := sha256.New()
+		fileBytes, err := os.ReadFile(filepath.Join(root, moduleDir, "main.go"))
+		require.NoError(t, err)
+		_, err = hasher.Write(fileBytes)
+		require.NoError(t, err)
+		expectedCID := uuid.FromBytesOrNil(hasher.Sum(nil)).String()
+
+		ws, err := workspaces.NewLocal(t.Context(), uuid.Max, sha256.New(), root, moduleName)
+		require.NoError(t, err)
+		require.NotNil(t, ws)
+
+		expectedRoot := filepath.Join(root, eg.WorkloadDirectory, "ffffffff")
+		require.Equal(t, expectedCID, ws.CachedID)
+		require.Equal(t, moduleName, ws.Module)
+		require.Equal(t, expectedRoot, ws.Root)
+		require.Equal(t, filepath.Join(expectedRoot, eg.ModuleDir), ws.ModuleDir)
+		require.Equal(t, filepath.Join(expectedRoot, eg.RuntimeDirectory), ws.RuntimeDir)
+		require.Equal(t, filepath.Join(expectedRoot, eg.WorkingDirectory), ws.WorkingDir)
+
+		_, err = os.Stat(filepath.Join(expectedRoot, eg.CacheDirectory))
+		require.NoError(t, err, "CacheDir should be created")
+		_, err = os.Stat(filepath.Join(expectedRoot, ws.GenModDir))
+		require.NoError(t, err, "GenModDir should be created")
+		_, err = os.Stat(filepath.Join(expectedRoot, ws.BuildDir, ws.Module, eg.ModuleDir))
+		require.NoError(t, err, "BuildDir should be created")
+		_, err = os.Stat(ws.RuntimeDir)
+		require.NoError(t, err, "RuntimeDir should be created")
+		_, err = os.Stat(ws.WorkspaceDir)
+		require.NoError(t, err, "WorkspaceDir should be created")
+	})
+
+	t.Run("test compute local config - specified workload", func(t *testing.T) {
+		root := t.TempDir()
+		moduleDir := ".eg"
+		moduleName := "test-module"
+		require.NoError(t, os.Mkdir(filepath.Join(root, moduleDir), 0755))
+		require.NoError(t, os.WriteFile(filepath.Join(root, moduleDir, "main.go"), []byte("package main"), 0644))
+
+		hasher := sha256.New()
+		fileBytes, err := os.ReadFile(filepath.Join(root, moduleDir, "main.go"))
+		require.NoError(t, err)
+		_, err = hasher.Write(fileBytes)
+		require.NoError(t, err)
+		expectedCID := uuid.FromBytesOrNil(hasher.Sum(nil)).String()
+
+		ws, err := workspaces.NewLocal(t.Context(), uuid.Max, sha256.New(), root, moduleName)
+		require.NoError(t, err)
+		require.NotNil(t, ws)
+
+		expectedRoot := filepath.Join(root, eg.WorkloadDirectory, "ffffffff")
+		require.Equal(t, expectedCID, ws.CachedID)
+		require.Equal(t, moduleName, ws.Module)
+		require.Equal(t, expectedRoot, ws.Root)
+		require.Equal(t, filepath.Join(expectedRoot, eg.ModuleDir), ws.ModuleDir)
+		require.Equal(t, filepath.Join(expectedRoot, eg.RuntimeDirectory), ws.RuntimeDir)
+		require.Equal(t, filepath.Join(expectedRoot, eg.WorkingDirectory), ws.WorkingDir)
+
+		_, err = os.Stat(filepath.Join(expectedRoot, eg.CacheDirectory))
+		require.NoError(t, err, "CacheDir should be created")
+		_, err = os.Stat(filepath.Join(expectedRoot, ws.GenModDir))
+		require.NoError(t, err, "GenModDir should be created")
+		_, err = os.Stat(filepath.Join(expectedRoot, ws.BuildDir, ws.Module, eg.ModuleDir))
+		require.NoError(t, err, "BuildDir should be created")
+		_, err = os.Stat(ws.RuntimeDir)
+		require.NoError(t, err, "RuntimeDir should be created")
+		_, err = os.Stat(ws.WorkspaceDir)
+		require.NoError(t, err, "WorkspaceDir should be created")
+	})
+}
+
+func TestNewQueued(t *testing.T) {
+	t.Run("test compute queued config - default workload", func(t *testing.T) {
+		root := t.TempDir()
+		moduleDir := ".eg"
+		moduleName := ""
+		require.NoError(t, os.Mkdir(filepath.Join(root, moduleDir), 0755))
+		require.NoError(t, os.WriteFile(filepath.Join(root, moduleDir, "main.go"), []byte("package main"), 0644))
+
+		hasher := sha256.New()
+		fileBytes, err := os.ReadFile(filepath.Join(root, moduleDir, "main.go"))
+		require.NoError(t, err)
+		_, err = hasher.Write(fileBytes)
+		require.NoError(t, err)
+		expectedCID := uuid.FromBytesOrNil(hasher.Sum(nil)).String()
+
+		ws, err := workspaces.NewLocal(t.Context(), uuid.Max, sha256.New(), root, moduleName)
+		require.NoError(t, err)
+		require.NotNil(t, ws)
+
+		expectedRoot := filepath.Join(root, eg.WorkloadDirectory, "ffffffff")
+		require.Equal(t, expectedCID, ws.CachedID)
+		require.Equal(t, moduleName, ws.Module)
+		require.Equal(t, expectedRoot, ws.Root)
+		require.Equal(t, filepath.Join(expectedRoot, eg.ModuleDir), ws.ModuleDir)
+		require.Equal(t, filepath.Join(expectedRoot, eg.RuntimeDirectory), ws.RuntimeDir)
+		require.Equal(t, filepath.Join(expectedRoot, eg.WorkingDirectory), ws.WorkingDir)
+
+		_, err = os.Stat(filepath.Join(expectedRoot, eg.CacheDirectory))
+		require.NoError(t, err, "CacheDir should be created")
+		_, err = os.Stat(filepath.Join(expectedRoot, ws.GenModDir))
+		require.NoError(t, err, "GenModDir should be created")
+		_, err = os.Stat(filepath.Join(expectedRoot, ws.BuildDir, ws.Module, eg.ModuleDir))
+		require.NoError(t, err, "BuildDir should be created")
+		_, err = os.Stat(ws.RuntimeDir)
+		require.NoError(t, err, "RuntimeDir should be created")
+		_, err = os.Stat(ws.WorkspaceDir)
+		require.NoError(t, err, "WorkspaceDir should be created")
+	})
+
+	t.Run("test compute queued config - specified workload", func(t *testing.T) {
+		root := t.TempDir()
+		moduleDir := ".eg"
+		moduleName := "test-module"
+		require.NoError(t, os.Mkdir(filepath.Join(root, moduleDir), 0755))
+		require.NoError(t, os.WriteFile(filepath.Join(root, moduleDir, "main.go"), []byte("package main"), 0644))
+
+		hasher := sha256.New()
+		fileBytes, err := os.ReadFile(filepath.Join(root, moduleDir, "main.go"))
+		require.NoError(t, err)
+		_, err = hasher.Write(fileBytes)
+		require.NoError(t, err)
+		expectedCID := uuid.FromBytesOrNil(hasher.Sum(nil)).String()
+
+		ws, err := workspaces.NewLocal(t.Context(), uuid.Max, sha256.New(), root, moduleName)
+		require.NoError(t, err)
+		require.NotNil(t, ws)
+
+		expectedRoot := filepath.Join(root, eg.WorkloadDirectory, "ffffffff")
+		require.Equal(t, expectedCID, ws.CachedID)
+		require.Equal(t, moduleName, ws.Module)
+		require.Equal(t, expectedRoot, ws.Root)
+		require.Equal(t, filepath.Join(expectedRoot, eg.ModuleDir), ws.ModuleDir)
+		require.Equal(t, filepath.Join(expectedRoot, eg.RuntimeDirectory), ws.RuntimeDir)
+		require.Equal(t, filepath.Join(expectedRoot, eg.WorkingDirectory), ws.WorkingDir)
+
+		_, err = os.Stat(filepath.Join(expectedRoot, eg.CacheDirectory))
+		require.NoError(t, err, "CacheDir should be created")
+		_, err = os.Stat(filepath.Join(expectedRoot, ws.GenModDir))
+		require.NoError(t, err, "GenModDir should be created")
+		_, err = os.Stat(filepath.Join(expectedRoot, ws.BuildDir, ws.Module, eg.ModuleDir))
+		require.NoError(t, err, "BuildDir should be created")
+		_, err = os.Stat(ws.RuntimeDir)
+		require.NoError(t, err, "RuntimeDir should be created")
+		_, err = os.Stat(ws.WorkspaceDir)
+		require.NoError(t, err, "WorkspaceDir should be created")
+	})
+}
+
+func TestNewBuiltin(t *testing.T) {
+	t.Run("test compute builtin config - default workload", func(t *testing.T) {
+		root := t.TempDir()
+		moduleDir := ".eg"
+		moduleName := ""
+		require.NoError(t, os.Mkdir(filepath.Join(root, moduleDir), 0755))
+		require.NoError(t, os.WriteFile(filepath.Join(root, moduleDir, "main.go"), []byte("package main"), 0644))
+
+		hasher := sha256.New()
+		fileBytes, err := os.ReadFile(filepath.Join(root, moduleDir, "main.go"))
+		require.NoError(t, err)
+		_, err = hasher.Write(fileBytes)
+		require.NoError(t, err)
+		expectedCID := uuid.FromBytesOrNil(hasher.Sum(nil)).String()
+
+		ws, err := workspaces.NewLocal(t.Context(), uuid.Max, sha256.New(), root, moduleName)
+		require.NoError(t, err)
+		require.NotNil(t, ws)
+
+		expectedRoot := filepath.Join(root, eg.WorkloadDirectory, "ffffffff")
+		require.Equal(t, expectedCID, ws.CachedID)
+		require.Equal(t, moduleName, ws.Module)
+		require.Equal(t, expectedRoot, ws.Root)
+		require.Equal(t, filepath.Join(expectedRoot, eg.ModuleDir), ws.ModuleDir)
+		require.Equal(t, filepath.Join(expectedRoot, eg.RuntimeDirectory), ws.RuntimeDir)
+		require.Equal(t, filepath.Join(expectedRoot, eg.WorkingDirectory), ws.WorkingDir)
+
+		_, err = os.Stat(filepath.Join(expectedRoot, eg.CacheDirectory))
+		require.NoError(t, err, "CacheDir should be created")
+		_, err = os.Stat(filepath.Join(expectedRoot, ws.GenModDir))
+		require.NoError(t, err, "GenModDir should be created")
+		_, err = os.Stat(filepath.Join(expectedRoot, ws.BuildDir, ws.Module, eg.ModuleDir))
+		require.NoError(t, err, "BuildDir should be created")
+		_, err = os.Stat(ws.RuntimeDir)
+		require.NoError(t, err, "RuntimeDir should be created")
+		_, err = os.Stat(ws.WorkspaceDir)
+		require.NoError(t, err, "WorkspaceDir should be created")
+	})
+
+	t.Run("test compute builtin config - specified workload", func(t *testing.T) {
+		root := t.TempDir()
+		moduleDir := ".eg"
+		moduleName := "test-module"
+		require.NoError(t, os.Mkdir(filepath.Join(root, moduleDir), 0755))
+		require.NoError(t, os.WriteFile(filepath.Join(root, moduleDir, "main.go"), []byte("package main"), 0644))
+
+		hasher := sha256.New()
+		fileBytes, err := os.ReadFile(filepath.Join(root, moduleDir, "main.go"))
+		require.NoError(t, err)
+		_, err = hasher.Write(fileBytes)
+		require.NoError(t, err)
+		expectedCID := uuid.FromBytesOrNil(hasher.Sum(nil)).String()
+
+		ws, err := workspaces.NewLocal(t.Context(), uuid.Max, sha256.New(), root, moduleName)
+		require.NoError(t, err)
+		require.NotNil(t, ws)
+
+		expectedRoot := filepath.Join(root, eg.WorkloadDirectory, "ffffffff")
+		require.Equal(t, expectedCID, ws.CachedID)
+		require.Equal(t, moduleName, ws.Module)
+		require.Equal(t, expectedRoot, ws.Root)
+		require.Equal(t, filepath.Join(expectedRoot, eg.ModuleDir), ws.ModuleDir)
+		require.Equal(t, filepath.Join(expectedRoot, eg.RuntimeDirectory), ws.RuntimeDir)
+		require.Equal(t, filepath.Join(expectedRoot, eg.WorkingDirectory), ws.WorkingDir)
+
+		_, err = os.Stat(filepath.Join(expectedRoot, eg.CacheDirectory))
+		require.NoError(t, err, "CacheDir should be created")
+		_, err = os.Stat(filepath.Join(expectedRoot, ws.GenModDir))
+		require.NoError(t, err, "GenModDir should be created")
+		_, err = os.Stat(filepath.Join(expectedRoot, ws.BuildDir, ws.Module, eg.ModuleDir))
+		require.NoError(t, err, "BuildDir should be created")
+		_, err = os.Stat(ws.RuntimeDir)
+		require.NoError(t, err, "RuntimeDir should be created")
+		_, err = os.Stat(ws.WorkspaceDir)
+		require.NoError(t, err, "WorkspaceDir should be created")
+	})
+}
 
 func TestNew(t *testing.T) {
 	t.Run("success_public_workspace", func(t *testing.T) {
@@ -30,14 +263,14 @@ func TestNew(t *testing.T) {
 		require.NoError(t, err)
 		expectedCID := uuid.FromBytesOrNil(hasher.Sum(nil)).String()
 
-		ws, err := workspaces.New(context.Background(), sha256.New(), root, moduleName)
+		ws, err := workspaces.New(t.Context(), sha256.New(), root, moduleName)
 		require.NoError(t, err)
 		require.NotNil(t, ws)
 
+		require.Equal(t, expectedCID, ws.CachedID)
 		require.Equal(t, moduleName, ws.Module)
 		require.Equal(t, root, ws.Root)
 		require.Equal(t, filepath.Join(root, eg.ModuleDir), ws.ModuleDir)
-		require.Equal(t, expectedCID, ws.CachedID)
 		require.Equal(t, filepath.Join(root, eg.RuntimeDirectory), ws.RuntimeDir)
 		require.Equal(t, filepath.Join(root, eg.WorkingDirectory), ws.WorkingDir)
 
@@ -76,7 +309,7 @@ func TestNew(t *testing.T) {
 		require.NoError(t, os.WriteFile(dummyBuildFile, []byte("old"), 0644))
 		require.NoError(t, os.WriteFile(dummyTransFile, []byte("old"), 0644))
 
-		ws, err := workspaces.New(context.Background(), sha256.New(), root, moduleName, workspaces.OptionInvalidateModuleCache)
+		ws, err := workspaces.New(t.Context(), sha256.New(), root, moduleName, workspaces.OptionInvalidateModuleCache)
 		require.NoError(t, err)
 		require.NotNil(t, ws)
 		require.Equal(t, expectedCID, ws.CachedID)
@@ -109,7 +342,7 @@ func TestNew(t *testing.T) {
 		require.NoError(t, os.MkdirAll(oldBuildDir, 0755))
 		require.NoError(t, os.WriteFile(dummyBuildFile, []byte("old"), 0644))
 
-		ws, err := workspaces.New(context.Background(), sha256.New(), root, moduleName, workspaces.OptionEnabled(workspaces.OptionInvalidateModuleCache, false))
+		ws, err := workspaces.New(t.Context(), sha256.New(), root, moduleName, workspaces.OptionEnabled(workspaces.OptionInvalidateModuleCache, false))
 		require.NoError(t, err)
 		require.NotNil(t, ws)
 		require.Equal(t, expectedCID, ws.CachedID)
@@ -124,7 +357,7 @@ func TestNew(t *testing.T) {
 		root := filepath.Join(roottmp, "nonexistent")
 		moduleName := "test-module"
 
-		ws, err := workspaces.New(context.Background(), sha256.New(), root, moduleName)
+		ws, err := workspaces.New(t.Context(), sha256.New(), root, moduleName)
 
 		log.Println(spew.Sdump(ws))
 		require.Error(t, err)
@@ -152,7 +385,7 @@ func TestNew(t *testing.T) {
 		require.NoError(t, err)
 		expectedCID := uuid.FromBytesOrNil(hasher.Sum(nil)).String()
 
-		ws, err := workspaces.New(context.Background(), sha256.New(), root, moduleName)
+		ws, err := workspaces.New(t.Context(), sha256.New(), root, moduleName)
 		require.NoError(t, err)
 		require.NotNil(t, ws)
 		require.Equal(t, expectedCID, ws.CachedID)
@@ -167,7 +400,7 @@ func TestNew(t *testing.T) {
 		hasher := sha256.New()
 		expectedCID := uuid.FromBytesOrNil(hasher.Sum(nil)).String()
 
-		ws, err := workspaces.New(context.Background(), sha256.New(), root, moduleName)
+		ws, err := workspaces.New(t.Context(), sha256.New(), root, moduleName)
 		require.NoError(t, err)
 		require.NotNil(t, ws)
 		require.Equal(t, expectedCID, ws.CachedID)

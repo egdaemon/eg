@@ -1,4 +1,4 @@
-FROM ubuntu:plucky
+FROM ubuntu:questing
 
 # used to cause rebuilds automatically when the version changes.
 ARG EG_VERSION="${EG_VERSION}"

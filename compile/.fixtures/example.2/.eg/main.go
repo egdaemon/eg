@@ -36,7 +36,7 @@ func main() {
 	err := eg.Perform(
 		ctx,
 		eg.Build(
-			c1.PullFrom("ubuntu:plucky"),
+			c1.PullFrom("ubuntu:questing"),
 		),
 		eg.Module(ctx, c1, Root),
 	)

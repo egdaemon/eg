@@ -24,6 +24,11 @@ var (
 	gcfg egdebuild.Config
 )
 
+// Returns the latest release codename for ubuntu
+func UbuntuLatestCodename() string {
+	return "questing"
+}
+
 func init() {
 	c := eggit.EnvCommit()
 	gcfg = egdebuild.New(
@@ -61,7 +66,7 @@ func Build(ctx context.Context, o eg.Op) error {
 	return eg.Parallel(
 		egdebuild.Build(gcfg, egdebuild.Option.Distro("jammy")),
 		egdebuild.Build(gcfg, egdebuild.Option.Distro("noble"), egdebuild.Option.NoLint()),
-		egdebuild.Build(gcfg, egdebuild.Option.Distro("plucky"), egdebuild.Option.NoLint()),
+		egdebuild.Build(gcfg, egdebuild.Option.Distro("questing"), egdebuild.Option.NoLint()),
 	)(ctx, o)
 }
 

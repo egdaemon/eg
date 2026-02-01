@@ -38,11 +38,11 @@ func OptionKeyGenRand(src io.Reader) option {
 }
 
 func NewKeyGenSeeded(seed string) *KeyGen {
-	return NewKeyGen(OptionKeyGenRand(cryptox.NewPRNGSHA512([]byte(seed))))
+	return NewKeyGen(OptionKeyGenRand(cryptox.NewChaCha8(seed)))
 }
 
 func UnsafeNewKeyGen() *KeyGen {
-	return NewKeyGen(OptionKeyGenRand(cryptox.NewPRNGSHA512([]byte("unsafe"))))
+	return NewKeyGenSeeded("unsafe")
 }
 
 func NewKeyGen(options ...option) *KeyGen {

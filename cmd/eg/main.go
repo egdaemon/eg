@@ -118,9 +118,9 @@ func main() {
 			"vars_tls_insecure_default": eg.EnvTLSInsecure(),
 			"vars_cwd":                  osx.Getwd("."),
 			"vars_git_directory":        gitdir,
-			"vars_eg_root_directory":    stringsx.FirstNonBlank(envx.String("", eg.EnvComputeWorkingDirectory), gitdir, eg.DefaultWorkingDirectory()),
 			"vars_cache_directory":      userx.DefaultCacheDirectory(),
 			"vars_runtime_directory":    userx.DefaultRuntimeDirectory(),
+			"vars_eg_root_directory":    stringsx.FirstNonBlank(envx.String("", eg.EnvComputeWorkingDirectory), gitdir, eg.DefaultWorkingDirectory()),
 			"vars_eg_runtime_directory": eg.DefaultMountRoot(eg.RuntimeDirectory),
 			"vars_account_id":           envx.String("", "EG_ACCOUNT"),
 			"vars_machine_id":           envx.String(machineID(), "EG_MACHINE_ID"),
@@ -142,6 +142,7 @@ func main() {
 			"vars_memory_minimum_default":  humanize.IBytes(envx.Uint64(0, "EG_RESOURCES_MEMORY")),
 			"vars_disk_minimum_default":    humanize.IBytes(envx.Uint64(0, "EG_RESOURCES_DISK")),
 			"vars_vram_minimum_default":    humanize.IBytes(envx.Uint64(0*bytesx.GiB, "EG_RESOURCES_VRAM")),
+			"vars_labels":                  envx.String("", "EG_LABELS"),
 			"vars_git_default_remote_name": git.DefaultRemoteName,
 			"vars_git_default_reference":   envx.String("main", "GITHUB_REF_NAME"), // github actions environment variable
 			"vars_git_head_reference":      envx.String("HEAD", "GITHUB_SHA"),      // github actions environment variable

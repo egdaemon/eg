@@ -8,6 +8,7 @@ import (
 	"os"
 	"runtime"
 	"strconv"
+	"strings"
 
 	"github.com/egdaemon/eg/cmd/cmdopts"
 	"github.com/egdaemon/eg/internal/bytesx"
@@ -70,6 +71,12 @@ func (t BootstrapEnvDaemon) Run(gctx *cmdopts.Global) (err error) {
 	if t.Workers > 0 {
 		environ.Var(
 			"EG_COMPUTE_WORKLOAD_CAPACITY", strconv.FormatUint(t.Workers, 10),
+		)
+	}
+
+	if len(t.Labels) > 0 {
+		environ.Var(
+			"EG_LABELS", fmt.Sprintf("\"%s\"", strings.Join(t.Labels, ",")),
 		)
 	}
 

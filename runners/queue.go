@@ -440,8 +440,11 @@ func beginwork(ctx context.Context, md metadata, dir string) state {
 	cachedir := userx.DefaultCacheDirectory("wcache", cacheprefix(workload.Enqueued), cachebucket(workload.Enqueued), "workloadcache")
 	log.Println("workload cachedir", cachedir)
 
-	if ws, err = workspaces.New(
-		ctx, md5.New(), filepath.Join(dir, workdirname), eg.DefaultModuleDirectory(),
+	if ws, err = workspaces.NewQueued(
+		ctx,
+		md5.New(),
+		filepath.Join(dir, workdirname),
+		eg.DefaultModuleDirectory(),
 		workspaces.OptionSymlinkCache(cachedir),
 		workspaces.OptionEnsureWorkingDirectory,
 	); err != nil {

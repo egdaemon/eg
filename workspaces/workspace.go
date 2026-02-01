@@ -115,16 +115,53 @@ func OptionInvalidateModuleCache(ctx *Context) {
 	os.RemoveAll(filepath.Join(ctx.Root, ctx.TransDir))
 }
 
-// NewLocal creates the workspace for a local run of eg using a unique root directory specific to that run.
-func NewLocal(ctx context.Context, cid hash.Hash, cwd string, name string, options ...Option) (zero Context, err error) {
-	workloadroot := filepath.Join(eg.WorkloadDirectory, fmt.Sprintf("%x", errorsx.Must(uuid.NewV7()).Bytes()[12:16]))
-	return New(ctx, cid, filepath.Join(cwd, workloadroot), name, options...)
+func OptionCompose(opts ...Option) Option {
+	return func(ctx *Context) {
+		for _, opt := range opts {
+			opt(ctx)
+		}
+	}
 }
 
-func New(ctx context.Context, cid hash.Hash, root string, name string, options ...Option) (zero Context, err error) {
-	ignore := ignoredir{path: eg.CacheDirectory, reason: "cache directory"}
+// NewLocal creates the workspace for a local run of eg using a unique root directory specific to that run.
+func NewLocal(ctx context.Context, uid uuid.UUID, cid hash.Hash, cwd string, name string, options ...Option) (zero Context, err error) {
+	workloadroot := filepath.Join(eg.WorkloadDirectory, fmt.Sprintf("%x", uid.Bytes()[12:16]))
+	return New(
+		ctx,
+		cid,
+		cwd,
+		filepath.Join(cwd, workloadroot),
+		name,
+		OptionSymlinkCache(filepath.Join(cwd, eg.CacheDirectory)),
+		OptionSymlinkWorking(cwd),
+		OptionCompose(options...),
+	)
+}
 
-	if err = cacheid(ctx, root, eg.ModuleDir, cid, ignore); err != nil {
+func NewBuiltin(ctx context.Context, uid uuid.UUID, cid hash.Hash, cwd string, name string, options ...Option) (zero Context, err error) {
+	workloadroot := filepath.Join(eg.WorkloadDirectory, fmt.Sprintf("%x", uid.Bytes()[12:16]))
+	root := filepath.Join(cwd, workloadroot)
+	return New(
+		ctx,
+		cid,
+		root,
+		root,
+		name,
+		options...,
+	)
+}
+
+func NewQueued(ctx context.Context, cid hash.Hash, cwd string, name string, options ...Option) (zero Context, err error) {
+	return New(ctx, cid, cwd, cwd, name, options...)
+}
+
+func New(ctx context.Context, cid hash.Hash, cwd string, root string, name string, options ...Option) (zero Context, err error) {
+	ignore := ignoredir{path: eg.CacheDirectory, reason: "cache directory"}
+	if err := os.MkdirAll(root, 0700); err != nil {
+		return zero, errorsx.Wrapf(err, "unable to ensure root directory: %s", root)
+	}
+
+	if err = cacheid(ctx, cwd, eg.DefaultModuleDirectory(), cid, ignore); err != nil {
 		return zero, errorsx.Wrap(err, "unable to create cache id")
 	}
 
@@ -173,13 +210,15 @@ func ensuredirs(c Context) (_ Context, err error) {
 
 func cacheid(ctx context.Context, root string, mdir string, cacheid hash.Hash, ignore ignorable) error {
 	if err := os.MkdirAll(filepath.Join(root, mdir), 0700); err != nil {
-		return errorsx.Wrapf(err, "unable to create directory: %s", root)
+		return errorsx.Wrapf(err, "unable to ensure module directory: %s", root)
 	}
 
 	if _, err := cacheid.Write([]byte(cmdopts.BuildInfoSafe())); err != nil {
 		return errorsx.Wrapf(err, "unable include buildinfo: %s", root)
 	}
 
+	// fsx.PrintFS(os.DirFS(filepath.Join(root, mdir)))
+	debugx.Println("generate cache id", root, mdir)
 	return fs.WalkDir(os.DirFS(root), mdir, func(path string, d fs.DirEntry, err error) error {
 		var (
 			c *os.File
@@ -210,7 +249,9 @@ func cacheid(ctx context.Context, root string, mdir string, cacheid hash.Hash, i
 		if c, err = os.Open(filepath.Join(root, path)); err != nil {
 			return errorsx.WithStack(err)
 		}
+		defer c.Close()
 
+		debugx.Println("generating cache id", filepath.Join(root, path))
 		if _, err = io.Copy(cacheid, c); err != nil {
 			return errorsx.Wrapf(err, "unable to digest file: %s", path)
 		}

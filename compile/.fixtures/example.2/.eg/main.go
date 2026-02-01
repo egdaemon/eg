@@ -31,12 +31,12 @@ func main() {
 	ctx, done := context.WithTimeout(context.Background(), egenv.TTL())
 	defer done()
 
-	c1 := eg.Container("egmeta.ubuntu.24.10")
+	c1 := eg.Container("egmeta.ubuntu")
 
 	err := eg.Perform(
 		ctx,
 		eg.Build(
-			c1.PullFrom("ubuntu:questing"),
+			c1.PullFrom("ubuntu:plucky"),
 		),
 		eg.Module(ctx, c1, Root),
 	)

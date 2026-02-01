@@ -1,6 +1,7 @@
 package env
 
 import (
+	"io"
 	"time"
 
 	"github.com/egdaemon/eg/internal/envx"
@@ -32,4 +33,8 @@ func Debug(envs ...string) {
 
 func FromPath(n string) (environ []string, err error) {
 	return envx.FromPath(n)
+}
+
+func FromReader(n io.Reader) (environ []string, err error) {
+	return envx.FromReader(n)
 }

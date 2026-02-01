@@ -30,6 +30,7 @@ import (
 	"github.com/egdaemon/eg/transpile"
 	"github.com/egdaemon/eg/workspaces"
 	"github.com/go-git/go-git/v5"
+	"github.com/gofrs/uuid/v5"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/oauth2"
 )
@@ -104,7 +105,12 @@ func (t c8sUpload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error
 		return err
 	}
 
-	if ws, err = workspaces.New(gctx.Context, md5x.Digest(errorsx.Zero(cmdopts.BuildInfo())), tmpdir, eg.DefaultModuleDirectory()); err != nil {
+	if ws, err = workspaces.NewBuiltin(
+		gctx.Context,
+		uuid.Must(uuid.NewV7()),
+		md5x.Digest(errorsx.Zero(cmdopts.BuildInfo())),
+		tmpdir,
+		eg.DefaultModuleDirectory()); err != nil {
 		return err
 	}
 

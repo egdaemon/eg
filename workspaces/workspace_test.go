@@ -263,7 +263,7 @@ func TestNew(t *testing.T) {
 		require.NoError(t, err)
 		expectedCID := uuid.FromBytesOrNil(hasher.Sum(nil)).String()
 
-		ws, err := workspaces.New(t.Context(), sha256.New(), root, moduleName)
+		ws, err := workspaces.New(t.Context(), sha256.New(), root, root, moduleName)
 		require.NoError(t, err)
 		require.NotNil(t, ws)
 
@@ -309,7 +309,7 @@ func TestNew(t *testing.T) {
 		require.NoError(t, os.WriteFile(dummyBuildFile, []byte("old"), 0644))
 		require.NoError(t, os.WriteFile(dummyTransFile, []byte("old"), 0644))
 
-		ws, err := workspaces.New(t.Context(), sha256.New(), root, moduleName, workspaces.OptionInvalidateModuleCache)
+		ws, err := workspaces.New(t.Context(), sha256.New(), root, root, moduleName, workspaces.OptionInvalidateModuleCache)
 		require.NoError(t, err)
 		require.NotNil(t, ws)
 		require.Equal(t, expectedCID, ws.CachedID)
@@ -342,7 +342,7 @@ func TestNew(t *testing.T) {
 		require.NoError(t, os.MkdirAll(oldBuildDir, 0755))
 		require.NoError(t, os.WriteFile(dummyBuildFile, []byte("old"), 0644))
 
-		ws, err := workspaces.New(t.Context(), sha256.New(), root, moduleName, workspaces.OptionEnabled(workspaces.OptionInvalidateModuleCache, false))
+		ws, err := workspaces.New(t.Context(), sha256.New(), root, root, moduleName, workspaces.OptionEnabled(workspaces.OptionInvalidateModuleCache, false))
 		require.NoError(t, err)
 		require.NotNil(t, ws)
 		require.Equal(t, expectedCID, ws.CachedID)
@@ -357,7 +357,7 @@ func TestNew(t *testing.T) {
 		root := filepath.Join(roottmp, "nonexistent")
 		moduleName := "test-module"
 
-		ws, err := workspaces.New(t.Context(), sha256.New(), root, moduleName)
+		ws, err := workspaces.New(t.Context(), sha256.New(), root, root, moduleName)
 
 		log.Println(spew.Sdump(ws))
 		require.Error(t, err)
@@ -385,7 +385,7 @@ func TestNew(t *testing.T) {
 		require.NoError(t, err)
 		expectedCID := uuid.FromBytesOrNil(hasher.Sum(nil)).String()
 
-		ws, err := workspaces.New(t.Context(), sha256.New(), root, moduleName)
+		ws, err := workspaces.New(t.Context(), sha256.New(), root, root, moduleName)
 		require.NoError(t, err)
 		require.NotNil(t, ws)
 		require.Equal(t, expectedCID, ws.CachedID)
@@ -400,7 +400,7 @@ func TestNew(t *testing.T) {
 		hasher := sha256.New()
 		expectedCID := uuid.FromBytesOrNil(hasher.Sum(nil)).String()
 
-		ws, err := workspaces.New(t.Context(), sha256.New(), root, moduleName)
+		ws, err := workspaces.New(t.Context(), sha256.New(), root, root, moduleName)
 		require.NoError(t, err)
 		require.NotNil(t, ws)
 		require.Equal(t, expectedCID, ws.CachedID)

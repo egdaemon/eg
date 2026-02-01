@@ -47,9 +47,11 @@ func (t archive) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) 
 	)
 
 	if ws, err = workspaces.NewLocal(
-		gctx.Context, uuid.Must(uuid.NewV7()), md5x.Digest(errorsx.Zero(cmdopts.BuildInfo())), t.Dir, t.Name,
-		workspaces.OptionSymlinkCache(filepath.Join(t.Dir, eg.CacheDirectory)),
-		workspaces.OptionSymlinkWorking(t.Dir),
+		gctx.Context,
+		uuid.Must(uuid.NewV7()),
+		md5x.Digest(errorsx.Zero(cmdopts.BuildInfo())),
+		t.Dir,
+		t.Name,
 	); err != nil {
 		return err
 	}

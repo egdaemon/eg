@@ -66,7 +66,7 @@ func (t builtinLocal) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath)
 		errorsx.Log(errorsx.Wrap(os.RemoveAll(tmpdir), "unable to remove temp directory"))
 	}()
 
-	if ws, err = workspaces.NewLocal(
+	if ws, err = workspaces.NewBuiltin(
 		gctx.Context,
 		uuid.Must(uuid.NewV7()),
 		md5x.Digest(errorsx.Zero(cmdopts.BuildInfo())),

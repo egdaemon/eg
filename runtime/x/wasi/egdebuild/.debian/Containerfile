@@ -10,6 +10,10 @@ RUN add-apt-repository -n ppa:egdaemon/duckdb
 
 RUN apt-get update
 RUN apt-get -y install golang-1.25 eg egbootstrap
+# temporary hack until egbootstrap is updated.
+RUN echo "%wheel ALL=(ALL:ALL) SETENV: NOPASSWD: ALL" > /etc/sudoers.d/egd
+# required until we update the shell to explicitly pass all env keys instead of using -E
+RUN update-alternatives --set sudo /usr/bin/sudo.ws
 
 RUN ln -s /usr/lib/go-1.23/bin/go /usr/local/bin/go
 

@@ -69,14 +69,15 @@ func Runner() eg.ContainerRunner {
 func Build(ctx context.Context, o eg.Op) error {
 	const latest = "questing"
 	return eg.Sequential(
-		// build the package to improve the chances it'll actually build in within ubuntu launchpad.
-		// egdebuild.Build(
-		// 	gcfg,
-		// 	egdebuild.Option.Distro(latest),
-		// 	egdebuild.Option.Environ(egccache.Env()...), // load ccache env variables to leverage it if its available.
-		// 	egdebuild.Option.BuildBinary(20*time.Minute),
-		// ),
 		eg.Parallel(
+			// build the package to improve the chances it'll actually build in within ubuntu launchpad.
+			// egdebuild.Build(
+			// 	gcfg,
+			// 	egdebuild.Option.Distro(latest),
+			// 	egdebuild.Option.BuildBinary(20*time.Minute),
+			// 	egdebuild.Option.Environ(egccache.Env()...),
+			// 	egdebuild.Option.NoLint(),
+			// ),
 			egdebuild.Build(gcfg, egdebuild.Option.Distro(latest), egdebuild.Option.NoLint()),
 			egdebuild.Build(gcfg, egdebuild.Option.Distro("noble"), egdebuild.Option.NoLint()),
 			egdebuild.Build(gcfg, egdebuild.Option.Distro("jammy")),

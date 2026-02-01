@@ -67,6 +67,7 @@ func IntegrationTests(ctx context.Context, op eg.Op) error {
 				runtime.New("/home/egd/go/bin/eg compute baremetal tests/metrics"),
 				runtime.New("/home/egd/go/bin/eg compute baremetal tests/stress"),
 				runtime.New("/home/egd/go/bin/eg compute baremetal tests/tty"),
+				// runtime.New("/home/egd/go/bin/eg compute builtin local"),
 				// runtime.New("/home/egd/go/bin/eg compute baremetal tests/envvars").
 				// 	Environ(egbug.EnvUnsafeDigest, "a129de7dadc3fe210b9162428f93d3fe").
 				// 	Environ("EG_COMPUTE_MODULE_LEVEL", "0"),

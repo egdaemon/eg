@@ -74,9 +74,11 @@ func (t local) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err e
 	}
 
 	if ws, err = workspaces.NewLocal(
-		gctx.Context, md5x.Digest(cmdopts.BuildInfoSafe()), t.Dir, t.Name,
-		workspaces.OptionSymlinkCache(filepath.Join(t.Dir, eg.CacheDirectory)),
-		workspaces.OptionSymlinkWorking(t.Dir),
+		gctx.Context,
+		uuid.Must(uuid.NewV7()),
+		md5x.Digest(cmdopts.BuildInfoSafe()),
+		t.Dir,
+		t.Name,
 		workspaces.OptionEnabled(workspaces.OptionInvalidateModuleCache, t.InvalidateCache),
 	); err != nil {
 		return errorsx.Wrap(err, "unable to setup workspace")

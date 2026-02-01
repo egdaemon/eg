@@ -63,6 +63,7 @@ func IntegrationTests(ctx context.Context, op eg.Op) error {
 		ctx,
 		eg.Sequential(
 			shell.Op(
+				runtime.New("/home/egd/go/bin/eg compute builtin local"),
 				runtime.New("/home/egd/go/bin/eg compute baremetal tests/concurrent"),
 				runtime.New("/home/egd/go/bin/eg compute baremetal tests/metrics"),
 				runtime.New("/home/egd/go/bin/eg compute baremetal tests/stress"),

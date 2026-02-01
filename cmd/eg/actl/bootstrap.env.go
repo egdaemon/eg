@@ -1,7 +1,10 @@
 package actl
 
 import (
+	"encoding/base64"
 	"fmt"
+	"io"
+	"math/rand/v2"
 	"os"
 	"runtime"
 	"strconv"
@@ -9,10 +12,11 @@ import (
 	"github.com/dustin/go-humanize"
 	"github.com/egdaemon/eg/cmd/cmdopts"
 	"github.com/egdaemon/eg/internal/bytesx"
+	"github.com/egdaemon/eg/internal/cryptox"
 	"github.com/egdaemon/eg/internal/envx"
-	"github.com/egdaemon/eg/internal/md5x"
+	"github.com/egdaemon/eg/internal/errorsx"
+	"github.com/egdaemon/eg/internal/langx"
 	"github.com/egdaemon/eg/internal/numericx"
-	"github.com/egdaemon/eg/internal/stringsx"
 	"github.com/gofrs/uuid/v5"
 	"github.com/pbnjay/memory"
 )
@@ -44,11 +48,17 @@ type BootstrapEnvDaemon struct {
 
 func (t BootstrapEnvDaemon) Run(gctx *cmdopts.Global) (err error) {
 	memory := numericx.Max(uint64(t.runtimecfg.Memory), uint64(float64(memory.TotalMemory())*0.9))
+	prng := cryptox.NewChaCha8(langx.FirstNonZero(t.Seed, uuid.Must(uuid.NewV4()).String()))
+
+	seed, err := io.ReadAll(io.LimitReader(prng, rand.New(prng).Int64N(128)))
+	if err != nil {
+		return errorsx.Wrap(err, "failed to generate entropy")
+	}
 
 	return envx.Build().Var(
 		"EG_ACCOUNT", t.AccountID,
 	).Var(
-		"EG_ENTROPY_SEED", stringsx.DefaultIfBlank(md5x.String(t.Seed), uuid.Must(uuid.NewV4()).String()),
+		"EG_ENTROPY_SEED", base64.RawURLEncoding.EncodeToString(seed),
 	).Var(
 		"EG_RESOURCES_CORES", strconv.FormatUint(numericx.Max(uint64(runtime.NumCPU()), t.runtimecfg.Cores), 10),
 	).Var(

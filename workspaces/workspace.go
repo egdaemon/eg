@@ -116,8 +116,8 @@ func OptionInvalidateModuleCache(ctx *Context) {
 }
 
 // NewLocal creates the workspace for a local run of eg using a unique root directory specific to that run.
-func NewLocal(ctx context.Context, cid hash.Hash, cwd string, name string, options ...Option) (zero Context, err error) {
-	workloadroot := filepath.Join(eg.WorkloadDirectory, fmt.Sprintf("%x", errorsx.Must(uuid.NewV7()).Bytes()[12:16]))
+func NewLocal(ctx context.Context, uid uuid.UUID, cid hash.Hash, cwd string, name string, options ...Option) (zero Context, err error) {
+	workloadroot := filepath.Join(eg.WorkloadDirectory, fmt.Sprintf("%x", uid.Bytes()[12:16]))
 	return New(ctx, cid, filepath.Join(cwd, workloadroot), name, options...)
 }
 

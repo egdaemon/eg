@@ -75,7 +75,9 @@ func (t serve) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err e
 	}
 
 	if ws, err = workspaces.NewLocal(
-		gctx.Context, md5x.Digest(errorsx.Zero(cmdopts.BuildInfo())), t.Dir, t.Name,
+		gctx.Context,
+		uuid.Must(uuid.NewV7()),
+		md5x.Digest(errorsx.Zero(cmdopts.BuildInfo())), t.Dir, t.Name,
 		workspaces.OptionSymlinkCache(filepath.Join(t.Dir, eg.CacheDirectory)),
 		workspaces.OptionSymlinkWorking(t.Dir),
 		workspaces.OptionEnabled(workspaces.OptionInvalidateModuleCache, t.InvalidateCache),

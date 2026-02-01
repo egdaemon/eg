@@ -33,6 +33,7 @@ import (
 	"github.com/egdaemon/eg/transpile"
 	"github.com/egdaemon/eg/workspaces"
 	"github.com/go-git/go-git/v5"
+	"github.com/gofrs/uuid/v5"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/oauth2"
 )
@@ -67,7 +68,9 @@ func (t upload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 	}
 
 	if ws, err = workspaces.NewLocal(
-		gctx.Context, md5x.Digest(errorsx.Zero(cmdopts.BuildInfo())), t.Dir, t.Name,
+		gctx.Context,
+		uuid.Must(uuid.NewV7()),
+		md5x.Digest(errorsx.Zero(cmdopts.BuildInfo())), t.Dir, t.Name,
 		workspaces.OptionSymlinkCache(filepath.Join(t.Dir, eg.CacheDirectory)),
 		workspaces.OptionSymlinkWorking(t.Dir),
 	); err != nil {

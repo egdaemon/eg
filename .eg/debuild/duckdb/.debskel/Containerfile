@@ -1,4 +1,4 @@
-FROM ubuntu:plucky
+FROM ubuntu:questing
 ARG DEBIAN_FRONTEND=noninteractive
 
 RUN apt-get update

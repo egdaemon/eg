@@ -1,4 +1,4 @@
-FROM ubuntu:plucky
+FROM ubuntu:questing
 
 ARG GOBIN="/usr/bin"
 ARG GOMODCACHE="/tmp/gomod"
@@ -51,7 +51,7 @@ RUN podman version
 # BEGIN HACKS
 # systemd-resolved.service causes the container to delay its startup significantly causing issues.
 RUN systemctl disable systemd-resolved.service
-# the standard dbus service doesn't work with plucky.
+# the standard dbus service doesn't work with questing.
 RUN apt-get install -y --no-install-recommends dbus-broker
 RUN systemctl disable dbus.service
 RUN echo "cache buster 585ca506-2797-505a-ae80-b41535886d78"

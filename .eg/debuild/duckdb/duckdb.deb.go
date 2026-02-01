@@ -67,9 +67,9 @@ func Runner() eg.ContainerRunner {
 }
 
 func Build(ctx context.Context, o eg.Op) error {
-	const latest = "plucky"
+	const latest = "questing"
 	return eg.Sequential(
-		// build the package to improve the changes it'll actually build in within ubuntu launchpad.
+		// build the package to improve the chances it'll actually build in within ubuntu launchpad.
 		// egdebuild.Build(
 		// 	gcfg,
 		// 	egdebuild.Option.Distro(latest),

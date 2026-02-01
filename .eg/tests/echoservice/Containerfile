@@ -1,4 +1,4 @@
-FROM ubuntu:plucky
+FROM ubuntu:questing
 
 ARG GOBIN="/usr/bin"
 ARG GOMODCACHE="/tmp/gomod"

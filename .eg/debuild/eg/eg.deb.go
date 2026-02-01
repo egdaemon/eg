@@ -18,7 +18,7 @@ import (
 )
 
 const (
-	container = "eg.ubuntu.24.04"
+	container = "eg.ubuntu"
 )
 
 //go:embed .debskel
@@ -37,6 +37,7 @@ func init() {
 		egdebuild.Option.Maintainer(maintainer.Name, maintainer.Email),
 		egdebuild.Option.SigningKeyID(maintainer.GPGFingerprint),
 		egdebuild.Option.ChangeLogDate(c.Committer.When),
+		egdebuild.Option.Description("eg", "eg a developer friendly, self hostable ci/cd platform"),
 		egdebuild.Option.Version("0.0.:autopatch:"),
 		egdebuild.Option.Debian(errorsx.Must(fs.Sub(debskel, ".debskel"))),
 		egdebuild.Option.DependsBuild("golang-1.25", "dh-make", "debhelper", "duckdb", "libc6-dev (>= 2.35)", "libbtrfs-dev", "libassuan-dev", "libdevmapper-dev", "libglib2.0-dev", "libgpgme-dev", "libgpg-error-dev", "libprotobuf-dev", "libprotobuf-c-dev", "libseccomp-dev", "libselinux1-dev", "libsystemd-dev"),

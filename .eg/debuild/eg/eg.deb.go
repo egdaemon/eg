@@ -65,10 +65,10 @@ func Build(ctx context.Context, o eg.Op) error {
 	return eg.Parallel(
 		egdebuild.Build(gcfg, egdebuild.Option.Distro("jammy")),
 		egdebuild.Build(gcfg, egdebuild.Option.Distro("noble"), egdebuild.Option.NoLint()),
-		egdebuild.Build(gcfg, egdebuild.Option.Distro("plucky"), egdebuild.Option.NoLint()),
+		egdebuild.Build(gcfg, egdebuild.Option.Distro("questing"), egdebuild.Option.NoLint()),
 		egdebuild.Build(
 			gcfg,
-			egdebuild.Option.Distro("plucky"),
+			egdebuild.Option.Distro("questing"),
 			egdebuild.Option.BuildBinary(20*time.Minute),
 			egdebuild.Option.Environ(eggolang.Env()...),
 			egdebuild.Option.NoLint(),

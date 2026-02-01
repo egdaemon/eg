@@ -1,4 +1,4 @@
-FROM ubuntu:questing
+FROM ubuntu:plucky
 ARG DEBIAN_FRONTEND=noninteractive
 
 RUN echo "cache buster 059a9a06-1686-4f49-9a7f-a30535886d68"

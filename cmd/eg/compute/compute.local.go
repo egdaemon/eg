@@ -39,7 +39,7 @@ type local struct {
 	Privileged       bool     `name:"privileged" help:"run the initial container in privileged mode"`
 	Dirty            bool     `name:"dirty" help:"include user directories and environment variables" hidden:"true"`
 	InvalidateCache  bool     `name:"invalidate-cache" help:"removes workload build cache"`
-	EnvironmentPaths string   `name:"envpath" help:"environment files to pass to the module" default:""`
+	EnvironmentPaths []string `name:"envpath" help:"environment files to pass to the module" default:""`
 	Environment      []string `name:"env" short:"e" help:"define environment variables and their values to be included"`
 	GitRemote        string   `name:"git-remote" help:"name of the git remote to use" default:"${vars_git_default_remote_name}"`
 	GitReference     string   `name:"git-ref" help:"name of the branch or commit to checkout" default:"${vars_git_head_reference}"`
@@ -102,7 +102,7 @@ func (t local) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err e
 	}
 
 	envb := envx.Build().
-		FromPath(t.EnvironmentPaths).
+		FromPath(t.EnvironmentPaths...).
 		FromEnv(t.Environment...).
 		FromEnv(os.Environ()...).
 		FromEnviron(errorsx.Zero(gitx.LocalEnv(repo, t.GitRemote, t.GitReference))...).

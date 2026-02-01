@@ -15,6 +15,7 @@ import (
 
 type Signup struct {
 	SSHKeyPath  string `name:"sshkeypath" help:"path to ssh key to use" default:"${vars_ssh_key_path}"`
+	Seed        string `name:"seed" help:"seed for generating determistic credentials, useful for ci/cd platforms" default:"${vars_entropy_seed}"`
 	Endpoint    string `name:"endpoint" help:"specify the endpoint to connect to" default:"${vars_console_endpoint}" hidden:"true"`
 	Account     string `name:"account" help:"optional name of the account you want to register with can be found at https://console.egdaemon.com/s/settings"`
 	AutoBrowser bool   `name:"browser" help:"automatically open browser if possible" default:"false"`
@@ -26,7 +27,7 @@ func (t Signup) Run(gctx *cmdopts.Global, tlscfg *cmdopts.TLSConfig) (err error)
 		uri    *url.URL
 	)
 
-	if signer, err = sshx.AutoCached(sshx.NewKeyGen(), t.SSHKeyPath); err != nil {
+	if signer, err = sshx.AutoCached(sshx.NewKeyGenSeeded(t.Seed), t.SSHKeyPath); err != nil {
 		return err
 	}
 

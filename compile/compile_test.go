@@ -28,7 +28,7 @@ var _ = Describe("FromTranspiled", func() {
 
 		srcdir := testx.TempDir()
 		tmpdir := testx.TempDir()
-		ws, err = workspaces.New(ctx, md5.New(), tmpdir, "")
+		ws, err = workspaces.New(ctx, md5.New(), tmpdir, tmpdir, "")
 		Expect(err).To(Succeed())
 
 		Expect(fsx.CloneTree(ctx, srcdir, filepath.Join("example.1", eg.DefaultModuleDirectory()), os.DirFS(testx.Fixture()))).To(Succeed())
@@ -53,7 +53,7 @@ var _ = Describe("FromTranspiled", func() {
 
 		srcdir := testx.TempDir()
 		tmpdir := testx.TempDir()
-		ws, err = workspaces.New(ctx, md5.New(), tmpdir, "")
+		ws, err = workspaces.New(ctx, md5.New(), tmpdir, tmpdir, "")
 		Expect(err).To(Succeed())
 
 		Expect(fsx.CloneTree(ctx, srcdir, filepath.Join("example.2", eg.DefaultModuleDirectory()), os.DirFS(testx.Fixture()))).To(Succeed())
@@ -83,7 +83,7 @@ var _ = Describe("wasix warm cache", func() {
 
 		srcdir := testx.TempDir()
 		tmpdir := testx.TempDir()
-		ws, err = workspaces.New(ctx, md5.New(), tmpdir, "")
+		ws, err = workspaces.New(ctx, md5.New(), tmpdir, tmpdir, "")
 		Expect(err).To(Succeed())
 
 		Expect(fsx.CloneTree(ctx, srcdir, filepath.Join("example.1", eg.DefaultModuleDirectory()), os.DirFS(testx.Fixture()))).To(Succeed())

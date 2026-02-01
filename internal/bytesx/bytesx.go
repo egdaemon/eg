@@ -49,8 +49,8 @@ type FormatSI uint64
 
 // Format according to the SI standards of measurement.
 func (t FormatSI) Format(f fmt.State, verb rune) {
-	var div float64 = 1.0 // Use float64 for decimal division
-	suffix := ""          // Default suffix for bytes
+	var div = 1.0 // Use float64 for decimal division
+	suffix := ""  // Default suffix for bytes
 
 	// Define SI decimal powers (powers of 1000) as local constants.
 	// These are used for comparison and division in this function only.
@@ -86,7 +86,7 @@ func (t FormatSI) Format(f fmt.State, verb rune) {
 
 	value := math.Round(float64(t) / float64(div))
 
-	f.Write([]byte(fmt.Sprintf("%d%s", uint64(value), suffix)))
+	_, _ = f.Write(fmt.Appendf(nil, "%d%s", uint64(value), suffix))
 }
 
 type Unit uint64

@@ -39,7 +39,7 @@ type daemon struct {
 	Autodownload  bool     `name:"autodownload" help:"enable/disable the basic download scheduler" default:"true"`
 	CacheDir      string   `name:"directory" help:"local cache directory" default:"${vars_cache_directory}"`
 	MountDirs     []string `name:"mounts" short:"m" help:"folders to mount using podman mount specs" default:""`
-	EnvVars       []string `name:"env" short:"e" help:"environment variables to import" default:""`
+	EnvVars       []string `name:"env" short:"e" help:"environment variables to import"`
 }
 
 // essentially we use ssh forwarding from the control plane to the local http server

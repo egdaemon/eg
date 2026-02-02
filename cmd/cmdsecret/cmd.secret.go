@@ -12,6 +12,7 @@ import (
 type SecretCmd struct {
 	Read   CmdRead   `cmd:"" help:"Read secrets from various schemes."`
 	Update CmdUpdate `cmd:"" help:"Update or create secrets for various schemes."`
+	Edit   CmdEdit   `cmd:"" help:"Interactively edit a secret using $EDITOR."`
 }
 
 type CmdRead struct {

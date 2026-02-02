@@ -21,6 +21,7 @@ import (
 	"github.com/egdaemon/eg/cmd/cmderrors"
 	"github.com/egdaemon/eg/cmd/cmdopts"
 	"github.com/egdaemon/eg/cmd/cmdplete"
+	"github.com/egdaemon/eg/cmd/cmdsecret"
 	"github.com/egdaemon/eg/cmd/eg/accountcmds"
 	"github.com/egdaemon/eg/cmd/eg/compute"
 	"github.com/egdaemon/eg/cmd/eg/daemons"
@@ -83,6 +84,7 @@ func main() {
 		Browser            accountcmds.OTP              `cmd:"" name:"browser" help:"login to the browser console"`
 		Ident              accountcmds.Identity         `cmd:"" name:"iden" help:"display current credentials"`
 		DiskUsage          daemons.DiskUsage            `cmd:"" name:"disk-usage" help:"monitors disk usage and executes services when above threshold"`
+		Secrets            cmdsecret.SecretCmd          `cmd:"" name:"secrets" help:"ALPHA: builtin simple secret manager"`
 		InstallCompletions kongplete.InstallCompletions `cmd:"" help:"install shell completions"`
 	}
 

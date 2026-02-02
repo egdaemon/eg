@@ -5,7 +5,7 @@ COPY rootfs /
 # output directory for makepkg
 ARG PKGDEST=/tmp
 RUN mkdir -p /etc/sudoers.d/
-RUN echo "%%wheel ALL=(ALL:ALL) NOPASSWD: ALL" | tee /etc/sudoers.d/egd
+RUN echo "%wheel ALL=(ALL:ALL) NOPASSWD: ALL" | tee /etc/sudoers.d/egd
 RUN systemd-sysusers
 RUN systemd-tmpfiles --create
 RUN pacman --noconfirm -Syu podman netavark pacman-contrib pkgfile foot sudo bash-completion tree ccache base base-devel git go openssh rsync github-cli btrfs-progs fuse3

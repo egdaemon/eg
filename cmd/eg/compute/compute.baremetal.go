@@ -55,7 +55,7 @@ type baremetal struct {
 	InvalidateCache bool     `name:"invalidate-cache" help:"removes workload build cache"`
 	Infinite        bool     `name:"infinite" help:"allow this module to run forever, used for running a workload like a webserver" hidden:"true"`
 	Podman          bool     `name:"podman" help:"enable/disable podman" hidden:"true" negatable:"" default:"true"`
-	Workload        string   `arg:"" help:"name of the workload to run"`
+	Workload        string   `arg:"" help:"name of the workload to run" default:"" predictor:"eg.workload"`
 }
 
 func (t baremetal) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, hotswapbin *cmdopts.HotswapPath) (err error) {

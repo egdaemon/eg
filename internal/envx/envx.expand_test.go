@@ -10,7 +10,7 @@ import (
 	"testing"
 
 	"github.com/egdaemon/eg/internal/envx"
-	"github.com/egdaemon/eg/internal/iox"
+	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/testx"
 	"github.com/stretchr/testify/require"
 )
@@ -220,7 +220,7 @@ Another line without variables.
 	t.Run("error_handling", func(t *testing.T) {
 		t.Run("underlying_reader_returns_error", func(t *testing.T) {
 			expandedReader := envx.ExpandReader(
-				io.MultiReader(strings.NewReader("line1\nline2\nline3\n"), iox.ErrReader(fmt.Errorf("simulated underlying read error"))),
+				io.MultiReader(strings.NewReader("line1\nline2\nline3\n"), errorsx.Reader(fmt.Errorf("simulated underlying read error"))),
 				standardMapping,
 			)
 

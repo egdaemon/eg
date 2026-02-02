@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"time"
 
@@ -268,4 +269,18 @@ func NewUnrecoverable(err error) error {
 	return Unrecoverable{
 		cause: err,
 	}
+}
+
+type errReader struct {
+	error
+}
+
+func (t errReader) Read([]byte) (int, error) {
+	return 0, t.error
+}
+
+// Reader returns an io.Reader that returns the provided error.
+// useful for designing some apis.
+func Reader(err error) io.Reader {
+	return errReader{err}
 }

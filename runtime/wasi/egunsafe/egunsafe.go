@@ -55,7 +55,7 @@ func RuntimeDirectory(paths ...string) string {
 }
 
 func UnroutablePrefix() netip.Prefix {
-	return netip.PrefixFrom(netip.IPv4Unspecified(), 32)
+	return netip.PrefixFrom(netip.IPv6Unspecified(), 128)
 }
 
 // resolve the netip.Prefix of the host. returns an unroutable prefix on error.
@@ -67,9 +67,9 @@ func HostPrefix() netip.Prefix {
 	}
 
 	for _, ip := range ips {
-		if ipv4 := ip.To4(); ipv4 != nil {
-			addr, _ := netip.AddrFromSlice(ipv4)
-			return netip.PrefixFrom(addr, 32)
+		if ip.To4() == nil {
+			addr, _ := netip.AddrFromSlice(ip)
+			return netip.PrefixFrom(addr, 128)
 		}
 	}
 

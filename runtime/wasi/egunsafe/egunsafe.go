@@ -58,20 +58,33 @@ func UnroutablePrefix() netip.Prefix {
 	return netip.PrefixFrom(netip.IPv6Unspecified(), 128)
 }
 
-// resolve the netip.Prefix of the host. returns an unroutable prefix on error.
-func HostPrefix() netip.Prefix {
+// resolve the netip.Prefixes of the host. returns a slice containing only
+// the unroutable prefix on error.
+func HostPrefixes() []netip.Prefix {
 	ips, err := net.LookupIP("host.containers.internal")
 	if err != nil || len(ips) == 0 {
 		log.Println("failed to lookup host ip - return void prefix", err)
-		return UnroutablePrefix()
+		return []netip.Prefix{UnroutablePrefix()}
 	}
 
+	prefixes := make([]netip.Prefix, 0, len(ips))
 	for _, ip := range ips {
-		if ip.To4() == nil {
-			addr, _ := netip.AddrFromSlice(ip)
-			return netip.PrefixFrom(addr, 128)
+		addr, ok := netip.AddrFromSlice(ip)
+		if !ok {
+			continue
 		}
+
+		// Map to 32 for IPv4, 128 for IPv6
+		bits := 128
+		if addr.Is4() {
+			bits = 32
+		}
+		prefixes = append(prefixes, netip.PrefixFrom(addr, bits))
 	}
 
-	return UnroutablePrefix()
+	if len(prefixes) == 0 {
+		return []netip.Prefix{UnroutablePrefix()}
+	}
+
+	return prefixes
 }

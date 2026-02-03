@@ -7,12 +7,16 @@ package egpostgresql
 import (
 	"context"
 	"fmt"
+	"log"
+	"net/netip"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/langx"
 	"github.com/egdaemon/eg/runtime/wasi/eg"
+	"github.com/egdaemon/eg/runtime/wasi/egunsafe"
 	"github.com/egdaemon/eg/runtime/wasi/shell"
 )
 
@@ -28,6 +32,40 @@ func Auto(ctx context.Context, _ eg.Op) (err error) {
 		runtime.New("psql --no-password -c \"CREATE ROLE root WITH SUPERUSER LOGIN\""),
 		runtime.New("psql --no-password -c \"CREATE ROLE egd WITH SUPERUSER LOGIN\""),
 	)
+}
+
+// Add additional cidrs to hba.conf
+func Trust(v ...netip.Prefix) eg.OpFn {
+	return func(ctx context.Context, _ eg.Op) (err error) {
+		runtime := shell.Runtime().As("postgres").Timeout(5*time.Second).Environ("PAGER", "")
+		sentinel := egunsafe.UnroutablePrefix()
+
+		var sb strings.Builder
+		for _, prefix := range v {
+			if prefix == sentinel {
+				log.Println("ignoring unroutable host", prefix)
+				continue
+			}
+
+			sb.WriteString(fmt.Sprintf("host all all %s trust\\n", prefix.String()))
+		}
+
+		if sb.Len() == 0 {
+			return nil
+		}
+
+		cmd := fmt.Sprintf(
+			"HBA=$(psql -qAt -c 'SHOW hba_file;') && printf \"%s\" >> \"$HBA\"",
+			sb.String(),
+		)
+
+		return shell.Run(
+			ctx,
+			runtime.New("pg_isready").Attempts(15),
+			runtime.New(cmd),
+			runtime.New("psql -qAt -c 'SELECT pg_reload_conf();' > /dev/null"),
+		)
+	}
 }
 
 // Forcibly recreate a database.

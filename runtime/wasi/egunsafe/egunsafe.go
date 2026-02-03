@@ -5,7 +5,9 @@ package egunsafe
 import (
 	"context"
 	"fmt"
+	"log"
 	"net"
+	"net/netip"
 	"path/filepath"
 	"strings"
 	"time"
@@ -50,4 +52,26 @@ func DialModuleControlSocket(ctx context.Context) (conn *grpc.ClientConn, err er
 
 func RuntimeDirectory(paths ...string) string {
 	return eg.DefaultMountRoot(eg.RuntimeDirectory, filepath.Join(paths...))
+}
+
+func UnroutablePrefix() netip.Prefix {
+	return netip.PrefixFrom(netip.IPv4Unspecified(), 32)
+}
+
+// resolve the netip.Prefix of the host. returns an unroutable prefix on error.
+func HostPrefix() netip.Prefix {
+	ips, err := net.LookupIP("host.containers.internal")
+	if err != nil || len(ips) == 0 {
+		log.Println("failed to lookup host ip - return void prefix", err)
+		return UnroutablePrefix()
+	}
+
+	for _, ip := range ips {
+		if ipv4 := ip.To4(); ipv4 != nil {
+			addr, _ := netip.AddrFromSlice(ipv4)
+			return netip.PrefixFrom(addr, 32)
+		}
+	}
+
+	return UnroutablePrefix()
 }

@@ -31,6 +31,7 @@ func Auto(ctx context.Context, _ eg.Op) (err error) {
 		runtime.New("psql --no-password -q -At -c \"SELECT pg_reload_conf();\" >& /dev/null"),
 		runtime.New("psql --no-password -c \"CREATE ROLE root WITH SUPERUSER LOGIN\""),
 		runtime.New("psql --no-password -c \"CREATE ROLE egd WITH SUPERUSER LOGIN\""),
+		runtime.New("psql -c \"ALTER SYSTEM SET listen_addresses = '*';\""),
 	)
 }
 
@@ -64,6 +65,18 @@ func Trust(v ...netip.Prefix) eg.OpFn {
 			runtime.New("pg_isready").Attempts(15),
 			runtime.New(cmd),
 			runtime.New("psql -qAt -c 'SELECT pg_reload_conf();' > /dev/null"),
+		)
+	}
+}
+
+// command to restart postgresql
+func Restart(cmd string) eg.OpFn {
+	return func(ctx context.Context, _ eg.Op) (err error) {
+		runtime := shell.Runtime().As("postgres").Timeout(5*time.Second).Environ("PAGER", "")
+		return shell.Run(
+			ctx,
+			runtime.New(cmd).Privileged(),
+			runtime.New("pg_isready").Attempts(15), // 15 attempts = ~3seconds
 		)
 	}
 }

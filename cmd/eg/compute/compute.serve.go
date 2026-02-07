@@ -100,6 +100,7 @@ func (t serve) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err e
 		t.RuntimeResources.TTL = time.Duration(math.MaxInt)
 	}
 
+	log.Println("loading environment file", t.datadir(".eg.env"))
 	envb := envx.Build().
 		FromPath(
 			t.EnvironmentPaths,

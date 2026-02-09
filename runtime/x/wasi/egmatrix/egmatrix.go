@@ -1,9 +1,12 @@
 package egmatrix
 
 import (
+	"context"
 	"iter"
 	"net/netip"
 	"time"
+
+	"github.com/egdaemon/eg/runtime/wasi/eg"
 )
 
 // generates every permutation of provided options by assigning the values to their respective fields on T.
@@ -157,4 +160,17 @@ func (m *M[T]) generate(indices []int, depth int, yield func(T) bool) bool {
 		}
 	}
 	return true
+}
+
+// execute each variation of the matrix using the generating function.
+func Op[T any](b Builder[T], mkop func(*T) eg.OpFn) eg.OpFn {
+	return func(ctx context.Context, o eg.Op) error {
+		for v := range b.Perm() {
+			if err := eg.Perform(ctx, mkop(&v)); err != nil {
+				return err
+			}
+		}
+
+		return nil
+	}
 }

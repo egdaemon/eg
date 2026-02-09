@@ -134,6 +134,16 @@ func AgentOptionMemory(d uint64) AgentOption {
 	}
 }
 
+func AgentOptionPlatform(v string) AgentOption {
+	return func(a *Agent) {
+		if strings.TrimSpace(v) == "" {
+			return
+		}
+
+		a.literals = append(a.literals, "--platform", v)
+	}
+}
+
 func AgentOptionEnvKeys(keys ...string) AgentOption {
 	vs := []string{}
 	for _, k := range keys {

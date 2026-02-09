@@ -209,6 +209,10 @@ func (t baremetal) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, hotswapbin
 		eg.EnvComputeModuleNestedLevel, strconv.Itoa(0),
 	).Var(
 		eg.EnvComputeTTL, t.RuntimeResources.TTL.String(),
+	).Var(
+		eg.EnvComputeOS, runtime.GOOS,
+	).Var(
+		eg.EnvComputeArch, runtime.GOARCH,
 	).FromEnviron(
 		gitenv...,
 	)

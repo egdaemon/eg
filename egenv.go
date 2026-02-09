@@ -69,6 +69,8 @@ const (
 	EnvComputeAccountID          = "EG_COMPUTE_ACCOUNT_ID"                      // account id of the compute workload
 	EnvComputeVCS                = "EG_COMPUTE_VCS_URI"                         // vcs uri for the compute workload
 	EnvComputeTTL                = "EG_COMPUTE_TTL"                             // deadline for compute workload
+	EnvComputeArch               = "EG_COMPUTE_HOST_ARCH"                       // host machine cpu architecture
+	EnvComputeOS                 = "EG_COMPUTE_HOST_OS"                         // host machine operating system
 	EnvComputeWorkloadDirectory  = "EG_COMPUTE_WORKLOAD_DIRECTORY"              // root directory for workloads
 	EnvComputeWorkingDirectory   = "EG_COMPUTE_WORKING_DIRECTORY"               // working directory for workloads
 	EnvComputeCacheDirectory     = "EG_COMPUTE_CACHE_DIRECTORY"                 // cache directory for workloads

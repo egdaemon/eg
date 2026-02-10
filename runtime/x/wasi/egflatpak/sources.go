@@ -43,6 +43,12 @@ func (t soptions) Tag(a string) soptions {
 	})
 }
 
+func (t soptions) SHA256(checksum string) soptions {
+	return append(t, func(s *Source) {
+		s.SHA256 = checksum
+	})
+}
+
 func SourceDir(dir string, options ...soption) Source {
 	return langx.Clone(Source{Type: "dir", Path: dir}, options...)
 }
@@ -70,9 +76,16 @@ func SourceShell(options ...soption) Source {
 	}, options...)
 }
 
-func SourcePatchFile(path string, options ...soption) Source {
+func SourcePatch(path string, options ...soption) Source {
 	return langx.Clone(Source{
 		Type: "patch",
 		Path: path,
+	}, options...)
+}
+
+func SourceFile(url string, options ...soption) Source {
+	return langx.Clone(Source{
+		Type: "file",
+		URL:  url,
 	}, options...)
 }

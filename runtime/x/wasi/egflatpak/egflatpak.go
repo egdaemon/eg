@@ -165,7 +165,7 @@ func New(id string, command string, options ...option) *Builder {
 //		defer done()
 //		err := eg.Perform(
 //			ctx,
-//			// not eg.DefaultModule() does not have flatpak installed by default, you'll
+//			// note: eg.DefaultModule() does not have flatpak installed by default, you'll
 //			// have to provide a container with flatpak installed.
 //			eg.Build(eg.DefaultModule()),
 //			eg.Module(

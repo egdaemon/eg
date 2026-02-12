@@ -245,15 +245,26 @@ func retry(ctx context.Context, c Command, do func() error) (err error) {
 	return err
 }
 
-func run(ctx context.Context, user string, group string, cmd string, directory string, environ []string, exec execer) (err error) {
-	// environ = append(environ, "DBUS_SYSTEM_BUS_ADDRESS=\"unix:path=/run/dbus/system_bus_socket\"")
-	scmd := []string{fmt.Sprintf("--reuid=%s", user), fmt.Sprintf("--regid=%s", group), "--init-groups"}
-	for _, env := range environ {
-		scmd = append(scmd, fmt.Sprintf("--setenv=%s", envx.KeyOf(env)))
+// UnsafeRun0Entry is an experimental entrypoint that uses systemd's run0 for privilege escalation
+// instead of sudo. Not under compatibility promises.
+// Use via: cmd.UnsafeEntrypoint(shell.UnsafeRun0Entry)
+func UnsafeRun0Entry(ctx context.Context, user string, group string, cmd string, directory string, environ []string, exec execer) (err error) {
+	scmd := []string{fmt.Sprintf("--user=%s", user), fmt.Sprintf("--group=%s", group)}
+	for _, e := range environ {
+		scmd = append(scmd, fmt.Sprintf("--setenv=%s", envx.KeyOf(e)))
 	}
 	scmd = append(scmd, "bash", "-c", cmd)
-	log.Println("running command", directory, "setpriv", scmd)
-	return exec(ctx, directory, environ, "setpriv", scmd)
+	return exec(ctx, directory, environ, "run0", scmd)
+}
+
+func run(ctx context.Context, user string, group string, cmd string, directory string, environ []string, exec execer) (err error) {
+	scmd := []string{"-H", "-u", user, "-g", group}
+	if len(environ) > 0 {
+		scmd = append(scmd, "env")
+		scmd = append(scmd, environ...)
+	}
+	scmd = append(scmd, "bash", "-c", cmd)
+	return exec(ctx, directory, environ, "sudo", scmd)
 }
 
 // creates a recorder that allows for generating string representations of commands for tests.

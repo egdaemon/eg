@@ -43,9 +43,9 @@ func TestBuild(t *testing.T) {
 			}
 
 			seq := []string{
-				fmt.Sprintf("::sudo:-E -H -u egd -g egd bash -c cp -R %s/ %s/eg.app/ ", testx.Fixture("example1"), tmpdir),
-				"::sudo:-E -H -u egd -g egd bash -c ln -fs /Applications ",
-				"::sudo:-E -H -u egd -g egd bash -c mkisofs -D -R -apple -no-pad -V eg.app -o /workload/.eg.workspace/eg.dmg ",
+				fmt.Sprintf("::sudo:-H -u egd -g egd bash -c cp -R %s/ %s/eg.app/ ", testx.Fixture("example1"), tmpdir),
+				"::sudo:-H -u egd -g egd bash -c ln -fs /Applications ",
+				"::sudo:-H -u egd -g egd bash -c mkisofs -D -R -apple -no-pad -V eg.app -o /workload/.eg.workspace/eg.dmg ",
 			}
 			if len(cmds) != len(seq) {
 				log.Println("invalid number of commands", len(cmds), "vs", len(seq))

@@ -19,5 +19,5 @@ func TestCleanup(t *testing.T) {
 	runtime := egccache.Runtime()
 	rec := shell.NewRecorder(&runtime)
 	require.NoError(t, egccache.Cleanup(egccache.CleanupOption().DiskLimit(bytesx.GiB).UnsafeRuntime(runtime)...)(ctx, egtest.Op()))
-	require.Equal(t, rec.Result(), fmt.Sprintf(":CCACHE_DIR=%s:sudo:-E -H -u egd -g egd bash -c echo ccache -M 1024m", egccache.CacheDirectory()))
+	require.Equal(t, rec.Result(), fmt.Sprintf(":CCACHE_DIR=%s:sudo:-H -u egd -g egd env CCACHE_DIR=%s bash -c echo ccache -M 1024m", egccache.CacheDirectory(), egccache.CacheDirectory()))
 }

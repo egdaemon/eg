@@ -51,14 +51,16 @@ RUN podman version
 # BEGIN HACKS
 # systemd-resolved.service causes the container to delay its startup significantly causing issues.
 RUN systemctl disable systemd-resolved.service
-# the standard dbus service doesn't work with questing.
+
+# the standard dbus service doesn't work with podman.
 RUN apt-get install -y --no-install-recommends dbus-broker
 RUN systemctl disable dbus.service
 RUN echo "cache buster 585ca506-2797-505a-ae80-b41535886d78"
-RUN systemctl enable dbus-broker.service
+RUN systemctl enable dbus-broker.service dbus.socket
 RUN rm -rf /run/containers/storage /run/libpod
-# hack until egbootstrap is updated.
-RUN echo "%wheel ALL=(ALL:ALL) SETENV: NOPASSWD: ALL" > /etc/sudoers.d/egd
+
+# # hack until egbootstrap is updated.
+# RUN echo "%wheel ALL=(ALL:ALL) SETENV: NOPASSWD: ALL" > /etc/sudoers.d/egd
 # required until we update the shell to explicitly pass all env keys instead of using -E
 RUN update-alternatives --set sudo /usr/bin/sudo.ws
 # END HACKS

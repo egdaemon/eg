@@ -26,6 +26,12 @@ import (
 	"github.com/egdaemon/eg/internal/slicesx"
 )
 
+// KeyOf extracts the variable name from a KEY=VALUE environment string.
+func KeyOf(env string) string {
+	k, _, _ := strings.Cut(env, "=")
+	return k
+}
+
 func Print(environ []string) {
 	log.Println("--------- PRINT ENVIRON INITIATED ---------")
 	defer log.Println("--------- PRINT ENVIRON COMPLETED ---------")

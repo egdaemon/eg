@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"go/build"
+	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -132,8 +133,9 @@ func AutoInstall(options ...ioption) eg.OpFn {
 
 		for gomod := range modfilex.FindModules(stringsx.DefaultIfBlank(opts.bctx.Dir, egenv.WorkingDirectory())) {
 			cmd := stringsx.Join(" ", slicesx.Filter(func(s string) bool { return stringsx.Present(s) }, "go", "-C", filepath.Dir(gomod), "install", flags, "./...")...)
-			if err := shell.Run(ctx, runtime.New(cmd).Timeout(timeout)); err != nil {
-				return errorsx.Wrap(err, "unable to run tests")
+			log.Println("DERP DERP", cmd)
+			if err := shell.Run(ctx, runtime.New(cmd).Debug().Timeout(timeout)); err != nil {
+				return errorsx.Wrap(err, "unable to install")
 			}
 		}
 

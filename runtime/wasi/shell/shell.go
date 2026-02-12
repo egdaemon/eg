@@ -251,7 +251,7 @@ func run(ctx context.Context, user string, group string, cmd string, directory s
 // creates a recorder that allows for generating string representations of commands for tests.
 func NewRecorder(cmd *Command) *Recorder {
 	rec := Recorder{}
-	rec.Hijack(cmd)
+	errorsx.Never(rec.Hijack(cmd))
 	return &rec
 }
 

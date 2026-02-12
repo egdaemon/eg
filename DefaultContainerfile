@@ -46,8 +46,6 @@ RUN podman version
 # BEGIN HACKS
 RUN echo "cache buster 585ca506-2797-505a-ae80-b41535886d78"
 RUN rm -rf /run/containers/storage /run/libpod
-# required until we update the shell to explicitly pass all env keys instead of using -E
-RUN update-alternatives --set sudo /usr/bin/sudo.ws
 # END HACKS
 
 # # useful/temporary to deal with launchpad slowness/broken releases...

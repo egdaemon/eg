@@ -120,6 +120,7 @@ func (t Command) Debug() Command {
 	original := t.entry
 	t.entry = func(ctx context.Context, user, group, cmd, directory string, environ []string, do execer) (err error) {
 		log.Println("running command", directory, user, group, cmd, environ)
+		envx.Debug(os.Environ()...)
 		return original(ctx, user, group, cmd, directory, environ, do)
 	}
 	return t
@@ -245,12 +246,14 @@ func retry(ctx context.Context, c Command, do func() error) (err error) {
 }
 
 func run(ctx context.Context, user string, group string, cmd string, directory string, environ []string, exec execer) (err error) {
-	scmd := []string{fmt.Sprintf("--user=%s", user), fmt.Sprintf("--group=%s", group)}
+	// environ = append(environ, "DBUS_SYSTEM_BUS_ADDRESS=\"unix:path=/run/dbus/system_bus_socket\"")
+	scmd := []string{fmt.Sprintf("--reuid=%s", user), fmt.Sprintf("--regid=%s", group), "--init-groups"}
 	for _, env := range environ {
 		scmd = append(scmd, fmt.Sprintf("--setenv=%s", envx.KeyOf(env)))
 	}
 	scmd = append(scmd, "bash", "-c", cmd)
-	return exec(ctx, directory, environ, "run0", scmd)
+	log.Println("running command", directory, "setpriv", scmd)
+	return exec(ctx, directory, environ, "setpriv", scmd)
 }
 
 // creates a recorder that allows for generating string representations of commands for tests.

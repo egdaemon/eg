@@ -148,6 +148,7 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 	}
 
 	debugx.Println(spew.Sdump(ws))
+	envx.Debug(os.Environ()...)
 
 	cmdenvb := envx.Build().FromEnv(
 		"PATH",
@@ -155,6 +156,8 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 		"COLORTERM",
 		"LANG",
 		"CI",
+		"DBUS_SESSION_BUS_ADDRESS",
+		"DBUS_SYSTEM_BUS_ADDRESS",
 		eg.EnvComputeBin,
 		eg.EnvComputeRunID,
 		eg.EnvComputeAccountID,

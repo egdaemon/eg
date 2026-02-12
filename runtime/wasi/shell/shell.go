@@ -9,6 +9,7 @@ import (
 	"os/user"
 	"time"
 
+	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/stringsx"
 	"github.com/egdaemon/eg/internal/userx"
@@ -244,8 +245,12 @@ func retry(ctx context.Context, c Command, do func() error) (err error) {
 }
 
 func run(ctx context.Context, user string, group string, cmd string, directory string, environ []string, exec execer) (err error) {
-	scmd := []string{"-E", "-H", "-u", user, "-g", group, "bash", "-c", cmd}
-	return exec(ctx, directory, environ, "sudo", scmd)
+	scmd := []string{fmt.Sprintf("--user=%s", user), fmt.Sprintf("--group=%s", group)}
+	for _, env := range environ {
+		scmd = append(scmd, fmt.Sprintf("--setenv=%s", envx.KeyOf(env)))
+	}
+	scmd = append(scmd, "bash", "-c", cmd)
+	return exec(ctx, directory, environ, "run0", scmd)
 }
 
 // creates a recorder that allows for generating string representations of commands for tests.

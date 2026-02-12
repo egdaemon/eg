@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 
+	_eg "github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/cmd/cmdopts"
 	"github.com/egdaemon/eg/internal/bytesx"
 	"github.com/egdaemon/eg/internal/cryptox"
@@ -70,7 +71,7 @@ func (t BootstrapEnvDaemon) Run(gctx *cmdopts.Global) (err error) {
 
 	if t.Workers > 0 {
 		environ.Var(
-			"EG_COMPUTE_WORKLOAD_CAPACITY", strconv.FormatUint(t.Workers, 10),
+			_eg.EnvComputeWorkloadCapacity, strconv.FormatUint(t.Workers, 10),
 		)
 	}
 

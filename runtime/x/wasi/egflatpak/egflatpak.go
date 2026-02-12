@@ -42,6 +42,7 @@ type Runtime struct {
 
 type Source struct {
 	Type            string   `yaml:"type"`
+	Directory       string   `yaml:"dest,omitempty"`             // used by archive source(s).
 	Destination     string   `yaml:"dest-filename,omitempty"`    // used by archive source(s).
 	Path            string   `yaml:"path,omitempty"`             // used by directory source.
 	URL             string   `yaml:"url,omitempty"`              // used by archive source.

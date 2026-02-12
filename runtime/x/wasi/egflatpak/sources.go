@@ -31,6 +31,12 @@ func (t soptions) Destination(a string) soptions {
 	})
 }
 
+func (t soptions) Directory(a string) soptions {
+	return append(t, func(s *Source) {
+		s.Directory = a
+	})
+}
+
 func (t soptions) Mirrors(a ...string) soptions {
 	return append(t, func(s *Source) {
 		s.Mirrors = a

@@ -38,3 +38,26 @@ func TestManifestExample2(t *testing.T) {
 	// log.Println("content", string(encoded))
 	require.Equal(t, testx.ReadMD5(testx.Fixture(fmt.Sprintf("%s.yml", m.ID))), md5x.FormatString(md5x.Digest(encoded)))
 }
+
+func TestManifestSourceDirectory(t *testing.T) {
+	m := egflatpak.New(
+		"org.egdaemon.example3",
+		"example",
+		egflatpak.Option().Modules(
+			egflatpak.NewModule("download", "simple",
+				egflatpak.ModuleOptions().Commands(
+					"install -D somefile.bin /app/bin/somefile.bin",
+				).Sources(
+					egflatpak.SourceFile(
+						"https://example.com/somefile.bin",
+						egflatpak.SourceOptions().Directory("custom-dest")...,
+					),
+				)...,
+			),
+		)...,
+	).Manifest
+	encoded, err := yaml.Marshal(m)
+	require.NoError(t, err)
+	// log.Println("content", string(encoded))
+	require.Equal(t, testx.ReadMD5(testx.Fixture(fmt.Sprintf("%s.yml", m.ID))), md5x.FormatString(md5x.Digest(encoded)))
+}

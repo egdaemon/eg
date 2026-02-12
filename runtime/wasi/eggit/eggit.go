@@ -14,6 +14,7 @@ import (
 
 	_eg "github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/internal/debugx"
+	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/fsx"
 	"github.com/egdaemon/eg/internal/iox"
@@ -156,7 +157,7 @@ func Clone(ctx context.Context, uri, remote, commit string) error {
 
 // clone the repository specified by the eg environment variables into the working directory.
 func AutoClone(ctx context.Context, _ eg.Op) error {
-	if err := Clone(ctx, env.String("", "EG_GIT_HEAD_URI"), env.String("origin", "EG_GIT_HEAD_REMOTE"), env.String("main", "EG_GIT_HEAD_REF")); err != nil {
+	if err := Clone(ctx, env.String("", _eg.EnvGitHeadURI), env.String("origin", "EG_GIT_HEAD_REMOTE"), env.String("main", _eg.EnvGitHeadRef)); err != nil {
 		return err
 	}
 
@@ -166,16 +167,19 @@ func AutoClone(ctx context.Context, _ eg.Op) error {
 
 type modified struct {
 	o       sync.Once
+	runtime shell.Command
+	getenv  func(string) string
 	changed []string
 }
 
 func (t *modified) detect(ctx context.Context) error {
+	env := envx.NewEnviron(t.getenv)
 	var (
 		path = egenv.RuntimeDirectory("eg.git.mod")
 	)
 
-	hcommit := egenv.String("", _eg.EnvGitHeadCommit)
-	bcommit := egenv.String(hcommit, _eg.EnvGitBaseCommit)
+	hcommit := env.String("", _eg.EnvGitHeadCommit)
+	bcommit := env.String(hcommit, _eg.EnvGitBaseCommit)
 	if strings.TrimSpace(hcommit) == "" {
 		log.Println(fmt.Errorf("environment variable %s is empty", _eg.EnvGitHeadCommit))
 	} else {
@@ -197,10 +201,10 @@ func (t *modified) detect(ctx context.Context) error {
 	// resulting everything being treated as changed.
 	err := shell.Run(
 		ctx,
-		shell.Newf(
+		t.runtime.Newf(
 			"git show --name-only %s > /dev/null 2>&1", bcommit,
 		).Directory(egenv.WorkingDirectory()),
-		shell.Newf(
+		t.runtime.Newf(
 			"git show --name-only %s > /dev/null 2>&1", hcommit,
 		).Directory(egenv.WorkingDirectory()),
 	)
@@ -210,7 +214,7 @@ func (t *modified) detect(ctx context.Context) error {
 
 	err = shell.Run(
 		ctx,
-		shell.Newf(
+		t.runtime.Newf(
 			"git diff --name-only %s..%s | tee %s > /dev/null 2>&1", bcommit, hcommit, path,
 		).Directory(egenv.WorkingDirectory()),
 	)
@@ -260,7 +264,7 @@ func (t *modified) Changed(paths ...string) func(context.Context) bool {
 }
 
 func NewModified() modified {
-	return modified{o: sync.Once{}}
+	return modified{o: sync.Once{}, runtime: shell.Runtime(), getenv: os.Getenv}
 }
 
 // ensures the workspace has not been modified. useful for detecting

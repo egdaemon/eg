@@ -1,0 +1,15 @@
+id: org.egdaemon.example3
+runtime: org.freedesktop.Platform
+runtime-version: "24.08"
+sdk: org.freedesktop.Sdk
+command: example
+modules:
+    - name: download
+      buildsystem: simple
+      build-commands:
+        - install -D somefile.bin /app/bin/somefile.bin
+      sources:
+        - type: file
+          dest: custom-dest
+          url: https://example.com/somefile.bin
+finish-args: []

@@ -119,3 +119,93 @@ func TestRead_ChaCha(t *testing.T) {
 		require.Contains(t, err.Error(), "passphrase not provided")
 	})
 }
+
+func TestRead_File(t *testing.T) {
+	t.Run("success read plaintext file", func(t *testing.T) {
+		tmp := t.TempDir()
+		secretPath := filepath.Join(tmp, "secret.txt")
+		expected := "my plaintext secret"
+		require.NoError(t, os.WriteFile(secretPath, []byte(expected), 0644))
+
+		uri := "file://" + secretPath
+		result, err := io.ReadAll(secrets.Read(t.Context(), uri))
+		require.NoError(t, err)
+		require.Equal(t, expected, string(result))
+	})
+
+	t.Run("failure missing file", func(t *testing.T) {
+		uri := "file:///non/existent/path/secret.txt"
+		_, err := io.ReadAll(secrets.Read(t.Context(), uri))
+		require.Error(t, err)
+		require.ErrorIs(t, err, os.ErrNotExist)
+	})
+
+	t.Run("empty file returns empty content", func(t *testing.T) {
+		tmp := t.TempDir()
+		secretPath := filepath.Join(tmp, "empty.txt")
+		require.NoError(t, os.WriteFile(secretPath, []byte(""), 0644))
+
+		uri := "file://" + secretPath
+		result, err := io.ReadAll(secrets.Read(t.Context(), uri))
+		require.NoError(t, err)
+		require.Equal(t, "", string(result))
+	})
+
+	t.Run("works with NewReader", func(t *testing.T) {
+		tmp := t.TempDir()
+		p1 := filepath.Join(tmp, "a.txt")
+		p2 := filepath.Join(tmp, "b.txt")
+		require.NoError(t, os.WriteFile(p1, []byte("alpha"), 0644))
+		require.NoError(t, os.WriteFile(p2, []byte("bravo"), 0644))
+
+		result, err := io.ReadAll(secrets.NewReader(t.Context(), "file://"+p1, "file://"+p2))
+		require.NoError(t, err)
+		require.Equal(t, "alpha\nbravo\n", string(result))
+	})
+}
+
+func TestReadAll(t *testing.T) {
+	writeSecret := func(t *testing.T, dir, name, passphrase, content string) string {
+		t.Helper()
+		path := filepath.Join(dir, name)
+		encrypted, err := encryptChaCha(passphrase, []byte(content))
+		require.NoError(t, err)
+		require.NoError(t, os.WriteFile(path, encrypted, 0644))
+		return "chachasm://" + passphrase + "@" + path
+	}
+
+	t.Run("single uri", func(t *testing.T) {
+		tmp := t.TempDir()
+		uri := writeSecret(t, tmp, "s1.chacha", "pass1", "secret-one")
+
+		result, err := io.ReadAll(secrets.NewReader(t.Context(), uri))
+		require.NoError(t, err)
+		require.Equal(t, "secret-one\n", string(result))
+	})
+
+	t.Run("multiple uris concatenated with newlines", func(t *testing.T) {
+		tmp := t.TempDir()
+		uri1 := writeSecret(t, tmp, "s1.chacha", "pass1", "first")
+		uri2 := writeSecret(t, tmp, "s2.chacha", "pass2", "second")
+		uri3 := writeSecret(t, tmp, "s3.chacha", "pass3", "third")
+
+		result, err := io.ReadAll(secrets.NewReader(t.Context(), uri1, uri2, uri3))
+		require.NoError(t, err)
+		require.Equal(t, "first\nsecond\nthird\n", string(result))
+	})
+
+	t.Run("no uris produces empty output", func(t *testing.T) {
+		result, err := io.ReadAll(secrets.NewReader(t.Context()))
+		require.NoError(t, err)
+		require.Equal(t, "", string(result))
+	})
+
+	t.Run("error propagates from bad uri", func(t *testing.T) {
+		tmp := t.TempDir()
+		good := writeSecret(t, tmp, "good.chacha", "pass", "ok")
+		bad := "chachasm:///does/not/exist.chacha"
+
+		_, err := io.ReadAll(secrets.NewReader(t.Context(), good, bad))
+		require.Error(t, err)
+	})
+}

@@ -32,15 +32,8 @@ func (t CmdRead) Run(gctx *cmdopts.Global) error {
 		out = f
 	}
 
-	for _, uri := range t.URIs {
-		if _, err := io.Copy(out, secrets.Read(gctx.Context, uri)); err != nil {
-			return fmt.Errorf("failed to read secret [%s]: %w", uri, err)
-		}
-
-		// add a new line after each.
-		if _, err := out.Write([]byte("\n")); err != nil {
-			return fmt.Errorf("failed to read secret [%s]: %w", uri, err)
-		}
+	if _, err := io.Copy(out, secrets.NewReader(gctx.Context, t.URIs...)); err != nil {
+		return fmt.Errorf("failed to read secrets: %w", err)
 	}
 
 	return nil

@@ -45,6 +45,8 @@ func Update(ctx context.Context, uri string, r io.Reader, options ...ReadOption)
 		return updateAWS(ctx, u, data)
 	case "chachasm":
 		return updateCHACHA(u, data, opts)
+	case "file":
+		return os.WriteFile(u.Path, data, 0600)
 	default:
 		return fmt.Errorf("unsupported scheme: %s", u.Scheme)
 	}

@@ -32,6 +32,41 @@ func WithPassphrase(p string) ReadOption {
 	}
 }
 
+// NewReader returns an io.Reader that streams the secrets for each URI,
+// separated by newlines. Each secret is read lazily on demand.
+func NewReader(ctx context.Context, uris ...string) io.Reader {
+	r := &secretsReader{ctx: ctx, uris: uris}
+	return r
+}
+
+type secretsReader struct {
+	ctx     context.Context
+	uris    []string
+	idx     int
+	current io.Reader
+}
+
+func (t *secretsReader) Read(p []byte) (int, error) {
+	for {
+		if t.current != nil {
+			n, err := t.current.Read(p)
+			if err == io.EOF {
+				t.current = nil
+				continue
+			}
+			return n, err
+		}
+
+		if t.idx >= len(t.uris) {
+			return 0, io.EOF
+		}
+
+		uri := t.uris[t.idx]
+		t.idx++
+		t.current = io.MultiReader(Read(t.ctx, uri), strings.NewReader("\n"))
+	}
+}
+
 func Read(ctx context.Context, uri string, options ...ReadOption) io.Reader {
 	opts := &readOptions{}
 	for _, o := range options {
@@ -53,6 +88,8 @@ func Read(ctx context.Context, uri string, options ...ReadOption) io.Reader {
 		return downloadAWS(ctx, u, opts)
 	case "chachasm":
 		return downloadCHACHA(ctx, u, opts)
+	case "file":
+		return downloadFile(ctx, u)
 	default:
 		return errorsx.Reader(fmt.Errorf("unsupported scheme: %s", u.Scheme))
 	}
@@ -129,6 +166,14 @@ func downloadAWS(ctx context.Context, u *url.URL, opts *readOptions) io.Reader {
 	}
 
 	return errorsx.Reader(fmt.Errorf("secret contains no data"))
+}
+
+func downloadFile(ctx context.Context, u *url.URL) io.Reader {
+	data, err := os.ReadFile(u.Path)
+	if err != nil {
+		return errorsx.Reader(err)
+	}
+	return bytes.NewReader(data)
 }
 
 func downloadCHACHA(ctx context.Context, u *url.URL, opts *readOptions) io.Reader {

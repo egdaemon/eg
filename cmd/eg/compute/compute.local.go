@@ -27,6 +27,7 @@ import (
 	"github.com/egdaemon/eg/internal/wasix"
 	"github.com/egdaemon/eg/interp/c8sproxy"
 	"github.com/egdaemon/eg/runners"
+	"github.com/egdaemon/eg/secrets"
 	"github.com/egdaemon/eg/transpile"
 	"github.com/egdaemon/eg/workspaces"
 	"github.com/go-git/go-git/v5"
@@ -36,6 +37,7 @@ import (
 type local struct {
 	cmdopts.RuntimeResources
 	Dir              string   `name:"directory" help:"root directory of the repository" default:"${vars_eg_root_directory}"`
+	ModuleDir        string   `name:"moduledir" help:"must be a subdirectory in the provided directory" default:"${vars_workload_directory}" hidden:"true"`
 	Debug            bool     `name:"debug" help:"keep workspace around to debug issues, requires manual cleanup"`
 	Privileged       bool     `name:"privileged" help:"run the initial container in privileged mode"`
 	Dirty            bool     `name:"dirty" help:"include user directories and environment variables" hidden:"true"`
@@ -48,8 +50,8 @@ type local struct {
 	Infinite         bool     `name:"infinite" help:"allow this module to run forever, used for running a workload like a webserver" hidden:"true"`
 	Ports            []int    `name:"ports" help:"list of ports to publish to the host system" hidden:"true"`
 	ContainerArgs    []string `name:"cargs" help:"list of command line arguments to pass to the root container" hidden:"true"`
-
-	Name string `arg:"" name:"module" help:"name of the workload to run, i.e. the folder name within workload directory" default:"" predictor:"eg.workload"`
+	Secrets          []string `name:"secret" help:"List of secret URIs to use. Examples: chachasm://passphrase@/path/to/file, gcpsm://project-id/secret-name/version, awssm://secret-name?region=us-east-1"`
+	Name             string   `arg:"" name:"module" help:"name of the workload to run, i.e. the folder name within workload directory" default:"" predictor:"eg.workload"`
 }
 
 func (t local) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err error) {
@@ -59,12 +61,12 @@ func (t local) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err e
 		repo       *git.Repository
 		uid        = uuid.Must(uuid.NewV7())
 		environio  *os.File
+		gnupghome  runners.AgentOption
 		sshmount   runners.AgentOption = runners.AgentOptionNoop
 		sshenvvar  runners.AgentOption = runners.AgentOptionNoop
 		envvar     runners.AgentOption = runners.AgentOptionNoop
 		mounthome  runners.AgentOption = runners.AgentOptionNoop
 		privileged runners.AgentOption = runners.AgentOptionNoop
-		gnupghome  runners.AgentOption = runners.AgentOptionNoop
 		mountegbin runners.AgentOption = runners.AgentOptionEGBin(errorsx.Must(exec.LookPath(os.Args[0])))
 	)
 
@@ -107,6 +109,7 @@ func (t local) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err e
 	}
 
 	envb := envx.Build().
+		FromReader(secrets.NewReader(gctx.Context, t.Secrets...)).
 		FromPath(t.EnvironmentPaths...).
 		FromEnv(t.Environment...).
 		FromEnv(os.Environ()...).

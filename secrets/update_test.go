@@ -83,3 +83,37 @@ func TestUpdate_ChaCha(t *testing.T) {
 		require.True(t, os.IsNotExist(err) || os.IsPermission(err))
 	})
 }
+
+func TestUpdate_File(t *testing.T) {
+	t.Run("success write new file", func(t *testing.T) {
+		tmp := t.TempDir()
+		secretPath := filepath.Join(tmp, "secret.txt")
+		data := "plaintext secret"
+
+		uri := "file://" + secretPath
+		require.NoError(t, secrets.Update(t.Context(), uri, bytes.NewReader([]byte(data))))
+
+		result, err := io.ReadAll(secrets.Read(t.Context(), uri))
+		require.NoError(t, err)
+		require.Equal(t, data, string(result))
+	})
+
+	t.Run("success overwrite existing file", func(t *testing.T) {
+		tmp := t.TempDir()
+		secretPath := filepath.Join(tmp, "secret.txt")
+		uri := "file://" + secretPath
+
+		require.NoError(t, secrets.Update(t.Context(), uri, bytes.NewReader([]byte("old"))))
+		require.NoError(t, secrets.Update(t.Context(), uri, bytes.NewReader([]byte("new"))))
+
+		result, err := io.ReadAll(secrets.Read(t.Context(), uri))
+		require.NoError(t, err)
+		require.Equal(t, "new", string(result))
+	})
+
+	t.Run("failure invalid path", func(t *testing.T) {
+		uri := "file:///this/path/should/not/exist/secret.txt"
+		err := secrets.Update(t.Context(), uri, bytes.NewReader([]byte("data")))
+		require.Error(t, err)
+	})
+}

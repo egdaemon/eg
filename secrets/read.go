@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log"
 	"net/url"
 	"os"
 	"strings"
@@ -64,6 +65,7 @@ func (t *secretsReader) Read(p []byte) (int, error) {
 		uri := t.uris[t.idx]
 		t.idx++
 		t.current = io.MultiReader(Read(t.ctx, uri), strings.NewReader("\n"))
+		log.Println("Reading", uri)
 	}
 }
 
@@ -168,8 +170,18 @@ func downloadAWS(ctx context.Context, u *url.URL, opts *readOptions) io.Reader {
 	return errorsx.Reader(fmt.Errorf("secret contains no data"))
 }
 
+// filePath resolves the file path from a file:// URI.
+// file:///absolute/path -> u.Path = "/absolute/path"
+// file:./relative/path  -> u.Opaque = "./relative/path"
+func filePath(u *url.URL) string {
+	if u.Opaque != "" {
+		return u.Opaque
+	}
+	return u.Path
+}
+
 func downloadFile(ctx context.Context, u *url.URL) io.Reader {
-	data, err := os.ReadFile(u.Path)
+	data, err := os.ReadFile(filePath(u))
 	if err != nil {
 		return errorsx.Reader(err)
 	}

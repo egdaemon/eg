@@ -151,6 +151,17 @@ func TestRead_File(t *testing.T) {
 		require.Equal(t, "", string(result))
 	})
 
+	t.Run("relative path", func(t *testing.T) {
+		tmp := t.TempDir()
+		require.NoError(t, os.WriteFile(filepath.Join(tmp, "rel.txt"), []byte("relative content"), 0644))
+
+		// file:./rel.txt uses Opaque, not Path
+		uri := "file:" + filepath.Join(tmp, "rel.txt")
+		result, err := io.ReadAll(secrets.Read(t.Context(), uri))
+		require.NoError(t, err)
+		require.Equal(t, "relative content", string(result))
+	})
+
 	t.Run("works with NewReader", func(t *testing.T) {
 		tmp := t.TempDir()
 		p1 := filepath.Join(tmp, "a.txt")
@@ -164,7 +175,7 @@ func TestRead_File(t *testing.T) {
 	})
 }
 
-func TestReadAll(t *testing.T) {
+func TestNewReader(t *testing.T) {
 	writeSecret := func(t *testing.T, dir, name, passphrase, content string) string {
 		t.Helper()
 		path := filepath.Join(dir, name)

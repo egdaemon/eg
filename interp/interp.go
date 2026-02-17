@@ -159,6 +159,10 @@ type runner struct {
 }
 
 func (t runner) perform(ctx context.Context, wshost workspaces.Context, runid, path string, rtb runtimefn) (err error) {
+	const (
+		DefaultSSLCertDir = "/etc/ssl/certs"
+	)
+
 	defer func(before bool) {
 		// strictly speaking stdin should remain blocking at all times but using before
 		if nonBlocking(os.Stdin.Fd()) == before {
@@ -231,7 +235,7 @@ func (t runner) perform(ctx context.Context, wshost workspaces.Context, runid, p
 	// the call decide which paths the environment variables rsolve to.
 	// we also need to ensure we mount the working directory so pwd works correctly.
 	wazerofs := wazero.NewFSConfig().
-		WithDirMount(hostsslcerts, "/etc/ssl/certs").
+		WithDirMount(hostsslcerts, DefaultSSLCertDir).
 		WithDirMount(os.TempDir(), os.TempDir()).
 		WithDirMount(wshost.RuntimeDir, eg.DefaultRuntimeDirectory()).
 		WithDirMount(wshost.RuntimeDir, wshost.RuntimeDir).
@@ -243,6 +247,8 @@ func (t runner) perform(ctx context.Context, wshost workspaces.Context, runid, p
 		WithDirMount(wshost.WorkingDir, wshost.WorkingDir)
 
 	mcfg := wazero.NewModuleConfig().WithEnv(
+		"SSL_CERT_DIR", DefaultSSLCertDir,
+	).WithEnv(
 		"CI", envx.String("true", "CI"),
 	).WithEnv(
 		eg.EnvComputeRunID, runid,

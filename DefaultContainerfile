@@ -45,12 +45,11 @@ RUN usermod --add-subuids 100000-165535 --add-subgids 100000-165535 egd
 RUN echo "cache buster 474ba506-2797-505a-ae80-b41535886d78"
 
 RUN systemctl enable podman.socket
-RUN systemctl disable systemd-resolved.service
 RUN podman version
 
 # BEGIN HACKS
 # systemd-resolved.service causes the container to delay its startup significantly causing issues.
-RUN systemctl disable systemd-resolved.service
+# RUN systemctl disable systemd-resolved.service
 # the standard dbus service doesn't work with questing.
 RUN apt-get install -y --no-install-recommends dbus-broker
 RUN systemctl disable dbus.service

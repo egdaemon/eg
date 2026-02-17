@@ -151,3 +151,59 @@ func TestEnv(t *testing.T) {
 		require.Nil(t, environ)
 	})
 }
+
+func TestCopyInto(t *testing.T) {
+	t.Run("single uri", func(t *testing.T) {
+		tmp := t.TempDir()
+		uri := writeFileSecret(t, tmp, "secret.txt", "content")
+
+		var buf bytes.Buffer
+		require.NoError(t, egsecrets.CopyInto(t.Context(), &buf, uri))
+		require.Equal(t, "content\n", buf.String())
+	})
+
+	t.Run("multiple uris", func(t *testing.T) {
+		tmp := t.TempDir()
+		uri1 := writeFileSecret(t, tmp, "a.txt", "first")
+		uri2 := writeChaChaSecret(t, tmp, "b.chacha", "pass", "second")
+
+		var buf bytes.Buffer
+		require.NoError(t, egsecrets.CopyInto(t.Context(), &buf, uri1, uri2))
+		require.Equal(t, "first\nsecond\n", buf.String())
+	})
+}
+
+func TestCopyIntoFile(t *testing.T) {
+	t.Run("single uri", func(t *testing.T) {
+		tmp := t.TempDir()
+		uri := writeFileSecret(t, tmp, "secret.txt", "file-content")
+		dst := filepath.Join(tmp, "output.txt")
+
+		require.NoError(t, egsecrets.CopyIntoFile(t.Context(), dst, uri))
+
+		result, err := os.ReadFile(dst)
+		require.NoError(t, err)
+		require.Equal(t, "file-content\n", string(result))
+	})
+
+	t.Run("multiple uris", func(t *testing.T) {
+		tmp := t.TempDir()
+		uri1 := writeFileSecret(t, tmp, "a.txt", "alpha")
+		uri2 := writeFileSecret(t, tmp, "b.txt", "bravo")
+		dst := filepath.Join(tmp, "combined.txt")
+
+		require.NoError(t, egsecrets.CopyIntoFile(t.Context(), dst, uri1, uri2))
+
+		result, err := os.ReadFile(dst)
+		require.NoError(t, err)
+		require.Equal(t, "alpha\nbravo\n", string(result))
+	})
+
+	t.Run("invalid path", func(t *testing.T) {
+		tmp := t.TempDir()
+		uri := writeFileSecret(t, tmp, "secret.txt", "data")
+
+		err := egsecrets.CopyIntoFile(t.Context(), "/no/such/dir/out.txt", uri)
+		require.Error(t, err)
+	})
+}

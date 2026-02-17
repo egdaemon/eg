@@ -19,6 +19,6 @@ func CredentialsHack(ctx context.Context, o eg.Op) error {
 	return shell.Run(
 		ctx,
 		shell.Newf("echo %s | tr -- '-_' '+/' | base64 -d -i | install -D -m 600 /dev/stdin ~/.config/gcloud/application_default_credentials.json", encoded),
-		shell.Newf("echo %s | tr -- '-_' '+/' | base64 -d -i | install -D -m 600 /dev/stdin %s", encoded, _eg.DefaultMountRoot("gcloud", "application_default_credentials.json")),
+		shell.Newf("echo %s | tr -- '-_' '+/' | base64 -d -i | install -D -m 600 /dev/stdin %s", encoded, _eg.DefaultMountRoot("gcloudhack", "application_default_credentials.json")),
 	)
 }

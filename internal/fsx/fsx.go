@@ -79,6 +79,21 @@ func LocateFirst(paths ...string) (result string) {
 	return result
 }
 
+func LocatePhysicalPath(paths ...string) string {
+	for _, path := range paths {
+		// EvalSymlinks calculates the actual path after evaluating all symlinks
+		realPath, err := filepath.EvalSymlinks(path)
+		if err != nil {
+			continue
+		}
+
+		if info, err := os.Stat(realPath); err == nil && info.IsDir() {
+			return realPath
+		}
+	}
+	return ""
+}
+
 // FileExists returns true IFF a non-directory file exists at the provided path.
 func FileExists(path string) bool {
 	info, err := os.Stat(path)

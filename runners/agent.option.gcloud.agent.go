@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/base64"
 	"os"
-	"path/filepath"
 
 	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/internal/envx"
@@ -22,10 +21,11 @@ func AgentOptionGcloudCredentials(ctx context.Context, envb *envx.Builder, path 
 
 	errorsx.Never(envb.Append(eg.EnvUnsafeRemapDirectory, eg.DefaultMountRoot("gcloud"), ":")) // if this fails it means we've introduced a change to Append that can result in an error
 
-	return AgentOptionVolumes(
-		AgentMountOverlay(
-			filepath.Dir(path),
-			eg.DefaultMountRoot("gcloud"),
-		),
-	)
+	return AgentOptionNoop
+	// return AgentOptionVolumes(
+	// 	AgentMountOverlay(
+	// 		filepath.Dir(path),
+	// 		eg.DefaultMountRoot("gcloud"),
+	// 	),
+	// )
 }

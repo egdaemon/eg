@@ -17,6 +17,8 @@ import (
 	"github.com/egdaemon/eg/internal/debugx"
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
+	"github.com/egdaemon/eg/internal/fsx"
+	"github.com/egdaemon/eg/internal/langx"
 	"github.com/egdaemon/eg/internal/md5x"
 	"github.com/egdaemon/eg/internal/wasix"
 	"github.com/egdaemon/eg/interp/c8s"
@@ -214,18 +216,22 @@ func (t runner) perform(ctx context.Context, wshost workspaces.Context, runid, p
 		errpw.CloseWithError(_err)
 	}()
 
+	hostsslcerts := langx.FirstNonZero(fsx.LocatePhysicalPath("/etc/ssl/certs", "/etc/pki/tls/certs", "/usr/share/ca-certificates"), "/etc/ssl/certs")
+
 	debugx.Println("workload dir", wshost.Root, "->", eg.DefaultWorkloadDirectory())
 	debugx.Println("cache dir", wshost.CacheDir, "->", eg.DefaultCacheDirectory())
 	debugx.Println("runtime dir", wshost.RuntimeDir, "->", eg.DefaultRuntimeDirectory())
 	debugx.Println("working dir", wshost.WorkingDir, "->", eg.DefaultWorkingDirectory())
 	debugx.Println("workspace dir", wshost.WorkspaceDir, "->", eg.DefaultWorkspaceDirectory())
 	debugx.Println("wazero cache", wasix.WazCacheDir(wshost.CacheDir))
+	debugx.Println("system tls certs", hostsslcerts)
 
 	// we map twice so that baremetal can work. shell commands are run on the host itself so we need the host path.
 	// but inside wazero we need to be able to access the standard paths.
 	// the call decide which paths the environment variables rsolve to.
 	// we also need to ensure we mount the working directory so pwd works correctly.
 	wazerofs := wazero.NewFSConfig().
+		WithDirMount(hostsslcerts, "/etc/ssl/certs").
 		WithDirMount(os.TempDir(), os.TempDir()).
 		WithDirMount(wshost.RuntimeDir, eg.DefaultRuntimeDirectory()).
 		WithDirMount(wshost.RuntimeDir, wshost.RuntimeDir).

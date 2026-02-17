@@ -3,6 +3,7 @@ package egsecrets
 import (
 	"context"
 	"io"
+	"os"
 
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
@@ -29,4 +30,21 @@ func Update(ctx context.Context, uri string, r io.Reader) error {
 // (one KEY=VALUE per line), returning the resulting environment variables.
 func Env(ctx context.Context, uris ...string) []string {
 	return errorsx.Must(envx.FromReader(NewReader(ctx, uris...)))
+}
+
+// CopyInto copies the secret content from the given URIs into the provided writer.
+func CopyInto(ctx context.Context, w io.Writer, uris ...string) error {
+	_, err := io.Copy(w, NewReader(ctx, uris...))
+	return err
+}
+
+// CopyIntoFile copies the secret content from the given URIs into a file at the provided path.
+func CopyIntoFile(ctx context.Context, path string, uris ...string) error {
+	f, err := os.Create(path)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	return CopyInto(ctx, f, uris...)
 }

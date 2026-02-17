@@ -46,7 +46,7 @@ func CopyIntoFile(ctx context.Context, path string, uris ...string) error {
 		return err
 	}
 	defer f.Close()
-
+	// TODO: when copy fails f should be removed.
 	return CopyInto(ctx, f, uris...)
 }
 

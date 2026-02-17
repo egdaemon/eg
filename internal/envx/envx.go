@@ -470,7 +470,6 @@ func (t *Builder) Drop(keys ...string) *Builder {
 		vars = append(vars, s)
 	}
 
-	log.Println("wat", vars)
 	t.environ = vars
 	return t
 }
@@ -488,6 +487,18 @@ func (t *Builder) Setenv(k, v string) error {
 	return nil
 }
 
+func (t *Builder) Append(k, v, sep string) error {
+	t.environ = slicesx.Map(func(s string) string {
+		key, value, ok := strings.Cut(s, "=")
+		if ok && key == k {
+			return fmt.Sprintf("%s=%s%s%s", k, value, sep, v)
+		}
+
+		return s
+	}, t.environ...)
+
+	return nil
+}
 func (t *Builder) Unsetenv(k string) error {
 	t.environ = slicesx.Filter(func(s string) bool {
 		key, _, ok := strings.Cut(s, "=")

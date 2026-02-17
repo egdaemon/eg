@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/egdaemon/eg/internal/egtest"
 	"github.com/egdaemon/eg/runtime/x/wasi/egsecrets"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/crypto/argon2"
@@ -159,7 +160,7 @@ func TestCopyInto(t *testing.T) {
 
 		var buf bytes.Buffer
 		require.NoError(t, egsecrets.CopyInto(t.Context(), &buf, uri))
-		require.Equal(t, "content\n", buf.String())
+		require.Equal(t, "content", buf.String())
 	})
 
 	t.Run("multiple uris", func(t *testing.T) {
@@ -183,7 +184,7 @@ func TestCopyIntoFile(t *testing.T) {
 
 		result, err := os.ReadFile(dst)
 		require.NoError(t, err)
-		require.Equal(t, "file-content\n", string(result))
+		require.Equal(t, "file-content", string(result))
 	})
 
 	t.Run("multiple uris", func(t *testing.T) {
@@ -204,6 +205,41 @@ func TestCopyIntoFile(t *testing.T) {
 		uri := writeFileSecret(t, tmp, "secret.txt", "data")
 
 		err := egsecrets.CopyIntoFile(t.Context(), "/no/such/dir/out.txt", uri)
+		require.Error(t, err)
+	})
+}
+
+func TestCopyIntoFileOp(t *testing.T) {
+	t.Run("single uri", func(t *testing.T) {
+		tmp := t.TempDir()
+		uri := writeFileSecret(t, tmp, "secret.txt", "file-content")
+		dst := filepath.Join(tmp, "output.txt")
+
+		require.NoError(t, egsecrets.CopyIntoFileOp(dst, uri)(t.Context(), egtest.Op()))
+
+		result, err := os.ReadFile(dst)
+		require.NoError(t, err)
+		require.Equal(t, "file-content", string(result))
+	})
+
+	t.Run("multiple uris", func(t *testing.T) {
+		tmp := t.TempDir()
+		uri1 := writeFileSecret(t, tmp, "a.txt", "alpha")
+		uri2 := writeFileSecret(t, tmp, "b.txt", "bravo")
+		dst := filepath.Join(tmp, "combined.txt")
+
+		require.NoError(t, egsecrets.CopyIntoFileOp(dst, uri1, uri2)(t.Context(), egtest.Op()))
+
+		result, err := os.ReadFile(dst)
+		require.NoError(t, err)
+		require.Equal(t, "alpha\nbravo\n", string(result))
+	})
+
+	t.Run("invalid path", func(t *testing.T) {
+		tmp := t.TempDir()
+		uri := writeFileSecret(t, tmp, "secret.txt", "data")
+
+		err := egsecrets.CopyIntoFileOp("/no/such/dir/out.txt", uri)(t.Context(), egtest.Op())
 		require.Error(t, err)
 	})
 }

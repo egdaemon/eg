@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"math"
+	"os"
 	"os/user"
 	"time"
 
@@ -178,6 +179,11 @@ func Newf(cmd string, options ...any) Command {
 // )
 func Runtime() Command {
 	return New("")
+}
+
+// Env creates a runtime command pre-populated with the current process environment.
+func Env() Command {
+	return Runtime().EnvironFrom(os.Environ()...)
 }
 
 // Convience function for running a set of commands as an operation.

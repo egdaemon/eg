@@ -10,7 +10,6 @@ import (
 	"os"
 	"strings"
 
-	secretmanager "cloud.google.com/go/secretmanager/apiv1"
 	"cloud.google.com/go/secretmanager/apiv1/secretmanagerpb"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
@@ -103,7 +102,7 @@ func Read(ctx context.Context, uri string, options ...ReadOption) io.Reader {
 }
 
 func downloadGCP(ctx context.Context, u *url.URL, opts *readOptions) io.Reader {
-	client, err := secretmanager.NewClient(ctx)
+	client, err := newgcpclient(ctx)
 	if err != nil {
 		return errorsx.Reader(err)
 	}

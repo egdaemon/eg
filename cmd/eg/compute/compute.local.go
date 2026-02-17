@@ -23,6 +23,7 @@ import (
 	"github.com/egdaemon/eg/internal/gitx"
 	"github.com/egdaemon/eg/internal/md5x"
 	"github.com/egdaemon/eg/internal/podmanx"
+	"github.com/egdaemon/eg/internal/stringsx"
 	"github.com/egdaemon/eg/internal/userx"
 	"github.com/egdaemon/eg/internal/wasix"
 	"github.com/egdaemon/eg/interp/c8sproxy"
@@ -41,6 +42,7 @@ type local struct {
 	Debug            bool     `name:"debug" help:"keep workspace around to debug issues, requires manual cleanup"`
 	Privileged       bool     `name:"privileged" help:"run the initial container in privileged mode"`
 	Dirty            bool     `name:"dirty" help:"include user directories and environment variables" hidden:"true"`
+	GCP              string   `name:"gcp" help:"path to gcp's application default credentials. use '-' to use the default well known path"`
 	Platform         string   `name:"platform" help:"arch platform for the container" hidden:"true"`
 	InvalidateCache  bool     `name:"invalidate-cache" help:"removes workload build cache"`
 	EnvironmentPaths []string `name:"envpath" help:"environment files to pass to the module" default:""`
@@ -63,6 +65,7 @@ func (t local) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err e
 		environio  *os.File
 		gnupghome  runners.AgentOption
 		sshmount   runners.AgentOption = runners.AgentOptionNoop
+		gcpcreds   runners.AgentOption = runners.AgentOptionNoop
 		sshenvvar  runners.AgentOption = runners.AgentOptionNoop
 		envvar     runners.AgentOption = runners.AgentOptionNoop
 		mounthome  runners.AgentOption = runners.AgentOptionNoop
@@ -132,6 +135,15 @@ func (t local) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err e
 		mounthome = runners.AgentOptionAutoMountHome(homedir)
 	}
 
+	if stringsx.Present(t.GCP) {
+		path := userx.ConfigDirectory("gcloud", "application_default_credentials.json")
+		if t.GCP != "-" {
+			path = t.GCP
+		}
+
+		gcpcreds = runners.AgentOptionGcloudCredentials(gctx.Context, envb, path)
+	}
+
 	gnupghome = runners.AgentOptionLocalGPGAgent(gctx.Context, envb)
 
 	if err = envb.CopyTo(environio); err != nil {
@@ -198,6 +210,7 @@ func (t local) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err e
 		runners.AgentOptionMemory(uint64(t.RuntimeResources.Memory)),
 		runners.AgentOptionPlatform(t.Platform),
 		gnupghome, // must come after the runtime directory mount to ensure correct mounting order.
+		gcpcreds,  // must come after the mount directory to ensure correct mounting order.
 	)
 
 	for _, m := range modules {

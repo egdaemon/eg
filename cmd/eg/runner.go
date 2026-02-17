@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
@@ -95,6 +96,21 @@ func (t module) mounthack(ctx context.Context, runid string, ws workspaces.Conte
 	)
 	if err != nil {
 		return err
+	}
+
+	dirs := strings.Split(envx.String(eg.EnvUnsafeRemapDirectory), ":")
+	err = fsx.MkDirs(
+		0770,
+		dirs...,
+	)
+	if err != nil {
+		return err
+	}
+
+	for _, d := range dirs {
+		if err := remap(eg.DefaultMountRoot(d), eg.DefaultRuntimeDirectory(d)); err != nil {
+			return err
+		}
 	}
 
 	// HACK: gpg no longer obeys GNUPGHOME for the root user.

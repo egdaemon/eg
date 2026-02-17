@@ -62,6 +62,14 @@ func DefaultDirLocation(rel string) string {
 	return DefaultDirectory(rel, env, home, system)
 }
 
+// ConfigDirectory standard config directory for storing data.
+func ConfigDirectory(rel ...string) string {
+	user := CurrentUserOrDefault(Root())
+	// if no directory is specified
+	defaultdir := filepath.Join(user.HomeDir, ".config")
+	return filepath.Join(envx.String(defaultdir, "CONFIG_DIRECTORY", "XDG_CONFIG_HOME"), filepath.Join(rel...))
+}
+
 // DefaultCacheDirectory cache directory for storing data.
 func DefaultCacheDirectory(rel ...string) string {
 	user := CurrentUserOrDefault(Root())
@@ -108,8 +116,7 @@ func HomeDirectoryOrDefault(fallback string) (dir string) {
 	return dir
 }
 
-// HomeDirectory loads the user home directory or fallsback to the provided
-// path when an error occurs.
+// HomeDirectory loads the user home directory.
 func HomeDirectory(rel ...string) (dir string, err error) {
 	if dir, err = os.UserHomeDir(); err != nil {
 		return "", err

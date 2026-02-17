@@ -7,6 +7,7 @@ import (
 
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
+	"github.com/egdaemon/eg/runtime/wasi/eg"
 	"github.com/egdaemon/eg/secrets"
 )
 
@@ -47,4 +48,11 @@ func CopyIntoFile(ctx context.Context, path string, uris ...string) error {
 	defer f.Close()
 
 	return CopyInto(ctx, f, uris...)
+}
+
+// CopyIntoFileOp returns an OpFn that copies the secret content from the given URIs into a file at the provided path.
+func CopyIntoFileOp(path string, uris ...string) eg.OpFn {
+	return func(ctx context.Context, o eg.Op) error {
+		return CopyIntoFile(ctx, path, uris...)
+	}
 }

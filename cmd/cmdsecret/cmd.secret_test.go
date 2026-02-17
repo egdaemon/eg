@@ -48,7 +48,7 @@ func TestSecretCmd(t *testing.T) {
 		r, w, _ := os.Pipe()
 		os.Stdin = r
 		go func() {
-			w.Write([]byte(content))
+			_, _ = w.Write([]byte(content))
 			w.Close()
 		}()
 
@@ -62,7 +62,7 @@ func TestSecretCmd(t *testing.T) {
 
 		got, err := os.ReadFile(outputPath)
 		require.NoError(t, err)
-		require.Equal(t, content+"\n", string(got))
+		require.Equal(t, content, string(got))
 	})
 
 	t.Run("test update from file flag", func(t *testing.T) {
@@ -101,7 +101,8 @@ func TestSecretCmd(t *testing.T) {
 		require.NoError(t, err)
 
 		var buf bytes.Buffer
-		io.Copy(&buf, r)
+		_, err = io.Copy(&buf, r)
+		require.NoError(t, err)
 
 		require.Equal(t, "one\ntwo\n", buf.String())
 	})

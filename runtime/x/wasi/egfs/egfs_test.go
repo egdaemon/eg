@@ -51,6 +51,26 @@ func TestFileExistsFn(t *testing.T) {
 	})
 }
 
+func TestFileNotExistsFn(t *testing.T) {
+	ctx, done := testx.Context(t)
+	defer done()
+
+	t.Run("exists", func(t *testing.T) {
+		fn := egfs.FileNotExistsFn(testx.Fixture("example.txt"))
+		require.False(t, fn(ctx))
+	})
+
+	t.Run("missing", func(t *testing.T) {
+		fn := egfs.FileNotExistsFn(testx.Fixture("nonexistent.txt"))
+		require.True(t, fn(ctx))
+	})
+
+	t.Run("directory returns true", func(t *testing.T) {
+		fn := egfs.FileNotExistsFn(testx.Fixture("dir1"))
+		require.True(t, fn(ctx))
+	})
+}
+
 func TestDirExistsFn(t *testing.T) {
 	ctx, done := testx.Context(t)
 	defer done()
@@ -68,6 +88,26 @@ func TestDirExistsFn(t *testing.T) {
 	t.Run("file returns false", func(t *testing.T) {
 		fn := egfs.DirExistsFn(testx.Fixture("example.txt"))
 		require.False(t, fn(ctx))
+	})
+}
+
+func TestDirNotExistsFn(t *testing.T) {
+	ctx, done := testx.Context(t)
+	defer done()
+
+	t.Run("exists", func(t *testing.T) {
+		fn := egfs.DirNotExistsFn(testx.Fixture("dir1"))
+		require.False(t, fn(ctx))
+	})
+
+	t.Run("missing", func(t *testing.T) {
+		fn := egfs.DirNotExistsFn(testx.Fixture("nonexistent"))
+		require.True(t, fn(ctx))
+	})
+
+	t.Run("file returns true", func(t *testing.T) {
+		fn := egfs.DirNotExistsFn(testx.Fixture("example.txt"))
+		require.True(t, fn(ctx))
 	})
 }
 

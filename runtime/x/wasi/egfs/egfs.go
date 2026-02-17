@@ -70,6 +70,14 @@ func FileExistsFn(path string) func(ctx context.Context) bool {
 	}
 }
 
+// FileNotExistsFn returns a function compatible with eg.WhenFn that checks
+// that no non-directory file exists at the provided path.
+func FileNotExistsFn(path string) func(ctx context.Context) bool {
+	return func(ctx context.Context) bool {
+		return !FileExists(path)
+	}
+}
+
 // DirExists returns true IFF a non-directory file exists at the provided path.
 func DirExists(path string) bool {
 	info, err := os.Stat(path)
@@ -86,6 +94,14 @@ func DirExists(path string) bool {
 func DirExistsFn(path string) func(ctx context.Context) bool {
 	return func(ctx context.Context) bool {
 		return DirExists(path)
+	}
+}
+
+// DirNotExistsFn returns a function compatible with eg.WhenFn that checks
+// that no directory exists at the provided path.
+func DirNotExistsFn(path string) func(ctx context.Context) bool {
+	return func(ctx context.Context) bool {
+		return !DirExists(path)
 	}
 }
 

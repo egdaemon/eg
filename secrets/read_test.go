@@ -191,7 +191,7 @@ func TestNewReader(t *testing.T) {
 
 		result, err := io.ReadAll(secrets.NewReader(t.Context(), uri))
 		require.NoError(t, err)
-		require.Equal(t, "secret-one\n", string(result))
+		require.Equal(t, "secret-one", string(result))
 	})
 
 	t.Run("multiple uris concatenated with newlines", func(t *testing.T) {
@@ -203,6 +203,16 @@ func TestNewReader(t *testing.T) {
 		result, err := io.ReadAll(secrets.NewReader(t.Context(), uri1, uri2, uri3))
 		require.NoError(t, err)
 		require.Equal(t, "first\nsecond\nthird\n", string(result))
+	})
+
+	t.Run("single secret has no trailing newline", func(t *testing.T) {
+		tmp := t.TempDir()
+		p := filepath.Join(tmp, "only.txt")
+		require.NoError(t, os.WriteFile(p, []byte("solo"), 0644))
+
+		result, err := io.ReadAll(secrets.NewReader(t.Context(), "file://"+p))
+		require.NoError(t, err)
+		require.Equal(t, "solo", string(result))
 	})
 
 	t.Run("no uris produces empty output", func(t *testing.T) {

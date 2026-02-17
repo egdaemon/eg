@@ -17,7 +17,7 @@ func AgentOptionGcloudCredentials(ctx context.Context, envb *envx.Builder, path 
 	envb.Var(eg.EnvUnsafeGcloudADCB64, base64.URLEncoding.EncodeToString(raw))
 
 	// TODO: switch once eg.EnvUnsafeRemapDirectory is fully deployed.
-	envb.Var("GOOGLE_APPLICATION_CREDENTIALS", eg.DefaultRuntimeDirectory("gcloudhack", "application_default_credentials.json"))
+	envb.Var("GOOGLE_APPLICATION_CREDENTIALS", eg.DefaultWorkloadDirectory("gcloudhack", "application_default_credentials.json"))
 	// envb.Var("GOOGLE_APPLICATION_CREDENTIALS", "/home/egd/.config/gcloud/application_default_credentials.json")
 
 	errorsx.Never(envb.Append(eg.EnvUnsafeRemapDirectory, eg.DefaultMountRoot("gcloud"), ":")) // if this fails it means we've introduced a change to Append that can result in an error

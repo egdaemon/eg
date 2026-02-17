@@ -36,13 +36,18 @@ func WithPassphrase(p string) ReadOption {
 // NewReader returns an io.Reader that streams the secrets for each URI,
 // separated by newlines. Each secret is read lazily on demand.
 func NewReader(ctx context.Context, uris ...string) io.Reader {
-	r := &secretsReader{ctx: ctx, uris: uris}
+	var suffix []byte
+	if len(uris) > 1 {
+		suffix = []byte("\n")
+	}
+	r := &secretsReader{ctx: ctx, uris: uris, suffix: suffix}
 	return r
 }
 
 type secretsReader struct {
 	ctx     context.Context
 	uris    []string
+	suffix  []byte
 	idx     int
 	current io.Reader
 }
@@ -64,7 +69,7 @@ func (t *secretsReader) Read(p []byte) (int, error) {
 
 		uri := t.uris[t.idx]
 		t.idx++
-		t.current = io.MultiReader(Read(t.ctx, uri), strings.NewReader("\n"))
+		t.current = io.MultiReader(Read(t.ctx, uri), bytes.NewReader(t.suffix))
 		log.Println("Reading", uri)
 	}
 }

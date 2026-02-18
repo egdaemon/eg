@@ -61,3 +61,9 @@ RUN echo "%wheel ALL=(ALL:ALL) SETENV: NOPASSWD: ALL" > /etc/sudoers.d/egd
 # required until we update the shell to explicitly pass all env keys instead of using -E
 RUN update-alternatives --set sudo /usr/bin/sudo.ws
 # END HACKS
+RUN echo "cache buster 585ca506-2797-505a-ae80-b41535886d78"
+RUN which eg
+RUN apt-get -y install golang-1.25 libbtrfs-dev libassuan-dev libc6-dev libdevmapper-dev libglib2.0-dev libgpgme-dev libgpg-error-dev libprotobuf-dev libprotobuf-c-dev libseccomp-dev libselinux1-dev libsystemd-dev
+RUN GOPROXY=direct GOBIN=/usr/bin go install github.com/egdaemon/eg/cmd/eg@bc31bcfb82d365a2208eaa61bdd5c524ca891fa8
+RUN which eg
+RUN ls -lha /usr/bin/eg

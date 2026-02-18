@@ -30,3 +30,7 @@ RUN podman version
 RUN echo "%wheel ALL=(ALL:ALL) SETENV: NOPASSWD: ALL" > /etc/sudoers.d/egd
 # required until we update the shell to explicitly pass all env keys instead of using -E
 RUN update-alternatives --set sudo /usr/bin/sudo.ws
+
+# BEGIN HACKS
+RUN rm -rf /run/containers/storage /run/libpod
+RUN GOPROXY=direct GOBIN=/usr/bin go install github.com/egdaemon/eg/cmd/eg@bc31bcfb82d365a2208eaa61bdd5c524ca891fa8

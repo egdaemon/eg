@@ -207,6 +207,16 @@ func TestCopyIntoFile(t *testing.T) {
 		err := egsecrets.CopyIntoFile(t.Context(), "/no/such/dir/out.txt", uri)
 		require.Error(t, err)
 	})
+
+	t.Run("removes file when copy fails", func(t *testing.T) {
+		tmp := t.TempDir()
+		dst := filepath.Join(tmp, "output.txt")
+
+		err := egsecrets.CopyIntoFile(t.Context(), dst, "file:///no/such/secret.txt")
+		require.Error(t, err)
+		_, statErr := os.Stat(dst)
+		require.True(t, os.IsNotExist(statErr), "expected output file to be removed after failed copy")
+	})
 }
 
 func TestCopyIntoFileOp(t *testing.T) {

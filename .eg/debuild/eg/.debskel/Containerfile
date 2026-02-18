@@ -26,7 +26,8 @@ RUN echo "cache buster 3f48af53-7ae7-41da-960f-808788f6f886"
 RUN systemctl enable podman.socket
 RUN podman version
 
-# temporary hack until egbootstrap is updated.
-RUN echo "%wheel ALL=(ALL:ALL) SETENV: NOPASSWD: ALL" > /etc/sudoers.d/egd
 # required until we update the shell to explicitly pass all env keys instead of using -E
 RUN update-alternatives --set sudo /usr/bin/sudo.ws
+
+# BEGIN HACKS
+RUN rm -rf /run/containers/storage /run/libpod

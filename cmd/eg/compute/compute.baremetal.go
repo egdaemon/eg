@@ -322,7 +322,7 @@ func (t baremetal) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, hotswapbin
 	}()
 
 	if cc, err = grpc.DialContext(ctx, fmt.Sprintf("unix://%s", cspath), grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithBlock()); err != nil {
-		return err
+		return errorsx.Wrap(err, "failed to dial control service")
 	}
 
 	for _, m := range modules {
@@ -335,8 +335,9 @@ func (t baremetal) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, hotswapbin
 			m.Path,
 			interp.OptionEnviron(cmdenv...),
 		)
+
 		if err != nil {
-			return err
+			return errorsx.Wrap(err, "failed to run module")
 		}
 	}
 

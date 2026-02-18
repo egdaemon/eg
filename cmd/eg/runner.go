@@ -29,6 +29,7 @@ import (
 	"github.com/egdaemon/eg/internal/gitx"
 	"github.com/egdaemon/eg/internal/podmanx"
 	"github.com/egdaemon/eg/internal/runtimex"
+	"github.com/egdaemon/eg/internal/stringsx"
 	"github.com/egdaemon/eg/internal/wasix"
 	"github.com/egdaemon/eg/interp"
 	"github.com/egdaemon/eg/interp/c8sproxy"
@@ -98,19 +99,22 @@ func (t module) mounthack(ctx context.Context, runid string, ws workspaces.Conte
 		return err
 	}
 
-	dirs := strings.Split(envx.String(eg.EnvUnsafeRemapDirectory), ":")
-	err = fsx.MkDirs(
-		0770,
-		dirs...,
-	)
-	if err != nil {
-		return err
-	}
+	if dirstr := envx.String("", eg.EnvUnsafeRemapDirectory); stringsx.Present(dirstr) {
+		dirs := strings.Split(dirstr, ":")
+		debugx.Println("remap dirs", dirs)
+		// err = fsx.MkDirs(
+		// 	0770,
+		// 	dirs...,
+		// )
+		// if err != nil {
+		// 	return err
+		// }
 
-	for _, d := range dirs {
-		if err := remap(eg.DefaultMountRoot(d), eg.DefaultRuntimeDirectory(d)); err != nil {
-			return err
-		}
+		// for _, d := range dirs {
+		// 	if err := remap(eg.DefaultMountRoot(d), eg.DefaultRuntimeDirectory(d)); err != nil {
+		// 		return err
+		// 	}
+		// }
 	}
 
 	// HACK: gpg no longer obeys GNUPGHOME for the root user.
@@ -218,7 +222,7 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 			os.Environ()...,
 		)
 		if cmdenv, err = cmdenvb.Environ(); err != nil {
-			return err
+			return errorsx.Wrap(err, "unable to generate command environment")
 		}
 
 		// periodic sampling of system metrics
@@ -273,7 +277,7 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 
 		// TODO: investigate further tonight. this token might be getting clobbered by the auth client.
 		if err = gitx.AutomaticCredentialRefresh(gctx.Context, tlsc.DefaultClient(), t.RuntimeDir, envx.String("", gitx.EnvAuthEGAccessToken)); err != nil {
-			return err
+			return errorsx.Wrap(err, "failed to refresh git credentials")
 		}
 	} else {
 		var (
@@ -310,7 +314,7 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 		)
 
 		if cmdenv, err = cmdenvb.Environ(); err != nil {
-			return err
+			return errorsx.Wrap(err, "failed to generate module command environment")
 		}
 
 		execproxy.NewExecProxy(t.Dir, cmdenv).Bind(srv)
@@ -328,7 +332,7 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 	}
 
 	if cc, err = daemons.AutoRunnerClient(gctx, ws, uid, runners.AgentOptionAutoEGBin()); err != nil {
-		return err
+		return errorsx.Wrap(err, "auto runner client failed")
 	}
 
 	return interp.Remote(

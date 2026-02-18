@@ -40,13 +40,20 @@ func CopyInto(ctx context.Context, w io.Writer, uris ...string) error {
 }
 
 // CopyIntoFile copies the secret content from the given URIs into a file at the provided path.
-func CopyIntoFile(ctx context.Context, path string, uris ...string) error {
+func CopyIntoFile(ctx context.Context, path string, uris ...string) (err error) {
 	f, err := os.Create(path)
 	if err != nil {
 		return err
 	}
+	defer func() {
+		if err == nil {
+			return
+		}
+
+		errorsx.Log(errorsx.Wrap(os.Remove(path), "failed to remove"))
+	}()
 	defer f.Close()
-	// TODO: when copy fails f should be removed.
+
 	return CopyInto(ctx, f, uris...)
 }
 

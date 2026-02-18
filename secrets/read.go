@@ -3,6 +3,7 @@ package secrets
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/url"
@@ -13,11 +14,14 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
+	awstypes "github.com/aws/aws-sdk-go-v2/service/secretsmanager/types"
 	"github.com/egdaemon/eg/internal/debugx"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/langx"
 	"golang.org/x/crypto/argon2"
 	"golang.org/x/crypto/chacha20poly1305"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 type readOptions struct {
@@ -126,6 +130,9 @@ func downloadGCP(ctx context.Context, u *url.URL, opts *readOptions) io.Reader {
 
 	resp, err := client.AccessSecretVersion(ctx, req)
 	if err != nil {
+		if s, ok := status.FromError(err); ok && s.Code() == codes.NotFound {
+			return errorsx.Reader(os.ErrNotExist)
+		}
 		return errorsx.Reader(err)
 	}
 
@@ -160,6 +167,10 @@ func downloadAWS(ctx context.Context, u *url.URL, opts *readOptions) io.Reader {
 
 	resp, err := client.GetSecretValue(ctx, input)
 	if err != nil {
+		var notFound *awstypes.ResourceNotFoundException
+		if errors.As(err, &notFound) {
+			return errorsx.Reader(os.ErrNotExist)
+		}
 		return errorsx.Reader(err)
 	}
 

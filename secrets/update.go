@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/rand"
+	"errors"
 	"fmt"
 	"io"
 	"net/url"
@@ -14,9 +15,12 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
+	awstypes "github.com/aws/aws-sdk-go-v2/service/secretsmanager/types"
 	"github.com/egdaemon/eg/internal/langx"
 	"golang.org/x/crypto/argon2"
 	"golang.org/x/crypto/chacha20poly1305"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 func Update(ctx context.Context, uri string, r io.Reader, options ...ReadOption) error {
@@ -58,17 +62,45 @@ func updateGCP(ctx context.Context, u *url.URL, data []byte) error {
 	}
 	defer client.Close()
 
-	// GCP updates require the parent secret path: projects/*/secrets/*
-	secretPath := fmt.Sprintf("projects/%s/secrets/%s", u.Host, strings.Split(strings.Trim(u.Path, "/"), "/")[0])
+	project := u.Host
+	secretName := strings.Split(strings.Trim(u.Path, "/"), "/")[0]
+	secretPath := fmt.Sprintf("projects/%s/secrets/%s", project, secretName)
 
-	req := &secretmanagerpb.AddSecretVersionRequest{
+	_, err = client.AddSecretVersion(ctx, &secretmanagerpb.AddSecretVersionRequest{
 		Parent: secretPath,
 		Payload: &secretmanagerpb.SecretPayload{
 			Data: data,
 		},
+	})
+	if err == nil {
+		return nil
 	}
 
-	_, err = client.AddSecretVersion(ctx, req)
+	if s, ok := status.FromError(err); !ok || s.Code() != codes.NotFound {
+		return err
+	}
+
+	// Secret doesn't exist yet; create it then add the first version.
+	if _, err = client.CreateSecret(ctx, &secretmanagerpb.CreateSecretRequest{
+		Parent:   fmt.Sprintf("projects/%s", project),
+		SecretId: secretName,
+		Secret: &secretmanagerpb.Secret{
+			Replication: &secretmanagerpb.Replication{
+				Replication: &secretmanagerpb.Replication_Automatic_{
+					Automatic: &secretmanagerpb.Replication_Automatic{},
+				},
+			},
+		},
+	}); err != nil {
+		return err
+	}
+
+	_, err = client.AddSecretVersion(ctx, &secretmanagerpb.AddSecretVersionRequest{
+		Parent: secretPath,
+		Payload: &secretmanagerpb.SecretPayload{
+			Data: data,
+		},
+	})
 	return err
 }
 
@@ -84,6 +116,20 @@ func updateAWS(ctx context.Context, u *url.URL, data []byte) error {
 
 	_, err = client.PutSecretValue(ctx, &secretsmanager.PutSecretValueInput{
 		SecretId:     aws.String(secretID),
+		SecretBinary: data,
+	})
+	if err == nil {
+		return nil
+	}
+
+	var notFound *awstypes.ResourceNotFoundException
+	if !errors.As(err, &notFound) {
+		return err
+	}
+
+	// Secret doesn't exist yet; create it with the initial value.
+	_, err = client.CreateSecret(ctx, &secretsmanager.CreateSecretInput{
+		Name:         aws.String(secretID),
 		SecretBinary: data,
 	})
 	return err

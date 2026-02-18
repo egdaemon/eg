@@ -282,7 +282,7 @@ func (t runner) perform(ctx context.Context, wshost workspaces.Context, runid, p
 
 	wasienv, err := wasi_snapshot_preview1.NewBuilder(runtime).Instantiate(ctx)
 	if err != nil {
-		return err
+		return errorsx.Wrap(err, "unable to create wasi runtime")
 	}
 	defer wasienv.Close(ctx)
 
@@ -295,7 +295,7 @@ func (t runner) perform(ctx context.Context, wshost workspaces.Context, runid, p
 		),
 	).Instantiate(ctx)
 	if err != nil {
-		return err
+		return errorsx.Wrap(err, "failed to setup wasinet")
 	}
 	defer wasinet.Close(ctx)
 
@@ -306,7 +306,7 @@ func (t runner) perform(ctx context.Context, wshost workspaces.Context, runid, p
 	hostenv, err := rtb(t, runtime.NewHostModuleBuilder("env")).
 		Instantiate(ctx)
 	if err != nil {
-		return err
+		return errorsx.Wrap(err, "failed to setup host environment")
 	}
 	defer hostenv.Close(ctx)
 
@@ -316,12 +316,12 @@ func (t runner) perform(ctx context.Context, wshost workspaces.Context, runid, p
 
 	wasi, err := os.ReadFile(path)
 	if err != nil {
-		return err
+		return errorsx.Wrap(err, "unable to read module")
 	}
 
 	c, err := runtime.CompileModule(ctx, wasi)
 	if err != nil {
-		return err
+		return errorsx.Wrap(err, "unable to compile module")
 	}
 	defer c.Close(ctx)
 
@@ -331,7 +331,7 @@ func (t runner) perform(ctx context.Context, wshost workspaces.Context, runid, p
 	defer debugx.Println("interp completed", path)
 	m, err := runtime.InstantiateModule(ctx, c, mcfg.WithName(path))
 	if err != nil {
-		return err
+		return errorsx.Wrap(err, "unable to run module")
 	}
 	defer m.Close(ctx)
 

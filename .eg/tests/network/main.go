@@ -5,19 +5,23 @@ import (
 	"context"
 	"crypto/md5"
 	"crypto/rand"
-	"crypto/tls"
 	"encoding/hex"
 	"fmt"
 	"io"
 	"log"
 	"net"
 	"net/http"
-	"time"
 
+	secretmanager "cloud.google.com/go/secretmanager/apiv1"
+	secretmanagerpb "cloud.google.com/go/secretmanager/apiv1/secretmanagerpb"
 	"github.com/egdaemon/eg/runtime/wasi/eg"
 	"github.com/egdaemon/eg/runtime/wasi/egenv"
 	"github.com/egdaemon/eg/runtime/wasi/shell"
 	"github.com/egdaemon/wasinet/wasinet"
+	"google.golang.org/api/option"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 func digest(b []byte) string {
@@ -187,7 +191,6 @@ func HTTPServerTest(ctx context.Context, op eg.Op) (err error) {
 
 func init() {
 	wasinet.Hijack()
-	http.DefaultTransport = InsecureHTTP()
 }
 
 func main() {
@@ -203,6 +206,7 @@ func main() {
 			TCPTest,
 			HTTPServerTest,
 			HTTPTest,
+			GRPCTest,
 		),
 	)
 
@@ -211,18 +215,26 @@ func main() {
 	}
 }
 
-func InsecureHTTP() *http.Transport {
-	return &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-		Proxy:           http.ProxyFromEnvironment,
-		DialContext: (&wasinet.Dialer{
-			Timeout: 20 * time.Second,
-		}).DialContext,
-		ForceAttemptHTTP2:     true,
-		MaxIdleConns:          10,
-		ResponseHeaderTimeout: 20 * time.Second,
-		IdleConnTimeout:       20 * time.Second,
-		TLSHandshakeTimeout:   20 * time.Second,
-		ExpectContinueTimeout: 20 * time.Second,
+func GRPCTest(ctx context.Context, o eg.Op) error {
+	dialer := option.WithGRPCDialOption(grpc.WithContextDialer(func(ctx context.Context, addr string) (net.Conn, error) {
+		return wasinet.DialContext(ctx, "tcp", addr)
+	}))
+
+	svc, err := secretmanager.NewClient(ctx, option.WithoutAuthentication(), dialer)
+	if err != nil {
+		return err
 	}
+	defer svc.Close()
+
+	_, err = svc.GetSecret(ctx, &secretmanagerpb.GetSecretRequest{
+		Name: "projects/test-project/secrets/test-secret",
+	})
+
+	// An auth error means TLS handshake and DNS resolution both succeeded.
+	if code := status.Code(err); code == codes.Unauthenticated || code == codes.PermissionDenied {
+		log.Printf("SUCCESS: grpc ssl/dns test passed, got expected auth error: %v", err)
+		return nil
+	}
+
+	return fmt.Errorf("unexpected grpc error (expected unauthenticated/permission-denied): %w", err)
 }

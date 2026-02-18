@@ -109,6 +109,7 @@ func (c commit) StringReplace(pattern string) string {
 // completely clean any git substitutions from the pattern.
 func PatternClean(pattern string) string {
 	s := strings.ReplaceAll(pattern, ".%", "%")
+	s = strings.ReplaceAll(s, "%.", "%")
 	s = strings.ReplaceAll(s, "%git.hash%", "")
 	s = strings.ReplaceAll(s, "%git.hash.short%", "")
 	s = strings.ReplaceAll(s, "%git.commit.year%", "")

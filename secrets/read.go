@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"log"
 	"net/url"
 	"os"
 	"strings"
@@ -14,6 +13,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
+	"github.com/egdaemon/eg/internal/debugx"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/langx"
 	"golang.org/x/crypto/argon2"
@@ -69,7 +69,7 @@ func (t *secretsReader) Read(p []byte) (int, error) {
 		uri := t.uris[t.idx]
 		t.idx++
 		t.current = io.MultiReader(Read(t.ctx, uri), bytes.NewReader(t.suffix))
-		log.Println("Reading", uri)
+		debugx.Println("Reading", uri)
 	}
 }
 

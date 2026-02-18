@@ -185,7 +185,7 @@ func main() {
 	}
 
 	if err = ctx.Run(); err != nil {
-		log.Println(cmderrors.Sprint(err))
+		log.Println(ctx.Command(), cmderrors.Sprint(err))
 		os.Exit(1)
 	}
 

@@ -48,6 +48,22 @@ func TestHashFormat(t *testing.T) {
 	require.Equal(t, fulllength, fmt.Sprintf("%s", ex))
 }
 
+func TestPatternClean(t *testing.T) {
+	require.Equal(t, "", PatternClean("%git.hash%"))
+	require.Equal(t, "", PatternClean("%git.hash.short%"))
+	require.Equal(t, "", PatternClean("%git.commit.year%"))
+	require.Equal(t, "", PatternClean("%git.commit.month%"))
+	require.Equal(t, "", PatternClean("%git.commit.day%"))
+	require.Equal(t, "", PatternClean("%git.commit.unix%"))
+	require.Equal(t, "", PatternClean("%git.commit.unix.milli%"))
+	require.Equal(t, "", PatternClean("%git.commit.unix.micro%"))
+	require.Equal(t, "", PatternClean("%eg.git.canonical.uri%"))
+	// the .% prefix is stripped to avoid leaving a dangling separator
+	require.Equal(t, "v1", PatternClean("v1.%git.commit.unix%"))
+	// the %. suffix is stripped to avoid leaving a dangling separator
+	require.Equal(t, "v1", PatternClean("%git.commit.unix%.v1"))
+}
+
 func TestStringReplace(t *testing.T) {
 	ex := testcommit1()
 	require.Equal(t, "git hash short: 211a6f2", ex.StringReplace("git hash short: %git.hash.short%"))

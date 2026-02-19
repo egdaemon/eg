@@ -66,7 +66,7 @@ func (t module) mounthack(ctx context.Context, runid string, ws workspaces.Conte
 	}
 
 	remap := func(from, to string) error {
-		if envx.Boolean(false, eg.EnvExperimentalBindFsEntryTimeout) {
+		if envx.Boolean(true, eg.EnvExperimentalBindFsEntryTimeout) {
 			mcmd := exec.CommandContext(ctx, mbin, "--map=root/egd:@root/@egd", "-o", "entry_timeout=0", from, to)
 			if err = execx.MaybeRun(mcmd); err != nil {
 				return errorsx.Wrapf(err, "unable to run bindfs: %s", from)

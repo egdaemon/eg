@@ -43,7 +43,8 @@ type local struct {
 	Debug            bool     `name:"debug" help:"keep workspace around to debug issues, requires manual cleanup"`
 	Privileged       bool     `name:"privileged" help:"run the initial container in privileged mode"`
 	Dirty            bool     `name:"dirty" help:"include user directories and environment variables" hidden:"true"`
-	GCP              string   `name:"gcp" help:"path to gcp's application default credentials. use '-' to use the default well known path"`
+	GCPAuto          bool     `name:"gcp-auto" help:"use the default well known path for gcp's application default credentials"`
+	GCP              string   `name:"gcp" help:"path to gcp's application default credentials"`
 	Platform         string   `name:"platform" help:"arch platform for the container" hidden:"true"`
 	InvalidateCache  bool     `name:"invalidate-cache" help:"removes workload build cache"`
 	EnvironmentPaths []string `name:"envpath" help:"environment files to pass to the module" default:""`
@@ -138,13 +139,10 @@ func (t local) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err e
 		mounthome = runners.AgentOptionAutoMountHome(homedir)
 	}
 
-	if stringsx.Present(t.GCP) {
-		path := userx.ConfigDirectory("gcloud", "application_default_credentials.json")
-		if t.GCP != "-" {
-			path = t.GCP
-		}
-
-		gcpcreds = runners.AgentOptionGcloudCredentials(gctx.Context, envb, path)
+	if t.GCPAuto {
+		gcpcreds = runners.AgentOptionGcloudCredentials(gctx.Context, envb, userx.ConfigDirectory("gcloud", "application_default_credentials.json"))
+	} else if stringsx.Present(t.GCP) {
+		gcpcreds = runners.AgentOptionGcloudCredentials(gctx.Context, envb, t.GCP)
 	}
 
 	gnupghome = runners.AgentOptionLocalGPGAgent(gctx.Context, envb)

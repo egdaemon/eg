@@ -30,6 +30,7 @@ import (
 	"github.com/egdaemon/eg/internal/runtimex"
 	"github.com/egdaemon/eg/internal/stringsx"
 	"github.com/egdaemon/eg/internal/wasix"
+	"github.com/egdaemon/eg/secrets"
 	"github.com/egdaemon/eg/interp"
 	"github.com/egdaemon/eg/interp/c8sproxy"
 	"github.com/egdaemon/eg/interp/events"
@@ -51,6 +52,7 @@ type baremetal struct {
 	GitRemote       string   `name:"git-remote" help:"name of the git remote to use" default:"${vars_git_default_remote_name}"`
 	GitReference    string   `name:"git-ref" help:"name of the branch or commit to checkout" default:"${vars_git_head_reference}"`
 	Environment     []string `name:"env" short:"e" help:"define environment variables and their values to be included"`
+	Secrets         []string `name:"secret" help:"List of secret URIs to use. Examples: chachasm://passphrase@/path/to/file, gcpsm://project-id/secret-name/version, awssm://secret-name?region=us-east-1"`
 	Clone           bool     `name:"git-clone" help:"allow cloning via git"`
 	InvalidateCache bool     `name:"invalidate-cache" help:"removes workload build cache"`
 	Infinite        bool     `name:"infinite" help:"allow this module to run forever, used for running a workload like a webserver" hidden:"true"`
@@ -187,9 +189,10 @@ func (t baremetal) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, hotswapbin
 	}
 
 	gitenv := errorsx.Zero(gitx.LocalEnv(repo, t.GitRemote, t.GitReference))
-	cmdenvb := envx.Build().FromEnv(
-		t.Environment...,
-	).FromEnv(
+	cmdenvb := envx.Build().
+		FromReader(secrets.NewReader(ctx, t.Secrets...)).
+		FromEnv(t.Environment...).
+		FromEnv(
 		"PATH",
 		"TERM",
 		"COLORTERM",

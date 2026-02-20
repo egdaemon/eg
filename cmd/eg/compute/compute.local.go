@@ -1,6 +1,7 @@
 package compute
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log"
@@ -97,6 +98,8 @@ func (t local) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err e
 		log.Println("debug enabled", ws.Root)
 	}
 
+	defer ws.Cleanup(context.Background())
+
 	environpath := filepath.Join(ws.RuntimeDir, eg.EnvironFile)
 	if environio, err = os.Create(environpath); err != nil {
 		return errorsx.Wrap(err, "unable to open the environment variable file")
@@ -177,7 +180,7 @@ func (t local) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err e
 		return err
 	}
 
-	if err = wasix.WarmCacheDirectory(gctx.Context, filepath.Join(ws.Root, ws.BuildDir), wasix.WazCacheDir(filepath.Join(ws.CacheDir, eg.DefaultModuleDirectory()))); err != nil {
+	if err = wasix.WarmCacheDirectory(gctx.Context, filepath.Join(ws.Root, ws.BuildDir), ws.CacheDirWazero); err != nil {
 		log.Println("unable to prewarm wasi directory cache", err)
 	}
 

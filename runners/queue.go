@@ -459,10 +459,10 @@ func beginwork(ctx context.Context, md metadata, dir string) state {
 
 	// fsx.PrintFS(os.DirFS(ws.RuntimeDir))
 
-	if err = wasix.WarmCacheDirectory(ctx, filepath.Join(ws.Root, ws.BuildDir), wasix.WazCacheDir(filepath.Join(ws.CacheDir, eg.DefaultModuleDirectory()))); err != nil {
+	if err = wasix.WarmCacheDirectory(ctx, filepath.Join(ws.Root, ws.BuildDir), ws.CacheDirWazero); err != nil {
 		log.Println("unable to prewarm wasi cache", err)
 	} else {
-		log.Println("wasi cache prewarmed", wasix.WazCacheDir(filepath.Join(ws.CacheDir, eg.DefaultModuleDirectory())))
+		log.Println("wasi cache prewarmed", ws.CacheDirWazero)
 	}
 
 	environpath := filepath.Join(ws.RuntimeDir, eg.EnvironFile)

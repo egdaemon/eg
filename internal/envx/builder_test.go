@@ -158,6 +158,57 @@ func TestBuilder(t *testing.T) {
 		})
 	})
 
+	t.Run("Append", func(t *testing.T) {
+		t.Run("append_to_existing_key", func(t *testing.T) {
+			b := envx.Build().FromEnviron("KEY1=val1", "KEY2=val2")
+			require.NoError(t, b.Append("KEY1", "val2", ":"))
+			actual, err := b.Environ()
+			require.NoError(t, err)
+			expected := []string{"KEY1=val1:val2", "KEY2=val2"}
+			sort.Strings(actual)
+			sort.Strings(expected)
+			require.Equal(t, expected, actual)
+		})
+
+		t.Run("append_to_missing_key_adds_it", func(t *testing.T) {
+			b := envx.Build().FromEnviron("KEY1=val1")
+			require.NoError(t, b.Append("KEY2", "val2", ":"))
+			actual, err := b.Environ()
+			require.NoError(t, err)
+			expected := []string{"KEY1=val1", "KEY2=val2"}
+			sort.Strings(actual)
+			sort.Strings(expected)
+			require.Equal(t, expected, actual)
+		})
+
+		t.Run("append_to_empty_builder_adds_key", func(t *testing.T) {
+			b := envx.Build()
+			require.NoError(t, b.Append("KEY1", "val1", ":"))
+			actual, err := b.Environ()
+			require.NoError(t, err)
+			expected := []string{"KEY1=val1"}
+			require.Equal(t, expected, actual)
+		})
+
+		t.Run("append_uses_separator", func(t *testing.T) {
+			b := envx.Build().FromEnviron("PATH=/usr/bin")
+			require.NoError(t, b.Append("PATH", "/usr/local/bin", ":"))
+			actual, err := b.Environ()
+			require.NoError(t, err)
+			expected := []string{"PATH=/usr/bin:/usr/local/bin"}
+			require.Equal(t, expected, actual)
+		})
+
+		t.Run("append_to_key_with_empty_value", func(t *testing.T) {
+			b := envx.Build().FromEnviron("KEY1=")
+			require.NoError(t, b.Append("KEY1", "val1", ":"))
+			actual, err := b.Environ()
+			require.NoError(t, err)
+			expected := []string{"KEY1=:val1"}
+			require.Equal(t, expected, actual)
+		})
+	})
+
 	t.Run("Only", func(t *testing.T) {
 		t.Run("only_keeps_specified_keys", func(t *testing.T) {
 			b := envx.Build().FromEnviron("A=1", "B=2", "C=3")

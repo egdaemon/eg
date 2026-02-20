@@ -102,19 +102,28 @@ func (t module) mounthack(ctx context.Context, runid string, ws workspaces.Conte
 	if dirstr := envx.String("", eg.EnvUnsafeRemapDirectory); stringsx.Present(dirstr) {
 		dirs := strings.Split(dirstr, ":")
 		debugx.Println("remap dirs", dirs)
-		// err = fsx.MkDirs(
-		// 	0770,
-		// 	dirs...,
-		// )
-		// if err != nil {
-		// 	return err
-		// }
+		err = fsx.MkDirs(
+			0770,
+			dirs...,
+		)
+		if err != nil {
+			log.Println("failed to mkdirs for remap", err)
+			// 	return err
+		}
 
-		// for _, d := range dirs {
-		// 	if err := remap(eg.DefaultMountRoot(d), eg.DefaultRuntimeDirectory(d)); err != nil {
-		// 		return err
-		// 	}
-		// }
+		for _, d := range dirs {
+			rel, err := filepath.Rel(eg.DefaultWorkloadDirectory(), d)
+			if err != nil {
+				log.Println("unable to map directory", d, err)
+				continue
+			}
+
+			if err := remap(eg.DefaultMountRoot(rel), d); err != nil {
+				log.Println("map failed", d, err)
+				continue
+				// return err
+			}
+		}
 	}
 
 	// HACK: gpg no longer obeys GNUPGHOME for the root user.

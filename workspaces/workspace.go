@@ -20,6 +20,7 @@ import (
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/fsx"
 	"github.com/egdaemon/eg/internal/langx"
+	"github.com/egdaemon/eg/internal/wasix"
 	"github.com/gofrs/uuid/v5"
 )
 
@@ -44,18 +45,19 @@ func (t ignoredir) Ignore(path string, d fs.DirEntry) error {
 }
 
 type Context struct {
-	Module       string // name of the module
-	CachedID     string // unique id generated from the content of the module.
-	Root         string // workspace root directory.
-	WorkingDir   string // working directory for modules.
-	ModuleDir    string // eg module directory; relative to the root
-	CacheDir     string // cache directory. relative to the module directory.
-	RuntimeDir   string // eg internal directory
-	WorkspaceDir string // shared directory between modules within a single workload.
-	BuildDir     string // directory for built wasm modules; relative to the cache directory.
-	TransDir     string // root directory for the transpiled code; relative to the cache directory.
-	GenModDir    string // root directory for generated modules; relative to the cache directory.
-	Ignore       ignorable
+	Module         string // name of the module
+	CachedID       string // unique id generated from the content of the module.
+	Root           string // workspace root directory.
+	WorkingDir     string // working directory for modules.
+	ModuleDir      string // eg module directory; relative to the root
+	CacheDir       string // cache directory. relative to the module directory.
+	CacheDirWazero string // wazero compilation cache directory.
+	RuntimeDir     string // eg internal directory
+	WorkspaceDir   string // shared directory between modules within a single workload.
+	BuildDir       string // directory for built wasm modules; relative to the cache directory.
+	TransDir       string // root directory for the transpiled code; relative to the cache directory.
+	GenModDir      string // root directory for generated modules; relative to the cache directory.
+	Ignore         ignorable
 }
 
 func (t Context) FS() fs.FS {
@@ -64,13 +66,14 @@ func (t Context) FS() fs.FS {
 
 func FromEnv(ctx context.Context, root, name string) (zero Context, err error) {
 	return Context{
-		Module:       name,
-		Root:         root,
-		ModuleDir:    eg.ModuleDir,
-		CacheDir:     eg.DefaultCacheDirectory(),
-		RuntimeDir:   eg.DefaultRuntimeDirectory(),
-		WorkingDir:   eg.DefaultWorkingDirectory(),
-		WorkspaceDir: eg.DefaultWorkspaceDirectory(),
+		Module:         name,
+		Root:           root,
+		ModuleDir:      eg.ModuleDir,
+		CacheDir:       eg.DefaultCacheDirectory(),
+		CacheDirWazero: wasix.WazCacheDir(eg.DefaultCacheDirectory(), eg.DefaultModuleDirectory()),
+		RuntimeDir:     eg.DefaultRuntimeDirectory(),
+		WorkingDir:     eg.DefaultWorkingDirectory(),
+		WorkspaceDir:   eg.DefaultWorkspaceDirectory(),
 	}, nil
 }
 
@@ -168,18 +171,19 @@ func New(ctx context.Context, cid hash.Hash, cwd string, root string, name strin
 	_cid := uuid.FromBytesOrNil(cid.Sum(nil)).String()
 
 	return ensuredirs(langx.Clone(Context{
-		Module:       name,
-		CachedID:     _cid,
-		Root:         root,
-		ModuleDir:    filepath.Join(root, eg.ModuleDir),
-		CacheDir:     filepath.Join(root, eg.CacheDirectory),
-		RuntimeDir:   filepath.Join(root, eg.RuntimeDirectory),
-		WorkingDir:   filepath.Join(root, eg.WorkingDirectory),
-		WorkspaceDir: filepath.Join(root, eg.WorkspaceDirectory),
-		BuildDir:     filepath.Join(eg.CacheDirectory, eg.DefaultModuleDirectory(), ".gen", _cid, "build"),
-		TransDir:     filepath.Join(eg.CacheDirectory, eg.DefaultModuleDirectory(), ".gen", _cid, "trans"),
-		GenModDir:    filepath.Join(eg.CacheDirectory, eg.DefaultModuleDirectory(), ".gen", _cid, "trans", ".genmod"),
-		Ignore:       ignore,
+		Module:         name,
+		CachedID:       _cid,
+		Root:           root,
+		ModuleDir:      filepath.Join(root, eg.ModuleDir),
+		CacheDir:       filepath.Join(root, eg.CacheDirectory),
+		CacheDirWazero: wasix.WazCacheDir(filepath.Join(root, eg.CacheDirectory, eg.DefaultModuleDirectory())),
+		RuntimeDir:     filepath.Join(root, eg.RuntimeDirectory),
+		WorkingDir:     filepath.Join(root, eg.WorkingDirectory),
+		WorkspaceDir:   filepath.Join(root, eg.WorkspaceDirectory),
+		BuildDir:       filepath.Join(eg.CacheDirectory, eg.DefaultModuleDirectory(), ".gen", _cid, "build"),
+		TransDir:       filepath.Join(eg.CacheDirectory, eg.DefaultModuleDirectory(), ".gen", _cid, "trans"),
+		GenModDir:      filepath.Join(eg.CacheDirectory, eg.DefaultModuleDirectory(), ".gen", _cid, "trans", ".genmod"),
+		Ignore:         ignore,
 	}, options...))
 }
 

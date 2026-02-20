@@ -51,6 +51,7 @@ func TestNewLocal(t *testing.T) {
 		require.NoError(t, err, "RuntimeDir should be created")
 		_, err = os.Stat(ws.WorkspaceDir)
 		require.NoError(t, err, "WorkspaceDir should be created")
+		require.Equal(t, filepath.Join(expectedRoot, eg.CacheDirectory, eg.DefaultModuleDirectory(), "wazcache"), ws.CacheDirWazero)
 	})
 
 	t.Run("test compute local config - specified workload", func(t *testing.T) {
@@ -89,6 +90,7 @@ func TestNewLocal(t *testing.T) {
 		require.NoError(t, err, "RuntimeDir should be created")
 		_, err = os.Stat(ws.WorkspaceDir)
 		require.NoError(t, err, "WorkspaceDir should be created")
+		require.Equal(t, filepath.Join(expectedRoot, eg.CacheDirectory, eg.DefaultModuleDirectory(), "wazcache"), ws.CacheDirWazero)
 	})
 }
 
@@ -129,6 +131,7 @@ func TestNewQueued(t *testing.T) {
 		require.NoError(t, err, "RuntimeDir should be created")
 		_, err = os.Stat(ws.WorkspaceDir)
 		require.NoError(t, err, "WorkspaceDir should be created")
+		require.Equal(t, filepath.Join(expectedRoot, eg.CacheDirectory, eg.DefaultModuleDirectory(), "wazcache"), ws.CacheDirWazero)
 	})
 
 	t.Run("test compute queued config - specified workload", func(t *testing.T) {
@@ -167,6 +170,7 @@ func TestNewQueued(t *testing.T) {
 		require.NoError(t, err, "RuntimeDir should be created")
 		_, err = os.Stat(ws.WorkspaceDir)
 		require.NoError(t, err, "WorkspaceDir should be created")
+		require.Equal(t, filepath.Join(expectedRoot, eg.CacheDirectory, eg.DefaultModuleDirectory(), "wazcache"), ws.CacheDirWazero)
 	})
 }
 
@@ -207,6 +211,7 @@ func TestNewBuiltin(t *testing.T) {
 		require.NoError(t, err, "RuntimeDir should be created")
 		_, err = os.Stat(ws.WorkspaceDir)
 		require.NoError(t, err, "WorkspaceDir should be created")
+		require.Equal(t, filepath.Join(expectedRoot, eg.CacheDirectory, eg.DefaultModuleDirectory(), "wazcache"), ws.CacheDirWazero)
 	})
 
 	t.Run("test compute builtin config - specified workload", func(t *testing.T) {
@@ -245,6 +250,7 @@ func TestNewBuiltin(t *testing.T) {
 		require.NoError(t, err, "RuntimeDir should be created")
 		_, err = os.Stat(ws.WorkspaceDir)
 		require.NoError(t, err, "WorkspaceDir should be created")
+		require.Equal(t, filepath.Join(expectedRoot, eg.CacheDirectory, eg.DefaultModuleDirectory(), "wazcache"), ws.CacheDirWazero)
 	})
 }
 
@@ -284,6 +290,7 @@ func TestNew(t *testing.T) {
 		require.NoError(t, err, "RuntimeDir should be created")
 		_, err = os.Stat(ws.WorkspaceDir)
 		require.NoError(t, err, "WorkspaceDir should be created")
+		require.Equal(t, filepath.Join(root, eg.CacheDirectory, eg.DefaultModuleDirectory(), "wazcache"), ws.CacheDirWazero)
 	})
 
 	t.Run("success_with_invalidate_cache_option", func(t *testing.T) {
@@ -323,6 +330,7 @@ func TestNew(t *testing.T) {
 		require.NoError(t, err, "BuildDir should be recreated by ensuredirs")
 		_, err = os.Stat(filepath.Join(root, ws.TransDir))
 		require.NoError(t, err, "TransDir should be recreated by ensuredirs")
+		require.Equal(t, filepath.Join(root, eg.CacheDirectory, eg.DefaultModuleDirectory(), "wazcache"), ws.CacheDirWazero)
 	})
 
 	t.Run("success_with_option_enabled_false", func(t *testing.T) {
@@ -349,6 +357,7 @@ func TestNew(t *testing.T) {
 
 		_, err = os.Stat(dummyBuildFile)
 		require.NoError(t, err, "dummy file in build dir should NOT be removed")
+		require.Equal(t, filepath.Join(root, eg.CacheDirectory, eg.DefaultModuleDirectory(), "wazcache"), ws.CacheDirWazero)
 	})
 
 	t.Run("failure_on_invalid_permissions", func(t *testing.T) {
@@ -389,6 +398,7 @@ func TestNew(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, ws)
 		require.Equal(t, expectedCID, ws.CachedID)
+		require.Equal(t, filepath.Join(root, eg.CacheDirectory, eg.DefaultModuleDirectory(), "wazcache"), ws.CacheDirWazero)
 	})
 
 	t.Run("success_with_empty_module_dir", func(t *testing.T) {
@@ -407,5 +417,6 @@ func TestNew(t *testing.T) {
 
 		_, err = os.Stat(filepath.Join(root, ws.BuildDir, ws.Module, eg.ModuleDir))
 		require.NoError(t, err, "BuildDir should be created even for empty module")
+		require.Equal(t, filepath.Join(root, eg.CacheDirectory, eg.DefaultModuleDirectory(), "wazcache"), ws.CacheDirWazero)
 	})
 }

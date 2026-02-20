@@ -2,6 +2,7 @@ package cmdsecret_test
 
 import (
 	"bytes"
+	"encoding/base64"
 	"io"
 	"os"
 	"path/filepath"
@@ -105,5 +106,55 @@ func TestSecretCmd(t *testing.T) {
 		require.NoError(t, err)
 
 		require.Equal(t, "one\ntwo\n", buf.String())
+	})
+
+	t.Run("encode stdin to stdout", func(t *testing.T) {
+		content := []byte("hello encode")
+
+		oldStdin := os.Stdin
+		r, w, _ := os.Pipe()
+		os.Stdin = r
+		go func() {
+			_, _ = w.Write(content)
+			w.Close()
+		}()
+
+		oldStdout := os.Stdout
+		or, ow, _ := os.Pipe()
+		os.Stdout = ow
+
+		err := runSecretCLI(t, []string{"secret", "b64"})
+
+		ow.Close()
+		os.Stdin = oldStdin
+		os.Stdout = oldStdout
+		require.NoError(t, err)
+
+		var buf bytes.Buffer
+		_, err = io.Copy(&buf, or)
+		require.NoError(t, err)
+
+		require.Equal(t, base64.URLEncoding.EncodeToString(content), buf.String())
+	})
+
+	t.Run("encode stdin to file", func(t *testing.T) {
+		content := []byte("hello encode to file")
+		outputPath := filepath.Join(t.TempDir(), "out.b64")
+
+		oldStdin := os.Stdin
+		r, w, _ := os.Pipe()
+		os.Stdin = r
+		go func() {
+			_, _ = w.Write(content)
+			w.Close()
+		}()
+
+		err := runSecretCLI(t, []string{"secret", "b64", "-o", outputPath})
+		os.Stdin = oldStdin
+		require.NoError(t, err)
+
+		got, err := os.ReadFile(outputPath)
+		require.NoError(t, err)
+		require.Equal(t, base64.URLEncoding.EncodeToString(content), string(got))
 	})
 }

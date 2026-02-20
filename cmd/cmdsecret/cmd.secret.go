@@ -1,6 +1,7 @@
 package cmdsecret
 
 import (
+	"encoding/base64"
 	"fmt"
 	"io"
 	"os"
@@ -13,6 +14,7 @@ type SecretCmd struct {
 	Read   CmdRead   `cmd:"" help:"Read secrets from various schemes."`
 	Update CmdUpdate `cmd:"" help:"Update or create secrets for various schemes."`
 	Edit   CmdEdit   `cmd:"" help:"Interactively edit a secret using $EDITOR."`
+	B64 CmdB64 `cmd:"" name:"b64" help:"Base64 URL encode stdin and write the result to stdout or a file."`
 }
 
 type CmdRead struct {
@@ -61,4 +63,29 @@ func (t CmdUpdate) Run(gctx *cmdopts.Global) error {
 	}
 
 	return nil
+}
+
+type CmdB64 struct {
+	Output string `name:"output" short:"o" help:"Write output to a file instead of stdout"`
+}
+
+func (t CmdB64) Run(gctx *cmdopts.Global) error {
+	var out io.Writer = os.Stdout
+
+	if t.Output != "" {
+		f, err := os.Create(t.Output)
+		if err != nil {
+			return fmt.Errorf("unable to create output file: %w", err)
+		}
+		defer f.Close()
+		out = f
+	}
+
+	raw, err := io.ReadAll(os.Stdin)
+	if err != nil {
+		return fmt.Errorf("failed to read stdin: %w", err)
+	}
+
+	_, err = fmt.Fprint(out, base64.URLEncoding.EncodeToString(raw))
+	return err
 }

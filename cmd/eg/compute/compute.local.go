@@ -151,6 +151,7 @@ func (t local) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err e
 		return errorsx.Wrap(err, "unable to generate environment")
 	}
 
+	// envx.Debug(errorsx.Zero(envb.Environ())...)
 	log.Println("cacheid", ws.CachedID)
 
 	roots, err := transpile.Autodetect(transpile.New(eg.DefaultModuleDirectory(t.Dir), ws)).Run(gctx.Context)

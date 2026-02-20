@@ -488,14 +488,20 @@ func (t *Builder) Setenv(k, v string) error {
 }
 
 func (t *Builder) Append(k, v, sep string) error {
+	found := false
 	t.environ = slicesx.Map(func(s string) string {
 		key, value, ok := strings.Cut(s, "=")
 		if ok && key == k {
+			found = true
 			return fmt.Sprintf("%s=%s%s%s", k, value, sep, v)
 		}
 
 		return s
 	}, t.environ...)
+
+	if !found {
+		t.environ = append(t.environ, fmt.Sprintf("%s=%s", k, v))
+	}
 
 	return nil
 }

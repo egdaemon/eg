@@ -173,7 +173,7 @@ func (t runner) perform(ctx context.Context, wshost workspaces.Context, runid, p
 
 	ctx = experimental.WithCompilationWorkers(ctx, runtime.GOMAXPROCS(0))
 
-	cache, err := wazero.NewCompilationCacheWithDir(wasix.WazCacheDir(wshost.CacheDir, eg.DefaultModuleDirectory()))
+	cache, err := wazero.NewCompilationCacheWithDir(wshost.CacheDirWazero)
 	if err != nil {
 		return err
 	}
@@ -227,7 +227,7 @@ func (t runner) perform(ctx context.Context, wshost workspaces.Context, runid, p
 	debugx.Println("runtime dir", wshost.RuntimeDir, "->", eg.DefaultRuntimeDirectory())
 	debugx.Println("working dir", wshost.WorkingDir, "->", eg.DefaultWorkingDirectory())
 	debugx.Println("workspace dir", wshost.WorkspaceDir, "->", eg.DefaultWorkspaceDirectory())
-	debugx.Println("wazero cache", wasix.WazCacheDir(wshost.CacheDir))
+	debugx.Println("wazero cache", wshost.CacheDirWazero)
 	debugx.Println("system tls certs", hostsslcerts)
 
 	// we map twice so that baremetal can work. shell commands are run on the host itself so we need the host path.

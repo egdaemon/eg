@@ -229,6 +229,7 @@ func (t runner) perform(ctx context.Context, wshost workspaces.Context, runid, p
 	debugx.Println("workspace dir", wshost.WorkspaceDir, "->", eg.DefaultWorkspaceDirectory())
 	debugx.Println("wazero cache", wshost.CacheDirWazero)
 	debugx.Println("system tls certs", hostsslcerts)
+	debugx.Println("------------------------------------------------------")
 
 	// we map twice so that baremetal can work. shell commands are run on the host itself so we need the host path.
 	// but inside wazero we need to be able to access the standard paths.
@@ -237,6 +238,7 @@ func (t runner) perform(ctx context.Context, wshost workspaces.Context, runid, p
 	wazerofs := wazero.NewFSConfig().
 		WithDirMount(hostsslcerts, DefaultSSLCertDir).
 		WithDirMount(os.TempDir(), os.TempDir()).
+		WithDirMount(wshost.Root, eg.DefaultWorkloadDirectory()).
 		WithDirMount(wshost.RuntimeDir, eg.DefaultRuntimeDirectory()).
 		WithDirMount(wshost.RuntimeDir, wshost.RuntimeDir).
 		WithDirMount(wshost.CacheDir, eg.DefaultCacheDirectory()).

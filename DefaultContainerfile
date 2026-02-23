@@ -50,6 +50,6 @@ RUN rm -rf /run/containers/storage /run/libpod
 RUN update-alternatives --set sudo /usr/bin/sudo.ws
 # END HACKS
 
-# useful/temporary to deal with launchpad slowness/broken releases...
-RUN apt-get install -y --no-install-recommends libbtrfs-dev libassuan-dev libc6-dev libdevmapper-dev libglib2.0-dev libgpgme-dev libgpg-error-dev libprotobuf-dev libprotobuf-c-dev libseccomp-dev libselinux1-dev libsystemd-dev
-RUN GOPROXY=direct go install github.com/egdaemon/eg/...@latest
+# # useful/temporary to deal with launchpad slowness/broken releases...
+# RUN apt-get install -y --no-install-recommends libbtrfs-dev libassuan-dev libc6-dev libdevmapper-dev libglib2.0-dev libgpgme-dev libgpg-error-dev libprotobuf-dev libprotobuf-c-dev libseccomp-dev libselinux1-dev libsystemd-dev
+# RUN GOPROXY=direct go install github.com/egdaemon/eg/...@latest

@@ -118,6 +118,7 @@ func (t module) mounthack(ctx context.Context, runid string, ws workspaces.Conte
 				continue
 			}
 
+			debugx.Println("remapping", eg.DefaultMountRoot(rel), "->", d)
 			if err := remap(eg.DefaultMountRoot(rel), d); err != nil {
 				log.Println("map failed", d, err)
 				continue

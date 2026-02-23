@@ -239,6 +239,7 @@ func (t runner) perform(ctx context.Context, wshost workspaces.Context, runid, p
 		WithDirMount(hostsslcerts, DefaultSSLCertDir).
 		WithDirMount(os.TempDir(), os.TempDir()).
 		WithDirMount(wshost.Root, eg.DefaultWorkloadDirectory()).
+		WithDirMount(wshost.Root, wshost.Root).
 		WithDirMount(wshost.RuntimeDir, eg.DefaultRuntimeDirectory()).
 		WithDirMount(wshost.RuntimeDir, wshost.RuntimeDir).
 		WithDirMount(wshost.CacheDir, eg.DefaultCacheDirectory()).

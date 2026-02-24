@@ -20,8 +20,8 @@ const (
 	DefaultTimeout = 5 * time.Minute
 )
 
-type execer func(ctx context.Context, dir string, environ []string, cmd string, args []string) error
-type entrypoint func(ctx context.Context, user string, group string, cmd string, directory string, environ []string, do execer) (err error)
+type Execer func(ctx context.Context, dir string, environ []string, cmd string, args []string) error
+type entrypoint func(ctx context.Context, user string, group string, cmd string, directory string, environ []string, do Execer) (err error)
 
 type Command struct {
 	user      string
@@ -33,7 +33,7 @@ type Command struct {
 	attempts  int16
 	lenient   bool
 	entry     entrypoint
-	exec      execer
+	exec      Execer
 }
 
 // number of attempts to make before giving up.
@@ -109,7 +109,7 @@ func (t Command) UnsafeEntrypoint(e entrypoint) Command {
 	return t
 }
 
-func (t Command) UnsafeExec(e execer) Command {
+func (t Command) UnsafeExec(e Execer) Command {
 	t.exec = e
 	return t
 }
@@ -117,7 +117,7 @@ func (t Command) UnsafeExec(e execer) Command {
 // debug a command
 func (t Command) Debug() Command {
 	original := t.entry
-	t.entry = func(ctx context.Context, user, group, cmd, directory string, environ []string, do execer) (err error) {
+	t.entry = func(ctx context.Context, user, group, cmd, directory string, environ []string, do Execer) (err error) {
 		log.Println("running command", directory, user, group, cmd, environ)
 		return original(ctx, user, group, cmd, directory, environ, do)
 	}
@@ -243,7 +243,7 @@ func retry(ctx context.Context, c Command, do func() error) (err error) {
 	return err
 }
 
-func run(ctx context.Context, user string, group string, cmd string, directory string, environ []string, exec execer) (err error) {
+func run(ctx context.Context, user string, group string, cmd string, directory string, environ []string, exec Execer) (err error) {
 	scmd := []string{"-E", "-H", "-u", user, "-g", group, "bash", "-c", cmd}
 	return exec(ctx, directory, environ, "sudo", scmd)
 }

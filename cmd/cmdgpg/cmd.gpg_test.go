@@ -44,8 +44,8 @@ func TestCmdKeyring(t *testing.T) {
 		dir := t.TempDir()
 		err := runGPGCLI(t, []string{"gpg", "keyring", "--seed", "test-seed", "--directory", dir})
 		require.NoError(t, err)
-		require.FileExists(t, filepath.Join(dir, "secring.gpg"))
-		require.FileExists(t, filepath.Join(dir, "pubring.gpg"))
+		require.FileExists(t, filepath.Join(dir, "private.asc"))
+		require.FileExists(t, filepath.Join(dir, "public.asc"))
 	})
 
 	t.Run("second_call_loads_from_disk", func(t *testing.T) {
@@ -58,7 +58,7 @@ func TestCmdKeyring(t *testing.T) {
 		err = runGPGCLI(t, []string{"gpg", "keyring", "--seed", "other-seed", "--directory", dir})
 		require.NoError(t, err)
 
-		matches, err := filepath.Glob(filepath.Join(dir, "secring.gpg"))
+		matches, err := filepath.Glob(filepath.Join(dir, "private.asc"))
 		require.NoError(t, err)
 		require.Len(t, matches, 1)
 	})
@@ -73,6 +73,6 @@ func TestCmdKeyring(t *testing.T) {
 			"--email", "test@example.com",
 		})
 		require.NoError(t, err)
-		require.FileExists(t, filepath.Join(dir, "secring.gpg"))
+		require.FileExists(t, filepath.Join(dir, "private.asc"))
 	})
 }

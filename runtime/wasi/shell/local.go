@@ -17,7 +17,7 @@ func NewLocal() Command {
 	}
 }
 
-func runlocal(ctx context.Context, user string, group string, cmd string, directory string, environ []string, do execer) (err error) {
+func runlocal(ctx context.Context, user string, group string, cmd string, directory string, environ []string, do Execer) (err error) {
 	return do(ctx, directory, environ, "bash", []string{"-c", cmd})
 }
 

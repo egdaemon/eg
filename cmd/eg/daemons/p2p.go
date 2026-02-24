@@ -28,7 +28,7 @@ import (
 
 func P2PProxy(ctx context.Context, seed []byte, httpl net.Listener) (zero host.Host, err error) {
 	logging.SetAllLoggers(logging.LevelError)
-	priv, _, err := crypto.GenerateEd25519Key(cryptox.NewPRNGSHA512(seed))
+	priv, _, err := crypto.GenerateEd25519Key(cryptox.NewChaCha8(seed))
 	if err != nil {
 		return zero, errorsx.Wrap(err, "unable to generate p2p credentials")
 	}

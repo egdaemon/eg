@@ -21,7 +21,9 @@ import (
 	"github.com/egdaemon/eg/cmd/cmderrors"
 	"github.com/egdaemon/eg/cmd/cmdopts"
 	"github.com/egdaemon/eg/cmd/cmdplete"
+	"github.com/egdaemon/eg/cmd/cmdgpg"
 	"github.com/egdaemon/eg/cmd/cmdsecret"
+	"github.com/egdaemon/eg/internal/gpgx"
 	"github.com/egdaemon/eg/cmd/eg/accountcmds"
 	"github.com/egdaemon/eg/cmd/eg/compute"
 	"github.com/egdaemon/eg/cmd/eg/daemons"
@@ -85,6 +87,7 @@ func main() {
 		Ident              accountcmds.Identity         `cmd:"" name:"iden" help:"display current credentials"`
 		DiskUsage          daemons.DiskUsage            `cmd:"" name:"disk-usage" help:"monitors disk usage and executes services when above threshold"`
 		Secrets            cmdsecret.SecretCmd          `cmd:"" name:"secrets" help:"ALPHA: builtin simple secret manager"`
+		GPG                cmdgpg.GpgCmd                `cmd:"" name:"gpg" help:"gpg keyring management"`
 		InstallCompletions kongplete.InstallCompletions `cmd:"" help:"install shell completions"`
 	}
 
@@ -138,6 +141,7 @@ func main() {
 			"vars_user_name":               stringsx.DefaultIfBlank(user.Name, user.Username),
 			"vars_user_username":           user.Username,
 			"vars_user_home":               userx.HomeDirectoryOrDefault(user.HomeDir),
+			"vars_gpg_directory":           gpgx.DefaultDirectory(userx.HomeDirectoryOrDefault(user.HomeDir)),
 			"vars_os":                      runtime.GOOS,
 			"vars_arch":                    runtime.GOARCH,
 			"vars_cores_minimum_default":   strconv.FormatUint(envx.Uint64(uint64(float64(runtime.NumCPU())*0.8), "EG_RESOURCES_CORES"), 10),

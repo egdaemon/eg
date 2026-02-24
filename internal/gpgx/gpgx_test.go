@@ -43,8 +43,8 @@ func TestKeyring(t *testing.T) {
 		dir := t.TempDir()
 		_, err := gpgx.Keyring(dir, "test-seed")
 		require.NoError(t, err)
-		require.FileExists(t, filepath.Join(dir, "secring.gpg"))
-		require.FileExists(t, filepath.Join(dir, "pubring.gpg"))
+		require.FileExists(t, filepath.Join(dir, "private.asc"))
+		require.FileExists(t, filepath.Join(dir, "public.asc"))
 	})
 
 	t.Run("same_seed_same_key_id_across_calls", func(t *testing.T) {

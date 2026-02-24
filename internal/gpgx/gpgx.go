@@ -39,7 +39,7 @@ func Keyring(dir, seed string, options ...option) (entity *openpgp.Entity, err e
 }
 
 func loadkeyring(dir string) (*openpgp.Entity, error) {
-	encoded, err := os.ReadFile(filepath.Join(dir, "secring.gpg"))
+	encoded, err := os.ReadFile(filepath.Join(dir, "private.asc"))
 	if err != nil {
 		return nil, err
 	}
@@ -87,11 +87,11 @@ func savekeyring(dir string, entity *openpgp.Entity) (err error) {
 		return err
 	}
 
-	if err = os.WriteFile(filepath.Join(dir, "secring.gpg"), privbuf.Bytes(), 0600); err != nil {
+	if err = os.WriteFile(filepath.Join(dir, "private.asc"), privbuf.Bytes(), 0600); err != nil {
 		return err
 	}
 
-	return os.WriteFile(filepath.Join(dir, "pubring.gpg"), pubbuf.Bytes(), 0644)
+	return os.WriteFile(filepath.Join(dir, "public.asc"), pubbuf.Bytes(), 0644)
 }
 
 type option func(*KeyGen)
@@ -119,7 +119,7 @@ func OptionKeyGenClock(fn func() time.Time) option {
 func NewKeyGenSeeded(seed string, options ...option) *KeyGen {
 	return NewKeyGen(append([]option{
 		OptionKeyGenRand(cryptox.NewChaCha8(seed)),
-		OptionKeyGenClock(func() time.Time { return time.Time{} }),
+		OptionKeyGenClock(func() time.Time { return time.Unix(0, 0) }),
 	}, options...)...)
 }
 

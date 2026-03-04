@@ -27,6 +27,7 @@ import (
 	"github.com/egdaemon/eg/internal/wasix"
 	"github.com/egdaemon/eg/interp/c8sproxy"
 	"github.com/egdaemon/eg/runners"
+	"github.com/egdaemon/eg/secrets"
 	"github.com/egdaemon/eg/transpile"
 	"github.com/egdaemon/eg/workspaces"
 	"github.com/go-git/go-git/v5"
@@ -40,8 +41,9 @@ type serve struct {
 	InvalidateCache  bool     `name:"invalidate-cache" help:"removes workload build cache"`
 	Privileged       bool     `name:"privileged" help:"run the initial container in privileged mode"`
 	Dirty            bool     `name:"dirty" help:"include user directories and environment variables" hidden:"true"`
-	EnvironmentPaths string   `name:"envpath" help:"environment files to pass to the module" default:""`
+	EnvironmentPaths []string `name:"envpath" help:"environment files to pass to the module" default:""`
 	Environment      []string `name:"env" short:"e" help:"define environment variables and their values to be included"`
+	Secrets          []string `name:"secret" help:"List of secret URIs to use. Examples: chachasm://passphrase@/path/to/file, gcpsm://project-id/secret-name/version, awssm://secret-name?region=us-east-1"`
 	GitRemote        string   `name:"git-remote" help:"name of the git remote to use" default:"${vars_git_default_remote_name}"`
 	GitReference     string   `name:"git-ref" help:"name of the branch or commit to checkout" default:"${vars_git_head_reference}"`
 	Infinite         bool     `name:"infinite" help:"allow this module to run forever, used for running a workload like a webserver"`
@@ -102,12 +104,11 @@ func (t serve) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err e
 
 	log.Println("loading environment file", t.datadir(".eg.env"))
 	envb := envx.Build().
-		FromPath(
-			t.EnvironmentPaths,
-			t.datadir(".eg.env"),
-		).
-		FromEnv(t.Environment...).
 		FromEnv(os.Environ()...).
+		FromReader(secrets.NewReader(gctx.Context, t.Secrets...)).
+		FromPath(t.EnvironmentPaths...).
+		FromPath(t.datadir(".eg.env")).
+		FromEnv(t.Environment...).
 		FromEnviron(errorsx.Zero(gitx.LocalEnv(repo, t.GitRemote, t.GitReference))...).
 		Var(eg.EnvComputeRunID, uid.String()).
 		Var(eg.EnvComputeLoggingVerbosity, strconv.Itoa(gctx.Verbosity)).

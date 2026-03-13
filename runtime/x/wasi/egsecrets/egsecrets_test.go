@@ -208,6 +208,18 @@ func TestCopyIntoFile(t *testing.T) {
 		require.Error(t, err)
 	})
 
+	t.Run("parent directory does not exist", func(t *testing.T) {
+		tmp := t.TempDir()
+		uri := writeFileSecret(t, tmp, "secret.txt", "data")
+		dst := filepath.Join(tmp, "nonexistent", "output.txt")
+
+		require.NoError(t, egsecrets.CopyIntoFile(t.Context(), dst, uri))
+
+		result, err := os.ReadFile(dst)
+		require.NoError(t, err)
+		require.Equal(t, "data", string(result))
+	})
+
 	t.Run("removes file when copy fails", func(t *testing.T) {
 		tmp := t.TempDir()
 		dst := filepath.Join(tmp, "output.txt")

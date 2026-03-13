@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 	"os"
+	"path/filepath"
 
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
@@ -41,6 +42,9 @@ func CopyInto(ctx context.Context, w io.Writer, uris ...string) error {
 
 // CopyIntoFile copies the secret content from the given URIs into a file at the provided path.
 func CopyIntoFile(ctx context.Context, path string, uris ...string) (err error) {
+	if err = os.MkdirAll(filepath.Dir(path), 0700); err != nil {
+		return err
+	}
 	f, err := os.Create(path)
 	if err != nil {
 		return err

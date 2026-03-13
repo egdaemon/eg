@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"os"
+	"path/filepath"
 
 	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/internal/envx"
@@ -18,7 +19,17 @@ func AgentOptionLocalGPGAgent(ctx context.Context, envb *envx.Builder) AgentOpti
 	// https://blog.packagecloud.io/how-to-gpg-sign-and-verify-deb-packages-and-apt-repositories/
 	upstream := userx.DefaultRuntimeDirectory("gnupg", "S.gpg-agent")
 
-	if _, err := os.Stat(upstream); fsx.ErrIsNotExist(err) != nil {
+	gnupghome, err := userx.HomeDirectory(".gnupg")
+	if err != nil {
+		log.Println("unable to check if gpg config is available", err)
+		return AgentOptionNoop
+	}
+
+	return agentOptionLocalGPGAgent(ctx, envb, upstream, gnupghome)
+}
+
+func agentOptionLocalGPGAgent(ctx context.Context, envb *envx.Builder, agentsock string, gnupghome string) AgentOption {
+	if _, err := os.Stat(agentsock); fsx.ErrIsNotExist(err) != nil {
 		log.Println("gpg agent is not available", err)
 		return AgentOptionNoop
 	} else if err != nil {
@@ -26,29 +37,32 @@ func AgentOptionLocalGPGAgent(ctx context.Context, envb *envx.Builder) AgentOpti
 		return AgentOptionNoop
 	}
 
-	gnupghome, err := userx.HomeDirectory(".gnupg")
-	if err != nil {
-		log.Println("unable to check if gpg agent is available", err)
+	if _, err := os.Stat(gnupghome); fsx.ErrIsNotExist(err) != nil {
+		log.Println("gpg config is not available", err)
+		return AgentOptionNoop
+	} else if err != nil {
+		log.Println("unable to check if gpg config is available", err)
 		return AgentOptionNoop
 	}
 
 	envb.Var("GNUPGHOME", eg.DefaultMountRoot(".gnupg"))
 
+	runtimedir := filepath.Dir(agentsock)
 	return AgentOptionVolumes(
 		AgentMountOverlay(
 			gnupghome,
 			eg.DefaultMountRoot(".gnupg"),
 		),
 		AgentMountReadWrite(
-			userx.DefaultRuntimeDirectory("gnupg", "S.gpg-agent"),
+			agentsock,
 			eg.DefaultMountRoot(".gnupg", "S.gpg-agent"),
 		),
 		AgentMountReadWrite(
-			userx.DefaultRuntimeDirectory("gnupg", "S.dirmngr"),
+			filepath.Join(runtimedir, "S.dirmngr"),
 			eg.DefaultMountRoot(".gnupg", "S.dirmngr"),
 		),
 		AgentMountReadWrite(
-			userx.DefaultRuntimeDirectory("gnupg", "S.keyboxd"),
+			filepath.Join(runtimedir, "S.keyboxd"),
 			eg.DefaultMountRoot(".gnupg", "S.keyboxd"),
 		),
 	)

@@ -32,7 +32,7 @@ func OptionBuildDir(s string) Option {
 // directory to place dmg, defaults to egenv.WorkloadDirectory
 func OptionOutputDir(s string) Option {
 	return func(d *Specification) {
-		d.builddir = s
+		d.outputpath = s
 	}
 }
 
@@ -40,7 +40,7 @@ func OptionOutputDir(s string) Option {
 // defaults to {name}.dmg
 func OptionOutputName(s string) Option {
 	return func(d *Specification) {
-		d.builddir = s
+		d.outputname = s
 	}
 }
 
@@ -89,7 +89,7 @@ func Build(b Specification, archive string) eg.OpFn {
 		return shell.Run(
 			ctx,
 			sruntime.Newf("cp -R %s/ %s/", archive, filepath.Join(b.builddir, root)),
-			sruntime.Newf("ln -fs /Applications %s", filepath.Join(b.builddir, "Applications")),
+			sruntime.Newf("ln -fs /Applications %s", filepath.Join(b.builddir, root, "Applications")),
 			sruntime.New(cmd),
 		)
 	}

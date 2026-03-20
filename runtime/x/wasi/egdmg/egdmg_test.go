@@ -3,6 +3,7 @@ package egdmg_test
 import (
 	"fmt"
 	"log"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -63,5 +64,52 @@ func TestBuild(t *testing.T) {
 
 			return true
 		}(r.Results()...), r.Results())
+	})
+
+	t.Run("applications symlink inside srcfolder", func(t *testing.T) {
+		tmpdir := testx.PrivateTemp(t)
+		r := &shell.Recorder{}
+		rt := shell.Runtime().UnsafeExec(r.Record).As("egd")
+
+		b := egdmg.New("eg", egdmg.OptionRuntime(rt), egdmg.OptionMkisofs)
+		require.NoError(t, egdmg.Build(b, testx.Fixture("example1"))(t.Context(), egtest.Op()))
+
+		cmds := r.Results()
+		require.Len(t, cmds, 3)
+		require.Contains(t, cmds[1], filepath.Join(tmpdir, "eg.app", "Applications"))
+	})
+
+	t.Run("option output dir sets outputpath", func(t *testing.T) {
+		tmpdir := testx.PrivateTemp(t)
+		r := &shell.Recorder{}
+		rt := shell.Runtime().UnsafeExec(r.Record).As("egd")
+
+		b := egdmg.New("eg", egdmg.OptionRuntime(rt), egdmg.OptionMkisofs, egdmg.OptionOutputDir("/custom/output"))
+		require.NoError(t, egdmg.Build(b, testx.Fixture("example1"))(t.Context(), egtest.Op()))
+
+		cmds := r.Results()
+		require.Len(t, cmds, 3)
+		// cp and symlink should still use the default builddir, not the output dir
+		require.Contains(t, cmds[0], filepath.Join(tmpdir, "eg.app"))
+		// mkisofs output should use the custom output dir
+		require.Contains(t, cmds[2], filepath.Join("/custom/output", "eg.dmg"))
+	})
+
+	t.Run("option output name sets outputname", func(t *testing.T) {
+		tmpdir := testx.PrivateTemp(t)
+		r := &shell.Recorder{}
+		rt := shell.Runtime().UnsafeExec(r.Record).As("egd")
+
+		b := egdmg.New("eg", egdmg.OptionRuntime(rt), egdmg.OptionMkisofs, egdmg.OptionOutputName("custom.dmg"))
+		require.NoError(t, egdmg.Build(b, testx.Fixture("example1"))(t.Context(), egtest.Op()))
+
+		cmds := r.Results()
+		require.Len(t, cmds, 3)
+		// cp and symlink should still use the default builddir
+		require.Contains(t, cmds[0], filepath.Join(tmpdir, "eg.app"))
+		// mkisofs output should use the custom name
+		require.Contains(t, cmds[2], "custom.dmg")
+		// mkisofs output should not use the default name
+		require.NotContains(t, cmds[2], "eg.dmg")
 	})
 }

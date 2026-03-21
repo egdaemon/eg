@@ -3,6 +3,7 @@ package egdmg
 import (
 	"context"
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -85,13 +86,34 @@ func Build(b Specification, archive string) eg.OpFn {
 		cmd = strings.ReplaceAll(cmd, "%dmg.src.directory%", filepath.Join(b.builddir, b.name))
 
 		sruntime := b.runtime
-		return shell.Run(
+		if err := shell.Run(
 			ctx,
 			sruntime.Newf("cp -R %s/ %s/", archive, filepath.Join(b.builddir, b.name)),
 			sruntime.Newf("ln -fs /Applications %s", filepath.Join(b.builddir, b.name, "Applications")),
-			sruntime.New(cmd),
-		)
+		); err != nil {
+			return err
+		}
+
+		if err := templateInfoPlist(filepath.Join(b.builddir, b.name, "Contents", "Info.plist")); err != nil {
+			return err
+		}
+
+		return shell.Run(ctx, sruntime.New(cmd))
 	}
+}
+
+// templateInfoPlist replaces template variables in the Info.plist after copying.
+func templateInfoPlist(path string) error {
+	data, err := os.ReadFile(path)
+	if os.IsNotExist(err) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+
+	templated := strings.ReplaceAll(string(data), "${DMG_BUNDLE_SIGNATURE}", "????")
+	return os.WriteFile(path, []byte(templated), 0644)
 }
 
 func root(paths ...string) string {

@@ -28,15 +28,6 @@ func TestBuild(t *testing.T) {
 
 		require.NoError(t, egdmg.Build(b, testx.Fixture("example1"))(t.Context(), egtest.Op()))
 
-		// fsx.PrintFS(os.DirFS(egenv.EphemeralDirectory()))
-
-		// TODO:
-		// require.NoError(t, fsx.DirExists(egenv.EphemeralDirectory("eg")))
-		// require.Equal(t, testx.ReadMD5(testx.Fixture("example1", "hello.world.txt")), testx.ReadMD5(egenv.EphemeralDirectory("eg", "hello.world.txt")))
-		// require.Equal(t, testx.ReadMD5(testx.Fixture("example1", "Contents", "MacOS", "bin")), testx.ReadMD5(egenv.EphemeralDirectory("eg", "Contents", "MacOS", "bin")))
-		// require.Equal(t, testx.ReadMD5(testx.Fixture("example1", "Contents", "Resources", "icon.icns")), testx.ReadMD5(egenv.EphemeralDirectory("eg", "Contents", "Resources", "icon.icns")))
-		// require.NotEqual(t, testx.ReadMD5(testx.Fixture("example1", "Contents", "Info.plist")), testx.ReadMD5(egenv.EphemeralDirectory("eg", "Contents", "Info.plist")), testx.ReadString(egenv.EphemeralDirectory("eg", "Contents", "Info.plist")))
-		// require.Equal(t, "930df5f0-b121-133a-8d2a-51ed2a420683", testx.ReadMD5(egenv.EphemeralDirectory("eg", "Contents", "Info.plist")), testx.ReadString(egenv.EphemeralDirectory("eg", "Contents", "Info.plist")))
 		require.True(t, func(cmds ...string) bool {
 			check := func(cmd, expected string) bool {
 
@@ -64,6 +55,20 @@ func TestBuild(t *testing.T) {
 
 			return true
 		}(r.Results()...), r.Results())
+	})
+
+	t.Run("copies archive contents into staging directory", func(t *testing.T) {
+		tmpdir := testx.PrivateTemp(t)
+		b := egdmg.New("eg", egdmg.OptionRuntime(shell.NewLocal()), egdmg.OptionDmgCmd("true"))
+		require.NoError(t, egdmg.Build(b, testx.Fixture("example1"))(t.Context(), egtest.Op()))
+
+		require.NoError(t, fsx.DirExists(filepath.Join(tmpdir, "eg")))
+		require.Equal(t, testx.ReadMD5(testx.Fixture("example1", "hello.world.txt")), testx.ReadMD5(filepath.Join(tmpdir, "eg", "hello.world.txt")))
+		require.Equal(t, testx.ReadMD5(testx.Fixture("example1", "Contents", "MacOS", "bin")), testx.ReadMD5(filepath.Join(tmpdir, "eg", "Contents", "MacOS", "bin")))
+		require.Equal(t, testx.ReadMD5(testx.Fixture("example1", "Contents", "Resources", "icon.icns")), testx.ReadMD5(filepath.Join(tmpdir, "eg", "Contents", "Resources", "icon.icns")))
+		require.NotEqual(t, testx.ReadMD5(testx.Fixture("example1", "Contents", "Info.plist")), testx.ReadMD5(filepath.Join(tmpdir, "eg", "Contents", "Info.plist")), testx.ReadString(filepath.Join(tmpdir, "eg", "Contents", "Info.plist")))
+		require.Equal(t, "1cbafcbe-a85d-7a8f-5578-a1215753ff1f", testx.ReadMD5(filepath.Join(tmpdir, "eg", "Contents", "Info.plist")), testx.ReadString(filepath.Join(tmpdir, "eg", "Contents", "Info.plist")))
+		require.NoError(t, fsx.SymlinkExists(filepath.Join(tmpdir, "eg", "Applications")))
 	})
 
 	t.Run("applications symlink inside srcfolder", func(t *testing.T) {

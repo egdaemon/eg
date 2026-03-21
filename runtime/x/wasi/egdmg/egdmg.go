@@ -80,16 +80,15 @@ type Specification struct {
 
 func Build(b Specification, archive string) eg.OpFn {
 	return func(ctx context.Context, o eg.Op) error {
-		root := fmt.Sprintf("%s.app", b.name)
-		cmd := strings.ReplaceAll(b.cmd, "%dmg.volume.name%", root)
+		cmd := strings.ReplaceAll(b.cmd, "%dmg.volume.name%", b.name)
 		cmd = strings.ReplaceAll(cmd, "%dmg.volume.output%", filepath.Join(b.outputpath, b.outputname))
-		cmd = strings.ReplaceAll(cmd, "%dmg.src.directory%", filepath.Join(b.builddir, root))
+		cmd = strings.ReplaceAll(cmd, "%dmg.src.directory%", filepath.Join(b.builddir, b.name))
 
 		sruntime := b.runtime
 		return shell.Run(
 			ctx,
-			sruntime.Newf("cp -R %s/ %s/", archive, filepath.Join(b.builddir, root)),
-			sruntime.Newf("ln -fs /Applications %s", filepath.Join(b.builddir, root, "Applications")),
+			sruntime.Newf("cp -R %s/ %s/", archive, filepath.Join(b.builddir, b.name)),
+			sruntime.Newf("ln -fs /Applications %s", filepath.Join(b.builddir, b.name, "Applications")),
 			sruntime.New(cmd),
 		)
 	}

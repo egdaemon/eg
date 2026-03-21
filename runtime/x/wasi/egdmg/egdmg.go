@@ -3,6 +3,7 @@ package egdmg
 import (
 	"context"
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -80,19 +81,39 @@ type Specification struct {
 
 func Build(b Specification, archive string) eg.OpFn {
 	return func(ctx context.Context, o eg.Op) error {
-		root := fmt.Sprintf("%s.app", b.name)
-		cmd := strings.ReplaceAll(b.cmd, "%dmg.volume.name%", root)
+		cmd := strings.ReplaceAll(b.cmd, "%dmg.volume.name%", b.name)
 		cmd = strings.ReplaceAll(cmd, "%dmg.volume.output%", filepath.Join(b.outputpath, b.outputname))
-		cmd = strings.ReplaceAll(cmd, "%dmg.src.directory%", filepath.Join(b.builddir, root))
+		cmd = strings.ReplaceAll(cmd, "%dmg.src.directory%", filepath.Join(b.builddir, b.name))
 
 		sruntime := b.runtime
-		return shell.Run(
+		if err := shell.Run(
 			ctx,
-			sruntime.Newf("cp -R %s/ %s/", archive, filepath.Join(b.builddir, root)),
-			sruntime.Newf("ln -fs /Applications %s", filepath.Join(b.builddir, root, "Applications")),
-			sruntime.New(cmd),
-		)
+			sruntime.Newf("cp -R %s/ %s/", archive, filepath.Join(b.builddir, b.name)),
+			sruntime.Newf("ln -fs /Applications %s", filepath.Join(b.builddir, b.name, "Applications")),
+		); err != nil {
+			return err
+		}
+
+		if err := templateInfoPlist(filepath.Join(b.builddir, b.name, "Contents", "Info.plist")); err != nil {
+			return err
+		}
+
+		return shell.Run(ctx, sruntime.New(cmd))
 	}
+}
+
+// templateInfoPlist replaces template variables in the Info.plist after copying.
+func templateInfoPlist(path string) error {
+	data, err := os.ReadFile(path)
+	if os.IsNotExist(err) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+
+	templated := strings.ReplaceAll(string(data), "${DMG_BUNDLE_SIGNATURE}", "????")
+	return os.WriteFile(path, []byte(templated), 0644)
 }
 
 func root(paths ...string) string {

@@ -284,3 +284,17 @@ func (t errReader) Read([]byte) (int, error) {
 func Reader(err error) io.Reader {
 	return errReader{err}
 }
+
+type errWriter struct {
+	error
+}
+
+func (t errWriter) Write([]byte) (int, error) {
+	return 0, t.error
+}
+
+// Writer returns an io.Writer that returns the provided error.
+// useful for designing some apis.
+func Writer(err error) io.Writer {
+	return errWriter{err}
+}

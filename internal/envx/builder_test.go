@@ -1,10 +1,15 @@
 package envx_test
 
 import (
+	"bytes"
+	"os"
+	"path/filepath"
 	"sort"
+	"strings"
 	"testing"
 
 	"github.com/egdaemon/eg/internal/envx"
+	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/stretchr/testify/require"
 )
 
@@ -206,6 +211,72 @@ func TestBuilder(t *testing.T) {
 			require.NoError(t, err)
 			expected := []string{"KEY1=:val1"}
 			require.Equal(t, expected, actual)
+		})
+	})
+
+	t.Run("CopyTo", func(t *testing.T) {
+		t.Run("writes_variables_to_writer", func(t *testing.T) {
+			var buf bytes.Buffer
+			b := envx.Build().FromEnviron("KEY1=val1", "KEY2=val2")
+			require.NoError(t, b.CopyTo(&buf))
+			require.Equal(t, "KEY1=val1\nKEY2=val2\n", buf.String())
+		})
+
+		t.Run("empty_builder_writes_nothing", func(t *testing.T) {
+			var buf bytes.Buffer
+			b := envx.Build()
+			require.NoError(t, b.CopyTo(&buf))
+			require.Empty(t, buf.String())
+		})
+
+		t.Run("returns_failed_set_by_from_path", func(t *testing.T) {
+			tmpFile, err := os.CreateTemp(t.TempDir(), "unreadable.*")
+			require.NoError(t, err)
+			tmpFile.Close()
+			require.NoError(t, os.Chmod(tmpFile.Name(), 0000))
+
+			var buf bytes.Buffer
+			b := envx.Build().FromPath(tmpFile.Name())
+			require.ErrorIs(t, b.CopyTo(&buf), os.ErrPermission)
+		})
+
+		t.Run("reads_vars_from_reader", func(t *testing.T) {
+			var buf bytes.Buffer
+			b := envx.Build().FromReader(strings.NewReader("KEY1=val1\nKEY2=val2\n"))
+			require.NoError(t, b.CopyTo(&buf))
+			require.Equal(t, "KEY1=val1\nKEY2=val2\n", buf.String())
+		})
+
+		t.Run("reader_failure_propagates_via_copy_to", func(t *testing.T) {
+			var buf bytes.Buffer
+			b := envx.Build().FromReader(errorsx.Reader(os.ErrNotExist))
+			require.ErrorIs(t, b.CopyTo(&buf), os.ErrNotExist)
+		})
+	})
+
+	t.Run("WriteTo", func(t *testing.T) {
+		t.Run("writes_variables_to_file", func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), "env")
+			b := envx.Build().FromEnviron("KEY1=val1", "KEY2=val2")
+			require.NoError(t, b.WriteTo(path))
+			data, err := os.ReadFile(path)
+			require.NoError(t, err)
+			require.Equal(t, "KEY1=val1\nKEY2=val2\n", string(data))
+		})
+
+		t.Run("returns_failed_set_by_from_path", func(t *testing.T) {
+			tmpFile, err := os.CreateTemp(t.TempDir(), "unreadable.*")
+			require.NoError(t, err)
+			tmpFile.Close()
+			require.NoError(t, os.Chmod(tmpFile.Name(), 0000))
+
+			b := envx.Build().FromPath(tmpFile.Name())
+			require.ErrorIs(t, b.WriteTo(filepath.Join(t.TempDir(), "env")), os.ErrPermission)
+		})
+
+		t.Run("returns_error_for_invalid_output_path", func(t *testing.T) {
+			b := envx.Build().FromEnviron("KEY1=val1")
+			require.ErrorIs(t, b.WriteTo("/nonexistent/dir/env"), os.ErrNotExist)
 		})
 	})
 

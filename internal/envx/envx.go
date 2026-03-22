@@ -314,7 +314,7 @@ func FromReader(r io.Reader) (environ []string, err error) {
 		environ = append(environ, Format(k, v))
 	}
 
-	return environ, nil
+	return environ, scanner.Err()
 }
 
 func FromPath(n string) (environ []string, err error) {

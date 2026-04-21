@@ -89,7 +89,11 @@ func TestProxy(t *testing.T) {
 
 		ctx, cancel := context.WithCancel(ctx)
 		defer cancel()
-		go func() { watcherx.Proxy(ctx, src, dst, 10*time.Millisecond) }()
+		go func() {
+			if err := watcherx.Proxy(ctx, src, dst, 10*time.Millisecond); err != nil {
+				t.Logf("Proxy error: %v", err)
+			}
+		}()
 
 		time.Sleep(50 * time.Millisecond)
 		require.NoError(t, os.Remove(filepath.Join(src, "gone.txt")))

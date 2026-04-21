@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/egdaemon/eg/internal/debugx"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/radovskyb/watcher"
 )
@@ -38,7 +39,7 @@ func Proxy(ctx context.Context, src, dst string, interval time.Duration) error {
 			return nil
 		case event := <-w.Event:
 			if err := applyEvent(src, dst, event); err != nil {
-				errorsx.Log(errorsx.Wrap(err, "unable to apply file system event"))
+				debugx.Println(errorsx.Wrap(err, "unable to apply file system event"))
 			}
 		}
 	}

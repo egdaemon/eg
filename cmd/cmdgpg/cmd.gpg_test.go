@@ -15,7 +15,7 @@ func runGPGCLI(t *testing.T, args []string) error {
 
 	var cli struct {
 		cmdopts.Global
-		GPG cmdgpg.GpgCmd `cmd:""`
+		GPG cmdgpg.Cmd `cmd:""`
 	}
 
 	cli.Context = t.Context()

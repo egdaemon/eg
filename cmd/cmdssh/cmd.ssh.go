@@ -2,6 +2,8 @@ package cmdssh
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 
 	"github.com/egdaemon/eg/cmd/cmdopts"
 	"github.com/egdaemon/eg/internal/sshx"
@@ -24,6 +26,10 @@ type GenKey struct {
 // The key is stable: running the command again with the same seed produces the
 // same key, and if the file already exists it is loaded from disk unchanged.
 func (t GenKey) Run(gctx *cmdopts.Global) error {
+	if err := os.MkdirAll(filepath.Dir(t.Path), 0700); err != nil {
+		return fmt.Errorf("failed to create parent directory: %w", err)
+	}
+
 	kg := sshx.NewKeyGenSeeded(t.Seed)
 	signer, err := sshx.AutoCached(kg, t.Path)
 	if err != nil {

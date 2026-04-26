@@ -13,7 +13,7 @@ type Cmd struct {
 }
 
 type GenKey struct {
-	Seed string `name:"seed" help:"seed for generating a deterministic key, useful for ci/cd" default:"${vars_entropy_seed}"`
+	Seed string `name:"seed" help:"seed for generating a deterministic key, useful for ci/cd" default:"${vars_entropy_seed}" env:"${vars_ssh_key_seed}"`
 	Path string `name:"path" help:"path for the generated key (private key and .pub file)" default:"${vars_ssh_key_path}"`
 }
 

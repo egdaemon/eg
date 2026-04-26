@@ -1,6 +1,7 @@
 package cmdssh_test
 
 import (
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -23,7 +24,8 @@ func runSSHCLI(t *testing.T, args []string) error {
 	parser, err := kong.New(&cli,
 		kong.Name("eg"),
 		kong.Vars{
-			"vars_entropy_seed": "test-default-seed",
+			"vars_entropy_seed":     "test-default-seed",
+			"vars_ssh_key_seed":     "test-default-seed",
 			"vars_ssh_key_path": filepath.Join(t.TempDir(), "id_ed25519"),
 			"vars_user_name":    "testuser",
 			"vars_user_home":    t.TempDir(),
@@ -48,6 +50,19 @@ func TestCmdKey(t *testing.T) {
 		require.NoError(t, err)
 		require.FileExists(t, path)
 		require.FileExists(t, path+".pub")
+	})
+
+	t.Run("creates_parent_directory_with_0700", func(t *testing.T) {
+		dir := t.TempDir()
+		path := filepath.Join(dir, "nonexistent", "subdir", "id_ed25519")
+		err := runSSHCLI(t, []string{"ssh", "key", "--seed", "test-seed", "--path", path})
+		require.NoError(t, err)
+		require.FileExists(t, path)
+		require.FileExists(t, path+".pub")
+
+		info, err := os.Stat(filepath.Dir(path))
+		require.NoError(t, err)
+		require.Equal(t, os.FileMode(0700), info.Mode().Perm())
 	})
 
 	t.Run("second_call_loads_from_disk", func(t *testing.T) {

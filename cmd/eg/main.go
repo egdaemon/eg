@@ -140,6 +140,7 @@ func main() {
 				userx.DefaultDir,
 			),
 			"vars_ssh_known_hosts_path":    filepath.Join(userx.HomeDirectoryOrDefault(user.HomeDir), ".ssh", "known_hosts"),
+			"vars_ssh_key_seed":            eg.EnvEGSSHSeed,
 			"vars_user_name":               stringsx.DefaultIfBlank(user.Name, user.Username),
 			"vars_user_username":           user.Username,
 			"vars_user_home":               userx.HomeDirectoryOrDefault(user.HomeDir),

@@ -7,7 +7,7 @@ import (
 	"github.com/egdaemon/eg/internal/gpgx"
 )
 
-type GpgCmd struct {
+type Cmd struct {
 	Keyring CmdKeyring `cmd:"" name:"keyring" help:"generate a deterministic gpg keyring from a seed"`
 }
 

@@ -19,11 +19,11 @@ import (
 	"github.com/dustin/go-humanize"
 	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/cmd/cmderrors"
+	"github.com/egdaemon/eg/cmd/cmdgpg"
 	"github.com/egdaemon/eg/cmd/cmdopts"
 	"github.com/egdaemon/eg/cmd/cmdplete"
-	"github.com/egdaemon/eg/cmd/cmdgpg"
 	"github.com/egdaemon/eg/cmd/cmdsecret"
-	"github.com/egdaemon/eg/internal/gpgx"
+	"github.com/egdaemon/eg/cmd/cmdssh"
 	"github.com/egdaemon/eg/cmd/eg/accountcmds"
 	"github.com/egdaemon/eg/cmd/eg/compute"
 	"github.com/egdaemon/eg/cmd/eg/daemons"
@@ -33,6 +33,7 @@ import (
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/gitx"
+	"github.com/egdaemon/eg/internal/gpgx"
 	"github.com/egdaemon/eg/internal/osx"
 	"github.com/egdaemon/eg/internal/stringsx"
 	"github.com/egdaemon/eg/internal/tracex"
@@ -87,7 +88,8 @@ func main() {
 		Ident              accountcmds.Identity         `cmd:"" name:"iden" help:"display current credentials"`
 		DiskUsage          daemons.DiskUsage            `cmd:"" name:"disk-usage" help:"monitors disk usage and executes services when above threshold"`
 		Secrets            cmdsecret.SecretCmd          `cmd:"" name:"secrets" help:"ALPHA: builtin simple secret manager"`
-		GPG                cmdgpg.GpgCmd                `cmd:"" name:"gpg" help:"gpg keyring management"`
+		GPG                cmdgpg.Cmd                   `cmd:"" name:"gpg" help:"gpg keyring management"`
+		SSH                cmdssh.Cmd                   `cmd:"" name:"ssh" help:"ssh key management"`
 		InstallCompletions kongplete.InstallCompletions `cmd:"" help:"install shell completions"`
 	}
 

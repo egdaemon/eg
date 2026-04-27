@@ -19,8 +19,7 @@ func PatternVersion() string {
 
 // replaces the substitution values within the pattern, resulting in the final resulting archive file's name.
 func archiveName(pattern string) string {
-	c := eggit.EnvCommit()
-	return fmt.Sprintf("%s.tar.xz", c.StringReplace(pattern))
+	return eggit.EnvCommit().StringReplace(pattern)
 }
 
 // generate the github download url

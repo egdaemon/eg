@@ -39,10 +39,19 @@ func Path(pattern string) string {
 	return root(fmt.Sprintf(".eg.tarball.%s", egmd5x.String(filepath.Join(eggit.EnvCanonicalURI(), pattern))))
 }
 
+// suffixes the pattern with the the .tar.xz extension.
+func Tarxz(pattern string) string {
+	return fmt.Sprintf("%s.tar.xz", pattern)
+}
+
+// suffixes the pattern with the the .tar.gz extension.
+func Targz(pattern string) string {
+	return fmt.Sprintf("%s.tar.gz", pattern)
+}
+
 // replaces the substitution values within the pattern, resulting in the final resulting archive file's name.
 func Name(pattern string) string {
-	c := eggit.EnvCommit()
-	return fmt.Sprintf("%s.tar.xz", c.StringReplace(pattern))
+	return eggit.EnvCommit().StringReplace(pattern)
 }
 
 // simple template for naming a tarball from git commit information. see eggit.commit.StringReplace for details.

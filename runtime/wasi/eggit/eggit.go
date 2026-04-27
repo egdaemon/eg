@@ -274,6 +274,28 @@ func NewModified() modified {
 	return modified{o: sync.Once{}, runtime: shell.Runtime(), getenv: os.Getenv}
 }
 
+// Archive creates a gzipped tar archive of the git repository at dir, writing it to dest.
+// The archive is created from the commit specified by the eg environment.
+func Archive(dir, dest string) eg.OpFn {
+	return archive(shell.Runtime(), dir, dest)
+}
+
+func archive(runtime shell.Command, dir, dest string) eg.OpFn {
+	return func(ctx context.Context, _ eg.Op) error {
+		return shell.Run(
+			ctx,
+			runtime.Newf("git archive --format=tar.gz -o %s %s", dest, EnvCommit().StringReplace("%git.hash%")).Directory(dir),
+		)
+	}
+}
+
+// AutoArchive clones the repository from the eg environment and archives it.
+func AutoArchive(ctx context.Context, op eg.Op) error {
+	dir := egenv.WorkingDirectory()
+	dest := egenv.RuntimeDirectory(EnvCommit().StringReplace("%git.hash%") + ".tar.gz")
+	return archive(shell.Runtime(), dir, dest)(ctx, op)
+}
+
 // ensures the workspace has not been modified. useful for detecting
 // if there have been changes during the run.
 func Pristine() eg.OpFn {

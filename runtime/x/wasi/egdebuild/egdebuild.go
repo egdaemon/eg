@@ -26,7 +26,8 @@ import (
 )
 
 const (
-	ContainerName = "egdebuild"
+	ContainerName        = "egdebuild"
+	UbuntuLatestCodename = "resolute"
 )
 
 //go:embed .debian
@@ -45,6 +46,7 @@ type Dependency struct {
 	Build   []string
 	Runtime []string
 }
+
 type Config struct {
 	Maintainer
 	ChangeLog

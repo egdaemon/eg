@@ -5,6 +5,7 @@ import (
 	"embed"
 	"fmt"
 	"io/fs"
+	"time"
 
 	"eg/compute/errorsx"
 	"eg/compute/maintainer"
@@ -78,14 +79,14 @@ func Build(ctx context.Context, o eg.Op) error {
 			// 	egdebuild.Option.Environ(egccache.Env()...),
 			// 	egdebuild.Option.NoLint(),
 			// ),
-			egdebuild.Build(gcfg, egdebuild.Option.Distro(latest), egdebuild.Option.NoLint()),
-			egdebuild.Build(gcfg, egdebuild.Option.Distro("questing"), egdebuild.Option.NoLint()),
-			egdebuild.Build(gcfg, egdebuild.Option.Distro("noble"), egdebuild.Option.NoLint()),
 			egdebuild.Build(gcfg, egdebuild.Option.Distro("jammy")),
+			egdebuild.Build(gcfg, egdebuild.Option.Distro("noble"), egdebuild.Option.NoLint()),
+			egdebuild.Build(gcfg, egdebuild.Option.Distro("questing"), egdebuild.Option.NoLint()),
+			egdebuild.Build(gcfg, egdebuild.Option.Distro(latest), egdebuild.Option.NoLint()),
 		),
 	)(ctx, o)
 }
 
 func Upload(ctx context.Context, o eg.Op) error {
-	return egdebuild.UploadDPut(gcfg, errorsx.Must(fs.Sub(debskel, ".debskel")))(ctx, o)
+	return egdebuild.UploadDPut(gcfg, errorsx.Must(fs.Sub(debskel, ".debskel")), egdebuild.Option.Timeout(20*time.Minute))(ctx, o)
 }

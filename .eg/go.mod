@@ -6,7 +6,7 @@ toolchain go1.24.5
 
 require (
 	cloud.google.com/go/secretmanager v1.16.0
-	github.com/egdaemon/eg v0.0.0-20260504120137-c7115aefb216
+	github.com/egdaemon/eg v0.0.0-20260504130058-345b218ec482
 	github.com/egdaemon/wasinet/wasinet v0.0.0-20250806175613-49e153bd345a
 	google.golang.org/api v0.247.0
 	google.golang.org/grpc v1.76.0
@@ -23,13 +23,9 @@ require (
 	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/gofrs/uuid/v5 v5.4.0 // indirect
-	github.com/google/pprof v0.0.0-20250820193118-f64d9cf942d6 // indirect
 	github.com/google/s2a-go v0.1.9 // indirect
 	github.com/googleapis/enterprise-certificate-proxy v0.3.6 // indirect
 	github.com/googleapis/gax-go/v2 v2.15.0 // indirect
-	github.com/onsi/ginkgo/v2 v2.27.5 // indirect
-	github.com/onsi/gomega v1.39.0 // indirect
-	github.com/stretchr/testify v1.11.1 // indirect
 	go.opentelemetry.io/auto/sdk v1.1.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.61.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.61.0 // indirect

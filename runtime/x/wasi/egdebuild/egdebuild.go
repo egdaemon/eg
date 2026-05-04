@@ -272,14 +272,14 @@ func Build(cfg Config, opts ...option) eg.OpFn {
 }
 
 // uploads the generated deb packages using a dput configuration.
-func UploadDPut(gcfg Config, dput fs.FS) eg.OpFn {
+func UploadDPut(gcfg Config, dput fs.FS, opts ...option) eg.OpFn {
 	return func(ctx context.Context, o eg.Op) error {
 		if err := egfs.CloneFS(ctx, egenv.EphemeralDirectory(), "dput.config", dput); err != nil {
 			return err
 		}
 		root := fmt.Sprintf("deb.%s", gcfg.Name)
 		bdir := egenv.EphemeralDirectory(root)
-		runtime := Runtime(gcfg)
+		runtime := Runtime(gcfg, opts...)
 		return shell.Run(
 			ctx,
 			runtime.Newf(

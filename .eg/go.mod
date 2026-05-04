@@ -1,12 +1,12 @@
 module eg/compute
 
-go 1.24.0
+go 1.24.2
 
 toolchain go1.24.5
 
 require (
 	cloud.google.com/go/secretmanager v1.16.0
-	github.com/egdaemon/eg v0.0.0-20251028122306-41f47a7f070c
+	github.com/egdaemon/eg v0.0.0-20260504120137-c7115aefb216
 	github.com/egdaemon/wasinet/wasinet v0.0.0-20250806175613-49e153bd345a
 	google.golang.org/api v0.247.0
 	google.golang.org/grpc v1.76.0

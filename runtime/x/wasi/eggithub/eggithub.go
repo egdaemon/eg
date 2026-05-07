@@ -12,9 +12,11 @@ import (
 )
 
 // provides the version pattern based on a github commit.
+// provides sequentially incrementing versions based on the commit dates.
+// assuming you're generating commits on merge this will always move forward.
 func PatternVersion() string {
 	c := eggit.EnvCommit()
-	return c.StringReplace("r%git.commit.year%.%git.commit.month%.%git.commit.day%%git.hash.short%")
+	return c.StringReplace("r%git.commit.year%.%git.commit.month%.%git.commit.day%%git.commit.unix%")
 }
 
 // replaces the substitution values within the pattern, resulting in the final resulting archive file's name.

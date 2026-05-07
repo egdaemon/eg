@@ -44,7 +44,7 @@ type builtinUpload struct {
 	HostedCompute bool     `name:"shared-compute" help:"allow hosted compute" default:"true"`
 	SSHKeyPath    string   `name:"sshkeypath" help:"path to ssh key to use" default:"${vars_ssh_key_path}"`
 	Dir           string   `name:"directory" help:"root directory of the repository" default:"${vars_eg_root_directory}"`
-	Name          string   `arg:"" name:"module" help:"name of the module to run, i.e. the folder name within moduledir" default:"" predictor:"eg.workload"`
+	Name          string   `arg:"" name:"module" help:"name of the module to run, i.e. the folder name within moduledir" default:"" predictor:"eg.workload.builtin"`
 	Environment   []string `name:"env" short:"e" help:"define environment variables and their values to be included"`
 	Dirty         bool     `name:"dirty" help:"include all environment variables"`
 	Endpoint      string   `name:"endpoint" help:"specify the endpoint to upload to" default:"${vars_endpoint}/c/q/" hidden:"true"`

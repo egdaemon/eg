@@ -37,7 +37,7 @@ type builtinLocal struct {
 	GitRemote        string   `name:"git-remote" help:"name of the git remote to use" default:"${vars_git_default_remote_name}"`
 	GitReference     string   `name:"git-ref" help:"name of the branch or commit to checkout" default:"${vars_git_default_reference}"`
 	Endpoint         string   `name:"endpoint" help:"specify the endpoint to upload to" default:"${vars_endpoint}/c/q/" hidden:"true"`
-	Name             string   `arg:"" name:"workload" help:"name of the workload to run, i.e. the folder name within workload directory" default:"" predictor:"eg.workload"`
+	Name             string   `arg:"" name:"workload" help:"name of the workload to run, i.e. the folder name within workload directory" default:"" predictor:"eg.workload.builtin"`
 }
 
 func (t builtinLocal) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err error) {

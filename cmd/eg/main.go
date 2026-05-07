@@ -169,6 +169,7 @@ func main() {
 	)
 
 	pw := cmdplete.NewWorkload(filepath.Join(gitdir, eg.DefaultModuleDirectory()))
+	pwbuiltin := compute.NewBuiltinPredictor(shellcli.Context)
 
 	// Run kongplete.Complete to handle completion requests
 	kongplete.Complete(
@@ -176,6 +177,10 @@ func main() {
 		kongplete.WithPredictor(
 			"eg.workload",
 			pw,
+		),
+		kongplete.WithPredictor(
+			"eg.workload.builtin",
+			pwbuiltin,
 		),
 	)
 

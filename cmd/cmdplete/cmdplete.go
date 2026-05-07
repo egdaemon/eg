@@ -10,6 +10,25 @@ import (
 	"golang.org/x/tools/go/packages"
 )
 
+// will initialize data if necessary when prediction is called using the provided init function.
+func InitializingPrediction(init func() error, p complete.Predictor) complete.Predictor {
+	return initializing{init: init, p: p}
+}
+
+type initializing struct {
+	init func() error
+	p    complete.Predictor
+}
+
+func (t initializing) Predict(args complete.Args) (results []string) {
+	if err := t.init(); err != nil {
+		log.Println("failed to prepare the prediction, return nothing", err)
+		return []string(nil)
+	}
+
+	return t.p.Predict(args)
+}
+
 func NewWorkload(root string) Workload {
 	return Workload{
 		root: root,
@@ -42,6 +61,7 @@ func (t Workload) Predict(args complete.Args) (results []string) {
 			err error
 			m   string
 		)
+
 		if !pkg.Module.Main {
 			continue
 		}

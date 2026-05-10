@@ -11,7 +11,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/egdaemon/eg/internal/debugx"
 	"github.com/egdaemon/eg/internal/errorsx"
 )
 
@@ -174,7 +173,7 @@ func CloneFS(ctx context.Context, dstdir string, rootdir string, archive fs.FS) 
 			return err
 		}
 
-		debugx.Println("cloning", rootdir, path, "->", dst, info.Mode().Perm())
+		log.Println("cloning", rootdir, path, "->", dst, info.Mode().Perm())
 
 		if d.IsDir() {
 			return os.MkdirAll(dst, info.Mode().Perm())

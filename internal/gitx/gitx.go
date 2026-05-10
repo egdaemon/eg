@@ -111,7 +111,7 @@ func Clone(ctx context.Context, auth transport.AuthMethod, dir, uri, remote, tre
 func QuirkCloneURI(r *git.Repository, name string) (_ string, err error) {
 	uri, err := CanonicalURI(r, name)
 
-	replaced := strings.Replace(uri, "git@github.com:", "https://github.com/", -1)
+	replaced := strings.ReplaceAll(uri, "git@github.com:", "https://github.com/")
 
 	return replaced, err
 }

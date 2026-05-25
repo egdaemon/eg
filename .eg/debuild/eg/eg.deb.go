@@ -67,10 +67,10 @@ func Build(ctx context.Context, o eg.Op) error {
 		egdebuild.Build(gcfg, egdebuild.Option.Distro("jammy")),
 		egdebuild.Build(gcfg, egdebuild.Option.Distro("noble"), egdebuild.Option.NoLint()),
 		egdebuild.Build(gcfg, egdebuild.Option.Distro("questing"), egdebuild.Option.NoLint()),
-		egdebuild.Build(gcfg, egdebuild.Option.Distro("resolute"), egdebuild.Option.NoLint()),
+		egdebuild.Build(gcfg, egdebuild.Option.Distro(egdebuild.UbuntuLatestCodename), egdebuild.Option.NoLint()),
 		egdebuild.Build(
 			gcfg,
-			egdebuild.Option.Distro("resolute"),
+			egdebuild.Option.Distro(egdebuild.UbuntuLatestCodename),
 			egdebuild.Option.BuildBinary(20*time.Minute),
 			egdebuild.Option.Environ(eggolang.Env()...),
 			egdebuild.Option.NoLint(),

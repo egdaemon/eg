@@ -1,0 +1,10 @@
+FROM eg:latest
+ARG DEBIAN_FRONTEND=noninteractive
+ARG GOBIN=/usr/local/bin
+
+RUN echo "cache buster 78a58873-3818-4200-b130-5d677e8bbcef"
+
+RUN sh /usr/share/eg/install/postgresql.sh
+
+RUN apt-get update
+RUN apt-get -y install libpq5 postgresql-18 postgresql-client-18 postgresql-contrib-18

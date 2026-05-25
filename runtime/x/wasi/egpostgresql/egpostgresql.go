@@ -6,7 +6,9 @@ package egpostgresql
 
 import (
 	"context"
+	"embed"
 	"fmt"
+	"io/fs"
 	"log"
 	"net/netip"
 	"os"
@@ -48,7 +50,7 @@ func Trust(v ...netip.Prefix) eg.OpFn {
 				continue
 			}
 
-			sb.WriteString(fmt.Sprintf("host all all %s trust\\n", prefix.String()))
+			_, _ = fmt.Fprintf(&sb, "host all all %s trust\\n", prefix.String())
 		}
 
 		if sb.Len() == 0 {
@@ -137,4 +139,11 @@ func LocatePort(ctx context.Context, begin, end int) int {
 	}
 
 	return 5432
+}
+
+//go:embed .psqlskel
+var psqlskel embed.FS
+
+func TestArchive() fs.FS {
+	return psqlskel
 }

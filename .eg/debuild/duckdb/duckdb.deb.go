@@ -23,7 +23,7 @@ var debskel embed.FS
 
 const (
 	container = "eg.deb.duckdb"
-	version   = "1.4.1"
+	version   = "1.5.2"
 )
 
 var (
@@ -55,7 +55,7 @@ func Prepare(ctx context.Context, o eg.Op) error {
 		shell.Op(
 			sruntime.Newf("test -d duckdb || git clone -b v%s --depth 1 https://github.com/duckdb/duckdb.git duckdb", version),
 			sruntime.New("md5sum duckdb/src/include/duckdb.h"),
-			sruntime.New("echo \"2a20d340931922b25919dd8a870365a9  duckdb/src/include/duckdb.h\" > duckdb.md5"),
+			sruntime.New("echo \"fcdba922a5ef1ac7373134cb915d204b  duckdb/src/include/duckdb.h\" > duckdb.md5"),
 			sruntime.New("md5sum -c duckdb.md5"),
 		),
 		egdebuild.Prepare(Runner(), errorsx.Must(fs.Sub(debskel, ".debskel"))),
@@ -68,13 +68,12 @@ func Runner() eg.ContainerRunner {
 }
 
 func Build(ctx context.Context, o eg.Op) error {
-	const latest = "resolute"
 	return eg.Sequential(
 		eg.Parallel(
 			// build the package to improve the chances it'll actually build in within ubuntu launchpad.
 			// egdebuild.Build(
 			// 	gcfg,
-			// 	egdebuild.Option.Distro(latest),
+			// 	egdebuild.Option.Distro(egdebuild.UbuntuLatestCodename),
 			// 	egdebuild.Option.BuildBinary(20*time.Minute),
 			// 	egdebuild.Option.Environ(egccache.Env()...),
 			// 	egdebuild.Option.NoLint(),
@@ -82,7 +81,7 @@ func Build(ctx context.Context, o eg.Op) error {
 			egdebuild.Build(gcfg, egdebuild.Option.Distro("jammy")),
 			egdebuild.Build(gcfg, egdebuild.Option.Distro("noble"), egdebuild.Option.NoLint()),
 			egdebuild.Build(gcfg, egdebuild.Option.Distro("questing"), egdebuild.Option.NoLint()),
-			egdebuild.Build(gcfg, egdebuild.Option.Distro(latest), egdebuild.Option.NoLint()),
+			egdebuild.Build(gcfg, egdebuild.Option.Distro(egdebuild.UbuntuLatestCodename), egdebuild.Option.NoLint()),
 		),
 	)(ctx, o)
 }

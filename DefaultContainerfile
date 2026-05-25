@@ -1,4 +1,4 @@
-FROM ubuntu:questing
+FROM ubuntu:resolute
 
 ARG GOBIN="/usr/bin"
 ARG GOMODCACHE="/tmp/gomod"

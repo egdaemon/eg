@@ -4,37 +4,36 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"testing"
 
 	"github.com/egdaemon/eg/internal/sshx"
-	"github.com/egdaemon/eg/internal/testx"
 	"github.com/egdaemon/eg/internal/userx"
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
+	"github.com/stretchr/testify/require"
 )
 
-var _ = Describe("newAutoSignerPath", func() {
-	It("should succeed when no key exists", func() {
+func TestNewAutoSignerPath(t *testing.T) {
+	t.Run("should succeed when no key exists", func(t *testing.T) {
 		_, err := newAutoSignerPath(
-			filepath.Join(testx.TempDir(), DefaultNotaryKey),
+			filepath.Join(t.TempDir(), DefaultNotaryKey),
 			"",
 			sshx.UnsafeNewKeyGen(),
 		)
-		Expect(err).To(Succeed())
+		require.NoError(t, err)
 	})
 
-	It("should fail when unable to write to disk", func() {
+	t.Run("should fail when unable to write to disk", func(t *testing.T) {
 		if userx.CurrentUserOrDefault(userx.Root()).Uid == "0" {
 			log.Println("ROOT USER")
 			return
 		}
-		tmp := testx.TempDir()
+		tmp := t.TempDir()
 		os.Stat(tmp)
-		Expect(os.Chmod(tmp, 0100)).To(Succeed())
+		require.NoError(t, os.Chmod(tmp, 0100))
 		_, err := newAutoSignerPath(
 			filepath.Join(tmp, DefaultNotaryKey),
 			"",
 			sshx.UnsafeNewKeyGen(),
 		)
-		Expect(err).ToNot(Succeed())
+		require.Error(t, err)
 	})
-})
+}

@@ -3,15 +3,11 @@ package httpx_test
 import (
 	"io"
 	"log"
-
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
-
+	"os"
 	"testing"
 )
 
-func TestHttputilx(t *testing.T) {
+func TestMain(m *testing.M) {
 	log.SetOutput(io.Discard)
-	RegisterFailHandler(Fail)
-	RunSpecs(t, "httputilx Suite")
+	os.Exit(m.Run())
 }

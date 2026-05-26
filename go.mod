@@ -37,10 +37,9 @@ require (
 	github.com/mailru/easyjson v0.9.0
 	github.com/mattn/go-isatty v0.0.20
 	github.com/multiformats/go-multiaddr v0.16.0
-	github.com/onsi/ginkgo/v2 v2.27.5
-	github.com/onsi/gomega v1.39.0
 	github.com/pbnjay/memory v0.0.0-20210728143218-7b4eea64cf58
 	github.com/pkg/errors v0.9.1
+	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2
 	github.com/posener/complete v1.2.3
 	github.com/radovskyb/watcher v1.0.7
 	github.com/shirou/gopsutil/v4 v4.25.12
@@ -86,13 +85,14 @@ require (
 	github.com/google/s2a-go v0.1.9 // indirect
 	github.com/googleapis/enterprise-certificate-proxy v0.3.6 // indirect
 	github.com/googleapis/gax-go/v2 v2.15.0 // indirect
+	github.com/onsi/ginkgo/v2 v2.27.5 // indirect
+	github.com/onsi/gomega v1.39.0 // indirect
 	github.com/raulk/go-watchdog v1.3.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.61.0 // indirect
 	go.podman.io/common v0.66.1 // indirect
 	go.podman.io/image/v5 v5.38.0 // indirect
 	go.podman.io/storage v1.61.0 // indirect
 	go.yaml.in/yaml/v2 v2.4.2 // indirect
-	go.yaml.in/yaml/v3 v3.0.4 // indirect
 	golang.org/x/telemetry v0.0.0-20260109210033-bd525da824e2 // indirect
 	google.golang.org/genproto v0.0.0-20250603155806-513f23925822 // indirect
 )
@@ -157,7 +157,6 @@ require (
 	github.com/golang/groupcache v0.0.0-20241129210726-2c02b8208cf8 // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/google/flatbuffers v25.2.10+incompatible // indirect
-	github.com/google/go-cmp v0.7.0 // indirect
 	github.com/google/go-containerregistry v0.20.6 // indirect
 	github.com/google/go-intervals v0.0.2 // indirect
 	github.com/google/gopacket v1.1.19 // indirect
@@ -255,7 +254,6 @@ require (
 	github.com/pion/webrtc/v4 v4.1.3 // indirect
 	github.com/pjbgf/sha1cd v0.3.2 // indirect
 	github.com/pkg/sftp v1.13.9 // indirect
-	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/polydawn/refmt v0.89.0 // indirect
 	github.com/power-devops/perfstat v0.0.0-20240221224432-82ca36839d55 // indirect
 	github.com/proglottis/gpgme v0.1.5 // indirect

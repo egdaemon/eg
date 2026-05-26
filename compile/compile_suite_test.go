@@ -1,15 +1,13 @@
 package compile_test
 
 import (
+	"os"
 	"testing"
 
 	"github.com/egdaemon/eg/internal/testx"
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
 )
 
-func TestCompile(t *testing.T) {
+func TestMain(m *testing.M) {
 	testx.Logging()
-	RegisterFailHandler(Fail)
-	RunSpecs(t, "Compile Suite")
+	os.Exit(m.Run())
 }

@@ -1,11 +1,11 @@
 package compile_test
 
 import (
-	"context"
 	"crypto/md5"
 	"io/fs"
 	"os"
 	"path/filepath"
+	"testing"
 
 	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/compile"
@@ -14,106 +14,88 @@ import (
 	"github.com/egdaemon/eg/internal/wasix"
 	"github.com/egdaemon/eg/transpile"
 	"github.com/egdaemon/eg/workspaces"
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
+	"github.com/stretchr/testify/require"
 	"github.com/tetratelabs/wazero"
 )
 
-var _ = Describe("FromTranspiled", func() {
-	It("should compile example 1", func(ctx context.Context) {
-		var (
-			err error
-			ws  workspaces.Context
-		)
+func TestFromTranspiled(t *testing.T) {
+	t.Run("should compile example 1", func(t *testing.T) {
+		ctx := t.Context()
+		srcdir := t.TempDir()
+		tmpdir := t.TempDir()
+		ws, err := workspaces.New(ctx, md5.New(), tmpdir, tmpdir, "")
+		require.NoError(t, err)
 
-		srcdir := testx.TempDir()
-		tmpdir := testx.TempDir()
-		ws, err = workspaces.New(ctx, md5.New(), tmpdir, tmpdir, "")
-		Expect(err).To(Succeed())
-
-		Expect(fsx.CloneTree(ctx, srcdir, filepath.Join("example.1", eg.DefaultModuleDirectory()), os.DirFS(testx.Fixture()))).To(Succeed())
+		require.NoError(t, fsx.CloneTree(ctx, srcdir, filepath.Join("example.1", eg.DefaultModuleDirectory()), os.DirFS(testx.Fixture())))
 
 		roots, err := transpile.Autodetect(transpile.New(srcdir, ws)).Run(ctx)
-		Expect(err).To(Succeed())
+		require.NoError(t, err)
 
 		err = compile.EnsureRequiredPackages(ctx, filepath.Join(ws.Root, ws.TransDir))
-		Expect(err).To(Succeed())
+		require.NoError(t, err)
 		modules, err := compile.FromTranspiled(ctx, ws, roots...)
-		Expect(err).To(Succeed())
-		Expect(modules).To(HaveLen(1))
-		Expect(modules[0].Generated).To(BeFalse())
-		Expect(modules[0].Path).To(Equal(filepath.Join(tmpdir, ws.BuildDir, "main.wasm")))
+		require.NoError(t, err)
+		require.Len(t, modules, 1)
+		require.False(t, modules[0].Generated)
+		require.Equal(t, filepath.Join(tmpdir, ws.BuildDir, "main.wasm"), modules[0].Path)
 	})
 
-	It("should transform nested modules", func(ctx context.Context) {
-		var (
-			err error
-			ws  workspaces.Context
-		)
+	t.Run("should transform nested modules", func(t *testing.T) {
+		ctx := t.Context()
+		srcdir := t.TempDir()
+		tmpdir := t.TempDir()
+		ws, err := workspaces.New(ctx, md5.New(), tmpdir, tmpdir, "")
+		require.NoError(t, err)
 
-		srcdir := testx.TempDir()
-		tmpdir := testx.TempDir()
-		ws, err = workspaces.New(ctx, md5.New(), tmpdir, tmpdir, "")
-		Expect(err).To(Succeed())
-
-		Expect(fsx.CloneTree(ctx, srcdir, filepath.Join("example.2", eg.DefaultModuleDirectory()), os.DirFS(testx.Fixture()))).To(Succeed())
+		require.NoError(t, fsx.CloneTree(ctx, srcdir, filepath.Join("example.2", eg.DefaultModuleDirectory()), os.DirFS(testx.Fixture())))
 
 		roots, err := transpile.Autodetect(transpile.New(srcdir, ws)).Run(ctx)
-		Expect(err).To(Succeed())
+		require.NoError(t, err)
 		err = compile.EnsureRequiredPackages(ctx, filepath.Join(ws.Root, ws.TransDir))
-		Expect(err).To(Succeed())
+		require.NoError(t, err)
 
 		modules, err := compile.FromTranspiled(ctx, ws, roots...)
-
-		Expect(err).To(Succeed())
-		Expect(modules).To(HaveLen(1))
-		Expect(modules[0].Generated).To(BeFalse())
-		Expect(modules[0].Path).To(Equal(filepath.Join(tmpdir, ws.BuildDir, "main.wasm")))
-		Expect(testx.ReadMD5(filepath.Join(tmpdir, ws.TransDir, "m1", "m1.go"))).To(Equal("6d5e29ce-6e99-d52f-f8c6-4ab44bee50b1"), testx.ReadString(filepath.Join(tmpdir, ws.TransDir, "m1", "m1.go")))
-		Expect(testx.ReadMD5(filepath.Join(tmpdir, ws.TransDir, "m1", "m2", "m2.go"))).To(Equal("8d6b4444-b948-e467-8435-24d7c4fea235"))
+		require.NoError(t, err)
+		require.Len(t, modules, 1)
+		require.False(t, modules[0].Generated)
+		require.Equal(t, filepath.Join(tmpdir, ws.BuildDir, "main.wasm"), modules[0].Path)
+		require.Equal(t, "6d5e29ce-6e99-d52f-f8c6-4ab44bee50b1", testx.ReadMD5(filepath.Join(tmpdir, ws.TransDir, "m1", "m1.go")), testx.ReadString(filepath.Join(tmpdir, ws.TransDir, "m1", "m1.go")))
+		require.Equal(t, "8d6b4444-b948-e467-8435-24d7c4fea235", testx.ReadMD5(filepath.Join(tmpdir, ws.TransDir, "m1", "m2", "m2.go")))
 	})
-})
+}
 
-var _ = Describe("wasix warm cache", func() {
-	It("should compile example 1 and warm the provided cache", func(ctx context.Context) {
-		var (
-			err error
-			ws  workspaces.Context
-		)
+func TestWasixWarmCache(t *testing.T) {
+	t.Run("should compile example 1 and warm the provided cache", func(t *testing.T) {
+		ctx := t.Context()
+		srcdir := t.TempDir()
+		tmpdir := t.TempDir()
+		ws, err := workspaces.New(ctx, md5.New(), tmpdir, tmpdir, "")
+		require.NoError(t, err)
 
-		srcdir := testx.TempDir()
-		tmpdir := testx.TempDir()
-		ws, err = workspaces.New(ctx, md5.New(), tmpdir, tmpdir, "")
-		Expect(err).To(Succeed())
-
-		Expect(fsx.CloneTree(ctx, srcdir, filepath.Join("example.1", eg.DefaultModuleDirectory()), os.DirFS(testx.Fixture()))).To(Succeed())
+		require.NoError(t, fsx.CloneTree(ctx, srcdir, filepath.Join("example.1", eg.DefaultModuleDirectory()), os.DirFS(testx.Fixture())))
 
 		wazcache, err := os.MkdirTemp(tmpdir, "wazcache")
-		Expect(err).To(Succeed())
+		require.NoError(t, err)
 
-		Expect(err).To(Succeed())
 		roots, err := transpile.Autodetect(transpile.New(srcdir, ws)).Run(ctx)
-		Expect(err).To(Succeed())
+		require.NoError(t, err)
 		err = compile.EnsureRequiredPackages(ctx, filepath.Join(ws.Root, ws.TransDir))
-		Expect(err).To(Succeed())
+		require.NoError(t, err)
 
 		_, err = compile.FromTranspiled(ctx, ws, roots...)
-		Expect(err).To(Succeed())
+		require.NoError(t, err)
 
 		cache, err := wazero.NewCompilationCacheWithDir(wazcache)
-		Expect(err).To(Succeed())
+		require.NoError(t, err)
 		defer cache.Close(ctx)
-		Expect(
-			wasix.WarmCacheFromDirectoryTree(ctx, filepath.Join(ws.Root, ws.BuildDir), cache),
-		).To(Succeed())
+		require.NoError(t, wasix.WarmCacheFromDirectoryTree(ctx, filepath.Join(ws.Root, ws.BuildDir), cache))
 
-		// grab the cache dir.
 		cached, err := fs.ReadDir(os.DirFS(wazcache), ".")
-		Expect(err).To(Succeed())
-		Expect(cached).To(HaveLen(1))
+		require.NoError(t, err)
+		require.Len(t, cached, 1)
 
 		entries, err := fs.ReadDir(os.DirFS(wazcache), cached[0].Name())
-		Expect(err).To(Succeed())
-		Expect(entries).To(HaveLen(3))
+		require.NoError(t, err)
+		require.Len(t, entries, 3)
 	})
-})
+}

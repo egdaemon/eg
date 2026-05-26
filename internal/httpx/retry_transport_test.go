@@ -6,18 +6,16 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"testing"
 	"time"
 
 	"github.com/egdaemon/eg/internal/httptestx"
-
 	. "github.com/egdaemon/eg/internal/httpx"
-
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
+	"github.com/stretchr/testify/require"
 )
 
-var _ = Describe("Retry Transport", func() {
-	It("should retry once", func() {
+func TestRetryTransport(t *testing.T) {
+	t.Run("should retry once", func(t *testing.T) {
 		invoked := 0
 		body := []byte("")
 		c := httptestx.NewTestClient(func(req *http.Request) *http.Response {
@@ -33,15 +31,15 @@ var _ = Describe("Retry Transport", func() {
 
 		c.Transport = NewRetryTransport(c.Transport, http.StatusBadGateway)
 		req, err := http.NewRequest(http.MethodGet, "http://example.com/", strings.NewReader("Hello World"))
-		Expect(err).To(Succeed())
+		require.NoError(t, err)
 		resp, err := c.Do(req)
-		Expect(err).To(Succeed())
-		Expect(resp.StatusCode).To(Equal(http.StatusBadGateway))
-		Expect(invoked).To(Equal(2))
-		Expect(body).To(Equal([]byte("Hello World")))
+		require.NoError(t, err)
+		require.Equal(t, http.StatusBadGateway, resp.StatusCode)
+		require.Equal(t, 2, invoked)
+		require.Equal(t, []byte("Hello World"), body)
 	})
 
-	It("should retry on context.DeadlineExceeded", func() {
+	t.Run("should retry on context.DeadlineExceeded", func(t *testing.T) {
 		s := httptest.NewServer(http.HandlerFunc(func(resp http.ResponseWriter, req *http.Request) {
 			time.Sleep(time.Hour)
 		}))
@@ -52,13 +50,13 @@ var _ = Describe("Retry Transport", func() {
 		ctx, done := context.WithTimeout(context.Background(), -1*time.Second)
 		defer done()
 		req, err := http.NewRequestWithContext(ctx, http.MethodGet, s.URL, strings.NewReader("Hello World"))
-		Expect(err).To(Succeed())
+		require.NoError(t, err)
 		resp, err := c.Do(req)
-		Expect(err).ToNot(Succeed())
-		Expect(resp).To(BeNil())
+		require.Error(t, err)
+		require.Nil(t, resp)
 	})
 
-	It("should retry with a nil body", func() {
+	t.Run("should retry with a nil body", func(t *testing.T) {
 		invoked := 0
 		body := []byte("")
 		c := httptestx.NewTestClient(func(req *http.Request) *http.Response {
@@ -74,11 +72,11 @@ var _ = Describe("Retry Transport", func() {
 
 		c.Transport = NewRetryTransport(c.Transport, http.StatusBadGateway)
 		req, err := http.NewRequest(http.MethodGet, "http://example.com/", nil)
-		Expect(err).To(Succeed())
+		require.NoError(t, err)
 		resp, err := c.Do(req)
-		Expect(err).To(Succeed())
-		Expect(resp.StatusCode).To(Equal(http.StatusBadGateway))
-		Expect(invoked).To(Equal(2))
-		Expect(body).To(Equal([]byte("")))
+		require.NoError(t, err)
+		require.Equal(t, http.StatusBadGateway, resp.StatusCode)
+		require.Equal(t, 2, invoked)
+		require.Equal(t, []byte(""), body)
 	})
-})
+}

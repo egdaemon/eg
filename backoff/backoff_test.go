@@ -3,40 +3,47 @@ package backoff
 import (
 	"fmt"
 	"math"
+	"testing"
 	"time"
 
-	. "github.com/onsi/ginkgo/v2"
-
-	. "github.com/onsi/gomega"
+	"github.com/stretchr/testify/require"
 )
 
-func testBackoff(attempts int, s Strategy, expected ...time.Duration) {
+func testBackoff(t testing.TB, attempts int, s Strategy, expected ...time.Duration) {
+	t.Helper()
 	for i := 0; i < attempts; i++ {
-		Expect(s.Backoff(int64(i))).To(Equal(expected[i]), fmt.Sprintf("attempt %d", i))
+		require.Equal(t, expected[i], s.Backoff(int64(i)), fmt.Sprintf("attempt %d", i))
 	}
 }
 
-func expectedDurationTest(attempt int, s Strategy, expected time.Duration) {
-	Expect(s.Backoff(int64(attempt))).To(Equal(expected))
+func expectedDurationTest(t testing.TB, attempt int, s Strategy, expected time.Duration) {
+	t.Helper()
+	require.Equal(t, expected, s.Backoff(int64(attempt)))
 }
 
-func expectedDurationRangeTest(attempt int, s Strategy, expected, delta time.Duration) {
+func expectedDurationRangeTest(t testing.TB, attempt int, s Strategy, expected, delta time.Duration) {
+	t.Helper()
 	b := s.Backoff(int64(attempt))
-	Expect(b).To(BeNumerically("~", expected, delta))
+	diff := b - expected
+	if diff < 0 {
+		diff = -diff
+	}
+	require.LessOrEqual(t, diff, delta)
 }
 
-var _ = Describe("Backoff", func() {
-	DescribeTable("Explicit",
-		testBackoff,
-		Entry("more attempts than delays", 5, Explicit(1*time.Second, 2*time.Second, 3*time.Second), 1*time.Second, 2*time.Second, 3*time.Second, 1*time.Second, 2*time.Second),
-	)
-	DescribeTable("Exponential",
-		testBackoff,
-		Entry("should double each time", 5, Exponential(1*time.Second), 1*time.Second, 2*time.Second, 4*time.Second, 8*time.Second, 16*time.Second),
-		Entry(
-			"should gracefully handle overflows",
-			101,
-			Exponential(1*time.Second),
+func TestBackoff(t *testing.T) {
+	t.Run("Explicit/more attempts than delays", func(t *testing.T) {
+		testBackoff(t, 5, Explicit(1*time.Second, 2*time.Second, 3*time.Second),
+			1*time.Second, 2*time.Second, 3*time.Second, 1*time.Second, 2*time.Second)
+	})
+
+	t.Run("Exponential/should double each time", func(t *testing.T) {
+		testBackoff(t, 5, Exponential(1*time.Second),
+			1*time.Second, 2*time.Second, 4*time.Second, 8*time.Second, 16*time.Second)
+	})
+
+	t.Run("Exponential/should gracefully handle overflows", func(t *testing.T) {
+		testBackoff(t, 101, Exponential(1*time.Second),
 			time.Second<<uint(0),
 			time.Second<<uint(1),
 			time.Second<<uint(2),
@@ -138,55 +145,43 @@ var _ = Describe("Backoff", func() {
 			time.Duration(math.MaxInt64),
 			time.Duration(math.MaxInt64),
 			time.Duration(math.MaxInt64), // 100
-		),
-	)
-	DescribeTable("Constant",
-		testBackoff,
-		Entry("should remain constant", 5, Constant(1*time.Second), 1*time.Second, 1*time.Second, 1*time.Second, 1*time.Second, 1*time.Second),
-	)
+		)
+	})
 
-	DescribeTable("Exponential Backoff",
-		expectedDurationTest,
-		Entry("attempt 0", 0, Exponential(1*time.Second), time.Duration(1*time.Second)),
-		Entry("attempt 1", 1, Exponential(1*time.Second), time.Duration(2*time.Second)),
-		Entry("attempt 2", 2, Exponential(1*time.Second), time.Duration(4*time.Second)),
-		Entry("attempt 3", 3, Exponential(1*time.Second), time.Duration(8*time.Second)),
-		Entry("attempt 36", 36, Exponential(1*time.Second), time.Duration(math.MaxInt64)),
-		Entry("attempt 37", 37, Exponential(1*time.Second), time.Duration(math.MaxInt64)),
-		Entry("attempt 54 - overflow", 54, Exponential(1*time.Second), time.Duration(math.MaxInt64)),
-		Entry("with scaling - attempt 0", 0, Exponential(500*time.Millisecond), time.Duration(500*time.Millisecond)),
-		Entry("with scaling - attempt 1", 1, Exponential(500*time.Millisecond), time.Duration(1*time.Second)),
-		Entry("with scaling - attempt 2", 2, Exponential(500*time.Millisecond), time.Duration(2*time.Second)),
-		Entry("with scaling - attempt 3", 3, Exponential(500*time.Millisecond), time.Duration(4*time.Second)),
-		Entry("max attempt value", math.MaxInt64, Exponential(1*time.Second), time.Duration(math.MaxInt64)),
-	)
+	t.Run("Constant/should remain constant", func(t *testing.T) {
+		testBackoff(t, 5, Constant(1*time.Second),
+			1*time.Second, 1*time.Second, 1*time.Second, 1*time.Second, 1*time.Second)
+	})
 
-	DescribeTable(
-		"Jitter",
-		expectedDurationTest,
-		Entry(
-			"example 1 - with jitter",
-			57,
-			New(
-				Exponential(1*time.Second),
-				Jitter(0.25),
-			),
-			time.Duration(math.MaxInt64),
-		),
-	)
+	for _, tc := range []struct {
+		name     string
+		attempt  int
+		strategy Strategy
+		expected time.Duration
+	}{
+		{"Exponential Backoff/attempt 0", 0, Exponential(1 * time.Second), 1 * time.Second},
+		{"Exponential Backoff/attempt 1", 1, Exponential(1 * time.Second), 2 * time.Second},
+		{"Exponential Backoff/attempt 2", 2, Exponential(1 * time.Second), 4 * time.Second},
+		{"Exponential Backoff/attempt 3", 3, Exponential(1 * time.Second), 8 * time.Second},
+		{"Exponential Backoff/attempt 36", 36, Exponential(1 * time.Second), time.Duration(math.MaxInt64)},
+		{"Exponential Backoff/attempt 37", 37, Exponential(1 * time.Second), time.Duration(math.MaxInt64)},
+		{"Exponential Backoff/attempt 54 - overflow", 54, Exponential(1 * time.Second), time.Duration(math.MaxInt64)},
+		{"Exponential Backoff/with scaling - attempt 0", 0, Exponential(500 * time.Millisecond), 500 * time.Millisecond},
+		{"Exponential Backoff/with scaling - attempt 1", 1, Exponential(500 * time.Millisecond), 1 * time.Second},
+		{"Exponential Backoff/with scaling - attempt 2", 2, Exponential(500 * time.Millisecond), 2 * time.Second},
+		{"Exponential Backoff/with scaling - attempt 3", 3, Exponential(500 * time.Millisecond), 4 * time.Second},
+		{"Exponential Backoff/max attempt value", math.MaxInt64, Exponential(1 * time.Second), time.Duration(math.MaxInt64)},
+		{"Jitter/example 1 - with jitter", 57, New(Exponential(1*time.Second), Jitter(0.25)), time.Duration(math.MaxInt64)},
+	} {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			expectedDurationTest(t, tc.attempt, tc.strategy, tc.expected)
+		})
+	}
 
-	DescribeTable(
-		"JitterRandWindow",
-		expectedDurationRangeTest,
-		Entry(
-			"example 1 - with jitter range",
-			0,
-			New(
-				Constant(1*time.Second),
-				JitterRandWindow(200*time.Millisecond),
-			),
-			time.Second,
-			200*time.Millisecond,
-		),
-	)
-})
+	t.Run("JitterRandWindow/example 1 - with jitter range", func(t *testing.T) {
+		expectedDurationRangeTest(t, 0,
+			New(Constant(1*time.Second), JitterRandWindow(200*time.Millisecond)),
+			time.Second, 200*time.Millisecond)
+	})
+}

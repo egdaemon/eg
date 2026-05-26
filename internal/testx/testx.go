@@ -11,14 +11,8 @@ import (
 
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/gofrs/uuid/v5"
-	"github.com/onsi/ginkgo/v2"
-	"github.com/onsi/gomega"
 	"github.com/stretchr/testify/require"
 )
-
-func TempDir() string {
-	return ginkgo.GinkgoT().TempDir()
-}
 
 func Fixture(path ...string) string {
 	return filepath.Join(".fixtures", filepath.Join(path...))
@@ -40,15 +34,7 @@ func ReadMD5(path ...string) string {
 	return uuid.FromBytesOrNil(d.Sum(nil)).String()
 }
 
-// Must is a small language extension for panicing on the common
-// value, error return pattern. only used in tests.
-func Must[T any](v T, err error) T {
-	gomega.Expect(err).To(gomega.BeNil())
-	return v
-}
-
-// Must is a small language extension for panicing on the common
-// value, error return pattern. only used in tests.
+// MustT is a small language extension for the common value, error return pattern.
 func MustT[T any](v T, err error) func(t testing.TB) T {
 	return func(t testing.TB) T {
 		require.NoError(t, err)

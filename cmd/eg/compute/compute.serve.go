@@ -1,13 +1,16 @@
 package compute
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log"
 	"math"
+	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -25,13 +28,17 @@ import (
 	"github.com/egdaemon/eg/internal/stringsx"
 	"github.com/egdaemon/eg/internal/userx"
 	"github.com/egdaemon/eg/internal/wasix"
+	"github.com/egdaemon/eg/interp"
 	"github.com/egdaemon/eg/interp/c8sproxy"
+	"github.com/egdaemon/eg/interp/macvmproxy"
 	"github.com/egdaemon/eg/runners"
 	"github.com/egdaemon/eg/secrets"
 	"github.com/egdaemon/eg/transpile"
 	"github.com/egdaemon/eg/workspaces"
 	"github.com/go-git/go-git/v5"
 	"github.com/gofrs/uuid/v5"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 type serve struct {
@@ -68,12 +75,14 @@ func (t serve) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err e
 		mounthome  runners.AgentOption = runners.AgentOptionNoop
 		privileged runners.AgentOption = runners.AgentOptionNoop
 		gnupghome  runners.AgentOption = runners.AgentOptionNoop
-		mountegbin runners.AgentOption = runners.AgentOptionEGBin(errorsx.Must(exec.LookPath(os.Args[0])))
+		mountegbin runners.AgentOption
 	)
 
-	ctx, err := podmanx.WithClient(gctx.Context)
-	if err != nil {
-		return errorsx.Wrap(err, "unable to connect to podman")
+	ctx := gctx.Context
+	if runtime.GOOS != "darwin" {
+		if ctx, err = podmanx.WithClient(gctx.Context); err != nil {
+			return errorsx.Wrap(err, "unable to connect to podman")
+		}
 	}
 
 	if ws, err = workspaces.NewLocal(
@@ -87,6 +96,15 @@ func (t serve) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err e
 		return errorsx.Wrap(err, "unable to setup workspace")
 	}
 	defer os.RemoveAll(ws.Root)
+
+	// Stage the running eg binary into the workspace so the podman machine
+	// VM (which on darwin only shares the user home/project tree, never
+	// /tmp) can mount it into the build container.
+	hostEgBin, err := stageHostToolchain(ws.RuntimeDir)
+	if err != nil {
+		return errorsx.Wrap(err, "stage eg binary for container mount")
+	}
+	mountegbin = runners.AgentOptionEGBin(hostEgBin)
 
 	environpath := filepath.Join(ws.RuntimeDir, eg.EnvironFile)
 	if environio, err = os.Create(environpath); err != nil {
@@ -154,8 +172,10 @@ func (t serve) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err e
 	debugx.Println("modules", modules)
 
 	imagename := stringsx.Join(".", "eg.serve", strings.ReplaceAll(t.Name, string(filepath.Separator), "."))
-	if err = runners.BuildContainer(gctx.Context, imagename, t.Dir, t.datadir("Containerfile")); err != nil {
-		return errorsx.Wrap(err, "serve requires a containerfile to run")
+	if runtime.GOOS != "darwin" {
+		if err = runners.BuildContainer(gctx.Context, imagename, t.Dir, t.datadir("Containerfile")); err != nil {
+			return errorsx.Wrap(err, "serve requires a containerfile to run")
+		}
 	}
 
 	if err = wasix.WarmCacheDirectory(gctx.Context, filepath.Join(ws.Root, ws.BuildDir), ws.CacheDirWazero); err != nil {
@@ -193,6 +213,66 @@ func (t serve) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err e
 		runners.AgentOptionCores(t.RuntimeResources.Cores),
 		runners.AgentOptionMemory(uint64(t.RuntimeResources.Memory)),
 	)
+
+	// Stand up a gRPC control socket the container's workload dials through
+	// the mounted runtime directory. macvm RPCs (Pull, Build, Run, Module)
+	// have to run on the host — vz lives in the host kernel, not in a
+	// Linux container — so the socket lets the workload's FFI calls reach
+	// the macvm proxy.
+	cspath := filepath.Join(ws.RuntimeDir, eg.SocketControl)
+	listener, err := net.Listen("unix", cspath)
+	if err != nil {
+		return errorsx.Wrapf(err, "unable to create control socket %s", cspath)
+	}
+	defer listener.Close()
+
+	rpcServer := grpc.NewServer(grpc.Creds(insecure.NewCredentials()))
+	defer rpcServer.GracefulStop()
+
+	c8sproxy.NewServiceProxy(
+		log.Default(),
+		ws,
+		c8sproxy.ServiceProxyOptionContainerOptions(ragent.Options()...),
+		c8sproxy.ServiceProxyOptionBaremetal,
+	).Bind(rpcServer)
+
+	macvmproxyService := macvmproxy.NewServiceProxy(
+		log.Default(),
+		ws,
+		macvmproxy.ServiceProxyOptionEGBin(stringsx.FirstNonBlank(hotswapbin.String(), hostEgBin)),
+	)
+	macvmproxyService.Bind(rpcServer)
+
+	go func() {
+		errorsx.Log(errorsx.Wrap(rpcServer.Serve(listener), "control socket serve"))
+	}()
+
+	// Darwin can't dispatch through podman: the podman-machine VM mounts the
+	// project tree via virtio-fs, which doesn't carry AF_UNIX, so the nested
+	// `eg module` invocation can't bind the control socket on the mount. Run
+	// the workload via the in-process WASI interpreter against the host
+	// control socket instead — the macvm proxy on it serves the same surface
+	// the container path would have used through podman.
+	if runtime.GOOS == "darwin" {
+		cc, err := grpc.DialContext(ctx, fmt.Sprintf("unix://%s", cspath), grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithBlock())
+		if err != nil {
+			return errorsx.Wrap(err, "failed to dial control service")
+		}
+
+		defer func() {
+			sctx, scancel := context.WithTimeout(context.Background(), 60*time.Second)
+			defer scancel()
+			errorsx.Log(errorsx.Wrap(macvmproxyService.Shutdown(sctx), "macvm shutdown"))
+		}()
+
+		aid := uid.String()
+		for _, m := range modules {
+			if err := interp.Remote(ctx, ws, aid, uid.String(), cc, m.Path, interp.OptionEnviron(errorsx.Must(envb.Environ())...)); err != nil {
+				return errorsx.Wrap(err, "module execution failed")
+			}
+		}
+		return nil
+	}
 
 	for _, m := range modules {
 		options := append(

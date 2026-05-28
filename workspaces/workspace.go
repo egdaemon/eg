@@ -64,16 +64,26 @@ func (t Context) FS() fs.FS {
 	return os.DirFS(t.Root)
 }
 
+// FromEnv constructs a workspace Context for the in-guest / in-container
+// `eg module` invocation. EG_COMPUTE_{CACHE,WORKING,RUNTIME,WORKLOAD}_DIRECTORY
+// override the per-purpose paths so the host can point the guest at its
+// virtio-fs / bind-mount layout (the macvm proxy sets all four when
+// dispatching a module over SSH); defaults preserve the original container
+// mount-root locations when the host hasn't published an override.
 func FromEnv(ctx context.Context, root, name string) (zero Context, err error) {
+	cache := envx.String(eg.DefaultCacheDirectory(), eg.EnvComputeCacheDirectory)
+	working := envx.String(eg.DefaultWorkingDirectory(), eg.EnvComputeWorkingDirectory)
+	runtime := envx.String(eg.DefaultRuntimeDirectory(), eg.EnvComputeRuntimeDirectory)
+	workspace := envx.String(eg.DefaultWorkspaceDirectory(), eg.EnvComputeWorkloadDirectory)
 	return Context{
 		Module:         name,
 		Root:           root,
 		ModuleDir:      eg.ModuleDir,
-		CacheDir:       eg.DefaultCacheDirectory(),
-		CacheDirWazero: wasix.WazCacheDir(eg.DefaultCacheDirectory(), eg.DefaultModuleDirectory()),
-		RuntimeDir:     eg.DefaultRuntimeDirectory(),
-		WorkingDir:     eg.DefaultWorkingDirectory(),
-		WorkspaceDir:   eg.DefaultWorkspaceDirectory(),
+		CacheDir:       cache,
+		CacheDirWazero: wasix.WazCacheDir(cache, eg.DefaultModuleDirectory()),
+		RuntimeDir:     runtime,
+		WorkingDir:     working,
+		WorkspaceDir:   workspace,
 	}, nil
 }
 

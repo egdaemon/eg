@@ -2,9 +2,9 @@
 // versions:
 // - protoc-gen-go-grpc v1.5.1
 // - protoc             v7.34.1
-// source: eg.interp.containers.proto
+// source: eg.interp.macvm.proto
 
-package c8s
+package macvm
 
 import (
 	context "context"
@@ -19,10 +19,9 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	Proxy_Pull_FullMethodName   = "/eg.interp.containers.Proxy/Pull"
-	Proxy_Build_FullMethodName  = "/eg.interp.containers.Proxy/Build"
-	Proxy_Run_FullMethodName    = "/eg.interp.containers.Proxy/Run"
-	Proxy_Module_FullMethodName = "/eg.interp.containers.Proxy/Module"
+	Proxy_Pull_FullMethodName   = "/eg.interp.macvm.Proxy/Pull"
+	Proxy_Run_FullMethodName    = "/eg.interp.macvm.Proxy/Run"
+	Proxy_Module_FullMethodName = "/eg.interp.macvm.Proxy/Module"
 )
 
 // ProxyClient is the client API for Proxy service.
@@ -30,7 +29,6 @@ const (
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type ProxyClient interface {
 	Pull(ctx context.Context, in *PullRequest, opts ...grpc.CallOption) (*PullResponse, error)
-	Build(ctx context.Context, in *BuildRequest, opts ...grpc.CallOption) (*BuildResponse, error)
 	Run(ctx context.Context, in *RunRequest, opts ...grpc.CallOption) (*RunResponse, error)
 	Module(ctx context.Context, in *ModuleRequest, opts ...grpc.CallOption) (*ModuleResponse, error)
 }
@@ -47,16 +45,6 @@ func (c *proxyClient) Pull(ctx context.Context, in *PullRequest, opts ...grpc.Ca
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(PullResponse)
 	err := c.cc.Invoke(ctx, Proxy_Pull_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *proxyClient) Build(ctx context.Context, in *BuildRequest, opts ...grpc.CallOption) (*BuildResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(BuildResponse)
-	err := c.cc.Invoke(ctx, Proxy_Build_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -88,7 +76,6 @@ func (c *proxyClient) Module(ctx context.Context, in *ModuleRequest, opts ...grp
 // for forward compatibility.
 type ProxyServer interface {
 	Pull(context.Context, *PullRequest) (*PullResponse, error)
-	Build(context.Context, *BuildRequest) (*BuildResponse, error)
 	Run(context.Context, *RunRequest) (*RunResponse, error)
 	Module(context.Context, *ModuleRequest) (*ModuleResponse, error)
 	mustEmbedUnimplementedProxyServer()
@@ -103,9 +90,6 @@ type UnimplementedProxyServer struct{}
 
 func (UnimplementedProxyServer) Pull(context.Context, *PullRequest) (*PullResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Pull not implemented")
-}
-func (UnimplementedProxyServer) Build(context.Context, *BuildRequest) (*BuildResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method Build not implemented")
 }
 func (UnimplementedProxyServer) Run(context.Context, *RunRequest) (*RunResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Run not implemented")
@@ -152,24 +136,6 @@ func _Proxy_Pull_Handler(srv interface{}, ctx context.Context, dec func(interfac
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Proxy_Build_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(BuildRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(ProxyServer).Build(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: Proxy_Build_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ProxyServer).Build(ctx, req.(*BuildRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 func _Proxy_Run_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(RunRequest)
 	if err := dec(in); err != nil {
@@ -210,16 +176,12 @@ func _Proxy_Module_Handler(srv interface{}, ctx context.Context, dec func(interf
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
 var Proxy_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "eg.interp.containers.Proxy",
+	ServiceName: "eg.interp.macvm.Proxy",
 	HandlerType: (*ProxyServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
 			MethodName: "Pull",
 			Handler:    _Proxy_Pull_Handler,
-		},
-		{
-			MethodName: "Build",
-			Handler:    _Proxy_Build_Handler,
 		},
 		{
 			MethodName: "Run",
@@ -231,5 +193,5 @@ var Proxy_ServiceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "eg.interp.containers.proto",
+	Metadata: "eg.interp.macvm.proto",
 }

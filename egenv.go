@@ -121,7 +121,8 @@ const (
 	WorkspaceDirectory = ".eg.workspace" // persistent shared directory for the duration of a single workload.
 	ModuleDir          = "main.wasm.d"
 	ModuleBin          = ".eg.module.wasm"
-	BinaryBin          = "egbin"
+	BinaryBin          = "egbin"   // in-container/in-guest eg binary path under the runtime mount.
+	HostBin            = "eg.host" // host eg binary staged alongside BinaryBin for guest-side mounts (macvm, podman-machine).
 	EnvironFile        = "environ.env"
 	SocketControl      = "control.socket"
 )

@@ -52,7 +52,7 @@ func (t Workload) Predict(args complete.Args) (results []string) {
 	)
 
 	if pset, err = packages.Load(pkgc, "./..."); err != nil {
-		log.Println("unable to predict workloads available", err)
+		log.Println("unable to predict workloads available", t.root, err)
 		return nil
 	}
 

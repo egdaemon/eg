@@ -1,7 +1,5 @@
-// Package egbootstrap builds a debian with base system settings for eg compute systems.
-// primarily provides basic configuration settings like available package repositories
-// and system configuration.
-package egbootstrap
+// Package egworkload builds a debian package that configures a container for running eg workloads.
+package egworkload
 
 import (
 	"context"
@@ -28,21 +26,24 @@ var (
 func init() {
 	c := eggit.EnvCommit()
 	gcfg = egdebuild.New(
-		"egbootstrap",
+		"egworkload",
 		"",
-		egenv.WorkingDirectory(".eg", "debuild", "egbootstrap", "rootfs"),
+		egenv.WorkingDirectory(".eg", "debuild", "egworkload", "rootfs"),
 		egdebuild.Option.Maintainer(maintainer.Name, maintainer.Email),
 		egdebuild.Option.SigningKeyID(maintainer.GPGFingerprint),
 		egdebuild.Option.ChangeLogDate(c.Committer.When),
 		egdebuild.Option.Version("0.0.:autopatch:"),
 		egdebuild.Option.Debian(errorsx.Must(fs.Sub(debskel, ".debskel"))),
-		egdebuild.Option.DependsBuild("rsync", "curl", "tree", "software-properties-common", "ca-certificates"),
 		egdebuild.Option.Depends(
-			"software-properties-common",
+			"egbootstrap",
+			"eg",
+			"sudo",
+			"golang",
+			"systemd-container", // required for machinectl to be present for use within shell.New(...) commands. which allows invoking systemctl --user commands.
 		),
 		egdebuild.Option.Description(
-			"configures the machine for running as a eg module",
-			"performs various changes to the system for running as an eg module. makes egd a privileged user and adds scripts for setting up apt repositories",
+			"configures a container for running eg workloads",
+			"installs and configures all components required to run eg workloads in a container",
 		),
 	)
 }
@@ -58,7 +59,9 @@ func Runner() eg.ContainerRunner {
 }
 
 func Build(ctx context.Context, o eg.Op) error {
-	return egdebuild.Build(gcfg, egdebuild.Option.Distro(egdebuild.UbuntuLatestCodename))(ctx, o)
+	return egdebuild.Build(gcfg,
+		egdebuild.Option.Distro(egdebuild.UbuntuLatestCodename),
+	)(ctx, o)
 }
 
 func Upload(ctx context.Context, o eg.Op) error {

@@ -1,0 +1,22 @@
+#!/bin/sh
+
+set -e
+
+systemd-sysusers
+systemd-tmpfiles --create
+
+usermod --add-subuids 100000-165535 --add-subgids 100000-165535 egd
+
+# systemctl preset reads all installed preset files and applies the policy for the named unit.
+# We use systemctl preset rather than deb-systemd-helper because deb-systemd-helper is for
+# units shipped by the package itself; podman.socket is shipped by the podman package, so
+# deb-systemd-helper won't manage it. systemctl preset applies our 51.eg.workload.preset
+# (enable podman.socket) to a unit that's already on disk.
+systemctl preset podman.socket
+
+# hack due to ubuntu updating sudo
+update-alternatives --set sudo /usr/bin/sudo.ws
+
+rm -rf /run/containers/storage /run/libpod
+
+#DEBHELPER#

@@ -27,7 +27,6 @@ import (
 	"github.com/egdaemon/eg/internal/execx"
 	"github.com/egdaemon/eg/internal/fsx"
 	"github.com/egdaemon/eg/internal/gitx"
-	"github.com/egdaemon/eg/internal/podmanx"
 	"github.com/egdaemon/eg/internal/runtimex"
 	"github.com/egdaemon/eg/internal/stringsx"
 	"github.com/egdaemon/eg/internal/wasix"
@@ -204,8 +203,13 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 			return errorsx.Wrap(err, "unable to set cpu limits")
 		}
 
+		// Cgroups are Linux-only; on darwin guests (macvm) the provider
+		// reports "cgroups is not supported on this system." Treat as
+		// best-effort — GOMEMLIMIT is a performance hint, not load-bearing.
 		if vmemlimit, err = memlimit.SetGoMemLimitWithOpts(memlimit.WithProvider(memlimit.FromCgroup)); err != nil {
-			return errorsx.Wrap(err, "unable to set max limits")
+			log.Println("unable to set GOMEMLIMIT from cgroups, continuing without:", err)
+			vmemlimit = 0
+			err = nil
 		}
 
 		if err = systemReady(gctx.Context); err != nil {
@@ -259,7 +263,7 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 		srv := grpc.NewServer(
 			grpc.Creds(insecure.NewCredentials()), // this is a local socket
 			grpc.ChainUnaryInterceptor(
-				podmanx.GrpcClient,
+				controlSocketInterceptors()...,
 			),
 		)
 		defer srv.GracefulStop()
@@ -278,7 +282,7 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 				runners.AgentMountReadWrite(eg.DefaultMountRoot(), eg.DefaultMountRoot()),
 				runners.AgentMountReadWrite("/var/lib/containers", "/var/lib/containers"),
 			),
-			runners.AgentOptionEGBin(errorsx.Must(exec.LookPath(eg.DefaultMountRoot(eg.RuntimeDirectory, eg.BinaryBin)))),
+			runners.AgentOptionEGBin(resolveContainerEGBin()),
 			runners.AgentOptionHostOS(),
 			runners.AgentOptionCommandLine("--cgroups", "disabled"),
 			hostnet,
@@ -349,7 +353,7 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 	// creating extensions/tables, it would nuke the working directory. it *mostly* worked once we moved this mount
 	// call after duckdb. we're leaving the call here for now but it shouldn't matter.
 	// and we're keen to remove it.
-	if err = t.mounthack(gctx.Context, uid, ws); err != nil {
+	if err = runContainerMountHack(t, gctx.Context, uid, ws); err != nil {
 		return errorsx.Wrap(err, "unable to mount with correct permissions - this is a transient error that happens occassional likely due to bindfs/podman bugs")
 	}
 

@@ -33,6 +33,8 @@ func init() {
 		egdebuild.Option.SigningKeyID(maintainer.GPGFingerprint),
 		egdebuild.Option.ChangeLogDate(c.Committer.When),
 		egdebuild.Option.Version("0.0.:autopatch:"),
+		egdebuild.Option.DependsBuild("rsync", "curl", "tree", "software-properties-common", "ca-certificates"),
+
 		egdebuild.Option.Debian(errorsx.Must(fs.Sub(debskel, ".debskel"))),
 		egdebuild.Option.Depends(
 			"egbootstrap",

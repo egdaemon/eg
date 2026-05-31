@@ -7,26 +7,14 @@ ARG EG_RUNNER_OVERRIDE_DIR=/usr/share/eg/rootfs
 
 COPY ${EG_RUNNER_OVERRIDE_DIR} /
 
-# remove the docker settings.... they're absurd and break base assumptions.
-RUN rm /etc/apt/apt.conf.d/docker-*
 RUN apt-get update
-RUN apt-get -y install software-properties-common build-essential apt-file podman netavark rsync vim dput devscripts dh-make dput git uidmap dbus-user-session fuse-overlayfs inetutils-ping iproute2
+RUN apt-get -y install software-properties-common build-essential apt-file netavark rsync vim dput devscripts dh-make dput git uidmap dbus-user-session fuse-overlayfs inetutils-ping iproute2
 RUN add-apt-repository -n ppa:egdaemon/eg
 RUN add-apt-repository -n ppa:egdaemon/duckdb
 RUN apt-get update
-RUN apt-get -y install eg
+RUN apt-get -y install egworkload
 
-RUN systemd-sysusers
-RUN systemd-tmpfiles --create
-RUN systemd-tmpfiles --remove
-RUN usermod --add-subuids 100000-165535 --add-subgids 100000-165535 egd
-
-RUN systemctl disable eg-runner-build.service
-RUN systemctl disable eg-runner.service
 RUN systemctl enable eg-daemon.service eg-daily-reload.service eg-disk-usage.service
-
-# enable podman for users because our daemon runs as a standard user it needs to be available for the user to use.
-RUN systemctl --global enable podman.socket
 
 # preload some wellknown hosts
 RUN ssh-keyscan -H github.com >> /etc/ssh/ssh_known_hosts

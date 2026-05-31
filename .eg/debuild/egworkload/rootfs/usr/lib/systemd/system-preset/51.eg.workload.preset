@@ -1,1 +1,2 @@
+# enable podman for root because the daemon needs to manage container lifecycles.
 enable podman.socket

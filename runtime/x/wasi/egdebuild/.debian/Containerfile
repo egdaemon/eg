@@ -8,13 +8,8 @@ RUN add-apt-repository -n ppa:longsleep/golang-backports
 RUN add-apt-repository -n ppa:egdaemon/eg
 RUN add-apt-repository -n ppa:egdaemon/duckdb
 
+RUN echo "cache buster 059a9a06-1686-4f49-9a7f-a30535886d57"
 RUN apt-get update
-RUN apt-get -y install golang-1.26 eg egbootstrap
+RUN apt-get -y install golang-1.26 egworkload
 
 RUN ln -s /usr/lib/go-1.26/bin/go /usr/local/bin/go
-
-RUN systemd-sysusers
-RUN systemd-tmpfiles --create
-
-# required until we update the shell to explicitly pass all env keys instead of using -E
-RUN update-alternatives --set sudo /usr/bin/sudo.ws

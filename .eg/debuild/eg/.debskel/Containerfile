@@ -14,24 +14,6 @@ RUN apt-get -y install golang-1.26 libbtrfs-dev libassuan-dev libc6-dev libdevma
 
 RUN ln -s /usr/lib/go-1.26/bin/go /usr/local/bin/go
 
-RUN echo "cache buster 61571c95-0539-4f6e-bad4-f913db80e226"
+RUN echo "cache buster 61571c95-0539-4f6e-bad4-f913db80e227"
 RUN apt-get update
-RUN apt-get -y install eg egbootstrap
-
-RUN systemd-sysusers
-RUN systemd-tmpfiles --create
-RUN usermod --add-subuids 100000-165535 --add-subgids 100000-165535 egd
-RUN echo "cache buster 3f48af53-7ae7-41da-960f-808788f6f886"
-
-RUN systemctl enable podman.socket
-RUN podman version
-
-# required until we update the shell to explicitly pass all env keys instead of using -E
-RUN update-alternatives --set sudo /usr/bin/sudo.ws
-
-# BEGIN HACKS
-RUN echo "cache buster 585ca506-2797-505a-ae80-b41535886d78"
-RUN rm -rf /run/containers/storage /run/libpod
-# required until we update the shell to explicitly pass all env keys instead of using -E
-RUN update-alternatives --set sudo /usr/bin/sudo.ws
-# END HACKS
+RUN apt-get -y install egworkload

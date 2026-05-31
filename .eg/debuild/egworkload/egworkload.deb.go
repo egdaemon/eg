@@ -34,7 +34,6 @@ func init() {
 		egdebuild.Option.ChangeLogDate(c.Committer.When),
 		egdebuild.Option.Version("0.0.:autopatch:"),
 		egdebuild.Option.DependsBuild("rsync", "curl", "tree", "software-properties-common", "ca-certificates"),
-
 		egdebuild.Option.Debian(errorsx.Must(fs.Sub(debskel, ".debskel"))),
 		egdebuild.Option.Depends(
 			"egbootstrap",
@@ -61,8 +60,14 @@ func Runner() eg.ContainerRunner {
 }
 
 func Build(ctx context.Context, o eg.Op) error {
-	return egdebuild.Build(gcfg,
-		egdebuild.Option.Distro(egdebuild.UbuntuLatestCodename),
+	return eg.Parallel(
+		egdebuild.Build(gcfg, egdebuild.Option.Distro(egdebuild.UbuntuLatestCodename)),
+		egdebuild.Build(
+			gcfg,
+			egdebuild.Option.Distro(egdebuild.UbuntuLatestCodename),
+			egdebuild.Option.BuildBinary(20*time.Minute),
+			egdebuild.Option.NoLint(),
+		),
 	)(ctx, o)
 }
 

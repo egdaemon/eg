@@ -34,7 +34,13 @@ func init() {
 		egdebuild.Option.ChangeLogDate(c.Committer.When),
 		egdebuild.Option.Version("0.0.:autopatch:"),
 		egdebuild.Option.Debian(errorsx.Must(fs.Sub(debskel, ".debskel"))),
-		egdebuild.Option.Depends("egbootstrap", "eg", "podman", "sudo", "golang-1.26"),
+		egdebuild.Option.Depends(
+			"egbootstrap",
+			"eg",
+			"sudo",
+			"golang",
+			"systemd-container", // required for machinectl to be present for use within shell.New(...) commands. which allows invoking systemctl --user commands.
+		),
 		egdebuild.Option.Description(
 			"configures a container for running eg workloads",
 			"installs and configures all components required to run eg workloads in a container",

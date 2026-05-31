@@ -39,7 +39,6 @@ func init() {
 		egdebuild.Option.DependsBuild("rsync", "curl", "tree", "software-properties-common", "ca-certificates"),
 		egdebuild.Option.Depends(
 			"software-properties-common",
-			"systemd-container", // required for machinectl to be present for use within shell.New(...) commands. which allows invoking systemctl --user commands.
 		),
 		egdebuild.Option.Description(
 			"configures the machine for running as a eg module",
@@ -59,12 +58,7 @@ func Runner() eg.ContainerRunner {
 }
 
 func Build(ctx context.Context, o eg.Op) error {
-	return eg.Parallel(
-		egdebuild.Build(gcfg, egdebuild.Option.Distro("jammy")),
-		egdebuild.Build(gcfg, egdebuild.Option.Distro("noble"), egdebuild.Option.NoLint()),
-		egdebuild.Build(gcfg, egdebuild.Option.Distro("questing"), egdebuild.Option.NoLint()),
-		egdebuild.Build(gcfg, egdebuild.Option.Distro(egdebuild.UbuntuLatestCodename), egdebuild.Option.NoLint()),
-	)(ctx, o)
+	return egdebuild.Build(gcfg, egdebuild.Option.Distro(egdebuild.UbuntuLatestCodename))(ctx, o)
 }
 
 func Upload(ctx context.Context, o eg.Op) error {

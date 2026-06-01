@@ -1,11 +1,11 @@
-pkgname=eg
+pkgname=egd
 pkgver=v0.0.0
 pkgrel=1
-pkgdesc='eg ci/cd/batch processing tooling'
+pkgdesc='egd ci/cd/batch processing tooling'
 arch=('x86_64')
 license=('AGPL')
-provides=('eg')
-conflicts=('eg')
+provides=('egd')
+conflicts=('egd')
 depends=(
   'podman'
   'aardvark-dns'

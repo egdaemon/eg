@@ -12,7 +12,7 @@ import (
 	"github.com/libp2p/go-libp2p-kad-dht/amino"
 	"github.com/libp2p/go-libp2p-kad-dht/internal/net"
 	pb "github.com/libp2p/go-libp2p-kad-dht/pb"
-	"github.com/libp2p/go-libp2p-kad-dht/providers"
+	"github.com/libp2p/go-libp2p-kad-dht/records"
 	"github.com/libp2p/go-libp2p-kbucket/peerdiversity"
 	record "github.com/libp2p/go-libp2p-record"
 	"github.com/libp2p/go-libp2p/core/host"
@@ -29,11 +29,11 @@ const DefaultPrefix protocol.ID = amino.ProtocolPrefix
 type ModeOpt int
 
 // QueryFilterFunc is a filter applied when considering peers to dial when querying
-type QueryFilterFunc func(dht interface{}, ai peer.AddrInfo) bool
+type QueryFilterFunc func(dht any, ai peer.AddrInfo) bool
 
 // RouteTableFilterFunc is a filter applied when considering connections to keep in
 // the local route table.
-type RouteTableFilterFunc func(dht interface{}, p peer.ID) bool
+type RouteTableFilterFunc func(dht any, p peer.ID) bool
 
 // Config is a structure containing all the options that can be used when constructing a DHT.
 type Config struct {
@@ -49,7 +49,8 @@ type Config struct {
 	MaxRecordAge           time.Duration
 	EnableProviders        bool
 	EnableValues           bool
-	ProviderStore          providers.ProviderStore
+	ProviderManagerOpts    []records.Option
+	ProviderStore          records.ProviderStore
 	QueryPeerFilter        QueryFilterFunc
 	LookupCheckConcurrency int
 	MsgSenderBuilder       func(h host.Host, protos []protocol.ID) pb.MessageSenderWithDisconnect
@@ -76,8 +77,8 @@ type Config struct {
 	OptimisticProvideJobsPoolSize int
 }
 
-func EmptyQueryFilter(_ interface{}, ai peer.AddrInfo) bool { return true }
-func EmptyRTFilter(_ interface{}, p peer.ID) bool           { return true }
+func EmptyQueryFilter(_ any, ai peer.AddrInfo) bool { return true }
+func EmptyRTFilter(_ any, p peer.ID) bool           { return true }
 
 // Apply applies the given options to this Option
 func (c *Config) Apply(opts ...Option) error {
@@ -128,7 +129,7 @@ var Defaults = func(o *Config) error {
 	o.RoutingTable.AutoRefresh = true
 	o.RoutingTable.PeerFilter = EmptyRTFilter
 
-	o.MaxRecordAge = providers.ProvideValidity
+	o.MaxRecordAge = amino.DefaultProvideValidity
 
 	o.BucketSize = amino.DefaultBucketSize
 	o.Concurrency = amino.DefaultConcurrency

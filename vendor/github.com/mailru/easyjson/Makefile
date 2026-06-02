@@ -1,3 +1,6 @@
+VERSION := $(shell git describe --tags --always --dirty)
+COMMIT  := $(shell git rev-parse --short HEAD)
+
 all: test
 
 clean:
@@ -6,13 +9,15 @@ clean:
 	rm -rf benchmark/*_easyjson.go
 
 build:
-	go build -o ./bin/easyjson ./easyjson
+	go build -ldflags="-s -w -X 'main.Version=$(VERSION)' -X 'main.Commit=$(COMMIT)'" -o ./bin/easyjson ./easyjson
+
 
 generate: build
 	bin/easyjson -stubs \
 		./tests/snake.go \
 		./tests/data.go \
 		./tests/omitempty.go \
+		./tests/omitzero.go \
 		./tests/nothing.go \
 		./tests/named_type.go \
 		./tests/custom_map_key_type.go \
@@ -46,9 +51,11 @@ generate: build
 		./tests/intern.go \
 		./tests/nocopy.go \
 		./tests/escaping.go \
-		./tests/nested_marshaler.go
+		./tests/nested_marshaler.go \
+		./tests/text_marshaler.go
 	bin/easyjson -snake_case ./tests/snake.go
 	bin/easyjson -omit_empty ./tests/omitempty.go
+	bin/easyjson -omit_zero ./tests/omitzero.go
 	bin/easyjson -build_tags=use_easyjson -disable_members_unescape ./benchmark/data.go
 	bin/easyjson -disallow_unknown_fields ./tests/disallow_unknown.go
 	bin/easyjson -disable_members_unescape ./tests/members_unescaped.go

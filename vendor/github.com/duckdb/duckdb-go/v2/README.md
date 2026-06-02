@@ -5,23 +5,33 @@
 
 The DuckDB driver conforms to the built-in `database/sql` interface.
 
-**Current DuckDB version: `v1.4.1`.**
+**Current DuckDB version: `v1.5.3`.**
 
-The first duckdb-go tag with that version is `v2.4.2`.
+The first duckdb-go tag with that version is `v2.10503.0`.
+
+Starting with DuckDB `v1.5.0`, the duckdb-go version encodes the DuckDB version in its second semver component.
+The format is `v2.MAJOR_MINOR_PATCH.x`, e.g., DuckDB `v1.5.0` maps to duckdb-go `v2.10500.x`.
 
 Previous DuckDB versions:
 
-| DuckDB   | duckdb-go |
-| -------- | --------- |
-| `v1.4.1` | `v2.4.2`  |
-| `v1.4.0` | `v2.4.0`  |
-| `v1.3.2` | `v2.3.3`  |
-| `v1.3.1` | `v2.3.2`  |
-| `v1.3.0` | `v2.3.0`  |
-| `v1.2.2` | `v2.2.0`  |
-| `v1.2.1` | `v2.1.0`  |
-| `v1.2.0` | `v2.0.3`  |
-| `v1.1.3` | `v1.8.5`  |
+| DuckDB   | duckdb-go    |
+|----------|--------------|
+| `v1.5.3` | `v2.10503.0` |
+| `v1.5.2` | `v2.10502.0` |
+| `v1.5.1` | `v2.10501.0` |
+| `v1.5.0` | `v2.10500.0` |
+| `v1.4.4` | `v2.5.5`     |
+| `v1.4.3` | `v2.5.4`     |
+| `v1.4.2` | `v2.5.2`     |
+| `v1.4.1` | `v2.4.2`     |
+| `v1.4.0` | `v2.4.0`     |
+| `v1.3.2` | `v2.3.3`     |
+| `v1.3.1` | `v2.3.2`     |
+| `v1.3.0` | `v2.3.0`     |
+| `v1.2.2` | `v2.2.0`     |
+| `v1.2.1` | `v2.1.0`     |
+| `v1.2.0` | `v2.0.3`     |
+| `v1.1.3` | `v1.8.5`     |
 
 ## Migration from marcboeker/go-duckdb
 
@@ -39,8 +49,8 @@ go get github.com/duckdb/duckdb-go/v2@v2.5.0
 gofmt -w -r '"github.com/marcboeker/go-duckdb/v2" -> "github.com/duckdb/duckdb-go/v2"' .
 
 # If you use the mapping or arrowmapping submodules, also run
-gofmt -w -r '"github.com/marcboeker/go-duckdb/mapping" -> "github.com/duckdb/duckdb-go/mapping"' .
-gofmt -w -r '"github.com/marcboeker/go-duckdb/arrowmapping" -> "github.com/duckdb/duckdb-go/arrowmapping"' .
+gofmt -w -r '"github.com/marcboeker/go-duckdb/mapping" -> "github.com/duckdb/duckdb-go/v2/mapping"' .
+gofmt -w -r '"github.com/marcboeker/go-duckdb/arrowmapping" -> "github.com/duckdb/duckdb-go/v2/arrowmapping"' .
 
 # Clean up
 go mod tidy
@@ -86,7 +96,7 @@ If you want to use it, you can enable it by passing `-tags=duckdb_arrow` to `go 
 #### JSON type scanning changes
 
 The pre-built libraries ship DuckDB's JSON extension containing the `JSON` type.
-Pre-v2, it was possible to scan a JSON type into `[]byte` via [`Rows.Scan`](https://cs.opensource.google/go/go/+/go1.24.1:src/database/sql/sql.go;l=3365).
+Pre-v2, it was possible to scan a JSON type into `[]byte` via [`Rows.Scan`](https://pkg.go.dev/database/sql#Rows.Scan).
 However, scanning into `any` (`driver.Value`) would cause the JSON string to contain escape characters and other unexpected behavior.
 
 It is now possible to scan into `any`, or directly into duckdb-go's `Composite` type,
@@ -113,7 +123,7 @@ pacman -S mingw-w64-ucrt-x86_64-gcc
 
 Select "yes" when necessary; it is okay if the shell closes.
 Then, add gcc to the path using whatever method you prefer.
-In powershell this is `$env:PATH = "C:\msys64\ucrt64\bin:$env:PATH"`.
+In powershell this is `$env:PATH = "C:\msys64\ucrt64\bin;$env:PATH"`.
 After, you can compile this package in Windows.
 
 ### Vendoring
@@ -201,7 +211,36 @@ For Darwin ARM64, you can then build your module like so:
 CGO_ENABLED=1 CPPFLAGS="-DDUCKDB_STATIC_BUILD" CGO_LDFLAGS="-lduckdb_bundle -lc++ -L/path/to/libs" go build -tags=duckdb_use_static_lib
 ```
 
-You can also find these steps in the `Makefile` and the `tests.yaml`.
+#### Using a local DuckDB checkout
+
+If you want to validate local DuckDB changes from `duckdb-go`, point `duckdb-go` at a static library built from your local DuckDB checkout.
+
+1. Build DuckDB and create the bundled static archive in your local checkout. Rerun this command after editing DuckDB source files.
+
+```sh
+cd /path/to/duckdb
+make bundle-library
+```
+
+2. Run `duckdb-go` against that archive. The example below uses macOS linker flags.
+
+```sh
+CGO_ENABLED=1 \
+CPPFLAGS="-DDUCKDB_STATIC_BUILD" \
+CGO_LDFLAGS="-lduckdb_bundle -lc++ -L/path/to/duckdb/build/release" \
+go test -tags=duckdb_use_static_lib ./...
+```
+
+For targeted verification, run only the reproducer or regression test you care about:
+
+```sh
+CGO_ENABLED=1 \
+CPPFLAGS="-DDUCKDB_STATIC_BUILD" \
+CGO_LDFLAGS="-lduckdb_bundle -lc++ -L/path/to/duckdb/build/release" \
+go test -tags=duckdb_use_static_lib -run TestName -v
+```
+
+This lets you verify a local DuckDB fix from `duckdb-go` without replacing the bundled libraries in this repository. The same static-linking pattern is also used in the `Makefile` and `tests.yaml`.
 
 The DuckDB team also publishes pre-built libraries as part of their [releases](https://github.com/duckdb/duckdb/releases).
 The published zipped archives contain libraries for DuckDB core, the third-party libraries, and the default extensions.
@@ -262,6 +301,26 @@ When passing a `time.Time` to duckdb-go, duckdb-go transforms it to an instant w
 even when using `TIMESTAMP_TZ`. Later, scanning either type of value returns an instant, as SQL types do not model
 time zone information for individual values.
 
+Use `duckdb.Typed(value, typ)` to force the DuckDB logical type used when binding a query parameter.
+This is useful when DuckDB cannot infer the desired parameter type from SQL alone, or when duckdb-go's
+default Go-type inference would choose a different DuckDB type.
+
+```go
+start := time.Date(2024, time.April, 5, 0, 0, 0, 0, time.UTC)
+end := time.Date(2024, time.April, 6, 0, 0, 0, 0, time.UTC)
+
+row := db.QueryRow(`
+	SELECT COUNT(*)
+	FROM (VALUES
+		(TIMESTAMP_NS '2024-04-05 12:00:00.000000001')
+	) events_ns(ts)
+	WHERE ts >= ? AND ts < ?
+`, duckdb.Typed(start, duckdb.TYPE_TIMESTAMP_NS), duckdb.Typed(end, duckdb.TYPE_TIMESTAMP_NS))
+```
+
+In this example, the wrapper ensures the parameters bind as `TIMESTAMP_NS`. Bare `time.Time` values bind as
+`TIMESTAMP_TZ` by default. `Typed` is a narrow scalar binding hint; validation happens when the parameter is bound.
+
 **Connection lifetime**
 
 Temporary objects and state, such as temporary tables, are scoped to connections.
@@ -304,7 +363,7 @@ defer c.Close()
 ## DuckDB Appender API
 
 If you want to use the [DuckDB Appender API](https://duckdb.org/docs/data/appender.html), you can obtain a new `Appender` by passing a DuckDB connection to `NewAppenderFromConn()`.
-See `examples/appender.go` for a complete example.
+See `examples/appender/main.go` for a complete example.
 
 ```go
 c, err := duckdb.NewConnector("test.db", nil)
@@ -394,30 +453,15 @@ Additionally, automatic extension loading is enabled.
 
 ## Releasing a New DuckDB Version
 
-#### Update the Mappings
-
 1. Create a new branch.
-2. Update the `duckdb-go-bindings` dependencies in `mapping/mod.go` and `arrowmapping/mod.go`.
-3. Run `go mod tidy` inside `mapping` and inside `arrowmapping`.
-4. Commit and PR changes.
-5. Push two new tagged releases, `mapping/vx.x.x` and `arrowmapping/vx.x.x`.
-
-#### Update the Main Module
-
-1. Create a new branch.
-2. Update the `mapping` and `arrowmapping` dependencies in `mod.go`.
+2. Update `duckdb-go-bindings` via `go get github.com/duckdb/duckdb-go-bindings@latest`.
 3. Run `go mod tidy`.
-4. Update `VERSION=` in `tests.yaml`.
+4. Update `DUCKDB_VERSION` in `Makefile`.
 5. Update the latest version in `README.md`.
 6. Commit and PR changes.
-7. Push a new tagged release, `vx.x.x`.
+7. Push a new tagged release, `v2.MAJOR_MINOR_PATCH.x`, e.g. `v2.10500.0` for DuckDB 1.5.0.
 
 ```
 git tag <tagname>
 git push origin <tagname>
 ```
-
-Example PRs:
-
-- Update the Mappings: https://github.com/marcboeker/go-duckdb/pull/473
-- Update the Main Module: https://github.com/marcboeker/go-duckdb/pull/474

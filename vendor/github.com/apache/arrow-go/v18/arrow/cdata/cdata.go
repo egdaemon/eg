@@ -370,10 +370,10 @@ func (imp *cimporter) importChild(parent *cimporter, src *CArrowArray) error {
 
 // import any child arrays for lists, structs, and so on.
 func (imp *cimporter) doImportChildren() error {
-	children := unsafe.Slice(imp.arr.children, imp.arr.n_children)
-
-	if len(children) > 0 {
-		imp.children = make([]cimporter, len(children))
+	var children []*CArrowArray
+	if imp.arr.n_children > 0 {
+		children = unsafe.Slice(imp.arr.children, imp.arr.n_children)
+		imp.children = make([]cimporter, imp.arr.n_children)
 	}
 
 	// handle the cases
@@ -407,7 +407,9 @@ func (imp *cimporter) doImportChildren() error {
 		st := imp.dt.(*arrow.StructType)
 		for i, c := range children {
 			imp.children[i].dt = st.Field(i).Type
-			imp.children[i].importChild(imp, c)
+			if err := imp.children[i].importChild(imp, c); err != nil {
+				return err
+			}
 		}
 	case arrow.RUN_END_ENCODED: // import run-ends and values
 		st := imp.dt.(*arrow.RunEndEncodedType)
@@ -428,13 +430,17 @@ func (imp *cimporter) doImportChildren() error {
 		dt := imp.dt.(*arrow.DenseUnionType)
 		for i, c := range children {
 			imp.children[i].dt = dt.Fields()[i].Type
-			imp.children[i].importChild(imp, c)
+			if err := imp.children[i].importChild(imp, c); err != nil {
+				return err
+			}
 		}
 	case arrow.SPARSE_UNION:
 		dt := imp.dt.(*arrow.SparseUnionType)
 		for i, c := range children {
 			imp.children[i].dt = dt.Fields()[i].Type
-			imp.children[i].importChild(imp, c)
+			if err := imp.children[i].importChild(imp, c); err != nil {
+				return err
+			}
 		}
 	}
 
@@ -461,33 +467,28 @@ func (imp *cimporter) doImportArr(src *CArrowArray) error {
 	// and only null columns, then we can release the CArrowArray
 	// struct immediately after import, since we have no imported
 	// memory that we have to track the lifetime of.
+	// On error, we always release regardless of buffer count to avoid leaks.
+	var importErr error
 	defer func() {
-		if imp.alloc.bufCount.Load() == 0 {
-			C.ArrowArrayRelease(imp.arr)
-			C.free(unsafe.Pointer(imp.arr))
+		if importErr != nil || imp.alloc.bufCount.Load() == 0 {
+			imp.alloc.forceRelease()
 		}
 	}()
 
-	return imp.doImport()
+	importErr = imp.doImport()
+	return importErr
 }
 
 // import is called recursively as needed for importing an array and its children
 // in order to generate array.Data objects
 func (imp *cimporter) doImport() error {
-	// move the array from the src object passed in to the one referenced by
-	// this importer. That way we can set up a finalizer on the created
-	// arrow.ArrayData object so we clean up our Array's memory when garbage collected.
-	defer func(arr *CArrowArray) {
-		// this should only occur in the case of an error happening
-		// during import, at which point we need to clean up the
-		// ArrowArray struct we allocated.
-		if imp.data == nil {
-			C.free(unsafe.Pointer(arr))
-		}
-	}(imp.arr)
-
 	// import any children
 	if err := imp.doImportChildren(); err != nil {
+		for _, c := range imp.children {
+			if c.data != nil {
+				c.data.Release()
+			}
+		}
 		return err
 	}
 
@@ -711,10 +712,12 @@ func (imp *cimporter) importBinaryViewLike() (err error) {
 		return
 	}
 
-	dataBufferSizes := unsafe.Slice((*int64)(unsafe.Pointer(imp.cbuffers[len(buffers)])), len(buffers)-2)
-	for i, size := range dataBufferSizes {
-		if buffers[i+2], err = imp.importVariableValuesBuffer(i+2, 1, size); err != nil {
-			return
+	if len(buffers) > 2 {
+		dataBufferSizes := unsafe.Slice((*int64)(unsafe.Pointer(imp.cbuffers[len(buffers)])), len(buffers)-2)
+		for i, size := range dataBufferSizes {
+			if buffers[i+2], err = imp.importVariableValuesBuffer(i+2, 1, size); err != nil {
+				return
+			}
 		}
 	}
 
@@ -866,7 +869,7 @@ func (imp *cimporter) checkNumBuffers(n int64) error {
 func (imp *cimporter) importBuffer(bufferID int, sz int64) (*memory.Buffer, error) {
 	// this is not a copy, we're just having a slice which points at the data
 	// it's still owned by the C.ArrowArray object and its backing C++ object.
-	if imp.cbuffers[bufferID] == nil {
+	if imp.cbuffers[bufferID] == nil || sz == 0 {
 		if sz != 0 {
 			return nil, errors.New("invalid buffer")
 		}
@@ -935,6 +938,7 @@ func initReader(rdr *nativeCRecordBatchReader, stream *CArrowArrayStream) error 
 		return rdr.getError(int(errno))
 	}
 	defer C.ArrowSchemaRelease(&sc)
+
 	s, err := ImportCArrowSchema((*CArrowSchema)(&sc))
 	if err != nil {
 		return err

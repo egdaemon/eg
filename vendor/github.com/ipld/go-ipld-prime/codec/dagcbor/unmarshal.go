@@ -19,12 +19,13 @@ import (
 var (
 	ErrInvalidMultibase         = errors.New("invalid multibase on IPLD link")
 	ErrAllocationBudgetExceeded = errors.New("message structure demanded too many resources to process")
+	ErrDecodeDepthExceeded      = errors.New("message structure exceeded maximum nesting depth")
 	ErrTrailingBytes            = errors.New("unexpected content after end of cbor object")
 )
 
 const (
-	mapEntryGasScore  = 8
-	listEntryGasScore = 4
+	mapEntryCost  = 8
+	listEntryCost = 4
 )
 
 // This file should be identical to the general feature in the parent package,
@@ -62,7 +63,37 @@ type DecodeOptions struct {
 	// entire block to be part of the CBOR object and will error if there is
 	// extraneous data after the end of the object.
 	DontParseBeyondEnd bool
+
+	// AllocationBudget sets the maximum budget for the decoder. The budget is
+	// decremented as the decoder allocates resources (nodes, map entries, list
+	// elements, string/bytes content). If the budget is exhausted, the decoder
+	// returns ErrAllocationBudgetExceeded.
+	//
+	// When zero, a default budget is used which is generous for typical IPLD
+	// block sizes.
+	AllocationBudget int64
+
+	// MaxCollectionPrealloc sets the maximum size hint passed to
+	// BeginMap/BeginList. CBOR headers declare collection sizes upfront;
+	// this caps the initial allocation while collections grow dynamically
+	// as entries are decoded.
+	//
+	// When zero, a default of 1024 is used.
+	MaxCollectionPrealloc int64
+
+	// MaxDepth sets the maximum nesting depth for decoded structures. If the
+	// decoder encounters a map or list nested beyond this depth, it returns
+	// ErrDecodeDepthExceeded.
+	//
+	// When zero, a default of 1024 is used.
+	MaxDepth int64
 }
+
+const (
+	defaultAllocationBudget      int64 = 1048576 * 10
+	defaultMaxCollectionPrealloc int64 = 1024
+	defaultMaxDepth              int64 = 1024
+)
 
 // Decode deserializes data from the given io.Reader and feeds it into the given datamodel.NodeAssembler.
 // Decode fits the codec.Decoder function interface.
@@ -70,6 +101,10 @@ type DecodeOptions struct {
 // The behavior of the decoder can be customized by setting fields in the DecodeOptions struct before calling this method.
 func (cfg DecodeOptions) Decode(na datamodel.NodeAssembler, r io.Reader) error {
 	// Probe for a builtin fast path.  Shortcut to that if possible.
+	// Note: when an assembler implements this interface, it receives only the
+	// reader and none of the fields set on cfg. Implementations are responsible
+	// for enforcing their own equivalents of AllocationBudget,
+	// MaxCollectionPrealloc, MaxDepth and the other DecodeOptions fields.
 	type detectFastPath interface {
 		DecodeDagCbor(io.Reader) error
 	}
@@ -109,15 +144,28 @@ func (cfg DecodeOptions) Decode(na datamodel.NodeAssembler, r io.Reader) error {
 // Unmarshal is a deprecated function.
 // Please consider switching to DecodeOptions.Decode instead.
 func Unmarshal(na datamodel.NodeAssembler, tokSrc shared.TokenSource, options DecodeOptions) error {
-	// Have a gas budget, which will be decremented as we allocate memory, and an error returned when execeeded (or about to be exceeded).
-	//  This is a DoS defense mechanism.
-	//  It's *roughly* in units of bytes (but only very, VERY roughly) -- it also treats words as 1 in many cases.
-	// FUTURE: this ought be configurable somehow.  (How, and at what granularity though?)
-	var gas int64 = 1048576 * 10
-	return unmarshal1(na, tokSrc, &gas, options)
+	budget := options.AllocationBudget
+	if budget == 0 {
+		budget = defaultAllocationBudget
+	}
+	return unmarshal1(na, tokSrc, &budget, 0, options)
 }
 
-func unmarshal1(na datamodel.NodeAssembler, tokSrc shared.TokenSource, gas *int64, options DecodeOptions) error {
+func (cfg DecodeOptions) maxPrealloc() int64 {
+	if cfg.MaxCollectionPrealloc > 0 {
+		return cfg.MaxCollectionPrealloc
+	}
+	return defaultMaxCollectionPrealloc
+}
+
+func (cfg DecodeOptions) maxDepth() int64 {
+	if cfg.MaxDepth > 0 {
+		return cfg.MaxDepth
+	}
+	return defaultMaxDepth
+}
+
+func unmarshal1(na datamodel.NodeAssembler, tokSrc shared.TokenSource, budget *int64, depth int64, options DecodeOptions) error {
 	var tk tok.Token
 	done, err := tokSrc.Step(&tk)
 	if err == io.EOF {
@@ -129,24 +177,31 @@ func unmarshal1(na datamodel.NodeAssembler, tokSrc shared.TokenSource, gas *int6
 	if done && !tk.Type.IsValue() && tk.Type != tok.TNull {
 		return fmt.Errorf("unexpected eof")
 	}
-	return unmarshal2(na, tokSrc, &tk, gas, options)
+	return unmarshal2(na, tokSrc, &tk, budget, depth, options)
 }
 
 // starts with the first token already primed.  Necessary to get recursion
 //
 //	to flow right without a peek+unpeek system.
-func unmarshal2(na datamodel.NodeAssembler, tokSrc shared.TokenSource, tk *tok.Token, gas *int64, options DecodeOptions) error {
+func unmarshal2(na datamodel.NodeAssembler, tokSrc shared.TokenSource, tk *tok.Token, budget *int64, depth int64, options DecodeOptions) error {
 	// FUTURE: check for schema.TypedNodeBuilder that's going to parse a Link (they can slurp any token kind they want).
 	switch tk.Type {
 	case tok.TMapOpen:
+		if depth >= options.maxDepth() {
+			return ErrDecodeDepthExceeded
+		}
 		expectLen := int64(tk.Length)
 		allocLen := int64(tk.Length)
 		if tk.Length == -1 {
 			expectLen = math.MaxInt64
 			allocLen = 0
 		} else {
-			if *gas-allocLen < 0 { // halt early if this will clearly demand too many resources
+			*budget -= allocLen
+			if *budget < 0 {
 				return ErrAllocationBudgetExceeded
+			}
+			if allocLen > options.maxPrealloc() {
+				allocLen = options.maxPrealloc()
 			}
 		}
 		ma, err := na.BeginMap(allocLen)
@@ -167,8 +222,8 @@ func unmarshal2(na datamodel.NodeAssembler, tokSrc shared.TokenSource, tk *tok.T
 				}
 				return ma.Finish()
 			case tok.TString:
-				*gas -= int64(len(tk.Str) + mapEntryGasScore)
-				if *gas < 0 {
+				*budget -= int64(len(tk.Str) + mapEntryCost)
+				if *budget < 0 {
 					return ErrAllocationBudgetExceeded
 				}
 				// continue
@@ -189,7 +244,7 @@ func unmarshal2(na datamodel.NodeAssembler, tokSrc shared.TokenSource, tk *tok.T
 			if err != nil { // return in error if the key was rejected
 				return err
 			}
-			err = unmarshal1(mva, tokSrc, gas, options)
+			err = unmarshal1(mva, tokSrc, budget, depth+1, options)
 			if err != nil { // return in error if some part of the recursion errored
 				return err
 			}
@@ -197,14 +252,21 @@ func unmarshal2(na datamodel.NodeAssembler, tokSrc shared.TokenSource, tk *tok.T
 	case tok.TMapClose:
 		return fmt.Errorf("unexpected mapClose token")
 	case tok.TArrOpen:
+		if depth >= options.maxDepth() {
+			return ErrDecodeDepthExceeded
+		}
 		expectLen := int64(tk.Length)
 		allocLen := int64(tk.Length)
 		if tk.Length == -1 {
 			expectLen = math.MaxInt64
 			allocLen = 0
 		} else {
-			if *gas-allocLen < 0 { // halt early if this will clearly demand too many resources
+			*budget -= allocLen
+			if *budget < 0 {
 				return ErrAllocationBudgetExceeded
+			}
+			if allocLen > options.maxPrealloc() {
+				allocLen = options.maxPrealloc()
 			}
 		}
 		la, err := na.BeginList(allocLen)
@@ -224,15 +286,15 @@ func unmarshal2(na datamodel.NodeAssembler, tokSrc shared.TokenSource, tk *tok.T
 				}
 				return la.Finish()
 			default:
-				*gas -= listEntryGasScore
-				if *gas < 0 {
+				*budget -= listEntryCost
+				if *budget < 0 {
 					return ErrAllocationBudgetExceeded
 				}
 				observedLen++
 				if observedLen > expectLen {
 					return fmt.Errorf("unexpected continuation of array elements beyond declared length")
 				}
-				err := unmarshal2(la.AssembleValue(), tokSrc, tk, gas, options)
+				err := unmarshal2(la.AssembleValue(), tokSrc, tk, budget, depth+1, options)
 				if err != nil { // return in error if some part of the recursion errored
 					return err
 				}
@@ -243,14 +305,14 @@ func unmarshal2(na datamodel.NodeAssembler, tokSrc shared.TokenSource, tk *tok.T
 	case tok.TNull:
 		return na.AssignNull()
 	case tok.TString:
-		*gas -= int64(len(tk.Str))
-		if *gas < 0 {
+		*budget -= int64(len(tk.Str))
+		if *budget < 0 {
 			return ErrAllocationBudgetExceeded
 		}
 		return na.AssignString(tk.Str)
 	case tok.TBytes:
-		*gas -= int64(len(tk.Bytes))
-		if *gas < 0 {
+		*budget -= int64(len(tk.Bytes))
+		if *budget < 0 {
 			return ErrAllocationBudgetExceeded
 		}
 		if !tk.Tagged {
@@ -273,20 +335,20 @@ func unmarshal2(na datamodel.NodeAssembler, tokSrc shared.TokenSource, tk *tok.T
 			return fmt.Errorf("unhandled cbor tag %d", tk.Tag)
 		}
 	case tok.TBool:
-		*gas -= 1
-		if *gas < 0 {
+		*budget -= 1
+		if *budget < 0 {
 			return ErrAllocationBudgetExceeded
 		}
 		return na.AssignBool(tk.Bool)
 	case tok.TInt:
-		*gas -= 1
-		if *gas < 0 {
+		*budget -= 1
+		if *budget < 0 {
 			return ErrAllocationBudgetExceeded
 		}
 		return na.AssignInt(tk.Int)
 	case tok.TUint:
-		*gas -= 1
-		if *gas < 0 {
+		*budget -= 1
+		if *budget < 0 {
 			return ErrAllocationBudgetExceeded
 		}
 		// note that this pushes any overflow errors up the stack when AsInt() may
@@ -296,8 +358,8 @@ func unmarshal2(na datamodel.NodeAssembler, tokSrc shared.TokenSource, tk *tok.T
 		}
 		return na.AssignInt(int64(tk.Uint))
 	case tok.TFloat64:
-		*gas -= 1
-		if *gas < 0 {
+		*budget -= 1
+		if *budget < 0 {
 			return ErrAllocationBudgetExceeded
 		}
 		return na.AssignFloat(tk.Float64)

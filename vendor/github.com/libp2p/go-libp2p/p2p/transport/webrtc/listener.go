@@ -122,7 +122,7 @@ func (l *listener) listen() {
 		candidate, err := l.mux.Accept(l.ctx)
 		if err != nil {
 			if l.ctx.Err() == nil {
-				log.Debugf("accepting candidate failed: %s", err)
+				log.Debug("accepting candidate failed", "error", err)
 			}
 			return
 		}
@@ -136,7 +136,7 @@ func (l *listener) listen() {
 			conn, err := l.handleCandidate(ctx, candidate)
 			if err != nil {
 				l.mux.RemoveConnByUfrag(candidate.Ufrag)
-				log.Debugf("could not accept connection: %s: %v", candidate.Ufrag, err)
+				log.Debug("could not accept connection", "ufrag", candidate.Ufrag, "error", err)
 				return
 			}
 
@@ -253,7 +253,7 @@ func (l *listener) setupConnection(
 	if err != nil {
 		return nil, err
 	}
-	handshakeChannel := newStream(w.HandshakeDataChannel, rwc, func() {})
+	handshakeChannel := newStream(w.HandshakeDataChannel, rwc, maxSendMessageSize, nil)
 	// we do not yet know A's peer ID so accept any inbound
 	remotePubKey, err := l.transport.noiseHandshake(ctx, w.PeerConnection, handshakeChannel, "", crypto.SHA256, true)
 	if err != nil {
@@ -333,7 +333,7 @@ func (l *listener) Multiaddr() ma.Multiaddr {
 func addOnConnectionStateChangeCallback(pc *webrtc.PeerConnection) <-chan error {
 	errC := make(chan error, 1)
 	var once sync.Once
-	pc.OnConnectionStateChange(func(state webrtc.PeerConnectionState) {
+	pc.OnConnectionStateChange(func(_ webrtc.PeerConnectionState) {
 		switch pc.ConnectionState() {
 		case webrtc.PeerConnectionStateConnected:
 			once.Do(func() { close(errC) })

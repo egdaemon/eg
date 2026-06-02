@@ -17,11 +17,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/containers/podman/v5/pkg/api/handlers"
-	"github.com/containers/podman/v5/pkg/bindings"
-	"github.com/containers/podman/v5/pkg/bindings/containers"
-	"github.com/containers/podman/v5/pkg/errorhandling"
-	"github.com/docker/docker/api/types/container"
 	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/internal/debugx"
 	"github.com/egdaemon/eg/internal/envx"
@@ -30,6 +25,11 @@ import (
 	"github.com/egdaemon/eg/internal/langx"
 	"github.com/egdaemon/eg/internal/slicesx"
 	"github.com/egdaemon/eg/internal/stringsx"
+	"github.com/moby/moby/api/types/container"
+	"go.podman.io/podman/v6/pkg/api/handlers"
+	"go.podman.io/podman/v6/pkg/bindings"
+	"go.podman.io/podman/v6/pkg/bindings/containers"
+	"go.podman.io/podman/v6/pkg/errorhandling"
 
 	xterm "golang.org/x/term"
 )
@@ -168,7 +168,7 @@ func moduleExec(ctx context.Context, cname, moduledir string, stdin io.Reader, s
 	}
 
 	id, err := containers.ExecCreate(ctx, cname, &handlers.ExecCreateConfig{
-		ExecOptions: container.ExecOptions{
+		ExecCreateRequest: container.ExecCreateRequest{
 			Tty:          false,
 			AttachStdin:  stdin != nil,
 			AttachStderr: true,

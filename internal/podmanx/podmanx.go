@@ -3,11 +3,11 @@ package podmanx
 import (
 	"context"
 
-	"github.com/containers/podman/v5/pkg/bindings"
 	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/internal/debugx"
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
+	"go.podman.io/podman/v6/pkg/bindings"
 	"google.golang.org/grpc"
 )
 

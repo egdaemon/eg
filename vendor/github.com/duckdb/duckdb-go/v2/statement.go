@@ -8,7 +8,7 @@ import (
 	"math/big"
 	"reflect"
 
-	"github.com/duckdb/duckdb-go/mapping"
+	"github.com/duckdb/duckdb-go/v2/mapping"
 )
 
 type StmtType mapping.StatementType
@@ -54,6 +54,17 @@ type Stmt struct {
 	rows             bool
 }
 
+// checkState checks if the statement is closed or uninitialized.
+func (s *Stmt) checkState() error {
+	if s.closed {
+		return errClosedStmt
+	}
+	if s.preparedStmt == nil {
+		return errUninitializedStmt
+	}
+	return nil
+}
+
 // Close the statement.
 // Implements the driver.Stmt interface.
 func (s *Stmt) Close() error {
@@ -81,11 +92,8 @@ func (s *Stmt) NumInput() int {
 
 // ParamName returns the name of the parameter at the given index (1-based).
 func (s *Stmt) ParamName(n int) (string, error) {
-	if s.closed {
-		return "", errClosedStmt
-	}
-	if s.preparedStmt == nil {
-		return "", errUninitializedStmt
+	if err := s.checkState(); err != nil {
+		return "", err
 	}
 
 	count := mapping.NParams(*s.preparedStmt)
@@ -99,11 +107,8 @@ func (s *Stmt) ParamName(n int) (string, error) {
 
 // ParamType returns the expected type of the parameter at the given index (1-based).
 func (s *Stmt) ParamType(n int) (Type, error) {
-	if s.closed {
-		return TYPE_INVALID, errClosedStmt
-	}
-	if s.preparedStmt == nil {
-		return TYPE_INVALID, errUninitializedStmt
+	if err := s.checkState(); err != nil {
+		return TYPE_INVALID, err
 	}
 
 	count := mapping.NParams(*s.preparedStmt)
@@ -117,11 +122,8 @@ func (s *Stmt) ParamType(n int) (Type, error) {
 
 func (s *Stmt) paramLogicalType(n int) (mapping.LogicalType, error) {
 	var lt mapping.LogicalType
-	if s.closed {
-		return lt, errClosedStmt
-	}
-	if s.preparedStmt == nil {
-		return lt, errUninitializedStmt
+	if err := s.checkState(); err != nil {
+		return lt, err
 	}
 
 	count := mapping.NParams(*s.preparedStmt)
@@ -134,11 +136,8 @@ func (s *Stmt) paramLogicalType(n int) (mapping.LogicalType, error) {
 
 // StatementType returns the type of the statement.
 func (s *Stmt) StatementType() (StmtType, error) {
-	if s.closed {
-		return STATEMENT_TYPE_INVALID, errClosedStmt
-	}
-	if s.preparedStmt == nil {
-		return STATEMENT_TYPE_INVALID, errUninitializedStmt
+	if err := s.checkState(); err != nil {
+		return STATEMENT_TYPE_INVALID, err
 	}
 
 	t := mapping.PreparedStatementType(*s.preparedStmt)
@@ -148,12 +147,22 @@ func (s *Stmt) StatementType() (StmtType, error) {
 // Bind the parameters to the statement.
 // WARNING: This is a low-level API and should be used with caution.
 func (s *Stmt) Bind(args []driver.NamedValue) error {
+	return s.BindWithCtx(context.Background(), args)
+}
+
+// BindWithCtx takes a context and binds the parameters to the statement.
+// WARNING: This is a low-level API and should be used with caution.
+func (s *Stmt) BindWithCtx(ctx context.Context, args []driver.NamedValue) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	if s.closed {
 		return errors.Join(errCouldNotBind, errClosedStmt)
 	}
 	if s.preparedStmt == nil {
 		return errors.Join(errCouldNotBind, errUninitializedStmt)
 	}
+
 	return s.bind(args)
 }
 
@@ -163,6 +172,24 @@ func (s *Stmt) bindHugeint(val *big.Int, n int) (mapping.State, error) {
 		return mapping.StateError, err
 	}
 	state := mapping.BindHugeInt(*s.preparedStmt, mapping.IdxT(n+1), hugeint)
+	return state, nil
+}
+
+func (s *Stmt) bindUhugeint(val *big.Int, n int) (mapping.State, error) {
+	uhugeint, err := uhugeIntFromNative(val)
+	if err != nil {
+		return mapping.StateError, err
+	}
+	state := mapping.BindUHugeInt(*s.preparedStmt, mapping.IdxT(n+1), uhugeint)
+	return state, nil
+}
+
+func (s *Stmt) bindBigNum(val *big.Int, n int) (mapping.State, error) {
+	bignum := bigNumFromNative(val)
+	defer mapping.DestroyBigNum(&bignum)
+	v := mapping.CreateBigNum(bignum)
+	defer mapping.DestroyValue(&v)
+	state := mapping.BindValue(*s.preparedStmt, mapping.IdxT(n+1), v)
 	return state, nil
 }
 
@@ -230,8 +257,10 @@ func (s *Stmt) bindTime(val driver.NamedValue, t Type, n int) (mapping.State, er
 		return state, nil
 	}
 
-	// TYPE_TIME_TZ: The UTC offset is 0.
-	ti := mapping.CreateTimeTZ(ticks, 0)
+	// TYPE_TIME_TZ: Preserve the UTC offset from the input time.
+	goTime, _ := castToTime(val.Value)
+	_, offset := goTime.Zone()
+	ti := mapping.CreateTimeTZ(ticks, int32(offset))
 	v := mapping.CreateTimeTZValue(ti)
 	state := mapping.BindValue(*s.preparedStmt, mapping.IdxT(n+1), v)
 	mapping.DestroyValue(&v)
@@ -241,9 +270,9 @@ func (s *Stmt) bindTime(val driver.NamedValue, t Type, n int) (mapping.State, er
 func (s *Stmt) bindJSON(val driver.NamedValue, n int) (mapping.State, error) {
 	switch v := val.Value.(type) {
 	case []byte:
-		return mapping.BindVarchar(*s.preparedStmt, mapping.IdxT(n+1), string(v)), nil
+		return mapping.BindVarcharLength(*s.preparedStmt, mapping.IdxT(n+1), string(v), mapping.IdxT(len(v))), nil
 	case string:
-		return mapping.BindVarchar(*s.preparedStmt, mapping.IdxT(n+1), v), nil
+		return mapping.BindVarcharLength(*s.preparedStmt, mapping.IdxT(n+1), v, mapping.IdxT(len(v))), nil
 	case nil:
 		return mapping.BindNull(*s.preparedStmt, mapping.IdxT(n+1)), nil
 	}
@@ -253,17 +282,30 @@ func (s *Stmt) bindJSON(val driver.NamedValue, n int) (mapping.State, error) {
 func (s *Stmt) bindUUID(val driver.NamedValue, n int) (mapping.State, error) {
 	// Check if the interface contains a nil pointer using reflection
 	v := reflect.ValueOf(val.Value)
-	if v.Kind() == reflect.Ptr && v.IsNil() {
+	if v.Kind() == reflect.Pointer && v.IsNil() {
 		return mapping.BindNull(*s.preparedStmt, mapping.IdxT(n+1)), nil
 	}
 
 	if ss, ok := val.Value.(fmt.Stringer); ok {
-		return mapping.BindVarchar(*s.preparedStmt, mapping.IdxT(n+1), ss.String()), nil
+		str := ss.String()
+		return mapping.BindVarcharLength(*s.preparedStmt, mapping.IdxT(n+1), str, mapping.IdxT(len(str))), nil
 	}
 	return mapping.StateError, addIndexToError(unsupportedTypeError(unknownTypeErrMsg), n+1)
 }
 
-// Used for binding Array, List, Struct. In the future, also Map and Union
+func (s *Stmt) bindBit(val *Bit, n int) (mapping.State, error) {
+	if err := val.Validate(); err != nil {
+		return mapping.StateError, err
+	}
+	bit := mapping.NewBit(val.Data)
+	defer mapping.DestroyBit(&bit)
+	v := mapping.CreateBit(bit)
+	defer mapping.DestroyValue(&v)
+	state := mapping.BindValue(*s.preparedStmt, mapping.IdxT(n+1), v)
+	return state, nil
+}
+
+// Used for binding Array, List, Struct, Map. In the future, Union.
 func (s *Stmt) bindCompositeValue(val driver.NamedValue, n int) (mapping.State, error) {
 	lt, err := s.paramLogicalType(n + 1)
 	defer mapping.DestroyLogicalType(&lt)
@@ -308,9 +350,9 @@ func (s *Stmt) bindComplexValue(val driver.NamedValue, n int, t Type, name strin
 		return s.bindDate(val, n)
 	case TYPE_TIME, TYPE_TIME_TZ:
 		return s.bindTime(val, t, n)
-	case TYPE_ARRAY, TYPE_LIST, TYPE_STRUCT:
+	case TYPE_ARRAY, TYPE_LIST, TYPE_STRUCT, TYPE_MAP:
 		return s.bindCompositeValue(val, n)
-	case TYPE_MAP, TYPE_ENUM, TYPE_UNION:
+	case TYPE_ENUM, TYPE_UNION:
 		// FIXME: for other types: duckdb_param_logical_type once available, then create duckdb_value + duckdb_bind_value
 		// FIXME: for other types: use NamedValueChecker to support.
 		return mapping.StateError, addIndexToError(unsupportedTypeError(name), n+1)
@@ -318,7 +360,49 @@ func (s *Stmt) bindComplexValue(val driver.NamedValue, n int, t Type, name strin
 	return mapping.StateError, addIndexToError(unsupportedTypeError(unknownTypeErrMsg), n+1)
 }
 
+func (s *Stmt) bindTypedValue(val TypedValue, n int) (mapping.State, error) {
+	value := val.value
+	// Unwrap driver.Valuer unless the caller already signalled NULL.
+	// Calling Value() on a typed-nil receiver can panic.
+	if val.typ != TYPE_SQLNULL && !isNil(value) {
+		if valuer, ok := value.(driver.Valuer); ok {
+			driverVal, err := valuer.Value()
+			if err != nil {
+				return mapping.StateError, addIndexToError(err, n+1)
+			}
+			value = driverVal
+		}
+	}
+
+	coerced, err := coerceTypedValue(val.typ, value)
+	if err != nil {
+		return mapping.StateError, addIndexToError(err, n+1)
+	}
+	if coerced == nil {
+		return mapping.BindNull(*s.preparedStmt, mapping.IdxT(n+1)), nil
+	}
+
+	mappedVal, err := createPrimitiveValue(val.typ, coerced)
+	defer mapping.DestroyValue(&mappedVal)
+	if err != nil {
+		return mapping.StateError, addIndexToError(err, n+1)
+	}
+
+	return mapping.BindValue(*s.preparedStmt, mapping.IdxT(n+1), mappedVal), nil
+}
+
+//nolint:gocyclo
 func (s *Stmt) bindValue(val driver.NamedValue, n int) (mapping.State, error) {
+	switch explicit := val.Value.(type) {
+	case TypedValue:
+		return s.bindTypedValue(explicit, n)
+	case *TypedValue:
+		if explicit == nil {
+			return mapping.BindNull(*s.preparedStmt, mapping.IdxT(n+1)), nil
+		}
+		return s.bindTypedValue(*explicit, n)
+	}
+
 	// For some queries, we cannot resolve the parameter type when preparing the query.
 	// E.g., for "SELECT * FROM (VALUES (?, ?)) t(a, b)", we cannot know the parameter types from the SQL statement alone.
 	// For these cases, ParamType returns TYPE_INVALID.
@@ -327,8 +411,13 @@ func (s *Stmt) bindValue(val driver.NamedValue, n int) (mapping.State, error) {
 		return mapping.StateError, err
 	}
 
-	name, ok := unsupportedTypeToStringMap[t]
+	name, ok := unsupportedValueTypeToStringMap[t]
 	if ok && t != TYPE_INVALID {
+		// TODO: DuckDB can coerce primitive scalar binds into VARIANT columns
+		// when callers use the low-level bind functions; duckdb-rs relies on
+		// that behavior. Keep this blocked until tests prove this path can
+		// delegate primitive binds without falling through to Go-side VARIANT
+		// value creation, which has no C API helpers yet.
 		return mapping.StateError, addIndexToError(unsupportedTypeError(name), n+1)
 	}
 
@@ -371,7 +460,13 @@ func (s *Stmt) bindValue(val driver.NamedValue, n int) (mapping.State, error) {
 		// int is at least 32 bits.
 		return mapping.BindInt64(*s.preparedStmt, mapping.IdxT(n+1), int64(v)), nil
 	case *big.Int:
-		return s.bindHugeint(v, n)
+		if t == TYPE_HUGEINT {
+			return s.bindHugeint(v, n)
+		}
+		if t == TYPE_UHUGEINT {
+			return s.bindUhugeint(v, n)
+		}
+		return s.bindBigNum(v, n)
 	case Decimal:
 		// FIXME: use NamedValueChecker to support this type.
 		name := typeToStringMap[TYPE_DECIMAL]
@@ -389,7 +484,7 @@ func (s *Stmt) bindValue(val driver.NamedValue, n int) (mapping.State, error) {
 	case float64:
 		return mapping.BindDouble(*s.preparedStmt, mapping.IdxT(n+1), v), nil
 	case string:
-		return mapping.BindVarchar(*s.preparedStmt, mapping.IdxT(n+1), v), nil
+		return mapping.BindVarcharLength(*s.preparedStmt, mapping.IdxT(n+1), v, mapping.IdxT(len(v))), nil
 	case []byte:
 		return mapping.BindBlob(*s.preparedStmt, mapping.IdxT(n+1), v), nil
 	case Interval:
@@ -398,6 +493,13 @@ func (s *Stmt) bindValue(val driver.NamedValue, n int) (mapping.State, error) {
 			return mapping.StateError, inferErr
 		}
 		return mapping.BindInterval(*s.preparedStmt, mapping.IdxT(n+1), i), nil
+	case Bit:
+		return s.bindBit(&v, n)
+	case *Bit:
+		if v == nil {
+			return mapping.BindNull(*s.preparedStmt, mapping.IdxT(n+1)), nil
+		}
+		return s.bindBit(v, n)
 	case nil:
 		return mapping.BindNull(*s.preparedStmt, mapping.IdxT(n+1)), nil
 	}
@@ -460,14 +562,88 @@ func (s *Stmt) Exec(args []driver.Value) (driver.Result, error) {
 // ExecContext executes a query that doesn't return rows, such as an INSERT or UPDATE.
 // It implements the driver.StmtExecContext interface.
 func (s *Stmt) ExecContext(ctx context.Context, nargs []driver.NamedValue) (driver.Result, error) {
-	res, err := s.execute(ctx, nargs)
-	if err != nil {
+	cleanupCtx := s.conn.setContext(ctx)
+	defer cleanupCtx()
+
+	var res *mapping.Result
+	if err := runWithCtxInterrupt(ctx, s.conn.conn, func(wctx context.Context) error {
+		var executeErr error
+		res, executeErr = s.execute(wctx, nargs)
+		return executeErr
+	}); err != nil {
 		return nil, err
 	}
 	defer mapping.DestroyResult(res)
 
 	ra := int64(mapping.RowsChanged(res))
 	return &result{ra}, nil
+}
+
+// ColumnCount returns the number of columns that will be returned by executing the prepared statement.
+// If any of the column types is invalid (which can happen when the type is ambiguous), the result will be 1.
+// Returns an error if the statement is closed or uninitialized.
+func (s *Stmt) ColumnCount() (int, error) {
+	if err := s.checkState(); err != nil {
+		return 0, err
+	}
+
+	count := mapping.PreparedStatementColumnCount(*s.preparedStmt)
+	return int(count), nil
+}
+
+// ColumnType returns the type of the column at the given index (0-based).
+// Returns TYPE_INVALID and a columnIndexError if the column is out of range.
+// Returns an error if the statement is closed or uninitialized.
+func (s *Stmt) ColumnType(n int) (Type, error) {
+	if err := s.checkState(); err != nil {
+		return TYPE_INVALID, err
+	}
+
+	count := mapping.PreparedStatementColumnCount(*s.preparedStmt)
+	if n < 0 || n >= int(count) {
+		return TYPE_INVALID, getError(errAPI, columnIndexError(n, uint64(count)))
+	}
+
+	t := mapping.PreparedStatementColumnType(*s.preparedStmt, mapping.IdxT(n))
+	return t, nil
+}
+
+// ColumnTypeInfo returns the TypeInfo of the column at the given index (0-based).
+// TypeInfo provides detailed type information including nested structures, DECIMAL precision,
+// ENUM values, etc.
+// Returns a TypeInfo with internalType TYPE_INVALID and a columnIndexError if the column is out of range.
+// Returns an error if the statement is closed or uninitialized.
+func (s *Stmt) ColumnTypeInfo(n int) (TypeInfo, error) {
+	if err := s.checkState(); err != nil {
+		return nil, err
+	}
+
+	count := mapping.PreparedStatementColumnCount(*s.preparedStmt)
+	if n < 0 || n >= int(count) {
+		return nil, getError(errAPI, columnIndexError(n, uint64(count)))
+	}
+
+	lt := mapping.PreparedStatementColumnLogicalType(*s.preparedStmt, mapping.IdxT(n))
+	defer mapping.DestroyLogicalType(&lt)
+
+	return newTypeInfoFromLogicalType(lt)
+}
+
+// ColumnName returns the name of the column at the given index (0-based).
+// Returns "" and a columnIndexError if the column is out of range.
+// Returns an error if the statement is closed or uninitialized.
+func (s *Stmt) ColumnName(n int) (string, error) {
+	if err := s.checkState(); err != nil {
+		return "", err
+	}
+
+	count := mapping.PreparedStatementColumnCount(*s.preparedStmt)
+	if n < 0 || n >= int(count) {
+		return "", getError(errAPI, columnIndexError(n, uint64(count)))
+	}
+
+	name := mapping.PreparedStatementColumnName(*s.preparedStmt, mapping.IdxT(n))
+	return name, nil
 }
 
 // ExecBound executes a bound query that doesn't return rows, such as an INSERT or UPDATE.
@@ -484,8 +660,15 @@ func (s *Stmt) ExecBound(ctx context.Context) (driver.Result, error) {
 		return nil, errNotBound
 	}
 
-	res, err := s.executeBound(ctx)
-	if err != nil {
+	cleanupCtx := s.conn.setContext(ctx)
+	defer cleanupCtx()
+
+	var res *mapping.Result
+	if err := runWithCtxInterrupt(ctx, s.conn.conn, func(wctx context.Context) error {
+		var executeBoundErr error
+		res, executeBoundErr = s.executeBound(wctx)
+		return executeBoundErr
+	}); err != nil {
 		return nil, err
 	}
 	defer mapping.DestroyResult(res)
@@ -502,8 +685,15 @@ func (s *Stmt) Query(args []driver.Value) (driver.Rows, error) {
 // QueryContext executes a query that may return rows, such as a SELECT.
 // It implements the driver.StmtQueryContext interface.
 func (s *Stmt) QueryContext(ctx context.Context, nargs []driver.NamedValue) (driver.Rows, error) {
-	res, err := s.execute(ctx, nargs)
-	if err != nil {
+	cleanupCtx := s.conn.setContext(ctx)
+	defer cleanupCtx()
+
+	var res *mapping.Result
+	if err := runWithCtxInterrupt(ctx, s.conn.conn, func(wctx context.Context) error {
+		var executeErr error
+		res, executeErr = s.execute(wctx, nargs)
+		return executeErr
+	}); err != nil {
 		return nil, err
 	}
 	s.rows = true
@@ -524,10 +714,18 @@ func (s *Stmt) QueryBound(ctx context.Context) (driver.Rows, error) {
 		return nil, errNotBound
 	}
 
-	res, err := s.executeBound(ctx)
-	if err != nil {
+	cleanupCtx := s.conn.setContext(ctx)
+	defer cleanupCtx()
+
+	var res *mapping.Result
+	if err := runWithCtxInterrupt(ctx, s.conn.conn, func(wctx context.Context) error {
+		var executeBoundErr error
+		res, executeBoundErr = s.executeBound(wctx)
+		return executeBoundErr
+	}); err != nil {
 		return nil, err
 	}
+
 	s.rows = true
 	return newRowsWithStmt(*res, s), nil
 }
@@ -541,14 +739,34 @@ func (s *Stmt) execute(ctx context.Context, args []driver.NamedValue) (*mapping.
 	if s.rows {
 		panic("database/sql/driver: misuse of duckdb driver: ExecContext or QueryContext with active Rows")
 	}
-	if err := s.bind(args); err != nil {
+
+	if err := s.BindWithCtx(ctx, args); err != nil {
 		return nil, err
 	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+
 	return s.executeBound(ctx)
+}
+
+func interruptRoutine(mainDoneCh, bgDoneCh *chan struct{}, ctx context.Context, conn *Conn) {
+	select {
+	// Await an interrupt on the context.
+	case <-ctx.Done():
+		mapping.Interrupt(conn.conn)
+		break
+	// Await a done-signal on the main channel.
+	// Reading from a closed channel succeeds immediately.
+	case <-*mainDoneCh:
+		break
+	}
+	close(*bgDoneCh)
 }
 
 func (s *Stmt) executeBound(ctx context.Context) (*mapping.Result, error) {
 	var pendingRes mapping.PendingResult
+	// Phase 1: create pending result
 	if mapping.PendingPrepared(*s.preparedStmt, &pendingRes) == mapping.StateError {
 		dbErr := getDuckDBError(mapping.PendingError(pendingRes))
 		mapping.DestroyPending(&pendingRes)
@@ -556,37 +774,14 @@ func (s *Stmt) executeBound(ctx context.Context) (*mapping.Result, error) {
 	}
 	defer mapping.DestroyPending(&pendingRes)
 
-	mainDoneCh := make(chan struct{})
-	bgDoneCh := make(chan struct{})
+	// Short-circuit before execution
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 
-	// go-routine waiting to receive on the context or main channel.
-	go func() {
-		select {
-		// Await an interrupt on the context.
-		case <-ctx.Done():
-			mapping.Interrupt(s.conn.conn)
-			break
-		// Await a done-signal on the main channel.
-		// Reading from a closed channel succeeds immediately.
-		case <-mainDoneCh:
-			break
-		}
-		close(bgDoneCh)
-	}()
-
+	// Phase 2: execute pending
 	var res mapping.Result
 	state := mapping.ExecutePending(pendingRes, &res)
-
-	// We finished executing the pending query.
-	// Close the main channel.
-	close(mainDoneCh)
-
-	// Wait for the background go-routine to finish, too.
-	// Sometimes the go-routine is not scheduled immediately.
-	// By the time it is scheduled, another query might be running on this connection.
-	// If we don't wait for the go-routine to finish, it can cancel that new query.
-	<-bgDoneCh
-
 	if state == mapping.StateError {
 		err := errors.Join(ctx.Err(), getDuckDBError(mapping.ResultError(&res)))
 		mapping.DestroyResult(&res)

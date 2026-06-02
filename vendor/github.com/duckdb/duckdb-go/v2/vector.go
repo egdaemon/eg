@@ -1,9 +1,11 @@
 package duckdb
 
 import (
+	"math/big"
+	"time"
 	"unsafe"
 
-	"github.com/duckdb/duckdb-go/mapping"
+	"github.com/duckdb/duckdb-go/v2/mapping"
 )
 
 // vector storage of a DuckDB column.
@@ -25,9 +27,10 @@ type vector struct {
 	childVectors []vector
 }
 
+//nolint:gocyclo
 func (vec *vector) init(logicalType mapping.LogicalType, colIdx int) error {
 	t := mapping.GetTypeId(logicalType)
-	name, inMap := unsupportedTypeToStringMap[t]
+	name, inMap := unsupportedValueTypeToStringMap[t]
 	if inMap {
 		return addIndexToError(unsupportedTypeError(name), colIdx)
 	}
@@ -71,8 +74,14 @@ func (vec *vector) init(logicalType mapping.LogicalType, colIdx int) error {
 		vec.initInterval()
 	case TYPE_HUGEINT:
 		vec.initHugeint()
-	case TYPE_VARCHAR, TYPE_BLOB:
+	case TYPE_UHUGEINT:
+		vec.initUhugeint()
+	case TYPE_BIGNUM:
+		vec.initBignum()
+	case TYPE_VARCHAR, TYPE_BLOB, TYPE_GEOMETRY:
 		vec.initBytes(t)
+	case TYPE_BIT:
+		vec.initBit()
 	case TYPE_DECIMAL:
 		return vec.initDecimal(logicalType, colIdx)
 	case TYPE_ENUM:
@@ -179,7 +188,7 @@ func (vec *vector) initTS(t Type) {
 		return vec.getTS(t, rowIdx)
 	}
 	vec.setFn = func(vec *vector, rowIdx mapping.IdxT, val any) error {
-		if val == nil {
+		if val == nil || val == (*time.Time)(nil) {
 			vec.setNull(rowIdx)
 			return nil
 		}
@@ -196,7 +205,7 @@ func (vec *vector) initDate() {
 		return vec.getDate(rowIdx)
 	}
 	vec.setFn = func(vec *vector, rowIdx mapping.IdxT, val any) error {
-		if val == nil {
+		if val == nil || val == (*time.Time)(nil) {
 			vec.setNull(rowIdx)
 			return nil
 		}
@@ -213,7 +222,7 @@ func (vec *vector) initTime(t Type) {
 		return vec.getTime(rowIdx)
 	}
 	vec.setFn = func(vec *vector, rowIdx mapping.IdxT, val any) error {
-		if val == nil {
+		if val == nil || val == (*time.Time)(nil) {
 			vec.setNull(rowIdx)
 			return nil
 		}
@@ -230,7 +239,7 @@ func (vec *vector) initInterval() {
 		return vec.getInterval(rowIdx)
 	}
 	vec.setFn = func(vec *vector, rowIdx mapping.IdxT, val any) error {
-		if val == nil {
+		if val == nil || val == (*Interval)(nil) {
 			vec.setNull(rowIdx)
 			return nil
 		}
@@ -247,13 +256,47 @@ func (vec *vector) initHugeint() {
 		return vec.getHugeint(rowIdx)
 	}
 	vec.setFn = func(vec *vector, rowIdx mapping.IdxT, val any) error {
-		if val == nil {
+		if val == nil || val == (*big.Int)(nil) {
 			vec.setNull(rowIdx)
 			return nil
 		}
 		return setHugeint(vec, rowIdx, val)
 	}
 	vec.Type = TYPE_HUGEINT
+}
+
+func (vec *vector) initUhugeint() {
+	vec.getFn = func(vec *vector, rowIdx mapping.IdxT) any {
+		if vec.getNull(rowIdx) {
+			return nil
+		}
+		return vec.getUhugeint(rowIdx)
+	}
+	vec.setFn = func(vec *vector, rowIdx mapping.IdxT, val any) error {
+		if val == nil || val == (*big.Int)(nil) {
+			vec.setNull(rowIdx)
+			return nil
+		}
+		return setUhugeint(vec, rowIdx, val)
+	}
+	vec.Type = TYPE_UHUGEINT
+}
+
+func (vec *vector) initBignum() {
+	vec.getFn = func(vec *vector, rowIdx mapping.IdxT) any {
+		if vec.getNull(rowIdx) {
+			return nil
+		}
+		return vec.getBigNum(rowIdx)
+	}
+	vec.setFn = func(vec *vector, rowIdx mapping.IdxT, val any) error {
+		if val == nil || val == (*big.Int)(nil) {
+			vec.setNull(rowIdx)
+			return nil
+		}
+		return setBignum(vec, rowIdx, val)
+	}
+	vec.Type = TYPE_BIGNUM
 }
 
 func (vec *vector) initBytes(t Type) {
@@ -271,6 +314,23 @@ func (vec *vector) initBytes(t Type) {
 		return setBytes(vec, rowIdx, val)
 	}
 	vec.Type = t
+}
+
+func (vec *vector) initBit() {
+	vec.getFn = func(vec *vector, rowIdx mapping.IdxT) any {
+		if vec.getNull(rowIdx) {
+			return nil
+		}
+		return vec.getBit(rowIdx)
+	}
+	vec.setFn = func(vec *vector, rowIdx mapping.IdxT, val any) error {
+		if val == nil || val == (*Bit)(nil) {
+			vec.setNull(rowIdx)
+			return nil
+		}
+		return setBit(vec, rowIdx, val)
+	}
+	vec.Type = TYPE_BIT
 }
 
 func (vec *vector) initJSON() {
@@ -320,13 +380,17 @@ func (vec *vector) initDecimal(logicalType mapping.LogicalType, colIdx int) erro
 }
 
 func (vec *vector) initEnum(logicalType mapping.LogicalType, colIdx int) error {
-	// Initialize the dictionary.
+	// Initialize the forward (name→index) and reverse (index→name) dictionaries.
+	// enumDict uses a slice because enum indices are dense integers starting at 0,
+	// making slice indexing faster than map hashing.
 	dictSize := mapping.EnumDictionarySize(logicalType)
-	vec.namesDict = make(map[string]uint32)
+	vec.namesDict = make(map[string]uint32, dictSize)
+	vec.enumDict = make([]string, dictSize)
 
 	for i := range dictSize {
 		str := mapping.EnumDictionaryValue(logicalType, mapping.IdxT(i))
 		vec.namesDict[str] = i
+		vec.enumDict[i] = str
 	}
 
 	t := mapping.EnumInternalType(logicalType)

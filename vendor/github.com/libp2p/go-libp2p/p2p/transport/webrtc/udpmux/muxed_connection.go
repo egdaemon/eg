@@ -60,7 +60,7 @@ func (c *muxedConnection) ReadFrom(buf []byte) (int, net.Addr, error) {
 	case p := <-c.queue:
 		n := copy(buf, p.buf) // This might discard parts of the packet, if p is too short
 		if n < len(p.buf) {
-			log.Debugf("short read, had %d, read %d", len(p.buf), n)
+			log.Debug("short read", "had", len(p.buf), "read", n)
 		}
 		pool.Put(p.buf)
 		return n, p.addr, nil
@@ -103,17 +103,17 @@ func (c *muxedConnection) close() {
 
 func (c *muxedConnection) LocalAddr() net.Addr { return c.mux.socket.LocalAddr() }
 
-func (*muxedConnection) SetDeadline(t time.Time) error {
+func (*muxedConnection) SetDeadline(_ time.Time) error {
 	// no deadline is desired here
 	return nil
 }
 
-func (*muxedConnection) SetReadDeadline(t time.Time) error {
+func (*muxedConnection) SetReadDeadline(_ time.Time) error {
 	// no read deadline is desired here
 	return nil
 }
 
-func (*muxedConnection) SetWriteDeadline(t time.Time) error {
+func (*muxedConnection) SetWriteDeadline(_ time.Time) error {
 	// no write deadline is desired here
 	return nil
 }

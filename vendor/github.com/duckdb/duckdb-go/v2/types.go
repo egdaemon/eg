@@ -13,11 +13,11 @@ import (
 	"github.com/go-viper/mapstructure/v2"
 	"github.com/google/uuid"
 
-	"github.com/duckdb/duckdb-go/mapping"
+	"github.com/duckdb/duckdb-go/v2/mapping"
 )
 
 // duckdb-go exports the following type wrappers:
-// UUID, Map, Interval, Decimal, Union, Composite (optional, used to scan LIST and STRUCT).
+// UUID, Bit, Map, Interval, Decimal, Union, Composite (optional, used to scan LIST and STRUCT).
 
 // Pre-computed reflect type values to avoid repeated allocations.
 var (
@@ -40,11 +40,11 @@ var (
 	reflectTypeDecimal   = reflect.TypeFor[Decimal]()
 	reflectTypeSliceAny  = reflect.TypeFor[[]any]()
 	reflectTypeMapString = reflect.TypeFor[map[string]any]()
-	reflectTypeMap       = reflect.TypeFor[Map]()
+	reflectTypeMap       = reflect.TypeFor[OrderedMap]()
 	reflectTypeUnion     = reflect.TypeFor[Union]()
 	reflectTypeAny       = reflect.TypeFor[any]()
 	reflectTypeUUID      = reflect.TypeFor[UUID]()
-	reflectTypeHugeInt   = reflect.TypeFor[mapping.HugeInt]()
+	reflectTypeBit       = reflect.TypeFor[Bit]()
 )
 
 type numericType interface {
@@ -137,12 +137,190 @@ func uuidToHugeInt(uuid UUID) mapping.HugeInt {
 	return mapping.NewHugeInt(lower, int64(upper^(1<<63)))
 }
 
+// Bit represents a DuckDB BIT value as a sequence of bits.
+// Data stores DuckDB's internal format: a padding-count prefix byte followed by
+// the bit bytes (right-aligned with 1-padded MSB bits).
+// For example, "10101" (5 bits) is stored as [3, 11110101] where 3 is the padding count.
+//
+//nolint:recvcheck // Scan must use a pointer receiver for sql.Scanner. Helpers stay on value receivers so Bit values implement fmt.Stringer.
+type Bit struct {
+	Data []byte
+}
+
+// Scan implements the sql.Scanner interface.
+func (b *Bit) Scan(v any) error {
+	if b == nil {
+		return fmt.Errorf("invalid Bit destination")
+	}
+
+	switch val := v.(type) {
+	case nil:
+		b.Data = nil
+		return nil
+	case Bit:
+		if err := val.Validate(); err != nil {
+			return err
+		}
+		b.Data = append([]byte(nil), val.Data...)
+		return nil
+	case *Bit:
+		if val == nil {
+			b.Data = nil
+			return nil
+		}
+		return b.Scan(*val)
+	case string:
+		bit, err := NewBitFromString(val)
+		if err != nil {
+			return err
+		}
+		*b = bit
+		return nil
+	case []byte:
+		return b.Scan(string(val))
+	default:
+		return fmt.Errorf("invalid Bit value type: %T", v)
+	}
+}
+
+// NewBitFromString creates a Bit from a string of '0' and '1' characters.
+func NewBitFromString(s string) (Bit, error) {
+	if len(s) == 0 {
+		return Bit{}, fmt.Errorf("empty bit string")
+	}
+
+	numBytes := (len(s) + 7) / 8
+	padding := (8 - (len(s) % 8)) % 8
+	data := make([]byte, numBytes+1)
+	data[0] = byte(padding)
+
+	// Set padding bits to 1
+	if padding > 0 {
+		data[1] = byte(0xFF) << (8 - padding)
+	}
+
+	for i, c := range s {
+		switch c {
+		case '1':
+			bitPos := padding + i
+			byteIdx := bitPos/8 + 1
+			bitIdx := 7 - (bitPos % 8)
+			data[byteIdx] |= 1 << bitIdx
+		case '0':
+		default:
+			return Bit{}, fmt.Errorf("invalid character in bit string: %c", c)
+		}
+	}
+
+	return Bit{Data: data}, nil
+}
+
+// Validate checks that Data is a valid DuckDB bit encoding: the padding count
+// (first byte) must be 0-7, and the padding bits in the first data byte must
+// all be set to 1.
+func (b Bit) Validate() error {
+	if len(b.Data) <= 1 {
+		return fmt.Errorf("empty bit string")
+	}
+	padding := int(b.Data[0])
+	if padding > 7 {
+		return fmt.Errorf("invalid padding count %d, must be 0-7", padding)
+	}
+	if padding > 0 {
+		expectedMask := byte(0xFF) << (8 - padding)
+		if (b.Data[1] & expectedMask) != expectedMask {
+			return fmt.Errorf("padding bits must be 1s, expected high %d bits of first byte to be set", padding)
+		}
+	}
+	return nil
+}
+
+// Len returns the number of bits.
+func (b Bit) Len() int {
+	if len(b.Data) <= 1 {
+		return 0
+	}
+	length := (len(b.Data)-1)*8 - int(b.Data[0])
+	if length < 0 {
+		return 0
+	}
+	return length
+}
+
+// String returns the bit string representation (e.g., "10101").
+func (b Bit) String() string {
+	length := b.Len()
+	if length <= 0 {
+		return ""
+	}
+	var sb strings.Builder
+	sb.Grow(length)
+	padding := int(b.Data[0])
+	bitData := b.Data[1:]
+	for i := range length {
+		bitPos := padding + i
+		byteIdx := bitPos / 8
+		bitIdx := 7 - (bitPos % 8)
+		if (bitData[byteIdx] & (1 << bitIdx)) != 0 {
+			sb.WriteByte('1')
+		} else {
+			sb.WriteByte('0')
+		}
+	}
+	return sb.String()
+}
+
 func hugeIntToNative(hugeInt *mapping.HugeInt) *big.Int {
 	lower, upper := mapping.HugeIntMembers(hugeInt)
 	i := big.NewInt(upper)
 	i.Lsh(i, 64)
 	i.Add(i, new(big.Int).SetUint64(lower))
 	return i
+}
+
+func numToBigInt(val any) (*big.Int, error) {
+	switch v := val.(type) {
+	case uint8:
+		return big.NewInt(int64(v)), nil
+	case int8:
+		return big.NewInt(int64(v)), nil
+	case uint16:
+		return big.NewInt(int64(v)), nil
+	case int16:
+		return big.NewInt(int64(v)), nil
+	case uint32:
+		return big.NewInt(int64(v)), nil
+	case int32:
+		return big.NewInt(int64(v)), nil
+	case uint64:
+		return new(big.Int).SetUint64(v), nil
+	case int64:
+		return big.NewInt(v), nil
+	case uint:
+		return new(big.Int).SetUint64(uint64(v)), nil
+	case int:
+		return big.NewInt(int64(v)), nil
+	case float32:
+		bigFloat := new(big.Float).SetFloat64(float64(v))
+		bigInt, _ := bigFloat.Int(nil)
+		return bigInt, nil
+	case float64:
+		bigFloat := new(big.Float).SetFloat64(v)
+		bigInt, _ := bigFloat.Int(nil)
+		return bigInt, nil
+	case *big.Int:
+		if v == nil {
+			return nil, castError("nil *big.Int", "*big.Int")
+		}
+		return v, nil
+	case Decimal:
+		if v.Value == nil {
+			return nil, castError("nil Decimal.Value", "*big.Int")
+		}
+		return v.Value, nil
+	default:
+		return nil, castError(reflect.TypeOf(val).String(), "*big.Int")
+	}
 }
 
 func hugeIntFromNative(i *big.Int) (mapping.HugeInt, error) {
@@ -167,69 +345,241 @@ func inferHugeInt(val any) (mapping.HugeInt, error) {
 	case uint8:
 		hi = mapping.NewHugeInt(uint64(v), 0)
 	case int8:
-		hi = mapping.NewHugeInt(uint64(v), 0)
+		hi = mapping.NewHugeInt(uint64(v), int64(v)>>63)
 	case uint16:
 		hi = mapping.NewHugeInt(uint64(v), 0)
 	case int16:
-		hi = mapping.NewHugeInt(uint64(v), 0)
+		hi = mapping.NewHugeInt(uint64(v), int64(v)>>63)
 	case uint32:
 		hi = mapping.NewHugeInt(uint64(v), 0)
 	case int32:
-		hi = mapping.NewHugeInt(uint64(v), 0)
+		hi = mapping.NewHugeInt(uint64(v), int64(v)>>63)
 	case uint64:
 		hi = mapping.NewHugeInt(v, 0)
 	case int64:
-		hi, err = hugeIntFromNative(big.NewInt(v))
-		if err != nil {
-			return mapping.HugeInt{}, err
-		}
+		hi = mapping.NewHugeInt(uint64(v), v>>63)
 	case uint:
 		hi = mapping.NewHugeInt(uint64(v), 0)
 	case int:
-		hi, err = hugeIntFromNative(big.NewInt(int64(v)))
-		if err != nil {
-			return mapping.HugeInt{}, err
-		}
-	case float32:
-		hi, err = hugeIntFromNative(big.NewInt(int64(v)))
-		if err != nil {
-			return mapping.HugeInt{}, err
-		}
-	case float64:
-		hi, err = hugeIntFromNative(big.NewInt(int64(v)))
-		if err != nil {
-			return mapping.HugeInt{}, err
-		}
-	case *big.Int:
-		if v == nil {
-			return mapping.HugeInt{}, castError(reflect.TypeOf(val).String(), reflectTypeHugeInt.String())
-		}
-		if hi, err = hugeIntFromNative(v); err != nil {
-			return mapping.HugeInt{}, err
-		}
-	case Decimal:
-		if v.Value == nil {
-			return mapping.HugeInt{}, castError(reflect.TypeOf(val).String(), reflectTypeHugeInt.String())
-		}
-		if hi, err = hugeIntFromNative(v.Value); err != nil {
-			return mapping.HugeInt{}, err
-		}
+		hi = mapping.NewHugeInt(uint64(v), int64(v)>>63)
 	default:
-		return mapping.HugeInt{}, castError(reflect.TypeOf(val).String(), reflectTypeHugeInt.String())
+		var i *big.Int
+		if i, err = numToBigInt(val); err != nil {
+			return mapping.HugeInt{}, err
+		}
+		hi, err = hugeIntFromNative(i)
 	}
-
-	return hi, nil
+	return hi, err
 }
 
+func uhugeIntToNative(uhi *mapping.UHugeInt) *big.Int {
+	lower, upper := mapping.UHugeIntMembers(uhi)
+	i := new(big.Int).SetUint64(upper)
+	i.Lsh(i, 64)
+	i.Add(i, new(big.Int).SetUint64(lower))
+	return i
+}
+
+func uhugeIntFromNative(i *big.Int) (mapping.UHugeInt, error) {
+	if i.Sign() < 0 {
+		return mapping.UHugeInt{}, fmt.Errorf("big.Int(%s) is negative, cannot convert to UHUGEINT", i.String())
+	}
+
+	d := big.NewInt(1)
+	d.Lsh(d, 64)
+
+	q := new(big.Int)
+	r := new(big.Int)
+	q.DivMod(i, d, r)
+
+	if !q.IsUint64() {
+		return mapping.UHugeInt{}, fmt.Errorf("big.Int(%s) is too big for UHUGEINT", i.String())
+	}
+
+	return mapping.NewUHugeInt(r.Uint64(), q.Uint64()), nil
+}
+
+func bigNumToNative(bn *mapping.BigNum) *big.Int {
+	data, isNegative := mapping.BigNumMembers(bn)
+
+	// Data is in big-endian format, which is what big.Int.SetBytes expects.
+	i := new(big.Int).SetBytes(data)
+	if isNegative {
+		i.Neg(i)
+	}
+	return i
+}
+
+func bigNumFromNative(i *big.Int) mapping.BigNum {
+	isNegative := i.Sign() < 0
+
+	// Get absolute value bytes in big-endian format (which is what NewBigNum expects).
+	absVal := new(big.Int).Abs(i)
+	bigEndian := absVal.Bytes()
+
+	// Handle zero case - ensure at least one byte
+	if len(bigEndian) == 0 {
+		bigEndian = []byte{0}
+	}
+
+	return mapping.NewBigNum(bigEndian, isNegative)
+}
+
+func inferBigNum(val any) (mapping.BigNum, error) {
+	i, err := numToBigInt(val)
+	if err != nil {
+		return mapping.BigNum{}, err
+	}
+	return bigNumFromNative(i), nil
+}
+
+func inferUHugeInt(val any) (mapping.UHugeInt, error) {
+	var err error
+	var uhi mapping.UHugeInt
+	switch v := val.(type) {
+	case uint8:
+		uhi = mapping.NewUHugeInt(uint64(v), 0)
+	case int8:
+		if v < 0 {
+			return mapping.UHugeInt{}, fmt.Errorf("negative value %d cannot be converted to UHUGEINT", v)
+		}
+		uhi = mapping.NewUHugeInt(uint64(v), 0)
+	case uint16:
+		uhi = mapping.NewUHugeInt(uint64(v), 0)
+	case int16:
+		if v < 0 {
+			return mapping.UHugeInt{}, fmt.Errorf("negative value %d cannot be converted to UHUGEINT", v)
+		}
+		uhi = mapping.NewUHugeInt(uint64(v), 0)
+	case uint32:
+		uhi = mapping.NewUHugeInt(uint64(v), 0)
+	case int32:
+		if v < 0 {
+			return mapping.UHugeInt{}, fmt.Errorf("negative value %d cannot be converted to UHUGEINT", v)
+		}
+		uhi = mapping.NewUHugeInt(uint64(v), 0)
+	case uint64:
+		uhi = mapping.NewUHugeInt(v, 0)
+	case int64:
+		if v < 0 {
+			return mapping.UHugeInt{}, fmt.Errorf("negative value %d cannot be converted to UHUGEINT", v)
+		}
+		uhi = mapping.NewUHugeInt(uint64(v), 0)
+	case uint:
+		uhi = mapping.NewUHugeInt(uint64(v), 0)
+	case int:
+		if v < 0 {
+			return mapping.UHugeInt{}, fmt.Errorf("negative value %d cannot be converted to UHUGEINT", v)
+		}
+		uhi = mapping.NewUHugeInt(uint64(v), 0)
+	default:
+		var i *big.Int
+		if i, err = numToBigInt(val); err != nil {
+			return mapping.UHugeInt{}, err
+		}
+		uhi, err = uhugeIntFromNative(i)
+	}
+	return uhi, err
+}
+
+// Map is used to represent DuckDB maps as Go maps.
+// Note that Go maps do not preserve key order, so direct comparison operations
+// on DuckDB maps may not behave as expected when using this type. Use OrderedMap as an alternative.
+// Deprecated: Use OrderedMap instead to preserve key order.
 type Map map[any]any
 
 func (m *Map) Scan(v any) error {
-	data, ok := v.(Map)
+	data, ok := v.(OrderedMap)
 	if !ok {
-		return fmt.Errorf("invalid type `%T` for scanning `Map`, expected `Map`", data)
+		return fmt.Errorf("invalid type `%T` for scanning `Map`, expected `OrderedMap`", v)
 	}
 
-	*m = data
+	nm := make(map[any]any, data.Len())
+	keys := data.Keys()
+	vals := data.Values()
+	for i, key := range keys {
+		nm[key] = vals[i]
+	}
+
+	*m = nm
+	return nil
+}
+
+// OrderedMap is used to represent DuckDB maps while preserving key order.
+// Key order is significant in DuckDB maps for direct comparison operations.
+//
+// NOTE: only supports keys of comparable types (no slices, maps, or functions).
+// NOTE: Set and Get use linear search, so performance may degrade with large maps.
+//
+//nolint:recvcheck
+type OrderedMap struct {
+	keys   []any
+	values []any
+}
+
+func (om *OrderedMap) Keys() []any {
+	return append([]any(nil), om.keys...)
+}
+
+func (om *OrderedMap) Values() []any {
+	return append([]any(nil), om.values...)
+}
+
+func (om *OrderedMap) Len() int {
+	return len(om.keys)
+}
+
+// String implements the fmt.Stringer interface for debugging purposes.
+func (om OrderedMap) String() string {
+	var sb strings.Builder
+	sb.WriteString("OrderedMap{")
+	for i, key := range om.keys {
+		if i > 0 {
+			sb.WriteString(", ")
+		}
+		fmt.Fprintf(&sb, "%v: %v", key, om.values[i])
+	}
+	sb.WriteString("}")
+	return sb.String()
+}
+
+// Set adds or updates a key-value pair, always inserting the key to the end of the map.
+// Previous entries with the same key will be removed to ensure only the last value is retained.
+func (om *OrderedMap) Set(k, v any) {
+	om.Delete(k)
+
+	om.keys = append(om.keys, k)
+	om.values = append(om.values, v)
+}
+
+func (om *OrderedMap) Get(k any) (any, bool) {
+	for i, key := range om.keys {
+		if key == k {
+			return om.values[i], true
+		}
+	}
+	return nil, false
+}
+
+func (om *OrderedMap) Delete(k any) {
+	for i, key := range om.keys {
+		if key == k {
+			om.keys = append(om.keys[:i], om.keys[i+1:]...)
+			om.values = append(om.values[:i], om.values[i+1:]...)
+			return
+		}
+	}
+}
+
+func (om *OrderedMap) Scan(v any) error {
+	data, ok := v.(OrderedMap)
+	if !ok {
+		return fmt.Errorf("invalid type `%T` for scanning `OrderedMap`, expected `OrderedMap`", v)
+	}
+
+	om.keys = data.Keys()
+	om.values = data.Values()
+
 	return nil
 }
 
@@ -331,7 +681,7 @@ func castToTime(val any) (time.Time, error) {
 	default:
 		return ti, castError(reflect.TypeOf(val).String(), reflectTypeTime.String())
 	}
-	return ti.UTC(), nil
+	return ti, nil
 }
 
 func getTSTicks(t Type, val any) (int64, error) {
@@ -401,12 +751,18 @@ func inferTime(val any) (mapping.Time, error) {
 }
 
 func inferTimeTZ(val any) (mapping.TimeTZ, error) {
-	ticks, err := getTimeTicks(val)
+	ti, err := castToTime(val)
 	if err != nil {
 		return mapping.TimeTZ{}, err
 	}
-	// The UTC offset is 0.
-	return mapping.CreateTimeTZ(ticks, 0), nil
+
+	// DuckDB stores time as microseconds since 00:00:00.
+	base := time.Date(1970, time.January, 1, ti.Hour(), ti.Minute(), ti.Second(), ti.Nanosecond(), time.UTC)
+	ticks := base.UnixMicro()
+
+	// Preserve the UTC offset from the input time.
+	_, offset := ti.Zone()
+	return mapping.CreateTimeTZ(ticks, int32(offset)), nil
 }
 
 func getTimeTicks[T any](val T) (int64, error) {

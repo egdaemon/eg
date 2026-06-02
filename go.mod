@@ -156,3 +156,6 @@ require (
 	gonum.org/v1/gonum v0.17.0 // indirect
 	lukechampine.com/blake3 v1.4.1 // indirect
 )
+
+// https://github.com/darccio/mergo/issues/313
+replace dario.cat/mergo => github.com/darccio/mergo v1.0.2

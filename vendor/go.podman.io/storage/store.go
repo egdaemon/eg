@@ -25,13 +25,13 @@ import (
 	"github.com/sirupsen/logrus"
 	drivers "go.podman.io/storage/drivers"
 	"go.podman.io/storage/internal/dedup"
+	"go.podman.io/storage/internal/driver"
 	"go.podman.io/storage/internal/tempdir"
 	"go.podman.io/storage/pkg/archive"
 	"go.podman.io/storage/pkg/directory"
 	"go.podman.io/storage/pkg/idtools"
 	"go.podman.io/storage/pkg/ioutils"
 	"go.podman.io/storage/pkg/lockfile"
-	"go.podman.io/storage/pkg/parsers"
 	"go.podman.io/storage/pkg/stringutils"
 	"go.podman.io/storage/pkg/system"
 	"go.podman.io/storage/types"
@@ -807,7 +807,7 @@ type store struct {
 //	    return
 //	}
 func GetStore(options types.StoreOptions) (Store, error) {
-	defaultOpts, err := types.Options()
+	defaultOpts, err := types.DefaultStoreOptions()
 	if err != nil {
 		return nil, err
 	}
@@ -858,14 +858,6 @@ func GetStore(options types.StoreOptions) (Store, error) {
 	}
 	if options.ImageStore != "" {
 		if err := os.MkdirAll(options.ImageStore, 0o700); err != nil {
-			return nil, err
-		}
-	}
-	if err := os.MkdirAll(filepath.Join(options.GraphRoot, options.GraphDriverName), 0o700); err != nil {
-		return nil, err
-	}
-	if options.ImageStore != "" {
-		if err := os.MkdirAll(filepath.Join(options.ImageStore, options.GraphDriverName), 0o700); err != nil {
 			return nil, err
 		}
 	}
@@ -977,6 +969,16 @@ func (s *store) load() error {
 	}(); err != nil {
 		return err
 	}
+
+	if err := os.MkdirAll(filepath.Join(s.graphRoot, s.graphDriverName), 0o700); err != nil {
+		return err
+	}
+	if s.imageStoreDir != "" {
+		if err := os.MkdirAll(filepath.Join(s.imageStoreDir, s.graphDriverName), 0o700); err != nil {
+			return err
+		}
+	}
+
 	driverPrefix := s.graphDriverName + "-"
 
 	imgStoreRoot := s.imageStoreDir
@@ -1271,6 +1273,26 @@ func readAllLayerStores[T any](s *store, fn func(store roLayerStore) (T, bool, e
 	return zeroRes, false, nil
 }
 
+// readPrimaryLayerStore is a helper for working with store.getLayerStore():
+// It locks the store for reading, checks for updates, and calls fn()
+// It returns the return value of fn, or its own error initializing the store.
+//
+// Most callers should call readAllLayerStores instead.
+func readPrimaryLayerStore[T any](s *store, fn func(store rwLayerStore) (T, error)) (T, error) {
+	var zeroRes T // A zero value of T
+
+	store, err := s.getLayerStore()
+	if err != nil {
+		return zeroRes, err
+	}
+
+	if err := store.startReading(); err != nil {
+		return zeroRes, err
+	}
+	defer store.stopReading()
+	return fn(store)
+}
+
 // writeToLayerStore is a helper for working with store.getLayerStore():
 // It locks the store for writing, checks for updates, and calls fn()
 // It returns the return value of fn, or its own error initializing the store.
@@ -1450,11 +1472,47 @@ func (s *store) canUseShifting(uidmap, gidmap []idtools.IDMap) bool {
 }
 
 // On entry:
+// - rlstore must be locked for reading or writing
+// - rlstores MUST NOT be locked
+// Returns an extra unlock function to unlock any potentially read locked rlstores by this function.
+// The unlock function is always set and thus must always be called.
+func getParentLayer(rlstore roLayerStore, rlstores []roLayerStore, parent string) (*Layer, func(), error) {
+	// function we return to the caller so the caller gets the right stores locked and can unlock at the proper time themselves
+	var lockedLayerStores []roLayerStore
+	unlock := func() {
+		for _, i := range lockedLayerStores {
+			i.stopReading()
+		}
+	}
+	for _, l := range append([]roLayerStore{rlstore}, rlstores...) {
+		lstore := l
+		if lstore != rlstore {
+			if err := lstore.startReading(); err != nil {
+				return nil, unlock, err
+			}
+			lockedLayerStores = append(lockedLayerStores, lstore)
+		}
+		if l, err := lstore.Get(parent); err == nil && l != nil {
+			return l, unlock, nil
+		}
+	}
+
+	return nil, unlock, ErrLayerUnknown
+}
+
+// On entry:
 // - rlstore must be locked for writing
 // - rlstores MUST NOT be locked
-func (s *store) putLayer(rlstore rwLayerStore, rlstores []roLayerStore, id, parent string, names []string, mountLabel string, writeable bool, lOptions *LayerOptions, diff io.Reader, slo *stagedLayerOptions) (*Layer, int64, error) {
+//
+// Returns the new copied LayerOptions with mappings set, the parent Layer and
+// an extra unlock function to unlock any potentially read locked rlstores by this function.
+// The unlock function is always set and thus must always be called.
+func populateLayerOptions(s *store, rlstore rwLayerStore, rlstores []roLayerStore, parent string, lOptions *LayerOptions) (*LayerOptions, *Layer, func(), error) {
+	// WARNING: Update also the freshLayer checks in store.PutLayer if adding more logic here.
 	var parentLayer *Layer
 	var options LayerOptions
+	// make sure we always return a valid func instead of nil so the caller can call it without checking
+	unlock := func() {}
 	if lOptions != nil {
 		options = *lOptions
 		options.BigData = slices.Clone(lOptions.BigData)
@@ -1469,53 +1527,32 @@ func (s *store) putLayer(rlstore rwLayerStore, rlstores []roLayerStore, id, pare
 	uidMap := options.UIDMap
 	gidMap := options.GIDMap
 	if parent != "" {
-		var ilayer *Layer
-		for _, l := range append([]roLayerStore{rlstore}, rlstores...) {
-			lstore := l
-			if lstore != rlstore {
-				if err := lstore.startReading(); err != nil {
-					return nil, -1, err
-				}
-				defer lstore.stopReading()
-			}
-			if l, err := lstore.Get(parent); err == nil && l != nil {
-				ilayer = l
-				parent = ilayer.ID
-				break
-			}
+		var err error
+		parentLayer, unlock, err = getParentLayer(rlstore, rlstores, parent)
+		if err != nil {
+			return nil, nil, unlock, err
 		}
-		if ilayer == nil {
-			return nil, -1, ErrLayerUnknown
-		}
-		parentLayer = ilayer
 
 		if err := s.containerStore.startWriting(); err != nil {
-			return nil, -1, err
+			return nil, nil, unlock, err
 		}
 		defer s.containerStore.stopWriting()
 		containers, err := s.containerStore.Containers()
 		if err != nil {
-			return nil, -1, err
+			return nil, nil, unlock, err
 		}
 		for _, container := range containers {
 			if container.LayerID == parent {
-				return nil, -1, ErrParentIsContainer
+				return nil, nil, unlock, ErrParentIsContainer
 			}
 		}
 		if !options.HostUIDMapping && len(options.UIDMap) == 0 {
-			uidMap = ilayer.UIDMap
+			uidMap = parentLayer.UIDMap
 		}
 		if !options.HostGIDMapping && len(options.GIDMap) == 0 {
-			gidMap = ilayer.GIDMap
+			gidMap = parentLayer.GIDMap
 		}
 	} else {
-		// FIXME? It’s unclear why we are holding containerStore locked here at all
-		// (and because we are not modifying it, why it is a write lock, not a read lock).
-		if err := s.containerStore.startWriting(); err != nil {
-			return nil, -1, err
-		}
-		defer s.containerStore.stopWriting()
-
 		if !options.HostUIDMapping && len(options.UIDMap) == 0 {
 			uidMap = s.uidMap
 		}
@@ -1533,7 +1570,7 @@ func (s *store) putLayer(rlstore rwLayerStore, rlstores []roLayerStore, id, pare
 			GIDMap:         copySlicePreferringNil(gidMap),
 		}
 	}
-	return rlstore.create(id, parentLayer, names, mountLabel, nil, &options, writeable, diff, slo)
+	return &options, parentLayer, unlock, nil
 }
 
 func (s *store) PutLayer(id, parent string, names []string, mountLabel string, writeable bool, lOptions *LayerOptions, diff io.Reader) (*Layer, int64, error) {
@@ -1541,11 +1578,92 @@ func (s *store) PutLayer(id, parent string, names []string, mountLabel string, w
 	if err != nil {
 		return nil, -1, err
 	}
+
+	var (
+		contents    *layerCreationContents
+		options     *LayerOptions
+		parentLayer *Layer
+	)
+
+	if diff != nil {
+		m := rlstore.newMaybeStagedLayerExtraction(diff)
+		defer func() {
+			if err := m.cleanup(); err != nil {
+				logrus.Errorf("Error cleaning up temporary directories: %v", err)
+			}
+		}()
+		// driver can do unlocked staging so do that without holding the layer lock
+		// Special case we only support it when no mount label is used. c/image doesn't set it for layers
+		// and the overlay driver doesn't use it for extract today so it would be safe even when set but
+		// that is not exactly obvious and if someone would implement the ApplyDiffStaging interface for
+		// another driver that may be no longer true. So for now simply fall back to the locked extract path
+		// to ensure we don't cause any weird issues here.
+		if m.staging != nil && mountLabel == "" {
+			// func so we have a scope for defer, we don't want to hold the lock for stageWithUnlockedStore()
+			layer, err := func() (*Layer, error) {
+				if err := rlstore.startWriting(); err != nil {
+					return nil, err
+				}
+				defer rlstore.stopWriting()
+
+				if layer, err := rlstore.checkIdOrNameConflict(id, names); err != nil {
+					return layer, err
+				}
+
+				var unlockLayerStores func()
+				options, parentLayer, unlockLayerStores, err = populateLayerOptions(s, rlstore, rlstores, parent, lOptions)
+				unlockLayerStores()
+				return nil, err
+			}()
+			if err != nil {
+				return layer, -1, err
+			}
+
+			// make sure to use the resolved full ID if there is a parent
+			if parentLayer != nil {
+				parent = parentLayer.ID
+			}
+
+			if err := rlstore.stageWithUnlockedStore(m, parent, options); err != nil {
+				return nil, -1, err
+			}
+		}
+
+		contents = &layerCreationContents{
+			stagedLayerExtraction: m,
+		}
+	}
+
 	if err := rlstore.startWriting(); err != nil {
 		return nil, -1, err
 	}
 	defer rlstore.stopWriting()
-	return s.putLayer(rlstore, rlstores, id, parent, names, mountLabel, writeable, lOptions, diff, nil)
+
+	if options == nil {
+		var unlockLayerStores func()
+		options, parentLayer, unlockLayerStores, err = populateLayerOptions(s, rlstore, rlstores, parent, lOptions)
+		defer unlockLayerStores()
+		if err != nil {
+			return nil, -1, err
+		}
+	} else if parent != "" {
+		// We used the staged extraction without holding the lock.
+		// Check again that the parent layer is still valid and exists.
+		freshLayer, unlockLayerStores, err := getParentLayer(rlstore, rlstores, parent)
+		defer unlockLayerStores()
+		if err != nil {
+			return nil, -1, err
+		}
+		// In populateLayerOptions() we get the ID mappings in order to extract correctly, ensure the freshly
+		// looked up parent Layer still has the same mappings to prevent silent UID/GID corruption.
+		if !slices.Equal(freshLayer.UIDMap, parentLayer.UIDMap) || !slices.Equal(freshLayer.GIDMap, parentLayer.GIDMap) {
+			// Fatal problem. Mappings changed so the parent must be considered different now.
+			// Since we consumed the diff there is no we to recover, return error to caller. The caller would need to retry.
+			// How likely is that and would need to return a special error so c/image could do the retries?
+			return nil, -1, fmt.Errorf("error during staged layer apply, parent layer %q changed id mappings while the content was extracted, must retry layer creation", parent)
+		}
+	}
+	return rlstore.create(id, parentLayer, names, mountLabel, nil, options, writeable, contents)
 }
 
 func (s *store) CreateLayer(id, parent string, names []string, mountLabel string, writeable bool, options *LayerOptions) (*Layer, error) {
@@ -1753,7 +1871,7 @@ func (s *store) imageTopLayerForMapping(image *Image, ristore roImageStore, rlst
 		}
 	}
 	layerOptions.TemplateLayer = layer.ID
-	mappedLayer, _, err := rlstore.create("", parentLayer, nil, layer.MountLabel, nil, &layerOptions, false, nil, nil)
+	mappedLayer, _, err := rlstore.create("", parentLayer, nil, layer.MountLabel, nil, &layerOptions, false, nil)
 	if err != nil {
 		return nil, fmt.Errorf("creating an ID-mapped copy of layer %q: %w", layer.ID, err)
 	}
@@ -1924,7 +2042,7 @@ func (s *store) CreateContainer(id string, names []string, image, layer, metadat
 		options.Flags[mountLabelFlag] = mountLabel
 	}
 
-	clayer, _, err := rlstore.create(layer, imageTopLayer, nil, mlabel, options.StorageOpt, layerOptions, true, nil, nil)
+	clayer, _, err := rlstore.create(layer, imageTopLayer, nil, mlabel, options.StorageOpt, layerOptions, true, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -2550,7 +2668,7 @@ func (s *store) DeleteLayer(id string) (retErr error) {
 	}()
 	return s.writeToAllStores(func(rlstore rwLayerStore) error {
 		if rlstore.Exists(id) {
-			if l, err := rlstore.Get(id); err != nil {
+			if l, err := rlstore.Get(id); err == nil {
 				id = l.ID
 			}
 			layers, err := rlstore.Layers()
@@ -2987,16 +3105,9 @@ func (s *store) Mounted(id string) (int, error) {
 	if layerID, err := s.ContainerLayerID(id); err == nil {
 		id = layerID
 	}
-	rlstore, err := s.getLayerStore()
-	if err != nil {
-		return 0, err
-	}
-	if err := rlstore.startReading(); err != nil {
-		return 0, err
-	}
-	defer rlstore.stopReading()
-
-	return rlstore.Mounted(id)
+	return readPrimaryLayerStore(s, func(store rwLayerStore) (int, error) {
+		return store.Mounted(id)
+	})
 }
 
 func (s *store) UnmountImage(id string, force bool) (bool, error) {
@@ -3182,11 +3293,16 @@ func (s *store) ApplyStagedLayer(args ApplyStagedLayerOptions) (*Layer, error) {
 
 	// if the layer doesn't exist yet, try to create it.
 
-	slo := stagedLayerOptions{
+	contents := layerCreationContents{
 		DiffOutput:  args.DiffOutput,
 		DiffOptions: args.DiffOptions,
 	}
-	layer, _, err = s.putLayer(rlstore, rlstores, args.ID, args.ParentLayer, args.Names, args.MountLabel, args.Writeable, args.LayerOptions, nil, &slo)
+	options, parentLayer, unlockLayerStores, err := populateLayerOptions(s, rlstore, rlstores, args.ParentLayer, args.LayerOptions)
+	defer unlockLayerStores()
+	if err != nil {
+		return nil, err
+	}
+	layer, _, err = rlstore.create(args.ID, parentLayer, args.Names, args.MountLabel, nil, options, args.Writeable, &contents)
 	return layer, err
 }
 
@@ -3286,41 +3402,48 @@ func (s *store) LayerSize(id string) (int64, error) {
 }
 
 func (s *store) LayerParentOwners(id string) ([]int, []int, error) {
-	rlstore, err := s.getLayerStore()
-	if err != nil {
+	var parentUIDs, parentGIDs []int
+	if _, err := readPrimaryLayerStore(s, func(store rwLayerStore) (struct{}, error) {
+		if store.Exists(id) {
+			u, g, err := store.ParentOwners(id)
+			if err != nil {
+				return struct{}{}, err
+			}
+			parentUIDs = u
+			parentGIDs = g
+			return struct{}{}, nil
+		}
+		return struct{}{}, ErrLayerUnknown
+	}); err != nil {
 		return nil, nil, err
 	}
-	if err := rlstore.startReading(); err != nil {
-		return nil, nil, err
-	}
-	defer rlstore.stopReading()
-	if rlstore.Exists(id) {
-		return rlstore.ParentOwners(id)
-	}
-	return nil, nil, ErrLayerUnknown
+	return parentUIDs, parentGIDs, nil
 }
 
 func (s *store) ContainerParentOwners(id string) ([]int, []int, error) {
-	rlstore, err := s.getLayerStore()
-	if err != nil {
+	var parentUIDs, parentGIDs []int
+	if _, err := readPrimaryLayerStore(s, func(store rwLayerStore) (struct{}, error) {
+		_, _, err := readContainerStore(s, func() (struct{}, bool, error) {
+			container, err := s.containerStore.Get(id)
+			if err != nil {
+				return struct{}{}, true, err
+			}
+			if store.Exists(container.LayerID) {
+				u, g, err := store.ParentOwners(container.LayerID)
+				if err != nil {
+					return struct{}{}, true, err
+				}
+				parentUIDs = u
+				parentGIDs = g
+				return struct{}{}, true, nil
+			}
+			return struct{}{}, true, ErrLayerUnknown
+		})
+		return struct{}{}, err
+	}); err != nil {
 		return nil, nil, err
 	}
-	if err := rlstore.startReading(); err != nil {
-		return nil, nil, err
-	}
-	defer rlstore.stopReading()
-	if err := s.containerStore.startReading(); err != nil {
-		return nil, nil, err
-	}
-	defer s.containerStore.stopReading()
-	container, err := s.containerStore.Get(id)
-	if err != nil {
-		return nil, nil, err
-	}
-	if rlstore.Exists(container.LayerID) {
-		return rlstore.ParentOwners(container.LayerID)
-	}
-	return nil, nil, ErrLayerUnknown
+	return parentUIDs, parentGIDs, nil
 }
 
 func (s *store) Layers() ([]Layer, error) {
@@ -3398,6 +3521,12 @@ func (s *store) LookupAdditionalLayer(tocDigest digest.Digest, imageref string) 
 		}
 		return nil, err
 	}
+	succeeded := false
+	defer func() {
+		if !succeeded {
+			al.Release()
+		}
+	}()
 	info, err := al.Info()
 	if err != nil {
 		return nil, err
@@ -3407,6 +3536,7 @@ func (s *store) LookupAdditionalLayer(tocDigest digest.Digest, imageref string) 
 	if err := json.NewDecoder(info).Decode(&layer); err != nil {
 		return nil, err
 	}
+	succeeded = true
 	return &additionalLayer{&layer, al, s}, nil
 }
 
@@ -3822,27 +3952,9 @@ const AutoUserNsMaxSize = 65536
 // creating a user namespace.
 const RootAutoUserNsUser = "containers"
 
-// SetDefaultConfigFilePath sets the default configuration to the specified path, and loads the file.
-// Deprecated: Use types.SetDefaultConfigFilePath, which can return an error.
-func SetDefaultConfigFilePath(path string) {
-	_ = types.SetDefaultConfigFilePath(path)
-}
-
-// DefaultConfigFile returns the path to the storage config file used
-func DefaultConfigFile() (string, error) {
-	return types.DefaultConfigFile()
-}
-
-// ReloadConfigurationFile parses the specified configuration file and overrides
-// the configuration in storeOptions.
-// Deprecated: Use types.ReloadConfigurationFile, which can return an error.
-func ReloadConfigurationFile(configFile string, storeOptions *types.StoreOptions) {
-	_ = types.ReloadConfigurationFile(configFile, storeOptions)
-}
-
 // GetDefaultMountOptions returns the default mountoptions defined in container/storage
 func GetDefaultMountOptions() ([]string, error) {
-	defaultStoreOptions, err := types.Options()
+	defaultStoreOptions, err := types.DefaultStoreOptions()
 	if err != nil {
 		return nil, err
 	}
@@ -3850,18 +3962,13 @@ func GetDefaultMountOptions() ([]string, error) {
 }
 
 // GetMountOptions returns the mountoptions for the specified driver and graphDriverOptions
-func GetMountOptions(driver string, graphDriverOptions []string) ([]string, error) {
-	mountOpts := []string{
-		".mountopt",
-		fmt.Sprintf("%s.mountopt", driver),
-	}
+func GetMountOptions(usedDriver string, graphDriverOptions []string) ([]string, error) {
 	for _, option := range graphDriverOptions {
-		key, val, err := parsers.ParseKeyValueOpt(option)
+		optDriver, key, val, err := driver.ParseDriverOption(option)
 		if err != nil {
 			return nil, err
 		}
-		key = strings.ToLower(key)
-		if slices.Contains(mountOpts, key) {
+		if (optDriver == "" || optDriver == usedDriver) && key == "mountopt" {
 			return strings.Split(val, ","), nil
 		}
 	}

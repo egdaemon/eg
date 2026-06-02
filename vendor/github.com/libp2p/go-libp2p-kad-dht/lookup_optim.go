@@ -242,7 +242,7 @@ func (os *optimisticState) stopFn(qps *qpeerset.QueryPeerset) bool {
 func (os *optimisticState) putProviderRecord(pid peer.ID) {
 	err := os.dht.protoMessenger.PutProviderAddrs(os.putCtx, pid, []byte(os.key), peer.AddrInfo{
 		ID:    os.dht.self,
-		Addrs: os.dht.filterAddrs(os.dht.host.Addrs()),
+		Addrs: os.dht.FilteredAddrs(),
 	})
 	os.peerStatesLk.Lock()
 	if err != nil {
@@ -288,7 +288,7 @@ func (os *optimisticState) waitForRPCs() {
 	// If that worked we need to consume the doneChan and release the acquired lease on the
 	// optProvJobsPool channel.
 	remaining := rpcCount - int(os.putProvDone.Load())
-	for i := 0; i < remaining; i++ {
+	for range remaining {
 		select {
 		case os.dht.optProvJobsPool <- struct{}{}:
 			// We were able to acquire a lease on the optProvJobsPool channel.

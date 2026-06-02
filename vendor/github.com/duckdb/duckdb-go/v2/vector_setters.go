@@ -2,11 +2,12 @@ package duckdb
 
 import (
 	"encoding/json"
+	"math/big"
 	"reflect"
 	"strconv"
 	"unsafe"
 
-	"github.com/duckdb/duckdb-go/mapping"
+	"github.com/duckdb/duckdb-go/v2/mapping"
 )
 
 // secondsPerDay to calculate the days since 1970-01-01.
@@ -136,7 +137,6 @@ func setTime[S any](vec *vector, rowIdx mapping.IdxT, val S) error {
 		}
 		setPrimitive(vec, rowIdx, ti)
 	case TYPE_TIME_TZ:
-		// The UTC offset is 0.
 		ti, err := inferTimeTZ(val)
 		if err != nil {
 			return err
@@ -164,15 +164,97 @@ func setHugeint[S any](vec *vector, rowIdx mapping.IdxT, val S) error {
 	return nil
 }
 
+func setUhugeint[S any](vec *vector, rowIdx mapping.IdxT, val S) error {
+	uhi, err := inferUHugeInt(val)
+	if err != nil {
+		return err
+	}
+	setPrimitive(vec, rowIdx, uhi)
+	return nil
+}
+
+func setBignum[S any](vec *vector, rowIdx mapping.IdxT, val S) error {
+	i, err := numToBigInt(val)
+	if err != nil {
+		return err
+	}
+
+	// DuckDB BIGNUM format:
+	// - 3-byte header: (length | 0x800000), complemented for negative
+	// - Big-endian magnitude, complemented for negative
+	isNegative := i.Sign() < 0
+	absVal := new(big.Int).Abs(i)
+	magnitude := absVal.Bytes()
+
+	// Ensure at least 1 byte of magnitude (for zero)
+	if len(magnitude) == 0 {
+		magnitude = []byte{0}
+	}
+
+	// Build header: length | 0x800000
+	length := uint32(len(magnitude))
+	header := length | 0x00800000
+	if isNegative {
+		header = ^header
+	}
+
+	// Build output: 3 header bytes + magnitude
+	data := make([]byte, 3+len(magnitude))
+	data[0] = byte(header >> 16)
+	data[1] = byte(header >> 8)
+	data[2] = byte(header)
+
+	if isNegative {
+		// Complement magnitude bytes
+		for j, b := range magnitude {
+			data[3+j] = ^b
+		}
+	} else {
+		copy(data[3:], magnitude)
+	}
+
+	mapping.VectorAssignStringElementLen(vec.vec, rowIdx, data)
+	return nil
+}
+
 func setBytes[S any](vec *vector, rowIdx mapping.IdxT, val S) error {
 	switch v := any(val).(type) {
 	case string:
-		mapping.VectorAssignStringElement(vec.vec, rowIdx, v)
+		mapping.VectorAssignStringElementLen(vec.vec, rowIdx, []byte(v))
 	case []byte:
 		mapping.VectorAssignStringElementLen(vec.vec, rowIdx, v)
 	default:
 		return castError(reflect.TypeOf(val).String(), reflect.String.String())
 	}
+	return nil
+}
+
+func setBit[S any](vec *vector, rowIdx mapping.IdxT, val S) error {
+	var bit Bit
+	switch v := any(val).(type) {
+	case Bit:
+		bit = v
+	case *Bit:
+		bit = *v
+	case string:
+		var err error
+		bit, err = NewBitFromString(v)
+		if err != nil {
+			return err
+		}
+	case []byte:
+		var err error
+		bit, err = NewBitFromString(string(v))
+		if err != nil {
+			return err
+		}
+	default:
+		return castError(reflect.TypeOf(val).String(), reflectTypeBit.String())
+	}
+	if err := bit.Validate(); err != nil {
+		return err
+	}
+	mapping.VectorAssignStringElementLen(vec.vec, rowIdx, bit.Data)
 	return nil
 }
 
@@ -289,20 +371,26 @@ func setStruct[S any](vec *vector, rowIdx mapping.IdxT, val S) error {
 }
 
 func setMap[S any](vec *vector, rowIdx mapping.IdxT, val S) error {
-	var m Map
+	var m OrderedMap
+
 	switch v := any(val).(type) {
-	case Map:
+	case OrderedMap:
 		m = v
+	case Map:
+		m = OrderedMap{}
+		for key, value := range v {
+			m.Set(key, value)
+		}
 	default:
 		return castError(reflect.TypeOf(val).String(), reflectTypeMap.String())
 	}
 
 	// Create a LIST of STRUCT values.
-	i := 0
-	list := make([]any, len(m))
-	for key, value := range m {
-		list[i] = map[string]any{mapKeysField(): key, mapValuesField(): value}
-		i++
+	list := make([]any, m.Len())
+	keys := m.Keys()
+	vals := m.Values()
+	for i := range keys {
+		list[i] = map[string]any{mapKeysField(): keys[i], mapValuesField(): vals[i]}
 	}
 
 	return setList(vec, rowIdx, list)
@@ -404,8 +492,9 @@ func setUnion[S any](vec *vector, rowIdx mapping.IdxT, val S) error {
 	}
 }
 
+//nolint:gocyclo
 func setVectorVal[S any](vec *vector, rowIdx mapping.IdxT, val S) error {
-	name, inMap := unsupportedTypeToStringMap[vec.Type]
+	name, inMap := unsupportedValueTypeToStringMap[vec.Type]
 	if inMap {
 		return unsupportedTypeError(name)
 	}
@@ -443,10 +532,16 @@ func setVectorVal[S any](vec *vector, rowIdx mapping.IdxT, val S) error {
 		return setInterval(vec, rowIdx, val)
 	case TYPE_HUGEINT:
 		return setHugeint(vec, rowIdx, val)
+	case TYPE_UHUGEINT:
+		return setUhugeint(vec, rowIdx, val)
+	case TYPE_BIGNUM:
+		return setBignum(vec, rowIdx, val)
 	case TYPE_VARCHAR:
 		return setBytes(vec, rowIdx, val)
-	case TYPE_BLOB:
+	case TYPE_BLOB, TYPE_GEOMETRY:
 		return setBytes(vec, rowIdx, val)
+	case TYPE_BIT:
+		return setBit(vec, rowIdx, val)
 	case TYPE_DECIMAL:
 		return setDecimal(vec, rowIdx, val)
 	case TYPE_ENUM:
@@ -455,9 +550,11 @@ func setVectorVal[S any](vec *vector, rowIdx mapping.IdxT, val S) error {
 		return setList(vec, rowIdx, val)
 	case TYPE_STRUCT:
 		return setStruct(vec, rowIdx, val)
-	case TYPE_MAP, TYPE_ARRAY:
+	case TYPE_MAP:
+		return setMap(vec, rowIdx, val)
+	case TYPE_ARRAY:
 		// FIXME: Is this already supported? And tested?
-		return unsupportedTypeError(unsupportedTypeToStringMap[vec.Type])
+		return unsupportedTypeError(typeToStringMap[vec.Type])
 	case TYPE_UUID:
 		return setUUID(vec, rowIdx, val)
 	case TYPE_UNION:

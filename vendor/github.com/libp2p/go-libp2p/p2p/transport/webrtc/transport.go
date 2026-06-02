@@ -12,6 +12,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"os"
 	"time"
 
 	mrand "math/rand/v2"
@@ -44,7 +45,8 @@ func init() {
 	var err error
 	webrtcComponent, err = ma.NewComponent(ma.ProtocolWithCode(ma.P_WEBRTC_DIRECT).Name, "")
 	if err != nil {
-		log.Fatal(err)
+		fmt.Fprintln(os.Stderr, err.Error())
+		os.Executable()
 	}
 }
 
@@ -68,7 +70,13 @@ const (
 	DefaultFailedTimeout       = 30 * time.Second
 	DefaultKeepaliveTimeout    = 15 * time.Second
 
-	sctpReceiveBufferSize = 100_000
+	// sctpReceiveBufferSize is the size of the buffer for incoming messages.
+	//
+	// This is enough space for enqueuing 10 full sized messages.
+	// Besides throughput, this only matters if an application is using multiple dependent
+	// streams, say streams 1 & 2. It reads from stream 1 only after receiving message from
+	// stream 2. A buffer of 10 messages should serve all such situations.
+	sctpReceiveBufferSize = 10 * maxReceiveMessageSize
 )
 
 type WebRTCTransport struct {
@@ -367,7 +375,7 @@ func (t *WebRTCTransport) dial(ctx context.Context, scope network.ConnManagement
 	if err != nil {
 		return nil, err
 	}
-	channel := newStream(w.HandshakeDataChannel, detached, func() {})
+	channel := newStream(w.HandshakeDataChannel, detached, maxSendMessageSize, nil)
 
 	remotePubKey, err := t.noiseHandshake(ctx, w.PeerConnection, channel, p, remoteHashFunction, false)
 	if err != nil {
@@ -424,7 +432,7 @@ func genUfrag() string {
 	rand.Read(seed[:])
 	r := mrand.New(mrand.New(mrand.NewChaCha8(seed)))
 	b := make([]byte, uFragLength)
-	for i := 0; i < len(uFragPrefix); i++ {
+	for i := range len(uFragPrefix) {
 		b[i] = uFragPrefix[i]
 	}
 	for i := len(uFragPrefix); i < uFragLength; i++ {
@@ -467,12 +475,12 @@ func (t *WebRTCTransport) generateNoisePrologue(pc *webrtc.PeerConnection, hash 
 
 	localEncoded, err := multihash.Encode(localFpBytes, multihash.SHA2_256)
 	if err != nil {
-		log.Debugf("could not encode multihash for local fingerprint")
+		log.Debug("could not encode multihash for local fingerprint")
 		return nil, err
 	}
 	remoteEncoded, err := multihash.Encode(remoteFpBytes, multihash.SHA2_256)
 	if err != nil {
-		log.Debugf("could not encode multihash for remote fingerprint")
+		log.Debug("could not encode multihash for remote fingerprint")
 		return nil, err
 	}
 
@@ -531,7 +539,7 @@ func (t *WebRTCTransport) AddCertHashes(addr ma.Multiaddr) (ma.Multiaddr, bool) 
 	if err != nil {
 		return nil, false
 	}
-	return addr.AppendComponent(certComp), true
+	return addr.Encapsulate(certComp), true
 }
 
 type netConnWrapper struct {
@@ -602,13 +610,13 @@ func newWebRTCConnection(settings webrtc.SettingEngine, config webrtc.Configurat
 		dc.OnOpen(func() {
 			rwc, err := dc.Detach()
 			if err != nil {
-				log.Warnf("could not detach datachannel: id: %d", *dc.ID())
+				log.Warn("could not detach datachannel", "id", *dc.ID())
 				return
 			}
 			select {
 			case incomingDataChannels <- dataChannel{rwc, dc}:
 			default:
-				log.Warnf("connection busy, rejecting stream")
+				log.Warn("connection busy, rejecting stream")
 				b, _ := proto.Marshal(&pb.Message{Flag: pb.Message_RESET.Enum()})
 				w := msgio.NewWriter(rwc)
 				w.WriteMsg(b)
@@ -618,7 +626,7 @@ func newWebRTCConnection(settings webrtc.SettingEngine, config webrtc.Configurat
 	})
 
 	connectionClosedCh := make(chan struct{}, 1)
-	pc.SCTP().OnClose(func(err error) {
+	pc.SCTP().OnClose(func(_ error) {
 		// We only need one message. Closing a connection is a problem as pion might invoke the callback more than once.
 		select {
 		case connectionClosedCh <- struct{}{}:

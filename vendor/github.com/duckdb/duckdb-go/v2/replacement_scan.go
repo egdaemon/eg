@@ -14,7 +14,7 @@ import (
 	"runtime/cgo"
 	"unsafe"
 
-	"github.com/duckdb/duckdb-go/mapping"
+	"github.com/duckdb/duckdb-go/v2/mapping"
 )
 
 type ReplacementScanCallback func(tableName string) (string, []any, error)
@@ -56,12 +56,30 @@ func replacement_scan_callback(infoPtr, tableNamePtr, data unsafe.Pointer) {
 	for _, param := range params {
 		switch paramType := param.(type) {
 		case string:
-			val := mapping.CreateVarchar(paramType)
+			val := createVarchar(paramType)
 			mapping.ReplacementScanAddParameter(info, val)
 			mapping.DestroyValue(&val)
 		case int64:
 			val := mapping.CreateInt64(paramType)
 			mapping.ReplacementScanAddParameter(info, val)
+			mapping.DestroyValue(&val)
+		case []string:
+			// Create values and logical type.
+			values := make([]mapping.Value, len(paramType))
+			for i, v := range paramType {
+				values[i] = createVarchar(v)
+			}
+			lt := mapping.CreateLogicalType(mapping.TypeVarchar)
+			val := mapping.CreateListValue(lt, values)
+
+			// Add the parameter.
+			mapping.ReplacementScanAddParameter(info, val)
+
+			// Destroy logical type and values.
+			mapping.DestroyLogicalType(&lt)
+			for _, v := range values {
+				mapping.DestroyValue(&v)
+			}
 			mapping.DestroyValue(&val)
 		default:
 			mapping.ReplacementScanSetError(info, "unsupported type for replacement scan")

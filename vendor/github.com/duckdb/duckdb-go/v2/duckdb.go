@@ -13,7 +13,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/duckdb/duckdb-go/mapping"
+	"github.com/duckdb/duckdb-go/v2/mapping"
 )
 
 var GetInstanceCache = sync.OnceValue(
@@ -113,8 +113,7 @@ func (c *Connector) Connect(ctx context.Context) (driver.Conn, error) {
 	}
 
 	conn := newConn(mc, c.ctxStore)
-
-	cleanupCtx := c.ctxStore.store(conn.id, ctx)
+	cleanupCtx := conn.setContext(ctx)
 	defer cleanupCtx()
 
 	if c.connInitFn != nil {

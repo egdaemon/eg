@@ -8,6 +8,8 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -78,5 +80,88 @@ func TestDownloadClient(t *testing.T) {
 
 		err := dc.Download(ctx, workload)
 		require.NoError(t, err)
+	})
+
+	t.Run("success_on_first_attempt_writes_spool_files", func(t *testing.T) {
+		uid := errorsx.Must(uuid.NewV4())
+		archive := buildArchive(t, "entry.wasm", testx.Read(testx.Fixture("example.1.wasm")))
+
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write(archive)
+		}))
+		defer srv.Close()
+
+		root := t.TempDir()
+		dirs := runners.NewSpoolDir(root)
+		dc := runners.NewDownloadClient(http.DefaultClient, runners.DownloadClientOptionHost(srv.URL), runners.DownloadClientOptionDirs(dirs))
+
+		err := dc.Download(t.Context(), &runners.EnqueuedDequeueResponse{
+			Enqueued: &runners.Enqueued{Id: uid.String(), Entry: "entry.wasm"},
+		})
+		require.NoError(t, err)
+
+		// After a successful download the item moves from downloading → queued.
+		dirname := runners.Queued().Dirname(uid)
+		_, err = os.Stat(filepath.Join(dirs.Downloading, dirname))
+		require.True(t, os.IsNotExist(err), "downloading dir should be gone after enqueue")
+
+		require.FileExists(t, filepath.Join(dirs.Queued, dirname, "archive.tar.gz"))
+		require.FileExists(t, filepath.Join(dirs.Queued, dirname, "metadata.json"))
+	})
+
+	t.Run("context_cancelled_during_409_retry_loop", func(t *testing.T) {
+		uid := errorsx.Must(uuid.NewV4())
+
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			errorsx.Log(httpx.WriteEmptyJSON(w, http.StatusConflict))
+		}))
+		defer srv.Close()
+
+		dirs := runners.NewSpoolDir(t.TempDir())
+		dc := runners.NewDownloadClient(http.DefaultClient, runners.DownloadClientOptionHost(srv.URL), runners.DownloadClientOptionDirs(dirs))
+
+		ctx, cancel := context.WithTimeout(t.Context(), 200*time.Millisecond)
+		defer cancel()
+
+		err := dc.Download(ctx, &runners.EnqueuedDequeueResponse{
+			Enqueued: &runners.Enqueued{Id: uid.String(), Entry: "entry.wasm"},
+		})
+		require.ErrorIs(t, err, context.DeadlineExceeded)
+	})
+
+	t.Run("non_retryable_http_error_propagates", func(t *testing.T) {
+		uid := errorsx.Must(uuid.NewV4())
+
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusInternalServerError)
+		}))
+		defer srv.Close()
+
+		dirs := runners.NewSpoolDir(t.TempDir())
+		dc := runners.NewDownloadClient(http.DefaultClient, runners.DownloadClientOptionHost(srv.URL), runners.DownloadClientOptionDirs(dirs))
+
+		err := dc.Download(t.Context(), &runners.EnqueuedDequeueResponse{
+			Enqueued: &runners.Enqueued{Id: uid.String(), Entry: "entry.wasm"},
+		})
+		require.Error(t, err)
+	})
+
+	t.Run("invalid_uuid_returns_error", func(t *testing.T) {
+		archive := buildArchive(t, "entry.wasm", testx.Read(testx.Fixture("example.1.wasm")))
+
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write(archive)
+		}))
+		defer srv.Close()
+
+		dirs := runners.NewSpoolDir(t.TempDir())
+		dc := runners.NewDownloadClient(http.DefaultClient, runners.DownloadClientOptionHost(srv.URL), runners.DownloadClientOptionDirs(dirs))
+
+		err := dc.Download(t.Context(), &runners.EnqueuedDequeueResponse{
+			Enqueued: &runners.Enqueued{Id: "not-a-valid-uuid", Entry: "entry.wasm"},
+		})
+		require.ErrorContains(t, err, "malformed uid")
 	})
 }

@@ -11,11 +11,13 @@ import (
 	"sync"
 	"time"
 
+	"golang.org/x/net/http2"
 	"google.golang.org/grpc/grpclog"
 
 	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/internal/debugx"
 	"github.com/egdaemon/eg/internal/envx"
+	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/grpcx"
 	"github.com/egdaemon/eg/internal/httpx"
 	"github.com/egdaemon/eg/internal/tracex"
@@ -88,6 +90,16 @@ func (t TLSConfig) DefaultClient() *http.Client {
 		TLSHandshakeTimeout:   10 * time.Second,
 		ExpectContinueTimeout: 1 * time.Second,
 		TLSClientConfig:       t.Config(),
+	}
+
+	// detect connections that have stalled (e.g. silent network blackholes) by
+	// pinging idle connections and closing them if the ping goes unanswered,
+	// rather than allowing in-flight requests to hang forever.
+	if h2transport, err := http2.ConfigureTransports(ctransport); err != nil {
+		log.Println(errorsx.Wrap(err, "unable to configure http2 transport"))
+	} else {
+		h2transport.ReadIdleTimeout = 30 * time.Second
+		h2transport.PingTimeout = 15 * time.Second
 	}
 
 	defaultclient := &http.Client{Transport: ctransport}

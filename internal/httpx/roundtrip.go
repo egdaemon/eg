@@ -8,6 +8,7 @@ import (
 	"log"
 	"net/http"
 	"net/http/httputil"
+	"net/url"
 
 	"golang.org/x/time/rate"
 )
@@ -233,5 +234,32 @@ func (t RetryTransport) RoundTrip(req *http.Request) (resp *http.Response, err e
 	}
 
 	req.Body = io.NopCloser(buf)
+	return t.Delegate.RoundTrip(req)
+}
+
+func RewriteHostTransport(dst *url.URL, d http.RoundTripper) http.RoundTripper {
+	if d == nil {
+		d = http.DefaultTransport
+	}
+	return rewritehosttransport{
+		dst:      dst,
+		Delegate: d,
+	}
+}
+
+type rewritehosttransport struct {
+	dst      *url.URL
+	Delegate http.RoundTripper
+}
+
+// RoundTrip implements http.RoundTripper
+func (t rewritehosttransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	dup := *t.dst
+	dup.Path = req.URL.Path
+
+	// log.Println("rewriting", req.URL, req.RemoteAddr, req.Host, "->", dup)
+	req.Host = dup.Host
+	req.URL = &dup
+
 	return t.Delegate.RoundTrip(req)
 }

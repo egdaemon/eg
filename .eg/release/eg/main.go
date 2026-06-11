@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 
+	"eg/compute/archlinux"
 	debeg "eg/compute/debuild/eg"
 
 	"github.com/egdaemon/eg/runtime/wasi/eg"
@@ -22,6 +23,7 @@ func main() {
 		eggit.AutoClone,
 		eg.Parallel(
 			debeg.Prepare,
+			archlinux.Prepare,
 		),
 		eg.Parallel(
 			eg.Module(
@@ -37,6 +39,13 @@ func main() {
 					shell.Op(
 						shell.Newf("cp %s/*.deb %s", egenv.EphemeralDirectory("deb.eg"), egenv.CacheDirectory(".dist")),
 					),
+				),
+			),
+			eg.Module(
+				ctx,
+				archlinux.AURRunner(),
+				eg.Sequential(
+					archlinux.Publish,
 				),
 			),
 		),

@@ -11,6 +11,7 @@ import (
 	"github.com/egdaemon/eg/backoff"
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
+	"github.com/egdaemon/eg/internal/httpx"
 	"github.com/egdaemon/eg/internal/numericx"
 )
 
@@ -19,14 +20,17 @@ func workloadtarget() float64 {
 }
 
 func AutoDownload(ctx context.Context, authedclient *http.Client, m *ResourceManager) {
-	w := backoff.Chan()
 	s := backoff.New(
 		backoff.Exponential(200*time.Millisecond),
 		backoff.Maximum(envx.Duration(time.Minute, eg.EnvScheduleMaximumDelay)),
 		backoff.Jitter(0.02),
 	)
 
-	spool := DefaultSpoolDirs()
+	autodownload(ctx, authedclient, m, s, DefaultSpoolDirs())
+}
+
+func autodownload(ctx context.Context, authedclient *http.Client, m *ResourceManager, s backoff.Strategy, spool SpoolDirs) {
+	w := backoff.Chan()
 
 	determineload := func(limits, consumed RuntimeResources) float64 {
 		cores := float64(consumed.Cores) / float64(limits.Cores)
@@ -79,7 +83,13 @@ func AutoDownload(ctx context.Context, authedclient *http.Client, m *ResourceMan
 			continue
 		}
 
-		if err = NewDownloadClient(authedclient).Download(ctx, workload); err != nil {
+		if err = NewDownloadClient(authedclient).Download(ctx, workload); httpx.IsStatusError(err, http.StatusConflict, http.StatusNotFound) != nil {
+			// when we see 404s or conflict status codes it means we're working through a backlog.
+			// and we should treat them as successful by resetting the attempts.
+			log.Println(errorsx.Wrap(err, "unable to download workload"))
+			w.Reset()
+			continue
+		} else if err != nil {
 			log.Println(errorsx.Wrap(err, "unable to download workload"))
 			continue
 		}

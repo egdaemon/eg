@@ -58,14 +58,16 @@ func TestAutoDownload(t *testing.T) {
 		}))
 		defer srv.Close()
 
-		strategy := &recordingstrategy{delay: 15 * time.Millisecond}
+		strategy := &recordingstrategy{delay: 7 * time.Millisecond}
 		ctx, cancel := context.WithTimeout(t.Context(), 50*time.Millisecond)
 		defer cancel()
 
 		autodownload(ctx, newtestclient(t, srv), newresources(), strategy, NewSpoolDir(t.TempDir()))
 
 		require.NotEmpty(t, strategy.attempts)
-		for _, attempt := range strategy.attempts-1 {
+		// truncate the final attempt since it can be non zero due to context cancellation.
+		strategy.attempts = strategy.attempts[:len(strategy.attempts)-1]
+		for _, attempt := range strategy.attempts {
 			require.Equal(t, int64(0), attempt, "404s should reset the backoff attempts")
 		}
 	})

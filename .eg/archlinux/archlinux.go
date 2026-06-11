@@ -30,9 +30,9 @@ func Builder(name string) eg.ContainerRunner {
 }
 
 // pkgver derives the PKGBUILD pkgver from the current commit, matching the
-// scheme previously computed by PKGBUILD's pkgver(): v0.0.<committer unix timestamp>.
+// "0.0.:autopatch:" scheme used by egdebuild: 0.0.<committer unix millisecond timestamp>.
 func pkgver() string {
-	return fmt.Sprintf("v0.0.%d", eggit.EnvCommit().Committer.When.Unix())
+	return fmt.Sprintf("0.0.%d", eggit.EnvCommit().Committer.When.UnixMilli())
 }
 
 // AURRunner is the container used to publish the egd package to the AUR.

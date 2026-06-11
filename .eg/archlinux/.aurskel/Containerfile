@@ -1,0 +1,12 @@
+FROM eg.ubuntu:latest
+ARG DEBIAN_FRONTEND=noninteractive
+
+RUN echo "cache buster 1a2c3d4e-5f60-4a1b-9c2d-3e4f5a6b7c8d"
+RUN apt-get update
+# pacman-package-manager provides makepkg, used to generate the AUR's .SRCINFO from PKGBUILD.
+# openssh-client is required for pushing the AUR package over git+ssh.
+# gettext-base provides envsubst, used to inject pkgver into PKGBUILD.
+RUN apt-get -y install pacman-package-manager openssh-client gettext-base
+
+# preload the AUR's host key so git+ssh pushes don't prompt for host verification.
+RUN ssh-keyscan -H aur.archlinux.org >> /etc/ssh/ssh_known_hosts

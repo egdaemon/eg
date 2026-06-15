@@ -1,9 +1,12 @@
 package cmdopts
 
 import (
+	"fmt"
+	"math"
 	"net"
 	"reflect"
 	"strings"
+	"time"
 
 	"github.com/alecthomas/kong"
 	"github.com/egdaemon/eg/internal/errorsx"
@@ -34,6 +37,37 @@ func ParseTCPAddr(ctx *kong.DecodeContext, target reflect.Value) (err error) {
 
 	target.Set(reflect.ValueOf(addr))
 
+	return nil
+}
+
+// ParseDurationInf parses a time.Duration flag value. In addition to normal
+// time.ParseDuration syntax (e.g. "1h30m"), it accepts "infinity"
+// (case-insensitive) as an alias for the maximum representable duration,
+// used to signal "no timeout".
+func ParseDurationInf(ctx *kong.DecodeContext, target reflect.Value) (err error) {
+	t, err := ctx.Scan.PopValue("duration")
+	if err != nil {
+		return err
+	}
+
+	var d time.Duration
+	switch v := t.Value.(type) {
+	case string:
+		switch {
+		case strings.EqualFold(v, "infinity"):
+			d = time.Duration(math.MaxInt)
+		default:
+			if d, err = time.ParseDuration(v); err != nil {
+				return errorsx.Wrapf(err, "expected duration but got %q", v)
+			}
+		}
+	case int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64, float32, float64:
+		d = reflect.ValueOf(v).Convert(reflect.TypeOf(time.Duration(0))).Interface().(time.Duration)
+	default:
+		return fmt.Errorf("expected duration but got %q", v)
+	}
+
+	target.Set(reflect.ValueOf(d))
 	return nil
 }
 

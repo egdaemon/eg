@@ -3,6 +3,7 @@
 package runners
 
 import (
+	"errors"
 	"log"
 
 	"github.com/logrusorgru/aurora"
@@ -16,4 +17,13 @@ func AgentOptionHostOS(cli ...string) AgentOption {
 		AgentOptionCommandLine("--pids-limit", "-1"), // ensure we dont run into pid limits.
 		AgentOptionCommandLine(cli...),               // escape hatch to allow customizing the container cli
 	)
+}
+
+func AgentOptionGPU(enabled bool) (AgentOption, error) {
+	if !enabled {
+		return AgentOptionNoop, nil
+	}
+
+	log.Println(aurora.NewAurora(true).Red("darwin currently doesnt support gpu functionality. ignoring."))
+	return AgentOptionNoop, errors.ErrUnsupported
 }

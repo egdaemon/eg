@@ -111,6 +111,7 @@ type metadata struct {
 	dirs      *SpoolDirs
 	rm        *ResourceManager
 	agentopts []AgentOption
+	gpu       bool
 }
 
 type QueueOption func(*metadata)
@@ -131,6 +132,12 @@ func QueueOptionCompletion(c completion) QueueOption {
 func QueueOptionLogVerbosity(n int) QueueOption {
 	return func(m *metadata) {
 		m.logVerbosity = n
+	}
+}
+
+func QueueOptionGPU(enabled bool) QueueOption {
+	return func(m *metadata) {
+		m.gpu = enabled
 	}
 }
 
@@ -474,12 +481,18 @@ func beginwork(ctx context.Context, md metadata, dir string) state {
 		Var(eg.EnvComputeAccountID, workload.Enqueued.AccountId).
 		Var(eg.EnvComputeVCS, workload.Enqueued.VcsUri).
 		Var(eg.EnvComputeTTL, time.Duration(workload.Enqueued.Ttl).String()).
+		Var(eg.EnvComputeGPU, strconv.FormatBool(md.gpu)).
 		Var(eg.EnvComputeLoggingVerbosity, envx.String(strconv.Itoa(md.logVerbosity), eg.EnvComputeLoggingVerbosity))
 
 	// envx.Debug(errorsx.Zero(envb.Environ())...)
 
 	if err = envb.WriteTo(environpath); err != nil {
 		return completed(workload.Enqueued, md, ws, 0, errorsx.Wrap(err, "failed to update environment file"))
+	}
+
+	gpu, err := AgentOptionGPU(md.gpu)
+	if err != nil {
+		return completed(workload.Enqueued, md, ws, 0, errorsx.Wrap(err, "unable to configure gpu support"))
 	}
 
 	aopts := make([]AgentOption, 0, len(md.agentopts)+32)
@@ -492,6 +505,7 @@ func beginwork(ctx context.Context, md metadata, dir string) state {
 		AgentOptionCores(workload.Enqueued.Cores),
 		AgentOptionMemory(workload.Enqueued.Memory),
 		AgentOptionHostOS(),
+		gpu,
 	)
 
 	m := NewManager(

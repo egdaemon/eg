@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"math"
 	"net"
 	"os"
 	"os/exec"
@@ -30,12 +29,12 @@ import (
 	"github.com/egdaemon/eg/internal/runtimex"
 	"github.com/egdaemon/eg/internal/stringsx"
 	"github.com/egdaemon/eg/internal/wasix"
-	"github.com/egdaemon/eg/secrets"
 	"github.com/egdaemon/eg/interp"
 	"github.com/egdaemon/eg/interp/c8sproxy"
 	"github.com/egdaemon/eg/interp/events"
 	"github.com/egdaemon/eg/interp/execproxy"
 	"github.com/egdaemon/eg/runners"
+	"github.com/egdaemon/eg/secrets"
 	"github.com/egdaemon/eg/transpile"
 	"github.com/egdaemon/eg/workspaces"
 	"github.com/go-git/go-git/v5"
@@ -55,7 +54,6 @@ type baremetal struct {
 	Secrets         []string `name:"secret" help:"List of secret URIs to use. Examples: chachasm://passphrase@/path/to/file, gcpsm://project-id/secret-name/version, awssm://secret-name?region=us-east-1"`
 	Clone           bool     `name:"git-clone" help:"allow cloning via git"`
 	InvalidateCache bool     `name:"invalidate-cache" help:"removes workload build cache"`
-	Infinite        bool     `name:"infinite" help:"allow this module to run forever, used for running a workload like a webserver" hidden:"true"`
 	Podman          bool     `name:"podman" help:"enable/disable podman" hidden:"true" negatable:"" default:"true"`
 	Workload        string   `arg:"" help:"name of the workload to run" default:"" predictor:"eg.workload"`
 }
@@ -76,10 +74,6 @@ func (t baremetal) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, hotswapbin
 		)
 		cmdenv []string
 	)
-
-	if t.Infinite {
-		t.RuntimeResources.TTL = time.Duration(math.MaxInt)
-	}
 
 	// clean up the eg environment ensuring a clean starting state.
 	resetenv := func() error {
@@ -193,14 +187,14 @@ func (t baremetal) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, hotswapbin
 		FromReader(secrets.NewReader(ctx, t.Secrets...)).
 		FromEnv(t.Environment...).
 		FromEnv(
-		"PATH",
-		"TERM",
-		"COLORTERM",
-		"LANG",
-		"CI",
-		eg.EnvComputeRunID,
-		eg.EnvComputeAccountID,
-	).Var(
+			"PATH",
+			"TERM",
+			"COLORTERM",
+			"LANG",
+			"CI",
+			eg.EnvComputeRunID,
+			eg.EnvComputeAccountID,
+		).Var(
 		eg.EnvComputeBin, hotswapbin.String(),
 	).Var(
 		eg.EnvExperimentalBaremetal, strconv.FormatBool(true), // temporary while we flesh out the needed changes

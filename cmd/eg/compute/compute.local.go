@@ -5,13 +5,11 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"math"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strconv"
-	"time"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/egdaemon/eg"
@@ -43,6 +41,7 @@ type local struct {
 	Debug            bool     `name:"debug" help:"keep workspace around to debug issues, requires manual cleanup"`
 	Privileged       bool     `name:"privileged" help:"run the initial container in privileged mode"`
 	Dirty            bool     `name:"dirty" help:"include user directories and environment variables" hidden:"true"`
+	GPU              bool     `name:"gpu" help:"enable gpu support" hidden:"true"`
 	GCPAuto          bool     `name:"gcp-auto" help:"use the default well known path for gcp's application default credentials"`
 	GCP              string   `name:"gcp" help:"path to gcp's application default credentials"`
 	Platform         string   `name:"platform" help:"arch platform for the container" hidden:"true"`
@@ -51,7 +50,6 @@ type local struct {
 	Environment      []string `name:"env" short:"e" help:"define environment variables and their values to be included"`
 	GitRemote        string   `name:"git-remote" help:"name of the git remote to use" default:"${vars_git_default_remote_name}"`
 	GitReference     string   `name:"git-ref" help:"name of the branch or commit to checkout" default:"${vars_git_head_reference}"`
-	Infinite         bool     `name:"infinite" help:"allow this module to run forever, used for running a workload like a webserver" hidden:"true"`
 	Ports            []int    `name:"ports" help:"list of ports to publish to the host system" hidden:"true"`
 	ContainerArgs    []string `name:"cargs" help:"list of command line arguments to pass to the root container" hidden:"true"`
 	Secrets          []string `name:"secret" help:"List of secret URIs to use. Examples: chachasm://passphrase@/path/to/file, gcpsm://project-id/secret-name/version, awssm://secret-name?region=us-east-1"`
@@ -66,6 +64,7 @@ func (t local) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err e
 		uid        = uuid.Must(uuid.NewV7())
 		environio  *os.File
 		gnupghome  runners.AgentOption
+		gpu        runners.AgentOption
 		sshmount   runners.AgentOption = runners.AgentOptionNoop
 		gcpcreds   runners.AgentOption = runners.AgentOptionNoop
 		sshenvvar  runners.AgentOption = runners.AgentOptionNoop
@@ -111,10 +110,6 @@ func (t local) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err e
 		return errorsx.Wrapf(err, "unable to open git repository: %s", ws.WorkingDir)
 	}
 
-	if t.Infinite {
-		t.RuntimeResources.TTL = time.Duration(math.MaxInt)
-	}
-
 	envb := envx.Build().
 		FromReader(secrets.NewReader(gctx.Context, t.Secrets...)).
 		FromPath(t.EnvironmentPaths...).
@@ -133,6 +128,7 @@ func (t local) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err e
 		Var(eg.EnvComputeBin, hotswapbin.String()).
 		Var(eg.EnvUnsafeCacheID, ws.CachedID).
 		Var(eg.EnvComputeTTL, t.RuntimeResources.TTL.String()).
+		Var(eg.EnvComputeGPU, strconv.FormatBool(t.GPU)).
 		Var(eg.EnvUnsafeGitCloneEnabled, strconv.FormatBool(false)) // hack to disable cloning
 
 	if t.Dirty {
@@ -143,6 +139,10 @@ func (t local) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err e
 		gcpcreds = runners.AgentOptionGcloudCredentials(gctx.Context, envb, envx.String(userx.ConfigDirectory("gcloud", "application_default_credentials.json"), runners.EnvGoogleApplicationCredentials))
 	} else if stringsx.Present(t.GCP) {
 		gcpcreds = runners.AgentOptionGcloudCredentials(gctx.Context, envb, t.GCP)
+	}
+
+	if gpu, err = runners.AgentOptionGPU(t.GPU); err != nil {
+		return err
 	}
 
 	gnupghome = runners.AgentOptionLocalGPGAgent(gctx.Context, envb)
@@ -213,6 +213,7 @@ func (t local) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err e
 		runners.AgentOptionPlatform(t.Platform),
 		gnupghome, // must come after the runtime directory mount to ensure correct mounting order.
 		gcpcreds,  // must come after the mount directory to ensure correct mounting order.
+		gpu,       // enable gpu support
 	)
 
 	for _, m := range modules {

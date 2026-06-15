@@ -13,6 +13,6 @@ type RuntimeResources struct {
 	Memory bytesx.Unit   `flag:"" name:"memory" help:"the amount of RAM to make available" default:"${vars_memory_minimum_default}"`
 	Disk   bytesx.Unit   `flag:"" name:"disk" help:"the amount of disk space to make available" default:"${vars_disk_minimum_default}"`
 	Vram   bytesx.Unit   `flag:"" name:"vram" help:"the amount of GPU memory to make available (unavailable, alpha, only in dev builds)" default:"${vars_vram_minimum_default}"`
-	TTL    time.Duration `flag:"" name:"ttl" help:"maximum runtime for the upload" default:"1h"`
+	TTL    time.Duration `flag:"" name:"ttl" type:"durationinf" help:"maximum runtime for the upload. use 'infinity' to disable the ttl. infinite ttl is not supported for remote workloads." default:"1h"`
 	Labels []string      `flag:"" name:"label" help:"up to 10 labels to assign to this compute resource" default:"${vars_labels}"`
 }

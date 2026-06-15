@@ -267,6 +267,11 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 		events.NewServiceDispatch(db).Bind(srv)
 		execproxy.NewExecProxy(t.Dir, cmdenv).Bind(srv)
 
+		gpu, err := runners.AgentOptionGPU(envx.Boolean(false, eg.EnvComputeGPU))
+		if err != nil {
+			return errorsx.Wrap(err, "unable to configure gpu support")
+		}
+
 		ragent := runners.NewRunner(
 			gctx.Context,
 			ws,
@@ -282,6 +287,7 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 			runners.AgentOptionHostOS(),
 			runners.AgentOptionCommandLine("--cgroups", "disabled"),
 			hostnet,
+			gpu,
 		)
 
 		c8sproxy.NewServiceProxy(

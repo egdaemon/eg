@@ -38,7 +38,7 @@ func Proxy(ctx context.Context, src, dst string, interval time.Duration) error {
 		case <-w.Closed:
 			return nil
 		case event := <-w.Event:
-			if err := applyEvent(src, dst, event); err != nil {
+			if err := applyEvent(src, dst, event); errorsx.Ignore(err, os.ErrNotExist) != nil {
 				debugx.Println(errorsx.Wrap(err, "unable to apply file system event"))
 			}
 		}

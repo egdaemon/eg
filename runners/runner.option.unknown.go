@@ -23,3 +23,8 @@ func AgentOptionGPU(enabled bool) (AgentOption, error) {
 	log.Println(aurora.NewAurora(true).Red("unknown hosts do not support gpu functionality. ignoring."))
 	return AgentOptionNoop, errors.ErrUnsupported
 }
+
+// DetectGPU unknown hosts do not currently support gpu detection.
+func DetectGPU() (driver string, vram uint64, err error) {
+	return "", 0, nil
+}

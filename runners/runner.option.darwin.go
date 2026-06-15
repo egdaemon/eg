@@ -27,3 +27,8 @@ func AgentOptionGPU(enabled bool) (AgentOption, error) {
 	log.Println(aurora.NewAurora(true).Red("darwin currently doesnt support gpu functionality. ignoring."))
 	return AgentOptionNoop, errors.ErrUnsupported
 }
+
+// DetectGPU darwin does not currently support gpu detection.
+func DetectGPU() (driver string, vram uint64, err error) {
+	return "", 0, nil
+}

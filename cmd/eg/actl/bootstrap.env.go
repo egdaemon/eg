@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"io"
+	"log"
 	"math/rand/v2"
 	"os"
 	"runtime"
@@ -18,6 +19,7 @@ import (
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/langx"
 	"github.com/egdaemon/eg/internal/numericx"
+	"github.com/egdaemon/eg/runners"
 	"github.com/gofrs/uuid/v5"
 	"github.com/pbnjay/memory"
 )
@@ -34,10 +36,19 @@ type BootstrapEnvRunner struct {
 func (t BootstrapEnvRunner) Run(gctx *cmdopts.Global) (err error) {
 	memory := bytesx.Unit(numericx.Max(uint64(t.runtimecfg.Memory), uint64(float64(memory.TotalMemory())*0.9)))
 
+	_, gpuvram, err := runners.DetectGPU()
+	if err != nil {
+		log.Println("unable to detect gpu:", err)
+	}
+
+	vram := bytesx.Unit(numericx.Max(uint64(t.runtimecfg.Vram), gpuvram))
+
 	return envx.Build().Var(
 		"EG_RUNNER_CPU", strconv.FormatUint(numericx.Max(uint64(runtime.NumCPU()), t.runtimecfg.Cores), 10),
 	).Var(
 		"EG_RUNNER_MEMORY", fmt.Sprintf("%v", memory),
+	).Var(
+		"EG_RUNNER_VRAM", fmt.Sprintf("%v", vram),
 	).CopyTo(os.Stdout)
 }
 
@@ -57,6 +68,16 @@ func (t BootstrapEnvDaemon) Run(gctx *cmdopts.Global) (err error) {
 		return errorsx.Wrap(err, "failed to generate entropy")
 	}
 
+	gpudriver, gpuvram, err := runners.DetectGPU()
+	if err != nil {
+		log.Println("unable to detect gpu:", err)
+	}
+
+	labels := t.Labels
+	if gpudriver != "" {
+		labels = append(labels, fmt.Sprintf("eg:gpu:%s", gpudriver))
+	}
+
 	environ := envx.Build().Var(
 		"EG_ACCOUNT", t.AccountID,
 	).Var(
@@ -67,6 +88,8 @@ func (t BootstrapEnvDaemon) Run(gctx *cmdopts.Global) (err error) {
 		"EG_RESOURCES_MEMORY", strconv.FormatUint(memory, 10),
 	).Var(
 		"EG_RESOURCES_DISK", fmt.Sprintf("\"%s\"", string(errorsx.Zero(t.Disk.MarshalText()))),
+	).Var(
+		"EG_RESOURCES_VRAM", strconv.FormatUint(numericx.Max(uint64(t.Vram), gpuvram), 10),
 	)
 
 	if t.Workers > 0 {
@@ -75,9 +98,9 @@ func (t BootstrapEnvDaemon) Run(gctx *cmdopts.Global) (err error) {
 		)
 	}
 
-	if len(t.Labels) > 0 {
+	if len(labels) > 0 {
 		environ.Var(
-			"EG_LABELS", fmt.Sprintf("\"%s\"", strings.Join(t.Labels, ",")),
+			"EG_LABELS", fmt.Sprintf("\"%s\"", strings.Join(labels, ",")),
 		)
 	}
 

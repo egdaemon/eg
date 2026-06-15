@@ -4,14 +4,13 @@ package runners
 
 import (
 	"log"
+	"os"
+	"path/filepath"
+	"strconv"
+	"strings"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/egdaemon/eg/internal/errorsx"
-	"github.com/egdaemon/eg/internal/slicesx"
-	"github.com/egdaemon/eg/internal/stringsx"
 	"github.com/jaypipes/ghw"
-	"github.com/jaypipes/ghw/pkg/gpu"
-	"github.com/jaypipes/ghw/pkg/pci"
 	"github.com/logrusorgru/aurora"
 )
 
@@ -26,6 +25,37 @@ func AgentOptionHostOS(cli ...string) AgentOption {
 	)
 }
 
+// DetectGPU returns the driver and vram of the gpu with the most vram available on the host, if any.
+// the zero values are returned when no gpu (or its vram) could be detected.
+func DetectGPU() (driver string, vram uint64, err error) {
+	gpus, err := ghw.GPU()
+	if err != nil {
+		return "", 0, errorsx.Wrap(err, "unable to determine hardware capability")
+	}
+
+	for _, card := range gpus.GraphicsCards {
+		if card.DeviceInfo == nil {
+			continue
+		}
+
+		raw, err := os.ReadFile(filepath.Join("/sys/bus/pci/devices", card.DeviceInfo.Address, "mem_info_vram_total"))
+		if err != nil {
+			continue
+		}
+
+		cvram, err := strconv.ParseUint(strings.TrimSpace(string(raw)), 10, 64)
+		if err != nil {
+			continue
+		}
+
+		if cvram > vram {
+			driver, vram = card.DeviceInfo.Driver, cvram
+		}
+	}
+
+	return driver, vram, nil
+}
+
 func AgentOptionGPU(enabled bool) (AgentOption, error) {
 	if !enabled {
 		return AgentOptionNoop, nil
@@ -33,35 +63,20 @@ func AgentOptionGPU(enabled bool) (AgentOption, error) {
 
 	log.Println(aurora.NewAurora(true).Yellow("info: gpu support is currently experimental"))
 
-	gpus, err := ghw.GPU()
+	driver, _, err := DetectGPU()
 	if err != nil {
 		return nil, errorsx.Wrap(err, "unable to determine hardware capability")
 	}
 
-	driver := slicesx.Reduce(
-		func(device string, info *pci.Device) string {
-			if stringsx.Present(device) {
-				return device
-			}
-
-			switch info.Driver {
-			case "amdgpu":
-				return "amd.com/gpu=all"
-			default:
-				log.Println("unknown driver, file an issue", spew.Sdump(info))
-				return device
-			}
-		},
-		"",
-		slicesx.MapTransform(func(v *gpu.GraphicsCard) *pci.Device {
-			return v.DeviceInfo
-		}, gpus.GraphicsCards...)...,
-	)
+	device := GPUDeviceSpec(driver)
+	if device == "" && driver != "" {
+		log.Println("unknown driver, file an issue", driver)
+	}
 
 	return AgentOptionCompose(
 		AgentOptionVolumes(
 			AgentMountReadOnly("/etc/cdi", "/etc/cdi"),
 		),
-		AgentOptionCommandLine("--device", driver),
+		AgentOptionCommandLine("--device", device),
 	), nil
 }

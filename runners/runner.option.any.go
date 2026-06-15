@@ -6,6 +6,8 @@ func GPUDeviceSpec(driver string) string {
 	switch driver {
 	case "amdgpu":
 		return "amd.com/gpu=all"
+	case "nvidia":
+		return "nvidia.com/gpu=all"
 	default:
 		return ""
 	}

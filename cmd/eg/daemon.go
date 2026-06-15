@@ -155,5 +155,6 @@ func (t daemon) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 			runners.AgentOptionEnv(eg.EnvComputeTLSInsecure, strconv.FormatBool(tlsc.Insecure)),
 		),
 		runners.QueueOptionLogVerbosity(gctx.Verbosity),
+		runners.QueueOptionGPU(t.RuntimeResources.Vram > 0),
 	)
 }

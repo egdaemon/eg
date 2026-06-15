@@ -85,6 +85,7 @@ const (
 	EnvComputeBin                = "EG_COMPUTE_BIN"                             // hotswap the binary, used for development testing
 	EnvComputeBinAlt             = "EG_COMPUTE_BIN_ALTERNATE"                   // absolute path to an alternate binary to inject into the host environment when hotswapping.
 	EnvComputeContainerImpure    = "EG_COMPUTE_C8S_IMPURE"                      // informs the container runner that the container depends on the repository being present.
+	EnvComputeGPU                = "EG_COMPUTE_GPU"                             // enable gpu support for the compute workload, propagated to nested module containers.
 	EnvComputeModuleSocket       = "EG_COMPUTE_MODULE_SOCKET"                   // socket providing functionality that is scoped to an individual module. primarily command execution.
 	EnvComputeDefaultGroup       = "EG_COMPUTE_DEFAULT_GROUP"                   // override the group assigned to the user. mainly used by baremetal.
 )

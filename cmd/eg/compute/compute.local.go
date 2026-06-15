@@ -32,7 +32,6 @@ import (
 	"github.com/egdaemon/eg/workspaces"
 	"github.com/go-git/go-git/v5"
 	"github.com/gofrs/uuid/v5"
-	"github.com/jaypipes/ghw"
 )
 
 type local struct {
@@ -65,6 +64,7 @@ func (t local) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err e
 		uid        = uuid.Must(uuid.NewV7())
 		environio  *os.File
 		gnupghome  runners.AgentOption
+		gpu        runners.AgentOption
 		sshmount   runners.AgentOption = runners.AgentOptionNoop
 		gcpcreds   runners.AgentOption = runners.AgentOptionNoop
 		sshenvvar  runners.AgentOption = runners.AgentOptionNoop
@@ -76,12 +76,6 @@ func (t local) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err e
 
 	contextx.WaitGroupAdd(gctx.Context, 1)
 	go contextx.WaitGroupDone(gctx.Context)
-
-	log.Println("--------------------------------------------------")
-	log.Println("hardware cpu:", spew.Sdump(errorsx.Zero(ghw.CPU())))
-	log.Println("hardware memory:", spew.Sdump(errorsx.Zero(ghw.Memory())))
-	log.Println("hardware gpu:", spew.Sdump(errorsx.Zero(ghw.GPU())))
-	log.Println("--------------------------------------------------")
 
 	ctx, err := podmanx.WithClient(gctx.Context)
 	if err != nil {
@@ -134,6 +128,7 @@ func (t local) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err e
 		Var(eg.EnvComputeBin, hotswapbin.String()).
 		Var(eg.EnvUnsafeCacheID, ws.CachedID).
 		Var(eg.EnvComputeTTL, t.RuntimeResources.TTL.String()).
+		Var(eg.EnvComputeGPU, strconv.FormatBool(t.GPU)).
 		Var(eg.EnvUnsafeGitCloneEnabled, strconv.FormatBool(false)) // hack to disable cloning
 
 	if t.Dirty {
@@ -144,6 +139,10 @@ func (t local) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err e
 		gcpcreds = runners.AgentOptionGcloudCredentials(gctx.Context, envb, envx.String(userx.ConfigDirectory("gcloud", "application_default_credentials.json"), runners.EnvGoogleApplicationCredentials))
 	} else if stringsx.Present(t.GCP) {
 		gcpcreds = runners.AgentOptionGcloudCredentials(gctx.Context, envb, t.GCP)
+	}
+
+	if gpu, err = runners.AgentOptionGPU(t.GPU); err != nil {
+		return err
 	}
 
 	gnupghome = runners.AgentOptionLocalGPGAgent(gctx.Context, envb)
@@ -214,6 +213,7 @@ func (t local) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err e
 		runners.AgentOptionPlatform(t.Platform),
 		gnupghome, // must come after the runtime directory mount to ensure correct mounting order.
 		gcpcreds,  // must come after the mount directory to ensure correct mounting order.
+		gpu,       // enable gpu support
 	)
 
 	for _, m := range modules {

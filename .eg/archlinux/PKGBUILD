@@ -10,9 +10,14 @@ provides=('egd')
 conflicts=('egd')
 depends=(
   'podman'
+  'netavark'
   'aardvark-dns'
   'duckdb'
+  'bindfs'
+  'acl'
+  'pciutils'
 )
+
 makedepends=(
   'go'
   'btrfs-progs'

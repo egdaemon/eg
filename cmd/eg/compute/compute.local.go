@@ -5,13 +5,11 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"math"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strconv"
-	"time"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/egdaemon/eg"
@@ -34,6 +32,7 @@ import (
 	"github.com/egdaemon/eg/workspaces"
 	"github.com/go-git/go-git/v5"
 	"github.com/gofrs/uuid/v5"
+	"github.com/jaypipes/ghw"
 )
 
 type local struct {
@@ -43,6 +42,7 @@ type local struct {
 	Debug            bool     `name:"debug" help:"keep workspace around to debug issues, requires manual cleanup"`
 	Privileged       bool     `name:"privileged" help:"run the initial container in privileged mode"`
 	Dirty            bool     `name:"dirty" help:"include user directories and environment variables" hidden:"true"`
+	GPU              bool     `name:"gpu" help:"enable gpu support" hidden:"true"`
 	GCPAuto          bool     `name:"gcp-auto" help:"use the default well known path for gcp's application default credentials"`
 	GCP              string   `name:"gcp" help:"path to gcp's application default credentials"`
 	Platform         string   `name:"platform" help:"arch platform for the container" hidden:"true"`
@@ -51,7 +51,6 @@ type local struct {
 	Environment      []string `name:"env" short:"e" help:"define environment variables and their values to be included"`
 	GitRemote        string   `name:"git-remote" help:"name of the git remote to use" default:"${vars_git_default_remote_name}"`
 	GitReference     string   `name:"git-ref" help:"name of the branch or commit to checkout" default:"${vars_git_head_reference}"`
-	Infinite         bool     `name:"infinite" help:"allow this module to run forever, used for running a workload like a webserver" hidden:"true"`
 	Ports            []int    `name:"ports" help:"list of ports to publish to the host system" hidden:"true"`
 	ContainerArgs    []string `name:"cargs" help:"list of command line arguments to pass to the root container" hidden:"true"`
 	Secrets          []string `name:"secret" help:"List of secret URIs to use. Examples: chachasm://passphrase@/path/to/file, gcpsm://project-id/secret-name/version, awssm://secret-name?region=us-east-1"`
@@ -77,6 +76,12 @@ func (t local) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err e
 
 	contextx.WaitGroupAdd(gctx.Context, 1)
 	go contextx.WaitGroupDone(gctx.Context)
+
+	log.Println("--------------------------------------------------")
+	log.Println("hardware cpu:", spew.Sdump(errorsx.Zero(ghw.CPU())))
+	log.Println("hardware memory:", spew.Sdump(errorsx.Zero(ghw.Memory())))
+	log.Println("hardware gpu:", spew.Sdump(errorsx.Zero(ghw.GPU())))
+	log.Println("--------------------------------------------------")
 
 	ctx, err := podmanx.WithClient(gctx.Context)
 	if err != nil {
@@ -109,10 +114,6 @@ func (t local) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err e
 
 	if repo, err = git.PlainOpen(ws.WorkingDir); err != nil {
 		return errorsx.Wrapf(err, "unable to open git repository: %s", ws.WorkingDir)
-	}
-
-	if t.Infinite {
-		t.RuntimeResources.TTL = time.Duration(math.MaxInt)
 	}
 
 	envb := envx.Build().

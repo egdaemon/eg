@@ -4,13 +4,11 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"math"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/egdaemon/eg"
@@ -46,7 +44,6 @@ type serve struct {
 	Secrets          []string `name:"secret" help:"List of secret URIs to use. Examples: chachasm://passphrase@/path/to/file, gcpsm://project-id/secret-name/version, awssm://secret-name?region=us-east-1"`
 	GitRemote        string   `name:"git-remote" help:"name of the git remote to use" default:"${vars_git_default_remote_name}"`
 	GitReference     string   `name:"git-ref" help:"name of the branch or commit to checkout" default:"${vars_git_head_reference}"`
-	Infinite         bool     `name:"infinite" help:"allow this module to run forever, used for running a workload like a webserver"`
 	Ports            []int    `name:"ports" help:"list of ports to publish to the host system"`
 	Name             string   `arg:"" name:"module" help:"name of the module to run, i.e. the folder name within moduledir" default:"" predictor:"eg.workload"`
 }
@@ -62,12 +59,12 @@ func (t serve) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err e
 		ws         workspaces.Context
 		repo       *git.Repository
 		environio  *os.File
+		gnupghome  runners.AgentOption
 		sshmount   runners.AgentOption = runners.AgentOptionNoop
 		sshenvvar  runners.AgentOption = runners.AgentOptionNoop
 		envvar     runners.AgentOption = runners.AgentOptionNoop
 		mounthome  runners.AgentOption = runners.AgentOptionNoop
 		privileged runners.AgentOption = runners.AgentOptionNoop
-		gnupghome  runners.AgentOption = runners.AgentOptionNoop
 		mountegbin runners.AgentOption = runners.AgentOptionEGBin(errorsx.Must(exec.LookPath(os.Args[0])))
 	)
 
@@ -96,10 +93,6 @@ func (t serve) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err e
 
 	if repo, err = git.PlainOpen(ws.WorkingDir); err != nil {
 		return errorsx.Wrapf(err, "unable to open git repository: %s", ws.WorkingDir)
-	}
-
-	if t.Infinite {
-		t.RuntimeResources.TTL = time.Duration(math.MaxInt)
 	}
 
 	log.Println("loading environment file", t.datadir(".eg.env"))

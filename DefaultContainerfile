@@ -8,24 +8,20 @@ RUN echo "cache buster 059a9a06-1686-4f49-9a7f-a30535886d55"
 # put apt in non-interactive mode
 ENV DEBIAN_FRONTEND=noninteractive
 
-RUN apt-get update
-
 # general utilities
-RUN apt-get install -y software-properties-common build-essential ca-certificates curl sudo gnupg2 lsb-release iproute2 git apt-file uidmap dbus-user-session fuse-overlayfs rsync vim genisoimage
+RUN apt-get update && apt-get install -y software-properties-common build-essential ca-certificates curl sudo gnupg2 lsb-release iproute2 git apt-file uidmap dbus-user-session fuse-overlayfs rsync vim genisoimage pciutils acl nftables iptables
 RUN add-apt-repository -n ppa:longsleep/golang-backports
 RUN add-apt-repository -n ppa:egdaemon/eg
 RUN add-apt-repository -n ppa:egdaemon/duckdb
 
 RUN echo "cache buster 059a9a06-1686-4f49-9a7f-a30535886d57"
-RUN apt-get update
-RUN apt-get install -y --no-install-recommends ssh netavark golang-1.26 egworkload tree nftables iptables acl
+RUN apt-get update && apt-get install -y --no-install-recommends ssh netavark golang-1.26 egworkload tree
 
 # properly link golang into the path.
 RUN ln -s /usr/lib/go-1.26/bin/go /usr/local/bin/go
 
 RUN sh /usr/share/eg/install/github.sh
-RUN apt-get update
-RUN apt-get install -y gh
+RUN apt-get update && apt-get install -y gh
 
 # preload some well known hosts
 RUN ssh-keyscan -H github.com >> /etc/ssh/ssh_known_hosts
@@ -37,3 +33,6 @@ RUN systemd-tmpfiles --clean
 # # useful/temporary to deal with launchpad slowness/broken releases...
 # RUN apt-get install -y --no-install-recommends libbtrfs-dev libassuan-dev libc6-dev libdevmapper-dev libglib2.0-dev libgpgme-dev libgpg-error-dev libprotobuf-dev libprotobuf-c-dev libseccomp-dev libselinux1-dev libsystemd-dev
 # RUN GOPROXY=direct go install github.com/egdaemon/eg/...@latest
+
+# print the install version for diagnostics
+RUN eg version

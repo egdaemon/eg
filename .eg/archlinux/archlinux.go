@@ -94,7 +94,7 @@ func Publish(ctx context.Context, o eg.Op) error {
 			// generate into a default ssh key name so ssh/git pick it up automatically.
 			runtime.New(`eg ssh key --seed "$EG_SSH_KEY_SEED" --path "$HOME/.ssh/id_ed25519"`),
 			runtime.Newf("if [ -d %s/.git ]; then git -C %s pull --ff-only origin master; else git clone %s %s; fi", aurdir, aurdir, AURRepoSSHURI, aurdir),
-			runtime.Newf(`envsubst '$PKGVER' < %s/PKGBUILD > %s/PKGBUILD`, templatedir, aurdir),
+			runtime.Newf("envsubst '$PKGVER' < %s/PKGBUILD > %s/PKGBUILD", templatedir, aurdir),
 			runtime.New("makepkg --printsrcinfo > .SRCINFO").Directory(aurdir),
 			runtime.New("git add PKGBUILD .SRCINFO").Directory(aurdir),
 			runtime.Newf("git diff --cached --quiet || (git commit -m %q && git push origin master)", commitmsg).Directory(aurdir),

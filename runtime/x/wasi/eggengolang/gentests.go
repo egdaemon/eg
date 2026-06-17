@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/egdaemon/eg/runtime/wasi/eg"
-	"github.com/egdaemon/eg/runtime/x/wasi/egollama"
+	"github.com/egdaemon/eg/runtime/x/wasi/egllm"
 )
 
 func ImproveTestCoverage(codeblock string, focus string, style string, usage string) eg.OpFn {
@@ -39,10 +39,10 @@ rules:
 	prompt = strings.ReplaceAll(prompt, ":codeblock:", codeblock)
 	prompt = strings.ReplaceAll(prompt, ":focus:", focus)
 
-	return egollama.With(
+	return egllm.With(
 		model,
 		func(ctx context.Context, o eg.Op) error {
-			result, err := egollama.Generate(ctx, egollama.New(), model, prompt)
+			result, err := egllm.Generate(ctx, egllm.New(), model, prompt)
 			if err != nil {
 				return err
 			}

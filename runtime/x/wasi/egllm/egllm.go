@@ -1,4 +1,4 @@
-package egollama
+package egllm
 
 import (
 	"bytes"

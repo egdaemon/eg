@@ -3,6 +3,7 @@ package events
 import (
 	context "context"
 	"database/sql"
+	"fmt"
 	"log"
 	"time"
 
@@ -50,11 +51,49 @@ func PrepareDB(ctx context.Context, db *sql.DB) error {
 		return err
 	}
 
-	if _, err := db.ExecContext(dctx, "CREATE TABLE IF NOT EXISTS 'eg.metrics.coverage' (id UUID PRIMARY KEY, path TEXT NOT NULL, path_md5 uuid GENERATED ALWAYS AS (md5(path)), statements FLOAT4 NOT NULL, branches FLOAT4 NOT NULL)"); err != nil {
+	if _, err := db.ExecContext(dctx, "CREATE TABLE IF NOT EXISTS 'eg.metrics.coverage' (id UUID PRIMARY KEY, path TEXT NOT NULL, path_md5 uuid GENERATED ALWAYS AS (md5(path)), statements FLOAT4 NOT NULL, branches FLOAT4 NOT NULL, fnname TEXT NOT NULL DEFAULT '', hits BIGINT NOT NULL DEFAULT 0)"); err != nil {
 		return err
 	}
 
 	return nil
+}
+
+func scanCoverageFunctions(rows *sql.Rows) (_ []*Coverage, err error) {
+	defer func() { err = errorsx.Compact(err, rows.Close()) }()
+
+	results := make([]*Coverage, 0, 8)
+	for rows.Next() {
+		c := &Coverage{}
+		if err := rows.Scan(&c.Path, &c.FnName, &c.Hits, &c.Statements, &c.Branches); err != nil {
+			return nil, err
+		}
+		results = append(results, c)
+	}
+
+	return results, rows.Err()
+}
+
+// WorstCoverage returns the n functions with the lowest hit counts.
+func WorstCoverage(ctx context.Context, db *sql.DB, n int32) ([]*Coverage, error) {
+	rows, err := db.QueryContext(ctx, "SELECT path, fnname, hits, statements, branches FROM 'eg.metrics.coverage' WHERE fnname != '' ORDER BY hits ASC LIMIT ?", n)
+	if err != nil {
+		return nil, err
+	}
+
+	return scanCoverageFunctions(rows)
+}
+
+// SampleCoverage returns a random sample of n functions.
+func SampleCoverage(ctx context.Context, db *sql.DB, n int32) ([]*Coverage, error) {
+	// DuckDB's SAMPLE clause only accepts a literal row count, not a bound parameter.
+	rows, err := db.QueryContext(ctx, fmt.Sprintf(
+		"SELECT path, fnname, hits, statements, branches FROM (SELECT * FROM 'eg.metrics.coverage' WHERE fnname != '') USING SAMPLE %d ROWS", n,
+	))
+	if err != nil {
+		return nil, err
+	}
+
+	return scanCoverageFunctions(rows)
 }
 
 func RecordMetric(ctx context.Context, db *sql.DB, msgs ...*Message) error {
@@ -72,7 +111,7 @@ func RecordMetric(ctx context.Context, db *sql.DB, msgs ...*Message) error {
 			}
 		case *Message_Coverage:
 			mz := langx.Autoderef(evt.Coverage)
-			if err := db.QueryRowContext(ctx, "INSERT INTO 'eg.metrics.coverage' (id, path, statements, branches) VALUES (?, ?, ?, ?)", m.Id, mz.Path, mz.Statements, mz.Branches).Err(); err != nil {
+			if err := db.QueryRowContext(ctx, "INSERT INTO 'eg.metrics.coverage' (id, path, statements, branches, fnname, hits) VALUES (?, ?, ?, ?, ?, ?)", m.Id, mz.Path, mz.Statements, mz.Branches, mz.FnName, mz.Hits).Err(); err != nil {
 				return err
 			}
 

@@ -14,12 +14,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//go:build tools
-// +build tools
+//go:build !tinygo
 
-package tools
+package maphash
 
-import (
-	_ "golang.org/x/tools/cmd/goimports"
-	_ "golang.org/x/tools/cmd/stringer"
-)
+import "hash/maphash"
+
+type MapHash = maphash.Hash
+type Seed = maphash.Seed
+
+func MakeSeed() Seed {
+	return maphash.MakeSeed()
+}

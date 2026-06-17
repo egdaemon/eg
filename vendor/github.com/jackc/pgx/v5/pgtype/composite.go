@@ -112,11 +112,13 @@ func (plan *encodePlanCompositeCodecCompositeIndexGetterToText) Encode(value any
 func (c *CompositeCodec) PlanScan(m *Map, oid uint32, format int16, target any) ScanPlan {
 	switch format {
 	case BinaryFormatCode:
-		if _, ok := target.(CompositeIndexScanner); ok {
+		switch target.(type) {
+		case CompositeIndexScanner:
 			return &scanPlanBinaryCompositeToCompositeIndexScanner{cc: c, m: m}
 		}
 	case TextFormatCode:
-		if _, ok := target.(CompositeIndexScanner); ok {
+		switch target.(type) {
+		case CompositeIndexScanner:
 			return &scanPlanTextCompositeToCompositeIndexScanner{cc: c, m: m}
 		}
 	}
@@ -408,24 +410,22 @@ func (cfs *CompositeTextScanner) Next() bool {
 	case '"': // quoted value
 		cfs.rp++
 		cfs.fieldBytes = make([]byte, 0, 16)
-	quotedValue:
 		for {
 			ch := cfs.src[cfs.rp]
 
-			switch ch {
-			case '"':
+			if ch == '"' {
 				cfs.rp++
 				if cfs.src[cfs.rp] == '"' {
 					cfs.fieldBytes = append(cfs.fieldBytes, '"')
 					cfs.rp++
 				} else {
-					break quotedValue
+					break
 				}
-			case '\\':
+			} else if ch == '\\' {
 				cfs.rp++
 				cfs.fieldBytes = append(cfs.fieldBytes, cfs.src[cfs.rp])
 				cfs.rp++
-			default:
+			} else {
 				cfs.fieldBytes = append(cfs.fieldBytes, ch)
 				cfs.rp++
 			}
@@ -476,23 +476,17 @@ func (b *CompositeBinaryBuilder) AppendValue(oid uint32, field any) {
 		return
 	}
 
-	isNil, callNilDriverValuer := isNilDriverValuer(field)
-	if isNil && !callNilDriverValuer {
+	if isNil, _ := isNilDriverValuer(field); isNil {
 		b.buf = pgio.AppendUint32(b.buf, oid)
 		b.buf = pgio.AppendInt32(b.buf, -1)
 		b.fieldCount++
 		return
 	}
 
-	var plan EncodePlan
-	if isNil {
-		plan = &encodePlanDriverValuer{m: b.m, oid: oid, formatCode: BinaryFormatCode}
-	} else {
-		plan = b.m.PlanEncode(oid, BinaryFormatCode, field)
-		if plan == nil {
-			b.err = fmt.Errorf("unable to encode %v into OID %d in binary format", field, oid)
-			return
-		}
+	plan := b.m.PlanEncode(oid, BinaryFormatCode, field)
+	if plan == nil {
+		b.err = fmt.Errorf("unable to encode %v into OID %d in binary format", field, oid)
+		return
 	}
 
 	b.buf = pgio.AppendUint32(b.buf, oid)
@@ -539,21 +533,15 @@ func (b *CompositeTextBuilder) AppendValue(oid uint32, field any) {
 		return
 	}
 
-	isNil, callNilDriverValuer := isNilDriverValuer(field)
-	if isNil && !callNilDriverValuer {
+	if isNil, _ := isNilDriverValuer(field); isNil {
 		b.buf = append(b.buf, ',')
 		return
 	}
 
-	var plan EncodePlan
-	if isNil {
-		plan = &encodePlanDriverValuer{m: b.m, oid: oid, formatCode: TextFormatCode}
-	} else {
-		plan = b.m.PlanEncode(oid, TextFormatCode, field)
-		if plan == nil {
-			b.err = fmt.Errorf("unable to encode %v into OID %d in text format", field, oid)
-			return
-		}
+	plan := b.m.PlanEncode(oid, TextFormatCode, field)
+	if plan == nil {
+		b.err = fmt.Errorf("unable to encode %v into OID %d in text format", field, oid)
+		return
 	}
 
 	fieldBuf, err := plan.Encode(field, b.fieldBuf[0:0])

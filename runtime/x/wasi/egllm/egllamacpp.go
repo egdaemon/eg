@@ -17,11 +17,11 @@ import (
 	"github.com/egdaemon/eg/runtime/x/wasi/egfs"
 )
 
-//go:embed Containerfile
+//go:embed Containerfile llama-server.service
 var skel embed.FS
 
 func CacheDirectory(dirs ...string) string {
-	return egenv.CacheDirectory(_eg.DefaultModuleDirectory(), "ollama", filepath.Join(dirs...))
+	return egenv.CacheDirectory(_eg.DefaultModuleDirectory(), "llama.cpp", filepath.Join(dirs...))
 }
 
 type option = func(*envx.Builder)
@@ -38,47 +38,72 @@ func (t options) Env() []string {
 func (t options) env() ([]string, error) {
 	return langx.Clone(langx.Autoderef(
 		envx.Build().Var(
-			"OLLAMA_MODELS", CacheDirectory("models"),
+			"LLAMA_CACHE", CacheDirectory("models"),
 		),
 	), t...).Environ()
 }
 
-// attempt to build the ccache environment that sets up
-// the ccache environment for caching.
+// attempt to build the environment that sets up
+// the llama.cpp model cache directory.
 func Env() []string {
 	return Options().Env()
 }
 
 // Create a shell runtime that properly
-// sets up the ccache environment for caching.
+// sets up the llama.cpp caching environment.
 func Runtime() shell.Command {
 	return shell.Runtime().EnvironFrom(Env()...).Timeout(20 * time.Minute)
 }
 
-// pull a specific model
+// Pull warms the local model cache for the given model so that starting
+// llama-server (which loads the model at process start, unlike ollama's
+// decoupled daemon+pull model) never blocks on a cold download. It also
+// records which model the systemd unit should load.
 func Pull(runtime shell.Command, model string) eg.OpFn {
 	return func(ctx context.Context, o eg.Op) error {
-		return shell.Run(ctx, runtime.Newf("ollama pull %s", model))
+		return shell.Run(
+			ctx,
+			// llama-cli shares llama-server's -hf cache layout; running it
+			// with a minimal prediction count downloads the model without
+			// needing to stand up the HTTP server.
+			runtime.Newf("llama-cli -hf %s -no-cnv -n 1 -p ok", model),
+			runtime.Newf("echo LLAMA_MODEL=%s > /etc/default/llama-server", model),
+		)
 	}
 }
 
 func Serve(runtime shell.Command) eg.OpFn {
 	return func(ctx context.Context, o eg.Op) error {
-		return shell.Run(ctx, runtime.Newf("systemctl enable --now ollama.service").Privileged())
+		return shell.Run(ctx, runtime.Newf("systemctl enable --now llama-server.service").Privileged())
 	}
 }
 
 func Shutdown(runtime shell.Command) eg.OpFn {
 	return func(ctx context.Context, o eg.Op) error {
-		return shell.Run(ctx, runtime.Newf("systemctl stop ollama.service").Privileged())
+		return shell.Run(ctx, runtime.Newf("systemctl stop llama-server.service").Privileged())
 	}
 }
 
-// build ollama container.
+// waitHealthy polls llama-server's health endpoint until it responds, since
+// systemd reporting the unit "active" doesn't mean the model has finished
+// loading into memory yet.
+func waitHealthy(runtime shell.Command) eg.OpFn {
+	return func(ctx context.Context, o eg.Op) error {
+		return shell.Run(ctx, runtime.New(
+			"for i in $(seq 1 60); do curl -sf http://localhost:8080/health > /dev/null 2>&1 && exit 0; sleep 1; done; exit 1",
+		))
+	}
+}
+
+// build llama.cpp container.
 func Prepare(c eg.ContainerRunner) eg.OpFn {
 	return func(ctx context.Context, o eg.Op) error {
 		const relpath = "Containerfile"
 		if err := egfs.CloneFS(ctx, egenv.EphemeralDirectory(), relpath, skel); err != nil {
+			return err
+		}
+
+		if err := egfs.CloneFS(ctx, egenv.EphemeralDirectory(), "llama-server.service", skel); err != nil {
 			return err
 		}
 
@@ -88,7 +113,7 @@ func Prepare(c eg.ContainerRunner) eg.OpFn {
 
 // container for this package.
 func Runner() eg.ContainerRunner {
-	return eg.Container("eg.ollama")
+	return eg.Container("eg.llamacpp")
 }
 
 // run the provided operation with the given model.
@@ -96,12 +121,12 @@ func With(model string, op eg.OpFn) eg.OpFn {
 	rt := Runtime()
 	return func(ctx context.Context, o eg.Op) error {
 		return around(
-			Serve(rt),
 			eg.Sequential(
-				shell.Op(shell.New("systemctl status ollama.service")),
 				Pull(rt, model),
-				op,
+				Serve(rt),
+				waitHealthy(rt),
 			),
+			op,
 			Shutdown(rt),
 		)(ctx, o)
 	}

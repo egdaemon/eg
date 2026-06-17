@@ -66,12 +66,11 @@ func (dst *FunctionCall) Decode(src []byte) error {
 		// As a special case, -1 indicates a NULL argument value. No value bytes follow in the NULL case.
 		argumentLength := int(int32(binary.BigEndian.Uint32(src[rp:])))
 		rp += 4
-		switch {
-		case argumentLength == -1:
+		if argumentLength == -1 {
 			arguments[i] = nil
-		case argumentLength < 0:
+		} else if argumentLength < 0 {
 			return &invalidMessageFormatErr{messageType: "FunctionCall"}
-		default:
+		} else {
 			if len(src[rp:]) < argumentLength {
 				return &invalidMessageFormatErr{messageType: "FunctionCall"}
 			}

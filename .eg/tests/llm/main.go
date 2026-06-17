@@ -3,15 +3,25 @@ package main
 import (
 	"context"
 	"log"
+	"os"
 
 	"github.com/egdaemon/eg/runtime/wasi/eg"
 	"github.com/egdaemon/eg/runtime/wasi/egenv"
-	"github.com/egdaemon/eg/runtime/x/wasi/eggengolang"
-	"github.com/egdaemon/eg/runtime/x/wasi/egollama"
+	"github.com/egdaemon/eg/runtime/x/wasi/egautogentest"
+	"github.com/egdaemon/eg/runtime/x/wasi/egllm"
 )
 
 const (
+	model = "qwen3-coder:30b"
+
 	code = `package example
+
+import (
+	"crypto/md5"
+	"encoding/binary"
+	"math/rand"
+	"time"
+)
 
 // generates a *consistent* duration based on the input i within the
 // provided window. this isn't the best location for these functions.
@@ -51,8 +61,8 @@ func DynamicHashWindow(i string, n uint64) uint64 {
 }
 
 // generates a random duration from the provided range.
-func RandomFromRange[T numericx.Integer | time.Duration](r T) T {
-	return T(rand.Intn(int(r)))
+func RandomFromRange(r time.Duration) time.Duration {
+	return time.Duration(rand.Intn(int(r)))
 }
 `
 
@@ -73,18 +83,26 @@ func main() {
 	ctx, done := context.WithTimeout(context.Background(), egenv.TTL())
 	defer done()
 
+	samplepath := egenv.WorkingDirectory("dynamichash.go")
+
+	writeSample := func(ctx context.Context, _ eg.Op) error {
+		return os.WriteFile(samplepath, []byte(code), 0644)
+	}
+
+	// stands in for egautogentest.Worst/Sample, which would otherwise
+	// source this from recorded coverage data.
+	seq := egautogentest.From(egautogentest.Fn{Path: samplepath, Name: "DynamicHashHour"})
+
 	err := eg.Perform(
 		ctx,
 		eg.Build(eg.DefaultModule()),
-		egollama.Prepare(egollama.Runner()),
+		egllm.Prepare(egllm.Runner()),
 		eg.Module(
 			ctx,
-			egollama.Runner(),
-			eggengolang.ImproveTestCoverage(
-				code,
-				"DynamicHashHour",
-				style,
-				"func() { DynamicHashHour(\"foo\") }",
+			egllm.Runner(),
+			eg.Sequential(
+				writeSample,
+				egautogentest.Golang{Model: model, Style: style}.Generate(seq),
 			),
 		),
 	)

@@ -51,7 +51,8 @@ func (interval *Interval) Scan(src any) error {
 		return nil
 	}
 
-	if src, ok := src.(string); ok {
+	switch src := src.(type) {
+	case string:
 		return scanPlanTextAnyToIntervalScanner{}.Scan([]byte(src), interval)
 	}
 
@@ -160,11 +161,13 @@ func (encodePlanIntervalCodecText) Encode(value any, buf []byte) (newBuf []byte,
 func (IntervalCodec) PlanScan(m *Map, oid uint32, format int16, target any) ScanPlan {
 	switch format {
 	case BinaryFormatCode:
-		if _, ok := target.(IntervalScanner); ok {
+		switch target.(type) {
+		case IntervalScanner:
 			return scanPlanBinaryIntervalToIntervalScanner{}
 		}
 	case TextFormatCode:
-		if _, ok := target.(IntervalScanner); ok {
+		switch target.(type) {
+		case IntervalScanner:
 			return scanPlanTextAnyToIntervalScanner{}
 		}
 	}

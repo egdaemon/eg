@@ -41,7 +41,8 @@ func (dst *Bits) Scan(src any) error {
 		return nil
 	}
 
-	if src, ok := src.(string); ok {
+	switch src := src.(type) {
+	case string:
 		return scanPlanTextAnyToBitsScanner{}.Scan([]byte(src), dst)
 	}
 
@@ -130,11 +131,13 @@ func (encodePlanBitsCodecText) Encode(value any, buf []byte) (newBuf []byte, err
 func (BitsCodec) PlanScan(m *Map, oid uint32, format int16, target any) ScanPlan {
 	switch format {
 	case BinaryFormatCode:
-		if _, ok := target.(BitsScanner); ok {
+		switch target.(type) {
+		case BitsScanner:
 			return scanPlanBinaryBitsToBitsScanner{}
 		}
 	case TextFormatCode:
-		if _, ok := target.(BitsScanner); ok {
+		switch target.(type) {
+		case BitsScanner:
 			return scanPlanTextAnyToBitsScanner{}
 		}
 	}
@@ -200,7 +203,7 @@ func (scanPlanTextAnyToBitsScanner) Scan(src []byte, dst any) error {
 		if b == '1' {
 			byteIdx := i / 8
 			bitIdx := uint(i % 8)
-			buf[byteIdx] |= 128 >> bitIdx
+			buf[byteIdx] = buf[byteIdx] | (128 >> bitIdx)
 		}
 	}
 

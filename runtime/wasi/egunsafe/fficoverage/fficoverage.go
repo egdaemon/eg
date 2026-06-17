@@ -21,3 +21,35 @@ func Report(ctx context.Context, batch ...*events.Coverage) (err error) {
 	}
 	return nil
 }
+
+// Worst returns the n functions with the lowest hit counts.
+func Worst(ctx context.Context, n int32) ([]*events.Coverage, error) {
+	cc, err := egunsafe.DialControlSocket(ctx)
+	if err != nil {
+		return nil, err
+	}
+	d := events.NewEventsClient(cc)
+
+	resp, err := d.WorstCoverageFunctions(ctx, &events.WorstCoverageFunctionsRequest{N: n})
+	if err != nil {
+		return nil, errorsx.Wrap(err, "unable to query worst coverage")
+	}
+
+	return resp.Functions, nil
+}
+
+// Sample returns a random sample of n functions.
+func Sample(ctx context.Context, n int32) ([]*events.Coverage, error) {
+	cc, err := egunsafe.DialControlSocket(ctx)
+	if err != nil {
+		return nil, err
+	}
+	d := events.NewEventsClient(cc)
+
+	resp, err := d.SampleCoverageFunctions(ctx, &events.SampleCoverageFunctionsRequest{N: n})
+	if err != nil {
+		return nil, errorsx.Wrap(err, "unable to query sample coverage")
+	}
+
+	return resp.Functions, nil
+}

@@ -229,12 +229,11 @@ func (sc *scramClient) clientFirstMessage() []byte {
 
 	sc.clientFirstMessageBare = fmt.Appendf(nil, "n=,r=%s", sc.clientNonce)
 
-	switch {
-	case sc.authMechanism == scramSHA256PlusName:
+	if sc.authMechanism == scramSHA256PlusName {
 		sc.clientGS2Header = []byte("p=tls-server-end-point,,")
-	case sc.hasTLS:
+	} else if sc.hasTLS {
 		sc.clientGS2Header = []byte("y,,")
-	default:
+	} else {
 		sc.clientGS2Header = []byte("n,,")
 	}
 
@@ -283,13 +282,6 @@ func (sc *scramClient) recvServerFirstMessage(serverFirstMessage []byte) error {
 	sc.iterations, err = strconv.Atoi(string(iterationsStr))
 	if err != nil || sc.iterations <= 0 {
 		return fmt.Errorf("invalid SCRAM iteration count received from server: %w", err)
-	}
-	// Bound server-supplied iteration count to prevent a malicious server from forcing the client
-	// to spend unbounded CPU in PBKDF2. PostgreSQL's scram_iterations defaults to 4096; this ceiling
-	// is ~2500x that.
-	const maxScramIterations = 10_000_000
-	if sc.iterations > maxScramIterations {
-		return fmt.Errorf("SCRAM iteration count from server too high: %d (max %d)", sc.iterations, maxScramIterations)
 	}
 
 	if !bytes.HasPrefix(sc.clientAndServerNonce, sc.clientNonce) {

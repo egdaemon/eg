@@ -2,4 +2,8 @@ FROM eg:latest
 
 RUN apt-get update
 RUN apt-get -y install pciutils
-RUN curl -fsSL https://ollama.com/install.sh | sh
+RUN add-apt-repository -n ppa:egdaemon/llama.cpp
+RUN apt-get update && apt-get -y install llama.cpp
+
+COPY llama-server.service /etc/systemd/system/llama-server.service
+RUN touch /etc/default/llama-server

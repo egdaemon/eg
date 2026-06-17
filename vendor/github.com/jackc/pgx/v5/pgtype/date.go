@@ -228,11 +228,13 @@ func (encodePlanDateCodecText) Encode(value any, buf []byte) (newBuf []byte, err
 func (DateCodec) PlanScan(m *Map, oid uint32, format int16, target any) ScanPlan {
 	switch format {
 	case BinaryFormatCode:
-		if _, ok := target.(DateScanner); ok {
+		switch target.(type) {
+		case DateScanner:
 			return scanPlanBinaryDateToDateScanner{}
 		}
 	case TextFormatCode:
-		if _, ok := target.(DateScanner); ok {
+		switch target.(type) {
+		case DateScanner:
 			return scanPlanTextAnyToDateScanner{}
 		}
 	}

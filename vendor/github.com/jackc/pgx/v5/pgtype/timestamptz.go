@@ -217,7 +217,7 @@ func (encodePlanTimestamptzCodecText) Encode(value any, buf []byte) (newBuf []by
 		s = t.Format(pgTimestamptzSecondFormat)
 
 		if bc {
-			s += " BC"
+			s = s + " BC"
 		}
 	case Infinity:
 		s = "infinity"
@@ -233,11 +233,13 @@ func (encodePlanTimestamptzCodecText) Encode(value any, buf []byte) (newBuf []by
 func (c *TimestamptzCodec) PlanScan(m *Map, oid uint32, format int16, target any) ScanPlan {
 	switch format {
 	case BinaryFormatCode:
-		if _, ok := target.(TimestamptzScanner); ok {
+		switch target.(type) {
+		case TimestamptzScanner:
 			return &scanPlanBinaryTimestamptzToTimestamptzScanner{location: c.ScanLocation}
 		}
 	case TextFormatCode:
-		if _, ok := target.(TimestamptzScanner); ok {
+		switch target.(type) {
+		case TimestamptzScanner:
 			return &scanPlanTextTimestamptzToTimestamptzScanner{location: c.ScanLocation}
 		}
 	}
@@ -304,12 +306,11 @@ func (plan *scanPlanTextTimestamptzToTimestamptzScanner) Scan(src []byte, dst an
 		}
 
 		var format string
-		switch {
-		case len(sbuf) >= 9 && (sbuf[len(sbuf)-9] == '-' || sbuf[len(sbuf)-9] == '+'):
+		if len(sbuf) >= 9 && (sbuf[len(sbuf)-9] == '-' || sbuf[len(sbuf)-9] == '+') {
 			format = pgTimestamptzSecondFormat
-		case len(sbuf) >= 6 && (sbuf[len(sbuf)-6] == '-' || sbuf[len(sbuf)-6] == '+'):
+		} else if len(sbuf) >= 6 && (sbuf[len(sbuf)-6] == '-' || sbuf[len(sbuf)-6] == '+') {
 			format = pgTimestamptzMinuteFormat
-		default:
+		} else {
 			format = pgTimestamptzHourFormat
 		}
 

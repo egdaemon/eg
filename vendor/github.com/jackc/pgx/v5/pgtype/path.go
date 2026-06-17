@@ -43,7 +43,8 @@ func (path *Path) Scan(src any) error {
 		return nil
 	}
 
-	if src, ok := src.(string); ok {
+	switch src := src.(type) {
+	case string:
 		return scanPlanTextAnyToPathScanner{}.Scan([]byte(src), path)
 	}
 
@@ -157,11 +158,13 @@ func (encodePlanPathCodecText) Encode(value any, buf []byte) (newBuf []byte, err
 func (PathCodec) PlanScan(m *Map, oid uint32, format int16, target any) ScanPlan {
 	switch format {
 	case BinaryFormatCode:
-		if _, ok := target.(PathScanner); ok {
+		switch target.(type) {
+		case PathScanner:
 			return scanPlanBinaryPathToPathScanner{}
 		}
 	case TextFormatCode:
-		if _, ok := target.(PathScanner); ok {
+		switch target.(type) {
+		case PathScanner:
 			return scanPlanTextAnyToPathScanner{}
 		}
 	}
@@ -223,39 +226,29 @@ func (scanPlanTextAnyToPathScanner) Scan(src []byte, dst any) error {
 	closed := src[0] == '('
 	points := make([]Vec2, 0)
 
-	// Expected format: ((x1,y1),...,(xn,yn)) or [(x1,y1),...,(xn,yn)]
-	str := string(src[1 : len(src)-1])
+	str := string(src[2:])
 
 	for {
-		if len(str) == 0 || str[0] != '(' {
-			return fmt.Errorf("invalid format for Path")
-		}
-		body, rest, found := strings.Cut(str[1:], ")")
-		if !found {
-			return fmt.Errorf("invalid format for Path")
-		}
-
-		sx, sy, found := strings.Cut(body, ",")
-		if !found {
-			return fmt.Errorf("invalid format for Path")
-		}
-		x, err := strconv.ParseFloat(sx, 64)
+		end := strings.IndexByte(str, ',')
+		x, err := strconv.ParseFloat(str[:end], 64)
 		if err != nil {
 			return err
 		}
-		y, err := strconv.ParseFloat(sy, 64)
+
+		str = str[end+1:]
+		end = strings.IndexByte(str, ')')
+
+		y, err := strconv.ParseFloat(str[:end], 64)
 		if err != nil {
 			return err
 		}
 
 		points = append(points, Vec2{x, y})
 
-		if rest == "" {
+		if end+3 < len(str) {
+			str = str[end+3:]
+		} else {
 			break
-		}
-		str, found = strings.CutPrefix(rest, ",")
-		if !found {
-			return fmt.Errorf("invalid format for Path")
 		}
 	}
 

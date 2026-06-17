@@ -43,7 +43,8 @@ func (dst *Circle) Scan(src any) error {
 		return nil
 	}
 
-	if src, ok := src.(string); ok {
+	switch src := src.(type) {
+	case string:
 		return scanPlanTextAnyToCircleScanner{}.Scan([]byte(src), dst)
 	}
 
@@ -129,11 +130,13 @@ func (encodePlanCircleCodecText) Encode(value any, buf []byte) (newBuf []byte, e
 func (CircleCodec) PlanScan(m *Map, oid uint32, format int16, target any) ScanPlan {
 	switch format {
 	case BinaryFormatCode:
-		if _, ok := target.(CircleScanner); ok {
+		switch target.(type) {
+		case CircleScanner:
 			return scanPlanBinaryCircleToCircleScanner{}
 		}
 	case TextFormatCode:
-		if _, ok := target.(CircleScanner); ok {
+		switch target.(type) {
+		case CircleScanner:
 			return scanPlanTextAnyToCircleScanner{}
 		}
 	}
@@ -195,34 +198,24 @@ func (scanPlanTextAnyToCircleScanner) Scan(src []byte, dst any) error {
 		return fmt.Errorf("invalid length for Circle: %v", len(src))
 	}
 
-	// Expected format: <(x,y),r>
-	str, ok := strings.CutPrefix(string(src), "<(")
-	if !ok {
-		return fmt.Errorf("invalid format for Circle")
-	}
-	str, ok = strings.CutSuffix(str, ">")
-	if !ok {
-		return fmt.Errorf("invalid format for Circle")
-	}
-
-	sx, str, found := strings.Cut(str, ",")
-	if !found {
-		return fmt.Errorf("invalid format for Circle")
-	}
-	sy, sr, found := strings.Cut(str, "),")
-	if !found {
-		return fmt.Errorf("invalid format for Circle")
-	}
-
-	x, err := strconv.ParseFloat(sx, 64)
+	str := string(src[2:])
+	end := strings.IndexByte(str, ',')
+	x, err := strconv.ParseFloat(str[:end], 64)
 	if err != nil {
 		return err
 	}
-	y, err := strconv.ParseFloat(sy, 64)
+
+	str = str[end+1:]
+	end = strings.IndexByte(str, ')')
+
+	y, err := strconv.ParseFloat(str[:end], 64)
 	if err != nil {
 		return err
 	}
-	r, err := strconv.ParseFloat(sr, 64)
+
+	str = str[end+2 : len(str)-1]
+
+	r, err := strconv.ParseFloat(str, 64)
 	if err != nil {
 		return err
 	}

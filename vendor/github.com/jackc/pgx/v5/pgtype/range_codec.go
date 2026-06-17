@@ -237,11 +237,13 @@ func (plan *encodePlanRangeCodecRangeValuerToText) Encode(value any, buf []byte)
 func (c *RangeCodec) PlanScan(m *Map, oid uint32, format int16, target any) ScanPlan {
 	switch format {
 	case BinaryFormatCode:
-		if _, ok := target.(RangeScanner); ok {
+		switch target.(type) {
+		case RangeScanner:
 			return &scanPlanBinaryRangeToRangeScanner{rc: c, m: m}
 		}
 	case TextFormatCode:
-		if _, ok := target.(RangeScanner); ok {
+		switch target.(type) {
+		case RangeScanner:
 			return &scanPlanTextRangeToRangeScanner{rc: c, m: m}
 		}
 	}

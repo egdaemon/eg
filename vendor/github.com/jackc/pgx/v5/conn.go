@@ -808,8 +808,7 @@ optionLoop:
 
 	var err error
 	sd, explicitPreparedStatement := c.preparedStatements[sql]
-	switch {
-	case sd != nil || mode == QueryExecModeCacheStatement || mode == QueryExecModeCacheDescribe || mode == QueryExecModeDescribeExec:
+	if sd != nil || mode == QueryExecModeCacheStatement || mode == QueryExecModeCacheDescribe || mode == QueryExecModeDescribeExec {
 		if sd == nil {
 			sd, err = c.getStatementDescription(ctx, mode, sql)
 			if err != nil {
@@ -834,7 +833,7 @@ optionLoop:
 		if resultFormatsByOID != nil {
 			resultFormats = make([]int16, len(sd.Fields))
 			for i := range resultFormats {
-				resultFormats[i] = resultFormatsByOID[sd.Fields[i].DataTypeOID]
+				resultFormats[i] = resultFormatsByOID[uint32(sd.Fields[i].DataTypeOID)]
 			}
 		}
 
@@ -847,7 +846,7 @@ optionLoop:
 		} else {
 			rows.resultReader = c.pgConn.ExecStatement(ctx, sd, c.eqb.ParamValues, c.eqb.ParamFormats, resultFormats)
 		}
-	case mode == QueryExecModeExec:
+	} else if mode == QueryExecModeExec {
 		err := c.eqb.Build(c.typeMap, nil, args)
 		if err != nil {
 			rows.fatal(err)
@@ -855,7 +854,7 @@ optionLoop:
 		}
 
 		rows.resultReader = c.pgConn.ExecParams(ctx, sql, c.eqb.ParamValues, nil, c.eqb.ParamFormats, c.eqb.ResultFormats)
-	case mode == QueryExecModeSimpleProtocol:
+	} else if mode == QueryExecModeSimpleProtocol {
 		sql, err = c.sanitizeForSimpleQuery(sql, args...)
 		if err != nil {
 			rows.fatal(err)
@@ -873,7 +872,7 @@ optionLoop:
 		}
 
 		return rows, nil
-	default:
+	} else {
 		err = fmt.Errorf("unknown QueryExecMode: %v", mode)
 		rows.fatal(err)
 		return rows, rows.err

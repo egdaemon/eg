@@ -218,7 +218,7 @@ func (encodePlanTimestampCodecText) Encode(value any, buf []byte) (newBuf []byte
 		s = t.Truncate(time.Microsecond).Format(pgTimestampFormat)
 
 		if bc {
-			s += " BC"
+			s = s + " BC"
 		}
 	case Infinity:
 		s = "infinity"
@@ -242,11 +242,13 @@ func discardTimeZone(t time.Time) time.Time {
 func (c *TimestampCodec) PlanScan(m *Map, oid uint32, format int16, target any) ScanPlan {
 	switch format {
 	case BinaryFormatCode:
-		if _, ok := target.(TimestampScanner); ok {
+		switch target.(type) {
+		case TimestampScanner:
 			return &scanPlanBinaryTimestampToTimestampScanner{location: c.ScanLocation}
 		}
 	case TextFormatCode:
-		if _, ok := target.(TimestampScanner); ok {
+		switch target.(type) {
+		case TimestampScanner:
 			return &scanPlanTextTimestampToTimestampScanner{location: c.ScanLocation}
 		}
 	}

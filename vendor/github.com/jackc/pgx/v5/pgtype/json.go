@@ -199,10 +199,10 @@ type scanPlanJSONToJSONUnmarshal struct {
 func (s *scanPlanJSONToJSONUnmarshal) Scan(src []byte, dst any) error {
 	if src == nil {
 		dstValue := reflect.ValueOf(dst)
-		if dstValue.Kind() == reflect.Pointer {
+		if dstValue.Kind() == reflect.Ptr {
 			el := dstValue.Elem()
 			switch el.Kind() {
-			case reflect.Pointer, reflect.Slice, reflect.Map, reflect.Interface:
+			case reflect.Ptr, reflect.Slice, reflect.Map, reflect.Interface:
 				el.Set(reflect.Zero(el.Type()))
 				return nil
 			}

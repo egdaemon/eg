@@ -109,11 +109,13 @@ func (encodePlanInetCodecText) Encode(value any, buf []byte) (newBuf []byte, err
 func (InetCodec) PlanScan(m *Map, oid uint32, format int16, target any) ScanPlan {
 	switch format {
 	case BinaryFormatCode:
-		if _, ok := target.(NetipPrefixScanner); ok {
+		switch target.(type) {
+		case NetipPrefixScanner:
 			return scanPlanBinaryInetToNetipPrefixScanner{}
 		}
 	case TextFormatCode:
-		if _, ok := target.(NetipPrefixScanner); ok {
+		switch target.(type) {
+		case NetipPrefixScanner:
 			return scanPlanTextAnyToNetipPrefixScanner{}
 		}
 	}

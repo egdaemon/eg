@@ -42,7 +42,8 @@ func (lseg *Lseg) Scan(src any) error {
 		return nil
 	}
 
-	if src, ok := src.(string); ok {
+	switch src := src.(type) {
+	case string:
 		return scanPlanTextAnyToLsegScanner{}.Scan([]byte(src), lseg)
 	}
 
@@ -130,11 +131,13 @@ func (encodePlanLsegCodecText) Encode(value any, buf []byte) (newBuf []byte, err
 func (LsegCodec) PlanScan(m *Map, oid uint32, format int16, target any) ScanPlan {
 	switch format {
 	case BinaryFormatCode:
-		if _, ok := target.(LsegScanner); ok {
+		switch target.(type) {
+		case LsegScanner:
 			return scanPlanBinaryLsegToLsegScanner{}
 		}
 	case TextFormatCode:
-		if _, ok := target.(LsegScanner); ok {
+		switch target.(type) {
+		case LsegScanner:
 			return scanPlanTextAnyToLsegScanner{}
 		}
 	}
@@ -182,34 +185,35 @@ func (scanPlanTextAnyToLsegScanner) Scan(src []byte, dst any) error {
 		return fmt.Errorf("invalid length for lseg: %v", len(src))
 	}
 
-	// Expected format: [(x1,y1),(x2,y2)]
-	sp1, sp2, found := strings.Cut(string(src[2:len(src)-2]), "),(")
-	if !found {
-		return fmt.Errorf("invalid format for lseg")
+	str := string(src[2:])
+
+	var end int
+	end = strings.IndexByte(str, ',')
+
+	x1, err := strconv.ParseFloat(str[:end], 64)
+	if err != nil {
+		return err
 	}
 
-	sx1, sy1, found := strings.Cut(sp1, ",")
-	if !found {
-		return fmt.Errorf("invalid format for lseg")
-	}
-	sx2, sy2, found := strings.Cut(sp2, ",")
-	if !found {
-		return fmt.Errorf("invalid format for lseg")
+	str = str[end+1:]
+	end = strings.IndexByte(str, ')')
+
+	y1, err := strconv.ParseFloat(str[:end], 64)
+	if err != nil {
+		return err
 	}
 
-	x1, err := strconv.ParseFloat(sx1, 64)
+	str = str[end+3:]
+	end = strings.IndexByte(str, ',')
+
+	x2, err := strconv.ParseFloat(str[:end], 64)
 	if err != nil {
 		return err
 	}
-	y1, err := strconv.ParseFloat(sy1, 64)
-	if err != nil {
-		return err
-	}
-	x2, err := strconv.ParseFloat(sx2, 64)
-	if err != nil {
-		return err
-	}
-	y2, err := strconv.ParseFloat(sy2, 64)
+
+	str = str[end+1 : len(str)-2]
+
+	y2, err := strconv.ParseFloat(str, 64)
 	if err != nil {
 		return err
 	}

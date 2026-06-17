@@ -77,7 +77,8 @@ func (dst *Point) Scan(src any) error {
 		return nil
 	}
 
-	if src, ok := src.(string); ok {
+	switch src := src.(type) {
+	case string:
 		return scanPlanTextAnyToPointScanner{}.Scan([]byte(src), dst)
 	}
 
@@ -183,11 +184,13 @@ func (encodePlanPointCodecText) Encode(value any, buf []byte) (newBuf []byte, er
 func (PointCodec) PlanScan(m *Map, oid uint32, format int16, target any) ScanPlan {
 	switch format {
 	case BinaryFormatCode:
-		if _, ok := target.(PointScanner); ok {
+		switch target.(type) {
+		case PointScanner:
 			return scanPlanBinaryPointToPointScanner{}
 		}
 	case TextFormatCode:
-		if _, ok := target.(PointScanner); ok {
+		switch target.(type) {
+		case PointScanner:
 			return scanPlanTextAnyToPointScanner{}
 		}
 	}

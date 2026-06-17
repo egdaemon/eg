@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestStatementCoverage(t *testing.T) {
+func TestFunctionCoverage(t *testing.T) {
 	ctx, done := testx.Context(t)
 	defer done()
 
@@ -21,6 +21,49 @@ func TestStatementCoverage(t *testing.T) {
 	for rep, err := range lcov.Parse(ctx, testx.Read(".fixtures", "example1.lcov.info")) {
 		require.NoError(t, err)
 		require.NotNil(t, rep)
+		reports = append(reports, rep)
+	}
+
+	// every file always yields a file-level row (possibly alongside its
+	// per-function rows); the UI is expected to filter as needed.
+	require.Equal(t, 1002, len(reports))
+
+	authzcached := slicesx.Filter(func(c *coverage.Report) bool { return c.Path == "src/authzcached.tsx" }, reports...)
+	require.Len(t, authzcached, 5)
+
+	hits := map[string]int64{}
+	for _, c := range authzcached {
+		hits[c.FnName] = c.Hits
+		require.InDelta(t, 53.571426, c.Statements, 0.0001)
+		require.Equal(t, float32(100), c.Branches)
+	}
+	require.Equal(t, map[string]int64{"": 0, "zero": 1, "replace": 0, "useCache": 5, "Storage": 0}, hits)
+
+	noFunctions := slicesx.Filter(func(c *coverage.Report) bool { return c.Path == "src/accounts/index.ts" }, reports...)
+	require.Equal(t, []*coverage.Report{{Path: "src/accounts/index.ts", Statements: 100, Branches: 0}}, noFunctions)
+}
+
+func TestStatementCoverage(t *testing.T) {
+	ctx, done := testx.Context(t)
+	defer done()
+
+	var (
+		reports []*coverage.Report
+		seen    = map[string]bool{}
+	)
+
+	for rep, err := range lcov.Parse(ctx, testx.Read(".fixtures", "example1.lcov.info")) {
+		require.NoError(t, err)
+		require.NotNil(t, rep)
+
+		// a file with multiple functions now yields one Coverage row per
+		// function; keep only the first row per path to recover the
+		// original per-file statement/branch coverage values.
+		if seen[rep.Path] {
+			continue
+		}
+		seen[rep.Path] = true
+
 		reports = append(reports, rep)
 	}
 

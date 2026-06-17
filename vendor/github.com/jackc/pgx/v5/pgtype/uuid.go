@@ -76,7 +76,8 @@ func (dst *UUID) Scan(src any) error {
 		return nil
 	}
 
-	if src, ok := src.(string); ok {
+	switch src := src.(type) {
+	case string:
 		buf, err := parseUUID(src)
 		if err != nil {
 			return err
@@ -200,7 +201,8 @@ func (UUIDCodec) PlanScan(m *Map, oid uint32, format int16, target any) ScanPlan
 			return scanPlanBinaryUUIDToTextScanner{}
 		}
 	case TextFormatCode:
-		if _, ok := target.(UUIDScanner); ok {
+		switch target.(type) {
+		case UUIDScanner:
 			return scanPlanTextAnyToUUIDScanner{}
 		}
 	}

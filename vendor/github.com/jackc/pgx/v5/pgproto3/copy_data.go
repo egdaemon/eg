@@ -54,14 +54,6 @@ func (dst *CopyData) UnmarshalJSON(data []byte) error {
 		return err
 	}
 
-	if msg.Data == "" {
-		dst.Data = []byte{}
-		return nil
-	}
-	b, err := hex.DecodeString(msg.Data)
-	if err != nil {
-		return err
-	}
-	dst.Data = b
+	dst.Data = []byte(msg.Data)
 	return nil
 }

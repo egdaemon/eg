@@ -17,6 +17,7 @@ import (
 	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/cmd/cmdopts"
 	"github.com/egdaemon/eg/compile"
+	"github.com/egdaemon/eg/duckproxyserver"
 	"github.com/egdaemon/eg/internal/bytesx"
 	"github.com/egdaemon/eg/internal/debugx"
 	"github.com/egdaemon/eg/internal/envx"
@@ -181,6 +182,14 @@ func (t baremetal) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, hotswapbin
 	if err = events.PrepareDB(ctx, db); err != nil {
 		return errorsx.Wrap(err, "unable to prepare analytics.db")
 	}
+
+	dpsrv := duckproxyserver.New(db)
+	go func() {
+		dpspath := filepath.Join(ws.RuntimeDir, eg.SocketAnalytics)
+		if err := duckproxyserver.ListenUnix(ctx, dpspath, dpsrv); err != nil && ctx.Err() == nil {
+			log.Println("duckproxy:", err)
+		}
+	}()
 
 	gitenv := errorsx.Zero(gitx.LocalEnv(repo, t.GitRemote, t.GitReference))
 	cmdenvb := envx.Build().

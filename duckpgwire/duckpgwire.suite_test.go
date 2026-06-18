@@ -14,7 +14,7 @@ import (
 
 	_ "github.com/duckdb/duckdb-go/v2"
 	"github.com/egdaemon/eg/duckpgwire"
-	"github.com/egdaemon/eg/duckproxy"
+	"github.com/egdaemon/eg/duckproxyserver"
 	"github.com/jackc/pgx/v5"
 	"github.com/stretchr/testify/require"
 )
@@ -40,9 +40,9 @@ func startTestServer(t *testing.T, opts ...duckpgwire.Option) (dir string, duckd
 
 	ctx, cancel := context.WithCancel(context.Background())
 
-	duckproxySrv := duckproxy.New(duckdbDB)
+	duckproxySrv := duckproxyserver.New(duckdbDB)
 	duckproxyErrCh := make(chan error, 1)
-	go func() { duckproxyErrCh <- duckproxy.ListenUnix(ctx, duckproxySocketPath, duckproxySrv) }()
+	go func() { duckproxyErrCh <- duckproxyserver.ListenUnix(ctx, duckproxySocketPath, duckproxySrv) }()
 	waitForSocket(t, duckproxySocketPath)
 
 	duckproxyClientDB, err := sql.Open("duckproxy", duckproxySocketPath)

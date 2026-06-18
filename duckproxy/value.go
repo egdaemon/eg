@@ -7,16 +7,19 @@ import (
 	"math/big"
 	"time"
 
-	duckdb "github.com/duckdb/duckdb-go/v2"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-// toProtoValue converts a Go value -- either a query parameter already
+// ToProtoValue converts a Go value -- either a query parameter already
 // normalized by database/sql's default converter, or a column value
 // produced directly by duckdb-go's driver.Rows.Next -- into the wire
 // representation. Unlike a Postgres OID table, this only has to describe
-// DuckDB's own native types.
-func toProtoValue(v driver.Value) (*Value, error) {
+// DuckDB's own native types. duckdb.Interval/duckdb.Decimal aren't handled
+// here directly -- only the server side (duckproxyserver) ever actually
+// produces those from a real DuckDB row, and importing duckdb-go at all
+// pulls in its cgo bindings, which this package must stay free of so it can
+// build for GOOS=wasip1 (the wasm guest is a client of this package).
+func ToProtoValue(v driver.Value) (*Value, error) {
 	if v == nil {
 		return &Value{Kind: &Value_IsNull{IsNull: true}}, nil
 	}
@@ -57,20 +60,16 @@ func toProtoValue(v driver.Value) (*Value, error) {
 		return &Value{Kind: &Value_BytesValue{BytesValue: x}}, nil
 	case time.Time:
 		return &Value{Kind: &Value_TimestampValue{TimestampValue: timestamppb.New(x)}}, nil
-	case duckdb.Interval:
-		return &Value{Kind: &Value_IntervalValue{IntervalValue: &Interval{
-			Months: x.Months,
-			Days:   x.Days,
-			Micros: x.Micros,
-		}}}, nil
-	case duckdb.Decimal:
-		return &Value{Kind: &Value_DecimalValue{DecimalValue: x.String()}}, nil
+	case Interval:
+		return &Value{Kind: &Value_IntervalValue{IntervalValue: &x}}, nil
+	case *Interval:
+		return &Value{Kind: &Value_IntervalValue{IntervalValue: x}}, nil
 	case *big.Int:
 		return &Value{Kind: &Value_BignumValue{BignumValue: x.String()}}, nil
 	case []any:
 		values := make([]*Value, len(x))
 		for i, elem := range x {
-			ev, err := toProtoValue(elem)
+			ev, err := ToProtoValue(elem)
 			if err != nil {
 				return nil, err
 			}
@@ -80,7 +79,7 @@ func toProtoValue(v driver.Value) (*Value, error) {
 	case map[string]any:
 		fields := make(map[string]*Value, len(x))
 		for k, elem := range x {
-			ev, err := toProtoValue(elem)
+			ev, err := ToProtoValue(elem)
 			if err != nil {
 				return nil, err
 			}
@@ -92,10 +91,13 @@ func toProtoValue(v driver.Value) (*Value, error) {
 	}
 }
 
-// fromProtoValue is the inverse of toProtoValue: it turns a wire Value back
+// FromProtoValue is the inverse of ToProtoValue: it turns a wire Value back
 // into the Go-native value duckdb-go's own Bind/Stmt machinery (server
-// side) or a database/sql caller's Scan (client side) expects.
-func fromProtoValue(v *Value) (driver.Value, error) {
+// side) or a database/sql caller's Scan (client side) expects. An interval
+// decodes to the wire Interval struct directly (Months/Days/Micros) rather
+// than duckdb.Interval, for the same cgo-free reason as ToProtoValue; a
+// decimal decodes to its already-formatted string.
+func FromProtoValue(v *Value) (driver.Value, error) {
 	if v == nil {
 		return nil, nil
 	}
@@ -116,7 +118,7 @@ func fromProtoValue(v *Value) (driver.Value, error) {
 	case *Value_TimestampValue:
 		return k.TimestampValue.AsTime(), nil
 	case *Value_IntervalValue:
-		return duckdb.Interval{
+		return &Interval{
 			Months: k.IntervalValue.GetMonths(),
 			Days:   k.IntervalValue.GetDays(),
 			Micros: k.IntervalValue.GetMicros(),
@@ -132,7 +134,7 @@ func fromProtoValue(v *Value) (driver.Value, error) {
 	case *Value_ListValue:
 		out := make([]any, len(k.ListValue.GetValues()))
 		for i, elem := range k.ListValue.GetValues() {
-			ev, err := fromProtoValue(elem)
+			ev, err := FromProtoValue(elem)
 			if err != nil {
 				return nil, err
 			}
@@ -143,7 +145,7 @@ func fromProtoValue(v *Value) (driver.Value, error) {
 		fields := k.StructValue.GetFields()
 		out := make(map[string]any, len(fields))
 		for key, elem := range fields {
-			ev, err := fromProtoValue(elem)
+			ev, err := FromProtoValue(elem)
 			if err != nil {
 				return nil, err
 			}

@@ -1,9 +1,8 @@
-// Package duckproxy_test holds shared helpers for the driver-level tests
-// (driver.*.gen_test.go, server.serve.gen_test.go) -- a black-box suite
-// exercising the public sql.Open("duckproxy", ...) surface, as opposed
-// to the internal package's tests of unexported framing/value-conversion
-// functions.
-package duckproxy_test
+// Package server_test holds shared helpers for the server-level tests
+// (server.serve.gen_test.go) -- a black-box suite exercising the public
+// sql.Open("duckproxy", ...) surface against a real server.Server, as
+// opposed to duckproxy's own driver-level test suite.
+package duckproxyserver_test
 
 import (
 	"context"
@@ -17,7 +16,7 @@ import (
 	"github.com/egdaemon/eg/duckproxyserver"
 )
 
-// startTestServer starts a duckproxy.Server backed by a temp-file DuckDB
+// startTestServer starts a server.Server backed by a temp-file DuckDB
 // database, listening on a temp-dir unix socket, and returns the socket
 // path plus the server-side *sql.DB (for inspecting pool stats, e.g.
 // db.Stats().InUse in the concurrency test).

@@ -1,4 +1,4 @@
-package duckproxy_test
+package duckproxyserver_test
 
 import (
 	"context"
@@ -8,7 +8,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/egdaemon/eg/duckproxy"
+	"github.com/egdaemon/eg/duckproxyserver"
 	"github.com/stretchr/testify/require"
 )
 
@@ -51,7 +51,7 @@ func TestServerServe(t *testing.T) {
 			insertsPerClient = 20
 		)
 
-		socketPath, serverDB := startTestServer(t, duckproxy.WithMaxConnections(maxConnections))
+		socketPath, serverDB := startTestServer(t, duckproxyserver.WithMaxConnections(maxConnections))
 
 		setup := connect(t, socketPath)
 		_, err := setup.ExecContext(context.Background(), "CREATE TABLE concurrent (client INTEGER, n INTEGER)")

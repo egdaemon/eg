@@ -1,4 +1,4 @@
-package duckproxy
+package duckproxyserver
 
 import (
 	"context"

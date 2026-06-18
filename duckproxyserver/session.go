@@ -1,4 +1,4 @@
-package duckproxy
+package duckproxyserver
 
 import (
 	"context"
@@ -9,6 +9,7 @@ import (
 	"time"
 
 	duckdb "github.com/duckdb/duckdb-go/v2"
+	"github.com/egdaemon/eg/duckproxy"
 )
 
 // session holds the state of one client connection, and is only ever
@@ -39,7 +40,7 @@ func (s *Server) handleConn(ctx context.Context, conn net.Conn) {
 
 	sqlConn, err := s.db.Conn(acquireCtx)
 	if err != nil {
-		writeFrame(conn, &ServerFrame{Body: &ServerFrame_Error{Error: &ErrorResponse{Message: err.Error()}}})
+		duckproxy.WriteFrame(conn, &duckproxy.ServerFrame{Body: &duckproxy.ServerFrame_Error{Error: &duckproxy.ErrorResponse{Message: err.Error()}}})
 		return
 	}
 	defer sqlConn.Close()
@@ -67,8 +68,8 @@ func (s *session) serve(ctx context.Context) error {
 			s.conn.SetReadDeadline(time.Time{})
 		}
 
-		var frame ClientFrame
-		if err := readFrame(s.conn, &frame); err != nil {
+		var frame duckproxy.ClientFrame
+		if err := duckproxy.ReadFrame(s.conn, &frame); err != nil {
 			if isTimeout(err) && s.tx != nil {
 				s.killIdleInTransaction()
 			}
@@ -77,17 +78,17 @@ func (s *session) serve(ctx context.Context) error {
 
 		var err error
 		switch body := frame.GetBody().(type) {
-		case *ClientFrame_Exec:
+		case *duckproxy.ClientFrame_Exec:
 			err = s.handleExec(ctx, body.Exec)
-		case *ClientFrame_Query:
+		case *duckproxy.ClientFrame_Query:
 			err = s.handleQuery(ctx, body.Query)
-		case *ClientFrame_Begin:
+		case *duckproxy.ClientFrame_Begin:
 			err = s.handleBegin(ctx)
-		case *ClientFrame_Commit:
+		case *duckproxy.ClientFrame_Commit:
 			err = s.handleCommit()
-		case *ClientFrame_Rollback:
+		case *duckproxy.ClientFrame_Rollback:
 			err = s.handleRollback()
-		case *ClientFrame_Describe:
+		case *duckproxy.ClientFrame_Describe:
 			err = s.handleDescribe(ctx, body.Describe)
 		default:
 			err = s.sendError(errors.New("duckproxy: empty or unknown client frame"))
@@ -123,7 +124,7 @@ func (s *session) killIdleInTransaction() {
 }
 
 func (s *session) sendError(err error) error {
-	return writeFrame(s.conn, &ServerFrame{Body: &ServerFrame_Error{Error: &ErrorResponse{Message: err.Error()}}})
+	return duckproxy.WriteFrame(s.conn, &duckproxy.ServerFrame{Body: &duckproxy.ServerFrame_Error{Error: &duckproxy.ErrorResponse{Message: err.Error()}}})
 }
 
 // statementContext derives a context for one statement's execution,
@@ -140,7 +141,7 @@ func isTimeout(err error) bool {
 	return errors.As(err, &ne) && ne.Timeout()
 }
 
-func toNamedValues(params []*Param) ([]driver.NamedValue, error) {
+func toNamedValues(params []*duckproxy.Param) ([]driver.NamedValue, error) {
 	args := make([]driver.NamedValue, len(params))
 	for i, p := range params {
 		v, err := fromProtoValue(p.GetValue())

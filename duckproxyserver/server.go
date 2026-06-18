@@ -1,12 +1,14 @@
-// Package duckproxy fronts a single shared in-process DuckDB database
-// with a native Go protocol over a Unix domain socket, so that multiple
-// separate OS processes can connect -- via this package's own
+// Package server fronts a single shared in-process DuckDB database with
+// duckproxy's native Go protocol over a Unix domain socket, so that
+// multiple separate OS processes can connect -- via duckproxy's
 // database/sql/driver.Driver client -- and run SQL against one DuckDB
 // file, the way pgpool/pgbouncer let many Postgres clients share one
 // backend. Unlike a Postgres-wire-protocol proxy, both ends speak DuckDB's
-// own native types directly; only Go code using this package's client can
-// connect.
-package duckproxy
+// own native types directly; only Go code using duckproxy's client can
+// connect. This package needs the real duckdb-go driver (and its cgo
+// bindings) to actually execute SQL, unlike duckproxy itself, which stays
+// cgo-free so it can be imported from the wasm guest.
+package duckproxyserver
 
 import (
 	"context"

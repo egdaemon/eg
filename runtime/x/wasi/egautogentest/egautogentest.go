@@ -33,7 +33,7 @@ func Worst(n int) iterx.Seq[Fn] {
 		}
 
 		for _, c := range results {
-			if !yield(Fn{Path: c.Path, Name: c.FnName, Hits: int(c.Hits)}) {
+			if !yield(Fn{Path: c.Path, Name: c.Fnname, Hits: int(c.Hits)}) {
 				return nil
 			}
 		}
@@ -66,7 +66,7 @@ func Sample(n int) iterx.Seq[Fn] {
 		}
 
 		for _, c := range results {
-			if !yield(Fn{Path: c.Path, Name: c.FnName, Hits: int(c.Hits)}) {
+			if !yield(Fn{Path: c.Path, Name: c.Fnname, Hits: int(c.Hits)}) {
 				return nil
 			}
 		}

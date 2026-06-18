@@ -14,7 +14,6 @@ import (
 
 	"github.com/egdaemon/eg/internal/coverage"
 	"github.com/egdaemon/eg/internal/errorsx"
-	"github.com/egdaemon/eg/interp/events"
 )
 
 const (
@@ -132,7 +131,7 @@ func Parse(ctx context.Context, src io.Reader) iter.Seq2[*coverage.Report, error
 			}
 
 			if strings.HasPrefix(line, prefixEnd) {
-				if !yield(&events.Coverage{
+				if !yield(&coverage.Report{
 					Path:       path,
 					Statements: linesHit.Coverage(),
 					Branches:   branceshHit.Coverage(),
@@ -142,11 +141,11 @@ func Parse(ctx context.Context, src io.Reader) iter.Seq2[*coverage.Report, error
 				}
 
 				for name, hits := range fnhits {
-					if !yield(&events.Coverage{
+					if !yield(&coverage.Report{
 						Path:       path,
 						Statements: linesHit.Coverage(),
 						Branches:   branceshHit.Coverage(),
-						FnName:     name,
+						Fnname:     name,
 						Hits:       hits,
 					}, nil) {
 						clear(fnhits)

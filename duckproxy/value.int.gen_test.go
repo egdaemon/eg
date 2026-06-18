@@ -27,11 +27,11 @@ func TestValueInt(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			pv, err := toProtoValue(c.in)
+			pv, err := ToProtoValue(c.in)
 			require.NoError(t, err)
 			require.Equal(t, c.want, pv.GetIntValue())
 
-			got, err := fromProtoValue(pv)
+			got, err := FromProtoValue(pv)
 			require.NoError(t, err)
 			require.Equal(t, c.want, got)
 		})
@@ -41,21 +41,21 @@ func TestValueInt(t *testing.T) {
 		in := uint64(math.MaxUint64)
 		want := new(big.Int).SetUint64(in)
 
-		pv, err := toProtoValue(in)
+		pv, err := ToProtoValue(in)
 		require.NoError(t, err)
 		require.Equal(t, want.String(), pv.GetBignumValue())
 
-		got, err := fromProtoValue(pv)
+		got, err := FromProtoValue(pv)
 		require.NoError(t, err)
 		require.Equal(t, want, got)
 	})
 
 	t.Run("null", func(t *testing.T) {
-		pv, err := toProtoValue(nil)
+		pv, err := ToProtoValue(nil)
 		require.NoError(t, err)
 		require.True(t, pv.GetIsNull())
 
-		got, err := fromProtoValue(pv)
+		got, err := FromProtoValue(pv)
 		require.NoError(t, err)
 		require.Nil(t, got)
 	})

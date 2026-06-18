@@ -235,9 +235,7 @@ var Agent_ServiceDesc = grpc.ServiceDesc{
 }
 
 const (
-	Events_Dispatch_FullMethodName                = "/eg.interp.events.Events/Dispatch"
-	Events_WorstCoverageFunctions_FullMethodName  = "/eg.interp.events.Events/WorstCoverageFunctions"
-	Events_SampleCoverageFunctions_FullMethodName = "/eg.interp.events.Events/SampleCoverageFunctions"
+	Events_Dispatch_FullMethodName = "/eg.interp.events.Events/Dispatch"
 )
 
 // EventsClient is the client API for Events service.
@@ -245,8 +243,6 @@ const (
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type EventsClient interface {
 	Dispatch(ctx context.Context, in *DispatchRequest, opts ...grpc.CallOption) (*DispatchResponse, error)
-	WorstCoverageFunctions(ctx context.Context, in *WorstCoverageFunctionsRequest, opts ...grpc.CallOption) (*CoverageFunctionsResponse, error)
-	SampleCoverageFunctions(ctx context.Context, in *SampleCoverageFunctionsRequest, opts ...grpc.CallOption) (*CoverageFunctionsResponse, error)
 }
 
 type eventsClient struct {
@@ -267,33 +263,11 @@ func (c *eventsClient) Dispatch(ctx context.Context, in *DispatchRequest, opts .
 	return out, nil
 }
 
-func (c *eventsClient) WorstCoverageFunctions(ctx context.Context, in *WorstCoverageFunctionsRequest, opts ...grpc.CallOption) (*CoverageFunctionsResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(CoverageFunctionsResponse)
-	err := c.cc.Invoke(ctx, Events_WorstCoverageFunctions_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *eventsClient) SampleCoverageFunctions(ctx context.Context, in *SampleCoverageFunctionsRequest, opts ...grpc.CallOption) (*CoverageFunctionsResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(CoverageFunctionsResponse)
-	err := c.cc.Invoke(ctx, Events_SampleCoverageFunctions_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
 // EventsServer is the server API for Events service.
 // All implementations must embed UnimplementedEventsServer
 // for forward compatibility.
 type EventsServer interface {
 	Dispatch(context.Context, *DispatchRequest) (*DispatchResponse, error)
-	WorstCoverageFunctions(context.Context, *WorstCoverageFunctionsRequest) (*CoverageFunctionsResponse, error)
-	SampleCoverageFunctions(context.Context, *SampleCoverageFunctionsRequest) (*CoverageFunctionsResponse, error)
 	mustEmbedUnimplementedEventsServer()
 }
 
@@ -306,12 +280,6 @@ type UnimplementedEventsServer struct{}
 
 func (UnimplementedEventsServer) Dispatch(context.Context, *DispatchRequest) (*DispatchResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method Dispatch not implemented")
-}
-func (UnimplementedEventsServer) WorstCoverageFunctions(context.Context, *WorstCoverageFunctionsRequest) (*CoverageFunctionsResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "method WorstCoverageFunctions not implemented")
-}
-func (UnimplementedEventsServer) SampleCoverageFunctions(context.Context, *SampleCoverageFunctionsRequest) (*CoverageFunctionsResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "method SampleCoverageFunctions not implemented")
 }
 func (UnimplementedEventsServer) mustEmbedUnimplementedEventsServer() {}
 func (UnimplementedEventsServer) testEmbeddedByValue()                {}
@@ -352,42 +320,6 @@ func _Events_Dispatch_Handler(srv interface{}, ctx context.Context, dec func(int
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Events_WorstCoverageFunctions_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(WorstCoverageFunctionsRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(EventsServer).WorstCoverageFunctions(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: Events_WorstCoverageFunctions_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(EventsServer).WorstCoverageFunctions(ctx, req.(*WorstCoverageFunctionsRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _Events_SampleCoverageFunctions_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(SampleCoverageFunctionsRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(EventsServer).SampleCoverageFunctions(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: Events_SampleCoverageFunctions_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(EventsServer).SampleCoverageFunctions(ctx, req.(*SampleCoverageFunctionsRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 // Events_ServiceDesc is the grpc.ServiceDesc for Events service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -398,14 +330,6 @@ var Events_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Dispatch",
 			Handler:    _Events_Dispatch_Handler,
-		},
-		{
-			MethodName: "WorstCoverageFunctions",
-			Handler:    _Events_WorstCoverageFunctions_Handler,
-		},
-		{
-			MethodName: "SampleCoverageFunctions",
-			Handler:    _Events_SampleCoverageFunctions_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

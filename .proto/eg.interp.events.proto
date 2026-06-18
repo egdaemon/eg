@@ -42,8 +42,6 @@ message Coverage {
   string path = 1;
   float statements = 2;
   float branches = 3;
-  string fn_name = 4;
-  int64 hits = 5;
 }
 
 // Represents every message recorded when executing a job
@@ -98,14 +96,8 @@ message DispatchRequest { repeated Message messages = 1; }
 
 message DispatchResponse {}
 
-message WorstCoverageFunctionsRequest { int32 n = 1; }
-message SampleCoverageFunctionsRequest { int32 n = 1; }
-message CoverageFunctionsResponse { repeated Coverage functions = 1; }
-
 service Events {
   rpc Dispatch(DispatchRequest) returns (DispatchResponse) {}
-  rpc WorstCoverageFunctions(WorstCoverageFunctionsRequest) returns (CoverageFunctionsResponse) {}
-  rpc SampleCoverageFunctions(SampleCoverageFunctionsRequest) returns (CoverageFunctionsResponse) {}
 }
 
 service Runner {

@@ -24,45 +24,30 @@ func newTestDB(t *testing.T) *sql.DB {
 	return db
 }
 
-func TestWorstCoverage(t *testing.T) {
+// TestLegacyCoverageDispatch confirms the original Message_Coverage path
+// (still used by already-released SDK versions) keeps inserting correctly,
+// leaving the newer fnname/hits columns at their defaults.
+func TestLegacyCoverageDispatch(t *testing.T) {
 	db := newTestDB(t)
 	ctx, done := context.WithTimeout(context.Background(), 10*time.Second)
 	defer done()
 
 	require.NoError(t, events.RecordMetric(
 		ctx, db,
-		events.NewCoverage(&events.Coverage{Path: "a.go", FnName: "Foo", Hits: 5, Statements: 80, Branches: 80}),
-		events.NewCoverage(&events.Coverage{Path: "a.go", FnName: "Bar", Hits: 0, Statements: 80, Branches: 80}),
-		events.NewCoverage(&events.Coverage{Path: "b.go", FnName: "Baz", Hits: 2, Statements: 60, Branches: 60}),
-		events.NewCoverage(&events.Coverage{Path: "b.go", Statements: 60, Branches: 60}),
+		events.NewCoverage(&events.Coverage{Path: "a.go", Statements: 80, Branches: 60}),
 	))
 
-	worst, err := events.WorstCoverage(ctx, db, 2)
-	require.NoError(t, err)
-	require.Len(t, worst, 2)
-	require.Equal(t, "Bar", worst[0].FnName)
-	require.Equal(t, int64(0), worst[0].Hits)
-	require.Equal(t, "Baz", worst[1].FnName)
-	require.Equal(t, int64(2), worst[1].Hits)
-}
-
-func TestSampleCoverage(t *testing.T) {
-	db := newTestDB(t)
-	ctx, done := context.WithTimeout(context.Background(), 10*time.Second)
-	defer done()
-
-	require.NoError(t, events.RecordMetric(
-		ctx, db,
-		events.NewCoverage(&events.Coverage{Path: "a.go", FnName: "Foo", Hits: 5}),
-		events.NewCoverage(&events.Coverage{Path: "a.go", FnName: "Bar", Hits: 0}),
-		events.NewCoverage(&events.Coverage{Path: "b.go", FnName: "Baz", Hits: 2}),
-		events.NewCoverage(&events.Coverage{Path: "b.go"}),
-	))
-
-	sample, err := events.SampleCoverage(ctx, db, 2)
-	require.NoError(t, err)
-	require.Len(t, sample, 2)
-	for _, c := range sample {
-		require.NotEmpty(t, c.FnName)
-	}
+	var (
+		path                 string
+		statements, branches float32
+		fnname               string
+		hits                 int64
+	)
+	row := db.QueryRowContext(ctx, "SELECT path, statements, branches, fnname, hits FROM 'eg.metrics.coverage' WHERE path = ?", "a.go")
+	require.NoError(t, row.Scan(&path, &statements, &branches, &fnname, &hits))
+	require.Equal(t, "a.go", path)
+	require.Equal(t, float32(80), statements)
+	require.Equal(t, float32(60), branches)
+	require.Equal(t, "", fnname)
+	require.Equal(t, int64(0), hits)
 }

@@ -8,30 +8,30 @@ import (
 
 func TestValueString(t *testing.T) {
 	t.Run("roundtrip", func(t *testing.T) {
-		pv, err := toProtoValue("hello world")
+		pv, err := ToProtoValue("hello world")
 		require.NoError(t, err)
 		require.Equal(t, "hello world", pv.GetStringValue())
 
-		got, err := fromProtoValue(pv)
+		got, err := FromProtoValue(pv)
 		require.NoError(t, err)
 		require.Equal(t, "hello world", got)
 	})
 
 	t.Run("empty_string", func(t *testing.T) {
-		pv, err := toProtoValue("")
+		pv, err := ToProtoValue("")
 		require.NoError(t, err)
 
-		got, err := fromProtoValue(pv)
+		got, err := FromProtoValue(pv)
 		require.NoError(t, err)
 		require.Equal(t, "", got)
 	})
 
 	t.Run("null", func(t *testing.T) {
-		pv, err := toProtoValue(nil)
+		pv, err := ToProtoValue(nil)
 		require.NoError(t, err)
 		require.True(t, pv.GetIsNull())
 
-		got, err := fromProtoValue(pv)
+		got, err := FromProtoValue(pv)
 		require.NoError(t, err)
 		require.Nil(t, got)
 	})

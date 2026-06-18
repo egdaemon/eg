@@ -4,18 +4,20 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-
-	duckdb "github.com/duckdb/duckdb-go/v2"
 )
 
 // DescribedType pairs a DuckDB type with whatever identifies its slot --
 // the Go-side counterpart of the wire message TypeMetadata (named
 // differently to avoid colliding with the generated type of that name).
 // Name is empty for parameters, which are positional ($1, $2, ...), not
-// named.
+// named. Type is the raw duckdb.Type enum value as a uint32 rather than
+// duckdb.Type itself -- this package stays free of duckdb-go (and its cgo
+// bindings) so it can build for GOOS=wasip1; callers that want the
+// strongly-typed enum (e.g. duckpgwire, which already depends on
+// duckdb-go) can convert via duckdb.Type(d.Type).
 type DescribedType struct {
 	Name string
-	Type duckdb.Type
+	Type uint32
 }
 
 // DescribeResult is the outcome of Describe: enough to build a Postgres
@@ -24,7 +26,7 @@ type DescribeResult struct {
 	Tuples        bool
 	Params        []DescribedType
 	Columns       []DescribedType
-	StatementType duckdb.StmtType // e.g. duckdb.STATEMENT_TYPE_INSERT; a distinct enum from DescribedType.Type
+	StatementType uint32 // raw duckdb.StmtType enum value, e.g. duckdb.STATEMENT_TYPE_INSERT
 }
 
 // Describe prepares query against the duckproxy server sqlConn is
@@ -42,12 +44,12 @@ func Describe(ctx context.Context, sqlConn *sql.Conn, query string) (DescribeRes
 		c := driverConn.(*conn)
 		defer watchCancel(ctx, c.c)()
 
-		if err := writeFrame(c.c, &ClientFrame{Body: &ClientFrame_Describe{Describe: &DescribeRequest{Sql: query}}}); err != nil {
+		if err := WriteFrame(c.c, &ClientFrame{Body: &ClientFrame_Describe{Describe: &DescribeRequest{Sql: query}}}); err != nil {
 			return err
 		}
 
 		var resp ServerFrame
-		if err := readFrame(c.c, &resp); err != nil {
+		if err := ReadFrame(c.c, &resp); err != nil {
 			return err
 		}
 
@@ -68,18 +70,18 @@ func Describe(ctx context.Context, sqlConn *sql.Conn, query string) (DescribeRes
 func fromDescribeResponse(resp *DescribeResponse) DescribeResult {
 	params := make([]DescribedType, len(resp.GetParams()))
 	for i, p := range resp.GetParams() {
-		params[i] = DescribedType{Name: p.GetName(), Type: duckdb.Type(p.GetType())}
+		params[i] = DescribedType{Name: p.GetName(), Type: p.GetType()}
 	}
 
 	columns := make([]DescribedType, len(resp.GetColumns()))
 	for i, c := range resp.GetColumns() {
-		columns[i] = DescribedType{Name: c.GetName(), Type: duckdb.Type(c.GetType())}
+		columns[i] = DescribedType{Name: c.GetName(), Type: c.GetType()}
 	}
 
 	return DescribeResult{
 		Tuples:        resp.GetTuples(),
 		Params:        params,
 		Columns:       columns,
-		StatementType: duckdb.StmtType(resp.GetStatementType()),
+		StatementType: resp.GetStatementType(),
 	}
 }

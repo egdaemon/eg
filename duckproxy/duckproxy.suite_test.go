@@ -14,14 +14,14 @@ import (
 	"time"
 
 	_ "github.com/duckdb/duckdb-go/v2"
-	"github.com/egdaemon/eg/duckproxy"
+	"github.com/egdaemon/eg/duckproxyserver"
 )
 
 // startTestServer starts a duckproxy.Server backed by a temp-file DuckDB
 // database, listening on a temp-dir unix socket, and returns the socket
 // path plus the server-side *sql.DB (for inspecting pool stats, e.g.
 // db.Stats().InUse in the concurrency test).
-func startTestServer(t *testing.T, opts ...duckproxy.Option) (socketPath string, serverDB *sql.DB) {
+func startTestServer(t *testing.T, opts ...duckproxyserver.Option) (socketPath string, serverDB *sql.DB) {
 	t.Helper()
 
 	dir := t.TempDir()
@@ -34,12 +34,12 @@ func startTestServer(t *testing.T, opts ...duckproxy.Option) (socketPath string,
 	}
 	t.Cleanup(func() { db.Close() })
 
-	srv := duckproxy.New(db, opts...)
+	srv := duckproxyserver.New(db, opts...)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	errCh := make(chan error, 1)
 	go func() {
-		errCh <- duckproxy.ListenUnix(ctx, socketPath, srv)
+		errCh <- duckproxyserver.ListenUnix(ctx, socketPath, srv)
 	}()
 	t.Cleanup(func() {
 		cancel()

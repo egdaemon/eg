@@ -8,8 +8,6 @@ import (
 	"io"
 	"net"
 	"reflect"
-
-	duckdb "github.com/duckdb/duckdb-go/v2"
 )
 
 func init() {
@@ -43,7 +41,7 @@ func (c *conn) Begin() (driver.Tx, error) {
 func (c *conn) BeginTx(ctx context.Context, _ driver.TxOptions) (driver.Tx, error) {
 	defer watchCancel(ctx, c.c)()
 
-	if err := writeFrame(c.c, &ClientFrame{Body: &ClientFrame_Begin{Begin: &BeginRequest{}}}); err != nil {
+	if err := WriteFrame(c.c, &ClientFrame{Body: &ClientFrame_Begin{Begin: &BeginRequest{}}}); err != nil {
 		return nil, err
 	}
 	if err := c.readOK(); err != nil {
@@ -95,12 +93,12 @@ func (c *conn) ExecContext(ctx context.Context, query string, args []driver.Name
 		return nil, err
 	}
 
-	if err := writeFrame(c.c, &ClientFrame{Body: &ClientFrame_Exec{Exec: &ExecRequest{Sql: query, Args: params}}}); err != nil {
+	if err := WriteFrame(c.c, &ClientFrame{Body: &ClientFrame_Exec{Exec: &ExecRequest{Sql: query, Args: params}}}); err != nil {
 		return nil, err
 	}
 
 	var resp ServerFrame
-	if err := readFrame(c.c, &resp); err != nil {
+	if err := ReadFrame(c.c, &resp); err != nil {
 		return nil, err
 	}
 
@@ -124,12 +122,12 @@ func (c *conn) QueryContext(ctx context.Context, query string, args []driver.Nam
 		return nil, err
 	}
 
-	if err := writeFrame(c.c, &ClientFrame{Body: &ClientFrame_Query{Query: &QueryRequest{Sql: query, Args: params}}}); err != nil {
+	if err := WriteFrame(c.c, &ClientFrame{Body: &ClientFrame_Query{Query: &QueryRequest{Sql: query, Args: params}}}); err != nil {
 		return nil, err
 	}
 
 	var resp ServerFrame
-	if err := readFrame(c.c, &resp); err != nil {
+	if err := ReadFrame(c.c, &resp); err != nil {
 		return nil, err
 	}
 
@@ -143,14 +141,13 @@ func (c *conn) QueryContext(ctx context.Context, query string, args []driver.Nam
 	}
 }
 
-// CheckNamedValue allows the same richer set of Go types toProtoValue
-// supports (mirroring duckdb-go's own Conn.CheckNamedValue) to pass
-// through unconverted; everything else falls back to database/sql's
-// default conversion (to int64/float64/bool/[]byte/string/time.Time),
-// which toProtoValue already handles.
+// CheckNamedValue allows the same richer set of Go types ToProtoValue
+// supports to pass through unconverted; everything else falls back to
+// database/sql's default conversion (to int64/float64/bool/[]byte/
+// string/time.Time), which ToProtoValue already handles.
 func (c *conn) CheckNamedValue(nv *driver.NamedValue) error {
 	switch nv.Value.(type) {
-	case duckdb.Interval, duckdb.Decimal:
+	case Interval, *Interval:
 		return nil
 	}
 
@@ -164,7 +161,7 @@ func (c *conn) CheckNamedValue(nv *driver.NamedValue) error {
 
 func (c *conn) readOK() error {
 	var resp ServerFrame
-	if err := readFrame(c.c, &resp); err != nil {
+	if err := ReadFrame(c.c, &resp); err != nil {
 		return err
 	}
 
@@ -181,7 +178,7 @@ func (c *conn) readOK() error {
 func toParams(args []driver.NamedValue) ([]*Param, error) {
 	params := make([]*Param, len(args))
 	for i, a := range args {
-		v, err := toProtoValue(a.Value)
+		v, err := ToProtoValue(a.Value)
 		if err != nil {
 			return nil, err
 		}
@@ -272,7 +269,7 @@ func (r *rows) Next(dst []driver.Value) error {
 	}
 
 	var resp ServerFrame
-	if err := readFrame(r.c.c, &resp); err != nil {
+	if err := ReadFrame(r.c.c, &resp); err != nil {
 		r.done = true
 		return err
 	}
@@ -281,7 +278,7 @@ func (r *rows) Next(dst []driver.Value) error {
 	case *ServerFrame_Row:
 		values := body.Row.GetValues()
 		for i, v := range values {
-			gv, err := fromProtoValue(v)
+			gv, err := FromProtoValue(v)
 			if err != nil {
 				return err
 			}
@@ -305,14 +302,14 @@ type tx struct {
 }
 
 func (t *tx) Commit() error {
-	if err := writeFrame(t.c.c, &ClientFrame{Body: &ClientFrame_Commit{Commit: &CommitRequest{}}}); err != nil {
+	if err := WriteFrame(t.c.c, &ClientFrame{Body: &ClientFrame_Commit{Commit: &CommitRequest{}}}); err != nil {
 		return err
 	}
 	return t.c.readOK()
 }
 
 func (t *tx) Rollback() error {
-	if err := writeFrame(t.c.c, &ClientFrame{Body: &ClientFrame_Rollback{Rollback: &RollbackRequest{}}}); err != nil {
+	if err := WriteFrame(t.c.c, &ClientFrame{Body: &ClientFrame_Rollback{Rollback: &RollbackRequest{}}}); err != nil {
 		return err
 	}
 	return t.c.readOK()

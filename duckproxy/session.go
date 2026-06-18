@@ -2,133 +2,98 @@ package duckproxy
 
 import (
 	"context"
+	"database/sql/driver"
 	"errors"
 	"io"
 	"net"
-	"sync"
 	"time"
 
 	duckdb "github.com/duckdb/duckdb-go/v2"
-	"github.com/jackc/pgx/v5/pgproto3"
 )
 
-// session holds the state of one client connection. Everything that
-// touches dconn runs on the single goroutine that owns the session -- the
-// only exception is curCancel, which the cancel registry's goroutine may
-// invoke concurrently in response to a CancelRequest, so it's guarded by
-// mu.
+// session holds the state of one client connection, and is only ever
+// touched by the single goroutine that owns it -- there is no concurrent
+// cancellation mechanism in this protocol (see Server doc comment); a
+// caller that wants to interrupt an in-flight statement closes its
+// connection instead.
 type session struct {
-	server  *Server
-	conn    net.Conn
-	backend *pgproto3.Backend
-	dconn   *duckdb.Conn
+	server *Server
+	conn   net.Conn
+	dconn  *duckdb.Conn
 
-	pid    uint32
-	secret uint32
-
-	tx txState
-
-	statements map[string]*preparedStatement
-	portals    map[string]*portal
-
-	mu        sync.Mutex
-	curCancel context.CancelFunc
+	// tx is the active transaction, or nil if none is open. Its presence
+	// is what idle-in-transaction timeout and the rollback-on-cleanup
+	// safety net key off of.
+	tx driver.Tx
 }
 
 func (s *Server) handleConn(ctx context.Context, conn net.Conn) {
 	defer conn.Close()
 
-	sess := &session{
-		server:     s,
-		conn:       conn,
-		backend:    pgproto3.NewBackend(conn, conn),
-		statements: make(map[string]*preparedStatement),
-		portals:    make(map[string]*portal),
+	acquireCtx := ctx
+	if s.acquireTimeout > 0 {
+		var done context.CancelFunc
+		acquireCtx, done = context.WithTimeout(ctx, s.acquireTimeout)
+		defer done()
 	}
 
-	if err := sess.run(ctx); err != nil && !errors.Is(err, io.EOF) {
+	sqlConn, err := s.db.Conn(acquireCtx)
+	if err != nil {
+		writeFrame(conn, &ServerFrame{Body: &ServerFrame_Error{Error: &ErrorResponse{Message: err.Error()}}})
+		return
+	}
+	defer sqlConn.Close()
+
+	// The entire session runs inside Raw: database/sql documents that the
+	// driverConn it exposes "must not be used outside of f", so the
+	// dispatch loop -- not just a quick capture of dconn -- has to live in
+	// this closure.
+	err = sqlConn.Raw(func(driverConn any) error {
+		sess := &session{server: s, conn: conn, dconn: driverConn.(*duckdb.Conn)}
+		return sess.serve(ctx)
+	})
+	if err != nil && !errors.Is(err, io.EOF) {
 		s.logger.Printf("duckproxy: session ended: %v", err)
 	}
 }
 
-func (s *session) run(ctx context.Context) error {
-	proceed, err := s.negotiateStartup()
-	if err != nil || !proceed {
-		return err
-	}
-
-	acquireCtx := ctx
-	if s.server.acquireTimeout > 0 {
-		var done context.CancelFunc
-		acquireCtx, done = context.WithTimeout(ctx, s.server.acquireTimeout)
-		defer done()
-	}
-
-	sqlConn, err := s.server.db.Conn(acquireCtx)
-	if err != nil {
-		s.backend.Send(toErrorResponse(err))
-		s.backend.Flush()
-		return err
-	}
-	defer sqlConn.Close()
-
-	// The entire rest of the session runs inside Raw: database/sql
-	// documents that the driverConn it exposes "must not be used outside
-	// of f", so the protocol loop -- not just a quick capture of dconn --
-	// has to live in this closure.
-	return sqlConn.Raw(func(driverConn any) error {
-		s.dconn = driverConn.(*duckdb.Conn)
-		return s.serve(ctx)
-	})
-}
-
 func (s *session) serve(ctx context.Context) error {
-	pid, secret := s.server.registry.register(s.cancelCurrent)
-	s.pid, s.secret = pid, secret
-	defer s.server.registry.deregister(pid)
-
-	if err := s.sendHandshake(); err != nil {
-		return err
-	}
-
 	defer s.cleanup()
 
 	for {
-		if s.tx == txInTransaction && s.server.idleInTransactionTimeout > 0 {
+		if s.tx != nil && s.server.idleInTransactionTimeout > 0 {
 			s.conn.SetReadDeadline(time.Now().Add(s.server.idleInTransactionTimeout))
 		} else {
 			s.conn.SetReadDeadline(time.Time{})
 		}
 
-		msg, err := s.backend.Receive()
-		if err != nil {
-			if isTimeout(err) && s.tx == txInTransaction {
+		var frame ClientFrame
+		if err := readFrame(s.conn, &frame); err != nil {
+			if isTimeout(err) && s.tx != nil {
 				s.killIdleInTransaction()
 			}
 			return err
 		}
 
-		switch m := msg.(type) {
-		case *pgproto3.Query:
-			s.handleQuery(ctx, m)
-		case *pgproto3.Parse:
-			s.handleParse(ctx, m)
-		case *pgproto3.Bind:
-			s.handleBind(m)
-		case *pgproto3.Describe:
-			s.handleDescribe(m)
-		case *pgproto3.Execute:
-			s.handleExecute(ctx, m)
-		case *pgproto3.Sync:
-			s.handleSync()
-		case *pgproto3.Close:
-			s.handleClose(m)
-		case *pgproto3.Flush:
-		case *pgproto3.Terminate:
-			return nil
+		var err error
+		switch body := frame.GetBody().(type) {
+		case *ClientFrame_Exec:
+			err = s.handleExec(ctx, body.Exec)
+		case *ClientFrame_Query:
+			err = s.handleQuery(ctx, body.Query)
+		case *ClientFrame_Begin:
+			err = s.handleBegin(ctx)
+		case *ClientFrame_Commit:
+			err = s.handleCommit()
+		case *ClientFrame_Rollback:
+			err = s.handleRollback()
+		case *ClientFrame_Describe:
+			err = s.handleDescribe(ctx, body.Describe)
+		default:
+			err = s.sendError(errors.New("duckproxy: empty or unknown client frame"))
 		}
 
-		if err := s.backend.Flush(); err != nil {
+		if err != nil {
 			return err
 		}
 	}
@@ -136,43 +101,38 @@ func (s *session) serve(ctx context.Context) error {
 
 // cleanup runs once, inside the Raw closure, as the session ends. It rolls
 // back any transaction the client left open so the pooled connection comes
-// back clean for whichever session is handed it next, and closes every
-// statement still tracked for this session.
+// back clean for whichever session is handed it next.
 func (s *session) cleanup() {
-	if s.tx != txIdle {
-		_, _ = s.dconn.ExecContext(context.Background(), "ROLLBACK", nil)
-	}
-	for name, stmt := range s.statements {
-		stmt.close()
-		delete(s.statements, name)
-	}
-	s.portals = map[string]*portal{}
-}
-
-func (s *session) setCancel(cancel context.CancelFunc) {
-	s.mu.Lock()
-	s.curCancel = cancel
-	s.mu.Unlock()
-}
-
-func (s *session) cancelCurrent() {
-	s.mu.Lock()
-	cancel := s.curCancel
-	s.mu.Unlock()
-	if cancel != nil {
-		cancel()
+	if s.tx != nil {
+		_ = s.tx.Rollback()
+		s.tx = nil
 	}
 }
 
 // killIdleInTransaction is called from the session's own goroutine after
 // its read deadline expires while idle inside a transaction. It rolls
-// back, then closes the connection directly -- a plain disconnect rather
-// than a graceful FATAL ErrorResponse, since by this point the client has
-// already gone quiet and there's no one left to read a reply.
+// back, then closes the connection directly -- a plain disconnect, since
+// by this point the client has gone quiet and there's no one left to read
+// a reply.
 func (s *session) killIdleInTransaction() {
-	_, _ = s.dconn.ExecContext(context.Background(), "ROLLBACK", nil)
-	s.tx = txIdle
+	if s.tx != nil {
+		_ = s.tx.Rollback()
+		s.tx = nil
+	}
 	s.conn.Close()
+}
+
+func (s *session) sendError(err error) error {
+	return writeFrame(s.conn, &ServerFrame{Body: &ServerFrame_Error{Error: &ErrorResponse{Message: err.Error()}}})
+}
+
+// statementContext derives a context for one statement's execution,
+// bounded by the server's statement timeout, if any.
+func (s *session) statementContext(ctx context.Context) (context.Context, context.CancelFunc) {
+	if s.server.statementTimeout <= 0 {
+		return context.WithCancel(ctx)
+	}
+	return context.WithTimeout(ctx, s.server.statementTimeout)
 }
 
 func isTimeout(err error) bool {
@@ -180,17 +140,14 @@ func isTimeout(err error) bool {
 	return errors.As(err, &ne) && ne.Timeout()
 }
 
-// statementContext derives a context for one statement's execution,
-// bounded by the server's statement timeout (if any), and registers its
-// cancel func so a CancelRequest can interrupt it.
-func (s *session) statementContext(ctx context.Context) (context.Context, context.CancelFunc) {
-	if s.server.statementTimeout <= 0 {
-		ctx, cancel := context.WithCancel(ctx)
-		s.setCancel(cancel)
-		return ctx, cancel
+func toNamedValues(params []*Param) ([]driver.NamedValue, error) {
+	args := make([]driver.NamedValue, len(params))
+	for i, p := range params {
+		v, err := fromProtoValue(p.GetValue())
+		if err != nil {
+			return nil, err
+		}
+		args[i] = driver.NamedValue{Ordinal: int(p.GetOrdinal()), Name: p.GetName(), Value: v}
 	}
-
-	ctx, cancel := context.WithTimeout(ctx, s.server.statementTimeout)
-	s.setCancel(cancel)
-	return ctx, cancel
+	return args, nil
 }

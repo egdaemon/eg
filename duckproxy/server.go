@@ -1,9 +1,11 @@
-// Package duckproxy fronts a single shared in-process DuckDB database with
-// the Postgres wire protocol over a Unix domain socket, so that multiple
-// separate OS processes can connect with any off-the-shelf Postgres client
-// and run SQL against one DuckDB file -- the way pgpool/pgbouncer let many
-// Postgres clients share one backend, except the backend here is an
-// embedded DuckDB instance rather than a real Postgres server.
+// Package duckproxy fronts a single shared in-process DuckDB database
+// with a native Go protocol over a Unix domain socket, so that multiple
+// separate OS processes can connect -- via this package's own
+// database/sql/driver.Driver client -- and run SQL against one DuckDB
+// file, the way pgpool/pgbouncer let many Postgres clients share one
+// backend. Unlike a Postgres-wire-protocol proxy, both ends speak DuckDB's
+// own native types directly; only Go code using this package's client can
+// connect.
 package duckproxy
 
 import (
@@ -18,13 +20,12 @@ const (
 	defaultStatementTimeout = 30 * time.Second
 )
 
-// Server serves the Postgres wire protocol on behalf of a shared *sql.DB
-// backed by the duckdb driver. The zero value is not usable; construct with
-// New.
+// Server serves duckproxy's native protocol on behalf of a shared
+// *sql.DB backed by the duckdb driver. The zero value is not usable;
+// construct with New.
 type Server struct {
-	db       *sql.DB
-	logger   Logger
-	registry *cancelRegistry
+	db     *sql.DB
+	logger Logger
 
 	maxConnections           int
 	idleInTransactionTimeout time.Duration
@@ -37,17 +38,15 @@ type Option func(*Server)
 
 // WithMaxConnections caps the number of concurrent DuckDB connections handed
 // out to client sessions, via db.SetMaxOpenConns. Additional clients block
-// (queue) inside their Postgres handshake until a slot frees -- see
-// Server.Serve for why the handshake, not the socket Accept, is the
-// blocking point. Default: 4.
+// (queue) waiting to acquire a connection -- see Server.serve for why that
+// happens before any frame is exchanged, not at the socket Accept. Default: 4.
 func WithMaxConnections(n int) Option {
 	return func(s *Server) { s.maxConnections = n }
 }
 
 // WithIdleInTransactionTimeout closes a session and rolls back its open
-// transaction if it sits idle inside BEGIN/COMMIT for longer than d,
-// matching Postgres's idle_in_transaction_session_timeout. This guards
-// against one stalled client monopolizing DuckDB's single active
+// transaction if it sits idle inside Begin/Commit for longer than d. This
+// guards against one stalled client monopolizing DuckDB's single active
 // write-transaction slot. Default: disabled (0).
 func WithIdleInTransactionTimeout(d time.Duration) Option {
 	return func(s *Server) { s.idleInTransactionTimeout = d }
@@ -60,9 +59,9 @@ func WithStatementTimeout(d time.Duration) Option {
 	return func(s *Server) { s.statementTimeout = d }
 }
 
-// WithAcquireTimeout bounds how long a session's startup handshake may wait
-// for a free DuckDB connection slot before failing. Default: disabled (0 =
-// wait indefinitely).
+// WithAcquireTimeout bounds how long a new session may wait for a free
+// DuckDB connection slot before failing. Default: disabled (0 = wait
+// indefinitely).
 func WithAcquireTimeout(d time.Duration) Option {
 	return func(s *Server) { s.acquireTimeout = d }
 }
@@ -80,7 +79,6 @@ func New(db *sql.DB, opts ...Option) *Server {
 	s := &Server{
 		db:               db,
 		logger:           noopLogger{},
-		registry:         newCancelRegistry(),
 		maxConnections:   defaultMaxConnections,
 		statementTimeout: defaultStatementTimeout,
 	}
@@ -94,8 +92,8 @@ func New(db *sql.DB, opts ...Option) *Server {
 	return s
 }
 
-// Serve accepts connections from l and handles the Postgres wire protocol
-// on each, until ctx is cancelled or l.Accept fails. It always returns a
+// Serve accepts connections from l and handles duckproxy's protocol on
+// each, until ctx is cancelled or l.Accept fails. It always returns a
 // non-nil error.
 func (s *Server) Serve(ctx context.Context, l net.Listener) error {
 	go func() {

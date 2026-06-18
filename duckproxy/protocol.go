@@ -12,12 +12,12 @@ import (
 // against a corrupt or hostile peer, not a real limit on query/result size.
 const maxFrameLen = 64 << 20 // 64MiB
 
-// writeFrame writes msg to w as a 4-byte big-endian length prefix followed
+// WriteFrame writes msg to w as a 4-byte big-endian length prefix followed
 // by its marshaled bytes. This -- not gRPC, not gob -- is the entire
 // transport layer: a single connection carries one ClientFrame/ServerFrame
 // at a time, synchronously, since database/sql never calls a driver.Conn
 // concurrently from multiple goroutines.
-func writeFrame(w io.Writer, msg proto.Message) error {
+func WriteFrame(w io.Writer, msg proto.Message) error {
 	b, err := proto.Marshal(msg)
 	if err != nil {
 		return err
@@ -31,9 +31,9 @@ func writeFrame(w io.Writer, msg proto.Message) error {
 	return err
 }
 
-// readFrame reads one length-prefixed frame from r and unmarshals it into
+// ReadFrame reads one length-prefixed frame from r and unmarshals it into
 // msg.
-func readFrame(r io.Reader, msg proto.Message) error {
+func ReadFrame(r io.Reader, msg proto.Message) error {
 	var lenBuf [4]byte
 	if _, err := io.ReadFull(r, lenBuf[:]); err != nil {
 		return err

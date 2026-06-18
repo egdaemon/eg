@@ -30,21 +30,3 @@ func (t *EventsService) Dispatch(ctx context.Context, dr *DispatchRequest) (_ *D
 
 	return &DispatchResponse{}, nil
 }
-
-func (t *EventsService) WorstCoverageFunctions(ctx context.Context, req *WorstCoverageFunctionsRequest) (_ *CoverageFunctionsResponse, err error) {
-	functions, err := WorstCoverage(ctx, t.db, req.N)
-	if err != nil {
-		return nil, errorsx.WithStack(err)
-	}
-
-	return &CoverageFunctionsResponse{Functions: functions}, nil
-}
-
-func (t *EventsService) SampleCoverageFunctions(ctx context.Context, req *SampleCoverageFunctionsRequest) (_ *CoverageFunctionsResponse, err error) {
-	functions, err := SampleCoverage(ctx, t.db, req.N)
-	if err != nil {
-		return nil, errorsx.WithStack(err)
-	}
-
-	return &CoverageFunctionsResponse{Functions: functions}, nil
-}

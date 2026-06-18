@@ -49,11 +49,11 @@ func prepareStatement(ctx context.Context, sqlConn *sql.Conn, name, query string
 			paramOIDs[i] = clientParamOIDs[i]
 			continue
 		}
-		if p.Type == duckdb.TYPE_INVALID {
+		if duckdb.Type(p.Type) == duckdb.TYPE_INVALID {
 			paramOIDs[i] = pgtype.TextOID
 			continue
 		}
-		paramOIDs[i] = oidForDuckType(p.Type)
+		paramOIDs[i] = oidForDuckType(duckdb.Type(p.Type))
 	}
 
 	var columnOIDs []uint32
@@ -62,7 +62,7 @@ func prepareStatement(ctx context.Context, sqlConn *sql.Conn, name, query string
 		columnOIDs = make([]uint32, len(described.Columns))
 		columnNames = make([]string, len(described.Columns))
 		for i, c := range described.Columns {
-			columnOIDs[i] = oidForDuckType(c.Type)
+			columnOIDs[i] = oidForDuckType(duckdb.Type(c.Type))
 			columnNames[i] = c.Name
 		}
 	}
@@ -70,7 +70,7 @@ func prepareStatement(ctx context.Context, sqlConn *sql.Conn, name, query string
 	return &preparedStatement{
 		name:        name,
 		query:       query,
-		stmtType:    described.StatementType,
+		stmtType:    duckdb.StmtType(described.StatementType),
 		paramOIDs:   paramOIDs,
 		columnOIDs:  columnOIDs,
 		columnNames: columnNames,

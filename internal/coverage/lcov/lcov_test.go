@@ -33,7 +33,7 @@ func TestFunctionCoverage(t *testing.T) {
 
 	hits := map[string]int64{}
 	for _, c := range authzcached {
-		hits[c.FnName] = c.Hits
+		hits[c.Fnname] = c.Hits
 		require.InDelta(t, 53.571426, c.Statements, 0.0001)
 		require.Equal(t, float32(100), c.Branches)
 	}

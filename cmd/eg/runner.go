@@ -20,6 +20,7 @@ import (
 	"github.com/egdaemon/eg/cmd/cmdopts"
 	"github.com/egdaemon/eg/cmd/eg/daemons"
 	"github.com/egdaemon/eg/compile"
+	"github.com/egdaemon/eg/duckproxyserver"
 	"github.com/egdaemon/eg/internal/bytesx"
 	"github.com/egdaemon/eg/internal/debugx"
 	"github.com/egdaemon/eg/internal/envx"
@@ -237,6 +238,14 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 		if err = events.PrepareDB(gctx.Context, db); err != nil {
 			return errorsx.Wrap(err, "unable to prepare analytics.db")
 		}
+
+		dpsrv := duckproxyserver.New(db)
+		go func() {
+			dpspath := filepath.Join(t.RuntimeDir, eg.SocketAnalytics)
+			if err := duckproxyserver.ListenUnix(gctx.Context, dpspath, dpsrv); err != nil && gctx.Context.Err() == nil {
+				log.Println("duckproxy:", err)
+			}
+		}()
 
 		cmdenvb = cmdenvb.Var(
 			eg.EnvComputeModuleSocket, eg.DefaultMountRoot(eg.RuntimeDirectory, filepath.Base(cspath)),

@@ -1,4 +1,4 @@
-package duckproxy
+package duckproxyserver
 
 // Logger is the minimal logging interface duckproxy uses to report
 // per-connection errors that are not surfaced to the client (e.g. a write

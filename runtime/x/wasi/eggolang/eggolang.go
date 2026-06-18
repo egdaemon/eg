@@ -11,6 +11,7 @@ import (
 
 	_eg "github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/internal/contextx"
+	"github.com/egdaemon/eg/internal/coverage"
 	"github.com/egdaemon/eg/internal/coverage/golangcov"
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
@@ -20,7 +21,6 @@ import (
 	"github.com/egdaemon/eg/internal/slicesx"
 	"github.com/egdaemon/eg/internal/stringsx"
 	"github.com/egdaemon/eg/internal/timex"
-	"github.com/egdaemon/eg/interp/events"
 	"github.com/egdaemon/eg/runtime/wasi/eg"
 	"github.com/egdaemon/eg/runtime/wasi/egenv"
 	"github.com/egdaemon/eg/runtime/wasi/egunsafe/fficoverage"
@@ -324,7 +324,7 @@ func RecordCoverage(ctx context.Context, _ eg.Op) (err error) {
 	covpath := coveragedir()
 
 	// recover metrics
-	batch := make([]*events.Coverage, 0, 128)
+	batch := make([]*coverage.Report, 0, 128)
 	for rep, err := range golangcov.Coverage(ctx, covpath) {
 		if err != nil {
 			return err

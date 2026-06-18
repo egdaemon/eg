@@ -92,27 +92,27 @@ func TestProtocolRoundtrip(t *testing.T) {
 		var buf bytes.Buffer
 		buf.Write([]byte{0, 0}) // only 2 of the required 4 length bytes
 		var out ServerFrame
-		require.Error(t, readFrame(&buf, &out))
+		require.Error(t, ReadFrame(&buf, &out))
 	})
 
 	t.Run("truncated_body", func(t *testing.T) {
 		var buf bytes.Buffer
-		require.NoError(t, writeFrame(&buf, &ServerFrame{Body: &ServerFrame_Error{Error: &ErrorResponse{Message: "boom"}}}))
+		require.NoError(t, WriteFrame(&buf, &ServerFrame{Body: &ServerFrame_Error{Error: &ErrorResponse{Message: "boom"}}}))
 
 		truncated := bytes.NewReader(buf.Bytes()[:buf.Len()-1])
 		var out ServerFrame
-		require.Error(t, readFrame(truncated, &out))
+		require.Error(t, ReadFrame(truncated, &out))
 	})
 
 	t.Run("zero_length_frame", func(t *testing.T) {
 		var buf bytes.Buffer
-		require.NoError(t, writeFrame(&buf, &ClientFrame{}))
+		require.NoError(t, WriteFrame(&buf, &ClientFrame{}))
 
 		var out ClientFrame
-		require.NoError(t, readFrame(&buf, &out))
+		require.NoError(t, ReadFrame(&buf, &out))
 		require.Nil(t, out.GetBody())
 
-		require.ErrorIs(t, readFrame(&buf, &out), io.EOF, "expected io.EOF after consuming the only frame")
+		require.ErrorIs(t, ReadFrame(&buf, &out), io.EOF, "expected io.EOF after consuming the only frame")
 	})
 }
 
@@ -120,6 +120,6 @@ func roundtrip[T proto.Message](t *testing.T, in T, out T) {
 	t.Helper()
 
 	var buf bytes.Buffer
-	require.NoError(t, writeFrame(&buf, in))
-	require.NoError(t, readFrame(&buf, out))
+	require.NoError(t, WriteFrame(&buf, in))
+	require.NoError(t, ReadFrame(&buf, out))
 }

@@ -18,8 +18,6 @@ type Structure interface {
 	From(definition) Structure
 	Table(string) definition
 	Query(string) definition
-	// Ignore specify column names to exclude from the generated structure.
-	Ignore(...string) Structure
 	// OptionTransformColumns(x ...func(genieql.ColumnInfo) genieql.ColumnInfo) Structure
 }
 
@@ -49,7 +47,6 @@ type sconfig struct {
 	name    string
 	comment *ast.CommentGroup
 	d       definition
-	ignore  []string
 	ctx     generators.Context
 }
 
@@ -66,11 +63,7 @@ func (t *sconfig) Generate(dst io.Writer) error {
 		generators.StructOptionName(t.name),
 		generators.StructOptionComment(t.comment),
 		generators.StructOptionColumnsStrategy(func(generators.Context) ([]genieql.ColumnInfo, error) {
-			columns, err := t.d.Columns()
-			if err != nil {
-				return nil, err
-			}
-			return genieql.ColumnInfoSet(columns).Filter(genieql.ColumnInfoFilterIgnore(t.ignore...)), nil
+			return t.d.Columns()
 		}),
 		generators.StructOptionMappingConfigOptions(
 			genieql.MCOPackage(t.ctx.CurrentPackage),
@@ -80,11 +73,6 @@ func (t *sconfig) Generate(dst io.Writer) error {
 
 func (t *sconfig) From(d definition) Structure {
 	t.d = d
-	return t
-}
-
-func (t *sconfig) Ignore(ignore ...string) Structure {
-	t.ignore = ignore
 	return t
 }
 

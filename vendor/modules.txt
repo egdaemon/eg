@@ -441,6 +441,9 @@ github.com/emirpasic/gods/lists/arraylist
 github.com/emirpasic/gods/trees
 github.com/emirpasic/gods/trees/binaryheap
 github.com/emirpasic/gods/utils
+# github.com/felixge/fgprof v0.9.3
+## explicit; go 1.14
+github.com/felixge/fgprof
 # github.com/felixge/httpsnoop v1.0.4
 ## explicit; go 1.13
 github.com/felixge/httpsnoop
@@ -583,6 +586,9 @@ github.com/google/go-intervals/intervalset
 # github.com/google/gopacket v1.1.19
 ## explicit; go 1.12
 github.com/google/gopacket/routing
+# github.com/google/pprof v0.0.0-20260402051712-545e8a4df936
+## explicit; go 1.24.0
+github.com/google/pprof/profile
 # github.com/google/s2a-go v0.1.9
 ## explicit; go 1.20
 github.com/google/s2a-go
@@ -689,12 +695,18 @@ github.com/ipld/go-ipld-prime/schema
 github.com/ipld/go-ipld-prime/schema/dmt
 github.com/ipld/go-ipld-prime/schema/dsl
 github.com/ipld/go-ipld-prime/storage
+# github.com/jackc/pgio v1.0.0
+## go 1.12
+github.com/jackc/pgio
 # github.com/jackc/pgpassfile v1.0.0
 ## explicit; go 1.12
 github.com/jackc/pgpassfile
 # github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761
 ## explicit; go 1.14
 github.com/jackc/pgservicefile
+# github.com/jackc/pgtype v1.14.4
+## go 1.13
+github.com/jackc/pgtype
 # github.com/jackc/pgx/v5 v5.9.2
 ## explicit; go 1.25.0
 github.com/jackc/pgx/v5
@@ -707,9 +719,47 @@ github.com/jackc/pgx/v5/pgconn/ctxwatch
 github.com/jackc/pgx/v5/pgconn/internal/bgreader
 github.com/jackc/pgx/v5/pgproto3
 github.com/jackc/pgx/v5/pgtype
+github.com/jackc/pgx/v5/pgxpool
+github.com/jackc/pgx/v5/stdlib
+# github.com/jackc/puddle/v2 v2.2.2
+## go 1.19
+github.com/jackc/puddle/v2
+github.com/jackc/puddle/v2/internal/genstack
 # github.com/jackpal/go-nat-pmp v1.0.2
 ## explicit
 github.com/jackpal/go-nat-pmp
+# github.com/james-lawrence/genieql v0.0.0-20260610145836-e569517e6744
+## explicit; go 1.25.0
+github.com/james-lawrence/genieql
+github.com/james-lawrence/genieql/astbuild
+github.com/james-lawrence/genieql/astcodec
+github.com/james-lawrence/genieql/astutil
+github.com/james-lawrence/genieql/buildx
+github.com/james-lawrence/genieql/columninfo
+github.com/james-lawrence/genieql/dialects
+github.com/james-lawrence/genieql/fsx
+github.com/james-lawrence/genieql/generators
+github.com/james-lawrence/genieql/generators/functions
+github.com/james-lawrence/genieql/generators/typespec
+github.com/james-lawrence/genieql/ginterp
+github.com/james-lawrence/genieql/internal/bytesx
+github.com/james-lawrence/genieql/internal/contextx
+github.com/james-lawrence/genieql/internal/debugx
+github.com/james-lawrence/genieql/internal/drivers
+github.com/james-lawrence/genieql/internal/envx
+github.com/james-lawrence/genieql/internal/errorsx
+github.com/james-lawrence/genieql/internal/iox
+github.com/james-lawrence/genieql/internal/langx
+github.com/james-lawrence/genieql/internal/md5x
+github.com/james-lawrence/genieql/internal/postgresql
+github.com/james-lawrence/genieql/internal/postgresql/internal
+github.com/james-lawrence/genieql/internal/slicesx
+github.com/james-lawrence/genieql/internal/stringsx
+github.com/james-lawrence/genieql/internal/transformx
+github.com/james-lawrence/genieql/internal/userx
+github.com/james-lawrence/genieql/internal/wasidialect
+github.com/james-lawrence/genieql/internal/wasix/ffierrors
+github.com/james-lawrence/genieql/internal/wasix/ffiguest
 # github.com/jaypipes/ghw v0.24.0
 ## explicit; go 1.21
 github.com/jaypipes/ghw
@@ -1250,6 +1300,9 @@ github.com/pjbgf/sha1cd/ubc
 # github.com/pkg/errors v0.9.1
 ## explicit
 github.com/pkg/errors
+# github.com/pkg/profile v1.7.0
+## explicit; go 1.13
+github.com/pkg/profile
 # github.com/pkg/sftp v1.13.10
 ## go 1.23.0
 github.com/pkg/sftp
@@ -1329,6 +1382,9 @@ github.com/riywo/loginshell
 # github.com/secure-systems-lab/go-securesystemslib v0.11.0
 ## go 1.25.0
 github.com/secure-systems-lab/go-securesystemslib/encrypted
+# github.com/serenize/snaker v0.0.0-20201027110005-a7ad2135616e
+## explicit
+github.com/serenize/snaker
 # github.com/sergi/go-diff v1.3.2-0.20230802210424-5b0b94c5c0d3
 ## go 1.13
 github.com/sergi/go-diff/diffmatchpatch
@@ -1468,6 +1524,9 @@ github.com/yusufpapurcu/wmi
 # github.com/zeebo/xxh3 v1.1.0
 ## explicit; go 1.22
 github.com/zeebo/xxh3
+# github.com/zieckey/goini v0.0.0-20240615065340-08ee21c836fb
+## go 1.22.4
+github.com/zieckey/goini
 # go.opentelemetry.io/auto/sdk v1.2.1
 ## explicit; go 1.24.0
 go.opentelemetry.io/auto/sdk

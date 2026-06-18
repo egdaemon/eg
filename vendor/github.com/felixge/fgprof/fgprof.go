@@ -6,7 +6,6 @@ package fgprof
 import (
 	"fmt"
 	"io"
-	"math"
 	"runtime"
 	"sort"
 	"strings"
@@ -38,10 +37,9 @@ func Start(w io.Writer, format Format) func() error {
 	const hz = 99
 	ticker := time.NewTicker(time.Second / hz)
 	stopCh := make(chan struct{})
+
 	prof := &profiler{}
 	profile := newWallclockProfile()
-
-	var sampleCount int64
 
 	go func() {
 		defer ticker.Stop()
@@ -49,8 +47,6 @@ func Start(w io.Writer, format Format) func() error {
 		for {
 			select {
 			case <-ticker.C:
-				sampleCount++
-
 				stacks := prof.GoroutineProfile()
 				profile.Add(stacks)
 			case <-stopCh:
@@ -63,14 +59,7 @@ func Start(w io.Writer, format Format) func() error {
 		stopCh <- struct{}{}
 		endTime := time.Now()
 		profile.Ignore(prof.SelfFrames()...)
-
-		// Compute actual sample rate in case, due to performance issues, we
-		// were not actually able to sample at the given hz. Converting
-		// everything to float avoids integers being rounded in the wrong
-		// direction and improves the correctness of times in profiles.
-		duration := endTime.Sub(startTime)
-		actualHz := float64(sampleCount) / (float64(duration) / 1e9)
-		return profile.Export(w, format, int(math.Round(actualHz)), startTime, endTime)
+		return profile.Export(w, format, hz, startTime, endTime)
 	}
 }
 
@@ -80,11 +69,6 @@ type profiler struct {
 	stacks    []runtime.StackRecord
 	selfFrame *runtime.Frame
 }
-
-// nullTerminationWorkaround deals with a regression in go1.23, see:
-// - https://github.com/felixge/fgprof/issues/33
-// - https://go-review.googlesource.com/c/go/+/609815
-var nullTerminationWorkaround = runtime.Version() == "go1.23.0"
 
 // GoroutineProfile returns the stacks of all goroutines currently managed by
 // the scheduler. This includes both goroutines that are currently running
@@ -112,11 +96,6 @@ func (p *profiler) GoroutineProfile() []runtime.StackRecord {
 	// p.stacks dynamically as well, but let's not over-engineer this until we
 	// understand those cases better.
 	for {
-		if nullTerminationWorkaround {
-			for i := range p.stacks {
-				p.stacks[i].Stack0 = [32]uintptr{}
-			}
-		}
 		n, ok := runtime.GoroutineProfile(p.stacks)
 		if !ok {
 			p.stacks = make([]runtime.StackRecord, int(float64(n)*1.1))

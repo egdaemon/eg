@@ -2,6 +2,7 @@ package pgxpool
 
 import (
 	"context"
+	"sync/atomic"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -41,7 +42,7 @@ func (c *Conn) Release() {
 	// lifetime of a connection since we only check idle connections in checkConnsHealth
 	// so we also check the lifetime here and force a health check
 	if c.p.isExpired(res) {
-		c.p.lifetimeDestroyCount.Add(1)
+		atomic.AddInt64(&c.p.lifetimeDestroyCount, 1)
 		res.Destroy()
 		// Signal to the health check to run since we just destroyed a connections
 		// and we might be below minConns now

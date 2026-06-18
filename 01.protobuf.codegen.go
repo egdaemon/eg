@@ -18,4 +18,4 @@ package eg
 
 //go:generate protoc --proto_path=.proto --go_opt=Mci.authz.proto=github.com/egciorg/eg/compute --go_opt=paths=source_relative --go_out=compute ci.authz.proto
 
-//go:generate protoc --proto_path=.proto --go_opt=Meg.duckproxyv2.proto=github.com/egdaemon/eg/duckproxyv2 --go_opt=paths=source_relative --go_out=duckproxyv2 eg.duckproxyv2.proto
+//go:generate protoc --proto_path=.proto --go_opt=Meg.duckproxy.proto=github.com/egdaemon/eg/duckproxy --go_opt=paths=source_relative --go_out=duckproxy eg.duckproxy.proto

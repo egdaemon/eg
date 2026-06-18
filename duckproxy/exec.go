@@ -3,121 +3,193 @@ package duckproxy
 import (
 	"context"
 	"database/sql/driver"
-	"fmt"
+	"errors"
 	"io"
 
-	"github.com/jackc/pgx/v5/pgproto3"
+	duckdb "github.com/duckdb/duckdb-go/v2"
 )
 
-// runStatement executes stmt (already Bound, for the extended protocol; the
-// simple query protocol Binds with zero arguments itself before calling
-// this) and sends its result -- DataRow*/CommandComplete or ErrorResponse
-// -- to the client. p is nil for the simple query protocol, where every
-// column is always text.
-func (s *session) runStatement(ctx context.Context, stmt *preparedStatement, p *portal) {
-	kw := classifyTxKeyword(stmt.query)
-
-	if s.tx == txFailed && kw != txKeywordRollback && kw != txKeywordCommit {
-		s.backend.Send(errorResponse(sqlStateInFailedTransaction, errInFailedTransaction.Error()))
-		return
-	}
-
-	// Postgres silently turns a COMMIT into a ROLLBACK once the
-	// transaction block has already failed.
-	if s.tx == txFailed && kw == txKeywordCommit {
-		if _, err := s.dconn.ExecContext(ctx, "ROLLBACK", nil); err != nil {
-			s.backend.Send(toErrorResponse(err))
-			return
-		}
-		s.tx = txIdle
-		s.backend.Send(&pgproto3.CommandComplete{CommandTag: []byte("ROLLBACK")})
-		return
+// handleExec runs a non-tuple-returning statement. Unlike a Postgres-wire
+// proxy, the server never has to classify the statement itself -- the
+// client already told us it's an Exec by sending this frame, since
+// database/sql itself makes that distinction (ExecContext vs QueryContext)
+// before our driver.Conn is ever involved.
+func (s *session) handleExec(ctx context.Context, req *ExecRequest) error {
+	args, err := toNamedValues(req.GetArgs())
+	if err != nil {
+		return s.sendError(err)
 	}
 
 	ctx, cancel := s.statementContext(ctx)
-	defer func() {
-		cancel()
-		s.setCancel(nil)
-	}()
+	defer cancel()
 
-	var (
-		tag string
-		err error
-	)
-	if stmt.tuples {
-		tag, err = s.runQuery(ctx, stmt, p)
-	} else {
-		tag, err = s.runExec(ctx, stmt)
-	}
-
+	res, err := s.dconn.ExecContext(ctx, req.GetSql(), args)
 	if err != nil {
-		if s.tx != txIdle {
-			s.tx = txFailed
-		}
-		s.backend.Send(toErrorResponse(err))
-		return
+		return s.sendError(err)
 	}
 
-	switch kw {
-	case txKeywordBegin:
-		s.tx = txInTransaction
-		tag = "BEGIN"
-	case txKeywordCommit:
-		s.tx = txIdle
-		tag = "COMMIT"
-	case txKeywordRollback:
-		s.tx = txIdle
-		tag = "ROLLBACK"
-	}
-
-	s.backend.Send(&pgproto3.CommandComplete{CommandTag: []byte(tag)})
-}
-
-func (s *session) runQuery(ctx context.Context, stmt *preparedStatement, p *portal) (string, error) {
-	rows, err := stmt.stmt.QueryBound(ctx)
-	if err != nil {
-		return "", err
-	}
-	defer rows.Close()
-
-	dst := make([]driver.Value, len(stmt.columnOIDs))
-	n := 0
-	for {
-		err := rows.Next(dst)
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			return "", err
-		}
-		n++
-
-		values := make([][]byte, len(dst))
-		for i, v := range dst {
-			var format int16
-			if p != nil {
-				format = p.formatFor(i)
-			}
-			b, err := encodeValue(stmt.columnOIDs[i], format, v)
-			if err != nil {
-				return "", err
-			}
-			values[i] = b
-		}
-		s.backend.Send(&pgproto3.DataRow{Values: values})
-	}
-
-	return fmt.Sprintf("SELECT %d", n), nil
-}
-
-func (s *session) runExec(ctx context.Context, stmt *preparedStatement) (string, error) {
-	res, err := stmt.stmt.ExecBound(ctx)
-	if err != nil {
-		return "", err
-	}
 	n, err := res.RowsAffected()
 	if err != nil {
 		n = 0
 	}
-	return commandTag(stmt.stmtType, n), nil
+
+	return writeFrame(s.conn, &ServerFrame{Body: &ServerFrame_Result{Result: &ExecResponse{RowsAffected: n}}})
+}
+
+// handleQuery runs a tuple-returning statement and streams its result set
+// back one RowResponse frame per row, as DuckDB produces them -- it must
+// not buffer the whole result set before writing the first row. See the
+// package-level streaming requirement.
+func (s *session) handleQuery(ctx context.Context, req *QueryRequest) error {
+	args, err := toNamedValues(req.GetArgs())
+	if err != nil {
+		return s.sendError(err)
+	}
+
+	ctx, cancel := s.statementContext(ctx)
+	defer cancel()
+
+	rows, err := s.dconn.QueryContext(ctx, req.GetSql(), args)
+	if err != nil {
+		return s.sendError(err)
+	}
+	defer rows.Close()
+
+	if err := writeFrame(s.conn, &ServerFrame{Body: &ServerFrame_Columns{Columns: &ColumnsResponse{Names: rows.Columns()}}}); err != nil {
+		return err
+	}
+
+	dst := make([]driver.Value, len(rows.Columns()))
+	for {
+		err := rows.Next(dst)
+		if err == io.EOF {
+			return writeFrame(s.conn, &ServerFrame{Body: &ServerFrame_Done{Done: &DoneResponse{}}})
+		}
+		if err != nil {
+			return s.sendError(err)
+		}
+
+		values := make([]*Value, len(dst))
+		for i, v := range dst {
+			pv, err := toProtoValue(v)
+			if err != nil {
+				return s.sendError(err)
+			}
+			values[i] = pv
+		}
+
+		if err := writeFrame(s.conn, &ServerFrame{Body: &ServerFrame_Row{Row: &RowResponse{Values: values}}}); err != nil {
+			return err
+		}
+	}
+}
+
+// handleDescribe prepares req.Sql without executing it, purely to report
+// parameter/result type info -- needed by Postgres-wire frontends
+// (duckpgwire) for ParameterDescription/RowDescription, which neither end
+// of this protocol otherwise needs.
+func (s *session) handleDescribe(ctx context.Context, req *DescribeRequest) error {
+	ctx, cancel := s.statementContext(ctx)
+	defer cancel()
+
+	driverStmt, err := s.dconn.PrepareContext(ctx, req.GetSql())
+	if err != nil {
+		return s.sendError(err)
+	}
+	stmt := driverStmt.(*duckdb.Stmt)
+	defer stmt.Close()
+
+	st, err := stmt.StatementType()
+	if err != nil {
+		return s.sendError(err)
+	}
+	tuples := isTupleReturning(st)
+
+	numInput := stmt.NumInput()
+	params := make([]*TypeMetadata, numInput)
+	for i := range numInput {
+		pt, err := stmt.ParamType(i + 1)
+		if err != nil {
+			pt = duckdb.TYPE_INVALID
+		}
+		params[i] = &TypeMetadata{Type: uint32(pt)}
+	}
+
+	var columns []*TypeMetadata
+	if tuples {
+		colCount, err := stmt.ColumnCount()
+		if err != nil {
+			return s.sendError(err)
+		}
+		columns = make([]*TypeMetadata, colCount)
+		for i := range colCount {
+			ct, err := stmt.ColumnType(i)
+			if err != nil {
+				return s.sendError(err)
+			}
+			cn, err := stmt.ColumnName(i)
+			if err != nil {
+				return s.sendError(err)
+			}
+			columns[i] = &TypeMetadata{Name: cn, Type: uint32(ct)}
+		}
+	}
+
+	return writeFrame(s.conn, &ServerFrame{Body: &ServerFrame_Describe{Describe: &DescribeResponse{
+		Tuples:        tuples,
+		Params:        params,
+		Columns:       columns,
+		StatementType: uint32(st),
+	}}})
+}
+
+func isTupleReturning(st duckdb.StmtType) bool {
+	switch st {
+	case duckdb.STATEMENT_TYPE_SELECT, duckdb.STATEMENT_TYPE_EXPLAIN, duckdb.STATEMENT_TYPE_CALL, duckdb.STATEMENT_TYPE_PRAGMA:
+		return true
+	default:
+		return false
+	}
+}
+
+func (s *session) handleBegin(ctx context.Context) error {
+	if s.tx != nil {
+		return s.sendError(errors.New("duckproxy: transaction already in progress"))
+	}
+
+	tx, err := s.dconn.BeginTx(ctx, driver.TxOptions{})
+	if err != nil {
+		return s.sendError(err)
+	}
+
+	s.tx = tx
+	return writeFrame(s.conn, &ServerFrame{Body: &ServerFrame_Ok{Ok: &OkResponse{}}})
+}
+
+func (s *session) handleCommit() error {
+	if s.tx == nil {
+		return s.sendError(errors.New("duckproxy: no transaction in progress"))
+	}
+
+	tx := s.tx
+	s.tx = nil
+
+	if err := tx.Commit(); err != nil {
+		return s.sendError(err)
+	}
+	return writeFrame(s.conn, &ServerFrame{Body: &ServerFrame_Ok{Ok: &OkResponse{}}})
+}
+
+func (s *session) handleRollback() error {
+	if s.tx == nil {
+		return s.sendError(errors.New("duckproxy: no transaction in progress"))
+	}
+
+	tx := s.tx
+	s.tx = nil
+
+	if err := tx.Rollback(); err != nil {
+		return s.sendError(err)
+	}
+	return writeFrame(s.conn, &ServerFrame{Body: &ServerFrame_Ok{Ok: &OkResponse{}}})
 }

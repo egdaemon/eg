@@ -1,0 +1,22 @@
+#!/usr/bin/make -f
+# See debhelper(7) (uncomment to enable)
+# output every command that modifies files on the build system.
+DH_VERBOSE=1
+
+%:
+	dh $@
+
+override_dh_auto_build:
+	echo "DH AUTO BUILD OVERRIDE pkg version '${PACKAGE_VERSION}'"
+
+	cmake -B build -G Ninja \
+		-DCMAKE_BUILD_TYPE=Release \
+		-DGGML_NATIVE=OFF \
+		-DGGML_VULKAN=ON \
+		-DLLAMA_BUILD_TESTS=OFF \
+		-DLLAMA_BUILD_EXAMPLES=OFF
+	cmake --build build --config Release -j
+	DESTDIR="linux" cmake --install build --prefix="/usr"
+
+override_dh_usrlocal:
+	echo "DH usrlocal override due to overly restrict rules"

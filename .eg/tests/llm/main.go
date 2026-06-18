@@ -83,6 +83,23 @@ func main() {
 	ctx, done := context.WithTimeout(context.Background(), egenv.TTL())
 	defer done()
 
+	err := eg.Perform(
+		ctx,
+		eg.Build(eg.DefaultModule()),
+		egllm.Prepare(egllm.Runner()),
+		eg.Module(
+			ctx,
+			egllm.Runner(),
+			llm,
+		),
+	)
+
+	if err != nil {
+		log.Fatalln(err)
+	}
+}
+
+func llm(ctx context.Context, o eg.Op) error {
 	samplepath := egenv.WorkingDirectory("dynamichash.go")
 
 	writeSample := func(ctx context.Context, _ eg.Op) error {
@@ -93,21 +110,8 @@ func main() {
 	// source this from recorded coverage data.
 	seq := egautogentest.From(egautogentest.Fn{Path: samplepath, Name: "DynamicHashHour"})
 
-	err := eg.Perform(
-		ctx,
-		eg.Build(eg.DefaultModule()),
-		egllm.Prepare(egllm.Runner()),
-		eg.Module(
-			ctx,
-			egllm.Runner(),
-			eg.Sequential(
-				writeSample,
-				egautogentest.Golang{Model: model, Style: style}.Generate(seq),
-			),
-		),
-	)
-
-	if err != nil {
-		log.Fatalln(err)
-	}
+	return eg.Sequential(
+		writeSample,
+		egautogentest.Golang{Model: model, Style: style}.Generate(seq),
+	)(ctx, o)
 }

@@ -87,11 +87,11 @@ func TrustHost() eg.OpFn {
 // command to restart postgresql
 func Restart(cmd string) eg.OpFn {
 	return func(ctx context.Context, _ eg.Op) (err error) {
-		runtime := shell.Runtime().As("postgres").Timeout(5*time.Second).Environ("PAGER", "")
+		runtime := shell.Runtime().As("postgres").Timeout(time.Minute).Environ("PAGER", "")
 		return shell.Run(
 			ctx,
 			runtime.New(cmd).Privileged(),
-			runtime.New("pg_isready").Attempts(15), // 15 attempts = ~3seconds
+			runtime.New("pg_isready").Attempts(300), // 5 attempts = ~1 second
 		)
 	}
 }

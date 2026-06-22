@@ -28,3 +28,13 @@ func Reset(ctx context.Context, op eg.Op) error {
 		privileged.New("podman system prune -a -f"),
 	)
 }
+
+// ResetContainers clears the podman container/image cache without touching
+// the eg cache directory.
+func ResetContainers(ctx context.Context, op eg.Op) error {
+	privileged := shell.Runtime().Privileged().Directory("/")
+	return shell.Run(
+		ctx,
+		privileged.New("podman system prune -a -f"),
+	)
+}

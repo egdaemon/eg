@@ -36,7 +36,7 @@ func (t CmdKeyring) Run(gctx *cmdopts.Global) error {
 		return fmt.Errorf("gpg keyring generation failed: %w", err)
 	}
 
-	fmt.Printf("keyring written to %s (key id: %016X)\n", t.Directory, entity.PrimaryKey.KeyId)
+	fmt.Printf("keyring written to %s (key id: %016X, fingerprint: %X)\n", t.Directory, entity.PrimaryKey.KeyId, entity.PrimaryKey.Fingerprint)
 	fmt.Printf("to use with gpg: GNUPGHOME=%s gpg --import %s/private.asc\n", t.Directory, t.Directory)
 	return nil
 }

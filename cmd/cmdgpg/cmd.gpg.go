@@ -15,7 +15,7 @@ type CmdKeyring struct {
 	Seed      string `name:"seed" help:"seed for generating a deterministic keyring, useful for ci/cd" default:"${vars_entropy_seed}"`
 	Directory string `name:"directory" short:"d" help:"directory to write private.asc and public.asc into" default:"${vars_gpg_directory}"`
 	Name      string `name:"name" help:"identity name to embed in the key" default:"${vars_user_name}"`
-	Email     string `name:"email" help:"identity email to embed in the key" default:""`
+	Email     string `name:"email" help:"identity email to embed in the key" default:"" required:""`
 }
 
 // Run generates a deterministic GPG keyring from the given seed and writes

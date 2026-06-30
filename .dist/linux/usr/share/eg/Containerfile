@@ -20,4 +20,9 @@ RUN systemctl enable eg-daemon.service eg-daily-reload.service eg-disk-usage.ser
 RUN ssh-keyscan -H github.com >> /etc/ssh/ssh_known_hosts
 RUN ssh-keyscan -H gitlab.com >> /etc/ssh/ssh_known_hosts
 
+# TODO: gpu support...
+# generate the required json files for ROCM.
+# RUN apt-get -y install amd-container-toolkit
+# RUN amd-ctk cdi generate --output=/etc/cdi/amd.json
+
 CMD /usr/sbin/init

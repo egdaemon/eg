@@ -311,3 +311,26 @@ func LoadCredentials(ctx context.Context, vcsuri string, dir string) (transport.
 
 	return nil, nil
 }
+
+func bearer(dir, token string) string {
+	if stringsx.Present(token) {
+		return token
+	}
+
+	var httpauth compute.GitCredentialsHTTP
+	encoded, err := os.ReadFile(filepath.Join(dir, "vcsaccess.token"))
+	if err == nil {
+		if err = json.Unmarshal(encoded, &httpauth); err == nil && stringsx.Present(httpauth.Password) {
+			return httpauth.Password
+		}
+	}
+
+	return ""
+}
+
+func Bearer() string {
+	return bearer(
+		envx.String("", eg.EnvComputeRuntimeDirectory),
+		envx.String("", EnvAuthHTTPPassword, "GH_TOKEN"),
+	)
+}

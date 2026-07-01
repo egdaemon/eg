@@ -104,6 +104,28 @@ func CloneV1(dir string) func(
 	}
 }
 
+func Bearer(runtimedir string) func(
+	ctx context.Context,
+	m api.Module,
+	tokenptr uint32, tokenlen uint32,
+) (errcode uint32) {
+	return func(ctx context.Context, m api.Module, tokenptr, tokenlen uint32) uint32 {
+		token := gitx.Bearer(runtimedir)
+
+		if !m.Memory().WriteString(tokenptr, token) {
+			log.Println("failed to write bearer token")
+			return 1
+		}
+
+		if !m.Memory().WriteUint32Le(tokenlen, uint32(len(token))) {
+			log.Println("failed to write bearer token length")
+			return 1
+		}
+
+		return 0
+	}
+}
+
 func CloneV2(dir string, runtimedir string) func(
 	ctx context.Context,
 	m api.Module,

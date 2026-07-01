@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/egdaemon/eg/internal/gitx"
 	"github.com/egdaemon/eg/runtime/wasi/eg"
+	"github.com/egdaemon/eg/runtime/wasi/egunsafe/ffigit"
 	"github.com/egdaemon/eg/runtime/wasi/eggit"
 	"github.com/egdaemon/eg/runtime/wasi/shell"
 )
@@ -48,7 +48,7 @@ func ReleaseIdempotent(patterns ...string) eg.OpFn {
 		version := PatternVersion()
 
 		runtime := shell.Runtime().Environ(
-			"GH_TOKEN", gitx.Bearer(),
+			"GH_TOKEN", ffigit.Bearer(),
 		)
 
 		return shell.Run(
@@ -70,7 +70,7 @@ func Release(patterns ...string) eg.OpFn {
 		version := PatternVersion()
 
 		runtime := shell.Runtime().Environ(
-			"GH_TOKEN", gitx.Bearer(),
+			"GH_TOKEN", ffigit.Bearer(),
 		)
 
 		if shell.Run(ctx, runtime.Newf("gh release view %s", version)) != nil {
@@ -97,7 +97,7 @@ func Release(patterns ...string) eg.OpFn {
 func Upload(release string, patterns ...string) eg.OpFn {
 	return func(ctx context.Context, o eg.Op) error {
 		runtime := shell.Runtime().Environ(
-			"GH_TOKEN", gitx.Bearer(),
+			"GH_TOKEN", ffigit.Bearer(),
 		)
 
 		return shell.Run(

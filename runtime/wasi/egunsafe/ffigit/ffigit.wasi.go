@@ -21,6 +21,11 @@ func clone(
 	treeishptr unsafe.Pointer, treeishlen uint32, // string
 ) (errcode uint32)
 
+//go:wasmimport env github.com/egdaemon/eg/runtime/wasi/runtime/ffigit.Bearer
+func bearer(
+	tokenptr unsafe.Pointer, tokenlen uint32,
+) (errcode uint32)
+
 //go:wasmimport env github.com/egdaemon/eg/runtime/wasi/runtime/ffigit.CloneV2
 func clone2(
 	deadline int64, // context.Context

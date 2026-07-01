@@ -11,20 +11,14 @@ import (
 )
 
 func TestBearer(t *testing.T) {
-	t.Run("token takes precedence over file", func(t *testing.T) {
+	t.Run("returns password from token file", func(t *testing.T) {
 		dir := t.TempDir()
 		writeTokenFile(t, dir, "filetoken")
-		require.Equal(t, "tok", bearer(dir, "tok"))
+		require.Equal(t, "filetoken", Bearer(dir))
 	})
 
-	t.Run("file when token absent", func(t *testing.T) {
-		dir := t.TempDir()
-		writeTokenFile(t, dir, "filetoken")
-		require.Equal(t, "filetoken", bearer(dir, ""))
-	})
-
-	t.Run("empty when both absent", func(t *testing.T) {
-		require.Equal(t, "", bearer(t.TempDir(), ""))
+	t.Run("empty when file absent", func(t *testing.T) {
+		require.Equal(t, "", Bearer(t.TempDir()))
 	})
 }
 

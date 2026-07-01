@@ -34,14 +34,14 @@ cloud.google.com/go/iam/apiv1/iampb
 cloud.google.com/go/secretmanager/apiv1
 cloud.google.com/go/secretmanager/apiv1/secretmanagerpb
 cloud.google.com/go/secretmanager/internal
-# cyphar.com/go-pathrs v0.2.4
+# cyphar.com/go-pathrs v0.2.5
 ## go 1.18
 cyphar.com/go-pathrs
 cyphar.com/go-pathrs/internal/fdutils
 cyphar.com/go-pathrs/internal/libpathrs
 cyphar.com/go-pathrs/procfs
 # dario.cat/mergo v1.0.2
-## go 1.13
+## explicit; go 1.13
 dario.cat/mergo
 # filippo.io/bigmod v0.1.1-0.20260103110540-f8a47775ebe5
 ## explicit; go 1.23
@@ -61,14 +61,14 @@ github.com/BurntSushi/toml/internal
 ## explicit; go 1.22.0
 github.com/KimMachineGun/automemlimit/memlimit
 # github.com/Microsoft/go-winio v0.6.2
-## go 1.21
+## explicit; go 1.21
 github.com/Microsoft/go-winio
 github.com/Microsoft/go-winio/internal/fs
 github.com/Microsoft/go-winio/internal/socket
 github.com/Microsoft/go-winio/internal/stringbuffer
 github.com/Microsoft/go-winio/pkg/guid
-# github.com/ProtonMail/go-crypto v1.3.0
-## explicit; go 1.22.0
+# github.com/ProtonMail/go-crypto v1.4.1
+## explicit; go 1.23.0
 github.com/ProtonMail/go-crypto/bitcurves
 github.com/ProtonMail/go-crypto/brainpool
 github.com/ProtonMail/go-crypto/eax
@@ -258,8 +258,8 @@ github.com/chzyer/readline
 # github.com/clipperhouse/uax29/v2 v2.7.0
 ## go 1.18
 github.com/clipperhouse/uax29/v2/graphemes
-# github.com/cloudflare/circl v1.6.3
-## go 1.22.0
+# github.com/cloudflare/circl v1.6.4
+## explicit; go 1.24.0
 github.com/cloudflare/circl/dh/x25519
 github.com/cloudflare/circl/dh/x448
 github.com/cloudflare/circl/ecc/goldilocks
@@ -329,8 +329,8 @@ github.com/coreos/go-systemd/v22/journal
 github.com/coreos/go-systemd/v22/sdjournal
 # github.com/cyberphone/json-canonicalization v0.0.0-20241213102144-19d51d7fe467
 github.com/cyberphone/json-canonicalization/go/src/webpki.org/jsoncanonicalizer
-# github.com/cyphar/filepath-securejoin v0.6.1
-## go 1.18
+# github.com/cyphar/filepath-securejoin v0.7.0
+## explicit; go 1.18
 github.com/cyphar/filepath-securejoin
 github.com/cyphar/filepath-securejoin/internal/consts
 github.com/cyphar/filepath-securejoin/pathrs-lite
@@ -433,7 +433,7 @@ github.com/egdaemon/wasinet/wasinet/wnetruntime
 ## explicit; go 1.23.4
 github.com/egdaemon/wasinet/wazeronet
 # github.com/emirpasic/gods v1.18.1
-## go 1.2
+## explicit; go 1.2
 github.com/emirpasic/gods/containers
 github.com/emirpasic/gods/lists
 github.com/emirpasic/gods/lists/arraylist
@@ -457,19 +457,21 @@ github.com/fsnotify/fsnotify/internal
 ## go 1.25.5
 github.com/fsouza/go-dockerclient
 # github.com/go-git/gcfg v1.5.1-0.20230307220236-3a3c6141e376
-## go 1.13
+## explicit; go 1.13
 github.com/go-git/gcfg
 github.com/go-git/gcfg/scanner
 github.com/go-git/gcfg/token
 github.com/go-git/gcfg/types
 # github.com/go-git/go-billy/v5 v5.9.0
-## go 1.25.0
+## explicit; go 1.25.0
 github.com/go-git/go-billy/v5
 github.com/go-git/go-billy/v5/helper/chroot
 github.com/go-git/go-billy/v5/helper/polyfill
 github.com/go-git/go-billy/v5/memfs
 github.com/go-git/go-billy/v5/osfs
 github.com/go-git/go-billy/v5/util
+# github.com/go-git/go-git v4.7.0+incompatible
+## explicit
 # github.com/go-git/go-git/v5 v5.19.1
 ## explicit; go 1.25.0
 github.com/go-git/go-git/v5
@@ -563,7 +565,7 @@ github.com/gogo/protobuf/proto
 ## explicit; go 1.16
 github.com/golang-jwt/jwt/v4
 # github.com/golang/groupcache v0.0.0-20241129210726-2c02b8208cf8
-## go 1.20
+## explicit; go 1.20
 github.com/golang/groupcache/lru
 # github.com/golang/protobuf v1.5.4
 ## go 1.17
@@ -721,6 +723,7 @@ github.com/jaypipes/pcidb
 github.com/jaypipes/pcidb/internal
 github.com/jaypipes/pcidb/types
 # github.com/jbenet/go-context v0.0.0-20150711004518-d14ea06fba99
+## explicit
 github.com/jbenet/go-context/io
 # github.com/jbenet/go-temp-err-catcher v0.1.0
 ## explicit; go 1.13
@@ -737,8 +740,8 @@ github.com/json-iterator/go
 # github.com/justinas/alice v1.2.0
 ## explicit; go 1.12
 github.com/justinas/alice
-# github.com/kevinburke/ssh_config v1.5.0
-## go 1.18
+# github.com/kevinburke/ssh_config v1.6.0
+## explicit; go 1.18
 github.com/kevinburke/ssh_config
 # github.com/klauspost/compress v1.18.6
 ## go 1.24
@@ -751,8 +754,8 @@ github.com/klauspost/compress/internal/le
 github.com/klauspost/compress/internal/snapref
 github.com/klauspost/compress/zstd
 github.com/klauspost/compress/zstd/internal/xxhash
-# github.com/klauspost/cpuid/v2 v2.3.0
-## explicit; go 1.22
+# github.com/klauspost/cpuid/v2 v2.4.0
+## explicit; go 1.24.0
 github.com/klauspost/cpuid/v2
 # github.com/klauspost/pgzip v1.2.6
 github.com/klauspost/pgzip
@@ -938,6 +941,8 @@ github.com/minio/sha256-simd
 # github.com/mistifyio/go-zfs/v4 v4.0.0
 ## go 1.14
 github.com/mistifyio/go-zfs/v4
+# github.com/mitchellh/go-homedir v1.1.0
+## explicit
 # github.com/moby/buildkit v0.30.0
 ## go 1.25.5
 github.com/moby/buildkit/frontend/dockerfile/command
@@ -1223,7 +1228,7 @@ github.com/pion/webrtc/v4/internal/util
 github.com/pion/webrtc/v4/pkg/media
 github.com/pion/webrtc/v4/pkg/rtcerr
 # github.com/pjbgf/sha1cd v0.6.0
-## go 1.22
+## explicit; go 1.22
 github.com/pjbgf/sha1cd
 github.com/pjbgf/sha1cd/internal
 github.com/pjbgf/sha1cd/ubc
@@ -1309,8 +1314,8 @@ github.com/riywo/loginshell
 # github.com/secure-systems-lab/go-securesystemslib v0.11.0
 ## go 1.25.0
 github.com/secure-systems-lab/go-securesystemslib/encrypted
-# github.com/sergi/go-diff v1.3.2-0.20230802210424-5b0b94c5c0d3
-## go 1.13
+# github.com/sergi/go-diff v1.4.0
+## explicit; go 1.13
 github.com/sergi/go-diff/diffmatchpatch
 # github.com/shirou/gopsutil/v4 v4.26.4
 ## explicit; go 1.24.0
@@ -1336,7 +1341,7 @@ github.com/sigstore/sigstore/pkg/signature/payload
 ## explicit; go 1.17
 github.com/sirupsen/logrus
 # github.com/skeema/knownhosts v1.3.2
-## go 1.24.0
+## explicit; go 1.24.0
 github.com/skeema/knownhosts
 # github.com/smallstep/pkcs7 v0.1.1
 ## go 1.14
@@ -1351,6 +1356,8 @@ github.com/spf13/cobra
 # github.com/spf13/pflag v1.0.10
 ## go 1.12
 github.com/spf13/pflag
+# github.com/src-d/gcfg v1.4.0
+## explicit
 # github.com/stefanberger/go-pkcs11uri v0.0.0-20230803200340-78284954bff6
 ## go 1.19
 github.com/stefanberger/go-pkcs11uri
@@ -1440,7 +1447,7 @@ github.com/willabides/kongplete/internal/positionalpredictor
 ## explicit; go 1.20
 github.com/wlynxg/anet
 # github.com/xanzy/ssh-agent v0.3.3
-## go 1.16
+## explicit; go 1.16
 github.com/xanzy/ssh-agent
 # github.com/yusufpapurcu/wmi v1.2.4
 ## explicit; go 1.16
@@ -1731,7 +1738,7 @@ go.uber.org/zap/zapcore
 # go.yaml.in/yaml/v2 v2.4.4
 ## explicit; go 1.15
 go.yaml.in/yaml/v2
-# golang.org/x/crypto v0.52.0
+# golang.org/x/crypto v0.53.0
 ## explicit; go 1.25.0
 golang.org/x/crypto/argon2
 golang.org/x/crypto/blake2b
@@ -1772,7 +1779,7 @@ golang.org/x/mod/internal/lazyregexp
 golang.org/x/mod/modfile
 golang.org/x/mod/module
 golang.org/x/mod/semver
-# golang.org/x/net v0.55.0
+# golang.org/x/net v0.56.0
 ## explicit; go 1.25.0
 golang.org/x/net/bpf
 golang.org/x/net/context
@@ -1804,7 +1811,7 @@ golang.org/x/oauth2/google/internal/stsexchange
 golang.org/x/oauth2/internal
 golang.org/x/oauth2/jws
 golang.org/x/oauth2/jwt
-# golang.org/x/sync v0.20.0
+# golang.org/x/sync v0.21.0
 ## explicit; go 1.25.0
 golang.org/x/sync/errgroup
 golang.org/x/sync/semaphore
@@ -1822,10 +1829,10 @@ golang.org/x/telemetry/counter
 golang.org/x/telemetry/internal/counter
 golang.org/x/telemetry/internal/mmap
 golang.org/x/telemetry/internal/telemetry
-# golang.org/x/term v0.43.0
+# golang.org/x/term v0.44.0
 ## explicit; go 1.25.0
 golang.org/x/term
-# golang.org/x/text v0.37.0
+# golang.org/x/text v0.38.0
 ## explicit; go 1.25.0
 golang.org/x/text/secure/bidirule
 golang.org/x/text/transform
@@ -2029,9 +2036,14 @@ google.golang.org/protobuf/types/known/emptypb
 google.golang.org/protobuf/types/known/fieldmaskpb
 google.golang.org/protobuf/types/known/timestamppb
 google.golang.org/protobuf/types/pluginpb
+# gopkg.in/src-d/go-billy.v4 v4.3.2
+## explicit
+# gopkg.in/src-d/go-git.v4 v4.13.1
+## explicit
 # gopkg.in/tomb.v1 v1.0.0-20141024135613-dd632973f1e7
 gopkg.in/tomb.v1
 # gopkg.in/warnings.v0 v0.1.2
+## explicit
 gopkg.in/warnings.v0
 # gopkg.in/yaml.v3 v3.0.1
 ## explicit

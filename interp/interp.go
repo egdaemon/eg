@@ -142,6 +142,9 @@ func Remote(ctx context.Context, wshost workspaces.Context, aid string, runid st
 			ffigit.CloneV2(wshost.WorkingDir, wshost.RuntimeDir),
 		).Export("github.com/egdaemon/eg/runtime/wasi/runtime/ffigit.CloneV2").
 			NewFunctionBuilder().WithFunc(
+			ffigit.Bearer(wshost.RuntimeDir),
+		).Export("github.com/egdaemon/eg/runtime/wasi/runtime/ffigit.Bearer").
+			NewFunctionBuilder().WithFunc(
 			// ffimetric.Metric(evtclient),
 			ffigraph.NoopTrace,
 		).Export("github.com/egdaemon/eg/runtime/wasi/runtime/metrics.Record").

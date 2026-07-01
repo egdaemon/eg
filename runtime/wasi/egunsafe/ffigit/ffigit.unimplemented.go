@@ -16,6 +16,12 @@ func commitish(
 	return ffierrors.ErrNotImplemented
 }
 
+func bearer(
+	tokenptr unsafe.Pointer, tokenlen uint32,
+) (errcode uint32) {
+	return ffierrors.ErrNotImplemented
+}
+
 func clone(
 	deadline int64, // context.Context
 	uriptr unsafe.Pointer, urilen uint32, // string

@@ -381,7 +381,7 @@ func (t stateidle) Update(ctx context.Context) state {
 }
 
 func recover(_ context.Context, md metadata) error {
-	return fs.WalkDir(os.DirFS(md.dirs.Running), ".", func(path string, d fs.DirEntry, err error) error {
+	if err := fs.WalkDir(os.DirFS(md.dirs.Running), ".", func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
@@ -404,6 +404,27 @@ func recover(_ context.Context, md metadata) error {
 			return fs.SkipDir
 		} else if cause != nil {
 			return cause
+		}
+
+		return fs.SkipDir
+	}); err != nil {
+		return err
+	}
+
+	// on a fresh start nothing is actually running, so any stale repo-block
+	// markers left behind by a prior crash must be released, otherwise those
+	// repos would be blocked forever.
+	return fs.WalkDir(os.DirFS(md.dirs.Blocked), ".", func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+
+		if path == "." {
+			return nil
+		}
+
+		if err := md.dirs.Unblock(d.Name()); err != nil {
+			return err
 		}
 
 		return fs.SkipDir
@@ -435,6 +456,14 @@ func beginwork(ctx context.Context, md metadata, dir string) state {
 	}
 
 	log.Println("metadata", workload.Enqueued.Id)
+
+	key := cachebucket(workload.Enqueued)
+	if err := md.dirs.Block(key, dir); errors.Is(err, ErrRepoBlocked) {
+		log.Println("repo already active, deferring workload", workload.Enqueued.VcsUri)
+		return idle(md)
+	} else if err != nil {
+		return failure(md, errorsx.Wrap(err, "unable to claim repo lock"), idle(md))
+	}
 
 	md.rm.Reserve(NewRuntimeResourcesFromDequeued(workload.Enqueued))
 
@@ -668,6 +697,12 @@ func (t statediscard) Update(ctx context.Context) state {
 	defer log.Println("discard completed")
 	defer func() {
 		t.metadata.rm.Release(NewRuntimeResourcesFromDequeued(t.workload))
+	}()
+
+	defer func() {
+		if err := t.metadata.dirs.Unblock(cachebucket(t.workload)); err != nil {
+			log.Println("unable to release repo lock", err)
+		}
 	}()
 
 	if err := t.metadata.dirs.Completed(uuid.FromStringOrNil(t.workload.Id)); err != nil {

@@ -38,10 +38,8 @@ func DownloadURL(pattern string) string {
 
 // ReleaseIdempotent to github, this is experimental. it will delete any
 // release with the same version effectively replacing it. this is to make the function idempotent.
-// WARNING: for local environments this assumes you've provided the token to the eg command.
+// IMPORTANT: for local environments this assumes you've provided the token to the eg command.
 // e.g.) GH_TOKEN="$(gh auth token)" eg compute local -e GH_TOKEN
-// WARNING: for hosted environments: we've assumed the git auth access token for pulling the repository
-// will work. this has not yet been validated. and likely needs permission updates.
 func ReleaseIdempotent(patterns ...string) eg.OpFn {
 	return func(ctx context.Context, o eg.Op) error {
 		c := eggit.EnvCommit()
@@ -60,10 +58,8 @@ func ReleaseIdempotent(patterns ...string) eg.OpFn {
 }
 
 // Release to github, this is very experimental.
-// WARNING: for local environments this assumes you've provided the token to the eg command.
+// IMPORTANT: for local environments this assumes you've provided the token to the eg command.
 // e.g.) GH_TOKEN="$(gh auth token)" eg compute local -e GH_TOKEN
-// WARNING: for hosted environments: we've assumed the git auth access token for pulling the repository
-// will work. this has not yet been validated. and likely needs permission updates.
 func Release(patterns ...string) eg.OpFn {
 	return func(ctx context.Context, o eg.Op) error {
 		c := eggit.EnvCommit()
@@ -87,10 +83,8 @@ func Release(patterns ...string) eg.OpFn {
 }
 
 // Upload an asset to a github release, this is very experimental.
-// WARNING: for local environments this assumes you've provided the token to the eg command.
+// IMPORTANT: for local environments this assumes you've provided the token to the eg command.
 // e.g.) GH_TOKEN="$(gh auth token)" eg compute local -e GH_TOKEN
-// WARNING: for hosted environments: we've assumed the git auth access token for pulling the repository
-// will work. this has not yet been validated. and likely needs permission updates.
 // Usage:
 //
 //	eggithub.Upload(eggithub.PatternVersion(), "foo.txt", "bar.txt")

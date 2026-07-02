@@ -1,6 +1,7 @@
 package ffigit
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"log"
@@ -25,7 +26,7 @@ func Bearer() string {
 		log.Println("unable to get bearer token", err)
 		return ""
 	}
-	return string(ffiguest.BytesRead(tokenptr, tokenlen))
+	return string(bytes.TrimRight(ffiguest.BytesRead(tokenptr, tokenlen), "\x00"))
 }
 
 func Commitish(ctx context.Context, treeish string) string {

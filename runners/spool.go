@@ -18,6 +18,11 @@ import (
 	"github.com/pkg/errors"
 )
 
+// ErrRepoBlocked is returned by Block when another workload for the same
+// repo key is already active; the caller's item has been parked and should
+// be revisited once Unblock is called for that key.
+const ErrRepoBlocked = errorsx.String("repo workload already active")
+
 type SpoolOption func(*SpoolDirs)
 
 func SpoolOptionPopLimit(n int) SpoolOption {
@@ -33,6 +38,7 @@ type SpoolDirs struct {
 	Queued       string
 	Running      string
 	Tombstoned   string
+	Blocked      string
 	poplimit     int
 }
 
@@ -45,10 +51,11 @@ func NewSpoolDir(root string) SpoolDirs {
 		Queued:       filepath.Join(root, "q"),
 		Running:      filepath.Join(root, "r"),
 		Tombstoned:   filepath.Join(root, "t"),
+		Blocked:      filepath.Join(root, "b"),
 		poplimit:     100,
 	}
 
-	errorsx.Log(errors.Wrap(fsx.MkDirs(defaultPerms, dirs.Downloading, dirs.Queued, dirs.Running, dirs.Tombstoned), "unable to make spool directories"))
+	errorsx.Log(errors.Wrap(fsx.MkDirs(defaultPerms, dirs.Downloading, dirs.Queued, dirs.Running, dirs.Tombstoned, dirs.Blocked), "unable to make spool directories"))
 
 	return dirs
 }
@@ -146,6 +153,57 @@ func (t SpoolDirs) Completed(uid uuid.UUID) (err error) {
 		"unable to tombstone work directory: %s",
 		Queued().Dirname(uid),
 	)
+}
+
+// Block claims the repo key for the caller if it is unclaimed, by creating
+// Blocked/<key> and returning nil. If the key is already claimed, dir is
+// moved under Blocked/<key> and ErrRepoBlocked is returned so the caller
+// knows to back off rather than proceed.
+func (t SpoolDirs) Block(key, dir string) (err error) {
+	t.renamemux.Lock()
+	defer t.renamemux.Unlock()
+
+	blockeddir := filepath.Join(t.Blocked, key)
+
+	if err = os.Rename(dir, filepath.Join(blockeddir, filepath.Base(dir))); err == nil {
+		return ErrRepoBlocked
+	} else if !os.IsNotExist(err) {
+		return err
+	}
+
+	return os.Mkdir(blockeddir, t.defaultPerms)
+}
+
+// Unblock releases the repo key: any items parked under Blocked/<key> are
+// moved back into Queued, then the marker directory itself is removed. Safe
+// to call even if the key was never blocked (no-op).
+func (t SpoolDirs) Unblock(key string) (err error) {
+	t.renamemux.Lock()
+	defer t.renamemux.Unlock()
+
+	blockeddir := filepath.Join(t.Blocked, key)
+
+	if err = fs.WalkDir(os.DirFS(blockeddir), ".", func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+
+		if path == "." {
+			return nil
+		}
+
+		if err := os.Rename(filepath.Join(blockeddir, d.Name()), filepath.Join(t.Queued, d.Name())); err != nil {
+			return err
+		}
+
+		return fs.SkipDir
+	}); fsx.ErrIsNotExist(err) != nil {
+		return nil
+	} else if err != nil {
+		return err
+	}
+
+	return os.Remove(blockeddir)
 }
 
 func (t SpoolDirs) Discard(dir string) (err error) {

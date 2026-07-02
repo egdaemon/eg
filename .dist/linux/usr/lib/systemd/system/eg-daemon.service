@@ -15,7 +15,6 @@ CacheDirectory=%p
 ConfigurationDirectory=%p
 RuntimeDirectory=%p
 RuntimeDirectoryMode=0700
-# Environment=EG_PODMAN_SOCKET="unix:///var/run/user/992/podman/podman.sock"
 EnvironmentFile=-/etc/eg/daemon.env
 PermissionsStartOnly=true
 ExecStartPre=/usr/bin/loginctl enable-linger egd

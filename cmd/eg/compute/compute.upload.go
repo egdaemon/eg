@@ -182,6 +182,7 @@ func (t upload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 		AllowShared: t.HostedCompute,
 		VcsUri:      errorsx.Zero(gitx.CanonicalURI(repo, t.GitRemote)), // optionally set the vcsuri if we're inside a repository.
 		Labels:      append([]string{}, t.RuntimeResources.Labels...),
+		Description: t.Name,
 	}, archiveio)
 	if err != nil {
 		return errorsx.Wrap(err, "unable to generate multipart upload")

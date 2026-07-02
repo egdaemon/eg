@@ -44,6 +44,10 @@ func NewEnqueueUpload(enq *Enqueued, archive io.Reader) (mimetype string, body i
 			return errorsx.Wrap(err, "unable to set vcsuri")
 		}
 
+		if err = w.WriteField("description", enq.Description); err != nil {
+			return errorsx.Wrap(err, "unable to set description")
+		}
+
 		part, lerr := w.CreatePart(httpx.NewMultipartHeader("application/gzip", "archive", "archive.tar.gz"))
 		if lerr != nil {
 			return errorsx.Wrap(lerr, "unable to create archive part")

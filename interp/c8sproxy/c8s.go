@@ -69,7 +69,7 @@ func PodmanPull(ctx context.Context, name string, options ...string) (cmd *exec.
 
 func PodmanBuild(ctx context.Context, name string, dir string, definition string, options ...string) (cmd *exec.Cmd, err error) {
 	args := []string{
-		"build", "--stdin", "-t", name, "-f", definition,
+		"build", "--stdin", "--squash", "-t", name, "-f", definition,
 	}
 	args = append(args, options...)
 	args = append(args, dir)

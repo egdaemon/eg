@@ -39,6 +39,7 @@ type serve struct {
 	InvalidateCache  bool     `name:"invalidate-cache" help:"removes workload build cache"`
 	Privileged       bool     `name:"privileged" help:"run the initial container in privileged mode"`
 	Dirty            bool     `name:"dirty" help:"include user directories and environment variables" hidden:"true"`
+	Wayland          bool     `name:"wayland" help:"bind-mount the host wayland display socket into the container"`
 	EnvironmentPaths []string `name:"envpath" help:"environment files to pass to the module" default:""`
 	Environment      []string `name:"env" short:"e" help:"define environment variables and their values to be included"`
 	Secrets          []string `name:"secret" help:"List of secret URIs to use. Examples: chachasm://passphrase@/path/to/file, gcpsm://project-id/secret-name/version, awssm://secret-name?region=us-east-1"`
@@ -64,6 +65,7 @@ func (t serve) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err e
 		sshenvvar  runners.AgentOption = runners.AgentOptionNoop
 		envvar     runners.AgentOption = runners.AgentOptionNoop
 		mounthome  runners.AgentOption = runners.AgentOptionNoop
+		wayland    runners.AgentOption = runners.AgentOptionNoop
 		privileged runners.AgentOption = runners.AgentOptionNoop
 		mountegbin runners.AgentOption = runners.AgentOptionEGBin(errorsx.Must(exec.LookPath(os.Args[0])))
 	)
@@ -119,6 +121,10 @@ func (t serve) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err e
 	}
 
 	gnupghome = runners.AgentOptionLocalGPGAgent(gctx.Context, envb)
+
+	if t.Wayland {
+		wayland = runners.AgentOptionWayland(gctx.Context, envb)
+	}
 
 	if err = errorsx.Compact(envb.CopyTo(environio), environio.Close()); err != nil {
 		return errorsx.Wrap(err, "unable to generate environment")
@@ -180,6 +186,7 @@ func (t serve) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err e
 		),
 		runners.AgentOptionLocalComputeCachingVolumes(canonicaluri),
 		gnupghome, // must come after the runtime directory mount to ensure correct mounting order.
+		wayland,   // must come after the runtime directory mount to ensure correct mounting order.
 		runners.AgentOptionEnvironFile(environpath), // ensure we pick up the environment file with the container.
 		runners.AgentOptionHostOS(),
 		runners.AgentOptionPublish(t.Ports...),

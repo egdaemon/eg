@@ -71,14 +71,14 @@ func autodownload(ctx context.Context, authedclient *http.Client, m *ResourceMan
 		var (
 			err      error
 			workload *EnqueuedDequeueResponse
-			c        = m.Snapshot()
 		)
 
-		if workload, err = NewWorkloadClient(authedclient, m).Download(ctx, c); err != nil {
+		if workload, err = NewWorkloadClient(authedclient, m).Download(ctx, m.Available()); err != nil {
 			log.Println(errorsx.Wrap(err, "unable to locate workload"))
 			continue
 		}
 
+		c := m.Snapshot()
 		wants := NewRuntimeResourcesFromDequeued(workload.Enqueued)
 		if determineload(m.Limit, c.Reserve(wants)) > targetload {
 			continue

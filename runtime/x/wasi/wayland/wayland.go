@@ -29,7 +29,7 @@ func Backport() eg.OpFn {
 					cat /tmp/waypipe-client.log 2>/dev/null || true
 				'`).Privileged().Environ("WAYLAND_DISPLAY", egenv.String("", "WAYLAND_HOST_SOCKET")),
 				shell.Env().New(`sh -c '
-					nohup waypipe -s "${WAYPIPE_CTRL_SOCKET}" --display "${WAYLAND_DISPLAY}" server -- sleep infinity >/tmp/waypipe-server.log 2>&1 &
+					nohup waypipe -s "${WAYPIPE_CTRL_SOCKET}" --display "${WAYLAND_DISPLAY}" server -- sleep infinity > /tmp/waypipe-server.log 2>&1 &
 					sleep 1
 					cat /tmp/waypipe-server.log 2>/dev/null || true
 				'`),

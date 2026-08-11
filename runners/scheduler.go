@@ -35,8 +35,9 @@ func autodownload(ctx context.Context, authedclient *http.Client, m *ResourceMan
 	determineload := func(limits, consumed RuntimeResources) float64 {
 		cores := float64(consumed.Cores) / float64(limits.Cores)
 		memory := float64(consumed.Memory) / float64(limits.Memory)
-		log.Println("load", cores, memory, numericx.Max(cores, memory))
-		return numericx.Max(cores, memory)
+		vram := float64(consumed.Vram) / float64(max(limits.Vram, 1))
+		log.Println("load", cores, memory, vram, numericx.Max(cores, memory, vram))
+		return numericx.Max(cores, memory, vram)
 	}
 
 	capacity := workloadcapacity()

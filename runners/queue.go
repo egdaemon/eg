@@ -503,6 +503,10 @@ func beginwork(ctx context.Context, md metadata, dir string) state {
 
 	environpath := filepath.Join(ws.RuntimeDir, eg.EnvironFile)
 
+	// requesting vram implies the workload needs a gpu, in addition to whatever
+	// this daemon was configured with.
+	gpuenabled := md.gpu || workload.Enqueued.Vram > 0
+
 	envb := envx.Build().FromPath(environpath).
 		Var(gitx.EnvAuthEGAccessToken, workload.AccessToken).
 		Var(eg.EnvCI, "true").
@@ -510,7 +514,7 @@ func beginwork(ctx context.Context, md metadata, dir string) state {
 		Var(eg.EnvComputeAccountID, workload.Enqueued.AccountId).
 		Var(eg.EnvComputeVCS, workload.Enqueued.VcsUri).
 		Var(eg.EnvComputeTTL, time.Duration(workload.Enqueued.Ttl).String()).
-		Var(eg.EnvComputeGPU, strconv.FormatBool(md.gpu)).
+		Var(eg.EnvComputeGPU, strconv.FormatBool(gpuenabled)).
 		Var(eg.EnvComputeLoggingVerbosity, envx.String(strconv.Itoa(md.logVerbosity), eg.EnvComputeLoggingVerbosity))
 
 	// envx.Debug(errorsx.Zero(envb.Environ())...)
@@ -519,7 +523,7 @@ func beginwork(ctx context.Context, md metadata, dir string) state {
 		return completed(workload.Enqueued, md, ws, 0, errorsx.Wrap(err, "failed to update environment file"))
 	}
 
-	gpu, err := AgentOptionGPU(md.gpu)
+	gpu, err := AgentOptionGPU(gpuenabled)
 	if err != nil {
 		return completed(workload.Enqueued, md, ws, 0, errorsx.Wrap(err, "unable to configure gpu support"))
 	}

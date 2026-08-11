@@ -93,3 +93,10 @@ func (t *ResourceManager) Snapshot() RuntimeResources {
 	defer t.m.Unlock()
 	return t.Current
 }
+
+// Available returns the remaining, unreserved capacity (Limit - Current).
+func (t *ResourceManager) Available() RuntimeResources {
+	t.m.Lock()
+	defer t.m.Unlock()
+	return t.Limit.Release(t.Current)
+}

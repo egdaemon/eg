@@ -2,7 +2,9 @@ package runners
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -94,5 +96,40 @@ func TestAutoDownload(t *testing.T) {
 		for i := 1; i < len(strategy.attempts); i++ {
 			require.Equal(t, strategy.attempts[i-1]+1, strategy.attempts[i], "errors without a reset should grow the backoff attempts")
 		}
+	})
+
+	t.Run("dequeue request reports remaining capacity, not currently consumed resources", func(t *testing.T) {
+		// Bug: autodownload sent m.Snapshot() (resources currently reserved,
+		// i.e. 0 when nothing is running) as the dequeue query limits instead
+		// of the node's remaining available capacity. This starved the node
+		// down to whatever default the server falls back to when cores/memory
+		// are omitted from the request body.
+		var captured EnqueuedSearchRequest
+
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if strings.HasSuffix(r.URL.Path, "/dequeue") {
+				body, err := io.ReadAll(r.Body)
+				require.NoError(t, err)
+				require.NoError(t, json.Unmarshal(body, &captured))
+
+				errorsx.Log(httpx.WriteEmptyJSON(w, http.StatusNotFound))
+				return
+			}
+
+			errorsx.Log(httpx.WriteEmptyJSON(w, http.StatusNotFound))
+		}))
+		defer srv.Close()
+
+		limits := RuntimeResources{Cores: 4, Memory: 4 * 1024 * 1024 * 1024}
+		rm := NewResourceManager(limits)
+
+		strategy := &recordingstrategy{delay: 7 * time.Millisecond}
+		ctx, cancel := context.WithTimeout(t.Context(), 30*time.Millisecond)
+		defer cancel()
+
+		autodownload(ctx, newtestclient(t, srv), rm, strategy, NewSpoolDir(t.TempDir()))
+
+		require.Equal(t, limits.Cores, captured.Cores, "dequeue request should advertise remaining cores, not consumed cores")
+		require.Equal(t, limits.Memory, captured.Memory, "dequeue request should advertise remaining memory, not consumed memory")
 	})
 }

@@ -41,6 +41,7 @@ func init() {
 			"sudo",
 			"golang",
 			"systemd-container", // required for machinectl to be present for use within shell.New(...) commands. which allows invoking systemctl --user commands.
+			"waypipe",           // required to support --wayland passthrough.
 		),
 		egdebuild.Option.Description(
 			"configures a container for running eg workloads",

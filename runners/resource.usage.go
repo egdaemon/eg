@@ -1,16 +1,24 @@
 package runners
 
 import (
+	"log"
 	"runtime"
 	"sync"
 
+	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/pbnjay/memory"
 )
 
 func NewRuntimeResources() RuntimeResources {
+	_, vram, err := DetectGPU()
+	if err != nil {
+		log.Println(errorsx.Wrap(err, "unable to detect gpu, vram capacity defaulting to 0"))
+	}
+
 	return RuntimeResources{
 		Cores:  uint64(runtime.NumCPU()),
 		Memory: memory.TotalMemory(),
+		Vram:   vram,
 	}
 }
 
@@ -18,23 +26,27 @@ func NewRuntimeResourcesFromDequeued(d *Enqueued) RuntimeResources {
 	return RuntimeResources{
 		Cores:  d.Cores,
 		Memory: d.Memory,
+		Vram:   d.Vram,
 	}
 }
 
 type RuntimeResources struct {
 	Cores  uint64
 	Memory uint64
+	Vram   uint64
 }
 
 func (t RuntimeResources) Reserve(limits RuntimeResources) RuntimeResources {
 	t.Cores += limits.Cores
 	t.Memory += limits.Memory
+	t.Vram += limits.Vram
 	return t
 }
 
 func (t RuntimeResources) Release(limits RuntimeResources) RuntimeResources {
 	t.Cores -= limits.Cores
 	t.Memory -= limits.Memory
+	t.Vram -= limits.Vram
 	return t
 }
 

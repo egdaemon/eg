@@ -116,6 +116,7 @@ func (t WorkloadClient) Download(ctx context.Context, limits RuntimeResources) (
 			Arch:   runtime.GOARCH,
 			Cores:  limits.Cores,
 			Memory: limits.Memory,
+			Vram:   limits.Vram,
 		}
 		resp EnqueuedDequeueResponse
 	)

@@ -41,13 +41,13 @@ func main() {
 					),
 				),
 			),
-			eg.Module(
-				ctx,
-				archlinux.AURRunner(),
-				eg.Sequential(
-					archlinux.Publish,
-				),
-			),
+			// eg.Module(
+			// 	ctx,
+			// 	archlinux.AURRunner(),
+			// 	eg.Sequential(
+			// 		archlinux.Publish,
+			// 	),
+			// ),
 		),
 		func(ctx context.Context, o eg.Op) error {
 			return eggithub.Release(

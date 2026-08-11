@@ -151,6 +151,60 @@ func (t module) mounthack(ctx context.Context, runid string, ws workspaces.Conte
 	return nil
 }
 
+// bridges the host wayland compositor socket (bind-mounted read-write, but
+// root-owned from the unprivileged egd user's perspective, by
+// runners.AgentOptionWayland) to an egd-owned socket via waypipe, since
+// bindfs can't proxy live sockets the way mounthack remaps directories.
+// waypipe has no uid/gid option, so the control socket it creates as root
+// is chmod'd after the fact so the unprivileged server side can reach it.
+func (t module) waylandhack(ctx context.Context) (err error) {
+	hostsock := envx.String("", "WAYLAND_HOST_SOCKET")
+	if hostsock == "" {
+		return nil // --wayland not requested, AgentOptionWayland never set this.
+	}
+
+	ctrlsock := envx.String("/tmp/waypipe.sock", "WAYPIPE_CTRL_SOCKET")
+	display := envx.String("/tmp/wayland.sock", "WAYLAND_DISPLAY")
+
+	wbin, err := exec.LookPath("waypipe")
+	if err != nil {
+		return errorsx.Wrap(err, "unable to locate waypipe")
+	}
+
+	// client: this process is already root; it creates ctrlsock and connects
+	// out to the real (root-owned, bind-mounted) host compositor socket.
+	clientcmd := exec.CommandContext(ctx, wbin, "-s", ctrlsock, "client")
+	clientcmd.Env = append(os.Environ(), "WAYLAND_DISPLAY="+hostsock)
+	clientcmd.Stdout, clientcmd.Stderr = log.Writer(), log.Writer()
+	if err = clientcmd.Start(); err != nil {
+		return errorsx.Wrap(err, "unable to start waypipe client")
+	}
+	go func() {
+		errorsx.Log(errorsx.Wrap(clientcmd.Wait(), "waypipe client exited"))
+	}()
+
+	if err = fsx.Wait(ctx, 3*time.Second, ctrlsock); err != nil {
+		return errorsx.Wrapf(err, "waypipe control socket did not appear: %s", ctrlsock)
+	}
+
+	if err = os.Chmod(ctrlsock, 0666); err != nil {
+		return errorsx.Wrapf(err, "unable to chmod waypipe control socket: %s", ctrlsock)
+	}
+
+	// server: unprivileged (egd), connects to ctrlsock, creates the
+	// app-facing display socket that pipeline steps connect to normally.
+	servercmd := exec.CommandContext(ctx, "sudo", "-u", "egd", "-g", "egd", wbin, "-s", ctrlsock, "--display", display, "server", "--", "sleep", "infinity")
+	servercmd.Stdout, servercmd.Stderr = log.Writer(), log.Writer()
+	if err = servercmd.Start(); err != nil {
+		return errorsx.Wrap(err, "unable to start waypipe server")
+	}
+	go func() {
+		errorsx.Log(errorsx.Wrap(servercmd.Wait(), "waypipe server exited"))
+	}()
+
+	return fsx.Wait(ctx, 3*time.Second, display)
+}
+
 func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 	var (
 		ws      workspaces.Context
@@ -357,6 +411,10 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 	// and we're keen to remove it.
 	if err = t.mounthack(gctx.Context, uid, ws); err != nil {
 		return errorsx.Wrap(err, "unable to mount with correct permissions - this is a transient error that happens occassional likely due to bindfs/podman bugs")
+	}
+
+	if err = t.waylandhack(gctx.Context); err != nil {
+		return errorsx.Wrap(err, "unable to configure wayland passthrough")
 	}
 
 	if cc, err = daemons.AutoRunnerClient(gctx, ws, uid, runners.AgentOptionAutoEGBin()); err != nil {

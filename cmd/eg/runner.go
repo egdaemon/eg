@@ -5,10 +5,12 @@ import (
 	"crypto/rand"
 	"database/sql"
 	"errors"
+	"fmt"
 	"log"
 	"net"
 	"os"
 	"os/exec"
+	"os/user"
 	"path/filepath"
 	"runtime"
 	"strconv"
@@ -69,7 +71,25 @@ func (t module) mounthack(ctx context.Context, runid string, ws workspaces.Conte
 	}
 
 	remap := func(from, to string) error {
-		if envx.Boolean(true, eg.EnvExperimentalBindFsEntryTimeout) {
+		if envx.Boolean(false, eg.EnvExperimentalBindMount) {
+			egdu, err := user.Lookup("egd")
+			if err != nil {
+				return errorsx.Wrap(err, "failed to lookup user egd")
+			}
+
+			mcmd := exec.CommandContext(
+				ctx,
+				"mount",
+				"--bind",
+				fmt.Sprintf("--map-users=0:%s:1", egdu.Uid),
+				fmt.Sprintf("--map-groups=0:%s:1", egdu.Gid),
+				from,
+				to,
+			)
+			if err = execx.MaybeRun(mcmd); err != nil {
+				return errorsx.Wrapf(err, "unable to run bindfs: %s", from)
+			}
+		} else if envx.Boolean(true, eg.EnvExperimentalBindFsEntryTimeout) {
 			mcmd := exec.CommandContext(ctx, mbin, "--map=root/egd:@root/@egd", "-o", "entry_timeout=0", from, to)
 			if err = execx.MaybeRun(mcmd); err != nil {
 				return errorsx.Wrapf(err, "unable to run bindfs: %s", from)

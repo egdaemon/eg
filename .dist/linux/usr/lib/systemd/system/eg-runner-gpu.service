@@ -1,0 +1,31 @@
+[Unit]
+Description=eg runner container
+After=network.target
+Requires=eg-runner-build.service
+
+[Service]
+ProtectKernelModules=yes
+PrivateMounts=yes
+# interfers with ip v6 support. narrow to just the 169.254.x.x range
+# will need to add the aws metadata ipv6 address at some point.
+IPAddressDeny=169.254.0.0/16
+#IPAddressDeny=link-local
+#IPAddressDeny=multicast
+Restart=on-failure
+CacheDirectory=%p
+ConfigurationDirectory=%p
+RuntimeDirectory=%p
+RuntimeDirectoryMode=0700
+Environment=EG_RUNNER_CPU=2
+Environment=EG_RUNNER_MEMORY=2g
+Environment=EG_RUNNER_OVERRIDE_DIR=rootfs
+Environment=EG_RUNNER_DAEMON_ENV=/etc/eg/daemon.env
+EnvironmentFile=-/etc/eg/runner.env
+ExecStartPre=/usr/bin/echo ${EG_RUNNER_DAEMON_ENV} --cpus ${EG_RUNNER_CPU} --memory ${EG_RUNNER_MEMORY}
+# ensure the cdi directory exists for use by --volume. even if there isnt a gpu available.
+ExecStartPre=/usr/bin/mkdir -p /etc/cdi
+ExecStart=/usr/bin/podman run --replace --name eg-runner --privileged --gpus=all --cap-add=sys_admin,mknod --security-opt label=disable --device /dev/fuse --pids-limit=-1 --hostname eg-runner-%m --volume /etc/eg/daemon.env:/etc/eg/daemon.env:ro --volume /etc/cdi:/etc/cdi:ro --volume %C/%p:/var/cache/eg-daemon:rw --attach STDERR --no-healthcheck --cpus ${EG_RUNNER_CPU} --memory ${EG_RUNNER_MEMORY} --userns host eg.runner:latest /sbin/init
+ExecStop=/usr/bin/podman stop eg
+
+[Install]
+WantedBy=default.target

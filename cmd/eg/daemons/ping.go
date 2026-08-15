@@ -29,7 +29,7 @@ func Ping(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, runtimecfg *cmdopts.Run
 		return errorsx.String("an account id is required to register the daemon")
 	}
 
-	tokensrc := compute.NewAuthzTokenSource(tlsc.DefaultClient(), s, authn.EndpointCompute())
+	tokensrc := compute.NewAuthzTokenSource(tlsc.DefaultClient(), s, authn.EndpointCompute(), aid)
 	authclient := oauth2.NewClient(
 		context.WithValue(gctx.Context, oauth2.HTTPClient, tlsc.DefaultClient()),
 		tokensrc,

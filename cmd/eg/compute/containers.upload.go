@@ -203,7 +203,7 @@ func (t c8sUpload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error
 	defer buf.Close()
 
 	c := httpx.BindRetryTransport(tlsc.DefaultClient(), http.StatusTooManyRequests, http.StatusBadGateway)
-	tokensrc := compute.NewAuthzTokenSource(c, signer, authn.EndpointCompute())
+	tokensrc := compute.NewAuthzTokenSource(c, signer, authn.EndpointCompute(), gctx.AccountID)
 	chttp := oauth2.NewClient(
 		context.WithValue(gctx.Context, oauth2.HTTPClient, c),
 		tokensrc,

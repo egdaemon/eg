@@ -2,6 +2,7 @@ package actl
 
 import (
 	"context"
+	"net/http"
 
 	"github.com/egdaemon/eg/authn"
 	"github.com/egdaemon/eg/cmd/cmdopts"
@@ -12,11 +13,6 @@ import (
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/oauth2"
 )
-
-type AuthorizeAgent struct {
-	Seed AuthorizeSecret `cmd:"" help:"register a signing secret"`
-	ID   AuthorizeManual `cmd:"" help:"register using the id provided by the daemon without knowing the secret"`
-}
 
 type AuthorizeSecret struct {
 	Seed       string `arg:"" name:"seed" placeholder:"00000000-0000-0000-0000-000000000000"`
@@ -51,41 +47,15 @@ func (t AuthorizeSecret) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, entr
 		return err
 	}
 
-	tokensrc := compute.NewAuthzTokenSource(tlsc.DefaultClient(), signer, authn.EndpointCompute())
+	return t.run(gctx.Context, tlsc.DefaultClient(), gctx.AccountID, regid, signer)
+}
 
-	ctx := context.WithValue(gctx.Context, oauth2.HTTPClient, tlsc.DefaultClient())
-	httpc := oauth2.NewClient(ctx, tokensrc)
+func (t AuthorizeSecret) run(ctx context.Context, c *http.Client, account, regid string, signer ssh.Signer) (err error) {
+	tokensrc := compute.NewAuthzTokenSource(c, signer, authn.EndpointCompute(), account)
+	httpc := oauth2.NewClient(context.WithValue(ctx, oauth2.HTTPClient, c), tokensrc)
 
 	rc := registration.NewRegistrationClient(httpc)
 	if _, err = rc.Grant(ctx, &registration.RegistrationGrantRequest{Registration: &registration.Registration{Id: regid}, Global: t.Shared}); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-type AuthorizeManual struct {
-	ID         string `arg:"" name:"id" help:"grant authorization to compute" required:""`
-	SSHKeyPath string `name:"sshkeypath" help:"path to ssh key to use" default:"${vars_ssh_key_path}"`
-	Shared     bool   `name:"shared" help:"this setting is only useful for registering global runners and is a noop everywhere else" hidden:"true"`
-}
-
-func (t AuthorizeManual) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
-	var (
-		signer ssh.Signer
-	)
-
-	if signer, err = sshx.AutoCached(sshx.NewKeyGen(), t.SSHKeyPath); err != nil {
-		return err
-	}
-
-	tokensrc := compute.NewAuthzTokenSource(tlsc.DefaultClient(), signer, authn.EndpointCompute())
-
-	ctx := context.WithValue(gctx.Context, oauth2.HTTPClient, tlsc.DefaultClient())
-	httpc := oauth2.NewClient(ctx, tokensrc)
-
-	rc := registration.NewRegistrationClient(httpc)
-	if _, err = rc.Grant(ctx, &registration.RegistrationGrantRequest{Registration: &registration.Registration{Id: t.ID}, Global: t.Shared}); err != nil {
 		return err
 	}
 

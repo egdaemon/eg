@@ -6,7 +6,9 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 
@@ -58,8 +60,8 @@ func OAuth2SSHToken(ctx context.Context, signer ssh.Signer, endpoint oauth2.Endp
 	return cfg, tok, err
 }
 
-func ExchangeAuthed(ctx context.Context, chttp *http.Client, endpoint string, authed *Authed) (err error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, nil)
+func ExchangeAuthed(ctx context.Context, chttp *http.Client, endpoint string, body io.Reader, authed *Authed) (err error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, body)
 	if err != nil {
 		return err
 	}
@@ -74,6 +76,25 @@ func ExchangeAuthed(ctx context.Context, chttp *http.Client, endpoint string, au
 	}
 
 	return nil
+}
+
+// LoginOptionsToken fetches a signed login options token (carrying, e.g., a
+// requested account id) from the server. The response is passed through
+// unmodified as raw JSON so it can be forwarded directly as the request body
+// of ExchangeAuthed.
+func LoginOptionsToken(ctx context.Context, c *http.Client, accountId string) (token json.RawMessage, err error) {
+	uri := fmt.Sprintf("%s/authn/s/?account_id=%s", eg.EnvAPIHostDefault(), url.QueryEscape(accountId))
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, uri, nil)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := httpx.AsError(c.Do(req))
+	if err != nil {
+		return nil, err
+	}
+	defer httpx.AutoClose(resp)
+
+	return io.ReadAll(resp.Body)
 }
 
 func AutoTokenState(signer ssh.Signer) (encoded string, err error) {

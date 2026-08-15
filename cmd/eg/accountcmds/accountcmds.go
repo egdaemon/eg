@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 
@@ -41,8 +42,8 @@ func signup(ctx context.Context, chttp *http.Client, authed *authn.Authed) (err 
 	return nil
 }
 
-func loginssh(ctx context.Context, chttp *http.Client, authed *authn.Authed) (err error) {
-	return authn.ExchangeAuthed(ctx, chttp, fmt.Sprintf("%s/authn/ssh", eg.EnvAPIHostDefault()), authed)
+func loginssh(ctx context.Context, chttp *http.Client, options io.Reader, authed *authn.Authed) (err error) {
+	return authn.ExchangeAuthed(ctx, chttp, fmt.Sprintf("%s/authn/ssh", eg.EnvAPIHostDefault()), options, authed)
 }
 
 func session(ctx context.Context, chttp *http.Client, authed *authn.Authn) (err error) {

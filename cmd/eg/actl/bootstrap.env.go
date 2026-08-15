@@ -6,11 +6,11 @@ import (
 	"io"
 	"log"
 	"math/rand/v2"
-	"os"
 	"runtime"
 	"strconv"
 	"strings"
 
+	"github.com/alecthomas/kong"
 	_eg "github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/cmd/cmdopts"
 	"github.com/egdaemon/eg/internal/bytesx"
@@ -33,7 +33,7 @@ type BootstrapEnvRunner struct {
 	runtimecfg cmdopts.RuntimeResources
 }
 
-func (t BootstrapEnvRunner) Run(gctx *cmdopts.Global) (err error) {
+func (t BootstrapEnvRunner) Run(kctx *kong.Context, gctx *cmdopts.Global) (err error) {
 	memory := bytesx.Unit(numericx.Max(uint64(t.runtimecfg.Memory), uint64(float64(memory.TotalMemory())*0.9)))
 
 	_, gpuvram, err := runners.DetectGPU()
@@ -49,7 +49,7 @@ func (t BootstrapEnvRunner) Run(gctx *cmdopts.Global) (err error) {
 		"EG_RUNNER_MEMORY", fmt.Sprintf("%v", memory),
 	).Var(
 		"EG_RUNNER_VRAM", fmt.Sprintf("%v", vram),
-	).CopyTo(os.Stdout)
+	).CopyTo(kctx.Stdout)
 }
 
 type BootstrapEnvDaemon struct {
@@ -59,7 +59,7 @@ type BootstrapEnvDaemon struct {
 	Workers   uint64 `name:"workers" help:"specify the maximum concurrent workload capacity"`
 }
 
-func (t BootstrapEnvDaemon) Run(gctx *cmdopts.Global) (err error) {
+func (t BootstrapEnvDaemon) Run(kctx *kong.Context, gctx *cmdopts.Global) (err error) {
 	memory := numericx.Max(uint64(t.Memory), uint64(float64(memory.TotalMemory())*0.9))
 	prng := cryptox.NewChaCha8(langx.FirstNonZero(t.Seed, uuid.Must(uuid.NewV4()).String()))
 
@@ -104,5 +104,5 @@ func (t BootstrapEnvDaemon) Run(gctx *cmdopts.Global) (err error) {
 		)
 	}
 
-	return environ.CopyTo(os.Stdout)
+	return environ.CopyTo(kctx.Stdout)
 }

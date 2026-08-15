@@ -14,7 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestBootstrapEnvDaemonAccountDefault(t *testing.T) {
+func TestBootstrapEnvDaemon(t *testing.T) {
 	t.Run("account default resolves from vars_account_id at parse time", func(t *testing.T) {
 		var out bytes.Buffer
 		genparser := cmdtestx.Genparser(actl.BootstrapEnvDaemon{},

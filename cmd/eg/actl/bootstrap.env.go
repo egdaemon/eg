@@ -1,11 +1,8 @@
 package actl
 
 import (
-	"encoding/base64"
 	"fmt"
-	"io"
 	"log"
-	"math/rand/v2"
 	"runtime"
 	"strconv"
 	"strings"
@@ -14,13 +11,10 @@ import (
 	_eg "github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/cmd/cmdopts"
 	"github.com/egdaemon/eg/internal/bytesx"
-	"github.com/egdaemon/eg/internal/cryptox"
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
-	"github.com/egdaemon/eg/internal/langx"
 	"github.com/egdaemon/eg/internal/numericx"
 	"github.com/egdaemon/eg/runners"
-	"github.com/gofrs/uuid/v5"
 	"github.com/pbnjay/memory"
 )
 
@@ -55,15 +49,14 @@ func (t BootstrapEnvRunner) Run(kctx *kong.Context, gctx *cmdopts.Global) (err e
 type BootstrapEnvDaemon struct {
 	cmdopts.RuntimeResources
 	AccountID string `name:"account" help:"account to register runner with" default:"${vars_account_id}" required:"true"`
-	Seed      string `name:"seed" help:"used to ensure a consistent secret is used, this is a sensitive value" placeholder:"00000000-0000-0000-0000-000000000000"`
+	Seed      string `name:"seed" help:"used to ensure a consistent secret is used, this is a sensitive value" default:"${vars_entropy_seed}" placeholder:"00000000-0000-0000-0000-000000000000"`
 	Workers   uint64 `name:"workers" help:"specify the maximum concurrent workload capacity"`
 }
 
-func (t BootstrapEnvDaemon) Run(kctx *kong.Context, gctx *cmdopts.Global) (err error) {
+func (t BootstrapEnvDaemon) Run(kctx *kong.Context, gctx *cmdopts.Global, entropy cmdopts.Entropy) (err error) {
 	memory := numericx.Max(uint64(t.Memory), uint64(float64(memory.TotalMemory())*0.9))
-	prng := cryptox.NewChaCha8(langx.FirstNonZero(t.Seed, uuid.Must(uuid.NewV4()).String()))
 
-	seed, err := io.ReadAll(io.LimitReader(prng, rand.New(prng).Int64N(128)))
+	seed, err := entropy(t.Seed)
 	if err != nil {
 		return errorsx.Wrap(err, "failed to generate entropy")
 	}
@@ -81,7 +74,7 @@ func (t BootstrapEnvDaemon) Run(kctx *kong.Context, gctx *cmdopts.Global) (err e
 	environ := envx.Build().Var(
 		"EG_ACCOUNT", t.AccountID,
 	).Var(
-		"EG_ENTROPY_SEED", base64.RawURLEncoding.EncodeToString(seed),
+		"EG_ENTROPY_SEED", seed,
 	).Var(
 		"EG_RESOURCES_CORES", strconv.FormatUint(numericx.Max(uint64(runtime.NumCPU()), t.Cores), 10),
 	).Var(

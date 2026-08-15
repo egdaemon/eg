@@ -42,9 +42,13 @@ type daemon struct {
 	EnvVars       []string `name:"env" short:"e" help:"environment variables to import"`
 }
 
+func (t daemon) signer(keygen cmdopts.KeyGenSeeded) (ssh.Signer, error) {
+	return sshx.AutoCached(keygen(t.Seed), t.SSHKeyPath)
+}
+
 // essentially we use ssh forwarding from the control plane to the local http server
 // allowing the control plane to interogate
-func (t daemon) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
+func (t daemon) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, keygen cmdopts.KeyGenSeeded) (err error) {
 	var (
 		signer     ssh.Signer
 		httpl      net.Listener
@@ -67,7 +71,7 @@ func (t daemon) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 		return err
 	}
 
-	if signer, err = sshx.AutoCached(sshx.NewKeyGenSeeded(t.Seed), t.SSHKeyPath); err != nil {
+	if signer, err = t.signer(keygen); err != nil {
 		return errorsx.Wrap(err, "unable to retrieve identity credentials")
 	}
 

@@ -19,8 +19,9 @@ func TestBootstrapEnvDaemonAccountDefault(t *testing.T) {
 		var out bytes.Buffer
 		genparser := cmdtestx.Genparser(actl.BootstrapEnvDaemon{},
 			cmdopts.RuntimeResources{}.KongVars(),
-			kong.Vars{"vars_account_id": "expected-account"},
+			kong.Vars{"vars_account_id": "expected-account", "vars_entropy_seed": "expected-seed"},
 			kong.Writers(&out, nil),
+			kong.Bind(cmdopts.Entropy(cmdopts.GenerateEntropy)),
 		)
 
 		require.NoError(t, cmdtestx.Execute(t, genparser(t), "command"))
@@ -45,8 +46,9 @@ func TestBootstrapEnvDaemonAccountDefault(t *testing.T) {
 		var out bytes.Buffer
 		genparser := cmdtestx.Genparser(actl.BootstrapEnvDaemon{},
 			cmdopts.RuntimeResources{}.KongVars(),
-			kong.Vars{"vars_account_id": "expected-account"},
+			kong.Vars{"vars_account_id": "expected-account", "vars_entropy_seed": "expected-seed"},
 			kong.Writers(&out, nil),
+			kong.Bind(cmdopts.Entropy(cmdopts.GenerateEntropy)),
 		)
 
 		require.NoError(t, cmdtestx.Execute(t, genparser(t), "command"))

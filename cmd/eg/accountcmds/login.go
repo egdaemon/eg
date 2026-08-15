@@ -27,8 +27,6 @@ type Login struct {
 func (t Login) Run(gctx *cmdopts.Global, tlscfg *cmdopts.TLSConfig) (err error) {
 	var (
 		signer ssh.Signer
-		cfg    oauth2.Config
-		authed authn.Authed
 	)
 
 	if signer, err = sshx.AutoCached(sshx.NewKeyGenSeeded(t.Seed), t.SSHKeyPath); err != nil {
@@ -37,14 +35,20 @@ func (t Login) Run(gctx *cmdopts.Global, tlscfg *cmdopts.TLSConfig) (err error) 
 
 	chttp := httpx.BindRetryTransport(tlscfg.DefaultClient(), http.StatusTooManyRequests, http.StatusBadGateway)
 	ctx := context.WithValue(gctx.Context, oauth2.HTTPClient, chttp)
-	cfg = authn.OAuth2SSHConfig(signer, "", authn.EndpointSSHAuth())
+	cfg := authn.OAuth2SSHConfig(signer, "", authn.EndpointSSHAuth())
 
 	refreshtoken, err := authn.AutoRefreshToken(ctx, signer)
 	if err != nil {
 		return errorsx.WithStack(err)
 	}
 
-	if err = loginssh(ctx, cfg.Client(ctx, refreshtoken), &authed); err != nil {
+	return t.run(ctx, cfg.Client(ctx, refreshtoken), chttp, signer)
+}
+
+func (t Login) run(ctx context.Context, oauthc *http.Client, chttp *http.Client, signer ssh.Signer) (err error) {
+	var authed authn.Authed
+
+	if err = loginssh(ctx, oauthc, &authed); err != nil {
 		return err
 	}
 

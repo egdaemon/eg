@@ -92,7 +92,7 @@ func Register(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, runtimecfg *cmdopts
 		}
 
 		if ts := time.Now(); authzedts.After(ts) {
-			debugx.Println("authzed timestamp", authzedts, "<", ts)
+			debugx.Println("authzed timestamp", authzedts, ">", ts)
 			log.Printf("waiting for registration to be accepted. run `eg actl authorize id '%s'` to accept\n", md5x.String(fingerprint))
 			continue
 		}

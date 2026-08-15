@@ -15,7 +15,7 @@ func TestDeterministic(t *testing.T) {
 		bits     int
 		expected string
 	}{
-		{"example 1", "helloworld", 4096, "88b3d0f71f96aedc008771cdb2706626"},
+		{"example 1", "helloworld", 4096, "e6dc771f6e05513c0f80fef59f643491"},
 	} {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {

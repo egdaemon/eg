@@ -35,6 +35,7 @@ import (
 	"github.com/egdaemon/eg/internal/gitx"
 	"github.com/egdaemon/eg/internal/gpgx"
 	"github.com/egdaemon/eg/internal/osx"
+	"github.com/egdaemon/eg/internal/sshx"
 	"github.com/egdaemon/eg/internal/stringsx"
 	"github.com/egdaemon/eg/internal/tracex"
 	"github.com/egdaemon/eg/internal/userx"
@@ -162,6 +163,8 @@ func main() {
 			&shellcli.Global,
 			&shellcli.TLSConfig,
 			new(cmdopts.HotswapPath),
+			cmdopts.Entropy(cmdopts.GenerateEntropy),
+			cmdopts.KeyGenSeeded(sshx.NewKeyGenSeeded),
 		),
 		kong.TypeMapper(reflect.TypeOf(&net.IP{}), kong.MapperFunc(cmdopts.ParseIP)),
 		kong.TypeMapper(reflect.TypeOf(&net.TCPAddr{}), kong.MapperFunc(cmdopts.ParseTCPAddr)),

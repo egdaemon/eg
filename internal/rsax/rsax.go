@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/egdaemon/eg/internal/cryptox"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/fsx"
 )
@@ -88,10 +89,10 @@ func AutoDeterministic(key []byte) (pkey []byte, err error) {
 	return Deterministic(key, defaultBits)
 }
 
-// Deterministic rsa private key based on the seed. uses a SHA512 hash as
-// a csprng.
+// Deterministic rsa private key based on the seed. uses a SHA256-seeded
+// ChaCha8 csprng.
 func Deterministic(seed []byte, bits int) (pkey []byte, err error) {
-	return generate(NewSHA512CSPRNG(seed), bits, deterministicGenerateKey)
+	return generate(cryptox.NewChaCha8(seed), bits, deterministicGenerateKey)
 }
 
 // UnsafeAuto generates a ssh key using unsafe defaults, this method is used to

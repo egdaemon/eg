@@ -24,12 +24,24 @@ type AuthorizeSecret struct {
 	Shared     bool   `name:"shared" help:"this setting is only useful for registering global runners and is a noop everywhere else" hidden:"true"`
 }
 
-func (t AuthorizeSecret) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
+// Signer derives this command's identity: its own explicit seed, run through
+// the injected Entropy once, then through the injected keygen -- exported so
+// it can be compared directly against daemon's equivalent in a cohesion test,
+// with no network calls involved.
+func (t AuthorizeSecret) Signer(entropy cmdopts.Entropy, keygen cmdopts.KeyGenSeeded) (ssh.Signer, error) {
+	derived, err := entropy(t.Seed)
+	if err != nil {
+		return nil, err
+	}
+	return sshx.SignerFromGenerator(keygen(derived))
+}
+
+func (t AuthorizeSecret) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, entropy cmdopts.Entropy, keygen cmdopts.KeyGenSeeded) (err error) {
 	var (
 		signer ssh.Signer
 	)
 
-	if signer, err = sshx.SignerFromGenerator(sshx.NewKeyGenSeeded(t.Seed)); err != nil {
+	if signer, err = t.Signer(entropy, keygen); err != nil {
 		return err
 	}
 

@@ -26,6 +26,7 @@ import (
 
 type Global struct {
 	Verbosity int                     `help:"increase verbosity of logging" short:"v" type:"counter" default:"0" env:"EG_LOGGING_VERBOSITY"`
+	AccountID string                  `name:"account-id" help:"optional account id to use, disambiguates when the ssh key is associated with multiple profiles" env:"EG_ACCOUNT"`
 	Context   context.Context         `kong:"-"`
 	Shutdown  context.CancelCauseFunc `kong:"-"`
 	Cleanup   *sync.WaitGroup         `kong:"-"`

@@ -190,7 +190,7 @@ func (t upload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 	defer buf.Close()
 
 	c := tlsc.DefaultClient()
-	tokensrc := compute.NewAuthzTokenSource(tlsc.DefaultClient(), signer, authn.EndpointCompute())
+	tokensrc := compute.NewAuthzTokenSource(tlsc.DefaultClient(), signer, authn.EndpointCompute(), gctx.AccountID)
 	chttp := oauth2.NewClient(
 		context.WithValue(gctx.Context, oauth2.HTTPClient, c),
 		tokensrc,

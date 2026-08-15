@@ -84,7 +84,7 @@ func (t daemon) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, keygen cmdopt
 	}
 
 	c := httpx.BindRetryTransport(tlsc.DefaultClient(), http.StatusTooManyRequests, http.StatusBadGateway)
-	tokensrc := compute.NewAuthzTokenSource(c, signer, authn.EndpointCompute())
+	tokensrc := compute.NewAuthzTokenSource(c, signer, authn.EndpointCompute(), t.AccountID)
 	authclient = oauth2.NewClient(
 		context.WithValue(gctx.Context, oauth2.HTTPClient, c),
 		tokensrc,

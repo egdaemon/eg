@@ -39,7 +39,7 @@ func (t OTP) Run(gctx *cmdopts.Global, tlscfg *cmdopts.TLSConfig) (err error) {
 	if err != nil {
 		return errorsx.WithStack(err)
 	}
-	if err = loginssh(ctx, cfg.Client(ctx, refreshtoken), &authed); err != nil {
+	if err = loginssh(ctx, cfg.Client(ctx, refreshtoken), nil, &authed); err != nil {
 		return err
 	}
 

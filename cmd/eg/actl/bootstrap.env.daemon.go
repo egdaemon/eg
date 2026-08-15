@@ -19,7 +19,7 @@ import (
 
 type BootstrapEnvDaemon struct {
 	cmdopts.RuntimeResources
-	AccountID string `name:"account" help:"account to register runner with" default:"${vars_account_id}" required:"true"`
+	AccountID string `name:"account" help:"account to register runner with" default:"${vars_account_id}" env:"EG_ACCOUNT" required:"true"`
 	Seed      string `name:"seed" help:"used to ensure a consistent secret is used, this is a sensitive value" default:"${vars_entropy_seed}" placeholder:"00000000-0000-0000-0000-000000000000"`
 	Workers   uint64 `name:"workers" help:"specify the maximum concurrent workload capacity"`
 }

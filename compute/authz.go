@@ -1,9 +1,11 @@
 package compute
 
 import (
+	"bytes"
 	context "context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"time"
 
@@ -37,14 +39,15 @@ func (t *Token) UnmarshalJSON(b []byte) error {
 	return protojson.Unmarshal(b, t)
 }
 
-func NewAuthzTokenSource(c *http.Client, signer ssh.Signer, endpoint string) TokenSourceFromEndpoint {
-	return TokenSourceFromEndpoint{c: c, signer: signer, endpoint: endpoint}
+func NewAuthzTokenSource(c *http.Client, signer ssh.Signer, endpoint string, account string) TokenSourceFromEndpoint {
+	return TokenSourceFromEndpoint{c: c, signer: signer, endpoint: endpoint, account: account}
 }
 
 type TokenSourceFromEndpoint struct {
 	c        *http.Client
 	endpoint string
 	signer   ssh.Signer
+	account  string
 }
 
 func (t TokenSourceFromEndpoint) Token() (_ *oauth2.Token, err error) {
@@ -78,12 +81,24 @@ func (t TokenSourceFromEndpoint) Token() (_ *oauth2.Token, err error) {
 	cfg := authn.OAuth2SSHConfig(t.signer, "", authn.EndpointSSHAuth())
 	chttp := cfg.Client(context.WithValue(ctx, oauth2.HTTPClient, t.c), refreshtoken)
 
-	if err = authn.ExchangeAuthed(ctx, chttp, fmt.Sprintf("%s/authn/ssh", eg.EnvAPIHostDefault()), &authed); err != nil {
+	var options io.Reader
+	if t.account != "" {
+		token, err := authn.LoginOptionsToken(ctx, chttp, t.account)
+		if err != nil {
+			return nil, errorsx.Wrap(err, "unable to fetch login options")
+		}
+		options = bytes.NewReader(token)
+	}
+
+	if err = authn.ExchangeAuthed(ctx, chttp, fmt.Sprintf("%s/authn/ssh", eg.EnvAPIHostDefault()), options, &authed); err != nil {
 		return nil, errorsx.Wrap(err, "exchange failed")
 	}
 
-	if len(authed.Profiles) != 1 {
-		return nil, fmt.Errorf("expected a single profile: %s - %d", authed.Identity.Id, len(authed.Profiles))
+	if len(authed.Profiles) == 0 {
+		return nil, fmt.Errorf("identity %s is not associated with any profiles", authed.Identity.Id)
+	}
+	if len(authed.Profiles) > 1 {
+		return nil, fmt.Errorf("multiple profiles are associated with this ssh key; specify one with --account: %s", authed.Identity.Id)
 	}
 
 	session, err := authn.Session(ctx, t.c, authed.Profiles[0].Token)

@@ -98,7 +98,7 @@ func (t TokenSourceFromEndpoint) Token() (_ *oauth2.Token, err error) {
 		return nil, fmt.Errorf("identity %s is not associated with any profiles", authed.Identity.Id)
 	}
 	if len(authed.Profiles) > 1 {
-		return nil, fmt.Errorf("multiple profiles are associated with this ssh key; specify one with --account: %s", authed.Identity.Id)
+		return nil, fmt.Errorf("multiple profiles are associated with this ssh key; specify one with --account-id: %s", authed.Identity.Id)
 	}
 
 	session, err := authn.Session(ctx, t.c, authed.Profiles[0].Token)

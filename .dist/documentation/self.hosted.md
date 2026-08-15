@@ -58,6 +58,8 @@ eg secrets env --uri file:///tmp/daemon.secret -- \
 # clean up the plaintext secret file now that it's no longer needed.
 rm -f /tmp/daemon.secret
 
+# build the runner's container.
+systemctl start eg-runner-build.service
 # enable the service and start it immediately
 systemctl enable --now eg-runner.service
 ```

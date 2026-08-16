@@ -102,12 +102,17 @@ func choosehuh(profiles []*authn.Authn) (*authn.Authn, error) {
 
 	options := make([]huh.Option[*authn.Authn], 0, len(profiles))
 	for _, p := range profiles {
-		options = append(options, huh.NewOption(stringsx.DefaultIfBlank(p.Profile.Display, p.Profile.Id), p))
+		label := fmt.Sprintf(
+			"%s (account: %s)",
+			stringsx.DefaultIfBlank(p.Profile.Display, p.Profile.Id),
+			p.Profile.AccountId,
+		)
+		options = append(options, huh.NewOption(label, p))
 	}
 
 	var selected *authn.Authn
 	prompt := huh.NewSelect[*authn.Authn]().
-		Title("multiple profiles found, select one to login with").
+		Title("select the profile to login with").
 		Options(options...).
 		Value(&selected)
 

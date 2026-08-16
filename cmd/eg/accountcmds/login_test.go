@@ -122,8 +122,8 @@ func TestLoginRun(t *testing.T) {
 		oauthc := httptestx.NewTestClient(func(req *http.Request) *http.Response {
 			encoded, err := json.Marshal(authn.Authed{
 				Profiles: []*authn.Authn{
-					{Token: "token-1", Profile: &authn.Profile{Id: "profile-1"}},
-					{Token: "token-2", Profile: &authn.Profile{Id: "profile-2"}},
+					{Token: "token-1", Profile: &authn.Profile{Id: "profile-1", AccountId: "account-1"}},
+					{Token: "token-2", Profile: &authn.Profile{Id: "profile-2", AccountId: "account-2"}},
 				},
 			})
 			require.NoError(t, err)
@@ -142,6 +142,8 @@ func TestLoginRun(t *testing.T) {
 
 		picker := func(profiles []*authn.Authn) (*authn.Authn, error) {
 			require.Len(t, profiles, 2)
+			require.Equal(t, "account-1", profiles[0].Profile.AccountId)
+			require.Equal(t, "account-2", profiles[1].Profile.AccountId)
 			return profiles[1], nil
 		}
 

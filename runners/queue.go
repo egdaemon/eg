@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"iter"
 	"log"
 	"net/http"
 	"os"
@@ -44,6 +45,10 @@ import (
 
 const (
 	workdirname = "work"
+
+	// cachedirs is how many concurrent cache/lock buckets a repo may
+	// claim at once; a workload only defers once all of them are claimed.
+	cachedirs = 8
 )
 
 type downloader interface {
@@ -423,7 +428,7 @@ func recover(_ context.Context, md metadata) error {
 			return nil
 		}
 
-		if err := md.dirs.Unblock(d.Name()); err != nil {
+		if err := NewCacheResolution(*md.dirs, cachedirs).Release(d.Name()); err != nil {
 			return err
 		}
 
@@ -457,8 +462,8 @@ func beginwork(ctx context.Context, md metadata, dir string) state {
 
 	log.Println("metadata", workload.Enqueued.Id)
 
-	key := cachebucket(workload.Enqueued)
-	if err := md.dirs.Block(key, dir); errors.Is(err, ErrRepoBlocked) {
+	bucket, err := NewCacheResolution(*md.dirs, cachedirs).Claim(ctx, cachebuckets(workload.Enqueued), dir)
+	if errors.Is(err, ErrRepoBlocked) {
 		log.Println("repo already active, deferring workload", workload.Enqueued.VcsUri)
 		return idle(md)
 	} else if err != nil {
@@ -468,12 +473,12 @@ func beginwork(ctx context.Context, md metadata, dir string) state {
 	md.rm.Reserve(NewRuntimeResourcesFromDequeued(workload.Enqueued))
 
 	if archive, err = os.Open(filepath.Join(dir, "archive.tar.gz")); err != nil {
-		return completed(workload.Enqueued, md, ws, 0, errorsx.Wrap(err, "unable to read archive"))
+		return completed(workload.Enqueued, md, bucket, ws, 0, errorsx.Wrap(err, "unable to read archive"))
 	}
 
 	// errorsx.Log(tarx.Inspect(archive))
 
-	cachedir := userx.DefaultCacheDirectory("wcache", cacheprefix(workload.Enqueued), cachebucket(workload.Enqueued), "workloadcache")
+	cachedir := userx.DefaultCacheDirectory("wcache", cacheprefix(workload.Enqueued), bucket, "workloadcache")
 	log.Println("workload cachedir", cachedir)
 
 	if ws, err = workspaces.NewQueued(
@@ -484,13 +489,13 @@ func beginwork(ctx context.Context, md metadata, dir string) state {
 		workspaces.OptionSymlinkCache(cachedir),
 		workspaces.OptionEnsureWorkingDirectory,
 	); err != nil {
-		return completed(workload.Enqueued, md, ws, 0, errorsx.Wrap(err, "unable to setup workspace"))
+		return completed(workload.Enqueued, md, bucket, ws, 0, errorsx.Wrap(err, "unable to setup workspace"))
 	}
 
 	// debugx.Println("workspace", spew.Sdump(ws))
 
 	if err = tarx.Unpack(ws.RuntimeDir, archive); err != nil {
-		return completed(workload.Enqueued, md, ws, 0, errorsx.Wrap(err, "unable to unpack archive"))
+		return completed(workload.Enqueued, md, bucket, ws, 0, errorsx.Wrap(err, "unable to unpack archive"))
 	}
 
 	// fsx.PrintFS(os.DirFS(ws.RuntimeDir))
@@ -520,12 +525,12 @@ func beginwork(ctx context.Context, md metadata, dir string) state {
 	// envx.Debug(errorsx.Zero(envb.Environ())...)
 
 	if err = envb.WriteTo(environpath); err != nil {
-		return completed(workload.Enqueued, md, ws, 0, errorsx.Wrap(err, "failed to update environment file"))
+		return completed(workload.Enqueued, md, bucket, ws, 0, errorsx.Wrap(err, "failed to update environment file"))
 	}
 
 	gpu, err := AgentOptionGPU(gpuenabled)
 	if err != nil {
-		return completed(workload.Enqueued, md, ws, 0, errorsx.Wrap(err, "unable to configure gpu support"))
+		return completed(workload.Enqueued, md, bucket, ws, 0, errorsx.Wrap(err, "unable to configure gpu support"))
 	}
 
 	aopts := make([]AgentOption, 0, len(md.agentopts)+32)
@@ -546,10 +551,10 @@ func beginwork(ctx context.Context, md metadata, dir string) state {
 	)
 
 	if ragent, err = m.NewRun(ctx, ws, workload.Enqueued.Id, aopts...); err != nil {
-		return completed(workload.Enqueued, md, ws, 0, errorsx.Wrap(err, "run failure"))
+		return completed(workload.Enqueued, md, bucket, ws, 0, errorsx.Wrap(err, "run failure"))
 	}
 
-	return staterunning{metadata: md, workload: workload.Enqueued, ws: ws, ragent: ragent, dir: dir}
+	return staterunning{metadata: md, workload: workload.Enqueued, ws: ws, ragent: ragent, dir: dir, bucket: bucket}
 }
 
 func cacheprefix(enq *Enqueued) string {
@@ -560,8 +565,18 @@ func cacheprefix(enq *Enqueued) string {
 	return enq.AccountId
 }
 
-func cachebucket(enq *Enqueued) string {
-	return md5x.String(enq.AccountId + enq.VcsUri)
+// cachebuckets returns an unbounded deterministic hash chain of candidate
+// cache/lock keys for a repo, seeded from the repo's identity hash. It's up
+// to the caller (via CacheResolution's configured fan-out) to decide how
+// many candidates to actually try.
+func cachebuckets(enq *Enqueued) iter.Seq[string] {
+	return func(yield func(string) bool) {
+		for key := md5x.String(enq.AccountId + enq.VcsUri); ; key = md5x.String(key) {
+			if !yield(key) {
+				return
+			}
+		}
+	}
 }
 
 type staterunning struct {
@@ -570,6 +585,7 @@ type staterunning struct {
 	ws       workspaces.Context
 	ragent   *Agent
 	dir      string
+	bucket   string
 }
 
 func (t staterunning) Update(ctx context.Context) state {
@@ -582,22 +598,22 @@ func (t staterunning) Update(ctx context.Context) state {
 	var (
 		err           error
 		logdst        *os.File
-		containerdir  = userx.DefaultCacheDirectory("wcache", cacheprefix(t.workload), cachebucket(t.workload), "containers")
+		containerdir  = userx.DefaultCacheDirectory("wcache", cacheprefix(t.workload), t.bucket, "containers")
 		logpath       = filepath.Join(t.ws.RuntimeDir, "daemon.log")
 		analyticspath = filepath.Join(t.ws.RuntimeDir, "analytics.db")
 	)
 
 	if err = fsx.MkDirs(0770, containerdir); err != nil {
-		return completed(t.workload, t.metadata, t.ws, 0, errorsx.Wrap(err, "unable to setup container and cache directories"))
+		return completed(t.workload, t.metadata, t.bucket, t.ws, 0, errorsx.Wrap(err, "unable to setup container and cache directories"))
 	}
 
 	if logdst, err = os.Create(logpath); err != nil {
-		return completed(t.workload, t.metadata, t.ws, 0, err)
+		return completed(t.workload, t.metadata, t.bucket, t.ws, 0, err)
 	}
 	defer logdst.Close()
 
 	if err = events.InitializeDB(ctx, analyticspath); err != nil {
-		return completed(t.workload, t.metadata, t.ws, 0, err)
+		return completed(t.workload, t.metadata, t.bucket, t.ws, 0, err)
 	}
 
 	options := append(
@@ -622,12 +638,13 @@ func (t staterunning) Update(ctx context.Context) state {
 	ts := time.Now()
 	// TODO REVISIT using t.ws.RuntimeDir as moduledir.
 	err = c8sproxy.PodmanModule(ctx, prepcmd, "eg", fmt.Sprintf("eg-%s", t.ragent.id), t.ws.RuntimeDir, options...)
-	return completed(t.workload, t.metadata, t.ws, time.Since(ts), err)
+	return completed(t.workload, t.metadata, t.bucket, t.ws, time.Since(ts), err)
 }
 
-func completed(workload *Enqueued, md metadata, ws workspaces.Context, duration time.Duration, cause error) statecompleted {
+func completed(workload *Enqueued, md metadata, bucket string, ws workspaces.Context, duration time.Duration, cause error) statecompleted {
 	return statecompleted{
 		workload: workload,
+		bucket:   bucket,
 		ws:       ws,
 		metadata: md,
 		cause:    cause,
@@ -638,6 +655,7 @@ func completed(workload *Enqueued, md metadata, ws workspaces.Context, duration 
 type statecompleted struct {
 	metadata
 	workload *Enqueued
+	bucket   string
 	ws       workspaces.Context
 	cause    error
 	duration time.Duration
@@ -654,13 +672,13 @@ func (t statecompleted) Update(ctx context.Context) state {
 
 	logs, err := os.Open(logpath)
 	if err != nil {
-		return discard(t.workload, t.metadata, failure(t.metadata, errorsx.Wrap(err, "unable open logs for upload"), idle(t.metadata)))
+		return discard(t.workload, t.metadata, t.bucket, failure(t.metadata, errorsx.Wrap(err, "unable open logs for upload"), idle(t.metadata)))
 	}
 	defer logs.Close()
 
 	analytics, err := os.Open(analyticspath)
 	if err != nil {
-		return discard(t.workload, t.metadata, failure(t.metadata, errorsx.Wrap(err, "unable open analytics for upload"), idle(t.metadata)))
+		return discard(t.workload, t.metadata, t.bucket, failure(t.metadata, errorsx.Wrap(err, "unable open analytics for upload"), idle(t.metadata)))
 	}
 	defer analytics.Close()
 
@@ -670,21 +688,22 @@ func (t statecompleted) Update(ctx context.Context) state {
 
 	if err = t.metadata.completion.Upload(ctx, t.workload.Id, t.duration, t.cause, logs, analytics); httpx.IsStatusError(err, http.StatusNotFound) != nil {
 		// means we already uploaded the results.
-		return discard(t.workload, t.metadata, idle(t.metadata))
+		return discard(t.workload, t.metadata, t.bucket, idle(t.metadata))
 	} else if err != nil {
 		return failure(t.metadata, errorsx.Wrapf(err, "unable to upload completion: %s", t.workload.Id), newdelay(backoff.RandomFromRange(time.Second), t))
 	}
 
 	if t.cause != nil {
-		return discard(t.workload, t.metadata, failure(t.metadata, errorsx.Wrap(t.cause, "work failed"), idle(t.metadata)))
+		return discard(t.workload, t.metadata, t.bucket, failure(t.metadata, errorsx.Wrap(t.cause, "work failed"), idle(t.metadata)))
 	}
 
-	return discard(t.workload, t.metadata, idle(t.metadata))
+	return discard(t.workload, t.metadata, t.bucket, idle(t.metadata))
 }
 
-func discard(workload *Enqueued, md metadata, next state) statediscard {
+func discard(workload *Enqueued, md metadata, bucket string, next state) statediscard {
 	return statediscard{
 		workload: workload,
+		bucket:   bucket,
 		metadata: md,
 		n:        next,
 	}
@@ -693,6 +712,7 @@ func discard(workload *Enqueued, md metadata, next state) statediscard {
 type statediscard struct {
 	metadata
 	workload *Enqueued
+	bucket   string
 	n        state
 }
 
@@ -704,7 +724,7 @@ func (t statediscard) Update(ctx context.Context) state {
 	}()
 
 	defer func() {
-		if err := t.metadata.dirs.Unblock(cachebucket(t.workload)); err != nil {
+		if err := NewCacheResolution(*t.metadata.dirs, cachedirs).Release(t.bucket); err != nil {
 			log.Println("unable to release repo lock", err)
 		}
 	}()

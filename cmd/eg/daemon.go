@@ -60,6 +60,8 @@ func (t daemon) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, keygen cmdopt
 	defer log.Println("running daemon completed")
 
 	rm := runners.NewResourceManager(runners.NewRuntimeResources())
+	rundirs := runners.DefaultSpoolDirs()
+	compiledirs := runners.NewSpoolDir(userx.DefaultCacheDirectory("compilespool"))
 
 	// we want to set the umask to 0002 to ensure that the cache (and other) directory are readable by the group.
 	runtimex.Umask(0002)
@@ -90,7 +92,7 @@ func (t daemon) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, keygen cmdopt
 		tokensrc,
 	)
 
-	if err = daemons.HTTP(gctx, httpl); err != nil {
+	if err = daemons.HTTP(gctx, httpl, rm, compiledirs); err != nil {
 		return err
 	}
 	defer httpl.Close()
@@ -120,6 +122,8 @@ func (t daemon) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, keygen cmdopt
 	if t.Autodownload {
 		go runners.AutoDownload(gctx.Context, authclient, rm)
 	}
+
+	go runners.AutoCompile(gctx.Context, tlsc.DefaultClient(), compiledirs, rundirs)
 
 	if _, found := os.LookupEnv("SSH_AUTH_SOCK"); !found {
 		if err = daemons.SSHAgent(gctx, t.SSHAgentPath); err != nil {

@@ -49,4 +49,27 @@ func TestRuntimeResources(t *testing.T) {
 		rm.Release(runners.RuntimeResources{Cores: 1, Memory: 512, Vram: 2048})
 		require.Equal(t, runners.RuntimeResources{}, rm.Snapshot())
 	})
+
+	t.Run("Admit accepts requests that keep utilization at or below target load", func(t *testing.T) {
+		t.Setenv("EG_COMPUTE_WORKLOAD_TARGET_LOAD", "0.8")
+		rm := runners.NewResourceManager(runners.RuntimeResources{Cores: 10, Memory: 10, Vram: 10})
+
+		require.True(t, rm.Admit(runners.RuntimeResources{Cores: 8}))
+		require.True(t, rm.Admit(runners.RuntimeResources{Cores: 8})) // Admit doesn't reserve; repeated calls see the same starting point.
+	})
+
+	t.Run("Admit rejects requests that would exceed target load", func(t *testing.T) {
+		t.Setenv("EG_COMPUTE_WORKLOAD_TARGET_LOAD", "0.8")
+		rm := runners.NewResourceManager(runners.RuntimeResources{Cores: 10, Memory: 10, Vram: 10})
+
+		require.False(t, rm.Admit(runners.RuntimeResources{Cores: 9}))
+	})
+
+	t.Run("Admit accounts for already reserved capacity", func(t *testing.T) {
+		t.Setenv("EG_COMPUTE_WORKLOAD_TARGET_LOAD", "0.8")
+		rm := runners.NewResourceManager(runners.RuntimeResources{Cores: 10, Memory: 10, Vram: 10})
+
+		rm.Reserve(runners.RuntimeResources{Cores: 8})
+		require.False(t, rm.Admit(runners.RuntimeResources{Cores: 1}))
+	})
 }

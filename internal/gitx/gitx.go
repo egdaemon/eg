@@ -270,6 +270,23 @@ func AutomaticCredentialRefresh(ctx context.Context, c *http.Client, dst string,
 	return nil
 }
 
+// RefreshCredentials performs a single, immediate exchange of the given
+// long-lived access token for short-lived git credentials, written to
+// dst/vcsaccess.token (see LoadCredentials). Unlike AutomaticCredentialRefresh
+// it does not spawn a periodic background refresh goroutine, so it's safe to
+// call from a short-lived task (e.g. compiling a single workload) without
+// leaking a goroutine tied to a long-lived context. A blank token is a no-op
+// (matching AutomaticCredentialRefresh) -- callers fall back to LoadCredentials
+// finding nothing, and gitx.Clone proceeding with no auth (e.g. public repos).
+func RefreshCredentials(ctx context.Context, c *http.Client, dst string, token string) error {
+	if stringsx.Blank(token) {
+		debugx.Println("access token blank skipping")
+		return nil
+	}
+
+	return credentialRefresh(ctx, c, dst, token)
+}
+
 func credentialRefresh(ctx context.Context, c *http.Client, dst, token string) error {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/r/vcsaccess/", eg.EnvContainerAPIHostDefault()), nil)
 	if err != nil {

@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	"github.com/egdaemon/eg/internal/errorsx"
+	"github.com/egdaemon/eg/internal/numericx"
 	"github.com/pbnjay/memory"
 )
 
@@ -99,4 +100,21 @@ func (t *ResourceManager) Available() RuntimeResources {
 	t.m.Lock()
 	defer t.m.Unlock()
 	return t.Limit.Release(t.Current)
+}
+
+// DetermineLoad returns the maximum utilization fraction across
+// cores/memory/vram for the given limits and consumed resources. Mirrors the
+// determineload closure in scheduler.go's autodownload loop.
+func DetermineLoad(limits, consumed RuntimeResources) float64 {
+	cores := float64(consumed.Cores) / float64(limits.Cores)
+	memory := float64(consumed.Memory) / float64(limits.Memory)
+	vram := float64(consumed.Vram) / float64(max(limits.Vram, 1))
+	return numericx.Max(cores, memory, vram)
+}
+
+// Admit reports whether reserving want would keep utilization at or below
+// the target load (see workloadtarget in scheduler.go), without actually
+// reserving it -- callers that decide to proceed still need to call Reserve.
+func (t *ResourceManager) Admit(want RuntimeResources) bool {
+	return DetermineLoad(t.Limit, t.Snapshot().Reserve(want)) <= workloadtarget()
 }

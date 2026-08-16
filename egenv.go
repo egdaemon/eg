@@ -78,6 +78,7 @@ const (
 	EnvComputeRuntimeDirectory   = "EG_COMPUTE_RUNTIME_DIRECTORY"               // runtime directory for workloads
 	EnvComputeWorkspaceDirectory = "EG_COMPUTE_WORKSPACE_DIRECTORY"             // workspace directory for workloads
 	EnvComputeWorkloadCapacity   = "EG_COMPUTE_WORKLOAD_CAPACITY"               // upper bound for the maximum number of workloads that can be run concurrently
+	EnvComputeCompileCapacity    = "EG_COMPUTE_COMPILE_CAPACITY"                // upper bound for the maximum number of workloads that can be compiled concurrently
 	EnvComputeWorkloadTargetLoad = "EG_COMPUTE_WORKLOAD_TARGET_LOAD"            // upper bound for the maximum cpu load to target.
 	EnvScheduleMaximumDelay      = "EG_COMPUTE_SCHEDULER_MAXIMUM_DELAY"         // maximum delay between checks for workloads.
 	EnvScheduleSystemLoadFreq    = "EG_COMPUTE_SCHEDULER_SYSTEM_LOAD_FREQUENCY" // how frequently we measure system load, small enough we can saturate, high enough its not a burden.
@@ -88,6 +89,7 @@ const (
 	EnvComputeGPU                = "EG_COMPUTE_GPU"                             // enable gpu support for the compute workload, propagated to nested module containers.
 	EnvComputeModuleSocket       = "EG_COMPUTE_MODULE_SOCKET"                   // socket providing functionality that is scoped to an individual module. primarily command execution.
 	EnvComputeDefaultGroup       = "EG_COMPUTE_DEFAULT_GROUP"                   // override the group assigned to the user. mainly used by baremetal.
+	EnvComputeAPIEnabled         = "EG_COMPUTE_API_ENABLED"                     // gates the runner's push HTTP surface (POST /b/upload, POST /c/enqueue); default-disabled stopgap ahead of real request authentication.
 )
 
 const (

@@ -12,7 +12,6 @@ import (
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/httpx"
-	"github.com/egdaemon/eg/internal/numericx"
 )
 
 func workloadtarget() float64 {
@@ -31,14 +30,6 @@ func AutoDownload(ctx context.Context, authedclient *http.Client, m *ResourceMan
 
 func autodownload(ctx context.Context, authedclient *http.Client, m *ResourceManager, s backoff.Strategy, spool SpoolDirs) {
 	w := backoff.Chan()
-
-	determineload := func(limits, consumed RuntimeResources) float64 {
-		cores := float64(consumed.Cores) / float64(limits.Cores)
-		memory := float64(consumed.Memory) / float64(limits.Memory)
-		vram := float64(consumed.Vram) / float64(max(limits.Vram, 1))
-		log.Println("load", cores, memory, vram, numericx.Max(cores, memory, vram))
-		return numericx.Max(cores, memory, vram)
-	}
 
 	capacity := workloadcapacity()
 	targetload := workloadtarget()
@@ -80,7 +71,7 @@ func autodownload(ctx context.Context, authedclient *http.Client, m *ResourceMan
 
 		c := m.Snapshot()
 		wants := NewRuntimeResourcesFromDequeued(workload.Enqueued)
-		if determineload(m.Limit, c.Reserve(wants)) > targetload {
+		if DetermineLoad(m.Limit, c.Reserve(wants)) > targetload {
 			continue
 		}
 
@@ -95,7 +86,7 @@ func autodownload(ctx context.Context, authedclient *http.Client, m *ResourceMan
 			continue
 		}
 
-		if currentload := determineload(m.Limit, c.Reserve(wants)); currentload > targetlower {
+		if currentload := DetermineLoad(m.Limit, c.Reserve(wants)); currentload > targetlower {
 			continue
 		}
 

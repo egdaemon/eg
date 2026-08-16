@@ -2,87 +2,47 @@ package daemons
 
 import (
 	"log"
-	"mime/multipart"
 	"net"
 	"net/http"
-	"path/filepath"
 
+	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/cmd/cmdopts"
 	"github.com/egdaemon/eg/internal/envx"
-	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/httpx"
 	"github.com/egdaemon/eg/runners"
-	"github.com/gofrs/uuid/v5"
 	"github.com/gorilla/mux"
 	"github.com/justinas/alice"
 )
 
-func HTTP(global *cmdopts.Global, httpl net.Listener) (err error) {
+func HTTP(global *cmdopts.Global, httpl net.Listener, rm *runners.ResourceManager, compiledirs runners.SpoolDirs) (err error) {
 	httpmux := mux.NewRouter()
 	httpmux.NotFoundHandler = alice.New(httpx.RouteInvoked).ThenFunc(httpx.NotFound)
 
 	httpmux.HandleFunc("/healthz", httpx.Healthz(envx.Int(http.StatusOK, cmdopts.EnvHealthzCode))).Methods("GET")
 
-	httpmux.Handle("/b/upload", alice.New(httpx.RouteInvoked).ThenFunc(func(w http.ResponseWriter, r *http.Request) {
-		var (
-			err           error
-			uid           uuid.UUID
-			kernelc, envc multipart.File
-			kernelh, envh *multipart.FileHeader
-		)
+	// gates the runner's push HTTP surface (POST /b/upload, POST /c/enqueue) as a
+	// stopgap ahead of real request authentication -- see the accompanying plan doc.
+	apigate := httpx.GatedResponse(envx.Boolean(false, eg.EnvComputeAPIEnabled), http.StatusForbidden)
 
-		dirs := runners.DefaultSpoolDirs()
+	// POST /b/upload accepts a pre-built kernel archive + environment file
+	// pushed to this runner and enqueues them directly. See http.upload.go
+	// for the (independently testable) handler implementation.
+	httpmux.Handle("/b/upload", alice.New(httpx.RouteInvoked, apigate).Then(NewUploadHandler())).Methods(http.MethodPost)
 
-		if uid, err = uuid.NewV7(); err != nil {
-			log.Println(errorsx.Wrap(err, "unable to generate uuid"))
-			errorsx.Log(httpx.WriteEmptyJSON(w, http.StatusBadRequest))
-			return
-		}
+	// POST /c/enqueue pushes a source-ref submission (instead of a pre-built
+	// archive) to this runner: the runner clones and compiles it itself,
+	// asynchronously, after deciding synchronously whether to admit it based
+	// on current load. See http.enqueue.go for the (independently testable)
+	// handler implementation.
+	httpmux.Handle("/c/enqueue", alice.New(httpx.RouteInvoked, apigate).Then(NewEnqueueHandler(compiledirs, rm))).Methods(http.MethodPost)
 
-		if kernelc, kernelh, err = r.FormFile("kernel"); err != nil {
-			log.Println(errorsx.Wrap(err, "kernel file parameter required"))
-			errorsx.Log(httpx.WriteEmptyJSON(w, http.StatusBadRequest))
-			return
-		}
-		defer kernelc.Close()
-
-		if err = dirs.Download(uid, kernelh.Filename, kernelc); err != nil {
-			log.Println(errorsx.Wrap(err, "unable to receive kernel archive"))
-			errorsx.Log(httpx.WriteEmptyJSON(w, http.StatusBadRequest))
-			return
-		}
-
-		if envc, envh, err = r.FormFile("environ"); err != nil {
-			log.Println(errorsx.Wrap(err, "environ file parameter required"))
-			errorsx.Log(httpx.WriteEmptyJSON(w, http.StatusBadRequest))
-			return
-		}
-		defer envc.Close()
-
-		if err = dirs.Download(uid, envh.Filename, envc); err != nil {
-			log.Println(errorsx.Wrap(err, "unable to receive environment file"))
-			errorsx.Log(httpx.WriteEmptyJSON(w, http.StatusBadRequest))
-			return
-		}
-
-		if err = dirs.Enqueue(uid); err != nil {
-			log.Println(errorsx.Wrap(err, "unable to enqueue"))
-			errorsx.Log(httpx.WriteEmptyJSON(w, http.StatusBadRequest))
-			return
-		}
-
-		log.Println("enqueued", filepath.Join(dirs.Queued, uid.String()))
-	})).Methods("POST")
-
-	global.Cleanup.Add(1)
-	go func() {
-		defer global.Cleanup.Done()
+	global.Cleanup.Go(func() {
 		defer global.Shutdown(nil)
 		defer log.Println("http shutting down")
 		if err := http.Serve(httpl, httpmux); err != nil {
 			log.Println("failed to start http server", err)
 		}
-	}()
+	})
 
 	return nil
 }

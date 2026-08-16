@@ -15,6 +15,7 @@ RUN apt-get update
 RUN apt-get -y install egworkload
 
 RUN systemctl enable eg-daemon.service eg-daily-reload.service eg-disk-usage.service
+RUN systemctl disable eg-runner-gpu.service
 
 # preload some wellknown hosts
 RUN ssh-keyscan -H github.com >> /etc/ssh/ssh_known_hosts

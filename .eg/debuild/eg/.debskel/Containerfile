@@ -17,3 +17,5 @@ RUN ln -s /usr/lib/go-1.26/bin/go /usr/local/bin/go
 RUN echo "cache buster 61571c95-0539-4f6e-bad4-f913db80e227"
 RUN apt-get update
 RUN apt-get -y install egworkload
+
+RUN systemctl disable eg-runner-gpu.service

@@ -21,7 +21,21 @@ import (
 	"github.com/egdaemon/eg/runners"
 	"github.com/gofrs/uuid/v5"
 	"github.com/stretchr/testify/require"
+	"slices"
 )
+
+// repoBuckets mirrors the production cachebuckets hash chain
+// (md5(accountID+vcsURI), then repeated md5 of the previous key) so tests
+// can pre-claim the exact candidates beginwork would try.
+func repoBuckets(accountID, vcsURI string, n int) []string {
+	buckets := make([]string, 0, n)
+	key := md5x.String(accountID + vcsURI)
+	for range n {
+		buckets = append(buckets, key)
+		key = md5x.String(key)
+	}
+	return buckets
+}
 
 type completion struct {
 	done context.CancelCauseFunc
@@ -72,15 +86,50 @@ func TestQueue(t *testing.T) {
 			require.ErrorIs(t, err, io.EOF)
 		})
 
-		t.Run("workload for an already active repo is blocked instead of run concurrently", func(t *testing.T) {
+		t.Run("workload for the same repo runs concurrently instead of blocking", func(t *testing.T) {
+			dirs := runners.NewSpoolDir(t.TempDir())
+			createTestWorkload(t, dirs.Queued, errorsx.Must(uuid.NewV4()), "entry.wasm", testx.Read(testx.Fixture("example.1.wasm")))
+			createTestWorkload(t, dirs.Queued, errorsx.Must(uuid.NewV4()), "entry.wasm", testx.Read(testx.Fixture("example.1.wasm")))
+
+			rm := runners.NewResourceManager(runners.NewRuntimeResources())
+			reload := make(chan error, 1)
+
+			// same repo (account_id/vcs_uri) for both items: with the 8-way
+			// bucket fan-out a second workload for the same repo should claim
+			// a different bucket and run alongside the first, exactly like
+			// the different-repos case below.
+			ctx1, done1 := context.WithCancelCause(t.Context())
+			ctx2, done2 := context.WithCancelCause(t.Context())
+			c1 := completion{done: done1}
+			c2 := completion{done: done2}
+
+			var (
+				wg         sync.WaitGroup
+				err1, err2 error
+			)
+			wg.Add(2)
+			go func() { defer wg.Done(); err1 = runners.RunOne(ctx1, 0, 0, rm, &dirs, reload, runners.QueueOptionCompletion(&c1)) }()
+			go func() { defer wg.Done(); err2 = runners.RunOne(ctx2, 1, 0, rm, &dirs, reload, runners.QueueOptionCompletion(&c2)) }()
+			wg.Wait()
+
+			require.ErrorIs(t, err1, context.Canceled)
+			require.ErrorIs(t, err2, context.Canceled)
+		})
+
+		t.Run("workload is deferred once every repo bucket is claimed, and resumes once one is released", func(t *testing.T) {
 			dirs := runners.NewSpoolDir(t.TempDir())
 			uid := errorsx.Must(uuid.NewV4())
 			createTestWorkload(t, dirs.Queued, uid, "entry.wasm", testx.Read(testx.Fixture("example.1.wasm")))
 
-			// simulate another worker already actively running a job for this
-			// repo (account_id/vcs_uri match what createTestWorkload writes).
-			key := md5x.String(uuid.Nil.String() + "uri")
-			require.NoError(t, dirs.Block(key, ""))
+			// simulate 8 other workers already active for this repo by
+			// claiming every candidate bucket beginwork would try (account_id
+			// "" / vcs_uri "uri" match what createTestWorkload writes).
+			buckets := repoBuckets(uuid.Nil.String(), "uri", 8)
+			res := runners.NewCacheResolution(dirs, 1)
+			for _, bucket := range buckets {
+				_, err := res.Claim(t.Context(), slices.Values([]string{bucket}), "")
+				require.NoError(t, err)
+			}
 
 			rm := runners.NewResourceManager(runners.NewRuntimeResources())
 			reload := make(chan error, 1)
@@ -91,42 +140,22 @@ func TestQueue(t *testing.T) {
 			c := completion{done: func(cause error) { uploaded = true }}
 			err := runners.RunOne(ctx, 99, 0, rm, &dirs, reload, runners.QueueOptionCompletion(&c), runners.QueueOptionLogVerbosity(4))
 			require.ErrorIs(t, err, context.DeadlineExceeded)
-			require.False(t, uploaded, "workload should not have run while repo was already active")
+			require.False(t, uploaded, "workload should not have run while every repo bucket was already claimed")
 
 			// no resources should have been reserved for a workload that never ran.
 			require.Equal(t, runners.RuntimeResources{}, rm.Snapshot())
 
-			// the item should have been parked under Blocked/<key>, not run.
-			entries, err := os.ReadDir(filepath.Join(dirs.Blocked, key))
+			// the item should have been parked under the last candidate bucket, not run.
+			last := buckets[len(buckets)-1]
+			entries, err := os.ReadDir(filepath.Join(dirs.Blocked, last))
 			require.NoError(t, err)
 			require.Len(t, entries, 1)
 
-			// releasing the repo unblocks it back into Queued so it can run.
-			require.NoError(t, dirs.Unblock(key))
+			// one of the 8 "active" workers finishes and releases its bucket,
+			// which requeues the parked item.
+			require.NoError(t, res.Release(last))
 			_, err = dirs.Dequeue()
 			require.NoError(t, err)
-		})
-
-		t.Run("blocked workload completes once the repo is unblocked", func(t *testing.T) {
-			dirs := runners.NewSpoolDir(t.TempDir())
-			uid := errorsx.Must(uuid.NewV4())
-			createTestWorkload(t, dirs.Queued, uid, "entry.wasm", testx.Read(testx.Fixture("example.1.wasm")))
-
-			key := md5x.String(uuid.Nil.String() + "uri")
-			require.NoError(t, dirs.Block(key, ""))
-			require.NoError(t, dirs.Unblock(key))
-
-			rm := runners.NewResourceManager(runners.NewRuntimeResources())
-			reload := make(chan error, 1)
-			parent, cancel := context.WithTimeout(t.Context(), 10*time.Second)
-			defer cancel()
-
-			uploaded := false
-			ctx, cause := context.WithCancelCause(parent)
-			c := completion{done: func(err error) { uploaded = true; cause(err) }}
-			err := runners.RunOne(ctx, 99, 0, rm, &dirs, reload, runners.QueueOptionCompletion(&c), runners.QueueOptionLogVerbosity(4))
-			require.ErrorIs(t, err, context.Canceled)
-			require.True(t, uploaded, "workload should have run to completion once unblocked")
 		})
 
 		t.Run("workloads for different repos run without blocking each other", func(t *testing.T) {

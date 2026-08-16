@@ -16,33 +16,11 @@ import (
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/gitx"
 	"github.com/egdaemon/eg/internal/slicesx"
-	"github.com/egdaemon/eg/internal/stringsx"
 	"github.com/egdaemon/eg/internal/tarx"
 	"github.com/egdaemon/eg/transpile"
 	"github.com/egdaemon/eg/workspaces"
 	"github.com/go-git/go-git/v5"
 )
-
-// CompileRequest is the JSON body accepted by POST /c/enqueue and the
-// metadata written into the compile spool: a source ref instead of a
-// pre-built archive, plus a long-lived signed VcsAuthToken exchanged for
-// short-lived git credentials immediately before cloning (see
-// gitx.RefreshCredentials) rather than trusted as-is for the lifetime of the
-// job -- it is never written back to disk once the clone is done.
-type CompileRequest struct {
-	AccountId    string   `json:"account_id"`
-	ClusterId    string   `json:"cluster_id"`
-	VcsUri       string   `json:"vcs_uri"`
-	VcsRef       string   `json:"vcs_ref"`
-	VcsCommit    string   `json:"vcs_commit"`
-	VcsAuthToken string   `json:"vcs_auth_token"`
-	Entry        string   `json:"entry"`
-	Cores        uint64   `json:"cores"`
-	Memory       uint64   `json:"memory"`
-	Vram         uint64   `json:"vram"`
-	Ttl          uint64   `json:"ttl"`
-	Labels       []string `json:"labels"`
-}
 
 // compileEntrypoint transpiles and builds the eg module rooted at ws,
 // returning the (non-generated) compiled entrypoint. Mirrors
@@ -73,17 +51,20 @@ func compileEntrypoint(ctx context.Context, ws workspaces.Context) (*transpile.C
 	return &entry, nil
 }
 
-// compileWorkload reads the CompileRequest stored at dir/metadata.json
-// (dir is a job claimed from a compile SpoolDirs' Running stage, see
-// CompileN), clones and compiles the referenced source, then hands the
-// entire job directory off directly to rundirs.Queued -- bypassing
-// rundirs.Downloading/Enqueue entirely, since the job is already fully
-// formed once compiled and doesn't need to be staged through a second
-// spool's own two-step download/enqueue handshake.
+// compileWorkload reads the EnqueuedDequeueResponse stored at
+// dir/metadata.json (dir is a job claimed from a compile SpoolDirs' Running
+// stage, see CompileN) -- Enqueued.VcsCommit is the treeish to check out,
+// AccessToken is exchanged for short-lived git credentials, mirroring how
+// egmeta's own /c/dequeue handler populates it for the polling flow (see
+// computeapi/http.queue.go's dequeue handler) -- clones and compiles the
+// referenced source, then hands the entire job directory off directly to
+// rundirs.Queued -- bypassing rundirs.Downloading/Enqueue entirely, since
+// the job is already fully formed once compiled and doesn't need to be
+// staged through a second spool's own two-step download/enqueue handshake.
 func compileWorkload(ctx context.Context, c *http.Client, dir string, rundirs SpoolDirs) (err error) {
 	var (
 		encoded []byte
-		req     CompileRequest
+		req     EnqueuedDequeueResponse
 		repo    *git.Repository
 	)
 
@@ -95,30 +76,33 @@ func compileWorkload(ctx context.Context, c *http.Client, dir string, rundirs Sp
 		return errorsx.Wrap(err, "unable to decode compile request")
 	}
 
-	treeish := stringsx.DefaultIfBlank(req.VcsCommit, req.VcsRef)
+	if req.Enqueued == nil {
+		return errorsx.Wrap(err, "invalid workload missing enqueued information")
+	}
+
 	clonedir := filepath.Join(dir, "src")
 
 	if err = os.MkdirAll(clonedir, 0700); err != nil {
 		return errorsx.Wrap(err, "unable to create clone directory")
 	}
 
-	// exchange the long-lived request token for short-lived git credentials
-	// immediately before cloning, rather than trusting whatever was handed to
-	// the enqueue endpoint -- avoids needing to track/check token expiry
-	// ourselves while the job sat queued behind the compile concurrency cap.
-	if err = gitx.RefreshCredentials(ctx, c, clonedir, req.VcsAuthToken); err != nil {
+	// exchange the access token (if any) for short-lived git credentials
+	// immediately before cloning, rather than trusting it for the lifetime of
+	// the job -- avoids needing to track/check token expiry ourselves while
+	// the job sat queued behind the compile concurrency cap.
+	if err = gitx.RefreshCredentials(ctx, c, clonedir, req.AccessToken); err != nil {
 		return errorsx.Wrap(err, "unable to refresh git credentials")
 	}
 
-	// mirrors interp/runtime/wasi/ffigit.go's autoauth: absence of refreshed
-	// credentials (e.g. blank VcsAuthToken, public repo) is not fatal -- log
-	// and fall back to an unauthenticated clone rather than failing the job.
-	auth, err := gitx.LoadCredentials(ctx, req.VcsUri, clonedir)
+	// absence of refreshed credentials (e.g. blank access token, public
+	// repo) is not fatal -- log and fall through to an unauthenticated clone
+	// rather than failing the job.
+	auth, err := gitx.LoadCredentials(ctx, req.Enqueued.VcsUri, clonedir)
 	if err != nil {
 		log.Println(errorsx.Wrap(err, "unable to load git credentials"))
 	}
 
-	if err = gitx.Clone(ctx, auth, clonedir, req.VcsUri, treeish, treeish); err != nil {
+	if err = gitx.Clone(ctx, auth, clonedir, req.Enqueued.VcsUri, git.DefaultRemoteName, req.Enqueued.VcsCommit); err != nil {
 		return errorsx.Wrap(err, "unable to clone repository")
 	}
 
@@ -126,7 +110,7 @@ func compileWorkload(ctx context.Context, c *http.Client, dir string, rundirs Sp
 		return errorsx.Wrap(err, "unable to open cloned repository")
 	}
 
-	ws, err := workspaces.New(ctx, md5.New(), clonedir, clonedir, req.Entry)
+	ws, err := workspaces.New(ctx, md5.New(), clonedir, clonedir, req.Enqueued.Entry)
 	if err != nil {
 		return errorsx.Wrap(err, "unable to create workspace")
 	}
@@ -141,7 +125,7 @@ func compileWorkload(ctx context.Context, c *http.Client, dir string, rundirs Sp
 		return errorsx.Wrap(err, "unable to determine entry relative path")
 	}
 
-	envb := envx.Build().FromEnviron(errorsx.Zero(gitx.HeadEnv(repo, req.VcsUri, req.VcsUri, treeish))...)
+	envb := envx.Build().FromEnviron(errorsx.Zero(gitx.HeadEnv(repo, req.Enqueued.VcsUri, req.Enqueued.VcsUri, req.Enqueued.VcsCommit))...)
 
 	environpath := filepath.Join(dir, eg.EnvironFile)
 	environio, err := os.Create(environpath)
@@ -164,27 +148,16 @@ func compileWorkload(ctx context.Context, c *http.Client, dir string, rundirs Sp
 		return errorsx.Wrap(err, "unable to pack archive")
 	}
 
-	uid := Queued().Id(dir)
-	response := EnqueuedDequeueResponse{
-		Enqueued: &Enqueued{
-			Id:        uid.String(),
-			AccountId: req.AccountId,
-			ClusterId: req.ClusterId,
-			VcsUri:    req.VcsUri,
-			Entry:     entry,
-			Cores:     req.Cores,
-			Memory:    req.Memory,
-			Vram:      req.Vram,
-			Ttl:       req.Ttl,
-			Labels:    req.Labels,
-		},
-	}
+	req.Enqueued.Id = Queued().Id(dir).String()
+	req.Enqueued.Entry = entry
 
-	if encoded, err = json.Marshal(&response); err != nil {
+	// overwrite in place: metadata.json now holds the compiled workload's
+	// entry point and id, still carrying AccessToken through for the running
+	// container (see queue.go's beginwork).
+	if encoded, err = json.Marshal(&req); err != nil {
 		return errorsx.Wrap(err, "unable to encode workload metadata")
 	}
 
-	// overwrite in place: this drops VcsAuthToken from disk now that the clone is done.
 	if err = os.WriteFile(filepath.Join(dir, "metadata.json"), encoded, 0600); err != nil {
 		return errorsx.Wrap(err, "unable to overwrite workload metadata")
 	}

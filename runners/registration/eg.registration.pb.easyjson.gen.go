@@ -30,11 +30,6 @@ func easyjsonDabade4DecodeGithubComEgdaemonEgRunnersRegistration(in *jlexer.Lexe
 	for !in.IsDelim('}') {
 		key := in.UnsafeFieldName(false)
 		in.WantColon()
-		if in.IsNull() {
-			in.Skip()
-			in.WantComma()
-			continue
-		}
 		switch key {
 		case "items":
 			if in.IsNull() {
@@ -60,7 +55,11 @@ func easyjsonDabade4DecodeGithubComEgdaemonEgRunnersRegistration(in *jlexer.Lexe
 						if v1 == nil {
 							v1 = new(Registration)
 						}
-						(*v1).UnmarshalEasyJSON(in)
+						if in.IsNull() {
+							in.Skip()
+						} else {
+							(*v1).UnmarshalEasyJSON(in)
+						}
 					}
 					out.Items = append(out.Items, v1)
 					in.WantComma()
@@ -139,11 +138,6 @@ func easyjsonDabade4DecodeGithubComEgdaemonEgRunnersRegistration1(in *jlexer.Lex
 	for !in.IsDelim('}') {
 		key := in.UnsafeFieldName(false)
 		in.WantColon()
-		if in.IsNull() {
-			in.Skip()
-			in.WantComma()
-			continue
-		}
 		switch key {
 		default:
 			in.SkipRecursive()
@@ -198,11 +192,6 @@ func easyjsonDabade4DecodeGithubComEgdaemonEgRunnersRegistration2(in *jlexer.Lex
 	for !in.IsDelim('}') {
 		key := in.UnsafeFieldName(false)
 		in.WantColon()
-		if in.IsNull() {
-			in.Skip()
-			in.WantComma()
-			continue
-		}
 		switch key {
 		case "registration":
 			if in.IsNull() {
@@ -212,7 +201,11 @@ func easyjsonDabade4DecodeGithubComEgdaemonEgRunnersRegistration2(in *jlexer.Lex
 				if out.Registration == nil {
 					out.Registration = new(Registration)
 				}
-				(*out.Registration).UnmarshalEasyJSON(in)
+				if in.IsNull() {
+					in.Skip()
+				} else {
+					(*out.Registration).UnmarshalEasyJSON(in)
+				}
 			}
 		case "bootstrap":
 			if in.IsNull() {
@@ -231,7 +224,11 @@ func easyjsonDabade4DecodeGithubComEgdaemonEgRunnersRegistration2(in *jlexer.Lex
 				}
 				for !in.IsDelim(']') {
 					var v4 string
-					v4 = string(in.String())
+					if in.IsNull() {
+						in.Skip()
+					} else {
+						v4 = string(in.String())
+					}
 					out.Bootstrap = append(out.Bootstrap, v4)
 					in.WantComma()
 				}
@@ -315,11 +312,6 @@ func easyjsonDabade4DecodeGithubComEgdaemonEgRunnersRegistration3(in *jlexer.Lex
 	for !in.IsDelim('}') {
 		key := in.UnsafeFieldName(false)
 		in.WantColon()
-		if in.IsNull() {
-			in.Skip()
-			in.WantComma()
-			continue
-		}
 		switch key {
 		case "registration":
 			if in.IsNull() {
@@ -329,7 +321,11 @@ func easyjsonDabade4DecodeGithubComEgdaemonEgRunnersRegistration3(in *jlexer.Lex
 				if out.Registration == nil {
 					out.Registration = new(Registration)
 				}
-				(*out.Registration).UnmarshalEasyJSON(in)
+				if in.IsNull() {
+					in.Skip()
+				} else {
+					(*out.Registration).UnmarshalEasyJSON(in)
+				}
 			}
 		default:
 			in.SkipRecursive()
@@ -390,11 +386,6 @@ func easyjsonDabade4DecodeGithubComEgdaemonEgRunnersRegistration4(in *jlexer.Lex
 	for !in.IsDelim('}') {
 		key := in.UnsafeFieldName(false)
 		in.WantColon()
-		if in.IsNull() {
-			in.Skip()
-			in.WantComma()
-			continue
-		}
 		switch key {
 		case "registration":
 			if in.IsNull() {
@@ -404,7 +395,11 @@ func easyjsonDabade4DecodeGithubComEgdaemonEgRunnersRegistration4(in *jlexer.Lex
 				if out.Registration == nil {
 					out.Registration = new(Registration)
 				}
-				(*out.Registration).UnmarshalEasyJSON(in)
+				if in.IsNull() {
+					in.Skip()
+				} else {
+					(*out.Registration).UnmarshalEasyJSON(in)
+				}
 			}
 		default:
 			in.SkipRecursive()
@@ -465,11 +460,6 @@ func easyjsonDabade4DecodeGithubComEgdaemonEgRunnersRegistration5(in *jlexer.Lex
 	for !in.IsDelim('}') {
 		key := in.UnsafeFieldName(false)
 		in.WantColon()
-		if in.IsNull() {
-			in.Skip()
-			in.WantComma()
-			continue
-		}
 		switch key {
 		case "registration":
 			if in.IsNull() {
@@ -479,12 +469,24 @@ func easyjsonDabade4DecodeGithubComEgdaemonEgRunnersRegistration5(in *jlexer.Lex
 				if out.Registration == nil {
 					out.Registration = new(Registration)
 				}
-				(*out.Registration).UnmarshalEasyJSON(in)
+				if in.IsNull() {
+					in.Skip()
+				} else {
+					(*out.Registration).UnmarshalEasyJSON(in)
+				}
 			}
 		case "global":
-			out.Global = bool(in.Bool())
+			if in.IsNull() {
+				in.Skip()
+			} else {
+				out.Global = bool(in.Bool())
+			}
 		case "expiration":
-			out.Expiration = uint64(in.Uint64())
+			if in.IsNull() {
+				in.Skip()
+			} else {
+				out.Expiration = uint64(in.Uint64())
+			}
 		default:
 			in.SkipRecursive()
 		}
@@ -564,16 +566,19 @@ func easyjsonDabade4DecodeGithubComEgdaemonEgRunnersRegistration6(in *jlexer.Lex
 	for !in.IsDelim('}') {
 		key := in.UnsafeFieldName(false)
 		in.WantColon()
-		if in.IsNull() {
-			in.Skip()
-			in.WantComma()
-			continue
-		}
 		switch key {
 		case "id":
-			out.Id = string(in.String())
+			if in.IsNull() {
+				in.Skip()
+			} else {
+				out.Id = string(in.String())
+			}
 		case "description":
-			out.Description = string(in.String())
+			if in.IsNull() {
+				in.Skip()
+			} else {
+				out.Description = string(in.String())
+			}
 		case "publickey":
 			if in.IsNull() {
 				in.Skip()
@@ -582,19 +587,47 @@ func easyjsonDabade4DecodeGithubComEgdaemonEgRunnersRegistration6(in *jlexer.Lex
 				out.Publickey = in.Bytes()
 			}
 		case "authzed_at":
-			out.AuthzedAt = string(in.String())
+			if in.IsNull() {
+				in.Skip()
+			} else {
+				out.AuthzedAt = string(in.String())
+			}
 		case "expires_at":
-			out.ExpiresAt = string(in.String())
+			if in.IsNull() {
+				in.Skip()
+			} else {
+				out.ExpiresAt = string(in.String())
+			}
 		case "p2pid":
-			out.P2Pid = string(in.String())
+			if in.IsNull() {
+				in.Skip()
+			} else {
+				out.P2Pid = string(in.String())
+			}
 		case "os":
-			out.Os = string(in.String())
+			if in.IsNull() {
+				in.Skip()
+			} else {
+				out.Os = string(in.String())
+			}
 		case "arch":
-			out.Arch = string(in.String())
+			if in.IsNull() {
+				in.Skip()
+			} else {
+				out.Arch = string(in.String())
+			}
 		case "cores":
-			out.Cores = uint64(in.Uint64())
+			if in.IsNull() {
+				in.Skip()
+			} else {
+				out.Cores = uint64(in.Uint64())
+			}
 		case "memory":
-			out.Memory = uint64(in.Uint64())
+			if in.IsNull() {
+				in.Skip()
+			} else {
+				out.Memory = uint64(in.Uint64())
+			}
 		case "labels":
 			if in.IsNull() {
 				in.Skip()
@@ -612,7 +645,11 @@ func easyjsonDabade4DecodeGithubComEgdaemonEgRunnersRegistration6(in *jlexer.Lex
 				}
 				for !in.IsDelim(']') {
 					var v8 string
-					v8 = string(in.String())
+					if in.IsNull() {
+						in.Skip()
+					} else {
+						v8 = string(in.String())
+					}
 					out.Labels = append(out.Labels, v8)
 					in.WantComma()
 				}
@@ -786,11 +823,6 @@ func easyjsonDabade4DecodeGithubComEgdaemonEgRunnersRegistration7(in *jlexer.Lex
 	for !in.IsDelim('}') {
 		key := in.UnsafeFieldName(false)
 		in.WantColon()
-		if in.IsNull() {
-			in.Skip()
-			in.WantComma()
-			continue
-		}
 		switch key {
 		case "bootstrap":
 			if in.IsNull() {
@@ -809,7 +841,11 @@ func easyjsonDabade4DecodeGithubComEgdaemonEgRunnersRegistration7(in *jlexer.Lex
 				}
 				for !in.IsDelim(']') {
 					var v13 string
-					v13 = string(in.String())
+					if in.IsNull() {
+						in.Skip()
+					} else {
+						v13 = string(in.String())
+					}
 					out.Bootstrap = append(out.Bootstrap, v13)
 					in.WantComma()
 				}
@@ -883,11 +919,6 @@ func easyjsonDabade4DecodeGithubComEgdaemonEgRunnersRegistration8(in *jlexer.Lex
 	for !in.IsDelim('}') {
 		key := in.UnsafeFieldName(false)
 		in.WantColon()
-		if in.IsNull() {
-			in.Skip()
-			in.WantComma()
-			continue
-		}
 		switch key {
 		case "registration":
 			if in.IsNull() {
@@ -897,7 +928,11 @@ func easyjsonDabade4DecodeGithubComEgdaemonEgRunnersRegistration8(in *jlexer.Lex
 				if out.Registration == nil {
 					out.Registration = new(Registration)
 				}
-				(*out.Registration).UnmarshalEasyJSON(in)
+				if in.IsNull() {
+					in.Skip()
+				} else {
+					(*out.Registration).UnmarshalEasyJSON(in)
+				}
 			}
 		default:
 			in.SkipRecursive()

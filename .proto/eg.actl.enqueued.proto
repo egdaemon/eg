@@ -22,7 +22,8 @@ message Enqueued {
   string account_id = 17 [ json_name = "account_id" ];
   string mimetype = 18 [ json_name = "mimetype" ];
   string uploaded_by = 19 [ json_name = "uploaded_by" ];
-  reserved 20 to 999;
+  string vcs_commit = 20 [ json_name = "vcs_commit" ];
+  reserved 21 to 999;
   repeated string labels = 1000 [ json_name = "labels" ];
 }
 

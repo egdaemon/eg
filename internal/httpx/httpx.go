@@ -158,7 +158,7 @@ func WebsocketRequestScheme(req *http.Request) string {
 }
 
 // WriteJSON writes a json payload into the provided buffer and sets the context-type header to application/json.
-func WriteJSON(resp http.ResponseWriter, buffer *bytes.Buffer, context interface{}) error {
+func WriteJSON(resp http.ResponseWriter, buffer *bytes.Buffer, context any) error {
 	var (
 		err error
 	)

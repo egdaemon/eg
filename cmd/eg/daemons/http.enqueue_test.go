@@ -1,44 +1,43 @@
 package daemons_test
 
 import (
-	"bytes"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/egdaemon/eg/cmd/eg/daemons"
 	"github.com/egdaemon/eg/runners"
+	"github.com/gofrs/uuid/v5"
 	"github.com/stretchr/testify/require"
 )
 
-func newEnqueueHandler(t *testing.T, limits runners.RuntimeResources) *daemons.EnqueueHandler {
-	t.Helper()
-	return &daemons.EnqueueHandler{
-		Dirs: runners.NewSpoolDir(t.TempDir()),
-		RM:   runners.NewResourceManager(limits),
-	}
-}
-
-func doEnqueue(h *daemons.EnqueueHandler, req runners.CompileRequest) *httptest.ResponseRecorder {
-	encoded, _ := json.Marshal(req)
-	r := httptest.NewRequest(http.MethodPost, "/c/enqueue", bytes.NewReader(encoded))
-	w := httptest.NewRecorder()
-	h.ServeHTTP(w, r)
-	return w
-}
-
 func TestEnqueueHandler(t *testing.T) {
 	t.Run("accepted requests are spooled for compile", func(t *testing.T) {
-		h := newEnqueueHandler(t, runners.RuntimeResources{Cores: 10, Memory: 10, Vram: 10})
+		h := &daemons.EnqueueHandler{
+			Dirs: runners.NewSpoolDir(t.TempDir()),
+			RM:   runners.NewResourceManager(runners.RuntimeResources{Cores: 10, Memory: 10, Vram: 10}),
+		}
 
-		w := doEnqueue(h, runners.CompileRequest{VcsUri: "https://example.com/repo.git", VcsCommit: "deadbeef", Cores: 1})
+		enqresp := runners.EnqueuedDequeueResponse{
+			Enqueued:    &runners.Enqueued{Id: uuid.Must(uuid.NewV7()).String(), VcsUri: "https://example.com/repo.git", VcsCommit: "deadbeef", Cores: 1},
+			AccessToken: "tok",
+		}
+		mimetype, body, err := runners.NewWorkloadRequest(&enqresp, strings.NewReader(""))
+		require.NoError(t, err)
+		defer body.Close()
+
+		r := httptest.NewRequest(http.MethodPost, "/c/enqueue", body)
+		r.Header.Set("Content-Type", mimetype)
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, r)
 		require.Equal(t, http.StatusAccepted, w.Code)
 
-		var resp map[string]string
+		var resp runners.Enqueued
 		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
-		require.NotEmpty(t, resp["id"])
+		require.Equal(t, enqresp.Enqueued.Id, resp.Id)
 
 		entries, err := os.ReadDir(h.Dirs.Queued)
 		require.NoError(t, err)
@@ -46,9 +45,22 @@ func TestEnqueueHandler(t *testing.T) {
 	})
 
 	t.Run("requests that would exceed target load are rejected without touching the spool", func(t *testing.T) {
-		h := newEnqueueHandler(t, runners.RuntimeResources{Cores: 10, Memory: 10, Vram: 10})
+		h := &daemons.EnqueueHandler{
+			Dirs: runners.NewSpoolDir(t.TempDir()),
+			RM:   runners.NewResourceManager(runners.RuntimeResources{Cores: 10, Memory: 10, Vram: 10}),
+		}
 
-		w := doEnqueue(h, runners.CompileRequest{VcsUri: "https://example.com/repo.git", VcsCommit: "deadbeef", Cores: 9})
+		enqresp := runners.EnqueuedDequeueResponse{
+			Enqueued: &runners.Enqueued{Id: uuid.Must(uuid.NewV7()).String(), VcsUri: "https://example.com/repo.git", VcsCommit: "deadbeef", Cores: 9},
+		}
+		mimetype, body, err := runners.NewWorkloadRequest(&enqresp, strings.NewReader(""))
+		require.NoError(t, err)
+		defer body.Close()
+
+		r := httptest.NewRequest(http.MethodPost, "/c/enqueue", body)
+		r.Header.Set("Content-Type", mimetype)
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, r)
 		require.Equal(t, http.StatusConflict, w.Code)
 
 		entries, err := os.ReadDir(h.Dirs.Queued)
@@ -61,9 +73,12 @@ func TestEnqueueHandler(t *testing.T) {
 	})
 
 	t.Run("malformed bodies are rejected", func(t *testing.T) {
-		h := newEnqueueHandler(t, runners.RuntimeResources{Cores: 10, Memory: 10, Vram: 10})
+		h := &daemons.EnqueueHandler{
+			Dirs: runners.NewSpoolDir(t.TempDir()),
+			RM:   runners.NewResourceManager(runners.RuntimeResources{Cores: 10, Memory: 10, Vram: 10}),
+		}
 
-		r := httptest.NewRequest(http.MethodPost, "/c/enqueue", bytes.NewReader([]byte("not json")))
+		r := httptest.NewRequest(http.MethodPost, "/c/enqueue", strings.NewReader("not json"))
 		w := httptest.NewRecorder()
 		h.ServeHTTP(w, r)
 

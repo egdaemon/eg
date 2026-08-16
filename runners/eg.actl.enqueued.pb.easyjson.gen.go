@@ -30,11 +30,6 @@ func easyjson61363d27DecodeGithubComEgdaemonEgRunners(in *jlexer.Lexer, out *Enq
 	for !in.IsDelim('}') {
 		key := in.UnsafeFieldName(false)
 		in.WantColon()
-		if in.IsNull() {
-			in.Skip()
-			in.WantComma()
-			continue
-		}
 		switch key {
 		case "enqueued":
 			if in.IsNull() {
@@ -44,7 +39,11 @@ func easyjson61363d27DecodeGithubComEgdaemonEgRunners(in *jlexer.Lexer, out *Enq
 				if out.Enqueued == nil {
 					out.Enqueued = new(Enqueued)
 				}
-				(*out.Enqueued).UnmarshalEasyJSON(in)
+				if in.IsNull() {
+					in.Skip()
+				} else {
+					(*out.Enqueued).UnmarshalEasyJSON(in)
+				}
 			}
 		default:
 			in.SkipRecursive()
@@ -105,11 +104,6 @@ func easyjson61363d27DecodeGithubComEgdaemonEgRunners1(in *jlexer.Lexer, out *En
 	for !in.IsDelim('}') {
 		key := in.UnsafeFieldName(false)
 		in.WantColon()
-		if in.IsNull() {
-			in.Skip()
-			in.WantComma()
-			continue
-		}
 		switch key {
 		case "enqueued":
 			if in.IsNull() {
@@ -119,7 +113,11 @@ func easyjson61363d27DecodeGithubComEgdaemonEgRunners1(in *jlexer.Lexer, out *En
 				if out.Enqueued == nil {
 					out.Enqueued = new(Enqueued)
 				}
-				(*out.Enqueued).UnmarshalEasyJSON(in)
+				if in.IsNull() {
+					in.Skip()
+				} else {
+					(*out.Enqueued).UnmarshalEasyJSON(in)
+				}
 			}
 		default:
 			in.SkipRecursive()
@@ -180,11 +178,6 @@ func easyjson61363d27DecodeGithubComEgdaemonEgRunners2(in *jlexer.Lexer, out *En
 	for !in.IsDelim('}') {
 		key := in.UnsafeFieldName(false)
 		in.WantColon()
-		if in.IsNull() {
-			in.Skip()
-			in.WantComma()
-			continue
-		}
 		switch key {
 		case "next":
 			if in.IsNull() {
@@ -194,7 +187,11 @@ func easyjson61363d27DecodeGithubComEgdaemonEgRunners2(in *jlexer.Lexer, out *En
 				if out.Next == nil {
 					out.Next = new(EnqueuedSearchRequest)
 				}
-				(*out.Next).UnmarshalEasyJSON(in)
+				if in.IsNull() {
+					in.Skip()
+				} else {
+					(*out.Next).UnmarshalEasyJSON(in)
+				}
 			}
 		case "items":
 			if in.IsNull() {
@@ -220,7 +217,11 @@ func easyjson61363d27DecodeGithubComEgdaemonEgRunners2(in *jlexer.Lexer, out *En
 						if v1 == nil {
 							v1 = new(Enqueued)
 						}
-						(*v1).UnmarshalEasyJSON(in)
+						if in.IsNull() {
+							in.Skip()
+						} else {
+							(*v1).UnmarshalEasyJSON(in)
+						}
 					}
 					out.Items = append(out.Items, v1)
 					in.WantComma()
@@ -309,32 +310,67 @@ func easyjson61363d27DecodeGithubComEgdaemonEgRunners3(in *jlexer.Lexer, out *En
 	for !in.IsDelim('}') {
 		key := in.UnsafeFieldName(false)
 		in.WantColon()
-		if in.IsNull() {
-			in.Skip()
-			in.WantComma()
-			continue
-		}
 		switch key {
 		case "query":
-			out.Query = string(in.String())
+			if in.IsNull() {
+				in.Skip()
+			} else {
+				out.Query = string(in.String())
+			}
 		case "offset":
-			out.Offset = uint64(in.Uint64())
+			if in.IsNull() {
+				in.Skip()
+			} else {
+				out.Offset = uint64(in.Uint64())
+			}
 		case "limit":
-			out.Limit = uint64(in.Uint64())
+			if in.IsNull() {
+				in.Skip()
+			} else {
+				out.Limit = uint64(in.Uint64())
+			}
 		case "arch":
-			out.Arch = string(in.String())
+			if in.IsNull() {
+				in.Skip()
+			} else {
+				out.Arch = string(in.String())
+			}
 		case "os":
-			out.Os = string(in.String())
+			if in.IsNull() {
+				in.Skip()
+			} else {
+				out.Os = string(in.String())
+			}
 		case "cores":
-			out.Cores = uint64(in.Uint64())
+			if in.IsNull() {
+				in.Skip()
+			} else {
+				out.Cores = uint64(in.Uint64())
+			}
 		case "memory":
-			out.Memory = uint64(in.Uint64())
+			if in.IsNull() {
+				in.Skip()
+			} else {
+				out.Memory = uint64(in.Uint64())
+			}
 		case "vram":
-			out.Vram = uint64(in.Uint64())
+			if in.IsNull() {
+				in.Skip()
+			} else {
+				out.Vram = uint64(in.Uint64())
+			}
 		case "cluster_id":
-			out.ClusterId = string(in.String())
+			if in.IsNull() {
+				in.Skip()
+			} else {
+				out.ClusterId = string(in.String())
+			}
 		case "vcs_uri":
-			out.VcsUri = string(in.String())
+			if in.IsNull() {
+				in.Skip()
+			} else {
+				out.VcsUri = string(in.String())
+			}
 		case "labels":
 			if in.IsNull() {
 				in.Skip()
@@ -352,7 +388,11 @@ func easyjson61363d27DecodeGithubComEgdaemonEgRunners3(in *jlexer.Lexer, out *En
 				}
 				for !in.IsDelim(']') {
 					var v4 string
-					v4 = string(in.String())
+					if in.IsNull() {
+						in.Skip()
+					} else {
+						v4 = string(in.String())
+					}
 					out.Labels = append(out.Labels, v4)
 					in.WantComma()
 				}
@@ -526,11 +566,6 @@ func easyjson61363d27DecodeGithubComEgdaemonEgRunners4(in *jlexer.Lexer, out *En
 	for !in.IsDelim('}') {
 		key := in.UnsafeFieldName(false)
 		in.WantColon()
-		if in.IsNull() {
-			in.Skip()
-			in.WantComma()
-			continue
-		}
 		switch key {
 		case "enqueued":
 			if in.IsNull() {
@@ -540,7 +575,11 @@ func easyjson61363d27DecodeGithubComEgdaemonEgRunners4(in *jlexer.Lexer, out *En
 				if out.Enqueued == nil {
 					out.Enqueued = new(Enqueued)
 				}
-				(*out.Enqueued).UnmarshalEasyJSON(in)
+				if in.IsNull() {
+					in.Skip()
+				} else {
+					(*out.Enqueued).UnmarshalEasyJSON(in)
+				}
 			}
 		default:
 			in.SkipRecursive()
@@ -601,11 +640,6 @@ func easyjson61363d27DecodeGithubComEgdaemonEgRunners5(in *jlexer.Lexer, out *En
 	for !in.IsDelim('}') {
 		key := in.UnsafeFieldName(false)
 		in.WantColon()
-		if in.IsNull() {
-			in.Skip()
-			in.WantComma()
-			continue
-		}
 		switch key {
 		case "enqueued":
 			if in.IsNull() {
@@ -615,7 +649,11 @@ func easyjson61363d27DecodeGithubComEgdaemonEgRunners5(in *jlexer.Lexer, out *En
 				if out.Enqueued == nil {
 					out.Enqueued = new(Enqueued)
 				}
-				(*out.Enqueued).UnmarshalEasyJSON(in)
+				if in.IsNull() {
+					in.Skip()
+				} else {
+					(*out.Enqueued).UnmarshalEasyJSON(in)
+				}
 			}
 		default:
 			in.SkipRecursive()
@@ -676,11 +714,6 @@ func easyjson61363d27DecodeGithubComEgdaemonEgRunners6(in *jlexer.Lexer, out *En
 	for !in.IsDelim('}') {
 		key := in.UnsafeFieldName(false)
 		in.WantColon()
-		if in.IsNull() {
-			in.Skip()
-			in.WantComma()
-			continue
-		}
 		switch key {
 		default:
 			in.SkipRecursive()
@@ -735,11 +768,6 @@ func easyjson61363d27DecodeGithubComEgdaemonEgRunners7(in *jlexer.Lexer, out *En
 	for !in.IsDelim('}') {
 		key := in.UnsafeFieldName(false)
 		in.WantColon()
-		if in.IsNull() {
-			in.Skip()
-			in.WantComma()
-			continue
-		}
 		switch key {
 		case "enqueued":
 			if in.IsNull() {
@@ -749,10 +777,18 @@ func easyjson61363d27DecodeGithubComEgdaemonEgRunners7(in *jlexer.Lexer, out *En
 				if out.Enqueued == nil {
 					out.Enqueued = new(Enqueued)
 				}
-				(*out.Enqueued).UnmarshalEasyJSON(in)
+				if in.IsNull() {
+					in.Skip()
+				} else {
+					(*out.Enqueued).UnmarshalEasyJSON(in)
+				}
 			}
 		case "access_token":
-			out.AccessToken = string(in.String())
+			if in.IsNull() {
+				in.Skip()
+			} else {
+				out.AccessToken = string(in.String())
+			}
 		default:
 			in.SkipRecursive()
 		}
@@ -822,11 +858,6 @@ func easyjson61363d27DecodeGithubComEgdaemonEgRunners8(in *jlexer.Lexer, out *En
 	for !in.IsDelim('}') {
 		key := in.UnsafeFieldName(false)
 		in.WantColon()
-		if in.IsNull() {
-			in.Skip()
-			in.WantComma()
-			continue
-		}
 		switch key {
 		case "enqueued":
 			if in.IsNull() {
@@ -836,7 +867,11 @@ func easyjson61363d27DecodeGithubComEgdaemonEgRunners8(in *jlexer.Lexer, out *En
 				if out.Enqueued == nil {
 					out.Enqueued = new(Enqueued)
 				}
-				(*out.Enqueued).UnmarshalEasyJSON(in)
+				if in.IsNull() {
+					in.Skip()
+				} else {
+					(*out.Enqueued).UnmarshalEasyJSON(in)
+				}
 			}
 		default:
 			in.SkipRecursive()
@@ -897,11 +932,6 @@ func easyjson61363d27DecodeGithubComEgdaemonEgRunners9(in *jlexer.Lexer, out *En
 	for !in.IsDelim('}') {
 		key := in.UnsafeFieldName(false)
 		in.WantColon()
-		if in.IsNull() {
-			in.Skip()
-			in.WantComma()
-			continue
-		}
 		switch key {
 		case "enqueued":
 			if in.IsNull() {
@@ -911,7 +941,11 @@ func easyjson61363d27DecodeGithubComEgdaemonEgRunners9(in *jlexer.Lexer, out *En
 				if out.Enqueued == nil {
 					out.Enqueued = new(Enqueued)
 				}
-				(*out.Enqueued).UnmarshalEasyJSON(in)
+				if in.IsNull() {
+					in.Skip()
+				} else {
+					(*out.Enqueued).UnmarshalEasyJSON(in)
+				}
 			}
 		default:
 			in.SkipRecursive()
@@ -972,11 +1006,6 @@ func easyjson61363d27DecodeGithubComEgdaemonEgRunners10(in *jlexer.Lexer, out *E
 	for !in.IsDelim('}') {
 		key := in.UnsafeFieldName(false)
 		in.WantColon()
-		if in.IsNull() {
-			in.Skip()
-			in.WantComma()
-			continue
-		}
 		switch key {
 		case "enqueued":
 			if in.IsNull() {
@@ -986,7 +1015,11 @@ func easyjson61363d27DecodeGithubComEgdaemonEgRunners10(in *jlexer.Lexer, out *E
 				if out.Enqueued == nil {
 					out.Enqueued = new(Enqueued)
 				}
-				(*out.Enqueued).UnmarshalEasyJSON(in)
+				if in.IsNull() {
+					in.Skip()
+				} else {
+					(*out.Enqueued).UnmarshalEasyJSON(in)
+				}
 			}
 		default:
 			in.SkipRecursive()
@@ -1047,11 +1080,6 @@ func easyjson61363d27DecodeGithubComEgdaemonEgRunners11(in *jlexer.Lexer, out *E
 	for !in.IsDelim('}') {
 		key := in.UnsafeFieldName(false)
 		in.WantColon()
-		if in.IsNull() {
-			in.Skip()
-			in.WantComma()
-			continue
-		}
 		switch key {
 		default:
 			in.SkipRecursive()
@@ -1106,50 +1134,127 @@ func easyjson61363d27DecodeGithubComEgdaemonEgRunners12(in *jlexer.Lexer, out *E
 	for !in.IsDelim('}') {
 		key := in.UnsafeFieldName(false)
 		in.WantColon()
-		if in.IsNull() {
-			in.Skip()
-			in.WantComma()
-			continue
-		}
 		switch key {
 		case "id":
-			out.Id = string(in.String())
+			if in.IsNull() {
+				in.Skip()
+			} else {
+				out.Id = string(in.String())
+			}
 		case "created_at":
-			out.CreatedAt = string(in.String())
+			if in.IsNull() {
+				in.Skip()
+			} else {
+				out.CreatedAt = string(in.String())
+			}
 		case "updated_at":
-			out.UpdatedAt = string(in.String())
+			if in.IsNull() {
+				in.Skip()
+			} else {
+				out.UpdatedAt = string(in.String())
+			}
 		case "arch":
-			out.Arch = string(in.String())
+			if in.IsNull() {
+				in.Skip()
+			} else {
+				out.Arch = string(in.String())
+			}
 		case "os":
-			out.Os = string(in.String())
+			if in.IsNull() {
+				in.Skip()
+			} else {
+				out.Os = string(in.String())
+			}
 		case "cores":
-			out.Cores = uint64(in.Uint64())
+			if in.IsNull() {
+				in.Skip()
+			} else {
+				out.Cores = uint64(in.Uint64())
+			}
 		case "memory":
-			out.Memory = uint64(in.Uint64())
+			if in.IsNull() {
+				in.Skip()
+			} else {
+				out.Memory = uint64(in.Uint64())
+			}
 		case "vram":
-			out.Vram = uint64(in.Uint64())
+			if in.IsNull() {
+				in.Skip()
+			} else {
+				out.Vram = uint64(in.Uint64())
+			}
 		case "ttl":
-			out.Ttl = uint64(in.Uint64())
+			if in.IsNull() {
+				in.Skip()
+			} else {
+				out.Ttl = uint64(in.Uint64())
+			}
 		case "cluster_id":
-			out.ClusterId = string(in.String())
+			if in.IsNull() {
+				in.Skip()
+			} else {
+				out.ClusterId = string(in.String())
+			}
 		case "entry":
-			out.Entry = string(in.String())
+			if in.IsNull() {
+				in.Skip()
+			} else {
+				out.Entry = string(in.String())
+			}
 		case "initiated_at":
-			out.InitiatedAt = string(in.String())
+			if in.IsNull() {
+				in.Skip()
+			} else {
+				out.InitiatedAt = string(in.String())
+			}
 		case "completed_at":
-			out.CompletedAt = string(in.String())
+			if in.IsNull() {
+				in.Skip()
+			} else {
+				out.CompletedAt = string(in.String())
+			}
 		case "description":
-			out.Description = string(in.String())
+			if in.IsNull() {
+				in.Skip()
+			} else {
+				out.Description = string(in.String())
+			}
 		case "vcs_uri":
-			out.VcsUri = string(in.String())
+			if in.IsNull() {
+				in.Skip()
+			} else {
+				out.VcsUri = string(in.String())
+			}
 		case "allow_shared":
-			out.AllowShared = bool(in.Bool())
+			if in.IsNull() {
+				in.Skip()
+			} else {
+				out.AllowShared = bool(in.Bool())
+			}
 		case "account_id":
-			out.AccountId = string(in.String())
+			if in.IsNull() {
+				in.Skip()
+			} else {
+				out.AccountId = string(in.String())
+			}
 		case "mimetype":
-			out.Mimetype = string(in.String())
+			if in.IsNull() {
+				in.Skip()
+			} else {
+				out.Mimetype = string(in.String())
+			}
 		case "uploaded_by":
-			out.UploadedBy = string(in.String())
+			if in.IsNull() {
+				in.Skip()
+			} else {
+				out.UploadedBy = string(in.String())
+			}
+		case "vcs_commit":
+			if in.IsNull() {
+				in.Skip()
+			} else {
+				out.VcsCommit = string(in.String())
+			}
 		case "labels":
 			if in.IsNull() {
 				in.Skip()
@@ -1167,7 +1272,11 @@ func easyjson61363d27DecodeGithubComEgdaemonEgRunners12(in *jlexer.Lexer, out *E
 				}
 				for !in.IsDelim(']') {
 					var v7 string
-					v7 = string(in.String())
+					if in.IsNull() {
+						in.Skip()
+					} else {
+						v7 = string(in.String())
+					}
 					out.Labels = append(out.Labels, v7)
 					in.WantComma()
 				}
@@ -1372,6 +1481,16 @@ func easyjson61363d27EncodeGithubComEgdaemonEgRunners12(out *jwriter.Writer, in 
 			out.RawString(prefix)
 		}
 		out.String(string(in.UploadedBy))
+	}
+	if in.VcsCommit != "" {
+		const prefix string = ",\"vcs_commit\":"
+		if first {
+			first = false
+			out.RawString(prefix[1:])
+		} else {
+			out.RawString(prefix)
+		}
+		out.String(string(in.VcsCommit))
 	}
 	if len(in.Labels) != 0 {
 		const prefix string = ",\"labels\":"

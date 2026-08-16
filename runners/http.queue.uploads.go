@@ -1,14 +1,48 @@
 package runners
 
 import (
+	"encoding/json"
 	"io"
 	"mime/multipart"
 	"strconv"
 	"time"
 
+	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/httpx"
 )
+
+// NewWorkloadRequest builds the multipart body for POST /c/enqueue: an
+// "enqueued" field carrying the JSON-encoded EnqueuedDequeueResponse -- the
+// same shape a runner gets back from the polling /c/q/dequeue flow, whose
+// Enqueued.VcsCommit is the treeish to check out and whose AccessToken is
+// the short-lived token to exchange for actual git credentials -- and a
+// required "environ" file part (see eg.EnvironFile), only used as a fallback
+// for callers that predate those structured fields. Pass an empty reader
+// when neither applies; the part itself must still be present.
+func NewWorkloadRequest(resp *EnqueuedDequeueResponse, environ io.Reader) (mimetype string, body io.ReadCloser, err error) {
+	return httpx.Multipart(func(w *multipart.Writer) error {
+		encoded, lerr := json.Marshal(resp)
+		if lerr != nil {
+			return errorsx.Wrap(lerr, "unable to encode enqueue request")
+		}
+
+		if lerr = w.WriteField("enqueued", string(encoded)); lerr != nil {
+			return errorsx.Wrap(lerr, "unable to copy enqueued metadata")
+		}
+
+		part, lerr := w.CreatePart(httpx.NewMultipartHeader("text/plain", "environ", eg.EnvironFile))
+		if lerr != nil {
+			return errorsx.Wrap(lerr, "unable to create environ part")
+		}
+
+		if _, lerr = io.Copy(part, environ); lerr != nil {
+			return errorsx.Wrap(lerr, "unable to copy environ")
+		}
+
+		return nil
+	})
+}
 
 func NewEnqueueUpload(enq *Enqueued, archive io.Reader) (mimetype string, body io.ReadCloser, err error) {
 	return httpx.Multipart(func(w *multipart.Writer) error {

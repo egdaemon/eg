@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/internal/fsx"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing/object"
@@ -58,11 +59,12 @@ func TestCompileWorkload(t *testing.T) {
 		rundirs := NewSpoolDir(t.TempDir())
 
 		uid := uuid.Must(uuid.NewV7())
-		req := CompileRequest{
-			VcsUri: uri,
-			VcsRef: ref,
-			Cores:  1,
-			// VcsAuthToken intentionally blank: this is a local, unauthenticated repo.
+		req := EnqueuedDequeueResponse{
+			Enqueued: &Enqueued{
+				VcsUri:    uri,
+				VcsCommit: ref,
+				Cores:     1,
+			},
 		}
 		encoded, err := json.Marshal(&req)
 		require.NoError(t, err)
@@ -94,10 +96,17 @@ func TestCompileWorkload(t *testing.T) {
 		require.NoError(t, json.Unmarshal(mencoded, &resp))
 		require.Equal(t, uid.String(), resp.Enqueued.Id)
 		require.NotEmpty(t, resp.Enqueued.Entry)
-		require.NotContains(t, string(mencoded), "vcs_auth_token")
+		require.Equal(t, ref, resp.Enqueued.VcsCommit)
 
 		// clone artifacts are cleaned up, not left behind in the run directory.
 		require.NoDirExists(t, filepath.Join(target, "src"))
+
+		// the incoming request environment is overwritten by the outgoing
+		// workload environment once cloning is done, so any credentials it
+		// carried don't linger.
+		outgoing, err := os.ReadFile(filepath.Join(target, eg.EnvironFile))
+		require.NoError(t, err)
+		require.NotContains(t, string(outgoing), "EG_GIT_AUTH_ACCESS_TOKEN")
 
 		// the compile-side job directory is gone -- it was renamed, not copied.
 		require.NoDirExists(t, dir)
@@ -108,7 +117,7 @@ func TestCompileWorkload(t *testing.T) {
 		rundirs := NewSpoolDir(t.TempDir())
 
 		uid := uuid.Must(uuid.NewV7())
-		req := CompileRequest{VcsUri: filepath.Join(t.TempDir(), "does-not-exist"), VcsRef: "main"}
+		req := EnqueuedDequeueResponse{Enqueued: &Enqueued{VcsUri: filepath.Join(t.TempDir(), "does-not-exist")}}
 		encoded, err := json.Marshal(&req)
 		require.NoError(t, err)
 		require.NoError(t, compiledirs.Download(uid, "metadata.json", bytes.NewReader(encoded)))

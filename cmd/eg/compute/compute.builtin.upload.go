@@ -81,7 +81,7 @@ func (t builtinUpload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err e
 		tmpdir,
 		t.Name,
 		workspaces.OptionSymlinkCache(filepath.Join(t.Dir, eg.CacheDirectory)),
-		workspaces.OptionSymlinkWorking(t.Dir),
+		workspaces.OptionCloneWorking(gctx.Context, t.Dir),
 	); err != nil {
 		return err
 	}

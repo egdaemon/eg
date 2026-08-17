@@ -73,7 +73,7 @@ func (t builtinLocal) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath)
 		tmpdir,
 		t.Name,
 		workspaces.OptionSymlinkCache(filepath.Join(t.Dir, eg.CacheDirectory)),
-		workspaces.OptionSymlinkWorking(t.Dir),
+		workspaces.OptionCloneWorking(gctx.Context, t.Dir),
 		workspaces.OptionEnabled(workspaces.OptionInvalidateModuleCache, t.InvalidateCache),
 	); err != nil {
 		return errorsx.Wrap(err, "unable to initialize workspace")

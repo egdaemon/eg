@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/egdaemon/eg"
@@ -19,6 +20,7 @@ import (
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/fsx"
+	"github.com/egdaemon/eg/internal/gitx"
 	"github.com/egdaemon/eg/internal/langx"
 	"github.com/egdaemon/eg/internal/wasix"
 	"github.com/gofrs/uuid/v5"
@@ -101,6 +103,44 @@ func OptionSymlinkWorking(working string) Option {
 	}
 }
 
+// OptionWorktreeWorking checks out a linked git worktree at HEAD of repo into
+// the workspace's working directory, in place of the symlink this used to be
+// -- see internal/gitx.Worktree for the rationale. falls back to
+// OptionSymlinkWorking when repo isn't a git repository.
+func OptionWorktreeWorking(ctx context.Context, repo string) Option {
+	if !gitx.IsRepository(repo) {
+		return OptionSymlinkWorking(repo)
+	}
+
+	return func(wctx *Context) {
+		started := time.Now()
+		defer func() {
+			debugx.Println("worktree working directory checkout", repo, "completed in", time.Since(started))
+		}()
+		errorsx.Never(gitx.Worktree(ctx, repo, filepath.Join(wctx.Root, eg.WorkingDirectory)))
+	}
+}
+
+// OptionCloneWorking checks out a fully self-contained local clone at HEAD of
+// repo into the workspace's working directory. unlike OptionWorktreeWorking,
+// the checkout carries its own independent .git directory -- see
+// internal/gitx.LocalClone for why that matters when the working directory
+// gets relocated into a different mount namespace (e.g. a container). falls
+// back to OptionSymlinkWorking when repo isn't a git repository.
+func OptionCloneWorking(ctx context.Context, repo string) Option {
+	if !gitx.IsRepository(repo) {
+		return OptionSymlinkWorking(repo)
+	}
+
+	return func(wctx *Context) {
+		started := time.Now()
+		defer func() {
+			debugx.Println("cloned working directory checkout", repo, "completed in", time.Since(started))
+		}()
+		errorsx.Never(gitx.LocalClone(ctx, repo, filepath.Join(wctx.Root, eg.WorkingDirectory)))
+	}
+}
+
 func symlinkDir(perm fs.FileMode, oldname, newname string) {
 	errorsx.Never(errorsx.Compact(
 		fsx.MkDirs(perm, oldname), // ensure the directory exists before symlinking
@@ -136,7 +176,7 @@ func NewLocal(ctx context.Context, uid uuid.UUID, cid hash.Hash, cwd string, nam
 		filepath.Join(cwd, workloadroot),
 		name,
 		OptionSymlinkCache(filepath.Join(cwd, eg.CacheDirectory)),
-		OptionSymlinkWorking(cwd),
+		OptionCloneWorking(ctx, cwd),
 		OptionCompose(options...),
 	)
 }

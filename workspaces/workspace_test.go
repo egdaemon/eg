@@ -4,15 +4,43 @@ import (
 	"crypto/sha256"
 	"log"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"testing"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/workspaces"
+	git "github.com/go-git/go-git/v6"
 	"github.com/gofrs/uuid/v5"
 	"github.com/stretchr/testify/require"
 )
+
+// initRepo creates a git repository at dir containing a single commit with
+// moduleDir/main.go, then leaves an additional uncommitted file behind so
+// tests can assert the workspace's working directory only reflects committed
+// state (see gitx.Worktree).
+func initRepo(t *testing.T, dir, moduleDir string) {
+	t.Helper()
+
+	run := func(args ...string) {
+		cmd := exec.Command("git", append([]string{"-C", dir}, args...)...)
+		out, err := cmd.CombinedOutput()
+		require.NoErrorf(t, err, "git %v: %s", args, out)
+	}
+
+	run("init", "-q")
+	run("config", "user.email", "test@example.com")
+	run("config", "user.name", "test")
+
+	require.NoError(t, os.Mkdir(filepath.Join(dir, moduleDir), 0755))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, moduleDir, "main.go"), []byte("package main"), 0644))
+
+	run("add", ".")
+	run("commit", "-q", "-m", "init")
+
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "untracked.txt"), []byte("dirty"), 0644))
+}
 
 func TestNewLocal(t *testing.T) {
 	t.Run("test compute local config - default workload", func(t *testing.T) {
@@ -91,6 +119,45 @@ func TestNewLocal(t *testing.T) {
 		_, err = os.Stat(ws.WorkspaceDir)
 		require.NoError(t, err, "WorkspaceDir should be created")
 		require.Equal(t, filepath.Join(expectedRoot, eg.CacheDirectory, eg.DefaultModuleDirectory(), "wazcache"), ws.CacheDirWazero)
+	})
+
+	t.Run("working dir is a checked-out worktree, not a symlink, when root is a git repository", func(t *testing.T) {
+		root := t.TempDir()
+		moduleDir := ".eg"
+		initRepo(t, root, moduleDir)
+
+		ws, err := workspaces.NewLocal(t.Context(), uuid.Max, sha256.New(), root, "")
+		require.NoError(t, err)
+
+		fi, err := os.Lstat(ws.WorkingDir)
+		require.NoError(t, err)
+		require.Zero(t, fi.Mode()&os.ModeSymlink, "WorkingDir should be a real directory, not a symlink")
+
+		_, err = os.Stat(filepath.Join(ws.WorkingDir, moduleDir, "main.go"))
+		require.NoError(t, err, "committed file should be checked out")
+
+		_, err = os.Stat(filepath.Join(ws.WorkingDir, "untracked.txt"))
+		require.ErrorIs(t, err, os.ErrNotExist, "uncommitted/untracked files should not carry over")
+
+		// regression check: go-git v6's PlainOpen sandboxes path resolution
+		// and used to reject the old symlink-based WorkingDir with
+		// "path escapes from parent" -- a real worktree must open cleanly.
+		_, err = git.PlainOpen(ws.WorkingDir)
+		require.NoError(t, err, "git.PlainOpen should succeed against the linked worktree")
+	})
+
+	t.Run("falls back to a symlink when root is not a git repository", func(t *testing.T) {
+		root := t.TempDir()
+		moduleDir := ".eg"
+		require.NoError(t, os.Mkdir(filepath.Join(root, moduleDir), 0755))
+		require.NoError(t, os.WriteFile(filepath.Join(root, moduleDir, "main.go"), []byte("package main"), 0644))
+
+		ws, err := workspaces.NewLocal(t.Context(), uuid.Max, sha256.New(), root, "")
+		require.NoError(t, err)
+
+		fi, err := os.Lstat(ws.WorkingDir)
+		require.NoError(t, err)
+		require.NotZero(t, fi.Mode()&os.ModeSymlink, "WorkingDir should fall back to a symlink for a non-git root")
 	})
 }
 

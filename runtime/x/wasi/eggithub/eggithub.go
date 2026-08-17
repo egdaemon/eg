@@ -140,7 +140,7 @@ func Promote(patterns ...string) eg.OpFn {
 		if len(patterns) > 0 {
 			err := shell.Run(
 				ctx,
-				runtime.Newf(`gh release view %s --json assets --jq ".assets[].name" | tee %s`, version, path),
+				runtime.Newf(`gh release view %s --json assets --jq ".assets[].name" > %s`, version, path),
 			)
 			if err != nil {
 				return err

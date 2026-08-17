@@ -268,6 +268,22 @@ func MkDirs(perm fs.FileMode, paths ...string) (err error) {
 	return nil
 }
 
+// String reads the entire contents of the file at path and returns it as a string.
+func String(path string) (string, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return "", err
+	}
+	defer f.Close()
+
+	raw, err := io.ReadAll(f)
+	if err != nil {
+		return "", err
+	}
+
+	return string(raw), nil
+}
+
 func ErrIsNotExist(err error) error {
 	if errors.Is(err, os.ErrNotExist) {
 		return err

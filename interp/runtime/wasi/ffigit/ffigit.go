@@ -10,8 +10,8 @@ import (
 	"github.com/egdaemon/eg/internal/gitx"
 	"github.com/egdaemon/eg/internal/stringsx"
 	"github.com/egdaemon/eg/interp/runtime/wasi/ffi"
-	"github.com/go-git/go-git/v5/plumbing/transport"
-	githttp "github.com/go-git/go-git/v5/plumbing/transport/http"
+	"github.com/go-git/go-git/v6/plumbing/client"
+	githttp "github.com/go-git/go-git/v6/plumbing/transport/http"
 	"github.com/tetratelabs/wazero/api"
 )
 
@@ -73,7 +73,7 @@ func CloneV1(dir string) func(
 			uri     string
 			remote  string
 			treeish string
-			auth    transport.AuthMethod
+			opts    []client.Option
 		)
 
 		if uri, err = ffi.ReadString(m.Memory(), uriptr, urilen); err != nil {
@@ -92,10 +92,10 @@ func CloneV1(dir string) func(
 		}
 
 		if username, password := envx.String("", gitx.EnvAuthHTTPUsername), envx.String("", gitx.EnvAuthHTTPPassword); !(stringsx.Blank(username) || !stringsx.Blank(password)) {
-			auth = &githttp.BasicAuth{Username: username, Password: password}
+			opts = append(opts, client.WithHTTPAuth(&githttp.BasicAuth{Username: username, Password: password}))
 		}
 
-		if err := gitx.Clone(ctx, auth, dir, uri, remote, treeish); err != nil {
+		if err := gitx.Clone(ctx, dir, uri, remote, treeish, opts...); err != nil {
 			log.Println(errorsx.Wrap(err, "clone failed"))
 			return 1
 		}
@@ -177,7 +177,7 @@ func CloneV2(dir string, runtimedir string) func(
 
 		environ := envx.NewEnvironFromStrings(env...)
 		// envx.Debug(env...)
-		autoauth := func() transport.AuthMethod {
+		autoauth := func() client.Option {
 			if auth, err := gitx.LoadCredentials(ctx, uri, runtimedir); auth != nil {
 				log.Println("git access token detected", auth)
 				return auth
@@ -187,7 +187,7 @@ func CloneV2(dir string, runtimedir string) func(
 
 			if username, password := environ.String("", gitx.EnvAuthHTTPUsername), environ.String("", gitx.EnvAuthHTTPPassword); !stringsx.Blank(username) && !stringsx.Blank(password) {
 				log.Println("git http auth detected")
-				return &githttp.BasicAuth{Username: username, Password: password}
+				return client.WithHTTPAuth(&githttp.BasicAuth{Username: username, Password: password})
 			}
 
 			log.Println("no auth detected")
@@ -197,7 +197,7 @@ func CloneV2(dir string, runtimedir string) func(
 		// this is a hack to disable cloning in local environment. we need to work on improving
 		// go-git to support this case cleanly.
 		if environ.Boolean(true, eg.EnvUnsafeGitCloneEnabled) {
-			if err := gitx.Clone(ctx, autoauth(), dir, uri, remote, treeish); err != nil {
+			if err := gitx.Clone(ctx, dir, uri, remote, treeish, autoauth()); err != nil {
 				log.Println(errorsx.Wrap(err, "clone failed"))
 				return 1
 			}

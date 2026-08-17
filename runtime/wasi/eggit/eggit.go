@@ -169,7 +169,6 @@ func AutoClone(ctx context.Context, _ eg.Op) error {
 	}
 
 	return nil
-
 }
 
 type modified struct {

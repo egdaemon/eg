@@ -39,6 +39,7 @@ func init() {
 			"egbootstrap",
 			"eg",
 			"sudo",
+			"git",
 			"golang",
 			"systemd-container", // required for machinectl to be present for use within shell.New(...) commands. which allows invoking systemctl --user commands.
 			"waypipe",           // required to support --wayland passthrough.

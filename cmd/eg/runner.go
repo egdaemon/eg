@@ -471,39 +471,44 @@ func (t wasiCmd) Run(gctx *cmdopts.Global) (err error) {
 	if err = compile.Run(ctx, t.Dir, t.Module, mpath); err != nil {
 		return err
 	}
-	runtime := wazero.NewRuntimeWithConfig(
+	wruntime := wazero.NewRuntimeWithConfig(
 		ctx,
 		wazero.NewRuntimeConfigInterpreter(),
 	)
 
-	mcfg := wazero.NewModuleConfig().WithStdin(
-		os.Stdin,
-	).WithStderr(
-		os.Stderr,
-	).WithStdout(
-		os.Stdout,
-	).WithFSConfig(
-		wazero.NewFSConfig().
-			WithDirMount("/etc/resolv.conf", "/etc/resolv.conf"),
-	).WithSysNanotime().WithSysWalltime().WithRandSource(rand.Reader)
+	mcfg := wazero.NewModuleConfig().
+		// Instructs WASI sched_yield to actually yield the host thread
+		WithOsyield(runtime.Gosched).
+		// Enables actual sleeping for WASI nanosleep calls
+		WithSysNanosleep().
+		WithStdin(os.Stdin).
+		WithStderr(os.Stderr).
+		WithStdout(os.Stdout).
+		WithFSConfig(
+			wazero.NewFSConfig().
+				WithDirMount("/etc/resolv.conf", "/etc/resolv.conf"),
+		).
+		WithSysNanotime().
+		WithSysWalltime().
+		WithRandSource(rand.Reader)
 
 	environ := errorsx.Zero(envx.Build().FromEnviron(os.Environ()...).Environ())
 	// envx.Debug(environ...)
 	mcfg = wasix.Environ(mcfg, environ...)
 
-	wasienv, err := wasi_snapshot_preview1.NewBuilder(runtime).Instantiate(ctx)
+	wasienv, err := wasi_snapshot_preview1.NewBuilder(wruntime).Instantiate(ctx)
 	if err != nil {
 		return err
 	}
 	defer wasienv.Close(ctx)
 
-	wasinet, err := ffiwasinet.Wazero(runtime).Instantiate(ctx)
+	wasinet, err := ffiwasinet.Wazero(wruntime).Instantiate(ctx)
 	if err != nil {
 		return err
 	}
 	defer wasinet.Close(ctx)
 
-	hostenv, err := runtime.
+	hostenv, err := wruntime.
 		NewHostModuleBuilder("env").
 		Instantiate(ctx)
 	if err != nil {
@@ -518,7 +523,7 @@ func (t wasiCmd) Run(gctx *cmdopts.Global) (err error) {
 		return err
 	}
 
-	c, err := runtime.CompileModule(ctx, wasi)
+	c, err := wruntime.CompileModule(ctx, wasi)
 	if err != nil {
 		return err
 	}
@@ -526,7 +531,7 @@ func (t wasiCmd) Run(gctx *cmdopts.Global) (err error) {
 
 	// wasidebug.Module(c)
 
-	m, err := runtime.InstantiateModule(ctx, c, mcfg.WithName(mpath))
+	m, err := wruntime.InstantiateModule(ctx, c, mcfg.WithName(mpath))
 	if err != nil {
 		return err
 	}

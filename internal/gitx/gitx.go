@@ -14,11 +14,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/go-git/go-git/v5"
-	"github.com/go-git/go-git/v5/plumbing"
-	"github.com/go-git/go-git/v5/plumbing/object"
-	"github.com/go-git/go-git/v5/plumbing/transport"
-	githttp "github.com/go-git/go-git/v5/plumbing/transport/http"
+	"github.com/go-git/go-git/v6"
+	"github.com/go-git/go-git/v6/plumbing"
+	"github.com/go-git/go-git/v6/plumbing/client"
+	"github.com/go-git/go-git/v6/plumbing/object"
+	githttp "github.com/go-git/go-git/v6/plumbing/transport/http"
 	"github.com/golang-jwt/jwt/v4"
 
 	"github.com/egdaemon/eg"
@@ -57,7 +57,7 @@ func Commitish(dir, treeish string) (_ string, err error) {
 	return hash.String(), nil
 }
 
-func Clone(ctx context.Context, auth transport.AuthMethod, dir, uri, remote, treeish string) (err error) {
+func Clone(ctx context.Context, dir, uri, remote, treeish string, opts ...client.Option) (err error) {
 	var (
 		r *git.Repository
 	)
@@ -70,7 +70,7 @@ func Clone(ctx context.Context, auth transport.AuthMethod, dir, uri, remote, tre
 			return errorsx.Wrapf(err, "unable to find remote: '%s'", remote)
 		}
 
-		if err = remote.FetchContext(ctx, &git.FetchOptions{}); errors.Is(err, git.NoErrAlreadyUpToDate) {
+		if err = remote.FetchContext(ctx, &git.FetchOptions{ClientOptions: opts}); errors.Is(err, git.NoErrAlreadyUpToDate) {
 			return nil
 		} else if err != nil {
 			return errorsx.Wrap(err, "unable to fetch")
@@ -91,14 +91,16 @@ func Clone(ctx context.Context, auth transport.AuthMethod, dir, uri, remote, tre
 		log.Println(errorsx.Wrapf(err, "repository is missing attempting clone: %s", uri))
 	}
 
-	_, err = git.PlainCloneContext(ctx, dir, false, &git.CloneOptions{
+	cloneOpts := &git.CloneOptions{
 		URL:               uri,
 		ReferenceName:     branchRefName,
 		RecurseSubmodules: git.DefaultSubmoduleRecursionDepth,
-		Auth:              auth,
 		SingleBranch:      true,
-	})
+		Bare:              false,
+		ClientOptions:     opts,
+	}
 
+	_, err = git.PlainCloneContext(ctx, dir, cloneOpts)
 	if err = errorsx.Wrapf(err, "unable to clone: %s - %s", uri, treeish); err != nil {
 		return err
 	}
@@ -311,7 +313,7 @@ func credentialRefresh(ctx context.Context, c *http.Client, dst, token string) e
 	return nil
 }
 
-func LoadCredentials(ctx context.Context, vcsuri string, dir string) (transport.AuthMethod, error) {
+func LoadCredentials(ctx context.Context, vcsuri string, dir string) (client.Option, error) {
 	var (
 		httpauth compute.GitCredentialsHTTP
 	)
@@ -322,7 +324,7 @@ func LoadCredentials(ctx context.Context, vcsuri string, dir string) (transport.
 
 	if err = json.Unmarshal(encoded, &httpauth); err == nil && stringsx.Present(httpauth.Username) && stringsx.Present(httpauth.Password) {
 		if strings.HasPrefix(vcsuri, "http") {
-			return &githttp.BasicAuth{Username: httpauth.Username, Password: httpauth.Password}, nil
+			return client.WithHTTPAuth(&githttp.BasicAuth{Username: httpauth.Username, Password: httpauth.Password}), nil
 		}
 	}
 

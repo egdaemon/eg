@@ -24,7 +24,7 @@ import (
 	"github.com/egdaemon/eg/runners"
 	"github.com/egdaemon/eg/transpile"
 	"github.com/egdaemon/eg/workspaces"
-	"github.com/go-git/go-git/v5"
+	"github.com/go-git/go-git/v6"
 	"github.com/gofrs/uuid/v5"
 )
 

@@ -39,7 +39,7 @@ import (
 	"github.com/egdaemon/eg/internal/stringsx"
 	"github.com/egdaemon/eg/internal/tracex"
 	"github.com/egdaemon/eg/internal/userx"
-	"github.com/go-git/go-git/v5"
+	"github.com/go-git/go-git/v6"
 	"github.com/gofrs/uuid/v5"
 	"github.com/willabides/kongplete"
 

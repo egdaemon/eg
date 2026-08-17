@@ -3,6 +3,7 @@ package eggithub
 import (
 	"context"
 	"fmt"
+	"path/filepath"
 	"strings"
 
 	"github.com/egdaemon/eg/internal/fsx"
@@ -64,6 +65,60 @@ func Draft(patterns ...string) eg.OpFn {
 	}
 }
 
+// assetMatch reports whether pattern (a glob against an asset's basename, e.g.
+// "eg_*_amd64.deb") matches any non-blank line within assets, a
+// newline-separated listing of a release's asset names.
+func assetMatch(assets, pattern string) bool {
+	for line := range strings.SplitSeq(assets, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+
+		if ok, _ := filepath.Match(pattern, line); ok {
+			return true
+		}
+	}
+
+	return false
+}
+
+// verifyAssets checks that every pattern has a corresponding entry in assets,
+// a newline-separated listing of a release's asset names. When a pattern
+// includes a directory component it is first resolved against the local
+// filesystem so the error can name the specific missing file; a directory-less
+// pattern (e.g. "eg_*_amd64.deb") is matched directly against the asset names.
+// Returns an error naming the version and the first pattern or file found
+// missing.
+func verifyAssets(version, assets string, patterns ...string) error {
+	for _, p := range patterns {
+		if filepath.Dir(p) == "." {
+			if !assetMatch(assets, p) {
+				return fmt.Errorf("release %s missing asset matching pattern: %s\n%s", version, p, assets)
+			}
+
+			continue
+		}
+
+		matches, err := filepath.Glob(p)
+		if err != nil {
+			return err
+		}
+
+		if len(matches) == 0 {
+			return fmt.Errorf("release %s missing asset matching pattern: %s", version, p)
+		}
+
+		for _, m := range matches {
+			if !assetMatch(assets, filepath.Base(m)) {
+				return fmt.Errorf("release %s missing asset: %s\n%s", version, filepath.Base(m), assets)
+			}
+		}
+	}
+
+	return nil
+}
+
 // Promote a draft release to a full release, this is very experimental.
 // uses PatternVersion to determine which draft release to promote, and verifies
 // that every pattern is already present in the release's asset listing before
@@ -74,7 +129,7 @@ func Draft(patterns ...string) eg.OpFn {
 func Promote(patterns ...string) eg.OpFn {
 	return func(ctx context.Context, o eg.Op) error {
 		var (
-			path    = egenv.RuntimeDirectory("eg.github.release.assets")
+			path    = egenv.EphemeralDirectory("eg.github.release.assets")
 			version = PatternVersion()
 		)
 
@@ -96,10 +151,8 @@ func Promote(patterns ...string) eg.OpFn {
 				return err
 			}
 
-			for _, p := range patterns {
-				if !strings.Contains(lines, p) {
-					return fmt.Errorf("release %s missing asset matching pattern: %s", version, p)
-				}
+			if err := verifyAssets(version, lines, patterns...); err != nil {
+				return err
 			}
 		}
 
@@ -117,7 +170,7 @@ func Promote(patterns ...string) eg.OpFn {
 func Release(patterns ...string) eg.OpFn {
 	return eg.Sequential(
 		Draft(patterns...),
-		Promote(patterns...),
+		Promote(),
 	)
 }
 

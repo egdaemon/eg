@@ -49,11 +49,12 @@ func main() {
 			// 	),
 			// ),
 		),
-		func(ctx context.Context, o eg.Op) error {
-			return eggithub.Release(
-				egenv.CacheDirectory(".dist", "*.deb"),
-			)(ctx, o)
-		},
+		eggithub.Draft(
+			egenv.CacheDirectory(".dist", "*.deb"),
+		),
+		eggithub.Promote(
+			"eg_*_amd64.deb",
+		),
 	)
 
 	if err != nil {

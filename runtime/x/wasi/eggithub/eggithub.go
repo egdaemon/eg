@@ -38,8 +38,9 @@ func DownloadURL(pattern string) string {
 
 // ReleaseIdempotent to github, this is experimental. it will delete any
 // release with the same version effectively replacing it. this is to make the function idempotent.
-// IMPORTANT: for local environments this assumes you've provided the token to the eg command.
-// e.g.) GH_TOKEN="$(gh auth token)" eg compute local -e GH_TOKEN
+// for local environments `eg compute local` auto-detects a GitHub token via `gh auth token` when the
+// repository's remote is github.com and the gh cli is installed. override it explicitly with
+// e.g.) eg compute local -e GH_TOKEN=<token>, needed for non-github forges or environments without gh.
 func ReleaseIdempotent(patterns ...string) eg.OpFn {
 	return func(ctx context.Context, o eg.Op) error {
 		c := eggit.EnvCommit()
@@ -58,8 +59,9 @@ func ReleaseIdempotent(patterns ...string) eg.OpFn {
 }
 
 // Release to github, this is very experimental.
-// IMPORTANT: for local environments this assumes you've provided the token to the eg command.
-// e.g.) GH_TOKEN="$(gh auth token)" eg compute local -e GH_TOKEN
+// for local environments `eg compute local` auto-detects a GitHub token via `gh auth token` when the
+// repository's remote is github.com and the gh cli is installed. override it explicitly with
+// e.g.) eg compute local -e GH_TOKEN=<token>, needed for non-github forges or environments without gh.
 func Release(patterns ...string) eg.OpFn {
 	return func(ctx context.Context, o eg.Op) error {
 		c := eggit.EnvCommit()
@@ -83,8 +85,9 @@ func Release(patterns ...string) eg.OpFn {
 }
 
 // Upload an asset to a github release, this is very experimental.
-// IMPORTANT: for local environments this assumes you've provided the token to the eg command.
-// e.g.) GH_TOKEN="$(gh auth token)" eg compute local -e GH_TOKEN
+// for local environments `eg compute local` auto-detects a GitHub token via `gh auth token` when the
+// repository's remote is github.com and the gh cli is installed. override it explicitly with
+// e.g.) eg compute local -e GH_TOKEN=<token>, needed for non-github forges or environments without gh.
 // Usage:
 //
 //	eggithub.Upload(eggithub.PatternVersion(), "foo.txt", "bar.txt")

@@ -112,7 +112,10 @@ func (t local) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err e
 		return errorsx.Wrapf(err, "unable to open git repository: %s", ws.WorkingDir)
 	}
 
+	canonicaluri := errorsx.Zero(gitx.CanonicalURI(repo, t.GitRemote))
+
 	envb := envx.Build().
+		Var("GH_TOKEN", githubToken(gctx.Context, canonicaluri)).
 		FromReader(secrets.NewReader(gctx.Context, t.Secrets...)).
 		FromPath(t.EnvironmentPaths...).
 		FromEnv(t.Environment...).
@@ -193,7 +196,6 @@ func (t local) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err e
 		privileged = runners.AgentOptionCommandLine("--privileged")
 	}
 
-	canonicaluri := errorsx.Zero(gitx.CanonicalURI(repo, t.GitRemote))
 	ragent := runners.NewRunner(
 		gctx.Context,
 		ws,

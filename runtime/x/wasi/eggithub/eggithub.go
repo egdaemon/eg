@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/egdaemon/eg/internal/fsx"
 	"github.com/egdaemon/eg/runtime/wasi/eg"
+	"github.com/egdaemon/eg/runtime/wasi/egenv"
 	"github.com/egdaemon/eg/runtime/wasi/eggit"
 	"github.com/egdaemon/eg/runtime/wasi/egunsafe/ffigit"
 	"github.com/egdaemon/eg/runtime/wasi/shell"
@@ -36,33 +38,13 @@ func DownloadURL(pattern string) string {
 	return canon
 }
 
-// ReleaseIdempotent to github, this is experimental. it will delete any
-// release with the same version effectively replacing it. this is to make the function idempotent.
+// Draft creates (or reuses) a draft release for PatternVersion and uploads
+// the given patterns to it. Does not verify or publish the release — pair
+// with Promote to publish once all expected assets have been uploaded.
 // for local environments `eg compute local` auto-detects a GitHub token via `gh auth token` when the
 // repository's remote is github.com and the gh cli is installed. override it explicitly with
-// e.g.) eg compute local -e GH_TOKEN=<token>, needed for non-github forges or environments without gh.
-func ReleaseIdempotent(patterns ...string) eg.OpFn {
-	return func(ctx context.Context, o eg.Op) error {
-		c := eggit.EnvCommit()
-		version := PatternVersion()
-
-		runtime := shell.Runtime().Environ(
-			"GH_TOKEN", ffigit.Bearer(),
-		)
-
-		return shell.Run(
-			ctx,
-			runtime.Newf("gh release delete -y %s", version).Lenient(true),
-			runtime.Newf("gh release create --target %s %s %s", c.Hash.String(), version, strings.Join(patterns, " ")),
-		)
-	}
-}
-
-// Release to github, this is very experimental.
-// for local environments `eg compute local` auto-detects a GitHub token via `gh auth token` when the
-// repository's remote is github.com and the gh cli is installed. override it explicitly with
-// e.g.) eg compute local -e GH_TOKEN=<token>, needed for non-github forges or environments without gh.
-func Release(patterns ...string) eg.OpFn {
+// e.g.) eg compute local -e GH_TOKEN=<token>, needed for environments without gh.
+func Draft(patterns ...string) eg.OpFn {
 	return func(ctx context.Context, o eg.Op) error {
 		c := eggit.EnvCommit()
 		version := PatternVersion()
@@ -74,20 +56,77 @@ func Release(patterns ...string) eg.OpFn {
 		if shell.Run(ctx, runtime.Newf("gh release view %s", version)) != nil {
 			return shell.Run(
 				ctx,
-				runtime.Newf("gh release create --target %s %s %s", c.Hash.String(), version, strings.Join(patterns, " ")),
+				runtime.Newf("gh release create --draft --target %s %s %s", c.Hash.String(), version, strings.Join(patterns, " ")),
 			)
 		}
 
-		return eg.Sequential(
-			Upload(version, patterns...),
-		)(ctx, o)
+		return Upload(version, patterns...)(ctx, o)
 	}
 }
 
-// Upload an asset to a github release, this is very experimental.
+// Promote a draft release to a full release, this is very experimental.
+// uses PatternVersion to determine which draft release to promote, and verifies
+// that every pattern is already present in the release's asset listing before
+// publishing it.
 // for local environments `eg compute local` auto-detects a GitHub token via `gh auth token` when the
 // repository's remote is github.com and the gh cli is installed. override it explicitly with
-// e.g.) eg compute local -e GH_TOKEN=<token>, needed for non-github forges or environments without gh.
+// e.g.) eg compute local -e GH_TOKEN=<token>, needed for environments without gh.
+func Promote(patterns ...string) eg.OpFn {
+	return func(ctx context.Context, o eg.Op) error {
+		var (
+			path    = egenv.RuntimeDirectory("eg.github.release.assets")
+			version = PatternVersion()
+		)
+
+		runtime := shell.Runtime().Environ(
+			"GH_TOKEN", ffigit.Bearer(),
+		)
+
+		if len(patterns) > 0 {
+			err := shell.Run(
+				ctx,
+				runtime.Newf(`gh release view %s --json assets --jq ".assets[].name" | tee %s`, version, path),
+			)
+			if err != nil {
+				return err
+			}
+
+			lines, err := fsx.String(path)
+			if err != nil {
+				return err
+			}
+
+			for _, p := range patterns {
+				if !strings.Contains(lines, p) {
+					return fmt.Errorf("release %s missing asset matching pattern: %s", version, p)
+				}
+			}
+		}
+
+		return shell.Run(
+			ctx,
+			runtime.Newf("gh release edit %s --draft=false", version),
+		)
+	}
+}
+
+// Release to github, this is very experimental.
+// for local environments `eg compute local` auto-detects a GitHub token via `gh auth token` when the
+// repository's remote is github.com and the gh cli is installed. override it explicitly with
+// e.g.) eg compute local -e GH_TOKEN=<token>, needed for environments without gh.
+func Release(patterns ...string) eg.OpFn {
+	return eg.Sequential(
+		Draft(patterns...),
+		Promote(patterns...),
+	)
+}
+
+// Upload an asset to a github release, this is very experimental. uploads into
+// whatever release currently exists for the given version (typically a draft
+// created by Draft), and does not publish it.
+// for local environments `eg compute local` auto-detects a GitHub token via `gh auth token` when the
+// repository's remote is github.com and the gh cli is installed. override it explicitly with
+// e.g.) eg compute local -e GH_TOKEN=<token>, needed for environments without gh.
 // Usage:
 //
 //	eggithub.Upload(eggithub.PatternVersion(), "foo.txt", "bar.txt")

@@ -5,9 +5,9 @@ import (
 	"database/sql"
 	"time"
 
-	"github.com/egdaemon/eg/internal/contextx"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/slicesx"
+	"github.com/egdaemon/eg/internal/sqlx"
 	"github.com/egdaemon/eg/internal/timex"
 	"github.com/egdaemon/eg/internal/tracex"
 	"github.com/gofrs/uuid/v5"
@@ -20,7 +20,7 @@ import (
 func BackgroundSystemLoad(ctx context.Context, analytics *sql.DB) {
 	report := func(do func(ctx context.Context, analytics *sql.DB) error) {
 		errorsx.Log(
-			contextx.IgnoreCancelled(do(ctx, analytics)),
+			sqlx.IgnoreClosed(errorsx.Ignore(do(ctx, analytics), context.Canceled)),
 		)
 	}
 

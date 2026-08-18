@@ -99,6 +99,7 @@ const (
 	EnvComputeModuleSocket       = "EG_COMPUTE_MODULE_SOCKET"                   // socket providing functionality that is scoped to an individual module. primarily command execution.
 	EnvComputeDefaultGroup       = "EG_COMPUTE_DEFAULT_GROUP"                   // override the group assigned to the user. mainly used by baremetal.
 	EnvComputeAPIEnabled         = "EG_COMPUTE_API_ENABLED"                     // gates the runner's push HTTP surface (POST /b/upload, POST /c/enqueue); default-disabled stopgap ahead of real request authentication.
+	EnvComputeProfileMode        = "EG_COMPUTE_PROFILE_MODE"                    // profile mode (cpu,heap,mem,allocs,block) for module runs.
 )
 
 const (

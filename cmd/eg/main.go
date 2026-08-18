@@ -12,7 +12,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"syscall"
 	"time"
 
 	"github.com/alecthomas/kong"
@@ -29,7 +28,6 @@ import (
 	"github.com/egdaemon/eg/cmd/eg/daemons"
 	"github.com/egdaemon/eg/internal/bytesx"
 	"github.com/egdaemon/eg/internal/contextx"
-	"github.com/egdaemon/eg/internal/debugx"
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/gitx"
@@ -39,6 +37,8 @@ import (
 	"github.com/egdaemon/eg/internal/stringsx"
 	"github.com/egdaemon/eg/internal/tracex"
 	"github.com/egdaemon/eg/internal/userx"
+	"github.com/egdaemon/gdx"
+	"github.com/egdaemon/gdx/konggdx"
 	"github.com/go-git/go-git/v6"
 	"github.com/gofrs/uuid/v5"
 	"github.com/willabides/kongplete"
@@ -91,6 +91,7 @@ func main() {
 		Secrets            cmdsecret.SecretCmd          `cmd:"" name:"secrets" help:"ALPHA: builtin simple secret manager"`
 		GPG                cmdgpg.Cmd                   `cmd:"" name:"gpg" help:"gpg keyring management"`
 		SSH                cmdssh.Cmd                   `cmd:"" name:"ssh" help:"ssh key management"`
+		GDX                konggdx.Commands             `cmd:"" name:"gdx" help:"pull profiles/traces from a running eg debug socket"`
 		InstallCompletions kongplete.InstallCompletions `cmd:"" help:"install shell completions"`
 	}
 
@@ -104,16 +105,18 @@ func main() {
 	shellcli.Context, shellcli.Shutdown = context.WithCancelCause(shellcli.Context)
 	log.SetFlags(log.Lshortfile | log.LUTC | log.Ltime)
 	log.SetPrefix(fmt.Sprintf("[%d]", os.Getpid()))
-	go debugx.DumpOnSignal(shellcli.Context, syscall.SIGUSR2)
 	go cmdopts.Cleanup(shellcli.Context, shellcli.Shutdown, shellcli.Cleanup, func() {
 		log.Println("waiting for systems to shutdown")
 	}, os.Kill, os.Interrupt)
-	// go timex.NowAndEvery(shellcli.Context, 200*time.Millisecond, func(ctx context.Context) error {
-	// 	log.Println("$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$ STDIN NON BLOCKING:", debugx.NonBlocking(os.Stdin.Fd()))
-	// 	return nil
-	// })
 	user := userx.CurrentUserOrDefault(userx.Root())
 	gitdir := envx.String(gitx.DetectRoot(), "EG_GIT_REPOSITORY")
+	gdxsocket := filepath.Join(userx.DefaultRuntimeDirectory(), gdx.DefaultSocket)
+
+	go func() {
+		if err := (konggdx.Serve{Socket: gdxsocket}).Run(shellcli.Context); err != nil {
+			log.Println("gdx debug server failed", err)
+		}
+	}()
 
 	parser := kong.Must(
 		&shellcli,
@@ -128,6 +131,7 @@ func main() {
 			"vars_git_directory":        gitdir,
 			"vars_cache_directory":      userx.DefaultCacheDirectory(),
 			"vars_runtime_directory":    userx.DefaultRuntimeDirectory(),
+			"vars_gdx_socket":           gdxsocket,
 			"vars_eg_root_directory":    stringsx.FirstNonBlank(envx.String("", eg.EnvComputeWorkingDirectory), gitdir, eg.DefaultWorkingDirectory()),
 			"vars_eg_runtime_directory": eg.DefaultMountRoot(eg.RuntimeDirectory),
 			"vars_account_id":           envx.String("", "EG_ACCOUNT"),
@@ -166,9 +170,10 @@ func main() {
 			cmdopts.Entropy(cmdopts.GenerateEntropy),
 			cmdopts.KeyGenSeeded(sshx.NewKeyGenSeeded),
 		),
-		kong.TypeMapper(reflect.TypeOf(&net.IP{}), kong.MapperFunc(cmdopts.ParseIP)),
-		kong.TypeMapper(reflect.TypeOf(&net.TCPAddr{}), kong.MapperFunc(cmdopts.ParseTCPAddr)),
-		kong.TypeMapper(reflect.TypeOf([]*net.TCPAddr(nil)), kong.MapperFunc(cmdopts.ParseTCPAddrArray)),
+		kong.BindTo(shellcli.Context, (*context.Context)(nil)),
+		kong.TypeMapper(reflect.TypeFor[*net.IP](), kong.MapperFunc(cmdopts.ParseIP)),
+		kong.TypeMapper(reflect.TypeFor[*net.TCPAddr](), kong.MapperFunc(cmdopts.ParseTCPAddr)),
+		kong.TypeMapper(reflect.TypeFor[[]*net.TCPAddr](), kong.MapperFunc(cmdopts.ParseTCPAddrArray)),
 		kong.NamedMapper("durationinf", kong.MapperFunc(cmdopts.ParseDurationInf)),
 	)
 

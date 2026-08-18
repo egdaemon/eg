@@ -1,4 +1,21 @@
 ## workspace
+# capnproto.org/go/capnp/v3 v3.1.0-alpha.2
+## explicit; go 1.19
+capnproto.org/go/capnp/v3
+capnproto.org/go/capnp/v3/encoding/text
+capnproto.org/go/capnp/v3/exc
+capnproto.org/go/capnp/v3/exp/bufferpool
+capnproto.org/go/capnp/v3/flowcontrol
+capnproto.org/go/capnp/v3/internal/nodemap
+capnproto.org/go/capnp/v3/internal/schema
+capnproto.org/go/capnp/v3/internal/str
+capnproto.org/go/capnp/v3/internal/strquote
+capnproto.org/go/capnp/v3/packed
+capnproto.org/go/capnp/v3/schemas
+capnproto.org/go/capnp/v3/util/deferred
+capnproto.org/go/capnp/v3/util/maybe
+capnproto.org/go/capnp/v3/util/rc
+capnproto.org/go/capnp/v3/util/sync/mutex
 # cloud.google.com/go/auth v0.20.0
 ## explicit; go 1.25.0
 cloud.google.com/go/auth
@@ -97,7 +114,7 @@ github.com/VividCortex/ewma
 # github.com/acarl005/stripansi v0.0.0-20180116102854-5a71ef0e047d
 ## explicit
 github.com/acarl005/stripansi
-# github.com/alecthomas/kong v1.15.0
+# github.com/alecthomas/kong v1.16.0
 ## explicit; go 1.20
 github.com/alecthomas/kong
 # github.com/alitto/pond/v2 v2.5.0
@@ -322,6 +339,9 @@ github.com/cloudflare/circl/math/mlsbset
 github.com/cloudflare/circl/sign
 github.com/cloudflare/circl/sign/ed25519
 github.com/cloudflare/circl/sign/ed448
+# github.com/colega/zeropool v0.0.0-20230505084239-6fb4a4f75381
+## explicit; go 1.20
+github.com/colega/zeropool
 # github.com/containerd/errdefs v1.0.0
 ## explicit; go 1.20
 github.com/containerd/errdefs
@@ -468,7 +488,18 @@ github.com/ebitengine/purego/internal/fakecgo
 github.com/ebitengine/purego/internal/strings
 github.com/ebitengine/purego/internal/xreflect
 # github.com/egdaemon/eg v0.0.0-20260602150540-f4dec72d2ef0
-## explicit; go 1.25.7
+## explicit; go 1.25.8
+# github.com/egdaemon/gdx v0.0.0-20260818144127-e0645029ad8f => ../gdx
+## explicit; go 1.25.8
+github.com/egdaemon/gdx
+github.com/egdaemon/gdx/gdxapi
+github.com/egdaemon/gdx/internal/envx
+github.com/egdaemon/gdx/internal/errorsx
+github.com/egdaemon/gdx/internal/langx
+# github.com/egdaemon/gdx/konggdx v0.0.0-20260818142539-2af0a2bf0a1c => ../gdx/konggdx
+## explicit; go 1.25.8
+github.com/egdaemon/gdx/konggdx
+github.com/egdaemon/gdx/konggdx/cmdopts
 # github.com/egdaemon/wasinet/wasinet v0.0.0-20250806175613-49e153bd345a
 ## explicit; go 1.23.4
 github.com/egdaemon/wasinet/wasinet
@@ -2128,3 +2159,5 @@ sigs.k8s.io/yaml
 # tags.cncf.io/container-device-interface v1.1.0
 ## explicit; go 1.21
 tags.cncf.io/container-device-interface/pkg/parser
+# github.com/egdaemon/gdx => ../gdx
+# github.com/egdaemon/gdx/konggdx => ../gdx/konggdx

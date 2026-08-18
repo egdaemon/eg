@@ -1,12 +1,12 @@
 module github.com/egdaemon/eg
 
-go 1.25.7
+go 1.25.8
 
 require (
 	cloud.google.com/go/secretmanager v1.16.0
 	github.com/KimMachineGun/automemlimit v0.7.5
 	github.com/ProtonMail/go-crypto v1.4.1
-	github.com/alecthomas/kong v1.15.0
+	github.com/alecthomas/kong v1.16.0
 	github.com/alitto/pond/v2 v2.5.0
 	github.com/aws/aws-sdk-go-v2 v1.41.7
 	github.com/aws/aws-sdk-go-v2/config v1.32.17
@@ -18,6 +18,8 @@ require (
 	github.com/dominikbraun/graph v0.23.0
 	github.com/duckdb/duckdb-go/v2 v2.10503.1
 	github.com/dustin/go-humanize v1.0.1
+	github.com/egdaemon/gdx v0.0.0-20260818144127-e0645029ad8f
+	github.com/egdaemon/gdx/konggdx v0.0.0-20260818142539-2af0a2bf0a1c
 	github.com/egdaemon/wasinet/wasinet v0.0.0-20250806175613-49e153bd345a
 	github.com/egdaemon/wasinet/wazeronet v0.0.0-20250806175613-49e153bd345a
 	github.com/fsnotify/fsnotify v1.10.1
@@ -65,6 +67,7 @@ require (
 )
 
 require (
+	capnproto.org/go/capnp/v3 v3.1.0-alpha.2 // indirect
 	cloud.google.com/go/auth v0.20.0 // indirect
 	cloud.google.com/go/auth/oauth2adapt v0.2.8 // indirect
 	cloud.google.com/go/compute/metadata v0.9.0 // indirect
@@ -109,6 +112,7 @@ require (
 	github.com/chzyer/readline v1.5.1 // indirect
 	github.com/clipperhouse/uax29/v2 v2.7.0 // indirect
 	github.com/cloudflare/circl v1.6.4 // indirect
+	github.com/colega/zeropool v0.0.0-20230505084239-6fb4a4f75381 // indirect
 	github.com/containerd/errdefs v1.0.0 // indirect
 	github.com/containerd/errdefs/pkg v0.3.0 // indirect
 	github.com/containerd/log v0.1.0 // indirect
@@ -328,3 +332,7 @@ require (
 	sigs.k8s.io/yaml v1.6.0 // indirect
 	tags.cncf.io/container-device-interface v1.1.0 // indirect
 )
+
+replace github.com/egdaemon/gdx => ../gdx
+
+replace github.com/egdaemon/gdx/konggdx => ../gdx/konggdx

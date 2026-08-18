@@ -8,8 +8,8 @@ import (
 	"github.com/egdaemon/eg/compile"
 	"github.com/egdaemon/eg/internal/errorsx"
 
-	"github.com/go-git/go-git/v5"
-	"github.com/go-git/go-git/v5/plumbing"
+	"github.com/go-git/go-git/v6"
+	"github.com/go-git/go-git/v6/plumbing"
 )
 
 type BootstrapRepository struct {
@@ -25,12 +25,12 @@ func (t BootstrapRepository) Run(gctx *cmdopts.Global) (err error) {
 		return errorsx.UserFriendly(errorsx.Errorf("directory already exists, refusing to initialize a new eg module: %s", egdir))
 	}
 
-	_, err = git.PlainCloneContext(gctx.Context, filepath.Join(t.Dir, t.Relative), false, &git.CloneOptions{
+	_, err = git.PlainCloneContext(gctx.Context, filepath.Join(t.Dir, t.Relative), &git.CloneOptions{
 		URL:               t.URI,
 		ReferenceName:     plumbing.ReferenceName(t.Branch),
 		RecurseSubmodules: git.DefaultSubmoduleRecursionDepth,
-		Auth:              nil,
 		SingleBranch:      true,
+		Bare:              false,
 	})
 
 	if err != nil {

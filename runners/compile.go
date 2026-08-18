@@ -19,7 +19,8 @@ import (
 	"github.com/egdaemon/eg/internal/tarx"
 	"github.com/egdaemon/eg/transpile"
 	"github.com/egdaemon/eg/workspaces"
-	"github.com/go-git/go-git/v5"
+	"github.com/go-git/go-git/v6"
+	"github.com/go-git/go-git/v6/plumbing/client"
 )
 
 // compileEntrypoint transpiles and builds the eg module rooted at ws,
@@ -63,6 +64,7 @@ func compileEntrypoint(ctx context.Context, ws workspaces.Context) (*transpile.C
 // staged through a second spool's own two-step download/enqueue handshake.
 func compileWorkload(ctx context.Context, c *http.Client, dir string, rundirs SpoolDirs) (err error) {
 	var (
+		auth    client.Option
 		encoded []byte
 		req     EnqueuedDequeueResponse
 		repo    *git.Repository
@@ -97,12 +99,14 @@ func compileWorkload(ctx context.Context, c *http.Client, dir string, rundirs Sp
 	// absence of refreshed credentials (e.g. blank access token, public
 	// repo) is not fatal -- log and fall through to an unauthenticated clone
 	// rather than failing the job.
-	auth, err := gitx.LoadCredentials(ctx, req.Enqueued.VcsUri, clonedir)
-	if err != nil {
+	var opts []client.Option
+	if auth, err = gitx.LoadCredentials(ctx, req.Enqueued.VcsUri, clonedir); err != nil {
 		log.Println(errorsx.Wrap(err, "unable to load git credentials"))
+	} else if auth != nil {
+		opts = append(opts, auth)
 	}
 
-	if err = gitx.Clone(ctx, auth, clonedir, req.Enqueued.VcsUri, git.DefaultRemoteName, req.Enqueued.VcsCommit); err != nil {
+	if err = gitx.Clone(ctx, clonedir, req.Enqueued.VcsUri, git.DefaultRemoteName, req.Enqueued.VcsCommit, opts...); err != nil {
 		return errorsx.Wrap(err, "unable to clone repository")
 	}
 

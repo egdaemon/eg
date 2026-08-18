@@ -10,15 +10,16 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
 
-	"github.com/go-git/go-git/v5"
-	"github.com/go-git/go-git/v5/plumbing"
-	"github.com/go-git/go-git/v5/plumbing/object"
-	"github.com/go-git/go-git/v5/plumbing/transport"
-	githttp "github.com/go-git/go-git/v5/plumbing/transport/http"
+	"github.com/go-git/go-git/v6"
+	"github.com/go-git/go-git/v6/plumbing"
+	"github.com/go-git/go-git/v6/plumbing/client"
+	"github.com/go-git/go-git/v6/plumbing/object"
+	githttp "github.com/go-git/go-git/v6/plumbing/transport/http"
 	"github.com/golang-jwt/jwt/v4"
 
 	"github.com/egdaemon/eg"
@@ -26,6 +27,7 @@ import (
 	"github.com/egdaemon/eg/internal/debugx"
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
+	"github.com/egdaemon/eg/internal/execx"
 	"github.com/egdaemon/eg/internal/fsx"
 	"github.com/egdaemon/eg/internal/httpx"
 	"github.com/egdaemon/eg/internal/jwtx"
@@ -37,6 +39,12 @@ import (
 
 func DetectRoot() string {
 	return filepath.Dir(fsx.Locate(".git"))
+}
+
+// IsRepository reports whether dir is the root of a git repository.
+func IsRepository(dir string) bool {
+	_, err := git.PlainOpen(dir)
+	return err == nil
 }
 
 func Commitish(dir, treeish string) (_ string, err error) {
@@ -57,7 +65,58 @@ func Commitish(dir, treeish string) (_ string, err error) {
 	return hash.String(), nil
 }
 
-func Clone(ctx context.Context, auth transport.AuthMethod, dir, uri, remote, treeish string) (err error) {
+// gitcmd builds a `git -C repo <args>` invocation, run as the egd user --
+// repo is frequently bind-mounted into the workload container and owned by
+// the unprivileged egd user rather than whatever uid this process runs as,
+// which trips git's "dubious ownership" safe.directory check (CVE-2022-24765
+// mitigation) when run directly. see execx.RunAs.
+func gitcmd(ctx context.Context, repo string, args ...string) *exec.Cmd {
+	return execx.RunAs(ctx, "egd", "git", append([]string{"-C", repo}, args...)...)
+}
+
+// Worktree creates a linked worktree at dir, checked out to a detached HEAD
+// of repo. gives callers an isolated, real directory backed by repo's own
+// object store -- reflecting only committed state, no network clone, and
+// without mutating repo's own checkout. dir must not already exist.
+//
+// go-git has no API to create a linked worktree (only to open one), so this
+// shells out to the system git binary.
+func Worktree(ctx context.Context, repo, dir string) (err error) {
+	if out, perr := gitcmd(ctx, repo, "worktree", "prune").CombinedOutput(); perr != nil {
+		log.Println(errorsx.Wrapf(fmt.Errorf("%s: %w", strings.TrimSpace(string(out)), perr), "unable to prune stale worktrees: %s", repo))
+	}
+
+	out, err := gitcmd(ctx, repo, "worktree", "add", "--detach", dir, "HEAD").CombinedOutput()
+	if err != nil {
+		return errorsx.Wrapf(fmt.Errorf("%s: %w", strings.TrimSpace(string(out)), err), "unable to create worktree: %s -> %s", repo, dir)
+	}
+
+	return nil
+}
+
+// LocalClone creates a fully self-contained checkout of repo at dir, checked
+// out to a detached HEAD, reflecting only committed state. unlike Worktree,
+// dir gets its own independent .git directory rather than a .git file
+// pointing back into repo's .git/worktrees/<id> -- a linked worktree's gitdir
+// reference is an absolute path into repo's own .git, which breaks once dir
+// is relocated into a different mount namespace (e.g. bind-mounted into a
+// container that doesn't also have repo's .git available at that same path).
+// dir must not already exist.
+func LocalClone(ctx context.Context, repo, dir string) (err error) {
+	out, err := execx.RunAs(ctx, "egd", "git", "clone", "-q", "--local", repo, dir).CombinedOutput()
+	if err != nil {
+		return errorsx.Wrapf(fmt.Errorf("%s: %w", strings.TrimSpace(string(out)), err), "unable to clone repository: %s -> %s", repo, dir)
+	}
+
+	out, err = execx.RunAs(ctx, "egd", "git", "-C", dir, "checkout", "-q", "--detach", "HEAD").CombinedOutput()
+	if err != nil {
+		return errorsx.Wrapf(fmt.Errorf("%s: %w", strings.TrimSpace(string(out)), err), "unable to detach HEAD: %s", dir)
+	}
+
+	return nil
+}
+
+func Clone(ctx context.Context, dir, uri, remote, treeish string, opts ...client.Option) (err error) {
 	var (
 		r *git.Repository
 	)
@@ -70,7 +129,7 @@ func Clone(ctx context.Context, auth transport.AuthMethod, dir, uri, remote, tre
 			return errorsx.Wrapf(err, "unable to find remote: '%s'", remote)
 		}
 
-		if err = remote.FetchContext(ctx, &git.FetchOptions{}); errors.Is(err, git.NoErrAlreadyUpToDate) {
+		if err = remote.FetchContext(ctx, &git.FetchOptions{ClientOptions: opts}); errors.Is(err, git.NoErrAlreadyUpToDate) {
 			return nil
 		} else if err != nil {
 			return errorsx.Wrap(err, "unable to fetch")
@@ -91,14 +150,16 @@ func Clone(ctx context.Context, auth transport.AuthMethod, dir, uri, remote, tre
 		log.Println(errorsx.Wrapf(err, "repository is missing attempting clone: %s", uri))
 	}
 
-	_, err = git.PlainCloneContext(ctx, dir, false, &git.CloneOptions{
+	cloneOpts := &git.CloneOptions{
 		URL:               uri,
 		ReferenceName:     branchRefName,
 		RecurseSubmodules: git.DefaultSubmoduleRecursionDepth,
-		Auth:              auth,
 		SingleBranch:      true,
-	})
+		Bare:              false,
+		ClientOptions:     opts,
+	}
 
+	_, err = git.PlainCloneContext(ctx, dir, cloneOpts)
 	if err = errorsx.Wrapf(err, "unable to clone: %s - %s", uri, treeish); err != nil {
 		return err
 	}
@@ -311,7 +372,7 @@ func credentialRefresh(ctx context.Context, c *http.Client, dst, token string) e
 	return nil
 }
 
-func LoadCredentials(ctx context.Context, vcsuri string, dir string) (transport.AuthMethod, error) {
+func LoadCredentials(ctx context.Context, vcsuri string, dir string) (client.Option, error) {
 	var (
 		httpauth compute.GitCredentialsHTTP
 	)
@@ -322,7 +383,7 @@ func LoadCredentials(ctx context.Context, vcsuri string, dir string) (transport.
 
 	if err = json.Unmarshal(encoded, &httpauth); err == nil && stringsx.Present(httpauth.Username) && stringsx.Present(httpauth.Password) {
 		if strings.HasPrefix(vcsuri, "http") {
-			return &githttp.BasicAuth{Username: httpauth.Username, Password: httpauth.Password}, nil
+			return client.WithHTTPAuth(&githttp.BasicAuth{Username: httpauth.Username, Password: httpauth.Password}), nil
 		}
 	}
 

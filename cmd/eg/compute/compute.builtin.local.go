@@ -23,7 +23,7 @@ import (
 	"github.com/egdaemon/eg/runners"
 	"github.com/egdaemon/eg/transpile"
 	"github.com/egdaemon/eg/workspaces"
-	"github.com/go-git/go-git/v5"
+	"github.com/go-git/go-git/v6"
 	"github.com/gofrs/uuid/v5"
 )
 
@@ -73,7 +73,7 @@ func (t builtinLocal) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath)
 		tmpdir,
 		t.Name,
 		workspaces.OptionSymlinkCache(filepath.Join(t.Dir, eg.CacheDirectory)),
-		workspaces.OptionSymlinkWorking(t.Dir),
+		workspaces.OptionCloneWorking(gctx.Context, t.Dir),
 		workspaces.OptionEnabled(workspaces.OptionInvalidateModuleCache, t.InvalidateCache),
 	); err != nil {
 		return errorsx.Wrap(err, "unable to initialize workspace")

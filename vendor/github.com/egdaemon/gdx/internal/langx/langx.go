@@ -1,6 +1,8 @@
 // Package langx provides small utility functions to extend the standard golang language.
 package langx
 
+import "reflect"
+
 // Autoptr converts a value into a pointer
 func Autoptr[T any](a T) *T {
 	return &a
@@ -54,4 +56,28 @@ func FirstNonZero[T comparable](s ...T) T {
 	}
 
 	return x
+}
+
+func FirstNonNil[T any](s ...T) T {
+	var zero T
+
+	for _, v := range s {
+		if !isNil(v) {
+			return v
+		}
+	}
+
+	return zero
+}
+
+// isNil reports whether a value is nil using reflection.
+// Zero values (e.g. int(0)) are not considered nil.
+func isNil[T any](v T) bool {
+	r := reflect.ValueOf(v)
+	switch r.Kind() {
+	case reflect.Ptr, reflect.Map, reflect.Slice, reflect.Chan, reflect.Interface, reflect.Func, reflect.UnsafePointer:
+		return r.IsNil()
+	default:
+		return false
+	}
 }

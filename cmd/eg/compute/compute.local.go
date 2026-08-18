@@ -54,6 +54,7 @@ type local struct {
 	Ports            []int    `name:"ports" help:"list of ports to publish to the host system" hidden:"true"`
 	ContainerArgs    []string `name:"cargs" help:"list of command line arguments to pass to the root container" hidden:"true"`
 	Secrets          []string `name:"secret" help:"List of secret URIs to use. Examples: chachasm://passphrase@/path/to/file, gcpsm://project-id/secret-name/version, awssm://secret-name?region=us-east-1"`
+	Profile          string   `name:"profile" help:"enable profiling of module runs (cpu,heap,mem,allocs,block)" enum:"cpu,heap,mem,allocs,block," default:""`
 	Name             string   `arg:"" name:"module" help:"name of the workload to run, i.e. the folder name within workload directory" default:"" predictor:"eg.workload"`
 }
 
@@ -134,7 +135,8 @@ func (t local) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err e
 		Var(eg.EnvUnsafeCacheID, ws.CachedID).
 		Var(eg.EnvComputeTTL, t.RuntimeResources.TTL.String()).
 		Var(eg.EnvComputeGPU, strconv.FormatBool(t.GPU)).
-		Var(eg.EnvUnsafeGitCloneEnabled, strconv.FormatBool(false)) // hack to disable cloning
+		Var(eg.EnvUnsafeGitCloneEnabled, strconv.FormatBool(false)). // hack to disable cloning
+		Var(eg.EnvComputeProfileMode, t.Profile)
 
 	if t.Dirty {
 		mounthome = runners.AgentOptionAutoMountHome(homedir)

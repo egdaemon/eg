@@ -48,6 +48,7 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 
 	"github.com/KimMachineGun/automemlimit/memlimit"
+	"github.com/egdaemon/gdx"
 	"go.uber.org/automaxprocs/maxprocs"
 
 	_ "github.com/radovskyb/watcher"
@@ -435,6 +436,14 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 
 	if cc, err = daemons.AutoRunnerClient(gctx, ws, uid, runners.AgentOptionAutoEGBin()); err != nil {
 		return errorsx.Wrap(err, "auto runner client failed")
+	}
+
+	if pmode := envx.String("", eg.EnvComputeProfileMode); stringsx.Present(pmode) {
+		pfile := filepath.Join(ws.CacheDir, ".eg", ".profiles", aid, uid, fmt.Sprintf("%s.pprof", pmode))
+		log.Println("writing profile to", pfile)
+		go func() {
+			errorsx.Log(gdx.RecordFile(gctx.Context, pfile, gdx.Profile(gctx.Context, gdx.ProfileModeFromString(pmode))))
+		}()
 	}
 
 	return interp.Remote(

@@ -489,7 +489,7 @@ github.com/ebitengine/purego/internal/strings
 github.com/ebitengine/purego/internal/xreflect
 # github.com/egdaemon/eg v0.0.0-20260602150540-f4dec72d2ef0
 ## explicit; go 1.25.8
-# github.com/egdaemon/gdx v0.0.0-20260818144127-e0645029ad8f => ../gdx
+# github.com/egdaemon/gdx v0.0.0-20260818162210-df9073320007 => ../gdx
 ## explicit; go 1.25.8
 github.com/egdaemon/gdx
 github.com/egdaemon/gdx/gdxapi

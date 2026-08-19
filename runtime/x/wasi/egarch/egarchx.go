@@ -7,6 +7,11 @@ import (
 	"github.com/egdaemon/eg/runtime/wasi/egenv"
 )
 
+// Host arch
+func Host() string {
+	return egenv.String("amd64", eg.EnvComputeArch)
+}
+
 // POSIX see POSIXFrom
 func POSIX() string {
 	return DartFrom(egenv.String("amd64", eg.EnvComputeArch))

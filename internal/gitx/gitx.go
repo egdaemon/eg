@@ -102,8 +102,12 @@ func Worktree(ctx context.Context, repo, dir string) (err error) {
 func LocalClone(ctx context.Context, repo, dir string) (err error) {
 	origin, err := execx.String(ctx, "git", "-C", repo, "remote", "get-url", git.DefaultRemoteName)
 	if err != nil {
-		return errorsx.Wrapf(fmt.Errorf("%s: %w", strings.TrimSpace(origin), err), "unable to determine origin remote: %s -> %s", repo, dir)
+		debugx.Println("unable to determine repository origin remote", err)
+		// source repo has no origin remote — git clone --local handles this fine,
+		// so skip the remote-mutation step rather than failing outright.
+		origin = ""
 	}
+	origin = strings.TrimSpace(origin)
 
 	out, err := execx.RunAs(ctx, eg.DefaultUsername, "git", "clone", "-q", "--local", repo, dir).CombinedOutput()
 	if err != nil {
@@ -115,14 +119,16 @@ func LocalClone(ctx context.Context, repo, dir string) (err error) {
 		return errorsx.Wrapf(fmt.Errorf("%s: %w", strings.TrimSpace(string(out)), err), "unable to detach HEAD: %s", dir)
 	}
 
-	_, err = execx.RunAs(ctx, eg.DefaultUsername, "git", "-C", dir, "remote", "remove", git.DefaultRemoteName).CombinedOutput()
-	if err != nil {
-		return errorsx.Wrapf(fmt.Errorf("%s: %w", strings.TrimSpace(origin), err), "unable to remove origin remote: %s -> %s", repo, dir)
-	}
+	if origin != "" {
+		_, err = execx.RunAs(ctx, eg.DefaultUsername, "git", "-C", dir, "remote", "remove", git.DefaultRemoteName).CombinedOutput()
+		if err != nil {
+			return errorsx.Wrapf(err, "unable to remove origin remote: %s -> %s", repo, dir)
+		}
 
-	_, err = execx.RunAs(ctx, eg.DefaultUsername, "git", "-C", dir, "remote", "add", git.DefaultRemoteName, origin).CombinedOutput()
-	if err != nil {
-		return errorsx.Wrapf(fmt.Errorf("%s: %w", strings.TrimSpace(origin), err), "unable to remove origin remote: %s -> %s", repo, dir)
+		_, err = execx.RunAs(ctx, eg.DefaultUsername, "git", "-C", dir, "remote", "add", git.DefaultRemoteName, origin).CombinedOutput()
+		if err != nil {
+			return errorsx.Wrapf(err, "unable to add origin remote: %s -> %s", repo, dir)
+		}
 	}
 
 	return nil

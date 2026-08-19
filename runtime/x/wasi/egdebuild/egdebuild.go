@@ -62,7 +62,6 @@ type Config struct {
 	Environ        []string                          // additional environment variables to pass to the build process.
 	lintian        string                            // lintian flag
 	timeout        time.Duration                     // command timeout
-	privileged     bool                              // internal flagging of whether to run the shell runtime as a privileged user.
 	runtimeadj     func(shell.Command) shell.Command // internal allows adjusting the runtime dynamicly
 	buildCommand   func(*Config, shell.Command) shell.Command
 }
@@ -141,7 +140,7 @@ func (option) BuildCommand(d func(c1 *Config, c2 shell.Command) shell.Command) o
 func (option) BuildBinary(d time.Duration) option {
 	return func(c *Config) {
 		c.buildCommand = func(cfg *Config, runtime shell.Command) shell.Command {
-			return runtime.Newf("debuild %s-b -k%s", cfg.lintian, cfg.SignatureKeyID).MaybePrivileged(cfg.privileged).Timeout(d)
+			return runtime.Newf("debuild %s-b -k%s", cfg.lintian, cfg.SignatureKeyID).Timeout(d)
 		}
 	}
 }
@@ -170,12 +169,6 @@ func (option) Runtime(opt func(shell.Command) shell.Command) option {
 	}
 }
 
-func (option) UnsafePrivileged(b bool) option {
-	return func(c *Config) {
-		c.privileged = b
-	}
-}
-
 var Option = option(nil)
 
 func From(c Config, opts ...option) Config {
@@ -190,7 +183,7 @@ func New(pkg string, distro string, src string, opts ...option) (c Config) {
 		Architecture: "any",
 		Description:  "package built by egdebuild\n A package should provide its own description",
 		buildCommand: func(cfg *Config, runtime shell.Command) shell.Command {
-			return runtime.Newf("debuild %s-S -k%s", cfg.lintian, cfg.SignatureKeyID).MaybePrivileged(cfg.privileged)
+			return runtime.Newf("debuild %s-S -k%s", cfg.lintian, cfg.SignatureKeyID)
 		},
 		timeout:    5 * time.Minute,
 		runtimeadj: func(c shell.Command) shell.Command { return c },
@@ -308,7 +301,7 @@ func UploadDPut(gcfg Config, dput fs.FS, opts ...option) eg.OpFn {
 				bdir,
 				egenv.EphemeralDirectory("dput.config"),
 				cfg.Name,
-			).MaybePrivileged(cfg.privileged),
+			),
 		)
 	}
 }

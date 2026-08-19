@@ -81,6 +81,7 @@ func LookPath(file string) (string, error) {
 func RunAs(ctx context.Context, username string, name string, args ...string) *exec.Cmd {
 	u, err := user.Lookup(username)
 	if err != nil {
+		debugx.Println("failed to locate specified user", username, "fallback to current user", err)
 		return exec.CommandContext(ctx, name, args...)
 	}
 

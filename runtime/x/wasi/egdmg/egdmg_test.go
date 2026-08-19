@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/internal/egtest"
 	"github.com/egdaemon/eg/internal/fsx"
 	"github.com/egdaemon/eg/internal/testx"
@@ -21,7 +22,7 @@ func TestBuild(t *testing.T) {
 	t.Run("example1", func(t *testing.T) {
 		tmpdir := testx.PrivateTemp(t)
 		r := &shell.Recorder{}
-		rt := shell.Runtime().UnsafeExec(r.Record).As("egd")
+		rt := shell.Runtime().UnsafeExec(r.Record).As(eg.DefaultUsername)
 
 		b := egdmg.New("eg", egdmg.OptionRuntime(rt), egdmg.OptionMkisofs)
 		require.Error(t, fsx.SymlinkExists(egenv.EphemeralDirectory("Applications")))
@@ -74,7 +75,7 @@ func TestBuild(t *testing.T) {
 	t.Run("applications symlink inside srcfolder", func(t *testing.T) {
 		tmpdir := testx.PrivateTemp(t)
 		r := &shell.Recorder{}
-		rt := shell.Runtime().UnsafeExec(r.Record).As("egd")
+		rt := shell.Runtime().UnsafeExec(r.Record).As(eg.DefaultUsername)
 
 		b := egdmg.New("eg", egdmg.OptionRuntime(rt), egdmg.OptionMkisofs)
 		require.NoError(t, egdmg.Build(b, testx.Fixture("example1"))(t.Context(), egtest.Op()))
@@ -87,7 +88,7 @@ func TestBuild(t *testing.T) {
 	t.Run("option output dir sets outputpath", func(t *testing.T) {
 		tmpdir := testx.PrivateTemp(t)
 		r := &shell.Recorder{}
-		rt := shell.Runtime().UnsafeExec(r.Record).As("egd")
+		rt := shell.Runtime().UnsafeExec(r.Record).As(eg.DefaultUsername)
 
 		b := egdmg.New("eg", egdmg.OptionRuntime(rt), egdmg.OptionMkisofs, egdmg.OptionOutputDir("/custom/output"))
 		require.NoError(t, egdmg.Build(b, testx.Fixture("example1"))(t.Context(), egtest.Op()))
@@ -103,7 +104,7 @@ func TestBuild(t *testing.T) {
 	t.Run("option output name sets outputname", func(t *testing.T) {
 		tmpdir := testx.PrivateTemp(t)
 		r := &shell.Recorder{}
-		rt := shell.Runtime().UnsafeExec(r.Record).As("egd")
+		rt := shell.Runtime().UnsafeExec(r.Record).As(eg.DefaultUsername)
 
 		b := egdmg.New("eg", egdmg.OptionRuntime(rt), egdmg.OptionMkisofs, egdmg.OptionOutputName("custom.dmg"))
 		require.NoError(t, egdmg.Build(b, testx.Fixture("example1"))(t.Context(), egtest.Op()))

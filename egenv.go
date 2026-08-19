@@ -60,15 +60,6 @@ const (
 	EnvLogsNetwork = "EG_LOGS_NETWORK" // enable logging for network requests. boolean, see strconv.ParseBool for valid values.
 )
 
-// Logging verbosity levels, as stored in EnvComputeLoggingVerbosity.
-const (
-	LogVerbosityError   = 0
-	LogVerbosityInfo    = 1
-	LogVerbosityDebug   = 2
-	LogVerbosityTrace   = 3
-	LogVerbosityNetwork = 4
-)
-
 const (
 	EnvCI                        = "CI"                                         // standard ci/cd environment variable flag
 	EnvComputeTLSInsecure        = "EG_COMPUTE_TLS_INSECURE"                    // used to pass TLS insecure flag to container.
@@ -126,6 +117,7 @@ const (
 )
 
 const (
+	DefaultUsername    = "egd" // workload username
 	WorkingDirectory   = "eg"
 	MountDirectory     = "eg.mnt"
 	WorkloadDirectory  = ".eg.workload"

@@ -9,6 +9,7 @@ import (
 	"os/user"
 	"time"
 
+	_eg "github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/stringsx"
 	"github.com/egdaemon/eg/internal/userx"
@@ -151,8 +152,8 @@ func (t Command) Newf(cmd string, options ...any) Command {
 func New(cmd string) Command {
 	u := userx.CurrentUserOrDefault(user.User{})
 	return Command{
-		user:     stringsx.First(u.Username, "egd"), // default user to execute commands as
-		group:    stringsx.First(defaultgroup(u), "egd"),
+		user:     stringsx.First(u.Username, _eg.DefaultUsername), // default user to execute commands as
+		group:    stringsx.First(defaultgroup(u), _eg.DefaultUsername),
 		cmd:      cmd,
 		timeout:  DefaultTimeout,
 		entry:    run,

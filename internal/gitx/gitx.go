@@ -103,6 +103,14 @@ func Worktree(ctx context.Context, repo, dir string) (err error) {
 // container that doesn't also have repo's .git available at that same path).
 // dir must not already exist.
 func LocalClone(ctx context.Context, repo, dir string) (err error) {
+	// broke with the local clone/worktree work to allow updating
+	// go-git. we'll need to fix that.
+	// shell.New("git remote remove origin && git remote add origin git@github.com:retrovibed/deeppool.git"),
+	origin, err := execx.String(ctx, "git", "remote", "get-url", git.DefaultRemoteName)
+	if err != nil {
+		return errorsx.Wrapf(fmt.Errorf("%s: %w", strings.TrimSpace(origin), err), "unable to determine origin remote: %s -> %s", repo, dir)
+	}
+
 	out, err := execx.RunAs(ctx, "egd", "git", "clone", "-q", "--local", repo, dir).CombinedOutput()
 	if err != nil {
 		return errorsx.Wrapf(fmt.Errorf("%s: %w", strings.TrimSpace(string(out)), err), "unable to clone repository: %s -> %s", repo, dir)
@@ -111,6 +119,16 @@ func LocalClone(ctx context.Context, repo, dir string) (err error) {
 	out, err = execx.RunAs(ctx, "egd", "git", "-C", dir, "checkout", "-q", "--detach", "HEAD").CombinedOutput()
 	if err != nil {
 		return errorsx.Wrapf(fmt.Errorf("%s: %w", strings.TrimSpace(string(out)), err), "unable to detach HEAD: %s", dir)
+	}
+
+	_, err = execx.RunAs(ctx, "git", "remote", "remove", git.DefaultRemoteName).CombinedOutput()
+	if err != nil {
+		return errorsx.Wrapf(fmt.Errorf("%s: %w", strings.TrimSpace(origin), err), "unable to remove origin remote: %s -> %s", repo, dir)
+	}
+
+	_, err = execx.RunAs(ctx, "git", "remote", "add", git.DefaultRemoteName, origin).CombinedOutput()
+	if err != nil {
+		return errorsx.Wrapf(fmt.Errorf("%s: %w", strings.TrimSpace(origin), err), "unable to remove origin remote: %s -> %s", repo, dir)
 	}
 
 	return nil

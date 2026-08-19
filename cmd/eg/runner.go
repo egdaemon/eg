@@ -73,7 +73,7 @@ func (t module) mounthack(ctx context.Context, runid string, ws workspaces.Conte
 
 	remap := func(from, to string) error {
 		if envx.Boolean(false, eg.EnvExperimentalBindMount) {
-			egdu, err := user.Lookup("egd")
+			egdu, err := user.Lookup(eg.DefaultUsername)
 			if err != nil {
 				return errorsx.Wrap(err, "failed to lookup user egd")
 			}
@@ -210,7 +210,7 @@ func (t module) waylandhack(ctx context.Context) (err error) {
 
 	// server: unprivileged (egd), connects to ctrlsock, creates the
 	// app-facing display socket that pipeline steps connect to normally.
-	servercmd := exec.CommandContext(ctx, "sudo", "-u", "egd", "-g", "egd", wbin, "-s", ctrlsock, "--display", display, "server", "--", "sleep", "infinity")
+	servercmd := exec.CommandContext(ctx, "sudo", "-u", eg.DefaultUsername, "-g", eg.DefaultUsername, wbin, "-s", ctrlsock, "--display", display, "server", "--", "sleep", "infinity")
 	servercmd.Stdout, servercmd.Stderr = log.Writer(), log.Writer()
 	if err = servercmd.Start(); err != nil {
 		return errorsx.Wrap(err, "unable to start waypipe server")

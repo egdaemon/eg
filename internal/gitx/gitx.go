@@ -65,15 +65,6 @@ func Commitish(dir, treeish string) (_ string, err error) {
 	return hash.String(), nil
 }
 
-// gitcmd builds a `git -C repo <args>` invocation, run as the egd user --
-// repo is frequently bind-mounted into the workload container and owned by
-// the unprivileged egd user rather than whatever uid this process runs as,
-// which trips git's "dubious ownership" safe.directory check (CVE-2022-24765
-// mitigation) when run directly. see execx.RunAs.
-func gitcmd(ctx context.Context, repo string, args ...string) *exec.Cmd {
-	return execx.RunAs(ctx, "egd", "git", append([]string{"-C", repo}, args...)...)
-}
-
 // Worktree creates a linked worktree at dir, checked out to a detached HEAD
 // of repo. gives callers an isolated, real directory backed by repo's own
 // object store -- reflecting only committed state, no network clone, and
@@ -86,7 +77,7 @@ func Worktree(ctx context.Context, repo, dir string) (err error) {
 		log.Println(errorsx.Wrapf(fmt.Errorf("%s: %w", strings.TrimSpace(string(out)), perr), "unable to prune stale worktrees: %s", repo))
 	}
 
-	out, err := gitcmd(ctx, repo, "worktree", "add", "--detach", dir, "HEAD").CombinedOutput()
+	out, err := gitcmd(ctx, repo, "worktree", "add", "--relative-paths", "--detach", dir, "HEAD").CombinedOutput()
 	if err != nil {
 		return errorsx.Wrapf(fmt.Errorf("%s: %w", strings.TrimSpace(string(out)), err), "unable to create worktree: %s -> %s", repo, dir)
 	}
@@ -108,22 +99,22 @@ func LocalClone(ctx context.Context, repo, dir string) (err error) {
 		return errorsx.Wrapf(fmt.Errorf("%s: %w", strings.TrimSpace(origin), err), "unable to determine origin remote: %s -> %s", repo, dir)
 	}
 
-	out, err := execx.RunAs(ctx, "egd", "git", "clone", "-q", "--local", repo, dir).CombinedOutput()
+	out, err := execx.RunAs(ctx, eg.DefaultUsername, "git", "clone", "-q", "--local", repo, dir).CombinedOutput()
 	if err != nil {
 		return errorsx.Wrapf(fmt.Errorf("%s: %w", strings.TrimSpace(string(out)), err), "unable to clone repository: %s -> %s", repo, dir)
 	}
 
-	out, err = execx.RunAs(ctx, "egd", "git", "-C", dir, "checkout", "-q", "--detach", "HEAD").CombinedOutput()
+	out, err = execx.RunAs(ctx, eg.DefaultUsername, "git", "-C", dir, "checkout", "-q", "--detach", "HEAD").CombinedOutput()
 	if err != nil {
 		return errorsx.Wrapf(fmt.Errorf("%s: %w", strings.TrimSpace(string(out)), err), "unable to detach HEAD: %s", dir)
 	}
 
-	_, err = execx.RunAs(ctx, "egd", "git", "-C", dir, "remote", "remove", git.DefaultRemoteName).CombinedOutput()
+	_, err = execx.RunAs(ctx, eg.DefaultUsername, "git", "-C", dir, "remote", "remove", git.DefaultRemoteName).CombinedOutput()
 	if err != nil {
 		return errorsx.Wrapf(fmt.Errorf("%s: %w", strings.TrimSpace(origin), err), "unable to remove origin remote: %s -> %s", repo, dir)
 	}
 
-	_, err = execx.RunAs(ctx, "git", "-C", dir, "remote", "add", git.DefaultRemoteName, origin).CombinedOutput()
+	_, err = execx.RunAs(ctx, eg.DefaultUsername, "git", "-C", dir, "remote", "add", git.DefaultRemoteName, origin).CombinedOutput()
 	if err != nil {
 		return errorsx.Wrapf(fmt.Errorf("%s: %w", strings.TrimSpace(origin), err), "unable to remove origin remote: %s -> %s", repo, dir)
 	}
@@ -415,4 +406,13 @@ func Bearer(dir string) string {
 	}
 
 	return ""
+}
+
+// gitcmd builds a `git -C repo <args>` invocation, run as the egd user --
+// repo is frequently bind-mounted into the workload container and owned by
+// the unprivileged egd user rather than whatever uid this process runs as,
+// which trips git's "dubious ownership" safe.directory check (CVE-2022-24765
+// mitigation) when run directly. see execx.RunAs.
+func gitcmd(ctx context.Context, repo string, args ...string) *exec.Cmd {
+	return execx.RunAs(ctx, eg.DefaultUsername, "git", append([]string{"-C", repo}, args...)...)
 }

@@ -118,6 +118,7 @@ func compileWorkload(ctx context.Context, c *http.Client, dir string, rundirs Sp
 	if err != nil {
 		return errorsx.Wrap(err, "unable to create workspace")
 	}
+	defer os.RemoveAll(ws.Root)
 
 	module, err := compileEntrypoint(ctx, ws)
 	if err != nil {

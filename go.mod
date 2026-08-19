@@ -1,6 +1,6 @@
 module github.com/egdaemon/eg
 
-go 1.25.8
+go 1.26.3
 
 require (
 	cloud.google.com/go/secretmanager v1.16.0
@@ -18,7 +18,7 @@ require (
 	github.com/dominikbraun/graph v0.23.0
 	github.com/duckdb/duckdb-go/v2 v2.10503.1
 	github.com/dustin/go-humanize v1.0.1
-	github.com/egdaemon/gdx v0.0.0-20260818162210-df9073320007
+	github.com/egdaemon/gdx v0.0.0-20260819112956-edaa2df47170
 	github.com/egdaemon/gdx/konggdx v0.0.0-20260818142539-2af0a2bf0a1c
 	github.com/egdaemon/wasinet/wasinet v0.0.0-20250806175613-49e153bd345a
 	github.com/egdaemon/wasinet/wazeronet v0.0.0-20250806175613-49e153bd345a
@@ -332,7 +332,3 @@ require (
 	sigs.k8s.io/yaml v1.6.0 // indirect
 	tags.cncf.io/container-device-interface v1.1.0 // indirect
 )
-
-replace github.com/egdaemon/gdx => ../gdx
-
-replace github.com/egdaemon/gdx/konggdx => ../gdx/konggdx

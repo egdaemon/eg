@@ -488,16 +488,16 @@ github.com/ebitengine/purego/internal/fakecgo
 github.com/ebitengine/purego/internal/strings
 github.com/ebitengine/purego/internal/xreflect
 # github.com/egdaemon/eg v0.0.0-20260819091602-fed93fff85da
-## explicit; go 1.25.8
-# github.com/egdaemon/gdx v0.0.0-20260818162210-df9073320007 => ../gdx
+## explicit; go 1.26.3
+# github.com/egdaemon/gdx v0.0.0-20260819112956-edaa2df47170
 ## explicit; go 1.25.8
 github.com/egdaemon/gdx
 github.com/egdaemon/gdx/gdxapi
 github.com/egdaemon/gdx/internal/envx
 github.com/egdaemon/gdx/internal/errorsx
 github.com/egdaemon/gdx/internal/langx
-# github.com/egdaemon/gdx/konggdx v0.0.0-20260818142539-2af0a2bf0a1c => ../gdx/konggdx
-## explicit; go 1.25.8
+# github.com/egdaemon/gdx/konggdx v0.0.0-20260818142539-2af0a2bf0a1c
+## explicit; go 1.26.3
 github.com/egdaemon/gdx/konggdx
 github.com/egdaemon/gdx/konggdx/cmdopts
 # github.com/egdaemon/wasinet/wasinet v0.0.0-20250806175613-49e153bd345a
@@ -2161,5 +2161,3 @@ sigs.k8s.io/yaml
 # tags.cncf.io/container-device-interface v1.1.0
 ## explicit; go 1.21
 tags.cncf.io/container-device-interface/pkg/parser
-# github.com/egdaemon/gdx => ../gdx
-# github.com/egdaemon/gdx/konggdx => ../gdx/konggdx

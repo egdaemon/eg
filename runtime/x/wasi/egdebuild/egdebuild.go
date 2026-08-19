@@ -301,6 +301,8 @@ func UploadDPut(gcfg Config, dput fs.FS, opts ...option) eg.OpFn {
 		runtime := Runtime(cfg)
 		return shell.Run(
 			ctx,
+			// need to run permission adjustments as privileged since the files were created as the root user.
+			runtime.Newf("chown -R egd:egd %s", egenv.EphemeralDirectory("dput.config")).Privileged(),
 			runtime.Newf(
 				"ls %s/*_source.changes | xargs -I {} dput -f -c %s %s {}",
 				bdir,

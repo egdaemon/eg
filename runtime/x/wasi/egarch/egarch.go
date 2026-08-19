@@ -1,6 +1,6 @@
 // Package egarchx maps GOARCH architecture names (amd64, arm64, 386, arm)
 // to various third-party architecture naming conventions.
-package egarchx
+package egarch
 
 import (
 	"github.com/egdaemon/eg"
@@ -14,7 +14,7 @@ func Host() string {
 
 // POSIX see POSIXFrom
 func POSIX() string {
-	return DartFrom(egenv.String("amd64", eg.EnvComputeArch))
+	return POSIXFrom(Host())
 }
 
 // POSIXFrom maps GOARCH/dpkg architecture names (amd64, arm64, 386, arm)
@@ -34,20 +34,18 @@ func POSIXFrom(arch string) string {
 
 // Dart see DartFrom provided the current runtime.GOARCH
 func Dart() string {
-	return DartFrom(egenv.String("amd64", eg.EnvComputeArch))
+	return DartFrom(Host())
 }
 
 // DartFrom maps GOARCH/dpkg architecture names (386, amd64, arm, arm64)
 // to dart names (ia32, x64, arm, arm64).
 func DartFrom(arch string) string {
 	switch arch {
-	case "arm64":
-		return "arm64"
 	case "386":
 		return "ia32"
-	case "arm":
-		return "arm"
-	default: // amd64
+	case "amd64":
 		return "x64"
+	default: // amd64
+		return arch
 	}
 }

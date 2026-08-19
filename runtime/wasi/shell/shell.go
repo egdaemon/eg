@@ -104,6 +104,16 @@ func (t Command) Privileged() Command {
 	return t.As("root")
 }
 
+// specialized for As("root") which runs the command as root when true.
+// allows conditional flagging privileged.
+// when false the command is unchanged.
+func (t Command) MaybePrivileged(b bool) Command {
+	if b {
+		return t.As("root")
+	}
+	return t
+}
+
 // Internal use only not under compatability promises.
 func (t Command) UnsafeEntrypoint(e entrypoint) Command {
 	t.entry = e

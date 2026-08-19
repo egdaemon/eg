@@ -62,6 +62,7 @@ type Config struct {
 	Environ        []string      // additional environment variables to pass to the build process.
 	lintian        string        // lintian flag
 	timeout        time.Duration // command timeout
+	privileged     bool          // internal flagging of whether to run the shell runtime as a privileged user.
 	buildCommand   func(*Config, shell.Command) shell.Command
 }
 
@@ -139,7 +140,7 @@ func (option) BuildCommand(d func(c1 *Config, c2 shell.Command) shell.Command) o
 func (option) BuildBinary(d time.Duration) option {
 	return func(c *Config) {
 		c.buildCommand = func(cfg *Config, runtime shell.Command) shell.Command {
-			return runtime.Newf("debuild %s-b -k%s", cfg.lintian, cfg.SignatureKeyID).Privileged().Timeout(d)
+			return runtime.Newf("debuild %s-b -k%s", cfg.lintian, cfg.SignatureKeyID).MaybePrivileged(cfg.privileged).Timeout(d)
 		}
 	}
 }
@@ -162,6 +163,12 @@ func (option) NoLint() option {
 	}
 }
 
+func (option) UnsafePrivileged(b bool) option {
+	return func(c *Config) {
+		c.privileged = b
+	}
+}
+
 var Option = option(nil)
 
 func From(c Config, opts ...option) Config {
@@ -176,9 +183,10 @@ func New(pkg string, distro string, src string, opts ...option) (c Config) {
 		Architecture: "any",
 		Description:  "package built by egdebuild\n A package should provide its own description",
 		buildCommand: func(cfg *Config, runtime shell.Command) shell.Command {
-			return runtime.Newf("debuild %s-S -k%s", cfg.lintian, cfg.SignatureKeyID).Privileged()
+			return runtime.Newf("debuild %s-S -k%s", cfg.lintian, cfg.SignatureKeyID).MaybePrivileged(cfg.privileged)
 		},
-		timeout: 5 * time.Minute,
+		timeout:    5 * time.Minute,
+		privileged: false,
 	}, opts...)
 }
 
@@ -261,6 +269,7 @@ func Build(cfg Config, opts ...option) eg.OpFn {
 
 		return shell.Run(
 			ctx,
+			// need to run permission adjustments as privileged since the files were created as the root user.
 			runtime.Newf("chown -R egd:egd %s", root).Privileged(),
 			runtime.Newf("rsync --recursive --perms --links %s/ src/", cfg.SourceDir),
 			runtime.New("cat debian/control | envsubst | tee debian/control.new && mv debian/control.new debian/control"),
@@ -279,15 +288,16 @@ func UploadDPut(gcfg Config, dput fs.FS, opts ...option) eg.OpFn {
 		}
 		root := fmt.Sprintf("deb.%s", gcfg.Name)
 		bdir := egenv.EphemeralDirectory(root)
-		runtime := Runtime(gcfg, opts...)
+		cfg := From(gcfg, opts...)
+		runtime := Runtime(cfg)
 		return shell.Run(
 			ctx,
 			runtime.Newf(
 				"ls %s/*_source.changes | xargs -I {} dput -f -c %s %s {}",
 				bdir,
 				egenv.EphemeralDirectory("dput.config"),
-				gcfg.Name,
-			).Privileged(),
+				cfg.Name,
+			).MaybePrivileged(cfg.privileged),
 		)
 	}
 }

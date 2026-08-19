@@ -125,6 +125,8 @@ func (t upload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 	t.GitClone = stringsx.First(t.GitClone, errorsx.Zero(gitx.QuirkCloneURI(repo, t.GitRemote)))
 
 	envb := envx.Build().
+		Var(eg.EnvComputeArch, t.Arch).
+		Var(eg.EnvComputeOS, t.OS).
 		FromReader(secrets.NewReader(gctx.Context, t.Secrets...)).
 		FromEnviron(envx.Dirty(t.Dirty)...).
 		FromPath(t.EnvironmentPaths...).

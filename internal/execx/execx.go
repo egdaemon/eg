@@ -88,7 +88,7 @@ func RunAs(ctx context.Context, username string, name string, args ...string) *e
 		return exec.CommandContext(ctx, name, args...)
 	}
 
-	return exec.CommandContext(ctx, "sudo", append([]string{"-u", u.Username, "-g", u.Username, name}, args...)...)
+	return exec.CommandContext(ctx, "sudo", append([]string{"-u", u.Username, "-g", u.Username, "--", name}, args...)...)
 }
 
 func String(ctx context.Context, prog string, args ...string) (_ string, err error) {

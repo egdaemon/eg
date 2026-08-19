@@ -25,6 +25,7 @@ func initRepo(t *testing.T, dir string, committed map[string]string) {
 	run("init", "-q")
 	run("config", "user.email", "test@example.com")
 	run("config", "user.name", "test")
+	run("remote", "add", "origin", "https://example.com/dummy/repo.git")
 
 	for name, content := range committed {
 		path := filepath.Join(dir, name)

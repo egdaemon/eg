@@ -43,8 +43,14 @@ func DetectRoot() string {
 
 // IsRepository reports whether dir is the root of a git repository.
 func IsRepository(dir string) bool {
-	_, err := git.PlainOpen(dir)
-	return err == nil
+	dir = filepath.Clean(dir)
+	path := filepath.Clean(fsx.LocateWithin(dir, ".git"))
+	_, err := filepath.Rel(dir, path)
+	if err != nil {
+		debugx.Println(errorsx.Wrap(err, "is not a git repository"))
+		return false
+	}
+	return true
 }
 
 func Commitish(dir, treeish string) (_ string, err error) {
@@ -77,7 +83,7 @@ func Worktree(ctx context.Context, repo, dir string) (err error) {
 		log.Println(errorsx.Wrapf(fmt.Errorf("%s: %w", strings.TrimSpace(string(out)), perr), "unable to prune stale worktrees: %s", repo))
 	}
 
-	out, err := gitcmd(ctx, repo, "worktree", "add", "--relative-paths", "--detach", dir, "HEAD").CombinedOutput()
+	out, err := gitcmd(ctx, repo, "worktree", "add", "--detach", dir, "HEAD").CombinedOutput()
 	if err != nil {
 		return errorsx.Wrapf(fmt.Errorf("%s: %w", strings.TrimSpace(string(out)), err), "unable to create worktree: %s -> %s", repo, dir)
 	}

@@ -2,7 +2,9 @@ package gitx
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -48,5 +50,39 @@ func TestLocalClone(t *testing.T) {
 
 	t.Run("fails when repo is not a git repository", func(t *testing.T) {
 		require.Error(t, LocalClone(t.Context(), t.TempDir(), filepath.Join(t.TempDir(), "clone")))
+	})
+
+	t.Run("preserves origin SSH URL", func(t *testing.T) {
+		repo := t.TempDir()
+		initRepo(t, repo, map[string]string{"main.go": "package main"})
+		origin := "git@github.com:user/repo.git"
+
+		cmd := exec.Command("git", "-C", repo, "remote", "set-url", "origin", origin)
+		_, err := cmd.CombinedOutput()
+		require.NoError(t, err)
+
+		dir := filepath.Join(t.TempDir(), "clone")
+		require.NoError(t, LocalClone(t.Context(), repo, dir))
+
+		cloneOrigin, err := exec.Command("git", "-C", dir, "remote", "get-url", "origin").CombinedOutput()
+		require.NoError(t, err, "clone should have a valid origin URL")
+		require.Equal(t, origin, strings.TrimSpace(string(cloneOrigin)))
+	})
+
+	t.Run("preserves origin SSH URL via git@github.com", func(t *testing.T) {
+		repo := t.TempDir()
+		initRepo(t, repo, map[string]string{"main.go": "package main"})
+		origin := "ssh://git@github.com/user/repo.git"
+
+		cmd := exec.Command("git", "-C", repo, "remote", "set-url", "origin", origin)
+		_, err := cmd.CombinedOutput()
+		require.NoError(t, err)
+
+		dir := filepath.Join(t.TempDir(), "clone")
+		require.NoError(t, LocalClone(t.Context(), repo, dir))
+
+		cloneOrigin, err := exec.Command("git", "-C", dir, "remote", "get-url", "origin").CombinedOutput()
+		require.NoError(t, err, "clone should have a valid origin URL")
+		require.Equal(t, origin, strings.TrimSpace(string(cloneOrigin)))
 	})
 }

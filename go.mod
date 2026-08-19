@@ -24,7 +24,7 @@ require (
 	github.com/egdaemon/wasinet/wazeronet v0.0.0-20250806175613-49e153bd345a
 	github.com/fsnotify/fsnotify v1.10.1
 	github.com/go-git/go-git/v6 v6.0.0-alpha.5
-	github.com/gofrs/uuid/v5 v5.4.0
+	github.com/gofrs/uuid/v5 v5.5.1
 	github.com/golang-jwt/jwt/v4 v4.5.2
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/mux v1.8.1
@@ -47,7 +47,7 @@ require (
 	github.com/radovskyb/watcher v1.0.7
 	github.com/shirou/gopsutil/v4 v4.26.4
 	github.com/sirupsen/logrus v1.9.4
-	github.com/stretchr/testify v1.11.1
+	github.com/stretchr/testify v1.12.0
 	github.com/tetratelabs/wazero v1.12.0
 	github.com/willabides/kongplete v0.4.0
 	go.podman.io/podman/v6 v6.0.0-20260602192321-9e13b9ea52a4

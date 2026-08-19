@@ -487,7 +487,7 @@ github.com/ebitengine/purego/internal/cgo
 github.com/ebitengine/purego/internal/fakecgo
 github.com/ebitengine/purego/internal/strings
 github.com/ebitengine/purego/internal/xreflect
-# github.com/egdaemon/eg v0.0.0-20260602150540-f4dec72d2ef0
+# github.com/egdaemon/eg v0.0.0-20260819091602-fed93fff85da
 ## explicit; go 1.25.8
 # github.com/egdaemon/gdx v0.0.0-20260818162210-df9073320007 => ../gdx
 ## explicit; go 1.25.8
@@ -654,8 +654,8 @@ github.com/goccy/go-json/internal/runtime
 # github.com/godbus/dbus/v5 v5.2.2
 ## explicit; go 1.20
 github.com/godbus/dbus/v5
-# github.com/gofrs/uuid/v5 v5.4.0
-## explicit; go 1.19
+# github.com/gofrs/uuid/v5 v5.5.1
+## explicit; go 1.25
 github.com/gofrs/uuid/v5
 # github.com/gogo/protobuf v1.3.2
 ## explicit; go 1.15
@@ -1471,10 +1471,12 @@ github.com/spf13/pflag
 # github.com/stefanberger/go-pkcs11uri v0.0.0-20230803200340-78284954bff6
 ## explicit; go 1.19
 github.com/stefanberger/go-pkcs11uri
-# github.com/stretchr/testify v1.11.1
+# github.com/stretchr/testify v1.12.0
 ## explicit; go 1.17
 github.com/stretchr/testify/assert
 github.com/stretchr/testify/assert/yaml
+github.com/stretchr/testify/internal/difflib
+github.com/stretchr/testify/internal/spew
 github.com/stretchr/testify/require
 # github.com/sylabs/sif/v2 v2.24.0
 ## explicit; go 1.25.6

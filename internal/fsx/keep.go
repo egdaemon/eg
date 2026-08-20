@@ -17,8 +17,8 @@ import (
 func KeepNewestN(n int, s iterx.Seq[string]) iterx.Seq[string] {
 	return iterx.New(func(ctx context.Context, yield func(string) bool) error {
 		type entry struct {
-			path    string
-			oldest  int64
+			path   string
+			oldest int64
 		}
 
 		var entries []entry

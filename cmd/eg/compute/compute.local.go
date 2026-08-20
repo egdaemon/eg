@@ -119,8 +119,8 @@ func (t local) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err e
 		Var("GH_TOKEN", githubToken(gctx.Context, canonicaluri)).
 		FromReader(secrets.NewReader(gctx.Context, t.Secrets...)).
 		FromPath(t.EnvironmentPaths...).
-		FromEnv(t.Environment...).
 		FromEnv(os.Environ()...).
+		FromEnviron(envx.AutoEnviron(t.Environment...)...).
 		FromEnviron(errorsx.Zero(gitx.LocalEnv(repo, t.GitRemote, t.GitReference))...).
 		Var(eg.EnvComputeOS, runtime.GOOS).
 		Var(eg.EnvComputeArch, runtime.GOARCH).

@@ -29,9 +29,12 @@ func main() {
 			ctx,
 			c1,
 			daemon.Gogen,
+			shell.Op(
+				shell.New("git diff > ${PATCH}").Environ("PATCH", egenv.CacheDirectory("codegen.patch")),
+			),
 		),
 		shell.Op(
-			shell.New("git diff > ${PATCH}").Environ("PATCH", egenv.CacheDirectory("codegen.patch")),
+			shell.New("git apply ${PATCH}").Environ("PATCH", egenv.CacheDirectory("codegen.patch")),
 		),
 	)
 

@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package eg.ci.authz;
+package eg.compute.authz;
 
 message Authorization {
   bool compute_read = 1 [ json_name = "compute_read" ];

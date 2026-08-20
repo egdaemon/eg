@@ -409,6 +409,31 @@ func (t *Builder) FromEnviron(environ ...string) *Builder {
 	return t
 }
 
+// AutoEnviron resolves a list of keys or explicit key=value strings into a
+// []string suitable for use as os.Environ.
+//
+// Arguments that contain an '=' are treated as explicit key=value pairs and
+// passed through verbatim. Arguments without '=' are treated as bare key names;
+// the value is looked up from the current process environment via
+// os.LookupEnv. Keys that are not set are silently omitted.
+func AutoEnviron(keysOrEnviron ...string) (environ []string) {
+	environ = make([]string, 0, len(keysOrEnviron))
+
+	for _, k := range keysOrEnviron {
+		_k, v, ok := strings.Cut(k, "=")
+		if ok && len(v) > 0 {
+			environ = append(environ, k)
+			continue
+		}
+
+		if v, ok := os.LookupEnv(_k); ok {
+			environ = append(environ, Format(_k, v, FormatOptionTransforms(allowAll)))
+		}
+	}
+
+	return environ
+}
+
 // extract the key/value pairs from the os.Environ.
 // empty keys are passed as k=
 func (t *Builder) FromEnv(keys ...string) *Builder {

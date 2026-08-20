@@ -130,7 +130,7 @@ func (t upload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 		FromReader(secrets.NewReader(gctx.Context, t.Secrets...)).
 		FromEnviron(envx.Dirty(t.Dirty)...).
 		FromPath(t.EnvironmentPaths...).
-		FromEnviron(t.Environment...).
+		FromEnviron(envx.AutoEnviron(t.Environment...)...).
 		FromEnviron(errorsx.Zero(gitx.Env(repo, t.GitRemote, t.GitReference, t.GitClone))...)
 
 	if err = envb.CopyTo(environio); err != nil {

@@ -9,6 +9,7 @@ import (
 	"github.com/egdaemon/eg/runtime/wasi/eg"
 	"github.com/egdaemon/eg/runtime/wasi/egenv"
 	"github.com/egdaemon/eg/runtime/wasi/eggit"
+	"github.com/egdaemon/eg/runtime/wasi/shell"
 )
 
 func main() {
@@ -28,6 +29,9 @@ func main() {
 			ctx,
 			c1,
 			daemon.Gogen,
+		),
+		shell.Op(
+			shell.New("git diff > ${PATCH}").Environ("PATCH", egenv.CacheDirectory("codegen.patch")),
 		),
 	)
 

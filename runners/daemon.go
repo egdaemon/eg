@@ -109,7 +109,6 @@ func AgentOptionLocalComputeCachingVolumes(canonicaluri string) AgentOption {
 	_, path, _ := strings.Cut(canonicaluri, ":")
 	path = strings.ReplaceAll(path, "/", ".")
 	path = strings.ReplaceAll(path, ".git", "")
-	log.Println("ZERP ZERP", canonicaluri, "->", path)
 	return AgentOptionCompose(
 		AgentOptionVolumes(
 			AgentMountReadWrite(fmt.Sprintf("%s.eg.containers", path), "/var/lib/containers"),

@@ -315,7 +315,17 @@ func sshvcsuri(s string) string {
 
 func vcsuri(uris ...string) string {
 	uri := slicesx.FirstOrZero(uris...)
-	return strings.Replace(strings.TrimPrefix(sshvcsuri(uri), "ssh://"), "/", ":", 1)
+	u := errorsx.Zero(url.Parse(uri))
+	if u != nil {
+		return fmt.Sprintf("git@%s:%s", u.Host, strings.TrimPrefix(u.Path, "/"))
+	}
+
+	uri = strings.TrimPrefix(sshvcsuri(uri), "ssh://")
+	if strings.Contains(uri, "@") && strings.Count(uri, ":") == 0 {
+		return strings.Replace(uri, "/", ":", 1)
+	}
+
+	return uri
 }
 
 func VCSDownloadToken(aid string, vcsuri string, options ...jwtx.Option) jwt.RegisteredClaims {

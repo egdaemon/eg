@@ -58,25 +58,6 @@ func cleanup(ctx context.Context, cmdctx func(*exec.Cmd) *exec.Cmd, cname string
 	}
 }
 
-func PodmanPull(ctx context.Context, name string, options ...string) (cmd *exec.Cmd, err error) {
-	args := []string{
-		"pull", name,
-	}
-	args = append(args, options...)
-
-	return exec.CommandContext(ctx, "podman", args...), nil
-}
-
-func PodmanBuild(ctx context.Context, name string, dir string, definition string, options ...string) (cmd *exec.Cmd, err error) {
-	args := []string{
-		"build", "--stdin", "-t", name, "-f", definition,
-	}
-	args = append(args, options...)
-	args = append(args, dir)
-
-	return exec.CommandContext(ctx, "podman", args...), nil
-}
-
 func PodmanRun(ctx context.Context, cmdctx func(*exec.Cmd) *exec.Cmd, image, cname string, command []string, options ...string) (err error) {
 	var (
 		cmd *exec.Cmd
@@ -92,18 +73,6 @@ func PodmanRun(ctx context.Context, cmdctx func(*exec.Cmd) *exec.Cmd, image, cna
 	cmd.Args = append(cmd.Args, options...)
 	cmd.Args = append(cmd.Args, image)
 	cmd.Args = append(cmd.Args, command...)
-
-	if err = execx.MaybeRun(cmdctx(cmd)); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func PodmanPrune(ctx context.Context, cmdctx func(*exec.Cmd) *exec.Cmd) (err error) {
-	cmd := exec.CommandContext(
-		ctx, "podman", "system", "prune", "-f",
-	)
 
 	if err = execx.MaybeRun(cmdctx(cmd)); err != nil {
 		return err

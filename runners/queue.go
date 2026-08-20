@@ -32,6 +32,7 @@ import (
 	"github.com/egdaemon/eg/internal/iox"
 	"github.com/egdaemon/eg/internal/langx"
 	"github.com/egdaemon/eg/internal/md5x"
+	"github.com/egdaemon/eg/internal/podmanx"
 	"github.com/egdaemon/eg/internal/tarx"
 	"github.com/egdaemon/eg/internal/userx"
 	"github.com/egdaemon/eg/internal/wasix"
@@ -153,7 +154,7 @@ func QueueOptionFailure(fn func(cause error)) QueueOption {
 	}
 }
 
-func BuildRootContainer(ctx context.Context) error {
+func BuildRootContainer(ctx context.Context, options ...string) error {
 	tmpdir, err := os.MkdirTemp("", "eg.container.build")
 	if err != nil {
 		return errorsx.Wrap(err, "unable to preprate root container")
@@ -164,7 +165,7 @@ func BuildRootContainer(ctx context.Context) error {
 	return BuildRootContainerPath(ctx, tmpdir, rootc)
 }
 
-func BuildRootContainerPath(ctx context.Context, dir, path string) (err error) {
+func BuildRootContainerPath(ctx context.Context, dir, path string, options ...string) (err error) {
 	debugx.Println("building root container initiated")
 	defer debugx.Println("building root container completed")
 
@@ -172,14 +173,17 @@ func BuildRootContainerPath(ctx context.Context, dir, path string) (err error) {
 		return errorsx.Wrapf(err, "preparing root container failed: %s", path)
 	}
 
-	return BuildContainer(ctx, "eg", dir, path)
+	return BuildContainer(ctx, "eg", dir, path, options...)
 }
 
-func BuildContainer(ctx context.Context, name, dir, path string) (err error) {
+func BuildContainer(ctx context.Context, name, dir, path string, options ...string) (err error) {
 	debugx.Println("building container initiated")
 	defer debugx.Println("building container completed")
+	cmd, err := podmanx.Build(ctx, name, dir, path, options...)
+	if err != nil {
+		return err
+	}
 
-	cmd := exec.CommandContext(ctx, "podman", "build", "-t", name, "-f", path, dir)
 	cmd.Stderr = os.Stderr
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout

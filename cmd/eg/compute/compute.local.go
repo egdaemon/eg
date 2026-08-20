@@ -114,7 +114,7 @@ func (t local) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err e
 	}
 
 	canonicaluri := errorsx.Zero(gitx.CanonicalURI(repo, t.GitRemote))
-
+	log.Println("ZERP ZERP", canonicaluri)
 	envb := envx.Build().
 		Var("GH_TOKEN", githubToken(gctx.Context, canonicaluri)).
 		FromReader(secrets.NewReader(gctx.Context, t.Secrets...)).

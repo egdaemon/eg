@@ -202,12 +202,9 @@ func CanonicalURI(r *git.Repository, name string) (_ string, err error) {
 		return "", errorsx.Wrapf(err, "unable to detect remote: %s", name)
 	}
 
-	uri := slicesx.FirstOrZero(remote.Config().URLs...)
-	if strings.ContainsRune(uri, '@') {
-		return uri, nil
-	}
+	log.Println("BUG", remote.Config().URLs)
 
-	return vcsuri(uri), nil
+	return vcsuri(remote.Config().URLs...), nil
 }
 
 func Env(repo *git.Repository, remote string, branch string, vcsclone string) (env []string, err error) {
@@ -247,6 +244,8 @@ func LocalEnv(repo *git.Repository, remote string, branch string) (env []string,
 
 	env = append(env, benv...)
 	env = append(env, envx.Format(eg.EnvComputeVCS, uri))
+
+	log.Println("DERP DERP", env)
 	return env, nil
 }
 
@@ -317,8 +316,9 @@ func sshvcsuri(s string) string {
 	return vcs.String()
 }
 
-func vcsuri(s string) string {
-	return strings.Replace(strings.TrimPrefix(sshvcsuri(s), "ssh://"), "/", ":", 1)
+func vcsuri(uris ...string) string {
+	uri := slicesx.FirstOrZero(uris...)
+	return strings.Replace(strings.TrimPrefix(sshvcsuri(uri), "ssh://"), "/", ":", 1)
 }
 
 func VCSDownloadToken(aid string, vcsuri string, options ...jwtx.Option) jwt.RegisteredClaims {

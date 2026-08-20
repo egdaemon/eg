@@ -315,8 +315,7 @@ func sshvcsuri(s string) string {
 
 func vcsuri(uris ...string) string {
 	uri := slicesx.FirstOrZero(uris...)
-	u := errorsx.Zero(url.Parse(uri))
-	if u != nil {
+	if u, err := url.Parse(uri); err == nil {
 		return fmt.Sprintf("git@%s:%s", u.Host, strings.TrimPrefix(u.Path, "/"))
 	}
 

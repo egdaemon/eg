@@ -138,8 +138,8 @@ type Token struct {
 	QuotaModify      bool   `protobuf:"varint,1004,opt,name=quota_modify,proto3" json:"quota_modify,omitempty"`
 	RepositoryRead   bool   `protobuf:"varint,1005,opt,name=repository_read,proto3" json:"repository_read,omitempty"`
 	RepositoryModify bool   `protobuf:"varint,1006,opt,name=repository_modify,proto3" json:"repository_modify,omitempty"`
-	// compute_shared is a highly sensitive field used to authorize access to any
-	// workload task. should never be *written* to in the code base, only manually
+	// compute_shared is a sensitive field used to authorize access to any
+	// workload task. it is never *written* to in the code base, only manually
 	// changed in the DB.
 	ComputeShared    bool   `protobuf:"varint,1007,opt,name=compute_shared,proto3" json:"compute_shared,omitempty"`
 	ComputeRemaining uint64 `protobuf:"varint,1008,opt,name=compute_remaining,proto3" json:"compute_remaining,omitempty"`
@@ -669,7 +669,7 @@ var File_eg_ci_authz_proto protoreflect.FileDescriptor
 
 const file_eg_ci_authz_proto_rawDesc = "" +
 	"\n" +
-	"\x11eg.ci.authz.proto\x12\bci.authz\"\xcd\x02\n" +
+	"\x11eg.ci.authz.proto\x12\veg.ci.authz\"\xcd\x02\n" +
 	"\rAuthorization\x12\"\n" +
 	"\fcompute_read\x18\x01 \x01(\bR\fcompute_read\x12&\n" +
 	"\x0ecompute_modify\x18\x02 \x01(\bR\x0ecompute_modify\x12\x1e\n" +
@@ -704,35 +704,35 @@ const file_eg_ci_authz_proto_rawDesc = "" +
 	"\x11repository_modify\x18\xee\a \x01(\bR\x11repository_modify\x12'\n" +
 	"\x0ecompute_shared\x18\xef\a \x01(\bR\x0ecompute_shared\x12-\n" +
 	"\x11compute_remaining\x18\xf0\a \x01(\x04R\x11compute_remainingJ\x05\b\t\x10\xe8\a\"\x0e\n" +
-	"\fAuthzRequest\"6\n" +
-	"\rAuthzResponse\x12%\n" +
-	"\x05token\x18\x01 \x01(\v2\x0f.ci.authz.TokenR\x05token\"m\n" +
+	"\fAuthzRequest\"9\n" +
+	"\rAuthzResponse\x12(\n" +
+	"\x05token\x18\x01 \x01(\v2\x12.eg.ci.authz.TokenR\x05token\"p\n" +
 	"\fGrantRequest\x12\x1e\n" +
 	"\n" +
 	"profile_id\x18\x01 \x01(\tR\n" +
-	"profile_id\x12=\n" +
-	"\rauthorization\x18\x02 \x01(\v2\x17.ci.authz.AuthorizationR\rauthorization\"n\n" +
+	"profile_id\x12@\n" +
+	"\rauthorization\x18\x02 \x01(\v2\x1a.eg.ci.authz.AuthorizationR\rauthorization\"q\n" +
 	"\rGrantResponse\x12\x1e\n" +
 	"\n" +
 	"profile_id\x18\x01 \x01(\tR\n" +
-	"profile_id\x12=\n" +
-	"\rauthorization\x18\x02 \x01(\v2\x17.ci.authz.AuthorizationR\rauthorization\"n\n" +
+	"profile_id\x12@\n" +
+	"\rauthorization\x18\x02 \x01(\v2\x1a.eg.ci.authz.AuthorizationR\rauthorization\"q\n" +
 	"\rRevokeRequest\x12\x1e\n" +
 	"\n" +
 	"profile_id\x18\x01 \x01(\tR\n" +
-	"profile_id\x12=\n" +
-	"\rauthorization\x18\x02 \x01(\v2\x17.ci.authz.AuthorizationR\rauthorization\"o\n" +
+	"profile_id\x12@\n" +
+	"\rauthorization\x18\x02 \x01(\v2\x1a.eg.ci.authz.AuthorizationR\rauthorization\"r\n" +
 	"\x0eRevokeResponse\x12\x1e\n" +
 	"\n" +
 	"profile_id\x18\x01 \x01(\tR\n" +
-	"profile_id\x12=\n" +
-	"\rauthorization\x18\x02 \x01(\v2\x17.ci.authz.AuthorizationR\rauthorization\"0\n" +
+	"profile_id\x12@\n" +
+	"\rauthorization\x18\x02 \x01(\v2\x1a.eg.ci.authz.AuthorizationR\rauthorization\"0\n" +
 	"\x0eProfileRequest\x12\x1e\n" +
 	"\n" +
 	"profile_id\x18\x01 \x01(\tR\n" +
-	"profile_id\"P\n" +
-	"\x0fProfileResponse\x12=\n" +
-	"\rauthorization\x18\x01 \x01(\v2\x17.ci.authz.AuthorizationR\rauthorizationb\x06proto3"
+	"profile_id\"S\n" +
+	"\x0fProfileResponse\x12@\n" +
+	"\rauthorization\x18\x01 \x01(\v2\x1a.eg.ci.authz.AuthorizationR\rauthorizationb\x06proto3"
 
 var (
 	file_eg_ci_authz_proto_rawDescOnce sync.Once
@@ -748,24 +748,24 @@ func file_eg_ci_authz_proto_rawDescGZIP() []byte {
 
 var file_eg_ci_authz_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
 var file_eg_ci_authz_proto_goTypes = []any{
-	(*Authorization)(nil),   // 0: ci.authz.Authorization
-	(*Token)(nil),           // 1: ci.authz.Token
-	(*AuthzRequest)(nil),    // 2: ci.authz.AuthzRequest
-	(*AuthzResponse)(nil),   // 3: ci.authz.AuthzResponse
-	(*GrantRequest)(nil),    // 4: ci.authz.GrantRequest
-	(*GrantResponse)(nil),   // 5: ci.authz.GrantResponse
-	(*RevokeRequest)(nil),   // 6: ci.authz.RevokeRequest
-	(*RevokeResponse)(nil),  // 7: ci.authz.RevokeResponse
-	(*ProfileRequest)(nil),  // 8: ci.authz.ProfileRequest
-	(*ProfileResponse)(nil), // 9: ci.authz.ProfileResponse
+	(*Authorization)(nil),   // 0: eg.ci.authz.Authorization
+	(*Token)(nil),           // 1: eg.ci.authz.Token
+	(*AuthzRequest)(nil),    // 2: eg.ci.authz.AuthzRequest
+	(*AuthzResponse)(nil),   // 3: eg.ci.authz.AuthzResponse
+	(*GrantRequest)(nil),    // 4: eg.ci.authz.GrantRequest
+	(*GrantResponse)(nil),   // 5: eg.ci.authz.GrantResponse
+	(*RevokeRequest)(nil),   // 6: eg.ci.authz.RevokeRequest
+	(*RevokeResponse)(nil),  // 7: eg.ci.authz.RevokeResponse
+	(*ProfileRequest)(nil),  // 8: eg.ci.authz.ProfileRequest
+	(*ProfileResponse)(nil), // 9: eg.ci.authz.ProfileResponse
 }
 var file_eg_ci_authz_proto_depIdxs = []int32{
-	1, // 0: ci.authz.AuthzResponse.token:type_name -> ci.authz.Token
-	0, // 1: ci.authz.GrantRequest.authorization:type_name -> ci.authz.Authorization
-	0, // 2: ci.authz.GrantResponse.authorization:type_name -> ci.authz.Authorization
-	0, // 3: ci.authz.RevokeRequest.authorization:type_name -> ci.authz.Authorization
-	0, // 4: ci.authz.RevokeResponse.authorization:type_name -> ci.authz.Authorization
-	0, // 5: ci.authz.ProfileResponse.authorization:type_name -> ci.authz.Authorization
+	1, // 0: eg.ci.authz.AuthzResponse.token:type_name -> eg.ci.authz.Token
+	0, // 1: eg.ci.authz.GrantRequest.authorization:type_name -> eg.ci.authz.Authorization
+	0, // 2: eg.ci.authz.GrantResponse.authorization:type_name -> eg.ci.authz.Authorization
+	0, // 3: eg.ci.authz.RevokeRequest.authorization:type_name -> eg.ci.authz.Authorization
+	0, // 4: eg.ci.authz.RevokeResponse.authorization:type_name -> eg.ci.authz.Authorization
+	0, // 5: eg.ci.authz.ProfileResponse.authorization:type_name -> eg.ci.authz.Authorization
 	6, // [6:6] is the sub-list for method output_type
 	6, // [6:6] is the sub-list for method input_type
 	6, // [6:6] is the sub-list for extension type_name

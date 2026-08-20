@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/egdaemon/eg/internal/fsx"
 	"github.com/egdaemon/eg/runtime/wasi/eg"
@@ -184,7 +185,7 @@ func Release(patterns ...string) eg.OpFn {
 //
 //	eggithub.Upload(eggithub.PatternVersion(), "foo.txt", "bar.txt")
 func Upload(release string, patterns ...string) eg.OpFn {
-	return UploadRuntime(shell.Runtime(), release, patterns...)
+	return UploadRuntime(shell.Runtime().Attempts(3).Timeout(time.Duration(len(patterns))*shell.DefaultTimeout), release, patterns...)
 }
 
 func UploadRuntime(rt shell.Command, release string, patterns ...string) eg.OpFn {

@@ -16,4 +16,4 @@ package eg
 //go:generate protoc --proto_path=.proto --go_opt=Meg.interp.exec.proto=github.com/eg/interp/execproxy --go_opt=paths=source_relative --go_out=interp/execproxy eg.interp.exec.proto
 //go:generate protoc --proto_path=.proto --go-grpc_opt=Meg.interp.exec.proto=github.com/eg/interp/execproxy --go-grpc_opt=paths=source_relative --go-grpc_out=interp/execproxy eg.interp.exec.proto
 
-//go:generate protoc --proto_path=.proto --go_opt=Mci.authz.proto=github.com/egciorg/eg/compute --go_opt=paths=source_relative --go_out=compute ci.authz.proto
+//go:generate protoc --proto_path=.proto --go_opt=Meg.ci.authz.proto=github.com/egciorg/eg/compute --go_opt=paths=source_relative --go_out=compute eg.ci.authz.proto

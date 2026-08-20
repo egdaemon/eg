@@ -24,8 +24,8 @@ func runSSHCLI(t *testing.T, args []string) error {
 	parser, err := kong.New(&cli,
 		kong.Name("eg"),
 		kong.Vars{
-			"vars_entropy_seed":     "test-default-seed",
-			"vars_ssh_key_seed":     "test-default-seed",
+			"vars_entropy_seed": "test-default-seed",
+			"vars_ssh_key_seed": "test-default-seed",
 			"vars_ssh_key_path": filepath.Join(t.TempDir(), "id_ed25519"),
 			"vars_user_name":    "testuser",
 			"vars_user_home":    t.TempDir(),

@@ -83,7 +83,8 @@ func TestKeepNewestN(t *testing.T) {
 
 		expected := errors.New("upstream error")
 		s := fsx.KeepNewestN(1, iterx.Error[string](expected))
-		for range s.Each(ctx) {}
+		for range s.Each(ctx) {
+		}
 		require.ErrorIs(t, s.Err(), expected)
 	})
 }

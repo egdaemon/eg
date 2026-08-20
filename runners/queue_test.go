@@ -108,8 +108,14 @@ func TestQueue(t *testing.T) {
 				err1, err2 error
 			)
 			wg.Add(2)
-			go func() { defer wg.Done(); err1 = runners.RunOne(ctx1, 0, 0, rm, &dirs, reload, runners.QueueOptionCompletion(&c1)) }()
-			go func() { defer wg.Done(); err2 = runners.RunOne(ctx2, 1, 0, rm, &dirs, reload, runners.QueueOptionCompletion(&c2)) }()
+			go func() {
+				defer wg.Done()
+				err1 = runners.RunOne(ctx1, 0, 0, rm, &dirs, reload, runners.QueueOptionCompletion(&c1))
+			}()
+			go func() {
+				defer wg.Done()
+				err2 = runners.RunOne(ctx2, 1, 0, rm, &dirs, reload, runners.QueueOptionCompletion(&c2))
+			}()
 			wg.Wait()
 
 			require.ErrorIs(t, err1, context.Canceled)
@@ -180,8 +186,14 @@ func TestQueue(t *testing.T) {
 				err1, err2 error
 			)
 			wg.Add(2)
-			go func() { defer wg.Done(); err1 = runners.RunOne(ctx1, 0, 0, rm, &dirs, reload, runners.QueueOptionCompletion(&c1)) }()
-			go func() { defer wg.Done(); err2 = runners.RunOne(ctx2, 1, 0, rm, &dirs, reload, runners.QueueOptionCompletion(&c2)) }()
+			go func() {
+				defer wg.Done()
+				err1 = runners.RunOne(ctx1, 0, 0, rm, &dirs, reload, runners.QueueOptionCompletion(&c1))
+			}()
+			go func() {
+				defer wg.Done()
+				err2 = runners.RunOne(ctx2, 1, 0, rm, &dirs, reload, runners.QueueOptionCompletion(&c2))
+			}()
 			wg.Wait()
 
 			require.ErrorIs(t, err1, context.Canceled)

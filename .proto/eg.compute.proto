@@ -4,11 +4,19 @@ package eg.compute;
 
 message Compute {
   string id = 1 [ json_name = "id" ];
-  string cluster_id = 14 [ json_name = "cid" ];
-  string description = 3 [ json_name = "description" ];
+  string account_id = 2 [ json_name = "account_id" ];
+  string cluster_id = 3 [ json_name = "cid" ];
+  string description = 4 [ json_name = "description" ];
   string created_at = 5 [ json_name = "created_at" ];
   string updated_at = 6 [ json_name = "updated_at" ];
   string authzed_at = 7 [ json_name = "authzed_at" ];
+  string p2pid = 8 [ json_name = "p2p_id" ];
+  string os = 900 [ json_name = "os" ];
+  string arch = 901 [ json_name = "arch" ]; // the native architecture.
+  uint64 cores = 902 [ json_name = "cores" ];
+  uint64 memory = 903 [ json_name = "memory" ];
+  uint64 vram = 904 [ json_name = "vram" ];
+  repeated string labels = 1000 [ json_name = "labels" ];
 }
 
 message SearchRequest {

@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package eg.compute;
+package eg.eg.compute;
 
 message GitCredentialsAutomatic {
 } // used to signal using the local devices credentials.

@@ -184,8 +184,12 @@ func Release(patterns ...string) eg.OpFn {
 //
 //	eggithub.Upload(eggithub.PatternVersion(), "foo.txt", "bar.txt")
 func Upload(release string, patterns ...string) eg.OpFn {
+	return UploadRuntime(shell.Runtime(), release, patterns...)
+}
+
+func UploadRuntime(rt shell.Command, release string, patterns ...string) eg.OpFn {
 	return func(ctx context.Context, o eg.Op) error {
-		runtime := shell.Runtime().Environ(
+		runtime := rt.Environ(
 			"GH_TOKEN", ffigit.Bearer(),
 		)
 

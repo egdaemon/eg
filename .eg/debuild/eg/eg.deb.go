@@ -51,6 +51,10 @@ func init() {
 			"pciutils",     // required for GPU access
 		),
 		egdebuild.Option.Envvar("VCS_REVISION", c.Hash.String()),
+		egdebuild.Option.Runtime(func(c shell.Command) shell.Command {
+			return c.MaybePrivileged(true) // temporary until we register the gpg key.
+			// this allows the runner to access the .gnupg directory we mount via compute local
+		}),
 	)
 }
 

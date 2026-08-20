@@ -15,6 +15,7 @@ import (
 	"github.com/egdaemon/eg/internal/execx"
 	"github.com/egdaemon/eg/internal/fsx"
 	"github.com/egdaemon/eg/internal/langx"
+	"github.com/egdaemon/eg/internal/podmanx"
 	"github.com/egdaemon/eg/internal/slicesx"
 	"github.com/egdaemon/eg/internal/stringsx"
 	"github.com/egdaemon/eg/interp/c8s"
@@ -107,7 +108,7 @@ func (t *ProxyService) Build(ctx context.Context, req *c8s.BuildRequest) (_ *c8s
 	// determine the working directory from the request if specified or the definition file's path.
 	wdir := slicesx.FindOrZero(func(s string) bool { return !stringsx.Blank(s) }, req.Directory, filepath.Dir(abspath))
 
-	if cmd, err = PodmanBuild(ctx, req.Name, wdir, abspath, req.Options...); err != nil {
+	if cmd, err = podmanx.Build(ctx, req.Name, wdir, abspath, req.Options...); err != nil {
 		log.Println("unable to create build command", err)
 		return nil, err
 	}
@@ -129,7 +130,7 @@ func (t *ProxyService) Pull(ctx context.Context, req *c8s.PullRequest) (resp *c8
 		cmd *exec.Cmd
 	)
 
-	if cmd, err = PodmanPull(ctx, req.Name, req.Options...); err != nil {
+	if cmd, err = podmanx.Pull(ctx, req.Name, req.Options...); err != nil {
 		return nil, err
 	}
 

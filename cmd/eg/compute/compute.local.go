@@ -45,7 +45,6 @@ type local struct {
 	GPU              bool     `name:"gpu" help:"enable gpu support" hidden:"true"`
 	GCPAuto          bool     `name:"gcp-auto" help:"use the default well known path for gcp's application default credentials"`
 	GCP              string   `name:"gcp" help:"path to gcp's application default credentials"`
-	Platform         string   `name:"platform" help:"arch platform for the container" hidden:"true"`
 	InvalidateCache  bool     `name:"invalidate-cache" help:"removes workload build cache"`
 	EnvironmentPaths []string `name:"envpath" help:"environment files to pass to the module" default:""`
 	Environment      []string `name:"env" short:"e" help:"define environment variables and their values to be included"`
@@ -75,6 +74,7 @@ func (t local) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err e
 		wayland    runners.AgentOption = runners.AgentOptionNoop
 		privileged runners.AgentOption = runners.AgentOptionNoop
 		mountegbin runners.AgentOption = runners.AgentOptionEGBin(errorsx.Must(exec.LookPath(os.Args[0])))
+		platform                       = podmanx.AutoPlatform(t.Arch, t.OS)
 	)
 
 	contextx.WaitGroupAdd(gctx.Context, 1)
@@ -186,7 +186,7 @@ func (t local) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err e
 	debugx.Println("modules", modules)
 	debugx.Println("runtime resources", spew.Sdump(t.RuntimeResources))
 
-	if err = runners.BuildRootContainerPath(gctx.Context, t.Dir, filepath.Join(ws.RuntimeDir, "Containerfile")); err != nil {
+	if err = runners.BuildRootContainerPath(gctx.Context, t.Dir, filepath.Join(ws.RuntimeDir, "Containerfile"), "--platform", platform); err != nil {
 		return err
 	}
 
@@ -220,7 +220,7 @@ func (t local) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err e
 		runners.AgentOptionPublish(t.Ports...),
 		runners.AgentOptionCores(t.RuntimeResources.Cores),
 		runners.AgentOptionMemory(uint64(t.RuntimeResources.Memory)),
-		runners.AgentOptionPlatform(t.Platform),
+		runners.AgentOptionPlatform(platform),
 		gnupghome, // must come after the runtime directory mount to ensure correct mounting order.
 		gcpcreds,  // must come after the mount directory to ensure correct mounting order.
 		gpu,       // enable gpu support

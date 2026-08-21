@@ -15,15 +15,18 @@ import (
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/egdaemon/eg"
+	"github.com/egdaemon/eg/astcodec"
 	"github.com/egdaemon/eg/cmd/cmdopts"
 	"github.com/egdaemon/eg/internal/debugx"
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/fsx"
 	"github.com/egdaemon/eg/internal/gitx"
+	iterx "github.com/egdaemon/eg/internal/iterx"
 	"github.com/egdaemon/eg/internal/langx"
 	"github.com/egdaemon/eg/internal/wasix"
 	"github.com/gofrs/uuid/v5"
+	"golang.org/x/tools/go/packages"
 )
 
 func DefaultStateDirectory() string {
@@ -64,6 +67,48 @@ type Context struct {
 
 func (t Context) FS() fs.FS {
 	return os.DirFS(t.Root)
+}
+
+// Desc describes a discovered workload. a struct so future metadata can be
+// added without breaking callers.
+type Desc struct {
+	Path string // relative to dir
+}
+
+// Workloads scans dir for eg workloads: main-module go packages, the same
+// definition the "eg.workload" shell-completion predictor uses
+// (cmd/cmdplete.Workload).
+func Workloads(ctx context.Context, dir string) iterx.Seq[Desc] {
+	return iterx.New(func(ctx context.Context, yield func(Desc) bool) error {
+		pkgc := astcodec.DefaultPkgLoad(
+			astcodec.LoadDir(dir),
+			astcodec.AutoFileSet,
+			astcodec.DisableGowork, // dont want to do this but until I figure out the issue.
+		)
+
+		pset, err := packages.Load(pkgc, "./...")
+		if err != nil {
+			return err
+		}
+
+		for _, pkg := range pset {
+			if !pkg.Module.Main {
+				continue
+			}
+
+			m, err := filepath.Rel(dir, pkg.Dir)
+			if err != nil {
+				debugx.Println("unable to determine path", pkg.Name, pkg.Dir, err)
+				continue
+			}
+
+			if !yield(Desc{Path: m}) {
+				return nil
+			}
+		}
+
+		return nil
+	})
 }
 
 func FromEnv(ctx context.Context, root, name string) (zero Context, err error) {

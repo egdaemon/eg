@@ -7,6 +7,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/slicesx"
@@ -108,6 +109,29 @@ const (
 	EnvGitAuthHTTPPassword    = "EG_GIT_AUTH_HTTP_PASSWORD"
 	EnvGitAuthHTTPUsername    = "EG_GIT_AUTH_HTTP_USERNAME"
 )
+
+// IsDefaultBranchBuild reports whether the head and base commits recorded in
+// environ are identical, which only happens for default-branch builds (see
+// vcsevents push-event handling, where Head and Base are built from the same
+// Reference) and local runs performed directly on the base branch.
+//
+// implemented without internal/envx to avoid an import cycle -- envx itself
+// depends on this package.
+func IsDefaultBranchBuild(environ ...string) bool {
+	lookup := func(key string) string {
+		prefix := key + "="
+		for _, kv := range environ {
+			if v, ok := strings.CutPrefix(kv, prefix); ok {
+				return v
+			}
+		}
+		return ""
+	}
+
+	head := lookup(EnvGitHeadCommit)
+	base := lookup(EnvGitBaseCommit)
+	return head != "" && head == base
+}
 
 const (
 	EnvUnsafeCacheID         = "EG_UNSAFE_CACHE_ID"

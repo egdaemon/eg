@@ -1,0 +1,5 @@
+CREATE TABLE IF NOT EXISTS eg_workloads_discovered (
+	id UUID PRIMARY KEY,
+	path VARCHAR NOT NULL,
+	ts TIMESTAMPTZ NOT NULL
+);

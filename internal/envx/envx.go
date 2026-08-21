@@ -87,6 +87,10 @@ func Base64(fallback []byte, keys ...string) []byte {
 	return NewEnviron(os.Getenv).Base64(fallback, keys...)
 }
 
+func Base64URL(fallback []byte, keys ...string) []byte {
+	return NewEnviron(os.Getenv).Base64(fallback, keys...)
+}
+
 func URL(fallback string, keys ...string) *url.URL {
 	return NewEnviron(os.Getenv).URL(fallback, keys...)
 }
@@ -244,7 +248,16 @@ func (t environ) Hex(fallback []byte, keys ...string) []byte {
 
 // Base64 read value as a base64 encoded string
 func (t environ) Base64(fallback []byte, keys ...string) []byte {
-	enc := base64.RawStdEncoding.WithPadding('=')
+	return t.base64(base64.RawStdEncoding.WithPadding('='), fallback, keys...)
+}
+
+// Base64URL read value as a url base64 encoded string
+func (t environ) Base64URL(fallback []byte, keys ...string) []byte {
+	return t.base64(base64.URLEncoding, fallback, keys...)
+}
+
+// Base64 read value as a base64 encoded string
+func (t environ) base64(enc *base64.Encoding, fallback []byte, keys ...string) []byte {
 	return envval(fallback, t.m, func(s string) ([]byte, error) {
 		decoded, err := enc.DecodeString(s)
 		return decoded, errorsx.Wrapf(err, "invalid base64 encoded data '%s'", s)

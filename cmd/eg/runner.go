@@ -40,6 +40,7 @@ import (
 	"github.com/egdaemon/eg/interp/execproxy"
 	"github.com/egdaemon/eg/interp/runtime/wasi/ffiwasinet"
 	"github.com/egdaemon/eg/runners"
+	"github.com/egdaemon/eg/runtime/wasi/egunsafe/egworkloads"
 	"github.com/egdaemon/eg/workspaces"
 	"github.com/gofrs/uuid/v5"
 	"github.com/tetratelabs/wazero"
@@ -222,6 +223,21 @@ func (t module) waylandhack(ctx context.Context) (err error) {
 	return fsx.Wait(ctx, 3*time.Second, display)
 }
 
+// recordDiscoveredWorkloads scans dir for eg workloads and records what it
+// finds into db, but only for default-branch builds (see
+// eg.IsDefaultBranchBuild) -- everything else (PR builds, feature branches)
+// is skipped. failures are logged, not fatal: this is analytics bookkeeping
+// and shouldn't fail an actual workload run.
+func recordDiscoveredWorkloads(ctx context.Context, db *sql.DB, dir string, environ ...string) {
+	if !eg.IsDefaultBranchBuild(environ...) {
+		return
+	}
+
+	if err := egworkloads.Detect(ctx, db, dir); err != nil {
+		log.Println("unable to record discovered workloads", err)
+	}
+}
+
 func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 	var (
 		ws      workspaces.Context
@@ -308,6 +324,8 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 		if err = events.PrepareDB(gctx.Context, db); err != nil {
 			return errorsx.Wrap(err, "unable to prepare analytics.db")
 		}
+
+		recordDiscoveredWorkloads(gctx.Context, db, eg.DefaultModuleDirectory(t.Dir), os.Environ()...)
 
 		cmdenvb = cmdenvb.Var(
 			eg.EnvComputeModuleSocket, eg.DefaultMountRoot(eg.RuntimeDirectory, filepath.Base(cspath)),

@@ -1,8 +1,10 @@
 package envx_test
 
 import (
+	"crypto/rand"
 	"encoding/base64"
 	"encoding/hex"
+	"io"
 	"os"
 	"path/filepath"
 	"testing"
@@ -97,6 +99,17 @@ func TestBase64(t *testing.T) {
 	t.Setenv(key, base64.StdEncoding.EncodeToString(raw))
 	require.Equal(t, raw, envx.Base64(nil, key))
 	require.Equal(t, []byte{0xff}, envx.Base64([]byte{0xff}, "missing-key-base64"))
+}
+
+func TestBase64URL(t *testing.T) {
+	const key = "d1e2f3a4-b5c6-7890-defa-901234567890"
+	raw := make([]byte, 1024)
+	_, err := io.ReadFull(rand.Reader, raw)
+	require.NoError(t, err)
+
+	t.Setenv(key, base64.URLEncoding.EncodeToString(raw))
+	require.Equal(t, raw, envx.Base64URL(nil, key))
+	require.Equal(t, []byte{0xff}, envx.Base64URL([]byte{0xff}, "missing-key-base64url"))
 }
 
 func TestURL(t *testing.T) {

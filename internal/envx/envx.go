@@ -88,7 +88,7 @@ func Base64(fallback []byte, keys ...string) []byte {
 }
 
 func Base64URL(fallback []byte, keys ...string) []byte {
-	return NewEnviron(os.Getenv).Base64(fallback, keys...)
+	return NewEnviron(os.Getenv).Base64URL(fallback, keys...)
 }
 
 func URL(fallback string, keys ...string) *url.URL {

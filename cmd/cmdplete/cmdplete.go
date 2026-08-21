@@ -1,13 +1,11 @@
 package cmdplete
 
 import (
+	"context"
 	"log"
-	"path/filepath"
 
-	"github.com/egdaemon/eg/astcodec"
-	"github.com/egdaemon/eg/internal/debugx"
+	"github.com/egdaemon/eg/workspaces"
 	"github.com/posener/complete"
-	"golang.org/x/tools/go/packages"
 )
 
 // will initialize data if necessary when prediction is called using the provided init function.
@@ -40,38 +38,15 @@ type Workload struct {
 }
 
 func (t Workload) Predict(args complete.Args) (results []string) {
-	var (
-		err  error
-		pset []*packages.Package
-	)
-
-	pkgc := astcodec.DefaultPkgLoad(
-		astcodec.LoadDir(t.root),
-		astcodec.AutoFileSet,
-		astcodec.DisableGowork, // dont want to do this but until I figure out the issue.
-	)
-
-	if pset, err = packages.Load(pkgc, "./..."); err != nil {
-		log.Println("unable to predict workloads available", t.root, err)
-		return nil
+	ctx := context.Background()
+	seq := workspaces.Workloads(ctx, t.root)
+	for d := range seq.Each(ctx) {
+		results = append(results, d.Path)
 	}
 
-	for _, pkg := range pset {
-		var (
-			err error
-			m   string
-		)
-
-		if !pkg.Module.Main {
-			continue
-		}
-
-		if m, err = filepath.Rel(t.root, pkg.Dir); err != nil {
-			debugx.Println("unable to determine path", pkg.Name, pkg.Dir, err)
-			continue
-		}
-
-		results = append(results, m)
+	if err := seq.Err(); err != nil {
+		log.Println("unable to predict workloads available", t.root, err)
+		return nil
 	}
 
 	return results

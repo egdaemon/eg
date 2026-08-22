@@ -153,7 +153,7 @@ func Parallel(operations ...OpFn) OpFn {
 			}
 		})
 
-		for i := 0; i < len(operations); i++ {
+		for range operations {
 			select {
 			case <-octx.Done():
 				return octx.Err()

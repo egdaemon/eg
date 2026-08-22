@@ -2,6 +2,7 @@ package eggpg
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/egdaemon/eg/runtime/wasi/eg"
 	"github.com/egdaemon/eg/runtime/wasi/egenv"
@@ -58,22 +59,36 @@ func (t options) Seed(v string) options {
 	})
 }
 
-func runtime(options ...Option) shell.Command {
+func runtime(options ...Option) (shell.Command, error) {
 	var opts option
 	for _, opt := range options {
 		opt(&opts)
+	}
+
+	switch {
+	case opts.home == "":
+		return shell.Command{}, fmt.Errorf("%s must not be empty", EnvHome)
+	case opts.name == "":
+		return shell.Command{}, fmt.Errorf("%s must not be empty", EnvName)
+	case opts.email == "":
+		return shell.Command{}, fmt.Errorf("%s must not be empty", EnvEmail)
+	case opts.seed == "":
+		return shell.Command{}, fmt.Errorf("%s must not be empty", EnvSeed)
 	}
 
 	return shell.Env().
 		Environ(EnvHome, opts.home).
 		Environ(EnvEmail, opts.email).
 		Environ(EnvName, opts.name).
-		Environ(EnvSeed, opts.seed)
+		Environ(EnvSeed, opts.seed), nil
 }
 
 func Debug(options ...Option) eg.OpFn {
 	return func(ctx context.Context, o eg.Op) error {
-		runtime := runtime(options...)
+		runtime, err := runtime(options...)
+		if err != nil {
+			return err
+		}
 		return shell.Op(
 			runtime.New("env | grep -i 'GNUPG'"),
 			runtime.New("env | grep -i 'EG_GPG_'"),
@@ -85,10 +100,13 @@ func Debug(options ...Option) eg.OpFn {
 // Generate a usable gpg keyring from a seed.
 func Seed(options ...Option) eg.OpFn {
 	return func(ctx context.Context, o eg.Op) error {
-		runtime := runtime(options...)
+		runtime, err := runtime(options...)
+		if err != nil {
+			return err
+		}
 		return shell.Op(
 			runtime.New("eg gpg keyring --directory=\"${GNUPGHOME}\" --name=\"${EG_GPG_KEYRING_NAME}\" --email=\"${EG_GPG_KEYRING_EMAIL}\" --seed=\"${EG_GPG_KEYRING_SEED}\""),
-			runtime.New("gpg --import ${HOME}/.gnupg/private.asc"),
+			runtime.New("gpg --import ${GNUPGHOME}/private.asc"),
 		)(ctx, o)
 	}
 }

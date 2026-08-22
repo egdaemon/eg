@@ -204,6 +204,17 @@ func Op(cmds ...Command) eg.OpFn {
 	}
 }
 
+// Convience function for running a set of commands in parallel as an operation.
+func Parallel(cmds ...Command) eg.OpFn {
+	ops := make([]eg.OpFn, 0, len(cmds))
+	for _, cmd := range cmds {
+		ops = append(ops, func(ctx context.Context, o eg.Op) error {
+			return Run(ctx, cmd)
+		})
+	}
+	return eg.Parallel(ops...)
+}
+
 // Run the provided commands using the operation.
 func Run(ctx context.Context, cmds ...Command) error {
 	for _, cmd := range cmds {

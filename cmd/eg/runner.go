@@ -457,10 +457,11 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 	}
 
 	if pmode := envx.String("", eg.EnvComputeProfileMode); stringsx.Present(pmode) {
-		pfile := filepath.Join(ws.CacheDir, ".eg", ".profiles", aid, uid, fmt.Sprintf("%s.pprof", pmode))
-		log.Println("writing profile to", pfile)
+		pfile := filepath.Join(ws.CacheDir, ".eg", ".profiles", aid, uid, strconv.Itoa(envx.Int(0, eg.EnvComputeModuleNestedLevel)), fmt.Sprintf("%s.pprof", pmode))
+		log.Println("profile will be written to", pfile)
 		go func() {
 			errorsx.Log(gdx.RecordFile(gctx.Context, pfile, gdx.Profile(gctx.Context, gdx.ProfileModeFromString(pmode))))
+			log.Println("profile written to", pfile)
 		}()
 	}
 

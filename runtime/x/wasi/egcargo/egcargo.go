@@ -25,7 +25,7 @@ func CacheDirectory(dirs ...string) string {
 // attempt to build the rust environment that sets up
 // the cargo environment for caching.
 func env() ([]string, error) {
-	return envx.Build().FromEnv(os.Environ()...).
+	return envx.Build().
 		Var("CARGO_HOME", CacheDirectory()).
 		Environ()
 }

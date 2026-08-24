@@ -62,6 +62,7 @@ const (
 )
 
 const (
+	EnvGithubToken               = "GH_TOKEN"                                   // standard environment variable for github token
 	EnvCI                        = "CI"                                         // standard ci/cd environment variable flag
 	EnvComputeTLSInsecure        = "EG_COMPUTE_TLS_INSECURE"                    // used to pass TLS insecure flag to container.
 	EnvComputeLoggingVerbosity   = "EG_COMPUTE_LOG_VERBOSITY"                   // logging verbosity.

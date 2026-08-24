@@ -14,7 +14,7 @@ import (
 )
 
 func Bearer() string {
-	envtoken := envx.String("", eg.EnvGitAuthHTTPPassword, "GH_TOKEN")
+	envtoken := envx.String("", eg.EnvGitAuthHTTPPassword, eg.EnvGithubToken)
 	if stringsx.Present(envtoken) {
 		return envtoken
 	}

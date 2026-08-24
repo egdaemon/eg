@@ -132,6 +132,7 @@ func main() {
 			"vars_cache_directory":      userx.DefaultCacheDirectory(),
 			"vars_runtime_directory":    userx.DefaultRuntimeDirectory(),
 			"vars_gdx_socket":           gdxsocket,
+			"vars_gdx_default_output":   "-",
 			"vars_eg_root_directory":    stringsx.FirstNonBlank(envx.String("", eg.EnvComputeWorkingDirectory), gitdir, eg.DefaultWorkingDirectory()),
 			"vars_eg_runtime_directory": eg.DefaultMountRoot(eg.RuntimeDirectory),
 			"vars_account_id":           envx.String("", "EG_ACCOUNT"),

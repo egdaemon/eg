@@ -51,7 +51,7 @@ func (t DownloadClient) Download(ctx context.Context, workload *EnqueuedDequeueR
 		req     *http.Request
 	)
 
-	for {
+	for range 128 {
 		req, err = http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/c/q/%s/download", t.host, workload.Enqueued.Id), bytes.NewReader(encoded))
 		if err != nil {
 			return err
@@ -91,6 +91,8 @@ func (t DownloadClient) Download(ctx context.Context, workload *EnqueuedDequeueR
 
 		return nil
 	}
+
+	return errorsx.Errorf("unable to download workload %s: exceeded conflict retry limit", workload.Enqueued.Id)
 }
 
 // retrieves available workloads

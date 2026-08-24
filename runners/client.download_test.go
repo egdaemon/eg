@@ -147,6 +147,23 @@ func TestDownloadClient(t *testing.T) {
 		require.Error(t, err)
 	})
 
+	t.Run("gives_up_after_exhausting_conflict_retries", func(t *testing.T) {
+		uid := errorsx.Must(uuid.NewV4())
+
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			errorsx.Log(httpx.WriteEmptyJSON(w, http.StatusConflict))
+		}))
+		defer srv.Close()
+
+		dirs := runners.NewSpoolDir(t.TempDir())
+		dc := runners.NewDownloadClient(http.DefaultClient, runners.DownloadClientOptionHost(srv.URL), runners.DownloadClientOptionDirs(dirs))
+
+		err := dc.Download(t.Context(), &runners.EnqueuedDequeueResponse{
+			Enqueued: &runners.Enqueued{Id: uid.String(), Entry: "entry.wasm"},
+		})
+		require.Error(t, err)
+	})
+
 	t.Run("invalid_uuid_returns_error", func(t *testing.T) {
 		archive := buildArchive(t, "entry.wasm", testx.Read(testx.Fixture("example.1.wasm")))
 

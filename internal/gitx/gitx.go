@@ -302,24 +302,13 @@ func BaseEnv(repo *git.Repository, vcs, uri string, treeish string) (env []strin
 	).Environ()
 }
 
-func sshvcsuri(s string) string {
-	vcs := errorsx.Zero(url.Parse(s))
-	if vcs == nil {
-		return s
-	}
-
-	vcs.Scheme = "ssh"
-	vcs.User = url.User("git")
-	return vcs.String()
-}
-
 func vcsuri(uris ...string) string {
 	uri := slicesx.FirstOrZero(uris...)
 	if u, err := url.Parse(uri); err == nil {
 		return fmt.Sprintf("git@%s:%s", u.Host, strings.TrimPrefix(u.Path, "/"))
 	}
 
-	uri = strings.TrimPrefix(sshvcsuri(uri), "ssh://")
+	uri = strings.TrimPrefix(uri, "ssh://")
 	if strings.Contains(uri, "@") && strings.Count(uri, ":") == 0 {
 		return strings.Replace(uri, "/", ":", 1)
 	}

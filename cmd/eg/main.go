@@ -153,9 +153,9 @@ func main() {
 			"vars_os":                      runtime.GOOS,
 			"vars_arch":                    runtime.GOARCH,
 			"vars_cores_minimum_default":   strconv.FormatUint(envx.Uint64(uint64(float64(runtime.NumCPU())*0.8), "EG_RESOURCES_CORES"), 10),
-			"vars_memory_minimum_default":  humanize.IBytes(envx.Uint64(0, "EG_RESOURCES_MEMORY")),
-			"vars_disk_minimum_default":    humanize.IBytes(envx.Uint64(0, "EG_RESOURCES_DISK")),
-			"vars_vram_minimum_default":    humanize.IBytes(envx.Uint64(0*bytesx.GiB, "EG_RESOURCES_VRAM")),
+			"vars_memory_minimum_default":  humanize.IBytes(envx.Bytes(0, "EG_RESOURCES_MEMORY")),
+			"vars_disk_minimum_default":    humanize.IBytes(envx.Bytes(0, "EG_RESOURCES_DISK")),
+			"vars_vram_minimum_default":    humanize.IBytes(envx.Bytes(0*bytesx.GiB, "EG_RESOURCES_VRAM")),
 			"vars_labels":                  envx.String("", "EG_LABELS"),
 			"vars_git_default_remote_name": git.DefaultRemoteName,
 			"vars_git_default_reference":   envx.String("main", "GITHUB_REF_NAME"), // github actions environment variable

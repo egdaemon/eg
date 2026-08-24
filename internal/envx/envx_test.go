@@ -7,9 +7,11 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strconv"
 	"testing"
 	"time"
 
+	"github.com/egdaemon/eg/internal/bytesx"
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/stretchr/testify/require"
@@ -53,6 +55,24 @@ func TestUint64(t *testing.T) {
 	t.Setenv(key, "18446744073709551615")
 	require.Equal(t, uint64(18446744073709551615), envx.Uint64(0, key))
 	require.Equal(t, uint64(1), envx.Uint64(1, "missing-key-uint64"))
+}
+
+func TestBytes(t *testing.T) {
+	const key = "a1e2f3c4-b5d6-7890-abce-012345678902"
+	t.Setenv(key, strconv.FormatUint(6*bytesx.GiB, 10))
+	require.Equal(t, uint64(6*bytesx.GiB), envx.Bytes(0, key))
+
+	t.Setenv(key, "6GiB")
+	require.Equal(t, uint64(6*bytesx.GiB), envx.Bytes(0, key))
+
+	t.Setenv(key, "512MiB")
+	require.Equal(t, uint64(512*bytesx.MiB), envx.Bytes(0, key))
+
+	require.Equal(t, uint64(1), envx.Bytes(1, "missing-key-bytes"))
+
+	// invalid value falls back
+	t.Setenv(key, "notabytesize")
+	require.Equal(t, uint64(7), envx.Bytes(7, key))
 }
 
 func TestFloat64(t *testing.T) {

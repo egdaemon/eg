@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	_eg "github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/internal/fsx"
 	"github.com/egdaemon/eg/runtime/wasi/eg"
 	"github.com/egdaemon/eg/runtime/wasi/egenv"
@@ -52,7 +53,7 @@ func Draft(patterns ...string) eg.OpFn {
 		version := PatternVersion()
 
 		runtime := shell.Runtime().Environ(
-			"GH_TOKEN", ffigit.Bearer(),
+			_eg.EnvGithubToken, ffigit.Bearer(),
 		)
 
 		if shell.Run(ctx, runtime.Newf("gh release view %s", version)) != nil {
@@ -135,7 +136,7 @@ func Promote(patterns ...string) eg.OpFn {
 		)
 
 		runtime := shell.Runtime().Environ(
-			"GH_TOKEN", ffigit.Bearer(),
+			_eg.EnvGithubToken, ffigit.Bearer(),
 		)
 
 		if len(patterns) > 0 {
@@ -191,7 +192,7 @@ func Upload(release string, patterns ...string) eg.OpFn {
 func UploadRuntime(rt shell.Command, release string, patterns ...string) eg.OpFn {
 	return func(ctx context.Context, o eg.Op) error {
 		runtime := rt.Environ(
-			"GH_TOKEN", ffigit.Bearer(),
+			_eg.EnvGithubToken, ffigit.Bearer(),
 		)
 
 		return shell.Run(

@@ -14,7 +14,6 @@ import (
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/numericx"
 	"github.com/egdaemon/eg/runners"
-	"github.com/pbnjay/memory"
 )
 
 type BootstrapEnvDaemon struct {
@@ -25,8 +24,6 @@ type BootstrapEnvDaemon struct {
 }
 
 func (t BootstrapEnvDaemon) Run(kctx *kong.Context, gctx *cmdopts.Global, entropy cmdopts.Entropy) (err error) {
-	memory := numericx.Max(uint64(t.Memory), uint64(float64(memory.TotalMemory())*0.9))
-
 	seed, err := entropy(t.Seed)
 	if err != nil {
 		return errorsx.Wrap(err, "failed to generate entropy")
@@ -37,7 +34,7 @@ func (t BootstrapEnvDaemon) Run(kctx *kong.Context, gctx *cmdopts.Global, entrop
 		log.Println("unable to detect gpu:", err)
 	}
 
-	labels := t.Labels
+	labels := t.RuntimeResources.Labels
 	if gpudriver != "" {
 		labels = append(labels, fmt.Sprintf("eg:gpu:%s", gpudriver))
 	}
@@ -47,13 +44,13 @@ func (t BootstrapEnvDaemon) Run(kctx *kong.Context, gctx *cmdopts.Global, entrop
 	).Var(
 		"EG_ENTROPY_SEED", seed,
 	).Var(
-		"EG_RESOURCES_CORES", strconv.FormatUint(numericx.Max(uint64(runtime.NumCPU()), t.Cores), 10),
+		"EG_RESOURCES_CORES", strconv.FormatUint(numericx.Max(uint64(runtime.NumCPU()), t.RuntimeResources.Cores), 10),
 	).Var(
-		"EG_RESOURCES_MEMORY", strconv.FormatUint(memory, 10),
+		"EG_RESOURCES_MEMORY", strconv.FormatUint(uint64(t.RuntimeResources.Memory), 10),
 	).Var(
-		"EG_RESOURCES_DISK", fmt.Sprintf("\"%s\"", string(errorsx.Zero(t.Disk.MarshalText()))),
+		"EG_RESOURCES_DISK", fmt.Sprintf("\"%s\"", string(errorsx.Zero(t.RuntimeResources.Disk.MarshalText()))),
 	).Var(
-		"EG_RESOURCES_VRAM", strconv.FormatUint(numericx.Max(uint64(t.Vram), gpuvram), 10),
+		"EG_RESOURCES_VRAM", strconv.FormatUint(numericx.Max(uint64(t.RuntimeResources.Vram), gpuvram), 10),
 	)
 
 	if t.Workers > 0 {

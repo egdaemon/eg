@@ -18,6 +18,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/dustin/go-humanize"
 	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/internal/debugx"
 	"github.com/egdaemon/eg/internal/errorsx"
@@ -48,6 +49,13 @@ func Uint64(fallback uint64, keys ...string) uint64 {
 
 func Float64(fallback float64, keys ...string) float64 {
 	return NewEnviron(os.Getenv).Float64(fallback, keys...)
+}
+
+// Bytes retrieve a byte size flag from the environment, checks each key in order
+// first to parse successfully is returned. accepts human readable byte sizes
+// such as '6g', '6GB', or '6GiB' in addition to plain integers.
+func Bytes(fallback uint64, keys ...string) uint64 {
+	return NewEnviron(os.Getenv).Bytes(fallback, keys...)
 }
 
 // Boolean retrieve a boolean flag from the environment, checks each key in order
@@ -201,6 +209,16 @@ func (t environ) Uint64(fallback uint64, keys ...string) uint64 {
 	return envval(fallback, t.m, func(s string) (uint64, error) {
 		decoded, err := strconv.ParseUint(s, 10, 64)
 		return decoded, errorsx.Wrapf(err, "uint64 '%s' is invalid", s)
+	}, keys...)
+}
+
+// Bytes retrieve a byte size flag from the environment, checks each key in order
+// first to parse successfully is returned. accepts human readable byte sizes
+// such as '6g', '6GB', or '6GiB' in addition to plain integers.
+func (t environ) Bytes(fallback uint64, keys ...string) uint64 {
+	return envval(fallback, t.m, func(s string) (uint64, error) {
+		decoded, err := humanize.ParseBytes(s)
+		return decoded, errorsx.Wrapf(err, "bytes '%s' is invalid", s)
 	}, keys...)
 }
 

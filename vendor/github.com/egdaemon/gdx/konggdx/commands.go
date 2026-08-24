@@ -6,6 +6,7 @@ package konggdx
 
 // Commands is the top-level kong command group for gdx.
 type Commands struct {
-	Prof  Prof  `cmd:"" help:"pull profiles from a running gdx debug socket"`
-	Trace Trace `cmd:"" help:"capture a runtime/trace execution trace from a running gdx debug socket"`
+	Prof       Prof       `cmd:"" help:"pull profiles from a running gdx debug socket"`
+	Trace      Trace      `cmd:"" help:"capture a runtime/trace execution trace from a running gdx debug socket"`
+	Goroutines Goroutines `cmd:"" help:"dump goroutine stack traces from a running gdx debug socket"`
 }

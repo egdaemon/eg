@@ -30,10 +30,10 @@ func (t options) WithDefaultDuration(d time.Duration) options {
 }
 
 // FromEnv reads configuration from the environment:
-//   - DIAGX_DEFAULT_DURATION: default profile/trace capture duration, defaults to 10s.
+//   - DGX_DEFAULT_DURATION: default profile/trace capture duration, defaults to 10s.
 func (t options) FromEnv() options {
 	return append(t, func(c *config) {
-		c.defaultDuration = envx.Duration(10*time.Second, "DIAGX_DEFAULT_DURATION")
+		c.defaultDuration = envx.Duration(10*time.Second, "DGX_DEFAULT_DURATION")
 	})
 }
 

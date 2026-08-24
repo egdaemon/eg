@@ -18,8 +18,8 @@ require (
 	github.com/dominikbraun/graph v0.23.0
 	github.com/duckdb/duckdb-go/v2 v2.10503.1
 	github.com/dustin/go-humanize v1.0.1
-	github.com/egdaemon/gdx v0.0.0-20260819112956-edaa2df47170
-	github.com/egdaemon/gdx/konggdx v0.0.0-20260818142539-2af0a2bf0a1c
+	github.com/egdaemon/gdx v0.0.0-20260824162813-84291833ef44
+	github.com/egdaemon/gdx/konggdx v0.0.0-20260824162813-84291833ef44
 	github.com/egdaemon/wasinet/wasinet v0.0.0-20250806175613-49e153bd345a
 	github.com/egdaemon/wasinet/wazeronet v0.0.0-20250806175613-49e153bd345a
 	github.com/fsnotify/fsnotify v1.10.1
@@ -31,6 +31,7 @@ require (
 	github.com/gorilla/websocket v1.5.3
 	github.com/ipfs/go-datastore v0.9.1
 	github.com/ipfs/go-log/v2 v2.9.2
+	github.com/james-lawrence/genieql v0.0.0-20260821141941-92fda96aa606
 	github.com/jaypipes/ghw v0.24.0
 	github.com/justinas/alice v1.2.0
 	github.com/libp2p/go-libp2p v0.48.0
@@ -131,16 +132,17 @@ require (
 	github.com/docker/docker-credential-helpers v0.9.7 // indirect
 	github.com/docker/go-connections v0.7.0 // indirect
 	github.com/docker/go-units v0.5.0 // indirect
-	github.com/duckdb/duckdb-go-bindings v0.10503.0 // indirect
-	github.com/duckdb/duckdb-go-bindings/lib/darwin-amd64 v0.10503.0 // indirect
-	github.com/duckdb/duckdb-go-bindings/lib/darwin-arm64 v0.10503.0 // indirect
-	github.com/duckdb/duckdb-go-bindings/lib/linux-amd64 v0.10503.0 // indirect
-	github.com/duckdb/duckdb-go-bindings/lib/linux-arm64 v0.10503.0 // indirect
-	github.com/duckdb/duckdb-go-bindings/lib/windows-amd64 v0.10503.0 // indirect
+	github.com/duckdb/duckdb-go-bindings v0.10505.0 // indirect
+	github.com/duckdb/duckdb-go-bindings/lib/darwin-amd64 v0.10505.0 // indirect
+	github.com/duckdb/duckdb-go-bindings/lib/darwin-arm64 v0.10505.0 // indirect
+	github.com/duckdb/duckdb-go-bindings/lib/linux-amd64 v0.10505.0 // indirect
+	github.com/duckdb/duckdb-go-bindings/lib/linux-arm64 v0.10505.0 // indirect
+	github.com/duckdb/duckdb-go-bindings/lib/windows-amd64 v0.10505.0 // indirect
 	github.com/dunglas/httpsfv v1.1.0 // indirect
 	github.com/ebitengine/purego v0.10.0 // indirect
 	github.com/emirpasic/gods v1.18.1 // indirect
 	github.com/erikgeiser/coninput v0.0.0-20211004153227-1c3628e74d0f // indirect
+	github.com/felixge/fgprof v0.9.3 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/filecoin-project/go-clock v0.1.0 // indirect
 	github.com/flynn/noise v1.1.0 // indirect
@@ -160,6 +162,7 @@ require (
 	github.com/google/go-containerregistry v0.21.1 // indirect
 	github.com/google/go-intervals v0.0.2 // indirect
 	github.com/google/gopacket v1.1.19 // indirect
+	github.com/google/pprof v0.0.0-20260402051712-545e8a4df936 // indirect
 	github.com/google/s2a-go v0.1.9 // indirect
 	github.com/googleapis/enterprise-certificate-proxy v0.3.15 // indirect
 	github.com/googleapis/gax-go/v2 v2.22.0 // indirect
@@ -172,6 +175,12 @@ require (
 	github.com/ipfs/boxo v0.39.0 // indirect
 	github.com/ipfs/go-cid v0.6.1 // indirect
 	github.com/ipld/go-ipld-prime v0.23.0 // indirect
+	github.com/jackc/pgio v1.0.0 // indirect
+	github.com/jackc/pgpassfile v1.0.0 // indirect
+	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
+	github.com/jackc/pgtype v1.14.4 // indirect
+	github.com/jackc/pgx/v5 v5.9.1 // indirect
+	github.com/jackc/puddle/v2 v2.2.2 // indirect
 	github.com/jackpal/go-nat-pmp v1.0.2 // indirect
 	github.com/jaypipes/pcidb v1.1.1 // indirect
 	github.com/jbenet/go-temp-err-catcher v0.1.0 // indirect
@@ -262,6 +271,7 @@ require (
 	github.com/pion/turn/v4 v4.0.2 // indirect
 	github.com/pion/webrtc/v4 v4.1.3 // indirect
 	github.com/pjbgf/sha1cd v0.6.0 // indirect
+	github.com/pkg/profile v1.7.0 // indirect
 	github.com/pkg/sftp v1.13.10 // indirect
 	github.com/planetscale/vtprotobuf v0.6.1-0.20240319094008-0393e58bdf10 // indirect
 	github.com/polydawn/refmt v0.89.1-0.20231129105047-37766d95467a // indirect
@@ -277,6 +287,7 @@ require (
 	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/riywo/loginshell v0.0.0-20200815045211-7d26008be1ab // indirect
 	github.com/secure-systems-lab/go-securesystemslib v0.11.0 // indirect
+	github.com/serenize/snaker v0.0.0-20201027110005-a7ad2135616e // indirect
 	github.com/sergi/go-diff v1.4.0 // indirect
 	github.com/sigstore/fulcio v1.8.5 // indirect
 	github.com/sigstore/protobuf-specs v0.5.0 // indirect
@@ -299,6 +310,7 @@ require (
 	github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e // indirect
 	github.com/yusufpapurcu/wmi v1.2.4 // indirect
 	github.com/zeebo/xxh3 v1.1.0 // indirect
+	github.com/zieckey/goini v0.0.0-20240615065340-08ee21c836fb // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.68.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.69.0 // indirect

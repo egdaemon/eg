@@ -1,0 +1,25 @@
+package drivers
+
+const (
+	boolExprString    = "bool"
+	intExprString     = "int"
+	intArrExpr        = "[]int"
+	int16ExprString   = "int16"
+	int32ExprString   = "int32"
+	int64ExprString   = "int64"
+	uint16ExprString  = "uint16"
+	uint32ExprString  = "uint32"
+	uint64ExprString  = "uint64"
+	stringExprString  = "string"
+	stringArrExpr     = "[]string"
+	float32ExprString = "float32"
+	float64ExprString = "float64"
+	timeExprString    = "time.Time"
+	durationExpr      = "time.Duration"
+	netipAddrExpr     = "netip.Addr"
+	ipExpr            = "net.IP"
+	macExpr           = "net.HardwareAddr"
+	cidrExpr          = "net.IPNet"
+	cidrArrayExpr     = "[]net.IPNet"
+	bytesExpr         = "[]byte"
+)

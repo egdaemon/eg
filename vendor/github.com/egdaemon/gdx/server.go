@@ -5,22 +5,70 @@ import (
 	"expvar"
 	"fmt"
 	"io"
+	"log"
+	"net"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strconv"
 	"time"
 
+	"github.com/egdaemon/gdx/internal/errorsx"
+	"github.com/egdaemon/gdx/internal/langx"
+	"github.com/egdaemon/gdx/konggdx/userx"
 	"github.com/gorilla/mux"
 )
 
 const DefaultSocket = "gdx.socket"
+
+// autosocket builds the default unix socket path:
+// ${RUNTIME_DIR}/${binname}/gdx.socket.
+// binname must be a basename, not a full path (use filepath.Base).
+func autosocket(binname string) string {
+	return userx.RuntimeDirectory(filepath.Base(binname), DefaultSocket)
+}
+
+// AutoSocket returns the default unix socket path derived from os.Args[0].
+func AutoSocket() string {
+	return autosocket(langx.FirstNonZero(os.Args...))
+}
+
+func AutoUnixServe(ctx context.Context, options ...option) {
+	UnixServe(ctx, AutoSocket(), options...)
+}
+
+func UnixServe(ctx context.Context, gdxpath string, options ...option) {
+	errorsx.Log(errorsx.Wrap(errorsx.Ignore(os.Remove(gdxpath), os.ErrNotExist), "failed to remove previous gdx.socket"))
+	// best effort for ensuring directory exists. if this fails the socket will fail too.
+	errorsx.Log(errorsx.Wrap(os.MkdirAll(filepath.Dir(gdxpath), 0700), "failed to create socket directory"))
+
+	l, err := net.Listen("unix", gdxpath)
+	if err != nil {
+		log.Println("unable to bind gdx debug socket", err)
+		return
+	}
+
+	ctx, done := context.WithCancel(ctx)
+	defer done()
+	go func() {
+		<-ctx.Done()
+		errorsx.Log(errorsx.Wrap(l.Close(), "gdx shutdown"))
+	}()
+
+	log.Println("gdx debug available at:", gdxpath)
+	if err := http.Serve(l, NewHTTPFn(options...)); langx.FirstNonNil(err, ctx.Err()) == nil {
+		log.Println("gdx debug server stopped", langx.FirstNonNil(err, ctx.Err()))
+		return
+	}
+}
 
 // NewHTTPFn builds a stdlib http.Handler exposing the diagx debug surface
 // (goroutine dumps, profiles, traces, expvar). diagx never binds a listener
 // itself: mount the returned handler however the caller likes, e.g.
 //
 //	http.Serve(net.Listen("unix", path), diagx.NewHTTPFn(diagx.Options().FromEnv()))
-func NewHTTPFn(opts options) http.Handler {
-	cfg := opts.apply()
+func NewHTTPFn(opts ...option) http.Handler {
+	cfg := options(opts).apply()
 
 	r := mux.NewRouter()
 	r.Handle("/debug/vars", expvar.Handler()).Methods(http.MethodGet)

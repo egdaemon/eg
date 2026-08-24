@@ -34,7 +34,7 @@ func (t Serve) run(ctx context.Context, l net.Listener) error {
 		l.Close()
 	}()
 
-	if err := http.Serve(l, gdx.NewHTTPFn(gdx.Options().FromEnv())); err != nil && ctx.Err() == nil {
+	if err := http.Serve(l, gdx.NewHTTPFn(gdx.Options().FromEnv()...)); err != nil && ctx.Err() == nil {
 		return err
 	}
 

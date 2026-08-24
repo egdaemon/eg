@@ -450,23 +450,23 @@ github.com/docker/go-units
 # github.com/dominikbraun/graph v0.23.0
 ## explicit; go 1.18
 github.com/dominikbraun/graph
-# github.com/duckdb/duckdb-go-bindings v0.10503.0
+# github.com/duckdb/duckdb-go-bindings v0.10505.0
 ## explicit; go 1.24
 github.com/duckdb/duckdb-go-bindings
 github.com/duckdb/duckdb-go-bindings/include
-# github.com/duckdb/duckdb-go-bindings/lib/darwin-amd64 v0.10503.0
+# github.com/duckdb/duckdb-go-bindings/lib/darwin-amd64 v0.10505.0
 ## explicit; go 1.24
 github.com/duckdb/duckdb-go-bindings/lib/darwin-amd64
-# github.com/duckdb/duckdb-go-bindings/lib/darwin-arm64 v0.10503.0
+# github.com/duckdb/duckdb-go-bindings/lib/darwin-arm64 v0.10505.0
 ## explicit; go 1.24
 github.com/duckdb/duckdb-go-bindings/lib/darwin-arm64
-# github.com/duckdb/duckdb-go-bindings/lib/linux-amd64 v0.10503.0
+# github.com/duckdb/duckdb-go-bindings/lib/linux-amd64 v0.10505.0
 ## explicit; go 1.24
 github.com/duckdb/duckdb-go-bindings/lib/linux-amd64
-# github.com/duckdb/duckdb-go-bindings/lib/linux-arm64 v0.10503.0
+# github.com/duckdb/duckdb-go-bindings/lib/linux-arm64 v0.10505.0
 ## explicit; go 1.24
 github.com/duckdb/duckdb-go-bindings/lib/linux-arm64
-# github.com/duckdb/duckdb-go-bindings/lib/windows-amd64 v0.10503.0
+# github.com/duckdb/duckdb-go-bindings/lib/windows-amd64 v0.10505.0
 ## explicit; go 1.24
 github.com/duckdb/duckdb-go-bindings/lib/windows-amd64
 # github.com/duckdb/duckdb-go/v2 v2.10503.1
@@ -489,17 +489,18 @@ github.com/ebitengine/purego/internal/strings
 github.com/ebitengine/purego/internal/xreflect
 # github.com/egdaemon/eg v0.0.0-20260820140340-d96a42af7ba2
 ## explicit; go 1.26.3
-# github.com/egdaemon/gdx v0.0.0-20260819112956-edaa2df47170
+# github.com/egdaemon/gdx v0.0.0-20260824162813-84291833ef44
 ## explicit; go 1.25.8
 github.com/egdaemon/gdx
 github.com/egdaemon/gdx/gdxapi
 github.com/egdaemon/gdx/internal/envx
 github.com/egdaemon/gdx/internal/errorsx
 github.com/egdaemon/gdx/internal/langx
-# github.com/egdaemon/gdx/konggdx v0.0.0-20260818142539-2af0a2bf0a1c
-## explicit; go 1.26.3
+# github.com/egdaemon/gdx/konggdx v0.0.0-20260824162813-84291833ef44
+## explicit; go 1.25.8
 github.com/egdaemon/gdx/konggdx
 github.com/egdaemon/gdx/konggdx/cmdopts
+github.com/egdaemon/gdx/konggdx/userx
 # github.com/egdaemon/wasinet/wasinet v0.0.0-20250806175613-49e153bd345a
 ## explicit; go 1.23.4
 github.com/egdaemon/wasinet/wasinet
@@ -526,6 +527,9 @@ github.com/emirpasic/gods/utils
 # github.com/erikgeiser/coninput v0.0.0-20211004153227-1c3628e74d0f
 ## explicit; go 1.16
 github.com/erikgeiser/coninput
+# github.com/felixge/fgprof v0.9.3
+## explicit; go 1.14
+github.com/felixge/fgprof
 # github.com/felixge/httpsnoop v1.0.4
 ## explicit; go 1.13
 github.com/felixge/httpsnoop
@@ -680,6 +684,9 @@ github.com/google/go-intervals/intervalset
 # github.com/google/gopacket v1.1.19
 ## explicit; go 1.12
 github.com/google/gopacket/routing
+# github.com/google/pprof v0.0.0-20260402051712-545e8a4df936
+## explicit; go 1.24.0
+github.com/google/pprof/profile
 # github.com/google/s2a-go v0.1.9
 ## explicit; go 1.20
 github.com/google/s2a-go
@@ -787,9 +794,71 @@ github.com/ipld/go-ipld-prime/schema
 github.com/ipld/go-ipld-prime/schema/dmt
 github.com/ipld/go-ipld-prime/schema/dsl
 github.com/ipld/go-ipld-prime/storage
+# github.com/jackc/pgio v1.0.0
+## explicit; go 1.12
+github.com/jackc/pgio
+# github.com/jackc/pgpassfile v1.0.0
+## explicit; go 1.12
+github.com/jackc/pgpassfile
+# github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761
+## explicit; go 1.14
+github.com/jackc/pgservicefile
+# github.com/jackc/pgtype v1.14.4
+## explicit; go 1.13
+github.com/jackc/pgtype
+# github.com/jackc/pgx/v5 v5.9.1
+## explicit; go 1.25.0
+github.com/jackc/pgx/v5
+github.com/jackc/pgx/v5/internal/iobufpool
+github.com/jackc/pgx/v5/internal/pgio
+github.com/jackc/pgx/v5/internal/sanitize
+github.com/jackc/pgx/v5/internal/stmtcache
+github.com/jackc/pgx/v5/pgconn
+github.com/jackc/pgx/v5/pgconn/ctxwatch
+github.com/jackc/pgx/v5/pgconn/internal/bgreader
+github.com/jackc/pgx/v5/pgproto3
+github.com/jackc/pgx/v5/pgtype
+github.com/jackc/pgx/v5/pgxpool
+github.com/jackc/pgx/v5/stdlib
+# github.com/jackc/puddle/v2 v2.2.2
+## explicit; go 1.19
+github.com/jackc/puddle/v2
+github.com/jackc/puddle/v2/internal/genstack
 # github.com/jackpal/go-nat-pmp v1.0.2
 ## explicit
 github.com/jackpal/go-nat-pmp
+# github.com/james-lawrence/genieql v0.0.0-20260821141941-92fda96aa606
+## explicit; go 1.25.0
+github.com/james-lawrence/genieql
+github.com/james-lawrence/genieql/astbuild
+github.com/james-lawrence/genieql/astcodec
+github.com/james-lawrence/genieql/astutil
+github.com/james-lawrence/genieql/buildx
+github.com/james-lawrence/genieql/columninfo
+github.com/james-lawrence/genieql/dialects
+github.com/james-lawrence/genieql/fsx
+github.com/james-lawrence/genieql/generators
+github.com/james-lawrence/genieql/generators/functions
+github.com/james-lawrence/genieql/generators/typespec
+github.com/james-lawrence/genieql/ginterp
+github.com/james-lawrence/genieql/internal/bytesx
+github.com/james-lawrence/genieql/internal/contextx
+github.com/james-lawrence/genieql/internal/debugx
+github.com/james-lawrence/genieql/internal/drivers
+github.com/james-lawrence/genieql/internal/envx
+github.com/james-lawrence/genieql/internal/errorsx
+github.com/james-lawrence/genieql/internal/iox
+github.com/james-lawrence/genieql/internal/langx
+github.com/james-lawrence/genieql/internal/md5x
+github.com/james-lawrence/genieql/internal/postgresql
+github.com/james-lawrence/genieql/internal/postgresql/internal
+github.com/james-lawrence/genieql/internal/slicesx
+github.com/james-lawrence/genieql/internal/stringsx
+github.com/james-lawrence/genieql/internal/transformx
+github.com/james-lawrence/genieql/internal/userx
+github.com/james-lawrence/genieql/internal/wasidialect
+github.com/james-lawrence/genieql/internal/wasix/ffierrors
+github.com/james-lawrence/genieql/internal/wasix/ffiguest
 # github.com/jaypipes/ghw v0.24.0
 ## explicit; go 1.21
 github.com/jaypipes/ghw
@@ -1334,6 +1403,9 @@ github.com/pjbgf/sha1cd/ubc
 # github.com/pkg/errors v0.9.1
 ## explicit
 github.com/pkg/errors
+# github.com/pkg/profile v1.7.0
+## explicit; go 1.13
+github.com/pkg/profile
 # github.com/pkg/sftp v1.13.10
 ## explicit; go 1.23.0
 github.com/pkg/sftp
@@ -1417,6 +1489,9 @@ github.com/riywo/loginshell
 # github.com/secure-systems-lab/go-securesystemslib v0.11.0
 ## explicit; go 1.25.0
 github.com/secure-systems-lab/go-securesystemslib/encrypted
+# github.com/serenize/snaker v0.0.0-20201027110005-a7ad2135616e
+## explicit
+github.com/serenize/snaker
 # github.com/sergi/go-diff v1.4.0
 ## explicit; go 1.13
 github.com/sergi/go-diff/diffmatchpatch
@@ -1558,6 +1633,9 @@ github.com/yusufpapurcu/wmi
 # github.com/zeebo/xxh3 v1.1.0
 ## explicit; go 1.22
 github.com/zeebo/xxh3
+# github.com/zieckey/goini v0.0.0-20240615065340-08ee21c836fb
+## explicit; go 1.22.4
+github.com/zieckey/goini
 # go.opentelemetry.io/auto/sdk v1.2.1
 ## explicit; go 1.24.0
 go.opentelemetry.io/auto/sdk
@@ -1933,10 +2011,19 @@ golang.org/x/telemetry/internal/telemetry
 golang.org/x/term
 # golang.org/x/text v0.41.0
 ## explicit; go 1.25.0
+golang.org/x/text/cases
+golang.org/x/text/internal
+golang.org/x/text/internal/language
+golang.org/x/text/internal/language/compact
+golang.org/x/text/internal/tag
+golang.org/x/text/language
+golang.org/x/text/runes
 golang.org/x/text/secure/bidirule
+golang.org/x/text/secure/precis
 golang.org/x/text/transform
 golang.org/x/text/unicode/bidi
 golang.org/x/text/unicode/norm
+golang.org/x/text/width
 # golang.org/x/time v0.15.0
 ## explicit; go 1.25.0
 golang.org/x/time/rate

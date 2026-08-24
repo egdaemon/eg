@@ -16,7 +16,7 @@ import (
 type Trace struct {
 	Socket   string        `flag:"" name:"socket" help:"unix socket path to dial" default:"${vars_gdx_socket}"`
 	Duration time.Duration `flag:"" name:"duration" help:"length of the trace capture" default:"30s"`
-	Output   cmdopts.IOOut `flag:"" name:"output" help:"output destination; '-' for stdout" default:"-"`
+	Output   cmdopts.IOOut `flag:"" name:"output" help:"output destination; '-' for stdout" default:"${vars_gdx_default_output}"`
 }
 
 func (t Trace) Run(ctx context.Context) error {

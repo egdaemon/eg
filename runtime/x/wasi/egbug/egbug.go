@@ -19,7 +19,6 @@ import (
 	_eg "github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
-	"github.com/egdaemon/eg/internal/langx"
 	"github.com/egdaemon/eg/runtime/wasi/eg"
 	"github.com/egdaemon/eg/runtime/wasi/egenv"
 	"github.com/egdaemon/eg/runtime/wasi/env"
@@ -131,6 +130,20 @@ func Images(ctx context.Context, op eg.Op) error {
 		ctx,
 		shell.New("podman images"),
 	)
+}
+
+// prints information about the provided apt packages using dpkg and apt.
+func APTPackage(packages ...string) eg.OpFn {
+	return func(ctx context.Context, op eg.Op) error {
+		privileged := shell.Runtime().Privileged().Lenient(true)
+		pkgs := strings.Join(packages, " ")
+		return shell.Run(
+			ctx,
+			privileged.Newf("dpkg -l %s", pkgs),
+			privileged.Newf("apt-cache policy %s", pkgs),
+			privileged.Newf("apt list --installed %s", pkgs),
+		)
+	}
 }
 
 const (
@@ -267,7 +280,7 @@ func EnsureEnv(expected string, keys ...string) eg.OpFn {
 }
 
 func NewCounter() *counter {
-	return langx.Autoptr(counter(0))
+	return new(counter(0))
 }
 
 type counter uint64

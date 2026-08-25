@@ -54,6 +54,7 @@ type option struct {
 	seed           string
 	debug          bool
 	ignorelocalgnu bool
+	privileged     bool
 }
 
 // Generates default options from the environment
@@ -104,6 +105,15 @@ func (t options) IgnoreLocalGNU() options {
 	})
 }
 
+// IgnoreLocalGNU makes Seed a no-op whenever the resolved GNUPGHOME isn't the
+// known-safe default — i.e. if we can't be sure this isn't someone's real
+// local keyring, don't touch it.
+func (t options) Privileged() options {
+	return append(t, func(o *option) {
+		o.privileged = true
+	})
+}
+
 func autokeyringhome(o *option) {
 	root := md5x.FormatString(md5x.Digest("gnupg", egenv.RunID(), o.seed))
 	o.keyringhome = langx.FirstNonZero(
@@ -151,6 +161,7 @@ func (opts option) env() []string {
 func (opts option) runtime() shell.Command {
 	return shell.Env().
 		MaybeDebug(opts.debug).
+		MaybePrivileged(opts.privileged).
 		EnvironFrom(opts.env()...)
 }
 

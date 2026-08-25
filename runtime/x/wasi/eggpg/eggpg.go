@@ -143,7 +143,12 @@ func runtime(options ...Option) (_ shell.Command, err error) {
 }
 
 func Env(options ...Option) []string {
-	return errorsx.Must(parseOptions(options...)).env()
+	opts := errorsx.Must(parseOptions(options...))
+	if opts.ignorelocalgnu && opts.home != defaultHome {
+		return nil
+	}
+
+	return opts.env()
 }
 
 func Debug(options ...Option) eg.OpFn {

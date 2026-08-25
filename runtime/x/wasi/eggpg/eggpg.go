@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/egdaemon/eg/internal/gpgx"
 	"github.com/egdaemon/eg/runtime/wasi/eg"
 	"github.com/egdaemon/eg/runtime/wasi/egenv"
 	"github.com/egdaemon/eg/runtime/wasi/shell"
@@ -67,8 +68,7 @@ func (t options) Debug() options {
 	})
 }
 
-func runtime(options ...Option) (_ shell.Command, err error) {
-	var opts option
+func parseOptions(options ...Option) (opts option, err error) {
 	for _, opt := range options {
 		opt(&opts)
 	}
@@ -87,16 +87,25 @@ func runtime(options ...Option) (_ shell.Command, err error) {
 		emptycheck(opts.seed, EnvSeed),
 	)
 
-	if err != nil {
-		return shell.Command{}, err
-	}
+	return opts, err
+}
 
+func (opts option) runtime() shell.Command {
 	return shell.Env().
 		MaybeDebug(opts.debug).
 		Environ(EnvHome, opts.home).
 		Environ(EnvEmail, opts.email).
 		Environ(EnvName, opts.name).
-		Environ(EnvSeed, opts.seed), nil
+		Environ(EnvSeed, opts.seed)
+}
+
+func runtime(options ...Option) (_ shell.Command, err error) {
+	opts, err := parseOptions(options...)
+	if err != nil {
+		return shell.Command{}, err
+	}
+
+	return opts.runtime(), nil
 }
 
 func Debug(options ...Option) eg.OpFn {
@@ -121,13 +130,18 @@ func Debug(options ...Option) eg.OpFn {
 // Generate a usable gpg keyring from a seed.
 func Seed(options ...Option) eg.OpFn {
 	return func(ctx context.Context, o eg.Op) error {
-		runtime, err := runtime(options...)
+		opts, err := parseOptions(options...)
 		if err != nil {
 			return err
 		}
+
+		if _, err := gpgx.Keyring(opts.home, opts.seed, gpgx.OptionKeyGenIdentity(opts.name, "", opts.email)); err != nil {
+			return err
+		}
+
+		runtime := opts.runtime()
 		return shell.Run(
 			ctx,
-			runtime.New("eg gpg keyring --directory=\"${GNUPGHOME}\" --name=\"${EG_GPG_KEYRING_NAME}\" --email=\"${EG_GPG_KEYRING_EMAIL}\" --seed=\"${EG_GPG_KEYRING_SEED}\""),
 			// launch the gpg agent for this environment ensuring its available prior to importing.
 			runtime.New("gpgconf --launch gpg-agent"),
 			runtime.New("gpg-connect-agent /bye").Attempts(32),

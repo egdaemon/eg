@@ -25,6 +25,7 @@ type option struct {
 	name  string
 	email string
 	seed  string
+	debug bool
 }
 
 // Generates default options from the environment
@@ -60,6 +61,12 @@ func (t options) Seed(v string) options {
 	})
 }
 
+func (t options) Debug() options {
+	return append(t, func(o *option) {
+		o.debug = true
+	})
+}
+
 func runtime(options ...Option) (_ shell.Command, err error) {
 	var opts option
 	for _, opt := range options {
@@ -85,6 +92,7 @@ func runtime(options ...Option) (_ shell.Command, err error) {
 	}
 
 	return shell.Env().
+		MaybeDebug(opts.debug).
 		Environ(EnvHome, opts.home).
 		Environ(EnvEmail, opts.email).
 		Environ(EnvName, opts.name).

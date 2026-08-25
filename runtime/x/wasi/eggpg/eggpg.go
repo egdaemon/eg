@@ -1,3 +1,19 @@
+// Package eggpg generates and imports a deterministic GPG keyring for a
+// pipeline run.
+//
+// Known issue: libgcrypt < 1.12.1 has a regression in
+// gcry_mpi_ec_curve_point (upstream bug T8080: "gcry_mpi_ec_curve_point
+// corrupts point") where _gcry_mpi_ec_get_affine mutates the input point's
+// MPI coordinates in place instead of copying them first. gpg-agent hits
+// this during the self-test it runs on secret key import, which can corrupt
+// the point being checked and reject an otherwise-valid ECDH subkey with
+// "Bad secret key" / "Point 'G' does not belong to curve 'E'!". Whether a
+// given key triggers it depends on that key's specific MPI coordinate
+// sizing, so it reproduces deterministically for a given seed but not
+// predictably across seeds. Fixed upstream in libgcrypt 1.12.1
+// (2026-02-20); the fix is to run gpg/gpg-agent linked against
+// libgcrypt >= 1.12.1 — there is no workaround available in this package
+// (the keyring generation and import logic here are not the cause).
 package eggpg
 
 import (
@@ -172,6 +188,10 @@ func Debug(options ...Option) eg.OpFn {
 }
 
 // Generate a usable gpg keyring from a seed.
+//
+// If the final "gpg --import" fails with "Bad secret key" / "Point 'G' does
+// not belong to curve 'E'!", see the package doc — that's the libgcrypt
+// <1.12.1 T8080 regression, not a bug in this function.
 func Seed(options ...Option) eg.OpFn {
 	return func(ctx context.Context, o eg.Op) error {
 		opts, err := parseOptions(options...)

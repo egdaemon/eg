@@ -135,6 +135,14 @@ func (t Command) Debug() Command {
 	return t
 }
 
+func (t Command) MaybeDebug(b bool) Command {
+	if b {
+		return t.Debug()
+	}
+
+	return t
+}
+
 // New clone the current command configuration and replace the command
 // that will be executed.
 func (t Command) New(cmd string) Command {

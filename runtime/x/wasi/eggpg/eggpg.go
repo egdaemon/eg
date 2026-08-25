@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/egdaemon/eg/internal/envx"
+	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/gpgx"
 	"github.com/egdaemon/eg/internal/langx"
 	"github.com/egdaemon/eg/internal/md5x"
@@ -21,22 +23,27 @@ const (
 	envKeyringHome = "EG_GPG_KEYRING_HOME"
 )
 
+// the well known isolated gnupg home used so Seed never touches a real
+// user's personal keyring.
+const defaultHome = "/home/egd/.gnupg"
+
 type Option func(*option)
 type options []Option
 
 type option struct {
-	keyringhome string
-	home        string
-	name        string
-	email       string
-	seed        string
-	debug       bool
+	keyringhome    string
+	home           string
+	name           string
+	email          string
+	seed           string
+	debug          bool
+	ignorelocalgnu bool
 }
 
 // Generates default options from the environment
 func Options() options {
 	return options(nil).
-		Home(egenv.String("/home/egd/.gnupg", EnvHome)).
+		Home(egenv.String(defaultHome, EnvHome)).
 		Name(egenv.String("", EnvName)).
 		Email(egenv.String("", EnvEmail)).
 		Seed(egenv.String("", EnvSeed))
@@ -72,6 +79,15 @@ func (t options) Debug() options {
 	})
 }
 
+// IgnoreLocalGNU makes Seed a no-op whenever the resolved GNUPGHOME isn't the
+// known-safe default — i.e. if we can't be sure this isn't someone's real
+// local keyring, don't touch it.
+func (t options) IgnoreLocalGNU() options {
+	return append(t, func(o *option) {
+		o.ignorelocalgnu = true
+	})
+}
+
 func autokeyringhome(o *option) {
 	root := md5x.FormatString(md5x.Digest("gnupg", egenv.RunID(), o.seed))
 	o.keyringhome = langx.FirstNonZero(
@@ -102,14 +118,19 @@ func parseOptions(options ...Option) (opts option, err error) {
 	return opts, err
 }
 
+func (opts option) env() []string {
+	return errorsx.Zero(envx.Build().
+		Var(envKeyringHome, opts.keyringhome).
+		Var(EnvHome, opts.home).
+		Var(EnvEmail, opts.email).
+		Var(EnvName, opts.name).
+		Var(EnvSeed, opts.seed).Environ())
+}
+
 func (opts option) runtime() shell.Command {
 	return shell.Env().
 		MaybeDebug(opts.debug).
-		Environ(envKeyringHome, opts.keyringhome).
-		Environ(EnvHome, opts.home).
-		Environ(EnvEmail, opts.email).
-		Environ(EnvName, opts.name).
-		Environ(EnvSeed, opts.seed)
+		EnvironFrom(opts.env()...)
 }
 
 func runtime(options ...Option) (_ shell.Command, err error) {
@@ -119,6 +140,10 @@ func runtime(options ...Option) (_ shell.Command, err error) {
 	}
 
 	return opts.runtime(), nil
+}
+
+func Env(options ...Option) []string {
+	return errorsx.Must(parseOptions(options...)).env()
 }
 
 func Debug(options ...Option) eg.OpFn {
@@ -147,6 +172,10 @@ func Seed(options ...Option) eg.OpFn {
 		opts, err := parseOptions(options...)
 		if err != nil {
 			return err
+		}
+
+		if opts.ignorelocalgnu && opts.home != defaultHome {
+			return nil
 		}
 
 		if _, err := gpgx.Keyring(opts.keyringhome, opts.seed, gpgx.OptionKeyGenIdentity(opts.name, "", opts.email)); err != nil {

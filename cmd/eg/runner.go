@@ -33,7 +33,6 @@ import (
 	"github.com/egdaemon/eg/internal/runtimex"
 	"github.com/egdaemon/eg/internal/stringsx"
 	"github.com/egdaemon/eg/internal/wasix"
-	"github.com/egdaemon/eg/internal/watcherx"
 	"github.com/egdaemon/eg/interp"
 	"github.com/egdaemon/eg/interp/c8sproxy"
 	"github.com/egdaemon/eg/interp/events"
@@ -97,14 +96,15 @@ func (t module) mounthack(ctx context.Context, runid string, ws workspaces.Conte
 			if err = execx.MaybeRun(mcmd); err != nil {
 				return errorsx.Wrapf(err, "unable to run bindfs: %s", from)
 			}
-			go func() {
-				errorsx.Log(
-					errorsx.Wrapf(
-						watcherx.Proxy(ctx, from, to, 10*time.Millisecond),
-						"watcher proxy failed for %s -> %s", from, to,
-					),
-				)
-			}()
+			// watcherx proxy was too expensive.
+			// go func() {
+			// 	errorsx.Log(
+			// 		errorsx.Wrapf(
+			// 			watcherx.Proxy(ctx, from, to, 10*time.Millisecond),
+			// 			"watcher proxy failed for %s -> %s", from, to,
+			// 		),
+			// 	)
+			// }()
 		}
 
 		return nil

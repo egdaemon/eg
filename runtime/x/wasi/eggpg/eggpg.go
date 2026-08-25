@@ -2,6 +2,7 @@ package eggpg
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/egdaemon/eg/runtime/wasi/eg"
@@ -59,21 +60,28 @@ func (t options) Seed(v string) options {
 	})
 }
 
-func runtime(options ...Option) (shell.Command, error) {
+func runtime(options ...Option) (_ shell.Command, err error) {
 	var opts option
 	for _, opt := range options {
 		opt(&opts)
 	}
 
-	switch {
-	case opts.home == "":
-		return shell.Command{}, fmt.Errorf("%s must not be empty", EnvHome)
-	case opts.name == "":
-		return shell.Command{}, fmt.Errorf("%s must not be empty", EnvName)
-	case opts.email == "":
-		return shell.Command{}, fmt.Errorf("%s must not be empty", EnvEmail)
-	case opts.seed == "":
-		return shell.Command{}, fmt.Errorf("%s must not be empty", EnvSeed)
+	emptycheck := func(v, key string) error {
+		if v == "" {
+			return fmt.Errorf("%s must not be empty", key)
+		}
+		return nil
+	}
+
+	err = errors.Join(
+		emptycheck(opts.home, EnvHome),
+		emptycheck(opts.name, EnvName),
+		emptycheck(opts.email, EnvEmail),
+		emptycheck(opts.seed, EnvSeed),
+	)
+
+	if err != nil {
+		return shell.Command{}, err
 	}
 
 	return shell.Env().
@@ -89,9 +97,13 @@ func Debug(options ...Option) eg.OpFn {
 		if err != nil {
 			return err
 		}
+		runtime = runtime.Lenient(true)
 		return shell.Op(
 			runtime.New("env | grep -i 'GNUPG'"),
 			runtime.New("env | grep -i 'EG_GPG_'"),
+			runtime.New("ls -lha ${GNUPGHOME}"),
+			runtime.New("gpg --version"),
+			runtime.New("gpg-agent --version"),
 			runtime.New("gpg --list-keys"),
 		)(ctx, o)
 	}

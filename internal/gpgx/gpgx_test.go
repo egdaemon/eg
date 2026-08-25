@@ -1,10 +1,17 @@
 package gpgx_test
 
 import (
+	"bytes"
+	"os"
+	"os/exec"
 	"path/filepath"
 	"testing"
 
+	"github.com/egdaemon/eg/internal/envx"
+	"github.com/egdaemon/eg/internal/execx"
 	"github.com/egdaemon/eg/internal/gpgx"
+	"github.com/egdaemon/eg/internal/stringsx"
+	"github.com/gofrs/uuid/v5"
 	"github.com/stretchr/testify/require"
 )
 
@@ -74,5 +81,39 @@ func TestKeyring(t *testing.T) {
 		require.NoError(t, err)
 
 		require.Equal(t, e1.PrimaryKey.KeyId, e2.PrimaryKey.KeyId)
+	})
+
+	t.Run("integration with gpg import", func(t *testing.T) {
+		gpgpath, err := execx.LookPath("gpg")
+		if err != nil {
+			t.Skip("gpg not available:", err)
+		}
+
+		gnuhome := t.TempDir()
+
+		env := os.Environ()
+		env = append(env, "GNUPGHOME="+gnuhome)
+		runOnce := func(seed string) {
+			dir := t.TempDir()
+			_, err := gpgx.Keyring(dir, seed)
+			require.NoError(t, err)
+
+			var out bytes.Buffer
+			cmd := exec.CommandContext(t.Context(), gpgpath, "--import", filepath.Join(dir, "private.asc"))
+			cmd.Env = env
+			cmd.Stdout = &out
+			cmd.Stderr = &out
+
+			err = execx.MaybeRun(cmd)
+			require.NoErrorf(t, err, "seed=%s output=%s", seed, out.String())
+		}
+
+		for range envx.Int(512, "GPGX_FUZZ_N") {
+			runOnce(uuid.Must(uuid.NewV7()).String())
+		}
+
+		if seed := envx.String("", "GPGX_FUZZ_SEED"); stringsx.Present(seed) {
+			runOnce(seed)
+		}
 	})
 }

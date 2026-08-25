@@ -136,6 +136,7 @@ func Debug(options ...Option) eg.OpFn {
 			runtime.New("gpg --version"),
 			runtime.New("gpg-agent --version"),
 			runtime.New("gpg --list-keys"),
+			runtime.New("sha256sum ${EG_GPG_KEYRING_HOME}/private.asc ${EG_GPG_KEYRING_HOME}/public.asc"),
 		)
 	}
 }

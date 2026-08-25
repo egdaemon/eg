@@ -112,9 +112,14 @@ func autokeyringhome(o *option) {
 	)
 }
 
-func parseOptions(options ...Option) (opts option, err error) {
+func apply(options ...Option) (opts option) {
 	opts = langx.Clone(opts, options...)
 	opts = langx.Clone(opts, autokeyringhome)
+	return opts
+}
+
+func parseOptions(options ...Option) (opts option, err error) {
+	opts = apply(options...)
 
 	emptycheck := func(v, key string) error {
 		if v == "" {
@@ -161,7 +166,7 @@ func runtime(options ...Option) (_ shell.Command, err error) {
 func Env(options ...Option) []string {
 	opts := errorsx.Must(parseOptions(options...))
 	if opts.ignorelocalgnu && opts.home != defaultHome {
-		return nil
+		return apply(Options()...).env()
 	}
 
 	return opts.env()

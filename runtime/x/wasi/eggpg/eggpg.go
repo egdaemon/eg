@@ -6,27 +6,31 @@ import (
 	"fmt"
 
 	"github.com/egdaemon/eg/internal/gpgx"
+	"github.com/egdaemon/eg/internal/langx"
+	"github.com/egdaemon/eg/internal/md5x"
 	"github.com/egdaemon/eg/runtime/wasi/eg"
 	"github.com/egdaemon/eg/runtime/wasi/egenv"
 	"github.com/egdaemon/eg/runtime/wasi/shell"
 )
 
 const (
-	EnvHome  = "GNUPGHOME"
-	EnvName  = "EG_GPG_KEYRING_NAME"
-	EnvEmail = "EG_GPG_KEYRING_EMAIL"
-	EnvSeed  = "EG_GPG_KEYRING_SEED"
+	EnvHome        = "GNUPGHOME"
+	EnvName        = "EG_GPG_KEYRING_NAME"
+	EnvEmail       = "EG_GPG_KEYRING_EMAIL"
+	EnvSeed        = "EG_GPG_KEYRING_SEED"
+	envKeyringHome = "EG_GPG_KEYRING_HOME"
 )
 
 type Option func(*option)
 type options []Option
 
 type option struct {
-	home  string
-	name  string
-	email string
-	seed  string
-	debug bool
+	keyringhome string
+	home        string
+	name        string
+	email       string
+	seed        string
+	debug       bool
 }
 
 // Generates default options from the environment
@@ -68,10 +72,17 @@ func (t options) Debug() options {
 	})
 }
 
+func autokeyringhome(o *option) {
+	root := md5x.FormatString(md5x.Digest("gnupg", egenv.RunID(), o.seed))
+	o.keyringhome = langx.FirstNonZero(
+		o.keyringhome,
+		egenv.WorkspaceDirectory(fmt.Sprintf("gnupg.%s", root)),
+	)
+}
+
 func parseOptions(options ...Option) (opts option, err error) {
-	for _, opt := range options {
-		opt(&opts)
-	}
+	opts = langx.Clone(opts, options...)
+	opts = langx.Clone(opts, autokeyringhome)
 
 	emptycheck := func(v, key string) error {
 		if v == "" {
@@ -85,6 +96,7 @@ func parseOptions(options ...Option) (opts option, err error) {
 		emptycheck(opts.name, EnvName),
 		emptycheck(opts.email, EnvEmail),
 		emptycheck(opts.seed, EnvSeed),
+		emptycheck(opts.keyringhome, envKeyringHome),
 	)
 
 	return opts, err
@@ -93,6 +105,7 @@ func parseOptions(options ...Option) (opts option, err error) {
 func (opts option) runtime() shell.Command {
 	return shell.Env().
 		MaybeDebug(opts.debug).
+		Environ(envKeyringHome, opts.keyringhome).
 		Environ(EnvHome, opts.home).
 		Environ(EnvEmail, opts.email).
 		Environ(EnvName, opts.name).
@@ -135,7 +148,7 @@ func Seed(options ...Option) eg.OpFn {
 			return err
 		}
 
-		if _, err := gpgx.Keyring(opts.home, opts.seed, gpgx.OptionKeyGenIdentity(opts.name, "", opts.email)); err != nil {
+		if _, err := gpgx.Keyring(opts.keyringhome, opts.seed, gpgx.OptionKeyGenIdentity(opts.name, "", opts.email)); err != nil {
 			return err
 		}
 
@@ -145,7 +158,7 @@ func Seed(options ...Option) eg.OpFn {
 			// launch the gpg agent for this environment ensuring its available prior to importing.
 			runtime.New("gpgconf --launch gpg-agent"),
 			runtime.New("gpg-connect-agent /bye").Attempts(32),
-			runtime.New("gpg --import ${GNUPGHOME}/private.asc"),
+			runtime.New("gpg --import ${EG_GPG_KEYRING_HOME}/private.asc"),
 		)
 	}
 }

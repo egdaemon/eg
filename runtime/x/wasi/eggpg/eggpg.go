@@ -98,14 +98,15 @@ func Debug(options ...Option) eg.OpFn {
 			return err
 		}
 		runtime = runtime.Lenient(true)
-		return shell.Op(
+		return shell.Run(
+			ctx,
 			runtime.New("env | grep -i 'GNUPG'"),
 			runtime.New("env | grep -i 'EG_GPG_'"),
 			runtime.New("ls -lha ${GNUPGHOME}"),
 			runtime.New("gpg --version"),
 			runtime.New("gpg-agent --version"),
 			runtime.New("gpg --list-keys"),
-		)(ctx, o)
+		)
 	}
 }
 
@@ -116,9 +117,13 @@ func Seed(options ...Option) eg.OpFn {
 		if err != nil {
 			return err
 		}
-		return shell.Op(
+		return shell.Run(
+			ctx,
 			runtime.New("eg gpg keyring --directory=\"${GNUPGHOME}\" --name=\"${EG_GPG_KEYRING_NAME}\" --email=\"${EG_GPG_KEYRING_EMAIL}\" --seed=\"${EG_GPG_KEYRING_SEED}\""),
+			// launch the gpg agent for this environment ensuring its available prior to importing.
+			runtime.New("gpgconf --launch gpg-agent"),
+			runtime.New("gpg-connect-agent /bye").Attempts(32),
 			runtime.New("gpg --import ${GNUPGHOME}/private.asc"),
-		)(ctx, o)
+		)
 	}
 }

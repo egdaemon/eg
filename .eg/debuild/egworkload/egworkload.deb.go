@@ -41,6 +41,7 @@ func init() {
 			"sudo",
 			"git",
 			"golang",
+			"locales",           // required to generate en_US.UTF-8 so tools invoked within workloads (e.g. perl/debuild) don't fall back to the C locale.
 			"systemd-container", // required for machinectl to be present for use within shell.New(...) commands. which allows invoking systemctl --user commands.
 			"waypipe",           // required to support --wayland passthrough.
 		),

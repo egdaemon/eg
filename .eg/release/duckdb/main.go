@@ -20,8 +20,10 @@ func main() {
 		eg.Module(
 			ctx,
 			duckdb.Runner(),
-			duckdb.Build,
-			duckdb.Upload,
+			eg.Sequential(
+				duckdb.Build,
+				duckdb.Upload,
+			),
 		),
 	)
 

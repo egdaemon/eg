@@ -46,6 +46,9 @@ func init() {
 		egdebuild.Option.DependsBuild("rsync", "curl", "tree", "ca-certificates", "cmake", "ninja-build", "libssl-dev", "git"),
 		egdebuild.Option.Envvar("PACKAGE_VERSION", version),
 		egdebuild.Option.Envvar("GIT_COMMIT_HASH", c.Hash.String()),
+		egdebuild.Option.Runtime(func(r shell.Command) shell.Command {
+			return r.Privileged()
+		}),
 	)
 }
 
@@ -68,21 +71,19 @@ func Runner() eg.ContainerRunner {
 }
 
 func Build(ctx context.Context, o eg.Op) error {
-	return eg.Sequential(
-		eg.Parallel(
-			// build the package to improve the chances it'll actually build in within ubuntu launchpad.
-			// egdebuild.Build(
-			// 	gcfg,
-			// 	egdebuild.Option.Distro(egdebuild.UbuntuLatestCodename),
-			// 	egdebuild.Option.BuildBinary(20*time.Minute),
-			// 	egdebuild.Option.Environ(egccache.Env()...),
-			// 	egdebuild.Option.NoLint(),
-			// ),
-			egdebuild.Build(gcfg, egdebuild.Option.Distro("jammy")),
-			egdebuild.Build(gcfg, egdebuild.Option.Distro("noble"), egdebuild.Option.NoLint()),
-			egdebuild.Build(gcfg, egdebuild.Option.Distro("questing"), egdebuild.Option.NoLint()),
-			egdebuild.Build(gcfg, egdebuild.Option.Distro(egdebuild.UbuntuLatestCodename), egdebuild.Option.NoLint()),
-		),
+	return eg.Parallel(
+		// build the package to improve the chances it'll actually build in within ubuntu launchpad.
+		// egdebuild.Build(
+		// 	gcfg,
+		// 	egdebuild.Option.Distro(egdebuild.UbuntuLatestCodename),
+		// 	egdebuild.Option.BuildBinary(20*time.Minute),
+		// 	egdebuild.Option.Environ(egccache.Env()...),
+		// 	egdebuild.Option.NoLint(),
+		// ),
+		egdebuild.Build(gcfg, egdebuild.Option.Distro("jammy")),
+		egdebuild.Build(gcfg, egdebuild.Option.Distro("noble"), egdebuild.Option.NoLint()),
+		egdebuild.Build(gcfg, egdebuild.Option.Distro("questing"), egdebuild.Option.NoLint()),
+		egdebuild.Build(gcfg, egdebuild.Option.Distro(egdebuild.UbuntuLatestCodename), egdebuild.Option.NoLint()),
 	)(ctx, o)
 }
 

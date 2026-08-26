@@ -8,7 +8,7 @@ RUN add-apt-repository -n ppa:egdaemon/eg
 RUN add-apt-repository -n ppa:egdaemon/duckdb
 
 RUN apt-get update
-RUN apt-get -y install golang-1.26 eg
+RUN apt-get -y install golang-1.26 egworkload
 
 RUN ln -s /usr/lib/go-1.26/bin/go /usr/local/bin/go
 

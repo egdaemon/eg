@@ -25,6 +25,8 @@ eg daemon --account="00000000-0000-0000-0000-000000000000" --seed="00000000-0000
 currently we only support ubuntu. contact us if you want support on another platform, there are not any blockers for other distributions, we just havent built/published packages for them yet.
 
 ```bash
+# install the software.
+apt-get install egworkload
 
 # register with eg.
 eg register

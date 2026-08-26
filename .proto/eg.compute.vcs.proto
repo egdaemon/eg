@@ -16,3 +16,10 @@ message GitAccessCredentials {
     GitCredentialsHTTP git_http = 101;
   }
 }
+
+message GCPAccessCredentials {
+  string id_token = 1 [ json_name = "id_token" ];
+  string audience = 2 [ json_name = "audience" ];
+  string impersonate_service_account = 3
+      [ json_name = "impersonate_service_account" ];
+}

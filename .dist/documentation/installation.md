@@ -12,7 +12,6 @@ This document assumes you understand your local package manager/host environment
 ### ubuntu
 
 ```bash
-add-apt-repository ppa:egdaemon/duckdb
 add-apt-repository ppa:egdaemon/eg
 apt-get install eg
 ```

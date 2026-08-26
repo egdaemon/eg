@@ -88,11 +88,13 @@ func (t module) mounthack(ctx context.Context, runid string, ws workspaces.Conte
 				from,
 				to,
 			)
+			mcmd.Stdout, mcmd.Stderr = log.Writer(), log.Writer()
 			if err = execx.MaybeRun(mcmd); err != nil {
 				return errorsx.Wrapf(err, "unable to run bindfs: %s", from)
 			}
 		} else {
 			mcmd := exec.CommandContext(ctx, mbin, "--map=root/egd:@root/@egd", "-o", "entry_timeout=0", from, to)
+			mcmd.Stdout, mcmd.Stderr = log.Writer(), log.Writer()
 			if err = execx.MaybeRun(mcmd); err != nil {
 				return errorsx.Wrapf(err, "unable to run bindfs: %s", from)
 			}

@@ -25,8 +25,6 @@ eg daemon --account="00000000-0000-0000-0000-000000000000" --seed="00000000-0000
 currently we only support ubuntu. contact us if you want support on another platform, there are not any blockers for other distributions, we just havent built/published packages for them yet.
 
 ```bash
-# install the software.
-apt-get install egworkload
 
 # register with eg.
 eg register
@@ -40,28 +38,31 @@ eg register
 printf 'EG_ACCOUNT=00000000-0000-0000-0000-000000000000\nEG_ENTROPY_SEED=00000000-0000-0000-0000-000000000001\n' \
   | eg secrets update file:///tmp/daemon.secret
 
-# authorize this node's signing seed, reading it from the secret via the wrapper.
-# `authorize seed` takes its seed as a positional arg (not a kong default), so it needs a
-# shell to expand $EG_ENTROPY_SEED from the environment eg secrets env sets on the child.
-eg secrets env --uri file:///tmp/daemon.secret -- \
-  sh -c 'eg actl authorize seed "$EG_ENTROPY_SEED"'
-
 # bootstrap the resources the runner can use.
 eg actl bootstrap env runner | sudo tee /etc/eg/runner.env
 
 # settings for the daemon that specify the account and the credentials registered above.
 # secrets are loaded into the environment before eg actl bootstrap resolves its flags, so
 # --account/--seed don't need to be (and can't accidentally leak as) plaintext flags here.
-eg secrets env --uri file:///tmp/daemon.secret -- \
-  eg actl bootstrap env daemon | sudo tee /etc/eg/daemon.env
+eg secrets env --uri file:///tmp/daemon.secret eg actl bootstrap env daemon | sudo tee /etc/eg/daemon.env
 
 # clean up the plaintext secret file now that it's no longer needed.
 rm -f /tmp/daemon.secret
 
 # build the runner's container.
-systemctl start eg-runner-build.service
+sudo systemctl start eg-runner-build.service
 # enable the service and start it immediately
-systemctl enable --now eg-runner.service
+sudo systemctl enable --now eg-runner.service
+# optional gpu service you can run instead.
+# sudo systemctl enable --now eg-runner-gpu.service
+```
+
+```bash
+# authorize the node's signing seed
+# this needs to happen on the device you have a
+# profile with proper permissions in order to allow
+# server to access your eg account.
+eg actl authorize seed "$EG_ENTROPY_SEED"
 ```
 
 assuming everything was done correctly you'll see an eg-runner instance show up https://console.egdaemon.com/c

@@ -546,7 +546,6 @@ func beginwork(ctx context.Context, md metadata, dir string) state {
 		aopts,
 		AgentOptionEGBin(errorsx.Zero(exec.LookPath(os.Args[0]))),
 		AgentOptionEnvironFile(environpath),
-		AgentOptionCommandLine("--env-file", environpath),
 		AgentOptionCores(workload.Enqueued.Cores),
 		AgentOptionMemory(workload.Enqueued.Memory),
 		AgentOptionHostOS(),
@@ -625,7 +624,6 @@ func (t staterunning) Update(ctx context.Context) state {
 
 	options := append(
 		t.ragent.Options(),
-		"--replace", // during recovery we might have a container already running.
 		"--volume", AgentMountReadWrite(containerdir, "/var/lib/containers"),
 		"--volume", AgentMountReadOnly(filepath.Join(t.ws.RuntimeDir, t.workload.Entry), eg.ModuleMount()),
 		"--volume", AgentMountReadWrite(t.ws.RuntimeDir, eg.DefaultMountRoot(eg.RuntimeDirectory)),

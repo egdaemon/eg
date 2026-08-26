@@ -2,6 +2,13 @@
 
 set -e
 
+# only default to en_US.UTF-8 if no locale has been configured already, so we
+# don't clobber a locale the system/administrator already chose.
+if [ ! -s /etc/default/locale ] || ! grep -q '^LANG=' /etc/default/locale; then
+	locale-gen en_US.UTF-8
+	update-locale LANG=en_US.UTF-8
+fi
+
 systemd-sysusers
 systemd-tmpfiles --create
 

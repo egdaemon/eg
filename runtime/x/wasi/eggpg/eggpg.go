@@ -193,7 +193,7 @@ func Debug(options ...Option) eg.OpFn {
 		return shell.Run(
 			ctx,
 			runtime.New("env | grep -i 'GNUPG'"),
-			runtime.New("env | grep -i 'EG_GPG_'"),
+			runtime.New("env | grep -i 'EG_GPG_'").Environ(EnvSeed, "<redacted>"),
 			runtime.New("ls -lha ${GNUPGHOME}"),
 			runtime.New("gpg --version"),
 			runtime.New("gpg-agent --version"),

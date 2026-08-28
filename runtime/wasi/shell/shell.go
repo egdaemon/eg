@@ -226,10 +226,9 @@ func Parallel(cmds ...Command) eg.OpFn {
 // Run the provided commands using the operation.
 func Run(ctx context.Context, cmds ...Command) error {
 	for _, cmd := range cmds {
-		if err := retry(ctx, cmd, func() error {
+		if ts, err := time.Now(), retry(ctx, cmd, func() error {
 			cctx, done := context.WithTimeout(ctx, cmd.timeout)
 			defer done()
-
 			if cause := cmd.entry(cctx, cmd.user, cmd.group, cmd.cmd, cmd.directory, cmd.environ, cmd.exec); cmd.lenient && cause != nil {
 				log.Println("command failed, but lenient mode enable, ignoring", cause)
 				return nil
@@ -239,7 +238,7 @@ func Run(ctx context.Context, cmds ...Command) error {
 
 			return nil
 		}); err != nil {
-			return errorsx.Wrapf(err, "shell command failed: %s", cmd.cmd)
+			return errorsx.Wrapf(err, "duration(%v) shell command failed: %s", time.Since(ts), cmd.cmd)
 		}
 	}
 

@@ -3,8 +3,10 @@ package podmanx
 import (
 	"context"
 	"fmt"
+	"log"
 	"os/exec"
 	"runtime"
+	"unicode"
 
 	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/internal/debugx"
@@ -12,8 +14,26 @@ import (
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/langx"
 	"go.podman.io/podman/v6/pkg/bindings"
+	"golang.org/x/text/runes"
+	"golang.org/x/text/transform"
 	"google.golang.org/grpc"
 )
+
+// podman requires named volumes to match [a-zA-Z0-9][a-zA-Z0-9_.-]*, but forges like
+// sourcehut embed characters such as '~' in their repository paths (e.g. ~user/repo).
+func volumeNameDisallowed(r rune) bool {
+	return !(unicode.IsLetter(r) || unicode.IsDigit(r) || r == '_' || r == '.' || r == '-')
+}
+
+// SanitizeVolumeName strips characters that podman disallows in named volumes.
+func SanitizeVolumeName(s string) string {
+	sanitized, _, err := transform.String(runes.Remove(runes.Predicate(volumeNameDisallowed)), s)
+	if err != nil {
+		log.Println("sanitization of podman volume name failed", err)
+		return s
+	}
+	return sanitized
+}
 
 func WithClient(ctx context.Context) (rctx context.Context, err error) {
 	socket := envx.String(DefaultSocket(), eg.EnvPodmanSocket)

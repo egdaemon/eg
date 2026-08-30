@@ -12,6 +12,7 @@ import (
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/fsx"
 	"github.com/egdaemon/eg/internal/langx"
+	"github.com/egdaemon/eg/internal/podmanx"
 	"github.com/egdaemon/eg/internal/stringsx"
 	"github.com/egdaemon/eg/workspaces"
 	_ "github.com/shirou/gopsutil/v4/cpu"
@@ -109,6 +110,7 @@ func AgentOptionLocalComputeCachingVolumes(canonicaluri string) AgentOption {
 	_, path, _ := strings.Cut(canonicaluri, ":")
 	path = strings.ReplaceAll(path, "/", ".")
 	path = strings.ReplaceAll(path, ".git", "")
+	path = podmanx.SanitizeVolumeName(path)
 	return AgentOptionCompose(
 		AgentOptionVolumes(
 			AgentMountReadWrite(fmt.Sprintf("%s.eg.containers", path), "/var/lib/containers"),

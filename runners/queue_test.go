@@ -71,6 +71,8 @@ func TestQueue(t *testing.T) {
 	})
 
 	t.Run("replaces_a_leftover_container_with_the_same_name", func(t *testing.T) {
+		testx.SkipInCICD(t, "containers replacement test disabled in CI/CD - requires podman access")
+
 		// simulates recovery: a container from a crashed prior attempt is
 		// still occupying the name this workload is about to run under.
 		// podman refuses to start a new container over that name unless
@@ -81,14 +83,15 @@ func TestQueue(t *testing.T) {
 		createTestWorkload(t, dirs.Queued, uid, "entry.wasm", testx.Read(testx.Fixture("example.1.wasm")))
 
 		cname := fmt.Sprintf("eg-%s", uid.String())
-		require.NoError(t, exec.Command("podman", "run", "--detach", "--name", cname, "eg", "sleep", "infinity").Run())
+		out, err := exec.Command("podman", "run", "--detach", "--name", cname, "eg", "sleep", "infinity").CombinedOutput()
+		require.NoError(t, err, "podman run output: %s", out)
 		t.Cleanup(func() { _ = exec.Command("podman", "rm", "-f", cname).Run() })
 
 		rm := runners.NewResourceManager(runners.NewRuntimeResources())
 		reload := make(chan error, 1)
 		ctx, done := context.WithCancelCause(t.Context())
 		c := completion{done: done}
-		err := runners.RunOne(ctx, 99, 0, rm, &dirs, reload, runners.QueueOptionCompletion(&c), runners.QueueOptionLogVerbosity(4))
+		err = runners.RunOne(ctx, 99, 0, rm, &dirs, reload, runners.QueueOptionCompletion(&c), runners.QueueOptionLogVerbosity(4))
 		require.ErrorIs(t, err, context.Canceled)
 	})
 
@@ -225,6 +228,8 @@ func TestQueue(t *testing.T) {
 	})
 
 	t.Run("workload with no metadata", func(t *testing.T) {
+		testx.SkipInCICD(t, "workload missing metadata test disabled in CI/CD - requires podman access")
+
 		dirs := runners.NewSpoolDir(t.TempDir())
 		uid := errorsx.Must(uuid.NewV4())
 		createTestWorkload(t, dirs.Queued, uid, "entry.wasm", testx.Read(testx.Fixture("example.1.wasm")))

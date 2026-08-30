@@ -487,7 +487,7 @@ github.com/ebitengine/purego/internal/cgo
 github.com/ebitengine/purego/internal/fakecgo
 github.com/ebitengine/purego/internal/strings
 github.com/ebitengine/purego/internal/xreflect
-# github.com/egdaemon/eg v0.0.0-20260820140340-d96a42af7ba2
+# github.com/egdaemon/eg v0.0.0-20260828095718-c19fa49c0a10
 ## explicit; go 1.26.3
 # github.com/egdaemon/gdx v0.0.0-20260824162813-84291833ef44
 ## explicit; go 1.25.8
@@ -527,7 +527,7 @@ github.com/emirpasic/gods/utils
 # github.com/erikgeiser/coninput v0.0.0-20211004153227-1c3628e74d0f
 ## explicit; go 1.16
 github.com/erikgeiser/coninput
-# github.com/felixge/fgprof v0.9.3
+# github.com/felixge/fgprof v0.9.5
 ## explicit; go 1.14
 github.com/felixge/fgprof
 # github.com/felixge/httpsnoop v1.0.4
@@ -684,8 +684,8 @@ github.com/google/go-intervals/intervalset
 # github.com/google/gopacket v1.1.19
 ## explicit; go 1.12
 github.com/google/gopacket/routing
-# github.com/google/pprof v0.0.0-20260402051712-545e8a4df936
-## explicit; go 1.24.0
+# github.com/google/pprof v0.0.0-20260830171453-67a7179623a3
+## explicit; go 1.25.0
 github.com/google/pprof/profile
 # github.com/google/s2a-go v0.1.9
 ## explicit; go 1.20
@@ -806,7 +806,7 @@ github.com/jackc/pgservicefile
 # github.com/jackc/pgtype v1.14.4
 ## explicit; go 1.13
 github.com/jackc/pgtype
-# github.com/jackc/pgx/v5 v5.9.1
+# github.com/jackc/pgx/v5 v5.10.0
 ## explicit; go 1.25.0
 github.com/jackc/pgx/v5
 github.com/jackc/pgx/v5/internal/iobufpool
@@ -1243,6 +1243,10 @@ github.com/nxadm/tail/ratelimiter
 github.com/nxadm/tail/util
 github.com/nxadm/tail/watch
 github.com/nxadm/tail/winfile
+# github.com/onsi/ginkgo/v2 v2.29.0
+## explicit; go 1.25.0
+# github.com/onsi/gomega v1.41.0
+## explicit; go 1.24.0
 # github.com/opencontainers/cgroups v0.0.6
 ## explicit; go 1.23.0
 github.com/opencontainers/cgroups
@@ -1970,7 +1974,7 @@ golang.org/x/crypto/ssh/knownhosts
 golang.org/x/exp/constraints
 golang.org/x/exp/maps
 golang.org/x/exp/slices
-# golang.org/x/mod v0.39.0
+# golang.org/x/mod v0.40.0
 ## explicit; go 1.25.0
 golang.org/x/mod/internal/lazyregexp
 golang.org/x/mod/modfile

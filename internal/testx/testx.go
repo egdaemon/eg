@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/gofrs/uuid/v5"
 	"github.com/stretchr/testify/require"
@@ -72,4 +73,12 @@ func Context(t *testing.T) (context.Context, context.CancelFunc) {
 	}
 
 	return context.WithCancel(context.Background())
+}
+
+func SkipInCICD(t *testing.T, msg string) {
+	if !envx.Boolean(false, "CI") {
+		return
+	}
+
+	t.Skip(msg)
 }

@@ -108,6 +108,24 @@ func TestCleanup(t *testing.T) {
 		require.NoError(t, err, "e5 should be kept")
 	})
 
+	t.Run("cache_removes_read_only_entries", func(t *testing.T) {
+		ctx, done := testx.Context(t)
+		defer done()
+
+		cacheDir := t.TempDir()
+		ws := workspaces.Context{CacheDir: cacheDir}
+		// mirrors the golang module cache: a 0555 directory holding 0444 files.
+		mod := filepath.Join(cacheDir, ".eg", "golang", "mod", "example.com", "pkg@v1.0.0")
+		touch(t, filepath.Join(mod, "main.go"), 31*24*time.Hour)
+		require.NoError(t, os.Chmod(filepath.Join(mod, "main.go"), 0444))
+		require.NoError(t, os.Chmod(mod, 0555))
+
+		ws.Cleanup(ctx)
+
+		_, err := os.Stat(filepath.Join(cacheDir, ".eg"))
+		require.ErrorIs(t, err, os.ErrNotExist, "read only entry should be removed")
+	})
+
 	t.Run("cache_levels_limits_depth_traversal", func(t *testing.T) {
 		ctx, done := testx.Context(t)
 		defer done()

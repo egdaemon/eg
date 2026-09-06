@@ -275,6 +275,20 @@ func MkDirs(perm fs.FileMode, paths ...string) (err error) {
 	return nil
 }
 
+// RemoveAll removes path and everything beneath it. directories are made
+// writable first so read-only trees, such as the golang module cache, can be removed.
+func RemoveAll(path string) error {
+	errorsx.Log(filepath.WalkDir(path, func(p string, d fs.DirEntry, err error) error {
+		if err != nil || !d.IsDir() {
+			return nil
+		}
+
+		return os.Chmod(p, 0700)
+	}))
+
+	return os.RemoveAll(path)
+}
+
 // String reads the entire contents of the file at path and returns it as a string.
 func String(path string) (string, error) {
 	f, err := os.Open(path)

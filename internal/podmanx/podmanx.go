@@ -56,10 +56,10 @@ func GrpcClient(ctx context.Context, req any, info *grpc.UnaryServerInfo, handle
 	return handler(pctx, req)
 }
 
-// generates the platform architecture string defaulting to
-// host os/arch when not provided.
-func AutoPlatform(arch string, os string) string {
-	return fmt.Sprintf("%s/%s", langx.FirstNonZero(os, runtime.GOOS), langx.FirstNonZero(arch, runtime.GOARCH))
+// generates the platform string for podman images. containers are always
+// linux, the architecture defaults to the host when not provided.
+func AutoPlatform(arch string) string {
+	return fmt.Sprintf("linux/%s", langx.FirstNonZero(arch, runtime.GOARCH))
 }
 
 func Build(ctx context.Context, name string, dir string, definition string, options ...string) (cmd *exec.Cmd, err error) {

@@ -1,8 +1,11 @@
 package iox
 
 import (
+	"context"
+	"errors"
 	"io"
 	"os"
+	"time"
 
 	"github.com/egdaemon/eg/internal/errorsx"
 )
@@ -113,4 +116,42 @@ func (t readCompositeCloser) Close() (err error) {
 // the provided Writer w.
 func ReaderCompositeCloser(w io.Reader, closers ...func() error) io.ReadCloser {
 	return readCompositeCloser{Reader: w, closefn: closers}
+}
+
+func TimeoutReader(d time.Duration, s io.ReadCloser) *timeoutreader {
+	return newTimeoutReader(d, s)
+}
+
+func newTimeoutReader(d time.Duration, r io.ReadCloser) *timeoutreader {
+	return &timeoutreader{
+		inner: r,
+		d:     d,
+		timer: time.NewTimer(d),
+	}
+}
+
+type timeoutreader struct {
+	inner io.ReadCloser
+	d     time.Duration
+	timer *time.Timer
+}
+
+func (t *timeoutreader) Read(b []byte) (n int, err error) {
+	n, err = t.inner.Read(b)
+	if err != nil && !errors.Is(err, io.EOF) {
+		return n, err
+	}
+
+	select {
+	case <-t.timer.C:
+		return 0, context.DeadlineExceeded
+	default:
+		t.timer.Reset(t.d)
+	}
+
+	return n, err
+}
+
+func (t *timeoutreader) Close() error {
+	return t.inner.Close()
 }

@@ -198,9 +198,10 @@ func (t upload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 		tokensrc,
 	)
 
-	ctx, done := context.WithTimeout(gctx.Context, 10*time.Second)
-	defer done()
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, t.Endpoint, buf)
+	r := iox.TimeoutReader(10*time.Second, buf)
+	defer r.Close()
+
+	req, err := http.NewRequestWithContext(gctx.Context, http.MethodPost, t.Endpoint, r)
 	if err != nil {
 		return errorsx.Wrap(err, "unable to create kernel upload request")
 	}

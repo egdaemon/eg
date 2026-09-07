@@ -155,3 +155,30 @@ func (t *timeoutreader) Read(b []byte) (n int, err error) {
 func (t *timeoutreader) Close() error {
 	return t.inner.Close()
 }
+
+func DelayReader(d time.Duration, s io.ReadCloser) *delayreader {
+	return &delayreader{
+		inner: s,
+		d:     d,
+	}
+}
+
+type delayreader struct {
+	inner io.ReadCloser
+	d     time.Duration
+}
+
+func (t *delayreader) Read(b []byte) (n int, err error) {
+	n, err = t.inner.Read(b)
+	if err != nil && !errors.Is(err, io.EOF) {
+		return n, err
+	}
+
+	time.Sleep(t.d)
+
+	return n, err
+}
+
+func (t *delayreader) Close() error {
+	return t.inner.Close()
+}

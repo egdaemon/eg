@@ -137,7 +137,7 @@ func (t builtinUpload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err e
 	}
 	defer environio.Close()
 
-	if repo, err = git.PlainOpen(ws.WorkingDir); err != nil {
+	if repo, err = git.PlainOpen("."); err != nil {
 		return errorsx.Wrapf(err, "unable to open git repository %s", ws.WorkingDir)
 	}
 
@@ -183,6 +183,7 @@ func (t builtinUpload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err e
 	// push the archive to another node that matches the requirements.
 	// in theory we could use redirects to handle that but it'd still take a performance hit.
 	mimetype, buf, err := runners.NewEnqueueUpload(&runners.Enqueued{
+		Description: t.Name,
 		Entry:       filepath.Join(ws.Module, filepath.Base(entry.Path)),
 		Ttl:         uint64(t.RuntimeResources.TTL.Milliseconds()),
 		Cores:       t.RuntimeResources.Cores,

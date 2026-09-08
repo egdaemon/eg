@@ -88,7 +88,7 @@ func (boption) Environ(envvars ...string) boption {
 }
 
 func (t buildOption) options() (opts []string) {
-	copy(opts, t.flags)
+	opts = append(opts, t.flags...)
 	if len(t.bctx.BuildTags) > 0 {
 		opts = append(opts, fmt.Sprintf("-tags=%s", strings.Join(t.bctx.BuildTags, ",")))
 	}

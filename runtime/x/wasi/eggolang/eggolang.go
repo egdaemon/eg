@@ -88,7 +88,7 @@ func (boption) Environ(envvars ...string) boption {
 }
 
 func (t buildOption) options() (opts []string) {
-	copy(opts, t.flags)
+	opts = append(opts, t.flags...)
 	if len(t.bctx.BuildTags) > 0 {
 		opts = append(opts, fmt.Sprintf("-tags=%s", strings.Join(t.bctx.BuildTags, ",")))
 	}
@@ -131,7 +131,7 @@ func AutoInstall(options ...ioption) eg.OpFn {
 		timeout := timex.DurationMin(contextx.Until(ctx), timex.DurationFirstNonZero(opts.timeout, shell.DefaultTimeout))
 
 		for gomod := range modfilex.FindModules(stringsx.DefaultIfBlank(opts.bctx.Dir, egenv.WorkingDirectory())) {
-			cmd := stringsx.Join(" ", slicesx.Filter(func(s string) bool { return stringsx.Present(s) }, "go", "-C", filepath.Dir(gomod), "install", flags, "./...")...)
+			cmd := stringsx.Join(" ", slicesx.Filter(func(s string) bool { return stringsx.Present(s) }, "go", "-C", filepath.Dir(gomod), "install", "-modcacherw", flags, "./...")...)
 			if err := shell.Run(ctx, runtime.New(cmd).Timeout(timeout)); err != nil {
 				return errorsx.Wrap(err, "unable to run tests")
 			}
@@ -176,7 +176,7 @@ func AutoCompile(options ...coption) eg.OpFn {
 		timeout := timex.DurationMin(contextx.Until(ctx), timex.DurationFirstNonZero(opts.timeout, shell.DefaultTimeout))
 
 		for gomod := range modfilex.FindModules(stringsx.DefaultIfBlank(opts.bctx.Dir, egenv.WorkingDirectory())) {
-			cmd := stringsx.Join(" ", "go", "-C", filepath.Dir(gomod), "build", flags, "./...")
+			cmd := stringsx.Join(" ", "go", "-C", filepath.Dir(gomod), "build", "-modcacherw", flags, "./...")
 			if err := shell.Run(ctx, runtime.New(cmd).Timeout(timeout)); err != nil {
 				return errorsx.Wrap(err, "unable to compile")
 			}
@@ -309,7 +309,7 @@ func AutoTest(options ...toption) eg.OpFn {
 		timeout := timex.DurationMin(contextx.Until(ctx), timex.DurationFirstNonZero(opts.timeout, shell.DefaultTimeout))
 
 		for gomod := range modfilex.FindModules(egenv.WorkingDirectory()) {
-			cmd := stringsx.Join(" ", "go", "-C", filepath.Dir(gomod), "test", fmt.Sprintf("-timeout=%s", timeout), flags, fmt.Sprintf("-coverprofile %s", filepath.Join(covpath, md5x.String(gomod))), "./...")
+			cmd := stringsx.Join(" ", "go", "-C", filepath.Dir(gomod), "test", "-modcacherw", fmt.Sprintf("-timeout=%s", timeout), flags, fmt.Sprintf("-coverprofile %s", filepath.Join(covpath, md5x.String(gomod))), "./...")
 			if err := shell.Run(ctx, runtime.New(cmd).Timeout(timeout+time.Second)); err != nil {
 				return errorsx.Wrap(err, "unable to run tests")
 			}

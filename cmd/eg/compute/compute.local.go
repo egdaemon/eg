@@ -74,7 +74,7 @@ func (t local) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err e
 		wayland    runners.AgentOption = runners.AgentOptionNoop
 		privileged runners.AgentOption = runners.AgentOptionNoop
 		mountegbin runners.AgentOption = runners.AgentOptionEGBin(errorsx.Must(exec.LookPath(os.Args[0])))
-		platform                       = podmanx.AutoPlatform(t.Arch, t.OS)
+		platform                       = podmanx.AutoPlatform(t.Arch)
 	)
 
 	contextx.WaitGroupAdd(gctx.Context, 1)

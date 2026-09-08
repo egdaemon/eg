@@ -26,7 +26,7 @@ func InitGolang(ctx context.Context, dir string, packages ...string) error {
 
 func InitPackages(ctx context.Context, dir string, update string, packages ...string) error {
 	for _, pkg := range packages {
-		cmd := exec.CommandContext(ctx, "go", "get", update, pkg)
+		cmd := exec.CommandContext(ctx, "go", "get", "-modcacherw", update, pkg)
 		cmd.Dir = dir
 		if err := cmd.Run(); err != nil {
 			return errorsx.Wrapf(err, "unable to download default packages: %s", cmd.String())
@@ -37,7 +37,7 @@ func InitPackages(ctx context.Context, dir string, update string, packages ...st
 }
 
 func InitGolangTidy(ctx context.Context, dir string) error {
-	cmd := exec.CommandContext(ctx, "go", "mod", "tidy")
+	cmd := exec.CommandContext(ctx, "go", "mod", "tidy", "-modcacherw")
 	cmd.Dir = dir
 	if err := cmd.Run(); err != nil {
 		return errorsx.Wrapf(err, "unable to tidy go.mod: %s", cmd.Dir)
@@ -49,6 +49,7 @@ func InitGolangTidy(ctx context.Context, dir string) error {
 func EnsureRequiredPackages(ctx context.Context, dir string, packages ...string) error {
 	defaultPackages := []string{
 		"get",
+		"-modcacherw",
 		"google.golang.org/genproto@latest",
 		"github.com/egdaemon/eg/runtime/autowasinet",
 		"github.com/egdaemon/eg/interp/events",

@@ -279,7 +279,7 @@ func MkDirs(perm fs.FileMode, paths ...string) (err error) {
 // directories are made writable and removed again, so read-only trees such as
 // the golang module cache can be removed without paying for the walk otherwise.
 func RemoveAll(path string) error {
-	if err := os.RemoveAll(path); !errors.Is(err, fs.ErrPermission) {
+	if err := os.RemoveAll(path); err == nil || !errors.Is(err, fs.ErrPermission) {
 		return err
 	}
 

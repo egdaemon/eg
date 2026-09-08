@@ -199,8 +199,8 @@ func OptionEnsureWorkingDirectory(ctx *Context) {
 
 func OptionInvalidateModuleCache(ctx *Context) {
 	log.Println("resetting module cache", filepath.Join(ctx.Root, ctx.BuildDir))
-	os.RemoveAll(filepath.Join(ctx.Root, ctx.BuildDir))
-	os.RemoveAll(filepath.Join(ctx.Root, ctx.TransDir))
+	errorsx.Log(errorsx.Wrapf(fsx.RemoveAll(filepath.Join(ctx.Root, ctx.BuildDir)), "unable to reset module cache: %s", ctx.BuildDir))
+	errorsx.Log(errorsx.Wrapf(fsx.RemoveAll(filepath.Join(ctx.Root, ctx.TransDir)), "unable to reset module cache: %s", ctx.TransDir))
 }
 
 func OptionCompose(opts ...Option) Option {

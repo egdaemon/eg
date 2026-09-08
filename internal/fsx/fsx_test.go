@@ -34,6 +34,7 @@ func TestRemoveAll(t *testing.T) {
 		mod := filepath.Join(root, "mod")
 		readonly(t, filepath.Join(mod, "example.com", "pkg@v1.0.0"))
 		readonly(t, filepath.Join(mod, "example.com", "pkg@v1.1.0"))
+		require.NoError(t, os.WriteFile(filepath.Join(mod, "example.com", "list"), []byte{}, 0644))
 		require.Equal(t, fs.FileMode(0555), mode(t, filepath.Join(mod, "example.com", "pkg@v1.0.0")))
 
 		require.NoError(t, fsx.RemoveAll(mod))

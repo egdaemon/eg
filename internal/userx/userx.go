@@ -41,6 +41,18 @@ func CurrentUserOrDefault(d user.User) (result *user.User) {
 	return result
 }
 
+// CurrentUsername returns the username of the user running this process,
+// falling back to d when it can't be determined.
+func CurrentUsername(d string) string {
+	u, err := user.Current()
+	if err != nil {
+		tracex.Println("failed to retrieve current user, using default", err)
+		return d
+	}
+
+	return u.Username
+}
+
 // DefaultUserDirLocation returns the user directory location.
 func DefaultUserDirLocation(name string) string {
 	user := CurrentUserOrDefault(Root())

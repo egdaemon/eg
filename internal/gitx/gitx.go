@@ -35,6 +35,7 @@ import (
 	"github.com/egdaemon/eg/internal/stringsx"
 	"github.com/egdaemon/eg/internal/timex"
 	"github.com/egdaemon/eg/internal/tracex"
+	"github.com/egdaemon/eg/internal/userx"
 )
 
 func DetectRoot() string {
@@ -100,6 +101,8 @@ func Worktree(ctx context.Context, repo, dir string) (err error) {
 // container that doesn't also have repo's .git available at that same path).
 // dir must not already exist.
 func LocalClone(ctx context.Context, repo, dir string) (err error) {
+	username := userx.CurrentUsername(eg.DefaultUsername)
+
 	origin, err := execx.String(ctx, "git", "-C", repo, "remote", "get-url", git.DefaultRemoteName)
 	if err != nil {
 		debugx.Println("unable to determine repository origin remote", err)
@@ -109,23 +112,23 @@ func LocalClone(ctx context.Context, repo, dir string) (err error) {
 	}
 	origin = strings.TrimSpace(origin)
 
-	out, err := execx.RunAs(ctx, eg.DefaultUsername, "git", "clone", "-q", "--local", repo, dir).CombinedOutput()
+	out, err := execx.RunAs(ctx, username, "git", "clone", "-q", "--local", repo, dir).CombinedOutput()
 	if err != nil {
 		return errorsx.Wrapf(fmt.Errorf("%s: %w", strings.TrimSpace(string(out)), err), "unable to clone repository: %s -> %s", repo, dir)
 	}
 
-	out, err = execx.RunAs(ctx, eg.DefaultUsername, "git", "-C", dir, "checkout", "-q", "--detach", "HEAD").CombinedOutput()
+	out, err = execx.RunAs(ctx, username, "git", "-C", dir, "checkout", "-q", "--detach", "HEAD").CombinedOutput()
 	if err != nil {
 		return errorsx.Wrapf(fmt.Errorf("%s: %w", strings.TrimSpace(string(out)), err), "unable to detach HEAD: %s", dir)
 	}
 
 	if origin != "" {
-		_, err = execx.RunAs(ctx, eg.DefaultUsername, "git", "-C", dir, "remote", "remove", git.DefaultRemoteName).CombinedOutput()
+		_, err = execx.RunAs(ctx, username, "git", "-C", dir, "remote", "remove", git.DefaultRemoteName).CombinedOutput()
 		if err != nil {
 			return errorsx.Wrapf(err, "unable to remove origin remote: %s -> %s", repo, dir)
 		}
 
-		_, err = execx.RunAs(ctx, eg.DefaultUsername, "git", "-C", dir, "remote", "add", git.DefaultRemoteName, origin).CombinedOutput()
+		_, err = execx.RunAs(ctx, username, "git", "-C", dir, "remote", "add", git.DefaultRemoteName, origin).CombinedOutput()
 		if err != nil {
 			return errorsx.Wrapf(err, "unable to add origin remote: %s -> %s", repo, dir)
 		}
@@ -415,11 +418,11 @@ func Bearer(dir string) string {
 	return ""
 }
 
-// gitcmd builds a `git -C repo <args>` invocation, run as the egd user --
+// gitcmd builds a `git -C repo <args>` invocation, run as the current user --
 // repo is frequently bind-mounted into the workload container and owned by
-// the unprivileged egd user rather than whatever uid this process runs as,
-// which trips git's "dubious ownership" safe.directory check (CVE-2022-24765
-// mitigation) when run directly. see execx.RunAs.
+// a different uid than whatever this process runs as, which trips git's
+// "dubious ownership" safe.directory check (CVE-2022-24765 mitigation) when
+// run directly. see execx.RunAs.
 func gitcmd(ctx context.Context, repo string, args ...string) *exec.Cmd {
-	return execx.RunAs(ctx, eg.DefaultUsername, "git", append([]string{"-C", repo}, args...)...)
+	return execx.RunAs(ctx, userx.CurrentUsername(eg.DefaultUsername), "git", append([]string{"-C", repo}, args...)...)
 }

@@ -48,6 +48,8 @@ type serve struct {
 	GitRemote        string   `name:"git-remote" help:"name of the git remote to use" default:"${vars_git_default_remote_name}"`
 	GitReference     string   `name:"git-ref" help:"name of the branch or commit to checkout" default:"${vars_git_head_reference}"`
 	Ports            []int    `name:"ports" help:"list of ports to publish to the host system"`
+	SSHKeyPath       string   `name:"sshkeypath" help:"path to ssh key to use" default:"${vars_ssh_key_path}"`
+	SSH              int      `name:"ssh" type:"sshport" help:"enable ssh access into the container as the egd user, using eg's own managed ssh identity; optionally set the published host port (default 2222)"`
 	Name             string   `arg:"" name:"module" help:"name of the module to run, i.e. the folder name within moduledir" default:"" predictor:"eg.workload"`
 }
 
@@ -63,8 +65,6 @@ func (t serve) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err e
 		repo       *git.Repository
 		environio  *os.File
 		gnupghome  runners.AgentOption
-		sshmount   runners.AgentOption = runners.AgentOptionNoop
-		sshenvvar  runners.AgentOption = runners.AgentOptionNoop
 		envvar     runners.AgentOption = runners.AgentOptionNoop
 		mounthome  runners.AgentOption = runners.AgentOptionNoop
 		wayland    runners.AgentOption = runners.AgentOptionNoop
@@ -135,6 +135,11 @@ func (t serve) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err e
 		wayland = runners.AgentOptionWayland(gctx.Context, envb)
 	}
 
+	sshserver := runners.AgentOptionSSHServer(gctx.Context, ws, t.SSHKeyPath, t.SSH)
+	if t.SSH != 0 {
+		log.Printf("ssh access enabled: ssh -i %s -p %d %s@localhost\n", t.SSHKeyPath, t.SSH, eg.DefaultUsername)
+	}
+
 	if err = errorsx.Compact(envb.CopyTo(environio), environio.Close()); err != nil {
 		return errorsx.Wrap(err, "unable to generate environment")
 	}
@@ -184,8 +189,7 @@ func (t serve) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err e
 		privileged,
 		mounthome,
 		envvar,
-		sshmount,
-		sshenvvar,
+		sshserver,
 		mountegbin,
 		runners.AgentOptionVolumes(
 			runners.AgentMountReadWrite(ws.CacheDir, eg.DefaultMountRoot(eg.CacheDirectory)),

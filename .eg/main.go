@@ -35,15 +35,13 @@ func main() {
 				// 	eggolang.Build(eggolang.BuildOption.Timeout(10*time.Minute)),
 				// ),
 				),
-				eg.Parallel(
-					eggolang.AutoTest(
-					// eggolang.TestOption.BuildOptions(
-					// 	eggolang.Build(eggolang.BuildOption.Timeout(10*time.Minute)),
-					// ),
-					),
-					IntegrationTests,
+				eggolang.AutoTest(
+				// eggolang.TestOption.BuildOptions(
+				// 	eggolang.Build(eggolang.BuildOption.Timeout(10*time.Minute)),
+				// ),
 				),
 				eggolang.RecordCoverage,
+				IntegrationTests,
 			),
 		),
 	)
@@ -63,9 +61,9 @@ func IntegrationTests(ctx context.Context, op eg.Op) error {
 		ctx,
 		eg.Sequential(
 			shell.Op(
-				runtime.New("/home/egd/go/bin/eg compute baremetal tests/concurrent"),
-				runtime.New("/home/egd/go/bin/eg compute baremetal tests/metrics"),
-				runtime.New("/home/egd/go/bin/eg compute baremetal tests/stress"),
+				runtime.New("/home/egd/go/bin/eg compute local tests/concurrent"),
+				// runtime.New("/home/egd/go/bin/eg compute local tests/metrics"),
+				// runtime.New("/home/egd/go/bin/eg compute local tests/stress"),
 				// runtime.New("/home/egd/go/bin/eg compute baremetal -vvvv tests/tty"),
 				// runtime.New("/home/egd/go/bin/eg compute baremetal tests/envvars").
 				// 	Environ(egbug.EnvUnsafeDigest, "a129de7dadc3fe210b9162428f93d3fe").

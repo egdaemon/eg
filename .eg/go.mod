@@ -4,7 +4,7 @@ go 1.26.3
 
 require (
 	cloud.google.com/go/secretmanager v1.16.0
-	github.com/egdaemon/eg v0.0.0-20260828095718-c19fa49c0a10
+	github.com/egdaemon/eg v0.0.0-20260915105134-2d53cf13512d
 	github.com/egdaemon/wasinet/wasinet v0.0.0-20250806175613-49e153bd345a
 	google.golang.org/api v0.280.0
 	google.golang.org/grpc v1.81.1

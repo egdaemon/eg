@@ -2,6 +2,7 @@ package gpgx_test
 
 import (
 	"bytes"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -87,6 +88,17 @@ func TestKeyring(t *testing.T) {
 		gpgpath, err := execx.LookPath("gpg")
 		if err != nil {
 			t.Skip("gpg not available:", err)
+		}
+
+		// libgcrypt < 1.12.1 has the T8080 regression (see runtime/x/wasi/eggpg package doc)
+		// which rejects valid ECDH subkeys with "Bad secret key" on import for some seeds.
+		if version, err := exec.CommandContext(t.Context(), gpgpath, "--version").Output(); err == nil {
+			var major, minor, patch int
+			if idx := bytes.Index(version, []byte("libgcrypt ")); idx >= 0 {
+				if _, err := fmt.Sscanf(string(version[idx:]), "libgcrypt %d.%d.%d", &major, &minor, &patch); err == nil && [3]int{major, minor, patch} != [3]int{} && (major < 1 || (major == 1 && (minor < 12 || (minor == 12 && patch < 1)))) {
+					t.Skipf("libgcrypt %d.%d.%d < 1.12.1 is affected by T8080", major, minor, patch)
+				}
+			}
 		}
 
 		gnuhome := t.TempDir()

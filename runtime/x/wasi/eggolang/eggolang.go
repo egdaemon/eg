@@ -325,7 +325,8 @@ func RecordCoverage(ctx context.Context, _ eg.Op) (err error) {
 
 	// recover metrics
 	batch := make([]*coverage.Report, 0, 128)
-	for rep, err := range golangcov.Coverage(ctx, covpath) {
+	resolve := golangcov.Modules(modfilex.FindModules(egenv.WorkingDirectory()))
+	for rep, err := range golangcov.Coverage(ctx, covpath, resolve) {
 		if err != nil {
 			return err
 		}

@@ -7,16 +7,23 @@ DH_VERBOSE=1
 	dh $@
 
 override_dh_auto_build:
-	echo "DH AUTO BUILD OVERRIDE pkg version '${PACKAGE_VERSION}'"
+	echo "DH AUTO BUILD OVERRIDE pkg version '${PACKAGE_VERSION}' tag '${LLAMACPP_TAG}'"
 
+	# static libs so the package only ships executables; openssl provides https for -hf model downloads.
 	cmake -B build -G Ninja \
 		-DCMAKE_BUILD_TYPE=Release \
+		-DBUILD_SHARED_LIBS=OFF \
 		-DGGML_NATIVE=OFF \
 		-DGGML_VULKAN=ON \
+		-DLLAMA_OPENSSL=ON \
+		-DLLAMA_BUILD_SERVER=ON \
 		-DLLAMA_BUILD_TESTS=OFF \
-		-DLLAMA_BUILD_EXAMPLES=OFF
+		-DLLAMA_BUILD_EXAMPLES=OFF \
+		-DLLAMA_BUILD_NUMBER=${PACKAGE_VERSION}
 	cmake --build build --config Release -j
 	DESTDIR="linux" cmake --install build --prefix="/usr"
+	# only ship the executables, the headers and static libraries are build artifacts.
+	rm -rf linux/usr/include linux/usr/lib
 
 override_dh_usrlocal:
 	echo "DH usrlocal override due to overly restrict rules"

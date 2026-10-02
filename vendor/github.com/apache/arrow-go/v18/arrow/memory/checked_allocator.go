@@ -167,10 +167,10 @@ func (a *CheckedAllocator) AssertSize(t TestingT, sz int) {
 			// It may be nil for non-Go code or fully inlined functions.
 			if fn := frame.Func; fn != nil {
 				// format as func name + the offset in bytes from func entrypoint
-				fmt.Fprintf(&callersMsg, "%s+%x", fn.Name(), frame.PC-fn.Entry())
+				callersMsg.WriteString(fmt.Sprintf("%s+%x", fn.Name(), frame.PC-fn.Entry()))
 			} else {
 				// fallback to outer func name + file line
-				fmt.Fprintf(&callersMsg, "%s, line %d", frame.Function, frame.Line)
+				callersMsg.WriteString(fmt.Sprintf("%s, line %d", frame.Function, frame.Line))
 			}
 
 			// Write a proper file name + line, so it's really easy to find the leak

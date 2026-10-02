@@ -6,24 +6,28 @@ import (
 	"fmt"
 	"go/ast"
 	"go/format"
+	"go/parser"
 	"go/token"
-	"go/types"
+	"log"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 
-	"golang.org/x/tools/go/packages"
-
+	"github.com/egdaemon/eg/internal/coverage/golangcov"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/iterx"
 	"github.com/egdaemon/eg/runtime/wasi/eg"
+	"github.com/egdaemon/eg/runtime/wasi/shell"
+	"github.com/egdaemon/eg/runtime/x/wasi/eggolang"
 	"github.com/egdaemon/eg/runtime/x/wasi/egllm"
 )
 
 const golangPromptTemplate = `
 test the following codeblock using the given coding style and example usage blocks as guidance for how to structure the code.
 rules:
+- you must respond with a single complete go test file, including its package clause and imports, in a single go code block.
 - you must not include *any* comments
 - you must not share variables between tests.
 - you must not use or create mocking/stub or any kind of code that acts as a substitute that you do not find in samples.
@@ -46,28 +50,30 @@ rules:
 
 // Golang generates tests for Go functions, combining the target function's
 // source, the named types it operates on, and any existing tests that
-// already exercise it, into a single prompt for Model.
+// already exercise it, into a single prompt for Model. generated tests are
+// only kept if they compile and pass.
 type Golang struct {
-	Model string
-	Style string
+	Model    string
+	Style    string
+	Attempts int // number of generations to try per function, defaults to 1.
 }
 
 func (t Golang) Generate(seq iterx.Seq[Fn]) eg.OpFn {
 	op := func(ctx context.Context, _ eg.Op) (err error) {
-		loaded := map[string][]*packages.Package{}
+		loaded := map[string]*gopkg{}
 
 		for fn := range seq.Each(ctx) {
 			dir := filepath.Dir(fn.Path)
 
-			pkgs, ok := loaded[dir]
+			pkg, ok := loaded[dir]
 			if !ok {
-				if pkgs, err = loadPackages(dir); err != nil {
+				if pkg, err = loadPackage(dir); err != nil {
 					return err
 				}
-				loaded[dir] = pkgs
+				loaded[dir] = pkg
 			}
 
-			if err := t.generate(ctx, fn, pkgs); err != nil {
+			if err := t.generate(ctx, fn, pkg); err != nil {
 				return err
 			}
 		}
@@ -78,71 +84,152 @@ func (t Golang) Generate(seq iterx.Seq[Fn]) eg.OpFn {
 	return egllm.With(t.Model, op)
 }
 
-func loadPackages(dir string) ([]*packages.Package, error) {
-	cfg := &packages.Config{
-		Mode: packages.NeedName | packages.NeedFiles | packages.NeedCompiledGoFiles |
-			packages.NeedImports | packages.NeedDeps | packages.NeedTypes |
-			packages.NeedSyntax | packages.NeedTypesInfo,
-		Dir:   dir,
-		Tests: true,
-	}
-
-	pkgs, err := packages.Load(cfg, ".")
-	if err != nil {
-		return nil, errorsx.Wrapf(err, "unable to load package: %s", dir)
-	}
-
-	for _, p := range pkgs {
-		if len(p.Errors) > 0 {
-			return nil, fmt.Errorf("package %s failed to load: %v", p.PkgPath, p.Errors)
-		}
-	}
-
-	return pkgs, nil
+// gopkg is the syntax of a single directory's go files, test files included.
+// it's built with go/parser alone because go/packages shells out to the go
+// command, which isn't possible from within the wasi runtime.
+type gopkg struct {
+	name  string // package name of the non test files.
+	fset  *token.FileSet
+	files []*ast.File
 }
 
-func (t Golang) generate(ctx context.Context, fn Fn, pkgs []*packages.Package) error {
-	decl, fset, pkg := findFuncDecl(pkgs, fn.Name)
+func loadPackage(dir string) (*gopkg, error) {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return nil, errorsx.Wrapf(err, "unable to read package: %s", dir)
+	}
+
+	p := &gopkg{fset: token.NewFileSet()}
+	for _, e := range entries {
+		if e.IsDir() || filepath.Ext(e.Name()) != ".go" {
+			continue
+		}
+
+		f, err := parser.ParseFile(p.fset, filepath.Join(dir, e.Name()), nil, parser.SkipObjectResolution)
+		if err != nil {
+			return nil, errorsx.Wrapf(err, "unable to parse: %s", filepath.Join(dir, e.Name()))
+		}
+
+		if p.name == "" && !strings.HasSuffix(e.Name(), "_test.go") {
+			p.name = f.Name.Name
+		}
+
+		p.files = append(p.files, f)
+	}
+
+	if p.name == "" {
+		return nil, fmt.Errorf("no go source files found: %s", dir)
+	}
+
+	return p, nil
+}
+
+func (t Golang) generate(ctx context.Context, fn Fn, pkg *gopkg) error {
+	decl := findFuncDecl(pkg, fn.Name)
 	if decl == nil {
 		return fmt.Errorf("unable to locate function %s in %s", fn.Name, fn.Path)
 	}
 
-	codeblock, err := renderNode(fset, decl)
+	codeblock, err := renderNode(pkg.fset, decl)
 	if err != nil {
 		return errorsx.Wrap(err, "unable to render function")
 	}
 
 	prompt := strings.NewReplacer(
 		":sample:", t.Style,
-		":usage:", collectUsage(pkgs, fn.Name),
-		":types:", collectTypes(pkg, fset, decl),
+		":usage:", collectUsage(pkg, decl.Name.Name),
+		":types:", collectTypes(pkg, decl),
 		":codeblock:", codeblock,
 		":focus:", fn.Name,
 	).Replace(golangPromptTemplate)
 
-	result, err := egllm.Generate(ctx, egllm.New(), t.Model, prompt)
-	if err != nil {
-		return err
+	dir := filepath.Dir(fn.Path)
+	dest := strings.TrimSuffix(fn.Path, filepath.Ext(fn.Path)) + "_autogentest_test.go"
+
+	for attempt := 1; attempt <= max(t.Attempts, 1); attempt++ {
+		result, err := egllm.Generate(ctx, egllm.New(), t.Model, prompt)
+		if err != nil {
+			return err
+		}
+
+		src, tests, err := extractTest(result, pkg.name)
+		if err != nil {
+			log.Printf("autogentest %s attempt %d: discarding response: %v\n", fn.Name, attempt, err)
+			continue
+		}
+
+		if err := os.WriteFile(dest, src, 0644); err != nil {
+			return err
+		}
+
+		cmd := eggolang.Runtime().Directory(dir).Newf("go test -count=1 -run '^(%s)$' .", strings.Join(tests, "|"))
+		if err := shell.Run(ctx, cmd); err != nil {
+			log.Printf("autogentest %s attempt %d: discarding failing test: %v\n", fn.Name, attempt, err)
+			if err := os.Remove(dest); err != nil {
+				return err
+			}
+			continue
+		}
+
+		return nil
 	}
 
-	dest := strings.TrimSuffix(fn.Path, filepath.Ext(fn.Path)) + "_autogentest_test.go"
-	return os.WriteFile(dest, []byte(result), 0644)
+	log.Printf("autogentest %s: unable to generate a passing test\n", fn.Name)
+	return nil
+}
+
+var fencedcode = regexp.MustCompile("(?s)```[a-zA-Z]*[ \t]*\r?\n(.*?)```")
+
+// extractTest pulls the test file out of a model response, forces it into the
+// given package, and formats it. it returns the names of the tests within.
+func extractTest(response string, pkgname string) ([]byte, []string, error) {
+	code := response
+	for _, m := range fencedcode.FindAllStringSubmatch(response, -1) {
+		if strings.Contains(m[1], "func Test") {
+			code = m[1]
+			break
+		}
+	}
+
+	fset := token.NewFileSet()
+	f, err := parser.ParseFile(fset, "", code, parser.ParseComments|parser.SkipObjectResolution)
+	if err != nil {
+		return nil, nil, errorsx.Wrap(err, "invalid go source")
+	}
+
+	f.Name.Name = pkgname
+
+	var tests []string
+	for _, d := range f.Decls {
+		if fd, ok := d.(*ast.FuncDecl); ok && fd.Recv == nil && strings.HasPrefix(fd.Name.Name, "Test") {
+			tests = append(tests, fd.Name.Name)
+		}
+	}
+
+	if len(tests) == 0 {
+		return nil, nil, fmt.Errorf("no tests found")
+	}
+
+	var buf bytes.Buffer
+	if err := format.Node(&buf, fset, f); err != nil {
+		return nil, nil, errorsx.Wrap(err, "unable to format")
+	}
+
+	return buf.Bytes(), tests, nil
 }
 
 // findFuncDecl locates the top level function declaration named name across
-// the loaded package set (including its test variants).
-func findFuncDecl(pkgs []*packages.Package, name string) (*ast.FuncDecl, *token.FileSet, *packages.Package) {
-	for _, p := range pkgs {
-		for _, f := range p.Syntax {
-			for _, d := range f.Decls {
-				if fd, ok := d.(*ast.FuncDecl); ok && fd.Name.Name == name {
-					return fd, p.Fset, p
-				}
+// the package's files. methods are named Type.Method.
+func findFuncDecl(pkg *gopkg, name string) *ast.FuncDecl {
+	for _, f := range pkg.files {
+		for _, d := range f.Decls {
+			if fd, ok := d.(*ast.FuncDecl); ok && golangcov.FuncName(fd) == name {
+				return fd
 			}
 		}
 	}
 
-	return nil, nil, nil
+	return nil
 }
 
 func renderNode(fset *token.FileSet, node ast.Node) (string, error) {
@@ -157,47 +244,21 @@ func renderNode(fset *token.FileSet, node ast.Node) (string, error) {
 // collectTypes walks decl looking for references to named types declared
 // within pkg, and renders each of their declarations so the model can see
 // the shapes the function actually operates on.
-func collectTypes(pkg *packages.Package, fset *token.FileSet, decl *ast.FuncDecl) string {
-	if pkg == nil || pkg.TypesInfo == nil {
-		return ""
-	}
-
+func collectTypes(pkg *gopkg, decl *ast.FuncDecl) string {
 	seen := map[string]bool{}
-	var names []string
 
 	ast.Inspect(decl, func(n ast.Node) bool {
-		ident, ok := n.(*ast.Ident)
-		if !ok {
-			return true
+		if ident, ok := n.(*ast.Ident); ok {
+			seen[ident.Name] = true
 		}
-
-		obj := pkg.TypesInfo.Uses[ident]
-		if obj == nil {
-			obj = pkg.TypesInfo.Defs[ident]
-		}
-		if obj == nil {
-			return true
-		}
-
-		named, ok := obj.Type().(*types.Named)
-		if !ok {
-			return true
-		}
-
-		tobj := named.Obj()
-		if tobj.Pkg() == nil || tobj.Pkg() != pkg.Types {
-			return true
-		}
-
-		if seen[tobj.Name()] {
-			return true
-		}
-		seen[tobj.Name()] = true
-		names = append(names, tobj.Name())
 
 		return true
 	})
 
+	names := make([]string, 0, len(seen))
+	for name := range seen {
+		names = append(names, name)
+	}
 	sort.Strings(names)
 
 	rendered := make([]string, 0, len(names))
@@ -209,8 +270,8 @@ func collectTypes(pkg *packages.Package, fset *token.FileSet, decl *ast.FuncDecl
 
 		// render as its own "type X ..." declaration regardless of whether
 		// it was originally declared inside a grouped type (...) block.
-		decl := &ast.GenDecl{Tok: token.TYPE, Specs: []ast.Spec{spec}}
-		if s, err := renderNode(fset, decl); err == nil {
+		gd := &ast.GenDecl{Tok: token.TYPE, Specs: []ast.Spec{spec}}
+		if s, err := renderNode(pkg.fset, gd); err == nil {
 			rendered = append(rendered, s)
 		}
 	}
@@ -218,8 +279,13 @@ func collectTypes(pkg *packages.Package, fset *token.FileSet, decl *ast.FuncDecl
 	return strings.Join(rendered, "\n\n")
 }
 
-func findTypeSpec(pkg *packages.Package, name string) *ast.TypeSpec {
-	for _, f := range pkg.Syntax {
+// findTypeSpec locates a type declared by the package's non test files.
+func findTypeSpec(pkg *gopkg, name string) *ast.TypeSpec {
+	for _, f := range pkg.files {
+		if strings.HasSuffix(pkg.fset.Position(f.Package).Filename, "_test.go") {
+			continue
+		}
+
 		for _, d := range f.Decls {
 			gd, ok := d.(*ast.GenDecl)
 			if !ok {
@@ -239,27 +305,25 @@ func findTypeSpec(pkg *packages.Package, name string) *ast.TypeSpec {
 
 const maxUsageExamples = 3
 
-// collectUsage finds existing Test/Example/Fuzz functions across pkgs that
+// collectUsage finds existing Test/Example/Fuzz functions across pkg that
 // already call a function named name, rendering up to maxUsageExamples of
 // them whole as real usage examples.
-func collectUsage(pkgs []*packages.Package, name string) string {
+func collectUsage(pkg *gopkg, name string) string {
 	var examples []string
 
-	for _, p := range pkgs {
-		for _, f := range p.Syntax {
-			for _, d := range f.Decls {
-				fd, ok := d.(*ast.FuncDecl)
-				if !ok || fd.Recv != nil || !isTestFuncName(fd.Name.Name) || !callsFunction(fd, name) {
-					continue
-				}
+	for _, f := range pkg.files {
+		for _, d := range f.Decls {
+			fd, ok := d.(*ast.FuncDecl)
+			if !ok || fd.Recv != nil || !isTestFuncName(fd.Name.Name) || !callsFunction(fd, name) {
+				continue
+			}
 
-				if rendered, err := renderNode(p.Fset, fd); err == nil {
-					examples = append(examples, rendered)
-				}
+			if rendered, err := renderNode(pkg.fset, fd); err == nil {
+				examples = append(examples, rendered)
+			}
 
-				if len(examples) >= maxUsageExamples {
-					break
-				}
+			if len(examples) >= maxUsageExamples {
+				return strings.Join(examples, "\n\n")
 			}
 		}
 	}

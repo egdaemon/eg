@@ -1035,16 +1035,11 @@ func (w *recordEncoder) Encode(p *Payload, rec arrow.RecordBatch) error {
 	if err := w.encode(p, rec); err != nil {
 		return err
 	}
-
-	var customMeta arrow.Metadata
-	if rm, ok := rec.(arrow.RecordBatchWithMetadata); ok {
-		customMeta = rm.Metadata()
-	}
-	return w.encodeMetadata(p, rec.NumRows(), customMeta)
+	return w.encodeMetadata(p, rec.NumRows())
 }
 
-func (w *recordEncoder) encodeMetadata(p *Payload, nrows int64, customMetadata arrow.Metadata) error {
-	p.meta = writeRecordMessage(w.mem, nrows, p.size, w.fields, w.meta, w.codec, w.variadicCounts, customMetadata)
+func (w *recordEncoder) encodeMetadata(p *Payload, nrows int64) error {
+	p.meta = writeRecordMessage(w.mem, nrows, p.size, w.fields, w.meta, w.codec, w.variadicCounts)
 	return nil
 }
 

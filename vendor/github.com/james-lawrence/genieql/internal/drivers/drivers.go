@@ -59,7 +59,7 @@ const (
 	StdlibDecodeString = `func() {
 		if {{ .From | expr }}.Valid {
 			tmp := {{ .Type | expr }}({{ .From | expr }}.String)
-			{{ .To | autodereference | expr }} = tmp
+			{{ .To | autodereference | expr }} = {{ if .Column.Definition.Nullable }}&tmp{{ else }}tmp{{ end }}
 		}
 	}`
 	StdlibEncodeInt32 = `func() {
@@ -69,7 +69,7 @@ const (
 	StdlibDecodeInt32 = `func() {
 		if {{ .From | expr }}.Valid {
 			tmp := {{ .Type | expr }}({{ .From | expr }}.Int32)
-			{{ .To | autodereference | expr }} = tmp
+			{{ .To | autodereference | expr }} = {{ if .Column.Definition.Nullable }}&tmp{{ else }}tmp{{ end }}
 		}
 	}`
 	StdlibEncodeBool = `func() {
@@ -79,7 +79,7 @@ const (
 	StdlibDecodeBool = `func() {
 		if {{ .From | expr }}.Valid {
 			tmp := {{ .From | expr }}.Bool
-			{{ .To | autodereference | expr }} = tmp
+			{{ .To | autodereference | expr }} = {{ if .Column.Definition.Nullable }}&tmp{{ else }}tmp{{ end }}
 		}
 	}`
 	StdlibEncodeFloat64 = `func() {
@@ -89,7 +89,7 @@ const (
 	StdlibDecodeFloat64 = `func() {
 		if {{ .From | expr }}.Valid {
 			tmp := {{ .Type | expr }}({{ .From | expr }}.Float64)
-			{{ .To | autodereference | expr }} = tmp
+			{{ .To | autodereference | expr }} = {{ if .Column.Definition.Nullable }}&tmp{{ else }}tmp{{ end }}
 		}
 	}`
 	StdlibEncodeTime = `func() {
@@ -109,7 +109,7 @@ const (
 	StdlibDecodeDuration = `func() {
 		if {{ .From | expr }}.Valid {
 			tmp := {{ .From | expr }}.V
-			{{ .To | autodereference | expr }} = tmp
+			{{ .To | autodereference | expr }} = {{ if .Column.Definition.Nullable }}&tmp{{ else }}tmp{{ end }}
 		}
 	}`
 	StdlibEncodeInt64 = `func() {
@@ -119,7 +119,7 @@ const (
 	StdlibDecodeInt64 = `func() {
 		if {{ .From | expr }}.Valid {
 			tmp := {{ .Type | expr }}({{ .From | expr }}.Int64)
-			{{ .To | autodereference | expr }} = tmp
+			{{ .To | autodereference | expr }} = {{ if .Column.Definition.Nullable }}&tmp{{ else }}tmp{{ end }}
 		}
 	}`
 	StdlibEncodeUint64 = `func() {
@@ -129,7 +129,7 @@ const (
 	StdlibDecodeUint64 = `func() {
 		if {{ .From | expr }}.Valid {
 			tmp := {{ .From | expr }}.V
-			{{ .To | autodereference | expr }} = tmp
+			{{ .To | autodereference | expr }} = {{ if .Column.Definition.Nullable }}&tmp{{ else }}tmp{{ end }}
 		}
 	}`
 	StdlibEncodeInt16 = `func() {
@@ -139,7 +139,7 @@ const (
 	StdlibDecodeInt16 = `func() {
 		if {{ .From | expr }}.Valid {
 			tmp := {{ .Type | expr }}({{ .From | expr }}.Int16)
-			{{ .To | autodereference | expr }} = tmp
+			{{ .To | autodereference | expr }} = {{ if .Column.Definition.Nullable }}&tmp{{ else }}tmp{{ end }}
 		}
 	}`
 	StdlibEncodeNull = `func() {
@@ -148,7 +148,8 @@ const (
 	}`
 	StdlibDecodeNull = `func() {
 		if {{ .From | expr }}.Valid {
-			{{ .To | autodereference | expr }} = {{ .From | expr }}.V
+			tmp := {{ .From | expr }}.V
+			{{ .To | autodereference | expr }} = {{ if .Column.Definition.Nullable }}&tmp{{ else }}tmp{{ end }}
 		}
 	}`
 )

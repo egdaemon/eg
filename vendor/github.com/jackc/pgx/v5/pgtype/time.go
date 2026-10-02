@@ -46,8 +46,7 @@ func (t *Time) Scan(src any) error {
 		return nil
 	}
 
-	switch src := src.(type) {
-	case string:
+	if src, ok := src.(string); ok {
 		err := scanPlanTextAnyToTimeScanner{}.Scan([]byte(src), t)
 		if err != nil {
 			t.Microseconds = 0
@@ -147,8 +146,7 @@ func (TimeCodec) PlanScan(m *Map, oid uint32, format int16, target any) ScanPlan
 			return scanPlanBinaryTimeToTextScanner{}
 		}
 	case TextFormatCode:
-		switch target.(type) {
-		case TimeScanner:
+		if _, ok := target.(TimeScanner); ok {
 			return scanPlanTextAnyToTimeScanner{}
 		}
 	}

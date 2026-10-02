@@ -5,6 +5,7 @@ import (
 	"embed"
 	"fmt"
 	"io/fs"
+	"time"
 
 	"eg/compute/errorsx"
 	"eg/compute/maintainer"
@@ -23,6 +24,7 @@ var debskel embed.FS
 const (
 	container = "eg.deb.llamacpp"
 	tag       = "b9693" // upstream git tag; llama.cpp's "b<number>" releases aren't usable as a debian version (must start with a digit).
+	version   = "9693"  // tag without the leading 'b'.
 )
 
 var gcfg egdebuild.Config
@@ -30,7 +32,6 @@ var gcfg egdebuild.Config
 func init() {
 	egccache.CacheDirectory()
 	c := eggit.EnvCommit()
-	version := c.Committer.When.Format("2006.01.02")
 	gcfg = egdebuild.New(
 		"llama.cpp",
 		"",
@@ -41,8 +42,8 @@ func init() {
 		egdebuild.Option.Version(fmt.Sprintf("%s.:autopatch:", version)),
 		egdebuild.Option.Description("llama.cpp", "LLM inference in C/C++ (llama-server, llama-cli)"),
 		egdebuild.Option.Debian(errorsx.Must(fs.Sub(debskel, ".debskel"))),
-		egdebuild.Option.DependsBuild("rsync", "curl", "tree", "ca-certificates", "cmake", "ninja-build", "git", "libcurl4-openssl-dev", "libvulkan-dev", "glslc", "spirv-headers"),
-		egdebuild.Option.Depends("libvulkan1"), // runtime dep for the Vulkan backend
+		egdebuild.Option.DependsBuild("rsync", "curl", "tree", "ca-certificates", "cmake", "ninja-build", "git", "libssl-dev", "libvulkan-dev", "glslc", "spirv-headers"),
+		egdebuild.Option.Depends("libvulkan1", "mesa-vulkan-drivers"), // vulkan loader + ICDs for the Vulkan backend
 		egdebuild.Option.Envvar("PACKAGE_VERSION", version),
 		egdebuild.Option.Envvar("LLAMACPP_TAG", tag),
 		egdebuild.Option.Envvar("GIT_COMMIT_HASH", c.Hash.String()),
@@ -54,6 +55,9 @@ func Prepare(ctx context.Context, o eg.Op) error {
 	return eg.Parallel(
 		shell.Op(
 			sruntime.Newf("test -d llamacpp || git clone -b %s --depth 1 https://github.com/ggml-org/llama.cpp.git llamacpp", tag),
+			sruntime.New("md5sum llamacpp/include/llama.h"),
+			sruntime.New("echo \"9a9cf0a56defc5b6d4f8ba4efdbfe15f  llamacpp/include/llama.h\" > llamacpp.md5"),
+			sruntime.New("md5sum -c llamacpp.md5"),
 		),
 		egdebuild.Prepare(Runner(), errorsx.Must(fs.Sub(debskel, ".debskel"))),
 	)(ctx, o)
@@ -65,13 +69,13 @@ func Runner() eg.ContainerRunner {
 }
 
 func Build(ctx context.Context, o eg.Op) error {
-	return eg.Sequential(
-		eg.Parallel(
-			egdebuild.Build(gcfg, egdebuild.Option.Distro(egdebuild.UbuntuLatestCodename), egdebuild.Option.NoLint()),
-		),
+	return eg.Parallel(
+		egdebuild.Build(gcfg, egdebuild.Option.Distro("noble"), egdebuild.Option.NoLint()),
+		egdebuild.Build(gcfg, egdebuild.Option.Distro("questing"), egdebuild.Option.NoLint()),
+		egdebuild.Build(gcfg, egdebuild.Option.Distro(egdebuild.UbuntuLatestCodename), egdebuild.Option.NoLint()),
 	)(ctx, o)
 }
 
 func Upload(ctx context.Context, o eg.Op) error {
-	return egdebuild.UploadDPut(gcfg, errorsx.Must(fs.Sub(debskel, ".debskel")))(ctx, o)
+	return egdebuild.UploadDPut(gcfg, errorsx.Must(fs.Sub(debskel, ".debskel")), egdebuild.Option.Timeout(20*time.Minute))(ctx, o)
 }

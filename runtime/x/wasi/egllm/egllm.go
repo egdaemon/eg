@@ -41,12 +41,10 @@ type message struct {
 }
 
 type request struct {
-	Model       string         `json:"model,omitempty"`
-	Messages    []message      `json:"messages"`
-	Stream      bool           `json:"stream"`
-	Temperature float64        `json:"temperature"`
-	Think       bool           `json:"think"`
-	ExtraBody   map[string]any `json:"extra_body,omitempty"`
+	Model       string    `json:"model,omitempty"`
+	Messages    []message `json:"messages"`
+	Stream      bool      `json:"stream"`
+	Temperature float64   `json:"temperature,omitempty"` // zero defers to the server/model default.
 }
 
 type response struct {

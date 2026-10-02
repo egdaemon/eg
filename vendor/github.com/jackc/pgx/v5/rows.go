@@ -580,7 +580,7 @@ func (rs *mapRowScanner) ScanRow(rows Rows) error {
 	*rs = make(mapRowScanner, len(values))
 
 	for i := range values {
-		(*rs)[string(rows.FieldDescriptions()[i].Name)] = values[i]
+		(*rs)[rows.FieldDescriptions()[i].Name] = values[i]
 	}
 
 	return nil

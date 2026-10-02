@@ -5,11 +5,16 @@ import (
 	"github.com/james-lawrence/genieql/internal/errorsx"
 )
 
-const DuckDB = "github.com/marcboeker/go-duckdb"
+const (
+	DuckDBDeprecated = "github.com/marcboeker/go-duckdb"
+	DuckDB           = "github.com/duckdb/duckdb-go"
+)
 
-// implements the duckdb driver https://github.com/marcboeker/go-duckdb
+// implements the duckdb driver for https://github.com/duckdb/duckdb-go
+// includes the original for backwards compat https://github.com/marcboeker/go-duckdb
 func init() {
 	errorsx.MaybePanic(genieql.RegisterDriver(DuckDB, NewDriver(DuckDB, ddb...)))
+	errorsx.MaybePanic(genieql.RegisterDriver(DuckDBDeprecated, NewDriver(DuckDBDeprecated, ddb...)))
 }
 
 const (
@@ -18,7 +23,8 @@ const (
 			if uid, err := uuid.FromBytes([]byte({{ .From | expr }}.String)); err != nil {
 				return err
 			} else {
-				{{ .To | autodereference | expr }} = uid.String()
+				tmp := uid.String()
+				{{ .To | autodereference | expr }} = {{ if .Column.Definition.Nullable }}&tmp{{ else }}tmp{{ end }}
 			}
 		}
 	}`
@@ -44,7 +50,8 @@ const (
 			tmp := time.Unix(math.MinInt64, math.MinInt64)
 			{{ .To | autodereference | expr }} = {{ if .Column.Definition.Nullable }}&tmp{{ else }}tmp{{ end }}
 		default:
-			{{ .To | autodereference | expr }} = {{ .From | localident | expr }}.Time
+			tmp := {{ .From | localident | expr }}.Time
+			{{ .To | autodereference | expr }} = {{ if .Column.Definition.Nullable }}&tmp{{ else }}tmp{{ end }}
 		}
 	}`
 

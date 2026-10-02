@@ -113,8 +113,15 @@ func TestDownloadClient(t *testing.T) {
 	t.Run("context_cancelled_during_409_retry_loop", func(t *testing.T) {
 		uid := errorsx.Must(uuid.NewV4())
 
+		attempts := 0
 		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			errorsx.Log(httpx.WriteEmptyJSON(w, http.StatusConflict))
+			if attempts < 3 {
+				attempts++
+				errorsx.Log(httpx.WriteEmptyJSON(w, http.StatusConflict))
+				return
+			}
+			// block until the client gives up so the deadline fires mid retry loop.
+			<-r.Context().Done()
 		}))
 		defer srv.Close()
 

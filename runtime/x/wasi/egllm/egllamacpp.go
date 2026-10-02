@@ -58,16 +58,17 @@ func Runtime() shell.Command {
 // Pull warms the local model cache for the given model so that starting
 // llama-server (which loads the model at process start, unlike ollama's
 // decoupled daemon+pull model) never blocks on a cold download. It also
-// records which model the systemd unit should load.
+// records which model and cache the systemd unit should use, since the unit
+// does not inherit the runtime's environment.
 func Pull(runtime shell.Command, model string) eg.OpFn {
 	return func(ctx context.Context, o eg.Op) error {
 		return shell.Run(
 			ctx,
-			// llama-cli shares llama-server's -hf cache layout; running it
+			// llama-completion shares llama-server's -hf cache layout; running it
 			// with a minimal prediction count downloads the model without
 			// needing to stand up the HTTP server.
-			runtime.Newf("llama-cli -hf %s -no-cnv -n 1 -p ok", model),
-			runtime.Newf("echo LLAMA_MODEL=%s > /etc/default/llama-server", model),
+			runtime.Newf("llama-completion -hf %s -no-cnv -n 1 -p ok", model),
+			runtime.Newf("printf 'LLAMA_MODEL=%%s\\nLLAMA_CACHE=%%s\\n' %s %s > /etc/default/llama-server", model, CacheDirectory("models")).Privileged(),
 		)
 	}
 }
@@ -86,12 +87,13 @@ func Shutdown(runtime shell.Command) eg.OpFn {
 
 // waitHealthy polls llama-server's health endpoint until it responds, since
 // systemd reporting the unit "active" doesn't mean the model has finished
-// loading into memory yet.
-func waitHealthy(runtime shell.Command) eg.OpFn {
+// loading into memory yet. large models can take minutes to load.
+func waitHealthy(runtime shell.Command, timeout time.Duration) eg.OpFn {
 	return func(ctx context.Context, o eg.Op) error {
-		return shell.Run(ctx, runtime.New(
-			"for i in $(seq 1 60); do curl -sf http://localhost:8080/health > /dev/null 2>&1 && exit 0; sleep 1; done; exit 1",
-		))
+		return shell.Run(ctx, runtime.Newf(
+			"for i in $(seq 1 %d); do curl -sf http://localhost:8080/health > /dev/null 2>&1 && exit 0; sleep 1; done; exit 1",
+			int(timeout.Seconds()),
+		).Timeout(timeout+time.Minute))
 	}
 }
 
@@ -124,7 +126,7 @@ func With(model string, op eg.OpFn) eg.OpFn {
 			eg.Sequential(
 				Pull(rt, model),
 				Serve(rt),
-				waitHealthy(rt),
+				waitHealthy(rt, 10*time.Minute),
 			),
 			op,
 			Shutdown(rt),

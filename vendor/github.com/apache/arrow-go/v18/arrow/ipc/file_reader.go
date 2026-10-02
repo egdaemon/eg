@@ -458,11 +458,6 @@ func newRecordBatch(schema *arrow.Schema, memo *dictutils.Memo, meta *memory.Buf
 		defer codec.Close()
 	}
 
-	customMeta, err := metadataFromFB(msg)
-	if err != nil {
-		panic(err)
-	}
-
 	ctx := &arrayLoaderContext{
 		src: ipcSource{
 			meta:     &md,
@@ -493,7 +488,7 @@ func newRecordBatch(schema *arrow.Schema, memo *dictutils.Memo, meta *memory.Buf
 		defer cols[i].Release()
 	}
 
-	return array.NewRecordBatchWithMetadata(schema, cols, rows, customMeta)
+	return array.NewRecordBatch(schema, cols, rows)
 }
 
 type ipcSource struct {

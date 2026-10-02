@@ -17,7 +17,7 @@ import (
 //go:generate psql -X -1 -f .migrations/postgresql/structure.sql genieql_test_template
 //go:generate genieql bootstrap --queryer=sqlx.Queryer --driver=github.com/jackc/pgx postgres://$USER@localhost:5432/genieql_test_template?sslmode=disable
 //go:generate genieql bootstrap --queryer=sqlx.Queryer --driver=github.com/jackc/pgx --output-file=generators-test.config postgres://$USER@localhost:5432/genieql_test_template?sslmode=disable
-//go:generate genieql bootstrap --queryer=sqlx.Queryer --driver=github.com/marcboeker/go-duckdb --output-file=duckdb.test.config duckdb://localhost/duckdb.test.db
+//go:generate genieql bootstrap --queryer=sqlx.Queryer --driver=github.com/duckdb/duckdb-go --output-file=duckdb.test.config duckdb://localhost/duckdb.test.db
 
 // Build Tag constants
 const (

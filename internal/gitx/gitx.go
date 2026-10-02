@@ -11,8 +11,11 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
+	"os/user"
 	"path/filepath"
+	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/go-git/go-git/v6"
@@ -101,7 +104,7 @@ func Worktree(ctx context.Context, repo, dir string) (err error) {
 // container that doesn't also have repo's .git available at that same path).
 // dir must not already exist.
 func LocalClone(ctx context.Context, repo, dir string) (err error) {
-	username := userx.CurrentUsername(eg.DefaultUsername)
+	username := RepositoryUsername(repo)
 
 	origin, err := execx.String(ctx, "git", "-C", repo, "remote", "get-url", git.DefaultRemoteName)
 	if err != nil {
@@ -135,6 +138,31 @@ func LocalClone(ctx context.Context, repo, dir string) (err error) {
 	}
 
 	return nil
+}
+
+// RepositoryUsername returns the username owning the repository at path,
+// falling back to the current user when it can't be determined.
+func RepositoryUsername(path string) string {
+	fallback := userx.CurrentUsername(eg.DefaultUsername)
+
+	info, err := os.Stat(filepath.Join(path, ".git"))
+	if err != nil {
+		debugx.Println("unable to stat repository, using current user", err)
+		return fallback
+	}
+
+	st, ok := info.Sys().(*syscall.Stat_t)
+	if !ok {
+		return fallback
+	}
+
+	u, err := user.LookupId(strconv.FormatUint(uint64(st.Uid), 10))
+	if err != nil {
+		debugx.Println("unable to lookup repository owner, using current user", err)
+		return fallback
+	}
+
+	return u.Username
 }
 
 func Clone(ctx context.Context, dir, uri, remote, treeish string, opts ...client.Option) (err error) {

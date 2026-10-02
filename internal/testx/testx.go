@@ -76,6 +76,7 @@ func Context(t *testing.T) (context.Context, context.CancelFunc) {
 }
 
 func SkipInCICD(t *testing.T, msg string) {
+	envx.Debug(os.Environ()...)
 	if !envx.Boolean(false, "CI") {
 		return
 	}

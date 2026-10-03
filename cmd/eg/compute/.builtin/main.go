@@ -7,7 +7,6 @@ import (
 	"github.com/egdaemon/eg/runtime/wasi/eg"
 	"github.com/egdaemon/eg/runtime/wasi/egenv"
 	"github.com/egdaemon/eg/runtime/x/wasi/egbug"
-	"github.com/egdaemon/eg/runtime/x/wasi/egcache"
 )
 
 func main() {
@@ -17,7 +16,7 @@ func main() {
 
 	err := eg.Perform(
 		ctx,
-		egbug.Log("hello world")
+		egbug.Log("hello world"),
 	)
 
 	if err != nil {

@@ -6,6 +6,7 @@ import (
 
 	"github.com/egdaemon/eg/cmd/cmdopts"
 	"github.com/egdaemon/eg/cmd/eg/actl"
+	"github.com/egdaemon/eg/internal/bytesx"
 	"github.com/egdaemon/eg/internal/sshx"
 	"github.com/gofrs/uuid/v5"
 	"github.com/stretchr/testify/require"
@@ -50,5 +51,33 @@ func TestCmdDaemon(t *testing.T) {
 			ssh.FingerprintSHA256(asigner.PublicKey()),
 			ssh.FingerprintSHA256(dsigner.PublicKey()),
 		)
+	})
+
+	t.Run("gpu resources", func(t *testing.T) {
+		t.Run("detected vram larger than configured wins", func(t *testing.T) {
+			got := gpuresources(cmdopts.RuntimeResources{Vram: bytesx.GiB}, "amdgpu", 8*uint64(bytesx.GiB))
+			require.Equal(t, bytesx.Unit(8*bytesx.GiB), got.Vram)
+		})
+
+		t.Run("configured vram larger than detected wins", func(t *testing.T) {
+			got := gpuresources(cmdopts.RuntimeResources{Vram: 16 * bytesx.GiB}, "amdgpu", 8*uint64(bytesx.GiB))
+			require.Equal(t, bytesx.Unit(16*bytesx.GiB), got.Vram)
+		})
+
+		t.Run("detected driver is added as a label", func(t *testing.T) {
+			got := gpuresources(cmdopts.RuntimeResources{Labels: []string{"foo"}}, "amdgpu", 0)
+			require.Equal(t, []string{"foo", "eg:gpu:amdgpu"}, got.Labels)
+		})
+
+		t.Run("existing driver label is not duplicated", func(t *testing.T) {
+			got := gpuresources(cmdopts.RuntimeResources{Labels: []string{"eg:gpu:amdgpu", "foo"}}, "amdgpu", 0)
+			require.Equal(t, []string{"eg:gpu:amdgpu", "foo"}, got.Labels)
+		})
+
+		t.Run("no driver leaves labels unchanged", func(t *testing.T) {
+			got := gpuresources(cmdopts.RuntimeResources{Labels: []string{"foo"}}, "", 0)
+			require.Equal(t, []string{"foo"}, got.Labels)
+			require.Equal(t, bytesx.Unit(0), got.Vram)
+		})
 	})
 }

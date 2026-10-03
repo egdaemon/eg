@@ -40,6 +40,8 @@ type serve struct {
 	Privileged       bool     `name:"privileged" help:"run the initial container in privileged mode"`
 	Dirty            bool     `name:"dirty" help:"include user directories and environment variables" hidden:"true"`
 	Wayland          bool     `name:"wayland" help:"bind-mount the host wayland display socket into the container"`
+	GCPAuto          bool     `name:"gcp-auto" help:"use the default well known path for gcp's application default credentials"`
+	GCP              string   `name:"gcp" help:"path to gcp's application default credentials"`
 	EnvironmentPaths []string `name:"envpath" help:"environment files to pass to the module" default:""`
 	Environment      []string `name:"env" short:"e" help:"define environment variables and their values to be included"`
 	Secrets          []string `name:"secret" help:"List of secret URIs to use. Examples: chachasm://passphrase@/path/to/file, gcpsm://project-id/secret-name/version, awssm://secret-name?region=us-east-1"`
@@ -66,6 +68,7 @@ func (t serve) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err e
 		envvar     runners.AgentOption = runners.AgentOptionNoop
 		mounthome  runners.AgentOption = runners.AgentOptionNoop
 		wayland    runners.AgentOption = runners.AgentOptionNoop
+		gcpcreds   runners.AgentOption = runners.AgentOptionNoop
 		privileged runners.AgentOption = runners.AgentOptionNoop
 		mountegbin runners.AgentOption = runners.AgentOptionEGBin(errorsx.Must(exec.LookPath(os.Args[0])))
 	)
@@ -118,6 +121,12 @@ func (t serve) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err e
 
 	if t.Dirty {
 		mounthome = runners.AgentOptionAutoMountHome(homedir)
+	}
+
+	if t.GCPAuto {
+		gcpcreds = runners.AgentOptionGcloudCredentials(gctx.Context, envb, envx.String(userx.ConfigDirectory("gcloud", "application_default_credentials.json"), runners.EnvGoogleApplicationCredentials))
+	} else if stringsx.Present(t.GCP) {
+		gcpcreds = runners.AgentOptionGcloudCredentials(gctx.Context, envb, t.GCP)
 	}
 
 	gnupghome = runners.AgentOptionLocalGPGAgent(gctx.Context, envb)
@@ -186,6 +195,7 @@ func (t serve) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err e
 		),
 		runners.AgentOptionLocalComputeCachingVolumes(canonicaluri),
 		gnupghome, // must come after the runtime directory mount to ensure correct mounting order.
+		gcpcreds,  // must come after the mount directory to ensure correct mounting order.
 		wayland,   // must come after the runtime directory mount to ensure correct mounting order.
 		runners.AgentOptionEnvironFile(environpath), // ensure we pick up the environment file with the container.
 		runners.AgentOptionHostOS(),

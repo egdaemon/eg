@@ -14,6 +14,7 @@ message Registration {
   string arch = 901 [ json_name = "arch" ]; // the native architecture.
   uint64 cores = 902 [ json_name = "cores" ];
   uint64 memory = 903 [ json_name = "memory" ];
+  uint64 vram = 904 [ json_name = "vram" ];
   repeated string labels = 1000 [ json_name = "labels" ];
 }
 

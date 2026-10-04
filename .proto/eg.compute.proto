@@ -11,6 +11,7 @@ message Compute {
   string updated_at = 6 [ json_name = "updated_at" ];
   string authzed_at = 7 [ json_name = "authzed_at" ];
   string p2pid = 8 [ json_name = "p2p_id" ];
+  string token = 9 [ json_name = "token" ]; // signed by the control plane when returned as a candidate, presented to the runner when uploading directly.
   string os = 900 [ json_name = "os" ];
   string arch = 901 [ json_name = "arch" ]; // the native architecture.
   uint64 cores = 902 [ json_name = "cores" ];

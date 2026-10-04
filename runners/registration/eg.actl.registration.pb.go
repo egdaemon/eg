@@ -156,6 +156,7 @@ func (x *Registration) GetLabels() []string {
 type PingRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Registration  *Registration          `protobuf:"bytes,1,opt,name=registration,proto3" json:"registration,omitempty"`
+	Uploadable    bool                   `protobuf:"varint,2,opt,name=uploadable,proto3" json:"uploadable,omitempty"` // runner accepts workloads uploaded directly to it.
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -195,6 +196,13 @@ func (x *PingRequest) GetRegistration() *Registration {
 		return x.Registration
 	}
 	return nil
+}
+
+func (x *PingRequest) GetUploadable() bool {
+	if x != nil {
+		return x.Uploadable
+	}
+	return false
 }
 
 type PingResponse struct {
@@ -542,9 +550,12 @@ const file_eg_actl_registration_proto_rawDesc = "" +
 	"\x05cores\x18\x86\a \x01(\x04R\x05cores\x12\x17\n" +
 	"\x06memory\x18\x87\a \x01(\x04R\x06memory\x12\x13\n" +
 	"\x04vram\x18\x88\a \x01(\x04R\x04vram\x12\x17\n" +
-	"\x06labels\x18\xe8\a \x03(\tR\x06labelsJ\x05\b\a\x10\x84\a\"H\n" +
+	"\x06labels\x18\xe8\a \x03(\tR\x06labelsJ\x05\b\a\x10\x84\a\"h\n" +
 	"\vPingRequest\x129\n" +
-	"\fregistration\x18\x01 \x01(\v2\x15.eg.actl.RegistrationR\fregistration\"-\n" +
+	"\fregistration\x18\x01 \x01(\v2\x15.eg.actl.RegistrationR\fregistration\x12\x1e\n" +
+	"\n" +
+	"uploadable\x18\x02 \x01(\bR\n" +
+	"uploadable\"-\n" +
 	"\fPingResponse\x12\x1d\n" +
 	"\tbootstrap\x18\xe8\a \x03(\tR\tbootstrap\"P\n" +
 	"\x13RegistrationRequest\x129\n" +

@@ -5,7 +5,6 @@ import (
 	"net"
 	"net/http"
 
-	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/cmd/cmdopts"
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/httpx"
@@ -14,20 +13,23 @@ import (
 	"github.com/justinas/alice"
 )
 
-func HTTP(global *cmdopts.Global, httpl net.Listener, rm *runners.ResourceManager, compiledirs runners.SpoolDirs) (err error) {
+// uploadable gates the runner's push HTTP surface (POST /c/upload, POST /c/enqueue).
+func HTTP(global *cmdopts.Global, httpl net.Listener, rm *runners.ResourceManager, compiledirs runners.SpoolDirs, reserver Reserver, uploadable bool) (err error) {
 	httpmux := mux.NewRouter()
 	httpmux.NotFoundHandler = alice.New(httpx.RouteInvoked).ThenFunc(httpx.NotFound)
 
 	httpmux.HandleFunc("/healthz", httpx.Healthz(envx.Int(http.StatusOK, cmdopts.EnvHealthzCode))).Methods("GET")
 
-	// gates the runner's push HTTP surface (POST /b/upload, POST /c/enqueue) as a
-	// stopgap ahead of real request authentication -- see the accompanying plan doc.
-	apigate := httpx.GatedResponse(envx.Boolean(false, eg.EnvComputeAPIEnabled), http.StatusForbidden)
+	// gates the runner's push HTTP surface (POST /c/upload, POST /c/enqueue).
+	apigate := httpx.GatedResponse(uploadable, http.StatusForbidden)
 
-	// POST /b/upload accepts a pre-built kernel archive + environment file
-	// pushed to this runner and enqueues them directly. See http.upload.go
-	// for the (independently testable) handler implementation.
-	httpmux.Handle("/b/upload", alice.New(httpx.RouteInvoked, apigate).Then(NewUploadHandler())).Methods(http.MethodPost)
+	// POST /c/upload accepts a pre-built kernel archive + environment file
+	// pushed to this runner, records it with the control plane, and enqueues
+	// it directly, subject to current load. See http.upload.go for the
+	// (independently testable) handler implementation.
+	upload := NewUploadHandler(reserver)
+	upload.RM = rm
+	httpmux.Handle("/c/upload", alice.New(httpx.RouteInvoked, apigate).Then(upload)).Methods(http.MethodPost)
 
 	// POST /c/enqueue pushes a source-ref submission (instead of a pre-built
 	// archive) to this runner: the runner clones and compiles it itself,

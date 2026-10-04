@@ -44,6 +44,7 @@ type daemon struct {
 	CacheDir      string   `name:"directory" help:"local cache directory" default:"${vars_cache_directory}"`
 	MountDirs     []string `name:"mounts" short:"m" help:"folders to mount using podman mount specs" default:""`
 	EnvVars       []string `name:"env" short:"e" help:"environment variables to import"`
+	Uploadable    bool     `name:"uploadable" help:"accept workloads pushed directly to this runner (POST /c/upload, POST /c/enqueue) and advertise it to the control plane" default:"true" negatable:"" env:"EG_COMPUTE_API_ENABLED"`
 }
 
 func (t daemon) signer(keygen cmdopts.KeyGenSeeded) (ssh.Signer, error) {
@@ -115,7 +116,7 @@ func (t daemon) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, keygen cmdopt
 		tokensrc,
 	)
 
-	if err = daemons.HTTP(gctx, httpl, rm, compiledirs); err != nil {
+	if err = daemons.HTTP(gctx, httpl, rm, compiledirs, runners.NewDirectClient(authclient), t.Uploadable); err != nil {
 		return err
 	}
 	defer httpl.Close()
@@ -130,7 +131,7 @@ func (t daemon) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, keygen cmdopt
 
 	go func() {
 		for {
-			if cause := daemons.Ping(gctx, tlsc, &t.RuntimeResources, t.AccountID, t.MachineID, p2p, signer); cause != nil {
+			if cause := daemons.Ping(gctx, tlsc, &t.RuntimeResources, t.AccountID, t.MachineID, p2p, signer, t.Uploadable); cause != nil {
 				log.Println("ping failed", cause)
 			}
 

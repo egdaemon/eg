@@ -54,3 +54,27 @@ func (t PingClient) Request(ctx context.Context, id string, req *PingRequest) (_
 
 	return &resp, nil
 }
+
+// Meta retrieves the control plane's p2p addresses, used to reach runners directly.
+func (t PingClient) Meta(ctx context.Context) (_ *PingResponse, err error) {
+	var (
+		resp PingResponse
+	)
+
+	httpreq, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/c/runners/meta", t.host), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	httpresp, err := httpx.AsError(t.c.Do(httpreq))
+	defer func() { errorsx.Log(httpx.AutoClose(httpresp)) }()
+	if err != nil {
+		return nil, err
+	}
+
+	if err = json.NewDecoder(httpresp.Body).Decode(&resp); err != nil {
+		return nil, err
+	}
+
+	return &resp, nil
+}

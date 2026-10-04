@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -23,6 +24,7 @@ import (
 	"github.com/egdaemon/eg/internal/gitx"
 	"github.com/egdaemon/eg/internal/httpx"
 	"github.com/egdaemon/eg/internal/iox"
+	"github.com/egdaemon/eg/internal/libp2px"
 	"github.com/egdaemon/eg/internal/md5x"
 	"github.com/egdaemon/eg/internal/slicesx"
 	"github.com/egdaemon/eg/internal/sshx"
@@ -30,6 +32,7 @@ import (
 	"github.com/egdaemon/eg/internal/tarx"
 	"github.com/egdaemon/eg/internal/unsafepretty"
 	"github.com/egdaemon/eg/runners"
+	"github.com/egdaemon/eg/runners/registration"
 	"github.com/egdaemon/eg/secrets"
 	"github.com/egdaemon/eg/transpile"
 	"github.com/egdaemon/eg/workspaces"
@@ -37,11 +40,13 @@ import (
 	"github.com/gofrs/uuid/v5"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/oauth2"
+	"google.golang.org/protobuf/proto"
 )
 
 type upload struct {
 	cmdopts.RuntimeResources
 	HostedCompute    bool     `name:"shared-compute" help:"allow hosted compute" default:"true"`
+	Direct           bool     `name:"direct" help:"attempt to upload directly to an available runner before falling back to the cluster" default:"true" negatable:""`
 	SSHKeyPath       string   `name:"sshkeypath" help:"path to ssh key to use" default:"${vars_ssh_key_path}"`
 	Dir              string   `name:"directory" help:"root directory of the repository" default:"${vars_eg_root_directory}"`
 	Name             string   `arg:"" name:"module" help:"name of the module to run, i.e. the folder name within moduledir" default:"" predictor:"eg.workload"`
@@ -55,6 +60,10 @@ type upload struct {
 	Secrets          []string `name:"secret" help:"List of secret URIs to use. Examples: chachasm://passphrase@/path/to/file, gcpsm://project-id/secret-name/version, awssm://secret-name?region=us-east-1"`
 }
 
+// bounds the number of runners we attempt to upload to directly before
+// falling back to the cluster.
+const directCandidates = 8
+
 func (t upload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 	var (
 		signer               ssh.Signer
@@ -62,7 +71,6 @@ func (t upload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 		repo                 *git.Repository
 		tmpdir               string
 		archiveio, environio *os.File
-		e                    runners.EnqueuedCreateResponse
 	)
 
 	if signer, err = sshx.AutoCached(sshx.NewKeyGen(), t.SSHKeyPath); err != nil {
@@ -168,28 +176,20 @@ func (t upload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 	ainfo := errorsx.Zero(os.Stat(archiveio.Name()))
 	log.Println("archive metadata", ainfo.Name(), bytesx.Unit(ainfo.Size()))
 
-	// TODO: determine the destination based on the requirements
-	// i.e. cores, memory, labels, disk, videomem, etc.
-	// not sure if the client should do this or the node we upload to.
-	// if its the node we upload to it'll cost more due to having to
-	// push the archive to another node that matches the requirements.
-	// in theory we could use redirects to handle that but it'd still take a performance hit.
-	mimetype, buf, err := runners.NewEnqueueUpload(&runners.Enqueued{
+	enq := &runners.Enqueued{
 		Entry:       filepath.Join(ws.Module, filepath.Base(entry.Path)),
 		Ttl:         uint64(t.RuntimeResources.TTL.Milliseconds()),
 		Cores:       t.RuntimeResources.Cores,
 		Memory:      uint64(t.RuntimeResources.Memory),
+		Vram:        uint64(t.RuntimeResources.Vram),
 		Arch:        t.RuntimeResources.Arch,
 		Os:          t.RuntimeResources.OS,
 		AllowShared: t.HostedCompute,
 		VcsUri:      errorsx.Zero(gitx.CanonicalURI(repo, t.GitRemote)), // optionally set the vcsuri if we're inside a repository.
+		VcsCommit:   errorsx.Zero(gitx.Commitish(ws.WorkingDir, t.GitReference)),
 		Labels:      append([]string{}, t.RuntimeResources.Labels...),
 		Description: t.Name,
-	}, archiveio)
-	if err != nil {
-		return errorsx.Wrap(err, "unable to generate multipart upload")
 	}
-	defer buf.Close()
 
 	c := tlsc.DefaultClient()
 	tokensrc := compute.NewAuthzTokenSource(tlsc.DefaultClient(), signer, authn.EndpointCompute(), gctx.AccountID)
@@ -198,12 +198,54 @@ func (t upload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 		tokensrc,
 	)
 
+	if t.Direct {
+		direct := &runners.EnqueuedDequeueResponse{
+			Enqueued: proto.Clone(enq).(*runners.Enqueued),
+		}
+		direct.Enqueued.Id = uuid.Must(uuid.NewV7()).String()
+		direct.Enqueued.AccountId = gctx.AccountID
+
+		if accepted, cause := t.direct(gctx.Context, chttp, direct, archiveio, environio); cause != nil {
+			log.Println("direct upload unavailable, falling back to the cluster", cause)
+		} else {
+			log.Println("enqueued directly", direct.Enqueued.Id, accepted.Id, accepted.P2Pid)
+			return nil
+		}
+
+		if err = iox.Rewind(archiveio); err != nil {
+			return errorsx.Wrap(err, "unable to rewind kernel archive")
+		}
+	}
+
+	recorded, err := t.enqueue(gctx.Context, chttp, enq, archiveio)
+	if err != nil {
+		return err
+	}
+
+	log.Println("enqueued", spew.Sdump(recorded))
+	// TODO: monitoring the job once its uploaded and we have a run id.
+
+	return nil
+}
+
+// enqueue uploads the workload to the cluster.
+func (t upload) enqueue(ctx context.Context, chttp *http.Client, enq *runners.Enqueued, archive io.Reader) (_ *runners.EnqueuedCreateResponse, err error) {
+	var (
+		e runners.EnqueuedCreateResponse
+	)
+
+	mimetype, buf, err := runners.NewEnqueueUpload(enq, archive)
+	if err != nil {
+		return nil, errorsx.Wrap(err, "unable to generate multipart upload")
+	}
+	defer buf.Close()
+
 	r := iox.TimeoutReader(10*time.Second, buf)
 	defer r.Close()
 
-	req, err := http.NewRequestWithContext(gctx.Context, http.MethodPost, t.Endpoint, r)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, t.Endpoint, r)
 	if err != nil {
-		return errorsx.Wrap(err, "unable to create kernel upload request")
+		return nil, errorsx.Wrap(err, "unable to create kernel upload request")
 	}
 	req.Header.Set("Content-Type", mimetype)
 
@@ -213,15 +255,43 @@ func (t upload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 	debugx.Println("upload completed", t.Endpoint)
 
 	if err != nil {
-		return errorsx.Wrap(err, "unable to upload kernel for processing")
+		return nil, errorsx.Wrap(err, "unable to upload kernel for processing")
 	}
 
 	if err = json.NewDecoder(resp.Body).Decode(&e); err != nil {
-		return errorsx.Wrap(err, "unable to decode response")
+		return nil, errorsx.Wrap(err, "unable to decode response")
 	}
 
-	log.Println("enqueued", spew.Sdump(&e))
-	// TODO: monitoring the job once its uploaded and we have a run id.
+	if e.Enqueued == nil {
+		return nil, errorsx.New("enqueued response missing workload")
+	}
 
-	return nil
+	return &e, nil
+}
+
+// direct attempts to upload the workload straight to an available runner,
+// returning the runner that accepted it. the runner records the workload with
+// the cluster using the candidate token issued for it.
+func (t upload) direct(ctx context.Context, chttp *http.Client, req *runners.EnqueuedDequeueResponse, archive, environ io.ReadSeeker) (_ *compute.Compute, err error) {
+	meta, err := registration.NewPingClient(chttp).Meta(ctx)
+	if err != nil {
+		return nil, errorsx.Wrap(err, "unable to retrieve p2p bootstrap addresses")
+	}
+
+	p2p, err := libp2px.NewClient(ctx, libp2px.StringsToPeers(meta.Bootstrap...)...)
+	if err != nil {
+		return nil, errorsx.Wrap(err, "unable to join p2p network")
+	}
+	defer p2p.Close()
+
+	candidates, err := runners.NewPushClient(chttp).Candidates(ctx, req.Enqueued, directCandidates)
+	if err != nil {
+		return nil, errorsx.Wrap(err, "unable to retrieve candidate runners")
+	}
+
+	if accepted := runners.TryUpload(ctx, p2p, candidates.Items, req, archive, environ); accepted != nil {
+		return accepted, nil
+	}
+
+	return nil, errorsx.Errorf("no runner accepted the workload, %d candidates", len(candidates.Items))
 }

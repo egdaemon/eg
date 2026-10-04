@@ -20,7 +20,8 @@ import (
 	"golang.org/x/time/rate"
 )
 
-func Ping(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, runtimecfg *cmdopts.RuntimeResources, aid, machineid string, p2p host.Host, s ssh.Signer) (err error) {
+// uploadable advertises to the control plane whether this runner accepts workloads uploaded directly to it.
+func Ping(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, runtimecfg *cmdopts.RuntimeResources, aid, machineid string, p2p host.Host, s ssh.Signer, uploadable bool) (err error) {
 	fingerprint := ssh.FingerprintSHA256(s.PublicKey())
 	log.Println("periodic ping initiated", aid, machineid, fingerprint)
 	defer log.Println("periodic ping completed", aid, machineid, fingerprint)
@@ -41,6 +42,7 @@ func Ping(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, runtimecfg *cmdopts.Run
 
 	req := registration.PingRequest{
 		Registration: genregistration(s, p2p.ID(), runtimecfg),
+		Uploadable:   uploadable,
 	}
 
 	for err := r.Wait(gctx.Context); err == nil; err = r.Wait(gctx.Context) {

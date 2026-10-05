@@ -15,6 +15,7 @@ import (
 
 	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/compute"
+	"github.com/egdaemon/eg/internal/debugx"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/httpx"
 	"github.com/egdaemon/eg/internal/iox"
@@ -85,11 +86,14 @@ func (t PushClient) Candidates(ctx context.Context, enq *Enqueued, limit uint64)
 // TryUpload attempts to upload the workload to each candidate in order,
 // returning the runner that accepted it, or nil when none did.
 func TryUpload(ctx context.Context, p2p host.Host, candidates []*compute.Compute, req *EnqueuedDequeueResponse, archive, environ io.ReadSeeker) *compute.Compute {
+	debugx.Println("direct upload candidates", len(candidates))
 	for _, c := range candidates {
 		if accepted, err := Upload(ctx, p2p, c, req, archive, environ); err != nil {
 			log.Println("direct upload failed", c.Id, c.P2Pid, err)
 		} else if accepted {
 			return c
+		} else {
+			debugx.Println("direct upload declined", c.Id, c.P2Pid)
 		}
 	}
 
@@ -114,6 +118,8 @@ func Upload(ctx context.Context, p2p host.Host, candidate *compute.Compute, req 
 		return false, errorsx.Wrap(err, "unable to rewind environ")
 	}
 
+	debugx.Println("direct upload dialing", candidate.Id, pid, p2p.Peerstore().Addrs(pid))
+
 	dctx, done := context.WithTimeout(ctx, dialTimeout)
 	defer done()
 
@@ -122,6 +128,8 @@ func Upload(ctx context.Context, p2p host.Host, candidate *compute.Compute, req 
 		return false, fmt.Errorf("unable to open stream to %s: %w", candidate.P2Pid, err)
 	}
 	defer stream.Close()
+
+	debugx.Println("direct upload stream opened", candidate.Id, stream.Conn().RemotePeer(), stream.Conn().RemoteMultiaddr())
 
 	errorsx.Log(stream.SetDeadline(time.Now().Add(uploadTimeout)))
 
@@ -146,6 +154,8 @@ func Upload(ctx context.Context, p2p host.Host, candidate *compute.Compute, req 
 		return false, fmt.Errorf("unable to read response from stream: %w", err)
 	}
 	defer resp.Body.Close()
+
+	debugx.Println("direct upload response", candidate.Id, pid, resp.Status)
 
 	if httpx.IsSuccess(resp.StatusCode) {
 		return true, nil

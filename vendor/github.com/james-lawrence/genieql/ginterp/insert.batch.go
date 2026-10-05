@@ -21,7 +21,7 @@ import (
 // InsertBatch configuration interface for generating batch inserts.
 type InsertBatch interface {
 	genieql.Generator              // must satisfy the generator interface
-	Into(string) InsertBatch       // what table to insert into
+	Into(...string) InsertBatch    // what table to insert into
 	Default(...string) InsertBatch // use the database default for the specified columns.
 	Conflict(string) InsertBatch   // specify how conflicts should be handled.
 	Batch(n int) InsertBatch       // specify a batch insert
@@ -97,8 +97,8 @@ type batch struct {
 }
 
 // Into specify the table the data will be inserted into.
-func (t *batch) Into(s string) InsertBatch {
-	t.table = s
+func (t *batch) Into(s ...string) InsertBatch {
+	t.table = quotedTableName(t.ctx.Dialect, s...)
 	return t
 }
 

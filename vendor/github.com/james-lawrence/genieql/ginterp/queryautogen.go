@@ -22,7 +22,7 @@ import (
 // QueryAutogen configuration interface for generating basic queries automatically.
 type QueryAutogen interface {
 	genieql.Generator              // must satisfy the generator interface
-	From(string) QueryAutogen      // what table to insert into
+	From(...string) QueryAutogen   // what table to insert into
 	Ignore(...string) QueryAutogen // ignore the specified columns.
 }
 
@@ -99,8 +99,8 @@ type queryAutogen struct {
 }
 
 // Into specify the table the data will be inserted into.
-func (t *queryAutogen) From(s string) QueryAutogen {
-	t.table = s
+func (t *queryAutogen) From(s ...string) QueryAutogen {
+	t.table = quotedTableName(t.ctx.Dialect, s...)
 	return t
 }
 

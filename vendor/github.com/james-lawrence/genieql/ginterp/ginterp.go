@@ -3,6 +3,7 @@ package ginterp
 import (
 	"fmt"
 	"go/ast"
+	"strings"
 
 	"github.com/james-lawrence/genieql"
 	// register the drivers
@@ -17,6 +18,19 @@ import (
 
 type definition interface {
 	Columns() ([]genieql.ColumnInfo, error)
+}
+
+// quotedTableName quotes each part of a possibly schema-qualified table
+// reference individually via the dialect's own QuotedString, then joins them
+// with ".". A single part is unaffected structurally (still just one quoted
+// identifier); multiple parts (e.g. "cache", "library_known_media") produce
+// a valid two-part qualified reference ("cache"."library_known_media").
+func quotedTableName(d genieql.Dialect, parts ...string) string {
+	quoted := make([]string, 0, len(parts))
+	for _, p := range parts {
+		quoted = append(quoted, d.QuotedString(p))
+	}
+	return strings.Join(quoted, ".")
 }
 
 // Query extracts table information from the database making it available for

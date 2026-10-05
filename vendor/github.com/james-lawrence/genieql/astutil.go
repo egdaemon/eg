@@ -12,7 +12,9 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/james-lawrence/genieql/astutil"
 	"github.com/james-lawrence/genieql/internal/errorsx"
@@ -343,6 +345,7 @@ type Utils interface {
 	FindUniqueType(f ast.Filter, packageSet ...*build.Package) (*ast.TypeSpec, error)
 	FindFunction(f ast.Filter, pkgset ...*build.Package) (*ast.FuncDecl, error)
 	WalkFiles(delegate func(path string, file *ast.File), pkgset ...*build.Package) error
+	AddFile(pkg *build.Package, name string, src string) error
 }
 
 // NewUtils ...
@@ -381,19 +384,84 @@ func pkgFileFilter(pkg *build.Package) func(os.FileInfo) bool {
 	}
 }
 
+// parsed caches the syntax of a directory per file set so repeated searches
+// during a generation reuse it instead of re-reading the package.
+var parsed = struct {
+	sync.Mutex
+	packages map[parsedkey][]*ast.Package
+}{packages: map[parsedkey][]*ast.Package{}}
+
+type parsedkey struct {
+	fset *token.FileSet
+	dir  string
+}
+
 func (t utils) ParsePackages(pkgset ...*build.Package) (result []*ast.Package, err error) {
+	var (
+		key  parsedkey
+		pkgs []*ast.Package
+		ok   bool
+	)
+
+	parsed.Lock()
+	defer parsed.Unlock()
+
 	for _, pkg := range pkgset {
-		pkgs, err := parser.ParseDir(t.fset, pkg.Dir, pkgFileFilter(pkg), parser.ParseComments)
-		if err != nil {
-			return nil, err
+		key = parsedkey{fset: t.fset, dir: pkg.Dir}
+		if pkgs, ok = parsed.packages[key]; !ok {
+			if pkgs, err = t.parse(pkg); err != nil {
+				return nil, err
+			}
+			parsed.packages[key] = pkgs
 		}
 
-		for _, pkg := range pkgs {
-			result = append(result, pkg)
-		}
+		result = append(result, pkgs...)
 	}
 
 	return result, nil
+}
+
+// parse the go files of the package into the file set.
+func (t utils) parse(pkg *build.Package) (result []*ast.Package, err error) {
+	var (
+		pkgs map[string]*ast.Package
+	)
+
+	if pkgs, err = parser.ParseDir(t.fset, pkg.Dir, pkgFileFilter(pkg), parser.ParseComments); err != nil {
+		return nil, err
+	}
+
+	for _, pkg := range pkgs {
+		result = append(result, pkg)
+	}
+
+	return result, nil
+}
+
+// AddFile parses src as a file of the package, making its declarations visible
+// to subsequent searches within the file set.
+func (t utils) AddFile(pkg *build.Package, name string, src string) (err error) {
+	var (
+		pkgs []*ast.Package
+		file *ast.File
+		path = filepath.Join(pkg.Dir, name)
+	)
+
+	if pkgs, err = t.ParsePackages(pkg); err != nil {
+		return err
+	}
+
+	if file, err = parser.ParseFile(t.fset, path, src, parser.ParseComments); err != nil {
+		return err
+	}
+
+	for _, p := range pkgs {
+		if p.Name == file.Name.Name {
+			p.Files[path] = file
+		}
+	}
+
+	return nil
 }
 
 // FindUniqueType searches the provided packages for the unique declaration
@@ -466,10 +534,10 @@ func FilterValue(f ast.Filter, packageSet ...*ast.Package) []*ast.ValueSpec {
 		ast.Inspect(pkg, func(n ast.Node) bool {
 			switch x := n.(type) {
 			case *ast.ValueSpec:
-				results = append(results, x)
+				if _, ok := slicesx.Find(func(name *ast.Ident) bool { return f(name.Name) }, x.Names...); ok {
+					results = append(results, x)
+				}
 				return false
-			case *ast.GenDecl:
-				return ast.FilterDecl(x, f)
 			default:
 				return true
 			}
@@ -491,7 +559,7 @@ func RetrieveBasicLiteralString(f ast.Filter, packageSet ...*ast.Package) (strin
 		for idx, v := range valueSpec.Values {
 			basicLit, ok := v.(*ast.BasicLit)
 			if ok && basicLit.Kind == token.STRING && f(valueSpec.Names[idx].Name) {
-				return strings.Trim(basicLit.Value, "`\""), nil
+				return strconv.Unquote(basicLit.Value)
 			}
 		}
 	default:

@@ -16,7 +16,7 @@ type Structure interface {
 	genieql.Generator // must satisfy the generator interface
 	// From generate the structure based on the record definition.
 	From(definition) Structure
-	Table(string) definition
+	Table(...string) definition
 	Query(string) definition
 	// Ignore specify column names to exclude from the generated structure.
 	Ignore(...string) Structure
@@ -88,8 +88,8 @@ func (t *sconfig) Ignore(ignore ...string) Structure {
 	return t
 }
 
-func (t sconfig) Table(s string) definition {
-	return Table(t.ctx.Driver, t.ctx.Dialect, s)
+func (t sconfig) Table(s ...string) definition {
+	return Table(t.ctx.Driver, t.ctx.Dialect, quotedTableName(t.ctx.Dialect, s...))
 }
 
 func (t sconfig) Query(s string) definition {

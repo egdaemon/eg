@@ -161,7 +161,7 @@ func (t Test) ColumnInformationForTable(d genieql.Driver, table string) ([]genie
 	}
 
 	switch table {
-	case "struct_a":
+	case "struct_a", "\"struct_a\"", "\"schema\".\"struct_a\"":
 		return []genieql.ColumnInfo{
 			{Name: "a", Definition: mustLookupType(d.LookupType("int"))},
 			{Name: "b", Definition: mustLookupType(d.LookupType("int"))},

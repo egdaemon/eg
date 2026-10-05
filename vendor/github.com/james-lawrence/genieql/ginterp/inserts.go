@@ -17,7 +17,7 @@ import (
 // Insert configuration interface for generating Insert.
 type Insert interface {
 	genieql.Generator         // must satisfy the generator interface
-	Into(string) Insert       // what table to insert into
+	Into(...string) Insert    // what table to insert into
 	Ignore(...string) Insert  // do not attempt to insert the specified column.
 	Default(...string) Insert // use the database default for the specified columns.
 	Conflict(string) Insert   // specify how conflicts should be handled.
@@ -119,8 +119,8 @@ type insert struct {
 }
 
 // Into specify the table the data will be inserted into.
-func (t *insert) Into(s string) Insert {
-	t.table = s
+func (t *insert) Into(s ...string) Insert {
+	t.table = quotedTableName(t.ctx.Dialect, s...)
 	return t
 }
 

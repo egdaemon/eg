@@ -13,11 +13,17 @@ import (
 	rhost "github.com/libp2p/go-libp2p/p2p/host/routed"
 )
 
-// NewClient creates an ephemeral, dial only, p2p host that routes to peers via
-// the dht seeded by the given bootstrap peers.
+// NewClient creates an ephemeral p2p host that routes to peers via the dht
+// seeded by the given bootstrap peers. it listens on ephemeral ports so hole
+// punching has addresses to work with when upgrading relayed connections.
 func NewClient(ctx context.Context, bootstrap ...peer.AddrInfo) (_ host.Host, err error) {
 	self, err := libp2p.New(
-		libp2p.NoListenAddrs,
+		libp2p.ListenAddrStrings(
+			"/ip4/0.0.0.0/tcp/0",
+			"/ip6/::/tcp/0",
+			"/ip4/0.0.0.0/udp/0/quic-v1",
+			"/ip6/::/udp/0/quic-v1",
+		),
 		libp2p.DefaultTransports,
 		libp2p.DefaultMuxers,
 		libp2p.DefaultSecurity,

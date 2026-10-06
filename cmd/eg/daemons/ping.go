@@ -38,7 +38,7 @@ func Ping(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, runtimecfg *cmdopts.Run
 
 	rc := registration.NewPingClient(authclient)
 
-	r := rate.NewLimiter(rate.Every(envx.Duration(5*time.Minute, eg.EnvPingMinimumDelay)), 1)
+	r := rate.NewLimiter(rate.Every(envx.Duration(15*time.Minute, eg.EnvPingMinimumDelay)), 1)
 
 	req := registration.PingRequest{
 		Registration: genregistration(s, p2p.ID(), runtimecfg),
@@ -57,6 +57,9 @@ func Ping(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, runtimecfg *cmdopts.Run
 					"unable to connect to bootstrap node",
 				),
 			)
+
+			// keep relay reservations with new bootstrap nodes so clients can reach us via them.
+			libp2px.KeepReserved(gctx.Context, p2p, libp2px.StringsToPeers(resp.Bootstrap...)...)
 		}
 	}
 

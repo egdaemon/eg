@@ -106,6 +106,9 @@ func Register(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, runtimecfg *cmdopts
 			),
 		)
 
+		// keep relay reservations with the bootstrap nodes so clients can reach us via them.
+		libp2px.KeepReserved(gctx.Context, p2p, libp2px.StringsToPeers(reg.Bootstrap...)...)
+
 		log.Println("registration accepted", spew.Sdump(reg))
 		return nil
 	}

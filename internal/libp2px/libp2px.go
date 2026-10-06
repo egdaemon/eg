@@ -7,7 +7,9 @@ import (
 	"log"
 	"math/rand"
 	"sync"
+	"time"
 
+	"github.com/egdaemon/eg/backoff"
 	"github.com/egdaemon/eg/internal/debugx"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/langx"
@@ -16,10 +18,153 @@ import (
 	"github.com/egdaemon/eg/internal/stringsx"
 	"github.com/libp2p/go-libp2p/core/event"
 	"github.com/libp2p/go-libp2p/core/host"
+	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/peerstore"
+	"github.com/libp2p/go-libp2p/p2p/protocol/circuitv2/client"
 	"github.com/multiformats/go-multiaddr"
 )
+
+const (
+	reserveTimeout = 30 * time.Second
+	// spreads relay reconnects across nodes so a restarted relay isn't stampeded.
+	reserveJitterWindow = 30 * time.Second
+)
+
+type keeperKey struct {
+	self  peer.ID
+	relay peer.ID
+}
+
+// tracks the relays currently being kept reserved per host.
+var keepers sync.Map
+
+// KeepReserved maintains a relay reservation with each of the given relays for
+// the lifetime of ctx, renewing ahead of expiry and re-reserving as soon as the
+// connection to a relay is lost. safe to call repeatedly; relays already being
+// kept are ignored.
+func KeepReserved(ctx context.Context, p2p host.Host, relays ...peer.AddrInfo) {
+	keep(ctx, p2p, backoff.New(
+		backoff.Exponential(time.Second),
+		backoff.Maximum(time.Minute),
+		backoff.JitterRandom(backoff.DynamicHashDuration(reserveJitterWindow, p2p.ID().String())),
+	), relays...)
+}
+
+func keep(ctx context.Context, p2p host.Host, retry backoff.Strategy, relays ...peer.AddrInfo) {
+	for _, r := range relays {
+		k := keeperKey{self: p2p.ID(), relay: r.ID}
+		if _, loaded := keepers.LoadOrStore(k, struct{}{}); loaded {
+			continue
+		}
+
+		go func(r peer.AddrInfo) {
+			defer keepers.Delete(k)
+			keepReserved(ctx, p2p, retry, r)
+		}(r)
+	}
+}
+
+func keepReserved(ctx context.Context, p2p host.Host, retry backoff.Strategy, relay peer.AddrInfo) {
+	sub, err := p2p.EventBus().Subscribe(new(event.EvtPeerConnectednessChanged))
+	if err != nil {
+		log.Println("unable to watch relay connectivity", relay.ID, err)
+		return
+	}
+	defer sub.Close()
+
+	attempt := int64(0)
+	wait := time.After(0)
+
+	for {
+		select {
+		case <-wait:
+		case evt := <-sub.Out():
+			if e, ok := evt.(event.EvtPeerConnectednessChanged); ok && e.Peer == relay.ID && e.Connectedness == network.NotConnected {
+				d := retry.Backoff(attempt)
+				debugx.Println("relay disconnected, re-reserving", relay.ID, "in", d)
+				wait = time.After(d)
+			}
+			continue
+		case <-ctx.Done():
+			return
+		}
+
+		rctx, done := context.WithTimeout(ctx, reserveTimeout)
+		rsvp, err := client.Reserve(rctx, p2p, relay)
+		done()
+		if err != nil {
+			log.Println("unable to reserve relay", relay.ID, err)
+			wait = time.After(retry.Backoff(attempt))
+			attempt++
+			continue
+		}
+
+		debugx.Println("reserved relay with", relay.ID, "until", rsvp.Expiration)
+		attempt = 0
+		wait = time.After(time.Until(rsvp.Expiration) / 2)
+	}
+}
+
+// Reserve requests a relay reservation from each of the given peers so that
+// others can reach this host via circuit addresses through them (see
+// CircuitAddrs). reservations expire (1h by default); see KeepReserved for
+// keeping them alive.
+func Reserve(ctx context.Context, p2p host.Host, relays ...peer.AddrInfo) error {
+	if len(relays) < 1 {
+		return errors.New("no relay peers")
+	}
+
+	errs := make(chan error, len(relays))
+	var wg sync.WaitGroup
+	for _, r := range relays {
+		wg.Go(func(r peer.AddrInfo) func() {
+			return func() {
+				rsvp, err := client.Reserve(ctx, p2p, r)
+				if err != nil {
+					debugx.Printf("failed to reserve relay with %v: %s", r.ID, err)
+					errs <- err
+					return
+				}
+				debugx.Printf("reserved relay with %v until %s", r.ID, rsvp.Expiration)
+			}
+		}(r))
+	}
+	wg.Wait()
+	close(errs)
+
+	count := 0
+	var err error
+	for e := range errs {
+		count++
+		err = e
+	}
+
+	if count == len(relays) {
+		return fmt.Errorf("failed to reserve any relay. %s", err)
+	}
+
+	return nil
+}
+
+// CircuitAddrs returns circuit addresses for reaching a peer through each relay
+// this host is directly connected to.
+func CircuitAddrs(p2p host.Host) (addrs []multiaddr.Multiaddr) {
+	for _, c := range p2p.Network().Conns() {
+		if c.Stat().Limited {
+			continue
+		}
+
+		circuit, err := multiaddr.NewMultiaddr(fmt.Sprintf("/p2p/%s/p2p-circuit", c.RemotePeer()))
+		if err != nil {
+			continue
+		}
+
+		addrs = append(addrs, c.RemoteMultiaddr().Encapsulate(circuit))
+	}
+
+	return addrs
+}
 
 func Address(p2p host.Host) string {
 	// Build host multiaddress

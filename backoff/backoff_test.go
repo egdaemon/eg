@@ -179,9 +179,20 @@ func TestBackoff(t *testing.T) {
 		})
 	}
 
-	t.Run("JitterRandWindow/example 1 - with jitter range", func(t *testing.T) {
-		expectedDurationRangeTest(t, 0,
-			New(Constant(1*time.Second), JitterRandWindow(200*time.Millisecond)),
-			time.Second, 200*time.Millisecond)
+	t.Run("JitterRandom/stays within [x, x+d)", func(t *testing.T) {
+		s := New(Constant(time.Second), JitterRandom(200*time.Millisecond))
+		for i := 0; i < 100; i++ {
+			d := s.Backoff(0)
+			require.GreaterOrEqual(t, d, time.Second)
+			require.Less(t, d, time.Second+200*time.Millisecond)
+		}
+	})
+
+	t.Run("JitterRandom/zero window is a no-op", func(t *testing.T) {
+		expectedDurationTest(t, 0, New(Constant(time.Second), JitterRandom(0)), time.Second)
+	})
+
+	t.Run("JitterRandom/preserves overflow", func(t *testing.T) {
+		expectedDurationTest(t, 0, New(Constant(math.MaxInt64), JitterRandom(time.Second)), time.Duration(math.MaxInt64))
 	})
 }

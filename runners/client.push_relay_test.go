@@ -17,6 +17,7 @@ import (
 	"github.com/egdaemon/eg/internal/libp2px"
 	"github.com/egdaemon/eg/runners"
 	"github.com/gofrs/uuid/v5"
+	"github.com/golang-jwt/jwt/v4"
 	"github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"
@@ -161,4 +162,91 @@ func TestUploadViaRelay(t *testing.T) {
 		}
 	}
 	require.True(t, direct, "expected a hole punched connection to the runner")
+}
+
+// the client is only connected to a relay the runner holds no reservation with;
+// it must reach the runner through the relay named by the candidate token.
+func TestUploadViaCandidateTokenRelay(t *testing.T) {
+	ctx, done := context.WithTimeout(t.Context(), 30*time.Second)
+	defer done()
+
+	router := &simnet.SimpleFirewallRouter{}
+
+	newRelay := func(addr string) (host.Host, peer.AddrInfo) {
+		r := newSimHost(t,
+			quicSimnet(true, router),
+			libp2p.ListenAddrs(ma.StringCast(addr)),
+			libp2p.DisableRelay(),
+		)
+		_, err := relayv2.New(r)
+		require.NoError(t, err)
+		return r, peer.AddrInfo{ID: r.ID(), Addrs: r.Addrs()}
+	}
+
+	_, clientrelay := newRelay("/ip4/1.2.0.1/udp/8000/quic-v1")
+	runnerrelay, runnerrelayinfo := newRelay("/ip4/1.2.0.2/udp/8000/quic-v1")
+
+	var received atomic.Int64
+	runner := newSimHost(t,
+		quicSimnet(false, router),
+		libp2p.ListenAddrs(ma.StringCast("/ip4/2.2.0.2/udp/8001/quic-v1")),
+		libp2p.EnableRelay(),
+		libp2p.EnableHolePunching(holepunch.DirectDialTimeout(100*time.Millisecond)),
+		libp2p.ForceReachabilityPrivate(),
+	)
+	runner.SetStreamHandler("/egdaemon/proxy", func(s network.Stream) {
+		defer s.Close()
+		req, err := http.ReadRequest(bufio.NewReader(s))
+		if err != nil {
+			return
+		}
+
+		rec := httptest.NewRecorder()
+		if f, _, err := req.FormFile("kernel"); err == nil {
+			n, _ := io.Copy(io.Discard, f)
+			received.Store(n)
+			rec.WriteHeader(http.StatusAccepted)
+		} else {
+			rec.WriteHeader(http.StatusBadRequest)
+		}
+		_ = rec.Result().Write(s)
+	})
+
+	client := newSimHost(t,
+		quicSimnet(false, router),
+		libp2p.ListenAddrs(ma.StringCast("/ip4/2.2.0.1/udp/8000/quic-v1")),
+		libp2p.EnableRelay(),
+		libp2p.EnableHolePunching(holepunch.DirectDialTimeout(100*time.Millisecond)),
+		libp2p.ForceReachabilityPrivate(),
+	)
+
+	require.NoError(t, libp2px.Connect(ctx, runner, runnerrelayinfo))
+	require.NoError(t, libp2px.Reserve(ctx, runner, runnerrelayinfo))
+	require.NoError(t, libp2px.Connect(ctx, client, clientrelay))
+
+	waitForHolePunching(t, client, runner)
+
+	// the client only knows the runner's id.
+	require.Empty(t, client.Peerstore().Addrs(runner.ID()))
+
+	relayaddrs := make([]string, 0, len(runnerrelay.Addrs()))
+	for _, a := range runnerrelay.Addrs() {
+		relayaddrs = append(relayaddrs, a.Encapsulate(ma.StringCast("/p2p/"+runnerrelay.ID().String())).String())
+	}
+
+	// the client doesn't verify the token, only the control plane does.
+	token, err := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{"relay": relayaddrs}).SignedString([]byte("secret"))
+	require.NoError(t, err)
+
+	// below the relay's per circuit data limit (128KB) so the upload fits over the circuit.
+	kernel := bytes.Repeat([]byte("k"), 1<<10)
+
+	req := &runners.EnqueuedDequeueResponse{
+		Enqueued: &runners.Enqueued{Id: uuid.Must(uuid.NewV7()).String()},
+	}
+
+	accepted, err := runners.Upload(ctx, client, &compute.Compute{Id: "relayed", P2Pid: runner.ID().String(), Token: token}, req, bytes.NewReader(kernel), strings.NewReader(""))
+	require.NoError(t, err)
+	require.True(t, accepted)
+	require.Equal(t, int64(len(kernel)), received.Load())
 }

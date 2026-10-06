@@ -166,6 +166,26 @@ func CircuitAddrs(p2p host.Host) (addrs []multiaddr.Multiaddr) {
 	return addrs
 }
 
+// RelayCircuitAddrs returns circuit addresses for reaching a peer through the
+// given relay addresses (each including the relay's /p2p/ id).
+func RelayCircuitAddrs(relays ...string) (addrs []multiaddr.Multiaddr) {
+	circuit := multiaddr.StringCast("/p2p-circuit")
+	for _, r := range relays {
+		a, err := multiaddr.NewMultiaddr(r)
+		if err != nil {
+			continue
+		}
+
+		if _, err := a.ValueForProtocol(multiaddr.P_P2P); err != nil {
+			continue
+		}
+
+		addrs = append(addrs, a.Encapsulate(circuit))
+	}
+
+	return addrs
+}
+
 func Address(p2p host.Host) string {
 	// Build host multiaddress
 	host, _ := multiaddr.NewMultiaddr(fmt.Sprintf("/p2p/%s", p2p.ID()))

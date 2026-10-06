@@ -177,6 +177,8 @@ func (t upload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 	log.Println("archive metadata", ainfo.Name(), bytesx.Unit(ainfo.Size()))
 
 	enq := &runners.Enqueued{
+		Id:          uuid.Must(uuid.NewV7()).String(),
+		AccountId:   gctx.AccountID,
 		Entry:       filepath.Join(ws.Module, filepath.Base(entry.Path)),
 		Ttl:         uint64(t.RuntimeResources.TTL.Milliseconds()),
 		Cores:       t.RuntimeResources.Cores,
@@ -202,8 +204,6 @@ func (t upload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 		direct := &runners.EnqueuedDequeueResponse{
 			Enqueued: proto.Clone(enq).(*runners.Enqueued),
 		}
-		direct.Enqueued.Id = uuid.Must(uuid.NewV7()).String()
-		direct.Enqueued.AccountId = gctx.AccountID
 
 		if accepted, cause := t.direct(gctx.Context, chttp, direct, archiveio, environio); cause != nil {
 			log.Println("direct upload unavailable, falling back to the cluster", cause)

@@ -34,7 +34,12 @@ func P2PProxy(ctx context.Context, seed []byte, httpl net.Listener) (zero host.H
 	}
 
 	self := errorsx.Must(libp2p.New(
-		libp2p.ListenAddrStrings("/ip6/::/tcp/0"),
+		libp2p.ListenAddrStrings(
+			"/ip4/0.0.0.0/tcp/0",
+			"/ip6/::/tcp/0",
+			"/ip4/0.0.0.0/udp/0/quic-v1",
+			"/ip6/::/udp/0/quic-v1",
+		),
 		libp2p.Identity(priv),
 		libp2p.DefaultTransports,
 		libp2p.DefaultMuxers,

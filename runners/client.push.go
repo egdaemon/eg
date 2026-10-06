@@ -19,8 +19,10 @@ import (
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/httpx"
 	"github.com/egdaemon/eg/internal/iox"
+	"github.com/egdaemon/eg/internal/libp2px"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/core/peerstore"
 	"github.com/libp2p/go-libp2p/core/protocol"
 )
 
@@ -29,8 +31,8 @@ import (
 const proxyProtocol = protocol.ID("/egdaemon/proxy")
 
 // bounds how long a single runner gets to accept a stream before we move on to
-// the next candidate.
-const dialTimeout = 5 * time.Second
+// the next candidate. covers dialing through the relay and hole punching.
+const dialTimeout = 15 * time.Second
 
 // bounds how long a single runner gets to receive the workload.
 const uploadTimeout = 5 * time.Minute
@@ -116,6 +118,13 @@ func Upload(ctx context.Context, p2p host.Host, candidate *compute.Compute, req 
 
 	if err = iox.Rewind(environ); err != nil {
 		return false, errorsx.Wrap(err, "unable to rewind environ")
+	}
+
+	// candidates only carry the peer id; without addresses the routed host
+	// falls back to a dht lookup. reach the runner through the relays we're
+	// connected to instead, hole punching upgrades it to a direct connection.
+	if len(p2p.Peerstore().Addrs(pid)) == 0 {
+		p2p.Peerstore().AddAddrs(pid, libp2px.CircuitAddrs(p2p), peerstore.TempAddrTTL)
 	}
 
 	debugx.Println("direct upload dialing", candidate.Id, pid, p2p.Peerstore().Addrs(pid))

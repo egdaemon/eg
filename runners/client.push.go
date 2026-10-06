@@ -20,6 +20,7 @@ import (
 	"github.com/egdaemon/eg/internal/httpx"
 	"github.com/egdaemon/eg/internal/iox"
 	"github.com/egdaemon/eg/internal/libp2px"
+	"github.com/golang-jwt/jwt/v4"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/peerstore"
@@ -102,6 +103,23 @@ func TryUpload(ctx context.Context, p2p host.Host, candidates []*compute.Compute
 	return nil
 }
 
+// candidateRelay returns the p2p addresses of the relay holding the candidate's
+// reservation. the token is only verified by the control plane, the client just
+// reads the claim.
+func candidateRelay(token string) []string {
+	var claims struct {
+		jwt.RegisteredClaims
+		Relay []string `json:"relay"`
+	}
+
+	if _, _, err := jwt.NewParser().ParseUnverified(token, &claims); err != nil {
+		debugx.Println("unable to read candidate token relay", err)
+		return nil
+	}
+
+	return claims.Relay
+}
+
 // Upload dials the candidate over p2p and uploads the workload, along with the
 // candidate's token, to the runner's POST /c/upload. accepted=false with a nil
 // error means the runner declined the workload (i.e. it is at capacity); try
@@ -121,10 +139,12 @@ func Upload(ctx context.Context, p2p host.Host, candidate *compute.Compute, req 
 	}
 
 	// candidates only carry the peer id; without addresses the routed host
-	// falls back to a dht lookup. reach the runner through the relays we're
-	// connected to instead, hole punching upgrades it to a direct connection.
+	// falls back to a dht lookup. reach the runner through the relay holding its
+	// reservation (carried by the candidate token), and the relays we're connected
+	// to, instead. hole punching upgrades it to a direct connection.
 	if len(p2p.Peerstore().Addrs(pid)) == 0 {
-		p2p.Peerstore().AddAddrs(pid, libp2px.CircuitAddrs(p2p), peerstore.TempAddrTTL)
+		addrs := append(libp2px.RelayCircuitAddrs(candidateRelay(candidate.Token)...), libp2px.CircuitAddrs(p2p)...)
+		p2p.Peerstore().AddAddrs(pid, addrs, peerstore.TempAddrTTL)
 	}
 
 	debugx.Println("direct upload dialing", candidate.Id, pid, p2p.Peerstore().Addrs(pid))

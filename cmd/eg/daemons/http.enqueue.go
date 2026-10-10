@@ -7,10 +7,12 @@ import (
 	"mime/multipart"
 	"net/http"
 	"path/filepath"
+	"strings"
 
 	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/httpx"
+	"github.com/egdaemon/eg/internal/stringsx"
 	"github.com/egdaemon/eg/runners"
 	"github.com/gofrs/uuid/v5"
 )
@@ -34,7 +36,9 @@ func NewEnqueueHandler(dirs runners.SpoolDirs, rm *runners.ResourceManager) *Enq
 // gitx.RefreshCredentials -- it does not clone with AccessToken directly)
 // plus a required "environ" file (see eg.EnvironFile; may be empty -- only
 // carries a fallback ref/token for callers that predate these structured
-// fields) -- deciding synchronously whether to admit it based on current
+// fields) and the "token" field, the candidate token the control plane
+// issued for this runner, used to reserve the workload once it is compiled and
+// to report its progress -- deciding synchronously whether to admit it based on current
 // load before spooling it into the compile spool for asynchronous
 // clone+compile (see runners.CompileN). Dirs/RM are exported so tests can
 // point this at an isolated SpoolDirs and ResourceManager instead of the
@@ -83,6 +87,13 @@ func (t *EnqueueHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	candidate := r.FormValue("token")
+	if stringsx.Blank(candidate) {
+		log.Println("enqueue request missing candidate token")
+		errorsx.Log(httpx.WriteEmptyJSON(w, http.StatusBadRequest))
+		return
+	}
+
 	if envc, _, err = r.FormFile("environ"); err != nil {
 		log.Println(errorsx.Wrap(err, "environ file parameter required"))
 		errorsx.Log(httpx.WriteEmptyJSON(w, http.StatusBadRequest))
@@ -98,6 +109,12 @@ func (t *EnqueueHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	if err = t.Dirs.Download(uid, eg.EnvironFile, envc); err != nil {
 		log.Println(errorsx.Wrap(err, "unable to persist enqueue request environment"))
+		errorsx.Log(httpx.WriteEmptyJSON(w, http.StatusInternalServerError))
+		return
+	}
+
+	if err = t.Dirs.Download(uid, runners.CandidateTokenFile, strings.NewReader(candidate)); err != nil {
+		log.Println(errorsx.Wrap(err, "unable to persist candidate token"))
 		errorsx.Log(httpx.WriteEmptyJSON(w, http.StatusInternalServerError))
 		return
 	}

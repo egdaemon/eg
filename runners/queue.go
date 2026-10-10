@@ -114,11 +114,12 @@ type metadata struct {
 	reload       chan error
 	downloader
 	completion
-	failure   func(cause error)
-	dirs      *SpoolDirs
-	rm        *ResourceManager
-	agentopts []AgentOption
-	gpu       bool
+	authclient *http.Client
+	failure    func(cause error)
+	dirs       *SpoolDirs
+	rm         *ResourceManager
+	agentopts  []AgentOption
+	gpu        bool
 }
 
 type QueueOption func(*metadata)
@@ -195,7 +196,7 @@ func BuildContainer(ctx context.Context, name, dir, path string, options ...stri
 	return nil
 }
 
-func RunOne(ctx context.Context, id int, delay time.Duration, rm *ResourceManager, dirs *SpoolDirs, reload chan error, options ...func(*metadata)) error {
+func RunOne(ctx context.Context, id int, delay time.Duration, authclient *http.Client, rm *ResourceManager, dirs *SpoolDirs, reload chan error, options ...func(*metadata)) error {
 	var (
 		s state = newdelay(
 			delay,
@@ -205,6 +206,7 @@ func RunOne(ctx context.Context, id int, delay time.Duration, rm *ResourceManage
 					rm:         rm,
 					reload:     reload,
 					completion: noopcompletion{},
+					authclient: authclient,
 					downloader: localdownloader{},
 					failure: func(cause error) {
 						log.Println(cause)
@@ -236,13 +238,15 @@ func workloadcapacity() int {
 	return envx.Int(1, eg.EnvComputeWorkloadCapacity)
 }
 
-// runs the scheduler until the context is cancelled.
-func Queue(ctx context.Context, rm *ResourceManager, options ...func(*metadata)) (err error) {
-	return QueueN(ctx, workloadcapacity(), DefaultSpoolDirs(), rm, options...)
+// runs the scheduler until the context is cancelled. authclient is the runner's
+// authenticated client, used to report the progress of workloads pushed to this
+// runner to the control plane.
+func Queue(ctx context.Context, authclient *http.Client, rm *ResourceManager, options ...func(*metadata)) (err error) {
+	return QueueN(ctx, workloadcapacity(), authclient, DefaultSpoolDirs(), rm, options...)
 }
 
 // runs the scheduler until the context is cancelled.
-func QueueN(ctx context.Context, n int, dirs SpoolDirs, rm *ResourceManager, options ...func(*metadata)) (err error) {
+func QueueN(ctx context.Context, n int, authclient *http.Client, dirs SpoolDirs, rm *ResourceManager, options ...func(*metadata)) (err error) {
 	// monitor for reload signals, can't use the context because we
 	// dont want to interrupt running work but only want to stop after a run.
 	reload := make(chan error, 1)
@@ -259,6 +263,7 @@ func QueueN(ctx context.Context, n int, dirs SpoolDirs, rm *ResourceManager, opt
 				rm:         rm,
 				reload:     reload,
 				completion: noopcompletion{},
+				authclient: authclient,
 				downloader: localdownloader{},
 				dirs:       &dirs,
 			},
@@ -278,7 +283,7 @@ func QueueN(ctx context.Context, n int, dirs SpoolDirs, rm *ResourceManager, opt
 		delay := backoff.DynamicHashDuration(time.Second, strconv.FormatInt(int64(i), 36))
 		log.Println("workload", i, "deferred", delay)
 		workers = append(workers, pool.SubmitErr(func() error {
-			return RunOne(ctx, i, delay, rm, &dirs, reload, options...)
+			return RunOne(ctx, i, delay, authclient, rm, &dirs, reload, options...)
 		}))
 	}
 
@@ -560,7 +565,36 @@ func beginwork(ctx context.Context, md metadata, dir string) state {
 		return completed(workload.Enqueued, md, bucket, ws, 0, errorsx.Wrap(err, "run failure"))
 	}
 
-	return staterunning{metadata: md, workload: workload.Enqueued, ws: ws, ragent: ragent, dir: dir, bucket: bucket}
+	return status(md.authclient, ReadCandidateToken(dir), StatusRunning, workload.Enqueued, staterunning{metadata: md, workload: workload.Enqueued, ws: ws, ragent: ragent, dir: dir, bucket: bucket})
+}
+
+// status reports the progress of a workload pushed to this runner to the
+// control plane before transitioning to next. reporting is best effort, it
+// never fails the workload.
+func status(authclient *http.Client, token string, phase string, workload *Enqueued, next state) statestatus {
+	return statestatus{
+		authclient: authclient,
+		token:      token,
+		phase:      phase,
+		workload:   workload,
+		next:       next,
+	}
+}
+
+type statestatus struct {
+	authclient *http.Client
+	token      string
+	phase      string
+	workload   *Enqueued
+	next       state
+}
+
+func (t statestatus) Update(ctx context.Context) state {
+	if err := NewStatusClient(t.authclient).Status(ctx, t.token, t.phase, t.workload); err != nil {
+		log.Println(errorsx.Wrapf(err, "unable to report workload status: %s", t.workload.Id))
+	}
+
+	return t.next
 }
 
 func cacheprefix(enq *Enqueued) string {

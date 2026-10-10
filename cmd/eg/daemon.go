@@ -147,7 +147,7 @@ func (t daemon) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, keygen cmdopt
 		go runners.AutoDownload(gctx.Context, authclient, rm)
 	}
 
-	go runners.AutoCompile(gctx.Context, tlsc.DefaultClient(), compiledirs, rundirs)
+	go runners.AutoCompileReserved(gctx.Context, tlsc.DefaultClient(), authclient, compiledirs, rundirs)
 
 	if _, found := os.LookupEnv("SSH_AUTH_SOCK"); !found {
 		if err = daemons.SSHAgent(gctx, t.SSHAgentPath); err != nil {
@@ -169,6 +169,7 @@ func (t daemon) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, keygen cmdopt
 
 	return runners.Queue(
 		ctx,
+		authclient,
 		rm,
 		runners.QueueOptionCompletion(
 			runners.NewCompletionClient(authclient),

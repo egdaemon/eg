@@ -21,6 +21,14 @@ import (
 // for callers that predate those structured fields. Pass an empty reader
 // when neither applies; the part itself must still be present.
 func NewWorkloadRequest(resp *EnqueuedDequeueResponse, environ io.Reader) (mimetype string, body io.ReadCloser, err error) {
+	return NewWorkloadRequestToken(resp, "", environ)
+}
+
+// NewWorkloadRequestToken builds the same body as NewWorkloadRequest plus a
+// "token" field carrying the candidate token the control plane issued for the
+// runner, which the runner presents when reserving the workload and reporting
+// its status.
+func NewWorkloadRequestToken(resp *EnqueuedDequeueResponse, token string, environ io.Reader) (mimetype string, body io.ReadCloser, err error) {
 	return httpx.Multipart(func(w *multipart.Writer) error {
 		encoded, lerr := json.Marshal(resp)
 		if lerr != nil {
@@ -29,6 +37,12 @@ func NewWorkloadRequest(resp *EnqueuedDequeueResponse, environ io.Reader) (mimet
 
 		if lerr = w.WriteField("enqueued", string(encoded)); lerr != nil {
 			return errorsx.Wrap(lerr, "unable to copy enqueued metadata")
+		}
+
+		if token != "" {
+			if lerr = w.WriteField("token", token); lerr != nil {
+				return errorsx.Wrap(lerr, "unable to copy candidate token")
+			}
 		}
 
 		part, lerr := w.CreatePart(httpx.NewMultipartHeader("text/plain", "environ", eg.EnvironFile))

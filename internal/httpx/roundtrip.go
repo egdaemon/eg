@@ -237,6 +237,25 @@ func (t RetryTransport) RoundTrip(req *http.Request) (resp *http.Response, err e
 	return t.Delegate.RoundTrip(req)
 }
 
+type fixedStatusTransport struct {
+	code int
+}
+
+// RoundTrip implements http.RoundTripper
+func (t fixedStatusTransport) RoundTrip(r *http.Request) (*http.Response, error) {
+	return &http.Response{
+		StatusCode: t.code,
+		Body:       http.NoBody,
+		Header:     make(http.Header),
+		Request:    r,
+	}, nil
+}
+
+// NewFixedStatusClient returns an http.Client that responds to every request with the given status code.
+func NewFixedStatusClient(code int) *http.Client {
+	return &http.Client{Transport: fixedStatusTransport{code: code}}
+}
+
 func RewriteHostTransport(dst *url.URL, d http.RoundTripper) http.RoundTripper {
 	if d == nil {
 		d = http.DefaultTransport

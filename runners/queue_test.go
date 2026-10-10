@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -20,6 +21,7 @@ import (
 	"github.com/egdaemon/eg/internal/debugx"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/fsx"
+	"github.com/egdaemon/eg/internal/httpx"
 	"github.com/egdaemon/eg/internal/md5x"
 	"github.com/egdaemon/eg/internal/testx"
 	"github.com/egdaemon/eg/runners"
@@ -62,7 +64,7 @@ func TestQueue(t *testing.T) {
 		reload := make(chan error, 1)
 		ctx, done := context.WithCancelCause(t.Context())
 		c := completion{done: done}
-		err := runners.RunOne(ctx, 99, 0, rm, &dirs, reload, runners.QueueOptionCompletion(&c), runners.QueueOptionLogVerbosity(4))
+		err := runners.RunOne(ctx, 99, 0, httpx.NewFixedStatusClient(http.StatusNotImplemented), rm, &dirs, reload, runners.QueueOptionCompletion(&c), runners.QueueOptionLogVerbosity(4))
 		require.ErrorIs(t, err, context.Canceled)
 
 		// Ensure the workload directory is gone
@@ -91,7 +93,7 @@ func TestQueue(t *testing.T) {
 		reload := make(chan error, 1)
 		ctx, done := context.WithCancelCause(t.Context())
 		c := completion{done: done}
-		err = runners.RunOne(ctx, 99, 0, rm, &dirs, reload, runners.QueueOptionCompletion(&c), runners.QueueOptionLogVerbosity(4))
+		err = runners.RunOne(ctx, 99, 0, httpx.NewFixedStatusClient(http.StatusNotImplemented), rm, &dirs, reload, runners.QueueOptionCompletion(&c), runners.QueueOptionLogVerbosity(4))
 		require.ErrorIs(t, err, context.Canceled)
 	})
 
@@ -105,7 +107,7 @@ func TestQueue(t *testing.T) {
 		defer _done()
 
 		c := completion{done: func(cause error) {}}
-		err := runners.RunOne(ctx, 99, 0, rm, &dirs, reload, runners.QueueOptionCompletion(&c), runners.QueueOptionLogVerbosity(4))
+		err := runners.RunOne(ctx, 99, 0, httpx.NewFixedStatusClient(http.StatusNotImplemented), rm, &dirs, reload, runners.QueueOptionCompletion(&c), runners.QueueOptionLogVerbosity(4))
 		require.ErrorIs(t, err, context.DeadlineExceeded)
 
 		// Ensure the workload directory is gone
@@ -137,11 +139,11 @@ func TestQueue(t *testing.T) {
 		wg.Add(2)
 		go func() {
 			defer wg.Done()
-			err1 = runners.RunOne(ctx1, 0, 0, rm, &dirs, reload, runners.QueueOptionCompletion(&c1))
+			err1 = runners.RunOne(ctx1, 0, 0, httpx.NewFixedStatusClient(http.StatusNotImplemented), rm, &dirs, reload, runners.QueueOptionCompletion(&c1))
 		}()
 		go func() {
 			defer wg.Done()
-			err2 = runners.RunOne(ctx2, 1, 0, rm, &dirs, reload, runners.QueueOptionCompletion(&c2))
+			err2 = runners.RunOne(ctx2, 1, 0, httpx.NewFixedStatusClient(http.StatusNotImplemented), rm, &dirs, reload, runners.QueueOptionCompletion(&c2))
 		}()
 		wg.Wait()
 
@@ -171,7 +173,7 @@ func TestQueue(t *testing.T) {
 
 		uploaded := false
 		c := completion{done: func(cause error) { uploaded = true }}
-		err := runners.RunOne(ctx, 99, 0, rm, &dirs, reload, runners.QueueOptionCompletion(&c), runners.QueueOptionLogVerbosity(4))
+		err := runners.RunOne(ctx, 99, 0, httpx.NewFixedStatusClient(http.StatusNotImplemented), rm, &dirs, reload, runners.QueueOptionCompletion(&c), runners.QueueOptionLogVerbosity(4))
 		require.ErrorIs(t, err, context.DeadlineExceeded)
 		require.False(t, uploaded, "workload should not have run while every repo bucket was already claimed")
 
@@ -215,11 +217,11 @@ func TestQueue(t *testing.T) {
 		wg.Add(2)
 		go func() {
 			defer wg.Done()
-			err1 = runners.RunOne(ctx1, 0, 0, rm, &dirs, reload, runners.QueueOptionCompletion(&c1))
+			err1 = runners.RunOne(ctx1, 0, 0, httpx.NewFixedStatusClient(http.StatusNotImplemented), rm, &dirs, reload, runners.QueueOptionCompletion(&c1))
 		}()
 		go func() {
 			defer wg.Done()
-			err2 = runners.RunOne(ctx2, 1, 0, rm, &dirs, reload, runners.QueueOptionCompletion(&c2))
+			err2 = runners.RunOne(ctx2, 1, 0, httpx.NewFixedStatusClient(http.StatusNotImplemented), rm, &dirs, reload, runners.QueueOptionCompletion(&c2))
 		}()
 		wg.Wait()
 
@@ -240,7 +242,7 @@ func TestQueue(t *testing.T) {
 
 		reload := make(chan error, 1)
 		ctx, done := context.WithCancelCause(t.Context())
-		err := runners.RunOne(ctx, 99, 0, rm, &dirs, reload, runners.QueueOptionLogVerbosity(4), runners.QueueOptionFailure(done))
+		err := runners.RunOne(ctx, 99, 0, httpx.NewFixedStatusClient(http.StatusNotImplemented), rm, &dirs, reload, runners.QueueOptionLogVerbosity(4), runners.QueueOptionFailure(done))
 		require.ErrorIs(t, err, context.Canceled)
 
 		expected := new(fs.PathError)

@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -25,7 +26,7 @@ func TestEnqueueHandler(t *testing.T) {
 			Enqueued:    &runners.Enqueued{Id: uuid.Must(uuid.NewV7()).String(), VcsUri: "https://example.com/repo.git", VcsCommit: "deadbeef", Cores: 1},
 			AccessToken: "tok",
 		}
-		mimetype, body, err := runners.NewWorkloadRequest(&enqresp, strings.NewReader(""))
+		mimetype, body, err := runners.NewWorkloadRequestToken(&enqresp, "candidate", strings.NewReader(""))
 		require.NoError(t, err)
 		defer body.Close()
 
@@ -42,6 +43,31 @@ func TestEnqueueHandler(t *testing.T) {
 		entries, err := os.ReadDir(h.Dirs.Queued)
 		require.NoError(t, err)
 		require.Len(t, entries, 1)
+		require.Equal(t, "candidate", runners.ReadCandidateToken(filepath.Join(h.Dirs.Queued, entries[0].Name())))
+	})
+
+	t.Run("requests without a candidate token are rejected without touching the spool", func(t *testing.T) {
+		h := &daemons.EnqueueHandler{
+			Dirs: runners.NewSpoolDir(t.TempDir()),
+			RM:   runners.NewResourceManager(runners.RuntimeResources{Cores: 10, Memory: 10, Vram: 10}),
+		}
+
+		enqresp := runners.EnqueuedDequeueResponse{
+			Enqueued: &runners.Enqueued{Id: uuid.Must(uuid.NewV7()).String(), VcsUri: "https://example.com/repo.git", VcsCommit: "deadbeef", Cores: 1},
+		}
+		mimetype, body, err := runners.NewWorkloadRequest(&enqresp, strings.NewReader(""))
+		require.NoError(t, err)
+		defer body.Close()
+
+		r := httptest.NewRequest(http.MethodPost, "/c/enqueue", body)
+		r.Header.Set("Content-Type", mimetype)
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, r)
+		require.Equal(t, http.StatusBadRequest, w.Code)
+
+		entries, err := os.ReadDir(h.Dirs.Downloading)
+		require.NoError(t, err)
+		require.Empty(t, entries)
 	})
 
 	t.Run("requests that would exceed target load are rejected without touching the spool", func(t *testing.T) {

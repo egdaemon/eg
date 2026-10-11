@@ -22,6 +22,7 @@ import (
 	"github.com/egdaemon/eg/internal/libp2px"
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/libp2p/go-libp2p/core/host"
+	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/peerstore"
 	"github.com/libp2p/go-libp2p/core/protocol"
@@ -125,11 +126,6 @@ func candidateRelay(token string) []string {
 // error means the runner declined the workload (i.e. it is at capacity); try
 // the next candidate.
 func Upload(ctx context.Context, p2p host.Host, candidate *compute.Compute, req *EnqueuedDequeueResponse, archive, environ io.ReadSeeker) (accepted bool, err error) {
-	pid, err := peer.Decode(candidate.P2Pid)
-	if err != nil {
-		return false, fmt.Errorf("invalid peer id %q: %w", candidate.P2Pid, err)
-	}
-
 	if err = iox.Rewind(archive); err != nil {
 		return false, errorsx.Wrap(err, "unable to rewind archive")
 	}
@@ -138,23 +134,9 @@ func Upload(ctx context.Context, p2p host.Host, candidate *compute.Compute, req 
 		return false, errorsx.Wrap(err, "unable to rewind environ")
 	}
 
-	// candidates only carry the peer id; without addresses the routed host
-	// falls back to a dht lookup. reach the runner through the relay holding its
-	// reservation (carried by the candidate token), and the relays we're connected
-	// to, instead. hole punching upgrades it to a direct connection.
-	if len(p2p.Peerstore().Addrs(pid)) == 0 {
-		addrs := append(libp2px.RelayCircuitAddrs(candidateRelay(candidate.Token)...), libp2px.CircuitAddrs(p2p)...)
-		p2p.Peerstore().AddAddrs(pid, addrs, peerstore.TempAddrTTL)
-	}
-
-	debugx.Println("direct upload dialing", candidate.Id, pid, p2p.Peerstore().Addrs(pid))
-
-	dctx, done := context.WithTimeout(ctx, dialTimeout)
-	defer done()
-
-	stream, err := p2p.NewStream(dctx, pid, proxyProtocol)
+	stream, err := dialRunner(ctx, p2p, candidate)
 	if err != nil {
-		return false, fmt.Errorf("unable to open stream to %s: %w", candidate.P2Pid, err)
+		return false, err
 	}
 	defer stream.Close()
 
@@ -184,7 +166,7 @@ func Upload(ctx context.Context, p2p host.Host, candidate *compute.Compute, req 
 	}
 	defer resp.Body.Close()
 
-	debugx.Println("direct upload response", candidate.Id, pid, resp.Status)
+	debugx.Println("direct upload response", candidate.Id, stream.Conn().RemotePeer(), resp.Status)
 
 	if httpx.IsSuccess(resp.StatusCode) {
 		return true, nil
@@ -196,4 +178,70 @@ func Upload(ctx context.Context, p2p host.Host, candidate *compute.Compute, req 
 
 	b, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<10))
 	return false, fmt.Errorf("runner rejected upload with status %d: %s", resp.StatusCode, string(b))
+}
+
+// dialRunner opens a stream to the candidate runner's http proxy over p2p.
+func dialRunner(ctx context.Context, p2p host.Host, candidate *compute.Compute) (network.Stream, error) {
+	pid, err := peer.Decode(candidate.P2Pid)
+	if err != nil {
+		return nil, fmt.Errorf("invalid peer id %q: %w", candidate.P2Pid, err)
+	}
+
+	// candidates only carry the peer id; without addresses the routed host
+	// falls back to a dht lookup. reach the runner through the relay holding its
+	// reservation (carried by the candidate token), and the relays we're connected
+	// to, instead. hole punching upgrades it to a direct connection.
+	if len(p2p.Peerstore().Addrs(pid)) == 0 {
+		addrs := append(libp2px.RelayCircuitAddrs(candidateRelay(candidate.Token)...), libp2px.CircuitAddrs(p2p)...)
+		p2p.Peerstore().AddAddrs(pid, addrs, peerstore.TempAddrTTL)
+	}
+
+	debugx.Println("dialing runner", candidate.Id, pid, p2p.Peerstore().Addrs(pid))
+
+	dctx, done := context.WithTimeout(ctx, dialTimeout)
+	defer done()
+
+	stream, err := p2p.NewStream(dctx, pid, proxyProtocol)
+	if err != nil {
+		return nil, fmt.Errorf("unable to open stream to %s: %w", candidate.P2Pid, err)
+	}
+	return stream, nil
+}
+
+// FollowLogs streams the log of workload id from the candidate runner into dst
+// as it is written, until the workload completes or ctx is cancelled. token is a
+// log token for the workload issued by the control plane; offset resumes the stream
+// from the given byte offset.
+func FollowLogs(ctx context.Context, p2p host.Host, candidate *compute.Compute, id string, token string, offset int64, dst io.Writer) (err error) {
+	stream, err := dialRunner(ctx, p2p, candidate)
+	if err != nil {
+		return err
+	}
+	defer stream.Close()
+
+	// no deadline; the stream lives as long as the workload. cancelling ctx closes it.
+	stop := context.AfterFunc(ctx, func() { _ = stream.Reset() })
+	defer stop()
+
+	httpreq, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("http://runner/c/logs/%s?offset=%d", url.PathEscape(id), offset), nil)
+	if err != nil {
+		return err
+	}
+	httpreq.Header.Set("Authorization", token)
+
+	if err = httpreq.Write(stream); err != nil {
+		return fmt.Errorf("unable to write request over stream: %w", err)
+	}
+
+	resp, err := httpx.AsError(http.ReadResponse(bufio.NewReader(stream), httpreq))
+	defer func() { errorsx.Log(httpx.AutoClose(resp)) }()
+	if err != nil {
+		return errorsx.Wrap(err, "unable to stream logs")
+	}
+
+	if _, err = io.Copy(dst, resp.Body); ctx.Err() != nil {
+		return ctx.Err()
+	}
+
+	return errorsx.Wrap(err, "log stream interrupted")
 }

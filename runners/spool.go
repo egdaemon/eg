@@ -64,6 +64,32 @@ func DefaultSpoolDirs() SpoolDirs {
 	return NewSpoolDir(userx.DefaultCacheDirectory("spool"))
 }
 
+// Path to the running directory of the workload uid.
+func (t SpoolDirs) Path(uid uuid.UUID) SpoolPath {
+	return SpoolPath{dir: filepath.Join(t.Running, Queued().Dirname(uid))}
+}
+
+// Locate the spool directory currently holding the workload uid.
+func (t SpoolDirs) Locate(uid uuid.UUID) (dir string, ok bool) {
+	for _, root := range []string{t.Downloading, t.Queued, t.Running} {
+		dir = filepath.Join(root, Queued().Dirname(uid))
+		if _, err := os.Stat(dir); err == nil {
+			return dir, true
+		}
+	}
+
+	return "", false
+}
+
+type SpoolPath struct {
+	dir string
+}
+
+// Resolve a path within the spool directory.
+func (t SpoolPath) Resolve(parts ...string) string {
+	return filepath.Join(append([]string{t.dir}, parts...)...)
+}
+
 func Queued() queued {
 	return queued{}
 }

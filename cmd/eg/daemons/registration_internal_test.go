@@ -35,4 +35,25 @@ func TestGenRegistration(t *testing.T) {
 		require.Equal(t, uint64(runtimecfg.Vram), reg.Vram)
 		require.Equal(t, runtimecfg.Labels, reg.Labels)
 	})
+
+	t.Run("includes the runner jwt secret", func(t *testing.T) {
+		priv, _, err := sshx.NewKeyGenSeeded(t.Name()).Generate()
+		require.NoError(t, err)
+		s, err := ssh.ParsePrivateKey(priv)
+		require.NoError(t, err)
+
+		reg := genregistration(s, peer.ID("derp"), &cmdopts.RuntimeResources{})
+		require.Len(t, reg.Jwtsecret, 64)
+		require.Equal(t, JWTSecret()(), reg.Jwtsecret)
+	})
+}
+
+func TestJWTSecret(t *testing.T) {
+	t.Run("is stable within a process", func(t *testing.T) {
+		require.Equal(t, JWTSecret()(), JWTSecret()())
+	})
+
+	t.Run("is not zeroed", func(t *testing.T) {
+		require.NotEqual(t, make([]byte, 64), JWTSecret()())
+	})
 }

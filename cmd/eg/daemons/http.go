@@ -13,14 +13,14 @@ import (
 	"github.com/justinas/alice"
 )
 
-// uploadable gates the runner's push HTTP surface (POST /c/upload, POST /c/enqueue).
+// uploadable gates the runner's push HTTP surface (POST /c/upload, POST /c/enqueue, GET /c/logs/{id}).
 func HTTP(global *cmdopts.Global, httpl net.Listener, rm *runners.ResourceManager, compiledirs runners.SpoolDirs, reserver Reserver, uploadable bool) (err error) {
 	httpmux := mux.NewRouter()
 	httpmux.NotFoundHandler = alice.New(httpx.RouteInvoked).ThenFunc(httpx.NotFound)
 
 	httpmux.HandleFunc("/healthz", httpx.Healthz(envx.Int(http.StatusOK, cmdopts.EnvHealthzCode))).Methods("GET")
 
-	// gates the runner's push HTTP surface (POST /c/upload, POST /c/enqueue).
+	// gates the runner's push HTTP surface (POST /c/upload, POST /c/enqueue, GET /c/logs/{id}).
 	apigate := httpx.GatedResponse(uploadable, http.StatusForbidden)
 
 	// POST /c/upload accepts a pre-built kernel archive + environment file
@@ -37,6 +37,11 @@ func HTTP(global *cmdopts.Global, httpl net.Listener, rm *runners.ResourceManage
 	// on current load. See http.enqueue.go for the (independently testable)
 	// handler implementation.
 	httpmux.Handle("/c/enqueue", alice.New(httpx.RouteInvoked, apigate).Then(NewEnqueueHandler(compiledirs, rm))).Methods(http.MethodPost)
+
+	// GET /c/logs/{id} streams a workload's log as it is written (tail -f),
+	// authorized by a log token signed with this runner's secret. See
+	// http.logs.go for the (independently testable) handler implementation.
+	httpmux.Handle("/c/logs/{id}", alice.New(httpx.RouteInvoked, apigate).Then(NewLogsHandler())).Methods(http.MethodGet)
 
 	global.Cleanup.Go(func() {
 		defer global.Shutdown(nil)

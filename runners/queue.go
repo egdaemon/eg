@@ -48,6 +48,9 @@ import (
 const (
 	workdirname = "work"
 
+	// DaemonLogName is the file within a workload's runtime directory its output is written to.
+	DaemonLogName = "daemon.log"
+
 	// cachedirs is how many concurrent cache/lock buckets a repo may
 	// claim at once; a workload only defers once all of them are claimed.
 	cachedirs = 8
@@ -639,7 +642,7 @@ func (t staterunning) Update(ctx context.Context) state {
 		err           error
 		logdst        *os.File
 		containerdir  = userx.DefaultCacheDirectory("wcache", cacheprefix(t.workload), t.bucket, "containers")
-		logpath       = filepath.Join(t.ws.RuntimeDir, "daemon.log")
+		logpath       = filepath.Join(t.ws.RuntimeDir, DaemonLogName)
 		analyticspath = filepath.Join(t.ws.RuntimeDir, "analytics.db")
 	)
 
@@ -702,7 +705,7 @@ type statecompleted struct {
 
 func (t statecompleted) Update(ctx context.Context) state {
 	var (
-		logpath       = filepath.Join(t.ws.RuntimeDir, "daemon.log")
+		logpath       = filepath.Join(t.ws.RuntimeDir, DaemonLogName)
 		analyticspath = filepath.Join(t.ws.RuntimeDir, "analytics.db")
 	)
 

@@ -2,7 +2,9 @@ package runners
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -10,9 +12,12 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/egdaemon/eg"
+	"github.com/egdaemon/eg/compute"
 	"github.com/egdaemon/eg/internal/fsx"
+	"github.com/egdaemon/eg/internal/tarx"
 	"github.com/go-git/go-git/v6"
 	"github.com/go-git/go-git/v6/plumbing/object"
 	"github.com/gofrs/uuid/v5"
@@ -55,11 +60,17 @@ func newLocalSourceRepo(t *testing.T) (uri, ref string) {
 }
 
 func TestCompileWorkload(t *testing.T) {
-	t.Run("compiles a local source ref and hands it directly to rundirs.Queued, bypassing Downloading", func(t *testing.T) {
+	t.Run("compiles a local source ref and enqueues it into rundirs", func(t *testing.T) {
 		uri, ref := newLocalSourceRepo(t)
 
 		compiledirs := NewSpoolDir(t.TempDir())
 		rundirs := NewSpoolDir(t.TempDir())
+
+		vcsaccess := &http.Client{Transport: roundtripper(func(r *http.Request) (*http.Response, error) {
+			w := httptest.NewRecorder()
+			require.NoError(t, json.NewEncoder(w).Encode(&compute.GitCredentialsHTTP{Username: "git", Password: "short-lived"}))
+			return w.Result(), nil
+		})}
 
 		uid := uuid.Must(uuid.NewV7())
 		req := EnqueuedDequeueResponse{
@@ -68,18 +79,20 @@ func TestCompileWorkload(t *testing.T) {
 				VcsCommit: ref,
 				Cores:     1,
 			},
+			AccessToken: "token",
 		}
 		encoded, err := json.Marshal(&req)
 		require.NoError(t, err)
 		require.NoError(t, compiledirs.Download(uid, "metadata.json", bytes.NewReader(encoded)))
+		require.NoError(t, compiledirs.Download(uid, eg.EnvironFile, strings.NewReader(fmt.Sprintf("%s=%s\n%s=%s\n", eg.EnvGitHeadURI, uri, eg.EnvGitHeadRef, ref))))
 		require.NoError(t, compiledirs.Enqueue(uid))
 
 		dir, err := compiledirs.Dequeue()
 		require.NoError(t, err)
 
-		require.NoError(t, compileWorkload(t.Context(), http.DefaultClient, dir, rundirs))
+		require.NoError(t, compileWorkload(t.Context(), vcsaccess, dir, rundirs))
 
-		// bypasses rundirs.Downloading entirely.
+		// nothing is left staged in rundirs.Downloading.
 		dentries, err := os.ReadDir(rundirs.Downloading)
 		require.NoError(t, err)
 		require.Empty(t, dentries)
@@ -101,35 +114,226 @@ func TestCompileWorkload(t *testing.T) {
 		require.NotEmpty(t, resp.Enqueued.Entry)
 		require.Equal(t, ref, resp.Enqueued.VcsCommit)
 
-		// clone artifacts are cleaned up, not left behind in the run directory.
-		require.NoDirExists(t, filepath.Join(target, "src"))
+		// only what the run stage consumes is handed off.
+		tentries, err := os.ReadDir(target)
+		require.NoError(t, err)
+		names := make([]string, 0, len(tentries))
+		for _, e := range tentries {
+			names = append(names, e.Name())
+		}
+		require.ElementsMatch(t, []string{"metadata.json", "archive.tar.gz"}, names)
 
-		// the incoming request environment is overwritten by the outgoing
-		// workload environment once cloning is done, so any credentials it
-		// carried don't linger.
-		outgoing, err := os.ReadFile(filepath.Join(target, eg.EnvironFile))
+		// the outgoing workload environment travels in the archive, without
+		// any credentials.
+		archive, err := os.Open(filepath.Join(target, "archive.tar.gz"))
+		require.NoError(t, err)
+		defer archive.Close()
+		unpacked := t.TempDir()
+		require.NoError(t, tarx.Unpack(unpacked, archive))
+		outgoing, err := os.ReadFile(filepath.Join(unpacked, eg.EnvironFile))
 		require.NoError(t, err)
 		require.NotContains(t, string(outgoing), "EG_GIT_AUTH_ACCESS_TOKEN")
-
-		// the compile-side job directory is gone -- it was renamed, not copied.
-		require.NoDirExists(t, dir)
 	})
 
 	t.Run("failed compiles are discarded and never reach rundirs.Queued", func(t *testing.T) {
 		compiledirs := NewSpoolDir(t.TempDir())
 		rundirs := NewSpoolDir(t.TempDir())
 
+		vcsaccess := &http.Client{Transport: roundtripper(func(r *http.Request) (*http.Response, error) {
+			w := httptest.NewRecorder()
+			require.NoError(t, json.NewEncoder(w).Encode(&compute.GitCredentialsHTTP{Username: "git", Password: "short-lived"}))
+			return w.Result(), nil
+		})}
+
+		missing := filepath.Join(t.TempDir(), "does-not-exist")
 		uid := uuid.Must(uuid.NewV7())
-		req := EnqueuedDequeueResponse{Enqueued: &Enqueued{VcsUri: filepath.Join(t.TempDir(), "does-not-exist")}}
+		req := EnqueuedDequeueResponse{Enqueued: &Enqueued{VcsUri: missing}, AccessToken: "token"}
 		encoded, err := json.Marshal(&req)
 		require.NoError(t, err)
 		require.NoError(t, compiledirs.Download(uid, "metadata.json", bytes.NewReader(encoded)))
+		require.NoError(t, compiledirs.Download(uid, eg.EnvironFile, strings.NewReader(fmt.Sprintf("%s=%s\n%s=%s\n", eg.EnvGitHeadURI, missing, eg.EnvGitHeadRef, "main"))))
+		require.NoError(t, compiledirs.Enqueue(uid))
+
+		dir, err := compiledirs.Dequeue()
+		require.NoError(t, err)
+
+		require.Error(t, compileWorkload(t.Context(), vcsaccess, dir, rundirs))
+
+		qentries, err := os.ReadDir(rundirs.Queued)
+		require.NoError(t, err)
+		require.Empty(t, qentries)
+	})
+
+	t.Run("exchanges the access token for git credentials before cloning", func(t *testing.T) {
+		uri, ref := newLocalSourceRepo(t)
+
+		compiledirs := NewSpoolDir(t.TempDir())
+		rundirs := NewSpoolDir(t.TempDir())
+
+		var exchanged []string
+		vcsaccess := &http.Client{Transport: roundtripper(func(r *http.Request) (*http.Response, error) {
+			w := httptest.NewRecorder()
+			if !strings.HasSuffix(r.URL.Path, "/r/vcsaccess/") {
+				t.Errorf("unexpected vcs access request: %s", r.URL.Path)
+				w.WriteHeader(http.StatusNotFound)
+				return w.Result(), nil
+			}
+
+			exchanged = append(exchanged, r.Header.Get("Authorization"))
+			require.NoError(t, json.NewEncoder(w).Encode(&compute.GitCredentialsHTTP{Username: "git", Password: "short-lived"}))
+			return w.Result(), nil
+		})}
+
+		uid := uuid.Must(uuid.NewV7())
+		req := EnqueuedDequeueResponse{
+			Enqueued:    &Enqueued{VcsUri: uri, VcsCommit: ref, Cores: 1},
+			AccessToken: "token",
+		}
+		encoded, err := json.Marshal(&req)
+		require.NoError(t, err)
+		require.NoError(t, compiledirs.Download(uid, "metadata.json", bytes.NewReader(encoded)))
+		require.NoError(t, compiledirs.Download(uid, eg.EnvironFile, strings.NewReader(fmt.Sprintf("%s=%s\n%s=%s\n", eg.EnvGitHeadURI, uri, eg.EnvGitHeadRef, ref))))
+		require.NoError(t, compiledirs.Enqueue(uid))
+
+		dir, err := compiledirs.Dequeue()
+		require.NoError(t, err)
+
+		require.NoError(t, compileWorkload(t.Context(), vcsaccess, dir, rundirs))
+		require.Equal(t, []string{"BEARER token"}, exchanged)
+
+		// the short-lived credentials are only needed to clone, they don't
+		// travel with the workload.
+		target := filepath.Join(rundirs.Queued, filepath.Base(dir))
+		require.DirExists(t, target)
+		require.NoFileExists(t, filepath.Join(target, "vcsaccess.token"))
+	})
+
+	t.Run("never writes the exchanged credentials to disk", func(t *testing.T) {
+		compiledirs := NewSpoolDir(t.TempDir())
+		rundirs := NewSpoolDir(t.TempDir())
+
+		var exchanged []string
+		vcsaccess := &http.Client{Transport: roundtripper(func(r *http.Request) (*http.Response, error) {
+			w := httptest.NewRecorder()
+			exchanged = append(exchanged, r.Header.Get("Authorization"))
+			require.NoError(t, json.NewEncoder(w).Encode(&compute.GitCredentialsHTTP{Username: "git", Password: "short-lived"}))
+			return w.Result(), nil
+		})}
+
+		// the clone fails, leaving the job directory in place to inspect.
+		missing := filepath.Join(t.TempDir(), "does-not-exist")
+		uid := uuid.Must(uuid.NewV7())
+		req := EnqueuedDequeueResponse{
+			Enqueued:    &Enqueued{VcsUri: missing},
+			AccessToken: "token",
+		}
+		encoded, err := json.Marshal(&req)
+		require.NoError(t, err)
+		require.NoError(t, compiledirs.Download(uid, "metadata.json", bytes.NewReader(encoded)))
+		require.NoError(t, compiledirs.Download(uid, eg.EnvironFile, strings.NewReader(fmt.Sprintf("%s=%s\n%s=%s\n", eg.EnvGitHeadURI, missing, eg.EnvGitHeadRef, "main"))))
+		require.NoError(t, compiledirs.Enqueue(uid))
+
+		dir, err := compiledirs.Dequeue()
+		require.NoError(t, err)
+
+		require.Error(t, compileWorkload(t.Context(), vcsaccess, dir, rundirs))
+		require.Equal(t, []string{"BEARER token"}, exchanged)
+		require.NoFileExists(t, filepath.Join(dir, "vcsaccess.token"))
+		require.NoFileExists(t, filepath.Join(dir, "src", "vcsaccess.token"))
+	})
+
+	t.Run("clones the head uri/ref from the submitted environ", func(t *testing.T) {
+		uri, ref := newLocalSourceRepo(t)
+
+		compiledirs := NewSpoolDir(t.TempDir())
+		rundirs := NewSpoolDir(t.TempDir())
+
+		repo, err := git.PlainOpen(uri)
+		require.NoError(t, err)
+		head, err := repo.Head()
+		require.NoError(t, err)
+
+		vcsaccess := &http.Client{Transport: roundtripper(func(r *http.Request) (*http.Response, error) {
+			w := httptest.NewRecorder()
+			require.NoError(t, json.NewEncoder(w).Encode(&compute.GitCredentialsHTTP{Username: "git", Password: "short-lived"}))
+			return w.Result(), nil
+		})}
+
+		// mirrors what egmeta pushes: the canonical vcs uri and commit, which
+		// are not directly cloneable, alongside the clone uri and ref.
+		uid := uuid.Must(uuid.NewV7())
+		req := EnqueuedDequeueResponse{
+			Enqueued:    &Enqueued{VcsUri: "git@github.com:example/nope.git", VcsCommit: head.Hash().String(), Cores: 1},
+			AccessToken: "token",
+		}
+		encoded, err := json.Marshal(&req)
+		require.NoError(t, err)
+		require.NoError(t, compiledirs.Download(uid, "metadata.json", bytes.NewReader(encoded)))
+		require.NoError(t, compiledirs.Download(uid, eg.EnvironFile, strings.NewReader(fmt.Sprintf("%s=%s\n%s=%s\n", eg.EnvGitHeadURI, uri, eg.EnvGitHeadRef, ref))))
+		require.NoError(t, compiledirs.Enqueue(uid))
+
+		dir, err := compiledirs.Dequeue()
+		require.NoError(t, err)
+
+		require.NoError(t, compileWorkload(t.Context(), vcsaccess, dir, rundirs))
+
+		archive, err := os.Open(filepath.Join(rundirs.Queued, filepath.Base(dir), "archive.tar.gz"))
+		require.NoError(t, err)
+		defer archive.Close()
+		unpacked := t.TempDir()
+		require.NoError(t, tarx.Unpack(unpacked, archive))
+		outgoing, err := os.ReadFile(filepath.Join(unpacked, eg.EnvironFile))
+		require.NoError(t, err)
+		require.Contains(t, string(outgoing), eg.EnvGitHeadURI+"="+uri)
+	})
+
+	t.Run("fails when the submitted environ lacks the head uri/ref", func(t *testing.T) {
+		uri, ref := newLocalSourceRepo(t)
+
+		compiledirs := NewSpoolDir(t.TempDir())
+		rundirs := NewSpoolDir(t.TempDir())
+
+		uid := uuid.Must(uuid.NewV7())
+		req := EnqueuedDequeueResponse{Enqueued: &Enqueued{VcsUri: uri, VcsCommit: ref, Cores: 1}}
+		encoded, err := json.Marshal(&req)
+		require.NoError(t, err)
+		require.NoError(t, compiledirs.Download(uid, "metadata.json", bytes.NewReader(encoded)))
+		require.NoError(t, compiledirs.Download(uid, eg.EnvironFile, strings.NewReader("")))
 		require.NoError(t, compiledirs.Enqueue(uid))
 
 		dir, err := compiledirs.Dequeue()
 		require.NoError(t, err)
 
 		require.Error(t, compileWorkload(t.Context(), http.DefaultClient, dir, rundirs))
+
+		qentries, err := os.ReadDir(rundirs.Queued)
+		require.NoError(t, err)
+		require.Empty(t, qentries)
+	})
+
+	t.Run("fails without an access token", func(t *testing.T) {
+		uri, ref := newLocalSourceRepo(t)
+
+		compiledirs := NewSpoolDir(t.TempDir())
+		rundirs := NewSpoolDir(t.TempDir())
+
+		vcsaccess := &http.Client{Transport: roundtripper(func(r *http.Request) (*http.Response, error) {
+			t.Errorf("unexpected vcs access request: %s", r.URL.Path)
+			return httptest.NewRecorder().Result(), nil
+		})}
+
+		uid := uuid.Must(uuid.NewV7())
+		req := EnqueuedDequeueResponse{Enqueued: &Enqueued{VcsUri: uri, VcsCommit: ref, Cores: 1}}
+		encoded, err := json.Marshal(&req)
+		require.NoError(t, err)
+		require.NoError(t, compiledirs.Download(uid, "metadata.json", bytes.NewReader(encoded)))
+		require.NoError(t, compiledirs.Download(uid, eg.EnvironFile, strings.NewReader(fmt.Sprintf("%s=%s\n%s=%s\n", eg.EnvGitHeadURI, uri, eg.EnvGitHeadRef, ref))))
+		require.NoError(t, compiledirs.Enqueue(uid))
+
+		dir, err := compiledirs.Dequeue()
+		require.NoError(t, err)
+
+		require.Error(t, compileWorkload(t.Context(), vcsaccess, dir, rundirs))
 
 		qentries, err := os.ReadDir(rundirs.Queued)
 		require.NoError(t, err)
@@ -192,10 +396,11 @@ func (t roundtripper) RoundTrip(r *http.Request) (*http.Response, error) {
 }
 
 func TestCompileWorkloadReserved(t *testing.T) {
-	spool := func(t *testing.T, compiledirs SpoolDirs, uid uuid.UUID, req *EnqueuedDequeueResponse) string {
+	spool := func(t *testing.T, compiledirs SpoolDirs, uid uuid.UUID, req *EnqueuedDequeueResponse, environ string) string {
 		encoded, err := json.Marshal(req)
 		require.NoError(t, err)
 		require.NoError(t, compiledirs.Download(uid, "metadata.json", bytes.NewReader(encoded)))
+		require.NoError(t, compiledirs.Download(uid, eg.EnvironFile, strings.NewReader(environ)))
 		require.NoError(t, compiledirs.Download(uid, CandidateTokenFile, strings.NewReader("candidate")))
 		require.NoError(t, compiledirs.Enqueue(uid))
 
@@ -218,11 +423,18 @@ func TestCompileWorkloadReserved(t *testing.T) {
 			},
 		}
 
-		dir := spool(t, compiledirs, uid, &EnqueuedDequeueResponse{
-			Enqueued: &Enqueued{Id: uid.String(), VcsUri: uri, VcsCommit: ref, Cores: 1},
-		})
+		vcsaccess := &http.Client{Transport: roundtripper(func(r *http.Request) (*http.Response, error) {
+			w := httptest.NewRecorder()
+			require.NoError(t, json.NewEncoder(w).Encode(&compute.GitCredentialsHTTP{Username: "git", Password: "short-lived"}))
+			return w.Result(), nil
+		})}
 
-		require.NoError(t, compileWorkloadReserved(t.Context(), http.DefaultClient, cp.Client(t), dir, rundirs))
+		dir := spool(t, compiledirs, uid, &EnqueuedDequeueResponse{
+			Enqueued:    &Enqueued{Id: uid.String(), VcsUri: uri, VcsCommit: ref, Cores: 1},
+			AccessToken: "token",
+		}, fmt.Sprintf("%s=%s\n%s=%s\n", eg.EnvGitHeadURI, uri, eg.EnvGitHeadRef, ref))
+
+		require.NoError(t, compileWorkloadReserved(t.Context(), vcsaccess, cp.Client(t), dir, rundirs))
 		require.Equal(t, []string{StatusCompiling, "reserved", StatusQueued}, cp.Calls())
 
 		target := filepath.Join(rundirs.Queued, filepath.Base(dir))
@@ -238,6 +450,36 @@ func TestCompileWorkloadReserved(t *testing.T) {
 
 		// the token travels with the workload so it can report running.
 		require.Equal(t, "candidate", ReadCandidateToken(target))
+
+		// only what the run stage consumes is handed off.
+		tentries, err := os.ReadDir(target)
+		require.NoError(t, err)
+		names := make([]string, 0, len(tentries))
+		for _, e := range tentries {
+			names = append(names, e.Name())
+		}
+		require.ElementsMatch(t, []string{"metadata.json", "archive.tar.gz", CandidateTokenFile}, names)
+	})
+
+	t.Run("pushed workloads missing the head uri/ref report failure", func(t *testing.T) {
+		uri, ref := newLocalSourceRepo(t)
+
+		compiledirs := NewSpoolDir(t.TempDir())
+		rundirs := NewSpoolDir(t.TempDir())
+
+		uid := uuid.Must(uuid.NewV7())
+		cp := &controlplane{}
+
+		dir := spool(t, compiledirs, uid, &EnqueuedDequeueResponse{
+			Enqueued: &Enqueued{Id: uid.String(), VcsUri: uri, VcsCommit: ref, Cores: 1},
+		}, "")
+
+		require.Error(t, compileWorkloadReserved(t.Context(), http.DefaultClient, cp.Client(t), dir, rundirs))
+		require.Equal(t, []string{StatusCompiling, StatusFailed}, cp.Calls())
+
+		qentries, err := os.ReadDir(rundirs.Queued)
+		require.NoError(t, err)
+		require.Empty(t, qentries)
 	})
 
 	t.Run("pushed workloads report failures", func(t *testing.T) {
@@ -247,11 +489,19 @@ func TestCompileWorkloadReserved(t *testing.T) {
 		uid := uuid.Must(uuid.NewV7())
 		cp := &controlplane{}
 
-		dir := spool(t, compiledirs, uid, &EnqueuedDequeueResponse{
-			Enqueued: &Enqueued{Id: uid.String(), VcsUri: filepath.Join(t.TempDir(), "does-not-exist")},
-		})
+		vcsaccess := &http.Client{Transport: roundtripper(func(r *http.Request) (*http.Response, error) {
+			w := httptest.NewRecorder()
+			require.NoError(t, json.NewEncoder(w).Encode(&compute.GitCredentialsHTTP{Username: "git", Password: "short-lived"}))
+			return w.Result(), nil
+		})}
 
-		require.Error(t, compileWorkloadReserved(t.Context(), http.DefaultClient, cp.Client(t), dir, rundirs))
+		missing := filepath.Join(t.TempDir(), "does-not-exist")
+		dir := spool(t, compiledirs, uid, &EnqueuedDequeueResponse{
+			Enqueued:    &Enqueued{Id: uid.String(), VcsUri: missing},
+			AccessToken: "token",
+		}, fmt.Sprintf("%s=%s\n%s=%s\n", eg.EnvGitHeadURI, missing, eg.EnvGitHeadRef, "main"))
+
+		require.Error(t, compileWorkloadReserved(t.Context(), vcsaccess, cp.Client(t), dir, rundirs))
 		require.Equal(t, []string{StatusCompiling, StatusFailed}, cp.Calls())
 
 		qentries, err := os.ReadDir(rundirs.Queued)
@@ -265,15 +515,158 @@ func TestCompileWorkloadReserved(t *testing.T) {
 		compiledirs := NewSpoolDir(t.TempDir())
 		rundirs := NewSpoolDir(t.TempDir())
 
+		vcsaccess := &http.Client{Transport: roundtripper(func(r *http.Request) (*http.Response, error) {
+			w := httptest.NewRecorder()
+			require.NoError(t, json.NewEncoder(w).Encode(&compute.GitCredentialsHTTP{Username: "git", Password: "short-lived"}))
+			return w.Result(), nil
+		})}
+
 		uid := uuid.Must(uuid.NewV7())
 		dir := spool(t, compiledirs, uid, &EnqueuedDequeueResponse{
-			Enqueued: &Enqueued{VcsUri: uri, VcsCommit: ref, Cores: 1},
-		})
+			Enqueued:    &Enqueued{VcsUri: uri, VcsCommit: ref, Cores: 1},
+			AccessToken: "token",
+		}, fmt.Sprintf("%s=%s\n%s=%s\n", eg.EnvGitHeadURI, uri, eg.EnvGitHeadRef, ref))
 
-		require.Error(t, compileWorkload(t.Context(), http.DefaultClient, dir, rundirs))
+		require.Error(t, compileWorkload(t.Context(), vcsaccess, dir, rundirs))
 
 		qentries, err := os.ReadDir(rundirs.Queued)
 		require.NoError(t, err)
 		require.Empty(t, qentries)
+	})
+
+	t.Run("pushed workloads without an access token report failure", func(t *testing.T) {
+		uri, ref := newLocalSourceRepo(t)
+
+		compiledirs := NewSpoolDir(t.TempDir())
+		rundirs := NewSpoolDir(t.TempDir())
+
+		uid := uuid.Must(uuid.NewV7())
+		cp := &controlplane{}
+
+		vcsaccess := &http.Client{Transport: roundtripper(func(r *http.Request) (*http.Response, error) {
+			t.Errorf("unexpected vcs access request: %s", r.URL.Path)
+			return httptest.NewRecorder().Result(), nil
+		})}
+
+		dir := spool(t, compiledirs, uid, &EnqueuedDequeueResponse{
+			Enqueued: &Enqueued{Id: uid.String(), VcsUri: uri, VcsCommit: ref, Cores: 1},
+		}, fmt.Sprintf("%s=%s\n%s=%s\n", eg.EnvGitHeadURI, uri, eg.EnvGitHeadRef, ref))
+
+		require.Error(t, compileWorkloadReserved(t.Context(), vcsaccess, cp.Client(t), dir, rundirs))
+		require.Equal(t, []string{StatusCompiling, StatusFailed}, cp.Calls())
+
+		qentries, err := os.ReadDir(rundirs.Queued)
+		require.NoError(t, err)
+		require.Empty(t, qentries)
+	})
+}
+
+func TestCompileN(t *testing.T) {
+	t.Run("removes the compile job directory however the job completes", func(t *testing.T) {
+		uri, ref := newLocalSourceRepo(t)
+
+		compiledirs := NewSpoolDir(t.TempDir())
+		rundirs := NewSpoolDir(t.TempDir())
+
+		vcsaccess := &http.Client{Transport: roundtripper(func(r *http.Request) (*http.Response, error) {
+			w := httptest.NewRecorder()
+			require.NoError(t, json.NewEncoder(w).Encode(&compute.GitCredentialsHTTP{Username: "git", Password: "short-lived"}))
+			return w.Result(), nil
+		})}
+
+		// compiles and is handed off.
+		succeeds := uuid.Must(uuid.NewV7())
+		encoded, err := json.Marshal(&EnqueuedDequeueResponse{
+			Enqueued:    &Enqueued{VcsUri: uri, VcsCommit: ref, Cores: 1},
+			AccessToken: "token",
+		})
+		require.NoError(t, err)
+		require.NoError(t, compiledirs.Download(succeeds, "metadata.json", bytes.NewReader(encoded)))
+		require.NoError(t, compiledirs.Download(succeeds, eg.EnvironFile, strings.NewReader(fmt.Sprintf("%s=%s\n%s=%s\n", eg.EnvGitHeadURI, uri, eg.EnvGitHeadRef, ref))))
+		require.NoError(t, compiledirs.Enqueue(succeeds))
+
+		// fails, missing the head uri/ref.
+		fails := uuid.Must(uuid.NewV7())
+		encoded, err = json.Marshal(&EnqueuedDequeueResponse{
+			Enqueued:    &Enqueued{VcsUri: uri, VcsCommit: ref, Cores: 1},
+			AccessToken: "token",
+		})
+		require.NoError(t, err)
+		require.NoError(t, compiledirs.Download(fails, "metadata.json", bytes.NewReader(encoded)))
+		require.NoError(t, compiledirs.Download(fails, eg.EnvironFile, strings.NewReader("")))
+		require.NoError(t, compiledirs.Enqueue(fails))
+
+		ctx, cancel := context.WithCancel(t.Context())
+		defer cancel()
+
+		finished := make(chan error, 1)
+		go func() { finished <- CompileN(ctx, 1, vcsaccess, compiledirs, rundirs) }()
+
+		entries := func(dir string) []os.DirEntry {
+			dentries, err := os.ReadDir(dir)
+			require.NoError(t, err)
+			return dentries
+		}
+
+		require.Eventually(t, func() bool {
+			return len(entries(rundirs.Queued)) == 1 && len(entries(compiledirs.Queued)) == 0 && len(entries(compiledirs.Running)) == 0
+		}, time.Minute, 50*time.Millisecond)
+
+		cancel()
+		<-finished
+
+		require.Equal(t, Queued().Dirname(succeeds), entries(rundirs.Queued)[0].Name())
+		require.Empty(t, entries(compiledirs.Tombstoned))
+	})
+
+	t.Run("recovers jobs interrupted mid compile", func(t *testing.T) {
+		uri, ref := newLocalSourceRepo(t)
+
+		compiledirs := NewSpoolDir(t.TempDir())
+		rundirs := NewSpoolDir(t.TempDir())
+
+		vcsaccess := &http.Client{Transport: roundtripper(func(r *http.Request) (*http.Response, error) {
+			w := httptest.NewRecorder()
+			require.NoError(t, json.NewEncoder(w).Encode(&compute.GitCredentialsHTTP{Username: "git", Password: "short-lived"}))
+			return w.Result(), nil
+		})}
+
+		uid := uuid.Must(uuid.NewV7())
+		encoded, err := json.Marshal(&EnqueuedDequeueResponse{
+			Enqueued:    &Enqueued{VcsUri: uri, VcsCommit: ref, Cores: 1},
+			AccessToken: "token",
+		})
+		require.NoError(t, err)
+		require.NoError(t, compiledirs.Download(uid, "metadata.json", bytes.NewReader(encoded)))
+		require.NoError(t, compiledirs.Download(uid, eg.EnvironFile, strings.NewReader(fmt.Sprintf("%s=%s\n%s=%s\n", eg.EnvGitHeadURI, uri, eg.EnvGitHeadRef, ref))))
+		require.NoError(t, compiledirs.Enqueue(uid))
+
+		// claimed and partially cloned when the previous process was
+		// cancelled, left behind in Running.
+		dir, err := compiledirs.Dequeue()
+		require.NoError(t, err)
+		require.NoError(t, os.MkdirAll(filepath.Join(dir, "src"), 0700))
+		require.NoError(t, os.WriteFile(filepath.Join(dir, "src", "partial"), nil, 0600))
+
+		ctx, cancel := context.WithCancel(t.Context())
+		defer cancel()
+
+		finished := make(chan error, 1)
+		go func() { finished <- CompileN(ctx, 1, vcsaccess, compiledirs, rundirs) }()
+
+		entries := func(dir string) []os.DirEntry {
+			dentries, err := os.ReadDir(dir)
+			require.NoError(t, err)
+			return dentries
+		}
+
+		require.Eventually(t, func() bool {
+			return len(entries(rundirs.Queued)) == 1 && len(entries(compiledirs.Queued)) == 0 && len(entries(compiledirs.Running)) == 0
+		}, 30*time.Second, 50*time.Millisecond)
+
+		cancel()
+		<-finished
+
+		require.Equal(t, Queued().Dirname(uid), entries(rundirs.Queued)[0].Name())
 	})
 }

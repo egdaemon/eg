@@ -47,6 +47,7 @@ type upload struct {
 	cmdopts.RuntimeResources
 	HostedCompute    bool     `name:"shared-compute" help:"allow hosted compute" default:"true"`
 	Direct           bool     `name:"direct" help:"attempt to upload directly to an available runner before falling back to the cluster" default:"true" negatable:""`
+	Follow           bool     `name:"follow" help:"stream the workload's logs when uploaded directly to a runner"`
 	SSHKeyPath       string   `name:"sshkeypath" help:"path to ssh key to use" default:"${vars_ssh_key_path}"`
 	Dir              string   `name:"directory" help:"root directory of the repository" default:"${vars_eg_root_directory}"`
 	Name             string   `arg:"" name:"module" help:"name of the module to run, i.e. the folder name within moduledir" default:"" predictor:"eg.workload"`
@@ -289,9 +290,24 @@ func (t upload) direct(ctx context.Context, chttp *http.Client, req *runners.Enq
 		return nil, errorsx.Wrap(err, "unable to retrieve candidate runners")
 	}
 
-	if accepted := runners.TryUpload(ctx, p2p, candidates.Items, req, archive, environ); accepted != nil {
+	accepted, recorded := runners.TryUpload(ctx, p2p, candidates.Items, req, archive, environ)
+	if accepted == nil {
+		return nil, errorsx.Errorf("no runner accepted the workload, %d candidates", len(candidates.Items))
+	}
+
+	if !t.Follow {
 		return accepted, nil
 	}
 
-	return nil, errorsx.Errorf("no runner accepted the workload, %d candidates", len(candidates.Items))
+	// the workload is already enqueued; failing to stream its logs doesn't fail the upload.
+	if stringsx.Blank(recorded.LogsToken) {
+		log.Println("runner does not support log streaming", accepted.Id, accepted.P2Pid)
+		return accepted, nil
+	}
+
+	if err = runners.FollowLogs(ctx, p2p, recorded.LogsToken, recorded.Id, 0, os.Stdout); err != nil {
+		log.Println(errorsx.Wrap(err, "unable to stream workload logs"))
+	}
+
+	return accepted, nil
 }

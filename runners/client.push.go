@@ -88,55 +88,58 @@ func (t PushClient) Candidates(ctx context.Context, enq *Enqueued, limit uint64)
 }
 
 // TryUpload attempts to upload the workload to each candidate in order,
-// returning the runner that accepted it, or nil when none did.
-func TryUpload(ctx context.Context, p2p host.Host, candidates []*compute.Compute, req *EnqueuedDequeueResponse, archive, environ io.ReadSeeker) *compute.Compute {
+// returning the runner that accepted it and the workload as recorded, or nils
+// when none did.
+func TryUpload(ctx context.Context, p2p host.Host, candidates []*compute.Compute, req *EnqueuedDequeueResponse, archive, environ io.ReadSeeker) (*compute.Compute, *Enqueued) {
 	debugx.Println("direct upload candidates", len(candidates))
 	for _, c := range candidates {
-		if accepted, err := Upload(ctx, p2p, c, req, archive, environ); err != nil {
+		if recorded, err := Upload(ctx, p2p, c, req, archive, environ); err != nil {
 			log.Println("direct upload failed", c.Id, c.P2Pid, err)
-		} else if accepted {
-			return c
+		} else if recorded != nil {
+			return c, recorded
 		} else {
 			debugx.Println("direct upload declined", c.Id, c.P2Pid)
 		}
 	}
 
-	return nil
+	return nil, nil
 }
 
-// candidateRelay returns the p2p addresses of the relay holding the candidate's
-// reservation. the token is only verified by the control plane, the client just
-// reads the claim.
-func candidateRelay(token string) []string {
+// tokenClaims returns the p2p addresses of the relay holding the runner's
+// reservation and, when present, the runner's p2p id from a token issued by the
+// control plane (candidate or log tokens). the token is only verified by the
+// runner/control plane, the client just reads the claims.
+func tokenClaims(token string) (relay []string, p2pid string) {
 	var claims struct {
 		jwt.RegisteredClaims
 		Relay []string `json:"relay"`
+		P2P   string   `json:"p2p"`
 	}
 
 	if _, _, err := jwt.NewParser().ParseUnverified(token, &claims); err != nil {
-		debugx.Println("unable to read candidate token relay", err)
-		return nil
+		debugx.Println("unable to read token claims", err)
+		return nil, ""
 	}
 
-	return claims.Relay
+	return claims.Relay, claims.P2P
 }
 
 // Upload dials the candidate over p2p and uploads the workload, along with the
-// candidate's token, to the runner's POST /c/upload. accepted=false with a nil
-// error means the runner declined the workload (i.e. it is at capacity); try
-// the next candidate.
-func Upload(ctx context.Context, p2p host.Host, candidate *compute.Compute, req *EnqueuedDequeueResponse, archive, environ io.ReadSeeker) (accepted bool, err error) {
+// candidate's token, to the runner's POST /c/upload, returning the workload as
+// recorded by the control plane. a nil workload with a nil error means the runner
+// declined the workload (i.e. it is at capacity); try the next candidate.
+func Upload(ctx context.Context, p2p host.Host, candidate *compute.Compute, req *EnqueuedDequeueResponse, archive, environ io.ReadSeeker) (recorded *Enqueued, err error) {
 	if err = iox.Rewind(archive); err != nil {
-		return false, errorsx.Wrap(err, "unable to rewind archive")
+		return nil, errorsx.Wrap(err, "unable to rewind archive")
 	}
 
 	if err = iox.Rewind(environ); err != nil {
-		return false, errorsx.Wrap(err, "unable to rewind environ")
+		return nil, errorsx.Wrap(err, "unable to rewind environ")
 	}
 
-	stream, err := dialRunner(ctx, p2p, candidate)
+	stream, err := dialRunner(ctx, p2p, candidate.P2Pid, candidate.Token)
 	if err != nil {
-		return false, err
+		return nil, err
 	}
 	defer stream.Close()
 
@@ -146,74 +149,88 @@ func Upload(ctx context.Context, p2p host.Host, candidate *compute.Compute, req 
 
 	mimetype, body, err := NewDirectUpload(req, candidate.Token, archive, environ)
 	if err != nil {
-		return false, errorsx.Wrap(err, "unable to build upload request")
+		return nil, errorsx.Wrap(err, "unable to build upload request")
 	}
 	defer body.Close()
 
 	httpreq, err := http.NewRequestWithContext(ctx, http.MethodPost, "http://runner/c/upload", body)
 	if err != nil {
-		return false, err
+		return nil, err
 	}
 	httpreq.Header.Set("Content-Type", mimetype)
 
 	if err = httpreq.Write(stream); err != nil {
-		return false, fmt.Errorf("unable to write request over stream: %w", err)
+		return nil, fmt.Errorf("unable to write request over stream: %w", err)
 	}
 
 	resp, err := http.ReadResponse(bufio.NewReader(stream), httpreq)
 	if err != nil {
-		return false, fmt.Errorf("unable to read response from stream: %w", err)
+		return nil, fmt.Errorf("unable to read response from stream: %w", err)
 	}
 	defer resp.Body.Close()
 
 	debugx.Println("direct upload response", candidate.Id, stream.Conn().RemotePeer(), resp.Status)
 
 	if httpx.IsSuccess(resp.StatusCode) {
-		return true, nil
+		// the runner responds with the workload as recorded by the control plane,
+		// including the log token for streaming its logs.
+		recorded = &Enqueued{}
+		if err = json.NewDecoder(resp.Body).Decode(recorded); err != nil {
+			return nil, errorsx.Wrap(err, "unable to decode recorded workload")
+		}
+
+		return recorded, nil
 	}
 
 	if resp.StatusCode == http.StatusConflict {
-		return false, nil
+		return nil, nil
 	}
 
 	b, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<10))
-	return false, fmt.Errorf("runner rejected upload with status %d: %s", resp.StatusCode, string(b))
+	return nil, fmt.Errorf("runner rejected upload with status %d: %s", resp.StatusCode, string(b))
 }
 
-// dialRunner opens a stream to the candidate runner's http proxy over p2p.
-func dialRunner(ctx context.Context, p2p host.Host, candidate *compute.Compute) (network.Stream, error) {
-	pid, err := peer.Decode(candidate.P2Pid)
+// dialRunner opens a stream over p2p to the http proxy of the runner p2pid, reaching
+// it through the relay carried by token's claims when no addresses are known.
+func dialRunner(ctx context.Context, p2p host.Host, p2pid string, token string) (network.Stream, error) {
+	pid, err := peer.Decode(p2pid)
 	if err != nil {
-		return nil, fmt.Errorf("invalid peer id %q: %w", candidate.P2Pid, err)
+		return nil, fmt.Errorf("invalid peer id %q: %w", p2pid, err)
 	}
 
-	// candidates only carry the peer id; without addresses the routed host
+	// tokens only carry the peer id; without addresses the routed host
 	// falls back to a dht lookup. reach the runner through the relay holding its
-	// reservation (carried by the candidate token), and the relays we're connected
+	// reservation (carried by the token), and the relays we're connected
 	// to, instead. hole punching upgrades it to a direct connection.
 	if len(p2p.Peerstore().Addrs(pid)) == 0 {
-		addrs := append(libp2px.RelayCircuitAddrs(candidateRelay(candidate.Token)...), libp2px.CircuitAddrs(p2p)...)
+		relay, _ := tokenClaims(token)
+		addrs := append(libp2px.RelayCircuitAddrs(relay...), libp2px.CircuitAddrs(p2p)...)
 		p2p.Peerstore().AddAddrs(pid, addrs, peerstore.TempAddrTTL)
 	}
 
-	debugx.Println("dialing runner", candidate.Id, pid, p2p.Peerstore().Addrs(pid))
+	debugx.Println("dialing runner", pid, p2p.Peerstore().Addrs(pid))
 
 	dctx, done := context.WithTimeout(ctx, dialTimeout)
 	defer done()
 
 	stream, err := p2p.NewStream(dctx, pid, proxyProtocol)
 	if err != nil {
-		return nil, fmt.Errorf("unable to open stream to %s: %w", candidate.P2Pid, err)
+		return nil, fmt.Errorf("unable to open stream to %s: %w", p2pid, err)
 	}
 	return stream, nil
 }
 
-// FollowLogs streams the log of workload id from the candidate runner into dst
-// as it is written, until the workload completes or ctx is cancelled. token is a
-// log token for the workload issued by the control plane; offset resumes the stream
-// from the given byte offset.
-func FollowLogs(ctx context.Context, p2p host.Host, candidate *compute.Compute, id string, token string, offset int64, dst io.Writer) (err error) {
-	stream, err := dialRunner(ctx, p2p, candidate)
+// FollowLogs streams the log of workload id into dst as it is written, until the
+// workload completes or ctx is cancelled. token is the workload's log token issued by
+// the control plane (Enqueued.LogsToken); its claims identify the runner to dial.
+// offset resumes the stream from the given byte offset.
+func FollowLogs(ctx context.Context, p2p host.Host, token string, id string, offset int64, dst io.Writer) (err error) {
+	_, p2pid := tokenClaims(token)
+	if p2pid == "" {
+		return errorsx.String("log token missing runner")
+	}
+
+	stream, err := dialRunner(ctx, p2p, p2pid, token)
 	if err != nil {
 		return err
 	}

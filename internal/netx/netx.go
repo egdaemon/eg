@@ -146,26 +146,23 @@ func (t debugpacketconn) WriteTo(b []byte, addr net.Addr) (n int, err error) {
 
 func Proxy(ctx context.Context, src, dst io.ReadWriter) error {
 	var (
-		errors chan error
+		errors = make(chan error, 2)
 	)
 
 	ctx, done := context.WithCancel(ctx)
-	go func() {
-		select {
-		case errors <- proxyConn(done, src, dst):
-		case <-ctx.Done():
-			errors <- ctx.Err()
+	// close both sides once either direction finishes or ctx is done, unblocking the other copy.
+	defer context.AfterFunc(ctx, func() {
+		for _, rw := range []io.ReadWriter{src, dst} {
+			if c, ok := rw.(io.Closer); ok {
+				_ = c.Close()
+			}
 		}
-	}()
-	go func() {
-		select {
-		case errors <- proxyConn(done, dst, src):
-		case <-ctx.Done():
-			errors <- ctx.Err()
-		}
-	}()
+	})()
 
-	return errorsx.Compact(<-errors, <-errors)
+	go func() { errors <- proxyConn(done, src, dst) }()
+	go func() { errors <- proxyConn(done, dst, src) }()
+
+	return errorsx.Compact(errorsx.Ignore(<-errors, net.ErrClosed), errorsx.Ignore(<-errors, net.ErrClosed))
 }
 
 func proxyConn(done context.CancelFunc, from io.Reader, to io.Writer) (err error) {

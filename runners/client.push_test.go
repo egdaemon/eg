@@ -19,6 +19,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/proto"
 )
 
 // newRunner stands in for a runner's "/egdaemon/proxy" stream handler
@@ -42,6 +43,8 @@ func newRunner(t *testing.T, client host.Host, handler http.Handler) host.Host {
 		rec := httptest.NewRecorder()
 		handler.ServeHTTP(rec, req)
 
+		// drain the request like net/http does; closing a stream with unread data resets it.
+		_, _ = io.Copy(io.Discard, req.Body)
 		_ = rec.Result().Write(s)
 	})
 
@@ -88,7 +91,11 @@ func TestTryUpload(t *testing.T) {
 			require.NoError(t, err)
 			environ = string(b)
 
+			// the runner responds with the workload as recorded by the control plane.
+			recorded := proto.Clone(received.Enqueued).(*runners.Enqueued)
+			recorded.LogsToken = "logs-token"
 			w.WriteHeader(http.StatusAccepted)
+			require.NoError(t, json.NewEncoder(w).Encode(recorded))
 		}))
 
 		candidates := []*compute.Compute{
@@ -100,9 +107,12 @@ func TestTryUpload(t *testing.T) {
 			Enqueued: &runners.Enqueued{Id: uuid.Must(uuid.NewV7()).String(), AccountId: "acct", Entry: "main.wasm"},
 		}
 
-		accepted := runners.TryUpload(t.Context(), client, candidates, req, strings.NewReader("kernel contents"), strings.NewReader("environ contents"))
+		accepted, recorded := runners.TryUpload(t.Context(), client, candidates, req, strings.NewReader("kernel contents"), strings.NewReader("environ contents"))
 		require.NotNil(t, accepted)
 		require.Equal(t, "accepting", accepted.Id)
+		require.NotNil(t, recorded)
+		require.Equal(t, req.Enqueued.Id, recorded.Id)
+		require.Equal(t, "logs-token", recorded.LogsToken)
 		require.Equal(t, req.Enqueued.Id, received.Enqueued.Id)
 		require.Equal(t, "acct", received.Enqueued.AccountId)
 		require.Equal(t, "accepting-token", token)
@@ -133,6 +143,8 @@ func TestTryUpload(t *testing.T) {
 			Enqueued: &runners.Enqueued{Id: uuid.Must(uuid.NewV7()).String()},
 		}
 
-		require.Nil(t, runners.TryUpload(t.Context(), client, candidates, req, strings.NewReader("kernel contents"), strings.NewReader("")))
+		accepted, recorded := runners.TryUpload(t.Context(), client, candidates, req, strings.NewReader("kernel contents"), strings.NewReader(""))
+		require.Nil(t, accepted)
+		require.Nil(t, recorded)
 	})
 }

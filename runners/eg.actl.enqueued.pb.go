@@ -25,27 +25,31 @@ type Enqueued struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	Id          string   `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	CreatedAt   string   `protobuf:"bytes,2,opt,name=created_at,proto3" json:"created_at,omitempty"`
-	UpdatedAt   string   `protobuf:"bytes,3,opt,name=updated_at,proto3" json:"updated_at,omitempty"`
-	Arch        string   `protobuf:"bytes,4,opt,name=arch,proto3" json:"arch,omitempty"`
-	Os          string   `protobuf:"bytes,5,opt,name=os,proto3" json:"os,omitempty"`
-	Cores       uint64   `protobuf:"varint,6,opt,name=cores,proto3" json:"cores,omitempty"`
-	Memory      uint64   `protobuf:"varint,7,opt,name=memory,proto3" json:"memory,omitempty"`
-	Vram        uint64   `protobuf:"varint,8,opt,name=vram,proto3" json:"vram,omitempty"`
-	Ttl         uint64   `protobuf:"varint,9,opt,name=ttl,proto3" json:"ttl,omitempty"`
-	ClusterId   string   `protobuf:"bytes,10,opt,name=cluster_id,json=cid,proto3" json:"cluster_id,omitempty"`
-	Entry       string   `protobuf:"bytes,11,opt,name=entry,json=entrypoint,proto3" json:"entry,omitempty"`
-	InitiatedAt string   `protobuf:"bytes,12,opt,name=initiated_at,proto3" json:"initiated_at,omitempty"`
-	CompletedAt string   `protobuf:"bytes,13,opt,name=completed_at,proto3" json:"completed_at,omitempty"`
-	Description string   `protobuf:"bytes,14,opt,name=description,proto3" json:"description,omitempty"`
-	VcsUri      string   `protobuf:"bytes,15,opt,name=vcs_uri,proto3" json:"vcs_uri,omitempty"`
-	AllowShared bool     `protobuf:"varint,16,opt,name=allow_shared,proto3" json:"allow_shared,omitempty"`
-	AccountId   string   `protobuf:"bytes,17,opt,name=account_id,proto3" json:"account_id,omitempty"`
-	Mimetype    string   `protobuf:"bytes,18,opt,name=mimetype,proto3" json:"mimetype,omitempty"`
-	UploadedBy  string   `protobuf:"bytes,19,opt,name=uploaded_by,proto3" json:"uploaded_by,omitempty"`
-	VcsCommit   string   `protobuf:"bytes,20,opt,name=vcs_commit,proto3" json:"vcs_commit,omitempty"`
-	Labels      []string `protobuf:"bytes,1000,rep,name=labels,proto3" json:"labels,omitempty"`
+	Id          string `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	CreatedAt   string `protobuf:"bytes,2,opt,name=created_at,proto3" json:"created_at,omitempty"`
+	UpdatedAt   string `protobuf:"bytes,3,opt,name=updated_at,proto3" json:"updated_at,omitempty"`
+	Arch        string `protobuf:"bytes,4,opt,name=arch,proto3" json:"arch,omitempty"`
+	Os          string `protobuf:"bytes,5,opt,name=os,proto3" json:"os,omitempty"`
+	Cores       uint64 `protobuf:"varint,6,opt,name=cores,proto3" json:"cores,omitempty"`
+	Memory      uint64 `protobuf:"varint,7,opt,name=memory,proto3" json:"memory,omitempty"`
+	Vram        uint64 `protobuf:"varint,8,opt,name=vram,proto3" json:"vram,omitempty"`
+	Ttl         uint64 `protobuf:"varint,9,opt,name=ttl,proto3" json:"ttl,omitempty"`
+	ClusterId   string `protobuf:"bytes,10,opt,name=cluster_id,json=cid,proto3" json:"cluster_id,omitempty"`
+	Entry       string `protobuf:"bytes,11,opt,name=entry,json=entrypoint,proto3" json:"entry,omitempty"`
+	InitiatedAt string `protobuf:"bytes,12,opt,name=initiated_at,proto3" json:"initiated_at,omitempty"`
+	CompletedAt string `protobuf:"bytes,13,opt,name=completed_at,proto3" json:"completed_at,omitempty"`
+	Description string `protobuf:"bytes,14,opt,name=description,proto3" json:"description,omitempty"`
+	VcsUri      string `protobuf:"bytes,15,opt,name=vcs_uri,proto3" json:"vcs_uri,omitempty"`
+	AllowShared bool   `protobuf:"varint,16,opt,name=allow_shared,proto3" json:"allow_shared,omitempty"`
+	AccountId   string `protobuf:"bytes,17,opt,name=account_id,proto3" json:"account_id,omitempty"`
+	Mimetype    string `protobuf:"bytes,18,opt,name=mimetype,proto3" json:"mimetype,omitempty"`
+	UploadedBy  string `protobuf:"bytes,19,opt,name=uploaded_by,proto3" json:"uploaded_by,omitempty"`
+	VcsCommit   string `protobuf:"bytes,20,opt,name=vcs_commit,proto3" json:"vcs_commit,omitempty"`
+	// set while the workload is running: a short lived token, signed with the
+	// runner's secret, presented to the runner to stream the workload's logs.
+	// its claims carry the runner's p2p id and relay addresses for dialing it.
+	LogsToken string   `protobuf:"bytes,21,opt,name=logs_token,proto3" json:"logs_token,omitempty"`
+	Labels    []string `protobuf:"bytes,1000,rep,name=labels,proto3" json:"labels,omitempty"`
 }
 
 func (x *Enqueued) Reset() {
@@ -216,6 +220,13 @@ func (x *Enqueued) GetUploadedBy() string {
 func (x *Enqueued) GetVcsCommit() string {
 	if x != nil {
 		return x.VcsCommit
+	}
+	return ""
+}
+
+func (x *Enqueued) GetLogsToken() string {
+	if x != nil {
+		return x.LogsToken
 	}
 	return ""
 }
@@ -874,7 +885,7 @@ var File_eg_actl_enqueued_proto protoreflect.FileDescriptor
 var file_eg_actl_enqueued_proto_rawDesc = []byte{
 	0x0a, 0x16, 0x65, 0x67, 0x2e, 0x61, 0x63, 0x74, 0x6c, 0x2e, 0x65, 0x6e, 0x71, 0x75, 0x65, 0x75,
 	0x65, 0x64, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x12, 0x07, 0x65, 0x67, 0x2e, 0x61, 0x63, 0x74,
-	0x6c, 0x22, 0xcc, 0x04, 0x0a, 0x08, 0x45, 0x6e, 0x71, 0x75, 0x65, 0x75, 0x65, 0x64, 0x12, 0x0e,
+	0x6c, 0x22, 0xec, 0x04, 0x0a, 0x08, 0x45, 0x6e, 0x71, 0x75, 0x65, 0x75, 0x65, 0x64, 0x12, 0x0e,
 	0x0a, 0x02, 0x69, 0x64, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x02, 0x69, 0x64, 0x12, 0x1e,
 	0x0a, 0x0a, 0x63, 0x72, 0x65, 0x61, 0x74, 0x65, 0x64, 0x5f, 0x61, 0x74, 0x18, 0x02, 0x20, 0x01,
 	0x28, 0x09, 0x52, 0x0a, 0x63, 0x72, 0x65, 0x61, 0x74, 0x65, 0x64, 0x5f, 0x61, 0x74, 0x12, 0x1e,
@@ -909,8 +920,10 @@ var file_eg_actl_enqueued_proto_rawDesc = []byte{
 	0x01, 0x28, 0x09, 0x52, 0x0b, 0x75, 0x70, 0x6c, 0x6f, 0x61, 0x64, 0x65, 0x64, 0x5f, 0x62, 0x79,
 	0x12, 0x1e, 0x0a, 0x0a, 0x76, 0x63, 0x73, 0x5f, 0x63, 0x6f, 0x6d, 0x6d, 0x69, 0x74, 0x18, 0x14,
 	0x20, 0x01, 0x28, 0x09, 0x52, 0x0a, 0x76, 0x63, 0x73, 0x5f, 0x63, 0x6f, 0x6d, 0x6d, 0x69, 0x74,
+	0x12, 0x1e, 0x0a, 0x0a, 0x6c, 0x6f, 0x67, 0x73, 0x5f, 0x74, 0x6f, 0x6b, 0x65, 0x6e, 0x18, 0x15,
+	0x20, 0x01, 0x28, 0x09, 0x52, 0x0a, 0x6c, 0x6f, 0x67, 0x73, 0x5f, 0x74, 0x6f, 0x6b, 0x65, 0x6e,
 	0x12, 0x17, 0x0a, 0x06, 0x6c, 0x61, 0x62, 0x65, 0x6c, 0x73, 0x18, 0xe8, 0x07, 0x20, 0x03, 0x28,
-	0x09, 0x52, 0x06, 0x6c, 0x61, 0x62, 0x65, 0x6c, 0x73, 0x4a, 0x05, 0x08, 0x15, 0x10, 0xe8, 0x07,
+	0x09, 0x52, 0x06, 0x6c, 0x61, 0x62, 0x65, 0x6c, 0x73, 0x4a, 0x05, 0x08, 0x16, 0x10, 0xe8, 0x07,
 	0x22, 0x94, 0x02, 0x0a, 0x15, 0x45, 0x6e, 0x71, 0x75, 0x65, 0x75, 0x65, 0x64, 0x53, 0x65, 0x61,
 	0x72, 0x63, 0x68, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x12, 0x14, 0x0a, 0x05, 0x71, 0x75,
 	0x65, 0x72, 0x79, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x05, 0x71, 0x75, 0x65, 0x72, 0x79,

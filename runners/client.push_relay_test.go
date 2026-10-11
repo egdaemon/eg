@@ -119,9 +119,15 @@ func TestUploadViaRelay(t *testing.T) {
 			n, _ := io.Copy(io.Discard, f)
 			received.Store(n)
 			rec.WriteHeader(http.StatusAccepted)
+			_, _ = rec.WriteString(`{"id":"recorded"}`)
 		} else {
 			rec.WriteHeader(http.StatusBadRequest)
 		}
+
+		// drain the request (e.g. the chunked terminator after the final multipart
+		// boundary) like net/http does; closing a stream with unread data resets it,
+		// failing the client's write when it races the response.
+		_, _ = io.Copy(io.Discard, req.Body)
 		_ = rec.Result().Write(s)
 	})
 
@@ -152,7 +158,8 @@ func TestUploadViaRelay(t *testing.T) {
 
 	accepted, err := runners.Upload(ctx, client, &compute.Compute{Id: "relayed", P2Pid: runner.ID().String()}, req, bytes.NewReader(kernel), strings.NewReader(""))
 	require.NoError(t, err)
-	require.True(t, accepted)
+	require.NotNil(t, accepted)
+	require.Equal(t, "recorded", accepted.Id)
 	require.Equal(t, int64(len(kernel)), received.Load())
 
 	direct := false
@@ -206,9 +213,15 @@ func TestUploadViaCandidateTokenRelay(t *testing.T) {
 			n, _ := io.Copy(io.Discard, f)
 			received.Store(n)
 			rec.WriteHeader(http.StatusAccepted)
+			_, _ = rec.WriteString(`{"id":"recorded"}`)
 		} else {
 			rec.WriteHeader(http.StatusBadRequest)
 		}
+
+		// drain the request (e.g. the chunked terminator after the final multipart
+		// boundary) like net/http does; closing a stream with unread data resets it,
+		// failing the client's write when it races the response.
+		_, _ = io.Copy(io.Discard, req.Body)
 		_ = rec.Result().Write(s)
 	})
 
@@ -247,6 +260,7 @@ func TestUploadViaCandidateTokenRelay(t *testing.T) {
 
 	accepted, err := runners.Upload(ctx, client, &compute.Compute{Id: "relayed", P2Pid: runner.ID().String(), Token: token}, req, bytes.NewReader(kernel), strings.NewReader(""))
 	require.NoError(t, err)
-	require.True(t, accepted)
+	require.NotNil(t, accepted)
+	require.Equal(t, "recorded", accepted.Id)
 	require.Equal(t, int64(len(kernel)), received.Load())
 }

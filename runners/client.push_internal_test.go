@@ -5,6 +5,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/egdaemon/eg/internal/jwtx"
+	"github.com/golang-jwt/jwt/v4"
 	"github.com/stretchr/testify/require"
 )
 
@@ -34,5 +36,40 @@ func TestPushClientCandidates(t *testing.T) {
 		require.Len(t, resp.Items, 1)
 		require.Equal(t, "runner-1", resp.Items[0].Id)
 		require.Equal(t, "peer-1", resp.Items[0].P2Pid)
+	})
+}
+
+func TestTokenClaims(t *testing.T) {
+	sign := func(t *testing.T, claims jwt.Claims) string {
+		t.Helper()
+		token, err := jwtx.Signed([]byte("derp"), claims)
+		require.NoError(t, err)
+		return token
+	}
+
+	t.Run("log token", func(t *testing.T) {
+		relay, p2pid := tokenClaims(sign(t, struct {
+			jwt.RegisteredClaims
+			Relay    []string `json:"relay"`
+			P2P      string   `json:"p2p"`
+			Workload string   `json:"wid"`
+		}{Relay: []string{"/ip4/127.0.0.1/tcp/4001/p2p/relay"}, P2P: "peer-1", Workload: "wid"}))
+		require.Equal(t, []string{"/ip4/127.0.0.1/tcp/4001/p2p/relay"}, relay)
+		require.Equal(t, "peer-1", p2pid)
+	})
+
+	t.Run("candidate token", func(t *testing.T) {
+		relay, p2pid := tokenClaims(sign(t, struct {
+			jwt.RegisteredClaims
+			Relay []string `json:"relay"`
+		}{Relay: []string{"/ip4/127.0.0.1/tcp/4001/p2p/relay"}}))
+		require.Equal(t, []string{"/ip4/127.0.0.1/tcp/4001/p2p/relay"}, relay)
+		require.Empty(t, p2pid)
+	})
+
+	t.Run("garbage", func(t *testing.T) {
+		relay, p2pid := tokenClaims("derp")
+		require.Empty(t, relay)
+		require.Empty(t, p2pid)
 	})
 }

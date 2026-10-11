@@ -23,7 +23,11 @@ message Enqueued {
   string mimetype = 18 [ json_name = "mimetype" ];
   string uploaded_by = 19 [ json_name = "uploaded_by" ];
   string vcs_commit = 20 [ json_name = "vcs_commit" ];
-  reserved 21 to 999;
+  // set while the workload is running: a short lived token, signed with the
+  // runner's secret, presented to the runner to stream the workload's logs.
+  // its claims carry the runner's p2p id and relay addresses for dialing it.
+  string logs_token = 21 [ json_name = "logs_token" ];
+  reserved 22 to 999;
   repeated string labels = 1000 [ json_name = "labels" ];
 }
 

@@ -1,6 +1,7 @@
 package runners
 
 import (
+	"bytes"
 	"context"
 	"crypto/md5"
 	"encoding/json"
@@ -9,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/compile"
@@ -17,6 +19,7 @@ import (
 	"github.com/egdaemon/eg/internal/gitx"
 	"github.com/egdaemon/eg/internal/httpx"
 	"github.com/egdaemon/eg/internal/slicesx"
+	"github.com/egdaemon/eg/internal/stringsx"
 	"github.com/egdaemon/eg/internal/tarx"
 	"github.com/egdaemon/eg/transpile"
 	"github.com/egdaemon/eg/workspaces"
@@ -55,14 +58,12 @@ func compileEntrypoint(ctx context.Context, ws workspaces.Context) (*transpile.C
 
 // compileWorkload reads the EnqueuedDequeueResponse stored at
 // dir/metadata.json (dir is a job claimed from a compile SpoolDirs' Running
-// stage, see CompileN) -- Enqueued.VcsCommit is the treeish to check out,
-// AccessToken is exchanged for short-lived git credentials, mirroring how
-// egmeta's own /c/dequeue handler populates it for the polling flow (see
-// computeapi/http.queue.go's dequeue handler) -- clones and compiles the
-// referenced source, then hands the entire job directory off directly to
-// rundirs.Queued -- bypassing rundirs.Downloading/Enqueue entirely, since
-// the job is already fully formed once compiled and doesn't need to be
-// staged through a second spool's own two-step download/enqueue handshake.
+// stage, see CompileN) -- AccessToken is exchanged for short-lived git
+// credentials, mirroring how egmeta's own /c/dequeue handler populates it for
+// the polling flow (see computeapi/http.queue.go's dequeue handler) -- clones
+// the uri/ref named by the submitted environ (see eg.EnvironFile) and
+// compiles it, then enqueues the compiled workload into rundirs and removes
+// the compile job directory.
 func compileWorkload(ctx context.Context, c *http.Client, dir string, rundirs SpoolDirs) (err error) {
 	return compileWorkloadReserved(ctx, c, httpx.NewFixedStatusClient(http.StatusNotImplemented), dir, rundirs)
 }
@@ -154,30 +155,39 @@ func (t statecompiling) Update(ctx context.Context) state {
 	)
 
 	clonedir := filepath.Join(t.dir, "src")
+	environpath := filepath.Join(t.dir, eg.EnvironFile)
+
+	// clone from the uri and ref submitted with the workload, the same ones
+	// the workload itself clones from (see eggit.AutoClone).
+	submitted, err := envx.Build().FromPath(environpath).Environ()
+	if err != nil {
+		return compilefailed(t.compilejob, errorsx.Wrap(err, "unable to read submitted environment"))
+	}
+
+	environ := envx.NewEnvironFromStrings(submitted...)
+	uri, ref := environ.String("", eg.EnvGitHeadURI), environ.String("", eg.EnvGitHeadRef)
+	if stringsx.Blank(uri) || stringsx.Blank(ref) {
+		return compilefailed(t.compilejob, errorsx.Errorf("submitted environment missing %s or %s", eg.EnvGitHeadURI, eg.EnvGitHeadRef))
+	}
 
 	if err = os.MkdirAll(clonedir, 0700); err != nil {
 		return compilefailed(t.compilejob, errorsx.Wrap(err, "unable to create clone directory"))
 	}
 
-	// exchange the access token (if any) for short-lived git credentials
-	// immediately before cloning, rather than trusting it for the lifetime of
-	// the job -- avoids needing to track/check token expiry ourselves while
-	// the job sat queued behind the compile concurrency cap.
-	if err = gitx.RefreshCredentials(ctx, t.c, clonedir, t.req.AccessToken); err != nil {
-		return compilefailed(t.compilejob, errorsx.Wrap(err, "unable to refresh git credentials"))
+	// exchange the access token for short-lived git credentials immediately
+	// before cloning, rather than trusting it for the lifetime of the job --
+	// avoids needing to track/check token expiry ourselves while the job sat
+	// queued behind the compile concurrency cap.
+	if auth, err = gitx.ExchangeCredentials(ctx, t.c, uri, t.req.AccessToken); err != nil {
+		return compilefailed(t.compilejob, errorsx.Wrap(err, "unable to exchange git credentials"))
 	}
 
-	// absence of refreshed credentials (e.g. blank access token, public
-	// repo) is not fatal -- log and fall through to an unauthenticated clone
-	// rather than failing the job.
 	var opts []client.Option
-	if auth, err = gitx.LoadCredentials(ctx, t.req.Enqueued.VcsUri, clonedir); err != nil {
-		log.Println(errorsx.Wrap(err, "unable to load git credentials"))
-	} else if auth != nil {
+	if auth != nil {
 		opts = append(opts, auth)
 	}
 
-	if err = gitx.Clone(ctx, clonedir, t.req.Enqueued.VcsUri, git.DefaultRemoteName, t.req.Enqueued.VcsCommit, opts...); err != nil {
+	if err = gitx.Clone(ctx, clonedir, uri, git.DefaultRemoteName, ref, opts...); err != nil {
 		return compilefailed(t.compilejob, errorsx.Wrap(err, "unable to clone repository"))
 	}
 
@@ -189,7 +199,6 @@ func (t statecompiling) Update(ctx context.Context) state {
 	if err != nil {
 		return compilefailed(t.compilejob, errorsx.Wrap(err, "unable to create workspace"))
 	}
-	defer os.RemoveAll(ws.Root)
 
 	module, err := compileEntrypoint(ctx, ws)
 	if err != nil {
@@ -200,8 +209,6 @@ func (t statecompiling) Update(ctx context.Context) state {
 	if err != nil {
 		return compilefailed(t.compilejob, errorsx.Wrap(err, "unable to determine entry relative path"))
 	}
-
-	environpath := filepath.Join(t.dir, eg.EnvironFile)
 
 	// the environment submitted with the workload takes precedence over what
 	// can be determined from the commit alone (e.g. the branch being built).
@@ -264,32 +271,44 @@ func (t statereserve) Update(ctx context.Context) state {
 	return statehandoff{compilejob: t.compilejob}
 }
 
-// statehandoff moves the compiled workload into rundirs.Queued.
+// statehandoff enqueues the compiled workload into rundirs, then removes the
+// compile job directory entirely.
 type statehandoff struct {
 	compilejob
 }
 
 func (t statehandoff) Update(ctx context.Context) state {
-	// overwrite in place: metadata.json now holds the compiled workload's
-	// entry point and id, still carrying AccessToken through for the running
-	// container (see queue.go's beginwork).
+	uid := Queued().Id(t.dir)
+
+	// metadata.json now holds the compiled workload's entry point and id,
+	// still carrying AccessToken through for the running container (see
+	// queue.go's beginwork).
 	encoded, err := json.Marshal(t.req)
 	if err != nil {
 		return compilefailed(t.compilejob, errorsx.Wrap(err, "unable to encode workload metadata"))
 	}
 
-	if err = os.WriteFile(filepath.Join(t.dir, "metadata.json"), encoded, 0600); err != nil {
-		return compilefailed(t.compilejob, errorsx.Wrap(err, "unable to overwrite workload metadata"))
+	if err = t.rundirs.Download(uid, "metadata.json", bytes.NewReader(encoded)); err != nil {
+		return compilefailed(t.compilejob, errorsx.Wrap(err, "unable to write workload metadata"))
 	}
 
-	// clone artifacts have already been compiled into the archive above; drop
-	// them before handing the directory off so they don't linger in rundirs.
-	if err = os.RemoveAll(filepath.Join(t.dir, "src")); err != nil {
-		return compilefailed(t.compilejob, errorsx.Wrap(err, "unable to clean up clone directory"))
+	archiveio, err := os.Open(filepath.Join(t.dir, "archive.tar.gz"))
+	if err != nil {
+		return compilefailed(t.compilejob, errorsx.Wrap(err, "unable to open archive"))
+	}
+	defer archiveio.Close()
+
+	if err = t.rundirs.Download(uid, "archive.tar.gz", archiveio); err != nil {
+		return compilefailed(t.compilejob, errorsx.Wrap(err, "unable to write archive"))
 	}
 
-	target := filepath.Join(t.rundirs.Queued, filepath.Base(t.dir))
-	if err = os.Rename(t.dir, target); err != nil {
+	if t.token != "" {
+		if err = t.rundirs.Download(uid, CandidateTokenFile, strings.NewReader(t.token)); err != nil {
+			return compilefailed(t.compilejob, errorsx.Wrap(err, "unable to write candidate token"))
+		}
+	}
+
+	if err = t.rundirs.Enqueue(uid); err != nil {
 		return compilefailed(t.compilejob, errorsx.Wrap(err, "unable to hand off compiled workload"))
 	}
 
@@ -298,7 +317,8 @@ func (t statehandoff) Update(ctx context.Context) state {
 	return status(t.authclient, t.token, StatusQueued, t.req.Enqueued, t.done(t.dir, nil))
 }
 
-// compilediscard clears a failed compile job from the compile spool.
+// compilediscard clears a completed compile job from the compile spool,
+// whether it failed (cause is non-nil) or was handed off.
 type compilediscard struct {
 	compiledirs SpoolDirs
 	dir         string
@@ -307,7 +327,7 @@ type compilediscard struct {
 }
 
 func (t compilediscard) Update(ctx context.Context) state {
-	log.Println(errorsx.Wrap(t.cause, "compile failed"))
-	errorsx.Log(errorsx.Wrap(t.compiledirs.Discard(t.dir), "failed to clear failed compile job"))
+	errorsx.Log(errorsx.Wrap(t.cause, "compile failed"))
+	errorsx.Log(errorsx.Wrap(t.compiledirs.Discard(t.dir), "failed to clear compile job"))
 	return t.next
 }

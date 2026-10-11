@@ -2,14 +2,18 @@ package runners
 
 import (
 	"context"
+	"io/fs"
 	"log"
 	"net/http"
+	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/backoff"
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
+	"github.com/egdaemon/eg/internal/fsx"
 	"github.com/egdaemon/eg/internal/httpx"
 	"github.com/egdaemon/eg/internal/iox"
 
@@ -56,6 +60,10 @@ func CompileN(ctx context.Context, n int, c *http.Client, compiledirs, rundirs S
 }
 
 func compileN(ctx context.Context, n int, c *http.Client, authclient *http.Client, compiledirs, rundirs SpoolDirs) error {
+	if cause := compilerecover(ctx, compiledirs); cause != nil {
+		log.Println("compile recovery failed, continuing", cause)
+	}
+
 	pool := pond.NewPool(n)
 	workers := make([]pond.Task, 0, pool.MaxConcurrency())
 
@@ -76,6 +84,39 @@ func compileN(ctx context.Context, n int, c *http.Client, authclient *http.Clien
 	return nil
 }
 
+// compilerecover requeues compile jobs left in compiledirs.Running by a
+// previous process that was cancelled (or crashed) mid compile, mirroring
+// recover for the run spool. on a fresh start nothing is actually compiling.
+func compilerecover(_ context.Context, compiledirs SpoolDirs) error {
+	return fs.WalkDir(os.DirFS(compiledirs.Running), ".", func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+
+		if path == "." {
+			return nil
+		}
+
+		// reset the partial clone prior to restarting.
+		if err = os.RemoveAll(filepath.Join(compiledirs.Running, d.Name(), "src")); err != nil {
+			return err
+		}
+
+		// ensure the queue directory is available.
+		if err = os.RemoveAll(filepath.Join(compiledirs.Queued, d.Name())); err != nil {
+			return err
+		}
+
+		if cause := os.Rename(filepath.Join(compiledirs.Running, d.Name()), filepath.Join(compiledirs.Queued, d.Name())); fsx.ErrIsNotExist(cause) != nil {
+			return fs.SkipDir
+		} else if cause != nil {
+			return cause
+		}
+
+		return fs.SkipDir
+	})
+}
+
 // compileOne runs the compile state machine, claiming and compiling one job at
 // a time, until ctx is cancelled. Compile jobs don't need the execution state
 // machine or repo cache/lock resolution that beginwork/staterunning use -- a
@@ -92,10 +133,11 @@ func compileOne(ctx context.Context, c *http.Client, authclient *http.Client, co
 		c:          c,
 		authclient: authclient,
 		rundirs:    rundirs,
+		// however a job completes, its compile job directory is cleared; a
+		// compiled workload has already been enqueued into rundirs.
 		done: func(dir string, cause error) state {
 			if cause == nil {
 				w.Reset()
-				return idle
 			}
 
 			return compilediscard{compiledirs: compiledirs, dir: dir, cause: cause, next: idle}

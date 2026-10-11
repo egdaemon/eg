@@ -392,21 +392,29 @@ func RefreshCredentials(ctx context.Context, c *http.Client, dst string, token s
 	return credentialRefresh(ctx, c, dst, token)
 }
 
-func credentialRefresh(ctx context.Context, c *http.Client, dst, token string) error {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/r/vcsaccess/", eg.EnvContainerAPIHostDefault()), nil)
-	if err != nil {
-		return errorsx.Wrap(err, "unable to create http request")
+// ExchangeCredentials performs a single, immediate exchange of the given
+// long-lived access token for short-lived git credentials for vcsuri, kept in
+// memory rather than written to disk -- for callers that clone in-process
+// right away (e.g. compiling a single workload). Unlike RefreshCredentials a
+// blank token is an error. The returned option is nil when the credentials
+// don't apply to vcsuri (see LoadCredentials).
+func ExchangeCredentials(ctx context.Context, c *http.Client, vcsuri string, token string) (client.Option, error) {
+	if stringsx.Blank(token) {
+		return nil, errors.New("access token required")
 	}
-	req.Header.Add("Authorization", fmt.Sprintf("BEARER %s", token))
 
-	resp, err := httpx.AsError(c.Do(req))
+	encoded, err := credentialExchange(ctx, c, token)
 	if err != nil {
-		return errorsx.Wrap(err, "http request failed")
+		return nil, err
 	}
-	defer resp.Body.Close()
-	encoded, err := io.ReadAll(resp.Body)
+
+	return httpcredentials(vcsuri, encoded), nil
+}
+
+func credentialRefresh(ctx context.Context, c *http.Client, dst, token string) error {
+	encoded, err := credentialExchange(ctx, c, token)
 	if err != nil {
-		return errorsx.Wrap(err, "unable to create http request")
+		return err
 	}
 
 	if err = os.WriteFile(filepath.Join(dst, "vcsaccess.token"), encoded, 0666); err != nil {
@@ -416,22 +424,49 @@ func credentialRefresh(ctx context.Context, c *http.Client, dst, token string) e
 	return nil
 }
 
+func credentialExchange(ctx context.Context, c *http.Client, token string) ([]byte, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/r/vcsaccess/", eg.EnvContainerAPIHostDefault()), nil)
+	if err != nil {
+		return nil, errorsx.Wrap(err, "unable to create http request")
+	}
+	req.Header.Add("Authorization", fmt.Sprintf("BEARER %s", token))
+
+	resp, err := httpx.AsError(c.Do(req))
+	if err != nil {
+		return nil, errorsx.Wrap(err, "http request failed")
+	}
+	defer resp.Body.Close()
+	encoded, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, errorsx.Wrap(err, "unable to create http request")
+	}
+
+	return encoded, nil
+}
+
 func LoadCredentials(ctx context.Context, vcsuri string, dir string) (client.Option, error) {
-	var (
-		httpauth compute.GitCredentialsHTTP
-	)
 	encoded, err := os.ReadFile(filepath.Join(dir, "vcsaccess.token"))
 	if err != nil {
 		return nil, err
 	}
 
-	if err = json.Unmarshal(encoded, &httpauth); err == nil && stringsx.Present(httpauth.Username) && stringsx.Present(httpauth.Password) {
+	return httpcredentials(vcsuri, encoded), nil
+}
+
+// httpcredentials decodes exchanged credentials into http basic auth for
+// vcsuri, nil when they're malformed or vcsuri isn't an http uri.
+func httpcredentials(vcsuri string, encoded []byte) client.Option {
+	var (
+		httpauth compute.GitCredentialsHTTP
+	)
+
+	if err := json.Unmarshal(encoded, &httpauth); err == nil && stringsx.Present(httpauth.Username) && stringsx.Present(httpauth.Password) {
 		if strings.HasPrefix(vcsuri, "http") {
-			return client.WithHTTPAuth(&githttp.BasicAuth{Username: httpauth.Username, Password: httpauth.Password}), nil
+			return client.WithHTTPAuth(&githttp.BasicAuth{Username: httpauth.Username, Password: httpauth.Password})
 		}
 	}
 
-	return nil, nil
+	return nil
 }
 
 func Bearer(dir string) string {

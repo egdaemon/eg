@@ -13,7 +13,7 @@ import (
 func TestDirectClientReserve(t *testing.T) {
 	t.Run("uploads the archive with the candidate token", func(t *testing.T) {
 		var (
-			token, vram, archive string
+			token, vram, archive, description string
 			labels               []string
 		)
 
@@ -22,6 +22,7 @@ func TestDirectClientReserve(t *testing.T) {
 			require.Equal(t, "/c/q/reserved", r.URL.Path)
 			token = r.FormValue("token")
 			vram = r.FormValue("vram")
+			description = r.FormValue("description")
 			labels = r.MultipartForm.Value["labels"]
 
 			f, _, err := r.FormFile("archive")
@@ -37,9 +38,10 @@ func TestDirectClientReserve(t *testing.T) {
 		defer srv.Close()
 
 		c := DirectClient{c: srv.Client(), host: srv.URL}
-		recorded, err := c.Reserve(t.Context(), &Enqueued{Id: "pushed-id", Vram: 8, Labels: []string{"gpu", "fast"}}, strings.NewReader("kernel contents"), "candidate-token")
+		recorded, err := c.Reserve(t.Context(), &Enqueued{Id: "pushed-id", Vram: 8, Labels: []string{"gpu", "fast"}, Description: "my workload"}, strings.NewReader("kernel contents"), "candidate-token")
 		require.NoError(t, err)
 		require.Equal(t, "candidate-token", token)
+		require.Equal(t, "my workload", description)
 		require.Equal(t, "8", vram)
 		require.Equal(t, []string{"gpu", "fast"}, labels)
 		require.Equal(t, "kernel contents", archive)

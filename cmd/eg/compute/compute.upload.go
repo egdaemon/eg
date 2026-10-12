@@ -191,7 +191,7 @@ func (t upload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 		VcsUri:      errorsx.Zero(gitx.CanonicalURI(repo, t.GitRemote)), // optionally set the vcsuri if we're inside a repository.
 		VcsCommit:   errorsx.Zero(gitx.Commitish(ws.WorkingDir, t.GitReference)),
 		Labels:      append([]string{}, t.RuntimeResources.Labels...),
-		Description: t.Name,
+		Description: stringsx.FirstNonBlank(t.Name, gitx.Description("Uploaded: %git.commit.author% - %git.ref%", repo, t.GitReference)),
 	}
 
 	c := tlsc.DefaultClient()

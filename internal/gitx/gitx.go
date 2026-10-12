@@ -277,6 +277,41 @@ func LocalEnv(repo *git.Repository, remote string, branch string) (env []string,
 	return env, nil
 }
 
+// Description labels a workload for treeish by replacing the eggit style tokens in pattern,
+// so callers position them as they like.
+// %git.hash%           -> the full hex encoded commit id.
+// %git.hash.short%     -> the first 7 characters of the hex encoded commit id.
+// %git.commit.author%  -> the committer's name, falling back to their email and then the environment user.
+// %git.commit.email%   -> the committer's email.
+// %git.ref%            -> the treeish.
+// commit values are empty when the reference can't be resolved.
+func Description(pattern string, repo *git.Repository, treeish string) string {
+	var (
+		hash   *plumbing.Hash
+		commit *object.Commit
+		err    error
+		full   string
+		author string
+		email  string
+	)
+
+	if hash, err = repo.ResolveRevision(plumbing.Revision(treeish)); err == nil {
+		if commit, err = repo.CommitObject(*hash); err == nil {
+			full = commit.Hash.String()
+			author = stringsx.First(commit.Committer.Name, commit.Committer.Email)
+			email = commit.Committer.Email
+		}
+	}
+
+	return strings.NewReplacer(
+		"%git.hash%", full,
+		"%git.hash.short%", full[:min(len(full), 7)],
+		"%git.commit.author%", stringsx.First(author, envx.String("unknown", "USER", "USERNAME")),
+		"%git.commit.email%", email,
+		"%git.ref%", treeish,
+	).Replace(pattern)
+}
+
 func HeadEnv(repo *git.Repository, vcs, uri string, treeish string) (env []string, err error) {
 	var (
 		hash   *plumbing.Hash

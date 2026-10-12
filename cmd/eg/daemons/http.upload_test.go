@@ -25,6 +25,7 @@ type fakereserver struct {
 	err      error
 	called   bool
 	id       string
+	desc     string
 	archive  string
 	token    string
 }
@@ -36,7 +37,7 @@ func (t *fakereserver) Reserve(ctx context.Context, enq *runners.Enqueued, archi
 	}
 
 	t.called = true
-	t.id, t.archive, t.token = enq.Id, string(b), token
+	t.id, t.desc, t.archive, t.token = enq.Id, enq.Description, string(b), token
 	return t.recorded, t.err
 }
 
@@ -73,7 +74,7 @@ func TestUploadHandler(t *testing.T) {
 		h.RM = runners.NewResourceManager(runners.RuntimeResources{Cores: 10, Memory: 10, Vram: 10})
 
 		enqresp := runners.EnqueuedDequeueResponse{
-			Enqueued: &runners.Enqueued{Id: uuid.Must(uuid.NewV7()).String(), Entry: "main.wasm", Cores: 1},
+			Enqueued: &runners.Enqueued{Id: uuid.Must(uuid.NewV7()).String(), Entry: "main.wasm", Cores: 1, Description: "my workload"},
 		}
 
 		w := httptest.NewRecorder()
@@ -82,6 +83,7 @@ func TestUploadHandler(t *testing.T) {
 
 		require.True(t, reserver.called)
 		require.Equal(t, enqresp.Enqueued.Id, reserver.id)
+		require.Equal(t, "my workload", reserver.desc)
 		require.Equal(t, "kernel contents", reserver.archive)
 		require.Equal(t, "candidate-token", reserver.token)
 

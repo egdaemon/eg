@@ -202,14 +202,10 @@ func (t upload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 	)
 
 	if t.Direct {
-		direct := &runners.EnqueuedDequeueResponse{
-			Enqueued: proto.Clone(enq).(*runners.Enqueued),
-		}
-
-		if accepted, cause := t.direct(gctx.Context, chttp, direct, archiveio, environio); cause != nil {
+		if accepted, cause := t.direct(gctx.Context, chttp, enq, archiveio, environio); cause != nil {
 			log.Println("direct upload unavailable, falling back to the cluster", cause)
 		} else {
-			log.Println("enqueued directly", direct.Enqueued.Id, accepted.Id, accepted.P2Pid)
+			log.Println("enqueued directly", enq.Id, accepted.Id, accepted.P2Pid)
 			return nil
 		}
 
@@ -273,7 +269,7 @@ func (t upload) enqueue(ctx context.Context, chttp *http.Client, enq *runners.En
 // direct attempts to upload the workload straight to an available runner,
 // returning the runner that accepted it. the runner records the workload with
 // the cluster using the candidate token issued for it.
-func (t upload) direct(ctx context.Context, chttp *http.Client, req *runners.EnqueuedDequeueResponse, archive, environ io.ReadSeeker) (_ *compute.Compute, err error) {
+func (t upload) direct(ctx context.Context, chttp *http.Client, enq *runners.Enqueued, archive, environ io.ReadSeeker) (_ *compute.Compute, err error) {
 	meta, err := registration.NewPingClient(chttp).Meta(ctx)
 	if err != nil {
 		return nil, errorsx.Wrap(err, "unable to retrieve p2p bootstrap addresses")
@@ -284,6 +280,11 @@ func (t upload) direct(ctx context.Context, chttp *http.Client, req *runners.Enq
 		return nil, errorsx.Wrap(err, "unable to join p2p network")
 	}
 	defer p2p.Close()
+
+	// clone so the caller's enqueued remains untouched for the cluster fallback.
+	req := &runners.EnqueuedDequeueResponse{
+		Enqueued: proto.Clone(enq).(*runners.Enqueued),
+	}
 
 	candidates, err := runners.NewPushClient(chttp).Candidates(ctx, req.Enqueued, directCandidates)
 	if err != nil {

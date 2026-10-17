@@ -10,3 +10,5 @@ Section: misc
 Architecture: ${DEB_ARCHITECTURE}
 Description: ${DEB_DESCRIPTION}
 Depends: ${DEB_DEPENDS_RUNTIME}
+Recommends: ${DEB_RECOMMENDS}
+Suggests: ${DEB_SUGGESTS}

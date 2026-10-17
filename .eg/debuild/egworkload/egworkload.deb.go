@@ -45,6 +45,9 @@ func init() {
 			"systemd-container", // required for machinectl to be present for use within shell.New(...) commands. which allows invoking systemctl --user commands.
 			"waypipe",           // required to support --wayland passthrough.
 		),
+		egdebuild.Option.Suggests(
+			"openssh-server", // allows ssh access into workload containers, i.e. eg compute serve --ssh.
+		),
 		egdebuild.Option.Description(
 			"configures a container for running eg workloads",
 			"installs and configures all components required to run eg workloads in a container",

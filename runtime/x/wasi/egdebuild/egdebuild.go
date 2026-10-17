@@ -43,8 +43,10 @@ type ChangeLog struct {
 }
 
 type Dependency struct {
-	Build   []string
-	Runtime []string
+	Build      []string
+	Runtime    []string
+	Recommends []string
+	Suggests   []string
 }
 
 type Config struct {
@@ -122,6 +124,20 @@ func (option) DependsBuild(deps ...string) option {
 func (option) Depends(deps ...string) option {
 	return func(c *Config) {
 		c.Dependency.Runtime = deps
+	}
+}
+
+// packages that are installed by default but are not required for the package to function.
+func (option) Recommends(deps ...string) option {
+	return func(c *Config) {
+		c.Dependency.Recommends = deps
+	}
+}
+
+// packages that enhance the package but are never installed automatically, apt only lists them.
+func (option) Suggests(deps ...string) option {
+	return func(c *Config) {
+		c.Dependency.Suggests = deps
 	}
 }
 
@@ -234,6 +250,8 @@ func Runtime(cfg Config, opts ...option) shell.Command {
 			Environ("DEB_MAINTAINER_FULLNAME", cfg.Maintainer.Name).
 			Environ("DEB_DEPENDS_BUILD", strings.Join(append(cfg.Dependency.Build, "dh-make", "debhelper (>= 10)", "software-properties-common"), ", ")).
 			Environ("DEB_DEPENDS_RUNTIME", strings.Join(append(cfg.Dependency.Runtime, "${misc:Depends}", "${shlibs:Depends}"), ", ")).
+			Environ("DEB_RECOMMENDS", strings.Join(cfg.Dependency.Recommends, ", ")).
+			Environ("DEB_SUGGESTS", strings.Join(cfg.Dependency.Suggests, ", ")).
 			EnvironFrom(cfg.Environ...),
 	)
 }

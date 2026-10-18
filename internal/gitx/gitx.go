@@ -538,7 +538,7 @@ func (t remotesigner) SignWithAlgorithm(_ io.Reader, data []byte, algorithm stri
 		return nil, errorsx.Wrap(err, "unable to encode signing request")
 	}
 
-	req, err := http.NewRequestWithContext(t.ctx, http.MethodPost, fmt.Sprintf("%s/r/vcsaccess/", eg.EnvContainerAPIHostDefault()), bytes.NewReader(body))
+	req, err := http.NewRequestWithContext(t.ctx, http.MethodPost, fmt.Sprintf("%s/r/vcsaccess/sign", eg.EnvContainerAPIHostDefault()), bytes.NewReader(body))
 	if err != nil {
 		return nil, errorsx.Wrap(err, "unable to create http request")
 	}

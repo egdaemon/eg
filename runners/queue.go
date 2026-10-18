@@ -38,6 +38,7 @@ import (
 	"github.com/egdaemon/eg/internal/wasix"
 	"github.com/egdaemon/eg/interp/c8sproxy"
 	"github.com/egdaemon/eg/interp/events"
+	"github.com/egdaemon/eg/secrets"
 	"github.com/egdaemon/eg/workspaces"
 	"github.com/fsnotify/fsnotify"
 	"github.com/gofrs/uuid/v5"
@@ -525,7 +526,16 @@ func beginwork(ctx context.Context, md metadata, dir string) state {
 	// this daemon was configured with.
 	gpuenabled := md.gpu || workload.Enqueued.Vram > 0
 
-	envb := envx.Build().FromPath(environpath).
+	// the runner resolves the secrets with its own credentials so only references
+	// travel with the workload. scheme validation is repeated here since the
+	// uris originate from the enqueuing side.
+	if err = secrets.ValidateRemote(workload.Enqueued.SecretUris...); err != nil {
+		return completed(workload.Enqueued, md, bucket, ws, 0, errorsx.Wrap(err, "invalid secret uris"))
+	}
+
+	envb := envx.Build().
+		FromReader(secrets.NewReader(ctx, workload.Enqueued.SecretUris...)).
+		FromPath(environpath).
 		Var(gitx.EnvAuthEGAccessToken, workload.AccessToken).
 		Var(eg.EnvCI, "true").
 		Var(eg.EnvComputeOS, runtime.GOOS).

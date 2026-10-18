@@ -22,7 +22,6 @@ import (
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/execx"
-	"github.com/egdaemon/eg/internal/langx"
 	"github.com/egdaemon/eg/internal/slicesx"
 	"github.com/egdaemon/eg/internal/stringsx"
 	"github.com/moby/moby/api/types/container"
@@ -162,7 +161,7 @@ func moduleExec(ctx context.Context, cname, moduledir string, stdin io.Reader, s
 			return
 		}
 
-		errorsx.Log(errorsx.Wrap(containers.ExecRemove(ctx, id, &containers.ExecRemoveOptions{Force: langx.Autoptr(true)}), "failed to remove exec session"))
+		errorsx.Log(errorsx.Wrap(containers.ExecRemove(ctx, id, &containers.ExecRemoveOptions{Force: new(true)}), "failed to remove exec session"))
 	}()
 
 	if stdin != nil {

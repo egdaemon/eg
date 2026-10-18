@@ -1,6 +1,7 @@
 package gitx
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -23,7 +24,9 @@ import (
 	"github.com/go-git/go-git/v6/plumbing/client"
 	"github.com/go-git/go-git/v6/plumbing/object"
 	githttp "github.com/go-git/go-git/v6/plumbing/transport/http"
+	gitssh "github.com/go-git/go-git/v6/plumbing/transport/ssh"
 	"github.com/golang-jwt/jwt/v4"
+	"golang.org/x/crypto/ssh"
 
 	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/compute"
@@ -443,6 +446,10 @@ func ExchangeCredentials(ctx context.Context, c *http.Client, vcsuri string, tok
 		return nil, err
 	}
 
+	if opt := sshcredentials(ctx, c, vcsuri, token, encoded); opt != nil {
+		return opt, nil
+	}
+
 	return httpcredentials(vcsuri, encoded), nil
 }
 
@@ -502,6 +509,80 @@ func httpcredentials(vcsuri string, encoded []byte) client.Option {
 	}
 
 	return nil
+}
+
+// remotesigner is an ssh.Signer that delegates signing to the credential service,
+// the private key never leaves the service.
+type remotesigner struct {
+	ctx    context.Context
+	c      *http.Client
+	token  string
+	pubkey ssh.PublicKey
+}
+
+func (t remotesigner) PublicKey() ssh.PublicKey {
+	return t.pubkey
+}
+
+func (t remotesigner) Sign(r io.Reader, data []byte) (*ssh.Signature, error) {
+	return t.SignWithAlgorithm(r, data, "")
+}
+
+func (t remotesigner) SignWithAlgorithm(_ io.Reader, data []byte, algorithm string) (*ssh.Signature, error) {
+	var (
+		sig compute.GitSignatureSSH
+	)
+
+	body, err := json.Marshal(&compute.GitSignRequest{Data: data, Algorithm: algorithm})
+	if err != nil {
+		return nil, errorsx.Wrap(err, "unable to encode signing request")
+	}
+
+	req, err := http.NewRequestWithContext(t.ctx, http.MethodPost, fmt.Sprintf("%s/r/vcsaccess/", eg.EnvContainerAPIHostDefault()), bytes.NewReader(body))
+	if err != nil {
+		return nil, errorsx.Wrap(err, "unable to create http request")
+	}
+	req.Header.Add("Authorization", fmt.Sprintf("BEARER %s", t.token))
+	req.Header.Add("Content-Type", "application/json")
+
+	resp, err := httpx.AsError(t.c.Do(req))
+	if err != nil {
+		return nil, errorsx.Wrap(err, "signing request failed")
+	}
+	defer resp.Body.Close()
+
+	if err = json.NewDecoder(resp.Body).Decode(&sig); err != nil {
+		return nil, errorsx.Wrap(err, "unable to decode signature")
+	}
+
+	return &ssh.Signature{Format: sig.Format, Blob: sig.Blob}, nil
+}
+
+// sshcredentials decodes exchanged credentials into ssh auth for vcsuri,
+// nil when they're not ssh credentials or vcsuri isn't an ssh uri.
+func sshcredentials(ctx context.Context, c *http.Client, vcsuri string, token string, encoded []byte) client.Option {
+	var (
+		creds compute.GitCredentialsSSH
+	)
+
+	if strings.HasPrefix(vcsuri, "http") {
+		return nil
+	}
+
+	if err := json.Unmarshal(encoded, &creds); err != nil || len(creds.PublicKey) == 0 {
+		return nil
+	}
+
+	pubkey, err := ssh.ParsePublicKey(creds.PublicKey)
+	if err != nil {
+		debugx.Println(errorsx.Wrap(err, "invalid ssh public key"))
+		return nil
+	}
+
+	return client.WithSSHAuth(&gitssh.PublicKeys{
+		User:   creds.Username,
+		Signer: remotesigner{ctx: ctx, c: c, token: token, pubkey: pubkey},
+	})
 }
 
 func Bearer(dir string) string {

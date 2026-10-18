@@ -14,7 +14,7 @@ func TestDirectClientReserve(t *testing.T) {
 	t.Run("uploads the archive with the candidate token", func(t *testing.T) {
 		var (
 			token, vram, archive, description string
-			labels               []string
+			labels                            []string
 		)
 
 		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

@@ -18,6 +18,7 @@ import (
 	"github.com/dustin/go-humanize"
 	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/cmd/cmderrors"
+	"github.com/egdaemon/eg/cmd/cmdgcp"
 	"github.com/egdaemon/eg/cmd/cmdgpg"
 	"github.com/egdaemon/eg/cmd/cmdopts"
 	"github.com/egdaemon/eg/cmd/cmdplete"
@@ -91,6 +92,7 @@ func main() {
 		Secrets            cmdsecret.SecretCmd          `cmd:"" name:"secrets" help:"ALPHA: builtin simple secret manager"`
 		GPG                cmdgpg.Cmd                   `cmd:"" name:"gpg" help:"gpg keyring management"`
 		SSH                cmdssh.Cmd                   `cmd:"" name:"ssh" help:"ssh key management"`
+		GCP                cmdgcp.Cmd                   `cmd:"" name:"gcp" help:"gcp integration management"`
 		GDX                konggdx.Commands             `cmd:"" name:"gdx" help:"pull profiles/traces from a running eg debug socket"`
 		InstallCompletions kongplete.InstallCompletions `cmd:"" help:"install shell completions"`
 	}

@@ -35,8 +35,9 @@ func (t *Token) MarshalJSON() ([]byte, error) {
 	return protojson.Marshal(t)
 }
 
+// UnmarshalJSON ignores unknown fields, the meta authz endpoint issues tokens with additional permissions.
 func (t *Token) UnmarshalJSON(b []byte) error {
-	return protojson.Unmarshal(b, t)
+	return protojson.UnmarshalOptions{DiscardUnknown: true}.Unmarshal(b, t)
 }
 
 func NewAuthzTokenSource(c *http.Client, signer ssh.Signer, endpoint string, account string) TokenSourceFromEndpoint {

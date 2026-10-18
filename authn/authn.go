@@ -34,6 +34,11 @@ func EndpointCompute() string {
 	return fmt.Sprintf("%s/c/authz/", eg.EnvAPIHostDefault())
 }
 
+// EndpointMetaAuthz issues the account management (meta) authorization token.
+func EndpointMetaAuthz() string {
+	return fmt.Sprintf("%s/m/authz/", eg.EnvAPIHostDefault())
+}
+
 func OAuth2SSHConfig(signer ssh.Signer, otp string, endpoint oauth2.Endpoint) oauth2.Config {
 	return oauth2.Config{
 		ClientID:     ssh.FingerprintSHA256(signer.PublicKey()),

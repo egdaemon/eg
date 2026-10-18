@@ -1,0 +1,44 @@
+syntax = "proto3";
+
+package meta;
+
+message GCPWIFConnection {
+  string label = 1 [ json_name = "label" ];
+  string audience = 2 [ json_name = "audience" ];
+  string impersonate_service_account = 3
+      [ json_name = "impersonate_service_account" ];
+  string description = 4 [ json_name = "description" ];
+}
+
+message GCPWIFFindResponse {
+  GCPWIFConnection connection = 1 [ json_name = "connection" ];
+}
+
+message GCPWIFSearchRequest {
+  uint64 offset = 1 [ json_name = "offset" ];
+  uint64 limit = 2 [ json_name = "limit" ];
+  string query = 3 [ json_name = "query" ];
+}
+message GCPWIFSearchResponse {
+  GCPWIFSearchRequest next = 1 [ json_name = "next" ];
+  repeated GCPWIFConnection items = 2 [ json_name = "items" ];
+}
+
+// creates a connection, an empty label defaults to the account id.
+message GCPWIFCreateRequest {
+  GCPWIFConnection connection = 1 [ json_name = "connection" ];
+}
+message GCPWIFCreateResponse {
+  GCPWIFConnection connection = 1 [ json_name = "connection" ];
+}
+
+// unset fields are left unchanged.
+message GCPWIFUpdateRequest {
+  optional string audience = 1 [ json_name = "audience" ];
+  optional string impersonate_service_account = 2
+      [ json_name = "impersonate_service_account" ];
+  optional string description = 3 [ json_name = "description" ];
+}
+message GCPWIFUpdateResponse {
+  GCPWIFConnection connection = 1 [ json_name = "connection" ];
+}

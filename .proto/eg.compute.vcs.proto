@@ -10,10 +10,29 @@ message GitCredentialsHTTP {
   string password = 2 [ json_name = "password" ];
 }
 
+// ssh credentials never include the private key, signing is delegated
+// to the credential service, see GitSignRequest.
+message GitCredentialsSSH {
+  string username = 1 [ json_name = "username" ];
+  bytes public_key = 2 [ json_name = "public_key" ]; // ssh wire format.
+}
+
+message GitSignRequest {
+  bytes data = 1 [ json_name = "data" ];
+  string algorithm = 2 [ json_name = "algorithm" ];
+}
+
+message GitSignatureSSH {
+  string format = 1 [ json_name = "format" ];
+  bytes blob = 2 [ json_name = "blob" ];
+}
+
 message GitAccessCredentials {
   oneof Credentials {
     GitCredentialsAutomatic automatic = 100;
     GitCredentialsHTTP git_http = 101;
+    GitCredentialsSSH ssh = 102;
+    GitSignatureSSH ssh_signature = 103;
   }
 }
 

@@ -146,7 +146,7 @@ func (t options) Allow(s ...string) options {
 // configure the manifest for building the flatpak, but default it'll copy everything in the current
 // directory in an rsync like manner.
 func New(id string, command string, options ...option) *Builder {
-	return langx.Autoptr(langx.Clone(Builder{
+	return new(langx.Clone(Builder{
 		Manifest: Manifest{
 			ID:      id,
 			Runtime: Runtime{ID: "org.freedesktop.Platform", Version: "24.08"},
@@ -155,6 +155,7 @@ func New(id string, command string, options ...option) *Builder {
 			Modules: []Module{},
 		},
 	}, options...))
+
 }
 
 // Build the flatpak, requires that the container is run with --privileged option.

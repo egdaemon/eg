@@ -29,6 +29,9 @@ message Enqueued {
   string logs_token = 21 [ json_name = "logs_token" ];
   reserved 22 to 999;
   repeated string labels = 1000 [ json_name = "labels" ];
+  // secret manager uris (gcpsm://, awssm://) resolved by the runner into the
+  // workload's environment. references only, never secret values.
+  repeated string secret_uris = 1001 [ json_name = "secret_uris" ];
 }
 
 message EnqueuedSearchRequest {

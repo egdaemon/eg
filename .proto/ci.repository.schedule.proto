@@ -1,0 +1,49 @@
+syntax = "proto3";
+
+package ci.repository;
+
+message Schedule {
+  string id = 1 [ json_name = "id" ];
+  string account_id = 2 [ json_name = "account_id" ];
+  string created_at = 3 [ json_name = "created_at" ];
+  string updated_at = 4 [ json_name = "updated_at" ];
+  string lastrun_at = 5 [ json_name = "lastrun_at" ];
+  string nextrun_at = 6 [ json_name = "nextrun_at" ];
+  string description = 7 [ json_name = "description" ];
+  string vcs_uri = 8 [ json_name = "vcs_uri" ];
+  string cron = 9 [ json_name = "chron" ];
+  string mimetype = 10 [ json_name = "mimetype" ];
+  reserved 11 to 99;
+  string entry = 100 [ json_name = "entrypoint" ];
+  string arch = 101 [ json_name = "arch" ];
+  string os = 102 [ json_name = "os" ];
+  uint64 cores = 103 [ json_name = "cores" ];
+  uint64 memory = 104 [ json_name = "memory" ];
+  uint64 vram = 105 [ json_name = "vram" ];
+  uint64 ttl = 106 [ json_name = "ttl" ];
+  reserved 107 to 999;
+  repeated string labels = 1000 [ json_name = "labels" ];
+}
+
+message ScheduleSearchRequest {
+  string query = 1 [ json_name = "query" ];
+  string vcs_uri = 2 [ json_name = "vcs_uri" ];
+  reserved 3 to 100;
+  uint64 offset = 101 [ json_name = "offset" ];
+  uint64 limit = 102 [ json_name = "limit" ];
+}
+message ScheduleSearchResponse {
+  ScheduleSearchRequest next = 1 [ json_name = "next" ];
+  repeated Schedule items = 2 [ json_name = "items" ];
+}
+
+message ScheduleCreateRequest { Schedule schedule = 1; }
+message ScheduleCreateResponse { Schedule schedule = 1; }
+
+message ScheduleUpdateRequest { Schedule schedule = 1; }
+message ScheduleUpdateResponse { Schedule schedule = 1; }
+
+message ScheduleFindResponse { Schedule schedule = 1; }
+
+message ScheduleDestroyRequest {}
+message ScheduleDestroyResponse { Schedule schedule = 1; }

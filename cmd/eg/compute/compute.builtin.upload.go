@@ -36,7 +36,6 @@ import (
 	"github.com/go-git/go-git/v6"
 	"github.com/gofrs/uuid/v5"
 	"golang.org/x/crypto/ssh"
-	"golang.org/x/oauth2"
 )
 
 type builtinUpload struct {
@@ -199,12 +198,7 @@ func (t builtinUpload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err e
 	}
 	defer buf.Close()
 
-	c := tlsc.DefaultClient()
-	tokensrc := compute.NewAuthzTokenSource(tlsc.DefaultClient(), signer, authn.EndpointCompute(), gctx.AccountID)
-	chttp := oauth2.NewClient(
-		context.WithValue(gctx.Context, oauth2.HTTPClient, c),
-		tokensrc,
-	)
+	chttp := authn.New(gctx.Context, tlsc.DefaultClient(), signer, gctx.AccountID, compute.NewAuthzTokenSource)
 
 	ctx, done := context.WithTimeout(gctx.Context, 10*time.Second)
 	defer done()

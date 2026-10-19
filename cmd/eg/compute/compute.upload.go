@@ -39,7 +39,6 @@ import (
 	"github.com/go-git/go-git/v6"
 	"github.com/gofrs/uuid/v5"
 	"golang.org/x/crypto/ssh"
-	"golang.org/x/oauth2"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -194,12 +193,7 @@ func (t upload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 		Description: stringsx.FirstNonBlank(t.Name, gitx.Description("Uploaded: %git.commit.author% - %git.ref%", repo, t.GitReference)),
 	}
 
-	c := tlsc.DefaultClient()
-	tokensrc := compute.NewAuthzTokenSource(tlsc.DefaultClient(), signer, authn.EndpointCompute(), gctx.AccountID)
-	chttp := oauth2.NewClient(
-		context.WithValue(gctx.Context, oauth2.HTTPClient, c),
-		tokensrc,
-	)
+	chttp := authn.New(gctx.Context, tlsc.DefaultClient(), signer, gctx.AccountID, compute.NewAuthzTokenSource)
 
 	if t.Direct {
 		if accepted, cause := t.direct(gctx.Context, chttp, enq, archiveio, environio); cause != nil {

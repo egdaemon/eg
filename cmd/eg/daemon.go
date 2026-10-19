@@ -27,7 +27,6 @@ import (
 	"github.com/egdaemon/eg/internal/userx"
 	"github.com/egdaemon/eg/runners"
 	"golang.org/x/crypto/ssh"
-	"golang.org/x/oauth2"
 
 	"github.com/libp2p/go-libp2p/core/host"
 )
@@ -110,11 +109,7 @@ func (t daemon) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, keygen cmdopt
 	}
 
 	c := httpx.BindRetryTransport(tlsc.DefaultClient(), http.StatusTooManyRequests, http.StatusBadGateway)
-	tokensrc := compute.NewAuthzTokenSource(c, signer, authn.EndpointCompute(), t.AccountID)
-	authclient = oauth2.NewClient(
-		context.WithValue(gctx.Context, oauth2.HTTPClient, c),
-		tokensrc,
-	)
+	authclient = authn.New(gctx.Context, c, signer, t.AccountID, compute.NewAuthzTokenSource)
 
 	if err = daemons.HTTP(gctx, httpl, rm, compiledirs, runners.NewDirectClient(authclient), t.Uploadable); err != nil {
 		return err

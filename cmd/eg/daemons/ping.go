@@ -1,7 +1,6 @@
 package daemons
 
 import (
-	"context"
 	"log"
 	"time"
 
@@ -16,7 +15,6 @@ import (
 	"github.com/egdaemon/eg/runners/registration"
 	"github.com/libp2p/go-libp2p/core/host"
 	"golang.org/x/crypto/ssh"
-	"golang.org/x/oauth2"
 	"golang.org/x/time/rate"
 )
 
@@ -30,11 +28,7 @@ func Ping(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, runtimecfg *cmdopts.Run
 		return errorsx.String("an account id is required to register the daemon")
 	}
 
-	tokensrc := compute.NewAuthzTokenSource(tlsc.DefaultClient(), s, authn.EndpointCompute(), aid)
-	authclient := oauth2.NewClient(
-		context.WithValue(gctx.Context, oauth2.HTTPClient, tlsc.DefaultClient()),
-		tokensrc,
-	)
+	authclient := authn.New(gctx.Context, tlsc.DefaultClient(), s, aid, compute.NewAuthzTokenSource)
 
 	rc := registration.NewPingClient(authclient)
 

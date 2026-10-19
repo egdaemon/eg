@@ -1,7 +1,6 @@
 package compute
 
 import (
-	"context"
 	"embed"
 	"errors"
 	"log"
@@ -32,7 +31,6 @@ import (
 	"github.com/go-git/go-git/v6"
 	"github.com/gofrs/uuid/v5"
 	"golang.org/x/crypto/ssh"
-	"golang.org/x/oauth2"
 )
 
 type c8scmds struct {
@@ -203,11 +201,7 @@ func (t c8sUpload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error
 	defer buf.Close()
 
 	c := httpx.BindRetryTransport(tlsc.DefaultClient(), http.StatusTooManyRequests, http.StatusBadGateway)
-	tokensrc := compute.NewAuthzTokenSource(c, signer, authn.EndpointCompute(), gctx.AccountID)
-	chttp := oauth2.NewClient(
-		context.WithValue(gctx.Context, oauth2.HTTPClient, c),
-		tokensrc,
-	)
+	chttp := authn.New(gctx.Context, c, signer, gctx.AccountID, compute.NewAuthzTokenSource)
 
 	req, err := http.NewRequestWithContext(gctx.Context, http.MethodPost, t.Endpoint, buf)
 	if err != nil {

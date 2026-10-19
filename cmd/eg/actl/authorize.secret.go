@@ -11,7 +11,6 @@ import (
 	"github.com/egdaemon/eg/internal/sshx"
 	"github.com/egdaemon/eg/runners/registration"
 	"golang.org/x/crypto/ssh"
-	"golang.org/x/oauth2"
 )
 
 type AuthorizeSecret struct {
@@ -51,8 +50,7 @@ func (t AuthorizeSecret) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, entr
 }
 
 func (t AuthorizeSecret) run(ctx context.Context, c *http.Client, account, regid string, signer ssh.Signer) (err error) {
-	tokensrc := compute.NewAuthzTokenSource(c, signer, authn.EndpointCompute(), account)
-	httpc := oauth2.NewClient(context.WithValue(ctx, oauth2.HTTPClient, c), tokensrc)
+	httpc := authn.New(ctx, c, signer, account, compute.NewAuthzTokenSource)
 
 	rc := registration.NewRegistrationClient(httpc)
 	if _, err = rc.Grant(ctx, &registration.RegistrationGrantRequest{Registration: &registration.Registration{Id: regid}, Global: t.Shared}); err != nil {

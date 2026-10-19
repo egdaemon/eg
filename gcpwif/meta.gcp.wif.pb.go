@@ -4,7 +4,7 @@
 // 	protoc        v3.21.12
 // source: meta.gcp.wif.proto
 
-package cmdgcp
+package gcpwif
 
 import (
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"

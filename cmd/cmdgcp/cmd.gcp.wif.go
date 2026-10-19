@@ -2,18 +2,21 @@ package cmdgcp
 
 import (
 	"fmt"
-	"net/url"
 	"os"
-	"strconv"
 	"text/tabwriter"
 
+	"github.com/egdaemon/eg/authn"
 	"github.com/egdaemon/eg/cmd/cmdopts"
+	"github.com/egdaemon/eg/compute"
+	"github.com/egdaemon/eg/gcpwif"
 	"github.com/egdaemon/eg/internal/errorsx"
+	"github.com/egdaemon/eg/internal/langx"
+	"github.com/egdaemon/eg/internal/sshx"
 )
 
 // Selector selects the connection, defaults to the account id of the current profile.
 type Selector struct {
-	Label      string `arg:"" optional:"" name:"label" help:"label of the connection, defaults to the account id of the current profile"`
+	Label      string `arg:"" optional:"" name:"label" help:"label of the connection, defaults to the account id (--account-id)"`
 	SSHKeyPath string `name:"sshkeypath" help:"path to ssh key to use" default:"${vars_ssh_key_path}"`
 }
 
@@ -25,22 +28,26 @@ type Create struct {
 }
 
 func (t Create) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) error {
-	c, err := newClient(gctx.Context, gctx, tlsc, t.SSHKeyPath)
+	signer, err := sshx.AutoCached(sshx.NewKeyGen(), t.SSHKeyPath)
 	if err != nil {
 		return err
 	}
 
-	var rsp GCPWIFCreateResponse
-	if err = c.do(gctx.Context, "POST", "", nil, &GCPWIFCreateRequest{Connection: &GCPWIFConnection{
-		Label:                     c.label(t.Label),
+	// the management routes require the user management permission.
+	c := authn.New(gctx.Context, tlsc.DefaultClient(), signer, gctx.AccountID, compute.NewAuthzTokenSource, authn.OptionEndpoint(authn.EndpointMetaAuthz()))
+
+	// an empty label defaults to the account id on the server.
+	conn, err := gcpwif.Create(gctx.Context, c, &gcpwif.GCPWIFConnection{
+		Label:                     t.Label,
 		Audience:                  t.Audience,
 		ImpersonateServiceAccount: t.Impersonate,
 		Description:               t.Description,
-	}}, &rsp); err != nil {
-		return errorsx.Wrap(err, "unable to create connection")
+	})
+	if err != nil {
+		return err
 	}
 
-	fmt.Printf("created %s\n", rsp.GetConnection().GetLabel())
+	fmt.Printf("created %s\n", conn.GetLabel())
 	return nil
 }
 
@@ -50,19 +57,22 @@ type List struct {
 }
 
 func (t List) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) error {
-	c, err := newClient(gctx.Context, gctx, tlsc, t.SSHKeyPath)
+	signer, err := sshx.AutoCached(sshx.NewKeyGen(), t.SSHKeyPath)
 	if err != nil {
 		return err
 	}
+
+	// the management routes require the user management permission.
+	c := authn.New(gctx.Context, tlsc.DefaultClient(), signer, gctx.AccountID, compute.NewAuthzTokenSource, authn.OptionEndpoint(authn.EndpointMetaAuthz()))
 
 	w := tabwriter.NewWriter(os.Stdout, 0, 4, 2, ' ', 0)
 	fmt.Fprintln(w, "LABEL\tAUDIENCE\tIMPERSONATE\tDESCRIPTION")
 
 	// follow next until the last page, which resets the offset to zero.
 	for offset := uint64(0); ; {
-		var rsp GCPWIFSearchResponse
-		if err = c.do(gctx.Context, "GET", "", url.Values{"offset": {strconv.FormatUint(offset, 10)}, "query": {t.Query}}, nil, &rsp); err != nil {
-			return errorsx.Wrap(err, "unable to list connections")
+		rsp, err := gcpwif.Search(gctx.Context, c, t.Query, offset)
+		if err != nil {
+			return err
 		}
 
 		for _, i := range rsp.GetItems() {
@@ -86,12 +96,15 @@ type Edit struct {
 }
 
 func (t Edit) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) error {
-	c, err := newClient(gctx.Context, gctx, tlsc, t.SSHKeyPath)
+	signer, err := sshx.AutoCached(sshx.NewKeyGen(), t.SSHKeyPath)
 	if err != nil {
 		return err
 	}
 
-	var req GCPWIFUpdateRequest
+	// the management routes require the user management permission.
+	c := authn.New(gctx.Context, tlsc.DefaultClient(), signer, gctx.AccountID, compute.NewAuthzTokenSource, authn.OptionEndpoint(authn.EndpointMetaAuthz()))
+
+	var req gcpwif.GCPWIFUpdateRequest
 	if t.Audience != "" {
 		req.Audience = &t.Audience
 	}
@@ -110,12 +123,16 @@ func (t Edit) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) error {
 		return errorsx.New("nothing to change, provide at least one of --audience, --impersonate, --clear-impersonate, --description")
 	}
 
-	label := c.label(t.Label)
-	if err = c.do(gctx.Context, "PATCH", label, nil, &req, &GCPWIFUpdateResponse{}); err != nil {
-		return errorsx.Wrap(err, "unable to edit connection")
+	l := langx.FirstNonZero(t.Label, gctx.AccountID)
+	if l == "" {
+		return errorsx.New("a label or --account-id is required")
 	}
 
-	fmt.Printf("updated %s\n", label)
+	if _, err = gcpwif.Update(gctx.Context, c, l, &req); err != nil {
+		return err
+	}
+
+	fmt.Printf("updated %s\n", l)
 	return nil
 }
 
@@ -124,16 +141,23 @@ type Remove struct {
 }
 
 func (t Remove) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) error {
-	c, err := newClient(gctx.Context, gctx, tlsc, t.SSHKeyPath)
+	signer, err := sshx.AutoCached(sshx.NewKeyGen(), t.SSHKeyPath)
 	if err != nil {
 		return err
 	}
 
-	label := c.label(t.Label)
-	if err = c.do(gctx.Context, "DELETE", label, nil, nil, nil); err != nil {
-		return errorsx.Wrap(err, "unable to remove connection")
+	// the management routes require the user management permission.
+	c := authn.New(gctx.Context, tlsc.DefaultClient(), signer, gctx.AccountID, compute.NewAuthzTokenSource, authn.OptionEndpoint(authn.EndpointMetaAuthz()))
+
+	l := langx.FirstNonZero(t.Label, gctx.AccountID)
+	if l == "" {
+		return errorsx.New("a label or --account-id is required")
 	}
 
-	fmt.Printf("removed %s\n", label)
+	if err = gcpwif.Remove(gctx.Context, c, l); err != nil {
+		return err
+	}
+
+	fmt.Printf("removed %s\n", l)
 	return nil
 }

@@ -3,29 +3,26 @@ package cmdgcp
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/alecthomas/kong"
-	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"testing"
 	"time"
 
+	"github.com/alecthomas/kong"
+	"github.com/egdaemon/eg/authn"
+	"github.com/egdaemon/eg/compute"
+	"github.com/egdaemon/eg/gcpwif"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/httpx"
 	"github.com/egdaemon/eg/internal/sshx"
-	"github.com/golang-jwt/jwt/v4"
 	"github.com/stretchr/testify/require"
-	"google.golang.org/protobuf/encoding/protojson"
 )
 
 // fake api serving the ssh login flow, the meta authz token and the wif routes.
-func newtestclient(t *testing.T, accountID string, wif http.HandlerFunc) *client {
+func newtestclient(t *testing.T, accountID string, wif http.HandlerFunc) *http.Client {
 	t.Helper()
 	t.Setenv("EG_SESSION_TOKEN", "stub-refresh-token")
-
-	bearer, err := jwt.NewWithClaims(jwt.SigningMethodNone, jwt.RegisteredClaims{Issuer: accountID}).SignedString(jwt.UnsafeAllowNoneSignatureType)
-	require.NoError(t, err)
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/oauth2/ssh/token", func(w http.ResponseWriter, r *http.Request) {
@@ -37,8 +34,16 @@ func newtestclient(t *testing.T, accountID string, wif http.HandlerFunc) *client
 	mux.HandleFunc("/authn/current", func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprint(w, `{"token":"stub-session-token","profile":{"id":"profile-1"},"account":{"id":"account-1"}}`)
 	})
+	// the meta token carries permissions the compute token does not have.
 	mux.HandleFunc("/m/authz/", func(w http.ResponseWriter, r *http.Request) {
-		json.NewEncoder(w).Encode(map[string]any{"token": map[string]any{"bearer": bearer, "expires": time.Now().Add(time.Hour).UnixMilli(), "usermanagement": true, "billing_read": true, "billing_modify": true}})
+		json.NewEncoder(w).Encode(map[string]any{"token": map[string]any{
+			"iss":            accountID,
+			"bearer":         "meta-bearer",
+			"expires":        time.Now().Add(time.Hour).UnixMilli(),
+			"usermanagement": true,
+			"billing_read":   true,
+			"billing_modify": true,
+		}})
 	})
 	mux.HandleFunc("/m/gcp/wif/", wif)
 
@@ -51,48 +56,31 @@ func newtestclient(t *testing.T, accountID string, wif http.HandlerFunc) *client
 	signer, err := sshx.SignerFromGenerator(sshx.NewKeyGenSeeded(t.Name()))
 	require.NoError(t, err)
 
-	c, err := newClientFrom(t.Context(), &http.Client{Transport: httpx.RewriteHostTransport(errorsx.Must(url.Parse(srv.URL)), nil)}, signer, "")
-	require.NoError(t, err)
-	return c
+	return authn.New(t.Context(), &http.Client{Transport: httpx.RewriteHostTransport(errorsx.Must(url.Parse(srv.URL)), nil)}, signer, "", compute.NewAuthzTokenSource, authn.OptionEndpoint(authn.EndpointMetaAuthz()))
 }
 
 func TestClient(t *testing.T) {
-	t.Run("label defaults to the account id of the profile", func(t *testing.T) {
-		c := newtestclient(t, "account-1", func(w http.ResponseWriter, r *http.Request) {})
-		require.Equal(t, "account-1", c.label(""))
-		require.Equal(t, "prod", c.label("prod"))
+	t.Run("should authorize with the meta token and send it to the wif routes", func(t *testing.T) {
+		var authorization string
+		c := newtestclient(t, "account-1", func(w http.ResponseWriter, r *http.Request) {
+			authorization = r.Header.Get("Authorization")
+			w.WriteHeader(http.StatusCreated)
+			fmt.Fprint(w, `{"connection":{"label":"account-1","audience":"aud"}}`)
+		})
+
+		conn, err := gcpwif.Create(t.Context(), c, &gcpwif.GCPWIFConnection{Audience: "aud"})
+		require.NoError(t, err)
+		require.Equal(t, "account-1", conn.GetLabel())
+		require.Equal(t, "Bearer meta-bearer", authorization)
 	})
 
-	t.Run("create sends the defaulted label and surfaces the status", func(t *testing.T) {
-		var got GCPWIFCreateRequest
+	t.Run("should surface the status of a failed request", func(t *testing.T) {
 		c := newtestclient(t, "account-1", func(w http.ResponseWriter, r *http.Request) {
-			require.Equal(t, http.MethodPost, r.Method)
-			require.Contains(t, r.Header.Get("Authorization"), "Bearer ey")
-			b, err := io.ReadAll(r.Body)
-			require.NoError(t, err)
-			require.NoError(t, protojson.Unmarshal(b, &got))
 			w.WriteHeader(http.StatusBadRequest)
 		})
 
-		err := c.do(t.Context(), http.MethodPost, "", nil, &GCPWIFCreateRequest{Connection: &GCPWIFConnection{Label: c.label(""), Audience: "nope"}}, nil)
+		_, err := gcpwif.Create(t.Context(), c, &gcpwif.GCPWIFConnection{Audience: "nope"})
 		require.ErrorContains(t, err, "400")
-		require.Equal(t, "account-1", got.GetConnection().GetLabel())
-	})
-
-	t.Run("edit and remove address the label in the path", func(t *testing.T) {
-		var method, path string
-		c := newtestclient(t, "account-1", func(w http.ResponseWriter, r *http.Request) {
-			method, path = r.Method, r.URL.Path
-			fmt.Fprint(w, `{}`)
-		})
-
-		require.NoError(t, c.do(t.Context(), http.MethodPatch, c.label(""), nil, &GCPWIFUpdateRequest{}, nil))
-		require.Equal(t, http.MethodPatch, method)
-		require.Equal(t, "/m/gcp/wif/account-1", path)
-
-		require.NoError(t, c.do(t.Context(), http.MethodDelete, "prod", nil, nil, nil))
-		require.Equal(t, http.MethodDelete, method)
-		require.Equal(t, "/m/gcp/wif/prod", path)
 	})
 }
 

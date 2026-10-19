@@ -275,6 +275,8 @@ type rewritehosttransport struct {
 func (t rewritehosttransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	dup := *t.dst
 	dup.Path = req.URL.Path
+	dup.RawPath = req.URL.RawPath
+	dup.RawQuery = req.URL.RawQuery
 
 	// log.Println("rewriting", req.URL, req.RemoteAddr, req.Host, "->", dup)
 	req.Host = dup.Host

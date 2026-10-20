@@ -137,7 +137,7 @@ func (t serve) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err e
 
 	sshserver := runners.AgentOptionSSHServer(gctx.Context, ws, t.SSHKeyPath, t.SSH)
 	if t.SSH != 0 {
-		log.Printf("ssh access enabled: ssh -i %s -p %d %s@localhost\n", t.SSHKeyPath, t.SSH, eg.DefaultUsername)
+		log.Printf("ssh access enabled: ssh -i %s -p %d -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o LogLevel=ERROR %s@localhost\n", t.SSHKeyPath, t.SSH, eg.DefaultUsername)
 	}
 
 	if err = errorsx.Compact(envb.CopyTo(environio), environio.Close()); err != nil {

@@ -20,6 +20,7 @@ import (
 	"github.com/egdaemon/eg/cmd/cmderrors"
 	"github.com/egdaemon/eg/cmd/cmdgcp"
 	"github.com/egdaemon/eg/cmd/cmdgpg"
+	"github.com/egdaemon/eg/cmd/cmdmachine"
 	"github.com/egdaemon/eg/cmd/cmdopts"
 	"github.com/egdaemon/eg/cmd/cmdplete"
 	"github.com/egdaemon/eg/cmd/cmdsecret"
@@ -93,6 +94,7 @@ func main() {
 		Secrets            cmdsecret.SecretCmd          `cmd:"" name:"secrets" help:"ALPHA: builtin simple secret manager"`
 		GPG                cmdgpg.Cmd                   `cmd:"" name:"gpg" help:"gpg keyring management"`
 		SSH                cmdssh.Cmd                   `cmd:"" name:"ssh" help:"ssh key management"`
+		Machine            cmdmachine.Cmd               `cmd:"" name:"machine" help:"interact with machines"`
 		GCP                cmdgcp.Cmd                   `cmd:"" name:"gcp" help:"gcp integration management"`
 		GDX                konggdx.Commands             `cmd:"" name:"gdx" help:"pull profiles/traces from a running eg debug socket"`
 		InstallCompletions kongplete.InstallCompletions `cmd:"" help:"install shell completions"`
@@ -142,6 +144,7 @@ func main() {
 			"vars_machine_id":              envx.String(machineID(), "EG_MACHINE_ID"),
 			"vars_entropy_seed":            envx.String(errorsx.Must(uuid.NewV4()).String(), "EG_ENTROPY_SEED"),
 			"vars_ssh_key_path":            cmdopts.DefaultSSHKeyPath(),
+			"vars_machine_ssh_user":        eg.DefaultUsername,
 			"vars_ssh_known_hosts_path":    filepath.Join(userx.HomeDirectoryOrDefault(user.HomeDir), ".ssh", "known_hosts"),
 			"vars_ssh_key_seed":            eg.EnvEGSSHSeed,
 			"vars_user_name":               stringsx.DefaultIfBlank(user.Name, user.Username),

@@ -33,6 +33,7 @@ import (
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/gitx"
 	"github.com/egdaemon/eg/internal/gpgx"
+	"github.com/egdaemon/eg/internal/libp2px"
 	"github.com/egdaemon/eg/internal/osx"
 	"github.com/egdaemon/eg/internal/sshx"
 	"github.com/egdaemon/eg/internal/stringsx"
@@ -166,6 +167,7 @@ func main() {
 			new(cmdopts.HotswapPath),
 			cmdopts.Entropy(cmdopts.GenerateEntropy),
 			cmdopts.KeyGenSeeded(sshx.NewKeyGenSeeded),
+			libp2px.MDNSLookup(libp2px.DefaultMDNSLookup),
 		),
 		kong.BindTo(shellcli.Context, (*context.Context)(nil)),
 		kong.TypeMapper(reflect.TypeFor[*net.IP](), kong.MapperFunc(cmdopts.ParseIP)),

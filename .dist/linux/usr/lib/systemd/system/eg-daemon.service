@@ -10,6 +10,9 @@ IOSchedulingPriority=5
 PrivateMounts=yes
 IPAddressDeny=link-local
 IPAddressDeny=multicast
+# mDNS discovery: allow only the mDNS multicast groups (IPv4, IPv6) through the
+# multicast deny above. IPAddressAllow takes precedence over IPAddressDeny.
+IPAddressAllow=224.0.0.251 ff02::fb
 Restart=on-failure
 CacheDirectory=%p
 ConfigurationDirectory=%p

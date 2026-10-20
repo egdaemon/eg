@@ -65,4 +65,36 @@ func TestBootstrapEnvDaemon(t *testing.T) {
 
 		require.Panics(t, func() { genparser(t) })
 	})
+
+	t.Run("lan settings are only emitted when requested", func(t *testing.T) {
+		for _, c := range []struct {
+			name     string
+			args     []string
+			contains []string
+			absent   []string
+		}{
+			{name: "defaults", absent: []string{"EG_MDNS_ADVERTISE", "EG_LAN_PEER_TTL"}},
+			{name: "enabled", args: []string{"--mdns-advertise", "--lan-peer-ttl", "48h"}, contains: []string{"EG_MDNS_ADVERTISE=true", `EG_LAN_PEER_TTL="48h0m0s"`}},
+			{name: "negated", args: []string{"--no-mdns-advertise"}, absent: []string{"EG_MDNS_ADVERTISE"}},
+		} {
+			t.Run(c.name, func(t *testing.T) {
+				var out bytes.Buffer
+				genparser := cmdtestx.Genparser(actl.BootstrapEnvDaemon{},
+					cmdopts.RuntimeResources{}.KongVars(),
+					kong.NamedMapper("durationinf", kong.MapperFunc(cmdopts.ParseDurationInf)),
+					kong.Vars{"vars_account_id": "expected-account", "vars_entropy_seed": "expected-seed"},
+					kong.Writers(&out, nil),
+					kong.Bind(cmdopts.Entropy(cmdopts.GenerateEntropy)),
+				)
+
+				require.NoError(t, cmdtestx.Execute(t, genparser(t), append([]string{"command"}, c.args...)...))
+				for _, v := range c.contains {
+					require.Contains(t, out.String(), v)
+				}
+				for _, v := range c.absent {
+					require.NotContains(t, out.String(), v)
+				}
+			})
+		}
+	})
 }

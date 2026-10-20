@@ -2,6 +2,7 @@ package compute
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"io"
@@ -24,6 +25,7 @@ import (
 	"github.com/egdaemon/eg/internal/gitx"
 	"github.com/egdaemon/eg/internal/httpx"
 	"github.com/egdaemon/eg/internal/iox"
+	"github.com/egdaemon/eg/internal/lan"
 	"github.com/egdaemon/eg/internal/libp2px"
 	"github.com/egdaemon/eg/internal/md5x"
 	"github.com/egdaemon/eg/internal/slicesx"
@@ -32,49 +34,64 @@ import (
 	"github.com/egdaemon/eg/internal/tarx"
 	"github.com/egdaemon/eg/internal/unsafepretty"
 	"github.com/egdaemon/eg/runners"
-	"github.com/egdaemon/eg/runners/registration"
 	"github.com/egdaemon/eg/secrets"
 	"github.com/egdaemon/eg/transpile"
 	"github.com/egdaemon/eg/workspaces"
 	"github.com/go-git/go-git/v6"
 	"github.com/gofrs/uuid/v5"
 	"golang.org/x/crypto/ssh"
-	"google.golang.org/protobuf/proto"
 )
 
 type upload struct {
 	cmdopts.RuntimeResources
-	HostedCompute    bool     `name:"shared-compute" help:"allow hosted compute" default:"true"`
-	Direct           bool     `name:"direct" help:"attempt to upload directly to an available runner before falling back to the cluster" default:"true" negatable:""`
-	Follow           bool     `name:"follow" help:"stream the workload's logs when uploaded directly to a runner"`
-	SSHKeyPath       string   `name:"sshkeypath" help:"path to ssh key to use" default:"${vars_ssh_key_path}"`
-	Dir              string   `name:"directory" help:"root directory of the repository" default:"${vars_eg_root_directory}"`
-	Name             string   `arg:"" name:"module" help:"name of the module to run, i.e. the folder name within moduledir" default:"" predictor:"eg.workload"`
-	EnvironmentPaths []string `name:"envpath" help:"environment files to pass to the module" default:""`
-	Environment      []string `name:"env" short:"e" help:"define environment variables and their values to be included"`
-	Dirty            bool     `name:"dirty" help:"include all environment variables"`
-	Endpoint         string   `name:"endpoint" help:"specify the endpoint to upload to" default:"${vars_endpoint}/c/q/" hidden:"true"`
-	GitRemote        string   `name:"git-remote" help:"name of the git remote to use" default:"${vars_git_default_remote_name}"`
-	GitReference     string   `name:"git-ref" help:"name of the branch or commit to checkout" default:"${vars_git_default_reference}"`
-	GitClone         string   `name:"git-clone-uri" help:"clone uri"`
-	Secrets          []string `name:"secret" help:"List of secret URIs to use. Examples: chachasm://passphrase@/path/to/file, gcpsm://project-id/secret-name/version, awssm://secret-name?region=us-east-1"`
+	HostedCompute    bool          `name:"shared-compute" help:"allow hosted compute" default:"true"`
+	P2P              int           `name:"p2p" help:"priority of uploading directly to a runner the control plane suggests before falling back to the cluster, higher goes first, 0 disables" default:"1" env:"EG_P2P_PRIORITY"`
+	LAN              int           `name:"lan" help:"priority of uploading directly to a runner remembered from the local network (see 'eg compute lan'), higher goes first, 0 disables including scanning for runners" default:"0" env:"EG_LAN_PRIORITY"`
+	CacheDir         string        `name:"cache-directory" help:"directory the remembered systems on the local network are stored in" default:"${vars_cache_directory}" env:"EG_CACHE_DIRECTORY"`
+	LANScanTimeout   time.Duration `name:"lan-scan-timeout" help:"how long the background scan of the local network runs for" default:"3s"`
+	LANPeerTTL       time.Duration `name:"lan-peer-ttl" type:"durationinf" help:"how long systems on the local network are remembered after they were last seen" default:"720h" env:"EG_LAN_PEER_TTL"`
+	Follow           bool          `name:"follow" help:"stream the workload's logs when uploaded directly to a runner"`
+	SSHKeyPath       string        `name:"sshkeypath" help:"path to ssh key to use" default:"${vars_ssh_key_path}"`
+	Dir              string        `name:"directory" help:"root directory of the repository" default:"${vars_eg_root_directory}"`
+	Name             string        `arg:"" name:"module" help:"name of the module to run, i.e. the folder name within moduledir" default:"" predictor:"eg.workload"`
+	EnvironmentPaths []string      `name:"envpath" help:"environment files to pass to the module" default:""`
+	Environment      []string      `name:"env" short:"e" help:"define environment variables and their values to be included"`
+	Dirty            bool          `name:"dirty" help:"include all environment variables"`
+	Endpoint         string        `name:"endpoint" help:"specify the endpoint to upload to" default:"${vars_endpoint}/c/q/" hidden:"true"`
+	GitRemote        string        `name:"git-remote" help:"name of the git remote to use" default:"${vars_git_default_remote_name}"`
+	GitReference     string        `name:"git-ref" help:"name of the branch or commit to checkout" default:"${vars_git_default_reference}"`
+	GitClone         string        `name:"git-clone-uri" help:"clone uri"`
+	Secrets          []string      `name:"secret" help:"List of secret URIs to use. Examples: chachasm://passphrase@/path/to/file, gcpsm://project-id/secret-name/version, awssm://secret-name?region=us-east-1"`
 }
 
 // bounds the number of runners we attempt to upload to directly before
 // falling back to the cluster.
 const directCandidates = 8
 
-func (t upload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
+func (t upload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, find libp2px.MDNSLookup) (err error) {
 	var (
 		signer               ssh.Signer
 		ws                   workspaces.Context
 		repo                 *git.Repository
 		tmpdir               string
 		archiveio, environio *os.File
+		lancache             *sql.DB
 	)
 
 	if signer, err = sshx.AutoCached(sshx.NewKeyGen(), t.SSHKeyPath); err != nil {
 		return err
+	}
+
+	// remember the runners on the local network while the workload is being built, the scan only
+	// feeds the cache so it never delays the upload. the cache is optional.
+	if t.LAN > 0 {
+		if lancache, err = lan.Open(gctx.Context, lan.PathIn(t.CacheDir, lan.RoleClient), t.LANPeerTTL); err != nil {
+			log.Println(errorsx.Wrap(err, "the local network cache is unavailable"))
+			lancache = nil
+		} else {
+			defer lancache.Close()
+			defer autoscan(gctx.Context, lancache, find, t.LANScanTimeout)()
+		}
 	}
 
 	if ws, err = workspaces.NewLocal(
@@ -195,8 +212,8 @@ func (t upload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 
 	chttp := authn.New(gctx.Context, tlsc.DefaultClient(), signer, gctx.AccountID, compute.NewAuthzTokenSource)
 
-	if t.Direct {
-		if accepted, cause := t.direct(gctx.Context, chttp, enq, archiveio, environio); cause != nil {
+	if order := priorities(t.LAN, t.P2P); len(order) > 0 {
+		if accepted, cause := t.p2p(gctx.Context, chttp, lancache, order, enq, archiveio, environio); cause != nil {
 			log.Println("direct upload unavailable, falling back to the cluster", cause)
 		} else {
 			log.Println("enqueued directly", enq.Id, accepted.Id, accepted.P2Pid)
@@ -258,51 +275,4 @@ func (t upload) enqueue(ctx context.Context, chttp *http.Client, enq *runners.En
 	}
 
 	return &e, nil
-}
-
-// direct attempts to upload the workload straight to an available runner,
-// returning the runner that accepted it. the runner records the workload with
-// the cluster using the candidate token issued for it.
-func (t upload) direct(ctx context.Context, chttp *http.Client, enq *runners.Enqueued, archive, environ io.ReadSeeker) (_ *compute.Compute, err error) {
-	meta, err := registration.NewPingClient(chttp).Meta(ctx)
-	if err != nil {
-		return nil, errorsx.Wrap(err, "unable to retrieve p2p bootstrap addresses")
-	}
-
-	p2p, err := libp2px.NewClient(ctx, libp2px.StringsToPeers(meta.Bootstrap...)...)
-	if err != nil {
-		return nil, errorsx.Wrap(err, "unable to join p2p network")
-	}
-	defer p2p.Close()
-
-	// clone so the caller's enqueued remains untouched for the cluster fallback.
-	req := &runners.EnqueuedDequeueResponse{
-		Enqueued: proto.Clone(enq).(*runners.Enqueued),
-	}
-
-	candidates, err := runners.NewPushClient(chttp).Candidates(ctx, req.Enqueued, directCandidates)
-	if err != nil {
-		return nil, errorsx.Wrap(err, "unable to retrieve candidate runners")
-	}
-
-	accepted, recorded := runners.TryUpload(ctx, p2p, candidates.Items, req, archive, environ)
-	if accepted == nil {
-		return nil, errorsx.Errorf("no runner accepted the workload, %d candidates", len(candidates.Items))
-	}
-
-	if !t.Follow {
-		return accepted, nil
-	}
-
-	// the workload is already enqueued; failing to stream its logs doesn't fail the upload.
-	if stringsx.Blank(recorded.LogsToken) {
-		log.Println("runner does not support log streaming", accepted.Id, accepted.P2Pid)
-		return accepted, nil
-	}
-
-	if err = runners.FollowLogs(ctx, p2p, recorded.LogsToken, recorded.Id, 0, os.Stdout); err != nil {
-		log.Println(errorsx.Wrap(err, "unable to stream workload logs"))
-	}
-
-	return accepted, nil
 }

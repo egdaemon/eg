@@ -61,6 +61,7 @@ type upload struct {
 	GitRemote        string        `name:"git-remote" help:"name of the git remote to use" default:"${vars_git_default_remote_name}"`
 	GitReference     string        `name:"git-ref" help:"name of the branch or commit to checkout" default:"${vars_git_default_reference}"`
 	GitClone         string        `name:"git-clone-uri" help:"clone uri"`
+	GCPAuto          bool          `name:"gcp-auto" help:"have the runner issue the account's gcp credentials (workload identity) to the workload"`
 	Secrets          []string      `name:"secret" help:"List of secret URIs to use. Examples: chachasm://passphrase@/path/to/file, gcpsm://project-id/secret-name/version, awssm://secret-name?region=us-east-1"`
 }
 
@@ -157,6 +158,10 @@ func (t upload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, find libp2px.
 		FromPath(t.EnvironmentPaths...).
 		FromEnviron(envx.AutoEnviron(t.Environment...)...).
 		FromEnviron(errorsx.Zero(gitx.Env(repo, t.GitRemote, t.GitReference, t.GitClone))...)
+
+	if t.GCPAuto {
+		envb = envb.Var(eg.EnvGCPWorkloadIdentityEnabled, "true")
+	}
 
 	if err = envb.CopyTo(environio); err != nil {
 		return errorsx.Wrap(err, "unable to write environment variables buffer")

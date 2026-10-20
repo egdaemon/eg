@@ -135,6 +135,11 @@ func IsDefaultBranchBuild(environ ...string) bool {
 }
 
 const (
+	EnvGoogleApplicationCredentials = "GOOGLE_APPLICATION_CREDENTIALS"   // path to the application default credentials used by google clients and gcloud.
+	EnvGCPWorkloadIdentityEnabled   = "EG_GCP_WORKLOAD_IDENTITY_ENABLED" // set by whatever generates the workload (uploads, schedules) when it needs gcp credentials issued to it by its runner.
+)
+
+const (
 	EnvUnsafeCacheID         = "EG_UNSAFE_CACHE_ID"
 	EnvUnsafeGitCloneEnabled = "EG_UNSAFE_GIT_CLONE_ENABLED"
 	EnvUnsafeRemapDirectory  = "EG_UNSAFE_REMAP_DIRECTORY"                    // list of directories to remap, seperated by ':'.

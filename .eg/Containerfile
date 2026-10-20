@@ -12,9 +12,9 @@ RUN add-apt-repository -n ppa:longsleep/golang-backports
 RUN add-apt-repository -n ppa:egdaemon/eg
 RUN add-apt-repository -n ppa:egdaemon/duckdb
 RUN apt-get update && apt-get -y install dput devscripts dh-make dput git uidmap dbus-user-session fuse-overlayfs tree iproute2
-RUN apt-get update && apt-get -y install golang-1.26 podman rsync vim egworkload dpkg tree pinentry-tty protobuf-compiler
+RUN apt-get update && apt-get -y install golang-1.27 podman rsync vim egworkload dpkg tree pinentry-tty protobuf-compiler
 
-RUN ln -s /usr/lib/go-1.26/bin/go /usr/local/bin/go
+RUN ln -s /usr/lib/go-1.27/bin/go /usr/local/bin/go
 
 RUN podman --version
 RUN go install github.com/pressly/goose/v3/cmd/goose@latest

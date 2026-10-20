@@ -82,11 +82,13 @@ export EG_LAN_PRIORITY=2
 
 higher numbers are tried first and `0` disables a strategy. uploading to the cluster is always the last resort.
 
+```
 | strategy                                                 | flag    | environment       | default     |
 | -------------------------------------------------------- | ------- | ----------------- | ----------- |
 | runners remembered from the local network                | `--lan` | `EG_LAN_PRIORITY` | 0 (off)     |
 | runners the control plane suggests, over the p2p network | `--p2p` | `EG_P2P_PRIORITY` | 1           |
 | upload to the cluster                                    | -       | -                 | always last |
+```
 
 if no local runner is remembered, none accepts the workload, or the network is unavailable, the upload carries on with
 the next strategy. the control plane is always needed, local discovery doesn't work without it.
@@ -129,6 +131,7 @@ sudo -u egd eg compute lan upd --runner --cache-directory /var/cache/eg-daemon <
 
 ## settings
 
+```
 | setting                             | flag                                                                          | environment                           | default        |
 | ----------------------------------- | ----------------------------------------------------------------------------- | ------------------------------------- | -------------- |
 | advertise the daemon on the network | `eg daemon --mdns-advertise`                                                  | `EG_MDNS_ADVERTISE`                   | off            |
@@ -137,6 +140,7 @@ sudo -u egd eg compute lan upd --runner --cache-directory /var/cache/eg-daemon <
 | how long a scan runs                | `--lan-scan-timeout` (upload), `--scan-timeout` (`lan scan`, `lan ls --scan`) | -                                     | 3s             |
 | how long systems are remembered     | `--lan-peer-ttl`                                                              | `EG_LAN_PEER_TTL`                     | 720h (30 days) |
 | where the list is stored            | `--cache-directory` (upload, `eg compute lan`), `--directory` (daemon)        | `EG_CACHE_DIRECTORY` (not the daemon) | see below      |
+```
 
 `--lan-peer-ttl` is accepted by `eg daemon`, `eg compute upload` and the `eg compute lan` commands, and
 `eg actl bootstrap env daemon --lan-peer-ttl 168h` writes it to the daemon's environment file. a duration set on a

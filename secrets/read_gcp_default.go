@@ -9,5 +9,5 @@ import (
 )
 
 func newgcpclient(ctx context.Context) (*secretmanager.Client, error) {
-	return secretmanager.NewClient(ctx)
+	return secretmanager.NewClient(ctx, gcpcredentials(ctx)...)
 }

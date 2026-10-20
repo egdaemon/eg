@@ -27,6 +27,7 @@ import (
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/execx"
 	"github.com/egdaemon/eg/internal/fsx"
+	"github.com/egdaemon/eg/internal/gcpx"
 	"github.com/egdaemon/eg/internal/gitx"
 	"github.com/egdaemon/eg/internal/httpx"
 	"github.com/egdaemon/eg/internal/iox"
@@ -533,8 +534,14 @@ func beginwork(ctx context.Context, md metadata, dir string) state {
 		return completed(workload.Enqueued, md, bucket, ws, 0, errorsx.Wrap(err, "invalid secret uris"))
 	}
 
+	gcpadc, err := gcpx.ProvisionCredentials(ctx, &http.Client{Timeout: 30 * time.Second}, ws.RuntimeDir, workload.AccessToken)
+	if err != nil {
+		return completed(workload.Enqueued, md, bucket, ws, 0, err)
+	}
+
+	// secrets are read as the workload's account when it has a gcp identity connection.
 	envb := envx.Build().
-		FromReader(secrets.NewReader(ctx, workload.Enqueued.SecretUris...)).
+		FromReader(secrets.Env().GCP(gcpadc).NewReader(ctx, workload.Enqueued.SecretUris...)).
 		FromPath(environpath).
 		Var(gitx.EnvAuthEGAccessToken, workload.AccessToken).
 		Var(eg.EnvCI, "true").

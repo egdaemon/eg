@@ -49,7 +49,7 @@ func TestAgentOptionGcloudCredentials(t *testing.T) {
 		environ, err := envb.Environ()
 		require.NoError(t, err)
 		expected := eg.DefaultWorkloadDirectory("gcloud", "application_default_credentials.json")
-		require.Contains(t, environ, EnvGoogleApplicationCredentials+"="+expected)
+		require.Contains(t, environ, eg.EnvGoogleApplicationCredentials+"="+expected)
 	})
 
 	t.Run("appends gcloud workload directory to remap env var", func(t *testing.T) {

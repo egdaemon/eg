@@ -124,7 +124,7 @@ func (t serve) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err e
 	}
 
 	if t.GCPAuto {
-		gcpcreds = runners.AgentOptionGcloudCredentials(gctx.Context, envb, envx.String(userx.ConfigDirectory("gcloud", "application_default_credentials.json"), runners.EnvGoogleApplicationCredentials))
+		gcpcreds = runners.AgentOptionGcloudCredentials(gctx.Context, envb, envx.String(userx.ConfigDirectory("gcloud", "application_default_credentials.json"), eg.EnvGoogleApplicationCredentials))
 	} else if stringsx.Present(t.GCP) {
 		gcpcreds = runners.AgentOptionGcloudCredentials(gctx.Context, envb, t.GCP)
 	}

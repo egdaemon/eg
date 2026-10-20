@@ -28,6 +28,7 @@ import (
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/execx"
 	"github.com/egdaemon/eg/internal/fsx"
+	"github.com/egdaemon/eg/internal/gcpx"
 	"github.com/egdaemon/eg/internal/gitx"
 	"github.com/egdaemon/eg/internal/podmanx"
 	"github.com/egdaemon/eg/internal/runtimex"
@@ -159,6 +160,12 @@ func (t module) mounthack(ctx context.Context, runid string, ws workspaces.Conte
 		}
 	}
 
+	// workloads that were issued gcp credentials (see gcpx.ProvisionCredentials) use them as the
+	// application default credentials of the unprivileged user.
+	if credsdir := eg.DefaultRuntimeDirectory(gcpx.Directory); fsx.DirExists(credsdir) == nil {
+		errorsx.Log(errorsx.Wrap(installgcloud(ctx, credsdir, remap), "unable to install gcp credentials"))
+	}
+
 	// HACK: gpg no longer obeys GNUPGHOME for the root user.
 	if err = errorsx.Compact(fsx.MkDirs(0700, "/run/user/0/gnupg"), os.Symlink("/eg.mnt/.gnupg", "/run/user/0/gnupg/d.3uqafziaitu1mwy9asijecpi")); err != nil {
 		return err
@@ -169,6 +176,38 @@ func (t module) mounthack(ctx context.Context, runid string, ws workspaces.Conte
 	}
 
 	return nil
+}
+
+// installgcloud makes the credentials issued to the workload the application default credentials of the unprivileged user,
+// found by gcloud and the google client libraries at ~/.config/gcloud/application_default_credentials.json.
+// the directory is remapped, giving the user access to the credentials, and the adc is regenerated with the paths
+// of the remapped directory.
+func installgcloud(ctx context.Context, src string, remap func(from, to string) error) (err error) {
+	var (
+		egdu *user.User
+		adc  string
+	)
+
+	if egdu, err = user.Lookup(eg.DefaultUsername); err != nil {
+		return errorsx.Wrap(err, "failed to lookup user egd")
+	}
+
+	dst := filepath.Join(egdu.HomeDir, ".config", "gcloud")
+	if err = fsx.MkDirs(0770, dst); err != nil {
+		return errorsx.Wrapf(err, "unable to create %s", dst)
+	}
+
+	if err = remap(src, dst); err != nil {
+		return errorsx.Wrapf(err, "unable to remap %s", dst)
+	}
+
+	if adc, err = gcpx.LoadCredentials(ctx, dst); err != nil {
+		return errorsx.Wrap(err, "unable to load gcp credentials")
+	} else if adc == "" {
+		return nil
+	}
+
+	return errorsx.Wrap(os.Rename(adc, filepath.Join(dst, "application_default_credentials.json")), "unable to install application default credentials")
 }
 
 // bridges the host wayland compositor socket (bind-mounted read-write, but

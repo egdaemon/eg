@@ -15,6 +15,8 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/golang-jwt/jwt/v4"
@@ -22,7 +24,9 @@ import (
 	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/compute"
 	"github.com/egdaemon/eg/internal/debugx"
+	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
+	"github.com/egdaemon/eg/internal/fsx"
 	"github.com/egdaemon/eg/internal/httpx"
 	"github.com/egdaemon/eg/internal/jwtx"
 	"github.com/egdaemon/eg/internal/stringsx"
@@ -30,6 +34,9 @@ import (
 )
 
 const (
+	// Directory is the directory within the workload's runtime directory holding its gcp credentials.
+	Directory = "gcloud"
+
 	responseFilename = "gcpaccess.token"
 	idTokenFilename  = "gcpaccess.idtoken"
 	adcFilename      = "gcpaccess.adc.json"
@@ -166,4 +173,85 @@ func LoadCredentials(ctx context.Context, dir string) (string, error) {
 	}
 
 	return adcpath, nil
+}
+
+// fetch exchanges the workload's access token for gcp credentials, written to dst.
+type fetch func(ctx context.Context, c *http.Client, dst string, token string) error
+
+// wanted reports whether the workload enabled gcp workload identity in its environment file, see
+// eg.EnvGCPWorkloadIdentityEnabled.
+func wanted(environpath string) bool {
+	environ, err := envx.Build().FromPath(environpath).Environ()
+	if err != nil {
+		return false
+	}
+
+	for _, kv := range environ {
+		if k, v, _ := strings.Cut(kv, "="); k == eg.EnvGCPWorkloadIdentityEnabled {
+			enabled, _ := strconv.ParseBool(v)
+			return enabled
+		}
+	}
+
+	return false
+}
+
+// ProvisionCredentials provisions the gcp credentials of the workload's account when the workload enabled them,
+// into the Directory of the workload's runtime directory, which the container installs as the application default
+// credentials of the unprivileged user. the credentials are refreshed until ctx is done or the runtime directory
+// is removed.
+//
+// the path of the application default credentials as seen by the host is returned, it is empty when the workload
+// did not enable them or when the account has no gcp identity connection.
+func ProvisionCredentials(ctx context.Context, c *http.Client, runtimedir string, token string) (string, error) {
+	return provision(ctx, RefreshCredentials, c, runtimedir, token)
+}
+
+func provision(ctx context.Context, get fetch, c *http.Client, runtimedir string, token string) (adc string, err error) {
+	dir := filepath.Join(runtimedir, Directory)
+
+	if !wanted(filepath.Join(runtimedir, eg.EnvironFile)) {
+		return "", nil
+	}
+
+	if err = fsx.MkDirs(0770, dir); err != nil {
+		return "", errorsx.Wrap(err, "unable to create gcp credentials directory")
+	}
+
+	refresh := func() (string, error) {
+		if err := get(ctx, c, dir, token); err != nil {
+			return "", err
+		}
+
+		return LoadCredentials(ctx, dir)
+	}
+
+	if adc, err = refresh(); httpx.IsStatusError(err, http.StatusUnauthorized, http.StatusNotFound) != nil {
+		// no gcp identity connection, nothing to install.
+		return "", errorsx.Wrap(os.RemoveAll(dir), "unable to clear gcp credentials directory")
+	} else if err != nil {
+		return "", errorsx.Wrap(err, "unable to provision gcp credentials")
+	}
+
+	go func() {
+		ticker := time.NewTicker(10 * time.Minute)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+			}
+
+			if _, err := os.Stat(dir); err != nil {
+				return
+			}
+
+			_, err := refresh()
+			errorsx.Log(errorsx.Wrap(err, "unable to refresh gcp credentials"))
+		}
+	}()
+
+	return adc, nil
 }

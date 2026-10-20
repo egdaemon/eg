@@ -19,6 +19,7 @@ on the runner, enable advertising and restart the service. the secret is the one
 # a runner container (eg-runner.service), the container also needs an address on the local network.
 eg secrets env --uri file:///tmp/daemon.secret eg actl bootstrap env daemon --mdns-advertise | sudo tee /etc/eg/daemon.env
 eg actl bootstrap env runner --lan | sudo tee /etc/eg/runner.env
+sudo systemctl enable --now netavark-dhcp-proxy.socket
 sudo systemctl restart eg-runner-build.service
 sudo systemctl restart eg-runner.service
 
@@ -73,8 +74,10 @@ eg actl bootstrap env runner --lan | sudo tee /etc/eg/runner.env
 # or add it to an existing environment file.
 echo 'EG_RUNNER_NETWORK=egnet-lan' | sudo tee -a /etc/eg/runner.env
 
-# define the network (the build service does it) and start the runner on it. the runner also starts the netavark
-# dhcp proxy the container gets its address from.
+# the container gets its address through the netavark dhcp proxy.
+sudo systemctl enable --now netavark-dhcp-proxy.socket
+
+# define the network (the build service does it) and start the runner on it.
 sudo systemctl restart eg-runner-build.service eg-runner.service
 ```
 

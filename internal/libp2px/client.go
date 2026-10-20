@@ -60,3 +60,26 @@ func NewClient(ctx context.Context, bootstrap ...peer.AddrInfo) (_ host.Host, er
 
 	return p2p, nil
 }
+
+// NewLocalClient creates an ephemeral p2p host for reaching peers whose addresses are already
+// known, i.e. runners found on the local network. unlike NewClient it doesn't join the dht,
+// use relays or connect to bootstrap peers, so it is ready immediately and works without the control plane.
+func NewLocalClient() (_ host.Host, err error) {
+	self, err := libp2p.New(
+		libp2p.ListenAddrStrings(
+			"/ip4/0.0.0.0/tcp/0",
+			"/ip6/::/tcp/0",
+			"/ip4/0.0.0.0/udp/0/quic-v1",
+			"/ip6/::/udp/0/quic-v1",
+		),
+		libp2p.DefaultTransports,
+		libp2p.DefaultMuxers,
+		libp2p.DefaultSecurity,
+		libp2p.DisableRelay(),
+	)
+	if err != nil {
+		return nil, errorsx.Wrap(err, "unable to create p2p host")
+	}
+
+	return self, nil
+}

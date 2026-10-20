@@ -13,9 +13,16 @@ chooses to use it.
 
 ## quick start
 
-on the runner, enable advertising and restart the daemon. the secret is the one from the Self Hosted Runners guide.
+on the runner, enable advertising and restart the service. the secret is the one from the Self Hosted Runners guide.
 
 ```bash
+# a runner container (eg-runner.service), the container also needs an address on the local network.
+eg secrets env --uri file:///tmp/daemon.secret eg actl bootstrap env daemon --mdns-advertise | sudo tee /etc/eg/daemon.env
+eg actl bootstrap env runner --lan | sudo tee /etc/eg/runner.env
+sudo systemctl restart eg-runner-build.service
+sudo systemctl restart eg-runner.service
+
+# or a daemon running directly on the host (eg-daemon.service).
 eg secrets env --uri file:///tmp/daemon.secret eg actl bootstrap env daemon --mdns-advertise | sudo tee /etc/eg/daemon.env
 sudo systemctl restart eg-daemon.service
 ```
@@ -52,6 +59,36 @@ restart whichever service you run, `eg-daemon.service` or the containerized `eg-
 
 a runner only advertises when it accepts direct uploads (`--uploadable`, the default).
 
+### run the runner container on the local network
+
+the runner container (`eg-runner.service`) runs on a private bridge network (`egnet`) by default, which other machines
+on your network can't reach. `egnet-lan` is a second network, defined by `eg-runner-build.service`, that gives the
+container its own address on your network from its DHCP server (macvlan). switch to it with the runner's bootstrap, or
+set the variable yourself.
+
+```bash
+# write the runner environment file with the container on the local network.
+eg actl bootstrap env runner --lan | sudo tee /etc/eg/runner.env
+
+# or add it to an existing environment file.
+echo 'EG_RUNNER_NETWORK=egnet-lan' | sudo tee -a /etc/eg/runner.env
+
+# define the network (the build service does it) and start the runner on it. the runner also starts the netavark
+# dhcp proxy the container gets its address from.
+sudo systemctl restart eg-runner-build.service eg-runner.service
+```
+
+to go back, run `eg actl bootstrap env runner | sudo tee /etc/eg/runner.env` (without `--lan`) and restart
+`eg-runner.service`. the same variable works for `eg-runner-gpu.service`.
+
+macvlan puts some requirements on the machine and its network:
+
+- the parent interface is the host's default route interface. to use another, edit the `egnet-lan` line in
+  `eg-runner-build.service` to add `-o parent=<interface>`, and remove the network so it is created again with
+  `podman network rm egnet-lan`.
+- it doesn't work on wifi interfaces, on many cloud networks, or on switches that limit the MACs per port.
+- the host itself can't reach the container's address.
+
 ### network requirements
 
 advertising needs multicast traffic (UDP port 5353) to reach the network from the place the daemon runs.
@@ -59,9 +96,10 @@ advertising needs multicast traffic (UDP port 5353) to reach the network from th
 - `eg-daemon.service` runs on the host and already allows it. the unit denies multicast and link-local traffic and makes
   an exception for the two mDNS groups only, `IPAddressAllow=224.0.0.251 ff02::fb`. because link-local traffic is still
   denied, the runner needs an IPv4 address, or an IPv6 address that isn't link-local (`fe80::/10`), on that network.
-- the containerized runner (`eg-runner.service`) runs on a podman bridge network (`egnet`), which neither forwards
-  multicast nor gives other machines a route to the container. making it reachable (for example host networking) is up to
-  whoever administers the machine, eg doesn't change it for you.
+- the containerized runner (`eg-runner.service`) runs on a podman bridge network (`egnet`) by default, which neither
+  forwards multicast nor gives other machines a route to the container, so it can't be found there. run it on
+  `egnet-lan` (above), or make it reachable another way, for example host networking, which is up to whoever
+  administers the machine.
 - a firewall or network between the machines can still drop multicast, see troubleshooting below.
 
 ## upload using the local network
@@ -135,6 +173,7 @@ sudo -u egd eg compute lan upd --runner --cache-directory /var/cache/eg-daemon <
 | setting                             | flag                                                                          | environment                           | default        |
 | ----------------------------------- | ----------------------------------------------------------------------------- | ------------------------------------- | -------------- |
 | advertise the daemon on the network | `eg daemon --mdns-advertise`                                                  | `EG_MDNS_ADVERTISE`                   | off            |
+| runner container network            | `eg actl bootstrap env runner --lan`                                          | `EG_RUNNER_NETWORK`                   | egnet          |
 | local network priority              | `eg compute upload --lan`                                                     | `EG_LAN_PRIORITY`                     | 0 (off)        |
 | p2p network priority                | `eg compute upload --p2p`                                                     | `EG_P2P_PRIORITY`                     | 1              |
 | how long a scan runs                | `--lan-scan-timeout` (upload), `--scan-timeout` (`lan scan`, `lan ls --scan`) | -                                     | 3s             |
@@ -160,6 +199,10 @@ single system with `eg compute lan upd --ttl` takes priority over it.
 - **uploads are slower than before.** run with `--lan=0` (the default) to rule out the local network. a remembered runner
   whose address is no longer reachable has to time out before the next strategy is tried, `eg compute lan rm <peer-id>`
   forgets it.
+- **the runner container doesn't start after switching to `egnet-lan`.** check that the network exists with
+  `podman network inspect egnet-lan` (`eg-runner-build.service` defines it and carries on if it can't, i.e. before the
+  host has a default route, restart it) and that `systemctl status netavark-dhcp-proxy.socket` is active. if your machine
+  can't do macvlan (wifi, many cloud networks) go back to the bridge as described above.
 - **a command reports the database is locked.** only one process can use a list at a time. an upload (or the daemon,
   for a few milliseconds per connection) is using it, run the command again.
 

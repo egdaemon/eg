@@ -77,4 +77,33 @@ func TestBootstrapEnvRunner(t *testing.T) {
 		require.NotContains(t, out.String(), fmt.Sprintf("EG_RUNNER_VRAM=%v", bytesx.Unit(2*bytesx.PiB)))
 		require.Contains(t, out.String(), "EG_RUNNER_VRAM=")
 	})
+
+	t.Run("the runner network is only set when asked for", func(t *testing.T) {
+		for _, c := range []struct {
+			name     string
+			args     []string
+			contains []string
+			absent   []string
+		}{
+			{name: "defaults keep the unit's bridge", absent: []string{"EG_RUNNER_NETWORK"}},
+			{name: "lan switches to egnet-lan", args: []string{"--lan"}, contains: []string{"EG_RUNNER_NETWORK=egnet-lan"}},
+			{name: "negated keeps the bridge", args: []string{"--no-lan"}, absent: []string{"EG_RUNNER_NETWORK"}},
+		} {
+			t.Run(c.name, func(t *testing.T) {
+				var out bytes.Buffer
+				genparser := cmdtestx.Genparser(actl.BootstrapEnvRunner{},
+					cmdopts.RuntimeResources{}.KongVars(),
+					kong.Writers(&out, nil),
+				)
+
+				require.NoError(t, cmdtestx.Execute(t, genparser(t), append([]string{"command"}, c.args...)...))
+				for _, v := range c.contains {
+					require.Contains(t, out.String(), v)
+				}
+				for _, v := range c.absent {
+					require.NotContains(t, out.String(), v)
+				}
+			})
+		}
+	})
 }

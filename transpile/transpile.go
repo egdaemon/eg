@@ -200,6 +200,8 @@ func transform(ws workspaces.Context, fset *token.FileSet, gendir string, c *ast
 		return astcodec.TypePattern(refexec)(ce.Fun)
 	}
 
+	enclosing := enclosingCalls(c, moduleExpr)
+	usedvars := make(map[*ast.BlockStmt]map[ast.Stmt]struct{})
 	generr := error(nil)
 	genmod := astcodec.NewCallExprReplacement(func(ce *ast.CallExpr) *ast.CallExpr {
 		if len(ce.Args) < 3 {
@@ -211,7 +213,39 @@ func transform(ws workspaces.Context, fset *token.FileSet, gendir string, c *ast
 		rarg := ce.Args[1]
 		statements := make([]jen.Code, 0, len(ce.Args[2:]))
 		for _, op := range ce.Args[2:] {
-			statements = append(statements, jen.Id(types.ExprString(op)))
+			opsrc, cause := render(fset, op)
+			if cause != nil {
+				generr = errors.Join(generr, cause)
+				return ce
+			}
+			statements = append(statements, jen.Id(opsrc))
+		}
+
+		// declarations from the enclosing function referenced by the operations.
+		captured := make([]jen.Code, 0, 4)
+		unused := make([]jen.Code, 0, 4)
+		if fn, ok := enclosing[ce]; ok {
+			if usedvars[fn.Body] == nil {
+				usedvars[fn.Body] = make(map[ast.Stmt]struct{})
+			}
+			stmts, cause := capturedStatements(fn.Body, ce, ce.Args[2:])
+			if cause != nil {
+				generr = errors.Join(generr, cause)
+				return ce
+			}
+			for _, name := range unusedVars(stmts, ce.Args[2:]) {
+				unused = append(unused, jen.Id("_ = "+name))
+			}
+			for _, s := range stmts {
+				usedvars[fn.Body][s] = struct{}{}
+				ssrc, cause := render(fset, s)
+				if cause != nil {
+					generr = errors.Join(generr, cause)
+					return ce
+				}
+				captured = append(captured, jen.Id(ssrc))
+			}
+			captured = append(captured, unused...)
 		}
 
 		pos := fset.PositionFor(ce.Pos(), true)
@@ -220,7 +254,7 @@ func transform(ws workspaces.Context, fset *token.FileSet, gendir string, c *ast
 		main := jen.NewFile("main")
 		main.Commentf("automatically generated from: %s", pos)
 
-		main.Func().Id("main").Params().Block(
+		main.Func().Id("main").Params().Block(append(append([]jen.Code{
 			jen.List(jen.Id("ctx"), jen.Id("done")).Op(":=").Add(
 				jen.Qual("context", "WithTimeout").Call(
 					jen.Qual("context", "Background").Call(),
@@ -228,9 +262,12 @@ func transform(ws workspaces.Context, fset *token.FileSet, gendir string, c *ast
 				),
 			),
 			jen.Defer().Add(jen.Id("done").Call()),
+		}, captured...),
 			jen.If(
 				jen.Id("err").Op(":=").Add(jen.Qual(egident, "Perform").Call(
-					append([]jen.Code{jen.Id("ctx")}, statements...)...,
+					jen.Id("ctx"),
+					// bundle the operations into a single sequence for performance.
+					jen.Qual(egident, "Sequential").Call(statements...),
 				),
 				),
 				jen.Id("err").Op("!=").Id("nil"),
@@ -239,13 +276,14 @@ func transform(ws workspaces.Context, fset *token.FileSet, gendir string, c *ast
 					jen.Id("err"),
 				),
 			),
-		)
+		)...)
 
-		mainbuf := bytes.NewBuffer(nil)
-		if cause := main.Render(mainbuf); cause != nil {
-			generr = errors.Join(generr, cause)
+		mainsrc, cause := renderModule(main)
+		if cause != nil {
+			generr = errors.Join(generr, fmt.Errorf("unable to render module generated from %s: %w", pos, cause))
 			return ce
 		}
+		mainbuf := bytes.NewBuffer(mainsrc)
 
 		genwasm := filepath.Join(gendir, fmt.Sprintf("module.%d.%d.wasm", pos.Line, pos.Column))
 		m := &module{
@@ -284,6 +322,10 @@ func transform(ws workspaces.Context, fset *token.FileSet, gendir string, c *ast
 		genexec,
 	)
 	ast.Walk(v, c)
+
+	for body, captured := range usedvars {
+		markUsed(body, captured)
+	}
 
 	return generatedmodules, generr
 }

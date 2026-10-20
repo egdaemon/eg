@@ -62,6 +62,38 @@ func TestFromTranspiled(t *testing.T) {
 		require.Equal(t, "6d5e29ce-6e99-d52f-f8c6-4ab44bee50b1", testx.ReadMD5(filepath.Join(tmpdir, ws.TransDir, "m1", "m1.go")), testx.ReadString(filepath.Join(tmpdir, ws.TransDir, "m1", "m1.go")))
 		require.Equal(t, "8d6b4444-b948-e467-8435-24d7c4fea235", testx.ReadMD5(filepath.Join(tmpdir, ws.TransDir, "m1", "m2", "m2.go")))
 	})
+
+	t.Run("should compile modules referencing variables declared outside the operation", func(t *testing.T) {
+		ctx := t.Context()
+		srcdir := t.TempDir()
+		tmpdir := t.TempDir()
+		ws, err := workspaces.New(ctx, md5.New(), tmpdir, tmpdir, "")
+		require.NoError(t, err)
+
+		require.NoError(t, fsx.CloneTree(ctx, srcdir, filepath.Join("example.3", eg.DefaultModuleDirectory()), os.DirFS(testx.Fixture())))
+
+		roots, err := transpile.Autodetect(transpile.New(srcdir, ws)).Run(ctx)
+		require.NoError(t, err)
+
+		err = compile.EnsureRequiredPackages(ctx, filepath.Join(ws.Root, ws.TransDir))
+		require.NoError(t, err)
+
+		modules, err := compile.FromTranspiled(ctx, ws, roots...)
+		require.NoError(t, err)
+		require.Len(t, modules, 1)
+		require.False(t, modules[0].Generated)
+
+		// the generated module must carry the closure, the declaration it references, and be sequenced.
+		generated := filepath.Join(tmpdir, ws.GenModDir, "main.wasm.d", "module.22.3.go")
+		src := testx.ReadString(generated)
+		require.Contains(t, src, "const foo = \"bar\"", src)
+		require.Contains(t, src, "expected := \"value-\" + foo", src)
+		require.Contains(t, src, "log.Println(\"DERP\", foo, expected)", src)
+		require.Contains(t, src, "eg.Sequential(", src)
+
+		// and it must have compiled to a wasm module.
+		require.FileExists(t, filepath.Join(tmpdir, ws.BuildDir, "main.wasm.d", "module.22.3.wasm"))
+	})
 }
 
 func TestWasixWarmCache(t *testing.T) {

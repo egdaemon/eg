@@ -1,10 +1,6 @@
 [Unit]
 Description=eg runner container
 After=network.target
-# start the dhcp proxy with the runner, the container needs it for its address when it runs on egnet-lan
-# (EG_RUNNER_NETWORK). wants is lenient, it does nothing where the socket isn't installed.
-Wants=netavark-dhcp-proxy.socket
-After=netavark-dhcp-proxy.socket
 Requires=eg-runner-build.service
 
 [Service]
@@ -26,7 +22,7 @@ Environment=EG_RUNNER_MEMORY=2g
 Environment=EG_RUNNER_OVERRIDE_DIR=rootfs
 # the network the container runs on, set it in /etc/eg/runner.env. egnet is a private bridge. egnet-lan gives the
 # container an address on the local network (macvlan, see eg-runner-build.service) so it can be found with mDNS,
-# it needs a host whose network allows it, the unit starts the dhcp proxy it relies on.
+# it needs `systemctl enable --now netavark-dhcp-proxy.socket` and a host whose network allows it.
 Environment=EG_RUNNER_NETWORK=egnet
 Environment=EG_RUNNER_DAEMON_ENV=/etc/eg/daemon.env
 EnvironmentFile=-/etc/eg/runner.env
@@ -36,5 +32,3 @@ ExecStop=/usr/bin/podman stop eg-runner
 
 [Install]
 WantedBy=default.target
-# the dhcp proxy gives the container an address when it runs on egnet-lan (EG_RUNNER_NETWORK), ignored if not installed.
-Also=netavark-dhcp-proxy.socket

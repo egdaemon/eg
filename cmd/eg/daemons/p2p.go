@@ -26,7 +26,14 @@ import (
 	dsync "github.com/ipfs/go-datastore/sync"
 )
 
+// P2PProxy creates the p2p host that proxies incoming streams to the local http listener.
 func P2PProxy(ctx context.Context, seed []byte, httpl net.Listener) (zero host.Host, err error) {
+	return P2PProxyGated(ctx, seed, httpl, nil)
+}
+
+// P2PProxyGated is P2PProxy that consults the gate for every incoming proxy stream,
+// a nil gate allows every stream.
+func P2PProxyGated(ctx context.Context, seed []byte, httpl net.Listener, gate Gate) (zero host.Host, err error) {
 	logging.SetAllLoggers(logging.LevelError)
 	priv, _, err := crypto.GenerateEd25519Key(cryptox.NewChaCha8(seed))
 	if err != nil {
@@ -86,6 +93,12 @@ func P2PProxy(ctx context.Context, seed []byte, httpl net.Listener) (zero host.H
 	p2p.SetStreamHandler("/egdaemon/proxy", func(s network.Stream) {
 		log.Println("received new stream from", s.Conn().RemotePeer())
 		defer s.Close()
+
+		if gate != nil && !gate.Allow(ctx, s.Conn().RemotePeer(), s.Conn().RemoteMultiaddr()) {
+			log.Println("rejecting stream from disabled peer", s.Conn().RemotePeer())
+			s.Reset()
+			return
+		}
 
 		dstaddr := httpl.Addr()
 		dst, err := net.Dial(dstaddr.Network(), dstaddr.String())

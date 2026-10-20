@@ -13,9 +13,12 @@ import (
 	"time"
 
 	_ "github.com/duckdb/duckdb-go/v2" // registers the duckdb driver.
+	"github.com/egdaemon/eg/internal/bytesx"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/goosex"
+	"github.com/egdaemon/eg/internal/sqlx"
 	"github.com/egdaemon/eg/internal/userx"
+	"github.com/gofrs/uuid/v5"
 )
 
 //go:embed migrations
@@ -39,12 +42,22 @@ const (
 // Path is the location of the database for the role within the cache directory,
 // CACHE_DIRECTORY (systemd) first then XDG_CACHE_HOME, see userx.DefaultCacheDirectory.
 func Path(r Role) string {
-	return userx.DefaultCacheDirectory(filepath.Join("lan." + string(r) + ".duckdb"))
+	return PathIn(userx.DefaultCacheDirectory(), r)
 }
 
-// Open the database for the role, applying migrations and purging expired peers.
-func Open(ctx context.Context, r Role, ttl time.Duration) (*sql.DB, error) {
-	path := Path(r)
+// PathIn is the location of the database for the role within the given cache directory.
+func PathIn(dir string, r Role) string {
+	return filepath.Join(dir, "lan."+string(r)+".duckdb")
+}
+
+// Migrate applies the schema to an already opened database.
+func Migrate(ctx context.Context, db *sql.DB) error {
+	return goosex.Up(ctx, db, migrations)
+}
+
+// Open the database at path, applying migrations and purging peers older than ttl.
+// see Path for the conventional location of the role's database.
+func Open(ctx context.Context, path string, ttl time.Duration) (*sql.DB, error) {
 	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
 		return nil, errorsx.Wrap(err, "unable to create lan peers directory")
 	}
@@ -54,22 +67,43 @@ func Open(ctx context.Context, r Role, ttl time.Duration) (*sql.DB, error) {
 		return nil, errorsx.Wrap(err, "unable to open lan peers database")
 	}
 
-	if err = goosex.Up(ctx, db, migrations); err != nil {
+	if err = Migrate(ctx, db); err != nil {
 		errorsx.Log(db.Close())
 		return nil, err
 	}
 
-	// purge the expired. iterate the returned rows so the delete is fully applied.
-	scanner := PeerPurgeExpired(ctx, db, int64(ttl))
-	defer scanner.Close()
-	for scanner.Next() {
-		var p Peer
-		if err = scanner.Scan(&p); err != nil {
-			break
-		}
+	// purge the expired.
+	if err = sqlx.Discard(sqlx.Scan(PeerPurgeExpired(ctx, db, int64(ttl)))); err != nil {
+		errorsx.Log(db.Close())
+		return nil, errorsx.Wrap(err, "unable to purge expired lan peers")
 	}
 
-	return db, errorsx.Wrap(scanner.Err(), "unable to purge expired lan peers")
+	return db, nil
+}
+
+// PeerOptionTestDefaults populates a peer with representative values and a unique id,
+// intended for use with langx.Clone in tests.
+func PeerOptionTestDefaults(p *Peer) {
+	p.PeerID = uuid.Must(uuid.NewV7()).String()
+	p.PublicKey = []byte{1, 2, 3}
+	p.Addrs = EncodeList([]string{"/ip4/192.168.1.2/tcp/4001"})
+	p.Description = "host - " + p.PeerID
+	p.OS = "linux"
+	p.Arch = "amd64"
+	p.Cores = 8
+	p.Memory = 16 * bytesx.GiB
+	p.Disk = 100 * bytesx.GiB
+	p.Vram = 4 * bytesx.GiB
+	p.WorkloadTTL = int64(time.Hour)
+	p.Labels = EncodeList([]string{"gpu", "fast"})
+	p.Uploadable = true
+}
+
+// PeerOptionID sets the peer's id.
+func PeerOptionID(id string) func(*Peer) {
+	return func(p *Peer) {
+		p.PeerID = id
+	}
 }
 
 // AddrList decodes the peer's stored multiaddrs.

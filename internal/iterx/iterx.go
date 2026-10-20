@@ -38,3 +38,20 @@ func Error[T any](err error) Seq[T] {
 		return err
 	})
 }
+
+// Slice returns a Seq that yields the given items in order.
+func Slice[T any](items ...T) Seq[T] {
+	return New[T](func(ctx context.Context, yield func(T) bool) error {
+		for _, item := range items {
+			if ctx.Err() != nil {
+				return ctx.Err()
+			}
+
+			if !yield(item) {
+				return nil
+			}
+		}
+
+		return nil
+	})
+}

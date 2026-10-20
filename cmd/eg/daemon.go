@@ -9,6 +9,7 @@ import (
 	"os"
 	"slices"
 	"strconv"
+	"time"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/egdaemon/eg"
@@ -20,6 +21,8 @@ import (
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/httpx"
+	"github.com/egdaemon/eg/internal/lan"
+	"github.com/egdaemon/eg/internal/libp2px"
 	"github.com/egdaemon/eg/internal/numericx"
 	"github.com/egdaemon/eg/internal/podmanx"
 	"github.com/egdaemon/eg/internal/runtimex"
@@ -33,17 +36,19 @@ import (
 
 type daemon struct {
 	cmdopts.RuntimeResources
-	AccountID     string   `name:"account" help:"account to register runner with" default:"${vars_account_id}" required:"true"`
-	MachineID     string   `name:"machine" help:"unique id for this particular machine" default:"${vars_machine_id}" required:"true"`
-	Seed          string   `name:"seed" help:"seed for generating ssh credentials in a consistent manner" default:"${vars_entropy_seed}"`
-	SSHKeyPath    string   `name:"sshkeypath" help:"path to ssh key to use" default:"${vars_ssh_key_path}"`
-	SSHAgentPath  string   `name:"sshagentpath" help:"ssh agent socket path" default:"${vars_runtime_directory}/ssh.agent.socket"`
-	SSHKnownHosts string   `name:"sshknownhostspath" help:"ssh known hosts path" default:"${vars_ssh_known_hosts_path}"`
-	Autodownload  bool     `name:"autodownload" help:"enable/disable the basic download scheduler" default:"true"`
-	CacheDir      string   `name:"directory" help:"local cache directory" default:"${vars_cache_directory}"`
-	MountDirs     []string `name:"mounts" short:"m" help:"folders to mount using podman mount specs" default:""`
-	EnvVars       []string `name:"env" short:"e" help:"environment variables to import"`
-	Uploadable    bool     `name:"uploadable" help:"accept workloads pushed directly to this runner (POST /c/upload, POST /c/enqueue) and advertise it to the control plane" default:"true" negatable:"" env:"EG_COMPUTE_API_ENABLED"`
+	AccountID     string        `name:"account" help:"account to register runner with" default:"${vars_account_id}" required:"true"`
+	MachineID     string        `name:"machine" help:"unique id for this particular machine" default:"${vars_machine_id}" required:"true"`
+	Seed          string        `name:"seed" help:"seed for generating ssh credentials in a consistent manner" default:"${vars_entropy_seed}"`
+	SSHKeyPath    string        `name:"sshkeypath" help:"path to ssh key to use" default:"${vars_ssh_key_path}"`
+	SSHAgentPath  string        `name:"sshagentpath" help:"ssh agent socket path" default:"${vars_runtime_directory}/ssh.agent.socket"`
+	SSHKnownHosts string        `name:"sshknownhostspath" help:"ssh known hosts path" default:"${vars_ssh_known_hosts_path}"`
+	Autodownload  bool          `name:"autodownload" help:"enable/disable the basic download scheduler" default:"true"`
+	CacheDir      string        `name:"directory" help:"local cache directory" default:"${vars_cache_directory}"`
+	MountDirs     []string      `name:"mounts" short:"m" help:"folders to mount using podman mount specs" default:""`
+	EnvVars       []string      `name:"env" short:"e" help:"environment variables to import"`
+	MDNSAdvertise bool          `name:"mdns-advertise" help:"advertise this daemon on the local network (multicast dns) so clients on the same network can upload to it directly, requires --uploadable" default:"false" negatable:"" env:"EG_MDNS_ADVERTISE"`
+	LANPeerTTL    time.Duration `name:"lan-peer-ttl" type:"durationinf" help:"how long peers that reached this daemon are remembered after they were last seen" default:"720h" env:"EG_LAN_PEER_TTL"`
+	Uploadable    bool          `name:"uploadable" help:"accept workloads pushed directly to this runner (POST /c/upload, POST /c/enqueue) and advertise it to the control plane" default:"true" negatable:"" env:"EG_COMPUTE_API_ENABLED"`
 }
 
 func (t daemon) signer(keygen cmdopts.KeyGenSeeded) (ssh.Signer, error) {
@@ -100,8 +105,18 @@ func (t daemon) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, keygen cmdopt
 		return errorsx.Wrap(err, "unable to retrieve identity credentials")
 	}
 
-	if p2p, err = daemons.P2PProxy(gctx.Context, append([]byte(machineID()), signer.PublicKey().Marshal()...), httpl); err != nil {
+	lanpeers := daemons.NewLANGate(lan.PathIn(t.CacheDir, lan.RoleRunner), t.LANPeerTTL)
+	if p2p, err = daemons.P2PProxyGated(gctx.Context, append([]byte(machineID()), signer.PublicKey().Marshal()...), httpl, lanpeers); err != nil {
 		return errorsx.Wrap(err, "unable to initialize p2p")
+	}
+
+	if t.MDNSAdvertise && t.Uploadable {
+		if advertisement, cause := libp2px.Advertise(p2p); cause != nil {
+			log.Println(errorsx.Wrap(cause, "unable to advertise on the local network"))
+		} else {
+			log.Println("advertising on the local network", p2p.ID())
+			context.AfterFunc(gctx.Context, func() { errorsx.Log(advertisement.Close()) })
+		}
 	}
 
 	if err = daemons.Register(gctx, tlsc, &t.RuntimeResources, t.AccountID, t.MachineID, p2p, signer); err != nil {

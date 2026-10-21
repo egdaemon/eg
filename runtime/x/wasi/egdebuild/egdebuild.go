@@ -1,5 +1,6 @@
 // Package egdebuild for building debian packages. allowing developers to create debian packages
-// and upload them using common debian tools. currently only supported for local runs due to gpg requirements.
+// and upload them using common debian tools (dput) or publish them to an eg deb namespace (Publish).
+// currently only supported for local runs due to gpg requirements.
 // useful links:
 // - https://www.debian.org/doc/debian-policy/ch-controlfields.html
 package egdebuild
@@ -320,6 +321,37 @@ func UploadDPut(gcfg Config, dput fs.FS, opts ...option) eg.OpFn {
 				egenv.EphemeralDirectory("dput.config"),
 				cfg.Name,
 			),
+		)
+	}
+}
+
+// Publish the packages built by Build into an eg deb namespace, served at
+// {namespace}.{account id}.apt.egdaemon.com. the packages must be built as binaries (see Option.BuildBinary)
+// and the repository indexes are signed with the configured signing key, which must be registered with the namespace.
+// the namespace is authorized using the EG_DEB_TOKEN environment variable, see `eg deb token`.
+// existing packages and other distributions of the namespace are retained.
+func Publish(gcfg Config, namespace string, opts ...option) eg.OpFn {
+	return func(ctx context.Context, o eg.Op) error {
+		const script = "publish.sh"
+
+		archive, err := fs.Sub(debskel, ".debian")
+		if err != nil {
+			return err
+		}
+
+		if err = egfs.CloneFS(ctx, egenv.EphemeralDirectory(), script, archive); err != nil {
+			return err
+		}
+
+		cfg := From(gcfg, opts...)
+		bdir := egenv.EphemeralDirectory(fmt.Sprintf("deb.%s", cfg.Name))
+		runtime := Runtime(cfg).
+			Environ("DEB_NAMESPACE", namespace).
+			Environ("DEB_SIGNING_KEY", cfg.SignatureKeyID)
+
+		return shell.Run(
+			ctx,
+			runtime.Newf("bash %s %s/*.deb", egenv.EphemeralDirectory(script), bdir),
 		)
 	}
 }

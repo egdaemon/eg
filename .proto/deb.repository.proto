@@ -1,0 +1,63 @@
+syntax = "proto3";
+
+package deb.repository;
+
+// copy of the egmeta deb repository api, see egmeta/daemons/.proto/deb.repository.proto
+
+message Namespace {
+  string id = 1 [ json_name = "id" ];
+  string account_id = 2 [ json_name = "account_id" ];
+  string name = 3 [ json_name = "name" ];
+  string description = 4 [ json_name = "description" ];
+  bool public = 5 [ json_name = "public" ];
+  // armored openpgp public keys used to verify the signed repository indexes.
+  string signing_keys = 6 [ json_name = "signing_keys" ];
+  // incremented on every publish, required by publish to detect concurrent updates.
+  int64 generation = 7 [ json_name = "generation" ];
+  string created_at = 8 [ json_name = "created_at" ];
+  string updated_at = 9 [ json_name = "updated_at" ];
+}
+
+message SearchRequest {
+  uint64 offset = 1 [ json_name = "offset" ];
+  uint64 limit = 2 [ json_name = "limit" ];
+}
+message SearchResponse {
+  SearchRequest next = 1 [ json_name = "next" ];
+  repeated Namespace items = 2 [ json_name = "items" ];
+}
+
+message FindResponse { Namespace namespace = 1 [ json_name = "namespace" ]; }
+message CreateRequest { Namespace namespace = 1 [ json_name = "namespace" ]; }
+message CreateResponse { Namespace namespace = 1 [ json_name = "namespace" ]; }
+message UpdateRequest { Namespace namespace = 1 [ json_name = "namespace" ]; }
+message UpdateResponse { Namespace namespace = 1 [ json_name = "namespace" ]; }
+message DestroyResponse { Namespace namespace = 1 [ json_name = "namespace" ]; }
+
+message Content {
+  string digest = 1 [ json_name = "digest" ];
+  int64 size = 2 [ json_name = "size" ];
+}
+message UploadResponse { Content content = 1 [ json_name = "content" ]; }
+
+message PublishResponse { Namespace namespace = 1 [ json_name = "namespace" ]; }
+
+// returned when a publish is rejected.
+message PublishError {
+  string reason = 1 [ json_name = "reason" ];
+  // the digests referenced by the indexes that need to be uploaded before publishing.
+  repeated string missing = 2 [ json_name = "missing" ];
+}
+
+message File {
+  string path = 1 [ json_name = "path" ];
+  string digest = 2 [ json_name = "digest" ];
+  int64 size = 3 [ json_name = "size" ];
+}
+
+// the dists files of the current generation, allowing publishers to carry over distributions
+// they are not updating.
+message FilesResponse {
+  int64 generation = 1 [ json_name = "generation" ];
+  repeated File items = 2 [ json_name = "items" ];
+}

@@ -22,3 +22,12 @@ func TestBuildContainer(t *testing.T) {
 	s := testx.ReadMD5(os.TempDir(), "Containerfile")
 	require.Equal(t, testx.ReadMD5(filepath.Join(".debian", "Containerfile")), s)
 }
+
+func TestPublish(t *testing.T) {
+	ctx, done := testx.Context(t)
+	defer done()
+
+	// running the script requires the container runtime, ensure the script is staged.
+	require.Error(t, egdebuild.Publish(egdebuild.New("example", "resolute", "src"), "tools")(ctx, egtest.Op()), ffierrors.ErrNotImplemented)
+	require.Equal(t, testx.ReadMD5(filepath.Join(".debian", "publish.sh")), testx.ReadMD5(os.TempDir(), "publish.sh"))
+}

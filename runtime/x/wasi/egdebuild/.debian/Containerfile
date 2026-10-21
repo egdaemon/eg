@@ -1,13 +1,13 @@
 FROM ubuntu:resolute
 ARG DEBIAN_FRONTEND=noninteractive
 
-RUN echo "cache buster 059a9a06-1686-4f49-9a7f-a30535886d68"
+RUN echo "cache buster e735a82d-4291-40cf-be3e-3a44caf7d8b4"
 RUN apt-get update
 RUN apt-get install -y software-properties-common build-essential ca-certificates curl sudo podman netavark rsync vim dput devscripts dh-make dput git uidmap dbus-user-session tree python3 python3-venv
 RUN add-apt-repository -n ppa:longsleep/golang-backports
 RUN add-apt-repository -n ppa:egdaemon/eg
 
-RUN echo "cache buster 059a9a06-1686-4f49-9a7f-a30535886d57"
+RUN echo "cache buster 829262f0-be2b-4e1e-8cff-336acc51573b"
 RUN apt-get update
 RUN apt-get -y install golang-1.27 egworkload
 

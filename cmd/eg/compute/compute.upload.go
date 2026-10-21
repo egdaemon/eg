@@ -50,7 +50,7 @@ type upload struct {
 	CacheDir         string        `name:"cache-directory" help:"directory the remembered systems on the local network are stored in" default:"${vars_cache_directory}" env:"EG_CACHE_DIRECTORY"`
 	LANScanTimeout   time.Duration `name:"lan-scan-timeout" help:"how long the background scan of the local network runs for" default:"3s"`
 	LANPeerTTL       time.Duration `name:"lan-peer-ttl" type:"durationinf" help:"how long systems on the local network are remembered after they were last seen" default:"720h" env:"EG_LAN_PEER_TTL"`
-	Follow           bool          `name:"follow" help:"stream the workload's logs when uploaded directly to a runner"`
+	Follow           bool          `name:"follow" help:"stream the workload's logs once it is running, requires a runner supporting log streaming"`
 	SSHKeyPath       string        `name:"sshkeypath" help:"path to ssh key to use" default:"${vars_ssh_key_path}"`
 	Dir              string        `name:"directory" help:"root directory of the repository" default:"${vars_eg_root_directory}"`
 	Name             string        `arg:"" name:"module" help:"name of the module to run, i.e. the folder name within moduledir" default:"" predictor:"eg.workload"`
@@ -218,12 +218,15 @@ func (t upload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, find libp2px.
 	chttp := authn.New(gctx.Context, tlsc.DefaultClient(), signer, gctx.AccountID, compute.NewAuthzTokenSource)
 
 	if order := priorities(t.LAN, t.P2P); len(order) > 0 {
-		if accepted, cause := t.p2p(gctx.Context, chttp, lancache, order, enq, archiveio, environio); cause != nil {
-			log.Println("direct upload unavailable, falling back to the cluster", cause)
-		} else {
+		// a nil runner means nothing accepted the workload. otherwise it was uploaded and
+		// the error, if any, is the result of following it, so we must not upload it again.
+		accepted, cause := t.p2p(gctx.Context, chttp, lancache, order, enq, archiveio, environio)
+		if accepted != nil {
 			log.Println("enqueued directly", enq.Id, accepted.Id, accepted.P2Pid)
-			return nil
+			return cause
 		}
+
+		log.Println("direct upload unavailable, falling back to the cluster", cause)
 
 		if err = iox.Rewind(archiveio); err != nil {
 			return errorsx.Wrap(err, "unable to rewind kernel archive")
@@ -236,9 +239,8 @@ func (t upload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, find libp2px.
 	}
 
 	log.Println("enqueued", spew.Sdump(recorded))
-	// TODO: monitoring the job once its uploaded and we have a run id.
 
-	return nil
+	return t.followenqueued(gctx.Context, chttp, recorded.Enqueued.Id)
 }
 
 // enqueue uploads the workload to the cluster.

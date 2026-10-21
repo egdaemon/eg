@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"context"
 	"database/sql"
+	"errors"
 	"io"
 	"log"
 	"net/http"
@@ -14,6 +15,7 @@ import (
 	"github.com/egdaemon/eg/compute"
 	"github.com/egdaemon/eg/internal/asynccompute"
 	"github.com/egdaemon/eg/internal/errorsx"
+	"github.com/egdaemon/eg/internal/httpx"
 	"github.com/egdaemon/eg/internal/lan"
 	"github.com/egdaemon/eg/internal/libp2px"
 	"github.com/egdaemon/eg/internal/slicesx"
@@ -89,6 +91,8 @@ type outcome struct {
 // p2p attempts to upload the workload straight to a runner, trying the strategies in order and
 // returning the runner that accepted it. the runner records the workload with the cluster using
 // the candidate token issued for it. db is the cache of remembered systems and may be nil.
+// a nil runner means none accepted the workload and the caller should fall back to the cluster. otherwise
+// the error is the result of following the workload (see follow) and it must not be uploaded again.
 func (t upload) p2p(ctx context.Context, chttp *http.Client, db *sql.DB, order []strategy, enq *runners.Enqueued, archive, environ io.ReadSeeker) (_ *compute.Compute, err error) {
 	// clone so the caller's enqueued remains untouched for the cluster fallback.
 	req := &runners.EnqueuedDequeueResponse{
@@ -122,7 +126,7 @@ func (t upload) p2p(ctx context.Context, chttp *http.Client, db *sql.DB, order [
 		}
 		defer o.host.Close()
 
-		return t.follow(ctx, o), nil
+		return o.runner, t.follow(ctx, chttp, o)
 	}
 
 	return nil, errorsx.Compact(failures, errorsx.Errorf("no runner accepted the workload, %d candidates", len(candidates.Items)))
@@ -207,21 +211,124 @@ func (t upload) direct(ctx context.Context, chttp *http.Client, candidates []*co
 	return outcome{host: p2p, runner: accepted, recorded: recorded}, nil
 }
 
-// follow streams the workload's logs when requested.
-// the workload is already enqueued; failing to stream its logs doesn't fail the upload.
-func (t upload) follow(ctx context.Context, o outcome) *compute.Compute {
+// follow streams the workload's logs when requested and reports how the workload ended, nil when it succeeded.
+// the workload is already enqueued; an error here must not trigger another upload.
+func (t upload) follow(ctx context.Context, chttp *http.Client, o outcome) error {
 	if !t.Follow {
-		return o.runner
+		return nil
 	}
 
 	if stringsx.Blank(o.recorded.LogsToken) {
 		log.Println("runner does not support log streaming", o.runner.Id, o.runner.P2Pid)
-		return o.runner
+	} else if err := runners.FollowLogs(ctx, o.host, o.recorded.LogsToken, o.recorded.Id, 0, os.Stdout); err != nil {
+		return errorsx.Wrap(err, "unable to stream workload logs")
 	}
 
-	if err := runners.FollowLogs(ctx, o.host, o.recorded.LogsToken, o.recorded.Id, 0, os.Stdout); err != nil {
-		log.Println(errorsx.Wrap(err, "unable to stream workload logs"))
+	return t.workloadresult(ctx, chttp, o.recorded.Id)
+}
+
+// followenqueued streams the logs of a workload enqueued with the cluster. it waits for the cluster to
+// schedule the workload on a runner, then dials that runner through the p2p network. when the workload
+// completes before it can be followed its stored log is printed instead.
+func (t upload) followenqueued(ctx context.Context, chttp *http.Client, id string) (err error) {
+	if !t.Follow {
+		return nil
 	}
 
-	return o.runner
+	// how often the cluster is polled for the workload to be scheduled on a runner.
+	const pollinterval = 2 * time.Second
+
+	log.Println("waiting for the workload to start", id)
+	found, err := runners.NewPushClient(chttp).AwaitLogsToken(ctx, id, pollinterval)
+	if errors.Is(err, runners.ErrWorkloadCompleted) {
+		if err = t.storedlogs(ctx, chttp, id); err != nil {
+			return err
+		}
+
+		return t.workloadresult(ctx, chttp, id)
+	} else if err != nil {
+		return errorsx.Wrap(err, "unable to stream workload logs")
+	}
+
+	meta, err := registration.NewPingClient(chttp).Meta(ctx)
+	if err != nil {
+		return errorsx.Wrap(err, "unable to retrieve p2p bootstrap addresses")
+	}
+
+	p2p, err := libp2px.NewClient(ctx, libp2px.StringsToPeers(meta.Bootstrap...)...)
+	if err != nil {
+		return errorsx.Wrap(err, "unable to join p2p network")
+	}
+	defer p2p.Close()
+
+	if err = runners.FollowLogs(ctx, p2p, found.LogsToken, found.Id, 0, os.Stdout); err != nil {
+		return errorsx.Wrap(err, "unable to stream workload logs")
+	}
+
+	return t.workloadresult(ctx, chttp, id)
+}
+
+// workloadresult reports how the completed workload ended, nil when it succeeded.
+func (t upload) workloadresult(ctx context.Context, chttp *http.Client, id string) (err error) {
+	// the history record is written by the completion upload and can trail the end of the log stream.
+	const (
+		attempts = 10
+		delay    = time.Second
+	)
+
+	// values of the history record's result.
+	const (
+		resultfailure   = 1
+		resultcompleted = 2
+		resultcancelled = 3
+	)
+
+	for range attempts {
+		var h *compute.History
+
+		// not found and unknown results mean the completion hasn't been recorded yet.
+		if h, err = runners.NewPushClient(chttp).HistoryFind(ctx, id); err == nil {
+			switch h.Result {
+			case resultcompleted:
+				return nil
+			case resultfailure:
+				return errorsx.Errorf("workload %s failed", id)
+			case resultcancelled:
+				return errorsx.Errorf("workload %s was cancelled", id)
+			}
+		} else if httpx.IsStatusError(err, http.StatusNotFound) == nil {
+			return errorsx.Wrap(err, "unable to determine the workload result")
+		}
+
+		select {
+		case <-time.After(delay):
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}
+
+	return errorsx.Errorf("workload %s result was not recorded", id)
+}
+
+// storedlogs prints the stored log of a workload that completed before its logs could be followed.
+func (t upload) storedlogs(ctx context.Context, chttp *http.Client, id string) (err error) {
+	// the history record is written by the completion upload and can trail the workload's completion.
+	const (
+		attempts = 5
+		delay    = time.Second
+	)
+
+	for range attempts {
+		if err = runners.NewPushClient(chttp).HistoryLogs(ctx, id, os.Stdout); httpx.IsStatusError(err, http.StatusNotFound) == nil {
+			return errorsx.Wrap(err, "stored workload logs unavailable")
+		}
+
+		select {
+		case <-time.After(delay):
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}
+
+	return errorsx.Wrap(err, "stored workload logs unavailable")
 }

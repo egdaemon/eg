@@ -181,6 +181,8 @@ func (t compileidle) Update(ctx context.Context) state {
 	case <-ctx.Done():
 		return terminate(ctx.Err())
 	case <-t.awaiter.Await(t.strategy):
+	case <-t.compiledirs.Awake():
+		t.awaiter.Reset()
 	}
 
 	dir, err := t.compiledirs.Dequeue()

@@ -27,7 +27,8 @@ func main() {
 			ctx,
 			eg.DefaultModule(),
 			shell.Op(
-				shell.New("command -v gcloud || sudo sh /usr/share/eg/install/google-cloud.sh"),
+				// google-cloud.sh only registers the apt repository, the cli still has to be installed.
+				shell.New("command -v gcloud || (sudo sh /usr/share/eg/install/google-cloud.sh && sudo apt-get update && sudo apt-get install -y google-cloud-cli)"),
 				// mints an access token from the credentials of the workload, for federation that exchanges the identity token via sts and impersonation.
 				shell.New("gcloud auth application-default print-access-token > /dev/null && echo 'gcp access ok'"),
 			),

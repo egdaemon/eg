@@ -695,6 +695,10 @@ func (t staterunning) Update(ctx context.Context) state {
 	}
 
 	ts := time.Now()
+	options = append(options,
+		"--env", fmt.Sprintf("%s=%s", eg.EnvComputeInitiatedTimestamp, ts.UTC().Format(time.RFC3339Nano)),
+		"--env", fmt.Sprintf("%s=%s", eg.EnvComputeWorkload, t.workload.Entry),
+	)
 	// TODO REVISIT using t.ws.RuntimeDir as moduledir.
 	err = c8sproxy.PodmanModule(ctx, prepcmd, "eg", fmt.Sprintf("eg-%s", t.ragent.id), t.ws.RuntimeDir, options...)
 	return completed(t.workload, t.metadata, t.bucket, t.ws, time.Since(ts), err)

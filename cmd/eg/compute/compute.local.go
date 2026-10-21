@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strconv"
+	"time"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/egdaemon/eg"
@@ -134,6 +135,7 @@ func (t local) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err e
 		Var(eg.EnvComputeBin, hotswapbin.String()).
 		Var(eg.EnvUnsafeCacheID, ws.CachedID).
 		Var(eg.EnvComputeTTL, t.RuntimeResources.TTL.String()).
+		Var(eg.EnvComputeInitiatedTimestamp, time.Now().UTC().Format(time.RFC3339Nano)).
 		Var(eg.EnvComputeGPU, strconv.FormatBool(t.GPU)).
 		Var(eg.EnvUnsafeGitCloneEnabled, strconv.FormatBool(false)). // hack to disable cloning
 		Var(eg.EnvComputeProfileMode, t.Profile)

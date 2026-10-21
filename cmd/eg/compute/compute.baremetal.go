@@ -207,6 +207,8 @@ func (t baremetal) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, hotswapbin
 	).Var(
 		eg.EnvComputeTTL, t.RuntimeResources.TTL.String(),
 	).Var(
+		eg.EnvComputeInitiatedTimestamp, time.Now().UTC().Format(time.RFC3339Nano),
+	).Var(
 		eg.EnvComputeOS, runtime.GOOS,
 	).Var(
 		eg.EnvComputeArch, runtime.GOARCH,

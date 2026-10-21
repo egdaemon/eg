@@ -18,7 +18,8 @@ import (
 )
 
 var (
-	Treeish = ""
+	Treeish          = ""
+	TreeishTimestamp = "" // RFC3339 commit time, used when vcs.time is unavailable (-buildvcs=false).
 )
 
 type Version struct{}
@@ -77,6 +78,12 @@ func BuildInfo() (_ string, err error) {
 			}
 		default:
 			debugx.Printf("build.%s.%s\n", v.Key, v.Value)
+		}
+	}
+
+	if ts.IsZero() && stringsx.Present(TreeishTimestamp) {
+		if ts, err = time.Parse(time.RFC3339, TreeishTimestamp); err != nil {
+			return "", err
 		}
 	}
 

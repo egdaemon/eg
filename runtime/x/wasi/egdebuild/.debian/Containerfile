@@ -3,7 +3,7 @@ ARG DEBIAN_FRONTEND=noninteractive
 
 RUN echo "cache buster e735a82d-4291-40cf-be3e-3a44caf7d8b4"
 RUN apt-get update
-RUN apt-get install -y software-properties-common build-essential ca-certificates curl sudo podman netavark rsync vim dput devscripts dh-make dput git uidmap dbus-user-session tree python3 python3-venv
+RUN apt-get install -y software-properties-common build-essential ca-certificates curl sudo podman netavark rsync vim dput devscripts dh-make dput git uidmap dbus-user-session tree python3 python3-venv apt-utils gnupg jq
 RUN add-apt-repository -n ppa:longsleep/golang-backports
 RUN add-apt-repository -n ppa:egdaemon/eg
 

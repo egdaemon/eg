@@ -11,6 +11,7 @@ package eg
 //go:generate protoc --proto_path=.proto --go_opt=Mmeta.me.proto=github.com/egdaemon/eg/me --go_opt=Mauthn.proto=github.com/egdaemon/eg/authn --go_opt=paths=source_relative --go_out=me meta.me.proto
 //go:generate protoc --proto_path=.proto --go_opt=Meg.repository.schedule.proto=github.com/egdaemon/eg/schedules --go_opt=paths=source_relative --go_out=schedules eg.repository.schedule.proto
 //go:generate protoc --proto_path=.proto --go_opt=Meg.repository.proto=github.com/egdaemon/eg/repositories --go_opt=paths=source_relative --go_out=repositories eg.repository.proto
+//go:generate protoc --proto_path=.proto --go_opt=Mdeb.repository.proto=github.com/egdaemon/eg/debrepo --go_opt=paths=source_relative --go_out=debrepo deb.repository.proto
 
 //go:generate protoc --proto_path=.proto --go_opt=Meg.interp.events.proto=github.com/eg/interp/events --go_opt=paths=source_relative --go_out=interp/events eg.interp.events.proto
 //go:generate protoc --proto_path=.proto --go-grpc_opt=Meg.interp.events.proto=github.com/eg/interp/events --go-grpc_opt=paths=source_relative --go-grpc_out=interp/events eg.interp.events.proto

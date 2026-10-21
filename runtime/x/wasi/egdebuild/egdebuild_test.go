@@ -171,3 +171,12 @@ func TestSuggests(t *testing.T) {
 		require.Equal(t, "3.0.0", cfg.Version)
 	})
 }
+
+func TestPublish(t *testing.T) {
+	ctx, done := testx.Context(t)
+	defer done()
+
+	// running the script requires the container runtime, ensure the script is staged.
+	require.Error(t, egdebuild.Publish(egdebuild.New("example", "resolute", "src"), "tools")(ctx, egtest.Op()), ffierrors.ErrNotImplemented)
+	require.Equal(t, testx.ReadMD5(filepath.Join(".debian", "publish.sh")), testx.ReadMD5(os.TempDir(), "publish.sh"))
+}

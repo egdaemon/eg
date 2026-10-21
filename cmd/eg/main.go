@@ -19,6 +19,7 @@ import (
 	"github.com/dustin/go-humanize"
 	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/cmd/cmdaccounts"
+	"github.com/egdaemon/eg/cmd/cmddeb"
 	"github.com/egdaemon/eg/cmd/cmderrors"
 	"github.com/egdaemon/eg/cmd/cmdgcp"
 	"github.com/egdaemon/eg/cmd/cmdgpg"
@@ -101,6 +102,7 @@ func main() {
 		Machine            cmdmachine.Cmd               `cmd:"" name:"machine" help:"interact with machines"`
 		Me                 cmdme.Cmd                    `cmd:"" name:"me" help:"manage your own profile"`
 		GCP                cmdgcp.Cmd                   `cmd:"" name:"gcp" help:"gcp integration management"`
+		Deb                cmddeb.Cmd                   `cmd:"" name:"deb" help:"manage deb namespaces, apt repositories hosted by eg"`
 		GDX                konggdx.Commands             `cmd:"" name:"gdx" help:"pull profiles/traces from a running eg debug socket"`
 		InstallCompletions kongplete.InstallCompletions `cmd:"" help:"install shell completions"`
 	}

@@ -12,6 +12,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -211,6 +212,7 @@ func provision(ctx context.Context, get fetch, c *http.Client, runtimedir string
 	dir := filepath.Join(runtimedir, Directory)
 
 	if !wanted(filepath.Join(runtimedir, eg.EnvironFile)) {
+		log.Println("debug: gcp workload identity not requested by the workload,", eg.EnvGCPWorkloadIdentityEnabled, "is not true")
 		return "", nil
 	}
 
@@ -228,6 +230,7 @@ func provision(ctx context.Context, get fetch, c *http.Client, runtimedir string
 
 	if adc, err = refresh(); httpx.IsStatusError(err, http.StatusUnauthorized, http.StatusNotFound) != nil {
 		// no gcp identity connection, nothing to install.
+		log.Println("debug: no gcp identity connection for the account", err)
 		return "", errorsx.Wrap(os.RemoveAll(dir), "unable to clear gcp credentials directory")
 	} else if err != nil {
 		return "", errorsx.Wrap(err, "unable to provision gcp credentials")

@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"log"
 	"math/rand"
+	"slices"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/egdaemon/eg/backoff"
@@ -20,7 +22,6 @@ import (
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
-	"github.com/libp2p/go-libp2p/core/peerstore"
 	"github.com/libp2p/go-libp2p/p2p/protocol/circuitv2/client"
 	"github.com/multiformats/go-multiaddr"
 )
@@ -29,43 +30,113 @@ const (
 	reserveTimeout = 30 * time.Second
 	// spreads relay reconnects across nodes so a restarted relay isn't stampeded.
 	reserveJitterWindow = 30 * time.Second
+	// how often the keeper checks for changes to the relays it is given.
+	reserveReconcile = 30 * time.Second
 )
 
-type keeperKey struct {
-	self  peer.ID
-	relay peer.ID
+// tracks the relays a keeper is currently maintaining reservations with.
+type keeper struct {
+	mu     sync.Mutex
+	active map[peer.ID]struct{}
 }
 
-// tracks the relays currently being kept reserved per host.
-var keepers sync.Map
+// begin reports whether the relay wasn't already being maintained.
+func (t *keeper) begin(relay peer.ID) bool {
+	t.mu.Lock()
+	defer t.mu.Unlock()
 
-// KeepReserved maintains a relay reservation with each of the given relays for
-// the lifetime of ctx, renewing ahead of expiry and re-reserving as soon as the
-// connection to a relay is lost. safe to call repeatedly; relays already being
-// kept are ignored.
-func KeepReserved(ctx context.Context, p2p host.Host, relays ...peer.AddrInfo) {
-	keep(ctx, p2p, backoff.New(
+	if _, ok := t.active[relay]; ok {
+		return false
+	}
+
+	if t.active == nil {
+		t.active = make(map[peer.ID]struct{})
+	}
+	t.active[relay] = struct{}{}
+
+	return true
+}
+
+func (t *keeper) end(relay peer.ID) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	delete(t.active, relay)
+}
+
+func (t *keeper) count() int {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return len(t.active)
+}
+
+func newRetry(p2p host.Host) backoff.Strategy {
+	return backoff.New(
 		backoff.Exponential(time.Second),
 		backoff.Maximum(time.Minute),
 		backoff.JitterRandom(backoff.DynamicHashDuration(reserveJitterWindow, p2p.ID().String())),
-	), relays...)
+	)
 }
 
-func keep(ctx context.Context, p2p host.Host, retry backoff.Strategy, relays ...peer.AddrInfo) {
-	for _, r := range relays {
-		k := keeperKey{self: p2p.ID(), relay: r.ID}
-		if _, loaded := keepers.LoadOrStore(k, struct{}{}); loaded {
-			continue
+// KeepReservedFrom maintains relay reservations for the lifetime of ctx, renewing
+// ahead of expiry and re-reserving as soon as the connection to a relay is lost.
+// it is intended to be called once per host. reservations are kept with each
+// relay stored in the returned list, follow a relay's addresses when they
+// change, and are dropped once the relay leaves the list.
+func KeepReservedFrom(ctx context.Context, p2p host.Host) *atomic.Pointer[[]peer.AddrInfo] {
+	relays := new(atomic.Pointer[[]peer.AddrInfo])
+	go keepfrom(ctx, p2p, new(keeper), newRetry(p2p), relays, reserveReconcile)
+	return relays
+}
+
+func keepfrom(ctx context.Context, p2p host.Host, t *keeper, retry backoff.Strategy, relays *atomic.Pointer[[]peer.AddrInfo], every time.Duration) {
+	for {
+		if current := relays.Load(); current != nil {
+			for _, r := range *current {
+				t.keepsource(ctx, p2p, retry, r.ID, every, func() (peer.AddrInfo, bool) {
+					if current := relays.Load(); current != nil {
+						if i := slices.IndexFunc(*current, func(c peer.AddrInfo) bool { return c.ID == r.ID }); i >= 0 {
+							return (*current)[i], true
+						}
+					}
+					return peer.AddrInfo{}, false
+				})
+			}
 		}
 
-		go func(r peer.AddrInfo) {
-			defer keepers.Delete(k)
-			keepReserved(ctx, p2p, retry, r)
-		}(r)
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(every):
+		}
 	}
 }
 
-func keepReserved(ctx context.Context, p2p host.Host, retry backoff.Strategy, relay peer.AddrInfo) {
+// keepsource starts maintaining a reservation with the relay unless one is
+// already being maintained. source reports the relay's current addresses, and
+// false once the relay should no longer be kept.
+func (t *keeper) keepsource(ctx context.Context, p2p host.Host, retry backoff.Strategy, relay peer.ID, poll time.Duration, source func() (peer.AddrInfo, bool)) {
+	if !t.begin(relay) {
+		return
+	}
+
+	go func() {
+		defer t.end(relay)
+		keepReserved(ctx, p2p, retry, poll, source)
+	}()
+}
+
+func sameAddrs(a, b peer.AddrInfo) bool {
+	return a.ID == b.ID && len(a.Addrs) == len(b.Addrs) && !slices.ContainsFunc(a.Addrs, func(x multiaddr.Multiaddr) bool {
+		return !slices.ContainsFunc(b.Addrs, x.Equal)
+	})
+}
+
+func keepReserved(ctx context.Context, p2p host.Host, retry backoff.Strategy, poll time.Duration, source func() (peer.AddrInfo, bool)) {
+	relay, ok := source()
+	if !ok {
+		return
+	}
+
 	sub, err := p2p.EventBus().Subscribe(new(event.EvtPeerConnectednessChanged))
 	if err != nil {
 		log.Println("unable to watch relay connectivity", relay.ID, err)
@@ -73,12 +144,30 @@ func keepReserved(ctx context.Context, p2p host.Host, retry backoff.Strategy, re
 	}
 	defer sub.Close()
 
+	ticker := time.NewTicker(poll)
+	defer ticker.Stop()
+
 	attempt := int64(0)
 	wait := time.After(0)
 
 	for {
 		select {
 		case <-wait:
+		case <-ticker.C:
+			current, ok := source()
+			if !ok {
+				debugx.Println("relay no longer known, releasing", relay.ID)
+				return
+			}
+
+			// pick up new addresses without waiting out the backoff or renewal.
+			if !sameAddrs(relay, current) {
+				debugx.Println("relay addresses changed, re-reserving", relay.ID)
+				relay = current
+				attempt = 0
+				wait = time.After(0)
+			}
+			continue
 		case evt := <-sub.Out():
 			if e, ok := evt.(event.EvtPeerConnectednessChanged); ok && e.Peer == relay.ID && e.Connectedness == network.NotConnected {
 				d := retry.Backoff(attempt)
@@ -87,6 +176,13 @@ func keepReserved(ctx context.Context, p2p host.Host, retry backoff.Strategy, re
 			}
 			continue
 		case <-ctx.Done():
+			return
+		}
+
+		if current, ok := source(); ok {
+			relay = current
+		} else {
+			debugx.Println("relay no longer known, releasing", relay.ID)
 			return
 		}
 
@@ -108,8 +204,8 @@ func keepReserved(ctx context.Context, p2p host.Host, retry backoff.Strategy, re
 
 // Reserve requests a relay reservation from each of the given peers so that
 // others can reach this host via circuit addresses through them (see
-// CircuitAddrs). reservations expire (1h by default); see KeepReserved for
-// keeping them alive.
+// CircuitAddrs). reservations expire (1h by default); see KeepReservedFrom
+// for keeping them alive.
 func Reserve(ctx context.Context, p2p host.Host, relays ...peer.AddrInfo) error {
 	if len(relays) < 1 {
 		return errors.New("no relay peers")
@@ -217,7 +313,6 @@ func Connect(ctx context.Context, p2p host.Host, peers ...peer.AddrInfo) error {
 			defer wg.Done()
 			debugx.Printf("%s bootstrapping with %s", p2p.ID(), p.ID)
 
-			p2p.Peerstore().AddAddrs(p.ID, p.Addrs, peerstore.PermanentAddrTTL)
 			if err := p2p.Connect(ctx, p); err != nil {
 				debugx.Printf("failed to bootstrap with %v: %s", p.ID, err)
 				errs <- err

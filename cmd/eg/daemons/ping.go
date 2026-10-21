@@ -2,6 +2,7 @@ package daemons
 
 import (
 	"log"
+	"sync/atomic"
 	"time"
 
 	"github.com/egdaemon/eg"
@@ -14,12 +15,13 @@ import (
 	"github.com/egdaemon/eg/internal/stringsx"
 	"github.com/egdaemon/eg/runners/registration"
 	"github.com/libp2p/go-libp2p/core/host"
+	"github.com/libp2p/go-libp2p/core/peer"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/time/rate"
 )
 
 // uploadable advertises to the control plane whether this runner accepts workloads uploaded directly to it.
-func Ping(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, runtimecfg *cmdopts.RuntimeResources, aid, machineid string, p2p host.Host, s ssh.Signer, uploadable bool) (err error) {
+func Ping(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, runtimecfg *cmdopts.RuntimeResources, aid, machineid string, p2p host.Host, relays *atomic.Pointer[[]peer.AddrInfo], s ssh.Signer, uploadable bool) (err error) {
 	fingerprint := ssh.FingerprintSHA256(s.PublicKey())
 	log.Println("periodic ping initiated", aid, machineid, fingerprint)
 	defer log.Println("periodic ping completed", aid, machineid, fingerprint)
@@ -52,8 +54,9 @@ func Ping(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, runtimecfg *cmdopts.Run
 				),
 			)
 
-			// keep relay reservations with new bootstrap nodes so clients can reach us via them.
-			libp2px.KeepReserved(gctx.Context, p2p, libp2px.StringsToPeers(resp.Bootstrap...)...)
+			// publish the current relays; the keeper started at daemon startup reserves
+			// with them so clients can reach us via them.
+			relays.Store(new(libp2px.StringsToPeers(resp.Bootstrap...)))
 		}
 	}
 

@@ -13,7 +13,7 @@ ARG DEBIAN_FRONTEND=noninteractive
 
 RUN apt-get update
 RUN apt-get install -y software-properties-common build-essential ca-certificates curl
-RUN add-apt-repository -n ppa:egdaemon/duckdb ppa:egdaemon/eg
+RUN add-apt-repository -n ppa:egdaemon/eg
 
 RUN apt-get update
 RUN apt-get -y install egworkload

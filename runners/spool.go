@@ -1,6 +1,7 @@
 package runners
 
 import (
+	"context"
 	"encoding/base64"
 	"fmt"
 	"io"
@@ -11,6 +12,7 @@ import (
 	"path/filepath"
 	"sync"
 
+	"github.com/egdaemon/eg/internal/asyncx"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/fsx"
 	"github.com/egdaemon/eg/internal/userx"
@@ -34,6 +36,7 @@ func SpoolOptionPopLimit(n int) SpoolOption {
 type SpoolDirs struct {
 	defaultPerms fs.FileMode
 	renamemux    *sync.Mutex
+	wakeup       *asyncx.Wakeup
 	Downloading  string
 	Queued       string
 	Running      string
@@ -47,6 +50,7 @@ func NewSpoolDir(root string) SpoolDirs {
 	dirs := SpoolDirs{
 		defaultPerms: defaultPerms,
 		renamemux:    &sync.Mutex{},
+		wakeup:       asyncx.NewWakeup(context.Background()),
 		Downloading:  filepath.Join(root, "d"),
 		Queued:       filepath.Join(root, "q"),
 		Running:      filepath.Join(root, "r"),
@@ -127,6 +131,16 @@ func (t SpoolDirs) Download(uid uuid.UUID, name string, content io.Reader) (err 
 
 func (t SpoolDirs) Enqueue(uid uuid.UUID) (err error) {
 	return os.Rename(filepath.Join(t.Downloading, Queued().Dirname(uid)), filepath.Join(t.Queued, Queued().Dirname(uid)))
+}
+
+// Wake signals a single idle worker waiting on Awake to check the queue.
+func (t SpoolDirs) Wake() {
+	t.wakeup.Signal()
+}
+
+// Awake receives a value whenever Wake signals this worker.
+func (t SpoolDirs) Awake() <-chan error {
+	return t.wakeup.C
 }
 
 func (t SpoolDirs) Dequeue() (_ string, err error) {

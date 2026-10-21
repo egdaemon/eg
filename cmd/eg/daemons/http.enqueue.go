@@ -125,6 +125,8 @@ func (t *EnqueueHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	defer t.Dirs.Wake()
+
 	log.Println("enqueued for compile", filepath.Join(t.Dirs.Queued, uid.String()))
 
 	w.WriteHeader(http.StatusAccepted)

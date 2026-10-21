@@ -110,6 +110,8 @@ func (t daemon) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, keygen cmdopt
 		return errorsx.Wrap(err, "unable to initialize p2p")
 	}
 
+	relays := libp2px.KeepReservedFrom(gctx.Context, p2p)
+
 	if t.MDNSAdvertise && t.Uploadable {
 		if advertisement, cause := libp2px.Advertise(p2p); cause != nil {
 			log.Println(errorsx.Wrap(cause, "unable to advertise on the local network"))
@@ -119,7 +121,7 @@ func (t daemon) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, keygen cmdopt
 		}
 	}
 
-	if err = daemons.Register(gctx, tlsc, &t.RuntimeResources, t.AccountID, t.MachineID, p2p, signer); err != nil {
+	if err = daemons.Register(gctx, tlsc, &t.RuntimeResources, t.AccountID, t.MachineID, p2p, relays, signer); err != nil {
 		return err
 	}
 
@@ -141,7 +143,7 @@ func (t daemon) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, keygen cmdopt
 
 	go func() {
 		for {
-			if cause := daemons.Ping(gctx, tlsc, &t.RuntimeResources, t.AccountID, t.MachineID, p2p, signer, t.Uploadable); cause != nil {
+			if cause := daemons.Ping(gctx, tlsc, &t.RuntimeResources, t.AccountID, t.MachineID, p2p, relays, signer, t.Uploadable); cause != nil {
 				log.Println("ping failed", cause)
 			}
 

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"sync/atomic"
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
@@ -39,7 +40,7 @@ func genregistration(s ssh.Signer, p2pid peer.ID, runtimecfg *cmdopts.RuntimeRes
 	}
 }
 
-func Register(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, runtimecfg *cmdopts.RuntimeResources, aid, machineid string, p2p host.Host, s ssh.Signer) (err error) {
+func Register(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, runtimecfg *cmdopts.RuntimeResources, aid, machineid string, p2p host.Host, relays *atomic.Pointer[[]peer.AddrInfo], s ssh.Signer) (err error) {
 	fingerprint := ssh.FingerprintSHA256(s.PublicKey())
 	log.Println("registering daemon with control plane initiated", aid, machineid, fingerprint, p2p.ID().String())
 	defer log.Println("registering daemon with control plane completed", aid, machineid, fingerprint)
@@ -107,8 +108,9 @@ func Register(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, runtimecfg *cmdopts
 			),
 		)
 
-		// keep relay reservations with the bootstrap nodes so clients can reach us via them.
-		libp2px.KeepReserved(gctx.Context, p2p, libp2px.StringsToPeers(reg.Bootstrap...)...)
+		// publish the current relays; the keeper started at daemon startup reserves
+		// with them so clients can reach us via them.
+		relays.Store(new(libp2px.StringsToPeers(reg.Bootstrap...)))
 
 		log.Println("registration accepted", spew.Sdump(reg))
 		return nil

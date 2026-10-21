@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"fmt"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -53,17 +54,7 @@ func reachable(ctx context.Context, client host.Host, relay peer.AddrInfo, targe
 	return true
 }
 
-func keeping(self peer.ID) (n int) {
-	keepers.Range(func(k, _ any) bool {
-		if k.(keeperKey).self == self {
-			n++
-		}
-		return true
-	})
-	return n
-}
-
-func TestKeepReserved(t *testing.T) {
+func TestKeepReservedFromRestartedRelay(t *testing.T) {
 	ctx, done := context.WithTimeout(t.Context(), 30*time.Second)
 	defer done()
 
@@ -92,9 +83,12 @@ func TestKeepReserved(t *testing.T) {
 
 	require.False(t, reachable(ctx, client, relayinfo, runner.ID()))
 
-	keep(kctx, runner, retry, relayinfo)
-	keep(kctx, runner, retry, relayinfo)
-	require.Equal(t, 1, keeping(runner.ID()))
+	relays := new(atomic.Pointer[[]peer.AddrInfo])
+	relays.Store(&[]peer.AddrInfo{relayinfo})
+
+	k := new(keeper)
+	go keepfrom(kctx, runner, k, retry, relays, 50*time.Millisecond)
+	require.Eventually(t, func() bool { return k.count() == 1 }, 5*time.Second, 20*time.Millisecond)
 
 	require.Eventually(t, func() bool { return reachable(ctx, client, relayinfo, runner.ID()) }, 5*time.Second, 100*time.Millisecond)
 
@@ -107,5 +101,54 @@ func TestKeepReserved(t *testing.T) {
 	require.Eventually(t, func() bool { return reachable(ctx, client, relayinfo, runner.ID()) }, 10*time.Second, 100*time.Millisecond)
 
 	kdone()
-	require.Eventually(t, func() bool { return keeping(runner.ID()) == 0 }, 5*time.Second, 50*time.Millisecond)
+	require.Eventually(t, func() bool { return k.count() == 0 }, 5*time.Second, 50*time.Millisecond)
+}
+
+func TestKeepReservedFromFollowsRelayList(t *testing.T) {
+	ctx, done := context.WithTimeout(t.Context(), 30*time.Second)
+	defer done()
+
+	// long enough that only the periodic check can pick up the change.
+	retry := backoff.Constant(time.Minute)
+
+	priv, _, err := crypto.GenerateEd25519Key(rand.Reader)
+	require.NoError(t, err)
+
+	relay := newRelay(t, priv, multiaddr.StringCast("/ip4/127.0.0.1/tcp/0"))
+	defer relay.Close()
+	relayinfo := peer.AddrInfo{ID: relay.ID(), Addrs: relay.Addrs()}
+	stale := peer.AddrInfo{ID: relay.ID(), Addrs: []multiaddr.Multiaddr{multiaddr.StringCast("/ip4/127.0.0.1/tcp/1")}}
+
+	runner, err := libp2p.New(libp2p.ListenAddrStrings("/ip4/127.0.0.1/tcp/0"), libp2p.EnableRelay())
+	require.NoError(t, err)
+	defer runner.Close()
+	runner.SetStreamHandler(echoProtocol, func(s network.Stream) { _ = s.Close() })
+
+	client, err := libp2p.New(libp2p.ListenAddrStrings("/ip4/127.0.0.1/tcp/0"), libp2p.EnableRelay())
+	require.NoError(t, err)
+	defer client.Close()
+
+	circuit := relayinfo.Addrs[0].Encapsulate(multiaddr.StringCast(fmt.Sprintf("/p2p/%s/p2p-circuit", relay.ID())))
+	client.Peerstore().AddAddr(runner.ID(), circuit, peerstore.PermanentAddrTTL)
+
+	kctx, kdone := context.WithCancel(ctx)
+	defer kdone()
+
+	relays := new(atomic.Pointer[[]peer.AddrInfo])
+	relays.Store(&[]peer.AddrInfo{stale})
+
+	k := new(keeper)
+	go keepfrom(kctx, runner, k, retry, relays, 50*time.Millisecond)
+
+	require.Eventually(t, func() bool { return k.count() == 1 }, 5*time.Second, 20*time.Millisecond)
+	require.False(t, reachable(ctx, client, relayinfo, runner.ID()))
+
+	// the same relay arriving with working addresses is picked up without waiting out the backoff.
+	relays.Store(&[]peer.AddrInfo{relayinfo})
+	require.Eventually(t, func() bool { return reachable(ctx, client, relayinfo, runner.ID()) }, 5*time.Second, 100*time.Millisecond)
+	require.Equal(t, 1, k.count())
+
+	// a relay leaving the list is released.
+	relays.Store(&[]peer.AddrInfo{})
+	require.Eventually(t, func() bool { return k.count() == 0 }, 5*time.Second, 20*time.Millisecond)
 }

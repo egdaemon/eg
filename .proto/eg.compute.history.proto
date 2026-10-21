@@ -1,0 +1,18 @@
+syntax = "proto3";
+
+package eg.compute;
+
+// the record of a completed workload, mirrors the control plane's history record.
+message History {
+  string id = 1 [ json_name = "id" ];
+  string description = 2 [ json_name = "description" ];
+  string created_at = 3 [ json_name = "created_at" ];
+  string initiated_at = 4 [ json_name = "initiated_at" ];
+  string completed_at = 5 [ json_name = "completed_at" ];
+  int64 duration = 6 [ json_name = "duration" ];
+  // 0 unknown, 1 failure, 2 completed, 3 cancelled.
+  int32 result = 7 [ json_name = "result" ];
+  string uploaded_by = 8 [ json_name = "uploaded_by" ];
+}
+
+message HistoryFindResponse { History history = 1 [ json_name = "history" ]; }

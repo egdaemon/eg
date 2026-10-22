@@ -198,7 +198,12 @@ func (t builtinUpload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err e
 	}
 	defer buf.Close()
 
-	chttp := authn.New(gctx.Context, tlsc.DefaultClient(), signer, gctx.AccountID, compute.NewAuthzTokenSource)
+	aid, err := gctx.Identity().Account(tlsc.DefaultClient(), signer, errorsx.Zero(gitx.CanonicalURI(repo, t.GitRemote)))
+	if err != nil {
+		return err
+	}
+
+	chttp := authn.New(gctx.Context, tlsc.DefaultClient(), signer, aid, compute.NewAuthzTokenSource)
 
 	ctx, done := context.WithTimeout(gctx.Context, 10*time.Second)
 	defer done()

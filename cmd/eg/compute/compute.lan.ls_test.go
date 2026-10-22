@@ -4,8 +4,11 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/egdaemon/eg/cmd/migrations"
 
 	"github.com/alecthomas/kong"
 	"github.com/egdaemon/eg/cmd/cmdopts"
@@ -27,7 +30,7 @@ func TestLanList(t *testing.T) {
 
 	t.Run("lists remembered systems", func(t *testing.T) {
 		db := sqltestx.DuckDB(t)
-		require.NoError(t, lan.Migrate(t.Context(), db))
+		require.NoError(t, migrations.Migrate(t.Context(), db))
 
 		for _, id := range []string{"alpha", "beta", "gamma"} {
 			require.NoError(t, lan.PeerUpsert(t.Context(), db, langx.Clone(lan.Peer{}, lan.PeerOptionTestDefaults, lan.PeerOptionID(id))).Scan(&lan.Peer{}))
@@ -56,7 +59,7 @@ func TestLanList(t *testing.T) {
 
 	t.Run("scan remembers new systems and keeps what is known about existing ones", func(t *testing.T) {
 		db := sqltestx.DuckDB(t)
-		require.NoError(t, lan.Migrate(t.Context(), db))
+		require.NoError(t, migrations.Migrate(t.Context(), db))
 
 		newid := func() peer.ID {
 			priv, _, err := crypto.GenerateEd25519Key(nil)
@@ -97,7 +100,7 @@ func TestLanList(t *testing.T) {
 
 	t.Run("scan failures are reported", func(t *testing.T) {
 		db := sqltestx.DuckDB(t)
-		require.NoError(t, lan.Migrate(t.Context(), db))
+		require.NoError(t, migrations.Migrate(t.Context(), db))
 
 		cmd := lanList{
 			lanDatabase: lanDatabase{PeerTTL: lan.DefaultTTL},
@@ -111,7 +114,7 @@ func TestLanList(t *testing.T) {
 	t.Run("runs against the given directory and writes to the context's stdout", func(t *testing.T) {
 		dir := t.TempDir()
 
-		db := testx.MustT(lan.Open(t.Context(), lan.PathIn(dir, lan.RoleClient), lan.DefaultTTL))(t)
+		db := testx.MustT(lan.Open(t.Context(), filepath.Join(dir, migrations.CLI), lan.DefaultTTL))(t)
 		require.NoError(t, lan.PeerUpsert(t.Context(), db, langx.Clone(lan.Peer{}, lan.PeerOptionTestDefaults, lan.PeerOptionID("remembered"))).Scan(&lan.Peer{}))
 		require.NoError(t, db.Close())
 

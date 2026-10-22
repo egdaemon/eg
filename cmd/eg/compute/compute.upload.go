@@ -12,6 +12,8 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/egdaemon/eg/cmd/migrations"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/authn"
@@ -51,7 +53,7 @@ type upload struct {
 	CacheDir         string        `name:"cache-directory" help:"directory the remembered systems on the local network are stored in" default:"${vars_cache_directory}" env:"EG_CACHE_DIRECTORY"`
 	LANScanTimeout   time.Duration `name:"lan-scan-timeout" help:"how long the background scan of the local network runs for" default:"3s"`
 	LANPeerTTL       time.Duration `name:"lan-peer-ttl" type:"durationinf" help:"how long systems on the local network are remembered after they were last seen" default:"720h" env:"EG_LAN_PEER_TTL"`
-	Follow           bool          `name:"follow" help:"stream the workload's logs once it is running, requires a runner supporting log streaming"`
+	Follow           bool          `name:"follow" help:"stream the workload's logs once it is running, requires a runner supporting log streaming" negatable:"" default:"true"`
 	SSHKeyPath       string        `name:"sshkeypath" help:"path to ssh key to use" default:"${vars_ssh_key_path}"`
 	Dir              string        `name:"directory" help:"root directory of the repository" default:"${vars_eg_root_directory}"`
 	Name             string        `arg:"" name:"module" help:"name of the module to run, i.e. the folder name within moduledir" default:"" predictor:"eg.workload"`
@@ -87,7 +89,7 @@ func (t upload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, find libp2px.
 	// remember the runners on the local network while the workload is being built, the scan only
 	// feeds the cache so it never delays the upload. the cache is optional.
 	if t.LAN > 0 {
-		if lancache, err = lan.Open(gctx.Context, lan.PathIn(t.CacheDir, lan.RoleClient), t.LANPeerTTL); err != nil {
+		if lancache, err = lan.Open(gctx.Context, filepath.Join(t.CacheDir, migrations.CLI), t.LANPeerTTL); err != nil {
 			log.Println(errorsx.Wrap(err, "the local network cache is unavailable"))
 			lancache = nil
 		} else {
@@ -199,9 +201,14 @@ func (t upload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, find libp2px.
 	ainfo := errorsx.Zero(os.Stat(archiveio.Name()))
 	log.Println("archive metadata", ainfo.Name(), bytesx.Unit(ainfo.Size()))
 
+	aid, err := gctx.Identity().Account(tlsc.DefaultClient(), signer, errorsx.Zero(gitx.CanonicalURI(repo, t.GitRemote)))
+	if err != nil {
+		return err
+	}
+
 	enq := &runners.Enqueued{
 		Id:          uuid.Must(uuid.NewV7()).String(),
-		AccountId:   gctx.AccountID,
+		AccountId:   aid,
 		Entry:       filepath.Join(ws.Module, filepath.Base(entry.Path)),
 		Ttl:         uint64(t.RuntimeResources.TTL.Milliseconds()),
 		Cores:       t.RuntimeResources.Cores,
@@ -216,7 +223,7 @@ func (t upload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, find libp2px.
 		Description: stringsx.FirstNonBlank(t.Name, gitx.Description("Uploaded: %git.commit.author% - %git.ref%", repo, t.GitReference)),
 	}
 
-	chttp := authn.New(gctx.Context, tlsc.DefaultClient(), signer, gctx.AccountID, compute.NewAuthzTokenSource)
+	chttp := authn.New(gctx.Context, tlsc.DefaultClient(), signer, aid, compute.NewAuthzTokenSource)
 
 	if order := priorities(t.LAN, t.P2P); len(order) > 0 {
 		// a nil runner means nothing accepted the workload. otherwise it was uploaded and

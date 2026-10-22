@@ -6,6 +6,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/egdaemon/eg/cmd/migrations"
+
 	"github.com/egdaemon/eg/internal/iterx"
 	"github.com/egdaemon/eg/internal/lan"
 	"github.com/egdaemon/eg/internal/sqltestx"
@@ -18,7 +20,7 @@ import (
 func TestDiscover(t *testing.T) {
 	t.Run("remembers what the scan finds", func(t *testing.T) {
 		db := sqltestx.DuckDB(t)
-		require.NoError(t, lan.Migrate(t.Context(), db))
+		require.NoError(t, migrations.Migrate(t.Context(), db))
 
 		priv, _, err := crypto.GenerateEd25519Key(nil)
 		require.NoError(t, err)
@@ -37,7 +39,7 @@ func TestDiscover(t *testing.T) {
 
 	t.Run("scan failures are reported and nothing is remembered", func(t *testing.T) {
 		db := sqltestx.DuckDB(t)
-		require.NoError(t, lan.Migrate(t.Context(), db))
+		require.NoError(t, migrations.Migrate(t.Context(), db))
 
 		require.ErrorContains(t, lan.Discover(t.Context(), db, func(ctx context.Context, timeout time.Duration) iterx.Seq[peer.AddrInfo] {
 			return iterx.Error[peer.AddrInfo](errors.New("no multicast"))

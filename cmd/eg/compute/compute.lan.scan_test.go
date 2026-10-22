@@ -4,8 +4,11 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/egdaemon/eg/cmd/migrations"
 
 	"github.com/alecthomas/kong"
 	"github.com/egdaemon/eg/cmd/cmdopts"
@@ -27,7 +30,7 @@ func TestLanScan(t *testing.T) {
 
 	t.Run("remembers new systems and keeps what is known about existing ones", func(t *testing.T) {
 		db := sqltestx.DuckDB(t)
-		require.NoError(t, lan.Migrate(t.Context(), db))
+		require.NoError(t, migrations.Migrate(t.Context(), db))
 
 		priv1, _, err := crypto.GenerateEd25519Key(nil)
 		require.NoError(t, err)
@@ -69,7 +72,7 @@ func TestLanScan(t *testing.T) {
 
 	t.Run("scan failures are reported and nothing is listed", func(t *testing.T) {
 		db := sqltestx.DuckDB(t)
-		require.NoError(t, lan.Migrate(t.Context(), db))
+		require.NoError(t, migrations.Migrate(t.Context(), db))
 
 		var out bytes.Buffer
 		cmd := lanScan{
@@ -102,7 +105,7 @@ func TestLanScan(t *testing.T) {
 		require.NoError(t, cmdtestx.Execute(t, genparser(t), "command", "--cache-directory", dir, "--scan-timeout", "10s", "--lan-peer-ttl", "48h"))
 		require.Contains(t, out.String(), found.String())
 
-		db := testx.MustT(lan.Open(t.Context(), lan.PathIn(dir, lan.RoleClient), lan.DefaultTTL))(t)
+		db := testx.MustT(lan.Open(t.Context(), filepath.Join(dir, migrations.CLI), lan.DefaultTTL))(t)
 		defer db.Close()
 		require.NoError(t, lan.PeerFindByID(t.Context(), db, found.String()).Scan(&lan.Peer{}), "remembered in the given directory")
 	})

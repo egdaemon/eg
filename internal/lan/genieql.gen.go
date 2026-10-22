@@ -816,5 +816,3 @@ func PeerPurgeExpired(ctx context.Context, q sqlx.Queryer, ttl int64) PeerScanne
 	c0.Int64 = ttl
 	return NewPeerScannerStatic(q.QueryContext(ctx, query, c0))
 }
-
-

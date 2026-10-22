@@ -11,6 +11,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/egdaemon/eg/cmd/migrations"
+
 	"golang.org/x/net/http2"
 	"google.golang.org/grpc/grpclog"
 
@@ -26,10 +28,20 @@ import (
 
 type Global struct {
 	Verbosity int                     `help:"increase verbosity of logging" short:"v" type:"counter" default:"0" env:"EG_LOGGING_VERBOSITY"`
-	AccountID string                  `name:"account-id" help:"optional account id to use, disambiguates when the ssh key is associated with multiple profiles" env:"EG_ACCOUNT"`
+	AccountID string                  `name:"account-id" help:"account id to use, when blank it is detected from the repository (and remembered) if the ssh key is associated with multiple profiles" env:"EG_ACCOUNT"`
 	Context   context.Context         `kong:"-"`
 	Shutdown  context.CancelCauseFunc `kong:"-"`
 	Cleanup   *sync.WaitGroup         `kong:"-"`
+	identity  *Identity
+}
+
+// Identity the account resolution for this invocation, see Identity.
+func (t *Global) Identity() *Identity {
+	if t.identity == nil {
+		t.identity = &Identity{ctx: t.Context, account: t.AccountID, store: migrations.Path(migrations.CLI)}
+	}
+
+	return t.identity
 }
 
 func (t Global) AfterApply() error {

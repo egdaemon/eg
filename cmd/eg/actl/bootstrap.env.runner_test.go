@@ -12,6 +12,7 @@ import (
 	"github.com/egdaemon/eg/cmd/cmdtestx"
 	"github.com/egdaemon/eg/cmd/eg/actl"
 	"github.com/egdaemon/eg/internal/bytesx"
+	"github.com/egdaemon/eg/internal/netx"
 	"github.com/stretchr/testify/require"
 )
 
@@ -76,6 +77,23 @@ func TestBootstrapEnvRunner(t *testing.T) {
 		require.NoError(t, cmdtestx.Execute(t, genparser(t), "command", "--vram=2Pi"))
 		require.NotContains(t, out.String(), fmt.Sprintf("EG_RUNNER_VRAM=%v", bytesx.Unit(2*bytesx.PiB)))
 		require.Contains(t, out.String(), "EG_RUNNER_VRAM=")
+	})
+
+	t.Run("the default network interface is written with or without lan", func(t *testing.T) {
+		if _, err := netx.DefaultRouteInterface(); err != nil {
+			t.Skip("host has no default route:", err)
+		}
+
+		for _, args := range [][]string{nil, {"--lan"}} {
+			var out bytes.Buffer
+			genparser := cmdtestx.Genparser(actl.BootstrapEnvRunner{},
+				cmdopts.RuntimeResources{}.KongVars(),
+				kong.Writers(&out, nil),
+			)
+
+			require.NoError(t, cmdtestx.Execute(t, genparser(t), append([]string{"command"}, args...)...))
+			require.Contains(t, out.String(), "EG_RUNNER_DEFAULT_NETWORK_INTERFACE=")
+		}
 	})
 
 	t.Run("the runner network is only set when asked for", func(t *testing.T) {

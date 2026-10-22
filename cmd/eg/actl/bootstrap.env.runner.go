@@ -11,6 +11,7 @@ import (
 	"github.com/egdaemon/eg/internal/bytesx"
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/langx"
+	"github.com/egdaemon/eg/internal/netx"
 	"github.com/egdaemon/eg/internal/numericx"
 	"github.com/egdaemon/eg/runners"
 	"github.com/pbnjay/memory"
@@ -39,6 +40,13 @@ func (t BootstrapEnvRunner) Run(kctx *kong.Context, gctx *cmdopts.Global) (err e
 	).Var(
 		"EG_RUNNER_VRAM", fmt.Sprintf("%v", vram),
 	)
+
+	// the interface the egnet-lan network is attached to, see eg-runner-build.service.
+	if iface, err := netx.DefaultRouteInterface(); err != nil {
+		log.Println("unable to detect the default network interface:", err)
+	} else {
+		environ.Var("EG_RUNNER_DEFAULT_NETWORK_INTERFACE", iface)
+	}
 
 	// the runner units default to the egnet bridge when this is unset.
 	if t.LAN {

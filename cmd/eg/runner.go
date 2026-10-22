@@ -207,7 +207,12 @@ func installgcloud(ctx context.Context, src string, remap func(from, to string) 
 		return nil
 	}
 
-	return errorsx.Wrap(os.Rename(adc, filepath.Join(dst, "application_default_credentials.json")), "unable to install application default credentials")
+	installed := filepath.Join(dst, "application_default_credentials.json")
+	if err = os.Rename(adc, installed); err != nil {
+		return errorsx.Wrap(err, "unable to install application default credentials")
+	}
+
+	return errorsx.Wrap(gcpx.ConfigureGCP(dst, installed), "unable to configure gcloud")
 }
 
 // bridges the host wayland compositor socket (bind-mounted read-write, but

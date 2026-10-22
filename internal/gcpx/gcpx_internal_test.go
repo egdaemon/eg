@@ -34,6 +34,30 @@ func TestWanted(t *testing.T) {
 	})
 }
 
+func TestConfigureGCP(t *testing.T) {
+	config := func(t *testing.T, dir string) string {
+		encoded, err := os.ReadFile(filepath.Join(dir, "configurations", "config_default"))
+		require.NoError(t, err)
+		return string(encoded)
+	}
+
+	t.Run("should point gcloud at the application default credentials", func(t *testing.T) {
+		dir := t.TempDir()
+		adc := filepath.Join(dir, "application_default_credentials.json")
+
+		require.NoError(t, ConfigureGCP(dir, adc))
+		require.Equal(t, "[auth]\ncredential_file_override = "+adc+"\n", config(t, dir))
+	})
+
+	t.Run("should replace an existing configuration", func(t *testing.T) {
+		dir := t.TempDir()
+
+		require.NoError(t, ConfigureGCP(dir, "/old/adc.json"))
+		require.NoError(t, ConfigureGCP(dir, "/new/adc.json"))
+		require.Equal(t, "[auth]\ncredential_file_override = /new/adc.json\n", config(t, dir))
+	})
+}
+
 func TestProvision(t *testing.T) {
 	// a runtime directory of a workload that enabled gcp workload identity.
 	enabled := func(t *testing.T) string {

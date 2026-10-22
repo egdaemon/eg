@@ -127,6 +127,12 @@ func newEnqueueUpload(enq *Enqueued, archive io.Reader, fields ...string) (mimet
 			}
 		}
 
+		for _, uri := range enq.SecretUris {
+			if err = w.WriteField("secret_uris", uri); err != nil {
+				return errorsx.Wrap(err, "unable to set secret uris")
+			}
+		}
+
 		part, lerr := w.CreatePart(httpx.NewMultipartHeader("application/gzip", "archive", "archive.tar.gz"))
 		if lerr != nil {
 			return errorsx.Wrap(lerr, "unable to create archive part")

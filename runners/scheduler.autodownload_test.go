@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -104,13 +105,22 @@ func TestAutoDownload(t *testing.T) {
 		// of the node's remaining available capacity. This starved the node
 		// down to whatever default the server falls back to when cores/memory
 		// are omitted from the request body.
-		var captured EnqueuedSearchRequest
+		var (
+			m             sync.Mutex
+			cores, memory uint64
+		)
 
 		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if strings.HasSuffix(r.URL.Path, "/dequeue") {
+				var captured EnqueuedSearchRequest
 				body, err := io.ReadAll(r.Body)
 				require.NoError(t, err)
 				require.NoError(t, json.Unmarshal(body, &captured))
+
+				// requests are served concurrently with the assertions below.
+				m.Lock()
+				cores, memory = captured.Cores, captured.Memory
+				m.Unlock()
 
 				errorsx.Log(httpx.WriteEmptyJSON(w, http.StatusNotFound))
 				return
@@ -129,7 +139,9 @@ func TestAutoDownload(t *testing.T) {
 
 		autodownload(ctx, newtestclient(t, srv), rm, strategy, NewSpoolDir(t.TempDir()))
 
-		require.Equal(t, limits.Cores, captured.Cores, "dequeue request should advertise remaining cores, not consumed cores")
-		require.Equal(t, limits.Memory, captured.Memory, "dequeue request should advertise remaining memory, not consumed memory")
+		m.Lock()
+		defer m.Unlock()
+		require.Equal(t, limits.Cores, cores, "dequeue request should advertise remaining cores, not consumed cores")
+		require.Equal(t, limits.Memory, memory, "dequeue request should advertise remaining memory, not consumed memory")
 	})
 }

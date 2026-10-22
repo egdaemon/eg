@@ -6,15 +6,17 @@ import (
 	"io"
 	"net"
 	"os"
+	"sync/atomic"
 	"syscall"
 	"time"
 )
 
 type conn struct {
-	fd *netFD
+	closed atomic.Bool // set once Close has run; fd itself is never nil'd out
+	fd     *netFD
 }
 
-func (c *conn) ok() bool { return c != nil && c.fd != nil }
+func (c *conn) ok() bool { return c != nil && c.fd != nil && !c.closed.Load() }
 
 // Implementation of the Conn interface.
 
@@ -45,10 +47,12 @@ func (c *conn) Write(b []byte) (int, error) {
 
 // Close closes the connection.
 func (c *conn) Close() error {
-	defer func() {
-		c.fd = nil
-	}()
-	if !c.ok() {
+	if c == nil || c.fd == nil {
+		return syscall.EINVAL
+	}
+	// CompareAndSwap ensures fd.Close is invoked exactly once even if Close
+	// is called concurrently from multiple goroutines.
+	if !c.closed.CompareAndSwap(false, true) {
 		return syscall.EINVAL
 	}
 	err := c.fd.Close()
@@ -151,11 +155,13 @@ func (c *conn) File() (f *os.File, err error) {
 }
 
 func (c *conn) SyscallConn() syscall.RawConn {
-	return netsysconn{*c}
+	return netsysconn{c}
 }
 
+// netsysconn embeds *conn (never conn by value) so constructing one only
+// ever copies a pointer, not conn's atomic.Bool.
 type netsysconn struct {
-	conn
+	*conn
 }
 
 func (t netsysconn) Control(f func(fd uintptr)) error {

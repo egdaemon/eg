@@ -13,7 +13,9 @@ import (
 )
 
 const (
-	DefaultQueueSize        = 0
+	// Constant for an unbounded queue
+	Unbounded               = math.MaxInt
+	DefaultQueueSize        = Unbounded
 	DefaultNonBlocking      = false
 	LinkedBufferInitialSize = 1024
 	LinkedBufferMaxCapacity = 100 * 1024
@@ -32,8 +34,8 @@ var (
 	}()
 )
 
-// basePool is the base interface for all pool types.
-type basePool interface {
+// BasePool defines methods common to all pool types.
+type BasePool interface {
 	// Returns the number of worker goroutines that are currently active (executing a task) in the pool.
 	RunningWorkers() int64
 
@@ -50,10 +52,15 @@ type basePool interface {
 	SuccessfulTasks() uint64
 
 	// Returns the total number of tasks that have completed (either successfully or with an error).
+	// Tasks accepted by the pool but canceled before execution are excluded.
 	CompletedTasks() uint64
 
 	// Returns the number of tasks that have been dropped because the queue was full.
 	DroppedTasks() uint64
+
+	// Returns the number of tasks accepted by the pool that were canceled
+	// before executing user code due to pool context cancellation.
+	CanceledTasks() uint64
 
 	// Returns the maximum concurrency of the pool.
 	MaxConcurrency() int
@@ -87,7 +94,7 @@ type basePool interface {
 
 // Represents a pool of goroutines that can execute tasks concurrently.
 type Pool interface {
-	basePool
+	BasePool
 
 	// Submits a task to the pool without waiting for it to complete.
 	// The pool will not accept new tasks after it has been stopped.
@@ -134,6 +141,7 @@ type pool struct {
 	ctx                 context.Context
 	cancel              context.CancelCauseFunc
 	nonBlocking         bool
+	panicRecovery       bool
 	maxConcurrency      int
 	closed              atomic.Bool
 	workerCount         atomic.Int64
@@ -145,6 +153,7 @@ type pool struct {
 	successfulTaskCount atomic.Uint64
 	failedTaskCount     atomic.Uint64
 	droppedTaskCount    atomic.Uint64
+	canceledTaskCount   atomic.Uint64
 }
 
 func (p *pool) Context() context.Context {
@@ -173,8 +182,11 @@ func (p *pool) Resize(maxConcurrency int) {
 
 	p.mutex.Lock()
 
-	// Calculate the number of new workers to launch to reach the new max concurrency or the number of tasks in the queue, whichever is smaller
-	newWorkers := int(math.Min(float64(maxConcurrency-p.maxConcurrency), float64(p.tasks.Len())))
+	// Workers from an earlier limit can still be running after a shrink.
+	newWorkers := maxConcurrency - int(p.workerCount.Load())
+	if queuedTasks := int(p.tasks.Len()); newWorkers > queuedTasks {
+		newWorkers = queuedTasks
+	}
 
 	p.maxConcurrency = maxConcurrency
 
@@ -208,6 +220,9 @@ func (p *pool) SubmittedTasks() uint64 {
 }
 
 func (p *pool) WaitingTasks() uint64 {
+	p.mutex.Lock()
+	defer p.mutex.Unlock()
+
 	return p.tasks.Len()
 }
 
@@ -227,11 +242,33 @@ func (p *pool) DroppedTasks() uint64 {
 	return p.droppedTaskCount.Load()
 }
 
+func (p *pool) CanceledTasks() uint64 {
+	return p.canceledTaskCount.Load()
+}
+
 func (p *pool) worker(task any) {
 	var readTaskErr, err error
+	exitedNormally := false
+	defer func() {
+		if !exitedNormally {
+			// In case of abnormal exit (e.g. runtime.Goexit() in the task),
+			// launch a new worker to execute the next task in the queue.
+			p.updateMetrics(fmt.Errorf("worker exited abnormally: %w", err))
+
+			task, err := p.readTask()
+			if err != nil {
+				return
+			}
+
+			if task != nil {
+				p.launchWorker(task)
+				p.notifySubmitWaiter()
+			}
+		}
+	}()
 	for {
 		if task != nil {
-			_, err = invokeTask[any](task)
+			_, err = invokeTask[any](task, p.panicRecovery)
 
 			p.updateMetrics(err)
 		}
@@ -239,6 +276,7 @@ func (p *pool) worker(task any) {
 		task, readTaskErr = p.readTask()
 
 		if readTaskErr != nil {
+			exitedNormally = true
 			return
 		}
 	}
@@ -246,15 +284,46 @@ func (p *pool) worker(task any) {
 
 func (p *pool) subpoolWorker(task any) func() (output any, err error) {
 	return func() (output any, err error) {
+		exitedNormally := false
+		defer func() {
+			if !exitedNormally {
+				p.updateMetrics(fmt.Errorf("worker exited abnormally: %w", err))
+				if nextTask, readErr := p.readTask(); readErr == nil {
+					p.launchWorker(nextTask)
+				}
+			}
+		}()
+
 		if task != nil {
-			output, err = invokeTask[any](task)
+			output, err = invokeTask[any](task, p.panicRecovery)
 
 			p.updateMetrics(err)
 		}
 
+		exitedNormally = true
+
 		// Attempt to submit the next task to the parent pool
 		if task, err := p.readTask(); err == nil {
-			p.parent.submit(p.subpoolWorker(task), p.nonBlocking)
+			for {
+				submitErr := p.parent.submit(p.subpoolWorker(task), p.nonBlocking)
+				if submitErr == nil {
+					break
+				}
+
+				// Wrap the error with the context canceled error to reflect that the task was canceled.
+				if errors.Is(submitErr, ErrPoolStopped) {
+					err = errors.Join(ErrContextCanceled, submitErr)
+					p.updateMetrics(err)
+					p.parent.updateMetrics(err)
+				}
+
+				// If the parent pool is stopped/canceled it won't accept submissions.
+				// Keep draining the subpool queue so workers can exit cleanly.
+				task, err = p.readTask()
+				if err != nil {
+					break
+				}
+			}
 		}
 
 		return
@@ -302,7 +371,7 @@ func (p *pool) wrapTask(task any) (Task, func() error, func(error)) {
 	ctx := p.Context()
 	future, resolve := future.NewFuture(ctx)
 
-	wrappedTask := wrapTask[struct{}, func(error)](task, resolve)
+	wrappedTask := wrapTask[struct{}, func(error)](task, resolve, ctx, p.panicRecovery)
 
 	return future, wrappedTask, resolve
 }
@@ -354,26 +423,32 @@ func (p *pool) trySubmit(task any) error {
 		return ErrPoolStopped
 	}
 
+	queueEnabled := p.queueSize > 0
 	tasksLen := int(p.tasks.Len())
 
-	if p.queueSize > 0 && tasksLen >= p.queueSize {
+	// When queue is enabled, check if it is full
+	if queueEnabled && tasksLen >= p.queueSize {
 		p.mutex.Unlock()
 		return ErrQueueFull
 	}
 
 	if int(p.workerCount.Load()) >= p.maxConcurrency {
-		// Push the task at the back of the queue
+		// When queue is disabled, return an error immediately if max concurrency is reached
+		if !queueEnabled {
+			p.mutex.Unlock()
+			return ErrQueueFull
+		}
+
+		// If queue is enabled, push the task at the back of the queue
 		p.tasks.Write(task)
-
 		p.mutex.Unlock()
-
 		return nil
 	}
 
 	p.workerCount.Add(1)
 	p.workerWaitGroup.Add(1)
 
-	if tasksLen > 0 {
+	if queueEnabled && tasksLen > 0 {
 		// Push the task at the back of the queue
 		p.tasks.Write(task)
 
@@ -404,19 +479,6 @@ func (p *pool) launchWorker(task any) {
 
 func (p *pool) readTask() (task any, err error) {
 	p.mutex.Lock()
-
-	// Check if the pool context has been cancelled
-	select {
-	case <-p.ctx.Done():
-		// Context cancelled, worker will exit
-		p.workerCount.Add(-1)
-		p.workerWaitGroup.Done()
-		p.mutex.Unlock()
-
-		err = p.ctx.Err()
-		return
-	default:
-	}
 
 	if p.tasks.Len() == 0 {
 		// No more tasks in the queue, worker will exit
@@ -462,7 +524,11 @@ func (p *pool) notifySubmitWaiter() {
 
 func (p *pool) updateMetrics(err error) {
 	if err != nil {
-		p.failedTaskCount.Add(1)
+		if errors.Is(err, ErrContextCanceled) {
+			p.canceledTaskCount.Add(1)
+		} else {
+			p.failedTaskCount.Add(1)
+		}
 	} else {
 		p.successfulTaskCount.Add(1)
 	}
@@ -522,6 +588,7 @@ func newPool(maxConcurrency int, parent *pool, options ...Option) *pool {
 	pool := &pool{
 		ctx:            context.Background(),
 		nonBlocking:    DefaultNonBlocking,
+		panicRecovery:  true,
 		maxConcurrency: maxConcurrency,
 		queueSize:      DefaultQueueSize,
 		// Buffer size of 1 to prevent deadlock when read on the submitWaiters channel happens
@@ -535,6 +602,7 @@ func newPool(maxConcurrency int, parent *pool, options ...Option) *pool {
 		pool.ctx = parent.Context()
 		pool.queueSize = parent.queueSize
 		pool.nonBlocking = parent.nonBlocking
+		pool.panicRecovery = parent.panicRecovery
 	}
 
 	for _, option := range options {

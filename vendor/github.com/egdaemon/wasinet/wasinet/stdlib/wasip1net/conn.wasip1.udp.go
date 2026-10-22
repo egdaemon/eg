@@ -46,7 +46,7 @@ func udpsockaddr(a *net.UDPAddr, family int) (syscall.Sockaddr, error) {
 }
 
 func udpToLocal(a *net.UDPAddr, n string) *net.UDPAddr {
-	return &net.UDPAddr{loopbackIP(n), a.Port, a.Zone}
+	return &net.UDPAddr{IP: loopbackIP(n), Port: a.Port, Zone: a.Zone}
 }
 
 func udpOpAddr(a *net.UDPAddr) net.Addr {
@@ -137,15 +137,12 @@ func (addrPortUDPAddr) Network() string { return "udp" }
 // UDPConn is the implementation of the Conn and PacketConn interfaces
 // for UDP network connections.
 type UDPConn struct {
-	conn
+	*conn
 }
 
 // SyscallConn returns a raw network connection.
 // This implements the syscall.Conn interface.
 func (c *UDPConn) SyscallConn() (syscall.RawConn, error) {
-	if !c.ok() {
-		return nil, syscall.EINVAL
-	}
 	return netsysconn{c.conn}, nil
 }
 
@@ -295,7 +292,7 @@ func (c *UDPConn) WriteMsgUDPAddrPort(b, oob []byte, addr netip.AddrPort) (n, oo
 	return
 }
 
-func newUDPConn(fd *netFD) *UDPConn { return &UDPConn{conn{fd}} }
+func newUDPConn(fd *netFD) *UDPConn { return &UDPConn{&conn{fd: fd}} }
 
 func (c *UDPConn) readFrom(b []byte, addr *net.UDPAddr) (int, *net.UDPAddr, error) {
 	n, _, _, rsa, err := c.fd.readMsg(b, nil)

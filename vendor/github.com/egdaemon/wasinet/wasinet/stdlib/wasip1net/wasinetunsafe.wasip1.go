@@ -77,11 +77,11 @@ func newFileConn(family, sotype int, f *os.File) (net.Conn, error) {
 func newFdConn(fd *netFD) (net.Conn, error) {
 	switch fd.net {
 	case "tcp":
-		return &TCPConn{conn{fd: fd}}, nil
+		return &TCPConn{&conn{fd: fd}}, nil
 	case "udp":
-		return &UDPConn{conn{fd: fd}}, nil
+		return &UDPConn{&conn{fd: fd}}, nil
 	case "unix":
-		return &UnixConn{conn{fd: fd}}, nil
+		return &UnixConn{&conn{fd: fd}}, nil
 	default:
 		return nil, fmt.Errorf("unsupported network for file connection: %s", fd.net)
 	}
@@ -92,7 +92,7 @@ func PacketConnFd(family, sotype int, fd uintptr) (net.PacketConn, error) {
 	if err != nil {
 		return nil, err
 	}
-	return makePacketConn(&packetConn{conn: &conn{pfd}}), nil
+	return makePacketConn(&packetConn{conn: &conn{fd: pfd}}), nil
 }
 
 func Listener(family, sotype int, fd uintptr) (net.Listener, error) {

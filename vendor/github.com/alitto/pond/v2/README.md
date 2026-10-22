@@ -317,6 +317,8 @@ customCtx, cancel := context.WithCancel(context.Background())
 pool := pond.NewPool(10, pond.WithContext(customCtx))
 ``` 
 
+When a pool-level context is canceled, workers stop accepting new work and any queued tasks are drained so the pool can shut down cleanly without deadlocking. Drained tasks are not executed and resolve with a cancellation error.
+
 ### Stopping a pool
 
 You can stop a pool using the `Stop` method. This will stop all workers and prevent new tasks from being submitted. You can also wait for all submitted tasks by calling the `Wait` method.
@@ -370,6 +372,16 @@ if err != nil {
 } else {
 	fmt.Println("Task completed successfully")
 }
+```
+
+If you prefer to keep the default Go runtime behavior (panics crashing the goroutine), you can disable panic interception when creating the pool:
+
+``` go
+pool := pond.NewPool(10, pond.WithoutPanicRecovery())
+
+pool.Go(func() {
+	panic("this panic will crash the goroutine")
+})
 ```
 
 ### Subpools (v2)
@@ -449,6 +461,30 @@ pool := pond.NewPool(1, pond.WithQueueSize(10), pond.WithNonBlocking(true))
 
 **Note**: you can technically use `TrySubmit` and `TrySubmitErr` methods or `NonBlocking` option for both bounded and unbounded task queues, but they are only useful when the queue is bounded. For unbounded task queues there is always space in the queue and non-blocking submission will always succeed.
 
+#### Using the `pond.Unbounded` constant
+
+`pond.Unbounded` is a convenience constant that resolves to the maximum supported queue size. Passing it to `WithQueueSize` keeps the queue effectively infinite while still allowing other queue-related options to be configured explicitly (for example in subpools or helper constructors).
+
+```go
+// Force the queue back to the default unbounded behavior.
+pool := pond.NewPool(8, pond.WithQueueSize(pond.Unbounded), pond.WithNonBlocking(false))
+```
+
+#### Disabling the queue altogether
+
+Passing `WithQueueSize(0)` disables the queue completely. Only running workers can accept work; if all workers are busy, submissions will either block (default) until a worker becomes available or fail immediately when using `TrySubmit`, `TrySubmitErr`, or `WithNonBlocking(true)`. This is helpful when you need "no backlog" semantics and want to ensure work runs immediately or gets rejected.
+
+```go
+// Create a pool that never queues tasks: they either run immediately or error.
+pool := pond.NewPool(4, pond.WithQueueSize(0))
+
+if _, ok := pool.TrySubmit(func() {
+	// Do some work that must start right away
+}); !ok {
+	// All 4 workers were busy so the task was rejected
+}
+```
+
 ### Resizing pools (v2)
 
 You can dynamically change the maximum number of workers in a pool using the `Resize` method. This is useful when you need to adjust the pool's capacity based on runtime conditions.
@@ -491,8 +527,9 @@ Each worker pool instance exposes useful metrics that can be queried through the
 - `pool.SubmittedTasks() uint64`: Total number of tasks submitted since the pool was created and before it was stopped. This includes tasks that were dropped because the queue was full
 - `pool.WaitingTasks() uint64`: Current number of tasks in the queue that are waiting to be executed
 - `pool.SuccessfulTasks() uint64`: Total number of tasks that have successfully completed their execution since the pool was created
-- `pool.FailedTasks() uint64`: Total number of tasks that completed with panic since the pool was created
-- `pool.CompletedTasks() uint64`: Total number of tasks that have completed their execution either successfully or with panic since the pool was created
+- `pool.FailedTasks() uint64`: Total number of tasks that completed with a non-cancellation error (including panics) since the pool was created
+- `pool.CanceledTasks() uint64`: Total number of tasks accepted by the pool that were canceled before executing user code due to context cancellation
+- `pool.CompletedTasks() uint64`: Total number of tasks that have completed their execution either successfully or with a non-cancellation error since the pool was created
 - `pool.DroppedTasks() uint64`: Total number of tasks that were dropped because the queue was full since the pool was created
 
 In our [Prometheus example](./examples/prometheus/main.go) we showcase how to configure collectors for these metrics and expose them to Prometheus.

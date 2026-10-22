@@ -217,7 +217,7 @@ func (fd *netFD) Read(p []byte) (n int, err error) {
 			case syscall.EINTR, syscall.EAGAIN:
 				runtime.Gosched()
 			default:
-				return -1, err
+				return 0, err
 			}
 		}
 	}

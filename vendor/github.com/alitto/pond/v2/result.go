@@ -8,7 +8,7 @@ import (
 
 // ResultPool is a pool that can be used to submit tasks that return a result.
 type ResultPool[R any] interface {
-	basePool
+	BasePool
 
 	// Submits a task to the pool and returns a future that can be used to wait for the task to complete and get the result.
 	// The pool will not accept new tasks after it has been stopped.
@@ -75,7 +75,8 @@ func (p *resultPool[R]) TrySubmitErr(task func() (R, error)) (ResultTask[R], boo
 }
 
 func (p *resultPool[R]) submit(task any, nonBlocking bool) (ResultTask[R], bool) {
-	future, resolve := future.NewValueFuture[R](p.Context())
+	ctx := p.Context()
+	future, resolve := future.NewValueFuture[R](ctx)
 
 	if p.Stopped() {
 		var zero R
@@ -83,7 +84,7 @@ func (p *resultPool[R]) submit(task any, nonBlocking bool) (ResultTask[R], bool)
 		return future, false
 	}
 
-	wrapped := wrapTask[R, func(R, error)](task, resolve)
+	wrapped := wrapTask[R, func(R, error)](task, resolve, ctx, p.pool.panicRecovery)
 
 	if err := p.pool.submit(wrapped, nonBlocking); err != nil {
 		var zero R

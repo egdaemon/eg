@@ -4,6 +4,7 @@ package wnetruntime
 
 import (
 	"context"
+	"errors"
 	"log"
 	"net"
 	"syscall"
@@ -17,6 +18,35 @@ import (
 
 func TranslateErrno(err error) syscall.Errno {
 	return wasip1syscall.ErrnoTranslate(ffierrors.Errno(err))
+}
+
+// classifyLookupErrno maps an address/port lookup failure (e.g. from
+// net.DefaultResolver) to a syscall.Errno suitable for TranslateErrno.
+// ffierrors.Errno panics on errors it doesn't recognize (a plain
+// "no such host" *net.DNSError is neither a syscall.Errno, a
+// context.Canceled/DeadlineExceeded, nor Timeout()==true), so lookup
+// failures must be classified here first rather than passed through
+// directly.
+func classifyLookupErrno(err error) syscall.Errno {
+	var errno syscall.Errno
+	if errors.As(err, &errno) {
+		return errno
+	}
+
+	switch {
+	case errors.Is(err, context.Canceled):
+		return syscall.ECANCELED
+	case errors.Is(err, context.DeadlineExceeded):
+		return syscall.ETIMEDOUT
+	}
+
+	var timeout interface{ Timeout() bool }
+	if errors.As(err, &timeout) && timeout.Timeout() {
+		return syscall.ETIMEDOUT
+	}
+
+	// most common remaining case: name/service not found.
+	return syscall.ENOENT
 }
 
 // translate wasi syscall.AF_* to the host.
@@ -440,7 +470,7 @@ func SocketAddrIP(fn AddrIPFn) AddrIPHostFn {
 
 		if ip, err = fn(ctx, network, address); err != nil {
 			log.Println("socket ip lookup failed", err)
-			return syscall.EINVAL
+			return TranslateErrno(classifyLookupErrno(err))
 		}
 
 		reslength := len(ip)

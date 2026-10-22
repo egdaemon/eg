@@ -149,7 +149,7 @@ func (t baremetal) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, hotswapbin
 		vmemlimit int64
 	)
 
-	if vmemlimit, err = memlimit.SetGoMemLimitWithOpts(memlimit.WithProvider(memlimit.FromSystem)); err != nil {
+	if vmemlimit, err = memlimit.Set(memlimit.WithProvider(memlimit.FromSystem)); err != nil {
 		return errorsx.Wrap(err, "unable to set max limits")
 	}
 

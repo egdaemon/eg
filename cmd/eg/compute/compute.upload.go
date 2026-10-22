@@ -47,6 +47,7 @@ type upload struct {
 	HostedCompute    bool          `name:"shared-compute" help:"allow hosted compute" default:"true"`
 	P2P              int           `name:"p2p" help:"priority of uploading directly to a runner the control plane suggests before falling back to the cluster, higher goes first, 0 disables" default:"1" env:"EG_P2P_PRIORITY"`
 	LAN              int           `name:"lan" help:"priority of uploading directly to a runner remembered from the local network (see 'eg compute lan'), higher goes first, 0 disables including scanning for runners" default:"0" env:"EG_LAN_PRIORITY"`
+	P2POnly          bool          `name:"p2p-only" help:"never fall back to uploading to the cluster, fail if no runner accepts a direct upload" env:"EG_P2P_ONLY"`
 	CacheDir         string        `name:"cache-directory" help:"directory the remembered systems on the local network are stored in" default:"${vars_cache_directory}" env:"EG_CACHE_DIRECTORY"`
 	LANScanTimeout   time.Duration `name:"lan-scan-timeout" help:"how long the background scan of the local network runs for" default:"3s"`
 	LANPeerTTL       time.Duration `name:"lan-peer-ttl" type:"durationinf" help:"how long systems on the local network are remembered after they were last seen" default:"720h" env:"EG_LAN_PEER_TTL"`
@@ -226,11 +227,17 @@ func (t upload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, find libp2px.
 			return cause
 		}
 
+		if t.P2POnly {
+			return errorsx.Wrap(cause, "direct upload unavailable and --p2p-only is set")
+		}
+
 		log.Println("direct upload unavailable, falling back to the cluster", cause)
 
 		if err = iox.Rewind(archiveio); err != nil {
 			return errorsx.Wrap(err, "unable to rewind kernel archive")
 		}
+	} else if t.P2POnly {
+		return errorsx.Errorf("--p2p-only is set but no direct upload strategy is enabled, see --p2p and --lan")
 	}
 
 	recorded, err := t.enqueue(gctx.Context, chttp, enq, archiveio)

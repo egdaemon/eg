@@ -14,7 +14,7 @@ func TestDirectClientReserve(t *testing.T) {
 	t.Run("uploads the archive with the candidate token", func(t *testing.T) {
 		var (
 			token, vram, archive, description string
-			labels                            []string
+			labels, secretURIs                []string
 		)
 
 		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -24,6 +24,7 @@ func TestDirectClientReserve(t *testing.T) {
 			vram = r.FormValue("vram")
 			description = r.FormValue("description")
 			labels = r.MultipartForm.Value["labels"]
+			secretURIs = r.MultipartForm.Value["secret_uris"]
 
 			f, _, err := r.FormFile("archive")
 			require.NoError(t, err)
@@ -38,12 +39,13 @@ func TestDirectClientReserve(t *testing.T) {
 		defer srv.Close()
 
 		c := DirectClient{c: srv.Client(), host: srv.URL}
-		recorded, err := c.Reserve(t.Context(), &Enqueued{Id: "pushed-id", Vram: 8, Labels: []string{"gpu", "fast"}, Description: "my workload"}, strings.NewReader("kernel contents"), "candidate-token")
+		recorded, err := c.Reserve(t.Context(), &Enqueued{Id: "pushed-id", Vram: 8, Labels: []string{"gpu", "fast"}, SecretUris: []string{"gcpsm://project/test-secret", "awssm://other?region=us-east-1"}, Description: "my workload"}, strings.NewReader("kernel contents"), "candidate-token")
 		require.NoError(t, err)
 		require.Equal(t, "candidate-token", token)
 		require.Equal(t, "my workload", description)
 		require.Equal(t, "8", vram)
 		require.Equal(t, []string{"gpu", "fast"}, labels)
+		require.Equal(t, []string{"gcpsm://project/test-secret", "awssm://other?region=us-east-1"}, secretURIs)
 		require.Equal(t, "kernel contents", archive)
 		require.Equal(t, "recorded-id", recorded.Enqueued.Id)
 		require.Equal(t, "tok", recorded.AccessToken)

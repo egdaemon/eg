@@ -55,7 +55,7 @@ func (t archive) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) 
 	); err != nil {
 		return err
 	}
-	defer os.RemoveAll(filepath.Join(ws.Root, ws.RuntimeDir))
+	defer os.RemoveAll(ws.Root)
 
 	roots, err := transpile.Autodetect(transpile.New(eg.DefaultModuleDirectory(t.Dir), ws)).Run(gctx.Context)
 	if err != nil {

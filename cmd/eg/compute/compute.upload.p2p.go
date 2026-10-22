@@ -224,7 +224,7 @@ func (t upload) follow(ctx context.Context, chttp *http.Client, o outcome) error
 		return errorsx.Wrap(err, "unable to stream workload logs")
 	}
 
-	return t.workloadresult(ctx, chttp, o.recorded.Id)
+	return workloadresult(ctx, chttp, o.recorded.Id)
 }
 
 // followenqueued streams the logs of a workload enqueued with the cluster. it waits for the cluster to
@@ -235,17 +235,22 @@ func (t upload) followenqueued(ctx context.Context, chttp *http.Client, id strin
 		return nil
 	}
 
+	return followenqueued(ctx, chttp, id)
+}
+
+// followenqueued streams the logs of a workload enqueued with the cluster, see upload.followenqueued.
+func followenqueued(ctx context.Context, chttp *http.Client, id string) (err error) {
 	// how often the cluster is polled for the workload to be scheduled on a runner.
 	const pollinterval = 2 * time.Second
 
 	log.Println("waiting for the workload to start", id)
 	found, err := runners.NewPushClient(chttp).AwaitLogsToken(ctx, id, pollinterval)
 	if errors.Is(err, runners.ErrWorkloadCompleted) {
-		if err = t.storedlogs(ctx, chttp, id); err != nil {
+		if err = storedlogs(ctx, chttp, id); err != nil {
 			return err
 		}
 
-		return t.workloadresult(ctx, chttp, id)
+		return workloadresult(ctx, chttp, id)
 	} else if err != nil {
 		return errorsx.Wrap(err, "unable to stream workload logs")
 	}
@@ -265,11 +270,11 @@ func (t upload) followenqueued(ctx context.Context, chttp *http.Client, id strin
 		return errorsx.Wrap(err, "unable to stream workload logs")
 	}
 
-	return t.workloadresult(ctx, chttp, id)
+	return workloadresult(ctx, chttp, id)
 }
 
 // workloadresult reports how the completed workload ended, nil when it succeeded.
-func (t upload) workloadresult(ctx context.Context, chttp *http.Client, id string) (err error) {
+func workloadresult(ctx context.Context, chttp *http.Client, id string) (err error) {
 	// the history record is written by the completion upload and can trail the end of the log stream.
 	const (
 		attempts = 10
@@ -311,7 +316,7 @@ func (t upload) workloadresult(ctx context.Context, chttp *http.Client, id strin
 }
 
 // storedlogs prints the stored log of a workload that completed before its logs could be followed.
-func (t upload) storedlogs(ctx context.Context, chttp *http.Client, id string) (err error) {
+func storedlogs(ctx context.Context, chttp *http.Client, id string) (err error) {
 	// the history record is written by the completion upload and can trail the workload's completion.
 	const (
 		attempts = 5

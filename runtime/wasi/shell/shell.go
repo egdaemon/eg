@@ -248,8 +248,7 @@ func Run(ctx context.Context, cmds ...Command) error {
 
 			return nil
 		}); err != nil {
-			log.Println(cmd.color.Red("ERROR"), fmt.Sprintf("duration(%v) shell command failed: %s", time.Since(ts), cmd.cmd), err)
-			return errorsx.Wrapf(err, "duration(%v) shell command failed: %s", time.Since(ts), cmd.cmd)
+			return errorsx.Wrapf(err, "%s duration(%v) shell command failed: %s", cmd.color.Red("ERROR"), time.Since(ts), cmd.cmd)
 		}
 	}
 

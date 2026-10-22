@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/alecthomas/kong"
@@ -113,7 +114,7 @@ func main() {
 	log.SetPrefix(fmt.Sprintf("[%d]", os.Getpid()))
 	go cmdopts.Cleanup(shellcli.Context, shellcli.Shutdown, shellcli.Cleanup, func() {
 		log.Println("waiting for systems to shutdown")
-	}, os.Kill, os.Interrupt)
+	}, os.Kill, syscall.SIGTERM, os.Interrupt)
 	user := userx.CurrentUserOrDefault(userx.Root())
 	gitdir := envx.String(gitx.DetectRoot(), "EG_GIT_REPOSITORY")
 	gdxsocket := filepath.Join(userx.DefaultRuntimeDirectory(), gdx.DefaultSocket)
@@ -212,6 +213,8 @@ func main() {
 
 	if err = ctx.Run(); err != nil {
 		log.Println(ctx.Command(), cmderrors.Sprint(err))
+		shellcli.Shutdown(err)
+		shellcli.Cleanup.Wait()
 		os.Exit(1)
 	}
 

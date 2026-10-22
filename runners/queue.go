@@ -53,6 +53,9 @@ const (
 	// DaemonLogName is the file within a workload's runtime directory its output is written to.
 	DaemonLogName = "daemon.log"
 
+	// DaemonAnalyticsName is the file within a workload's runtime directory its analytics are written to.
+	DaemonAnalyticsName = "analytics.db"
+
 	// cachedirs is how many concurrent cache/lock buckets a repo may
 	// claim at once; a workload only defers once all of them are claimed.
 	cachedirs = 8
@@ -455,7 +458,6 @@ func beginwork(ctx context.Context, md metadata, dir string) state {
 	var (
 		err      error
 		ws       workspaces.Context
-		ragent   *Agent
 		archive  *os.File
 		encoded  []byte
 		workload = &EnqueuedDequeueResponse{
@@ -496,6 +498,10 @@ func beginwork(ctx context.Context, md metadata, dir string) state {
 	cachedir := userx.DefaultCacheDirectory("wcache", cacheprefix(workload.Enqueued), bucket, "workloadcache")
 	log.Println("workload cachedir", cachedir)
 
+	// failures with workspace setup cannot be moved into stateinit. the runtime directory
+	// (where the logs live) is derived by workspaces.New, which returns a zero context on error,
+	// so there is nowhere to record the cause until the workspace exists. these failures complete
+	// without logs.
 	if ws, err = workspaces.NewQueued(
 		ctx,
 		md5.New(),
@@ -507,10 +513,100 @@ func beginwork(ctx context.Context, md metadata, dir string) state {
 		return completed(workload.Enqueued, md, bucket, ws, 0, errorsx.Wrap(err, "unable to setup workspace"))
 	}
 
+	return initialize(workload.Enqueued, md, bucket, ws, stateprepare{
+		metadata: md,
+		workload: workload,
+		ws:       ws,
+		bucket:   bucket,
+		dir:      dir,
+		archive:  archive,
+	})
+}
+
+// initialize prepares the log and analytics of the workload before anything that can fail
+// so the cause of the failures can be reported to the user, then continues with next.
+func initialize(workload *Enqueued, md metadata, bucket string, ws workspaces.Context, next state) stateinit {
+	return stateinit{
+		workload: workload,
+		bucket:   bucket,
+		ws:       ws,
+		metadata: md,
+		next:     next,
+	}
+}
+
+type stateinit struct {
+	metadata
+	workload *Enqueued
+	bucket   string
+	ws       workspaces.Context
+	next     state
+}
+
+func (t stateinit) Update(ctx context.Context) state {
+	var (
+		containerdir  = userx.DefaultCacheDirectory("wcache", cacheprefix(t.workload), t.bucket, "containers")
+		logpath       = filepath.Join(t.ws.RuntimeDir, DaemonLogName)
+		analyticspath = filepath.Join(t.ws.RuntimeDir, DaemonAnalyticsName)
+	)
+
+	if err := fsx.MkDirs(0770, containerdir); err != nil {
+		return completed(t.workload, t.metadata, t.bucket, t.ws, 0, errorsx.Wrap(err, "unable to setup container and cache directories"))
+	}
+
+	logdst, err := os.Create(logpath)
+	if err != nil {
+		return completed(t.workload, t.metadata, t.bucket, t.ws, 0, err)
+	}
+
+	if err = logdst.Close(); err != nil {
+		return completed(t.workload, t.metadata, t.bucket, t.ws, 0, err)
+	}
+
+	if err = events.InitializeDB(ctx, analyticspath); err != nil {
+		return completed(t.workload, t.metadata, t.bucket, t.ws, 0, err)
+	}
+
+	return t.next
+}
+
+// stateprepare readies the workload to run: unpacks the archive, builds the environment and the agent.
+type stateprepare struct {
+	metadata
+	workload *EnqueuedDequeueResponse
+	ws       workspaces.Context
+	bucket   string
+	dir      string
+	archive  *os.File
+}
+
+// failed records the cause within the log of the workload, which is uploaded on completion, before completing.
+func (t stateprepare) failed(cause error) state {
+	logdst, err := os.OpenFile(filepath.Join(t.ws.RuntimeDir, DaemonLogName), os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0600)
+	if err != nil {
+		log.Println(errorsx.Wrap(err, "unable to record failure in the workload logs"))
+		return completed(t.workload.Enqueued, t.metadata, t.bucket, t.ws, 0, cause)
+	}
+	defer logdst.Close()
+
+	log.New(logdst, "", log.Flags()).Println(cause)
+
+	return completed(t.workload.Enqueued, t.metadata, t.bucket, t.ws, 0, cause)
+}
+
+func (t stateprepare) Update(ctx context.Context) state {
+	var (
+		err      error
+		ragent   *Agent
+		ws       = t.ws
+		archive  = t.archive
+		workload = t.workload
+	)
+
 	// debugx.Println("workspace", spew.Sdump(ws))
 
 	if err = tarx.Unpack(ws.RuntimeDir, archive); err != nil {
-		return completed(workload.Enqueued, md, bucket, ws, 0, errorsx.Wrap(err, "unable to unpack archive"))
+		return t.failed(errorsx.Wrap(err, "unable to unpack archive"))
 	}
 
 	// fsx.PrintFS(os.DirFS(ws.RuntimeDir))
@@ -525,18 +621,18 @@ func beginwork(ctx context.Context, md metadata, dir string) state {
 
 	// requesting vram implies the workload needs a gpu, in addition to whatever
 	// this daemon was configured with.
-	gpuenabled := md.gpu || workload.Enqueued.Vram > 0
+	gpuenabled := t.metadata.gpu || workload.Enqueued.Vram > 0
 
 	// the runner resolves the secrets with its own credentials so only references
 	// travel with the workload. scheme validation is repeated here since the
 	// uris originate from the enqueuing side.
 	if err = secrets.ValidateRemote(workload.Enqueued.SecretUris...); err != nil {
-		return completed(workload.Enqueued, md, bucket, ws, 0, errorsx.Wrap(err, "invalid secret uris"))
+		return t.failed(errorsx.Wrap(err, "invalid secret uris"))
 	}
 
 	gcpadc, err := gcpx.ProvisionCredentials(ctx, &http.Client{Timeout: 30 * time.Second}, ws.RuntimeDir, workload.AccessToken)
 	if err != nil {
-		return completed(workload.Enqueued, md, bucket, ws, 0, err)
+		return t.failed(err)
 	}
 
 	// secrets are read as the workload's account when it has a gcp identity connection.
@@ -552,21 +648,21 @@ func beginwork(ctx context.Context, md metadata, dir string) state {
 		Var(eg.EnvComputeVCS, workload.Enqueued.VcsUri).
 		Var(eg.EnvComputeTTL, time.Duration(workload.Enqueued.Ttl).String()).
 		Var(eg.EnvComputeGPU, strconv.FormatBool(gpuenabled)).
-		Var(eg.EnvComputeLoggingVerbosity, envx.String(strconv.Itoa(md.logVerbosity), eg.EnvComputeLoggingVerbosity))
+		Var(eg.EnvComputeLoggingVerbosity, envx.String(strconv.Itoa(t.metadata.logVerbosity), eg.EnvComputeLoggingVerbosity))
 
 	// envx.Debug(errorsx.Zero(envb.Environ())...)
 
 	if err = envb.WriteTo(environpath); err != nil {
-		return completed(workload.Enqueued, md, bucket, ws, 0, errorsx.Wrap(err, "failed to update environment file"))
+		return t.failed(errorsx.Wrap(err, "failed to update environment file"))
 	}
 
 	gpu, err := AgentOptionGPU(gpuenabled)
 	if err != nil {
-		return completed(workload.Enqueued, md, bucket, ws, 0, errorsx.Wrap(err, "unable to configure gpu support"))
+		return t.failed(errorsx.Wrap(err, "unable to configure gpu support"))
 	}
 
-	aopts := make([]AgentOption, 0, len(md.agentopts)+32)
-	aopts = append(aopts, md.agentopts...)
+	aopts := make([]AgentOption, 0, len(t.metadata.agentopts)+32)
+	aopts = append(aopts, t.metadata.agentopts...)
 	aopts = append(
 		aopts,
 		AgentOptionEGBin(errorsx.Zero(exec.LookPath(os.Args[0]))),
@@ -582,10 +678,10 @@ func beginwork(ctx context.Context, md metadata, dir string) state {
 	)
 
 	if ragent, err = m.NewRun(ctx, ws, workload.Enqueued.Id, aopts...); err != nil {
-		return completed(workload.Enqueued, md, bucket, ws, 0, errorsx.Wrap(err, "run failure"))
+		return t.failed(errorsx.Wrap(err, "run failure"))
 	}
 
-	return status(md.authclient, ReadCandidateToken(dir), StatusRunning, workload.Enqueued, staterunning{metadata: md, workload: workload.Enqueued, ws: ws, ragent: ragent, dir: dir, bucket: bucket})
+	return status(t.metadata.authclient, ReadCandidateToken(t.dir), StatusRunning, workload.Enqueued, staterunning{metadata: t.metadata, workload: workload.Enqueued, ws: ws, ragent: ragent, dir: t.dir, bucket: t.bucket})
 }
 
 // status reports the progress of a workload pushed to this runner to the
@@ -656,25 +752,16 @@ func (t staterunning) Update(ctx context.Context) state {
 	}
 
 	var (
-		err           error
-		logdst        *os.File
-		containerdir  = userx.DefaultCacheDirectory("wcache", cacheprefix(t.workload), t.bucket, "containers")
-		logpath       = filepath.Join(t.ws.RuntimeDir, DaemonLogName)
-		analyticspath = filepath.Join(t.ws.RuntimeDir, "analytics.db")
+		err          error
+		logdst       *os.File
+		containerdir = userx.DefaultCacheDirectory("wcache", cacheprefix(t.workload), t.bucket, "containers")
+		logpath      = filepath.Join(t.ws.RuntimeDir, DaemonLogName)
 	)
 
-	if err = fsx.MkDirs(0770, containerdir); err != nil {
-		return completed(t.workload, t.metadata, t.bucket, t.ws, 0, errorsx.Wrap(err, "unable to setup container and cache directories"))
-	}
-
-	if logdst, err = os.Create(logpath); err != nil {
+	if logdst, err = os.OpenFile(logpath, os.O_WRONLY|os.O_APPEND, 0); err != nil {
 		return completed(t.workload, t.metadata, t.bucket, t.ws, 0, err)
 	}
 	defer logdst.Close()
-
-	if err = events.InitializeDB(ctx, analyticspath); err != nil {
-		return completed(t.workload, t.metadata, t.bucket, t.ws, 0, err)
-	}
 
 	options := append(
 		t.ragent.Options(),
@@ -727,7 +814,7 @@ type statecompleted struct {
 func (t statecompleted) Update(ctx context.Context) state {
 	var (
 		logpath       = filepath.Join(t.ws.RuntimeDir, DaemonLogName)
-		analyticspath = filepath.Join(t.ws.RuntimeDir, "analytics.db")
+		analyticspath = filepath.Join(t.ws.RuntimeDir, DaemonAnalyticsName)
 	)
 
 	log.Println("completed", t.workload.Id, t.workload.AccountId, t.workload.VcsUri, t.ws.Root, t.duration, t.cause)

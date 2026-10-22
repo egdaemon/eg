@@ -337,7 +337,7 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 			return errorsx.Wrap(err, "unable to set cpu limits")
 		}
 
-		if vmemlimit, err = memlimit.SetGoMemLimitWithOpts(memlimit.WithProvider(memlimit.FromCgroup)); err != nil {
+		if vmemlimit, err = memlimit.Set(memlimit.WithProvider(memlimit.FromCgroup)); err != nil {
 			return errorsx.Wrap(err, "unable to set max limits")
 		}
 

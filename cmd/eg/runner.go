@@ -357,7 +357,7 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 		}
 		defer control.Close()
 
-		if db, err = sql.Open("duckdb", filepath.Join(t.RuntimeDir, "analytics.db")); err != nil {
+		if db, err = sql.Open("duckdb", filepath.Join(t.RuntimeDir, runners.DaemonAnalyticsName)); err != nil {
 			return errorsx.Wrap(err, "unable to create analytics.db")
 		}
 		defer db.Close()

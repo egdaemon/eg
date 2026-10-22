@@ -173,7 +173,7 @@ func (t baremetal) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, hotswapbin
 	}
 	defer control.Close()
 
-	if db, err = sql.Open("duckdb", filepath.Join(ws.RuntimeDir, "analytics.db")); err != nil {
+	if db, err = sql.Open("duckdb", filepath.Join(ws.RuntimeDir, runners.DaemonAnalyticsName)); err != nil {
 		return errorsx.Wrap(err, "unable to create analytics.db")
 	}
 	defer db.Close()

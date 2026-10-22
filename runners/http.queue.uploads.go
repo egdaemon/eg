@@ -206,7 +206,7 @@ func NewEnqueueCompletion(cause error, duration time.Duration, logs io.Reader, a
 			return errorsx.Wrap(lerr, "unable to copy logs")
 		}
 
-		apart, aerr := w.CreatePart(httpx.NewMultipartHeader("application/vnd.egdaemon-analytics", "analytics", "analytics.db"))
+		apart, aerr := w.CreatePart(httpx.NewMultipartHeader("application/vnd.egdaemon-analytics", "analytics", DaemonAnalyticsName))
 		if aerr != nil {
 			return errorsx.Wrap(aerr, "unable to create analytics part")
 		}

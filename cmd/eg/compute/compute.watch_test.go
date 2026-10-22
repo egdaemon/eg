@@ -1,7 +1,10 @@
 package compute
 
 import (
+	"bufio"
 	"context"
+	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -9,6 +12,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/golang-jwt/jwt/v4"
+	"github.com/libp2p/go-libp2p"
+	"github.com/libp2p/go-libp2p/core/host"
+	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/stretchr/testify/require"
 )
 
@@ -121,4 +128,78 @@ func TestFollowEnqueued(t *testing.T) {
 
 		require.Error(t, followenqueued(t.Context(), chttp, "missing"))
 	})
+}
+
+// newlogrunner stands in for a runner's "/egdaemon/proxy" stream handler (cmd/eg/daemons/p2p.go),
+// serving the request read off the stream with the given handler.
+func newlogrunner(t *testing.T, handler http.Handler) host.Host {
+	t.Helper()
+
+	h, err := libp2p.New(libp2p.ListenAddrStrings("/ip4/127.0.0.1/tcp/0"))
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = h.Close() })
+
+	h.SetStreamHandler("/egdaemon/proxy", func(s network.Stream) {
+		defer s.Close()
+
+		req, err := http.ReadRequest(bufio.NewReader(s))
+		if err != nil {
+			return
+		}
+
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+
+		_, _ = io.Copy(io.Discard, req.Body)
+		_ = rec.Result().Write(s)
+	})
+
+	return h
+}
+
+func TestFollowEnqueuedLive(t *testing.T) {
+	for _, c := range []struct {
+		name   string
+		result string
+		err    string
+	}{
+		{name: "streams the runner's log then reports success", result: `{"history":{"result":2}}`},
+		{name: "streams the runner's log then reports failure", result: `{"history":{"result":1}}`, err: "failed"},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			var offset, auth string
+
+			runner := newlogrunner(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				require.Equal(t, "/c/logs/w1", r.URL.Path)
+				offset, auth = r.URL.Query().Get("offset"), r.Header.Get("Authorization")
+				_, _ = w.Write([]byte("from the runner\n"))
+			}))
+
+			token, err := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{"p2p": runner.ID().String()}).SignedString([]byte("secret"))
+			require.NoError(t, err)
+
+			// the runner doubles as the bootstrap peer the client joins the p2p network through.
+			bootstrap := fmt.Sprintf("%s/p2p/%s", runner.Addrs()[0], runner.ID())
+
+			chttp, seen := fakeapi(t, map[string]string{
+				"/c/runners/meta": fmt.Sprintf(`{"bootstrap":[%q]}`, bootstrap),
+				"/c/q/w1":         fmt.Sprintf(`{"enqueue":{"id":"w1","logs_token":%q,"completed_at":"9999-12-31T23:59:59Z"}}`, token),
+				"/c/history/w1":   c.result,
+			})
+
+			ctx, cancel := context.WithTimeout(t.Context(), 20*time.Second)
+			defer cancel()
+
+			err = followenqueued(ctx, chttp, "w1")
+			if c.err == "" {
+				require.NoError(t, err)
+			} else {
+				require.ErrorContains(t, err, c.err)
+			}
+
+			require.Equal(t, "0", offset)
+			require.Equal(t, token, auth)
+			require.Equal(t, []string{"/c/q/w1", "/c/runners/meta", "/c/history/w1"}, seen())
+		})
+	}
 }

@@ -18,13 +18,19 @@ func Cleanup(ctx context.Context, cancel func(error), wg *sync.WaitGroup, cleanu
 
 	select {
 	case <-ctx.Done():
+		signal.Stop(signals)
 	case s := <-signals:
 		log.Println("signal received", s.String())
 		cancel(fmt.Errorf("signal received: %s", s.String()))
-	}
 
-	signal.Stop(signals)
-	close(signals)
+		// keep handling signals while cleanup runs, a second one forces the exit
+		// instead of falling back to the default behavior which skips deferred cleanup silently.
+		go func() {
+			s := <-signals
+			log.Println("second signal received, forcing exit", s.String())
+			os.Exit(1)
+		}()
+	}
 
 	cleanup()
 }

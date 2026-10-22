@@ -19,6 +19,13 @@ type Gate interface {
 	Allow(ctx context.Context, remote peer.ID, addr multiaddr.Multiaddr) bool
 }
 
+// passthrough is the Gate that allows every stream, for peers that are not on the lan.
+type passthrough struct{}
+
+func (passthrough) Allow(context.Context, peer.ID, multiaddr.Multiaddr) bool {
+	return true
+}
+
 // NewLANGate records the peers that reach the daemon and refuses the ones an operator disabled
 // (see eg compute lan upd --runner). it is bookkeeping, not an authorization boundary: the
 // control plane's token still decides whether a workload is accepted. any failure to read or

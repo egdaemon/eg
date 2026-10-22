@@ -9,12 +9,16 @@ import (
 	"github.com/egdaemon/eg/internal/cryptox"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/libp2px"
+	"github.com/egdaemon/eg/internal/libp2px/webrtcp2p"
 	"github.com/egdaemon/eg/internal/netx"
 
 	"github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"
+	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/core/protocol"
+	"github.com/multiformats/go-multiaddr"
 
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 
@@ -28,11 +32,11 @@ import (
 
 // P2PProxy creates the p2p host that proxies incoming streams to the local http listener.
 func P2PProxy(ctx context.Context, seed []byte, httpl net.Listener) (zero host.Host, err error) {
-	return P2PProxyGated(ctx, seed, httpl, nil)
+	return P2PProxyGated(ctx, seed, httpl, passthrough{})
 }
 
 // P2PProxyGated is P2PProxy that consults the gate for every incoming proxy stream,
-// a nil gate allows every stream.
+// the gate must not be nil.
 func P2PProxyGated(ctx context.Context, seed []byte, httpl net.Listener, gate Gate) (zero host.Host, err error) {
 	logging.SetAllLoggers(logging.LevelError)
 	priv, _, err := crypto.GenerateEd25519Key(cryptox.NewChaCha8(seed))
@@ -90,13 +94,15 @@ func P2PProxyGated(ctx context.Context, seed []byte, httpl net.Listener, gate Ga
 		}
 	})
 
-	p2p.SetStreamHandler("/egdaemon/proxy", func(s network.Stream) {
-		log.Println("received new stream from", s.Conn().RemotePeer())
+	// proxy serves one stream, either from a libp2p stream or from a webrtc data channel.
+	proxy := func(gate Gate, remote peer.ID, addr multiaddr.Multiaddr, s io.ReadWriteCloser) {
 		defer s.Close()
 
-		if gate != nil && !gate.Allow(ctx, s.Conn().RemotePeer(), s.Conn().RemoteMultiaddr()) {
-			log.Println("rejecting stream from disabled peer", s.Conn().RemotePeer())
-			s.Reset()
+		if !gate.Allow(ctx, remote, addr) {
+			log.Println("rejecting stream from disabled peer", remote)
+			if r, ok := s.(interface{ Reset() error }); ok {
+				r.Reset()
+			}
 			return
 		}
 
@@ -109,10 +115,24 @@ func P2PProxyGated(ctx context.Context, seed []byte, httpl net.Listener, gate Ga
 		defer dst.Close()
 
 		if err = netx.Proxy(ctx, s, dst); err != nil {
-			log.Println("proxy ended", s.Conn().RemotePeer(), err)
+			log.Println("proxy ended", remote, err)
 			return
 		}
+	}
+
+	p2p.SetStreamHandler("/egdaemon/proxy", func(s network.Stream) {
+		log.Println("received new stream from", s.Conn().RemotePeer())
+		proxy(gate, s.Conn().RemotePeer(), s.Conn().RemoteMultiaddr(), s)
 	})
+
+	// browsers cannot dial runners directly, they reach them through a relay and then
+	// negotiate a webrtc connection, see webrtcp2p. these are not lan peers, so they bypass the
+	// lan gate, the logs token is what authorizes them.
+	p2p.SetStreamHandler(webrtcp2p.SignalProtocol, webrtcp2p.New(ctx, nil, map[protocol.ID]webrtcp2p.StreamHandler{
+		"/egdaemon/proxy": func(remote peer.ID, addr multiaddr.Multiaddr, s io.ReadWriteCloser) {
+			proxy(passthrough{}, remote, addr, s)
+		},
+	}).Handle)
 
 	// go libp2px.DebugEvents(p2p)
 	log.Println("p2p identity", p2p.ID(), libp2px.Address(p2p))

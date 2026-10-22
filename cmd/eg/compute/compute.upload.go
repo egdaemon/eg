@@ -107,7 +107,7 @@ func (t upload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, find libp2px.
 	); err != nil {
 		return err
 	}
-	defer os.RemoveAll(filepath.Join(ws.Root, ws.RuntimeDir))
+	defer os.RemoveAll(ws.Root)
 
 	roots, err := transpile.Autodetect(transpile.New(eg.DefaultModuleDirectory(t.Dir), ws)).Run(gctx.Context)
 	if err != nil {

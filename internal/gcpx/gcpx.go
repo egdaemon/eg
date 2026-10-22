@@ -176,6 +176,18 @@ func LoadCredentials(ctx context.Context, dir string) (string, error) {
 	return adcpath, nil
 }
 
+// ConfigureGCP points gcloud at the application default credentials installed at adc. gcloud commands (storage,
+// compute, ...) only use credentials of their own account and ignore the ADC unless auth/credential_file_override
+// is set, which the google client libraries do not need. dir is the gcloud configuration directory of the user.
+func ConfigureGCP(dir string, adc string) error {
+	configs := filepath.Join(dir, "configurations")
+	if err := fsx.MkDirs(0770, configs); err != nil {
+		return errorsx.Wrapf(err, "unable to create %s", configs)
+	}
+
+	return errorsx.Wrap(os.WriteFile(filepath.Join(configs, "config_default"), []byte("[auth]\ncredential_file_override = "+adc+"\n"), 0600), "unable to write gcloud configuration")
+}
+
 // fetch exchanges the workload's access token for gcp credentials, written to dst.
 type fetch func(ctx context.Context, c *http.Client, dst string, token string) error
 

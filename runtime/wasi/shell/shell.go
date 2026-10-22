@@ -9,6 +9,8 @@ import (
 	"os/user"
 	"time"
 
+	"github.com/logrusorgru/aurora"
+
 	_eg "github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/stringsx"
@@ -35,6 +37,13 @@ type Command struct {
 	lenient   bool
 	entry     entrypoint
 	exec      Execer
+	color     aurora.Aurora
+}
+
+// enable or disable colorized log output (warnings on retries, errors on failure). default is enabled.
+func (t Command) Colors(enabled bool) Command {
+	t.color = aurora.NewAurora(enabled)
+	return t
 }
 
 // number of attempts to make before giving up.
@@ -177,6 +186,7 @@ func New(cmd string) Command {
 		entry:    run,
 		exec:     ffiexec.Command,
 		attempts: 1,
+		color:    aurora.NewAurora(true),
 	}
 }
 
@@ -230,7 +240,7 @@ func Run(ctx context.Context, cmds ...Command) error {
 			cctx, done := context.WithTimeout(ctx, cmd.timeout)
 			defer done()
 			if cause := cmd.entry(cctx, cmd.user, cmd.group, cmd.cmd, cmd.directory, cmd.environ, cmd.exec); cmd.lenient && cause != nil {
-				log.Println("command failed, but lenient mode enable, ignoring", cause)
+				log.Println(cmd.color.Yellow("WARN"), "command failed, but lenient mode enable, ignoring", cause)
 				return nil
 			} else if cause != nil {
 				return cause
@@ -238,6 +248,7 @@ func Run(ctx context.Context, cmds ...Command) error {
 
 			return nil
 		}); err != nil {
+			log.Println(cmd.color.Red("ERROR"), fmt.Sprintf("duration(%v) shell command failed: %s", time.Since(ts), cmd.cmd), err)
 			return errorsx.Wrapf(err, "duration(%v) shell command failed: %s", time.Since(ts), cmd.cmd)
 		}
 	}
@@ -260,6 +271,9 @@ func retry(ctx context.Context, c Command, do func() error) (err error) {
 			return nil
 		} else {
 			err = errorsx.Compact(err, cause)
+			if i+1 < attempts && ctx.Err() == nil {
+				log.Println(c.color.Yellow("WARN"), fmt.Sprintf("attempt %d failed, retrying: %s", i+1, c.cmd), cause)
+			}
 		}
 
 		select {

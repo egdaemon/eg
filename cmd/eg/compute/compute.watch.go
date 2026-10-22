@@ -8,8 +8,9 @@ import (
 )
 
 type watch struct {
-	SSHKeyPath string `name:"sshkeypath" help:"path to ssh key to use" default:"${vars_ssh_key_path}"`
-	ID         string `arg:"" name:"id" help:"id of the enqueued workload, printed when it was uploaded"`
+	cmdopts.VCS `embed:""`
+	SSHKeyPath  string `name:"sshkeypath" help:"path to ssh key to use" default:"${vars_ssh_key_path}"`
+	ID          string `arg:"" name:"id" help:"id of the enqueued workload, printed when it was uploaded"`
 }
 
 func (t watch) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
@@ -18,7 +19,12 @@ func (t watch) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 		return err
 	}
 
-	chttp := authn.New(gctx.Context, tlsc.DefaultClient(), signer, gctx.AccountID, compute.NewAuthzTokenSource)
+	aid, err := gctx.Identity().Account(tlsc.DefaultClient(), signer, t.VcsURI)
+	if err != nil {
+		return err
+	}
+
+	chttp := authn.New(gctx.Context, tlsc.DefaultClient(), signer, aid, compute.NewAuthzTokenSource)
 
 	return followenqueued(gctx.Context, chttp, t.ID)
 }

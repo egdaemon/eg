@@ -3,7 +3,10 @@ package compute
 import (
 	"database/sql"
 	"io"
+	"path/filepath"
 	"time"
+
+	"github.com/egdaemon/eg/cmd/migrations"
 
 	"github.com/alecthomas/kong"
 	"github.com/egdaemon/eg/cmd/cmdopts"
@@ -18,7 +21,7 @@ type lanScan struct {
 }
 
 func (t lanScan) Run(kctx *kong.Context, gctx *cmdopts.Global, find libp2px.MDNSLookup) (err error) {
-	db, err := lan.Open(gctx.Context, lan.PathIn(t.CacheDir, lan.RoleClient), t.PeerTTL)
+	db, err := lan.Open(gctx.Context, filepath.Join(t.CacheDir, migrations.CLI), t.PeerTTL)
 	if err != nil {
 		return err
 	}

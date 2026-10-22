@@ -5,55 +5,21 @@ package lan
 import (
 	"context"
 	"database/sql"
-	"embed"
 	"encoding/json"
-	"io/fs"
 	"os"
 	"path/filepath"
 	"time"
 
 	_ "github.com/duckdb/duckdb-go/v2" // registers the duckdb driver.
+	"github.com/egdaemon/eg/cmd/migrations"
 	"github.com/egdaemon/eg/internal/bytesx"
 	"github.com/egdaemon/eg/internal/errorsx"
-	"github.com/egdaemon/eg/internal/goosex"
 	"github.com/egdaemon/eg/internal/sqlx"
-	"github.com/egdaemon/eg/internal/userx"
 	"github.com/gofrs/uuid/v5"
 )
 
-//go:embed migrations
-var migrationsdir embed.FS
-
-// migrations rooted at the directory's contents, goose expects migration filenames at the fs root.
-var migrations = errorsx.Must(fs.Sub(migrationsdir, "migrations"))
-
 // DefaultTTL is how long a peer is remembered after it was last seen.
 const DefaultTTL = 30 * 24 * time.Hour
-
-// Role selects which database file is used. duckdb is single writer per file so a daemon and
-// a cli sharing a cache directory must not share a file.
-type Role string
-
-const (
-	RoleRunner Role = "runner"
-	RoleClient Role = "client"
-)
-
-// Path is the location of the database for the role within the cache directory,
-// CACHE_DIRECTORY (systemd) first then XDG_CACHE_HOME, see userx.DefaultCacheDirectory.
-func Path(r Role) string {
-	return PathIn(userx.DefaultCacheDirectory(), r)
-}
-
-// PathIn is the location of the database for the role within the given cache directory.
-func PathIn(dir string, r Role) string {
-	return filepath.Join(dir, "lan."+string(r)+".duckdb")
-}
-
-// Migrate applies the schema to an already opened database.
-func Migrate(ctx context.Context, db *sql.DB) error {
-	return goosex.Up(ctx, db, migrations)
-}
 
 // Open the database at path, applying migrations and purging peers older than ttl.
 // see Path for the conventional location of the role's database.
@@ -67,7 +33,7 @@ func Open(ctx context.Context, path string, ttl time.Duration) (*sql.DB, error) 
 		return nil, errorsx.Wrap(err, "unable to open lan peers database")
 	}
 
-	if err = Migrate(ctx, db); err != nil {
+	if err = migrations.Migrate(ctx, db); err != nil {
 		errorsx.Log(db.Close())
 		return nil, err
 	}

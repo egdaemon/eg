@@ -16,8 +16,9 @@ import (
 
 // Selector selects the connection, defaults to the account id of the current profile.
 type Selector struct {
-	Label      string `arg:"" optional:"" name:"label" help:"label of the connection, defaults to the account id (--account-id)"`
-	SSHKeyPath string `name:"sshkeypath" help:"path to ssh key to use" default:"${vars_ssh_key_path}"`
+	cmdopts.VCS `embed:""`
+	Label       string `arg:"" optional:"" name:"label" help:"label of the connection, defaults to the account id (--account-id)"`
+	SSHKeyPath  string `name:"sshkeypath" help:"path to ssh key to use" default:"${vars_ssh_key_path}"`
 }
 
 type Create struct {
@@ -34,7 +35,12 @@ func (t Create) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) error {
 	}
 
 	// the management routes require the user management permission.
-	c := authn.New(gctx.Context, tlsc.DefaultClient(), signer, gctx.AccountID, compute.NewAuthzTokenSource, authn.OptionEndpoint(authn.EndpointMetaAuthz()))
+	aid, err := gctx.Identity().Account(tlsc.DefaultClient(), signer, t.VcsURI)
+	if err != nil {
+		return err
+	}
+
+	c := authn.New(gctx.Context, tlsc.DefaultClient(), signer, aid, compute.NewAuthzTokenSource, authn.OptionEndpoint(authn.EndpointMetaAuthz()))
 
 	// an empty label defaults to the account id on the server.
 	conn, err := gcpwif.Create(gctx.Context, c, &gcpwif.GCPWIFConnection{
@@ -52,8 +58,9 @@ func (t Create) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) error {
 }
 
 type List struct {
-	SSHKeyPath string `name:"sshkeypath" help:"path to ssh key to use" default:"${vars_ssh_key_path}"`
-	Query      string `name:"query" short:"q" help:"only list connections whose label, audience, or description contain the text"`
+	cmdopts.VCS `embed:""`
+	SSHKeyPath  string `name:"sshkeypath" help:"path to ssh key to use" default:"${vars_ssh_key_path}"`
+	Query       string `name:"query" short:"q" help:"only list connections whose label, audience, or description contain the text"`
 }
 
 func (t List) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) error {
@@ -63,7 +70,12 @@ func (t List) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) error {
 	}
 
 	// the management routes require the user management permission.
-	c := authn.New(gctx.Context, tlsc.DefaultClient(), signer, gctx.AccountID, compute.NewAuthzTokenSource, authn.OptionEndpoint(authn.EndpointMetaAuthz()))
+	aid, err := gctx.Identity().Account(tlsc.DefaultClient(), signer, t.VcsURI)
+	if err != nil {
+		return err
+	}
+
+	c := authn.New(gctx.Context, tlsc.DefaultClient(), signer, aid, compute.NewAuthzTokenSource, authn.OptionEndpoint(authn.EndpointMetaAuthz()))
 
 	w := tabwriter.NewWriter(os.Stdout, 0, 4, 2, ' ', 0)
 	fmt.Fprintln(w, "LABEL\tAUDIENCE\tIMPERSONATE\tDESCRIPTION")
@@ -102,7 +114,12 @@ func (t Edit) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) error {
 	}
 
 	// the management routes require the user management permission.
-	c := authn.New(gctx.Context, tlsc.DefaultClient(), signer, gctx.AccountID, compute.NewAuthzTokenSource, authn.OptionEndpoint(authn.EndpointMetaAuthz()))
+	aid, err := gctx.Identity().Account(tlsc.DefaultClient(), signer, t.VcsURI)
+	if err != nil {
+		return err
+	}
+
+	c := authn.New(gctx.Context, tlsc.DefaultClient(), signer, aid, compute.NewAuthzTokenSource, authn.OptionEndpoint(authn.EndpointMetaAuthz()))
 
 	var req gcpwif.GCPWIFUpdateRequest
 	if t.Audience != "" {
@@ -147,7 +164,12 @@ func (t Remove) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) error {
 	}
 
 	// the management routes require the user management permission.
-	c := authn.New(gctx.Context, tlsc.DefaultClient(), signer, gctx.AccountID, compute.NewAuthzTokenSource, authn.OptionEndpoint(authn.EndpointMetaAuthz()))
+	aid, err := gctx.Identity().Account(tlsc.DefaultClient(), signer, t.VcsURI)
+	if err != nil {
+		return err
+	}
+
+	c := authn.New(gctx.Context, tlsc.DefaultClient(), signer, aid, compute.NewAuthzTokenSource, authn.OptionEndpoint(authn.EndpointMetaAuthz()))
 
 	l := langx.FirstNonZero(t.Label, gctx.AccountID)
 	if l == "" {

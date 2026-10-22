@@ -3,6 +3,8 @@ package lan_test
 import (
 	"testing"
 
+	"github.com/egdaemon/eg/cmd/migrations"
+
 	"github.com/egdaemon/eg/internal/lan"
 	"github.com/egdaemon/eg/internal/langx"
 	"github.com/egdaemon/eg/internal/sqltestx"
@@ -27,7 +29,7 @@ func TestRemember(t *testing.T) {
 
 	t.Run("remembers new systems", func(t *testing.T) {
 		db := sqltestx.DuckDB(t)
-		require.NoError(t, lan.Migrate(t.Context(), db))
+		require.NoError(t, migrations.Migrate(t.Context(), db))
 
 		require.NoError(t, lan.Remember(t.Context(), db, peer.AddrInfo{ID: fresh, Addrs: []multiaddr.Multiaddr{addr}}))
 
@@ -40,7 +42,7 @@ func TestRemember(t *testing.T) {
 
 	t.Run("keeps what is known about existing systems and refreshes their addresses", func(t *testing.T) {
 		db := sqltestx.DuckDB(t)
-		require.NoError(t, lan.Migrate(t.Context(), db))
+		require.NoError(t, migrations.Migrate(t.Context(), db))
 
 		require.NoError(t, lan.PeerUpsert(t.Context(), db, langx.Clone(lan.Peer{}, lan.PeerOptionTestDefaults, lan.PeerOptionID(known.String()))).Scan(&lan.Peer{}))
 		require.NoError(t, lan.PeerUpdate(t.Context(), db, langx.Clone(lan.Peer{}, lan.PeerOptionTestDefaults, lan.PeerOptionID(known.String()), func(p *lan.Peer) {

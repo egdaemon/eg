@@ -89,7 +89,7 @@ func TestParsing(t *testing.T) {
 		var cli struct {
 			Cmd
 		}
-		parser, err := kong.New(&cli, kong.Vars{"vars_ssh_key_path": "/expected/path"})
+		parser, err := kong.New(&cli, kong.Vars{"vars_ssh_key_path": "/expected/path", "vars_vcs_uri": "git@github.com:u/r.git"})
 		require.NoError(t, err)
 		_, err = parser.Parse(args)
 		return err

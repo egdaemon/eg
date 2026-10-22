@@ -4,6 +4,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/egdaemon/eg/cmd/migrations"
+
 	"github.com/egdaemon/eg/internal/lan"
 	"github.com/egdaemon/eg/internal/langx"
 	"github.com/egdaemon/eg/internal/slicesx"
@@ -14,7 +16,7 @@ import (
 
 func TestPeerLookupLive(t *testing.T) {
 	db := sqltestx.DuckDB(t)
-	require.NoError(t, lan.Migrate(t.Context(), db))
+	require.NoError(t, migrations.Migrate(t.Context(), db))
 
 	for _, id := range []string{"fresh", "stale", "pinned", "short", "disabled"} {
 		require.NoError(t, lan.PeerUpsert(t.Context(), db, langx.Clone(lan.Peer{}, lan.PeerOptionTestDefaults, lan.PeerOptionID(id))).Scan(&lan.Peer{}))

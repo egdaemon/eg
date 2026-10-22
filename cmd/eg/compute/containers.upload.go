@@ -201,7 +201,12 @@ func (t c8sUpload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error
 	defer buf.Close()
 
 	c := httpx.BindRetryTransport(tlsc.DefaultClient(), http.StatusTooManyRequests, http.StatusBadGateway)
-	chttp := authn.New(gctx.Context, c, signer, gctx.AccountID, compute.NewAuthzTokenSource)
+	aid, err := gctx.Identity().Account(c, signer, errorsx.Zero(gitx.CanonicalURI(repo, t.GitRemote)))
+	if err != nil {
+		return err
+	}
+
+	chttp := authn.New(gctx.Context, c, signer, aid, compute.NewAuthzTokenSource)
 
 	req, err := http.NewRequestWithContext(gctx.Context, http.MethodPost, t.Endpoint, buf)
 	if err != nil {

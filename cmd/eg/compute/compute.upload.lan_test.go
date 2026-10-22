@@ -10,6 +10,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/egdaemon/eg/cmd/migrations"
+
 	"github.com/egdaemon/eg/compute"
 	"github.com/egdaemon/eg/internal/lan"
 	"github.com/egdaemon/eg/internal/langx"
@@ -56,7 +58,7 @@ func TestUploadLAN(t *testing.T) {
 		})
 
 		db := sqltestx.DuckDB(t)
-		require.NoError(t, lan.Migrate(t.Context(), db))
+		require.NoError(t, migrations.Migrate(t.Context(), db))
 		addrs := make([]string, 0, len(runner.Addrs()))
 		for _, a := range runner.Addrs() {
 			addrs = append(addrs, a.String())
@@ -104,7 +106,7 @@ func TestUploadLAN(t *testing.T) {
 		})
 
 		db := sqltestx.DuckDB(t)
-		require.NoError(t, lan.Migrate(t.Context(), db))
+		require.NoError(t, migrations.Migrate(t.Context(), db))
 		addrs := make([]string, 0, len(runner.Addrs()))
 		for _, a := range runner.Addrs() {
 			addrs = append(addrs, a.String())
@@ -123,7 +125,7 @@ func TestUploadLAN(t *testing.T) {
 		defer runner.Close()
 
 		db := sqltestx.DuckDB(t)
-		require.NoError(t, lan.Migrate(t.Context(), db))
+		require.NoError(t, migrations.Migrate(t.Context(), db))
 		require.NoError(t, lan.PeerUpsert(t.Context(), db, langx.Clone(lan.Peer{}, lan.PeerOptionTestDefaults, lan.PeerOptionID(runner.ID().String()))).Scan(&lan.Peer{}))
 		require.NoError(t, lan.PeerUpdate(t.Context(), db, langx.Clone(lan.Peer{}, lan.PeerOptionTestDefaults, lan.PeerOptionID(runner.ID().String()), func(p *lan.Peer) {
 			p.Disabled = true
@@ -139,7 +141,7 @@ func TestUploadLAN(t *testing.T) {
 		defer runner.Close()
 
 		db := sqltestx.DuckDB(t)
-		require.NoError(t, lan.Migrate(t.Context(), db))
+		require.NoError(t, migrations.Migrate(t.Context(), db))
 		require.NoError(t, lan.PeerUpsert(t.Context(), db, langx.Clone(lan.Peer{}, lan.PeerOptionTestDefaults, lan.PeerOptionID(runner.ID().String()))).Scan(&lan.Peer{}))
 		sqltestx.Exec(t, db, `UPDATE lan_peers SET last_seen = now() - INTERVAL '90 days'`)
 
@@ -149,7 +151,7 @@ func TestUploadLAN(t *testing.T) {
 
 	t.Run("runners without remembered addresses are skipped", func(t *testing.T) {
 		db := sqltestx.DuckDB(t)
-		require.NoError(t, lan.Migrate(t.Context(), db))
+		require.NoError(t, migrations.Migrate(t.Context(), db))
 		require.NoError(t, lan.PeerUpsert(t.Context(), db, lan.Peer{PeerID: "12D3KooWDpJ7As7BWAwRMfu1VU2WCqNjvq387JEYKDBj4kx6nXTN"}).Scan(&lan.Peer{}))
 
 		_, err := cmd.lan(t.Context(), db, []*compute.Compute{{Id: "nowhere", P2Pid: "12D3KooWDpJ7As7BWAwRMfu1VU2WCqNjvq387JEYKDBj4kx6nXTN"}}, req, strings.NewReader("kernel"), strings.NewReader("environ"))

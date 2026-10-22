@@ -5,11 +5,13 @@ import (
 	"database/sql"
 	"fmt"
 	"io"
+	"path/filepath"
 	"strings"
 	"text/tabwriter"
 	"time"
 
 	"github.com/egdaemon/eg/cmd/cmdopts"
+	"github.com/egdaemon/eg/cmd/migrations"
 	"github.com/egdaemon/eg/internal/bytesx"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/lan"
@@ -30,16 +32,16 @@ type lanDatabase struct {
 	PeerTTL  time.Duration `name:"lan-peer-ttl" type:"durationinf" help:"how long systems are remembered after they were last seen" default:"720h" env:"EG_LAN_PEER_TTL"`
 }
 
-func (t lanDatabase) role() lan.Role {
+func (t lanDatabase) database() string {
 	if t.Runner {
-		return lan.RoleRunner
+		return migrations.Runner
 	}
 
-	return lan.RoleClient
+	return migrations.CLI
 }
 
 func (t lanDatabase) open(gctx *cmdopts.Global) (*sql.DB, error) {
-	return lan.Open(gctx.Context, lan.PathIn(t.CacheDir, t.role()), t.PeerTTL)
+	return lan.Open(gctx.Context, filepath.Join(t.CacheDir, t.database()), t.PeerTTL)
 }
 
 // lanTable prints the remembered, unexpired systems.

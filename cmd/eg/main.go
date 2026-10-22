@@ -23,6 +23,7 @@ import (
 	"github.com/egdaemon/eg/cmd/cmdmachine"
 	"github.com/egdaemon/eg/cmd/cmdopts"
 	"github.com/egdaemon/eg/cmd/cmdplete"
+	"github.com/egdaemon/eg/cmd/cmdrepo"
 	"github.com/egdaemon/eg/cmd/cmdsecret"
 	"github.com/egdaemon/eg/cmd/cmdssh"
 	"github.com/egdaemon/eg/cmd/eg/accountcmds"
@@ -89,7 +90,7 @@ func main() {
 		Register           accountcmds.Signup           `cmd:"" name:"register" help:"register with an account with eg"`
 		Login              accountcmds.Login            `cmd:"" name:"login" help:"login to a profile"`
 		Browser            accountcmds.OTP              `cmd:"" name:"browser" help:"login to the browser console"`
-		Ident              accountcmds.Identity         `cmd:"" name:"iden" help:"display current credentials"`
+		Repo               cmdrepo.Cmd                  `cmd:"" name:"repo" help:"repository identity and defaults"`
 		DiskUsage          daemons.DiskUsage            `cmd:"" name:"disk-usage" help:"monitors disk usage and executes services when above threshold"`
 		Secrets            cmdsecret.SecretCmd          `cmd:"" name:"secrets" help:"ALPHA: builtin simple secret manager"`
 		GPG                cmdgpg.Cmd                   `cmd:"" name:"gpg" help:"gpg keyring management"`
@@ -158,6 +159,7 @@ func main() {
 			"vars_disk_minimum_default":    humanize.IBytes(envx.Bytes(0, "EG_RESOURCES_DISK")),
 			"vars_vram_minimum_default":    humanize.IBytes(envx.Bytes(0*bytesx.GiB, "EG_RESOURCES_VRAM")),
 			"vars_labels":                  envx.String("", "EG_LABELS"),
+			"vars_vcs_uri":                 cmdopts.WorkspaceVCSURI(),
 			"vars_git_default_remote_name": git.DefaultRemoteName,
 			"vars_git_default_reference":   envx.String("main", "GITHUB_REF_NAME"), // github actions environment variable
 			"vars_git_head_reference":      envx.String("HEAD", "GITHUB_SHA"),      // github actions environment variable

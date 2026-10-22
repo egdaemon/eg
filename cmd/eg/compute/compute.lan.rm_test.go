@@ -2,7 +2,10 @@ package compute
 
 import (
 	"database/sql"
+	"path/filepath"
 	"testing"
+
+	"github.com/egdaemon/eg/cmd/migrations"
 
 	"github.com/alecthomas/kong"
 	"github.com/egdaemon/eg/cmd/cmdopts"
@@ -19,7 +22,7 @@ func TestLanRemove(t *testing.T) {
 
 	t.Run("forgets every requested system", func(t *testing.T) {
 		db := sqltestx.DuckDB(t)
-		require.NoError(t, lan.Migrate(t.Context(), db))
+		require.NoError(t, migrations.Migrate(t.Context(), db))
 		for _, id := range []string{"a", "b", "c"} {
 			require.NoError(t, lan.PeerUpsert(t.Context(), db, langx.Clone(lan.Peer{}, lan.PeerOptionTestDefaults, lan.PeerOptionID(id))).Scan(&lan.Peer{}))
 		}
@@ -33,7 +36,7 @@ func TestLanRemove(t *testing.T) {
 
 	t.Run("reports unknown systems but still forgets the rest", func(t *testing.T) {
 		db := sqltestx.DuckDB(t)
-		require.NoError(t, lan.Migrate(t.Context(), db))
+		require.NoError(t, migrations.Migrate(t.Context(), db))
 		require.NoError(t, lan.PeerUpsert(t.Context(), db, langx.Clone(lan.Peer{}, lan.PeerOptionTestDefaults, lan.PeerOptionID("a"))).Scan(&lan.Peer{}))
 
 		err := lanRemove{PeerIDs: []string{"missing", "a"}}.remove(gctx, db)
@@ -44,7 +47,7 @@ func TestLanRemove(t *testing.T) {
 	t.Run("runs against the given directory", func(t *testing.T) {
 		dir := t.TempDir()
 
-		db := testx.MustT(lan.Open(t.Context(), lan.PathIn(dir, lan.RoleClient), lan.DefaultTTL))(t)
+		db := testx.MustT(lan.Open(t.Context(), filepath.Join(dir, migrations.CLI), lan.DefaultTTL))(t)
 		for _, id := range []string{"a", "b"} {
 			require.NoError(t, lan.PeerUpsert(t.Context(), db, langx.Clone(lan.Peer{}, lan.PeerOptionTestDefaults, lan.PeerOptionID(id))).Scan(&lan.Peer{}))
 		}
@@ -53,7 +56,7 @@ func TestLanRemove(t *testing.T) {
 		genparser := cmdtestx.Genparser(lanRemove{}, kong.NamedMapper("durationinf", kong.MapperFunc(cmdopts.ParseDurationInf)), kong.Vars{"vars_cache_directory": t.TempDir()})
 		require.NoError(t, cmdtestx.Execute(t, genparser(t), "command", "a", "--cache-directory", dir))
 
-		db = testx.MustT(lan.Open(t.Context(), lan.PathIn(dir, lan.RoleClient), lan.DefaultTTL))(t)
+		db = testx.MustT(lan.Open(t.Context(), filepath.Join(dir, migrations.CLI), lan.DefaultTTL))(t)
 		defer db.Close()
 		require.ErrorIs(t, lan.PeerFindByID(t.Context(), db, "a").Scan(&lan.Peer{}), sql.ErrNoRows)
 		require.NoError(t, lan.PeerFindByID(t.Context(), db, "b").Scan(&lan.Peer{}))

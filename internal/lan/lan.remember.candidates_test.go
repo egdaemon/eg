@@ -3,6 +3,8 @@ package lan_test
 import (
 	"testing"
 
+	"github.com/egdaemon/eg/cmd/migrations"
+
 	"github.com/egdaemon/eg/compute"
 	"github.com/egdaemon/eg/internal/lan"
 	"github.com/egdaemon/eg/internal/sqltestx"
@@ -19,7 +21,7 @@ func TestRememberCandidates(t *testing.T) {
 
 	t.Run("records what the control plane reports", func(t *testing.T) {
 		db := sqltestx.DuckDB(t)
-		require.NoError(t, lan.Migrate(t.Context(), db))
+		require.NoError(t, migrations.Migrate(t.Context(), db))
 
 		require.NoError(t, lan.RememberCandidates(t.Context(), db,
 			&compute.Compute{P2Pid: id.String(), Description: "build box", Os: "linux", Arch: "arm64", Cores: 16, Memory: 32 << 30, Vram: 8 << 30, Labels: []string{"gpu"}, Uploadable: true},
@@ -43,7 +45,7 @@ func TestRememberCandidates(t *testing.T) {
 
 	t.Run("keeps the addresses and operator settings already known", func(t *testing.T) {
 		db := sqltestx.DuckDB(t)
-		require.NoError(t, lan.Migrate(t.Context(), db))
+		require.NoError(t, migrations.Migrate(t.Context(), db))
 
 		require.NoError(t, lan.PeerUpsert(t.Context(), db, lan.Peer{PeerID: id.String(), Addrs: lan.EncodeList([]string{"/ip4/10.0.0.3/tcp/4001"}), Disk: 500}).Scan(&lan.Peer{}))
 		require.NoError(t, lan.PeerUpdate(t.Context(), db, lan.Peer{PeerID: id.String(), Description: "mine", Disabled: true, ExpiresAfter: -1}).Scan(&lan.Peer{}))

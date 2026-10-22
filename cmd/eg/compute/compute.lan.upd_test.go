@@ -2,8 +2,11 @@ package compute
 
 import (
 	"math"
+	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/egdaemon/eg/cmd/migrations"
 
 	"github.com/alecthomas/kong"
 	"github.com/egdaemon/eg/cmd/cmdopts"
@@ -20,7 +23,7 @@ func TestLanUpdate(t *testing.T) {
 
 	t.Run("disable and enable", func(t *testing.T) {
 		db := sqltestx.DuckDB(t)
-		require.NoError(t, lan.Migrate(t.Context(), db))
+		require.NoError(t, migrations.Migrate(t.Context(), db))
 		require.NoError(t, lan.PeerUpsert(t.Context(), db, langx.Clone(lan.Peer{}, lan.PeerOptionTestDefaults, lan.PeerOptionID("a"))).Scan(&lan.Peer{}))
 
 		p, err := lanUpdate{PeerID: "a", Disable: true}.update(gctx, db)
@@ -34,7 +37,7 @@ func TestLanUpdate(t *testing.T) {
 
 	t.Run("ttl", func(t *testing.T) {
 		db := sqltestx.DuckDB(t)
-		require.NoError(t, lan.Migrate(t.Context(), db))
+		require.NoError(t, migrations.Migrate(t.Context(), db))
 		require.NoError(t, lan.PeerUpsert(t.Context(), db, langx.Clone(lan.Peer{}, lan.PeerOptionTestDefaults, lan.PeerOptionID("a"))).Scan(&lan.Peer{}))
 
 		p, err := lanUpdate{PeerID: "a", TTL: 2 * time.Hour}.update(gctx, db)
@@ -52,7 +55,7 @@ func TestLanUpdate(t *testing.T) {
 
 	t.Run("description keeps everything else", func(t *testing.T) {
 		db := sqltestx.DuckDB(t)
-		require.NoError(t, lan.Migrate(t.Context(), db))
+		require.NoError(t, migrations.Migrate(t.Context(), db))
 		require.NoError(t, lan.PeerUpsert(t.Context(), db, langx.Clone(lan.Peer{}, lan.PeerOptionTestDefaults, lan.PeerOptionID("a"))).Scan(&lan.Peer{}))
 
 		desc := "the build box"
@@ -65,7 +68,7 @@ func TestLanUpdate(t *testing.T) {
 
 	t.Run("requires a change", func(t *testing.T) {
 		db := sqltestx.DuckDB(t)
-		require.NoError(t, lan.Migrate(t.Context(), db))
+		require.NoError(t, migrations.Migrate(t.Context(), db))
 		require.NoError(t, lan.PeerUpsert(t.Context(), db, langx.Clone(lan.Peer{}, lan.PeerOptionTestDefaults, lan.PeerOptionID("a"))).Scan(&lan.Peer{}))
 
 		_, err := lanUpdate{PeerID: "a"}.update(gctx, db)
@@ -74,7 +77,7 @@ func TestLanUpdate(t *testing.T) {
 
 	t.Run("unknown system", func(t *testing.T) {
 		db := sqltestx.DuckDB(t)
-		require.NoError(t, lan.Migrate(t.Context(), db))
+		require.NoError(t, migrations.Migrate(t.Context(), db))
 
 		_, err := lanUpdate{PeerID: "missing", Disable: true}.update(gctx, db)
 		require.ErrorContains(t, err, "missing")
@@ -83,14 +86,14 @@ func TestLanUpdate(t *testing.T) {
 	t.Run("runs against the given directory", func(t *testing.T) {
 		dir := t.TempDir()
 
-		db := testx.MustT(lan.Open(t.Context(), lan.PathIn(dir, lan.RoleRunner), lan.DefaultTTL))(t)
+		db := testx.MustT(lan.Open(t.Context(), filepath.Join(dir, migrations.Runner), lan.DefaultTTL))(t)
 		require.NoError(t, lan.PeerUpsert(t.Context(), db, langx.Clone(lan.Peer{}, lan.PeerOptionTestDefaults, lan.PeerOptionID("a"))).Scan(&lan.Peer{}))
 		require.NoError(t, db.Close())
 
 		genparser := cmdtestx.Genparser(lanUpdate{}, kong.NamedMapper("durationinf", kong.MapperFunc(cmdopts.ParseDurationInf)), kong.Vars{"vars_cache_directory": t.TempDir()})
 		require.NoError(t, cmdtestx.Execute(t, genparser(t), "command", "a", "--runner", "--cache-directory", dir, "--disable", "--ttl", "infinity", "--description", "x"))
 
-		db = testx.MustT(lan.Open(t.Context(), lan.PathIn(dir, lan.RoleRunner), lan.DefaultTTL))(t)
+		db = testx.MustT(lan.Open(t.Context(), filepath.Join(dir, migrations.Runner), lan.DefaultTTL))(t)
 		defer db.Close()
 
 		var p lan.Peer

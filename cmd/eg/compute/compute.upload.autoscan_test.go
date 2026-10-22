@@ -7,6 +7,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/egdaemon/eg/cmd/migrations"
+
 	"github.com/egdaemon/eg/internal/iterx"
 	"github.com/egdaemon/eg/internal/lan"
 	"github.com/egdaemon/eg/internal/sqltestx"
@@ -19,7 +21,7 @@ import (
 func TestAutoscan(t *testing.T) {
 	t.Run("doesn't block the caller and records what is found", func(t *testing.T) {
 		db := sqltestx.DuckDB(t)
-		require.NoError(t, lan.Migrate(t.Context(), db))
+		require.NoError(t, migrations.Migrate(t.Context(), db))
 
 		priv, _, err := crypto.GenerateEd25519Key(nil)
 		require.NoError(t, err)
@@ -49,7 +51,7 @@ func TestAutoscan(t *testing.T) {
 
 	t.Run("failures are ignored", func(t *testing.T) {
 		db := sqltestx.DuckDB(t)
-		require.NoError(t, lan.Migrate(t.Context(), db))
+		require.NoError(t, migrations.Migrate(t.Context(), db))
 
 		stop := autoscan(t.Context(), db, func(ctx context.Context, timeout time.Duration) iterx.Seq[peer.AddrInfo] {
 			return iterx.Error[peer.AddrInfo](errors.New("no multicast"))
@@ -60,7 +62,7 @@ func TestAutoscan(t *testing.T) {
 
 	t.Run("stopping cancels a scan in flight", func(t *testing.T) {
 		db := sqltestx.DuckDB(t)
-		require.NoError(t, lan.Migrate(t.Context(), db))
+		require.NoError(t, migrations.Migrate(t.Context(), db))
 
 		stop := autoscan(t.Context(), db, func(ctx context.Context, timeout time.Duration) iterx.Seq[peer.AddrInfo] {
 			<-ctx.Done()

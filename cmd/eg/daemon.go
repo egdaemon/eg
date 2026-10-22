@@ -7,9 +7,12 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"path/filepath"
 	"slices"
 	"strconv"
 	"time"
+
+	"github.com/egdaemon/eg/cmd/migrations"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/egdaemon/eg"
@@ -21,7 +24,6 @@ import (
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/httpx"
-	"github.com/egdaemon/eg/internal/lan"
 	"github.com/egdaemon/eg/internal/libp2px"
 	"github.com/egdaemon/eg/internal/numericx"
 	"github.com/egdaemon/eg/internal/podmanx"
@@ -105,7 +107,7 @@ func (t daemon) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, keygen cmdopt
 		return errorsx.Wrap(err, "unable to retrieve identity credentials")
 	}
 
-	lanpeers := daemons.NewLANGate(lan.PathIn(t.CacheDir, lan.RoleRunner), t.LANPeerTTL)
+	lanpeers := daemons.NewLANGate(filepath.Join(t.CacheDir, migrations.Runner), t.LANPeerTTL)
 	if p2p, err = daemons.P2PProxyGated(gctx.Context, append([]byte(machineID()), signer.PublicKey().Marshal()...), httpl, lanpeers); err != nil {
 		return errorsx.Wrap(err, "unable to initialize p2p")
 	}

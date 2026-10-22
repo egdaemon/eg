@@ -4,6 +4,8 @@ import (
 	"database/sql"
 	"testing"
 
+	"github.com/egdaemon/eg/cmd/migrations"
+
 	"github.com/egdaemon/eg/internal/lan"
 	"github.com/egdaemon/eg/internal/langx"
 	"github.com/egdaemon/eg/internal/sqltestx"
@@ -12,7 +14,7 @@ import (
 
 func TestPeerDeleteByID(t *testing.T) {
 	db := sqltestx.DuckDB(t)
-	require.NoError(t, lan.Migrate(t.Context(), db))
+	require.NoError(t, migrations.Migrate(t.Context(), db))
 	require.NoError(t, lan.PeerUpsert(t.Context(), db, langx.Clone(lan.Peer{}, lan.PeerOptionTestDefaults, lan.PeerOptionID("a"))).Scan(&lan.Peer{}))
 
 	var p lan.Peer

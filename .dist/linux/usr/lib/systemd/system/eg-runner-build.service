@@ -19,13 +19,14 @@ EnvironmentFile=-/etc/eg/runner.env
 ExecStartPre=/usr/bin/podman network create --ignore --ipv6 egnet
 # egnet-lan puts the runner on the local network with an address from its DHCP server (macvlan) instead of the private
 # bridge above, select it with EG_RUNNER_NETWORK=egnet-lan in /etc/eg/runner.env. it is only defined here, nothing uses it
-# until selected, and failing to define it (i.e. no default route yet) doesn't stop the build.
-# - the parent interface defaults to the host's default route interface, add `-o parent=<interface>` to choose another.
+# until selected, and failing to define it doesn't stop the build.
+# - the parent interface is EG_RUNNER_DEFAULT_NETWORK_INTERFACE, `eg actl bootstrap env runner` writes it to runner.env.
+#   without it the network is created without a parent and the runner can't get an address from it.
+# - the network is removed first so it is created again with the current interface, it stays when a runner is using it.
 # - requires `systemctl enable --now netavark-dhcp-proxy.socket` on the host.
 # - macvlan doesn't work on wifi interfaces, many cloud networks or switches that limit the MACs per port, and the
 #   host can't reach the container.
-# - networks are only created when they don't exist, to change one remove it first: podman network rm egnet-lan
-ExecStartPre=-/usr/bin/podman network create --ignore -d macvlan --ipam-driver dhcp egnet-lan
+ExecStartPre=/usr/bin/podman network create --ignore -d macvlan --ipam-driver dhcp --ipv6 -o parent=${EG_RUNNER_DEFAULT_NETWORK_INTERFACE} egnet-lan
 ExecStart=/usr/bin/podman build --build-arg EG_RUNNER_OVERRIDE_DIR="${EG_RUNNER_OVERRIDE_DIR}" -t eg.runner -f /usr/share/eg/Containerfile /usr/share/eg
 # clear out the worklod cache after a successful rebuild.
 ExecStartPost=/usr/bin/rm -rf /var/cache/eg-runner/wcache

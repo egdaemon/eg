@@ -4,8 +4,6 @@ After=network.target
 Requires=eg-runner-build.service
 
 [Service]
-ProtectKernelModules=yes
-PrivateMounts=yes
 # interfers with ip v6 support. narrow to just the 169.254.x.x range
 IPAddressDeny=169.254.0.0/16
 # aws metadata ipv6 address (IMDS); gcp/azure metadata is ipv4-only, no equivalent needed
@@ -23,6 +21,8 @@ Environment=EG_RUNNER_OVERRIDE_DIR=rootfs
 # the network the container runs on, set it in /etc/eg/runner.env. egnet is a private bridge. egnet-lan gives the
 # container an address on the local network (macvlan, see eg-runner-build.service) so it can be found with mDNS,
 # it needs `systemctl enable --now netavark-dhcp-proxy.socket` and a host whose network allows it.
+# the unit doesn't set PrivateMounts or ProtectKernelModules, either gives the service a private mount namespace which
+# hides the container's network namespace from the netavark dhcp proxy and the container fails to get an address.
 Environment=EG_RUNNER_NETWORK=egnet
 Environment=EG_RUNNER_DAEMON_ENV=/etc/eg/daemon.env
 EnvironmentFile=-/etc/eg/runner.env

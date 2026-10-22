@@ -48,7 +48,7 @@ type upload struct {
 	cmdopts.RuntimeResources
 	HostedCompute    bool          `name:"shared-compute" help:"allow hosted compute" default:"true"`
 	P2P              int           `name:"p2p" help:"priority of uploading directly to a runner the control plane suggests before falling back to the cluster, higher goes first, 0 disables" default:"1" env:"EG_P2P_PRIORITY"`
-	LAN              int           `name:"lan" help:"priority of uploading directly to a runner remembered from the local network (see 'eg compute lan'), higher goes first, 0 disables including scanning for runners" default:"0" env:"EG_LAN_PRIORITY"`
+	LAN              int           `name:"lan" help:"priority of uploading directly to a runner remembered from the local network (see 'eg compute lan'), higher goes first, 0 disables including scanning for runners" default:"2" env:"EG_LAN_PRIORITY"`
 	P2POnly          bool          `name:"p2p-only" help:"never fall back to uploading to the cluster, fail if no runner accepts a direct upload" env:"EG_P2P_ONLY"`
 	CacheDir         string        `name:"cache-directory" help:"directory the remembered systems on the local network are stored in" default:"${vars_cache_directory}" env:"EG_CACHE_DIRECTORY"`
 	LANScanTimeout   time.Duration `name:"lan-scan-timeout" help:"how long the background scan of the local network runs for" default:"3s"`

@@ -36,7 +36,6 @@ func TestShellLogging(t *testing.T) {
 		cmd      shell.Command
 		failed   bool
 		warnings int
-		errors   int
 		colored  bool
 	}
 
@@ -52,14 +51,12 @@ func TestShellLogging(t *testing.T) {
 			cmd:      shell.New("false").Attempts(2).UnsafeExec(failures(5)),
 			failed:   true,
 			warnings: 1,
-			errors:   1,
 			colored:  true,
 		},
 		{
 			name:    "single attempt does not warn",
 			cmd:     shell.New("false").UnsafeExec(failures(1)),
 			failed:  true,
-			errors:  1,
 			colored: true,
 		},
 		{
@@ -81,16 +78,18 @@ func TestShellLogging(t *testing.T) {
 			err := shell.Run(ctx, e.cmd)
 			if e.failed {
 				require.Error(t, err)
+				if e.colored {
+					require.Contains(t, err.Error(), red+"ERROR")
+				}
 			} else {
 				require.NoError(t, err)
 			}
 
 			out := buf.String()
 			require.Equal(t, e.warnings, strings.Count(out, "WARN"))
-			require.Equal(t, e.errors, strings.Count(out, "ERROR"))
+			require.Zero(t, strings.Count(out, "ERROR"), "errors are returned, not logged")
 			if e.colored {
 				require.Equal(t, e.warnings, strings.Count(out, yellow+"WARN"))
-				require.Equal(t, e.errors, strings.Count(out, red+"ERROR"))
 			} else {
 				require.NotContains(t, out, "\x1b[")
 			}

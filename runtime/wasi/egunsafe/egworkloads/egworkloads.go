@@ -31,11 +31,37 @@ func Detect(ctx context.Context, db *sql.DB, dir string) error {
 
 	ts := time.Now()
 	for d := range workspaces.Workloads(ctx, dir).Each(ctx) {
-		w := Discovered{ID: uuid.Must(uuid.NewV7()).String(), Path: d.Path, Ts: ts}
-		if err := DiscoveredInsert(ctx, db, w).Scan(&w); err != nil {
+		if err := record(ctx, db, ts, d); err != nil {
 			return err
 		}
 	}
 
 	return nil
+}
+
+// DetectBuiltin scans the embedded builtin workloads in archive and records
+// what it finds. paths are prefixed with .builtin.
+func DetectBuiltin(ctx context.Context, db *sql.DB, archive fs.FS) error {
+	if err := goosex.Up(ctx, db, migrations); err != nil {
+		return err
+	}
+
+	found, err := workspaces.BuiltinWorkloads(ctx, archive)
+	if err != nil {
+		return err
+	}
+
+	ts := time.Now()
+	for _, d := range found {
+		if err := record(ctx, db, ts, d); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func record(ctx context.Context, db *sql.DB, ts time.Time, d workspaces.Desc) error {
+	w := Discovered{ID: uuid.Must(uuid.NewV7()).String(), Path: d.Path, Ts: ts}
+	return DiscoveredInsert(ctx, db, w).Scan(&w)
 }

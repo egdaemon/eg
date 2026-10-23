@@ -20,6 +20,7 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/cmd/cmdopts"
+	"github.com/egdaemon/eg/cmd/eg/compute"
 	"github.com/egdaemon/eg/cmd/eg/daemons"
 	"github.com/egdaemon/eg/compile"
 	"github.com/egdaemon/eg/internal/bytesx"
@@ -268,6 +269,10 @@ func recordDiscoveredWorkloads(ctx context.Context, db *sql.DB, dir string, envi
 
 	if err := egworkloads.Detect(ctx, db, dir); err != nil {
 		log.Println("unable to record discovered workloads", err)
+	}
+
+	if err := egworkloads.DetectBuiltin(ctx, db, compute.Builtin()); err != nil {
+		log.Println("unable to record discovered builtin workloads", err)
 	}
 }
 

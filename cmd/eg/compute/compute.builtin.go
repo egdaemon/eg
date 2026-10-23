@@ -3,6 +3,7 @@ package compute
 import (
 	"context"
 	"embed"
+	"io/fs"
 	"path/filepath"
 
 	"github.com/egdaemon/eg/cmd/cmdopts"
@@ -23,6 +24,11 @@ type cmdbuiltin struct {
 
 //go:embed .builtin
 var embeddedbuiltin embed.FS
+
+// Builtin returns the workloads embedded in the binary, rooted such that they live under .builtin.
+func Builtin() fs.FS {
+	return embeddedbuiltin
+}
 
 func NewBuiltinPredictor(ctx context.Context) complete.Predictor {
 	current := md5x.FormatString(md5x.Digest(errorsx.Zero(cmdopts.BuildInfo())))

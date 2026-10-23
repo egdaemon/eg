@@ -42,6 +42,10 @@ func TestRecordDiscoveredWorkloads(t *testing.T) {
 		defer scanner.Close()
 		require.True(t, scanner.Next(), "expected a recorded workload")
 		require.NoError(t, scanner.Err())
+
+		var builtin int
+		require.NoError(t, db.QueryRow(`SELECT count(*) FROM eg_workloads_discovered WHERE path LIKE '.builtin/%'`).Scan(&builtin))
+		require.Positive(t, builtin, "expected builtin workloads to be recorded")
 	})
 
 	t.Run("skips a PR/feature-branch build", func(t *testing.T) {

@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"slices"
 	"testing"
+	"testing/fstest"
 
 	_ "github.com/duckdb/duckdb-go/v2"
 	"github.com/egdaemon/eg/runtime/wasi/egunsafe/egworkloads"
@@ -40,4 +41,35 @@ func TestDetect(t *testing.T) {
 
 	slices.Sort(paths)
 	require.Equal(t, []string{".", "sub"}, paths)
+}
+
+func TestDetectBuiltin(t *testing.T) {
+	archive := fstest.MapFS{
+		".builtin/main.go":        {Data: []byte("package main\n")},
+		".builtin/a/main.go":      {Data: []byte("package main\n")},
+		".builtin/a/main_test.go": {Data: []byte("package main\n")},
+		".builtin/b/c/main.go":    {Data: []byte("package main\n")},
+	}
+
+	db, err := sql.Open("duckdb", filepath.Join(t.TempDir(), "analytics.db"))
+	require.NoError(t, err)
+	defer db.Close()
+
+	require.NoError(t, egworkloads.DetectBuiltin(t.Context(), db, archive))
+
+	scanner := egworkloads.DiscoveredLookup(t.Context(), db)
+	defer scanner.Close()
+
+	var paths []string
+	for scanner.Next() {
+		var w egworkloads.Discovered
+		require.NoError(t, scanner.Scan(&w))
+		require.NotEmpty(t, w.ID)
+		require.False(t, w.Ts.IsZero())
+		paths = append(paths, w.Path)
+	}
+	require.NoError(t, scanner.Err())
+
+	slices.Sort(paths)
+	require.Equal(t, []string{".builtin/a", ".builtin/b/c"}, paths)
 }

@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"slices"
 	"testing"
+	"testing/fstest"
 
 	"github.com/egdaemon/eg/workspaces"
 	"github.com/stretchr/testify/require"
@@ -41,4 +42,26 @@ func TestWorkloads(t *testing.T) {
 		require.NoError(t, seq.Err())
 		require.Empty(t, paths)
 	})
+}
+
+func TestBuiltinWorkloads(t *testing.T) {
+	archive := fstest.MapFS{
+		".builtin/main.go":            {Data: []byte("package main\n")},
+		".builtin/a/main.go":          {Data: []byte("package main\n")},
+		".builtin/a/main_test.go":     {Data: []byte("package main\n")},
+		".builtin/b/c/main.go":        {Data: []byte("package main\n")},
+		".builtin/b/c/extra.go":       {Data: []byte("package main\n")},
+		".builtin/onlytest/x_test.go": {Data: []byte("package main\n")},
+		".builtin/empty/.keep":        {Data: []byte("")},
+	}
+
+	found, err := workspaces.BuiltinWorkloads(t.Context(), archive)
+	require.NoError(t, err)
+
+	paths := make([]string, 0, len(found))
+	for _, d := range found {
+		paths = append(paths, d.Path)
+	}
+	slices.Sort(paths)
+	require.Equal(t, []string{".builtin/a", ".builtin/b/c"}, paths)
 }

@@ -12,6 +12,10 @@ import (
 )
 
 // configures the agent to use the current machines application default credentials.
+//
+// TODO: the runner installs eg.EnvUnsafeGcloudADCB64 as the application default credentials of the user, see gcpx.InstallCredentials.
+// once that is confirmed in practice remove the GOOGLE_APPLICATION_CREDENTIALS variable, the remap directory
+// and the overlay volume below, leaving only the base64 variable, along with their tests.
 func AgentOptionGcloudCredentials(ctx context.Context, envb *envx.Builder, path string) AgentOption {
 	raw := errorsx.Must(os.ReadFile(path))
 	envb.Var(eg.EnvUnsafeGcloudADCB64, base64.URLEncoding.EncodeToString(raw))

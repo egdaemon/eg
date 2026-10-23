@@ -30,7 +30,7 @@ func MaxAge(d time.Duration) FilterOption {
 }
 
 // Levels limits how many directory levels deep to scan inside each candidate
-// when determining its effective modification time.
+// when determining its effective modification time. 1 scans the direct children.
 func Levels(n int) FilterOption {
 	return func(c *filterConfig) {
 		c.levels = n
@@ -56,6 +56,7 @@ func Find(root string, options ...FilterOption) iterx.Seq[string] {
 		var (
 			curName   string
 			curOldest time.Time
+			stopped   bool // the consumer stopped iterating, yielding again would panic.
 		)
 
 		check := func() bool {
@@ -86,12 +87,13 @@ func Find(root string, options ...FilterOption) iterx.Seq[string] {
 			topLevel, _, _ := strings.Cut(path, "/")
 			depth := strings.Count(path, "/") + 1
 
-			if d.IsDir() && depth >= cfg.levels {
+			if d.IsDir() && depth > cfg.levels {
 				return fs.SkipDir
 			}
 
 			if topLevel != curName {
 				if check() && !yield(filepath.Join(root, curName)) {
+					stopped = true
 					return fs.SkipAll
 				}
 				curName = topLevel
@@ -110,7 +112,7 @@ func Find(root string, options ...FilterOption) iterx.Seq[string] {
 			return nil
 		})
 
-		if check() {
+		if !stopped && check() {
 			yield(filepath.Join(root, curName))
 		}
 

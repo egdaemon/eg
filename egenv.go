@@ -137,8 +137,9 @@ func IsDefaultBranchBuild(environ ...string) bool {
 }
 
 const (
-	EnvGoogleApplicationCredentials = "GOOGLE_APPLICATION_CREDENTIALS"   // path to the application default credentials used by google clients and gcloud.
-	EnvGCPWorkloadIdentityEnabled   = "EG_GCP_WORKLOAD_IDENTITY_ENABLED" // set by whatever generates the workload (uploads, schedules) when it needs gcp credentials issued to it by its runner.
+	EnvGoogleApplicationCredentials   = "GOOGLE_APPLICATION_CREDENTIALS"         // path to the application default credentials used by google clients and gcloud.
+	EnvCloudSDKCredentialFileOverride = "CLOUDSDK_AUTH_CREDENTIAL_FILE_OVERRIDE" // makes gcloud commands use the credentials in the file, set when the workload was provided credentials.
+	EnvGCPWorkloadIdentityEnabled     = "EG_GCP_WORKLOAD_IDENTITY_ENABLED"       // set by whatever generates the workload (uploads, schedules) when it needs gcp credentials issued to it by its runner.
 )
 
 const (

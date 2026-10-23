@@ -62,17 +62,9 @@ type module struct {
 	Module     string `arg:"" help:"name of the module to run"`
 }
 
-func (t module) mounthack(ctx context.Context, runid string, ws workspaces.Context) (err error) {
-	var (
-		binname = "bindfs"
-		mbin    string
-	)
-
-	if mbin, err = exec.LookPath(binname); err != nil {
-		return errorsx.Wrap(err, "unable to locate bindfs, failing")
-	}
-
-	remap := func(from, to string) error {
+// remapdir returns a function that remaps a directory, giving the unprivileged user access to the contents.
+func remapdir(ctx context.Context, bindfs string) func(from, to string) error {
+	return func(from, to string) (err error) {
 		if envx.Boolean(false, eg.EnvExperimentalBindMount) {
 			egdu, err := user.Lookup(eg.DefaultUsername)
 			if err != nil {
@@ -94,7 +86,7 @@ func (t module) mounthack(ctx context.Context, runid string, ws workspaces.Conte
 				return errorsx.Wrapf(err, "unable to run bindfs: %s", from)
 			}
 		} else {
-			mcmd := exec.CommandContext(ctx, mbin, "--map=root/egd:@root/@egd", "-o", "entry_timeout=0", from, to)
+			mcmd := exec.CommandContext(ctx, bindfs, "--map=root/egd:@root/@egd", "-o", "entry_timeout=0", from, to)
 			mcmd.Stdout, mcmd.Stderr = log.Writer(), log.Writer()
 			if err = execx.MaybeRun(mcmd); err != nil {
 				return errorsx.Wrapf(err, "unable to run bindfs: %s", from)
@@ -112,6 +104,44 @@ func (t module) mounthack(ctx context.Context, runid string, ws workspaces.Conte
 
 		return nil
 	}
+}
+
+// defaultgcloudcredentials points gcloud at the credentials installed for the workload, gcloud commands only use them when told to.
+// the environment of the process is used by the module and the commands it runs. a value already in the environment is
+// the users override and is kept. it must not be set when there are no credentials, it would shadow the user's own gcloud login.
+func defaultgcloudcredentials(adc string) error {
+	if adc == "" {
+		return nil
+	}
+
+	if _, set := os.LookupEnv(eg.EnvCloudSDKCredentialFileOverride); set {
+		return nil
+	}
+
+	return os.Setenv(eg.EnvCloudSDKCredentialFileOverride, adc)
+}
+
+// installcredentials installs the gcp credentials provided to the workload, see gcpx.InstallCredentials.
+func installcredentials(ctx context.Context) error {
+	adc, err := gcpx.InstallCredentials(ctx, eg.DefaultRuntimeDirectory(gcpx.Directory))
+	if err != nil {
+		return err
+	}
+
+	return defaultgcloudcredentials(adc)
+}
+
+func (t module) mounthack(ctx context.Context, runid string, ws workspaces.Context) (err error) {
+	var (
+		binname = "bindfs"
+		mbin    string
+	)
+
+	if mbin, err = exec.LookPath(binname); err != nil {
+		return errorsx.Wrap(err, "unable to locate bindfs, failing")
+	}
+
+	remap := remapdir(ctx, mbin)
 
 	err = fsx.MkDirs(
 		0770,
@@ -160,12 +190,6 @@ func (t module) mounthack(ctx context.Context, runid string, ws workspaces.Conte
 		}
 	}
 
-	// workloads that were issued gcp credentials (see gcpx.ProvisionCredentials) use them as the
-	// application default credentials of the unprivileged user.
-	if credsdir := eg.DefaultRuntimeDirectory(gcpx.Directory); fsx.DirExists(credsdir) == nil {
-		errorsx.Log(errorsx.Wrap(installgcloud(ctx, credsdir, remap), "unable to install gcp credentials"))
-	}
-
 	// HACK: gpg no longer obeys GNUPGHOME for the root user.
 	if err = errorsx.Compact(fsx.MkDirs(0700, "/run/user/0/gnupg"), os.Symlink("/eg.mnt/.gnupg", "/run/user/0/gnupg/d.3uqafziaitu1mwy9asijecpi")); err != nil {
 		return err
@@ -176,43 +200,6 @@ func (t module) mounthack(ctx context.Context, runid string, ws workspaces.Conte
 	}
 
 	return nil
-}
-
-// installgcloud makes the credentials issued to the workload the application default credentials of the unprivileged user,
-// found by gcloud and the google client libraries at ~/.config/gcloud/application_default_credentials.json.
-// the directory is remapped, giving the user access to the credentials, and the adc is regenerated with the paths
-// of the remapped directory.
-func installgcloud(ctx context.Context, src string, remap func(from, to string) error) (err error) {
-	var (
-		egdu *user.User
-		adc  string
-	)
-
-	if egdu, err = user.Lookup(eg.DefaultUsername); err != nil {
-		return errorsx.Wrap(err, "failed to lookup user egd")
-	}
-
-	dst := filepath.Join(egdu.HomeDir, ".config", "gcloud")
-	if err = fsx.MkDirs(0770, dst); err != nil {
-		return errorsx.Wrapf(err, "unable to create %s", dst)
-	}
-
-	if err = remap(src, dst); err != nil {
-		return errorsx.Wrapf(err, "unable to remap %s", dst)
-	}
-
-	if adc, err = gcpx.LoadCredentials(ctx, dst); err != nil {
-		return errorsx.Wrap(err, "unable to load gcp credentials")
-	} else if adc == "" {
-		return nil
-	}
-
-	installed := filepath.Join(dst, "application_default_credentials.json")
-	if err = os.Rename(adc, installed); err != nil {
-		return errorsx.Wrap(err, "unable to install application default credentials")
-	}
-
-	return errorsx.Wrap(gcpx.ConfigureGCP(dst, installed), "unable to configure gcloud")
 }
 
 // bridges the host wayland compositor socket (bind-mounted read-write, but
@@ -303,6 +290,10 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 	}
 
 	debugx.Println(spew.Sdump(ws))
+
+	// workloads that were provided gcp credentials use them as the application default credentials of the unprivileged user.
+	// this must happen before the environment of the module and its commands is built.
+	errorsx.Log(errorsx.Wrap(installcredentials(gctx.Context), "unable to install gcp credentials"))
 
 	cmdenvb := envx.Build().FromEnv(
 		"PATH",

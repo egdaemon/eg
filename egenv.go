@@ -146,7 +146,7 @@ const (
 	EnvUnsafeCacheID         = "EG_UNSAFE_CACHE_ID"
 	EnvUnsafeGitCloneEnabled = "EG_UNSAFE_GIT_CLONE_ENABLED"
 	EnvUnsafeRemapDirectory  = "EG_UNSAFE_REMAP_DIRECTORY"                    // list of directories to remap, seperated by ':'.
-	EnvUnsafeGcloudADCB64    = "EG_UNSAFE_GOOGLE_APPLICATION_CREDENTIALS_B64" // temporary hack while we deploy remap directory
+	EnvUnsafeGcloudADCB64    = "EG_UNSAFE_GOOGLE_APPLICATION_CREDENTIALS_B64" // application default credentials, base64 encoded with the url alphabet (base64.URLEncoding). temporary hack while we deploy remap directory
 )
 
 const (

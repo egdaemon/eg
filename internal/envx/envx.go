@@ -264,21 +264,32 @@ func (t environ) Hex(fallback []byte, keys ...string) []byte {
 	}, keys...)
 }
 
-// Base64 read value as a base64 encoded string
+// Base64 read value as a base64 encoded string, the standard alphabet is attempted first and then the url alphabet.
 func (t environ) Base64(fallback []byte, keys ...string) []byte {
-	return t.base64(base64.RawStdEncoding.WithPadding('='), fallback, keys...)
+	return t.base64(fallback, keys, base64.RawStdEncoding.WithPadding('='), base64.URLEncoding)
 }
 
 // Base64URL read value as a url base64 encoded string
 func (t environ) Base64URL(fallback []byte, keys ...string) []byte {
-	return t.base64(base64.URLEncoding, fallback, keys...)
+	return t.base64(fallback, keys, base64.URLEncoding)
 }
 
-// Base64 read value as a base64 encoded string
-func (t environ) base64(enc *base64.Encoding, fallback []byte, keys ...string) []byte {
+// base64 decodes the value with the first encoding that succeeds, failing with the error of the first encoding.
+func (t environ) base64(fallback []byte, keys []string, encs ...*base64.Encoding) []byte {
 	return envval(fallback, t.m, func(s string) ([]byte, error) {
-		decoded, err := enc.DecodeString(s)
-		return decoded, errorsx.Wrapf(err, "invalid base64 encoded data '%s'", s)
+		var first error
+		for _, enc := range encs {
+			decoded, err := enc.DecodeString(s)
+			if err == nil {
+				return decoded, nil
+			}
+
+			if first == nil {
+				first = err
+			}
+		}
+
+		return nil, errorsx.Wrapf(first, "invalid base64 encoded data '%s'", s)
 	}, keys...)
 }
 

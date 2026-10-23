@@ -121,6 +121,20 @@ func TestBase64(t *testing.T) {
 	require.Equal(t, []byte{0xff}, envx.Base64([]byte{0xff}, "missing-key-base64"))
 }
 
+func TestBase64FallsBackToURL(t *testing.T) {
+	const key = "c9d0e1f2-a3b4-5678-cdef-789012345678"
+	raw := []byte{0xfb, 0xff, 0xfe, 0xfb, 0xff, 0xfe}
+
+	// the url alphabet differs from the standard alphabet, only for these bytes.
+	require.NotEqual(t, base64.StdEncoding.EncodeToString(raw), base64.URLEncoding.EncodeToString(raw))
+
+	t.Setenv(key, base64.URLEncoding.EncodeToString(raw))
+	require.Equal(t, raw, envx.Base64(nil, key))
+
+	t.Setenv(key, "not base64!")
+	require.Equal(t, []byte{0xff}, envx.Base64([]byte{0xff}, key))
+}
+
 func TestBase64URL(t *testing.T) {
 	const key = "d1e2f3a4-b5c6-7890-defa-901234567890"
 	raw := make([]byte, 1024)

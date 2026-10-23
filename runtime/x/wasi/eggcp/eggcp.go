@@ -12,8 +12,6 @@ import (
 func Credentials(adc string) eg.OpFn {
 	return shell.Op(
 		shell.Newf("gcloud config set auth/credential_file_override %s", adc),
-		// TODO remove pass_credentials_to_gsutil once its set in gcloud directory by default.
-		shell.New("gcloud config set core/pass_credentials_to_gsutil true"),
 	)
 }
 

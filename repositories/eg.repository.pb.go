@@ -2,7 +2,7 @@
 // versions:
 // 	protoc-gen-go v1.36.12
 // 	protoc        v7.36.1
-// source: ci.repository.proto
+// source: eg.repository.proto
 
 package repositories
 
@@ -47,7 +47,7 @@ type Repository struct {
 
 func (x *Repository) Reset() {
 	*x = Repository{}
-	mi := &file_ci_repository_proto_msgTypes[0]
+	mi := &file_eg_repository_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -59,7 +59,7 @@ func (x *Repository) String() string {
 func (*Repository) ProtoMessage() {}
 
 func (x *Repository) ProtoReflect() protoreflect.Message {
-	mi := &file_ci_repository_proto_msgTypes[0]
+	mi := &file_eg_repository_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -72,7 +72,7 @@ func (x *Repository) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Repository.ProtoReflect.Descriptor instead.
 func (*Repository) Descriptor() ([]byte, []int) {
-	return file_ci_repository_proto_rawDescGZIP(), []int{0}
+	return file_eg_repository_proto_rawDescGZIP(), []int{0}
 }
 
 func (x *Repository) GetId() string {
@@ -213,7 +213,7 @@ type SearchRequest struct {
 
 func (x *SearchRequest) Reset() {
 	*x = SearchRequest{}
-	mi := &file_ci_repository_proto_msgTypes[1]
+	mi := &file_eg_repository_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -225,7 +225,7 @@ func (x *SearchRequest) String() string {
 func (*SearchRequest) ProtoMessage() {}
 
 func (x *SearchRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_ci_repository_proto_msgTypes[1]
+	mi := &file_eg_repository_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -238,7 +238,7 @@ func (x *SearchRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SearchRequest.ProtoReflect.Descriptor instead.
 func (*SearchRequest) Descriptor() ([]byte, []int) {
-	return file_ci_repository_proto_rawDescGZIP(), []int{1}
+	return file_eg_repository_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *SearchRequest) GetQuery() string {
@@ -279,7 +279,7 @@ type SearchResponse struct {
 
 func (x *SearchResponse) Reset() {
 	*x = SearchResponse{}
-	mi := &file_ci_repository_proto_msgTypes[2]
+	mi := &file_eg_repository_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -291,7 +291,7 @@ func (x *SearchResponse) String() string {
 func (*SearchResponse) ProtoMessage() {}
 
 func (x *SearchResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_ci_repository_proto_msgTypes[2]
+	mi := &file_eg_repository_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -304,7 +304,7 @@ func (x *SearchResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SearchResponse.ProtoReflect.Descriptor instead.
 func (*SearchResponse) Descriptor() ([]byte, []int) {
-	return file_ci_repository_proto_rawDescGZIP(), []int{2}
+	return file_eg_repository_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *SearchResponse) GetNext() *SearchRequest {
@@ -330,7 +330,7 @@ type FindResponse struct {
 
 func (x *FindResponse) Reset() {
 	*x = FindResponse{}
-	mi := &file_ci_repository_proto_msgTypes[3]
+	mi := &file_eg_repository_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -342,7 +342,7 @@ func (x *FindResponse) String() string {
 func (*FindResponse) ProtoMessage() {}
 
 func (x *FindResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_ci_repository_proto_msgTypes[3]
+	mi := &file_eg_repository_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -355,7 +355,7 @@ func (x *FindResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FindResponse.ProtoReflect.Descriptor instead.
 func (*FindResponse) Descriptor() ([]byte, []int) {
-	return file_ci_repository_proto_rawDescGZIP(), []int{3}
+	return file_eg_repository_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *FindResponse) GetRepository() *Repository {
@@ -377,7 +377,7 @@ type Workload struct {
 
 func (x *Workload) Reset() {
 	*x = Workload{}
-	mi := &file_ci_repository_proto_msgTypes[4]
+	mi := &file_eg_repository_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -389,7 +389,7 @@ func (x *Workload) String() string {
 func (*Workload) ProtoMessage() {}
 
 func (x *Workload) ProtoReflect() protoreflect.Message {
-	mi := &file_ci_repository_proto_msgTypes[4]
+	mi := &file_eg_repository_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -402,7 +402,7 @@ func (x *Workload) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Workload.ProtoReflect.Descriptor instead.
 func (*Workload) Descriptor() ([]byte, []int) {
-	return file_ci_repository_proto_rawDescGZIP(), []int{4}
+	return file_eg_repository_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *Workload) GetPath() string {
@@ -445,7 +445,7 @@ type WorkloadSearchRequest struct {
 
 func (x *WorkloadSearchRequest) Reset() {
 	*x = WorkloadSearchRequest{}
-	mi := &file_ci_repository_proto_msgTypes[5]
+	mi := &file_eg_repository_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -457,7 +457,7 @@ func (x *WorkloadSearchRequest) String() string {
 func (*WorkloadSearchRequest) ProtoMessage() {}
 
 func (x *WorkloadSearchRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_ci_repository_proto_msgTypes[5]
+	mi := &file_eg_repository_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -470,7 +470,7 @@ func (x *WorkloadSearchRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WorkloadSearchRequest.ProtoReflect.Descriptor instead.
 func (*WorkloadSearchRequest) Descriptor() ([]byte, []int) {
-	return file_ci_repository_proto_rawDescGZIP(), []int{5}
+	return file_eg_repository_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *WorkloadSearchRequest) GetQuery() string {
@@ -511,7 +511,7 @@ type WorkloadSearchResponse struct {
 
 func (x *WorkloadSearchResponse) Reset() {
 	*x = WorkloadSearchResponse{}
-	mi := &file_ci_repository_proto_msgTypes[6]
+	mi := &file_eg_repository_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -523,7 +523,7 @@ func (x *WorkloadSearchResponse) String() string {
 func (*WorkloadSearchResponse) ProtoMessage() {}
 
 func (x *WorkloadSearchResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_ci_repository_proto_msgTypes[6]
+	mi := &file_eg_repository_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -536,7 +536,7 @@ func (x *WorkloadSearchResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WorkloadSearchResponse.ProtoReflect.Descriptor instead.
 func (*WorkloadSearchResponse) Descriptor() ([]byte, []int) {
-	return file_ci_repository_proto_rawDescGZIP(), []int{6}
+	return file_eg_repository_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *WorkloadSearchResponse) GetNext() *WorkloadSearchRequest {
@@ -562,7 +562,7 @@ type CreateRequest struct {
 
 func (x *CreateRequest) Reset() {
 	*x = CreateRequest{}
-	mi := &file_ci_repository_proto_msgTypes[7]
+	mi := &file_eg_repository_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -574,7 +574,7 @@ func (x *CreateRequest) String() string {
 func (*CreateRequest) ProtoMessage() {}
 
 func (x *CreateRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_ci_repository_proto_msgTypes[7]
+	mi := &file_eg_repository_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -587,7 +587,7 @@ func (x *CreateRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateRequest.ProtoReflect.Descriptor instead.
 func (*CreateRequest) Descriptor() ([]byte, []int) {
-	return file_ci_repository_proto_rawDescGZIP(), []int{7}
+	return file_eg_repository_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *CreateRequest) GetRepository() *Repository {
@@ -606,7 +606,7 @@ type CreateResponse struct {
 
 func (x *CreateResponse) Reset() {
 	*x = CreateResponse{}
-	mi := &file_ci_repository_proto_msgTypes[8]
+	mi := &file_eg_repository_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -618,7 +618,7 @@ func (x *CreateResponse) String() string {
 func (*CreateResponse) ProtoMessage() {}
 
 func (x *CreateResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_ci_repository_proto_msgTypes[8]
+	mi := &file_eg_repository_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -631,7 +631,7 @@ func (x *CreateResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateResponse.ProtoReflect.Descriptor instead.
 func (*CreateResponse) Descriptor() ([]byte, []int) {
-	return file_ci_repository_proto_rawDescGZIP(), []int{8}
+	return file_eg_repository_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *CreateResponse) GetRepository() *Repository {
@@ -650,7 +650,7 @@ type UpdateRequest struct {
 
 func (x *UpdateRequest) Reset() {
 	*x = UpdateRequest{}
-	mi := &file_ci_repository_proto_msgTypes[9]
+	mi := &file_eg_repository_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -662,7 +662,7 @@ func (x *UpdateRequest) String() string {
 func (*UpdateRequest) ProtoMessage() {}
 
 func (x *UpdateRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_ci_repository_proto_msgTypes[9]
+	mi := &file_eg_repository_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -675,7 +675,7 @@ func (x *UpdateRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateRequest.ProtoReflect.Descriptor instead.
 func (*UpdateRequest) Descriptor() ([]byte, []int) {
-	return file_ci_repository_proto_rawDescGZIP(), []int{9}
+	return file_eg_repository_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *UpdateRequest) GetRepository() *Repository {
@@ -694,7 +694,7 @@ type UpdateResponse struct {
 
 func (x *UpdateResponse) Reset() {
 	*x = UpdateResponse{}
-	mi := &file_ci_repository_proto_msgTypes[10]
+	mi := &file_eg_repository_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -706,7 +706,7 @@ func (x *UpdateResponse) String() string {
 func (*UpdateResponse) ProtoMessage() {}
 
 func (x *UpdateResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_ci_repository_proto_msgTypes[10]
+	mi := &file_eg_repository_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -719,7 +719,7 @@ func (x *UpdateResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateResponse.ProtoReflect.Descriptor instead.
 func (*UpdateResponse) Descriptor() ([]byte, []int) {
-	return file_ci_repository_proto_rawDescGZIP(), []int{10}
+	return file_eg_repository_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *UpdateResponse) GetRepository() *Repository {
@@ -738,7 +738,7 @@ type DestroyRequest struct {
 
 func (x *DestroyRequest) Reset() {
 	*x = DestroyRequest{}
-	mi := &file_ci_repository_proto_msgTypes[11]
+	mi := &file_eg_repository_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -750,7 +750,7 @@ func (x *DestroyRequest) String() string {
 func (*DestroyRequest) ProtoMessage() {}
 
 func (x *DestroyRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_ci_repository_proto_msgTypes[11]
+	mi := &file_eg_repository_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -763,7 +763,7 @@ func (x *DestroyRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DestroyRequest.ProtoReflect.Descriptor instead.
 func (*DestroyRequest) Descriptor() ([]byte, []int) {
-	return file_ci_repository_proto_rawDescGZIP(), []int{11}
+	return file_eg_repository_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *DestroyRequest) GetRepository() *Repository {
@@ -782,7 +782,7 @@ type DestroyResponse struct {
 
 func (x *DestroyResponse) Reset() {
 	*x = DestroyResponse{}
-	mi := &file_ci_repository_proto_msgTypes[12]
+	mi := &file_eg_repository_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -794,7 +794,7 @@ func (x *DestroyResponse) String() string {
 func (*DestroyResponse) ProtoMessage() {}
 
 func (x *DestroyResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_ci_repository_proto_msgTypes[12]
+	mi := &file_eg_repository_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -807,7 +807,7 @@ func (x *DestroyResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DestroyResponse.ProtoReflect.Descriptor instead.
 func (*DestroyResponse) Descriptor() ([]byte, []int) {
-	return file_ci_repository_proto_rawDescGZIP(), []int{12}
+	return file_eg_repository_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *DestroyResponse) GetRepository() *Repository {
@@ -833,7 +833,7 @@ type SSHCredential struct {
 
 func (x *SSHCredential) Reset() {
 	*x = SSHCredential{}
-	mi := &file_ci_repository_proto_msgTypes[13]
+	mi := &file_eg_repository_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -845,7 +845,7 @@ func (x *SSHCredential) String() string {
 func (*SSHCredential) ProtoMessage() {}
 
 func (x *SSHCredential) ProtoReflect() protoreflect.Message {
-	mi := &file_ci_repository_proto_msgTypes[13]
+	mi := &file_eg_repository_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -858,7 +858,7 @@ func (x *SSHCredential) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SSHCredential.ProtoReflect.Descriptor instead.
 func (*SSHCredential) Descriptor() ([]byte, []int) {
-	return file_ci_repository_proto_rawDescGZIP(), []int{13}
+	return file_eg_repository_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *SSHCredential) GetId() string {
@@ -927,7 +927,7 @@ type SSHGenKeyRequest struct {
 
 func (x *SSHGenKeyRequest) Reset() {
 	*x = SSHGenKeyRequest{}
-	mi := &file_ci_repository_proto_msgTypes[14]
+	mi := &file_eg_repository_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -939,7 +939,7 @@ func (x *SSHGenKeyRequest) String() string {
 func (*SSHGenKeyRequest) ProtoMessage() {}
 
 func (x *SSHGenKeyRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_ci_repository_proto_msgTypes[14]
+	mi := &file_eg_repository_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -952,7 +952,7 @@ func (x *SSHGenKeyRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SSHGenKeyRequest.ProtoReflect.Descriptor instead.
 func (*SSHGenKeyRequest) Descriptor() ([]byte, []int) {
-	return file_ci_repository_proto_rawDescGZIP(), []int{14}
+	return file_eg_repository_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *SSHGenKeyRequest) GetCredential() *SSHCredential {
@@ -978,7 +978,7 @@ type SSHGenKeyResponse struct {
 
 func (x *SSHGenKeyResponse) Reset() {
 	*x = SSHGenKeyResponse{}
-	mi := &file_ci_repository_proto_msgTypes[15]
+	mi := &file_eg_repository_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -990,7 +990,7 @@ func (x *SSHGenKeyResponse) String() string {
 func (*SSHGenKeyResponse) ProtoMessage() {}
 
 func (x *SSHGenKeyResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_ci_repository_proto_msgTypes[15]
+	mi := &file_eg_repository_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1003,7 +1003,7 @@ func (x *SSHGenKeyResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SSHGenKeyResponse.ProtoReflect.Descriptor instead.
 func (*SSHGenKeyResponse) Descriptor() ([]byte, []int) {
-	return file_ci_repository_proto_rawDescGZIP(), []int{15}
+	return file_eg_repository_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *SSHGenKeyResponse) GetCredential() *SSHCredential {
@@ -1024,7 +1024,7 @@ type SSHSearchRequest struct {
 
 func (x *SSHSearchRequest) Reset() {
 	*x = SSHSearchRequest{}
-	mi := &file_ci_repository_proto_msgTypes[16]
+	mi := &file_eg_repository_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1036,7 +1036,7 @@ func (x *SSHSearchRequest) String() string {
 func (*SSHSearchRequest) ProtoMessage() {}
 
 func (x *SSHSearchRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_ci_repository_proto_msgTypes[16]
+	mi := &file_eg_repository_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1049,7 +1049,7 @@ func (x *SSHSearchRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SSHSearchRequest.ProtoReflect.Descriptor instead.
 func (*SSHSearchRequest) Descriptor() ([]byte, []int) {
-	return file_ci_repository_proto_rawDescGZIP(), []int{16}
+	return file_eg_repository_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *SSHSearchRequest) GetQuery() string {
@@ -1083,7 +1083,7 @@ type SSHSearchResponse struct {
 
 func (x *SSHSearchResponse) Reset() {
 	*x = SSHSearchResponse{}
-	mi := &file_ci_repository_proto_msgTypes[17]
+	mi := &file_eg_repository_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1095,7 +1095,7 @@ func (x *SSHSearchResponse) String() string {
 func (*SSHSearchResponse) ProtoMessage() {}
 
 func (x *SSHSearchResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_ci_repository_proto_msgTypes[17]
+	mi := &file_eg_repository_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1108,7 +1108,7 @@ func (x *SSHSearchResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SSHSearchResponse.ProtoReflect.Descriptor instead.
 func (*SSHSearchResponse) Descriptor() ([]byte, []int) {
-	return file_ci_repository_proto_rawDescGZIP(), []int{17}
+	return file_eg_repository_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *SSHSearchResponse) GetNext() *SearchRequest {
@@ -1134,7 +1134,7 @@ type SSHCreateRequest struct {
 
 func (x *SSHCreateRequest) Reset() {
 	*x = SSHCreateRequest{}
-	mi := &file_ci_repository_proto_msgTypes[18]
+	mi := &file_eg_repository_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1146,7 +1146,7 @@ func (x *SSHCreateRequest) String() string {
 func (*SSHCreateRequest) ProtoMessage() {}
 
 func (x *SSHCreateRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_ci_repository_proto_msgTypes[18]
+	mi := &file_eg_repository_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1159,7 +1159,7 @@ func (x *SSHCreateRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SSHCreateRequest.ProtoReflect.Descriptor instead.
 func (*SSHCreateRequest) Descriptor() ([]byte, []int) {
-	return file_ci_repository_proto_rawDescGZIP(), []int{18}
+	return file_eg_repository_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *SSHCreateRequest) GetCredential() *SSHCredential {
@@ -1178,7 +1178,7 @@ type SSHCreateResponse struct {
 
 func (x *SSHCreateResponse) Reset() {
 	*x = SSHCreateResponse{}
-	mi := &file_ci_repository_proto_msgTypes[19]
+	mi := &file_eg_repository_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1190,7 +1190,7 @@ func (x *SSHCreateResponse) String() string {
 func (*SSHCreateResponse) ProtoMessage() {}
 
 func (x *SSHCreateResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_ci_repository_proto_msgTypes[19]
+	mi := &file_eg_repository_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1203,7 +1203,7 @@ func (x *SSHCreateResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SSHCreateResponse.ProtoReflect.Descriptor instead.
 func (*SSHCreateResponse) Descriptor() ([]byte, []int) {
-	return file_ci_repository_proto_rawDescGZIP(), []int{19}
+	return file_eg_repository_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *SSHCreateResponse) GetCredential() *SSHCredential {
@@ -1222,7 +1222,7 @@ type SSHFindRequest struct {
 
 func (x *SSHFindRequest) Reset() {
 	*x = SSHFindRequest{}
-	mi := &file_ci_repository_proto_msgTypes[20]
+	mi := &file_eg_repository_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1234,7 +1234,7 @@ func (x *SSHFindRequest) String() string {
 func (*SSHFindRequest) ProtoMessage() {}
 
 func (x *SSHFindRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_ci_repository_proto_msgTypes[20]
+	mi := &file_eg_repository_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1247,7 +1247,7 @@ func (x *SSHFindRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SSHFindRequest.ProtoReflect.Descriptor instead.
 func (*SSHFindRequest) Descriptor() ([]byte, []int) {
-	return file_ci_repository_proto_rawDescGZIP(), []int{20}
+	return file_eg_repository_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *SSHFindRequest) GetFingerprint() string {
@@ -1266,7 +1266,7 @@ type SSHFindResponse struct {
 
 func (x *SSHFindResponse) Reset() {
 	*x = SSHFindResponse{}
-	mi := &file_ci_repository_proto_msgTypes[21]
+	mi := &file_eg_repository_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1278,7 +1278,7 @@ func (x *SSHFindResponse) String() string {
 func (*SSHFindResponse) ProtoMessage() {}
 
 func (x *SSHFindResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_ci_repository_proto_msgTypes[21]
+	mi := &file_eg_repository_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1291,7 +1291,7 @@ func (x *SSHFindResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SSHFindResponse.ProtoReflect.Descriptor instead.
 func (*SSHFindResponse) Descriptor() ([]byte, []int) {
-	return file_ci_repository_proto_rawDescGZIP(), []int{21}
+	return file_eg_repository_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *SSHFindResponse) GetCredential() *SSHCredential {
@@ -1310,7 +1310,7 @@ type SSHDestroyRequest struct {
 
 func (x *SSHDestroyRequest) Reset() {
 	*x = SSHDestroyRequest{}
-	mi := &file_ci_repository_proto_msgTypes[22]
+	mi := &file_eg_repository_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1322,7 +1322,7 @@ func (x *SSHDestroyRequest) String() string {
 func (*SSHDestroyRequest) ProtoMessage() {}
 
 func (x *SSHDestroyRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_ci_repository_proto_msgTypes[22]
+	mi := &file_eg_repository_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1335,7 +1335,7 @@ func (x *SSHDestroyRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SSHDestroyRequest.ProtoReflect.Descriptor instead.
 func (*SSHDestroyRequest) Descriptor() ([]byte, []int) {
-	return file_ci_repository_proto_rawDescGZIP(), []int{22}
+	return file_eg_repository_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *SSHDestroyRequest) GetFingerprint() string {
@@ -1354,7 +1354,7 @@ type SSHDestroyResponse struct {
 
 func (x *SSHDestroyResponse) Reset() {
 	*x = SSHDestroyResponse{}
-	mi := &file_ci_repository_proto_msgTypes[23]
+	mi := &file_eg_repository_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1366,7 +1366,7 @@ func (x *SSHDestroyResponse) String() string {
 func (*SSHDestroyResponse) ProtoMessage() {}
 
 func (x *SSHDestroyResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_ci_repository_proto_msgTypes[23]
+	mi := &file_eg_repository_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1379,7 +1379,7 @@ func (x *SSHDestroyResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SSHDestroyResponse.ProtoReflect.Descriptor instead.
 func (*SSHDestroyResponse) Descriptor() ([]byte, []int) {
-	return file_ci_repository_proto_rawDescGZIP(), []int{23}
+	return file_eg_repository_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *SSHDestroyResponse) GetCredential() *SSHCredential {
@@ -1389,11 +1389,11 @@ func (x *SSHDestroyResponse) GetCredential() *SSHCredential {
 	return nil
 }
 
-var File_ci_repository_proto protoreflect.FileDescriptor
+var File_eg_repository_proto protoreflect.FileDescriptor
 
-const file_ci_repository_proto_rawDesc = "" +
+const file_eg_repository_proto_rawDesc = "" +
 	"\n" +
-	"\x13ci.repository.proto\x12\rci.repository\"\xf9\x03\n" +
+	"\x13eg.repository.proto\x12\reg.repository\"\xf9\x03\n" +
 	"\n" +
 	"Repository\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1a\n" +
@@ -1428,11 +1428,11 @@ const file_ci_repository_proto_rawDesc = "" +
 	"\x05limit\x18\x03 \x01(\x04R\x05limit\x12\x18\n" +
 	"\avcs_uri\x18\x04 \x01(\tR\avcs_uri\"s\n" +
 	"\x0eSearchResponse\x120\n" +
-	"\x04next\x18\x01 \x01(\v2\x1c.ci.repository.SearchRequestR\x04next\x12/\n" +
-	"\x05items\x18\x02 \x03(\v2\x19.ci.repository.RepositoryR\x05items\"I\n" +
+	"\x04next\x18\x01 \x01(\v2\x1c.eg.repository.SearchRequestR\x04next\x12/\n" +
+	"\x05items\x18\x02 \x03(\v2\x19.eg.repository.RepositoryR\x05items\"I\n" +
 	"\fFindResponse\x129\n" +
 	"\n" +
-	"repository\x18\x01 \x01(\v2\x19.ci.repository.RepositoryR\n" +
+	"repository\x18\x01 \x01(\v2\x19.eg.repository.RepositoryR\n" +
 	"repository\"~\n" +
 	"\bWorkload\x12\x12\n" +
 	"\x04path\x18\x01 \x01(\tR\x04path\x12\x1e\n" +
@@ -1451,31 +1451,31 @@ const file_ci_repository_proto_rawDesc = "" +
 	"\x06offset\x18e \x01(\x04R\x06offset\x12\x14\n" +
 	"\x05limit\x18f \x01(\x04R\x05limitJ\x04\b\x03\x10e\"\x81\x01\n" +
 	"\x16WorkloadSearchResponse\x128\n" +
-	"\x04next\x18\x01 \x01(\v2$.ci.repository.WorkloadSearchRequestR\x04next\x12-\n" +
-	"\x05items\x18\x02 \x03(\v2\x17.ci.repository.WorkloadR\x05items\"J\n" +
+	"\x04next\x18\x01 \x01(\v2$.eg.repository.WorkloadSearchRequestR\x04next\x12-\n" +
+	"\x05items\x18\x02 \x03(\v2\x17.eg.repository.WorkloadR\x05items\"J\n" +
 	"\rCreateRequest\x129\n" +
 	"\n" +
-	"repository\x18\x01 \x01(\v2\x19.ci.repository.RepositoryR\n" +
+	"repository\x18\x01 \x01(\v2\x19.eg.repository.RepositoryR\n" +
 	"repository\"K\n" +
 	"\x0eCreateResponse\x129\n" +
 	"\n" +
-	"repository\x18\x01 \x01(\v2\x19.ci.repository.RepositoryR\n" +
+	"repository\x18\x01 \x01(\v2\x19.eg.repository.RepositoryR\n" +
 	"repository\"J\n" +
 	"\rUpdateRequest\x129\n" +
 	"\n" +
-	"repository\x18\x01 \x01(\v2\x19.ci.repository.RepositoryR\n" +
+	"repository\x18\x01 \x01(\v2\x19.eg.repository.RepositoryR\n" +
 	"repository\"K\n" +
 	"\x0eUpdateResponse\x129\n" +
 	"\n" +
-	"repository\x18\x01 \x01(\v2\x19.ci.repository.RepositoryR\n" +
+	"repository\x18\x01 \x01(\v2\x19.eg.repository.RepositoryR\n" +
 	"repository\"K\n" +
 	"\x0eDestroyRequest\x129\n" +
 	"\n" +
-	"repository\x18\x01 \x01(\v2\x19.ci.repository.RepositoryR\n" +
+	"repository\x18\x01 \x01(\v2\x19.eg.repository.RepositoryR\n" +
 	"repository\"L\n" +
 	"\x0fDestroyResponse\x129\n" +
 	"\n" +
-	"repository\x18\x01 \x01(\v2\x19.ci.repository.RepositoryR\n" +
+	"repository\x18\x01 \x01(\v2\x19.eg.repository.RepositoryR\n" +
 	"repository\"\xf5\x01\n" +
 	"\rSSHCredential\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1e\n" +
@@ -1494,100 +1494,100 @@ const file_ci_repository_proto_rawDesc = "" +
 	"\aprivate\x18\b \x01(\tR\aprivate\"d\n" +
 	"\x10SSHGenKeyRequest\x12<\n" +
 	"\n" +
-	"credential\x18\x01 \x01(\v2\x1c.ci.repository.SSHCredentialR\n" +
+	"credential\x18\x01 \x01(\v2\x1c.eg.repository.SSHCredentialR\n" +
 	"credential\x12\x12\n" +
 	"\x04seed\x18\x02 \x01(\fR\x04seed\"Q\n" +
 	"\x11SSHGenKeyResponse\x12<\n" +
 	"\n" +
-	"credential\x18\x01 \x01(\v2\x1c.ci.repository.SSHCredentialR\n" +
+	"credential\x18\x01 \x01(\v2\x1c.eg.repository.SSHCredentialR\n" +
 	"credential\"V\n" +
 	"\x10SSHSearchRequest\x12\x14\n" +
 	"\x05query\x18\x01 \x01(\tR\x05query\x12\x16\n" +
 	"\x06offset\x18\x02 \x01(\x04R\x06offset\x12\x14\n" +
 	"\x05limit\x18\x03 \x01(\x04R\x05limit\"y\n" +
 	"\x11SSHSearchResponse\x120\n" +
-	"\x04next\x18\x01 \x01(\v2\x1c.ci.repository.SearchRequestR\x04next\x122\n" +
-	"\x05items\x18\x02 \x03(\v2\x1c.ci.repository.SSHCredentialR\x05items\"P\n" +
+	"\x04next\x18\x01 \x01(\v2\x1c.eg.repository.SearchRequestR\x04next\x122\n" +
+	"\x05items\x18\x02 \x03(\v2\x1c.eg.repository.SSHCredentialR\x05items\"P\n" +
 	"\x10SSHCreateRequest\x12<\n" +
 	"\n" +
-	"credential\x18\x01 \x01(\v2\x1c.ci.repository.SSHCredentialR\n" +
+	"credential\x18\x01 \x01(\v2\x1c.eg.repository.SSHCredentialR\n" +
 	"credential\"Q\n" +
 	"\x11SSHCreateResponse\x12<\n" +
 	"\n" +
-	"credential\x18\x01 \x01(\v2\x1c.ci.repository.SSHCredentialR\n" +
+	"credential\x18\x01 \x01(\v2\x1c.eg.repository.SSHCredentialR\n" +
 	"credential\"2\n" +
 	"\x0eSSHFindRequest\x12 \n" +
 	"\vfingerprint\x18\x01 \x01(\tR\vfingerprint\"O\n" +
 	"\x0fSSHFindResponse\x12<\n" +
 	"\n" +
-	"credential\x18\x01 \x01(\v2\x1c.ci.repository.SSHCredentialR\n" +
+	"credential\x18\x01 \x01(\v2\x1c.eg.repository.SSHCredentialR\n" +
 	"credential\"5\n" +
 	"\x11SSHDestroyRequest\x12 \n" +
 	"\vfingerprint\x18\x01 \x01(\tR\vfingerprint\"R\n" +
 	"\x12SSHDestroyResponse\x12<\n" +
 	"\n" +
-	"credential\x18\x01 \x01(\v2\x1c.ci.repository.SSHCredentialR\n" +
+	"credential\x18\x01 \x01(\v2\x1c.eg.repository.SSHCredentialR\n" +
 	"credentialb\x06proto3"
 
 var (
-	file_ci_repository_proto_rawDescOnce sync.Once
-	file_ci_repository_proto_rawDescData []byte
+	file_eg_repository_proto_rawDescOnce sync.Once
+	file_eg_repository_proto_rawDescData []byte
 )
 
-func file_ci_repository_proto_rawDescGZIP() []byte {
-	file_ci_repository_proto_rawDescOnce.Do(func() {
-		file_ci_repository_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_ci_repository_proto_rawDesc), len(file_ci_repository_proto_rawDesc)))
+func file_eg_repository_proto_rawDescGZIP() []byte {
+	file_eg_repository_proto_rawDescOnce.Do(func() {
+		file_eg_repository_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_eg_repository_proto_rawDesc), len(file_eg_repository_proto_rawDesc)))
 	})
-	return file_ci_repository_proto_rawDescData
+	return file_eg_repository_proto_rawDescData
 }
 
-var file_ci_repository_proto_msgTypes = make([]protoimpl.MessageInfo, 24)
-var file_ci_repository_proto_goTypes = []any{
-	(*Repository)(nil),             // 0: ci.repository.Repository
-	(*SearchRequest)(nil),          // 1: ci.repository.SearchRequest
-	(*SearchResponse)(nil),         // 2: ci.repository.SearchResponse
-	(*FindResponse)(nil),           // 3: ci.repository.FindResponse
-	(*Workload)(nil),               // 4: ci.repository.Workload
-	(*WorkloadSearchRequest)(nil),  // 5: ci.repository.WorkloadSearchRequest
-	(*WorkloadSearchResponse)(nil), // 6: ci.repository.WorkloadSearchResponse
-	(*CreateRequest)(nil),          // 7: ci.repository.CreateRequest
-	(*CreateResponse)(nil),         // 8: ci.repository.CreateResponse
-	(*UpdateRequest)(nil),          // 9: ci.repository.UpdateRequest
-	(*UpdateResponse)(nil),         // 10: ci.repository.UpdateResponse
-	(*DestroyRequest)(nil),         // 11: ci.repository.DestroyRequest
-	(*DestroyResponse)(nil),        // 12: ci.repository.DestroyResponse
-	(*SSHCredential)(nil),          // 13: ci.repository.SSHCredential
-	(*SSHGenKeyRequest)(nil),       // 14: ci.repository.SSHGenKeyRequest
-	(*SSHGenKeyResponse)(nil),      // 15: ci.repository.SSHGenKeyResponse
-	(*SSHSearchRequest)(nil),       // 16: ci.repository.SSHSearchRequest
-	(*SSHSearchResponse)(nil),      // 17: ci.repository.SSHSearchResponse
-	(*SSHCreateRequest)(nil),       // 18: ci.repository.SSHCreateRequest
-	(*SSHCreateResponse)(nil),      // 19: ci.repository.SSHCreateResponse
-	(*SSHFindRequest)(nil),         // 20: ci.repository.SSHFindRequest
-	(*SSHFindResponse)(nil),        // 21: ci.repository.SSHFindResponse
-	(*SSHDestroyRequest)(nil),      // 22: ci.repository.SSHDestroyRequest
-	(*SSHDestroyResponse)(nil),     // 23: ci.repository.SSHDestroyResponse
+var file_eg_repository_proto_msgTypes = make([]protoimpl.MessageInfo, 24)
+var file_eg_repository_proto_goTypes = []any{
+	(*Repository)(nil),             // 0: eg.repository.Repository
+	(*SearchRequest)(nil),          // 1: eg.repository.SearchRequest
+	(*SearchResponse)(nil),         // 2: eg.repository.SearchResponse
+	(*FindResponse)(nil),           // 3: eg.repository.FindResponse
+	(*Workload)(nil),               // 4: eg.repository.Workload
+	(*WorkloadSearchRequest)(nil),  // 5: eg.repository.WorkloadSearchRequest
+	(*WorkloadSearchResponse)(nil), // 6: eg.repository.WorkloadSearchResponse
+	(*CreateRequest)(nil),          // 7: eg.repository.CreateRequest
+	(*CreateResponse)(nil),         // 8: eg.repository.CreateResponse
+	(*UpdateRequest)(nil),          // 9: eg.repository.UpdateRequest
+	(*UpdateResponse)(nil),         // 10: eg.repository.UpdateResponse
+	(*DestroyRequest)(nil),         // 11: eg.repository.DestroyRequest
+	(*DestroyResponse)(nil),        // 12: eg.repository.DestroyResponse
+	(*SSHCredential)(nil),          // 13: eg.repository.SSHCredential
+	(*SSHGenKeyRequest)(nil),       // 14: eg.repository.SSHGenKeyRequest
+	(*SSHGenKeyResponse)(nil),      // 15: eg.repository.SSHGenKeyResponse
+	(*SSHSearchRequest)(nil),       // 16: eg.repository.SSHSearchRequest
+	(*SSHSearchResponse)(nil),      // 17: eg.repository.SSHSearchResponse
+	(*SSHCreateRequest)(nil),       // 18: eg.repository.SSHCreateRequest
+	(*SSHCreateResponse)(nil),      // 19: eg.repository.SSHCreateResponse
+	(*SSHFindRequest)(nil),         // 20: eg.repository.SSHFindRequest
+	(*SSHFindResponse)(nil),        // 21: eg.repository.SSHFindResponse
+	(*SSHDestroyRequest)(nil),      // 22: eg.repository.SSHDestroyRequest
+	(*SSHDestroyResponse)(nil),     // 23: eg.repository.SSHDestroyResponse
 }
-var file_ci_repository_proto_depIdxs = []int32{
-	1,  // 0: ci.repository.SearchResponse.next:type_name -> ci.repository.SearchRequest
-	0,  // 1: ci.repository.SearchResponse.items:type_name -> ci.repository.Repository
-	0,  // 2: ci.repository.FindResponse.repository:type_name -> ci.repository.Repository
-	5,  // 3: ci.repository.WorkloadSearchResponse.next:type_name -> ci.repository.WorkloadSearchRequest
-	4,  // 4: ci.repository.WorkloadSearchResponse.items:type_name -> ci.repository.Workload
-	0,  // 5: ci.repository.CreateRequest.repository:type_name -> ci.repository.Repository
-	0,  // 6: ci.repository.CreateResponse.repository:type_name -> ci.repository.Repository
-	0,  // 7: ci.repository.UpdateRequest.repository:type_name -> ci.repository.Repository
-	0,  // 8: ci.repository.UpdateResponse.repository:type_name -> ci.repository.Repository
-	0,  // 9: ci.repository.DestroyRequest.repository:type_name -> ci.repository.Repository
-	0,  // 10: ci.repository.DestroyResponse.repository:type_name -> ci.repository.Repository
-	13, // 11: ci.repository.SSHGenKeyRequest.credential:type_name -> ci.repository.SSHCredential
-	13, // 12: ci.repository.SSHGenKeyResponse.credential:type_name -> ci.repository.SSHCredential
-	1,  // 13: ci.repository.SSHSearchResponse.next:type_name -> ci.repository.SearchRequest
-	13, // 14: ci.repository.SSHSearchResponse.items:type_name -> ci.repository.SSHCredential
-	13, // 15: ci.repository.SSHCreateRequest.credential:type_name -> ci.repository.SSHCredential
-	13, // 16: ci.repository.SSHCreateResponse.credential:type_name -> ci.repository.SSHCredential
-	13, // 17: ci.repository.SSHFindResponse.credential:type_name -> ci.repository.SSHCredential
-	13, // 18: ci.repository.SSHDestroyResponse.credential:type_name -> ci.repository.SSHCredential
+var file_eg_repository_proto_depIdxs = []int32{
+	1,  // 0: eg.repository.SearchResponse.next:type_name -> eg.repository.SearchRequest
+	0,  // 1: eg.repository.SearchResponse.items:type_name -> eg.repository.Repository
+	0,  // 2: eg.repository.FindResponse.repository:type_name -> eg.repository.Repository
+	5,  // 3: eg.repository.WorkloadSearchResponse.next:type_name -> eg.repository.WorkloadSearchRequest
+	4,  // 4: eg.repository.WorkloadSearchResponse.items:type_name -> eg.repository.Workload
+	0,  // 5: eg.repository.CreateRequest.repository:type_name -> eg.repository.Repository
+	0,  // 6: eg.repository.CreateResponse.repository:type_name -> eg.repository.Repository
+	0,  // 7: eg.repository.UpdateRequest.repository:type_name -> eg.repository.Repository
+	0,  // 8: eg.repository.UpdateResponse.repository:type_name -> eg.repository.Repository
+	0,  // 9: eg.repository.DestroyRequest.repository:type_name -> eg.repository.Repository
+	0,  // 10: eg.repository.DestroyResponse.repository:type_name -> eg.repository.Repository
+	13, // 11: eg.repository.SSHGenKeyRequest.credential:type_name -> eg.repository.SSHCredential
+	13, // 12: eg.repository.SSHGenKeyResponse.credential:type_name -> eg.repository.SSHCredential
+	1,  // 13: eg.repository.SSHSearchResponse.next:type_name -> eg.repository.SearchRequest
+	13, // 14: eg.repository.SSHSearchResponse.items:type_name -> eg.repository.SSHCredential
+	13, // 15: eg.repository.SSHCreateRequest.credential:type_name -> eg.repository.SSHCredential
+	13, // 16: eg.repository.SSHCreateResponse.credential:type_name -> eg.repository.SSHCredential
+	13, // 17: eg.repository.SSHFindResponse.credential:type_name -> eg.repository.SSHCredential
+	13, // 18: eg.repository.SSHDestroyResponse.credential:type_name -> eg.repository.SSHCredential
 	19, // [19:19] is the sub-list for method output_type
 	19, // [19:19] is the sub-list for method input_type
 	19, // [19:19] is the sub-list for extension type_name
@@ -1595,26 +1595,26 @@ var file_ci_repository_proto_depIdxs = []int32{
 	0,  // [0:19] is the sub-list for field type_name
 }
 
-func init() { file_ci_repository_proto_init() }
-func file_ci_repository_proto_init() {
-	if File_ci_repository_proto != nil {
+func init() { file_eg_repository_proto_init() }
+func file_eg_repository_proto_init() {
+	if File_eg_repository_proto != nil {
 		return
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
-			RawDescriptor: unsafe.Slice(unsafe.StringData(file_ci_repository_proto_rawDesc), len(file_ci_repository_proto_rawDesc)),
+			RawDescriptor: unsafe.Slice(unsafe.StringData(file_eg_repository_proto_rawDesc), len(file_eg_repository_proto_rawDesc)),
 			NumEnums:      0,
 			NumMessages:   24,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
-		GoTypes:           file_ci_repository_proto_goTypes,
-		DependencyIndexes: file_ci_repository_proto_depIdxs,
-		MessageInfos:      file_ci_repository_proto_msgTypes,
+		GoTypes:           file_eg_repository_proto_goTypes,
+		DependencyIndexes: file_eg_repository_proto_depIdxs,
+		MessageInfos:      file_eg_repository_proto_msgTypes,
 	}.Build()
-	File_ci_repository_proto = out.File
-	file_ci_repository_proto_goTypes = nil
-	file_ci_repository_proto_depIdxs = nil
+	File_eg_repository_proto = out.File
+	file_eg_repository_proto_goTypes = nil
+	file_eg_repository_proto_depIdxs = nil
 }

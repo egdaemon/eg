@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package ci.repository;
+package eg.repository;
 
 message Repository {
   string id = 1 [ json_name = "id" ];

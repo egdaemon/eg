@@ -449,7 +449,6 @@ type Message struct {
 	Id string `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`  // uuid v7
 	Ts int64  `protobuf:"varint,2,opt,name=ts,proto3" json:"ts,omitempty"` // unix timestamp.
 	// Types that are assignable to Event:
-	//
 	//	*Message_Preamble
 	//	*Message_Heartbeat
 	//	*Message_Op
@@ -588,7 +587,6 @@ type RunUploadChunk struct {
 	Data     []byte `protobuf:"bytes,1,opt,name=data,proto3" json:"data,omitempty"`
 	Checksum []byte `protobuf:"bytes,2,opt,name=checksum,proto3" json:"checksum,omitempty"`
 	// Types that are assignable to InitialChunkMetadata:
-	//
 	//	*RunUploadChunk_None
 	//	*RunUploadChunk_Metadata_
 	InitialChunkMetadata isRunUploadChunk_InitialChunkMetadata `protobuf_oneof:"initialChunkMetadata"`

@@ -286,7 +286,6 @@ type GitAccessCredentials struct {
 	unknownFields protoimpl.UnknownFields
 
 	// Types that are assignable to Credentials:
-	//
 	//	*GitAccessCredentials_Automatic
 	//	*GitAccessCredentials_GitHttp
 	//	*GitAccessCredentials_Ssh

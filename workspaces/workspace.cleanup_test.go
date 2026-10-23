@@ -134,8 +134,8 @@ func TestCleanup(t *testing.T) {
 		ws := workspaces.Context{CacheDir: cacheDir}
 		// recent file within scan range - this is what Cleanup sees
 		touch(t, filepath.Join(cacheDir, "candidate", "recent.txt"), 1*time.Hour)
-		// old file inside a directory at depth 8 from root; that dir gets SkipDir'd so old.txt is never visited
-		touch(t, filepath.Join(cacheDir, "candidate", "1", "2", "3", "4", "5", "6", "7", "old.txt"), 31*24*time.Hour)
+		// Levels(8) scans 8 levels inside the candidate. old file inside the directory 8 levels inside (depth 9 from root); that dir gets SkipDir'd so old.txt is never visited
+		touch(t, filepath.Join(cacheDir, "candidate", "1", "2", "3", "4", "5", "6", "7", "8", "old.txt"), 31*24*time.Hour)
 
 		ws.Cleanup(ctx)
 

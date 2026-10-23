@@ -3,7 +3,6 @@ package compute
 import (
 	"context"
 	"embed"
-	"os"
 	"path/filepath"
 
 	"github.com/egdaemon/eg/cmd/cmdopts"
@@ -36,9 +35,7 @@ func NewBuiltinPredictor(ctx context.Context) complete.Predictor {
 			return err
 		}
 
-		for path := range fsx.KeepNewestN(3, fsx.Find(root, fsx.Levels(1))).Each(ctx) {
-			errorsx.Log(errorsx.Wrapf(os.RemoveAll(path), "builtin cache cleanup: %s", path))
-		}
+		errorsx.Log(errorsx.Wrap(fsx.Prune(ctx, fsx.KeepNewestN(3, fsx.Find(root, fsx.Levels(1)))), "builtin cache cleanup"))
 
 		if err := fsx.DirExists(dir); err == nil {
 			return nil

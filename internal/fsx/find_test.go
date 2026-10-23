@@ -97,6 +97,24 @@ func TestFind(t *testing.T) {
 		require.Empty(t, collected(t, ctx, fsx.Find(root, fsx.MaxAge(1*time.Hour), fsx.Levels(1))))
 	})
 
+	t.Run("levels_one_scans_the_direct_children_of_each_subdir", func(t *testing.T) {
+		ctx, done := testx.Context(t)
+		defer done()
+
+		root := t.TempDir()
+		touch(t, filepath.Join(root, "a", ".keep"), 2*time.Hour)
+		touch(t, filepath.Join(root, "b", ".keep"), 30*time.Minute)
+
+		require.Equal(t, []string{
+			filepath.Join(root, "a"),
+			filepath.Join(root, "b"),
+		}, collected(t, ctx, fsx.Find(root, fsx.Levels(1))))
+
+		require.Equal(t, []string{
+			filepath.Join(root, "a"),
+		}, collected(t, ctx, fsx.Find(root, fsx.MaxAge(1*time.Hour), fsx.Levels(1))))
+	})
+
 	t.Run("empty_root_returns_nothing", func(t *testing.T) {
 		ctx, done := testx.Context(t)
 		defer done()
@@ -117,5 +135,24 @@ func TestFind(t *testing.T) {
 		cancel()
 
 		require.Empty(t, collected(t, cancelCtx, fsx.Find(root)))
+	})
+
+	t.Run("consumer_break_stops_iteration", func(t *testing.T) {
+		ctx, done := testx.Context(t)
+		defer done()
+
+		root := t.TempDir()
+		touch(t, filepath.Join(root, "a", ".keep"), 3*time.Hour)
+		touch(t, filepath.Join(root, "b", ".keep"), 2*time.Hour)
+		touch(t, filepath.Join(root, "c", ".keep"), 1*time.Hour)
+
+		var seen int
+		require.NotPanics(t, func() {
+			for range fsx.Find(root).Each(ctx) {
+				seen++
+				break
+			}
+		})
+		require.Equal(t, 1, seen)
 	})
 }

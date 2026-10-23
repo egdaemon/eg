@@ -1,24 +1,25 @@
 package eggcp
 
 import (
-	"context"
-
 	"github.com/egdaemon/eg/runtime/wasi/eg"
-	"github.com/egdaemon/eg/runtime/wasi/egenv"
 	"github.com/egdaemon/eg/runtime/wasi/shell"
 )
 
-// temporary hack until remap directory functionality is working.
-func CredentialsHack(ctx context.Context, o eg.Op) error {
-	// encoded := envx.String("", _eg.EnvUnsafeGcloudADCB64)
-	// if encoded == "" {
-	// 	return nil
-	// }
-
-	return shell.Run(
-		ctx,
-		// shell.Newf("echo %s | tr -- '-_' '+/' | base64 -d -i | install -D -m 600 /dev/stdin ~/.config/gcloud/application_default_credentials.json", encoded),
-		// shell.Newf("echo %s | tr -- '-_' '+/' | base64 -d -i | install -D -m 600 /dev/stdin %s", encoded, egenv.WorkloadDirectory("gcloud", "application_default_credentials.json")),
-		shell.Newf("which gcloud && gcloud config set auth/credential_file_override %s", egenv.WorkloadDirectory("gcloud", "application_default_credentials.json")),
+// Credentials points gcloud at the application default credentials in the file adc. gcloud commands (storage, compute, ...)
+// only use credentials of their own account and ignore the application default credentials, which the google client
+// libraries use, unless auth/credential_file_override is set. the runner does this for the credentials it provides to
+// the workload, use this for credentials installed anywhere else.
+func Credentials(adc string) eg.OpFn {
+	return shell.Op(
+		shell.Newf("gcloud config set auth/credential_file_override %s", adc),
+		// TODO remove pass_credentials_to_gsutil once its set in gcloud directory by default.
+		shell.New("gcloud config set core/pass_credentials_to_gsutil true"),
 	)
+}
+
+// Debug returns a command that prints how gcloud is configured for the user the command runs as: the user, home directory,
+// the contents of ~/.config/gcloud, the google and gcloud environment, the credentialed accounts and every gcloud property. it never aborts the workload.
+// c provides the environment and user the command runs with, e.g. shell.Run(ctx, eggcp.Debug(console)).
+func Debug(c shell.Command) shell.Command {
+	return c.New(`id; echo HOME=${HOME}; tree -a -p -u -s ${HOME}/.config/gcloud; env | grep -E '^(CLOUDSDK|GOOGLE)'; gcloud auth list; gcloud config list --all`).Debug().Lenient(true)
 }

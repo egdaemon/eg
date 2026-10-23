@@ -1,0 +1,2 @@
+[core]
+pass_credentials_to_gsutil = true

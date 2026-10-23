@@ -17,7 +17,7 @@ import (
 )
 
 func newgcpclient(ctx context.Context) (*secretmanager.Client, error) {
-	gcpcreds := option.WithCredentialsJSON(envx.Base64([]byte("{}"), eg.EnvUnsafeGcloudADCB64))
+	gcpcreds := option.WithCredentialsJSON(envx.Base64URL([]byte("{}"), eg.EnvUnsafeGcloudADCB64))
 	tlscreds := option.WithGRPCDialOption(
 		grpc.WithTransportCredentials(
 			credentials.NewTLS(&tls.Config{

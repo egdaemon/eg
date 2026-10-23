@@ -133,7 +133,7 @@ func String(fallback string, keys ...string) string {
 	return envx.String(fallback, keys...)
 }
 
-// Base64 read value as a standard base64 encoded string
+// Base64 read value as a base64 encoded string, the standard alphabet is attempted first and then the url alphabet.
 func Base64(fallback []byte, keys ...string) []byte {
 	return envx.Base64(fallback, keys...)
 }

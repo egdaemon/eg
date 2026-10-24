@@ -3,6 +3,7 @@ package runners
 import (
 	"context"
 	"crypto/md5"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -122,6 +123,7 @@ type metadata struct {
 	reload       chan error
 	downloader
 	completion
+	history    *historyrecorder
 	authclient *http.Client
 	failure    func(cause error)
 	dirs       *SpoolDirs
@@ -142,6 +144,14 @@ func QueueOptionAgentOptions(options ...AgentOption) QueueOption {
 func QueueOptionCompletion(c completion) QueueOption {
 	return func(m *metadata) {
 		m.completion = c
+	}
+}
+
+// QueueOptionHistory records the outcome and logs of every completed workload into db, with the
+// logs kept within the directory logs.
+func QueueOptionHistory(db *sql.DB, logs string) QueueOption {
+	return func(m *metadata) {
+		m.history = &historyrecorder{db: db, logs: logs}
 	}
 }
 
@@ -836,6 +846,8 @@ func (t statecompleted) Update(ctx context.Context) state {
 	ctx, done := context.WithTimeout(ctx, 5*time.Minute)
 	defer done()
 
+	t.record(ctx, logpath)
+
 	if err = t.metadata.completion.Upload(ctx, t.workload.Id, t.duration, t.cause, logs, analytics); httpx.IsStatusError(err, http.StatusNotFound) != nil {
 		// means we already uploaded the results.
 		return discard(t.workload, t.metadata, t.bucket, idle(t.metadata))
@@ -848,6 +860,15 @@ func (t statecompleted) Update(ctx context.Context) state {
 	}
 
 	return discard(t.workload, t.metadata, t.bucket, idle(t.metadata))
+}
+
+// record keeps the outcome locally before it is uploaded, a failure to record must not fail the completion.
+func (t statecompleted) record(ctx context.Context, logpath string) {
+	if t.metadata.history == nil {
+		return
+	}
+
+	errorsx.Log(errorsx.Wrap(t.metadata.history.record(ctx, t.workload, t.cause, t.duration, logpath), "unable to record history"))
 }
 
 func discard(workload *Enqueued, md metadata, bucket string, next state) statediscard {

@@ -1,0 +1,116 @@
+syntax = "proto3";
+
+package eg.duckproxy;
+
+import "google/protobuf/timestamp.proto";
+
+// Param mirrors database/sql/driver.NamedValue.
+message Param {
+  int32 ordinal = 1;
+  string name = 2;
+  Value value = 3;
+}
+
+// Value describes a single DuckDB-native value crossing the wire. Unlike a
+// Postgres OID table, this only needs to describe DuckDB's own types --
+// both ends of this protocol are DuckDB.
+message Value {
+  oneof kind {
+    bool is_null = 1;
+    bool bool_value = 2;
+    int64 int_value = 3;
+    double double_value = 4;
+    string string_value = 5;
+    bytes bytes_value = 6;
+    google.protobuf.Timestamp timestamp_value = 7;
+    Interval interval_value = 8;
+    string decimal_value = 9; // duckdb.Decimal.String()
+    string bignum_value = 10; // *big.Int (HUGEINT/UHUGEINT) base-10 string
+    ListValue list_value = 11;
+    StructValue struct_value = 12;
+  }
+}
+
+message Interval {
+  int32 months = 1;
+  int32 days = 2;
+  int64 micros = 3;
+}
+
+message ListValue { repeated Value values = 1; }
+
+message StructValue { map<string, Value> fields = 1; }
+
+message ExecRequest {
+  string sql = 1;
+  repeated Param args = 2;
+}
+
+message QueryRequest {
+  string sql = 1;
+  repeated Param args = 2;
+}
+
+message BeginRequest {}
+message CommitRequest {}
+message RollbackRequest {}
+
+// DescribeRequest prepares sql without executing it, purely to learn
+// parameter/result type info ahead of time -- needed by Postgres-wire
+// frontends (duckpgwire) for ParameterDescription/RowDescription, which
+// neither end of this protocol otherwise needs.
+message DescribeRequest { string sql = 1; }
+
+// TypeMetadata pairs a DuckDB type with whatever identifies its slot, so
+// callers don't have to index two parallel arrays together. Name is empty
+// for parameters, which are positional ($1, $2, ...), not named.
+message TypeMetadata {
+  string name = 1;
+  uint32 type = 2; // duckdb.Type enum value
+}
+
+message DescribeResponse {
+  bool tuples = 1; // whether this statement returns rows
+  repeated TypeMetadata params = 2;
+  repeated TypeMetadata columns = 3;
+  uint32 statement_type = 4; // duckdb.StmtType enum value (distinct enum from TypeMetadata.type)
+}
+
+message ExecResponse { int64 rows_affected = 1; }
+
+message ColumnsResponse { repeated string names = 1; }
+
+message RowResponse { repeated Value values = 1; }
+
+message DoneResponse {}
+message OkResponse {}
+
+message ErrorResponse { string message = 1; }
+
+// ClientFrame is one request, sent client -> server.
+message ClientFrame {
+  oneof body {
+    ExecRequest exec = 1;
+    QueryRequest query = 2;
+    BeginRequest begin = 3;
+    CommitRequest commit = 4;
+    RollbackRequest rollback = 5;
+    DescribeRequest describe = 6;
+  }
+}
+
+// ServerFrame is one response, sent server -> client. Query responses are
+// one ColumnsResponse followed by zero or more RowResponse frames and a
+// terminal DoneResponse; an ErrorResponse may replace any terminal frame,
+// including after RowResponse frames have already been streamed.
+message ServerFrame {
+  oneof body {
+    ExecResponse result = 1;
+    ColumnsResponse columns = 2;
+    RowResponse row = 3;
+    DoneResponse done = 4;
+    OkResponse ok = 5;
+    ErrorResponse error = 6;
+    DescribeResponse describe = 7;
+  }
+}

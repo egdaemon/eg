@@ -2,6 +2,7 @@ package compute
 
 import (
 	"database/sql"
+	"time"
 
 	"github.com/egdaemon/eg/cmd/cmdopts"
 	"github.com/egdaemon/eg/internal/errorsx"
@@ -9,12 +10,13 @@ import (
 )
 
 type lanRemove struct {
-	lanDatabase `embed:""`
-	PeerIDs     []string `arg:"" name:"peer-id" help:"ids of the systems to forget"`
+	Database string        `name:"database" help:"path of the database to operate on, defaults to the client's (the systems it can reach). the daemon's (who has reached it) is daemon.db within its cache directory"`
+	PeerTTL  time.Duration `name:"lan-peer-ttl" type:"durationinf" help:"how long systems are remembered after they were last seen" default:"720h" env:"EG_LAN_PEER_TTL"`
+	PeerIDs  []string      `arg:"" name:"peer-id" help:"ids of the systems to forget"`
 }
 
 func (t lanRemove) Run(gctx *cmdopts.Global) (err error) {
-	db, err := t.open(gctx)
+	db, err := openlan(gctx.Context, t.Database, t.PeerTTL)
 	if err != nil {
 		return err
 	}

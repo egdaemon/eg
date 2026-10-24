@@ -21,7 +21,7 @@ type lanScan struct {
 }
 
 func (t lanScan) Run(kctx *kong.Context, gctx *cmdopts.Global, find libp2px.MDNSLookup) (err error) {
-	db, err := lan.Open(gctx.Context, filepath.Join(t.CacheDir, migrations.CLI), t.PeerTTL)
+	db, err := openlan(gctx.Context, filepath.Join(t.CacheDir, migrations.CLI), t.PeerTTL)
 	if err != nil {
 		return err
 	}

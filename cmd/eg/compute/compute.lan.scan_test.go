@@ -105,7 +105,7 @@ func TestLanScan(t *testing.T) {
 		require.NoError(t, cmdtestx.Execute(t, genparser(t), "command", "--cache-directory", dir, "--scan-timeout", "10s", "--lan-peer-ttl", "48h"))
 		require.Contains(t, out.String(), found.String())
 
-		db := testx.MustT(lan.Open(t.Context(), filepath.Join(dir, migrations.CLI), lan.DefaultTTL))(t)
+		db := testx.MustT(migrations.Open(t.Context(), filepath.Join(dir, migrations.CLI)))(t)
 		defer db.Close()
 		require.NoError(t, lan.PeerFindByID(t.Context(), db, found.String()).Scan(&lan.Peer{}), "remembered in the given directory")
 	})

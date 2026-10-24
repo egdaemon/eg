@@ -44,7 +44,7 @@ func TestLanList(t *testing.T) {
 		sqltestx.Exec(t, db, `UPDATE lan_peers SET last_seen = now() - INTERVAL '40 days' WHERE peer_id = 'alpha'`)
 
 		var out bytes.Buffer
-		require.NoError(t, lanList{lanDatabase: lanDatabase{PeerTTL: lan.DefaultTTL}}.list(gctx, db, nil, &out))
+		require.NoError(t, lanList{PeerTTL: lan.DefaultTTL}.list(gctx, db, nil, &out))
 
 		got := out.String()
 		require.Contains(t, got, "ID")
@@ -78,7 +78,7 @@ func TestLanList(t *testing.T) {
 
 		var out bytes.Buffer
 		cmd := lanList{
-			lanDatabase: lanDatabase{PeerTTL: lan.DefaultTTL},
+			PeerTTL:     lan.DefaultTTL,
 			Scan:        true,
 			ScanTimeout: time.Second,
 		}
@@ -103,8 +103,8 @@ func TestLanList(t *testing.T) {
 		require.NoError(t, migrations.Migrate(t.Context(), db))
 
 		cmd := lanList{
-			lanDatabase: lanDatabase{PeerTTL: lan.DefaultTTL},
-			Scan:        true,
+			PeerTTL: lan.DefaultTTL,
+			Scan:    true,
 		}
 		require.ErrorContains(t, cmd.list(gctx, db, func(ctx context.Context, timeout time.Duration) iterx.Seq[peer.AddrInfo] {
 			return iterx.Error[peer.AddrInfo](errors.New("no multicast"))
@@ -114,7 +114,7 @@ func TestLanList(t *testing.T) {
 	t.Run("runs against the given directory and writes to the context's stdout", func(t *testing.T) {
 		dir := t.TempDir()
 
-		db := testx.MustT(lan.Open(t.Context(), filepath.Join(dir, migrations.CLI), lan.DefaultTTL))(t)
+		db := testx.MustT(migrations.Open(t.Context(), filepath.Join(dir, migrations.CLI)))(t)
 		require.NoError(t, lan.PeerUpsert(t.Context(), db, langx.Clone(lan.Peer{}, lan.PeerOptionTestDefaults, lan.PeerOptionID("remembered"))).Scan(&lan.Peer{}))
 		require.NoError(t, db.Close())
 
@@ -133,7 +133,7 @@ func TestLanList(t *testing.T) {
 			})),
 		)
 
-		require.NoError(t, cmdtestx.Execute(t, genparser(t), "command", "--cache-directory", dir, "--scan", "--scan-timeout", "10s", "--lan-peer-ttl", "48h"))
+		require.NoError(t, cmdtestx.Execute(t, genparser(t), "command", "--database", filepath.Join(dir, migrations.CLI), "--scan", "--scan-timeout", "10s", "--lan-peer-ttl", "48h"))
 		require.Contains(t, out.String(), "remembered")
 		require.Contains(t, out.String(), found.String(), "what the scan found is listed")
 	})

@@ -107,7 +107,16 @@ func (t daemon) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, keygen cmdopt
 		return errorsx.Wrap(err, "unable to retrieve identity credentials")
 	}
 
-	lanpeers := daemons.NewLANGate(filepath.Join(t.CacheDir, migrations.Runner), t.LANPeerTTL)
+	// the daemon's database is opened once and shared, other processes reach it through the proxy.
+	db, err := migrations.Open(gctx.Context, filepath.Join(t.CacheDir, migrations.Daemon))
+	if err != nil {
+		return errorsx.Wrap(err, "unable to open the daemon database")
+	}
+	defer db.Close()
+
+	daemons.DatabaseProxy(gctx, db)
+
+	lanpeers := daemons.NewLANGate(db, t.LANPeerTTL)
 	if p2p, err = daemons.P2PProxyGated(gctx.Context, append([]byte(machineID()), signer.PublicKey().Marshal()...), httpl, lanpeers); err != nil {
 		return errorsx.Wrap(err, "unable to initialize p2p")
 	}
@@ -130,7 +139,7 @@ func (t daemon) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, keygen cmdopt
 	c := httpx.BindRetryTransport(tlsc.DefaultClient(), http.StatusTooManyRequests, http.StatusBadGateway)
 	authclient = authn.New(gctx.Context, c, signer, t.AccountID, compute.NewAuthzTokenSource)
 
-	if err = daemons.HTTP(gctx, httpl, rm, compiledirs, runners.NewDirectClient(authclient), t.Uploadable); err != nil {
+	if err = daemons.HTTP(gctx, httpl, rm, compiledirs, runners.NewDirectClient(authclient), db, t.Uploadable); err != nil {
 		return err
 	}
 	defer httpl.Close()
@@ -188,6 +197,7 @@ func (t daemon) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, keygen cmdopt
 		runners.QueueOptionCompletion(
 			runners.NewCompletionClient(authclient),
 		),
+		runners.QueueOptionHistory(db, userx.DefaultCacheDirectory("history")),
 		runners.QueueOptionAgentOptions(
 			runners.AgentOptionVolumes(
 				runners.AgentMountReadWrite(

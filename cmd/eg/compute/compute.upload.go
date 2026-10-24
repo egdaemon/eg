@@ -27,7 +27,6 @@ import (
 	"github.com/egdaemon/eg/internal/gitx"
 	"github.com/egdaemon/eg/internal/httpx"
 	"github.com/egdaemon/eg/internal/iox"
-	"github.com/egdaemon/eg/internal/lan"
 	"github.com/egdaemon/eg/internal/libp2px"
 	"github.com/egdaemon/eg/internal/md5x"
 	"github.com/egdaemon/eg/internal/slicesx"
@@ -89,7 +88,7 @@ func (t upload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, find libp2px.
 	// remember the runners on the local network while the workload is being built, the scan only
 	// feeds the cache so it never delays the upload. the cache is optional.
 	if t.LAN > 0 {
-		if lancache, err = lan.Open(gctx.Context, filepath.Join(t.CacheDir, migrations.CLI), t.LANPeerTTL); err != nil {
+		if lancache, err = openlan(gctx.Context, filepath.Join(t.CacheDir, migrations.CLI), t.LANPeerTTL); err != nil {
 			log.Println(errorsx.Wrap(err, "the local network cache is unavailable"))
 			lancache = nil
 		} else {

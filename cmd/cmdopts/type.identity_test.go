@@ -8,7 +8,6 @@ import (
 
 	"github.com/egdaemon/eg/cmd/cmdopts"
 	"github.com/egdaemon/eg/identity"
-	"github.com/egdaemon/eg/internal/lan"
 	"github.com/egdaemon/eg/internal/sshx"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/crypto/ssh"
@@ -87,7 +86,7 @@ func TestIdentityAccount(t *testing.T) {
 func remember(t *testing.T, signer ssh.Signer, vcsuri, account string) {
 	t.Helper()
 
-	db, err := lan.Open(context.Background(), migrations.Path(migrations.CLI), lan.DefaultTTL)
+	db, err := migrations.Open(context.Background(), migrations.Path(migrations.CLI))
 	require.NoError(t, err)
 	defer db.Close()
 	require.NoError(t, identity.Remember(context.Background(), db, signer, vcsuri, account))

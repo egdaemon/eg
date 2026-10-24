@@ -12,13 +12,14 @@ import (
 )
 
 type lanList struct {
-	lanDatabase `embed:""`
+	Database    string        `name:"database" help:"path of the database to operate on, defaults to the client's (the systems it can reach). the daemon's (who has reached it) is daemon.db within its cache directory"`
+	PeerTTL     time.Duration `name:"lan-peer-ttl" type:"durationinf" help:"how long systems are remembered after they were last seen" default:"720h" env:"EG_LAN_PEER_TTL"`
 	Scan        bool          `name:"scan" help:"scan the network for systems before listing"`
 	ScanTimeout time.Duration `name:"scan-timeout" help:"how long to scan for" default:"3s"`
 }
 
 func (t lanList) Run(kctx *kong.Context, gctx *cmdopts.Global, find libp2px.MDNSLookup) (err error) {
-	db, err := t.open(gctx)
+	db, err := openlan(gctx.Context, t.Database, t.PeerTTL)
 	if err != nil {
 		return err
 	}

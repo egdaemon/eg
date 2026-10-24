@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"github.com/egdaemon/eg/cmd/migrations"
 	"io"
 	"net/http"
 	"path/filepath"
@@ -13,7 +14,6 @@ import (
 
 	"github.com/egdaemon/eg/authn"
 	"github.com/egdaemon/eg/internal/httptestx"
-	"github.com/egdaemon/eg/internal/lan"
 	"github.com/egdaemon/eg/internal/sshx"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/crypto/ssh"
@@ -55,7 +55,7 @@ func reposhaving(t *testing.T, has ...string) *http.Client {
 func TestHints(t *testing.T) {
 	ctx := context.Background()
 	signer := testsigner(t)
-	db, err := lan.Open(ctx, filepath.Join(t.TempDir(), "identity.duckdb"), lan.DefaultTTL)
+	db, err := migrations.Open(ctx, filepath.Join(t.TempDir(), "identity.duckdb"))
 	require.NoError(t, err)
 	defer db.Close()
 
@@ -83,7 +83,7 @@ func TestResolve(t *testing.T) {
 	ctx := context.Background()
 	const vcsuri = "git@github.com:u/r.git"
 	opendb := func(t *testing.T) (db *sql.DB) {
-		d, err := lan.Open(ctx, filepath.Join(t.TempDir(), "identity.duckdb"), lan.DefaultTTL)
+		d, err := migrations.Open(ctx, filepath.Join(t.TempDir(), "identity.duckdb"))
 		require.NoError(t, err)
 		t.Cleanup(func() { d.Close() })
 		return d

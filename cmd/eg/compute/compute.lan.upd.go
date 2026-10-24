@@ -11,7 +11,8 @@ import (
 )
 
 type lanUpdate struct {
-	lanDatabase `embed:""`
+	Database    string        `name:"database" help:"path of the database to operate on, defaults to the client's (the systems it can reach). the daemon's (who has reached it) is daemon.db within its cache directory"`
+	PeerTTL     time.Duration `name:"lan-peer-ttl" type:"durationinf" help:"how long systems are remembered after they were last seen" default:"720h" env:"EG_LAN_PEER_TTL"`
 	PeerID      string        `arg:"" name:"peer-id" help:"id of the system to update"`
 	Description *string       `name:"description" help:"describe the system"`
 	Disable     bool          `name:"disable" help:"never use this system" xor:"state"`
@@ -21,7 +22,7 @@ type lanUpdate struct {
 }
 
 func (t lanUpdate) Run(gctx *cmdopts.Global) (err error) {
-	db, err := t.open(gctx)
+	db, err := openlan(gctx.Context, t.Database, t.PeerTTL)
 	if err != nil {
 		return err
 	}

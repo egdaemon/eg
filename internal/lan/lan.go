@@ -4,14 +4,9 @@ package lan
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
-	"os"
-	"path/filepath"
 	"time"
 
-	_ "github.com/duckdb/duckdb-go/v2" // registers the duckdb driver.
-	"github.com/egdaemon/eg/cmd/migrations"
 	"github.com/egdaemon/eg/internal/bytesx"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/sqlx"
@@ -21,30 +16,9 @@ import (
 // DefaultTTL is how long a peer is remembered after it was last seen.
 const DefaultTTL = 30 * 24 * time.Hour
 
-// Open the database at path, applying migrations and purging peers older than ttl.
-// see Path for the conventional location of the role's database.
-func Open(ctx context.Context, path string, ttl time.Duration) (*sql.DB, error) {
-	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
-		return nil, errorsx.Wrap(err, "unable to create lan peers directory")
-	}
-
-	db, err := sql.Open("duckdb", path)
-	if err != nil {
-		return nil, errorsx.Wrap(err, "unable to open lan peers database")
-	}
-
-	if err = migrations.Migrate(ctx, db); err != nil {
-		errorsx.Log(db.Close())
-		return nil, err
-	}
-
-	// purge the expired.
-	if err = sqlx.Discard(sqlx.Scan(PeerPurgeExpired(ctx, db, int64(ttl)))); err != nil {
-		errorsx.Log(db.Close())
-		return nil, errorsx.Wrap(err, "unable to purge expired lan peers")
-	}
-
-	return db, nil
+// Purge deletes the peers that have expired, see PeerLookupLive for when a peer has.
+func Purge(ctx context.Context, db sqlx.Queryer, ttl time.Duration) error {
+	return errorsx.Wrap(sqlx.Discard(sqlx.Scan(PeerPurgeExpired(ctx, db, int64(ttl)))), "unable to purge expired lan peers")
 }
 
 // PeerOptionTestDefaults populates a peer with representative values and a unique id,

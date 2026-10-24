@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"errors"
 	"log"
-	"sync"
 	"time"
 
 	"github.com/egdaemon/eg/internal/errorsx"
@@ -20,35 +19,27 @@ type Gate interface {
 }
 
 // NewLANGate records the peers that reach the daemon and refuses the ones an operator disabled
-// (see eg compute lan upd --runner). it is bookkeeping, not an authorization boundary: the
+// (see eg compute lan upd --database daemon.db). it is bookkeeping, not an authorization boundary: the
 // control plane's token still decides whether a workload is accepted. any failure to read or
 // write the record allows the stream.
 //
-// the database is opened for each stream and closed again, duckdb only allows a single process
-// to have a database open, holding it for the life of the daemon would lock out the eg compute lan
-// commands.
-func NewLANGate(path string, ttl time.Duration) Gate {
-	return &langate{path: path, ttl: ttl}
+// the database is shared with the rest of the daemon, see migrations.Open.
+func NewLANGate(db *sql.DB, ttl time.Duration) Gate {
+	return &langate{db: db, ttl: ttl}
 }
 
 type langate struct {
-	m    sync.Mutex
-	path string
-	ttl  time.Duration
+	db  *sql.DB
+	ttl time.Duration
 }
 
 func (t *langate) Allow(ctx context.Context, remote peer.ID, addr multiaddr.Multiaddr) bool {
-	t.m.Lock()
-	defer t.m.Unlock()
-
-	db, err := lan.Open(ctx, t.path, t.ttl)
-	if err != nil {
-		log.Println(errorsx.Wrap(err, "unable to open the lan peers database, allowing the stream"))
-		return true
+	// age out the stale peers.
+	if err := lan.Purge(ctx, t.db, t.ttl); err != nil {
+		log.Println(errorsx.Wrap(err, "unable to purge the lan peers"))
 	}
-	defer db.Close()
 
-	allowed, err := record(ctx, db, remote, addr)
+	allowed, err := record(ctx, t.db, remote, addr)
 	if err != nil {
 		log.Println(errorsx.Wrap(err, "unable to record the lan peer, allowing the stream"))
 		return true

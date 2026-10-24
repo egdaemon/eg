@@ -10,12 +10,14 @@ import (
 	"text/tabwriter"
 	"time"
 
-	"github.com/egdaemon/eg/cmd/cmdopts"
 	"github.com/egdaemon/eg/cmd/migrations"
+	_ "github.com/egdaemon/eg/duckproxy" // registers the duckproxy driver.
 	"github.com/egdaemon/eg/internal/bytesx"
 	"github.com/egdaemon/eg/internal/errorsx"
+	"github.com/egdaemon/eg/internal/fsx"
 	"github.com/egdaemon/eg/internal/lan"
 	"github.com/egdaemon/eg/internal/sqlx"
+	"github.com/egdaemon/eg/internal/userx"
 )
 
 type lanCmd struct {
@@ -25,23 +27,30 @@ type lanCmd struct {
 	Remove lanRemove `cmd:"" name:"rm" help:"forget a remembered system"`
 }
 
-// lanDatabase are the options shared by the commands that operate on the lan peer database.
-type lanDatabase struct {
-	CacheDir string        `name:"cache-directory" help:"directory the remembered systems are stored in" default:"${vars_cache_directory}" env:"EG_CACHE_DIRECTORY"`
-	Runner   bool          `name:"runner" help:"operate on the daemon's database (who has reached it) instead of the client's (the systems it can reach)"`
-	PeerTTL  time.Duration `name:"lan-peer-ttl" type:"durationinf" help:"how long systems are remembered after they were last seen" default:"720h" env:"EG_LAN_PEER_TTL"`
-}
-
-func (t lanDatabase) database() string {
-	if t.Runner {
-		return migrations.Runner
+// openlan opens the database of the lan peers at the path, defaulting to the client's. the daemon holds its own
+// database open, duckdb only allows a single process to have a file open, so it is reached through the daemon
+// when it is running. expired peers are purged.
+func openlan(ctx context.Context, database string, ttl time.Duration) (db *sql.DB, err error) {
+	if database == "" {
+		database = migrations.Path(migrations.CLI)
 	}
 
-	return migrations.CLI
-}
+	if socket := userx.DefaultRuntimeDirectory(migrations.DatabaseSocketName); filepath.Base(database) == migrations.Daemon && fsx.FileExists(socket) {
+		db, err = sql.Open("duckproxy", socket)
+	} else {
+		db, err = migrations.Open(ctx, database)
+	}
 
-func (t lanDatabase) open(gctx *cmdopts.Global) (*sql.DB, error) {
-	return lan.Open(gctx.Context, filepath.Join(t.CacheDir, t.database()), t.PeerTTL)
+	if err != nil {
+		return nil, err
+	}
+
+	if err = lan.Purge(ctx, db, ttl); err != nil {
+		errorsx.Log(db.Close())
+		return nil, err
+	}
+
+	return db, nil
 }
 
 // lanTable prints the remembered, unexpired systems.

@@ -86,14 +86,14 @@ func TestLanUpdate(t *testing.T) {
 	t.Run("runs against the given directory", func(t *testing.T) {
 		dir := t.TempDir()
 
-		db := testx.MustT(lan.Open(t.Context(), filepath.Join(dir, migrations.Runner), lan.DefaultTTL))(t)
+		db := testx.MustT(migrations.Open(t.Context(), filepath.Join(dir, migrations.Daemon)))(t)
 		require.NoError(t, lan.PeerUpsert(t.Context(), db, langx.Clone(lan.Peer{}, lan.PeerOptionTestDefaults, lan.PeerOptionID("a"))).Scan(&lan.Peer{}))
 		require.NoError(t, db.Close())
 
 		genparser := cmdtestx.Genparser(lanUpdate{}, kong.NamedMapper("durationinf", kong.MapperFunc(cmdopts.ParseDurationInf)), kong.Vars{"vars_cache_directory": t.TempDir()})
-		require.NoError(t, cmdtestx.Execute(t, genparser(t), "command", "a", "--runner", "--cache-directory", dir, "--disable", "--ttl", "infinity", "--description", "x"))
+		require.NoError(t, cmdtestx.Execute(t, genparser(t), "command", "a", "--database", filepath.Join(dir, migrations.Daemon), "--disable", "--ttl", "infinity", "--description", "x"))
 
-		db = testx.MustT(lan.Open(t.Context(), filepath.Join(dir, migrations.Runner), lan.DefaultTTL))(t)
+		db = testx.MustT(migrations.Open(t.Context(), filepath.Join(dir, migrations.Daemon)))(t)
 		defer db.Close()
 
 		var p lan.Peer

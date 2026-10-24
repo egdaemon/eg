@@ -18,11 +18,14 @@ import (
 
 	"slices"
 
+	"github.com/egdaemon/eg/cmd/migrations"
 	"github.com/egdaemon/eg/internal/debugx"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/fsx"
+	"github.com/egdaemon/eg/internal/history"
 	"github.com/egdaemon/eg/internal/httpx"
 	"github.com/egdaemon/eg/internal/md5x"
+	"github.com/egdaemon/eg/internal/sqltestx"
 	"github.com/egdaemon/eg/internal/testx"
 	"github.com/egdaemon/eg/runners"
 	"github.com/gofrs/uuid/v5"
@@ -56,6 +59,26 @@ func (t *completion) Upload(ctx context.Context, id string, duration time.Durati
 }
 
 func TestQueue(t *testing.T) {
+	t.Run("records_the_completed_workload", func(t *testing.T) {
+		dirs := runners.NewSpoolDir(t.TempDir())
+		uid := errorsx.Must(uuid.NewV4())
+		createTestWorkload(t, dirs.Queued, uid, "entry.wasm", testx.Read(testx.Fixture("example.1.wasm")))
+		rm := runners.NewResourceManager(runners.NewRuntimeResources())
+		reload := make(chan error, 1)
+		ctx, done := context.WithCancelCause(t.Context())
+		c := completion{done: done}
+		db := testx.MustT(migrations.Open(t.Context(), sqltestx.Path(t)))(t)
+		defer db.Close()
+		logs := t.TempDir()
+		err := runners.RunOne(ctx, 99, 0, httpx.NewFixedStatusClient(http.StatusNotImplemented), rm, &dirs, reload, runners.QueueOptionCompletion(&c), runners.QueueOptionHistory(db, logs))
+		require.ErrorIs(t, err, context.Canceled)
+
+		var entry history.Entry
+		require.NoError(t, history.EntryFindByID(t.Context(), db, uid.String()).Scan(&entry))
+		require.Equal(t, filepath.Join(logs, uid.String()+".log"), entry.LogsPath)
+		require.FileExists(t, entry.LogsPath)
+	})
+
 	t.Run("runs_a_single_workload_and_completes", func(t *testing.T) {
 		dirs := runners.NewSpoolDir(t.TempDir())
 		createTestWorkload(t, dirs.Queued, errorsx.Must(uuid.NewV4()), "entry.wasm", testx.Read(testx.Fixture("example.1.wasm")))

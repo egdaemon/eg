@@ -15,7 +15,7 @@ import (
 	"github.com/egdaemon/eg/compute"
 	"github.com/egdaemon/eg/internal/asynccompute"
 	"github.com/egdaemon/eg/internal/errorsx"
-	"github.com/egdaemon/eg/internal/httpx"
+	"github.com/egdaemon/eg/internal/history"
 	"github.com/egdaemon/eg/internal/lan"
 	"github.com/egdaemon/eg/internal/libp2px"
 	"github.com/egdaemon/eg/internal/slicesx"
@@ -220,11 +220,22 @@ func (t upload) follow(ctx context.Context, chttp *http.Client, o outcome) error
 
 	if stringsx.Blank(o.recorded.LogsToken) {
 		log.Println("runner does not support log streaming", o.runner.Id, o.runner.P2Pid)
-	} else if err := runners.FollowLogs(ctx, o.host, o.recorded.LogsToken, o.recorded.Id, 0, os.Stdout); err != nil {
+		return history.Await(ctx, o.recorded.Id, runners.NewPushClient(chttp).HistoryFind)
+	}
+
+	if err := runners.FollowLogs(ctx, o.host, o.recorded.LogsToken, o.recorded.Id, 0, os.Stdout); err != nil {
 		return errorsx.Wrap(err, "unable to stream workload logs")
 	}
 
-	return workloadresult(ctx, chttp, o.recorded.Id)
+	// the runner records the outcome itself, the control plane is only consulted when it can't answer.
+	return history.Await(
+		ctx,
+		o.recorded.Id,
+		func(ctx context.Context, id string) (*compute.History, error) {
+			return runners.RunnerHistoryFind(ctx, o.host, o.recorded.LogsToken, id)
+		},
+		runners.NewPushClient(chttp).HistoryFind,
+	)
 }
 
 // followenqueued streams the logs of a workload enqueued with the cluster. it waits for the cluster to
@@ -246,11 +257,11 @@ func followenqueued(ctx context.Context, chttp *http.Client, id string) (err err
 	log.Println("waiting for the workload to start", id)
 	found, err := runners.NewPushClient(chttp).AwaitLogsToken(ctx, id, pollinterval)
 	if errors.Is(err, runners.ErrWorkloadCompleted) {
-		if err = storedlogs(ctx, chttp, id); err != nil {
+		if err = history.Logs(ctx, id, os.Stdout, runners.NewPushClient(chttp).HistoryLogs); err != nil {
 			return err
 		}
 
-		return workloadresult(ctx, chttp, id)
+		return history.Await(ctx, id, runners.NewPushClient(chttp).HistoryFind)
 	} else if err != nil {
 		return errorsx.Wrap(err, "unable to stream workload logs")
 	}
@@ -270,70 +281,5 @@ func followenqueued(ctx context.Context, chttp *http.Client, id string) (err err
 		return errorsx.Wrap(err, "unable to stream workload logs")
 	}
 
-	return workloadresult(ctx, chttp, id)
-}
-
-// workloadresult reports how the completed workload ended, nil when it succeeded.
-func workloadresult(ctx context.Context, chttp *http.Client, id string) (err error) {
-	// the history record is written by the completion upload and can trail the end of the log stream.
-	const (
-		attempts = 10
-		delay    = time.Second
-	)
-
-	// values of the history record's result.
-	const (
-		resultfailure   = 1
-		resultcompleted = 2
-		resultcancelled = 3
-	)
-
-	for range attempts {
-		var h *compute.History
-
-		// not found and unknown results mean the completion hasn't been recorded yet.
-		if h, err = runners.NewPushClient(chttp).HistoryFind(ctx, id); err == nil {
-			switch h.Result {
-			case resultcompleted:
-				return nil
-			case resultfailure:
-				return errorsx.Errorf("workload %s failed", id)
-			case resultcancelled:
-				return errorsx.Errorf("workload %s was cancelled", id)
-			}
-		} else if httpx.IsStatusError(err, http.StatusNotFound) == nil {
-			return errorsx.Wrap(err, "unable to determine the workload result")
-		}
-
-		select {
-		case <-time.After(delay):
-		case <-ctx.Done():
-			return ctx.Err()
-		}
-	}
-
-	return errorsx.Errorf("workload %s result was not recorded", id)
-}
-
-// storedlogs prints the stored log of a workload that completed before its logs could be followed.
-func storedlogs(ctx context.Context, chttp *http.Client, id string) (err error) {
-	// the history record is written by the completion upload and can trail the workload's completion.
-	const (
-		attempts = 5
-		delay    = time.Second
-	)
-
-	for range attempts {
-		if err = runners.NewPushClient(chttp).HistoryLogs(ctx, id, os.Stdout); httpx.IsStatusError(err, http.StatusNotFound) == nil {
-			return errorsx.Wrap(err, "stored workload logs unavailable")
-		}
-
-		select {
-		case <-time.After(delay):
-		case <-ctx.Done():
-			return ctx.Err()
-		}
-	}
-
-	return errorsx.Wrap(err, "stored workload logs unavailable")
+	return history.Await(ctx, id, runners.NewPushClient(chttp).HistoryFind)
 }

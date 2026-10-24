@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"net/http"
 
+	"github.com/egdaemon/eg/cmd/migrations"
 	"github.com/egdaemon/eg/identity"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/gitx"
@@ -29,7 +30,17 @@ type Identity struct {
 
 // Store opens the local database, shared with the lan peers, the caller closes it.
 func (t *Identity) Store() (*sql.DB, error) {
-	return lan.Open(t.ctx, t.store, lan.DefaultTTL)
+	db, err := migrations.Open(t.ctx, t.store)
+	if err != nil {
+		return nil, err
+	}
+
+	if err = lan.Purge(t.ctx, db, lan.DefaultTTL); err != nil {
+		errorsx.Log(db.Close())
+		return nil, err
+	}
+
+	return db, nil
 }
 
 // Account resolves the account to act as. the explicit --account-id wins, otherwise the account

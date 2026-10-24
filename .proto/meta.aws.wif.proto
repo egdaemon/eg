@@ -1,0 +1,51 @@
+syntax = "proto3";
+
+package meta;
+
+message AWSWIFConnection {
+  string label = 1 [ json_name = "label" ];
+  string role_arn = 2 [ json_name = "role_arn" ];
+  string region = 3 [ json_name = "region" ];
+  string audience = 4 [ json_name = "audience" ];
+  string description = 5 [ json_name = "description" ];
+}
+
+message AWSWIFFindResponse {
+  AWSWIFConnection connection = 1 [ json_name = "connection" ];
+}
+
+message AWSWIFSearchRequest {
+  uint64 offset = 1 [ json_name = "offset" ];
+  uint64 limit = 2 [ json_name = "limit" ];
+  string query = 3 [ json_name = "query" ];
+}
+message AWSWIFSearchResponse {
+  AWSWIFSearchRequest next = 1 [ json_name = "next" ];
+  repeated AWSWIFConnection items = 2 [ json_name = "items" ];
+}
+
+// creates a connection, an empty label defaults to the account id.
+message AWSWIFCreateRequest {
+  AWSWIFConnection connection = 1 [ json_name = "connection" ];
+}
+message AWSWIFCreateResponse {
+  AWSWIFConnection connection = 1 [ json_name = "connection" ];
+}
+
+// unset fields are left unchanged.
+message AWSWIFUpdateRequest {
+  optional string role_arn = 1 [ json_name = "role_arn" ];
+  optional string region = 2 [ json_name = "region" ];
+  optional string audience = 3 [ json_name = "audience" ];
+  optional string description = 4 [ json_name = "description" ];
+}
+message AWSWIFUpdateResponse {
+  AWSWIFConnection connection = 1 [ json_name = "connection" ];
+}
+
+// the information about the issuer needed to trust egdaemon's workload
+// identities from an aws account.
+message AWSWIFIssuerResponse {
+  string issuer_url = 1 [ json_name = "issuer_url" ];
+  string subject = 2 [ json_name = "subject" ];
+}

@@ -143,6 +143,15 @@ const (
 )
 
 const (
+	EnvAWSWorkloadIdentityEnabled = "EG_AWS_WORKLOAD_IDENTITY_ENABLED" // set by whatever generates the workload (uploads, schedules) when it needs aws credentials issued to it by its runner.
+	EnvAWSRoleARN                 = "AWS_ROLE_ARN"                     // the role the aws sdks and cli assume with the web identity token.
+	EnvAWSWebIdentityTokenFile    = "AWS_WEB_IDENTITY_TOKEN_FILE"      // path to the identity token the aws sdks and cli exchange for the role, re-read whenever they refresh.
+	EnvAWSRoleSessionName         = "AWS_ROLE_SESSION_NAME"            // name of the session, shows in cloudtrail.
+	EnvAWSRegion                  = "AWS_REGION"                       // default region of the aws sdks and cli.
+	EnvUnsafeAWSCredentialsB64    = "EG_UNSAFE_AWS_CREDENTIALS_B64"    // base64 url encoded json of the developer's aws credentials, provided by the agent (eg compute local|serve --aws-auto).
+)
+
+const (
 	EnvUnsafeCacheID         = "EG_UNSAFE_CACHE_ID"
 	EnvUnsafeGitCloneEnabled = "EG_UNSAFE_GIT_CLONE_ENABLED"
 	EnvUnsafeRemapDirectory  = "EG_UNSAFE_REMAP_DIRECTORY"                    // list of directories to remap, seperated by ':'.

@@ -22,6 +22,7 @@ import (
 	"github.com/egdaemon/eg/cmd/cmdopts"
 	"github.com/egdaemon/eg/cmd/eg/daemons"
 	"github.com/egdaemon/eg/compile"
+	"github.com/egdaemon/eg/internal/awsx"
 	"github.com/egdaemon/eg/internal/bytesx"
 	"github.com/egdaemon/eg/internal/debugx"
 	"github.com/egdaemon/eg/internal/envx"
@@ -121,14 +122,35 @@ func defaultgcloudcredentials(adc string) error {
 	return os.Setenv(eg.EnvCloudSDKCredentialFileOverride, adc)
 }
 
-// installcredentials installs the gcp credentials provided to the workload, see gcpx.InstallCredentials.
-func installcredentials(ctx context.Context) error {
-	adc, err := gcpx.InstallCredentials(ctx, eg.DefaultRuntimeDirectory(gcpx.Directory))
-	if err != nil {
-		return err
+// defaultawscredentials points the aws sdks and cli at the credentials installed for the workload by setting them in
+// the environment of the process, which the module and the commands it runs use. the credentials of the user
+// (a role, access keys or a profile already in the environment) are kept entirely, mixing the role of the user with the
+// token of the workload would not work.
+func defaultawscredentials(settings awsx.Settings) error {
+	for _, k := range []string{eg.EnvAWSRoleARN, "AWS_ACCESS_KEY_ID", "AWS_PROFILE"} {
+		if _, set := os.LookupEnv(k); set {
+			return nil
+		}
 	}
 
-	return defaultgcloudcredentials(adc)
+	for _, kv := range settings.Environ() {
+		k, v, _ := strings.Cut(kv, "=")
+		if err := os.Setenv(k, v); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// installcredentials installs the gcp and aws credentials provided to the workload, see gcpx.InstallCredentials and
+// awsx.InstallCredentials.
+func installcredentials(ctx context.Context) error {
+	adc, gcperr := gcpx.InstallCredentials(ctx, eg.DefaultRuntimeDirectory(gcpx.Directory))
+	settings, awserr := awsx.InstallCredentials(ctx, eg.DefaultRuntimeDirectory(awsx.Directory))
+
+	// one provider failing must not leave the other without its defaults.
+	return errorsx.Compact(gcperr, awserr, defaultgcloudcredentials(adc), defaultawscredentials(settings))
 }
 
 func (t module) mounthack(ctx context.Context, runid string, ws workspaces.Context) (err error) {

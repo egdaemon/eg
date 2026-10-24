@@ -1,0 +1,11 @@
+syntax = "proto3";
+
+package eg.eg.compute;
+
+// the credentials issued to a workload for an aws account: the identity token
+// to exchange for the role through AssumeRoleWithWebIdentity.
+message AWSAccessCredentials {
+  string id_token = 1 [ json_name = "id_token" ];
+  string role_arn = 2 [ json_name = "role_arn" ];
+  string region = 3 [ json_name = "region" ];
+}

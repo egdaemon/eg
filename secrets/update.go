@@ -13,7 +13,6 @@ import (
 
 	"cloud.google.com/go/secretmanager/apiv1/secretmanagerpb"
 	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
 	awstypes "github.com/aws/aws-sdk-go-v2/service/secretsmanager/types"
 	"github.com/egdaemon/eg/internal/langx"
@@ -106,7 +105,7 @@ func updateGCP(ctx context.Context, u *url.URL, data []byte) error {
 
 func updateAWS(ctx context.Context, u *url.URL, data []byte) error {
 	region := u.Query().Get("region")
-	cfg, err := config.LoadDefaultConfig(ctx, config.WithRegion(region))
+	cfg, err := awsconfig(ctx, region)
 	if err != nil {
 		return err
 	}

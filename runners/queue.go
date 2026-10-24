@@ -22,6 +22,7 @@ import (
 
 	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/backoff"
+	"github.com/egdaemon/eg/internal/awsx"
 	"github.com/egdaemon/eg/internal/debugx"
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
@@ -635,9 +636,14 @@ func (t stateprepare) Update(ctx context.Context) state {
 		return t.failed(err)
 	}
 
-	// secrets are read as the workload's account when it has a gcp identity connection.
+	awssettings, err := awsx.ProvisionCredentials(ctx, &http.Client{Timeout: 30 * time.Second}, ws.RuntimeDir, workload.AccessToken)
+	if err != nil {
+		return t.failed(err)
+	}
+
+	// secrets are read as the workload's account when it has a gcp or aws identity connection.
 	envb := envx.Build().
-		FromReader(secrets.Env().GCP(gcpadc).NewReader(ctx, workload.Enqueued.SecretUris...)).
+		FromReader(secrets.Env().GCP(gcpadc).AWS(awssettings.RoleARN, awssettings.TokenFile, awssettings.Region, "eg-"+workload.Enqueued.Id).NewReader(ctx, workload.Enqueued.SecretUris...)).
 		FromPath(environpath).
 		Var(gitx.EnvAuthEGAccessToken, workload.AccessToken).
 		Var(eg.EnvCI, "true").

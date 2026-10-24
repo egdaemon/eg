@@ -6,13 +6,11 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"strings"
-	"sync"
-	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/egdaemon/eg"
+	"github.com/egdaemon/eg/internal/generations"
 	"github.com/egdaemon/eg/internal/httpx"
 	"github.com/stretchr/testify/require"
 )
@@ -77,9 +75,9 @@ func TestInstall(t *testing.T) {
 		return string(encoded)
 	}
 
-	generations := func(t *testing.T, base string) []string {
+	published := func(t *testing.T, base string) []string {
 		t.Helper()
-		matches, err := filepath.Glob(filepath.Join(base, pastGenerations, "*"))
+		matches, err := filepath.Glob(filepath.Join(base, generations.Past, "*"))
 		require.NoError(t, err)
 		return matches
 	}
@@ -103,7 +101,7 @@ func TestInstall(t *testing.T) {
 		require.Equal(t, filepath.Join(dst, adcInstalledFilename), adc)
 		require.Equal(t, `{"type":"authorized_user"}`, read(t, adc))
 		require.Contains(t, chowned, filepath.Join(dst, generationsDirectory))
-		require.Len(t, generations(t, filepath.Join(dst, generationsDirectory)), 1)
+		require.Len(t, published(t, filepath.Join(dst, generationsDirectory)), 1)
 	})
 
 	t.Run("should install the credentials issued by the runner", func(t *testing.T) {
@@ -115,7 +113,7 @@ func TestInstall(t *testing.T) {
 		// the identity token is read through current, which follows every new generation.
 		var cfg externalAccountConfig
 		require.NoError(t, json.Unmarshal([]byte(read(t, adc)), &cfg))
-		require.Equal(t, filepath.Join(dst, generationsDirectory, currentGeneration, idTokenFilename), cfg.CredentialSource.File)
+		require.Equal(t, filepath.Join(dst, generationsDirectory, generations.Current, idTokenFilename), cfg.CredentialSource.File)
 		require.Equal(t, "idtoken", read(t, cfg.CredentialSource.File))
 	})
 
@@ -125,7 +123,7 @@ func TestInstall(t *testing.T) {
 		require.NoError(t, err)
 		require.Empty(t, adc)
 		require.NoFileExists(t, filepath.Join(dst, adcInstalledFilename))
-		require.Empty(t, generations(t, filepath.Join(dst, generationsDirectory)))
+		require.Empty(t, published(t, filepath.Join(dst, generationsDirectory)))
 	})
 
 	t.Run("should leave the existing configuration untouched", func(t *testing.T) {
@@ -156,93 +154,9 @@ func TestInstall(t *testing.T) {
 
 		require.NoError(t, os.WriteFile(filepath.Join(src, responseFilename), []byte(`{"id_token":"refreshed","audience":"//iam.googleapis.com/example"}`), 0600))
 		require.Eventually(t, func() bool {
-			encoded, err := os.ReadFile(filepath.Join(dst, generationsDirectory, currentGeneration, idTokenFilename))
+			encoded, err := os.ReadFile(filepath.Join(dst, generationsDirectory, generations.Current, idTokenFilename))
 			return err == nil && string(encoded) == "refreshed"
 		}, 5*time.Second, 10*time.Millisecond)
-	})
-}
-
-func TestPublish(t *testing.T) {
-	nochown := func(string) error { return nil }
-
-	write := func(content string) func(string) (bool, error) {
-		return func(dir string) (bool, error) {
-			return true, os.WriteFile(filepath.Join(dir, "file"), []byte(content), 0600)
-		}
-	}
-
-	t.Run("should make the generation current", func(t *testing.T) {
-		base := filepath.Join(t.TempDir(), "eg")
-		ok, err := publish(t.Context(), base, nochown, write("first"))
-		require.NoError(t, err)
-		require.True(t, ok)
-
-		encoded, err := os.ReadFile(filepath.Join(base, currentGeneration, "file"))
-		require.NoError(t, err)
-		require.Equal(t, "first", string(encoded))
-	})
-
-	t.Run("should publish nothing when there is nothing to build", func(t *testing.T) {
-		base := filepath.Join(t.TempDir(), "eg")
-		ok, err := publish(t.Context(), base, nochown, func(string) (bool, error) { return false, nil })
-		require.NoError(t, err)
-		require.False(t, ok)
-		require.NoFileExists(t, filepath.Join(base, currentGeneration))
-
-		entries, err := os.ReadDir(filepath.Join(base, pastGenerations))
-		require.NoError(t, err)
-		require.Empty(t, entries, "expected the unpublished generation to be removed")
-	})
-
-	t.Run("should keep the previous generation and remove older ones", func(t *testing.T) {
-		base := filepath.Join(t.TempDir(), "eg")
-		for _, content := range []string{"a", "b", "c", "d"} {
-			_, err := publish(t.Context(), base, nochown, write(content))
-			require.NoError(t, err)
-		}
-
-		matches, err := filepath.Glob(filepath.Join(base, pastGenerations, "*"))
-		require.NoError(t, err)
-		require.Len(t, matches, 2)
-
-		encoded, err := os.ReadFile(filepath.Join(base, currentGeneration, "file"))
-		require.NoError(t, err)
-		require.Equal(t, "d", string(encoded))
-	})
-
-	t.Run("should never expose a partial generation", func(t *testing.T) {
-		base := filepath.Join(t.TempDir(), "eg")
-		_, err := publish(t.Context(), base, nochown, write(strings.Repeat("a", 1<<16)))
-		require.NoError(t, err)
-
-		done := make(chan struct{})
-		var torn atomic.Bool
-		var readers sync.WaitGroup
-		readers.Add(1)
-		go func() {
-			defer readers.Done()
-			for {
-				select {
-				case <-done:
-					return
-				default:
-				}
-
-				encoded, err := os.ReadFile(filepath.Join(base, currentGeneration, "file"))
-				if err != nil || len(encoded) != 1<<16 || len(strings.Trim(string(encoded), string(encoded[:1]))) != 0 {
-					torn.Store(true)
-				}
-			}
-		}()
-
-		for i := 0; i < 50; i++ {
-			_, err := publish(t.Context(), base, nochown, write(strings.Repeat(string(rune('a'+i%26)), 1<<16)))
-			require.NoError(t, err)
-		}
-
-		close(done)
-		readers.Wait()
-		require.False(t, torn.Load())
 	})
 }
 

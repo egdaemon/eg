@@ -29,6 +29,7 @@ import (
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/fsx"
+	"github.com/egdaemon/eg/internal/generations"
 	"github.com/egdaemon/eg/internal/httpx"
 	"github.com/egdaemon/eg/internal/jwtx"
 	"github.com/egdaemon/eg/internal/stringsx"
@@ -53,9 +54,7 @@ const (
 
 	adcInstalledFilename = "application_default_credentials.json"
 
-	generationsDirectory = "eg"          // within the gcloud configuration directory of the user, holds the generations of the credentials.
-	currentGeneration    = "current"     // symlink to the generation in use.
-	pastGenerations      = "generations" // holds the generations, the current one and the previous one.
+	generationsDirectory = "eg" // within the gcloud configuration directory of the user, holds the generations of the credentials.
 )
 
 // GCPDownloadToken builds the claims for the bearer token presented to
@@ -135,7 +134,7 @@ func credentialRefresh(ctx context.Context, c *http.Client, dst, token string) e
 		return errorsx.Wrap(err, "unable to read response")
 	}
 
-	if err = writeFile(filepath.Join(dst, responseFilename), encoded, 0666); err != nil {
+	if err = generations.WriteFile(filepath.Join(dst, responseFilename), encoded, 0666); err != nil {
 		return errorsx.Wrap(err, "unable to write credentials")
 	}
 
@@ -165,7 +164,7 @@ func load(from, to, published string) (string, error) {
 		return "", nil
 	}
 
-	if err = writeFile(filepath.Join(to, idTokenFilename), []byte(creds.IdToken), 0600); err != nil {
+	if err = generations.WriteFile(filepath.Join(to, idTokenFilename), []byte(creds.IdToken), 0600); err != nil {
 		return "", errorsx.Wrap(err, "unable to write identity token")
 	}
 
@@ -190,21 +189,11 @@ func load(from, to, published string) (string, error) {
 	}
 
 	adcpath := filepath.Join(to, adcFilename)
-	if err = writeFile(adcpath, encodedcfg, 0600); err != nil {
+	if err = generations.WriteFile(adcpath, encodedcfg, 0600); err != nil {
 		return "", errorsx.Wrap(err, "unable to write adc config")
 	}
 
 	return adcpath, nil
-}
-
-// writeFile writes the file such that readers see either the previous or the new content, never a partial file.
-func writeFile(path string, content []byte, mode os.FileMode) error {
-	tmp := path + ".tmp"
-	if err := os.WriteFile(tmp, content, mode); err != nil {
-		return err
-	}
-
-	return os.Rename(tmp, path)
 }
 
 // InstallCredentials installs the credentials provided to the workload as the application default credentials of the
@@ -234,7 +223,7 @@ func install(ctx context.Context, dst string, src string, provided []byte, every
 	var (
 		installed = filepath.Join(dst, adcInstalledFilename)
 		base      = filepath.Join(dst, generationsDirectory)
-		current   = filepath.Join(base, currentGeneration)
+		current   = filepath.Join(base, generations.Current)
 	)
 
 	if fsx.DirExists(src) != nil {
@@ -242,17 +231,17 @@ func install(ctx context.Context, dst string, src string, provided []byte, every
 			return "", nil
 		}
 
-		if _, err := publish(ctx, base, chown, func(dir string) (bool, error) {
-			return true, writeFile(filepath.Join(dir, adcInstalledFilename), provided, 0600)
+		if _, err := generations.Publish(ctx, base, chown, func(dir string) (bool, error) {
+			return true, generations.WriteFile(filepath.Join(dir, adcInstalledFilename), provided, 0600)
 		}); err != nil {
 			return "", errorsx.Wrap(err, "unable to publish application default credentials")
 		}
 
-		return installed, errorsx.Wrap(link(installed, filepath.Join(generationsDirectory, currentGeneration, adcInstalledFilename)), "unable to link application default credentials")
+		return installed, errorsx.Wrap(generations.Link(installed, filepath.Join(generationsDirectory, generations.Current, adcInstalledFilename)), "unable to link application default credentials")
 	}
 
 	refresh := func() (bool, error) {
-		return publish(ctx, base, chown, func(dir string) (bool, error) {
+		return generations.Publish(ctx, base, chown, func(dir string) (bool, error) {
 			adc, err := load(src, dir, current)
 			if err != nil || adc == "" {
 				return false, err
@@ -268,7 +257,7 @@ func install(ctx context.Context, dst string, src string, provided []byte, every
 		return "", nil
 	}
 
-	if err := link(installed, filepath.Join(generationsDirectory, currentGeneration, adcInstalledFilename)); err != nil {
+	if err := generations.Link(installed, filepath.Join(generationsDirectory, generations.Current, adcInstalledFilename)); err != nil {
 		return "", errorsx.Wrap(err, "unable to link application default credentials")
 	}
 
@@ -289,61 +278,6 @@ func install(ctx context.Context, dst string, src string, provided []byte, every
 	}()
 
 	return installed, nil
-}
-
-// publish makes a new generation of files current. the generation is only reachable through the current symlink,
-// which is replaced by renaming a new one over it, an atomic operation, once the generation is complete. readers
-// using the path through current see either the previous or the new generation, never a partial one.
-// all but the newest two generations are removed.
-// build writes the files into the directory, when it returns false nothing is published.
-func publish(ctx context.Context, base string, chown func(path string) error, build func(dir string) (bool, error)) (bool, error) {
-	generations := filepath.Join(base, pastGenerations)
-	generation := filepath.Join(generations, strconv.FormatInt(time.Now().UnixNano(), 10)) // named with the time it was published.
-
-	if err := fsx.MkDirs(0770, generation); err != nil {
-		return false, errorsx.Wrapf(err, "unable to create %s", generation)
-	}
-
-	if ok, err := build(generation); err != nil || !ok {
-		return false, errorsx.Compact(err, os.RemoveAll(generation))
-	}
-
-	entries, err := os.ReadDir(generation)
-	if err != nil {
-		return false, errorsx.Compact(errorsx.Wrapf(err, "unable to read %s", generation), os.RemoveAll(generation))
-	}
-
-	owned := []string{base, generations, generation}
-	for _, e := range entries {
-		owned = append(owned, filepath.Join(generation, e.Name()))
-	}
-
-	for _, path := range owned {
-		if err = chown(path); err != nil {
-			return false, errorsx.Compact(errorsx.Wrapf(err, "unable to give the user access to %s", path), os.RemoveAll(generation))
-		}
-	}
-
-	if err = link(filepath.Join(base, currentGeneration), filepath.Join(pastGenerations, filepath.Base(generation))); err != nil {
-		return false, errorsx.Compact(errorsx.Wrap(err, "unable to replace the current generation"), os.RemoveAll(generation))
-	}
-
-	// keep the previous generation, a reader that resolved its path a moment ago still finishes reading it.
-	return true, errorsx.Wrap(fsx.Prune(ctx, fsx.KeepNewestN(2, fsx.Find(generations, fsx.Levels(1)))), "unable to remove old generations")
-}
-
-// link atomically creates or replaces the symlink at path pointing to target.
-func link(path, target string) error {
-	tmp := path + ".tmp"
-	if err := os.Remove(tmp); err != nil && !os.IsNotExist(err) {
-		return err
-	}
-
-	if err := os.Symlink(target, tmp); err != nil {
-		return err
-	}
-
-	return os.Rename(tmp, path)
 }
 
 // provided reports whether the agent provided the credentials of the workload, see eg.EnvUnsafeGcloudADCB64, by

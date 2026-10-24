@@ -10,6 +10,7 @@ import (
 // EnvReader reads secrets with credentials injected into the lookup of the secret managers.
 type EnvReader struct {
 	gcp []option.ClientOption
+	aws *awsidentity
 }
 
 // Env builds a reader whose secrets are read with the given credentials, see GCP.
@@ -24,5 +25,5 @@ func (t *EnvReader) NewReader(ctx context.Context, uris ...string) io.Reader {
 
 // context injects the credentials into the lookups made with the returned context.
 func (t *EnvReader) context(ctx context.Context) context.Context {
-	return t.gcpcontext(ctx)
+	return t.awscontext(t.gcpcontext(ctx))
 }

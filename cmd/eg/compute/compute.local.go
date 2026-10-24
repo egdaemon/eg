@@ -45,6 +45,7 @@ type local struct {
 	Wayland          bool     `name:"wayland" help:"bind-mount the host wayland display socket into the container"`
 	GPU              bool     `name:"gpu" help:"enable gpu support" hidden:"true"`
 	GCPAuto          bool     `name:"gcp-auto" help:"use the default well known path for gcp's application default credentials"`
+	AWSAuto          bool     `name:"aws-auto" help:"use the aws credentials resolved by the default credential chain of this machine"`
 	GCP              string   `name:"gcp" help:"path to gcp's application default credentials"`
 	InvalidateCache  bool     `name:"invalidate-cache" help:"removes workload build cache"`
 	EnvironmentPaths []string `name:"envpath" help:"environment files to pass to the module" default:""`
@@ -148,6 +149,13 @@ func (t local) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err e
 		gcpcreds = runners.AgentOptionGcloudCredentials(gctx.Context, envb, envx.String(userx.ConfigDirectory("gcloud", "application_default_credentials.json"), eg.EnvGoogleApplicationCredentials))
 	} else if stringsx.Present(t.GCP) {
 		gcpcreds = runners.AgentOptionGcloudCredentials(gctx.Context, envb, t.GCP)
+	}
+
+	if t.AWSAuto {
+		// the credentials are provided through the environment, the runner installs them.
+		if _, err = runners.AgentOptionAWSCredentials(gctx.Context, envb); err != nil {
+			return err
+		}
 	}
 
 	if gpu, err = runners.AgentOptionGPU(t.GPU); err != nil {

@@ -65,6 +65,7 @@ type upload struct {
 	GitReference     string        `name:"git-ref" help:"name of the branch or commit to checkout" default:"${vars_git_default_reference}"`
 	GitClone         string        `name:"git-clone-uri" help:"clone uri"`
 	GCPAuto          bool          `name:"gcp-auto" help:"have the runner issue the account's gcp credentials (workload identity) to the workload"`
+	AWSAuto          bool          `name:"aws-auto" help:"have the runner issue the account's aws credentials (web identity) to the workload"`
 	Secrets          []string      `name:"secret" help:"List of secret URIs to use. Examples: chachasm://passphrase@/path/to/file, gcpsm://project-id/secret-name/version, awssm://secret-name?region=us-east-1"`
 }
 
@@ -164,6 +165,10 @@ func (t upload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, find libp2px.
 
 	if t.GCPAuto {
 		envb = envb.Var(eg.EnvGCPWorkloadIdentityEnabled, "true")
+	}
+
+	if t.AWSAuto {
+		envb = envb.Var(eg.EnvAWSWorkloadIdentityEnabled, "true")
 	}
 
 	if err = envb.CopyTo(environio); err != nil {

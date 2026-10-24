@@ -18,6 +18,7 @@ import (
 	"github.com/alecthomas/kong"
 	"github.com/dustin/go-humanize"
 	"github.com/egdaemon/eg"
+	"github.com/egdaemon/eg/cmd/cmdaws"
 	"github.com/egdaemon/eg/cmd/cmderrors"
 	"github.com/egdaemon/eg/cmd/cmdgcp"
 	"github.com/egdaemon/eg/cmd/cmdgpg"
@@ -98,6 +99,7 @@ func main() {
 		SSH                cmdssh.Cmd                   `cmd:"" name:"ssh" help:"ssh key management"`
 		Machine            cmdmachine.Cmd               `cmd:"" name:"machine" help:"interact with machines"`
 		GCP                cmdgcp.Cmd                   `cmd:"" name:"gcp" help:"gcp integration management"`
+		AWS                cmdaws.Cmd                   `cmd:"" name:"aws" help:"aws integration management"`
 		GDX                konggdx.Commands             `cmd:"" name:"gdx" help:"pull profiles/traces from a running eg debug socket"`
 		InstallCompletions kongplete.InstallCompletions `cmd:"" help:"install shell completions"`
 	}

@@ -1,7 +1,7 @@
 //go:build !genieql.ignore
 // +build !genieql.ignore
 
-package history
+package computex
 
 import (
 	"context"

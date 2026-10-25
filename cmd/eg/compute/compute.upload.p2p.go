@@ -16,8 +16,8 @@ import (
 
 	"github.com/egdaemon/eg/compute"
 	"github.com/egdaemon/eg/internal/asynccompute"
+	"github.com/egdaemon/eg/internal/computex"
 	"github.com/egdaemon/eg/internal/errorsx"
-	"github.com/egdaemon/eg/internal/history"
 	"github.com/egdaemon/eg/internal/lan"
 	"github.com/egdaemon/eg/internal/libp2px"
 	"github.com/egdaemon/eg/internal/slicesx"
@@ -222,7 +222,7 @@ func (t upload) follow(ctx context.Context, chttp *http.Client, o outcome) error
 
 	if stringsx.Blank(o.recorded.LogsToken) {
 		log.Println("runner does not support log streaming", o.runner.Id, o.runner.P2Pid)
-		return history.Await(ctx, o.recorded.Id, runners.NewPushClient(chttp).HistoryFind)
+		return computex.Await(ctx, o.recorded.Id, runners.NewPushClient(chttp).HistoryFind)
 	}
 
 	if err := runners.FollowLogs(ctx, o.host, o.recorded.LogsToken, o.recorded.Id, 0, os.Stdout); err != nil {
@@ -230,7 +230,7 @@ func (t upload) follow(ctx context.Context, chttp *http.Client, o outcome) error
 	}
 
 	// the runner records the outcome itself, the control plane is only consulted when it can't answer.
-	return history.Await(
+	return computex.Await(
 		ctx,
 		o.recorded.Id,
 		func(ctx context.Context, id string) (*compute.History, error) {
@@ -259,11 +259,11 @@ func followenqueued(ctx context.Context, chttp *http.Client, id string) (err err
 	log.Println("waiting for the workload to start", id)
 	found, err := runners.NewPushClient(chttp).AwaitLogsToken(ctx, id, pollinterval)
 	if errors.Is(err, runners.ErrWorkloadCompleted) {
-		if err = history.Logs(ctx, id, os.Stdout, runners.NewPushClient(chttp).HistoryLogs); err != nil {
+		if err = computex.Logs(ctx, id, os.Stdout, runners.NewPushClient(chttp).HistoryLogs); err != nil {
 			return err
 		}
 
-		return history.Await(ctx, id, runners.NewPushClient(chttp).HistoryFind)
+		return computex.Await(ctx, id, runners.NewPushClient(chttp).HistoryFind)
 	} else if err != nil {
 		return errorsx.Wrap(err, "unable to stream workload logs")
 	}
@@ -283,5 +283,5 @@ func followenqueued(ctx context.Context, chttp *http.Client, id string) (err err
 		return errorsx.Wrap(err, "unable to stream workload logs")
 	}
 
-	return history.Await(ctx, id, runners.NewPushClient(chttp).HistoryFind)
+	return computex.Await(ctx, id, runners.NewPushClient(chttp).HistoryFind)
 }

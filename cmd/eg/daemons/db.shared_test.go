@@ -7,7 +7,7 @@ import (
 
 	"github.com/egdaemon/eg/cmd/eg/daemons"
 	"github.com/egdaemon/eg/cmd/migrations"
-	"github.com/egdaemon/eg/internal/history"
+	"github.com/egdaemon/eg/internal/computex"
 	"github.com/egdaemon/eg/internal/lan"
 	"github.com/egdaemon/eg/internal/langx"
 	"github.com/egdaemon/eg/internal/sqltestx"
@@ -41,13 +41,13 @@ func TestDaemonDatabaseShared(t *testing.T) {
 		}()
 		go func() {
 			defer wg.Done()
-			require.NoError(t, history.EntryUpsert(t.Context(), db, langx.Clone(history.Entry{}, history.EntryOptionTestDefaults, history.EntryOptionID(fmt.Sprintf("w%d", i)))).Scan(&history.Entry{}))
+			require.NoError(t, computex.EntryUpsert(t.Context(), db, langx.Clone(computex.Entry{}, computex.EntryOptionTestDefaults, computex.EntryOptionID(fmt.Sprintf("w%d", i)))).Scan(&computex.Entry{}))
 		}()
 	}
 	wg.Wait()
 
 	for i := range n {
-		require.NoError(t, history.EntryFindByID(t.Context(), db, fmt.Sprintf("w%d", i)).Scan(&history.Entry{}))
+		require.NoError(t, computex.EntryFindByID(t.Context(), db, fmt.Sprintf("w%d", i)).Scan(&computex.Entry{}))
 	}
 
 	var peers []lan.Peer

@@ -1,4 +1,4 @@
-package history_test
+package computex_test
 
 import (
 	"database/sql"
@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"github.com/egdaemon/eg/cmd/migrations"
-	"github.com/egdaemon/eg/internal/history"
+	"github.com/egdaemon/eg/internal/computex"
 	"github.com/egdaemon/eg/internal/langx"
 	"github.com/egdaemon/eg/internal/sqltestx"
 	"github.com/egdaemon/eg/internal/testx"
@@ -23,16 +23,16 @@ func TestPurge(t *testing.T) {
 		logs := filepath.Join(t.TempDir(), "old.log")
 		require.NoError(t, os.WriteFile(logs, []byte("old"), 0600))
 
-		old := langx.Clone(history.Entry{}, history.EntryOptionTestDefaults, func(e *history.Entry) { e.LogsPath = logs })
-		keep := langx.Clone(history.Entry{}, history.EntryOptionTestDefaults)
-		require.NoError(t, history.EntryUpsert(t.Context(), db, old).Scan(&history.Entry{}))
-		require.NoError(t, history.EntryUpsert(t.Context(), db, keep).Scan(&history.Entry{}))
+		old := langx.Clone(computex.Entry{}, computex.EntryOptionTestDefaults, func(e *computex.Entry) { e.LogsPath = logs })
+		keep := langx.Clone(computex.Entry{}, computex.EntryOptionTestDefaults)
+		require.NoError(t, computex.EntryUpsert(t.Context(), db, old).Scan(&computex.Entry{}))
+		require.NoError(t, computex.EntryUpsert(t.Context(), db, keep).Scan(&computex.Entry{}))
 		sqltestx.Exec(t, db, `UPDATE compute_history SET expires_at = now() - INTERVAL '1 minute' WHERE id = ?`, old.ID)
 
-		require.NoError(t, history.Purge(t.Context(), db))
+		require.NoError(t, computex.Purge(t.Context(), db))
 
-		require.ErrorIs(t, history.EntryFindByID(t.Context(), db, old.ID).Scan(&history.Entry{}), sql.ErrNoRows)
-		require.NoError(t, history.EntryFindByID(t.Context(), db, keep.ID).Scan(&history.Entry{}))
+		require.ErrorIs(t, computex.EntryFindByID(t.Context(), db, old.ID).Scan(&computex.Entry{}), sql.ErrNoRows)
+		require.NoError(t, computex.EntryFindByID(t.Context(), db, keep.ID).Scan(&computex.Entry{}))
 		_, err := os.Stat(logs)
 		require.True(t, errors.Is(err, os.ErrNotExist))
 	})

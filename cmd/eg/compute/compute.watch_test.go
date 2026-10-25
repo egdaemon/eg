@@ -13,7 +13,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/egdaemon/eg/internal/history"
+	"github.com/egdaemon/eg/internal/computex"
 	"github.com/egdaemon/eg/runners"
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/libp2p/go-libp2p"
@@ -75,7 +75,7 @@ func TestWorkloadResult(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			chttp, _ := fakeapi(t, map[string]string{"/c/history/w1": c.result})
 
-			err := history.Await(t.Context(), "w1", runners.NewPushClient(chttp).HistoryFind)
+			err := computex.Await(t.Context(), "w1", runners.NewPushClient(chttp).HistoryFind)
 			if c.err == "" {
 				require.NoError(t, err)
 			} else {
@@ -90,7 +90,7 @@ func TestWorkloadResult(t *testing.T) {
 		ctx, cancel := context.WithTimeout(t.Context(), 1500*time.Millisecond)
 		defer cancel()
 
-		require.ErrorIs(t, history.Await(ctx, "w1", runners.NewPushClient(chttp).HistoryFind), context.DeadlineExceeded)
+		require.ErrorIs(t, computex.Await(ctx, "w1", runners.NewPushClient(chttp).HistoryFind), context.DeadlineExceeded)
 		require.GreaterOrEqual(t, len(seen()), 2)
 	})
 }
@@ -99,7 +99,7 @@ func TestStoredLogs(t *testing.T) {
 	t.Run("prints the stored log", func(t *testing.T) {
 		chttp, seen := fakeapi(t, map[string]string{"/c/history/w1/logs": "hello\n"})
 
-		require.NoError(t, history.Logs(t.Context(), "w1", os.Stdout, runners.NewPushClient(chttp).HistoryLogs))
+		require.NoError(t, computex.Logs(t.Context(), "w1", os.Stdout, runners.NewPushClient(chttp).HistoryLogs))
 		require.Equal(t, []string{"/c/history/w1/logs"}, seen())
 	})
 }

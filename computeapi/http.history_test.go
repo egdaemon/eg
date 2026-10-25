@@ -1,4 +1,4 @@
-package historyapi_test
+package computeapi_test
 
 import (
 	"database/sql"
@@ -15,8 +15,7 @@ import (
 
 	"github.com/egdaemon/eg/cmd/migrations"
 	"github.com/egdaemon/eg/compute"
-	"github.com/egdaemon/eg/internal/history"
-	"github.com/egdaemon/eg/internal/historyapi"
+	"github.com/egdaemon/eg/internal/computex"
 	"github.com/egdaemon/eg/internal/langx"
 	"github.com/egdaemon/eg/internal/sqltestx"
 	"github.com/egdaemon/eg/internal/testx"
@@ -30,7 +29,7 @@ func newHistoryServer(t *testing.T) (*httptest.Server, *sql.DB) {
 	db := testx.MustT(migrations.Open(t.Context(), sqltestx.Path(t)))(t)
 	t.Cleanup(func() { _ = db.Close() })
 	r := mux.NewRouter()
-	historyapi.NewHTTPHistory(db, logsecret).Bind(r.PathPrefix("/c/history").Subrouter())
+	computeapi.NewHTTPHistory(db, logsecret).Bind(r.PathPrefix("/c/history").Subrouter())
 	srv := httptest.NewServer(r)
 	t.Cleanup(srv.Close)
 	return srv, db
@@ -74,17 +73,17 @@ func TestHistoryHandler(t *testing.T) {
 		id := uuid.Must(uuid.NewV7()).String()
 		logs := filepath.Join(t.TempDir(), "w.log")
 		require.NoError(t, os.WriteFile(logs, []byte("output"), 0600))
-		require.NoError(t, history.EntryUpsert(t.Context(), db, langx.Clone(history.Entry{}, history.EntryOptionTestDefaults, history.EntryOptionID(id), func(e *history.Entry) {
-			e.Result = history.ResultFailure
+		require.NoError(t, computex.EntryUpsert(t.Context(), db, langx.Clone(computex.Entry{}, computex.EntryOptionTestDefaults, computex.EntryOptionID(id), func(e *computex.Entry) {
+			e.Result = computex.ResultFailure
 			e.LogsPath = logs
-		})).Scan(&history.Entry{}))
+		})).Scan(&computex.Entry{}))
 
 		resp := historyRequest(t, srv, "/c/history/"+id, logsToken(t, id))
 		require.Equal(t, http.StatusOK, resp.StatusCode)
 		var out compute.HistoryFindResponse
 		require.NoError(t, json.NewDecoder(resp.Body).Decode(&out))
 		require.Equal(t, id, out.History.Id)
-		require.EqualValues(t, history.ResultFailure, out.History.Result)
+		require.EqualValues(t, computex.ResultFailure, out.History.Result)
 
 		resp = historyRequest(t, srv, "/c/history/"+id+"/logs", logsToken(t, id))
 		require.Equal(t, http.StatusOK, resp.StatusCode)

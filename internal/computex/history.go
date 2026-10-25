@@ -1,6 +1,6 @@
 // Package history records the workloads a runner completed so the runner can answer for their
 // result and logs without the control plane. records expire, see DefaultTTL.
-package history
+package computex
 
 import (
 	"context"

@@ -19,10 +19,10 @@ import (
 	"slices"
 
 	"github.com/egdaemon/eg/cmd/migrations"
+	"github.com/egdaemon/eg/internal/computex"
 	"github.com/egdaemon/eg/internal/debugx"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/fsx"
-	"github.com/egdaemon/eg/internal/history"
 	"github.com/egdaemon/eg/internal/httpx"
 	"github.com/egdaemon/eg/internal/md5x"
 	"github.com/egdaemon/eg/internal/sqltestx"
@@ -73,8 +73,8 @@ func TestQueue(t *testing.T) {
 		err := runners.RunOne(ctx, 99, 0, httpx.NewFixedStatusClient(http.StatusNotImplemented), rm, &dirs, reload, runners.QueueOptionCompletion(&c), runners.QueueOptionHistory(db, logs))
 		require.ErrorIs(t, err, context.Canceled)
 
-		var entry history.Entry
-		require.NoError(t, history.EntryFindByID(t.Context(), db, uid.String()).Scan(&entry))
+		var entry computex.Entry
+		require.NoError(t, computex.EntryFindByID(t.Context(), db, uid.String()).Scan(&entry))
 		require.Equal(t, filepath.Join(logs, uid.String()+".log"), entry.LogsPath)
 		require.FileExists(t, entry.LogsPath)
 	})

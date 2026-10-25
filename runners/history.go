@@ -11,8 +11,8 @@ import (
 
 	"github.com/egdaemon/eg/computeapi"
 
+	"github.com/egdaemon/eg/internal/computex"
 	"github.com/egdaemon/eg/internal/errorsx"
-	"github.com/egdaemon/eg/internal/history"
 )
 
 // historyrecorder keeps the outcome of completed workloads locally so the runner can answer for them
@@ -27,28 +27,28 @@ type historyrecorder struct {
 func (t historyrecorder) record(ctx context.Context, workload *computeapi.Enqueued, cause error, duration time.Duration, logpath string) (err error) {
 	now := time.Now()
 
-	entry := history.Entry{
+	entry := computex.Entry{
 		ID:          workload.Id,
 		Description: workload.Description,
 		VcsURI:      workload.VcsUri,
 		VcsCommit:   workload.VcsCommit,
-		Result:      history.ResultFrom(cause),
+		Result:      computex.ResultFrom(cause),
 		CreatedAt:   now,
 		InitiatedAt: now.Add(-duration),
 		CompletedAt: now,
 		Duration:    int64(duration),
-		ExpiresAt:   now.Add(history.DefaultTTL),
+		ExpiresAt:   now.Add(computex.DefaultTTL),
 	}
 
 	if entry.LogsPath, err = t.keeplogs(workload.Id, logpath); err != nil {
 		return err
 	}
 
-	if err = history.EntryUpsert(ctx, t.db, entry).Scan(&entry); err != nil {
+	if err = computex.EntryUpsert(ctx, t.db, entry).Scan(&entry); err != nil {
 		return errorsx.Wrap(err, "unable to record the workload")
 	}
 
-	return history.Purge(ctx, t.db)
+	return computex.Purge(ctx, t.db)
 }
 
 // keeplogs keeps the log of the workload beyond the workload's directory by linking it into the history

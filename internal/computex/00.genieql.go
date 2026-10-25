@@ -1,6 +1,6 @@
 //go:build genieql.generate
 
-package history
+package computex
 
 import (
 	"context"

@@ -7,8 +7,8 @@ import (
 	"net/http"
 
 	"github.com/egdaemon/eg/cmd/cmdopts"
+	"github.com/egdaemon/eg/computeapi"
 	"github.com/egdaemon/eg/internal/envx"
-	"github.com/egdaemon/eg/internal/historyapi"
 	"github.com/egdaemon/eg/internal/httpx"
 	"github.com/egdaemon/eg/runners"
 	"github.com/gorilla/mux"
@@ -46,10 +46,10 @@ func HTTP(global *cmdopts.Global, httpl net.Listener, rm *runners.ResourceManage
 	httpmux.Handle("/c/logs/{id}", alice.New(httpx.RouteInvoked, apigate).Then(NewLogsHandler())).Methods(http.MethodGet)
 
 	// GET /c/history/{id} and GET /c/history/{id}/logs report the recorded result and logs of a workload this
-	// runner completed, authorized by the same log token. See historyapi for the (independently testable) implementation.
+	// runner completed, authorized by the same log token. See computeapi for the (independently testable) implementation.
 	historyr := httpmux.PathPrefix("/c/history").Subrouter()
 	historyr.Use(apigate)
-	historyapi.NewHTTPHistory(db, JWTSecret()).Bind(historyr)
+	computeapi.NewHTTPHistory(db, JWTSecret()).Bind(historyr)
 
 	global.Cleanup.Go(func() {
 		defer global.Shutdown(nil)

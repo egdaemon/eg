@@ -1,4 +1,4 @@
-package historyapi
+package computeapi
 
 import (
 	"bytes"
@@ -10,11 +10,9 @@ import (
 	"os"
 	"time"
 
-	"github.com/egdaemon/eg/computeapi"
-
 	"github.com/egdaemon/eg/compute"
+	"github.com/egdaemon/eg/internal/computex"
 	"github.com/egdaemon/eg/internal/errorsx"
-	"github.com/egdaemon/eg/internal/history"
 	"github.com/egdaemon/eg/internal/httpx"
 	"github.com/egdaemon/eg/internal/jwtx"
 	"github.com/gofrs/uuid/v5"
@@ -22,7 +20,7 @@ import (
 )
 
 // NewHTTPHistory constructs the history service over the database, authorizing requests with log tokens
-// (computeapi.LogClaims) signed with the secret, the runner's in-memory jwt secret.
+// (LogClaims) signed with the secret, the runner's in-memory jwt secret.
 func NewHTTPHistory(db *sql.DB, secret jwtx.JWTSecretSource) *HistoryService {
 	return &HistoryService{
 		db:     db,
@@ -31,8 +29,8 @@ func NewHTTPHistory(db *sql.DB, secret jwtx.JWTSecretSource) *HistoryService {
 }
 
 // HistoryService implements GET /{id} and GET /{id}/logs: the recorded outcome
-// and the logs of a workload this runner completed, until the record expires (history.DefaultTTL).
-// the request must present a log token (computeapi.LogClaims) for the workload signed with this runner's secret.
+// and the logs of a workload this runner completed, until the record expires (computex.DefaultTTL).
+// the request must present a log token (LogClaims) for the workload signed with this runner's secret.
 type HistoryService struct {
 	db     *sql.DB
 	secret jwtx.JWTSecretSource
@@ -54,8 +52,8 @@ func (t *HistoryService) find(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var rec history.Entry
-	err := history.EntryFindByID(r.Context(), t.db, uid.String()).Scan(&rec)
+	var rec computex.Entry
+	err := computex.EntryFindByID(r.Context(), t.db, uid.String()).Scan(&rec)
 	if errors.Is(err, sql.ErrNoRows) {
 		errorsx.Log(httpx.WriteEmptyJSON(w, http.StatusNotFound))
 		return
@@ -86,8 +84,8 @@ func (t *HistoryService) logs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var rec history.Entry
-	err := history.EntryFindByID(r.Context(), t.db, uid.String()).Scan(&rec)
+	var rec computex.Entry
+	err := computex.EntryFindByID(r.Context(), t.db, uid.String()).Scan(&rec)
 	if errors.Is(err, sql.ErrNoRows) {
 		errorsx.Log(httpx.WriteEmptyJSON(w, http.StatusNotFound))
 		return
@@ -127,7 +125,7 @@ func (t *HistoryService) logs(w http.ResponseWriter, r *http.Request) {
 func (t *HistoryService) authorize(w http.ResponseWriter, r *http.Request) (uid uuid.UUID, ok bool) {
 	var (
 		err    error
-		claims computeapi.LogClaims
+		claims LogClaims
 	)
 
 	if uid, err = uuid.FromString(mux.Vars(r)["id"]); err != nil {

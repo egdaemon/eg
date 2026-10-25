@@ -1,11 +1,11 @@
-package history_test
+package computex_test
 
 import (
 	"database/sql"
 	"testing"
 
 	"github.com/egdaemon/eg/cmd/migrations"
-	"github.com/egdaemon/eg/internal/history"
+	"github.com/egdaemon/eg/internal/computex"
 	"github.com/egdaemon/eg/internal/langx"
 	"github.com/egdaemon/eg/internal/sqltestx"
 	"github.com/egdaemon/eg/internal/testx"
@@ -17,17 +17,17 @@ func TestEntryFindByID(t *testing.T) {
 		db := testx.MustT(migrations.Open(t.Context(), sqltestx.Path(t)))(t)
 		defer db.Close()
 
-		require.ErrorIs(t, history.EntryFindByID(t.Context(), db, "missing").Scan(&history.Entry{}), sql.ErrNoRows)
+		require.ErrorIs(t, computex.EntryFindByID(t.Context(), db, "missing").Scan(&computex.Entry{}), sql.ErrNoRows)
 	})
 
 	t.Run("expired outcomes are not found before they are purged", func(t *testing.T) {
 		db := testx.MustT(migrations.Open(t.Context(), sqltestx.Path(t)))(t)
 		defer db.Close()
 
-		e := langx.Clone(history.Entry{}, history.EntryOptionTestDefaults)
-		require.NoError(t, history.EntryUpsert(t.Context(), db, e).Scan(&history.Entry{}))
+		e := langx.Clone(computex.Entry{}, computex.EntryOptionTestDefaults)
+		require.NoError(t, computex.EntryUpsert(t.Context(), db, e).Scan(&computex.Entry{}))
 		sqltestx.Exec(t, db, `UPDATE compute_history SET expires_at = now() - INTERVAL '1 minute'`)
 
-		require.ErrorIs(t, history.EntryFindByID(t.Context(), db, e.ID).Scan(&history.Entry{}), sql.ErrNoRows)
+		require.ErrorIs(t, computex.EntryFindByID(t.Context(), db, e.ID).Scan(&computex.Entry{}), sql.ErrNoRows)
 	})
 }

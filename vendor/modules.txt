@@ -512,7 +512,7 @@ github.com/ebitengine/purego/internal/fakecgo
 github.com/ebitengine/purego/internal/strings
 github.com/ebitengine/purego/internal/xreflect
 # github.com/egdaemon/eg v0.0.0-20261021193502-1257c4c0a358
-## explicit; go 1.26.3
+## explicit; go 1.27.2
 # github.com/egdaemon/gdx v0.0.0-20260824162813-84291833ef44
 ## explicit; go 1.25.8
 github.com/egdaemon/gdx

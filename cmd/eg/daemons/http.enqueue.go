@@ -2,7 +2,7 @@ package daemons
 
 import (
 	"bytes"
-	"encoding/json"
+	"github.com/egdaemon/eg/jsonx"
 	"log"
 	"mime/multipart"
 	"net/http"
@@ -59,7 +59,7 @@ func (t *EnqueueHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	)
 
 	encoded := []byte(r.FormValue("enqueued"))
-	if err = json.Unmarshal(encoded, &req); err != nil {
+	if err = jsonx.Unmarshal(encoded, &req); err != nil {
 		log.Println(errorsx.Wrap(err, "unable to decode enqueue request"))
 		errorsx.Log(httpx.WriteEmptyJSON(w, http.StatusBadRequest))
 		return

@@ -3,8 +3,8 @@ package runners
 import (
 	"bufio"
 	"context"
-	"encoding/json"
 	"fmt"
+	"github.com/egdaemon/eg/jsonx"
 	"io"
 	"net/http"
 	"net/url"
@@ -72,7 +72,7 @@ func RunnerHistoryFind(ctx context.Context, p2p host.Host, token string, id stri
 	}
 	defer closer()
 
-	if err = json.NewDecoder(resp.Body).Decode(&out); err != nil {
+	if err = jsonx.UnmarshalRead(resp.Body, &out); err != nil {
 		return nil, errorsx.Wrap(err, "unable to decode history")
 	}
 

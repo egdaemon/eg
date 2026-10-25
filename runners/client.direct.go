@@ -2,8 +2,8 @@ package runners
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
+	"github.com/egdaemon/eg/jsonx"
 	"io"
 	"net/http"
 
@@ -53,7 +53,7 @@ func (t DirectClient) Reserve(ctx context.Context, enq *computeapi.Enqueued, arc
 		return nil, err
 	}
 
-	if err = json.NewDecoder(httpresp.Body).Decode(&resp); err != nil {
+	if err = jsonx.UnmarshalRead(httpresp.Body, &resp); err != nil {
 		return nil, errorsx.Wrap(err, "unable to decode workload metadata")
 	}
 

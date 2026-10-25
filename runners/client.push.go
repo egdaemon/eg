@@ -3,8 +3,8 @@ package runners
 import (
 	"bufio"
 	"context"
-	"encoding/json"
 	"fmt"
+	"github.com/egdaemon/eg/jsonx"
 	"io"
 	"log"
 	"net/http"
@@ -82,7 +82,7 @@ func (t PushClient) Candidates(ctx context.Context, enq *computeapi.Enqueued, li
 		return nil, err
 	}
 
-	if err = json.NewDecoder(httpresp.Body).Decode(&resp); err != nil {
+	if err = jsonx.UnmarshalRead(httpresp.Body, &resp); err != nil {
 		return nil, errorsx.Wrap(err, "unable to decode candidates")
 	}
 
@@ -177,7 +177,7 @@ func Upload(ctx context.Context, p2p host.Host, candidate *compute.Compute, req 
 		// the runner responds with the workload as recorded by the control plane,
 		// including the log token for streaming its logs.
 		recorded = &computeapi.Enqueued{}
-		if err = json.NewDecoder(resp.Body).Decode(recorded); err != nil {
+		if err = jsonx.UnmarshalRead(resp.Body, recorded); err != nil {
 			return nil, errorsx.Wrap(err, "unable to decode recorded workload")
 		}
 

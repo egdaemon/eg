@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/egdaemon/eg/jsonx"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -127,5 +128,5 @@ func do(ctx context.Context, c *http.Client, method string, target string, in an
 		return nil
 	}
 
-	return errorsx.Wrap(json.NewDecoder(resp.Body).Decode(out), "unable to decode response")
+	return errorsx.Wrap(jsonx.UnmarshalRead(resp.Body, out), "unable to decode response")
 }

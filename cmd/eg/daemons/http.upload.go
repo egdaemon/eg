@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"github.com/egdaemon/eg/jsonx"
 	"io"
 	"log"
 	"mime/multipart"
@@ -62,7 +63,7 @@ func (t *UploadHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		kernelc, envc multipart.File
 	)
 
-	if err = json.Unmarshal([]byte(r.FormValue("enqueued")), &req); err != nil {
+	if err = jsonx.Unmarshal([]byte(r.FormValue("enqueued")), &req); err != nil {
 		log.Println(errorsx.Wrap(err, "unable to decode upload request"))
 		errorsx.Log(httpx.WriteEmptyJSON(w, http.StatusBadRequest))
 		return

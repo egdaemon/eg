@@ -129,13 +129,13 @@ type Token struct {
 	unknownFields protoimpl.UnknownFields
 
 	// START OF STANDARD FIELDS
-	Id               string `protobuf:"bytes,1,opt,name=id,json=jti,proto3" json:"id,omitempty"`
-	AccountId        string `protobuf:"bytes,2,opt,name=account_id,json=iss,proto3" json:"account_id,omitempty"`
-	ProfileId        string `protobuf:"bytes,3,opt,name=profile_id,json=sub,proto3" json:"profile_id,omitempty"`
-	SessionId        string `protobuf:"bytes,4,opt,name=session_id,json=sid,proto3" json:"session_id,omitempty"`
-	Issued           int64  `protobuf:"varint,5,opt,name=issued,json=iat,proto3" json:"issued,omitempty"`
-	Expires          int64  `protobuf:"varint,6,opt,name=expires,json=exp,proto3" json:"expires,omitempty"`
-	NotBefore        int64  `protobuf:"varint,7,opt,name=not_before,json=nbf,proto3" json:"not_before,omitempty"`
+	Id               string `protobuf:"bytes,1,opt,name=id,json=jti,proto3" json:"jti,omitempty"`
+	AccountId        string `protobuf:"bytes,2,opt,name=account_id,json=iss,proto3" json:"iss,omitempty"`
+	ProfileId        string `protobuf:"bytes,3,opt,name=profile_id,json=sub,proto3" json:"sub,omitempty"`
+	SessionId        string `protobuf:"bytes,4,opt,name=session_id,json=sid,proto3" json:"sid,omitempty"`
+	Issued           int64  `protobuf:"varint,5,opt,name=issued,json=iat,proto3" json:"iat,omitempty,string"`
+	Expires          int64  `protobuf:"varint,6,opt,name=expires,json=exp,proto3" json:"exp,omitempty,string"`
+	NotBefore        int64  `protobuf:"varint,7,opt,name=not_before,json=nbf,proto3" json:"nbf,omitempty,string"`
 	Bearer           string `protobuf:"bytes,8,opt,name=bearer,proto3" json:"bearer,omitempty"`
 	ComputeRead      bool   `protobuf:"varint,1000,opt,name=compute_read,proto3" json:"compute_read,omitempty"`
 	ComputeModify    bool   `protobuf:"varint,1002,opt,name=compute_modify,proto3" json:"compute_modify,omitempty"`
@@ -147,7 +147,7 @@ type Token struct {
 	// workload task. it is never *written* to in the code base, only manually
 	// changed in the DB.
 	ComputeShared    bool   `protobuf:"varint,1007,opt,name=compute_shared,proto3" json:"compute_shared,omitempty"`
-	ComputeRemaining uint64 `protobuf:"varint,1008,opt,name=compute_remaining,proto3" json:"compute_remaining,omitempty"`
+	ComputeRemaining uint64 `protobuf:"varint,1008,opt,name=compute_remaining,proto3" json:"compute_remaining,omitempty,string"`
 }
 
 func (x *Token) Reset() {

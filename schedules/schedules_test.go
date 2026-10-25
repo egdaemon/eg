@@ -29,7 +29,7 @@ func TestCreate(t *testing.T) {
 		c := newclient(t, func(w http.ResponseWriter, r *http.Request) {
 			var body struct {
 				Schedule struct {
-					Cron  string `json:"chron"`
+					Cron  string `json:"cron"`
 					Entry string `json:"entrypoint"`
 					TTL   string `json:"ttl"`
 				} `json:"schedule"`
@@ -42,7 +42,7 @@ func TestCreate(t *testing.T) {
 			require.Equal(t, "1d", body.Schedule.Cron)
 			require.Equal(t, "tests/stress", body.Schedule.Entry)
 			require.Equal(t, "3600000", body.Schedule.TTL)
-			fmt.Fprint(w, `{"schedule":{"id":"s1","chron":"1d","entrypoint":"tests/stress","nextrun_at":"2026-10-17T00:00:00Z"}}`)
+			fmt.Fprint(w, `{"schedule":{"id":"s1","cron":"1d","entrypoint":"tests/stress","nextrun_at":"2026-10-17T00:00:00Z"}}`)
 		})
 
 		s, err := schedules.Create(t.Context(), c, &schedules.Schedule{Cron: "1d", Entry: "tests/stress", Ttl: 3600000})
@@ -79,7 +79,7 @@ func TestSearch(t *testing.T) {
 			require.Equal(t, "nightly", r.URL.Query().Get("query"))
 			require.Equal(t, "2", r.URL.Query().Get("offset"))
 			require.Equal(t, "50", r.URL.Query().Get("limit"))
-			fmt.Fprint(w, `{"next":{"offset":"3","limit":"50"},"items":[{"id":"s1","chron":"1d","entrypoint":"tests/stress","cores":"8"}]}`)
+			fmt.Fprint(w, `{"next":{"offset":"3","limit":"50"},"items":[{"id":"s1","cron":"1d","entrypoint":"tests/stress","cores":"8"}]}`)
 		})
 
 		page, err := schedules.Search(t.Context(), c, &schedules.ScheduleSearchRequest{

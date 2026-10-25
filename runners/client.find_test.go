@@ -2,6 +2,7 @@ package runners
 
 import (
 	"bytes"
+	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -18,7 +19,7 @@ import (
 
 func TestAwaitLogsToken(t *testing.T) {
 	respond := func(w http.ResponseWriter, e *computeapi.Enqueued) {
-		b, err := (&computeapi.EnqueuedFindResponse{Enqueued: e}).MarshalJSON()
+		b, err := json.Marshal(&computeapi.EnqueuedFindResponse{Enqueued: e})
 		require.NoError(t, err)
 		_, _ = w.Write(b)
 	}

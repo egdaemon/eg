@@ -3,8 +3,8 @@ package compute
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"errors"
+	"github.com/egdaemon/eg/jsonx"
 	"io"
 	"log"
 	"net/http"
@@ -287,7 +287,7 @@ func (t upload) enqueue(ctx context.Context, chttp *http.Client, enq *computeapi
 		return nil, errorsx.Wrap(err, "unable to upload kernel for processing")
 	}
 
-	if err = json.NewDecoder(resp.Body).Decode(&e); err != nil {
+	if err = jsonx.UnmarshalRead(resp.Body, &e); err != nil {
 		return nil, errorsx.Wrap(err, "unable to decode response")
 	}
 

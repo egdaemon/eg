@@ -3,8 +3,8 @@ package compute
 import (
 	"bytes"
 	context "context"
-	"encoding/json"
 	"fmt"
+	"github.com/egdaemon/eg/jsonx"
 	"io"
 	"net/http"
 	"time"
@@ -17,7 +17,6 @@ import (
 	"github.com/golang-jwt/jwt/v4"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/oauth2"
-	"google.golang.org/protobuf/encoding/protojson"
 )
 
 func (t *Token) Valid() error {
@@ -29,15 +28,6 @@ func (t *Token) Valid() error {
 		ExpiresAt: jwt.NewNumericDate(time.Unix(t.Expires, 0)),
 		NotBefore: jwt.NewNumericDate(time.Unix(t.NotBefore, 0)),
 	}.Valid()
-}
-
-func (t *Token) MarshalJSON() ([]byte, error) {
-	return protojson.Marshal(t)
-}
-
-// UnmarshalJSON ignores unknown fields, the meta authz endpoint issues tokens with additional permissions.
-func (t *Token) UnmarshalJSON(b []byte) error {
-	return protojson.UnmarshalOptions{DiscardUnknown: true}.Unmarshal(b, t)
 }
 
 func NewAuthzTokenSource(c *http.Client, signer ssh.Signer, endpoint string, account string) TokenSourceFromEndpoint {
@@ -123,7 +113,7 @@ func (t TokenSourceFromEndpoint) Token() (_ *oauth2.Token, err error) {
 	}
 	defer httpx.AutoClose(resp)
 
-	if err = json.NewDecoder(resp.Body).Decode(&m); err != nil {
+	if err = jsonx.UnmarshalRead(resp.Body, &m); err != nil {
 		return nil, err
 	}
 

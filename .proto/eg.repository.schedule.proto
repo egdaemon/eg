@@ -11,7 +11,7 @@ message Schedule {
   string nextrun_at = 6 [ json_name = "nextrun_at" ];
   string description = 7 [ json_name = "description" ];
   string vcs_uri = 8 [ json_name = "vcs_uri" ];
-  string cron = 9 [ json_name = "chron" ];
+  string cron = 9 [ json_name = "cron" ];
   string mimetype = 10 [ json_name = "mimetype" ];
   reserved 11 to 99;
   string entry = 100 [ json_name = "entrypoint" ];

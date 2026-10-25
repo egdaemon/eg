@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/egdaemon/eg/jsonx"
 	"net/http"
 	"runtime"
 
@@ -140,7 +141,7 @@ func (t WorkloadClient) Download(ctx context.Context, limits RuntimeResources) (
 		return nil, err
 	}
 
-	if err = json.NewDecoder(dhttpresp.Body).Decode(&resp); err != nil {
+	if err = jsonx.UnmarshalRead(dhttpresp.Body, &resp); err != nil {
 		return nil, err
 	}
 

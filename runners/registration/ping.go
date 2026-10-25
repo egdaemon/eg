@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/egdaemon/eg/jsonx"
 	"net/http"
 
 	"github.com/egdaemon/eg"
@@ -48,7 +49,7 @@ func (t PingClient) Request(ctx context.Context, id string, req *PingRequest) (_
 		return nil, err
 	}
 
-	if err = json.NewDecoder(httpresp.Body).Decode(&resp); err != nil {
+	if err = jsonx.UnmarshalRead(httpresp.Body, &resp); err != nil {
 		return nil, err
 	}
 
@@ -72,7 +73,7 @@ func (t PingClient) Meta(ctx context.Context) (_ *PingResponse, err error) {
 		return nil, err
 	}
 
-	if err = json.NewDecoder(httpresp.Body).Decode(&resp); err != nil {
+	if err = jsonx.UnmarshalRead(httpresp.Body, &resp); err != nil {
 		return nil, err
 	}
 

@@ -2,9 +2,9 @@ package runners
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/egdaemon/eg/jsonx"
 	"io"
 	"net/http"
 	"net/url"
@@ -40,7 +40,7 @@ func (t PushClient) Find(ctx context.Context, id string) (_ *computeapi.Enqueued
 		return nil, err
 	}
 
-	if err = json.NewDecoder(httpresp.Body).Decode(&resp); err != nil {
+	if err = jsonx.UnmarshalRead(httpresp.Body, &resp); err != nil {
 		return nil, errorsx.Wrap(err, "unable to decode workload")
 	}
 
@@ -117,7 +117,7 @@ func (t PushClient) HistoryFind(ctx context.Context, id string) (_ *compute.Hist
 		return nil, err
 	}
 
-	if err = json.NewDecoder(httpresp.Body).Decode(&resp); err != nil {
+	if err = jsonx.UnmarshalRead(httpresp.Body, &resp); err != nil {
 		return nil, errorsx.Wrap(err, "unable to decode history")
 	}
 

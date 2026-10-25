@@ -6,6 +6,7 @@ import (
 	"crypto/md5"
 	"encoding/json"
 	"errors"
+	"github.com/egdaemon/eg/jsonx"
 	"log"
 	"net/http"
 	"os"
@@ -127,7 +128,7 @@ func compilebegin(md compilemetadata, dir string) state {
 		return md.done(dir, errorsx.Wrap(err, "unable to read compile request"))
 	}
 
-	if err = json.Unmarshal(encoded, &req); err != nil {
+	if err = jsonx.Unmarshal(encoded, &req); err != nil {
 		return md.done(dir, errorsx.Wrap(err, "unable to decode compile request"))
 	}
 

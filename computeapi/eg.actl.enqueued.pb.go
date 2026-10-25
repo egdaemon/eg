@@ -28,12 +28,12 @@ type Enqueued struct {
 	UpdatedAt   string                 `protobuf:"bytes,3,opt,name=updated_at,proto3" json:"updated_at,omitempty"`
 	Arch        string                 `protobuf:"bytes,4,opt,name=arch,proto3" json:"arch,omitempty"`
 	Os          string                 `protobuf:"bytes,5,opt,name=os,proto3" json:"os,omitempty"`
-	Cores       uint64                 `protobuf:"varint,6,opt,name=cores,proto3" json:"cores,omitempty"`
-	Memory      uint64                 `protobuf:"varint,7,opt,name=memory,proto3" json:"memory,omitempty"`
-	Vram        uint64                 `protobuf:"varint,8,opt,name=vram,proto3" json:"vram,omitempty"`
-	Ttl         uint64                 `protobuf:"varint,9,opt,name=ttl,proto3" json:"ttl,omitempty"`
-	ClusterId   string                 `protobuf:"bytes,10,opt,name=cluster_id,json=cid,proto3" json:"cluster_id,omitempty"`
-	Entry       string                 `protobuf:"bytes,11,opt,name=entry,json=entrypoint,proto3" json:"entry,omitempty"`
+	Cores       uint64                 `protobuf:"varint,6,opt,name=cores,proto3" json:"cores,omitempty,string"`
+	Memory      uint64                 `protobuf:"varint,7,opt,name=memory,proto3" json:"memory,omitempty,string"`
+	Vram        uint64                 `protobuf:"varint,8,opt,name=vram,proto3" json:"vram,omitempty,string"`
+	Ttl         uint64                 `protobuf:"varint,9,opt,name=ttl,proto3" json:"ttl,omitempty,string"`
+	ClusterId   string                 `protobuf:"bytes,10,opt,name=cluster_id,json=cid,proto3" json:"cid,omitempty"`
+	Entry       string                 `protobuf:"bytes,11,opt,name=entry,json=entrypoint,proto3" json:"entrypoint,omitempty"`
 	InitiatedAt string                 `protobuf:"bytes,12,opt,name=initiated_at,proto3" json:"initiated_at,omitempty"`
 	CompletedAt string                 `protobuf:"bytes,13,opt,name=completed_at,proto3" json:"completed_at,omitempty"`
 	Description string                 `protobuf:"bytes,14,opt,name=description,proto3" json:"description,omitempty"`
@@ -249,14 +249,14 @@ func (x *Enqueued) GetSecretUris() []string {
 type EnqueuedSearchRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Query         string                 `protobuf:"bytes,1,opt,name=query,proto3" json:"query,omitempty"`
-	Offset        uint64                 `protobuf:"varint,2,opt,name=offset,proto3" json:"offset,omitempty"`
-	Limit         uint64                 `protobuf:"varint,3,opt,name=limit,proto3" json:"limit,omitempty"`
+	Offset        uint64                 `protobuf:"varint,2,opt,name=offset,proto3" json:"offset,omitempty,string"`
+	Limit         uint64                 `protobuf:"varint,3,opt,name=limit,proto3" json:"limit,omitempty,string"`
 	Arch          string                 `protobuf:"bytes,4,opt,name=arch,proto3" json:"arch,omitempty"`
 	Os            string                 `protobuf:"bytes,5,opt,name=os,proto3" json:"os,omitempty"`
-	Cores         uint64                 `protobuf:"varint,6,opt,name=cores,proto3" json:"cores,omitempty"`
-	Memory        uint64                 `protobuf:"varint,7,opt,name=memory,proto3" json:"memory,omitempty"`
-	Vram          uint64                 `protobuf:"varint,8,opt,name=vram,proto3" json:"vram,omitempty"`
-	ClusterId     string                 `protobuf:"bytes,9,opt,name=cluster_id,json=cid,proto3" json:"cluster_id,omitempty"`
+	Cores         uint64                 `protobuf:"varint,6,opt,name=cores,proto3" json:"cores,omitempty,string"`
+	Memory        uint64                 `protobuf:"varint,7,opt,name=memory,proto3" json:"memory,omitempty,string"`
+	Vram          uint64                 `protobuf:"varint,8,opt,name=vram,proto3" json:"vram,omitempty,string"`
+	ClusterId     string                 `protobuf:"bytes,9,opt,name=cluster_id,json=cid,proto3" json:"cid,omitempty"`
 	VcsUri        string                 `protobuf:"bytes,10,opt,name=vcs_uri,proto3" json:"vcs_uri,omitempty"`
 	Labels        []string               `protobuf:"bytes,1000,rep,name=labels,proto3" json:"labels,omitempty"`
 	unknownFields protoimpl.UnknownFields
@@ -424,7 +424,7 @@ func (x *EnqueuedSearchResponse) GetItems() []*Enqueued {
 
 type EnqueuedCreateRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Enqueued      *Enqueued              `protobuf:"bytes,1,opt,name=enqueued,json=enqueue,proto3" json:"enqueued,omitempty"`
+	Enqueued      *Enqueued              `protobuf:"bytes,1,opt,name=enqueued,json=enqueue,proto3" json:"enqueue,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -468,7 +468,7 @@ func (x *EnqueuedCreateRequest) GetEnqueued() *Enqueued {
 
 type EnqueuedCreateResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Enqueued      *Enqueued              `protobuf:"bytes,1,opt,name=enqueued,json=enqueue,proto3" json:"enqueued,omitempty"`
+	Enqueued      *Enqueued              `protobuf:"bytes,1,opt,name=enqueued,json=enqueue,proto3" json:"enqueue,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -512,7 +512,7 @@ func (x *EnqueuedCreateResponse) GetEnqueued() *Enqueued {
 
 type EnqueuedUpdateRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Enqueued      *Enqueued              `protobuf:"bytes,1,opt,name=enqueued,json=enqueue,proto3" json:"enqueued,omitempty"`
+	Enqueued      *Enqueued              `protobuf:"bytes,1,opt,name=enqueued,json=enqueue,proto3" json:"enqueue,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -556,7 +556,7 @@ func (x *EnqueuedUpdateRequest) GetEnqueued() *Enqueued {
 
 type EnqueuedUpdateResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Enqueued      *Enqueued              `protobuf:"bytes,1,opt,name=enqueued,json=enqueue,proto3" json:"enqueued,omitempty"`
+	Enqueued      *Enqueued              `protobuf:"bytes,1,opt,name=enqueued,json=enqueue,proto3" json:"enqueue,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -724,7 +724,7 @@ func (*EnqueuedCompletedRequest) Descriptor() ([]byte, []int) {
 
 type EnqueuedCompletedResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Enqueued      *Enqueued              `protobuf:"bytes,1,opt,name=enqueued,json=enqueue,proto3" json:"enqueued,omitempty"`
+	Enqueued      *Enqueued              `protobuf:"bytes,1,opt,name=enqueued,json=enqueue,proto3" json:"enqueue,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -768,7 +768,7 @@ func (x *EnqueuedCompletedResponse) GetEnqueued() *Enqueued {
 
 type EnqueuedFindRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Enqueued      *Enqueued              `protobuf:"bytes,1,opt,name=enqueued,json=enqueue,proto3" json:"enqueued,omitempty"`
+	Enqueued      *Enqueued              `protobuf:"bytes,1,opt,name=enqueued,json=enqueue,proto3" json:"enqueue,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -812,7 +812,7 @@ func (x *EnqueuedFindRequest) GetEnqueued() *Enqueued {
 
 type EnqueuedFindResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Enqueued      *Enqueued              `protobuf:"bytes,1,opt,name=enqueued,json=enqueue,proto3" json:"enqueued,omitempty"`
+	Enqueued      *Enqueued              `protobuf:"bytes,1,opt,name=enqueued,json=enqueue,proto3" json:"enqueue,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }

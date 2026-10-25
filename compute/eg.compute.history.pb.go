@@ -31,7 +31,7 @@ type History struct {
 	CreatedAt   string `protobuf:"bytes,3,opt,name=created_at,proto3" json:"created_at,omitempty"`
 	InitiatedAt string `protobuf:"bytes,4,opt,name=initiated_at,proto3" json:"initiated_at,omitempty"`
 	CompletedAt string `protobuf:"bytes,5,opt,name=completed_at,proto3" json:"completed_at,omitempty"`
-	Duration    int64  `protobuf:"varint,6,opt,name=duration,proto3" json:"duration,omitempty"`
+	Duration    int64  `protobuf:"varint,6,opt,name=duration,proto3" json:"duration,omitempty,string"`
 	// 0 unknown, 1 failure, 2 completed, 3 cancelled.
 	Result     int32  `protobuf:"varint,7,opt,name=result,proto3" json:"result,omitempty"`
 	UploadedBy string `protobuf:"bytes,8,opt,name=uploaded_by,proto3" json:"uploaded_by,omitempty"`

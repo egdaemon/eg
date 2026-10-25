@@ -2,8 +2,8 @@ package compute
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
+	"github.com/egdaemon/eg/jsonx"
 	"log"
 	"net/http"
 	"os"
@@ -223,7 +223,7 @@ func (t builtinUpload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err e
 		return errorsx.Wrap(err, "unable to upload kernel for processing")
 	}
 
-	if err = json.NewDecoder(resp.Body).Decode(&e); err != nil {
+	if err = jsonx.UnmarshalRead(resp.Body, &e); err != nil {
 		return errorsx.Wrap(err, "unable to decode response")
 	}
 

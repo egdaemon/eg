@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/egdaemon/eg/jsonx"
 	"net/http"
 
 	"github.com/egdaemon/eg"
@@ -48,7 +49,7 @@ func (t RegistrationClient) Registration(ctx context.Context, req *RegistrationR
 		return nil, err
 	}
 
-	if err = json.NewDecoder(httpresp.Body).Decode(&resp); err != nil {
+	if err = jsonx.UnmarshalRead(httpresp.Body, &resp); err != nil {
 		return nil, err
 	}
 
@@ -76,7 +77,7 @@ func (t RegistrationClient) Search(ctx context.Context, req *RegistrationSearchR
 		return nil, err
 	}
 
-	if err = json.NewDecoder(httpresp.Body).Decode(&resp); err != nil {
+	if err = jsonx.UnmarshalRead(httpresp.Body, &resp); err != nil {
 		return nil, err
 	}
 
@@ -104,7 +105,7 @@ func (t RegistrationClient) Grant(ctx context.Context, req *RegistrationGrantReq
 		return nil, err
 	}
 
-	if err = json.NewDecoder(httpresp.Body).Decode(&resp); err != nil {
+	if err = jsonx.UnmarshalRead(httpresp.Body, &resp); err != nil {
 		return nil, err
 	}
 

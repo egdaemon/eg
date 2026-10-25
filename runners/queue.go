@@ -4,9 +4,9 @@ import (
 	"context"
 	"crypto/md5"
 	"database/sql"
-	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/egdaemon/eg/jsonx"
 	"io"
 	"io/fs"
 	"iter"
@@ -484,7 +484,7 @@ func beginwork(ctx context.Context, md metadata, dir string) state {
 		return failure(md, err, idle(md))
 	}
 
-	if err = json.Unmarshal(encoded, workload); err != nil {
+	if err = jsonx.Unmarshal(encoded, workload); err != nil {
 		errorsx.Log(errorsx.Wrap(md.dirs.Discard(dir), "failed to clear invalid workload"))
 		return failure(md, err, idle(md))
 	}

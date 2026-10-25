@@ -27,16 +27,16 @@ type Registration struct {
 
 	Id          string   `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
 	Description string   `protobuf:"bytes,2,opt,name=description,proto3" json:"description,omitempty"`
-	Publickey   []byte   `protobuf:"bytes,3,opt,name=publickey,json=pkey,proto3" json:"publickey,omitempty"`
+	Publickey   []byte   `protobuf:"bytes,3,opt,name=publickey,json=pkey,proto3" json:"pkey,omitempty"`
 	AuthzedAt   string   `protobuf:"bytes,4,opt,name=authzed_at,proto3" json:"authzed_at,omitempty"`
 	ExpiresAt   string   `protobuf:"bytes,5,opt,name=expires_at,proto3" json:"expires_at,omitempty"`
 	P2Pid       string   `protobuf:"bytes,6,opt,name=p2pid,proto3" json:"p2pid,omitempty"`
 	Jwtsecret   []byte   `protobuf:"bytes,7,opt,name=jwtsecret,proto3" json:"jwtsecret,omitempty"` // generated in memory by the runner at startup; egmeta signs tokens the runner verifies with it.
 	Os          string   `protobuf:"bytes,900,opt,name=os,proto3" json:"os,omitempty"`
 	Arch        string   `protobuf:"bytes,901,opt,name=arch,proto3" json:"arch,omitempty"` // the native architecture.
-	Cores       uint64   `protobuf:"varint,902,opt,name=cores,proto3" json:"cores,omitempty"`
-	Memory      uint64   `protobuf:"varint,903,opt,name=memory,proto3" json:"memory,omitempty"`
-	Vram        uint64   `protobuf:"varint,904,opt,name=vram,proto3" json:"vram,omitempty"`
+	Cores       uint64   `protobuf:"varint,902,opt,name=cores,proto3" json:"cores,omitempty,string"`
+	Memory      uint64   `protobuf:"varint,903,opt,name=memory,proto3" json:"memory,omitempty,string"`
+	Vram        uint64   `protobuf:"varint,904,opt,name=vram,proto3" json:"vram,omitempty,string"`
 	Labels      []string `protobuf:"bytes,1000,rep,name=labels,proto3" json:"labels,omitempty"`
 }
 
@@ -374,7 +374,7 @@ type RegistrationGrantRequest struct {
 
 	Registration *Registration `protobuf:"bytes,1,opt,name=registration,proto3" json:"registration,omitempty"`
 	Global       bool          `protobuf:"varint,2,opt,name=global,proto3" json:"global,omitempty"`
-	Expiration   uint64        `protobuf:"varint,3,opt,name=expiration,proto3" json:"expiration,omitempty"`
+	Expiration   uint64        `protobuf:"varint,3,opt,name=expiration,proto3" json:"expiration,omitempty,string"`
 }
 
 func (x *RegistrationGrantRequest) Reset() {

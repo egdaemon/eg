@@ -30,6 +30,13 @@ func (t *Token) Valid() error {
 	}.Valid()
 }
 
+// UnmarshalJSON accepts the numbers of the jwt claims (iat, exp, nbf, compute_remaining) as well as
+// the strings of the api responses; the jwt library decodes claims with encoding/json, which
+// rejects numbers for the fields tagged as strings.
+func (t *Token) UnmarshalJSON(b []byte) error {
+	return jsonx.Unmarshal(b, t)
+}
+
 func NewAuthzTokenSource(c *http.Client, signer ssh.Signer, endpoint string, account string) TokenSourceFromEndpoint {
 	return TokenSourceFromEndpoint{c: c, signer: signer, endpoint: endpoint, account: account}
 }

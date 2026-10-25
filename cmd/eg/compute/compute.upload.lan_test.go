@@ -10,13 +10,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/egdaemon/eg/computeapi"
+
 	"github.com/egdaemon/eg/cmd/migrations"
 
 	"github.com/egdaemon/eg/compute"
 	"github.com/egdaemon/eg/internal/lan"
 	"github.com/egdaemon/eg/internal/langx"
 	"github.com/egdaemon/eg/internal/sqltestx"
-	"github.com/egdaemon/eg/runners"
 	"github.com/gofrs/uuid/v5"
 	"github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p/core/network"
@@ -26,8 +27,8 @@ import (
 
 func TestUploadLAN(t *testing.T) {
 	cmd := upload{LANPeerTTL: lan.DefaultTTL}
-	req := &runners.EnqueuedDequeueResponse{
-		Enqueued: &runners.Enqueued{Id: uuid.Must(uuid.NewV7()).String(), AccountId: "acct", Entry: "main.wasm"},
+	req := &computeapi.EnqueuedDequeueResponse{
+		Enqueued: &computeapi.Enqueued{Id: uuid.Must(uuid.NewV7()).String(), AccountId: "acct", Entry: "main.wasm"},
 	}
 
 	t.Run("uploads to a remembered runner without the control plane's network", func(t *testing.T) {
@@ -45,13 +46,13 @@ func TestUploadLAN(t *testing.T) {
 				return
 			}
 
-			var received runners.EnqueuedDequeueResponse
+			var received computeapi.EnqueuedDequeueResponse
 			require.NoError(t, json.Unmarshal([]byte(r.FormValue("enqueued")), &received))
 			token = r.FormValue("token")
 
 			rec := httptest.NewRecorder()
 			rec.WriteHeader(http.StatusAccepted)
-			require.NoError(t, json.NewEncoder(rec).Encode(proto.Clone(received.Enqueued).(*runners.Enqueued)))
+			require.NoError(t, json.NewEncoder(rec).Encode(proto.Clone(received.Enqueued).(*computeapi.Enqueued)))
 
 			_, _ = io.Copy(io.Discard, r.Body)
 			_ = rec.Result().Write(s)

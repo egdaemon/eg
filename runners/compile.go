@@ -12,6 +12,8 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/egdaemon/eg/computeapi"
+
 	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/compile"
 	"github.com/egdaemon/eg/internal/envx"
@@ -56,7 +58,7 @@ func compileEntrypoint(ctx context.Context, ws workspaces.Context) (*transpile.C
 	return &entry, nil
 }
 
-// compileWorkload reads the EnqueuedDequeueResponse stored at
+// compileWorkload reads the computeapi.EnqueuedDequeueResponse stored at
 // dir/metadata.json (dir is a job claimed from a compile SpoolDirs' Running
 // stage, see CompileN) -- AccessToken is exchanged for short-lived git
 // credentials, mirroring how egmeta's own /c/dequeue handler populates it for
@@ -109,14 +111,14 @@ type compilejob struct {
 	compilemetadata
 	dir   string
 	token string
-	req   *EnqueuedDequeueResponse
+	req   *computeapi.EnqueuedDequeueResponse
 }
 
 func compilebegin(md compilemetadata, dir string) state {
 	var (
 		err     error
 		encoded []byte
-		req     EnqueuedDequeueResponse
+		req     computeapi.EnqueuedDequeueResponse
 	)
 
 	log.Println("compiling workload initiated", dir)
@@ -253,7 +255,7 @@ type statereserve struct {
 
 func (t statereserve) Update(ctx context.Context) state {
 	var (
-		recorded *EnqueuedDequeueResponse
+		recorded *computeapi.EnqueuedDequeueResponse
 	)
 
 	archiveio, err := os.Open(filepath.Join(t.dir, "archive.tar.gz"))

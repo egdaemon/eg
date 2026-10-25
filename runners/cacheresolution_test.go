@@ -8,6 +8,8 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/egdaemon/eg/computeapi"
+
 	"github.com/gofrs/uuid/v5"
 	"github.com/stretchr/testify/require"
 )
@@ -16,7 +18,7 @@ func TestCacheResolutionClaim(t *testing.T) {
 	t.Run("claims an unclaimed key", func(t *testing.T) {
 		sdir := t.TempDir()
 		dirs := NewSpoolDir(sdir)
-		enq := &Enqueued{AccountId: "acct-claims", VcsUri: "repo"}
+		enq := &computeapi.Enqueued{AccountId: "acct-claims", VcsUri: "repo"}
 
 		uid := uuid.Must(uuid.NewV7())
 		require.NoError(t, dirs.Download(uid, "archive.tar.gz", bytes.NewBufferString("")))
@@ -34,7 +36,7 @@ func TestCacheResolutionClaim(t *testing.T) {
 	t.Run("parks a second claim for an already active key", func(t *testing.T) {
 		sdir := t.TempDir()
 		dirs := NewSpoolDir(sdir)
-		enq := &Enqueued{AccountId: "acct-park", VcsUri: "repo"}
+		enq := &computeapi.Enqueued{AccountId: "acct-park", VcsUri: "repo"}
 
 		uid1 := uuid.Must(uuid.NewV7())
 		require.NoError(t, dirs.Download(uid1, "archive.tar.gz", bytes.NewBufferString("")))
@@ -60,7 +62,7 @@ func TestCacheResolutionClaim(t *testing.T) {
 	t.Run("claims the next candidate when the first is already active", func(t *testing.T) {
 		sdir := t.TempDir()
 		dirs := NewSpoolDir(sdir)
-		enq := &Enqueued{AccountId: "acct-next", VcsUri: "repo"}
+		enq := &computeapi.Enqueued{AccountId: "acct-next", VcsUri: "repo"}
 
 		uid1 := uuid.Must(uuid.NewV7())
 		require.NoError(t, dirs.Download(uid1, "archive.tar.gz", bytes.NewBufferString("")))
@@ -85,7 +87,7 @@ func TestCacheResolutionClaim(t *testing.T) {
 	t.Run("parks under the last candidate once all are exhausted", func(t *testing.T) {
 		sdir := t.TempDir()
 		dirs := NewSpoolDir(sdir)
-		enq := &Enqueued{AccountId: "acct-exhausted", VcsUri: "repo"}
+		enq := &computeapi.Enqueued{AccountId: "acct-exhausted", VcsUri: "repo"}
 
 		const n = 3
 		var last string
@@ -117,7 +119,7 @@ func TestCacheResolutionClaim(t *testing.T) {
 	t.Run("release drains parked items back to queued and removes the marker", func(t *testing.T) {
 		sdir := t.TempDir()
 		dirs := NewSpoolDir(sdir)
-		enq := &Enqueued{AccountId: "acct-release", VcsUri: "repo"}
+		enq := &computeapi.Enqueued{AccountId: "acct-release", VcsUri: "repo"}
 
 		uid1 := uuid.Must(uuid.NewV7())
 		require.NoError(t, dirs.Download(uid1, "archive.tar.gz", bytes.NewBufferString("")))
@@ -149,7 +151,7 @@ func TestCacheResolutionClaim(t *testing.T) {
 	t.Run("concurrent claims for the same key elect exactly one winner", func(t *testing.T) {
 		sdir := t.TempDir()
 		dirs := NewSpoolDir(sdir)
-		enq := &Enqueued{AccountId: "acct-concurrent", VcsUri: "repo"}
+		enq := &computeapi.Enqueued{AccountId: "acct-concurrent", VcsUri: "repo"}
 
 		const n = 8
 		rundirs := make([]string, n)
@@ -202,7 +204,7 @@ func TestCacheResolutionClaim(t *testing.T) {
 	t.Run("concurrent claims across a fan-out of candidates elect up to len(candidates) winners", func(t *testing.T) {
 		sdir := t.TempDir()
 		dirs := NewSpoolDir(sdir)
-		enq := &Enqueued{AccountId: "acct-fanout", VcsUri: "repo"}
+		enq := &computeapi.Enqueued{AccountId: "acct-fanout", VcsUri: "repo"}
 
 		const buckets = 8
 		const n = buckets * 2

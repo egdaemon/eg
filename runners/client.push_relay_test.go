@@ -13,6 +13,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/egdaemon/eg/computeapi"
+
 	"github.com/egdaemon/eg/compute"
 	"github.com/egdaemon/eg/internal/libp2px"
 	"github.com/egdaemon/eg/runners"
@@ -152,8 +154,8 @@ func TestUploadViaRelay(t *testing.T) {
 	// upload must go over the hole punched connection.
 	kernel := bytes.Repeat([]byte("k"), 1<<20)
 
-	req := &runners.EnqueuedDequeueResponse{
-		Enqueued: &runners.Enqueued{Id: uuid.Must(uuid.NewV7()).String()},
+	req := &computeapi.EnqueuedDequeueResponse{
+		Enqueued: &computeapi.Enqueued{Id: uuid.Must(uuid.NewV7()).String()},
 	}
 
 	accepted, err := runners.Upload(ctx, client, &compute.Compute{Id: "relayed", P2Pid: runner.ID().String()}, req, bytes.NewReader(kernel), strings.NewReader(""))
@@ -254,8 +256,8 @@ func TestUploadViaCandidateTokenRelay(t *testing.T) {
 	// below the relay's per circuit data limit (128KB) so the upload fits over the circuit.
 	kernel := bytes.Repeat([]byte("k"), 1<<10)
 
-	req := &runners.EnqueuedDequeueResponse{
-		Enqueued: &runners.Enqueued{Id: uuid.Must(uuid.NewV7()).String()},
+	req := &computeapi.EnqueuedDequeueResponse{
+		Enqueued: &computeapi.Enqueued{Id: uuid.Must(uuid.NewV7()).String()},
 	}
 
 	accepted, err := runners.Upload(ctx, client, &compute.Compute{Id: "relayed", P2Pid: runner.ID().String(), Token: token}, req, bytes.NewReader(kernel), strings.NewReader(""))

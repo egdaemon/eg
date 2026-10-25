@@ -14,6 +14,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/egdaemon/eg/computeapi"
+
 	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/compute"
 	"github.com/egdaemon/eg/internal/fsx"
@@ -73,8 +75,8 @@ func TestCompileWorkload(t *testing.T) {
 		})}
 
 		uid := uuid.Must(uuid.NewV7())
-		req := EnqueuedDequeueResponse{
-			Enqueued: &Enqueued{
+		req := computeapi.EnqueuedDequeueResponse{
+			Enqueued: &computeapi.Enqueued{
 				VcsUri:    uri,
 				VcsCommit: ref,
 				Cores:     1,
@@ -108,7 +110,7 @@ func TestCompileWorkload(t *testing.T) {
 		mencoded, err := os.ReadFile(filepath.Join(target, "metadata.json"))
 		require.NoError(t, err)
 
-		var resp EnqueuedDequeueResponse
+		var resp computeapi.EnqueuedDequeueResponse
 		require.NoError(t, json.Unmarshal(mencoded, &resp))
 		require.Equal(t, uid.String(), resp.Enqueued.Id)
 		require.NotEmpty(t, resp.Enqueued.Entry)
@@ -147,7 +149,7 @@ func TestCompileWorkload(t *testing.T) {
 
 		missing := filepath.Join(t.TempDir(), "does-not-exist")
 		uid := uuid.Must(uuid.NewV7())
-		req := EnqueuedDequeueResponse{Enqueued: &Enqueued{VcsUri: missing}, AccessToken: "token"}
+		req := computeapi.EnqueuedDequeueResponse{Enqueued: &computeapi.Enqueued{VcsUri: missing}, AccessToken: "token"}
 		encoded, err := json.Marshal(&req)
 		require.NoError(t, err)
 		require.NoError(t, compiledirs.Download(uid, "metadata.json", bytes.NewReader(encoded)))
@@ -185,8 +187,8 @@ func TestCompileWorkload(t *testing.T) {
 		})}
 
 		uid := uuid.Must(uuid.NewV7())
-		req := EnqueuedDequeueResponse{
-			Enqueued:    &Enqueued{VcsUri: uri, VcsCommit: ref, Cores: 1},
+		req := computeapi.EnqueuedDequeueResponse{
+			Enqueued:    &computeapi.Enqueued{VcsUri: uri, VcsCommit: ref, Cores: 1},
 			AccessToken: "token",
 		}
 		encoded, err := json.Marshal(&req)
@@ -223,8 +225,8 @@ func TestCompileWorkload(t *testing.T) {
 		// the clone fails, leaving the job directory in place to inspect.
 		missing := filepath.Join(t.TempDir(), "does-not-exist")
 		uid := uuid.Must(uuid.NewV7())
-		req := EnqueuedDequeueResponse{
-			Enqueued:    &Enqueued{VcsUri: missing},
+		req := computeapi.EnqueuedDequeueResponse{
+			Enqueued:    &computeapi.Enqueued{VcsUri: missing},
 			AccessToken: "token",
 		}
 		encoded, err := json.Marshal(&req)
@@ -262,8 +264,8 @@ func TestCompileWorkload(t *testing.T) {
 		// mirrors what egmeta pushes: the canonical vcs uri and commit, which
 		// are not directly cloneable, alongside the clone uri and ref.
 		uid := uuid.Must(uuid.NewV7())
-		req := EnqueuedDequeueResponse{
-			Enqueued:    &Enqueued{VcsUri: "git@github.com:example/nope.git", VcsCommit: head.Hash().String(), Cores: 1},
+		req := computeapi.EnqueuedDequeueResponse{
+			Enqueued:    &computeapi.Enqueued{VcsUri: "git@github.com:example/nope.git", VcsCommit: head.Hash().String(), Cores: 1},
 			AccessToken: "token",
 		}
 		encoded, err := json.Marshal(&req)
@@ -294,7 +296,7 @@ func TestCompileWorkload(t *testing.T) {
 		rundirs := NewSpoolDir(t.TempDir())
 
 		uid := uuid.Must(uuid.NewV7())
-		req := EnqueuedDequeueResponse{Enqueued: &Enqueued{VcsUri: uri, VcsCommit: ref, Cores: 1}}
+		req := computeapi.EnqueuedDequeueResponse{Enqueued: &computeapi.Enqueued{VcsUri: uri, VcsCommit: ref, Cores: 1}}
 		encoded, err := json.Marshal(&req)
 		require.NoError(t, err)
 		require.NoError(t, compiledirs.Download(uid, "metadata.json", bytes.NewReader(encoded)))
@@ -323,7 +325,7 @@ func TestCompileWorkload(t *testing.T) {
 		})}
 
 		uid := uuid.Must(uuid.NewV7())
-		req := EnqueuedDequeueResponse{Enqueued: &Enqueued{VcsUri: uri, VcsCommit: ref, Cores: 1}}
+		req := computeapi.EnqueuedDequeueResponse{Enqueued: &computeapi.Enqueued{VcsUri: uri, VcsCommit: ref, Cores: 1}}
 		encoded, err := json.Marshal(&req)
 		require.NoError(t, err)
 		require.NoError(t, compiledirs.Download(uid, "metadata.json", bytes.NewReader(encoded)))
@@ -346,7 +348,7 @@ func TestCompileWorkload(t *testing.T) {
 type controlplane struct {
 	mu       sync.Mutex
 	calls    []string
-	reserved EnqueuedDequeueResponse
+	reserved computeapi.EnqueuedDequeueResponse
 }
 
 func (t *controlplane) Calls() []string {
@@ -396,7 +398,7 @@ func (t roundtripper) RoundTrip(r *http.Request) (*http.Response, error) {
 }
 
 func TestCompileWorkloadReserved(t *testing.T) {
-	spool := func(t *testing.T, compiledirs SpoolDirs, uid uuid.UUID, req *EnqueuedDequeueResponse, environ string) string {
+	spool := func(t *testing.T, compiledirs SpoolDirs, uid uuid.UUID, req *computeapi.EnqueuedDequeueResponse, environ string) string {
 		encoded, err := json.Marshal(req)
 		require.NoError(t, err)
 		require.NoError(t, compiledirs.Download(uid, "metadata.json", bytes.NewReader(encoded)))
@@ -417,8 +419,8 @@ func TestCompileWorkloadReserved(t *testing.T) {
 
 		uid := uuid.Must(uuid.NewV7())
 		cp := &controlplane{
-			reserved: EnqueuedDequeueResponse{
-				Enqueued:    &Enqueued{Id: uid.String(), VcsUri: uri, VcsCommit: ref, Entry: "reserved.wasm"},
+			reserved: computeapi.EnqueuedDequeueResponse{
+				Enqueued:    &computeapi.Enqueued{Id: uid.String(), VcsUri: uri, VcsCommit: ref, Entry: "reserved.wasm"},
 				AccessToken: "fresh",
 			},
 		}
@@ -429,8 +431,8 @@ func TestCompileWorkloadReserved(t *testing.T) {
 			return w.Result(), nil
 		})}
 
-		dir := spool(t, compiledirs, uid, &EnqueuedDequeueResponse{
-			Enqueued:    &Enqueued{Id: uid.String(), VcsUri: uri, VcsCommit: ref, Cores: 1},
+		dir := spool(t, compiledirs, uid, &computeapi.EnqueuedDequeueResponse{
+			Enqueued:    &computeapi.Enqueued{Id: uid.String(), VcsUri: uri, VcsCommit: ref, Cores: 1},
 			AccessToken: "token",
 		}, fmt.Sprintf("%s=%s\n%s=%s\n", eg.EnvGitHeadURI, uri, eg.EnvGitHeadRef, ref))
 
@@ -442,7 +444,7 @@ func TestCompileWorkloadReserved(t *testing.T) {
 		require.NoError(t, err)
 
 		// the workload is recorded as the control plane reserved it.
-		var resp EnqueuedDequeueResponse
+		var resp computeapi.EnqueuedDequeueResponse
 		require.NoError(t, json.Unmarshal(mencoded, &resp))
 		require.Equal(t, uid.String(), resp.Enqueued.Id)
 		require.Equal(t, "reserved.wasm", resp.Enqueued.Entry)
@@ -470,8 +472,8 @@ func TestCompileWorkloadReserved(t *testing.T) {
 		uid := uuid.Must(uuid.NewV7())
 		cp := &controlplane{}
 
-		dir := spool(t, compiledirs, uid, &EnqueuedDequeueResponse{
-			Enqueued: &Enqueued{Id: uid.String(), VcsUri: uri, VcsCommit: ref, Cores: 1},
+		dir := spool(t, compiledirs, uid, &computeapi.EnqueuedDequeueResponse{
+			Enqueued: &computeapi.Enqueued{Id: uid.String(), VcsUri: uri, VcsCommit: ref, Cores: 1},
 		}, "")
 
 		require.Error(t, compileWorkloadReserved(t.Context(), http.DefaultClient, cp.Client(t), dir, rundirs))
@@ -496,8 +498,8 @@ func TestCompileWorkloadReserved(t *testing.T) {
 		})}
 
 		missing := filepath.Join(t.TempDir(), "does-not-exist")
-		dir := spool(t, compiledirs, uid, &EnqueuedDequeueResponse{
-			Enqueued:    &Enqueued{Id: uid.String(), VcsUri: missing},
+		dir := spool(t, compiledirs, uid, &computeapi.EnqueuedDequeueResponse{
+			Enqueued:    &computeapi.Enqueued{Id: uid.String(), VcsUri: missing},
 			AccessToken: "token",
 		}, fmt.Sprintf("%s=%s\n%s=%s\n", eg.EnvGitHeadURI, missing, eg.EnvGitHeadRef, "main"))
 
@@ -522,8 +524,8 @@ func TestCompileWorkloadReserved(t *testing.T) {
 		})}
 
 		uid := uuid.Must(uuid.NewV7())
-		dir := spool(t, compiledirs, uid, &EnqueuedDequeueResponse{
-			Enqueued:    &Enqueued{VcsUri: uri, VcsCommit: ref, Cores: 1},
+		dir := spool(t, compiledirs, uid, &computeapi.EnqueuedDequeueResponse{
+			Enqueued:    &computeapi.Enqueued{VcsUri: uri, VcsCommit: ref, Cores: 1},
 			AccessToken: "token",
 		}, fmt.Sprintf("%s=%s\n%s=%s\n", eg.EnvGitHeadURI, uri, eg.EnvGitHeadRef, ref))
 
@@ -548,8 +550,8 @@ func TestCompileWorkloadReserved(t *testing.T) {
 			return httptest.NewRecorder().Result(), nil
 		})}
 
-		dir := spool(t, compiledirs, uid, &EnqueuedDequeueResponse{
-			Enqueued: &Enqueued{Id: uid.String(), VcsUri: uri, VcsCommit: ref, Cores: 1},
+		dir := spool(t, compiledirs, uid, &computeapi.EnqueuedDequeueResponse{
+			Enqueued: &computeapi.Enqueued{Id: uid.String(), VcsUri: uri, VcsCommit: ref, Cores: 1},
 		}, fmt.Sprintf("%s=%s\n%s=%s\n", eg.EnvGitHeadURI, uri, eg.EnvGitHeadRef, ref))
 
 		require.Error(t, compileWorkloadReserved(t.Context(), vcsaccess, cp.Client(t), dir, rundirs))
@@ -576,8 +578,8 @@ func TestCompileN(t *testing.T) {
 
 		// compiles and is handed off.
 		succeeds := uuid.Must(uuid.NewV7())
-		encoded, err := json.Marshal(&EnqueuedDequeueResponse{
-			Enqueued:    &Enqueued{VcsUri: uri, VcsCommit: ref, Cores: 1},
+		encoded, err := json.Marshal(&computeapi.EnqueuedDequeueResponse{
+			Enqueued:    &computeapi.Enqueued{VcsUri: uri, VcsCommit: ref, Cores: 1},
 			AccessToken: "token",
 		})
 		require.NoError(t, err)
@@ -587,8 +589,8 @@ func TestCompileN(t *testing.T) {
 
 		// fails, missing the head uri/ref.
 		fails := uuid.Must(uuid.NewV7())
-		encoded, err = json.Marshal(&EnqueuedDequeueResponse{
-			Enqueued:    &Enqueued{VcsUri: uri, VcsCommit: ref, Cores: 1},
+		encoded, err = json.Marshal(&computeapi.EnqueuedDequeueResponse{
+			Enqueued:    &computeapi.Enqueued{VcsUri: uri, VcsCommit: ref, Cores: 1},
 			AccessToken: "token",
 		})
 		require.NoError(t, err)
@@ -632,8 +634,8 @@ func TestCompileN(t *testing.T) {
 		})}
 
 		uid := uuid.Must(uuid.NewV7())
-		encoded, err := json.Marshal(&EnqueuedDequeueResponse{
-			Enqueued:    &Enqueued{VcsUri: uri, VcsCommit: ref, Cores: 1},
+		encoded, err := json.Marshal(&computeapi.EnqueuedDequeueResponse{
+			Enqueued:    &computeapi.Enqueued{VcsUri: uri, VcsCommit: ref, Cores: 1},
 			AccessToken: "token",
 		})
 		require.NoError(t, err)

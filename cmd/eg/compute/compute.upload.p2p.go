@@ -12,6 +12,8 @@ import (
 	"slices"
 	"time"
 
+	"github.com/egdaemon/eg/computeapi"
+
 	"github.com/egdaemon/eg/compute"
 	"github.com/egdaemon/eg/internal/asynccompute"
 	"github.com/egdaemon/eg/internal/errorsx"
@@ -85,7 +87,7 @@ func autoscan(parent context.Context, db *sql.DB, find libp2px.MDNSLookup, timeo
 type outcome struct {
 	host     host.Host
 	runner   *compute.Compute
-	recorded *runners.Enqueued
+	recorded *computeapi.Enqueued
 }
 
 // p2p attempts to upload the workload straight to a runner, trying the strategies in order and
@@ -93,10 +95,10 @@ type outcome struct {
 // the candidate token issued for it. db is the cache of remembered systems and may be nil.
 // a nil runner means none accepted the workload and the caller should fall back to the cluster. otherwise
 // the error is the result of following the workload (see follow) and it must not be uploaded again.
-func (t upload) p2p(ctx context.Context, chttp *http.Client, db *sql.DB, order []strategy, enq *runners.Enqueued, archive, environ io.ReadSeeker) (_ *compute.Compute, err error) {
+func (t upload) p2p(ctx context.Context, chttp *http.Client, db *sql.DB, order []strategy, enq *computeapi.Enqueued, archive, environ io.ReadSeeker) (_ *compute.Compute, err error) {
 	// clone so the caller's enqueued remains untouched for the cluster fallback.
-	req := &runners.EnqueuedDequeueResponse{
-		Enqueued: proto.Clone(enq).(*runners.Enqueued),
+	req := &computeapi.EnqueuedDequeueResponse{
+		Enqueued: proto.Clone(enq).(*computeapi.Enqueued),
 	}
 
 	candidates, err := runners.NewPushClient(chttp).Candidates(ctx, req.Enqueued, directCandidates)
@@ -134,7 +136,7 @@ func (t upload) p2p(ctx context.Context, chttp *http.Client, db *sql.DB, order [
 
 // lan uploads to the candidates that were remembered from the local network. it only consults the
 // cache, scanning the network is done in the background (see autoscan).
-func (t upload) lan(ctx context.Context, db *sql.DB, candidates []*compute.Compute, req *runners.EnqueuedDequeueResponse, archive, environ io.ReadSeeker) (_ outcome, err error) {
+func (t upload) lan(ctx context.Context, db *sql.DB, candidates []*compute.Compute, req *computeapi.EnqueuedDequeueResponse, archive, environ io.ReadSeeker) (_ outcome, err error) {
 	if db == nil {
 		return outcome{}, errorsx.String("the local network cache is unavailable")
 	}
@@ -191,7 +193,7 @@ func (t upload) lan(ctx context.Context, db *sql.DB, candidates []*compute.Compu
 }
 
 // direct uploads to the candidates through the p2p network, using the relays when they are not directly reachable.
-func (t upload) direct(ctx context.Context, chttp *http.Client, candidates []*compute.Compute, req *runners.EnqueuedDequeueResponse, archive, environ io.ReadSeeker) (_ outcome, err error) {
+func (t upload) direct(ctx context.Context, chttp *http.Client, candidates []*compute.Compute, req *computeapi.EnqueuedDequeueResponse, archive, environ io.ReadSeeker) (_ outcome, err error) {
 	meta, err := registration.NewPingClient(chttp).Meta(ctx)
 	if err != nil {
 		return outcome{}, errorsx.Wrap(err, "unable to retrieve p2p bootstrap addresses")

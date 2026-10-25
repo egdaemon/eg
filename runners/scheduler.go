@@ -7,6 +7,8 @@ import (
 	"os"
 	"time"
 
+	"github.com/egdaemon/eg/computeapi"
+
 	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/backoff"
 	"github.com/egdaemon/eg/internal/envx"
@@ -61,7 +63,7 @@ func autodownload(ctx context.Context, authedclient *http.Client, m *ResourceMan
 
 		var (
 			err      error
-			workload *EnqueuedDequeueResponse
+			workload *computeapi.EnqueuedDequeueResponse
 		)
 
 		if workload, err = NewWorkloadClient(authedclient, m).Download(ctx, m.Available()); err != nil {

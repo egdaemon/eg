@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/egdaemon/eg/computeapi"
+
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/workspaces"
 	"github.com/stretchr/testify/require"
@@ -18,7 +20,7 @@ func TestStatePrepare(t *testing.T) {
 		cause := errorsx.Wrap(errors.ErrUnsupported, "unable to configure gpu support")
 
 		result := stateprepare{
-			workload: &EnqueuedDequeueResponse{Enqueued: &Enqueued{Id: "prepare"}},
+			workload: &computeapi.EnqueuedDequeueResponse{Enqueued: &computeapi.Enqueued{Id: "prepare"}},
 			ws:       ws,
 		}.failed(cause)
 

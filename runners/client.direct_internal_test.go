@@ -7,6 +7,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/egdaemon/eg/computeapi"
+
 	"github.com/stretchr/testify/require"
 )
 
@@ -39,7 +41,7 @@ func TestDirectClientReserve(t *testing.T) {
 		defer srv.Close()
 
 		c := DirectClient{c: srv.Client(), host: srv.URL}
-		recorded, err := c.Reserve(t.Context(), &Enqueued{Id: "pushed-id", Vram: 8, Labels: []string{"gpu", "fast"}, SecretUris: []string{"gcpsm://project/test-secret", "awssm://other?region=us-east-1"}, Description: "my workload"}, strings.NewReader("kernel contents"), "candidate-token")
+		recorded, err := c.Reserve(t.Context(), &computeapi.Enqueued{Id: "pushed-id", Vram: 8, Labels: []string{"gpu", "fast"}, SecretUris: []string{"gcpsm://project/test-secret", "awssm://other?region=us-east-1"}, Description: "my workload"}, strings.NewReader("kernel contents"), "candidate-token")
 		require.NoError(t, err)
 		require.Equal(t, "candidate-token", token)
 		require.Equal(t, "my workload", description)
@@ -58,7 +60,7 @@ func TestDirectClientReserve(t *testing.T) {
 		defer srv.Close()
 
 		c := DirectClient{c: srv.Client(), host: srv.URL}
-		_, err := c.Reserve(t.Context(), &Enqueued{Id: "pushed-id"}, strings.NewReader("kernel contents"), "candidate-token")
+		_, err := c.Reserve(t.Context(), &computeapi.Enqueued{Id: "pushed-id"}, strings.NewReader("kernel contents"), "candidate-token")
 		require.Error(t, err)
 	})
 }

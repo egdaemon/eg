@@ -12,6 +12,8 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/egdaemon/eg/computeapi"
+
 	"github.com/egdaemon/eg/cmd/migrations"
 
 	"github.com/davecgh/go-spew/spew"
@@ -34,7 +36,6 @@ import (
 	"github.com/egdaemon/eg/internal/stringsx"
 	"github.com/egdaemon/eg/internal/tarx"
 	"github.com/egdaemon/eg/internal/unsafepretty"
-	"github.com/egdaemon/eg/runners"
 	"github.com/egdaemon/eg/secrets"
 	"github.com/egdaemon/eg/transpile"
 	"github.com/egdaemon/eg/workspaces"
@@ -205,7 +206,7 @@ func (t upload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, find libp2px.
 		return err
 	}
 
-	enq := &runners.Enqueued{
+	enq := &computeapi.Enqueued{
 		Id:          uuid.Must(uuid.NewV7()).String(),
 		AccountId:   aid,
 		Entry:       filepath.Join(ws.Module, filepath.Base(entry.Path)),
@@ -257,12 +258,12 @@ func (t upload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, find libp2px.
 }
 
 // enqueue uploads the workload to the cluster.
-func (t upload) enqueue(ctx context.Context, chttp *http.Client, enq *runners.Enqueued, archive io.Reader) (_ *runners.EnqueuedCreateResponse, err error) {
+func (t upload) enqueue(ctx context.Context, chttp *http.Client, enq *computeapi.Enqueued, archive io.Reader) (_ *computeapi.EnqueuedCreateResponse, err error) {
 	var (
-		e runners.EnqueuedCreateResponse
+		e computeapi.EnqueuedCreateResponse
 	)
 
-	mimetype, buf, err := runners.NewEnqueueUpload(enq, archive)
+	mimetype, buf, err := computeapi.NewEnqueueUpload(enq, archive)
 	if err != nil {
 		return nil, errorsx.Wrap(err, "unable to generate multipart upload")
 	}

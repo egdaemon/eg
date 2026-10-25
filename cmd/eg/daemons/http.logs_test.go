@@ -9,6 +9,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/egdaemon/eg/computeapi"
+
 	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/cmd/eg/daemons"
 	"github.com/egdaemon/eg/runners"
@@ -45,7 +47,7 @@ func logsRequest(t *testing.T, srv *httptest.Server, id string, token string, qu
 
 func logsToken(t *testing.T, wid string) string {
 	t.Helper()
-	token, err := runners.SignLogToken(logsecret, wid, time.Minute)
+	token, err := computeapi.SignLogToken(logsecret, wid, time.Minute)
 	require.NoError(t, err)
 	return token
 }
@@ -70,7 +72,7 @@ func TestLogsHandler(t *testing.T) {
 	t.Run("token signed with another secret", func(t *testing.T) {
 		srv := newLogsServer(t, runners.NewSpoolDir(t.TempDir()))
 		uid := uuid.Must(uuid.NewV7())
-		token, err := runners.SignLogToken(func() []byte { return []byte("derp") }, uid.String(), time.Minute)
+		token, err := computeapi.SignLogToken(func() []byte { return []byte("derp") }, uid.String(), time.Minute)
 		require.NoError(t, err)
 		resp := logsRequest(t, srv, uid.String(), token, "")
 		require.Equal(t, http.StatusUnauthorized, resp.StatusCode)
@@ -146,7 +148,7 @@ func TestLogsHandler(t *testing.T) {
 
 func mustExpired(t *testing.T, wid string) string {
 	t.Helper()
-	token, err := runners.SignLogToken(logsecret, wid, -time.Minute)
+	token, err := computeapi.SignLogToken(logsecret, wid, -time.Minute)
 	require.NoError(t, err)
 	return token
 }

@@ -21,6 +21,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/egdaemon/eg/computeapi"
+
 	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/backoff"
 	"github.com/egdaemon/eg/internal/debugx"
@@ -55,7 +57,7 @@ const (
 	DaemonLogName = "daemon.log"
 
 	// DaemonAnalyticsName is the file within a workload's runtime directory its analytics are written to.
-	DaemonAnalyticsName = "analytics.db"
+	DaemonAnalyticsName = computeapi.DaemonAnalyticsName
 
 	// cachedirs is how many concurrent cache/lock buckets a repo may
 	// claim at once; a workload only defers once all of them are claimed.
@@ -470,8 +472,8 @@ func beginwork(ctx context.Context, md metadata, dir string) state {
 		ws       workspaces.Context
 		archive  *os.File
 		encoded  []byte
-		workload = &EnqueuedDequeueResponse{
-			Enqueued: &Enqueued{Entry: "main.wasm"},
+		workload = &computeapi.EnqueuedDequeueResponse{
+			Enqueued: &computeapi.Enqueued{Entry: "main.wasm"},
 		}
 	)
 
@@ -535,7 +537,7 @@ func beginwork(ctx context.Context, md metadata, dir string) state {
 
 // initialize prepares the log and analytics of the workload before anything that can fail
 // so the cause of the failures can be reported to the user, then continues with next.
-func initialize(workload *Enqueued, md metadata, bucket string, ws workspaces.Context, next state) stateinit {
+func initialize(workload *computeapi.Enqueued, md metadata, bucket string, ws workspaces.Context, next state) stateinit {
 	return stateinit{
 		workload: workload,
 		bucket:   bucket,
@@ -547,7 +549,7 @@ func initialize(workload *Enqueued, md metadata, bucket string, ws workspaces.Co
 
 type stateinit struct {
 	metadata
-	workload *Enqueued
+	workload *computeapi.Enqueued
 	bucket   string
 	ws       workspaces.Context
 	next     state
@@ -583,7 +585,7 @@ func (t stateinit) Update(ctx context.Context) state {
 // stateprepare readies the workload to run: unpacks the archive, builds the environment and the agent.
 type stateprepare struct {
 	metadata
-	workload *EnqueuedDequeueResponse
+	workload *computeapi.EnqueuedDequeueResponse
 	ws       workspaces.Context
 	bucket   string
 	dir      string
@@ -697,7 +699,7 @@ func (t stateprepare) Update(ctx context.Context) state {
 // status reports the progress of a workload pushed to this runner to the
 // control plane before transitioning to next. reporting is best effort, it
 // never fails the workload.
-func status(authclient *http.Client, token string, phase string, workload *Enqueued, next state) statestatus {
+func status(authclient *http.Client, token string, phase string, workload *computeapi.Enqueued, next state) statestatus {
 	return statestatus{
 		authclient: authclient,
 		token:      token,
@@ -711,7 +713,7 @@ type statestatus struct {
 	authclient *http.Client
 	token      string
 	phase      string
-	workload   *Enqueued
+	workload   *computeapi.Enqueued
 	next       state
 }
 
@@ -723,7 +725,7 @@ func (t statestatus) Update(ctx context.Context) state {
 	return t.next
 }
 
-func cacheprefix(enq *Enqueued) string {
+func cacheprefix(enq *computeapi.Enqueued) string {
 	if prefix, _, ok := strings.Cut(enq.AccountId, "-"); ok {
 		return prefix
 	}
@@ -735,7 +737,7 @@ func cacheprefix(enq *Enqueued) string {
 // cache/lock keys for a repo, seeded from the repo's identity hash. It's up
 // to the caller (via CacheResolution's configured fan-out) to decide how
 // many candidates to actually try.
-func cachebuckets(enq *Enqueued) iter.Seq[string] {
+func cachebuckets(enq *computeapi.Enqueued) iter.Seq[string] {
 	return func(yield func(string) bool) {
 		for key := md5x.String(enq.AccountId + enq.VcsUri); ; key = md5x.String(key) {
 			if !yield(key) {
@@ -747,7 +749,7 @@ func cachebuckets(enq *Enqueued) iter.Seq[string] {
 
 type staterunning struct {
 	metadata
-	workload *Enqueued
+	workload *computeapi.Enqueued
 	ws       workspaces.Context
 	ragent   *Agent
 	dir      string
@@ -801,7 +803,7 @@ func (t staterunning) Update(ctx context.Context) state {
 	return completed(t.workload, t.metadata, t.bucket, t.ws, time.Since(ts), err)
 }
 
-func completed(workload *Enqueued, md metadata, bucket string, ws workspaces.Context, duration time.Duration, cause error) statecompleted {
+func completed(workload *computeapi.Enqueued, md metadata, bucket string, ws workspaces.Context, duration time.Duration, cause error) statecompleted {
 	return statecompleted{
 		workload: workload,
 		bucket:   bucket,
@@ -814,7 +816,7 @@ func completed(workload *Enqueued, md metadata, bucket string, ws workspaces.Con
 
 type statecompleted struct {
 	metadata
-	workload *Enqueued
+	workload *computeapi.Enqueued
 	bucket   string
 	ws       workspaces.Context
 	cause    error
@@ -871,7 +873,7 @@ func (t statecompleted) record(ctx context.Context, logpath string) {
 	errorsx.Log(errorsx.Wrap(t.metadata.history.record(ctx, t.workload, t.cause, t.duration, logpath), "unable to record history"))
 }
 
-func discard(workload *Enqueued, md metadata, bucket string, next state) statediscard {
+func discard(workload *computeapi.Enqueued, md metadata, bucket string, next state) statediscard {
 	return statediscard{
 		workload: workload,
 		bucket:   bucket,
@@ -882,7 +884,7 @@ func discard(workload *Enqueued, md metadata, bucket string, next state) statedi
 
 type statediscard struct {
 	metadata
-	workload *Enqueued
+	workload *computeapi.Enqueued
 	bucket   string
 	n        state
 }

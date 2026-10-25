@@ -10,6 +10,8 @@ import (
 	"net/http"
 	"path/filepath"
 
+	"github.com/egdaemon/eg/computeapi"
+
 	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/httpx"
@@ -22,7 +24,7 @@ import (
 // control plane, using the candidate token the client presented, returning
 // the recorded workload.
 type Reserver interface {
-	Reserve(ctx context.Context, enq *runners.Enqueued, archive io.Reader, token string) (*runners.EnqueuedDequeueResponse, error)
+	Reserve(ctx context.Context, enq *computeapi.Enqueued, archive io.Reader, token string) (*computeapi.EnqueuedDequeueResponse, error)
 }
 
 // NewUploadHandler constructs the POST /c/upload handler, using the default
@@ -36,7 +38,7 @@ func NewUploadHandler(r Reserver) *UploadHandler {
 
 // UploadHandler implements POST /c/upload: it accepts a pre-built kernel
 // archive pushed to this runner -- an "enqueued" field (JSON-encoded
-// runners.EnqueuedDequeueResponse), the "kernel" archive and an "environ"
+// computeapi.EnqueuedDequeueResponse), the "kernel" archive and an "environ"
 // file -- and enqueues them directly (no compile step -- see EnqueueHandler
 // in http.enqueue.go for the source-ref equivalent). the enqueued payload is
 // the workload as described by the client, and the "token" field is the
@@ -54,8 +56,8 @@ func (t *UploadHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	var (
 		err           error
 		uid           uuid.UUID
-		req           runners.EnqueuedDequeueResponse
-		recorded      *runners.EnqueuedDequeueResponse
+		req           computeapi.EnqueuedDequeueResponse
+		recorded      *computeapi.EnqueuedDequeueResponse
 		encoded       []byte
 		kernelc, envc multipart.File
 	)

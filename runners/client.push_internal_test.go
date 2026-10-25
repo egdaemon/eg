@@ -5,6 +5,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/egdaemon/eg/computeapi"
+
 	"github.com/egdaemon/eg/internal/jwtx"
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/stretchr/testify/require"
@@ -26,7 +28,7 @@ func TestPushClientCandidates(t *testing.T) {
 		}))
 		defer srv.Close()
 
-		resp, err := PushClient{c: srv.Client(), host: srv.URL}.Candidates(t.Context(), &Enqueued{
+		resp, err := PushClient{c: srv.Client(), host: srv.URL}.Candidates(t.Context(), &computeapi.Enqueued{
 			Cores:       4,
 			Vram:        8,
 			AllowShared: true,

@@ -12,6 +12,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/egdaemon/eg/computeapi"
+
 	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/cmd/eg/daemons"
 	"github.com/egdaemon/eg/runners"
@@ -21,7 +23,7 @@ import (
 
 // fakereserver records the reservation request and returns a canned result.
 type fakereserver struct {
-	recorded *runners.EnqueuedDequeueResponse
+	recorded *computeapi.EnqueuedDequeueResponse
 	err      error
 	called   bool
 	id       string
@@ -30,7 +32,7 @@ type fakereserver struct {
 	token    string
 }
 
-func (t *fakereserver) Reserve(ctx context.Context, enq *runners.Enqueued, archive io.Reader, token string) (*runners.EnqueuedDequeueResponse, error) {
+func (t *fakereserver) Reserve(ctx context.Context, enq *computeapi.Enqueued, archive io.Reader, token string) (*computeapi.EnqueuedDequeueResponse, error) {
 	b, err := io.ReadAll(archive)
 	if err != nil {
 		return nil, err
@@ -41,17 +43,17 @@ func (t *fakereserver) Reserve(ctx context.Context, enq *runners.Enqueued, archi
 	return t.recorded, t.err
 }
 
-func newRecorded() *runners.EnqueuedDequeueResponse {
-	return &runners.EnqueuedDequeueResponse{
-		Enqueued:    &runners.Enqueued{Id: uuid.Must(uuid.NewV7()).String(), Entry: "main.wasm"},
+func newRecorded() *computeapi.EnqueuedDequeueResponse {
+	return &computeapi.EnqueuedDequeueResponse{
+		Enqueued:    &computeapi.Enqueued{Id: uuid.Must(uuid.NewV7()).String(), Entry: "main.wasm"},
 		AccessToken: "access-token",
 	}
 }
 
-func newUploadRequest(t *testing.T, enq *runners.EnqueuedDequeueResponse, token string) *http.Request {
+func newUploadRequest(t *testing.T, enq *computeapi.EnqueuedDequeueResponse, token string) *http.Request {
 	t.Helper()
 
-	mimetype, body, err := runners.NewDirectUpload(enq, token, strings.NewReader("kernel contents"), strings.NewReader("environ contents"))
+	mimetype, body, err := computeapi.NewDirectUpload(enq, token, strings.NewReader("kernel contents"), strings.NewReader("environ contents"))
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = body.Close() })
 
@@ -73,8 +75,8 @@ func TestUploadHandler(t *testing.T) {
 		h := &daemons.UploadHandler{Dirs: runners.NewSpoolDir(t.TempDir()), Reserver: reserver}
 		h.RM = runners.NewResourceManager(runners.RuntimeResources{Cores: 10, Memory: 10, Vram: 10})
 
-		enqresp := runners.EnqueuedDequeueResponse{
-			Enqueued: &runners.Enqueued{Id: uuid.Must(uuid.NewV7()).String(), Entry: "main.wasm", Cores: 1, Description: "my workload"},
+		enqresp := computeapi.EnqueuedDequeueResponse{
+			Enqueued: &computeapi.Enqueued{Id: uuid.Must(uuid.NewV7()).String(), Entry: "main.wasm", Cores: 1, Description: "my workload"},
 		}
 
 		w := httptest.NewRecorder()
@@ -87,7 +89,7 @@ func TestUploadHandler(t *testing.T) {
 		require.Equal(t, "kernel contents", reserver.archive)
 		require.Equal(t, "candidate-token", reserver.token)
 
-		var resp runners.Enqueued
+		var resp computeapi.Enqueued
 		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
 		require.Equal(t, reserver.recorded.Enqueued.Id, resp.Id)
 
@@ -113,7 +115,7 @@ func TestUploadHandler(t *testing.T) {
 		encoded, err := os.ReadFile(filepath.Join(dir, "metadata.json"))
 		require.NoError(t, err)
 
-		var md runners.EnqueuedDequeueResponse
+		var md computeapi.EnqueuedDequeueResponse
 		require.NoError(t, json.Unmarshal(encoded, &md))
 		require.Equal(t, reserver.recorded.Enqueued.Id, md.Enqueued.Id)
 		require.Equal(t, "main.wasm", md.Enqueued.Entry)
@@ -124,8 +126,8 @@ func TestUploadHandler(t *testing.T) {
 		reserver := &fakereserver{err: errors.New("forbidden")}
 		h := &daemons.UploadHandler{Dirs: runners.NewSpoolDir(t.TempDir()), Reserver: reserver}
 
-		enqresp := runners.EnqueuedDequeueResponse{
-			Enqueued: &runners.Enqueued{Id: uuid.Must(uuid.NewV7()).String()},
+		enqresp := computeapi.EnqueuedDequeueResponse{
+			Enqueued: &computeapi.Enqueued{Id: uuid.Must(uuid.NewV7()).String()},
 		}
 
 		w := httptest.NewRecorder()
@@ -145,8 +147,8 @@ func TestUploadHandler(t *testing.T) {
 		h.Dirs.Downloading = filepath.Join(t.TempDir(), "downloading")
 		require.NoError(t, os.WriteFile(h.Dirs.Downloading, nil, 0600))
 
-		enqresp := runners.EnqueuedDequeueResponse{
-			Enqueued: &runners.Enqueued{Id: uuid.Must(uuid.NewV7()).String()},
+		enqresp := computeapi.EnqueuedDequeueResponse{
+			Enqueued: &computeapi.Enqueued{Id: uuid.Must(uuid.NewV7()).String()},
 		}
 
 		w := httptest.NewRecorder()
@@ -165,8 +167,8 @@ func TestUploadHandler(t *testing.T) {
 		h := &daemons.UploadHandler{Dirs: runners.NewSpoolDir(t.TempDir()), Reserver: reserver}
 		h.RM = runners.NewResourceManager(runners.RuntimeResources{Cores: 10, Memory: 10, Vram: 10})
 
-		enqresp := runners.EnqueuedDequeueResponse{
-			Enqueued: &runners.Enqueued{Id: uuid.Must(uuid.NewV7()).String(), Cores: 9},
+		enqresp := computeapi.EnqueuedDequeueResponse{
+			Enqueued: &computeapi.Enqueued{Id: uuid.Must(uuid.NewV7()).String(), Cores: 9},
 		}
 
 		w := httptest.NewRecorder()
@@ -182,10 +184,10 @@ func TestUploadHandler(t *testing.T) {
 		reserver := &fakereserver{recorded: newRecorded()}
 		h := &daemons.UploadHandler{Dirs: runners.NewSpoolDir(t.TempDir()), Reserver: reserver}
 
-		enqresp := runners.EnqueuedDequeueResponse{
-			Enqueued: &runners.Enqueued{Id: uuid.Must(uuid.NewV7()).String()},
+		enqresp := computeapi.EnqueuedDequeueResponse{
+			Enqueued: &computeapi.Enqueued{Id: uuid.Must(uuid.NewV7()).String()},
 		}
-		mimetype, body, err := runners.NewWorkloadRequest(&enqresp, strings.NewReader(""))
+		mimetype, body, err := computeapi.NewWorkloadRequest(&enqresp, strings.NewReader(""))
 		require.NoError(t, err)
 		defer body.Close()
 
@@ -203,8 +205,8 @@ func TestUploadHandler(t *testing.T) {
 		reserver := &fakereserver{recorded: newRecorded()}
 		h := &daemons.UploadHandler{Dirs: runners.NewSpoolDir(t.TempDir()), Reserver: reserver}
 
-		enqresp := runners.EnqueuedDequeueResponse{
-			Enqueued: &runners.Enqueued{Id: uuid.Must(uuid.NewV7()).String()},
+		enqresp := computeapi.EnqueuedDequeueResponse{
+			Enqueued: &computeapi.Enqueued{Id: uuid.Must(uuid.NewV7()).String()},
 		}
 
 		w := httptest.NewRecorder()

@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/egdaemon/eg/computeapi"
+
 	"github.com/gofrs/uuid/v5"
 	"github.com/stretchr/testify/require"
 )
@@ -13,7 +15,7 @@ func TestRecover(t *testing.T) {
 	t.Run("releases stale repo blocks and requeues everything", func(t *testing.T) {
 		sdir := t.TempDir()
 		dirs := NewSpoolDir(sdir)
-		enq := &Enqueued{AccountId: "acct-recover", VcsUri: "repo"}
+		enq := &computeapi.Enqueued{AccountId: "acct-recover", VcsUri: "repo"}
 
 		// item that had claimed the key (still sitting in Running, as if the
 		// process crashed mid-run).

@@ -13,6 +13,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/egdaemon/eg/computeapi"
+
 	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/compute"
 	"github.com/egdaemon/eg/internal/debugx"
@@ -53,7 +55,7 @@ type PushClient struct {
 }
 
 // Candidates returns the runners able to run the workload, best match first.
-func (t PushClient) Candidates(ctx context.Context, enq *Enqueued, limit uint64) (_ *compute.SearchResponse, err error) {
+func (t PushClient) Candidates(ctx context.Context, enq *computeapi.Enqueued, limit uint64) (_ *compute.SearchResponse, err error) {
 	var (
 		resp compute.SearchResponse
 	)
@@ -90,7 +92,7 @@ func (t PushClient) Candidates(ctx context.Context, enq *Enqueued, limit uint64)
 // TryUpload attempts to upload the workload to each candidate in order,
 // returning the runner that accepted it and the workload as recorded, or nils
 // when none did.
-func TryUpload(ctx context.Context, p2p host.Host, candidates []*compute.Compute, req *EnqueuedDequeueResponse, archive, environ io.ReadSeeker) (*compute.Compute, *Enqueued) {
+func TryUpload(ctx context.Context, p2p host.Host, candidates []*compute.Compute, req *computeapi.EnqueuedDequeueResponse, archive, environ io.ReadSeeker) (*compute.Compute, *computeapi.Enqueued) {
 	debugx.Println("direct upload candidates", len(candidates))
 	for _, c := range candidates {
 		if recorded, err := Upload(ctx, p2p, c, req, archive, environ); err != nil {
@@ -128,7 +130,7 @@ func tokenClaims(token string) (relay []string, p2pid string) {
 // candidate's token, to the runner's POST /c/upload, returning the workload as
 // recorded by the control plane. a nil workload with a nil error means the runner
 // declined the workload (i.e. it is at capacity); try the next candidate.
-func Upload(ctx context.Context, p2p host.Host, candidate *compute.Compute, req *EnqueuedDequeueResponse, archive, environ io.ReadSeeker) (recorded *Enqueued, err error) {
+func Upload(ctx context.Context, p2p host.Host, candidate *compute.Compute, req *computeapi.EnqueuedDequeueResponse, archive, environ io.ReadSeeker) (recorded *computeapi.Enqueued, err error) {
 	if err = iox.Rewind(archive); err != nil {
 		return nil, errorsx.Wrap(err, "unable to rewind archive")
 	}
@@ -147,7 +149,7 @@ func Upload(ctx context.Context, p2p host.Host, candidate *compute.Compute, req 
 
 	errorsx.Log(stream.SetDeadline(time.Now().Add(uploadTimeout)))
 
-	mimetype, body, err := NewDirectUpload(req, candidate.Token, archive, environ)
+	mimetype, body, err := computeapi.NewDirectUpload(req, candidate.Token, archive, environ)
 	if err != nil {
 		return nil, errorsx.Wrap(err, "unable to build upload request")
 	}
@@ -174,7 +176,7 @@ func Upload(ctx context.Context, p2p host.Host, candidate *compute.Compute, req 
 	if httpx.IsSuccess(resp.StatusCode) {
 		// the runner responds with the workload as recorded by the control plane,
 		// including the log token for streaming its logs.
-		recorded = &Enqueued{}
+		recorded = &computeapi.Enqueued{}
 		if err = json.NewDecoder(resp.Body).Decode(recorded); err != nil {
 			return nil, errorsx.Wrap(err, "unable to decode recorded workload")
 		}
@@ -222,7 +224,7 @@ func dialRunner(ctx context.Context, p2p host.Host, p2pid string, token string) 
 
 // FollowLogs streams the log of workload id into dst as it is written, until the
 // workload completes or ctx is cancelled. token is the workload's log token issued by
-// the control plane (Enqueued.LogsToken); its claims identify the runner to dial.
+// the control plane (computeapi.Enqueued.LogsToken); its claims identify the runner to dial.
 // offset resumes the stream from the given byte offset.
 func FollowLogs(ctx context.Context, p2p host.Host, token string, id string, offset int64, dst io.Writer) (err error) {
 	_, p2pid := tokenClaims(token)

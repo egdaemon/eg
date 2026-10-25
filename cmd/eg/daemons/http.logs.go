@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/egdaemon/eg/computeapi"
+
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/httpx"
 	"github.com/egdaemon/eg/internal/jwtx"
@@ -27,7 +29,7 @@ func NewLogsHandler() *LogsHandler {
 
 // LogsHandler implements GET /c/logs/{id}: it streams the log of the workload
 // as it is written (tail -f) until the workload completes or the client goes
-// away. the request must present a log token (runners.LogClaims) for the
+// away. the request must present a log token (computeapi.LogClaims) for the
 // workload signed with this runner's secret. the optional offset query
 // parameter resumes the stream from the given byte offset.
 // Dirs/Secret are exported so tests can point this at an isolated SpoolDirs
@@ -42,7 +44,7 @@ func (t *LogsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		err    error
 		uid    uuid.UUID
 		offset int64
-		claims runners.LogClaims
+		claims computeapi.LogClaims
 	)
 
 	if uid, err = uuid.FromString(mux.Vars(r)["id"]); err != nil {

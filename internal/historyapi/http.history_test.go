@@ -11,6 +11,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/egdaemon/eg/computeapi"
+
 	"github.com/egdaemon/eg/cmd/migrations"
 	"github.com/egdaemon/eg/compute"
 	"github.com/egdaemon/eg/internal/history"
@@ -18,7 +20,6 @@ import (
 	"github.com/egdaemon/eg/internal/langx"
 	"github.com/egdaemon/eg/internal/sqltestx"
 	"github.com/egdaemon/eg/internal/testx"
-	"github.com/egdaemon/eg/runners"
 	"github.com/gofrs/uuid/v5"
 	"github.com/gorilla/mux"
 	"github.com/stretchr/testify/require"
@@ -99,7 +100,7 @@ func logsecret() []byte {
 
 func logsToken(t *testing.T, wid string) string {
 	t.Helper()
-	token, err := runners.SignLogToken(logsecret, wid, time.Minute)
+	token, err := computeapi.SignLogToken(logsecret, wid, time.Minute)
 	require.NoError(t, err)
 	return token
 }

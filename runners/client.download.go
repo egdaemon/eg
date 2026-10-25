@@ -8,6 +8,8 @@ import (
 	"net/http"
 	"runtime"
 
+	"github.com/egdaemon/eg/computeapi"
+
 	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/httpx"
@@ -45,7 +47,7 @@ type DownloadClient struct {
 	dirs SpoolDirs
 }
 
-func (t DownloadClient) Download(ctx context.Context, workload *EnqueuedDequeueResponse) (err error) {
+func (t DownloadClient) Download(ctx context.Context, workload *computeapi.EnqueuedDequeueResponse) (err error) {
 	var (
 		encoded []byte
 		req     *http.Request
@@ -110,17 +112,17 @@ type WorkloadClient struct {
 	host string
 }
 
-func (t WorkloadClient) Download(ctx context.Context, limits RuntimeResources) (_ *EnqueuedDequeueResponse, err error) {
+func (t WorkloadClient) Download(ctx context.Context, limits RuntimeResources) (_ *computeapi.EnqueuedDequeueResponse, err error) {
 	var (
 		encoded []byte
-		req     = EnqueuedSearchRequest{
+		req     = computeapi.EnqueuedSearchRequest{
 			Os:     runtime.GOOS,
 			Arch:   runtime.GOARCH,
 			Cores:  limits.Cores,
 			Memory: limits.Memory,
 			Vram:   limits.Vram,
 		}
-		resp EnqueuedDequeueResponse
+		resp computeapi.EnqueuedDequeueResponse
 	)
 
 	if encoded, err = json.Marshal(&req); err != nil {

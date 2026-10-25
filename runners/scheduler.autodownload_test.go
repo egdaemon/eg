@@ -13,6 +13,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/egdaemon/eg/computeapi"
+
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/httpx"
 	"github.com/gofrs/uuid/v5"
@@ -112,7 +114,7 @@ func TestAutoDownload(t *testing.T) {
 
 		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if strings.HasSuffix(r.URL.Path, "/dequeue") {
-				var captured EnqueuedSearchRequest
+				var captured computeapi.EnqueuedSearchRequest
 				body, err := io.ReadAll(r.Body)
 				require.NoError(t, err)
 				require.NoError(t, json.Unmarshal(body, &captured))

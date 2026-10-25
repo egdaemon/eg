@@ -11,6 +11,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/egdaemon/eg/computeapi"
+
 	"github.com/egdaemon/eg/compute"
 	"github.com/egdaemon/eg/runners"
 	"github.com/gofrs/uuid/v5"
@@ -58,7 +60,7 @@ func newRunner(t *testing.T, client host.Host, handler http.Handler) host.Host {
 func TestTryUpload(t *testing.T) {
 	t.Run("uploads the workload to the first accepting runner", func(t *testing.T) {
 		var (
-			received runners.EnqueuedDequeueResponse
+			received computeapi.EnqueuedDequeueResponse
 			token    string
 			kernel   string
 			environ  string
@@ -92,7 +94,7 @@ func TestTryUpload(t *testing.T) {
 			environ = string(b)
 
 			// the runner responds with the workload as recorded by the control plane.
-			recorded := proto.Clone(received.Enqueued).(*runners.Enqueued)
+			recorded := proto.Clone(received.Enqueued).(*computeapi.Enqueued)
 			recorded.LogsToken = "logs-token"
 			w.WriteHeader(http.StatusAccepted)
 			require.NoError(t, json.NewEncoder(w).Encode(recorded))
@@ -103,8 +105,8 @@ func TestTryUpload(t *testing.T) {
 			{Id: "accepting", P2Pid: accepting.ID().String(), Token: "accepting-token"},
 		}
 
-		req := &runners.EnqueuedDequeueResponse{
-			Enqueued: &runners.Enqueued{Id: uuid.Must(uuid.NewV7()).String(), AccountId: "acct", Entry: "main.wasm"},
+		req := &computeapi.EnqueuedDequeueResponse{
+			Enqueued: &computeapi.Enqueued{Id: uuid.Must(uuid.NewV7()).String(), AccountId: "acct", Entry: "main.wasm"},
 		}
 
 		accepted, recorded := runners.TryUpload(t.Context(), client, candidates, req, strings.NewReader("kernel contents"), strings.NewReader("environ contents"))
@@ -139,8 +141,8 @@ func TestTryUpload(t *testing.T) {
 			{Id: "invalid", P2Pid: "not a peer id"},
 		}
 
-		req := &runners.EnqueuedDequeueResponse{
-			Enqueued: &runners.Enqueued{Id: uuid.Must(uuid.NewV7()).String()},
+		req := &computeapi.EnqueuedDequeueResponse{
+			Enqueued: &computeapi.Enqueued{Id: uuid.Must(uuid.NewV7()).String()},
 		}
 
 		accepted, recorded := runners.TryUpload(t.Context(), client, candidates, req, strings.NewReader("kernel contents"), strings.NewReader(""))

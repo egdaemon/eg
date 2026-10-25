@@ -10,18 +10,19 @@ import (
 	"os"
 	"time"
 
+	"github.com/egdaemon/eg/computeapi"
+
 	"github.com/egdaemon/eg/compute"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/history"
 	"github.com/egdaemon/eg/internal/httpx"
 	"github.com/egdaemon/eg/internal/jwtx"
-	"github.com/egdaemon/eg/runners"
 	"github.com/gofrs/uuid/v5"
 	"github.com/gorilla/mux"
 )
 
 // NewHTTPHistory constructs the history service over the database, authorizing requests with log tokens
-// (runners.LogClaims) signed with the secret, the runner's in-memory jwt secret.
+// (computeapi.LogClaims) signed with the secret, the runner's in-memory jwt secret.
 func NewHTTPHistory(db *sql.DB, secret jwtx.JWTSecretSource) *HistoryService {
 	return &HistoryService{
 		db:     db,
@@ -31,7 +32,7 @@ func NewHTTPHistory(db *sql.DB, secret jwtx.JWTSecretSource) *HistoryService {
 
 // HistoryService implements GET /{id} and GET /{id}/logs: the recorded outcome
 // and the logs of a workload this runner completed, until the record expires (history.DefaultTTL).
-// the request must present a log token (runners.LogClaims) for the workload signed with this runner's secret.
+// the request must present a log token (computeapi.LogClaims) for the workload signed with this runner's secret.
 type HistoryService struct {
 	db     *sql.DB
 	secret jwtx.JWTSecretSource
@@ -126,7 +127,7 @@ func (t *HistoryService) logs(w http.ResponseWriter, r *http.Request) {
 func (t *HistoryService) authorize(w http.ResponseWriter, r *http.Request) (uid uuid.UUID, ok bool) {
 	var (
 		err    error
-		claims runners.LogClaims
+		claims computeapi.LogClaims
 	)
 
 	if uid, err = uuid.FromString(mux.Vars(r)["id"]); err != nil {

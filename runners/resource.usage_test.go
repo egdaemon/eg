@@ -4,6 +4,8 @@ import (
 	"runtime"
 	"testing"
 
+	"github.com/egdaemon/eg/computeapi"
+
 	"github.com/egdaemon/eg/runners"
 	"github.com/stretchr/testify/require"
 )
@@ -16,7 +18,7 @@ func TestNewRuntimeResources(t *testing.T) {
 
 func TestRuntimeResources(t *testing.T) {
 	t.Run("NewRuntimeResourcesFromDequeued copies cores/memory/vram", func(t *testing.T) {
-		d := &runners.Enqueued{Cores: 2, Memory: 1024, Vram: 4096}
+		d := &computeapi.Enqueued{Cores: 2, Memory: 1024, Vram: 4096}
 		got := runners.NewRuntimeResourcesFromDequeued(d)
 		require.Equal(t, runners.RuntimeResources{Cores: 2, Memory: 1024, Vram: 4096}, got)
 	})

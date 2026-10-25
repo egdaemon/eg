@@ -9,6 +9,8 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/egdaemon/eg/computeapi"
+
 	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/httpx"
@@ -29,7 +31,7 @@ func NewEnqueueHandler(dirs runners.SpoolDirs, rm *runners.ResourceManager) *Enq
 
 // EnqueueHandler implements POST /c/enqueue: it accepts a multipart
 // source-ref submission (instead of a pre-built archive) pushed to this
-// runner -- an "enqueued" field (JSON-encoded runners.EnqueuedDequeueResponse,
+// runner -- an "enqueued" field (JSON-encoded computeapi.EnqueuedDequeueResponse,
 // the same shape a runner gets from the polling /c/q/dequeue flow: its
 // Enqueued.VcsCommit is the treeish to check out, its AccessToken is the
 // short-lived token the runner exchanges for actual git credentials via
@@ -52,7 +54,7 @@ func (t *EnqueueHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	var (
 		err  error
 		uid  uuid.UUID
-		req  runners.EnqueuedDequeueResponse
+		req  computeapi.EnqueuedDequeueResponse
 		envc multipart.File
 	)
 

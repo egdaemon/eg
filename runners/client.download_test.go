@@ -13,6 +13,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/egdaemon/eg/computeapi"
+
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/httpx"
 	"github.com/egdaemon/eg/internal/testx"
@@ -71,8 +73,8 @@ func TestDownloadClient(t *testing.T) {
 		ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 		defer cancel()
 
-		workload := &runners.EnqueuedDequeueResponse{
-			Enqueued: &runners.Enqueued{
+		workload := &computeapi.EnqueuedDequeueResponse{
+			Enqueued: &computeapi.Enqueued{
 				Id:    uid.String(),
 				Entry: "entry.wasm",
 			},
@@ -96,8 +98,8 @@ func TestDownloadClient(t *testing.T) {
 		dirs := runners.NewSpoolDir(root)
 		dc := runners.NewDownloadClient(http.DefaultClient, runners.DownloadClientOptionHost(srv.URL), runners.DownloadClientOptionDirs(dirs))
 
-		err := dc.Download(t.Context(), &runners.EnqueuedDequeueResponse{
-			Enqueued: &runners.Enqueued{Id: uid.String(), Entry: "entry.wasm"},
+		err := dc.Download(t.Context(), &computeapi.EnqueuedDequeueResponse{
+			Enqueued: &computeapi.Enqueued{Id: uid.String(), Entry: "entry.wasm"},
 		})
 		require.NoError(t, err)
 
@@ -131,8 +133,8 @@ func TestDownloadClient(t *testing.T) {
 		ctx, cancel := context.WithTimeout(t.Context(), 200*time.Millisecond)
 		defer cancel()
 
-		err := dc.Download(ctx, &runners.EnqueuedDequeueResponse{
-			Enqueued: &runners.Enqueued{Id: uid.String(), Entry: "entry.wasm"},
+		err := dc.Download(ctx, &computeapi.EnqueuedDequeueResponse{
+			Enqueued: &computeapi.Enqueued{Id: uid.String(), Entry: "entry.wasm"},
 		})
 		require.ErrorIs(t, err, context.DeadlineExceeded)
 	})
@@ -148,8 +150,8 @@ func TestDownloadClient(t *testing.T) {
 		dirs := runners.NewSpoolDir(t.TempDir())
 		dc := runners.NewDownloadClient(http.DefaultClient, runners.DownloadClientOptionHost(srv.URL), runners.DownloadClientOptionDirs(dirs))
 
-		err := dc.Download(t.Context(), &runners.EnqueuedDequeueResponse{
-			Enqueued: &runners.Enqueued{Id: uid.String(), Entry: "entry.wasm"},
+		err := dc.Download(t.Context(), &computeapi.EnqueuedDequeueResponse{
+			Enqueued: &computeapi.Enqueued{Id: uid.String(), Entry: "entry.wasm"},
 		})
 		require.Error(t, err)
 	})
@@ -165,8 +167,8 @@ func TestDownloadClient(t *testing.T) {
 		dirs := runners.NewSpoolDir(t.TempDir())
 		dc := runners.NewDownloadClient(http.DefaultClient, runners.DownloadClientOptionHost(srv.URL), runners.DownloadClientOptionDirs(dirs))
 
-		err := dc.Download(t.Context(), &runners.EnqueuedDequeueResponse{
-			Enqueued: &runners.Enqueued{Id: uid.String(), Entry: "entry.wasm"},
+		err := dc.Download(t.Context(), &computeapi.EnqueuedDequeueResponse{
+			Enqueued: &computeapi.Enqueued{Id: uid.String(), Entry: "entry.wasm"},
 		})
 		require.Error(t, err)
 	})
@@ -183,8 +185,8 @@ func TestDownloadClient(t *testing.T) {
 		dirs := runners.NewSpoolDir(t.TempDir())
 		dc := runners.NewDownloadClient(http.DefaultClient, runners.DownloadClientOptionHost(srv.URL), runners.DownloadClientOptionDirs(dirs))
 
-		err := dc.Download(t.Context(), &runners.EnqueuedDequeueResponse{
-			Enqueued: &runners.Enqueued{Id: "not-a-valid-uuid", Entry: "entry.wasm"},
+		err := dc.Download(t.Context(), &computeapi.EnqueuedDequeueResponse{
+			Enqueued: &computeapi.Enqueued{Id: "not-a-valid-uuid", Entry: "entry.wasm"},
 		})
 		require.ErrorContains(t, err, "malformed uid")
 	})

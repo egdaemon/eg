@@ -7,6 +7,8 @@ import (
 	"io"
 	"net/http"
 
+	"github.com/egdaemon/eg/computeapi"
+
 	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/httpx"
@@ -28,12 +30,12 @@ type DirectClient struct {
 // Reserve uploads the workload's archive to the control plane along with the
 // candidate token the client presented, recording the workload against the
 // client's account as claimed by this runner, and returns its metadata.
-func (t DirectClient) Reserve(ctx context.Context, enq *Enqueued, archive io.Reader, token string) (_ *EnqueuedDequeueResponse, err error) {
+func (t DirectClient) Reserve(ctx context.Context, enq *computeapi.Enqueued, archive io.Reader, token string) (_ *computeapi.EnqueuedDequeueResponse, err error) {
 	var (
-		resp EnqueuedDequeueResponse
+		resp computeapi.EnqueuedDequeueResponse
 	)
 
-	mimetype, body, err := NewEnqueueUploadReserved(enq, archive, token)
+	mimetype, body, err := computeapi.NewEnqueueUploadReserved(enq, archive, token)
 	if err != nil {
 		return nil, err
 	}

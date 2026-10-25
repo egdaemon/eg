@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/egdaemon/eg/computeapi"
+
 	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/httpx"
@@ -26,7 +28,7 @@ type CompletionClient struct {
 }
 
 func (t CompletionClient) Upload(ctx context.Context, id string, duration time.Duration, cause error, logs io.Reader, analytics io.Reader) (err error) {
-	mimetype, body, err := NewEnqueueCompletion(cause, duration, logs, analytics)
+	mimetype, body, err := computeapi.NewEnqueueCompletion(cause, duration, logs, analytics)
 	if err != nil {
 		return err
 	}

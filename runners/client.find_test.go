@@ -9,14 +9,16 @@ import (
 	"testing"
 	"time"
 
+	"github.com/egdaemon/eg/computeapi"
+
 	"github.com/egdaemon/eg/internal/httpx"
 	"github.com/egdaemon/eg/internal/timex"
 	"github.com/stretchr/testify/require"
 )
 
 func TestAwaitLogsToken(t *testing.T) {
-	respond := func(w http.ResponseWriter, e *Enqueued) {
-		b, err := (&EnqueuedFindResponse{Enqueued: e}).MarshalJSON()
+	respond := func(w http.ResponseWriter, e *computeapi.Enqueued) {
+		b, err := (&computeapi.EnqueuedFindResponse{Enqueued: e}).MarshalJSON()
 		require.NoError(t, err)
 		_, _ = w.Write(b)
 	}
@@ -28,10 +30,10 @@ func TestAwaitLogsToken(t *testing.T) {
 		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			require.Equal(t, "/c/q/abc", r.URL.Path)
 			if calls.Add(1) < 3 {
-				respond(w, &Enqueued{Id: "abc", CompletedAt: running})
+				respond(w, &computeapi.Enqueued{Id: "abc", CompletedAt: running})
 				return
 			}
-			respond(w, &Enqueued{Id: "abc", CompletedAt: running, LogsToken: "tok"})
+			respond(w, &computeapi.Enqueued{Id: "abc", CompletedAt: running, LogsToken: "tok"})
 		}))
 		defer srv.Close()
 
@@ -43,7 +45,7 @@ func TestAwaitLogsToken(t *testing.T) {
 
 	t.Run("errors when the workload completed without a token", func(t *testing.T) {
 		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			respond(w, &Enqueued{Id: "abc", CompletedAt: time.Now().UTC().Format(time.RFC3339Nano)})
+			respond(w, &computeapi.Enqueued{Id: "abc", CompletedAt: time.Now().UTC().Format(time.RFC3339Nano)})
 		}))
 		defer srv.Close()
 

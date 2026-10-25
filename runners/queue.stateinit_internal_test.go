@@ -4,6 +4,8 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/egdaemon/eg/computeapi"
+
 	"github.com/egdaemon/eg/workspaces"
 	"github.com/stretchr/testify/require"
 )
@@ -14,7 +16,7 @@ func TestStateInit(t *testing.T) {
 		ws := workspaces.Context{RuntimeDir: t.TempDir()}
 		next := idle(metadata{})
 
-		result := initialize(&Enqueued{AccountId: "acct", Id: "init"}, metadata{}, "bucket", ws, next).Update(t.Context())
+		result := initialize(&computeapi.Enqueued{AccountId: "acct", Id: "init"}, metadata{}, "bucket", ws, next).Update(t.Context())
 
 		require.Equal(t, next, result)
 		require.FileExists(t, filepath.Join(ws.RuntimeDir, DaemonLogName))

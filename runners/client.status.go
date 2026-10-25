@@ -10,6 +10,8 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/egdaemon/eg/computeapi"
+
 	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/httpx"
@@ -59,7 +61,7 @@ type StatusClient struct {
 
 // Status reports the workload reached phase; workloads without a candidate
 // token (i.e. not pushed to this runner) are not reported.
-func (t StatusClient) Status(ctx context.Context, token string, phase string, enq *Enqueued) error {
+func (t StatusClient) Status(ctx context.Context, token string, phase string, enq *computeapi.Enqueued) error {
 	if stringsx.Blank(token) || enq == nil {
 		return nil
 	}

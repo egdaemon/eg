@@ -1,4 +1,4 @@
-package runners
+package computeapi
 
 import (
 	"encoding/json"
@@ -11,6 +11,9 @@ import (
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/httpx"
 )
+
+// DaemonAnalyticsName is the file within a workload's runtime directory its analytics are written to.
+const DaemonAnalyticsName = "analytics.db"
 
 // NewWorkloadRequest builds the multipart body for POST /c/enqueue: an
 // "enqueued" field carrying the JSON-encoded EnqueuedDequeueResponse -- the

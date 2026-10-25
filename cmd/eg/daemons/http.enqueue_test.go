@@ -9,6 +9,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/egdaemon/eg/computeapi"
+
 	"github.com/egdaemon/eg/cmd/eg/daemons"
 	"github.com/egdaemon/eg/runners"
 	"github.com/gofrs/uuid/v5"
@@ -22,11 +24,11 @@ func TestEnqueueHandler(t *testing.T) {
 			RM:   runners.NewResourceManager(runners.RuntimeResources{Cores: 10, Memory: 10, Vram: 10}),
 		}
 
-		enqresp := runners.EnqueuedDequeueResponse{
-			Enqueued:    &runners.Enqueued{Id: uuid.Must(uuid.NewV7()).String(), VcsUri: "https://example.com/repo.git", VcsCommit: "deadbeef", Cores: 1},
+		enqresp := computeapi.EnqueuedDequeueResponse{
+			Enqueued:    &computeapi.Enqueued{Id: uuid.Must(uuid.NewV7()).String(), VcsUri: "https://example.com/repo.git", VcsCommit: "deadbeef", Cores: 1},
 			AccessToken: "tok",
 		}
-		mimetype, body, err := runners.NewWorkloadRequestToken(&enqresp, "candidate", strings.NewReader(""))
+		mimetype, body, err := computeapi.NewWorkloadRequestToken(&enqresp, "candidate", strings.NewReader(""))
 		require.NoError(t, err)
 		defer body.Close()
 
@@ -36,7 +38,7 @@ func TestEnqueueHandler(t *testing.T) {
 		h.ServeHTTP(w, r)
 		require.Equal(t, http.StatusAccepted, w.Code)
 
-		var resp runners.Enqueued
+		var resp computeapi.Enqueued
 		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
 		require.Equal(t, enqresp.Enqueued.Id, resp.Id)
 
@@ -52,10 +54,10 @@ func TestEnqueueHandler(t *testing.T) {
 			RM:   runners.NewResourceManager(runners.RuntimeResources{Cores: 10, Memory: 10, Vram: 10}),
 		}
 
-		enqresp := runners.EnqueuedDequeueResponse{
-			Enqueued: &runners.Enqueued{Id: uuid.Must(uuid.NewV7()).String(), VcsUri: "https://example.com/repo.git", VcsCommit: "deadbeef", Cores: 1},
+		enqresp := computeapi.EnqueuedDequeueResponse{
+			Enqueued: &computeapi.Enqueued{Id: uuid.Must(uuid.NewV7()).String(), VcsUri: "https://example.com/repo.git", VcsCommit: "deadbeef", Cores: 1},
 		}
-		mimetype, body, err := runners.NewWorkloadRequest(&enqresp, strings.NewReader(""))
+		mimetype, body, err := computeapi.NewWorkloadRequest(&enqresp, strings.NewReader(""))
 		require.NoError(t, err)
 		defer body.Close()
 
@@ -76,10 +78,10 @@ func TestEnqueueHandler(t *testing.T) {
 			RM:   runners.NewResourceManager(runners.RuntimeResources{Cores: 10, Memory: 10, Vram: 10}),
 		}
 
-		enqresp := runners.EnqueuedDequeueResponse{
-			Enqueued: &runners.Enqueued{Id: uuid.Must(uuid.NewV7()).String(), VcsUri: "https://example.com/repo.git", VcsCommit: "deadbeef", Cores: 9},
+		enqresp := computeapi.EnqueuedDequeueResponse{
+			Enqueued: &computeapi.Enqueued{Id: uuid.Must(uuid.NewV7()).String(), VcsUri: "https://example.com/repo.git", VcsCommit: "deadbeef", Cores: 9},
 		}
-		mimetype, body, err := runners.NewWorkloadRequest(&enqresp, strings.NewReader(""))
+		mimetype, body, err := computeapi.NewWorkloadRequest(&enqresp, strings.NewReader(""))
 		require.NoError(t, err)
 		defer body.Close()
 

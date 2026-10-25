@@ -5,6 +5,8 @@ import (
 	"runtime"
 	"sync"
 
+	"github.com/egdaemon/eg/computeapi"
+
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/numericx"
 	"github.com/pbnjay/memory"
@@ -23,7 +25,7 @@ func NewRuntimeResources() RuntimeResources {
 	}
 }
 
-func NewRuntimeResourcesFromDequeued(d *Enqueued) RuntimeResources {
+func NewRuntimeResourcesFromDequeued(d *computeapi.Enqueued) RuntimeResources {
 	return RuntimeResources{
 		Cores:  d.Cores,
 		Memory: d.Memory,

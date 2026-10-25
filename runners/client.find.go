@@ -10,6 +10,8 @@ import (
 	"net/url"
 	"time"
 
+	"github.com/egdaemon/eg/computeapi"
+
 	"github.com/egdaemon/eg/compute"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/httpx"
@@ -22,9 +24,9 @@ var ErrWorkloadCompleted = errors.New("workload completed")
 
 // Find retrieves the workload as recorded by the control plane. while the workload is
 // running the response carries a log token for streaming its logs from its runner.
-func (t PushClient) Find(ctx context.Context, id string) (_ *Enqueued, err error) {
+func (t PushClient) Find(ctx context.Context, id string) (_ *computeapi.Enqueued, err error) {
 	var (
-		resp EnqueuedFindResponse
+		resp computeapi.EnqueuedFindResponse
 	)
 
 	httpreq, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/c/q/%s", t.host, url.PathEscape(id)), nil)
@@ -52,7 +54,7 @@ func (t PushClient) Find(ctx context.Context, id string) (_ *Enqueued, err error
 // AwaitLogsToken polls the control plane until the workload is running on a runner that
 // supports log streaming, returning the workload carrying its log token. it errors when the
 // workload completes before a token is issued, or ctx ends.
-func (t PushClient) AwaitLogsToken(ctx context.Context, id string, interval time.Duration) (_ *Enqueued, err error) {
+func (t PushClient) AwaitLogsToken(ctx context.Context, id string, interval time.Duration) (_ *computeapi.Enqueued, err error) {
 	tick := time.NewTicker(interval)
 	defer tick.Stop()
 

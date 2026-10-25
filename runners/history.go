@@ -9,6 +9,8 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/egdaemon/eg/computeapi"
+
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/history"
 )
@@ -22,7 +24,7 @@ type historyrecorder struct {
 
 // record the outcome of the workload and keep its log, the workload's directory is removed when it is discarded.
 // then purges the outcomes that expired.
-func (t historyrecorder) record(ctx context.Context, workload *Enqueued, cause error, duration time.Duration, logpath string) (err error) {
+func (t historyrecorder) record(ctx context.Context, workload *computeapi.Enqueued, cause error, duration time.Duration, logpath string) (err error) {
 	now := time.Now()
 
 	entry := history.Entry{

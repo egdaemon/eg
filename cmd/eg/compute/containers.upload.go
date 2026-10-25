@@ -9,6 +9,8 @@ import (
 	"path/filepath"
 	"strconv"
 
+	"github.com/egdaemon/eg/computeapi"
+
 	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/authn"
 	"github.com/egdaemon/eg/cmd/cmdopts"
@@ -25,7 +27,6 @@ import (
 	"github.com/egdaemon/eg/internal/slicesx"
 	"github.com/egdaemon/eg/internal/sshx"
 	"github.com/egdaemon/eg/internal/tarx"
-	"github.com/egdaemon/eg/runners"
 	"github.com/egdaemon/eg/transpile"
 	"github.com/egdaemon/eg/workspaces"
 	"github.com/go-git/go-git/v6"
@@ -185,7 +186,7 @@ func (t c8sUpload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error
 	// if its the node we upload to it'll cost more due to having to
 	// push the archive to another node that matches the requirements.
 	// in theory we could use redirects to handle that but it'd still take a performance hit.
-	mimetype, buf, err := runners.NewEnqueueUpload(&runners.Enqueued{
+	mimetype, buf, err := computeapi.NewEnqueueUpload(&computeapi.Enqueued{
 		AllowShared: t.HostedCompute,
 		Entry:       filepath.Base(entry.Path),
 		Ttl:         uint64(t.RuntimeResources.TTL.Milliseconds()),

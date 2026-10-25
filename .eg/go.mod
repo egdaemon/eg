@@ -1,6 +1,6 @@
 module eg/compute
 
-go 1.26.3
+go 1.27.2
 
 require (
 	cloud.google.com/go/secretmanager v1.22.0

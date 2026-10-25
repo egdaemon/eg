@@ -5,18 +5,19 @@ ARG GOBIN=/usr/bin
 ARG GOMODCACHE=/tmp/gomod
 ARG GOCACHE=/tmp/gocache
 
-RUN echo "cache buster 059a9a06-1686-4f49-9a7f-a30535886d69"
+RUN echo "cache buster 4c5a0b78-95bf-43da-8acb-d04edfd4469b"
 
 RUN apt-get update && apt-get -y install software-properties-common build-essential apt-file ca-certificates curl apt-transport-https sudo
 RUN add-apt-repository -n ppa:longsleep/golang-backports
 RUN add-apt-repository -n ppa:egdaemon/eg
 RUN apt-get update && apt-get -y install dput devscripts dh-make dput git uidmap dbus-user-session fuse-overlayfs tree iproute2
-RUN apt-get update && apt-get -y install golang-1.27 podman rsync vim egworkload dpkg tree pinentry-tty protobuf-compiler
+RUN apt-get update && apt-get -y install golang-1.27 podman rsync vim egworkload dpkg tree pinentry-tty protobuf-compiler libprotobuf-dev
 
 RUN ln -s /usr/lib/go-1.27/bin/go /usr/local/bin/go
 
 RUN podman --version
 RUN go install github.com/pressly/goose/v3/cmd/goose@latest
+RUN go install github.com/fatih/gomodifytags@latest
 RUN go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.28.1
 RUN go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
 RUN go install github.com/onsi/ginkgo/v2/...@latest

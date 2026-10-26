@@ -1,5 +1,7 @@
-// Package sqlx contains small helpers for working with database/sql that
-// arent provided by the standard library.
+// Package sqlx provides the minimal database/sql-shaped interface that
+// genieql-generated code is built against, so callers can pass in any of
+// *sql.DB, *sql.Tx, *sql.Conn, etc. without genieql depending on database/sql
+// driver specifics.
 package sqlx
 
 import (
@@ -36,4 +38,9 @@ type Queryer interface {
 type Transactioner interface {
 	Queryer
 	BeginTx(context.Context, *sql.TxOptions) (*sql.Tx, error)
+}
+
+// Row interface for scanning a single row.
+type Row interface {
+	Scan(dest ...any) error
 }

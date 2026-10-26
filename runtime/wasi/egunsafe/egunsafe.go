@@ -32,6 +32,12 @@ func DialControlSocket(ctx context.Context) (conn *grpc.ClientConn, err error) {
 	}))
 }
 
+// DialAnalyticsSocket dials the analytics (duckproxy) socket, for issuing
+// SQL against the host's analytics.db. Signature matches duckproxy.DialFunc.
+func DialAnalyticsSocket(ctx context.Context, network, addr string) (net.Conn, error) {
+	return wasinet.DialContext(ctx, network, addr)
+}
+
 // dial the control socket for modules.
 func DialModuleControlSocket(ctx context.Context) (conn *grpc.ClientConn, err error) {
 	cspath := envx.String(RuntimeDirectory(eg.SocketControl), eg.EnvComputeModuleSocket)

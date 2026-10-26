@@ -14,7 +14,7 @@ import (
 )
 
 const (
-	model = "unsloth/Qwen3-Coder-30B-A3B-Instruct-GGUF:Q4_K_M"
+	model = "ggml-org/Qwen3.8-27B-GGUF:Q4_K_M"
 
 	// number of the least covered functions to generate tests for.
 	count = 5

@@ -10,7 +10,6 @@ import (
 	"github.com/egdaemon/eg/runtime/wasi/eggit"
 	"github.com/egdaemon/eg/runtime/x/wasi/egautogentest"
 	"github.com/egdaemon/eg/runtime/x/wasi/eggolang"
-	"github.com/egdaemon/eg/runtime/x/wasi/egllm"
 )
 
 const (
@@ -36,14 +35,16 @@ func main() {
 	ctx, done := context.WithTimeout(context.Background(), egenv.TTL())
 	defer done()
 
+	c1 := eg.Container("eg.ubuntu")
 	err := eg.Perform(
 		ctx,
 		eggit.AutoClone,
-		eg.Build(eg.DefaultModule()),
-		egllm.Prepare(egllm.Runner()),
+		eg.Build(
+			c1.BuildFromFile(".eg/Containerfile"),
+		),
 		eg.Module(
 			ctx,
-			egllm.Runner(),
+			c1,
 			eg.Sequential(
 				eggolang.AutoTest(
 					eggolang.TestOption.Environ(os.Environ()...),

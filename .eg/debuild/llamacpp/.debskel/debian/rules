@@ -10,7 +10,7 @@ override_dh_auto_build:
 	echo "DH AUTO BUILD OVERRIDE pkg version '${PACKAGE_VERSION}' tag '${LLAMACPP_TAG}'"
 
 	# static libs so the package only ships executables; openssl provides https for -hf model downloads.
-	cmake -B build -G Ninja \
+	cmake -S src -B build -G Ninja \
 		-DCMAKE_BUILD_TYPE=Release \
 		-DBUILD_SHARED_LIBS=OFF \
 		-DGGML_NATIVE=OFF \

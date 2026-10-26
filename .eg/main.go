@@ -5,8 +5,6 @@ import (
 	"log"
 	"os"
 
-	debian "eg/compute/debuild/eg"
-
 	"github.com/egdaemon/eg/runtime/wasi/eg"
 	"github.com/egdaemon/eg/runtime/wasi/egenv"
 	"github.com/egdaemon/eg/runtime/wasi/eggit"
@@ -19,17 +17,17 @@ func main() {
 	ctx, done := context.WithTimeout(context.Background(), egenv.TTL())
 	defer done()
 
-	deb := debian.Runner()
+	c1 := eg.Container("eg.ubuntu")
 	err := eg.Perform(
 		ctx,
 		eggit.AutoClone,
 		eg.Parallel(
 			eg.Build(eg.DefaultModule()),
-			eg.Build(deb.BuildFromFile(".eg/debuild/eg/.debskel/Containerfile")),
+			eg.Build(c1.BuildFromFile(".eg/Containerfile")),
 		),
 		eg.Module(
 			ctx,
-			deb,
+			c1,
 			eg.Sequential(
 				eggolang.AutoInstall(
 				// eggolang.InstallOption.BuildOptions(

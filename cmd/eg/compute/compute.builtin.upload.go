@@ -3,12 +3,14 @@ package compute
 import (
 	"context"
 	"errors"
-	"github.com/egdaemon/eg/jsonx"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
 	"path/filepath"
 	"time"
+
+	"github.com/egdaemon/eg/jsonx"
 
 	"github.com/egdaemon/eg/computeapi"
 
@@ -183,7 +185,7 @@ func (t builtinUpload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err e
 	// push the archive to another node that matches the requirements.
 	// in theory we could use redirects to handle that but it'd still take a performance hit.
 	mimetype, buf, err := computeapi.NewEnqueueUpload(&computeapi.Enqueued{
-		Description: t.Name,
+		Description: fmt.Sprintf("builtin workload - %s", t.Name),
 		Entry:       filepath.Join(ws.Module, filepath.Base(entry.Path)),
 		Ttl:         uint64(t.RuntimeResources.TTL.Milliseconds()),
 		Cores:       t.RuntimeResources.Cores,
@@ -192,6 +194,7 @@ func (t builtinUpload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err e
 		Os:          t.RuntimeResources.OS,
 		AllowShared: t.HostedCompute,
 		VcsUri:      errorsx.Zero(gitx.CanonicalURI(repo, t.GitRemote)), // optionally set the vcsuri if we're inside a repository.
+		VcsCommit:   errorsx.Zero(gitx.Commitish(".", t.GitReference)),  // the server rejects a vcsuri without a commit.
 		Labels:      append([]string{}, t.RuntimeResources.Labels...),
 	}, archiveio)
 	if err != nil {

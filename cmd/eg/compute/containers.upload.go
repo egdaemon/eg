@@ -3,6 +3,7 @@ package compute
 import (
 	"embed"
 	"errors"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -109,7 +110,7 @@ func (t c8sUpload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error
 		uuid.Must(uuid.NewV7()),
 		md5x.Digest(errorsx.Zero(cmdopts.BuildInfo())),
 		tmpdir,
-		eg.DefaultModuleDirectory()); err != nil {
+		""); err != nil {
 		return err
 	}
 
@@ -187,6 +188,7 @@ func (t c8sUpload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error
 	// push the archive to another node that matches the requirements.
 	// in theory we could use redirects to handle that but it'd still take a performance hit.
 	mimetype, buf, err := computeapi.NewEnqueueUpload(&computeapi.Enqueued{
+		Description: fmt.Sprintf("container workload - %s", t.Containerfile),
 		AllowShared: t.HostedCompute,
 		Entry:       filepath.Base(entry.Path),
 		Ttl:         uint64(t.RuntimeResources.TTL.Milliseconds()),
@@ -195,13 +197,14 @@ func (t c8sUpload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error
 		Arch:        t.RuntimeResources.Arch,
 		Os:          t.RuntimeResources.OS,
 		VcsUri:      errorsx.Zero(gitx.CanonicalURI(repo, t.GitRemote)), // optionally set the vcsuri if we're inside a repository.
+		VcsCommit:   errorsx.Zero(gitx.Commitish(".", t.GitReference)),  // the server rejects a vcsuri without a commit.
 	}, archiveio)
 	if err != nil {
 		return errorsx.Wrap(err, "unable to generate multipart upload")
 	}
 	defer buf.Close()
 
-	c := httpx.BindRetryTransport(tlsc.DefaultClient(), http.StatusTooManyRequests, http.StatusBadGateway)
+	c := tlsc.DefaultClient()
 	aid, err := gctx.Identity().Account(c, signer, errorsx.Zero(gitx.CanonicalURI(repo, t.GitRemote)))
 	if err != nil {
 		return err

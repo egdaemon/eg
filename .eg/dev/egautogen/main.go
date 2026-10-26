@@ -3,15 +3,21 @@ package main
 import (
 	"context"
 	"log"
+	"os"
 
 	"github.com/egdaemon/eg/runtime/wasi/eg"
 	"github.com/egdaemon/eg/runtime/wasi/egenv"
+	"github.com/egdaemon/eg/runtime/wasi/eggit"
 	"github.com/egdaemon/eg/runtime/x/wasi/egautogentest"
+	"github.com/egdaemon/eg/runtime/x/wasi/eggolang"
 	"github.com/egdaemon/eg/runtime/x/wasi/egllm"
 )
 
 const (
 	model = "unsloth/Qwen3-Coder-30B-A3B-Instruct-GGUF:Q4_K_M"
+
+	// number of the least covered functions to generate tests for.
+	count = 5
 
 	style = `func TestContainerRunnerClone(t *testing.T) {
 	t.Run("clone changes should not impact original", func(t *testing.T) {
@@ -32,24 +38,27 @@ func main() {
 
 	err := eg.Perform(
 		ctx,
+		eggit.AutoClone,
 		eg.Build(eg.DefaultModule()),
 		egllm.Prepare(egllm.Runner()),
 		eg.Module(
 			ctx,
 			egllm.Runner(),
-			llm,
+			eg.Sequential(
+				eggolang.AutoTest(
+					eggolang.TestOption.Environ(os.Environ()...),
+				),
+				eggolang.RecordCoverage,
+				egautogentest.New().Model(model).Attempts(3).Ensure(
+					"no helper functions are added",
+					"no global variables or setup code",
+					"you must not change non-test code",
+				).Run(egautogentest.Golang(egautogentest.Worst(count)).Style(style)),
+			),
 		),
 	)
 
 	if err != nil {
 		log.Fatalln(err)
 	}
-}
-
-func llm(ctx context.Context, o eg.Op) error {
-	// stands in for egautogentest.Worst/Sample, which would otherwise
-	// source this from recorded coverage data.
-	seq := egautogentest.From(egautogentest.Fn{Path: egenv.WorkingDirectory("backoff", "backoff.go"), Name: "DynamicHashHour"})
-
-	return egautogentest.Golang{Model: model, Style: style, Attempts: 3}.Generate(seq)(ctx, o)
 }

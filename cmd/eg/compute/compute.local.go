@@ -40,6 +40,7 @@ type local struct {
 	Dir              string   `name:"directory" help:"root directory of the repository" default:"${vars_eg_root_directory}"`
 	ModuleDir        string   `name:"moduledir" help:"must be a subdirectory in the provided directory" default:"${vars_workload_directory}" hidden:"true"`
 	Debug            bool     `name:"debug" help:"keep workspace around to debug issues, requires manual cleanup"`
+	AutoPatch        bool     `name:"auto-patch" help:"apply the changes a workload made to its working directory to the current worktree once it completes, when disabled the changes are printed as a patch instead (dry run)" default:"true" negatable:""`
 	Privileged       bool     `name:"privileged" help:"run the initial container in privileged mode"`
 	Dirty            bool     `name:"dirty" help:"include user directories and environment variables" hidden:"true"`
 	Wayland          bool     `name:"wayland" help:"bind-mount the host wayland display socket into the container"`
@@ -254,5 +255,15 @@ func (t local) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err e
 		}
 	}
 
-	return nil
+	patch, err := gitx.Changes(gctx.Context, ws.WorkingDir, t.Dir)
+	if err != nil {
+		return err
+	}
+
+	if !t.AutoPatch {
+		_, err = os.Stdout.Write(patch)
+		return err
+	}
+
+	return gitx.ApplyPatch(gctx.Context, t.Dir, patch)
 }

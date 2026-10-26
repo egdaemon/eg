@@ -605,3 +605,75 @@ func Bearer(dir string) string {
 func gitcmd(ctx context.Context, repo string, args ...string) *exec.Cmd {
 	return execx.RunAs(ctx, userx.CurrentUsername(eg.DefaultUsername), "git", append([]string{"-C", repo}, args...)...)
 }
+
+// Changes returns a patch of the changes made within clonedir, a clone of the repository at repodir,
+// e.g.) the changes a workload made, which would otherwise be lost with the clone. new files
+// are included. the patch is empty if there are no changes, or if clonedir is not a separate clone,
+// the clone is not usable afterwards.
+func Changes(ctx context.Context, clonedir string, repodir string) ([]byte, error) {
+	if !IsRepository(clonedir) {
+		return nil, nil
+	}
+
+	// directories that aren't repositories are symlinked instead of cloned.
+	if resolved, err := filepath.EvalSymlinks(clonedir); err == nil {
+		if original, err := filepath.EvalSymlinks(repodir); err == nil && resolved == original {
+			return nil, nil
+		}
+	}
+
+	// intent to add so new files are reported by diff.
+	if out, err := gitcmd(ctx, clonedir, "add", "-N", ".").CombinedOutput(); err != nil {
+		return nil, errorsx.Wrapf(fmt.Errorf("%s: %w", strings.TrimSpace(string(out)), err), "unable to detect changes: %s", clonedir)
+	}
+
+	patch, err := gitcmd(ctx, clonedir, "diff", "--binary", "HEAD").Output()
+	if err != nil {
+		return nil, errorsx.Wrapf(err, "unable to detect changes: %s", clonedir)
+	}
+
+	return patch, nil
+}
+
+// ApplyPatch applies the patch to the repository at repodir, changes that are already present are
+// skipped. if the patch cannot be applied repodir is left untouched and the patch is saved to a file,
+// which the returned error names.
+func ApplyPatch(ctx context.Context, repodir string, patch []byte) error {
+	if len(patch) == 0 {
+		return nil
+	}
+
+	patchfile, err := os.CreateTemp("", "eg-*.patch")
+	if err != nil {
+		return err
+	}
+	defer patchfile.Close()
+
+	if _, err = patchfile.Write(patch); err != nil {
+		return errors.Join(err, os.Remove(patchfile.Name()))
+	}
+
+	apply := func(options ...string) error {
+		args := append([]string{"apply"}, append(options, patchfile.Name())...)
+		if out, err := gitcmd(ctx, repodir, args...).CombinedOutput(); err != nil {
+			return errorsx.Wrapf(fmt.Errorf("%s: %w", strings.TrimSpace(string(out)), err), "git %s failed", strings.Join(args, " "))
+		}
+
+		return nil
+	}
+
+	// already present, e.g.) the changes were applied by whatever made them.
+	if err := apply("--reverse", "--check"); err == nil {
+		return os.Remove(patchfile.Name())
+	}
+
+	if err := apply("--check"); err != nil {
+		return errorsx.Wrapf(err, "unable to apply changes, they have been saved to %s", patchfile.Name())
+	}
+
+	if err := apply("--binary"); err != nil {
+		return errorsx.Wrapf(err, "unable to apply changes, they have been saved to %s", patchfile.Name())
+	}
+
+	return os.Remove(patchfile.Name())
+}

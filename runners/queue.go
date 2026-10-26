@@ -36,6 +36,7 @@ import (
 	"github.com/egdaemon/eg/internal/iox"
 	"github.com/egdaemon/eg/internal/langx"
 	"github.com/egdaemon/eg/internal/md5x"
+	"github.com/egdaemon/eg/internal/numericx"
 	"github.com/egdaemon/eg/internal/podmanx"
 	"github.com/egdaemon/eg/internal/tarx"
 	"github.com/egdaemon/eg/internal/userx"
@@ -255,7 +256,7 @@ func RunOne(ctx context.Context, id int, delay time.Duration, authclient *http.C
 }
 
 func workloadcapacity() int {
-	return envx.Int(1, eg.EnvComputeWorkloadCapacity)
+	return numericx.Max(envx.Int(0, eg.EnvComputeWorkloadCapacity), 1)
 }
 
 // runs the scheduler until the context is cancelled. authclient is the runner's

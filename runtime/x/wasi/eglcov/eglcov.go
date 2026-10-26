@@ -4,8 +4,8 @@ package eglcov
 import (
 	"context"
 
+	"github.com/egdaemon/eg/internal/coverage"
 	"github.com/egdaemon/eg/internal/coverage/lcov"
-	"github.com/egdaemon/eg/interp/events"
 	"github.com/egdaemon/eg/runtime/wasi/eg"
 	"github.com/egdaemon/eg/runtime/wasi/egunsafe/fficoverage"
 )
@@ -13,7 +13,7 @@ import (
 // report coverage from lcov files within a directory.
 func ReportCoverage(dir string) eg.OpFn {
 	return eg.OpFn(func(ctx context.Context, _ eg.Op) (err error) {
-		batch := make([]*events.Coverage, 0, 128)
+		batch := make([]*coverage.Report, 0, 128)
 		for rep, err := range lcov.Coverage(ctx, dir) {
 			if err != nil {
 				return err

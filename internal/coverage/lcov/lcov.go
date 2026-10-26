@@ -3,6 +3,7 @@ package lcov
 import (
 	"bufio"
 	"context"
+	"fmt"
 	"io"
 	"io/fs"
 	"iter"
@@ -13,11 +14,12 @@ import (
 
 	"github.com/egdaemon/eg/internal/coverage"
 	"github.com/egdaemon/eg/internal/errorsx"
-	"github.com/egdaemon/eg/interp/events"
 )
 
 const (
 	prefixSourceFile         = "SF:"
+	prefixFunction           = "FN:"
+	prefixFunctionHits       = "FNDA:"
 	prefixExecutableLines    = "LF:"
 	prefixExecutableLinesHit = "LH:"
 	prefixBranches           = "BRF:"
@@ -44,6 +46,7 @@ func Parse(ctx context.Context, src io.Reader) iter.Seq2[*coverage.Report, error
 			path        string
 			linesHit    HitCount
 			branceshHit HitCount
+			fnhits      = make(map[string]int64)
 		)
 
 		scanner := bufio.NewScanner(src)
@@ -51,13 +54,44 @@ func Parse(ctx context.Context, src io.Reader) iter.Seq2[*coverage.Report, error
 		for scanner.Scan() {
 			line := scanner.Text()
 
-			if strings.HasPrefix(line, prefixSourceFile) {
-				path = strings.TrimSpace(strings.TrimPrefix(line, prefixSourceFile))
+			if after, ok := strings.CutPrefix(line, prefixSourceFile); ok {
+				path = strings.TrimSpace(after)
 				continue
 			}
 
-			if strings.HasPrefix(line, prefixExecutableLines) {
-				if nLine, err := strconv.Atoi(strings.TrimSpace(strings.TrimPrefix(line, prefixExecutableLines))); err != nil {
+			if after, ok := strings.CutPrefix(line, prefixFunctionHits); ok {
+				rest := strings.TrimSpace(after)
+				shits, name, ok := strings.Cut(rest, ",")
+				if !ok {
+					yield(nil, errorsx.Wrapf(fmt.Errorf("missing function name"), "invalid line %s", line))
+					return
+				}
+
+				hits, err := strconv.ParseInt(strings.TrimSpace(shits), 10, 64)
+				if err != nil {
+					yield(nil, errorsx.Wrapf(err, "invalid line %s", line))
+					return
+				}
+
+				fnhits[name] = hits
+				continue
+			}
+
+			if after, ok := strings.CutPrefix(line, prefixFunction); ok {
+				_, name, ok := strings.Cut(strings.TrimSpace(after), ",")
+				if !ok {
+					yield(nil, errorsx.Wrapf(fmt.Errorf("missing function name"), "invalid line %s", line))
+					return
+				}
+
+				if _, ok := fnhits[name]; !ok {
+					fnhits[name] = 0
+				}
+				continue
+			}
+
+			if after, ok := strings.CutPrefix(line, prefixExecutableLines); ok {
+				if nLine, err := strconv.Atoi(strings.TrimSpace(after)); err != nil {
 					yield(nil, errorsx.Wrapf(err, "invalid line %s", line))
 					return
 				} else {
@@ -66,8 +100,8 @@ func Parse(ctx context.Context, src io.Reader) iter.Seq2[*coverage.Report, error
 				}
 			}
 
-			if strings.HasPrefix(line, prefixExecutableLinesHit) {
-				if nLine, err := strconv.Atoi(strings.TrimSpace(strings.TrimPrefix(line, prefixExecutableLinesHit))); err != nil {
+			if after, ok := strings.CutPrefix(line, prefixExecutableLinesHit); ok {
+				if nLine, err := strconv.Atoi(strings.TrimSpace(after)); err != nil {
 					yield(nil, errorsx.Wrapf(err, "invalid line %s", line))
 					return
 				} else {
@@ -76,8 +110,8 @@ func Parse(ctx context.Context, src io.Reader) iter.Seq2[*coverage.Report, error
 				}
 			}
 
-			if strings.HasPrefix(line, prefixBranches) {
-				if nLine, err := strconv.Atoi(strings.TrimSpace(strings.TrimPrefix(line, prefixBranches))); err != nil {
+			if after, ok := strings.CutPrefix(line, prefixBranches); ok {
+				if nLine, err := strconv.Atoi(strings.TrimSpace(after)); err != nil {
 					yield(nil, errorsx.Wrapf(err, "invalid line %s", line))
 					return
 				} else {
@@ -86,8 +120,8 @@ func Parse(ctx context.Context, src io.Reader) iter.Seq2[*coverage.Report, error
 				}
 			}
 
-			if strings.HasPrefix(line, prefixBranchesHit) {
-				if nLine, err := strconv.Atoi(strings.TrimSpace(strings.TrimPrefix(line, prefixBranchesHit))); err != nil {
+			if after, ok := strings.CutPrefix(line, prefixBranchesHit); ok {
+				if nLine, err := strconv.Atoi(strings.TrimSpace(after)); err != nil {
 					yield(nil, errorsx.Wrapf(err, "invalid line %s", line))
 					return
 				} else {
@@ -97,14 +131,32 @@ func Parse(ctx context.Context, src io.Reader) iter.Seq2[*coverage.Report, error
 			}
 
 			if strings.HasPrefix(line, prefixEnd) {
-				ok := yield(&events.Coverage{
+				if !yield(&coverage.Report{
 					Path:       path,
 					Statements: linesHit.Coverage(),
 					Branches:   branceshHit.Coverage(),
-				}, nil)
-				if !ok {
+				}, nil) {
+					clear(fnhits)
 					return
 				}
+
+				for name, hits := range fnhits {
+					if !yield(&coverage.Report{
+						Path:       path,
+						Statements: linesHit.Coverage(),
+						Branches:   branceshHit.Coverage(),
+						Fnname:     name,
+						Hits:       hits,
+					}, nil) {
+						clear(fnhits)
+						return
+					}
+				}
+
+				path = ""
+				linesHit = HitCount{}
+				branceshHit = HitCount{}
+				clear(fnhits)
 
 				select {
 				case <-ctx.Done():

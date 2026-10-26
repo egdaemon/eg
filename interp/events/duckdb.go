@@ -50,7 +50,7 @@ func PrepareDB(ctx context.Context, db *sql.DB) error {
 		return err
 	}
 
-	if _, err := db.ExecContext(dctx, "CREATE TABLE IF NOT EXISTS 'eg.metrics.coverage' (id UUID PRIMARY KEY, path TEXT NOT NULL, path_md5 uuid GENERATED ALWAYS AS (md5(path)), statements FLOAT4 NOT NULL, branches FLOAT4 NOT NULL)"); err != nil {
+	if _, err := db.ExecContext(dctx, "CREATE TABLE IF NOT EXISTS 'eg.metrics.coverage' (id UUID PRIMARY KEY DEFAULT uuidv7(), path TEXT NOT NULL, statements FLOAT4 NOT NULL, branches FLOAT4 NOT NULL, fnname TEXT NOT NULL DEFAULT '', hits BIGINT NOT NULL DEFAULT 0)"); err != nil {
 		return err
 	}
 

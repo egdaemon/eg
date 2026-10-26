@@ -9,12 +9,17 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"os"
+	"path/filepath"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/egdaemon/eg/cmd/cmdopts"
 	"github.com/egdaemon/eg/internal/computex"
 	"github.com/egdaemon/eg/runners"
+	"github.com/go-git/go-git/v6"
+	gitconfig "github.com/go-git/go-git/v6/config"
+	"github.com/go-git/go-git/v6/plumbing/object"
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p/core/host"
@@ -205,4 +210,103 @@ func TestFollowEnqueuedLive(t *testing.T) {
 			require.Equal(t, []string{"/c/q/w1", "/c/runners/meta", "/c/history/w1"}, seen())
 		})
 	}
+}
+
+// enqueueapi serves what an upload authenticates against along with the enqueue endpoint. the enqueue endpoint
+// rejects what egmeta's QueueService.enqueue rejects: a missing archive, and a vcs uri without a vcs commit
+// (see the vcs_commit_required migration). returns the config to point the command at it and the forms it accepted.
+func enqueueapi(t *testing.T) (*cmdopts.TLSConfig, func() []url.Values) {
+	var (
+		m        sync.Mutex
+		accepted []url.Values
+	)
+
+	json := func(w http.ResponseWriter, v string) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(v))
+	}
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/oauth2/ssh/token", func(w http.ResponseWriter, r *http.Request) {
+		json(w, `{"access_token":"access","token_type":"BEARER","refresh_token":"refresh","expires_in":3600}`)
+	})
+	mux.HandleFunc("/authn/s/", func(w http.ResponseWriter, r *http.Request) { json(w, `{}`) })
+	mux.HandleFunc("/authn/ssh", func(w http.ResponseWriter, r *http.Request) { json(w, `{"profiles":[{"token":"profile"}]}`) })
+	mux.HandleFunc("/authn/current", func(w http.ResponseWriter, r *http.Request) { json(w, `{"token":"session"}`) })
+	mux.HandleFunc("/c/authz/", func(w http.ResponseWriter, r *http.Request) {
+		json(w, fmt.Sprintf(`{"token":{"expires":%d,"bearer":"bearer"}}`, time.Now().Add(time.Hour).UnixMilli()))
+	})
+	mux.HandleFunc("/c/q/", func(w http.ResponseWriter, r *http.Request) {
+		if err := r.ParseMultipartForm(32 << 20); err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+
+		if _, _, err := r.FormFile("archive"); err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+
+		if r.FormValue("vcs_uri") != "" && r.FormValue("vcs_commit") == "" {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+
+		m.Lock()
+		accepted = append(accepted, r.Form)
+		m.Unlock()
+
+		json(w, `{"enqueue":{"id":"w1"}}`)
+	})
+
+	srv := httptest.NewServer(mux)
+	t.Cleanup(srv.Close)
+
+	u, err := url.Parse(srv.URL)
+	require.NoError(t, err)
+
+	return &cmdopts.TLSConfig{
+		Wrap: func(c *http.Client) *http.Client {
+			c.Transport = redirect{to: u}
+			return c
+		},
+	}, func() []url.Values {
+		m.Lock()
+		defer m.Unlock()
+		return append([]url.Values(nil), accepted...)
+	}
+}
+
+// uploadrepo creates a git repository with a commit and an origin remote and makes it the working directory.
+// also isolates what the commands persist (session, caches, ssh key) within the test.
+func uploadrepo(t *testing.T) (dir string, sshkey string) {
+	dir = t.TempDir()
+	t.Chdir(dir)
+	t.Setenv("EG_SESSION_TOKEN", "refresh")
+	t.Setenv("CACHE_DIRECTORY", t.TempDir())
+	t.Setenv("XDG_CACHE_HOME", t.TempDir())
+
+	repo, err := git.PlainInit(dir, false)
+	require.NoError(t, err)
+	_, err = repo.CreateRemote(&gitconfig.RemoteConfig{Name: "origin", URLs: []string{"https://example.com/org/repo.git"}})
+	require.NoError(t, err)
+
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "README.md"), []byte("hello"), 0600))
+	wt, err := repo.Worktree()
+	require.NoError(t, err)
+	_, err = wt.Add("README.md")
+	require.NoError(t, err)
+	_, err = wt.Commit("initial", &git.CommitOptions{Author: &object.Signature{Name: "test", Email: "test@example.com", When: time.Now()}})
+	require.NoError(t, err)
+
+	return dir, filepath.Join(t.TempDir(), "id_ed25519")
+}
+
+// requirevcs asserts the upload carried what the enqueue endpoint requires of a repository with a remote:
+// the commit along with the uri.
+func requirevcs(t *testing.T, description string, accepted []url.Values) {
+	require.Len(t, accepted, 1)
+	require.Equal(t, description, accepted[0].Get("description"))
+	require.Equal(t, "git@example.com:org/repo.git", accepted[0].Get("vcs_uri"))
+	require.Regexp(t, "^[0-9a-f]{40}$", accepted[0].Get("vcs_commit"))
 }

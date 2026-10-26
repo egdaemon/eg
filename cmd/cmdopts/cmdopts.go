@@ -82,6 +82,8 @@ func (t Global) AfterApply() error {
 
 type TLSConfig struct {
 	Insecure bool `help:"allow unsigned (and therefor insecure) tls certificates to be used" name:"insecure" default:"${vars_tls_insecure_default}" env:"EG_COMPUTE_TLS_INSECURE"`
+	// Wrap, when set, decorates the client returned by DefaultClient. primarily for tests to redirect requests.
+	Wrap func(*http.Client) *http.Client `kong:"-"`
 }
 
 func (t TLSConfig) Config() *tls.Config {
@@ -121,6 +123,10 @@ func (t TLSConfig) DefaultClient() *http.Client {
 	// if env.Boolean(false, eg.EnvLogsNetwork) {
 	// 	return httpx.DebugClient(defaultclient)
 	// }
+
+	if t.Wrap != nil {
+		defaultclient = t.Wrap(defaultclient)
+	}
 
 	return defaultclient
 }

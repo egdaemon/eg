@@ -9,6 +9,7 @@ import (
 	"github.com/egdaemon/eg/runtime/wasi/egenv"
 	"github.com/egdaemon/eg/runtime/wasi/eggit"
 	"github.com/egdaemon/eg/runtime/wasi/shell"
+	"github.com/egdaemon/eg/runtime/x/wasi/egbug"
 	"github.com/egdaemon/eg/runtime/x/wasi/eggolang"
 )
 
@@ -40,7 +41,9 @@ func main() {
 					// ),
 					eggolang.TestOption.Environ(os.Environ()...),
 				),
+				egbug.Log("recording coverage initiated"),
 				eggolang.RecordCoverage,
+				egbug.Log("egautogentest initiated"),
 				IntegrationTests,
 			),
 		),

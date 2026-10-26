@@ -364,7 +364,7 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 		}
 
 		recordDiscoveredWorkloads(gctx.Context, db, eg.DefaultModuleDirectory(t.Dir), os.Environ()...)
-		dpsrv := duckproxyserver.New(db)
+		dpsrv := duckproxyserver.New(db, duckproxyserver.WithAcquireTimeout(time.Minute))
 		go func() {
 			dpspath := filepath.Join(t.RuntimeDir, eg.SocketAnalytics)
 			if err := duckproxyserver.ListenUnix(gctx.Context, dpspath, dpsrv); err != nil && gctx.Context.Err() == nil {

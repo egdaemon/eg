@@ -3,6 +3,7 @@ package fficoverage
 import (
 	"context"
 	"database/sql"
+	"time"
 
 	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/duckproxy"
@@ -39,8 +40,14 @@ func sample(ctx context.Context, q sqlx.Queryer, n int32) (results []coverage.Re
 	return results, err
 }
 
-// Report inserts batch into the analytics database.
+// Report inserts batch into the analytics database. the time allowed is proportional to the size of the batch.
 func Report(ctx context.Context, batch ...*Coverage) error {
+	// reportTimeoutPerItem is the time allowed per item in a batch when reporting.
+	const reportTimeoutPerItem = 30 * time.Millisecond
+	delta := time.Duration(len(batch)+1) * reportTimeoutPerItem
+	ctx, done := context.WithTimeout(ctx, delta)
+	defer done()
+
 	db := dial()
 	defer db.Close()
 

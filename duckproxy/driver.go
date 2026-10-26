@@ -56,23 +56,15 @@ func (c *conn) BeginTx(ctx context.Context, _ driver.TxOptions) (driver.Tx, erro
 // cancelled context simply takes down the connection, which the server
 // notices on its next I/O attempt; WithStatementTimeout on the Server
 // remains the practical bound on a runaway statement. database/sql/driver
-// gives Rows.Next no context at all, so this only covers Exec/Query/Begin
-// themselves, not per-row iteration -- the same limitation every
-// database/sql driver has.
+// gives Rows.Next no context at all, so a query's watch is kept by its rows
+// until the result set is read to the end or closed.
 func watchCancel(ctx context.Context, c net.Conn) (stop func()) {
 	if ctx.Done() == nil {
 		return func() {}
 	}
 
-	done := make(chan struct{})
-	go func() {
-		select {
-		case <-ctx.Done():
-			c.Close()
-		case <-done:
-		}
-	}()
-	return func() { close(done) }
+	cancel := context.AfterFunc(ctx, func() { c.Close() })
+	return func() { cancel() }
 }
 
 func (c *conn) Prepare(query string) (driver.Stmt, error) {
@@ -115,28 +107,36 @@ func (c *conn) ExecContext(ctx context.Context, query string, args []driver.Name
 // QueryContext implements driver.QueryerContext, covering every ad hoc
 // db.QueryContext/db.QueryRowContext call without a Prepare round trip.
 func (c *conn) QueryContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Rows, error) {
-	defer watchCancel(ctx, c.c)()
+	// the watch outlives this call on success: it is handed to the rows, which keep it
+	// until the result set is fully read or closed, so a cancelled context also
+	// interrupts a server that stalls while streaming.
+	stop := watchCancel(ctx, c.c)
 
 	params, err := toParams(args)
 	if err != nil {
+		stop()
 		return nil, err
 	}
 
 	if err := WriteFrame(c.c, &ClientFrame{Body: &ClientFrame_Query{Query: &QueryRequest{Sql: query, Args: params}}}); err != nil {
+		stop()
 		return nil, err
 	}
 
 	var resp ServerFrame
 	if err := ReadFrame(c.c, &resp); err != nil {
+		stop()
 		return nil, err
 	}
 
 	switch body := resp.GetBody().(type) {
 	case *ServerFrame_Columns:
-		return &rows{c: c, columns: body.Columns.GetNames()}, nil
+		return &rows{ctx: ctx, c: c, columns: body.Columns.GetNames(), stop: stop}, nil
 	case *ServerFrame_Error:
+		stop()
 		return nil, errors.New(body.Error.GetMessage())
 	default:
+		stop()
 		return nil, errors.New("duckproxy: unexpected response to Query")
 	}
 }
@@ -240,9 +240,13 @@ func valuesToNamedValues(values []driver.Value) []driver.NamedValue {
 // `for rows.Next() { ... }` loop gets the same bounded-memory, incremental
 // iteration it would get from a direct embedded DuckDB connection.
 type rows struct {
+	ctx     context.Context
 	c       *conn
 	columns []string
 	done    bool
+
+	// stop ends the context watch started by QueryContext, it is safe to call repeatedly.
+	stop func()
 }
 
 func (r *rows) Columns() []string {
@@ -254,6 +258,8 @@ func (r *rows) Columns() []string {
 // later caller -- isn't left with leftover RowResponse/Done/Error frames
 // sitting unread on the wire ahead of that caller's next request.
 func (r *rows) Close() error {
+	defer r.stop()
+
 	dst := make([]driver.Value, len(r.columns))
 	for !r.done {
 		if err := r.Next(dst); err != nil {
@@ -268,9 +274,17 @@ func (r *rows) Next(dst []driver.Value) error {
 		return io.EOF
 	}
 
+	// the watch closes the connection on cancellation, don't attempt to read from it.
+	if err := r.ctx.Err(); err != nil {
+		r.done = true
+		r.stop()
+		return err
+	}
+
 	var resp ServerFrame
 	if err := ReadFrame(r.c.c, &resp); err != nil {
 		r.done = true
+		r.stop()
 		return err
 	}
 
@@ -287,12 +301,15 @@ func (r *rows) Next(dst []driver.Value) error {
 		return nil
 	case *ServerFrame_Done:
 		r.done = true
+		r.stop()
 		return io.EOF
 	case *ServerFrame_Error:
 		r.done = true
+		r.stop()
 		return errors.New(body.Error.GetMessage())
 	default:
 		r.done = true
+		r.stop()
 		return errors.New("duckproxy: unexpected response during row streaming")
 	}
 }

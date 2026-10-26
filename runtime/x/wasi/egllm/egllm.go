@@ -35,33 +35,38 @@ type Client interface {
 	Host() string
 }
 
-type message struct {
+// Message is a single turn of a chat, role is one of "system", "user" or "assistant".
+type Message struct {
 	Role    string `json:"role"`
 	Content string `json:"content"`
 }
 
 type request struct {
 	Model       string    `json:"model,omitempty"`
-	Messages    []message `json:"messages"`
+	Messages    []Message `json:"messages"`
 	Stream      bool      `json:"stream"`
 	Temperature float64   `json:"temperature,omitempty"` // zero defers to the server/model default.
 }
 
 type response struct {
 	Choices []struct {
-		Message message `json:"message"`
+		Message Message `json:"message"`
 	} `json:"choices"`
 }
 
 // Generate sends prompt as a single user message to the llama.cpp server's
 // OpenAI-compatible chat completions endpoint and returns the generated content.
 func Generate(ctx context.Context, c Client, model string, prompt string) (string, error) {
+	return Chat(ctx, c, model, Message{Role: "user", Content: prompt})
+}
+
+// Chat sends the messages, in order, to the llama.cpp server's OpenAI-compatible
+// chat completions endpoint and returns the generated content.
+func Chat(ctx context.Context, c Client, model string, messages ...Message) (string, error) {
 	encoded, err := json.Marshal(request{
-		Model:  model,
-		Stream: false,
-		Messages: []message{
-			{Role: "user", Content: prompt},
-		},
+		Model:    model,
+		Stream:   false,
+		Messages: messages,
 	})
 	if err != nil {
 		return "", err

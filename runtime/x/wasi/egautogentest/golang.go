@@ -3,85 +3,283 @@ package egautogentest
 import (
 	"bytes"
 	"context"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"go/ast"
 	"go/format"
 	"go/parser"
 	"go/token"
-	"log"
+	"io/fs"
 	"os"
 	"path/filepath"
-	"regexp"
 	"sort"
 	"strings"
+	"text/template"
 
 	"github.com/egdaemon/eg/internal/coverage/golangcov"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/iterx"
-	"github.com/egdaemon/eg/runtime/wasi/eg"
+	"github.com/egdaemon/eg/runtime/wasi/eggit"
 	"github.com/egdaemon/eg/runtime/wasi/shell"
 	"github.com/egdaemon/eg/runtime/x/wasi/eggolang"
-	"github.com/egdaemon/eg/runtime/x/wasi/egllm"
 )
 
-const golangPromptTemplate = `
+var golangPromptTemplate = template.Must(template.New("golang").Parse(`
 test the following codeblock using the given coding style and example usage blocks as guidance for how to structure the code.
 rules:
-- you must respond with a single complete go test file, including its package clause and imports, in a single go code block.
-- you must not include *any* comments
-- you must not share variables between tests.
-- you must not use or create mocking/stub or any kind of code that acts as a substitute that you do not find in samples.
-- you must not do not write commented out code.
-- you must not do not document the tests.
-- you must omit the test and print all the code you skipped at the end if you can't write an effective test.
-- you must ensure the test cases are comprehensive.
-
+{{range .Ensure}}- {{.}}
+{{end}}
 --------------------------------------------------- STYLE EXAMPLES ---------------------------------------------------
-:sample:
+{{.Style}}
 --------------------------------------------------- USAGE EXAMPLES ---------------------------------------------------
-:usage:
+{{.Usage}}
 ---------------------------------------------------     TYPES      ---------------------------------------------------
-:types:
----------------------------------------------------   CODE BLOCK   ---------------------------------------------------
-:codeblock:
+{{.Types}}
+{{if .Existing}}---------------------------------------------------  EXISTING TESTS ---------------------------------------------------
+this test file already exists, your response replaces it so it must contain all of its existing tests along with the new ones.
+{{.Existing}}
+{{end}}---------------------------------------------------   CODE BLOCK   ---------------------------------------------------
+{{.Codeblock}}
 ---------------------------------------------------     FOCUS      ---------------------------------------------------
-:focus:
-`
+{{.Fn.Name}}
+`))
 
-// Golang generates tests for Go functions, combining the target function's
-// source, the named types it operates on, and any existing tests that
-// already exercise it, into a single prompt for Model. generated tests are
-// only kept if they compile and pass.
-type Golang struct {
-	Model    string
-	Style    string
-	Attempts int // number of generations to try per function, defaults to 1.
+// golangDefaultRules are the rules used when none are given.
+var golangDefaultRules = []string{
+	"you must respond with only a single complete go test file, including its package clause and imports, as plain text without code fences or any other text.",
+	"you must not include *any* comments",
+	"you must not share variables between tests.",
+	"you must not use or create mocking/stub or any kind of code that acts as a substitute that you do not find in samples.",
+	"you must not do not write commented out code.",
+	"you must not do not document the tests.",
+	"you must omit the test if you can't write an effective test.",
+	"you must ensure the test cases are comprehensive.",
 }
 
-func (t Golang) Generate(seq iterx.Seq[Fn]) eg.OpFn {
-	op := func(ctx context.Context, _ eg.Op) (err error) {
-		loaded := map[string]*gopkg{}
+// golangPrompt is the data the golang prompt template is executed with.
+type golangPrompt struct {
+	PromptContext
+	Style     string
+	Usage     string
+	Types     string
+	Codeblock string
+	Existing  string // contents of the test file being generated, if it already exists.
+}
 
-		for fn := range seq.Each(ctx) {
-			dir := filepath.Dir(fn.Path)
+// golangOption is the resolved configuration of the Golang generator.
+type golangOption struct {
+	seq      iterx.Seq[Fn]
+	style    string
+	filename string
+	pkgs     *pkgcache
+}
 
-			pkg, ok := loaded[dir]
-			if !ok {
-				if pkg, err = loadPackage(dir); err != nil {
-					return err
-				}
-				loaded[dir] = pkg
-			}
+// DefaultGolangFilename is the pattern for the name of the file generated tests are written to.
+const DefaultGolangFilename = "%fn.file%.%fn.name%.autogentest_test.go"
 
-			if err := t.generate(ctx, fn, pkg); err != nil {
-				return err
-			}
-		}
+// GolangOption configures the Golang generator.
+type GolangOption func(*golangOption)
 
-		return seq.Err()
+// GolangOptions is a chainable set of GolangOption, it implements Generator.
+type GolangOptions []GolangOption
+
+// Golang generates tests for the Go functions in seq, combining the target function's
+// source, the named types it operates on, and any existing tests that
+// already exercise it, into a single prompt for the model. generated tests are
+// only kept if they compile and pass.
+func Golang(seq iterx.Seq[Fn]) GolangOptions {
+	pkgs := &pkgcache{loaded: map[string]*gopkg{}}
+	return GolangOptions{func(o *golangOption) {
+		o.seq = seq
+		o.pkgs = pkgs
+	}}
+}
+
+// Style sets an example test the generated tests should follow.
+func (t GolangOptions) Style(v string) GolangOptions {
+	return append(t, func(o *golangOption) {
+		o.style = v
+	})
+}
+
+// Filename sets the pattern for the name of the file generated tests are written to,
+// next to the function's source. the file name must end in _test.go. in addition to the
+// git patterns supported by eggit.StringReplace, the following are replaced:
+//
+//	%fn.file% -> the name of the file declaring the function, without its extension.
+//	%fn.name% -> the lower cased name of the function, methods are Type_method.
+//
+// defaults to DefaultGolangFilename.
+func (t GolangOptions) Filename(pattern string) GolangOptions {
+	return append(t, func(o *golangOption) {
+		o.filename = pattern
+	})
+}
+
+// golangFilename resolves the file name pattern for fn.
+func golangFilename(pattern string, fn Fn) (string, error) {
+	name := strings.NewReplacer(
+		"%fn.file%", strings.TrimSuffix(filepath.Base(fn.Path), filepath.Ext(fn.Path)),
+		"%fn.name%", strings.ToLower(strings.ReplaceAll(fn.Name, ".", "_")),
+	).Replace(pattern)
+	name = eggit.StringReplace(name)
+
+	if name != filepath.Base(name) {
+		return "", fmt.Errorf("file name must not contain a path: %s", name)
 	}
 
-	return egllm.With(t.Model, op)
+	if !strings.HasSuffix(name, "_test.go") {
+		return "", fmt.Errorf("file name must end in _test.go: %s", name)
+	}
+
+	return name, nil
+}
+
+func (t GolangOptions) resolve() (o golangOption) {
+	o.filename = DefaultGolangFilename
+	for _, opt := range t {
+		opt(&o)
+	}
+
+	return o
+}
+
+func (t GolangOptions) Seq() iterx.Seq[Fn] {
+	return t.resolve().seq
+}
+
+func (t GolangOptions) Prompt(c PromptContext) (string, error) {
+	o := t.resolve()
+
+	pkg, err := o.pkgs.load(filepath.Dir(c.Fn.Path))
+	if err != nil {
+		return "", err
+	}
+
+	decl := findFuncDecl(pkg, c.Fn.Name)
+	if decl == nil {
+		return "", fmt.Errorf("unable to locate function %s in %s", c.Fn.Name, c.Fn.Path)
+	}
+
+	codeblock, err := renderNode(pkg.fset, decl)
+	if err != nil {
+		return "", errorsx.Wrap(err, "unable to render function")
+	}
+
+	if len(c.Ensure) == 0 {
+		c.Ensure = golangDefaultRules
+	}
+
+	name, err := golangFilename(o.filename, c.Fn)
+	if err != nil {
+		return "", err
+	}
+
+	var existing string
+	if prev, err := os.ReadFile(filepath.Join(filepath.Dir(c.Fn.Path), name)); err == nil {
+		existing = string(prev)
+	} else if !errors.Is(err, fs.ErrNotExist) {
+		return "", errorsx.Wrap(err, "unable to read existing tests")
+	}
+
+	var buf strings.Builder
+	if err := golangPromptTemplate.Execute(&buf, golangPrompt{
+		PromptContext: c,
+		Style:         o.style,
+		Usage:         collectUsage(pkg, decl.Name.Name),
+		Types:         collectTypes(pkg, decl),
+		Codeblock:     codeblock,
+		Existing:      existing,
+	}); err != nil {
+		return "", errorsx.Wrap(err, "unable to render prompt")
+	}
+
+	return buf.String(), nil
+}
+
+// Verify keeps the generated test next to the function only if it compiles and passes.
+// the test is run in place of any existing test file by overlaying it, so the existing file is only
+// replaced once the generated test passes.
+func (t GolangOptions) Verify(ctx context.Context, fn Fn, artifact string) error {
+	o := t.resolve()
+	dir := filepath.Dir(fn.Path)
+
+	pkg, err := o.pkgs.load(dir)
+	if err != nil {
+		return err
+	}
+
+	src, tests, err := extractTest(artifact, pkg.name)
+	if err != nil {
+		return err
+	}
+
+	name, err := golangFilename(o.filename, fn)
+	if err != nil {
+		return err
+	}
+
+	dest := filepath.Join(dir, name)
+
+	tmp, err := writeTemp(dir, ".autogentest.*", src)
+	if err != nil {
+		return err
+	}
+	defer os.Remove(tmp)
+
+	overlay, err := writeOverlay(dir, dest, tmp)
+	if err != nil {
+		return err
+	}
+	defer os.Remove(overlay)
+
+	cmd := eggolang.Runtime().Directory(dir).Newf("go test -count=1 -overlay '%s' -run '^(%s)$' .", overlay, strings.Join(tests, "|"))
+	if err := shell.Run(ctx, cmd); err != nil {
+		return err
+	}
+
+	return os.Rename(tmp, dest)
+}
+
+// writeOverlay writes a go build overlay presenting the file at src as the one at dest.
+func writeOverlay(dir string, dest string, src string) (string, error) {
+	absdest, err := filepath.Abs(dest)
+	if err != nil {
+		return "", err
+	}
+
+	abssrc, err := filepath.Abs(src)
+	if err != nil {
+		return "", err
+	}
+
+	encoded, err := json.Marshal(struct {
+		Replace map[string]string
+	}{Replace: map[string]string{absdest: abssrc}})
+	if err != nil {
+		return "", err
+	}
+
+	return writeTemp(dir, ".autogentest.overlay.*.json", encoded)
+}
+
+// pkgcache loads each directory's package once.
+type pkgcache struct {
+	loaded map[string]*gopkg
+}
+
+func (t *pkgcache) load(dir string) (pkg *gopkg, err error) {
+	if pkg, ok := t.loaded[dir]; ok {
+		return pkg, nil
+	}
+
+	if pkg, err = loadPackage(dir); err != nil {
+		return nil, err
+	}
+
+	t.loaded[dir] = pkg
+	return pkg, nil
 }
 
 // gopkg is the syntax of a single directory's go files, test files included.
@@ -124,75 +322,11 @@ func loadPackage(dir string) (*gopkg, error) {
 	return p, nil
 }
 
-func (t Golang) generate(ctx context.Context, fn Fn, pkg *gopkg) error {
-	decl := findFuncDecl(pkg, fn.Name)
-	if decl == nil {
-		return fmt.Errorf("unable to locate function %s in %s", fn.Name, fn.Path)
-	}
-
-	codeblock, err := renderNode(pkg.fset, decl)
-	if err != nil {
-		return errorsx.Wrap(err, "unable to render function")
-	}
-
-	prompt := strings.NewReplacer(
-		":sample:", t.Style,
-		":usage:", collectUsage(pkg, decl.Name.Name),
-		":types:", collectTypes(pkg, decl),
-		":codeblock:", codeblock,
-		":focus:", fn.Name,
-	).Replace(golangPromptTemplate)
-
-	dir := filepath.Dir(fn.Path)
-	dest := strings.TrimSuffix(fn.Path, filepath.Ext(fn.Path)) + "_autogentest_test.go"
-
-	for attempt := 1; attempt <= max(t.Attempts, 1); attempt++ {
-		result, err := egllm.Generate(ctx, egllm.New(), t.Model, prompt)
-		if err != nil {
-			return err
-		}
-
-		src, tests, err := extractTest(result, pkg.name)
-		if err != nil {
-			log.Printf("autogentest %s attempt %d: discarding response: %v\n", fn.Name, attempt, err)
-			continue
-		}
-
-		if err := os.WriteFile(dest, src, 0644); err != nil {
-			return err
-		}
-
-		cmd := eggolang.Runtime().Directory(dir).Newf("go test -count=1 -run '^(%s)$' .", strings.Join(tests, "|"))
-		if err := shell.Run(ctx, cmd); err != nil {
-			log.Printf("autogentest %s attempt %d: discarding failing test: %v\n", fn.Name, attempt, err)
-			if err := os.Remove(dest); err != nil {
-				return err
-			}
-			continue
-		}
-
-		return nil
-	}
-
-	log.Printf("autogentest %s: unable to generate a passing test\n", fn.Name)
-	return nil
-}
-
-var fencedcode = regexp.MustCompile("(?s)```[a-zA-Z]*[ \t]*\r?\n(.*?)```")
-
 // extractTest pulls the test file out of a model response, forces it into the
 // given package, and formats it. it returns the names of the tests within.
 func extractTest(response string, pkgname string) ([]byte, []string, error) {
-	code := response
-	for _, m := range fencedcode.FindAllStringSubmatch(response, -1) {
-		if strings.Contains(m[1], "func Test") {
-			code = m[1]
-			break
-		}
-	}
-
 	fset := token.NewFileSet()
-	f, err := parser.ParseFile(fset, "", code, parser.ParseComments|parser.SkipObjectResolution)
+	f, err := parser.ParseFile(fset, "", response, parser.ParseComments|parser.SkipObjectResolution)
 	if err != nil {
 		return nil, nil, errorsx.Wrap(err, "invalid go source")
 	}

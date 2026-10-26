@@ -7,11 +7,11 @@ ARG GOCACHE=/tmp/gocache
 
 RUN echo "cache buster 4c5a0b78-95bf-43da-8acb-d04edfd4469b"
 
-RUN apt-get update && apt-get -y install software-properties-common build-essential apt-file ca-certificates curl apt-transport-https sudo
+RUN apt-get update && apt-get -y install software-properties-common build-essential apt-file ca-certificates curl apt-transport-https sudo netavark python3 python3-venv cmake ninja-build libssl-dev
 RUN add-apt-repository -n ppa:longsleep/golang-backports
 RUN add-apt-repository -n ppa:egdaemon/eg
 RUN apt-get update && apt-get -y install dput devscripts dh-make dput git uidmap dbus-user-session fuse-overlayfs tree iproute2
-RUN apt-get update && apt-get -y install golang-1.27 podman rsync vim egworkload dpkg tree pinentry-tty protobuf-compiler libprotobuf-dev pciutils llama.cpp
+RUN apt-get update && apt-get -y install golang-1.27 podman rsync vim egworkload dpkg tree pinentry-tty protobuf-compiler libprotobuf-dev libbtrfs-dev libassuan-dev libc6-dev libdevmapper-dev libglib2.0-dev libgpgme-dev libgpg-error-dev libprotobuf-c-dev libseccomp-dev libselinux1-dev libsystemd-dev pciutils llama.cpp
 
 RUN ln -s /usr/lib/go-1.27/bin/go /usr/local/bin/go
 

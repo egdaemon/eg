@@ -43,7 +43,7 @@ func main() {
 				),
 				egbug.Log("recording coverage initiated"),
 				eggolang.RecordCoverage,
-				egbug.Log("egautogentest initiated"),
+				egbug.Log("integration tests initiated"),
 				IntegrationTests,
 			),
 		),

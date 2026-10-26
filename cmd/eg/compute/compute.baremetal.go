@@ -183,7 +183,7 @@ func (t baremetal) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, hotswapbin
 		return errorsx.Wrap(err, "unable to prepare analytics.db")
 	}
 
-	dpsrv := duckproxyserver.New(db)
+	dpsrv := duckproxyserver.New(db, duckproxyserver.WithAcquireTimeout(time.Minute))
 	go func() {
 		dpspath := filepath.Join(ws.RuntimeDir, eg.SocketAnalytics)
 		if err := duckproxyserver.ListenUnix(ctx, dpspath, dpsrv); err != nil && ctx.Err() == nil {

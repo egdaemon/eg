@@ -9,6 +9,7 @@ import (
 	"github.com/egdaemon/eg/runtime/wasi/egenv"
 	"github.com/egdaemon/eg/runtime/wasi/eggit"
 	"github.com/egdaemon/eg/runtime/x/wasi/egautogentest"
+	"github.com/egdaemon/eg/runtime/x/wasi/egbug"
 	"github.com/egdaemon/eg/runtime/x/wasi/eggolang"
 )
 
@@ -49,12 +50,15 @@ func main() {
 				eggolang.AutoTest(
 					eggolang.TestOption.Environ(os.Environ()...),
 				),
+				egbug.Log("recording coverage initiated"),
 				eggolang.RecordCoverage,
+				egbug.Log("egautogentest initiated"),
 				egautogentest.New().Model(model).Attempts(3).Ensure(
 					"no helper functions are added",
 					"no global variables or setup code",
 					"you must not change non-test code",
 				).Run(egautogentest.Golang(egautogentest.Worst(count)).Style(style)),
+				egbug.Log("egautogentest completed"),
 			),
 		),
 	)

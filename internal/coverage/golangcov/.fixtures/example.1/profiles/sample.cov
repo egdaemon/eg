@@ -1,0 +1,5 @@
+mode: count
+example.com/sample/sample.go:7.31,8.18 1 1
+example.com/sample/sample.go:11.2,11.26 1 1
+example.com/sample/sample.go:8.18,10.3 1 0
+example.com/sample/sample.go:14.37,16.2 1 0

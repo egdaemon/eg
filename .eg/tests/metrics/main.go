@@ -5,7 +5,6 @@ import (
 	"log"
 	"math/rand"
 
-	"github.com/egdaemon/eg/interp/events"
 	"github.com/egdaemon/eg/runtime/wasi/eg"
 	"github.com/egdaemon/eg/runtime/wasi/egenv"
 	"github.com/egdaemon/eg/runtime/wasi/egmetrics"
@@ -22,8 +21,8 @@ func automcpu() MetricCPU {
 	}
 }
 
-func autocoverage() *events.Coverage {
-	return &events.Coverage{
+func autocoverage() *fficoverage.Coverage {
+	return &fficoverage.Coverage{
 		Path:       "foo",
 		Statements: 10,
 		Branches:   10,

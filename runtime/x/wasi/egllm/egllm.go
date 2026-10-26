@@ -6,9 +6,25 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 
+	_eg "github.com/egdaemon/eg"
+	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/httpx"
 )
+
+// DefaultEndpoint is where llama.cpp's llama-server listens by default.
+const DefaultEndpoint = "http://localhost:8080"
+
+// Endpoint returns the base url of the llm server: the value of eg.EnvComputeLLMEndpoint, otherwise llama.cpp's default.
+func Endpoint() string {
+	return strings.TrimRight(envx.String(DefaultEndpoint, _eg.EnvComputeLLMEndpoint), "/")
+}
+
+// overridden reports whether the endpoint has been overridden, in which case the server isn't ours to manage.
+func overridden() bool {
+	return Endpoint() != DefaultEndpoint
+}
 
 type llm struct {
 	c        *http.Client
@@ -18,7 +34,7 @@ type llm struct {
 func New() llm {
 	return llm{
 		c:        &http.Client{},
-		endpoint: "http://localhost:8080",
+		endpoint: Endpoint(),
 	}
 }
 

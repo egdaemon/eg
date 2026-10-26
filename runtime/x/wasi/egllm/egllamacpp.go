@@ -91,8 +91,9 @@ func Shutdown(runtime shell.Command) eg.OpFn {
 func waitHealthy(runtime shell.Command, timeout time.Duration) eg.OpFn {
 	return func(ctx context.Context, o eg.Op) error {
 		return shell.Run(ctx, runtime.Newf(
-			"for i in $(seq 1 %d); do curl -sf http://localhost:8080/health > /dev/null 2>&1 && exit 0; sleep 1; done; exit 1",
+			"for i in $(seq 1 %d); do curl -sf %s/health > /dev/null 2>&1 && exit 0; sleep 1; done; exit 1",
 			int(timeout.Seconds()),
+			DefaultEndpoint,
 		).Timeout(timeout+time.Minute))
 	}
 }
@@ -118,8 +119,14 @@ func Runner() eg.ContainerRunner {
 	return eg.Container("eg.llamacpp")
 }
 
-// run the provided operation with the given model.
+// run the provided operation with the given model. a llama-server is started for the
+// duration of the operation, unless the endpoint has been overridden (see eg.EnvComputeLLMEndpoint)
+// in which case the operation is run against that server as is.
 func With(model string, op eg.OpFn) eg.OpFn {
+	if overridden() {
+		return op
+	}
+
 	rt := Runtime()
 	return func(ctx context.Context, o eg.Op) error {
 		return around(

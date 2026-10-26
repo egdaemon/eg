@@ -2,7 +2,9 @@ package actl_test
 
 import (
 	"bytes"
+	"fmt"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/alecthomas/kong"
@@ -94,6 +96,77 @@ func TestBootstrapEnvDaemon(t *testing.T) {
 				for _, v := range c.absent {
 					require.NotContains(t, out.String(), v)
 				}
+			})
+		}
+	})
+
+	t.Run("scheduling and api settings are only emitted when requested", func(t *testing.T) {
+		// mirrors vars_cores_minimum_default from cmd/eg/main.go, varies by machine.
+		cores := max(uint64(float64(runtime.NumCPU())*0.8), 1)
+
+		for _, c := range []struct {
+			name     string
+			args     []string
+			contains []string
+			absent   []string
+		}{
+			// workers defaults to vars_cores_minimum_default, so it is always emitted.
+			{name: "defaults", contains: []string{fmt.Sprintf("EG_COMPUTE_WORKLOAD_CAPACITY=%d", cores)}, absent: []string{"EG_COMPUTE_COMPILE_CAPACITY", "EG_COMPUTE_WORKLOAD_TARGET_LOAD", "EG_COMPUTE_API_ENABLED"}},
+			{name: "workers", args: []string{"--workers", "2"}, contains: []string{"EG_COMPUTE_WORKLOAD_CAPACITY=2"}},
+			{name: "enabled", args: []string{"--compilers", "3", "--target-load", "0.65"}, contains: []string{"EG_COMPUTE_COMPILE_CAPACITY=3", "EG_COMPUTE_WORKLOAD_TARGET_LOAD=0.65"}, absent: []string{"EG_COMPUTE_API_ENABLED"}},
+			{name: "api explicitly enabled", args: []string{"--api"}, absent: []string{"EG_COMPUTE_API_ENABLED"}},
+			{name: "api disabled", args: []string{"--no-api"}, contains: []string{"EG_COMPUTE_API_ENABLED=false"}},
+		} {
+			t.Run(c.name, func(t *testing.T) {
+				var out bytes.Buffer
+				genparser := cmdtestx.Genparser(actl.BootstrapEnvDaemon{},
+					cmdopts.RuntimeResources{Cores: cores}.KongVars(),
+					kong.NamedMapper("durationinf", kong.MapperFunc(cmdopts.ParseDurationInf)),
+					kong.Vars{"vars_account_id": "expected-account", "vars_entropy_seed": "expected-seed"},
+					kong.Writers(&out, nil),
+					kong.Bind(cmdopts.Entropy(cmdopts.GenerateEntropy)),
+				)
+
+				require.NoError(t, cmdtestx.Execute(t, genparser(t), append([]string{"command"}, c.args...)...))
+				for _, v := range c.contains {
+					require.Contains(t, out.String(), v)
+				}
+				for _, v := range c.absent {
+					require.NotContains(t, out.String(), v)
+				}
+			})
+		}
+	})
+
+	t.Run("restart on upgrade", func(t *testing.T) {
+		for _, c := range []struct {
+			name     string
+			args     []string
+			contains string
+			invalid  bool
+		}{
+			{name: "default", contains: "EG_RESTART_ON_UPGRADE=auto"},
+			{name: "yes", args: []string{"--restart-on-upgrade", "yes"}, contains: "EG_RESTART_ON_UPGRADE=yes"},
+			{name: "no", args: []string{"--restart-on-upgrade", "no"}, contains: "EG_RESTART_ON_UPGRADE=no"},
+			{name: "invalid", args: []string{"--restart-on-upgrade", "sometimes"}, invalid: true},
+		} {
+			t.Run(c.name, func(t *testing.T) {
+				var out bytes.Buffer
+				genparser := cmdtestx.Genparser(actl.BootstrapEnvDaemon{},
+					cmdopts.RuntimeResources{}.KongVars(),
+					kong.NamedMapper("durationinf", kong.MapperFunc(cmdopts.ParseDurationInf)),
+					kong.Vars{"vars_account_id": "expected-account", "vars_entropy_seed": "expected-seed"},
+					kong.Writers(&out, nil),
+					kong.Bind(cmdopts.Entropy(cmdopts.GenerateEntropy)),
+				)
+
+				err := cmdtestx.Execute(t, genparser(t), append([]string{"command"}, c.args...)...)
+				if c.invalid {
+					require.Error(t, err)
+					return
+				}
+				require.NoError(t, err)
+				require.Contains(t, out.String(), c.contains)
 			})
 		}
 	})

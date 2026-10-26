@@ -8,9 +8,35 @@ systemd-tmpfiles --create
 # restart the daemon on upgrade so it picks up the new binary. try-restart is a no-op when
 # the daemon isn't running. the units are copied into the package rather than shipped via
 # debian/*.service, so dh_installsystemd generates no restart handling for us.
+#
+# EG_RESTART_ON_UPGRADE (see EnvRestartOnUpgrade in egenv.go) is read from the daemon's
+# environment file, configured by: eg actl bootstrap env daemon --restart-on-upgrade
+#   auto - the default when unset or the file is missing; currently the same as yes.
+#   yes  - restart the daemon.
+#   no   - leave the running daemon alone.
 if [ "$1" = "configure" ] && [ -n "$2" ] && [ -d /run/systemd/system ]; then
-	systemctl daemon-reload
-	systemctl try-restart eg-daemon.service
+	# a missing file means the default. a file that exists but fails to source means we can't
+	# know what the administrator asked for, so we fail safe and leave the daemon alone.
+	restart=auto
+	if [ -e /etc/eg/daemon.env ]; then
+		if restart=$( . /etc/eg/daemon.env >/dev/null 2>&1; printf '%s' "$EG_RESTART_ON_UPGRADE" ); then
+			restart="${restart:-auto}"
+		else
+			echo "eg: unable to read /etc/eg/daemon.env; not restarting eg-daemon.service" >&2
+			restart=no
+		fi
+	fi
+
+	case "$restart" in
+	auto | yes)
+		systemctl daemon-reload
+		systemctl try-restart eg-daemon.service
+		;;
+	no) ;;
+	*)
+		echo "eg: ignoring unrecognized EG_RESTART_ON_UPGRADE value '$restart', expected auto, yes or no; not restarting eg-daemon.service" >&2
+		;;
+	esac
 fi
 
 #DEBHELPER#

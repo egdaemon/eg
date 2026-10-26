@@ -1,20 +1,14 @@
 package compute
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"log"
-	"net/http"
 	"os"
 	"path/filepath"
-	"time"
-
-	"github.com/egdaemon/eg/jsonx"
 
 	"github.com/egdaemon/eg/computeapi"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/authn"
 	"github.com/egdaemon/eg/cmd/cmdopts"
@@ -26,8 +20,8 @@ import (
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/fsx"
 	"github.com/egdaemon/eg/internal/gitx"
-	"github.com/egdaemon/eg/internal/httpx"
 	"github.com/egdaemon/eg/internal/iox"
+	"github.com/egdaemon/eg/internal/libp2px"
 	"github.com/egdaemon/eg/internal/md5x"
 	"github.com/egdaemon/eg/internal/slicesx"
 	"github.com/egdaemon/eg/internal/sshx"
@@ -43,6 +37,7 @@ import (
 
 type builtinUpload struct {
 	cmdopts.RuntimeResources
+	uploadoptions `embed:""`
 	HostedCompute bool     `name:"shared-compute" help:"allow hosted compute" default:"true"`
 	SSHKeyPath    string   `name:"sshkeypath" help:"path to ssh key to use" default:"${vars_ssh_key_path}"`
 	Dir           string   `name:"directory" help:"root directory of the repository" default:"${vars_eg_root_directory}"`
@@ -55,19 +50,21 @@ type builtinUpload struct {
 	GitClone      string   `name:"git-clone-uri" help:"clone uri"`
 }
 
-func (t builtinUpload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
+func (t builtinUpload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, find libp2px.MDNSLookup) (err error) {
 	var (
 		signer               ssh.Signer
 		ws                   workspaces.Context
 		repo                 *git.Repository
 		tmpdir               string
 		archiveio, environio *os.File
-		e                    computeapi.EnqueuedCreateResponse
 	)
 
 	if signer, err = sshx.AutoCached(sshx.NewKeyGen(), t.SSHKeyPath); err != nil {
 		return err
 	}
+
+	lancache, stop := t.remember(gctx.Context, find)
+	defer stop()
 
 	if tmpdir, err = os.MkdirTemp("", "eg.builtin.*"); err != nil {
 		return errorsx.Wrap(err, "unable to create temporary directory")
@@ -178,13 +175,14 @@ func (t builtinUpload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err e
 	ainfo := errorsx.Zero(os.Stat(archiveio.Name()))
 	log.Println("archive metadata", ainfo.Name(), bytesx.Unit(ainfo.Size()))
 
-	// TODO: determine the destination based on the requirements
-	// i.e. cores, memory, labels, disk, videomem, etc.
-	// not sure if the client should do this or the node we upload to.
-	// if its the node we upload to it'll cost more due to having to
-	// push the archive to another node that matches the requirements.
-	// in theory we could use redirects to handle that but it'd still take a performance hit.
-	mimetype, buf, err := computeapi.NewEnqueueUpload(&computeapi.Enqueued{
+	aid, err := gctx.Identity().Account(tlsc.DefaultClient(), signer, errorsx.Zero(gitx.CanonicalURI(repo, t.GitRemote)))
+	if err != nil {
+		return err
+	}
+
+	enq := &computeapi.Enqueued{
+		Id:          uuid.Must(uuid.NewV7()).String(),
+		AccountId:   aid,
 		Description: fmt.Sprintf("builtin workload - %s", t.Name),
 		Entry:       filepath.Join(ws.Module, filepath.Base(entry.Path)),
 		Ttl:         uint64(t.RuntimeResources.TTL.Milliseconds()),
@@ -196,41 +194,9 @@ func (t builtinUpload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err e
 		VcsUri:      errorsx.Zero(gitx.CanonicalURI(repo, t.GitRemote)), // optionally set the vcsuri if we're inside a repository.
 		VcsCommit:   errorsx.Zero(gitx.Commitish(".", t.GitReference)),  // the server rejects a vcsuri without a commit.
 		Labels:      append([]string{}, t.RuntimeResources.Labels...),
-	}, archiveio)
-	if err != nil {
-		return errorsx.Wrap(err, "unable to generate multipart upload")
-	}
-	defer buf.Close()
-
-	aid, err := gctx.Identity().Account(tlsc.DefaultClient(), signer, errorsx.Zero(gitx.CanonicalURI(repo, t.GitRemote)))
-	if err != nil {
-		return err
 	}
 
 	chttp := authn.New(gctx.Context, tlsc.DefaultClient(), signer, aid, compute.NewAuthzTokenSource)
 
-	ctx, done := context.WithTimeout(gctx.Context, 10*time.Second)
-	defer done()
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, t.Endpoint, buf)
-	if err != nil {
-		return errorsx.Wrap(err, "unable to create kernel upload request")
-	}
-	req.Header.Set("Content-Type", mimetype)
-
-	debugx.Println("upload initiated", t.Endpoint)
-	resp, err := httpx.AsError(chttp.Do(req)) //nolint:golint,bodyclose
-	defer httpx.TryClose(resp)
-	debugx.Println("upload completed", t.Endpoint)
-
-	if err != nil {
-		return errorsx.Wrap(err, "unable to upload kernel for processing")
-	}
-
-	if err = jsonx.UnmarshalRead(resp.Body, &e); err != nil {
-		return errorsx.Wrap(err, "unable to decode response")
-	}
-
-	log.Println("enqueued", spew.Sdump(&e))
-
-	return nil
+	return t.submit(gctx.Context, chttp, t.Endpoint, lancache, enq, archiveio, environio)
 }

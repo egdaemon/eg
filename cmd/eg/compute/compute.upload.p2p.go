@@ -9,15 +9,22 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"path/filepath"
 	"slices"
 	"time"
 
+	"github.com/davecgh/go-spew/spew"
+	"github.com/egdaemon/eg/cmd/migrations"
 	"github.com/egdaemon/eg/computeapi"
+	"github.com/egdaemon/eg/jsonx"
 
 	"github.com/egdaemon/eg/compute"
 	"github.com/egdaemon/eg/internal/asynccompute"
 	"github.com/egdaemon/eg/internal/computex"
+	"github.com/egdaemon/eg/internal/debugx"
 	"github.com/egdaemon/eg/internal/errorsx"
+	"github.com/egdaemon/eg/internal/httpx"
+	"github.com/egdaemon/eg/internal/iox"
 	"github.com/egdaemon/eg/internal/lan"
 	"github.com/egdaemon/eg/internal/libp2px"
 	"github.com/egdaemon/eg/internal/slicesx"
@@ -31,6 +38,115 @@ import (
 	"github.com/multiformats/go-multiaddr"
 	"google.golang.org/protobuf/proto"
 )
+
+// uploadoptions are the flags of the commands that upload a workload to a runner: straight to one when
+// possible, otherwise through the cluster, optionally following the workload once it is running.
+type uploadoptions struct {
+	P2P            int           `name:"p2p" help:"priority of uploading directly to a runner the control plane suggests before falling back to the cluster, higher goes first, 0 disables" default:"1" env:"EG_P2P_PRIORITY"`
+	LAN            int           `name:"lan" help:"priority of uploading directly to a runner remembered from the local network (see 'eg compute lan'), higher goes first, 0 disables including scanning for runners" default:"2" env:"EG_LAN_PRIORITY"`
+	P2POnly        bool          `name:"p2p-only" help:"never fall back to uploading to the cluster, fail if no runner accepts a direct upload" env:"EG_P2P_ONLY"`
+	CacheDir       string        `name:"cache-directory" help:"directory the remembered systems on the local network are stored in" default:"${vars_cache_directory}" env:"EG_CACHE_DIRECTORY"`
+	LANScanTimeout time.Duration `name:"lan-scan-timeout" help:"how long the background scan of the local network runs for" default:"3s"`
+	LANPeerTTL     time.Duration `name:"lan-peer-ttl" type:"durationinf" help:"how long systems on the local network are remembered after they were last seen" default:"720h" env:"EG_LAN_PEER_TTL"`
+	Follow         bool          `name:"follow" help:"stream the workload's logs once it is running, requires a runner supporting log streaming" negatable:"" default:"true"`
+}
+
+// remember scans the local network for runners and remembers them while the workload is being built, the scan
+// only feeds the cache so it never delays the upload. the cache is optional, nil when unavailable.
+// stop must be called exactly once.
+func (t uploadoptions) remember(ctx context.Context, find libp2px.MDNSLookup) (lancache *sql.DB, stop func()) {
+	if t.LAN <= 0 {
+		return nil, func() {}
+	}
+
+	lancache, err := openlan(ctx, filepath.Join(t.CacheDir, migrations.CLI), t.LANPeerTTL)
+	if err != nil {
+		log.Println(errorsx.Wrap(err, "the local network cache is unavailable"))
+		return nil, func() {}
+	}
+
+	stopscan := autoscan(ctx, lancache, find, t.LANScanTimeout)
+	return lancache, func() {
+		stopscan()
+		errorsx.Log(lancache.Close())
+	}
+}
+
+// submit uploads the workload to a runner directly when enabled and possible, otherwise to the cluster at endpoint,
+// and follows it when requested.
+func (t uploadoptions) submit(ctx context.Context, chttp *http.Client, endpoint string, lancache *sql.DB, enq *computeapi.Enqueued, archiveio, environio io.ReadSeeker) error {
+	if order := priorities(t.LAN, t.P2P); len(order) > 0 {
+		// a nil runner means nothing accepted the workload. otherwise it was uploaded and
+		// the error, if any, is the result of following it, so we must not upload it again.
+		accepted, cause := t.p2p(ctx, chttp, lancache, order, enq, archiveio, environio)
+		if accepted != nil {
+			log.Println("enqueued directly", enq.Id, accepted.Id, accepted.P2Pid)
+			return cause
+		}
+
+		if t.P2POnly {
+			return errorsx.Wrap(cause, "direct upload unavailable and --p2p-only is set")
+		}
+
+		log.Println("direct upload unavailable, falling back to the cluster", cause)
+
+		if _, err := archiveio.Seek(0, io.SeekStart); err != nil {
+			return errorsx.Wrap(err, "unable to rewind kernel archive")
+		}
+	} else if t.P2POnly {
+		return errorsx.Errorf("--p2p-only is set but no direct upload strategy is enabled, see --p2p and --lan")
+	}
+
+	recorded, err := t.enqueue(ctx, chttp, endpoint, enq, archiveio)
+	if err != nil {
+		return err
+	}
+
+	log.Println("enqueued", spew.Sdump(recorded))
+
+	return t.followenqueued(ctx, chttp, recorded.Enqueued.Id)
+}
+
+// enqueue uploads the workload to the cluster.
+func (t uploadoptions) enqueue(ctx context.Context, chttp *http.Client, endpoint string, enq *computeapi.Enqueued, archive io.Reader) (_ *computeapi.EnqueuedCreateResponse, err error) {
+	var (
+		e computeapi.EnqueuedCreateResponse
+	)
+
+	mimetype, buf, err := computeapi.NewEnqueueUpload(enq, archive)
+	if err != nil {
+		return nil, errorsx.Wrap(err, "unable to generate multipart upload")
+	}
+	defer buf.Close()
+
+	r := iox.TimeoutReader(10*time.Second, buf)
+	defer r.Close()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, r)
+	if err != nil {
+		return nil, errorsx.Wrap(err, "unable to create kernel upload request")
+	}
+	req.Header.Set("Content-Type", mimetype)
+
+	debugx.Println("upload initiated", endpoint)
+	resp, err := httpx.AsError(chttp.Do(req)) //nolint:golint,bodyclose
+	defer httpx.TryClose(resp)
+	debugx.Println("upload completed", endpoint)
+
+	if err != nil {
+		return nil, errorsx.Wrap(err, "unable to upload kernel for processing")
+	}
+
+	if err = jsonx.UnmarshalRead(resp.Body, &e); err != nil {
+		return nil, errorsx.Wrap(err, "unable to decode response")
+	}
+
+	if e.Enqueued == nil {
+		return nil, errorsx.New("enqueued response missing workload")
+	}
+
+	return &e, nil
+}
 
 // strategy is a way of reaching a runner peer to peer. uploading to the cluster is not
 // one of them, it is always the last resort.
@@ -95,7 +211,7 @@ type outcome struct {
 // the candidate token issued for it. db is the cache of remembered systems and may be nil.
 // a nil runner means none accepted the workload and the caller should fall back to the cluster. otherwise
 // the error is the result of following the workload (see follow) and it must not be uploaded again.
-func (t upload) p2p(ctx context.Context, chttp *http.Client, db *sql.DB, order []strategy, enq *computeapi.Enqueued, archive, environ io.ReadSeeker) (_ *compute.Compute, err error) {
+func (t uploadoptions) p2p(ctx context.Context, chttp *http.Client, db *sql.DB, order []strategy, enq *computeapi.Enqueued, archive, environ io.ReadSeeker) (_ *compute.Compute, err error) {
 	// clone so the caller's enqueued remains untouched for the cluster fallback.
 	req := &computeapi.EnqueuedDequeueResponse{
 		Enqueued: proto.Clone(enq).(*computeapi.Enqueued),
@@ -122,12 +238,12 @@ func (t upload) p2p(ctx context.Context, chttp *http.Client, db *sql.DB, order [
 		}
 
 		if err != nil {
-			log.Println("upload strategy unavailable", err)
-			failures = errorsx.Compact(failures, err)
+			failures = errorsx.Compact(failures, errorsx.Wrap(err, "upload strategy failed"))
 			continue
 		}
 		defer o.host.Close()
 
+		debugx.Println("enqueued", spew.Sdump(o.recorded))
 		return o.runner, t.follow(ctx, chttp, o)
 	}
 
@@ -136,7 +252,7 @@ func (t upload) p2p(ctx context.Context, chttp *http.Client, db *sql.DB, order [
 
 // lan uploads to the candidates that were remembered from the local network. it only consults the
 // cache, scanning the network is done in the background (see autoscan).
-func (t upload) lan(ctx context.Context, db *sql.DB, candidates []*compute.Compute, req *computeapi.EnqueuedDequeueResponse, archive, environ io.ReadSeeker) (_ outcome, err error) {
+func (t uploadoptions) lan(ctx context.Context, db *sql.DB, candidates []*compute.Compute, req *computeapi.EnqueuedDequeueResponse, archive, environ io.ReadSeeker) (_ outcome, err error) {
 	if db == nil {
 		return outcome{}, errorsx.String("the local network cache is unavailable")
 	}
@@ -193,7 +309,7 @@ func (t upload) lan(ctx context.Context, db *sql.DB, candidates []*compute.Compu
 }
 
 // direct uploads to the candidates through the p2p network, using the relays when they are not directly reachable.
-func (t upload) direct(ctx context.Context, chttp *http.Client, candidates []*compute.Compute, req *computeapi.EnqueuedDequeueResponse, archive, environ io.ReadSeeker) (_ outcome, err error) {
+func (t uploadoptions) direct(ctx context.Context, chttp *http.Client, candidates []*compute.Compute, req *computeapi.EnqueuedDequeueResponse, archive, environ io.ReadSeeker) (_ outcome, err error) {
 	meta, err := registration.NewPingClient(chttp).Meta(ctx)
 	if err != nil {
 		return outcome{}, errorsx.Wrap(err, "unable to retrieve p2p bootstrap addresses")
@@ -215,7 +331,7 @@ func (t upload) direct(ctx context.Context, chttp *http.Client, candidates []*co
 
 // follow streams the workload's logs when requested and reports how the workload ended, nil when it succeeded.
 // the workload is already enqueued; an error here must not trigger another upload.
-func (t upload) follow(ctx context.Context, chttp *http.Client, o outcome) error {
+func (t uploadoptions) follow(ctx context.Context, chttp *http.Client, o outcome) error {
 	if !t.Follow {
 		return nil
 	}
@@ -243,7 +359,7 @@ func (t upload) follow(ctx context.Context, chttp *http.Client, o outcome) error
 // followenqueued streams the logs of a workload enqueued with the cluster. it waits for the cluster to
 // schedule the workload on a runner, then dials that runner through the p2p network. when the workload
 // completes before it can be followed its stored log is printed instead.
-func (t upload) followenqueued(ctx context.Context, chttp *http.Client, id string) (err error) {
+func (t uploadoptions) followenqueued(ctx context.Context, chttp *http.Client, id string) (err error) {
 	if !t.Follow {
 		return nil
 	}

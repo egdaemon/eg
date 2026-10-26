@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"net/http"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -22,8 +21,8 @@ import (
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/fsx"
 	"github.com/egdaemon/eg/internal/gitx"
-	"github.com/egdaemon/eg/internal/httpx"
 	"github.com/egdaemon/eg/internal/iox"
+	"github.com/egdaemon/eg/internal/libp2px"
 	"github.com/egdaemon/eg/internal/md5x"
 	"github.com/egdaemon/eg/internal/slicesx"
 	"github.com/egdaemon/eg/internal/sshx"
@@ -45,6 +44,7 @@ var embeddedc8supload embed.FS
 
 type c8sUpload struct {
 	cmdopts.RuntimeResources
+	uploadoptions `embed:""`
 	HostedCompute bool     `name:"shared-compute" help:"allow hosted compute" default:"true"`
 	Clone         bool     `name:"clone-repo" help:"clone the repository before running the container" default:"false"`
 	Containerfile string   `arg:"" help:"path to the container file to run" default:"Containerfile"`
@@ -56,7 +56,7 @@ type c8sUpload struct {
 	Endpoint      string   `name:"endpoint" help:"specify the endpoint to upload to" default:"${vars_endpoint}/c/q/" hidden:"true"`
 }
 
-func (t c8sUpload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
+func (t c8sUpload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, find libp2px.MDNSLookup) (err error) {
 	const buildir = "build"
 	var (
 		tmpdir               string
@@ -69,6 +69,9 @@ func (t c8sUpload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error
 	if signer, err = sshx.AutoCached(sshx.NewKeyGen(), t.SSHKeyPath); err != nil {
 		return err
 	}
+
+	lancache, stop := t.remember(gctx.Context, find)
+	defer stop()
 
 	if repo, err = git.PlainOpen(ws.Root); err != nil {
 		return errorsx.Wrap(err, "unable to open git repository")
@@ -181,13 +184,14 @@ func (t c8sUpload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error
 	ainfo := errorsx.Zero(os.Stat(archiveio.Name()))
 	log.Println("archive metadata", ainfo.Name(), ainfo.Size())
 
-	// TODO: determine the destination based on the requirements
-	// i.e. cores, memory, labels, disk, videomem, etc.
-	// not sure if the client should do this or the node we upload to.
-	// if its the node we upload to it'll cost more due to having to
-	// push the archive to another node that matches the requirements.
-	// in theory we could use redirects to handle that but it'd still take a performance hit.
-	mimetype, buf, err := computeapi.NewEnqueueUpload(&computeapi.Enqueued{
+	aid, err := gctx.Identity().Account(tlsc.DefaultClient(), signer, errorsx.Zero(gitx.CanonicalURI(repo, t.GitRemote)))
+	if err != nil {
+		return err
+	}
+
+	enq := &computeapi.Enqueued{
+		Id:          uuid.Must(uuid.NewV7()).String(),
+		AccountId:   aid,
 		Description: fmt.Sprintf("container workload - %s", t.Containerfile),
 		AllowShared: t.HostedCompute,
 		Entry:       filepath.Base(entry.Path),
@@ -198,32 +202,10 @@ func (t c8sUpload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error
 		Os:          t.RuntimeResources.OS,
 		VcsUri:      errorsx.Zero(gitx.CanonicalURI(repo, t.GitRemote)), // optionally set the vcsuri if we're inside a repository.
 		VcsCommit:   errorsx.Zero(gitx.Commitish(".", t.GitReference)),  // the server rejects a vcsuri without a commit.
-	}, archiveio)
-	if err != nil {
-		return errorsx.Wrap(err, "unable to generate multipart upload")
-	}
-	defer buf.Close()
-
-	c := tlsc.DefaultClient()
-	aid, err := gctx.Identity().Account(c, signer, errorsx.Zero(gitx.CanonicalURI(repo, t.GitRemote)))
-	if err != nil {
-		return err
+		Labels:      append([]string{}, t.RuntimeResources.Labels...),
 	}
 
-	chttp := authn.New(gctx.Context, c, signer, aid, compute.NewAuthzTokenSource)
+	chttp := authn.New(gctx.Context, tlsc.DefaultClient(), signer, aid, compute.NewAuthzTokenSource)
 
-	req, err := http.NewRequestWithContext(gctx.Context, http.MethodPost, t.Endpoint, buf)
-	if err != nil {
-		return errorsx.Wrap(err, "unable to create kernel upload request")
-	}
-	req.Header.Set("Content-Type", mimetype)
-
-	resp, err := httpx.AsError(chttp.Do(req)) //nolint:golint,bodyclose
-	defer httpx.TryClose(resp)
-
-	if err != nil {
-		return errorsx.Wrap(err, "unable to upload kernel for processing")
-	}
-
-	return nil
+	return t.submit(gctx.Context, chttp, t.Endpoint, lancache, enq, archiveio, environio)
 }

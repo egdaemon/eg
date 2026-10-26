@@ -15,8 +15,8 @@ import (
 func TestDirectClientReserve(t *testing.T) {
 	t.Run("uploads the archive with the candidate token", func(t *testing.T) {
 		var (
-			token, vram, archive, description string
-			labels, secretURIs                []string
+			token, vram, archive, description, entry string
+			labels, secretURIs                       []string
 		)
 
 		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -25,6 +25,7 @@ func TestDirectClientReserve(t *testing.T) {
 			token = r.FormValue("token")
 			vram = r.FormValue("vram")
 			description = r.FormValue("description")
+			entry = r.FormValue("entry")
 			labels = r.MultipartForm.Value["labels"]
 			secretURIs = r.MultipartForm.Value["secret_uris"]
 
@@ -36,20 +37,22 @@ func TestDirectClientReserve(t *testing.T) {
 			archive = string(b)
 
 			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte(`{"enqueued":{"id":"recorded-id","account_id":"acct"},"access_token":"tok"}`))
+			_, _ = w.Write([]byte(`{"enqueued":{"id":"recorded-id","account_id":"acct","entrypoint":"containers/clear/main.wasm"},"access_token":"tok"}`))
 		}))
 		defer srv.Close()
 
 		c := DirectClient{c: srv.Client(), host: srv.URL}
-		recorded, err := c.Reserve(t.Context(), &computeapi.Enqueued{Id: "pushed-id", Vram: 8, Labels: []string{"gpu", "fast"}, SecretUris: []string{"gcpsm://project/test-secret", "awssm://other?region=us-east-1"}, Description: "my workload"}, strings.NewReader("kernel contents"), "candidate-token")
+		recorded, err := c.Reserve(t.Context(), &computeapi.Enqueued{Id: "pushed-id", Entry: "containers/clear/main.wasm", Vram: 8, Labels: []string{"gpu", "fast"}, SecretUris: []string{"gcpsm://project/test-secret", "awssm://other?region=us-east-1"}, Description: "my workload"}, strings.NewReader("kernel contents"), "candidate-token")
 		require.NoError(t, err)
 		require.Equal(t, "candidate-token", token)
 		require.Equal(t, "my workload", description)
+		require.Equal(t, "containers/clear/main.wasm", entry)
 		require.Equal(t, "8", vram)
 		require.Equal(t, []string{"gpu", "fast"}, labels)
 		require.Equal(t, []string{"gcpsm://project/test-secret", "awssm://other?region=us-east-1"}, secretURIs)
 		require.Equal(t, "kernel contents", archive)
 		require.Equal(t, "recorded-id", recorded.Enqueued.Id)
+		require.Equal(t, "containers/clear/main.wasm", recorded.Enqueued.Entry)
 		require.Equal(t, "tok", recorded.AccessToken)
 	})
 

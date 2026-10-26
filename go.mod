@@ -20,7 +20,7 @@ require (
 	github.com/dustin/go-humanize v1.1.0
 	github.com/egdaemon/gdx v0.0.0-20260824162813-84291833ef44
 	github.com/egdaemon/gdx/konggdx v0.0.0-20260824162813-84291833ef44
-	github.com/egdaemon/wasinet/wasinet v0.0.0-20260928194155-07f223337a8d
+	github.com/egdaemon/wasinet/wasinet v0.0.0-20261026191505-4dce83a5be12
 	github.com/egdaemon/wasinet/wazeronet v0.0.0-20260928194155-07f223337a8d
 	github.com/fsnotify/fsnotify v1.10.1
 	github.com/go-git/go-git/v6 v6.0.0-beta.1

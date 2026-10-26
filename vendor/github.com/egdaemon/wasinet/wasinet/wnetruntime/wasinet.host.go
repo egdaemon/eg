@@ -14,6 +14,7 @@ import (
 	"github.com/egdaemon/wasinet/wasinet/ffierrors"
 	"github.com/egdaemon/wasinet/wasinet/ffiguest"
 	"github.com/egdaemon/wasinet/wasinet/stdlib/wasip1syscall"
+	"golang.org/x/sys/unix"
 )
 
 func TranslateErrno(err error) syscall.Errno {
@@ -388,11 +389,37 @@ func SocketAccept(fn AcceptFn) AcceptHostFn {
 type ShutdownFn func(ctx context.Context, fd, how int) error
 type ShutdownHostFn func(ctx context.Context, m ffi.Memory, fd, how int32) syscall.Errno
 
+// shutdownHow translates the guest's shutdown flags into the host's. the guest speaks wasi
+// numbering (sdflags: rd = 1, wr = 2, rdwr = 3) which differs from the host's, linux for
+// example uses rd = 0, wr = 1, rdwr = 2, so passing the value through is rejected with EINVAL.
+func shutdownHow(how int32) (int, bool) {
+	const (
+		wasiRd = 1 << iota
+		wasiWr
+	)
+
+	switch how {
+	case wasiRd:
+		return unix.SHUT_RD, true
+	case wasiWr:
+		return unix.SHUT_WR, true
+	case wasiRd | wasiWr:
+		return unix.SHUT_RDWR, true
+	default:
+		return 0, false
+	}
+}
+
 func SocketShutdown(fn ShutdownFn) ShutdownHostFn {
 	return func(
 		ctx context.Context, m ffi.Memory, fd, how int32,
 	) syscall.Errno {
-		return TranslateErrno(fn(ctx, int(fd), int(how)))
+		host, ok := shutdownHow(how)
+		if !ok {
+			return TranslateErrno(syscall.EINVAL)
+		}
+
+		return TranslateErrno(fn(ctx, int(fd), host))
 	}
 }
 

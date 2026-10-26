@@ -89,7 +89,7 @@ func OptionFSPrefixes(prefixes ...FSPrefix) Option {
 // Unrestricted initializes network with an unrestricted firewall: every
 // address is permitted unless narrowed via OptionFirewall.
 func Unrestricted(opts ...Option) Socket {
-	return langx.Autoptr(
+	return new(
 		langx.Clone(
 			network{Firewall: UnrestrictedFirewall()},
 			opts...,
@@ -100,7 +100,7 @@ func Unrestricted(opts ...Option) Socket {
 // New initializes network with an unrestricted firewall, same as
 // Unrestricted; use OptionFirewall to restrict it.
 func New(opts ...Option) Socket {
-	return langx.Autoptr(langx.Clone(network{Firewall: UnrestrictedFirewall()}, opts...))
+	return new(langx.Clone(network{Firewall: UnrestrictedFirewall()}, opts...))
 }
 
 // PrivatePrefixes are private, loopback, link-local, and multicast address
@@ -127,7 +127,7 @@ func PrivatePrefixes() []netip.Prefix {
 // private, loopback, link-local, and multicast ranges by default. opts are
 // applied afterwards and can widen or narrow the defaults.
 func PublicOnly(opts ...Option) Socket {
-	return langx.Autoptr(
+	return new(
 		langx.Clone(
 			network{
 				Firewall: PublicFirewall(),

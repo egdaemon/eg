@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"time"
 
 	"github.com/egdaemon/eg/runtime/wasi/eg"
 	"github.com/egdaemon/eg/runtime/wasi/egenv"
@@ -78,6 +79,33 @@ func Transaction(ctx context.Context, o eg.Op) error {
 	return nil
 }
 
+// the server caps concurrent sessions, each Open dials a fresh connection from the guest.
+// closing a database must release its session for subsequent opens.
+func SequentialSessions(ctx context.Context, o eg.Op) error {
+	const sessions = 12
+
+	for i := range sessions {
+		qctx, done := context.WithTimeout(ctx, 10*time.Second)
+
+		db, err := egdb.Open(qctx)
+		if err != nil {
+			done()
+			return fmt.Errorf("open %d: %w", i, err)
+		}
+
+		var n int
+		err = db.QueryRowContext(qctx, "SELECT 1").Scan(&n)
+		db.Close()
+		done()
+		if err != nil {
+			return fmt.Errorf("session %d: %w", i, err)
+		}
+	}
+
+	log.Println("sequential sessions succeeded", sessions)
+	return nil
+}
+
 func main() {
 	log.SetFlags(log.Lshortfile)
 	ctx, done := context.WithTimeout(context.Background(), egenv.TTL())
@@ -91,6 +119,7 @@ func main() {
 		eg.Sequential(
 			ExecQuery,
 			Transaction,
+			SequentialSessions,
 		),
 	)
 	if err != nil {

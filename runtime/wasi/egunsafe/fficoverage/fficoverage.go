@@ -12,6 +12,9 @@ import (
 	"github.com/egdaemon/eg/runtime/wasi/egunsafe"
 )
 
+// Coverage is a coverage measurement for a file, or for a function within it when Fnname is set.
+type Coverage = coverage.Report
+
 func dial() *sql.DB {
 	dsn := egunsafe.RuntimeDirectory(eg.SocketAnalytics)
 	return sql.OpenDB(duckproxy.NewConnector(dsn, egunsafe.DialAnalyticsSocket))
@@ -37,7 +40,7 @@ func sample(ctx context.Context, q sqlx.Queryer, n int32) (results []coverage.Re
 }
 
 // Report inserts batch into the analytics database.
-func Report(ctx context.Context, batch ...*coverage.Report) error {
+func Report(ctx context.Context, batch ...*Coverage) error {
 	db := dial()
 	defer db.Close()
 

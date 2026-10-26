@@ -5,7 +5,7 @@ package golangcov
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"go/ast"
 	"go/parser"
 	"go/token"
@@ -22,8 +22,14 @@ import (
 )
 
 // Resolver maps a profile's file name (an import path such as
-// example.com/mod/pkg/file.go) onto the filesystem.
+// example.com/mod/pkg/file.go) onto the filesystem. unresolved names are
+// returned unchanged with ok false.
 type Resolver func(name string) (path string, ok bool)
+
+// Files resolves nothing, restricting Coverage to per file reports.
+func Files(name string) (path string, ok bool) {
+	return name, false
+}
 
 // Modules resolves profile file names against the given go.mod files.
 func Modules(gomods iter.Seq[string]) Resolver {
@@ -49,21 +55,21 @@ func Modules(gomods iter.Seq[string]) Resolver {
 		}
 
 		if match == "" {
-			return "", false
+			return name, false
 		}
 
 		return filepath.Join(roots[match], strings.TrimPrefix(name, match+"/")), true
 	}
 }
 
+// errStopped is returned when the consumer stops iterating.
+// fs.SkipAll can't be used, fs.WalkDir swallows it.
+const errStopped = errorsx.String("iteration stopped")
+
 // Coverage reports per file and per function coverage for the profiles in dir.
 // per function reports require the source, so they're only generated for files
-// resolve can locate. a nil resolve reports per file coverage only.
+// resolve can locate. use Files for per file coverage only.
 func Coverage(ctx context.Context, dir string, resolve Resolver) iter.Seq2[*coverage.Report, error] {
-	if resolve == nil {
-		resolve = func(string) (string, bool) { return "", false }
-	}
-
 	return func(yield func(*coverage.Report, error) bool) {
 		err := fs.WalkDir(os.DirFS(dir), ".", func(path string, d fs.DirEntry, err error) error {
 			if err != nil {
@@ -81,22 +87,19 @@ func Coverage(ctx context.Context, dir string, resolve Resolver) iter.Seq2[*cove
 
 			for _, profile := range profiles {
 				path, resolved := resolve(profile.FileName)
-				if !resolved {
-					path = profile.FileName
-				}
 
 				ok := yield(&coverage.Report{
 					Path:       path,
 					Statements: percentCovered(profile.Blocks),
 				}, nil)
 				if !ok {
-					return fmt.Errorf("yield failed")
+					return errStopped
 				}
 
 				if resolved {
 					for _, fn := range functions(path, profile) {
 						if !yield(fn, nil) {
-							return fmt.Errorf("yield failed")
+							return errStopped
 						}
 					}
 				}
@@ -111,7 +114,8 @@ func Coverage(ctx context.Context, dir string, resolve Resolver) iter.Seq2[*cove
 			return nil
 		})
 
-		if err != nil {
+		// the consumer stopped iterating, yield must not be called again.
+		if err != nil && !errors.Is(err, errStopped) {
 			yield(nil, err)
 		}
 	}

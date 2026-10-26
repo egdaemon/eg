@@ -13,6 +13,7 @@ import (
 	"testing"
 
 	"github.com/egdaemon/eg/computeapi"
+	"github.com/egdaemon/eg/jsonx"
 
 	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/cmd/eg/daemons"
@@ -28,6 +29,7 @@ type fakereserver struct {
 	called   bool
 	id       string
 	desc     string
+	entry    string
 	archive  string
 	token    string
 }
@@ -39,13 +41,13 @@ func (t *fakereserver) Reserve(ctx context.Context, enq *computeapi.Enqueued, ar
 	}
 
 	t.called = true
-	t.id, t.desc, t.archive, t.token = enq.Id, enq.Description, string(b), token
+	t.id, t.desc, t.entry, t.archive, t.token = enq.Id, enq.Description, enq.Entry, string(b), token
 	return t.recorded, t.err
 }
 
 func newRecorded() *computeapi.EnqueuedDequeueResponse {
 	return &computeapi.EnqueuedDequeueResponse{
-		Enqueued:    &computeapi.Enqueued{Id: uuid.Must(uuid.NewV7()).String(), Entry: "main.wasm"},
+		Enqueued:    &computeapi.Enqueued{Id: uuid.Must(uuid.NewV7()).String(), Entry: "containers/clear/main.wasm"},
 		AccessToken: "access-token",
 	}
 }
@@ -76,7 +78,7 @@ func TestUploadHandler(t *testing.T) {
 		h.RM = runners.NewResourceManager(runners.RuntimeResources{Cores: 10, Memory: 10, Vram: 10})
 
 		enqresp := computeapi.EnqueuedDequeueResponse{
-			Enqueued: &computeapi.Enqueued{Id: uuid.Must(uuid.NewV7()).String(), Entry: "main.wasm", Cores: 1, Description: "my workload"},
+			Enqueued: &computeapi.Enqueued{Id: uuid.Must(uuid.NewV7()).String(), Entry: "containers/clear/main.wasm", Cores: 1, Description: "my workload"},
 		}
 
 		w := httptest.NewRecorder()
@@ -86,6 +88,7 @@ func TestUploadHandler(t *testing.T) {
 		require.True(t, reserver.called)
 		require.Equal(t, enqresp.Enqueued.Id, reserver.id)
 		require.Equal(t, "my workload", reserver.desc)
+		require.Equal(t, "containers/clear/main.wasm", reserver.entry)
 		require.Equal(t, "kernel contents", reserver.archive)
 		require.Equal(t, "candidate-token", reserver.token)
 
@@ -115,10 +118,12 @@ func TestUploadHandler(t *testing.T) {
 		encoded, err := os.ReadFile(filepath.Join(dir, "metadata.json"))
 		require.NoError(t, err)
 
-		var md computeapi.EnqueuedDequeueResponse
-		require.NoError(t, json.Unmarshal(encoded, &md))
+		// the runner reads the metadata back the way beginwork does, which defaults the entry to main.wasm
+		// when it is missing, so the recorded entry must not be the default for this to prove it was kept.
+		md := computeapi.EnqueuedDequeueResponse{Enqueued: &computeapi.Enqueued{Entry: "main.wasm"}}
+		require.NoError(t, jsonx.Unmarshal(encoded, &md))
 		require.Equal(t, reserver.recorded.Enqueued.Id, md.Enqueued.Id)
-		require.Equal(t, "main.wasm", md.Enqueued.Entry)
+		require.Equal(t, "containers/clear/main.wasm", md.Enqueued.Entry)
 		require.Equal(t, "access-token", md.AccessToken)
 	})
 

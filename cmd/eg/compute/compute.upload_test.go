@@ -38,14 +38,14 @@ if err := eg.Perform(context.Background()); err != nil {
 	require.NoError(t, compile.InitGolangTidy(t.Context(), moddir))
 
 	cmd := upload{
-		SSHKeyPath:   sshkey,
-		Dir:          dir,
-		Endpoint:     "https://api.egdaemon.com/c/q/",
-		GitRemote:    "origin",
-		GitReference: "HEAD",
-		CacheDir:     t.TempDir(),
+		SSHKeyPath:    sshkey,
+		Dir:           dir,
+		Endpoint:      "https://api.egdaemon.com/c/q/",
+		GitRemote:     "origin",
+		GitReference:  "HEAD",
+		uploadoptions: uploadoptions{CacheDir: t.TempDir(), Follow: true},
 	}
 
 	require.NoError(t, cmd.Run(&cmdopts.Global{Context: t.Context(), AccountID: "account"}, tlsc, nil))
-	requirevcs(t, "Uploaded: test - HEAD", accepted())
+	requirevcs(t, "Uploaded: test - HEAD", "main.wasm", accepted())
 }

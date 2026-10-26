@@ -258,6 +258,12 @@ func enqueueapi(t *testing.T) (*cmdopts.TLSConfig, func() []url.Values) {
 
 		json(w, `{"enqueue":{"id":"w1"}}`)
 	})
+	// the enqueued workload has already completed, following it prints its stored log and reports its result.
+	mux.HandleFunc("/c/q/w1", func(w http.ResponseWriter, r *http.Request) {
+		json(w, `{"enqueue":{"id":"w1","completed_at":"2020-01-01T00:00:00Z"}}`)
+	})
+	mux.HandleFunc("/c/history/w1/logs", func(w http.ResponseWriter, r *http.Request) { _, _ = w.Write([]byte("done\n")) })
+	mux.HandleFunc("/c/history/w1", func(w http.ResponseWriter, r *http.Request) { json(w, `{"history":{"result":2}}`) })
 
 	srv := httptest.NewServer(mux)
 	t.Cleanup(srv.Close)
@@ -302,11 +308,12 @@ func uploadrepo(t *testing.T) (dir string, sshkey string) {
 	return dir, filepath.Join(t.TempDir(), "id_ed25519")
 }
 
-// requirevcs asserts the upload carried what the enqueue endpoint requires of a repository with a remote:
-// the commit along with the uri.
-func requirevcs(t *testing.T, description string, accepted []url.Values) {
+// requirevcs asserts the upload carried the description and entry the runner needs to find the workload, and what the
+// enqueue endpoint requires of a repository with a remote: the commit along with the uri.
+func requirevcs(t *testing.T, description, entry string, accepted []url.Values) {
 	require.Len(t, accepted, 1)
 	require.Equal(t, description, accepted[0].Get("description"))
+	require.Equal(t, entry, accepted[0].Get("entry"))
 	require.Equal(t, "git@example.com:org/repo.git", accepted[0].Get("vcs_uri"))
 	require.Regexp(t, "^[0-9a-f]{40}$", accepted[0].Get("vcs_commit"))
 }

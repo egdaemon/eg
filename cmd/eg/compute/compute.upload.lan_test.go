@@ -26,7 +26,7 @@ import (
 )
 
 func TestUploadLAN(t *testing.T) {
-	cmd := upload{LANPeerTTL: lan.DefaultTTL}
+	cmd := upload{uploadoptions: uploadoptions{LANPeerTTL: lan.DefaultTTL}}
 	req := &computeapi.EnqueuedDequeueResponse{
 		Enqueued: &computeapi.Enqueued{Id: uuid.Must(uuid.NewV7()).String(), AccountId: "acct", Entry: "main.wasm"},
 	}

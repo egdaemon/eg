@@ -14,14 +14,15 @@ func TestBuiltinUpload(t *testing.T) {
 	dir, sshkey := uploadrepo(t)
 
 	cmd := builtinUpload{
-		SSHKeyPath:   sshkey,
-		Dir:          dir,
-		Name:         "containers/clear",
-		Endpoint:     "https://api.egdaemon.com/c/q/",
-		GitRemote:    "origin",
-		GitReference: "HEAD",
+		SSHKeyPath:    sshkey,
+		Dir:           dir,
+		Name:          "containers/clear",
+		Endpoint:      "https://api.egdaemon.com/c/q/",
+		GitRemote:     "origin",
+		GitReference:  "HEAD",
+		uploadoptions: uploadoptions{Follow: true},
 	}
 
-	require.NoError(t, cmd.Run(&cmdopts.Global{Context: t.Context(), AccountID: "account"}, tlsc))
-	requirevcs(t, "builtin workload - containers/clear", accepted())
+	require.NoError(t, cmd.Run(&cmdopts.Global{Context: t.Context(), AccountID: "account"}, tlsc, nil))
+	requirevcs(t, "builtin workload - containers/clear", "containers/clear/main.wasm", accepted())
 }

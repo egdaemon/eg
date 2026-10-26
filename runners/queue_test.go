@@ -79,6 +79,27 @@ func TestQueue(t *testing.T) {
 		require.FileExists(t, entry.LogsPath)
 	})
 
+	t.Run("mounts_an_entry_nested_in_the_archive", func(t *testing.T) {
+		dirs := runners.NewSpoolDir(t.TempDir())
+		uid := errorsx.Must(uuid.NewV4())
+		createTestWorkload(t, dirs.Queued, uid, "containers/clear/main.wasm", testx.Read(testx.Fixture("example.1.wasm")))
+		rm := runners.NewResourceManager(runners.NewRuntimeResources())
+		reload := make(chan error, 1)
+		ctx, done := context.WithCancelCause(t.Context())
+		c := completion{done: done}
+		db := testx.MustT(migrations.Open(t.Context(), sqltestx.Path(t)))(t)
+		defer db.Close()
+		logs := t.TempDir()
+		err := runners.RunOne(ctx, 99, 0, httpx.NewFixedStatusClient(http.StatusNotImplemented), rm, &dirs, reload, runners.QueueOptionCompletion(&c), runners.QueueOptionHistory(db, logs))
+		require.ErrorIs(t, err, context.Canceled)
+
+		var entry computex.Entry
+		require.NoError(t, computex.EntryFindByID(t.Context(), db, uid.String()).Scan(&entry))
+		log, err := os.ReadFile(entry.LogsPath)
+		require.NoError(t, err)
+		require.NotContains(t, string(log), "no such file or directory")
+	})
+
 	t.Run("runs_a_single_workload_and_completes", func(t *testing.T) {
 		dirs := runners.NewSpoolDir(t.TempDir())
 		createTestWorkload(t, dirs.Queued, errorsx.Must(uuid.NewV4()), "entry.wasm", testx.Read(testx.Fixture("example.1.wasm")))
@@ -303,7 +324,16 @@ func createTestWorkloadFor(t *testing.T, baseDir string, uid uuid.UUID, accountI
 
 	module, err := io.ReadAll(src)
 	require.NoError(t, err)
-	require.NoError(t, tw.WriteHeader(&tar.Header{Name: entrypoint, Size: int64(len(module))}))
+
+	// like tarx.Pack, directories precede the files within them.
+	var parents []string
+	for dir := filepath.Dir(entrypoint); dir != "."; dir = filepath.Dir(dir) {
+		parents = append([]string{dir}, parents...)
+	}
+	for _, dir := range parents {
+		require.NoError(t, tw.WriteHeader(&tar.Header{Name: dir, Typeflag: tar.TypeDir, Mode: 0755}))
+	}
+	require.NoError(t, tw.WriteHeader(&tar.Header{Name: entrypoint, Size: int64(len(module)), Mode: 0644}))
 	_, err = io.Copy(tw, bytes.NewReader(module))
 	require.NoError(t, err)
 

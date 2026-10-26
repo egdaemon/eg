@@ -53,9 +53,12 @@ func runnerget(ctx context.Context, p2p host.Host, token string, path string) (_
 		return nil, nil, err
 	}
 
+	// closer is a named result, capture the stream's closer or the returned function calls itself.
+	closestream := closer
+
 	return resp, func() {
 		errorsx.Log(httpx.AutoClose(resp))
-		closer()
+		closestream()
 	}, nil
 }
 

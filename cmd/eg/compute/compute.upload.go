@@ -1,22 +1,13 @@
 package compute
 
 import (
-	"context"
-	"database/sql"
 	"errors"
-	"github.com/egdaemon/eg/jsonx"
-	"io"
 	"log"
-	"net/http"
 	"os"
 	"path/filepath"
-	"time"
 
 	"github.com/egdaemon/eg/computeapi"
 
-	"github.com/egdaemon/eg/cmd/migrations"
-
-	"github.com/davecgh/go-spew/spew"
 	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/authn"
 	"github.com/egdaemon/eg/cmd/cmdopts"
@@ -27,7 +18,6 @@ import (
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/gitx"
-	"github.com/egdaemon/eg/internal/httpx"
 	"github.com/egdaemon/eg/internal/iox"
 	"github.com/egdaemon/eg/internal/libp2px"
 	"github.com/egdaemon/eg/internal/md5x"
@@ -46,26 +36,20 @@ import (
 
 type upload struct {
 	cmdopts.RuntimeResources
-	HostedCompute    bool          `name:"shared-compute" help:"allow hosted compute" default:"true"`
-	P2P              int           `name:"p2p" help:"priority of uploading directly to a runner the control plane suggests before falling back to the cluster, higher goes first, 0 disables" default:"1" env:"EG_P2P_PRIORITY"`
-	LAN              int           `name:"lan" help:"priority of uploading directly to a runner remembered from the local network (see 'eg compute lan'), higher goes first, 0 disables including scanning for runners" default:"2" env:"EG_LAN_PRIORITY"`
-	P2POnly          bool          `name:"p2p-only" help:"never fall back to uploading to the cluster, fail if no runner accepts a direct upload" env:"EG_P2P_ONLY"`
-	CacheDir         string        `name:"cache-directory" help:"directory the remembered systems on the local network are stored in" default:"${vars_cache_directory}" env:"EG_CACHE_DIRECTORY"`
-	LANScanTimeout   time.Duration `name:"lan-scan-timeout" help:"how long the background scan of the local network runs for" default:"3s"`
-	LANPeerTTL       time.Duration `name:"lan-peer-ttl" type:"durationinf" help:"how long systems on the local network are remembered after they were last seen" default:"720h" env:"EG_LAN_PEER_TTL"`
-	Follow           bool          `name:"follow" help:"stream the workload's logs once it is running, requires a runner supporting log streaming" negatable:"" default:"true"`
-	SSHKeyPath       string        `name:"sshkeypath" help:"path to ssh key to use" default:"${vars_ssh_key_path}"`
-	Dir              string        `name:"directory" help:"root directory of the repository" default:"${vars_eg_root_directory}"`
-	Name             string        `arg:"" name:"module" help:"name of the module to run, i.e. the folder name within moduledir" default:"" predictor:"eg.workload"`
-	EnvironmentPaths []string      `name:"envpath" help:"environment files to pass to the module" default:""`
-	Environment      []string      `name:"env" short:"e" help:"define environment variables and their values to be included"`
-	Dirty            bool          `name:"dirty" help:"include all environment variables"`
-	Endpoint         string        `name:"endpoint" help:"specify the endpoint to upload to" default:"${vars_endpoint}/c/q/" hidden:"true"`
-	GitRemote        string        `name:"git-remote" help:"name of the git remote to use" default:"${vars_git_default_remote_name}"`
-	GitReference     string        `name:"git-ref" help:"name of the branch or commit to checkout" default:"${vars_git_default_reference}"`
-	GitClone         string        `name:"git-clone-uri" help:"clone uri"`
-	GCPAuto          bool          `name:"gcp-auto" help:"have the runner issue the account's gcp credentials (workload identity) to the workload"`
-	Secrets          []string      `name:"secret" help:"List of secret URIs to use. Examples: chachasm://passphrase@/path/to/file, gcpsm://project-id/secret-name/version, awssm://secret-name?region=us-east-1"`
+	HostedCompute    bool `name:"shared-compute" help:"allow hosted compute" default:"true"`
+	uploadoptions    `embed:""`
+	SSHKeyPath       string   `name:"sshkeypath" help:"path to ssh key to use" default:"${vars_ssh_key_path}"`
+	Dir              string   `name:"directory" help:"root directory of the repository" default:"${vars_eg_root_directory}"`
+	Name             string   `arg:"" name:"module" help:"name of the module to run, i.e. the folder name within moduledir" default:"" predictor:"eg.workload"`
+	EnvironmentPaths []string `name:"envpath" help:"environment files to pass to the module" default:""`
+	Environment      []string `name:"env" short:"e" help:"define environment variables and their values to be included"`
+	Dirty            bool     `name:"dirty" help:"include all environment variables"`
+	Endpoint         string   `name:"endpoint" help:"specify the endpoint to upload to" default:"${vars_endpoint}/c/q/" hidden:"true"`
+	GitRemote        string   `name:"git-remote" help:"name of the git remote to use" default:"${vars_git_default_remote_name}"`
+	GitReference     string   `name:"git-ref" help:"name of the branch or commit to checkout" default:"${vars_git_default_reference}"`
+	GitClone         string   `name:"git-clone-uri" help:"clone uri"`
+	GCPAuto          bool     `name:"gcp-auto" help:"have the runner issue the account's gcp credentials (workload identity) to the workload"`
+	Secrets          []string `name:"secret" help:"List of secret URIs to use. Examples: chachasm://passphrase@/path/to/file, gcpsm://project-id/secret-name/version, awssm://secret-name?region=us-east-1"`
 }
 
 // bounds the number of runners we attempt to upload to directly before
@@ -79,24 +63,14 @@ func (t upload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, find libp2px.
 		repo                 *git.Repository
 		tmpdir               string
 		archiveio, environio *os.File
-		lancache             *sql.DB
 	)
 
 	if signer, err = sshx.AutoCached(sshx.NewKeyGen(), t.SSHKeyPath); err != nil {
 		return err
 	}
 
-	// remember the runners on the local network while the workload is being built, the scan only
-	// feeds the cache so it never delays the upload. the cache is optional.
-	if t.LAN > 0 {
-		if lancache, err = openlan(gctx.Context, filepath.Join(t.CacheDir, migrations.CLI), t.LANPeerTTL); err != nil {
-			log.Println(errorsx.Wrap(err, "the local network cache is unavailable"))
-			lancache = nil
-		} else {
-			defer lancache.Close()
-			defer autoscan(gctx.Context, lancache, find, t.LANScanTimeout)()
-		}
-	}
+	lancache, stop := t.remember(gctx.Context, find)
+	defer stop()
 
 	if ws, err = workspaces.NewLocal(
 		gctx.Context,
@@ -225,75 +199,5 @@ func (t upload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, find libp2px.
 
 	chttp := authn.New(gctx.Context, tlsc.DefaultClient(), signer, aid, compute.NewAuthzTokenSource)
 
-	if order := priorities(t.LAN, t.P2P); len(order) > 0 {
-		// a nil runner means nothing accepted the workload. otherwise it was uploaded and
-		// the error, if any, is the result of following it, so we must not upload it again.
-		accepted, cause := t.p2p(gctx.Context, chttp, lancache, order, enq, archiveio, environio)
-		if accepted != nil {
-			log.Println("enqueued directly", enq.Id, accepted.Id, accepted.P2Pid)
-			return cause
-		}
-
-		if t.P2POnly {
-			return errorsx.Wrap(cause, "direct upload unavailable and --p2p-only is set")
-		}
-
-		log.Println("direct upload unavailable, falling back to the cluster", cause)
-
-		if err = iox.Rewind(archiveio); err != nil {
-			return errorsx.Wrap(err, "unable to rewind kernel archive")
-		}
-	} else if t.P2POnly {
-		return errorsx.Errorf("--p2p-only is set but no direct upload strategy is enabled, see --p2p and --lan")
-	}
-
-	recorded, err := t.enqueue(gctx.Context, chttp, enq, archiveio)
-	if err != nil {
-		return err
-	}
-
-	log.Println("enqueued", spew.Sdump(recorded))
-
-	return t.followenqueued(gctx.Context, chttp, recorded.Enqueued.Id)
-}
-
-// enqueue uploads the workload to the cluster.
-func (t upload) enqueue(ctx context.Context, chttp *http.Client, enq *computeapi.Enqueued, archive io.Reader) (_ *computeapi.EnqueuedCreateResponse, err error) {
-	var (
-		e computeapi.EnqueuedCreateResponse
-	)
-
-	mimetype, buf, err := computeapi.NewEnqueueUpload(enq, archive)
-	if err != nil {
-		return nil, errorsx.Wrap(err, "unable to generate multipart upload")
-	}
-	defer buf.Close()
-
-	r := iox.TimeoutReader(10*time.Second, buf)
-	defer r.Close()
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, t.Endpoint, r)
-	if err != nil {
-		return nil, errorsx.Wrap(err, "unable to create kernel upload request")
-	}
-	req.Header.Set("Content-Type", mimetype)
-
-	debugx.Println("upload initiated", t.Endpoint)
-	resp, err := httpx.AsError(chttp.Do(req)) //nolint:golint,bodyclose
-	defer httpx.TryClose(resp)
-	debugx.Println("upload completed", t.Endpoint)
-
-	if err != nil {
-		return nil, errorsx.Wrap(err, "unable to upload kernel for processing")
-	}
-
-	if err = jsonx.UnmarshalRead(resp.Body, &e); err != nil {
-		return nil, errorsx.Wrap(err, "unable to decode response")
-	}
-
-	if e.Enqueued == nil {
-		return nil, errorsx.New("enqueued response missing workload")
-	}
-
-	return &e, nil
+	return t.submit(gctx.Context, chttp, t.Endpoint, lancache, enq, archiveio, environio)
 }

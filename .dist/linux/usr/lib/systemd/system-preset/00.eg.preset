@@ -1,5 +1,4 @@
 disable eg-daemon.service
-disable eg-daily-reload.service
 disable eg-disk-usage.service
 disable eg-podman-maintenance.service
 disable eg-runner-build.service

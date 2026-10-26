@@ -163,6 +163,7 @@ const (
 	BinaryBin          = "egbin"
 	EnvironFile        = "environ.env"
 	SocketControl      = "control.socket"
+	SocketAnalytics    = "analytics.socket"
 )
 
 // generate unique module socket

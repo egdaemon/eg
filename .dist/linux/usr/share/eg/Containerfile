@@ -13,7 +13,7 @@ RUN add-apt-repository -n ppa:egdaemon/eg
 RUN apt-get update
 RUN apt-get -y install egworkload
 
-RUN systemctl enable eg-daemon.service eg-daily-reload.service eg-disk-usage.service
+RUN systemctl enable eg-daemon.service eg-disk-usage.service
 
 # preload some wellknown hosts
 RUN ssh-keyscan -H github.com >> /etc/ssh/ssh_known_hosts

@@ -5,4 +5,12 @@ set -e
 systemd-sysusers
 systemd-tmpfiles --create
 
+# restart the daemon on upgrade so it picks up the new binary. try-restart is a no-op when
+# the daemon isn't running. the units are copied into the package rather than shipped via
+# debian/*.service, so dh_installsystemd generates no restart handling for us.
+if [ "$1" = "configure" ] && [ -n "$2" ] && [ -d /run/systemd/system ]; then
+	systemctl daemon-reload
+	systemctl try-restart eg-daemon.service
+fi
+
 #DEBHELPER#

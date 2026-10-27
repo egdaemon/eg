@@ -380,6 +380,9 @@ func followenqueued(ctx context.Context, chttp *http.Client, id string) (err err
 		}
 
 		return computex.Await(ctx, id, runners.NewPushClient(chttp).HistoryFind)
+	} else if errors.Is(err, runners.ErrLogsUnavailable) {
+		log.Println("unable to stream the workload logs, waiting for it to complete", err)
+		return computex.Await(ctx, id, runners.NewPushClient(chttp).HistoryFind)
 	} else if err != nil {
 		return errorsx.Wrap(err, "unable to stream workload logs")
 	}

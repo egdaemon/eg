@@ -42,10 +42,18 @@ func NewAuthzTokenSource(c *http.Client, signer ssh.Signer, endpoint string, acc
 }
 
 type TokenSourceFromEndpoint struct {
-	c        *http.Client
-	endpoint string
-	signer   ssh.Signer
-	account  string
+	c         *http.Client
+	endpoint  string
+	signer    ssh.Signer
+	account   string
+	machineid string
+}
+
+// WithMachineID asserts the machine id of the runner the tokens are for, so the tokens identify the exact
+// runner when the machines of an account share a key.
+func (t TokenSourceFromEndpoint) WithMachineID(mid string) TokenSourceFromEndpoint {
+	t.machineid = mid
+	return t
 }
 
 func (t TokenSourceFromEndpoint) Token() (_ *oauth2.Token, err error) {
@@ -81,7 +89,7 @@ func (t TokenSourceFromEndpoint) Token() (_ *oauth2.Token, err error) {
 
 	var options io.Reader
 	if t.account != "" {
-		token, err := authn.LoginOptionsToken(ctx, chttp, t.account)
+		token, err := authn.LoginOptionsToken(ctx, chttp, t.account, authn.LoginOptionMachineID(t.machineid))
 		if err != nil {
 			return nil, errorsx.Wrap(err, "unable to fetch login options")
 		}

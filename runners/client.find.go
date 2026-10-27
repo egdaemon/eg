@@ -2,7 +2,6 @@ package runners
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"github.com/egdaemon/eg/jsonx"
 	"io"
@@ -20,7 +19,11 @@ import (
 )
 
 // ErrWorkloadCompleted is returned when a workload completes before it could be followed.
-var ErrWorkloadCompleted = errors.New("workload completed")
+const ErrWorkloadCompleted = errorsx.String("workload completed")
+
+// ErrLogsUnavailable is returned when a workload is running but no log token was issued for it,
+// its runner is unknown to the control plane or doesn't support log streaming.
+const ErrLogsUnavailable = errorsx.String("workload logs unavailable")
 
 // Find retrieves the workload as recorded by the control plane. while the workload is
 // running the response carries a log token for streaming its logs from its runner.
@@ -53,7 +56,8 @@ func (t PushClient) Find(ctx context.Context, id string) (_ *computeapi.Enqueued
 
 // AwaitLogsToken polls the control plane until the workload is running on a runner that
 // supports log streaming, returning the workload carrying its log token. it errors when the
-// workload completes before a token is issued, or ctx ends.
+// workload completes before a token is issued, it started without a token being issued
+// (ErrLogsUnavailable), or ctx ends.
 func (t PushClient) AwaitLogsToken(ctx context.Context, id string, interval time.Duration) (_ *computeapi.Enqueued, err error) {
 	tick := time.NewTicker(interval)
 	defer tick.Stop()
@@ -71,6 +75,11 @@ func (t PushClient) AwaitLogsToken(ctx context.Context, id string, interval time
 		// completed workloads no longer issue tokens, an uncompleted one encodes completion as infinity.
 		if done, perr := time.Parse(time.RFC3339Nano, found.CompletedAt); perr == nil && done.Before(timex.RFC3339Inf()) {
 			return nil, errorsx.Wrapf(ErrWorkloadCompleted, "workload %s completed before its logs could be streamed", id)
+		}
+
+		// the runner is recorded when the workload starts, without a token by then none will be issued.
+		if began, perr := time.Parse(time.RFC3339Nano, found.InitiatedAt); perr == nil && began.Before(timex.RFC3339Inf()) {
+			return nil, errorsx.Wrapf(ErrLogsUnavailable, "workload %s started but no runner issued a log token", id)
 		}
 
 		select {

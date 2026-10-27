@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"go/build"
+	"iter"
 	"os"
 	"path/filepath"
 	"strings"
@@ -290,11 +291,13 @@ func (t options) autotest(base shell.Command) eg.OpFn {
 
 // Record the coverage profile into the duckdb database.
 func RecordCoverage(ctx context.Context, _ eg.Op) (err error) {
-	covpath := coveragedir()
+	return recordcoverage(ctx, coveragedir(), modfilex.FindModules(egenv.WorkingDirectory()), fficoverage.Report)
+}
 
+func recordcoverage(ctx context.Context, covpath string, modules iter.Seq[string], report func(context.Context, ...*coverage.Report) error) (err error) {
 	// recover metrics
 	batch := make([]*coverage.Report, 0, 128)
-	resolve := golangcov.Modules(modfilex.FindModules(egenv.WorkingDirectory()))
+	resolve := golangcov.Modules(modules)
 	for rep, err := range golangcov.Coverage(ctx, covpath, resolve) {
 		if err != nil {
 			return err
@@ -303,14 +306,14 @@ func RecordCoverage(ctx context.Context, _ eg.Op) (err error) {
 		batch = append(batch, rep)
 
 		if len(batch) == cap(batch) {
-			if err := fficoverage.Report(ctx, batch...); err != nil {
+			if err := report(ctx, batch...); err != nil {
 				return err
 			}
 			batch = batch[:0]
 		}
 	}
 
-	if err := fficoverage.Report(ctx, batch...); err != nil {
+	if err := report(ctx, batch...); err != nil {
 		return err
 	}
 

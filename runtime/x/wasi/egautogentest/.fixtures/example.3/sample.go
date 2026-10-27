@@ -1,0 +1,3 @@
+package sample
+
+func Noop() {}

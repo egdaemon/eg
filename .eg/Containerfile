@@ -29,10 +29,6 @@ RUN which protoc
 RUN which protoc-gen-go-grpc
 RUN which protoc-gen-go
 
-# llama-server, managed by runtime/x/wasi/egllm for the duration of a workload.
-RUN touch /etc/default/llama-server
-RUN printf '[Unit]\nDescription=llama.cpp server\nAfter=network.target\n\n[Service]\nEnvironmentFile=/etc/default/llama-server\nExecStart=/usr/bin/llama-server -hf ${LLAMA_MODEL} --port 8080 --host 127.0.0.1\nRestart=on-failure\n\n[Install]\nWantedBy=multi-user.target\n' > /etc/systemd/system/llama-server.service
-
 RUN systemd-tmpfiles --create
 RUN systemd-tmpfiles --clean
 

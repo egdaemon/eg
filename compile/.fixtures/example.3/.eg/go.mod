@@ -1,13 +1,13 @@
 module eg/compute
 
-go 1.26.3
+go 1.27.2
 
-require github.com/egdaemon/eg v0.0.0-20261022144927-152846e0124b
+require github.com/egdaemon/eg v0.0.0-20261027204946-c22a4832a812
 
 require (
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/dustin/go-humanize v1.1.0 // indirect
-	github.com/egdaemon/wasinet/wasinet v0.0.0-20260928194155-07f223337a8d // indirect
+	github.com/egdaemon/wasinet/wasinet v0.0.0-20261027202319-9cfc20f44598 // indirect
 	github.com/felixge/fgprof v0.9.5 // indirect
 	github.com/gofrs/uuid/v5 v5.5.1 // indirect
 	github.com/google/pprof v0.0.0-20261016150608-1facf8f91b50 // indirect
@@ -21,7 +21,6 @@ require (
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pkg/profile v1.7.0 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
-	github.com/rogpeppe/go-internal v1.16.0 // indirect
 	github.com/serenize/snaker v0.0.0-20201027110005-a7ad2135616e // indirect
 	github.com/stretchr/testify v1.12.1 // indirect
 	github.com/zieckey/goini v0.0.0-20240615065340-08ee21c836fb // indirect
@@ -32,7 +31,6 @@ require (
 	golang.org/x/sys v0.49.0 // indirect
 	golang.org/x/text v0.43.0 // indirect
 	golang.org/x/tools v0.52.0 // indirect
-	google.golang.org/genproto v0.0.0-20261019180522-ce908d29299b // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20261019180522-ce908d29299b // indirect
 	google.golang.org/grpc v1.84.0 // indirect
 	google.golang.org/protobuf v1.36.12 // indirect

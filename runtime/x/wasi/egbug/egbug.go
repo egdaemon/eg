@@ -149,7 +149,7 @@ func APTPackage(packages ...string) eg.OpFn {
 
 const (
 	EnvUnsafeDigest = "EG_UNSAFE_ENVVARS_DIGEST"
-	defaultDigest   = "6b419084b59a50a5fdbe64e97a446c7a"
+	defaultDigest   = "ad9846b3b7b0da7e457551458ac4ea74"
 )
 
 //go:embed default.env
@@ -218,6 +218,7 @@ func normalizeEnv(environ *envx.Builder) *envx.Builder {
 	environ.Setenv(_eg.EnvGitBaseURI, _eg.DefaultWorkingDirectory())
 	environ.Setenv(_eg.EnvGitHeadURI, _eg.DefaultWorkingDirectory())
 	environ.Setenv(_eg.EnvGitHeadRef, "HEAD")
+	environ.Setenv(_eg.EnvGitBaseVCS, "git@github.com:egdaemon/eg.git")
 
 	// normalize standard directories.
 	normalizedirprefix(_eg.EnvComputeWorkloadDirectory)
@@ -245,7 +246,6 @@ func normalizeEnv(environ *envx.Builder) *envx.Builder {
 	environ.Unsetenv("SHELL")
 	environ.Unsetenv("SHLVL")
 	environ.Unsetenv("SSH_AUTH_SOCK")
-	environ.Unsetenv(_eg.EnvGitBaseVCS)
 	environ.Unsetenv("_")
 	environ.Unsetenv("SUDO_COMMAND")
 	environ.Unsetenv("SUDO_GID")

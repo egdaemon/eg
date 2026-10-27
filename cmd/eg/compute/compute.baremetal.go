@@ -205,6 +205,9 @@ func (t baremetal) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, hotswapbin
 			"CI",
 			eg.EnvComputeRunID,
 			eg.EnvComputeAccountID,
+			eg.EnvComputeGPU,
+			eg.EnvComputeProfileMode,
+			eg.EnvUnsafeCacheID,
 		).
 		Var(eg.EnvComputeBin, hotswapbin.String()).
 		Var(eg.EnvExperimentalBaremetal, strconv.FormatBool(true)).    // temporary while we flesh out the needed changes

@@ -61,6 +61,7 @@ func ExampleNew() {
 }
 
 func ExampleEnv() {
+	os.Setenv("CACHE_DIRECTORY", "/cache")
 	os.Setenv(_eg.EnvComputeCacheDirectory, "/cache")
 
 	// the process environment is inherited, the cache directories are set last so they take precedence.

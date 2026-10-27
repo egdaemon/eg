@@ -21,6 +21,7 @@ func main() {
 	c1 := eg.Container("eg.ubuntu")
 	err := eg.Perform(
 		ctx,
+		shell.Op(shell.New("eg version")),
 		eggit.AutoClone,
 		eg.Parallel(
 			eg.Build(eg.DefaultModule()),
@@ -30,6 +31,7 @@ func main() {
 			ctx,
 			c1,
 			eg.Sequential(
+				shell.Op(shell.New("eg version")),
 				eggolang.New().Timeout(10*time.Minute).AutoInstall(),
 				eggolang.New().Timeout(10*time.Minute).AutoTest(),
 				egbug.Log("recording coverage initiated"),

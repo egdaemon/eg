@@ -9,17 +9,10 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	_eg "github.com/egdaemon/eg"
-	"github.com/egdaemon/eg/internal/debugx"
-	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
-	"github.com/egdaemon/eg/internal/fsx"
-	"github.com/egdaemon/eg/internal/iox"
-	"github.com/egdaemon/eg/internal/slicesx"
-	"github.com/egdaemon/eg/internal/stringsx"
 	"github.com/egdaemon/eg/runtime/wasi/eg"
 	"github.com/egdaemon/eg/runtime/wasi/egenv"
 	"github.com/egdaemon/eg/runtime/wasi/egunsafe/ffigit"
@@ -171,108 +164,6 @@ func AutoClone(ctx context.Context, _ eg.Op) error {
 	return nil
 }
 
-type modified struct {
-	o       sync.Once
-	runtime shell.Command
-	getenv  func(string) string
-	changed []string
-}
-
-func (t *modified) detect(ctx context.Context) error {
-	env := envx.NewEnviron(t.getenv)
-	var (
-		path = egenv.RuntimeDirectory("eg.git.mod")
-	)
-
-	hcommit := env.String("", _eg.EnvGitHeadCommit)
-	bcommit := env.String(hcommit, _eg.EnvGitBaseCommit)
-	if strings.TrimSpace(hcommit) == "" {
-		log.Println(fmt.Errorf("environment variable %s is empty", _eg.EnvGitHeadCommit))
-	} else {
-		debugx.Println("git.modified head commit", hcommit)
-	}
-	if strings.TrimSpace(bcommit) == "" {
-		log.Println(fmt.Errorf("environment variable %s is empty", _eg.EnvGitBaseCommit))
-	} else {
-		debugx.Println("git.modified base commit", bcommit)
-	}
-
-	if hcommit == bcommit {
-		return nil
-	}
-
-	// handle detecting missing commits
-	// if we can't find one of the commits
-	// then we treat it as if the commits were identical
-	// resulting everything being treated as changed.
-	err := shell.Run(
-		ctx,
-		t.runtime.Newf(
-			"git show --name-only %s > /dev/null 2>&1", bcommit,
-		).Directory(egenv.WorkingDirectory()),
-		t.runtime.Newf(
-			"git show --name-only %s > /dev/null 2>&1", hcommit,
-		).Directory(egenv.WorkingDirectory()),
-	)
-	if err != nil {
-		return nil
-	}
-
-	err = shell.Run(
-		ctx,
-		t.runtime.Newf(
-			"git diff --name-only %s..%s | tee %s > /dev/null 2>&1", bcommit, hcommit, path,
-		).Directory(egenv.WorkingDirectory()),
-	)
-	if err != nil {
-		return errorsx.Wrap(err, "git diff failed")
-	}
-
-	mods, err := os.Open(path)
-	// if we didnt generate the changeset then no changes occurred.
-	if fsx.ErrIsNotExist(err) != nil {
-		return nil
-	} else if err != nil {
-		return err
-	}
-
-	smods := iox.String(mods)
-
-	if stringsx.Blank(smods) {
-		return nil
-	}
-
-	t.changed = strings.Split(smods, "\n")
-	return nil
-}
-
-func (t *modified) Changed(paths ...string) func(context.Context) bool {
-	return func(ctx context.Context) bool {
-		t.o.Do(func() {
-			errorsx.Log(t.detect(ctx))
-		})
-
-		debugx.Println("changed", len(t.changed), t.changed, "paths", len(paths))
-		if len(t.changed) == 0 || len(paths) == 0 {
-			return true
-		}
-
-		return stringsx.Present(slicesx.FindOrZero(func(s string) bool {
-			for _, n := range paths {
-				if strings.HasPrefix(s, n) {
-					return true
-				}
-			}
-
-			return false
-		}, t.changed...))
-	}
-}
-
-func NewModified() modified {
-	return modified{o: sync.Once{}, runtime: shell.Runtime(), getenv: os.Getenv}
-}
-
 // Archive creates a gzipped tar archive of the git repository at dir, writing it to dest.
 // The archive is created from the commit specified by the eg environment.
 func Archive(dir, dest string) eg.OpFn {
@@ -290,21 +181,31 @@ func archive(runtime shell.Command, dir, dest string) eg.OpFn {
 
 // AutoArchive clones the repository from the eg environment and archives it.
 func AutoArchive(ctx context.Context, op eg.Op) error {
-	dir := egenv.WorkingDirectory()
-	dest := egenv.RuntimeDirectory(EnvCommit().StringReplace("%git.hash%") + ".tar.gz")
-	return archive(shell.Runtime(), dir, dest)(ctx, op)
+	return autoarchive(shell.Runtime())(ctx, op)
+}
+
+func autoarchive(runtime shell.Command) eg.OpFn {
+	return func(ctx context.Context, op eg.Op) error {
+		dir := egenv.WorkingDirectory()
+		dest := egenv.RuntimeDirectory(EnvCommit().StringReplace("%git.hash%") + ".tar.gz")
+		return archive(runtime, dir, dest)(ctx, op)
+	}
 }
 
 // ensures the workspace has not been modified. useful for detecting
 // if there have been changes during the run.
 func Pristine() eg.OpFn {
+	return pristine(shell.Runtime())
+}
+
+func pristine(runtime shell.Command) eg.OpFn {
 	return func(ctx context.Context, _ eg.Op) error {
 		log.Println("ensuring git repository has not changed initiated")
 		defer log.Println("ensuring git repository has not changed completed")
 		return shell.Run(
 			ctx,
-			shell.New("git diff-index --name-only HEAD"),
-			shell.New("git diff-index --quiet HEAD"),
+			runtime.New("git diff-index --name-only HEAD"),
+			runtime.New("git diff-index --quiet HEAD"),
 		)
 	}
 }

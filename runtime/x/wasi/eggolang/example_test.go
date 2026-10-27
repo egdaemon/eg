@@ -5,9 +5,10 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"strings"
 	"time"
 
+	_eg "github.com/egdaemon/eg"
+	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/runtime/wasi/eg"
 	"github.com/egdaemon/eg/runtime/x/wasi/eggolang"
 )
@@ -60,18 +61,13 @@ func ExampleNew() {
 }
 
 func ExampleEnv() {
-	os.Setenv("CACHE_DIRECTORY", "/cache")
+	os.Setenv(_eg.EnvComputeCacheDirectory, "/cache")
 
 	// the process environment is inherited, the cache directories are set last so they take precedence.
-	effective := make(map[string]string)
-	for _, e := range eggolang.Env() {
-		if k, v, ok := strings.Cut(e, "="); ok {
-			effective[k] = v
-		}
-	}
+	effective := envx.NewEnvironFromStrings(eggolang.Env()...)
 
-	fmt.Println("GOCACHE", effective["GOCACHE"])
-	fmt.Println("GOMODCACHE", effective["GOMODCACHE"])
+	fmt.Println("GOCACHE", effective.String("", "GOCACHE"))
+	fmt.Println("GOMODCACHE", effective.String("", "GOMODCACHE"))
 
 	// Output:
 	// GOCACHE /cache/.eg/golang/build

@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"log"
-	"os"
 
 	"github.com/egdaemon/eg/runtime/wasi/eg"
 	"github.com/egdaemon/eg/runtime/wasi/egenv"
@@ -47,9 +46,7 @@ func main() {
 			ctx,
 			c1,
 			eg.Sequential(
-				eggolang.AutoTest(
-					eggolang.TestOption.Environ(os.Environ()...),
-				),
+				eggolang.AutoTest(),
 				egbug.Log("recording coverage initiated"),
 				eggolang.RecordCoverage,
 				egbug.Log("egautogentest initiated"),

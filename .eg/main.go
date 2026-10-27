@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 	"log"
-	"os"
+	"time"
 
 	"github.com/egdaemon/eg/runtime/wasi/eg"
 	"github.com/egdaemon/eg/runtime/wasi/egenv"
@@ -30,17 +30,8 @@ func main() {
 			ctx,
 			c1,
 			eg.Sequential(
-				eggolang.AutoInstall(
-				// eggolang.InstallOption.BuildOptions(
-				// 	eggolang.Build(eggolang.BuildOption.Timeout(10*time.Minute)),
-				// ),
-				),
-				eggolang.AutoTest(
-					// eggolang.TestOption.BuildOptions(
-					// 	eggolang.Build(eggolang.BuildOption.Timeout(10*time.Minute)),
-					// ),
-					eggolang.TestOption.Environ(os.Environ()...),
-				),
+				eggolang.New().Timeout(10*time.Minute).AutoInstall(),
+				eggolang.New().Timeout(10*time.Minute).AutoTest(),
 				egbug.Log("recording coverage initiated"),
 				eggolang.RecordCoverage,
 				egbug.Log("integration tests initiated"),

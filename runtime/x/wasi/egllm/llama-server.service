@@ -4,7 +4,11 @@ After=network.target
 
 [Service]
 EnvironmentFile=/etc/default/llama-server
-ExecStart=/usr/bin/llama-server -hf ${LLAMA_MODEL} --port 8080 --host 127.0.0.1
+# the socket must match egllm.DefaultEndpoint. it is group writable so the egd user can connect.
+RuntimeDirectory=llama-server
+Group=egd
+UMask=0007
+ExecStart=/usr/bin/llama-server -hf ${LLAMA_MODEL} --host /run/llama-server/llama.sock
 Restart=on-failure
 
 [Install]

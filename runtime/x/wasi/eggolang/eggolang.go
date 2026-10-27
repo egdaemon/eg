@@ -191,6 +191,10 @@ func AutoTest() eg.OpFn {
 }
 
 func (t options) AutoInstall() eg.OpFn {
+	return t.autoinstall(shell.Runtime())
+}
+
+func (t options) autoinstall(base shell.Command) eg.OpFn {
 	opts := langx.Clone(config{}, t...)
 	flags := stringsx.Join(" ", opts.buildflags()...)
 
@@ -203,7 +207,7 @@ func (t options) AutoInstall() eg.OpFn {
 			return err
 		}
 
-		runtime := shell.Runtime().EnvironFrom(goenv...).EnvironFrom(opts.environ...)
+		runtime := base.EnvironFrom(goenv...).EnvironFrom(opts.environ...)
 		timeout := timex.DurationMin(contextx.Until(ctx), timex.DurationFirstNonZero(opts.timeout, shell.DefaultTimeout))
 
 		for gomod := range modfilex.FindModules(stringsx.DefaultIfBlank(opts.bctx.Dir, egenv.WorkingDirectory())) {
@@ -218,6 +222,10 @@ func (t options) AutoInstall() eg.OpFn {
 }
 
 func (t options) AutoCompile() eg.OpFn {
+	return t.autocompile(shell.Runtime())
+}
+
+func (t options) autocompile(base shell.Command) eg.OpFn {
 	opts := langx.Clone(config{}, t...)
 	flags := stringsx.Join(" ", opts.buildflags()...)
 
@@ -230,7 +238,7 @@ func (t options) AutoCompile() eg.OpFn {
 			return err
 		}
 
-		runtime := shell.Runtime().EnvironFrom(goenv...).EnvironFrom(opts.environ...)
+		runtime := base.EnvironFrom(goenv...).EnvironFrom(opts.environ...)
 		timeout := timex.DurationMin(contextx.Until(ctx), timex.DurationFirstNonZero(opts.timeout, shell.DefaultTimeout))
 
 		for gomod := range modfilex.FindModules(stringsx.DefaultIfBlank(opts.bctx.Dir, egenv.WorkingDirectory())) {
@@ -245,6 +253,10 @@ func (t options) AutoCompile() eg.OpFn {
 }
 
 func (t options) AutoTest() eg.OpFn {
+	return t.autotest(shell.Runtime())
+}
+
+func (t options) autotest(base shell.Command) eg.OpFn {
 	opts := langx.Clone(config{coverage: "-covermode count"}, t...)
 	flags := stringsx.Join(" ", opts.testflags()...)
 
@@ -254,7 +266,7 @@ func (t options) AutoTest() eg.OpFn {
 		)
 
 		covpath := coveragedir()
-		if err := shell.Run(ctx, shell.Newf("mkdir -p %s", covpath)); err != nil {
+		if err := shell.Run(ctx, base.Newf("mkdir -p %s", covpath)); err != nil {
 			return errorsx.Wrap(err, "unable to run tests")
 		}
 
@@ -262,7 +274,7 @@ func (t options) AutoTest() eg.OpFn {
 			return err
 		}
 
-		runtime := shell.Runtime().EnvironFrom(goenv...).EnvironFrom(opts.environ...)
+		runtime := base.EnvironFrom(goenv...).EnvironFrom(opts.environ...)
 		timeout := timex.DurationMin(contextx.Until(ctx), timex.DurationFirstNonZero(opts.timeout, shell.DefaultTimeout))
 
 		for gomod := range modfilex.FindModules(egenv.WorkingDirectory()) {

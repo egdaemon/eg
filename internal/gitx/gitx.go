@@ -245,7 +245,21 @@ func Env(repo *git.Repository, remote string, branch string, vcsclone string) (e
 		return nil, err
 	}
 
-	return HeadEnv(repo, uri, stringsx.First(vcsclone, errorsx.Zero(QuirkCloneURI(repo, remote))), branch)
+	cloneuri := stringsx.First(vcsclone, errorsx.Zero(QuirkCloneURI(repo, remote)))
+
+	if env, err = HeadEnv(repo, uri, cloneuri, branch); err != nil {
+		return nil, err
+	}
+
+	benv, err := BaseEnv(repo, uri, cloneuri, "main")
+	if err != nil {
+		if !errors.Is(err, plumbing.ErrReferenceNotFound) {
+			return nil, errorsx.Wrapf(err, "base env: %s", uri)
+		}
+		tracex.Println("missing base branch for env, omitting base variables")
+	}
+
+	return append(env, benv...), nil
 }
 
 // ideally we shouldn't need this but unfortunately go-git doesn't apply 'instead of' rules properly.

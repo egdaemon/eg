@@ -333,6 +333,7 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 			return errorsx.Wrap(err, "unable to set max limits")
 		}
 
+		// ensure the environment is up and running.
 		if err = systemReady(gctx.Context); err != nil {
 			return errorsx.Wrap(err, "failed system ready check")
 		}

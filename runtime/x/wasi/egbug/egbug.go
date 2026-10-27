@@ -148,7 +148,7 @@ func APTPackage(packages ...string) eg.OpFn {
 
 const (
 	EnvUnsafeDigest = "EG_UNSAFE_ENVVARS_DIGEST"
-	defaultDigest   = "28550586c73d13fa9967587b98a92e02"
+	defaultDigest   = "a38edd735ab6a23c17ff87ba3dc04161"
 )
 
 //go:embed default.env
@@ -193,17 +193,22 @@ func normalizeEnv(environ *envx.Builder) *envx.Builder {
 			key,
 			strings.Replace(os.Getenv(key), dirprefix, _eg.DefaultWorkloadDirectory(), 1),
 		)
-
 	}
+
 	// zero out some dynamic environment variables for consistent results
 	environ.Setenv(_eg.EnvComputeAccountID, uuid.Nil.String())
 	environ.Setenv(_eg.EnvComputeRunID, uuid.Nil.String())
 	environ.Setenv(_eg.EnvGitHeadCommitTimestamp, "0000-00-00T00:00:00-00:00")
 	environ.Setenv(_eg.EnvGitHeadCommit, "0000000000000000000000000000000000000000")
 	environ.Setenv(_eg.EnvGitBaseCommit, "0000000000000000000000000000000000000000")
+	environ.Setenv(_eg.EnvGitHeadCommitAuthor, "Egdaemon")
+	environ.Setenv(_eg.EnvGitHeadCommitEmail, "noreply@egdaemon.com")
+	environ.Setenv(_eg.EnvComputeInitiatedTimestamp, "0000-00-00T00:00:00-00:00")
 	environ.Setenv(_eg.EnvUnsafeCacheID, uuid.Nil.String())
 	environ.Setenv(_eg.EnvComputeLoggingVerbosity, "0")
 	environ.Setenv(_eg.EnvComputeModuleSocket, _eg.DefaultRuntimeDirectory("module.socket"))
+	environ.Setenv(_eg.EnvComputeOS, "linux")
+	environ.Setenv(_eg.EnvComputeArch, "amd64")
 
 	// normalize standard directories.
 	normalizedirprefix(_eg.EnvComputeWorkloadDirectory)
@@ -220,18 +225,35 @@ func normalizeEnv(environ *envx.Builder) *envx.Builder {
 	environ.Unsetenv("GRPC_GO_LOG_SEVERITY_LEVEL")
 	environ.Unsetenv("GRPC_GO_LOG_VERBOSITY_LEVEL")
 
+	// never include credentials, the environment is printed on mismatch.
+	environ.Unsetenv(_eg.EnvGithubToken)
+
+	// ignore variables that depend on how the process was launched (shell, sudo, baremetal).
+	environ.Unsetenv("USER")
+	environ.Unsetenv("LOGNAME")
+	environ.Unsetenv("SHELL")
+	environ.Unsetenv("SHLVL")
+	environ.Unsetenv("_")
+	environ.Unsetenv("SUDO_COMMAND")
+	environ.Unsetenv("SUDO_GID")
+	environ.Unsetenv("SUDO_HOME")
+	environ.Unsetenv("SUDO_UID")
+	environ.Unsetenv("SUDO_USER")
+	environ.Unsetenv(_eg.EnvComputeDefaultGroup)
+	environ.Unsetenv(_eg.EnvComputeTLSInsecure)
+	environ.Unsetenv(_eg.EnvExperimentalBaremetal)
+
 	// always ignore compute bin. its development tooling.
 	environ.Unsetenv(_eg.EnvComputeBin)
 	// always ingore unsafe digest, its for testing.
 	environ.Unsetenv(EnvUnsafeDigest)
-	// probably shouldn't ignore this...
-	environ.Unsetenv("DEBIAN_FRONTEND")
 
 	return environ
 }
 
-// Ensures the environment is stable between releases. only usable for standard compute.
-// baremetal is too variable. use EnsureEnvSubset for baremetal.
+// Ensures the environment is stable between releases. variance from the shell that launched
+// the process and from baremetal is removed by normalizeEnv.
+// use EnsureEnv when you need an exact digest over specific keys.
 func EnsureEnvAuto(ctx context.Context, op eg.Op) error {
 
 	// expected hash with normalized values.

@@ -12,11 +12,12 @@ import (
 // without the WASI runtime or sudo. Useful for testing.
 func NewLocal() Command {
 	return Command{
-		timeout:  DefaultTimeout,
-		entry:    runlocal,
-		exec:     execlocal,
-		attempts: 1,
-		color:    aurora.NewAurora(false),
+		timeout:    DefaultTimeout,
+		entry:      runlocal,
+		exec:       execlocal,
+		attempts:   1,
+		retrylimit: defaultRetryLimiter(),
+		color:      aurora.NewAurora(false),
 	}
 }
 

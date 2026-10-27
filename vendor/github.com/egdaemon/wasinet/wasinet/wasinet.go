@@ -5,53 +5,46 @@ import (
 	"net"
 	"net/http"
 	"time"
+
+	"github.com/egdaemon/wasinet/wasinet/internal/envx"
 )
 
-// hijack golang's networks net.DefaultResolver
+// Hijack golang's networks net.DefaultResolver and http.DefaultTransport.
+//
+// the transport timeouts are configurable through the environment, durations use
+// time.ParseDuration syntax (e.g. 30s, 2m), a value of 0 disables the timeout:
+//
+//	WASINET_HIJACK_DIAL_TIMEOUT                (default 10s)
+//	WASINET_HIJACK_RESPONSE_HEADER_TIMEOUT     (default 0, no timeout)
+//	WASINET_HIJACK_TLS_HANDSHAKE_TIMEOUT       (default 10s)
+//	WASINET_HIJACK_IDLE_CONN_TIMEOUT           (default 30s)
 func Hijack() {
 	net.DefaultResolver.Dial = DialContext
-	http.DefaultTransport = &http.Transport{
-		Proxy: http.ProxyFromEnvironment,
-		DialContext: (&Dialer{
-			Timeout: 2 * time.Second,
-		}).DialContext,
-		ForceAttemptHTTP2: true,
-
-		MaxIdleConns:          10,
-		ResponseHeaderTimeout: 1 * time.Second,
-		IdleConnTimeout:       5 * time.Second,
-		TLSHandshakeTimeout:   2 * time.Second,
-		ExpectContinueTimeout: 1 * time.Second,
-	}
+	http.DefaultTransport = transport()
 }
 
 // internal only. use at your own risk
 func InsecureHTTP() *http.Transport {
+	t := transport()
+	t.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
+	return t
+}
+
+func transport() *http.Transport {
 	return &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-		Proxy:           http.ProxyFromEnvironment,
+		Proxy: http.ProxyFromEnvironment,
 		DialContext: (&Dialer{
-			Timeout: 2 * time.Second,
+			Timeout: envx.Duration(10*time.Second, "WASINET_HIJACK_DIAL_TIMEOUT"),
 		}).DialContext,
 		ForceAttemptHTTP2: true,
 
 		MaxIdleConns:          10,
-		ResponseHeaderTimeout: 1 * time.Second,
-		IdleConnTimeout:       5 * time.Second,
-		TLSHandshakeTimeout:   2 * time.Second,
+		ResponseHeaderTimeout: envx.Duration(0, "WASINET_HIJACK_RESPONSE_HEADER_TIMEOUT"),
+		IdleConnTimeout:       envx.Duration(30*time.Second, "WASINET_HIJACK_IDLE_CONN_TIMEOUT"),
+		TLSHandshakeTimeout:   envx.Duration(10*time.Second, "WASINET_HIJACK_TLS_HANDSHAKE_TIMEOUT"),
 		ExpectContinueTimeout: 1 * time.Second,
 	}
 }
-
-// func netipaddrportToRaw(nap netip.AddrPort) (rawsocketaddr, error) {
-// 	if nap.Addr().Is4() || nap.Addr().Is4In6() {
-// 		a := sockipaddr[sockip4]{port: uint32(nap.Port()), addr: sockip4{ip: nap.Addr().As4()}}
-// 		return a.sockaddr(), nil
-// 	} else {
-// 		a := sockipaddr[sockip6]{port: uint32(nap.Port()), addr: sockip6{ip: nap.Addr().As16()}}
-// 		return a.sockaddr(), nil
-// 	}
-// }
 
 func netOpErr(op string, addr net.Addr, err error) error {
 	if err == nil {

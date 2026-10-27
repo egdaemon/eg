@@ -11,7 +11,7 @@ import (
 func TestEndpoint(t *testing.T) {
 	t.Run("defaults to llama.cpp", func(t *testing.T) {
 		t.Setenv(eg.EnvComputeLLMEndpoint, "")
-		require.Equal(t, "http://localhost:8080", egllm.Endpoint())
+		require.Equal(t, "unix:///run/llama-server/llama.sock", egllm.Endpoint())
 		require.Equal(t, egllm.DefaultEndpoint, egllm.Endpoint())
 	})
 

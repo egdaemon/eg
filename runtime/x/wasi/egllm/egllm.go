@@ -5,18 +5,25 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/http"
 	"strings"
 
 	_eg "github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/httpx"
+	"github.com/egdaemon/wasinet/wasinet"
 )
 
-// DefaultEndpoint is where llama.cpp's llama-server listens by default.
-const DefaultEndpoint = "http://localhost:8080"
+// DefaultEndpoint is where the managed llama-server listens, a unix socket.
+// must match the --host of llama-server.service.
+const DefaultEndpoint = "unix:///run/llama-server/llama.sock"
 
-// Endpoint returns the base url of the llm server: the value of eg.EnvComputeLLMEndpoint, otherwise llama.cpp's default.
+// unixScheme prefixes endpoints that are unix sockets, e.g. unix:///run/llama-server/llama.sock.
+const unixScheme = "unix://"
+
+// Endpoint returns the base url of the llm server: the value of eg.EnvComputeLLMEndpoint, otherwise the managed llama-server's.
+// either an http(s) url or a unix socket, see unixScheme.
 func Endpoint() string {
 	return strings.TrimRight(envx.String(DefaultEndpoint, _eg.EnvComputeLLMEndpoint), "/")
 }
@@ -32,9 +39,40 @@ type llm struct {
 }
 
 func New() llm {
+	endpoint := Endpoint()
+	c := &http.Client{}
+	if path, ok := socketPath(endpoint); ok {
+		c.Transport = socketTransport(path)
+	}
+
 	return llm{
-		c:        &http.Client{},
-		endpoint: Endpoint(),
+		c:        c,
+		endpoint: endpoint,
+	}
+}
+
+// socketPath returns the path of the unix socket if the endpoint is one.
+func socketPath(endpoint string) (string, bool) {
+	path, ok := strings.CutPrefix(endpoint, unixScheme)
+	return path, ok && path != ""
+}
+
+// baseURL converts an endpoint into the base url of requests. requests to a
+// unix socket use a placeholder host since the transport ignores it.
+func baseURL(endpoint string) string {
+	if _, ok := socketPath(endpoint); ok {
+		return "http://llama"
+	}
+
+	return endpoint
+}
+
+// socketTransport dials the unix socket regardless of the requested address.
+func socketTransport(path string) http.RoundTripper {
+	return &http.Transport{
+		DialContext: func(ctx context.Context, _, _ string) (net.Conn, error) {
+			return wasinet.DialContext(ctx, "unix", path)
+		},
 	}
 }
 
@@ -88,7 +126,7 @@ func Chat(ctx context.Context, c Client, model string, messages ...Message) (str
 		return "", err
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, fmt.Sprintf("%s/v1/chat/completions", c.Host()), bytes.NewReader(encoded))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, fmt.Sprintf("%s/v1/chat/completions", baseURL(c.Host())), bytes.NewReader(encoded))
 	if err != nil {
 		return "", err
 	}

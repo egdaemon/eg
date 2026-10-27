@@ -17,6 +17,7 @@ import (
 	"github.com/egdaemon/eg/runtime/wasi/egenv"
 	"github.com/egdaemon/eg/runtime/wasi/shell"
 	"github.com/egdaemon/eg/runtime/x/wasi/egfs"
+	"golang.org/x/time/rate"
 )
 
 //go:embed Containerfile llama-server.service
@@ -93,11 +94,21 @@ func Shutdown(runtime shell.Command) eg.OpFn {
 // loading into memory yet. large models can take minutes to load.
 func waitHealthy(runtime shell.Command, timeout time.Duration) eg.OpFn {
 	return func(ctx context.Context, o eg.Op) error {
+		target := fmt.Sprintf("%s/health", Endpoint())
+		var curl string
+		if path, ok := socketPath(Endpoint()); ok {
+			target, curl = "http://localhost/health", fmt.Sprintf("--unix-socket %s", path)
+		}
+
+		// polling is paced by the runtime's retry limiter, see shell.Command.Retry.
+		ctx, done := context.WithTimeout(ctx, timeout)
+		defer done()
+
 		return shell.Run(ctx, runtime.Newf(
-			"for i in $(seq 1 %d); do curl -sf %s/health > /dev/null 2>&1 && exit 0; sleep 1; done; exit 1",
-			int(timeout.Seconds()),
-			DefaultEndpoint,
-		).Timeout(timeout+time.Minute))
+			"curl -sf --max-time 5 %s %s > /dev/null",
+			curl,
+			target,
+		).Attempts(-1))
 	}
 }
 
@@ -133,13 +144,14 @@ func With(model string, op eg.OpFn) eg.OpFn {
 		}
 	}
 
-	rt := Runtime()
+	// the limiter paces the health polling, the other commands are not retried.
+	rt := Runtime().Retry(rate.NewLimiter(rate.Every(time.Second), 1))
 	return func(ctx context.Context, o eg.Op) error {
 		return around(
 			eg.Sequential(
 				phase(fmt.Sprintf("pulling model %s (cache %s)", model, CacheDirectory("models")), Pull(rt, model)),
 				phase("starting llama-server.service", Serve(rt)),
-				phase(fmt.Sprintf("waiting for llama-server health at %s (timeout 10m)", DefaultEndpoint), waitHealthy(rt, 10*time.Minute)),
+				phase(fmt.Sprintf("waiting for llama-server health at %s (timeout 10m)", Endpoint()), waitHealthy(rt, 10*time.Minute)),
 			),
 			phase("operation", op),
 			phase("stopping llama-server.service", Shutdown(rt)),

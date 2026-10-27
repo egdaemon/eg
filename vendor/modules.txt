@@ -525,8 +525,6 @@ github.com/egdaemon/gdx/internal/langx
 github.com/egdaemon/gdx/konggdx
 github.com/egdaemon/gdx/konggdx/cmdopts
 github.com/egdaemon/gdx/konggdx/userx
-# github.com/egdaemon/wasinet/wasinet v0.0.0-20261026191505-4dce83a5be12
-## explicit; go 1.26.0
 # github.com/egdaemon/wasinet/wasinet v0.0.0-20261027202319-9cfc20f44598
 ## explicit; go 1.26.0
 github.com/egdaemon/wasinet/wasinet

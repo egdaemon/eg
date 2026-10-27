@@ -5,5 +5,6 @@ RUN apt-get -y install pciutils
 RUN add-apt-repository -n ppa:egdaemon/eg
 RUN apt-get update && apt-get -y install llama.cpp
 
+RUN echo "cache buster 14ba6e35-b121-44da-a208-24725306c28d"
 COPY llama-server.service /etc/systemd/system/llama-server.service
 RUN touch /etc/default/llama-server

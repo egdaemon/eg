@@ -1,13 +1,13 @@
 module eg/compute
 
-go 1.26.3
+go 1.27.2
 
-require github.com/egdaemon/eg v0.0.0-20261022144927-152846e0124b
+require github.com/egdaemon/eg v0.0.0-20261027204946-c22a4832a812
 
 require (
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/dustin/go-humanize v1.1.0 // indirect
-	github.com/egdaemon/wasinet/wasinet v0.0.0-20260928194155-07f223337a8d // indirect
+	github.com/egdaemon/wasinet/wasinet v0.0.0-20261027202319-9cfc20f44598 // indirect
 	github.com/felixge/fgprof v0.9.5 // indirect
 	github.com/gofrs/uuid/v5 v5.5.1 // indirect
 	github.com/google/pprof v0.0.0-20261016150608-1facf8f91b50 // indirect
@@ -31,8 +31,8 @@ require (
 	golang.org/x/sync v0.24.0 // indirect
 	golang.org/x/sys v0.49.0 // indirect
 	golang.org/x/text v0.43.0 // indirect
+	golang.org/x/time v0.16.0 // indirect
 	golang.org/x/tools v0.52.0 // indirect
-	google.golang.org/genproto v0.0.0-20261019180522-ce908d29299b // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20261019180522-ce908d29299b // indirect
 	google.golang.org/grpc v1.84.0 // indirect
 	google.golang.org/protobuf v1.36.12 // indirect

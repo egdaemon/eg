@@ -11,6 +11,7 @@ import (
 	"go/parser"
 	"go/token"
 	"io/fs"
+	"log"
 	"os"
 	"path/filepath"
 	"sort"
@@ -235,7 +236,8 @@ func (t GolangOptions) Verify(ctx context.Context, fn Fn, artifact string) error
 	defer os.Remove(overlay)
 
 	cmd := eggolang.Runtime().Directory(dir).Newf("go test -count=1 -overlay '%s' -run '^(%s)$' .", overlay, strings.Join(tests, "|"))
-	if err := shell.Run(ctx, cmd); err != nil {
+	log.Printf("autogentest %s: verifying dest=%s tmp=%s overlay=%s tests=%v\n", fn.Name, dest, tmp, overlay, tests)
+	if err := shell.Run(ctx, cmd.Debug()); err != nil {
 		return err
 	}
 

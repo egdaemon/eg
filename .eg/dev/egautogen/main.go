@@ -49,6 +49,7 @@ func main() {
 				eggolang.AutoTest(),
 				egbug.Log("recording coverage initiated"),
 				eggolang.RecordCoverage,
+				egbug.Log("recording coverage completed"),
 				egbug.Log("egautogentest initiated"),
 				egautogentest.New().Model(model).Attempts(3).Ensure(
 					"no helper functions are added",

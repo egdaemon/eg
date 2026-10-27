@@ -137,7 +137,10 @@ func (t daemon) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, keygen cmdopt
 	}
 
 	c := httpx.BindRetryTransport(tlsc.DefaultClient(), http.StatusTooManyRequests, http.StatusBadGateway)
-	authclient = authn.New(gctx.Context, c, signer, t.AccountID, compute.NewAuthzTokenSource)
+	authclient = authn.New(gctx.Context, c, signer, t.AccountID, func(c *http.Client, signer ssh.Signer, endpoint string, account string) compute.TokenSourceFromEndpoint {
+		// identifies this exact runner to the control plane, machines can share a key.
+		return compute.NewAuthzTokenSource(c, signer, endpoint, account).WithMachineID(t.MachineID)
+	})
 
 	if err = daemons.HTTP(gctx, httpl, rm, compiledirs, runners.NewDirectClient(authclient), db, t.Uploadable); err != nil {
 		return err

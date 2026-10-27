@@ -55,6 +55,22 @@ func TestAwaitLogsToken(t *testing.T) {
 	})
 }
 
+func TestAwaitLogsTokenGivesUpOnStartedWorkload(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		b, err := json.Marshal(&computeapi.EnqueuedFindResponse{Enqueued: &computeapi.Enqueued{
+			Id:          "abc",
+			CompletedAt: timex.RFC3339Inf().Format(time.RFC3339Nano),
+			InitiatedAt: time.Now().UTC().Format(time.RFC3339Nano),
+		}})
+		require.NoError(t, err)
+		_, _ = w.Write(b)
+	}))
+	defer srv.Close()
+
+	_, err := PushClient{c: srv.Client(), host: srv.URL}.AwaitLogsToken(t.Context(), "abc", time.Millisecond)
+	require.ErrorIs(t, err, ErrLogsUnavailable)
+}
+
 func TestHistoryLogs(t *testing.T) {
 	t.Run("streams the stored log", func(t *testing.T) {
 		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

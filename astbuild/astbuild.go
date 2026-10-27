@@ -60,10 +60,16 @@ func BinaryExpr(lhs ast.Expr, op token.Token, rhs ast.Expr) *ast.BinaryExpr {
 	}
 }
 
-// StringLiteral expression
+// StringLiteral expression. uses a raw string literal when the value can be represented
+// unchanged as one, otherwise falls back to an interpreted (quoted) string literal.
 func StringLiteral(s string) *ast.BasicLit {
+	value := strconv.Quote(s)
+	if strconv.CanBackquote(s) {
+		value = fmt.Sprintf("`%s`", s)
+	}
+
 	return &ast.BasicLit{
 		Kind:  token.STRING,
-		Value: fmt.Sprintf("`%s`", s),
+		Value: value,
 	}
 }

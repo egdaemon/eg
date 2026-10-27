@@ -2,12 +2,12 @@ package astcodec
 
 import (
 	"errors"
-	"fmt"
 	"go/ast"
 	"go/token"
 	"go/types"
 	"log"
 	"os"
+	"slices"
 
 	"golang.org/x/tools/go/ast/astutil"
 	"golang.org/x/tools/go/packages"
@@ -90,22 +90,24 @@ func TypePattern(pattern ...ast.Expr) func(...ast.Expr) bool {
 
 // MapFieldsToTypeExpr - extracts the type for each name for each of the provided fields.
 // i.e.) a,b int, c string, d float is transformed into: int, int, string, float
+// anonymous fields count as a single name. the provided fields are not modified.
 func MapFieldsToTypeExpr(args ...*ast.Field) []ast.Expr {
 	r := []ast.Expr{}
-	for idx, f := range args {
-		if len(f.Names) == 0 {
-			f.Names = []*ast.Ident{ast.NewIdent(fmt.Sprintf("f%d", idx))}
-		}
-
-		for range f.Names {
+	for _, f := range args {
+		for range max(len(f.Names), 1) {
 			r = append(r, f.Type)
 		}
-
 	}
 	return r
 }
 
+// FieldListPattern extracts the types of the field list, a nil list (i.e. a function
+// without results) has no types.
 func FieldListPattern(l *ast.FieldList) []ast.Expr {
+	if l == nil {
+		return nil
+	}
+
 	return MapFieldsToTypeExpr(l.List...)
 }
 
@@ -134,16 +136,13 @@ func FindImportsByPath(path string) func(*ast.ImportSpec) bool {
 	}
 }
 
+// SearchDecls returns the declarations that match all of the filters.
 func SearchDecls(pkg *packages.Package, filters ...func(ast.Decl) bool) (fn []ast.Decl) {
 	for _, gf := range pkg.Syntax {
 		for _, d := range gf.Decls {
-			for _, f := range filters {
-				if !f(d) {
-					continue
-				}
+			if !slices.ContainsFunc(filters, func(f func(ast.Decl) bool) bool { return !f(d) }) {
+				fn = append(fn, d)
 			}
-
-			fn = append(fn, d)
 		}
 	}
 
@@ -158,19 +157,16 @@ func SearchPackageImports(pkg *packages.Package, filters ...func(*ast.ImportSpec
 	return fn
 }
 
+// SearchImports returns the imports that match all of the filters.
 func SearchImports(root ast.Node, filters ...func(*ast.ImportSpec) bool) (fn []*ast.ImportSpec) {
 	x := &findimports{}
 
 	ast.Walk(x, root)
 
 	for _, s := range x.found {
-		for _, f := range filters {
-			if !f(s) {
-				continue
-			}
+		if !slices.ContainsFunc(filters, func(f func(*ast.ImportSpec) bool) bool { return !f(s) }) {
+			fn = append(fn, s)
 		}
-
-		fn = append(fn, s)
 	}
 
 	return fn
@@ -207,7 +203,14 @@ type multivisit []ast.Visitor
 func (t multivisit) Visit(node ast.Node) (w ast.Visitor) {
 	updates := make([]ast.Visitor, 0, len(t))
 	for _, v := range t {
-		updates = append(updates, v.Visit(node))
+		// visitors that return nil are done with this subtree.
+		if u := v.Visit(node); u != nil {
+			updates = append(updates, u)
+		}
+	}
+
+	if len(updates) == 0 {
+		return nil
 	}
 
 	return multivisit(updates)
@@ -285,8 +288,14 @@ func (t filter) Visit(node ast.Node) (w ast.Visitor) {
 		return t
 	}
 
+	delegate := t.delegate.Visit(node)
+	if delegate == nil {
+		// the delegate is done with this subtree.
+		return nil
+	}
+
 	return filter{
-		delegate: t.delegate.Visit(node),
+		delegate: delegate,
 		pattern:  t.pattern,
 	}
 }

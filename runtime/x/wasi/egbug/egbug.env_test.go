@@ -44,6 +44,17 @@ func TestDefaultEnvMatchesDigest(t *testing.T) {
 // and baremetal specific variables. normalizing must reduce it to default.env.
 func TestNormalizeEnvIgnoresLaunchVariance(t *testing.T) {
 	expected := defaultEnviron(t)
+	// values that differ per launch mode and replace the defaults.
+	variance := []string{
+		"EG_COMPUTE_GPU=true",
+		"EG_COMPUTE_TTL=166666h40m0s",
+		"EG_COMPUTE_WORKLOAD=main.wasm",
+		"EG_COMPUTE_PROFILE_MODE=cpu",
+		"EG_COMPUTE_WORKSPACE_DIRECTORY=/workload/eg/.eg.workload/90cb0d5c/.eg.workspace",
+		"EG_GIT_BASE_URI=https://github.com/egdaemon/eg.git",
+		"EG_GIT_HEAD_URI=https://github.com/egdaemon/eg.git",
+		"EG_GIT_HEAD_REF=main",
+	}
 	for _, v := range expected {
 		k, val, _ := strings.Cut(v, "=")
 		switch k {
@@ -52,11 +63,29 @@ func TestNormalizeEnvIgnoresLaunchVariance(t *testing.T) {
 		}
 	}
 
+	overridden := map[string]bool{}
+	for _, v := range variance {
+		k, _, _ := strings.Cut(v, "=")
+		overridden[k] = true
+	}
+
+	launched := []string{}
+	for _, v := range expected {
+		if k, _, _ := strings.Cut(v, "="); !overridden[k] {
+			launched = append(launched, v)
+		}
+	}
+
 	environ := append(
-		append([]string(nil), expected...),
+		append(launched, variance...),
 		"EG_COMPUTE_DEFAULT_GROUP=",
 		"EG_COMPUTE_TLS_INSECURE=false",
 		"EG_EXPERIMENTAL_BAREMETAL=true",
+		"EG_GIT_AUTH_ACCESS_TOKEN=secret",
+		"EG_GIT_AUTH_HTTP_USERNAME=user",
+		"EG_GIT_AUTH_HTTP_PASSWORD=secret",
+		"EG_GIT_BASE_VCS=git@github.com:egdaemon/eg.git",
+		"SSH_AUTH_SOCK=/eg.mnt/.eg.runtime/ssh.agent.socket",
 		"LOGNAME=root",
 		"SHELL=/bin/bash",
 		"SHLVL=0",

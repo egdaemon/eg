@@ -19,6 +19,7 @@ import (
 	_eg "github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
+	"github.com/egdaemon/eg/internal/gitx"
 	"github.com/egdaemon/eg/runtime/wasi/eg"
 	"github.com/egdaemon/eg/runtime/wasi/egenv"
 	"github.com/egdaemon/eg/runtime/wasi/env"
@@ -148,7 +149,7 @@ func APTPackage(packages ...string) eg.OpFn {
 
 const (
 	EnvUnsafeDigest = "EG_UNSAFE_ENVVARS_DIGEST"
-	defaultDigest   = "a38edd735ab6a23c17ff87ba3dc04161"
+	defaultDigest   = "6b419084b59a50a5fdbe64e97a446c7a"
 )
 
 //go:embed default.env
@@ -209,11 +210,18 @@ func normalizeEnv(environ *envx.Builder) *envx.Builder {
 	environ.Setenv(_eg.EnvComputeModuleSocket, _eg.DefaultRuntimeDirectory("module.socket"))
 	environ.Setenv(_eg.EnvComputeOS, "linux")
 	environ.Setenv(_eg.EnvComputeArch, "amd64")
+	environ.Setenv(_eg.EnvComputeGPU, "false")
+	environ.Setenv(_eg.EnvComputeTTL, "0s")
+	environ.Setenv(_eg.EnvComputeWorkload, "")
+	environ.Setenv(_eg.EnvComputeProfileMode, "")
+	environ.Setenv(_eg.EnvComputeWorkspaceDirectory, _eg.DefaultWorkspaceDirectory())
+	environ.Setenv(_eg.EnvGitBaseURI, _eg.DefaultWorkingDirectory())
+	environ.Setenv(_eg.EnvGitHeadURI, _eg.DefaultWorkingDirectory())
+	environ.Setenv(_eg.EnvGitHeadRef, "HEAD")
 
 	// normalize standard directories.
 	normalizedirprefix(_eg.EnvComputeWorkloadDirectory)
 	normalizedirprefix(_eg.EnvComputeWorkingDirectory)
-	normalizedirprefix(_eg.EnvComputeWorkspaceDirectory)
 	normalizedirprefix(_eg.EnvComputeCacheDirectory)
 	normalizedirprefix(_eg.EnvComputeRuntimeDirectory)
 
@@ -227,12 +235,17 @@ func normalizeEnv(environ *envx.Builder) *envx.Builder {
 
 	// never include credentials, the environment is printed on mismatch.
 	environ.Unsetenv(_eg.EnvGithubToken)
+	environ.Unsetenv(gitx.EnvAuthEGAccessToken)
+	environ.Unsetenv(gitx.EnvAuthHTTPUsername)
+	environ.Unsetenv(gitx.EnvAuthHTTPPassword)
 
 	// ignore variables that depend on how the process was launched (shell, sudo, baremetal).
 	environ.Unsetenv("USER")
 	environ.Unsetenv("LOGNAME")
 	environ.Unsetenv("SHELL")
 	environ.Unsetenv("SHLVL")
+	environ.Unsetenv("SSH_AUTH_SOCK")
+	environ.Unsetenv(_eg.EnvGitBaseVCS)
 	environ.Unsetenv("_")
 	environ.Unsetenv("SUDO_COMMAND")
 	environ.Unsetenv("SUDO_GID")

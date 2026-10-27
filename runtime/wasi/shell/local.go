@@ -4,6 +4,8 @@ import (
 	"context"
 	"os"
 	"os/exec"
+
+	"github.com/logrusorgru/aurora"
 )
 
 // NewLocal creates a command that executes locally via bash
@@ -14,6 +16,7 @@ func NewLocal() Command {
 		entry:    runlocal,
 		exec:     execlocal,
 		attempts: 1,
+		color:    aurora.NewAurora(false),
 	}
 }
 

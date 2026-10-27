@@ -84,8 +84,9 @@ func TestLocalEnv(t *testing.T) {
 }
 
 func TestEnv(t *testing.T) {
-	t.Run("describes head only, using the quirked clone uri", func(t *testing.T) {
+	t.Run("describes head and base, using the quirked clone uri", func(t *testing.T) {
 		repo, h := newEnvRepo(t)
+		require.NoError(t, repo.Storer.SetReference(plumbing.NewHashReference(plumbing.NewBranchReferenceName("main"), h)))
 
 		environ, err := gitx.Env(repo, "origin", "HEAD", "")
 		require.NoError(t, err)
@@ -96,6 +97,22 @@ func TestEnv(t *testing.T) {
 		require.Equal(t, "Jane", env["EG_GIT_HEAD_COMMIT_AUTHOR"])
 		require.Equal(t, "jane@example.com", env["EG_GIT_HEAD_COMMIT_EMAIL"])
 		require.Equal(t, "https://github.com/egdaemon/eg.git", env["EG_GIT_HEAD_URI"])
+		require.Equal(t, testvcs, env["EG_GIT_BASE_VCS"])
+		require.Equal(t, "https://github.com/egdaemon/eg.git", env["EG_GIT_BASE_URI"])
+		require.Equal(t, "main", env["EG_GIT_BASE_REF"])
+		require.Equal(t, h.String(), env["EG_GIT_BASE_COMMIT"])
+	})
+
+	t.Run("a missing base branch omits the base variables", func(t *testing.T) {
+		repo, h := newEnvRepo(t)
+		// ensure there is no main branch regardless of go-git's default branch.
+		_ = repo.Storer.RemoveReference(plumbing.NewBranchReferenceName("main"))
+
+		environ, err := gitx.Env(repo, "origin", "HEAD", "")
+		require.NoError(t, err)
+
+		env := environMap(t, environ)
+		require.Equal(t, h.String(), env["EG_GIT_HEAD_COMMIT"])
 		for k := range env {
 			require.False(t, strings.HasPrefix(k, "EG_GIT_BASE_"), "unexpected base variable: %s", k)
 		}

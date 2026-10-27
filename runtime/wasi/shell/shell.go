@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/logrusorgru/aurora"
+	"golang.org/x/time/rate"
 
 	_eg "github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/internal/errorsx"
@@ -23,21 +24,27 @@ const (
 	DefaultTimeout = 5 * time.Minute
 )
 
+// defaultRetryLimiter retries once every 200ms.
+func defaultRetryLimiter() *rate.Limiter {
+	return rate.NewLimiter(rate.Every(200*time.Millisecond), 1)
+}
+
 type Execer func(ctx context.Context, dir string, environ []string, cmd string, args []string) error
 type entrypoint func(ctx context.Context, user string, group string, cmd string, directory string, environ []string, do Execer) (err error)
 
 type Command struct {
-	user      string
-	group     string
-	cmd       string
-	directory string
-	environ   []string
-	timeout   time.Duration
-	attempts  int16
-	lenient   bool
-	entry     entrypoint
-	exec      Execer
-	color     aurora.Aurora
+	user       string
+	group      string
+	cmd        string
+	directory  string
+	environ    []string
+	timeout    time.Duration
+	attempts   int16
+	retrylimit *rate.Limiter
+	lenient    bool
+	entry      entrypoint
+	exec       Execer
+	color      aurora.Aurora
 }
 
 // enable or disable colorized log output (warnings on retries, errors on failure). default is enabled.
@@ -49,6 +56,12 @@ func (t Command) Colors(enabled bool) Command {
 // number of attempts to make before giving up.
 func (t Command) Attempts(a int16) Command {
 	t.attempts = a
+	return t
+}
+
+// limits how quickly attempts are retried, see Attempts. the limiter must not be nil.
+func (t Command) Retry(l *rate.Limiter) Command {
+	t.retrylimit = l
 	return t
 }
 
@@ -179,14 +192,15 @@ func (t Command) Newf(cmd string, options ...any) Command {
 func New(cmd string) Command {
 	u := userx.CurrentUserOrDefault(user.User{})
 	return Command{
-		user:     stringsx.First(u.Username, _eg.DefaultUsername), // default user to execute commands as
-		group:    stringsx.First(defaultgroup(u), _eg.DefaultUsername),
-		cmd:      cmd,
-		timeout:  DefaultTimeout,
-		entry:    run,
-		exec:     ffiexec.Command,
-		attempts: 1,
-		color:    aurora.NewAurora(true),
+		user:       stringsx.First(u.Username, _eg.DefaultUsername), // default user to execute commands as
+		group:      stringsx.First(defaultgroup(u), _eg.DefaultUsername),
+		cmd:        cmd,
+		timeout:    DefaultTimeout,
+		entry:      run,
+		exec:       ffiexec.Command,
+		attempts:   1,
+		retrylimit: defaultRetryLimiter(),
+		color:      aurora.NewAurora(true),
 	}
 }
 
@@ -275,10 +289,10 @@ func retry(ctx context.Context, c Command, do func() error) (err error) {
 			}
 		}
 
-		select {
-		case <-time.After(200 * time.Millisecond):
-		case <-ctx.Done():
-			return ctx.Err()
+		if i+1 < attempts {
+			if werr := c.retrylimit.Wait(ctx); werr != nil {
+				return errorsx.Compact(err, werr)
+			}
 		}
 	}
 

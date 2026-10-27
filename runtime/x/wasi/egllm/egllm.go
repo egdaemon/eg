@@ -6,11 +6,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"runtime"
 	"strings"
+	"time"
 
 	_eg "github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/httpx"
+	"github.com/egdaemon/wasinet/wasinet"
 )
 
 // DefaultEndpoint is where llama.cpp's llama-server listens by default.
@@ -33,9 +36,26 @@ type llm struct {
 
 func New() llm {
 	return llm{
-		c:        &http.Client{},
+		c:        &http.Client{Transport: transport()},
 		endpoint: Endpoint(),
 	}
+}
+
+// transport is the default transport relaxed for llm servers. under wasi the default transport
+// (see wasinet.Hijack) allows 2s to dial and 1s for response headers, but a completion sends
+// no headers until the model has finished generating.
+func transport() http.RoundTripper {
+	dt, ok := http.DefaultTransport.(*http.Transport)
+	if !ok {
+		return http.DefaultTransport
+	}
+
+	t := dt.Clone()
+	t.ResponseHeaderTimeout = 0
+	if runtime.GOOS == "wasip1" {
+		t.DialContext = (&wasinet.Dialer{Timeout: 30 * time.Second}).DialContext
+	}
+	return t
 }
 
 func (t llm) Host() string {

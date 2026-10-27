@@ -57,6 +57,7 @@ type baremetal struct {
 	InvalidateCache bool     `name:"invalidate-cache" help:"removes workload build cache"`
 	Clean           bool     `name:"clean" help:"start with a clean environment" negatable:"" default:"false"`
 	Podman          bool     `name:"podman" help:"enable/disable podman" hidden:"true" negatable:"" default:"true"`
+	Cgroups         bool     `name:"cgroups" help:"enable/disable cgroups for the module container" hidden:"true" negatable:"" default:"true"`
 	Workload        string   `arg:"" help:"name of the workload to run" default:"" predictor:"eg.workload"`
 }
 
@@ -69,8 +70,8 @@ func (t baremetal) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, hotswapbin
 		uid        = uuid.Must(uuid.NewV7())
 		descr      = envx.String("", eg.EnvComputeVCS)
 		cc         grpc.ClientConnInterface
-		cgroups                        = envx.Toggle(runners.AgentOptionNoop, runners.AgentOptionCommandLine("--cgroups", "disabled"), envx.Int(0, eg.EnvComputeModuleNestedLevel) > 0)       // disable cgroups
-		hostnet                        = envx.Toggle(runners.AgentOptionCommandLine("--network", "host"), runners.AgentOptionNoop, envx.Boolean(false, eg.EnvExperimentalDisableHostNetwork)) // ipv4 group bullshit. pretty sure its a podman 4 issue that was resolved in podman 5. this is 'safe' to do because we are already in a container.
+		cgroups                        = envx.Toggle(runners.AgentOptionNoop, runners.AgentOptionCommandLine("--cgroups", "disabled"), !t.Cgroups || envx.Int(0, eg.EnvComputeModuleNestedLevel) > 0) // disable cgroups
+		hostnet                        = envx.Toggle(runners.AgentOptionCommandLine("--network", "host"), runners.AgentOptionNoop, envx.Boolean(false, eg.EnvExperimentalDisableHostNetwork))         // ipv4 group bullshit. pretty sure its a podman 4 issue that was resolved in podman 5. this is 'safe' to do because we are already in a container.
 		mountegbin runners.AgentOption = runners.AgentOptionEGBin(
 			envx.String(errorsx.Must(exec.LookPath(os.Args[0])), eg.EnvComputeBinAlt),
 		)

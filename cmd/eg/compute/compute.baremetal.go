@@ -205,9 +205,6 @@ func (t baremetal) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, hotswapbin
 			"CI",
 			eg.EnvComputeRunID,
 			eg.EnvComputeAccountID,
-			eg.EnvComputeGPU,
-			eg.EnvComputeProfileMode,
-			eg.EnvUnsafeCacheID,
 		).
 		Var(eg.EnvComputeBin, hotswapbin.String()).
 		Var(eg.EnvExperimentalBaremetal, strconv.FormatBool(true)).    // temporary while we flesh out the needed changes
@@ -215,6 +212,10 @@ func (t baremetal) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, hotswapbin
 		Var(eg.EnvComputeLoggingVerbosity, strconv.Itoa(gctx.Verbosity)).
 		Var(eg.EnvComputeModuleNestedLevel, strconv.Itoa(0)).
 		Var(eg.EnvComputeTTL, t.RuntimeResources.TTL.String()).
+		Var(eg.EnvComputeGPU, strconv.FormatBool(envx.Boolean(false, eg.EnvComputeGPU))).
+		Var(eg.EnvComputeProfileMode, envx.String("", eg.EnvComputeProfileMode)).
+		Var(eg.EnvComputeWorkload, t.Workload).
+		Var(eg.EnvUnsafeCacheID, ws.CachedID).
 		Var(eg.EnvComputeInitiatedTimestamp, time.Now().UTC().Format(time.RFC3339Nano)).
 		Var(eg.EnvComputeOS, runtime.GOOS).
 		Var(eg.EnvComputeArch, runtime.GOARCH).

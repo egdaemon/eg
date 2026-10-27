@@ -361,7 +361,7 @@ func BaseEnv(repo *git.Repository, vcs, uri string, treeish string) (env []strin
 	}
 
 	return envx.Build().Var(
-		eg.EnvGitBaseURI, vcs,
+		eg.EnvGitBaseVCS, vcs,
 	).Var(
 		eg.EnvGitBaseURI, uri,
 	).Var(

@@ -281,14 +281,18 @@ func (t option) rework(ctx context.Context, source string, generated string) (st
 			return generated, true, nil
 		}
 
-		if round == t.revisions {
-			break
-		}
-
 		var described strings.Builder
 		for _, v := range violations {
 			fmt.Fprintf(&described, "- rule %d (%s) line %d: %s\n", v.Rule, t.ensure[v.Rule-1], v.Line, v.Reason)
 		}
+		log.Printf("autogentest round %d/%d: violations\n%s", round, t.revisions, described.String())
+
+		if round == t.revisions {
+			break
+		}
+
+		revise := strings.NewReplacer(":violations:", described.String()).Replace(reviseTemplate)
+		log.Printf("autogentest round %d/%d: next prompt\n%s\n", round, t.revisions, revise)
 
 		if generated, err = egllm.Chat(
 			ctx,
@@ -296,11 +300,11 @@ func (t option) rework(ctx context.Context, source string, generated string) (st
 			t.model,
 			egllm.Message{Role: "user", Content: source},
 			egllm.Message{Role: "assistant", Content: generated},
-			egllm.Message{Role: "user", Content: strings.NewReplacer(":violations:", described.String()).Replace(reviseTemplate)},
+			egllm.Message{Role: "user", Content: revise},
 		); err != nil {
 			return "", false, err
 		}
-		log.Printf("autogentest round %d/%d: violations\n%srevised response\n%s\n", round, t.revisions, described.String(), generated)
+		log.Printf("autogentest round %d/%d: revised response\n%s\n", round, t.revisions, generated)
 	}
 
 	return "", false, nil

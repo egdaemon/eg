@@ -149,7 +149,7 @@ func APTPackage(packages ...string) eg.OpFn {
 
 const (
 	EnvUnsafeDigest = "EG_UNSAFE_ENVVARS_DIGEST"
-	defaultDigest   = "ad9846b3b7b0da7e457551458ac4ea74"
+	defaultDigest   = "0a77b0047b8aadd9436dde0f0c8d34e5"
 )
 
 //go:embed default.env
@@ -246,6 +246,7 @@ func normalizeEnv(environ *envx.Builder) *envx.Builder {
 	environ.Unsetenv("SHELL")
 	environ.Unsetenv("SHLVL")
 	environ.Unsetenv("SSH_AUTH_SOCK")
+	environ.Unsetenv("GNUPGHOME")
 	environ.Unsetenv("_")
 	environ.Unsetenv("SUDO_COMMAND")
 	environ.Unsetenv("SUDO_GID")

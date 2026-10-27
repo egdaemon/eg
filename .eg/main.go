@@ -21,7 +21,6 @@ func main() {
 	c1 := eg.Container("eg.ubuntu")
 	err := eg.Perform(
 		ctx,
-		shell.Op(shell.New("eg version")),
 		eggit.AutoClone,
 		eg.Parallel(
 			eg.Build(eg.DefaultModule()),
@@ -30,15 +29,19 @@ func main() {
 		eg.Module(
 			ctx,
 			c1,
-			eg.Sequential(
-				shell.Op(shell.New("eg version")),
-				eggolang.New().Timeout(10*time.Minute).AutoInstall(),
-				eggolang.New().Timeout(10*time.Minute).AutoTest(),
-				egbug.Log("recording coverage initiated"),
-				eggolang.RecordCoverage,
-				egbug.Log("integration tests initiated"),
-				IntegrationTests,
-			),
+			eggolang.New().Timeout(10*time.Minute).AutoInstall(),
+			eggolang.New().Timeout(10*time.Minute).AutoTest(),
+			egbug.Log("recording coverage initiated"),
+			eggolang.RecordCoverage,
+		),
+		eg.Module(
+			ctx,
+			// eg default module should generally be stable
+			// allowing these integration tests to be consistent
+			// w/ respect to behavior particularly regarding envvars.
+			eg.DefaultModule(),
+			egbug.Log("integration tests initiated"),
+			IntegrationTests,
 		),
 	)
 
@@ -55,21 +58,17 @@ func IntegrationTests(ctx context.Context, op eg.Op) error {
 	runtime := shell.Runtime().Privileged()
 	return eg.Perform(
 		ctx,
-		eg.Sequential(
-			shell.Op(
-				runtime.New("/home/egd/go/bin/eg compute baremetal tests/concurrent"),
-				runtime.New("/home/egd/go/bin/eg compute baremetal tests/metrics"),
-				runtime.New("/home/egd/go/bin/eg compute baremetal tests/stress"),
-				runtime.New("/home/egd/go/bin/eg compute baremetal tests/localref"),
-				runtime.New("/home/egd/go/bin/eg compute baremetal tests/egdb").Lenient(true),
-				// runtime.New("/home/egd/go/bin/eg compute baremetal -vvvv tests/tty"),
-				// runtime.New("/home/egd/go/bin/eg compute baremetal tests/envvars").
-				// 	Environ(egbug.EnvUnsafeDigest, "a129de7dadc3fe210b9162428f93d3fe").
-				// 	Environ("EG_COMPUTE_MODULE_LEVEL", "0"),
-				// runtime.New("/home/egd/go/bin/eg compute builtin local"),
-				// runtime.New("/home/egd/go/bin/eg compute baremetal tests/containers"),
-				// runtime.New("/home/egd/go/bin/eg compute baremetal -vv tests/gpgagent"),
-			),
+		shell.Parallel(
+			runtime.New("/home/egd/go/bin/eg compute baremetal tests/concurrent"),
+			runtime.New("/home/egd/go/bin/eg compute baremetal tests/metrics"),
+			runtime.New("/home/egd/go/bin/eg compute baremetal tests/stress"),
+			runtime.New("/home/egd/go/bin/eg compute baremetal tests/localref"),
+			runtime.New("/home/egd/go/bin/eg compute baremetal tests/egdb"),
+			runtime.New("/home/egd/go/bin/eg compute baremetal tests/envvars").
+				Environ(egenv.EnvComputeModuleNestedLevel, "0"),
+			// runtime.New("/home/egd/go/bin/eg compute baremetal -vvvv tests/tty"),
+			// runtime.New("/home/egd/go/bin/eg compute baremetal tests/containers"),
+			// runtime.New("/home/egd/go/bin/eg compute baremetal -vv tests/gpgagent"),
 		),
 	)
 }

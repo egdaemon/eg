@@ -55,6 +55,7 @@ type baremetal struct {
 	Secrets         []string `name:"secret" help:"List of secret URIs to use. Examples: chachasm://passphrase@/path/to/file, gcpsm://project-id/secret-name/version, awssm://secret-name?region=us-east-1"`
 	Clone           bool     `name:"git-clone" help:"allow cloning via git"`
 	InvalidateCache bool     `name:"invalidate-cache" help:"removes workload build cache"`
+	Clean           bool     `name:"clean" help:"start with a clean environment" negatable:"" default:"false"`
 	Podman          bool     `name:"podman" help:"enable/disable podman" hidden:"true" negatable:"" default:"true"`
 	Workload        string   `arg:"" help:"name of the workload to run" default:"" predictor:"eg.workload"`
 }
@@ -203,27 +204,17 @@ func (t baremetal) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, hotswapbin
 			"CI",
 			eg.EnvComputeRunID,
 			eg.EnvComputeAccountID,
-		).Var(
-		eg.EnvComputeBin, hotswapbin.String(),
-	).Var(
-		eg.EnvExperimentalBaremetal, strconv.FormatBool(true), // temporary while we flesh out the needed changes
-	).Var(
-		eg.EnvUnsafeGitCloneEnabled, strconv.FormatBool(t.Clone), // hack to disable cloning
-	).Var(
-		eg.EnvComputeLoggingVerbosity, strconv.Itoa(gctx.Verbosity),
-	).Var(
-		eg.EnvComputeModuleNestedLevel, strconv.Itoa(0),
-	).Var(
-		eg.EnvComputeTTL, t.RuntimeResources.TTL.String(),
-	).Var(
-		eg.EnvComputeInitiatedTimestamp, time.Now().UTC().Format(time.RFC3339Nano),
-	).Var(
-		eg.EnvComputeOS, runtime.GOOS,
-	).Var(
-		eg.EnvComputeArch, runtime.GOARCH,
-	).FromEnviron(
-		gitenv...,
-	)
+		).
+		Var(eg.EnvComputeBin, hotswapbin.String()).
+		Var(eg.EnvExperimentalBaremetal, strconv.FormatBool(true)).    // temporary while we flesh out the needed changes
+		Var(eg.EnvUnsafeGitCloneEnabled, strconv.FormatBool(t.Clone)). // hack to disable cloning
+		Var(eg.EnvComputeLoggingVerbosity, strconv.Itoa(gctx.Verbosity)).
+		Var(eg.EnvComputeModuleNestedLevel, strconv.Itoa(0)).
+		Var(eg.EnvComputeTTL, t.RuntimeResources.TTL.String()).
+		Var(eg.EnvComputeInitiatedTimestamp, time.Now().UTC().Format(time.RFC3339Nano)).
+		Var(eg.EnvComputeOS, runtime.GOOS).
+		Var(eg.EnvComputeArch, runtime.GOARCH).
+		FromEnviron(gitenv...)
 
 	environpath := filepath.Join(ws.RuntimeDir, eg.EnvironFile)
 	if environio, err = os.Create(environpath); err != nil {
@@ -260,9 +251,13 @@ func (t baremetal) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, hotswapbin
 		eg.EnvComputeWorkingDirectory, ws.WorkingDir,
 	).Var(
 		eg.EnvComputeDefaultGroup, defaultgroup(),
-	).FromEnviron(
-		os.Environ()...,
 	)
+
+	if !t.Clean {
+		cmdenvb.FromEnviron(
+			os.Environ()...,
+		)
+	}
 
 	if cmdenv, err = cmdenvb.Environ(); err != nil {
 		return err

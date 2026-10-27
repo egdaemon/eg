@@ -4,6 +4,8 @@ import (
 	"context"
 	"embed"
 	"errors"
+	"fmt"
+	"log"
 	"path/filepath"
 	"time"
 
@@ -62,6 +64,7 @@ func Runtime() shell.Command {
 // does not inherit the runtime's environment.
 func Pull(runtime shell.Command, model string) eg.OpFn {
 	return func(ctx context.Context, o eg.Op) error {
+		log.Printf("egllm: warming model cache; llama-completion output follows\n")
 		return shell.Run(
 			ctx,
 			// llama-completion shares llama-server's -hf cache layout; running it
@@ -124,20 +127,34 @@ func Runner() eg.ContainerRunner {
 // in which case the operation is run against that server as is.
 func With(model string, op eg.OpFn) eg.OpFn {
 	if overridden() {
-		return op
+		return func(ctx context.Context, o eg.Op) error {
+			log.Printf("egllm: using external endpoint %s, skipping server setup\n", Endpoint())
+			return phase("operation", op)(ctx, o)
+		}
 	}
 
 	rt := Runtime()
 	return func(ctx context.Context, o eg.Op) error {
 		return around(
 			eg.Sequential(
-				Pull(rt, model),
-				Serve(rt),
-				waitHealthy(rt, 10*time.Minute),
+				phase(fmt.Sprintf("pulling model %s (cache %s)", model, CacheDirectory("models")), Pull(rt, model)),
+				phase("starting llama-server.service", Serve(rt)),
+				phase(fmt.Sprintf("waiting for llama-server health at %s (timeout 10m)", DefaultEndpoint), waitHealthy(rt, 10*time.Minute)),
 			),
-			op,
-			Shutdown(rt),
+			phase("operation", op),
+			phase("stopping llama-server.service", Shutdown(rt)),
 		)(ctx, o)
+	}
+}
+
+// phase logs the start and completion, with the elapsed time, of an operation.
+func phase(name string, op eg.OpFn) eg.OpFn {
+	return func(ctx context.Context, o eg.Op) error {
+		log.Printf("egllm: %s: started\n", name)
+		start := time.Now()
+		err := op(ctx, o)
+		log.Printf("egllm: %s: completed in %v err=%v\n", name, time.Since(start), err)
+		return err
 	}
 }
 

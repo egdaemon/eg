@@ -12,6 +12,7 @@ import (
 	"log"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/iterx"
@@ -114,12 +115,26 @@ func (t Options) Run(g Generator) eg.OpFn {
 func (t option) run(g Generator) eg.OpFn {
 	seq := g.Seq()
 	op := func(ctx context.Context, _ eg.Op) error {
+		var passed, failed uint
+		started := time.Now()
 		for fn := range seq.Each(ctx) {
-			if err := t.generate(ctx, g, fn); err != nil {
+			log.Printf("autogentest [%d] %s:%s hits=%d started\n", passed+failed+1, fn.Path, fn.Name, fn.Hits)
+			fstart := time.Now()
+			ok, err := t.try(ctx, g, fn)
+			if err != nil {
+				log.Printf("autogentest %s:%s errored after %v: %v\n", fn.Path, fn.Name, time.Since(fstart), err)
 				return err
 			}
+
+			if ok {
+				passed++
+			} else {
+				failed++
+			}
+			log.Printf("autogentest %s:%s completed ok=%t in %v\n", fn.Path, fn.Name, ok, time.Since(fstart))
 		}
 
+		log.Printf("autogentest summary: selected=%d passed=%d failed=%d elapsed=%v\n", passed+failed, passed, failed, time.Since(started))
 		return seq.Err()
 	}
 
@@ -127,37 +142,50 @@ func (t option) run(g Generator) eg.OpFn {
 }
 
 func (t option) generate(ctx context.Context, g Generator, fn Fn) error {
+	_, err := t.try(ctx, g, fn)
+	return err
+}
+
+// try reports whether a verified result was produced for fn.
+func (t option) try(ctx context.Context, g Generator, fn Fn) (bool, error) {
 	prompt, err := g.Prompt(PromptContext{Fn: fn, Ensure: t.ensure})
 	if err != nil {
-		return err
+		return false, err
 	}
+	log.Printf("autogentest %s: prompt (%d bytes)\n%s\n", fn.Name, len(prompt), prompt)
 
-	for attempt := 1; attempt <= max(t.attempts, 1); attempt++ {
+	attempts := max(t.attempts, 1)
+	for attempt := 1; attempt <= attempts; attempt++ {
+		astart := time.Now()
+		log.Printf("autogentest %s attempt %d/%d started\n", fn.Name, attempt, attempts)
 		result, err := egllm.Generate(ctx, t.client, t.model, prompt)
 		if err != nil {
-			return err
+			return false, err
 		}
+		log.Printf("autogentest %s attempt %d/%d: model response (%d bytes) in %v\n%s\n", fn.Name, attempt, attempts, len(result), time.Since(astart), result)
 
 		if len(t.ensure) > 0 {
 			var ok bool
 			if result, ok, err = t.rework(ctx, prompt, result); err != nil {
-				return err
+				return false, err
 			} else if !ok {
-				log.Printf("autogentest %s attempt %d: discarding result violating rules\n", fn.Name, attempt)
+				log.Printf("autogentest %s attempt %d/%d: skipped, result violating rules\n", fn.Name, attempt, attempts)
 				continue
 			}
+			log.Printf("autogentest %s attempt %d/%d: rules satisfied, final result\n%s\n", fn.Name, attempt, attempts, result)
 		}
 
 		if err := g.Verify(ctx, fn, result); err != nil {
-			log.Printf("autogentest %s attempt %d: discarding failing result: %v\n", fn.Name, attempt, err)
+			log.Printf("autogentest %s attempt %d/%d: skipped, failing result after %v: %v\n", fn.Name, attempt, attempts, time.Since(astart), err)
 			continue
 		}
 
-		return nil
+		log.Printf("autogentest %s attempt %d/%d completed, passing result in %v\n", fn.Name, attempt, attempts, time.Since(astart))
+		return true, nil
 	}
 
-	log.Printf("autogentest %s: unable to generate a passing result\n", fn.Name)
-	return nil
+	log.Printf("autogentest %s:%s unable to generate a passing result after %d attempts\n", fn.Path, fn.Name, attempts)
+	return false, nil
 }
 
 const judgeTemplate = `
@@ -229,7 +257,12 @@ func (t option) judge(ctx context.Context, response string) ([]violation, error)
 		return nil, err
 	}
 
-	return parseViolations(judged, len(t.ensure))
+	violations, err := parseViolations(judged, len(t.ensure))
+	if err != nil {
+		log.Printf("autogentest unable to parse judge response:\n%s\n", judged)
+	}
+
+	return violations, err
 }
 
 // rework checks the generated response against the rules. violations are sent back to the model,
@@ -243,6 +276,7 @@ func (t option) rework(ctx context.Context, source string, generated string) (st
 			continue
 		}
 
+		log.Printf("autogentest round %d/%d: %d violations\n", round, t.revisions, len(violations))
 		if len(violations) == 0 {
 			return generated, true, nil
 		}
@@ -266,6 +300,7 @@ func (t option) rework(ctx context.Context, source string, generated string) (st
 		); err != nil {
 			return "", false, err
 		}
+		log.Printf("autogentest round %d/%d: violations\n%srevised response\n%s\n", round, t.revisions, described.String(), generated)
 	}
 
 	return "", false, nil

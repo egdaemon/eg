@@ -82,6 +82,7 @@ func TestNormalizeEnvIgnoresLaunchVariance(t *testing.T) {
 		"EG_COMPUTE_DEFAULT_GROUP=",
 		"EG_COMPUTE_TLS_INSECURE=false",
 		"EG_EXPERIMENTAL_BAREMETAL=true",
+		"GNUPGHOME=/eg.mnt/.gnupg",
 		"EG_GIT_AUTH_ACCESS_TOKEN=secret",
 		"EG_GIT_AUTH_HTTP_USERNAME=user",
 		"EG_GIT_AUTH_HTTP_PASSWORD=secret",

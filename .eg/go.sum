@@ -37,8 +37,7 @@ github.com/dustin/go-humanize v1.1.0 h1:dbKTrvD0klcbBV/h4AWJdMuZogJACoMlvWIWZ5b2
 github.com/dustin/go-humanize v1.1.0/go.mod h1:hc1CvRkJMsgxqjmjMQF3QNRAZBwY8AXBAzKYoSX9sFI=
 github.com/egdaemon/eg v0.0.0-20261021193502-1257c4c0a358 h1:Vpce4aDDXL+e9tzIxH4SmAsHuAYaEbkJFAgnsido1wI=
 github.com/egdaemon/eg v0.0.0-20261021193502-1257c4c0a358/go.mod h1:A7FIyrXOT0X5D8+utRDapqwSwKXJCoK8xjyW/5mqCiA=
-github.com/egdaemon/wasinet/wasinet v0.0.0-20261026191505-4dce83a5be12 h1:3J6u0uC5DFRpeAiZ9OZbr/FDmYD/boe46ENgCauAiko=
-github.com/egdaemon/wasinet/wasinet v0.0.0-20261026191505-4dce83a5be12/go.mod h1:2/G25/idU+fUZa8vElMrvgKi2RRkNM/0z0hHRsIfvkQ=
+github.com/egdaemon/wasinet/wasinet v0.0.0-20261027202319-9cfc20f44598 h1:VmTb24Bj8I8v0ce6a9P4elGL7Sxjp1O7DAXcNWx+ax4=
 github.com/envoyproxy/go-control-plane v0.14.0 h1:hbG2kr4RuFj222B6+7T83thSPqLjwBIfQawTkC++2HA=
 github.com/envoyproxy/go-control-plane/envoy v1.37.0 h1:u3riX6BoYRfF4Dr7dwSOroNfdSbEPe9Yyl09/B6wBrQ=
 github.com/envoyproxy/protoc-gen-validate v1.3.3 h1:MVQghNeW+LZcmXe7SY1V36Z+WFMDjpqGAGacLe2T0ds=

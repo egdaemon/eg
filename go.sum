@@ -296,10 +296,6 @@ github.com/egdaemon/gdx v0.0.0-20260824162813-84291833ef44 h1:8/KOTjSzVnx4IksPpg
 github.com/egdaemon/gdx v0.0.0-20260824162813-84291833ef44/go.mod h1:zXd9WfJPRaoir/hXAwJcf6AhbNB0r3vqIFqhZdMswFg=
 github.com/egdaemon/gdx/konggdx v0.0.0-20260824162813-84291833ef44 h1:WK7lQr+b6dvU21JaZ2lOd0p4kiv3k015ivk4i28Juao=
 github.com/egdaemon/gdx/konggdx v0.0.0-20260824162813-84291833ef44/go.mod h1:sxFiDGA2e8ATW1MfyDsiVv21OwmQLMjuA5XC8iwDp3k=
-github.com/egdaemon/wasinet v0.0.0-20261027202319-9cfc20f44598 h1:+cY5WExo8lCIqmoelKnolf68TgNS8Mr8c84k+P2++BE=
-github.com/egdaemon/wasinet v0.0.0-20261027202319-9cfc20f44598/go.mod h1:uRNi0/bT9BlwEUy7GBbIDcUAzxhfqida/BjNTBMIxqo=
-github.com/egdaemon/wasinet/wasinet v0.0.0-20261026191505-4dce83a5be12 h1:3J6u0uC5DFRpeAiZ9OZbr/FDmYD/boe46ENgCauAiko=
-github.com/egdaemon/wasinet/wasinet v0.0.0-20261026191505-4dce83a5be12/go.mod h1:2/G25/idU+fUZa8vElMrvgKi2RRkNM/0z0hHRsIfvkQ=
 github.com/egdaemon/wasinet/wasinet v0.0.0-20261027202319-9cfc20f44598 h1:VmTb24Bj8I8v0ce6a9P4elGL7Sxjp1O7DAXcNWx+ax4=
 github.com/egdaemon/wasinet/wasinet v0.0.0-20261027202319-9cfc20f44598/go.mod h1:2/G25/idU+fUZa8vElMrvgKi2RRkNM/0z0hHRsIfvkQ=
 github.com/egdaemon/wasinet/wazeronet v0.0.0-20260928194155-07f223337a8d h1:7Q86hXF6BAjqT28Xc9HTBi3Yyi6JzFTFP4QzfSuSnos=

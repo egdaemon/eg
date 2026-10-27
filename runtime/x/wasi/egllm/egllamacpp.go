@@ -77,6 +77,24 @@ func Pull(runtime shell.Command, model string) eg.OpFn {
 	}
 }
 
+// Install copies the embedded llama-server systemd unit into place, replacing any unit already
+// present, so the image doesn't need to provide one. run it before Serve.
+func Install(runtime shell.Command) eg.OpFn {
+	const unit = "llama-server.service"
+
+	return func(ctx context.Context, o eg.Op) error {
+		if err := egfs.CloneFS(ctx, egenv.EphemeralDirectory(), unit, skel); err != nil {
+			return err
+		}
+
+		return shell.Run(
+			ctx,
+			runtime.Newf("install -m 0644 %s /etc/systemd/system/%s", egenv.EphemeralDirectory(unit), unit).Privileged(),
+			runtime.New("systemctl daemon-reload").Privileged(),
+		)
+	}
+}
+
 func Serve(runtime shell.Command) eg.OpFn {
 	return func(ctx context.Context, o eg.Op) error {
 		return shell.Run(ctx, runtime.Newf("systemctl enable --now llama-server.service").Privileged())
@@ -100,6 +118,10 @@ func waitHealthy(runtime shell.Command, timeout time.Duration) eg.OpFn {
 			target, curl = "http://localhost/health", fmt.Sprintf("--unix-socket %s", path)
 		}
 
+		if path, ok := socketPath(Endpoint()); ok {
+			debugSocket(ctx, runtime, path)
+		}
+
 		// polling is paced by the runtime's retry limiter, see shell.Command.Retry.
 		ctx, done := context.WithTimeout(ctx, timeout)
 		defer done()
@@ -109,6 +131,24 @@ func waitHealthy(runtime shell.Command, timeout time.Duration) eg.OpFn {
 			curl,
 			target,
 		).Attempts(-1))
+	}
+}
+
+// debugSocket logs the state of the llama-server unix socket and its service before polling it.
+// failures are ignored, this is purely informational.
+func debugSocket(ctx context.Context, runtime shell.Command, path string) {
+	dir := filepath.Dir(path)
+	log.Printf("egllm: debugging unix socket %s\n", path)
+	for _, cmd := range []string{
+		fmt.Sprintf("id; ls -lad %s %s", dir, path),
+		fmt.Sprintf("ls -la %s", dir),
+		"systemctl cat llama-server.service --no-pager",
+		"systemctl status llama-server.service --no-pager -l",
+		"journalctl -u llama-server.service -n 20 --no-pager",
+	} {
+		if err := shell.Run(ctx, runtime.Newf("%s", cmd).Lenient(true).Attempts(1)); err != nil {
+			log.Printf("egllm: debug command failed: %s: %v\n", cmd, err)
+		}
 	}
 }
 
@@ -145,10 +185,11 @@ func With(model string, op eg.OpFn) eg.OpFn {
 	}
 
 	// the limiter paces the health polling, the other commands are not retried.
-	rt := Runtime().Retry(rate.NewLimiter(rate.Every(time.Second), 1))
+	rt := Runtime().Retry(rate.NewLimiter(rate.Every(5*time.Second), 1))
 	return func(ctx context.Context, o eg.Op) error {
 		return around(
 			eg.Sequential(
+				phase("installing llama-server.service", Install(rt)),
 				phase(fmt.Sprintf("pulling model %s (cache %s)", model, CacheDirectory("models")), Pull(rt, model)),
 				phase("starting llama-server.service", Serve(rt)),
 				phase(fmt.Sprintf("waiting for llama-server health at %s (timeout 10m)", Endpoint()), waitHealthy(rt, 10*time.Minute)),

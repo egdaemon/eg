@@ -44,7 +44,7 @@ func Migrate(ctx context.Context, db *sql.DB) error {
 
 // Open the database at path, creating its directory and applying the migrations. the caller closes it.
 // duckdb only allows a single process to have a database file open, share the returned handle
-// within the process.
+// within the process. use it for files with a single owner, i.e. the daemon's, see OpenLocked for the rest.
 func Open(ctx context.Context, path string) (*sql.DB, error) {
 	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
 		return nil, errorsx.Wrap(err, "unable to create the database directory")
@@ -55,7 +55,22 @@ func Open(ctx context.Context, path string) (*sql.DB, error) {
 		return nil, errorsx.Wrap(err, "unable to open the database")
 	}
 
-	if err = Migrate(ctx, db); err != nil {
+	return migrated(ctx, db)
+}
+
+// OpenLocked is Open for a database shared by concurrent commands: the command that connects first owns the file and
+// serves it to the others, see sharedconnector. the database recovers if the owner closes its database or exits,
+// the next connection takes the file over.
+func OpenLocked(ctx context.Context, path string) (*sql.DB, error) {
+	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+		return nil, errorsx.Wrap(err, "unable to create the database directory")
+	}
+
+	return migrated(ctx, sql.OpenDB(newsharedconnector(path)))
+}
+
+func migrated(ctx context.Context, db *sql.DB) (*sql.DB, error) {
+	if err := Migrate(ctx, db); err != nil {
 		errorsx.Log(db.Close())
 		return nil, err
 	}

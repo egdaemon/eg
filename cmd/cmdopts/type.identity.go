@@ -30,7 +30,7 @@ type Identity struct {
 
 // Store opens the local database, shared with the lan peers, the caller closes it.
 func (t *Identity) Store() (*sql.DB, error) {
-	db, err := migrations.Open(t.ctx, t.store)
+	db, err := migrations.OpenLocked(t.ctx, t.store)
 	if err != nil {
 		return nil, err
 	}

@@ -39,6 +39,11 @@ func FormatHex(m hash.Hash) string {
 	return hex.EncodeToString(m.Sum(nil))
 }
 
+// format md5 hash to a hex encoded string of at most n characters
+func FormatNHex(n int, m hash.Hash) string {
+	return FormatHex(m)[:min(n, hex.EncodedLen(m.Size()))]
+}
+
 // format hash to a base64 encoded string
 func FormatBase64(m hash.Hash) string {
 	return base64.RawURLEncoding.EncodeToString(m.Sum(nil))

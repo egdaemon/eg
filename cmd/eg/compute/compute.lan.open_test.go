@@ -18,10 +18,7 @@ import (
 
 func TestOpenLAN(t *testing.T) {
 	t.Run("the daemon's database is reached through the daemon while it runs", func(t *testing.T) {
-		// unix socket paths are length limited, keep the directory short.
-		runtime, err := os.MkdirTemp("", "eg")
-		require.NoError(t, err)
-		t.Cleanup(func() { _ = os.RemoveAll(runtime) })
+		runtime := t.TempDir()
 		t.Setenv("RUNTIME_DIRECTORY", runtime)
 
 		// the daemon holds the file open and serves it.
@@ -51,8 +48,29 @@ func TestOpenLAN(t *testing.T) {
 		require.Error(t, lan.PeerFindByID(t.Context(), db, "drop").Scan(&lan.Peer{}), "expired peers are purged through the proxy")
 	})
 
+	t.Run("commands share the client's database and recover when the first lets go", func(t *testing.T) {
+		runtime := t.TempDir()
+		t.Setenv("RUNTIME_DIRECTORY", runtime)
+
+		path := filepath.Join(t.TempDir(), migrations.CLI)
+		first, err := openlan(t.Context(), path, lan.DefaultTTL)
+		require.NoError(t, err)
+
+		second, err := openlan(t.Context(), path, lan.DefaultTTL)
+		require.NoError(t, err)
+		defer second.Close()
+
+		require.NoError(t, lan.PeerUpsert(t.Context(), first, langx.Clone(lan.Peer{}, lan.PeerOptionTestDefaults, lan.PeerOptionID("one"))).Scan(&lan.Peer{}))
+		require.NoError(t, lan.PeerFindByID(t.Context(), second, "one").Scan(&lan.Peer{}))
+
+		require.NoError(t, first.Close())
+
+		require.NoError(t, lan.PeerFindByID(t.Context(), second, "one").Scan(&lan.Peer{}))
+	})
+
 	t.Run("opens the file when the daemon is not running", func(t *testing.T) {
-		t.Setenv("RUNTIME_DIRECTORY", t.TempDir())
+		runtime := t.TempDir()
+		t.Setenv("RUNTIME_DIRECTORY", runtime)
 
 		dir := t.TempDir()
 		db, err := openlan(t.Context(), filepath.Join(dir, migrations.Daemon), lan.DefaultTTL)
@@ -64,6 +82,9 @@ func TestOpenLAN(t *testing.T) {
 	})
 
 	t.Run("defaults to the client's database", func(t *testing.T) {
+		runtime := t.TempDir()
+		t.Setenv("RUNTIME_DIRECTORY", runtime)
+
 		dir := t.TempDir()
 		t.Setenv("CACHE_DIRECTORY", dir)
 

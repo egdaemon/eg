@@ -29,7 +29,7 @@ type lanCmd struct {
 
 // openlan opens the database of the lan peers at the path, defaulting to the client's. the daemon holds its own
 // database open, duckdb only allows a single process to have a file open, so it is reached through the daemon
-// when it is running. expired peers are purged.
+// when it is running. otherwise the file is shared with the other commands using it (see migrations.OpenLocked). expired peers are purged.
 func openlan(ctx context.Context, database string, ttl time.Duration) (db *sql.DB, err error) {
 	if database == "" {
 		database = migrations.Path(migrations.CLI)
@@ -38,7 +38,7 @@ func openlan(ctx context.Context, database string, ttl time.Duration) (db *sql.D
 	if socket := userx.DefaultRuntimeDirectory(migrations.DatabaseSocketName); filepath.Base(database) == migrations.Daemon && fsx.FileExists(socket) {
 		db, err = sql.Open("duckproxy", socket)
 	} else {
-		db, err = migrations.Open(ctx, database)
+		db, err = migrations.OpenLocked(ctx, database)
 	}
 
 	if err != nil {

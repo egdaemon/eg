@@ -26,6 +26,7 @@ func TestIdentityAccount(t *testing.T) {
 
 	t.Run("explicit account wins without any lookup", func(t *testing.T) {
 		t.Setenv("CACHE_DIRECTORY", t.TempDir())
+		t.Setenv("RUNTIME_DIRECTORY", t.TempDir())
 		g := &cmdopts.Global{Context: context.Background(), AccountID: "explicit"}
 
 		// a nil client would panic if the network were used.
@@ -40,6 +41,7 @@ func TestIdentityAccount(t *testing.T) {
 
 	t.Run("explicit account is not overridden by the remembered account", func(t *testing.T) {
 		t.Setenv("CACHE_DIRECTORY", t.TempDir())
+		t.Setenv("RUNTIME_DIRECTORY", t.TempDir())
 		remember(t, signer, vcsuri, "remembered")
 
 		g := &cmdopts.Global{Context: context.Background(), AccountID: "explicit"}
@@ -50,6 +52,7 @@ func TestIdentityAccount(t *testing.T) {
 
 	t.Run("blank vcs uri is rejected", func(t *testing.T) {
 		t.Setenv("CACHE_DIRECTORY", t.TempDir())
+		t.Setenv("RUNTIME_DIRECTORY", t.TempDir())
 		g := &cmdopts.Global{Context: context.Background()}
 
 		_, err := g.Identity().Account(nil, signer, "")
@@ -58,6 +61,7 @@ func TestIdentityAccount(t *testing.T) {
 
 	t.Run("remembered account is used without a lookup", func(t *testing.T) {
 		t.Setenv("CACHE_DIRECTORY", t.TempDir())
+		t.Setenv("RUNTIME_DIRECTORY", t.TempDir())
 		remember(t, signer, vcsuri, "remembered")
 
 		g := &cmdopts.Global{Context: context.Background()}
@@ -69,6 +73,7 @@ func TestIdentityAccount(t *testing.T) {
 
 	t.Run("result is memoized", func(t *testing.T) {
 		t.Setenv("CACHE_DIRECTORY", t.TempDir())
+		t.Setenv("RUNTIME_DIRECTORY", t.TempDir())
 		remember(t, signer, vcsuri, "first")
 
 		g := &cmdopts.Global{Context: context.Background()}
@@ -86,7 +91,7 @@ func TestIdentityAccount(t *testing.T) {
 func remember(t *testing.T, signer ssh.Signer, vcsuri, account string) {
 	t.Helper()
 
-	db, err := migrations.Open(context.Background(), migrations.Path(migrations.CLI))
+	db, err := migrations.OpenLocked(context.Background(), migrations.Path(migrations.CLI))
 	require.NoError(t, err)
 	defer db.Close()
 	require.NoError(t, identity.Remember(context.Background(), db, signer, vcsuri, account))

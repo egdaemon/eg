@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	_eg "github.com/egdaemon/eg"
+	"github.com/egdaemon/eg/internal/md5x"
 	"github.com/egdaemon/eg/runtime/wasi/eg"
 	"github.com/egdaemon/eg/runtime/wasi/shell"
 	"github.com/stretchr/testify/require"
@@ -54,9 +55,9 @@ func noop(Changer) eg.OpFn {
 }
 
 func TestChange(t *testing.T) {
-	t.Run("relative paths are within the workspace and absolute paths are used as is", func(t *testing.T) {
+	t.Run("relative paths are within the workspace worktrees directory and absolute paths are used as is", func(t *testing.T) {
 		dir, _ := changefixture(t)
-		require.Equal(t, filepath.Join(dir, "wt"), Change("wt").dir)
+		require.Equal(t, filepath.Join(dir, ".eg", ".worktrees", md5x.String("wt")), Change("wt").dir)
 		require.Equal(t, "/abs/wt", Change("/abs/wt").dir)
 	})
 
@@ -276,7 +277,7 @@ func TestPush(t *testing.T) {
 
 		require.NoError(t, Push(c)(t.Context(), nil))
 
-		patch := filepath.Join(workspace, ".egpatch", "feature-x.patch")
+		patch := filepath.Join(workspace, ".eg", ".patches", md5x.String("feature/x")+".patch")
 		contents, err := os.ReadFile(patch)
 		require.NoError(t, err)
 		require.Contains(t, string(contents), "Subject: [PATCH 1/2] first")
@@ -301,7 +302,7 @@ func TestPush(t *testing.T) {
 		require.NoError(t, Commit(c, NewCommit("msg").Branch("feature/x"))(t.Context(), nil))
 		require.NoError(t, Push(c)(t.Context(), nil))
 
-		require.NoDirExists(t, filepath.Join(workspace, ".egpatch"))
+		require.NoDirExists(t, filepath.Join(workspace, ".eg", ".patches"))
 	})
 }
 

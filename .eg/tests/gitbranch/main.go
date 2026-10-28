@@ -1,12 +1,14 @@
 // Package gitbranch provides tests for eggit.Change, Commit and Push on the host and within a container.
-// when cloning is disabled (eg compute local) it verifies the patch written to the cache directory,
+// when cloning is disabled (eg compute local) it verifies the patch written to the workspace directory,
 // otherwise it verifies the branch was pushed to the remote and then removes it.
 package main
 
 import (
 	"context"
+	"crypto/md5"
 	"encoding/base64"
 	"errors"
+	"fmt"
 	"log"
 	"strings"
 
@@ -64,7 +66,9 @@ func verify(ctx context.Context, _ eg.Op) error {
 	branch := branchname()
 
 	if !env.Boolean(true, _eg.EnvUnsafeGitCloneEnabled) {
-		patch := egenv.WorkspaceDirectory(".egpatch",strings.ReplaceAll(branch, "/", "-")+".patch")
+		// md5 of the branch formatted as a uuid.
+		sum := md5.Sum([]byte(branch))
+		patch := egenv.WorkspaceDirectory(".eg", ".patches", fmt.Sprintf("%x-%x-%x-%x-%x", sum[0:4], sum[4:6], sum[6:8], sum[8:10], sum[10:])+".patch")
 		return shell.Run(ctx, shell.Newf("test -s %s", patch))
 	}
 
@@ -79,7 +83,7 @@ func verify(ctx context.Context, _ eg.Op) error {
 }
 
 func submit() eg.OpFn {
-	change := eggit.Change(egenv.EphemeralDirectory("gitbranch", env.String("local", _eg.EnvComputeRunID)))
+	change := eggit.Change(env.String("local", _eg.EnvComputeRunID))
 
 	return eg.Sequential(
 		egbug.Log("gitbranch initiated"),

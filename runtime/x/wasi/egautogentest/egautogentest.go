@@ -50,6 +50,8 @@ type PromptContext struct {
 	Fn Fn
 	// Ensure are the rules the result must satisfy.
 	Ensure []string
+	// Previous is the response of the attempt before this one for Fn, empty on the first attempt.
+	Previous string
 }
 
 // DefaultRevisions is the number of rework rounds used when none are specified.
@@ -173,8 +175,21 @@ func (t option) try(ctx context.Context, g Generator, fn Fn) (bool, error) {
 		judge.ensure = r.Rules(t.ensure...)
 	}
 
+	reprompt := func(previous string) (string, error) {
+		return g.Prompt(PromptContext{Fn: fn, Ensure: t.ensure, Previous: previous})
+	}
+
+	var previous string
 	attempts := max(t.attempts, 1)
 	for attempt := 1; attempt <= attempts; attempt++ {
+		if attempt > 1 {
+			// let the generator learn from the previous attempt.
+			if prompt, err = g.Prompt(PromptContext{Fn: fn, Ensure: t.ensure, Previous: previous}); err != nil {
+				return false, err
+			}
+			log.Printf("autogentest %s attempt %d/%d: prompt (%d bytes)\n%s\n", fn.Name, attempt, attempts, len(prompt), prompt)
+		}
+
 		astart := time.Now()
 		log.Printf("autogentest %s attempt %d/%d started\n", fn.Name, attempt, attempts)
 		result, err := t.llm.Do(ctx, egllm.Message{Role: "user", Content: prompt})
@@ -182,10 +197,11 @@ func (t option) try(ctx context.Context, g Generator, fn Fn) (bool, error) {
 			return false, err
 		}
 		log.Printf("autogentest %s attempt %d/%d: model response (%d bytes) in %v\n%s\n", fn.Name, attempt, attempts, len(result), time.Since(astart), result)
+		previous = result
 
 		if len(t.ensure) > 0 {
 			var ok bool
-			if result, ok, err = judge.rework(ctx, prompt, result); err != nil {
+			if result, ok, err = judge.rework(ctx, prompt, reprompt, result); err != nil {
 				return false, err
 			} else if !ok {
 				log.Printf("autogentest %s attempt %d/%d: skipped, result violating rules\n", fn.Name, attempt, attempts)
@@ -287,7 +303,9 @@ func (t option) judge(ctx context.Context, response string) ([]violation, error)
 // rework checks the generated response against the rules. violations are sent back to the model,
 // with the source material and the response it generated as context, to be reworked until the rules
 // hold or the revisions are exhausted. returns false if the rules still do not hold.
-func (t option) rework(ctx context.Context, source string, generated string) (string, bool, error) {
+// a revision can use apis the source never showed the model, so after each one the source is
+// rendered again by reprompt from the revision.
+func (t option) rework(ctx context.Context, source string, reprompt func(previous string) (string, error), generated string) (string, bool, error) {
 	for round := uint(0); round <= t.revisions; round++ {
 		violations, err := t.judge(ctx, generated)
 		if err != nil {
@@ -322,6 +340,10 @@ func (t option) rework(ctx context.Context, source string, generated string) (st
 			return "", false, err
 		}
 		log.Printf("autogentest round %d/%d: revised response\n%s\n", round, t.revisions, generated)
+
+		if source, err = reprompt(generated); err != nil {
+			return "", false, err
+		}
 	}
 
 	return "", false, nil

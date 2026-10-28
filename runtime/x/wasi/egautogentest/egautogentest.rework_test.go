@@ -10,12 +10,13 @@ import (
 
 func TestRework(t *testing.T) {
 	ensure := []string{"no helper functions are added"}
+	same := func(string) (string, error) { return "source", nil }
 
 	t.Run("keeps a response satisfying the rules without reworking it", func(t *testing.T) {
 		s := script(t, "")
 		o := option{ensure: ensure, revisions: 2, llm: s}
 
-		got, ok, err := o.rework(t.Context(), "source", "generated")
+		got, ok, err := o.rework(t.Context(), "source", same, "generated")
 		require.NoError(t, err)
 		require.True(t, ok)
 		require.Equal(t, "generated", got)
@@ -26,7 +27,7 @@ func TestRework(t *testing.T) {
 		s := script(t, violationrecord(1, 5, "helper is declared"), "reworked", "")
 		o := option{ensure: ensure, revisions: 2, llm: s}
 
-		got, ok, err := o.rework(t.Context(), "source", "generated")
+		got, ok, err := o.rework(t.Context(), "source", same, "generated")
 		require.NoError(t, err)
 		require.True(t, ok)
 		require.Equal(t, "reworked", got)
@@ -44,12 +45,31 @@ func TestRework(t *testing.T) {
 		require.Contains(t, s.requests[2][0].Content, "reworked")
 	})
 
+	t.Run("renders the source again from each revision", func(t *testing.T) {
+		v := violationrecord(1, 5, "helper is declared")
+		s := script(t, v, "reworked", v, "reworked again", "")
+		o := option{ensure: ensure, revisions: 2, llm: s}
+
+		var previous []string
+		reprompt := func(p string) (string, error) {
+			previous = append(previous, p)
+			return "source for " + p, nil
+		}
+
+		_, ok, err := o.rework(t.Context(), "source", reprompt, "generated")
+		require.NoError(t, err)
+		require.True(t, ok)
+		require.Equal(t, []string{"reworked", "reworked again"}, previous)
+		require.Equal(t, "source", s.requests[1][0].Content)
+		require.Equal(t, "source for reworked", s.requests[3][0].Content)
+	})
+
 	t.Run("fails once the revisions are exhausted", func(t *testing.T) {
 		v := violationrecord(1, 5, "helper is declared")
 		s := script(t, v, "reworked", v, "reworked again", v)
 		o := option{ensure: ensure, revisions: 2, llm: s}
 
-		_, ok, err := o.rework(t.Context(), "source", "generated")
+		_, ok, err := o.rework(t.Context(), "source", same, "generated")
 		require.NoError(t, err)
 		require.False(t, ok)
 		require.Len(t, s.requests, 5)
@@ -59,7 +79,7 @@ func TestRework(t *testing.T) {
 		s := script(t, violationrecord(1, 5, "helper is declared"))
 		o := option{ensure: ensure, llm: s}
 
-		_, ok, err := o.rework(t.Context(), "source", "generated")
+		_, ok, err := o.rework(t.Context(), "source", same, "generated")
 		require.NoError(t, err)
 		require.False(t, ok)
 		require.Len(t, s.requests, 1)
@@ -69,7 +89,7 @@ func TestRework(t *testing.T) {
 		s := script(t, "looks fine to me", "")
 		o := option{ensure: ensure, revisions: 2, llm: s}
 
-		_, ok, err := o.rework(t.Context(), "source", "generated")
+		_, ok, err := o.rework(t.Context(), "source", same, "generated")
 		require.NoError(t, err)
 		require.True(t, ok)
 		require.Len(t, s.requests, 2)
@@ -79,7 +99,7 @@ func TestRework(t *testing.T) {
 		s := script(t, "")
 		o := option{ensure: ensure, revisions: 2, llm: s}
 
-		_, _, err := o.rework(t.Context(), "source", "first\nsecond")
+		_, _, err := o.rework(t.Context(), "source", same, "first\nsecond")
 		require.NoError(t, err)
 
 		prompt := s.requests[0][0].Content

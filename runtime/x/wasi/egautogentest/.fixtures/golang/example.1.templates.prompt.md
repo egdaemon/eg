@@ -28,6 +28,22 @@ Greet(Account{Name: "world"})
 type Account struct {
 	Name string
 }
+
+package testing // import "testing"
+func AllocsPerRun(runs int, f func()) (avg float64)
+func Benchmark(f func(b *B)) BenchmarkResult
+func CoverMode() string
+func Coverage() float64
+func Init()
+func Main(matchString func(pat, str string) (bool, error), tests []InternalTest, benchmarks []InternalBenchmark, examples []InternalExample)
+func MainStart(deps testDeps, tests []InternalTest, benchmarks []InternalBenchmark, fuzzTargets []InternalFuzzTarget, examples []InternalExample) *M
+func RegisterCover(c Cover)
+func RunBenchmarks(matchString func(pat, str string) (bool, error), benchmarks []InternalBenchmark)
+func RunExamples(matchString func(pat, str string) (bool, error), examples []InternalExample) (ok bool)
+func RunTests(matchString func(pat, str string) (bool, error), tests []InternalTest) (ok bool)
+func Short() bool
+func Testing() bool
+func Verbose() bool
 ---------------------------------------------------    PACKAGE     ---------------------------------------------------
 the code block is in package sample and is not part of its public api, so your file must declare "package sample" and use it directly.
 ---------------------------------------------------  EXISTING TESTS ---------------------------------------------------

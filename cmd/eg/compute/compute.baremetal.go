@@ -17,6 +17,7 @@ import (
 	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/cmd/cmdopts"
 	"github.com/egdaemon/eg/compile"
+	"github.com/egdaemon/eg/duckpgwire"
 	"github.com/egdaemon/eg/duckproxyserver"
 	"github.com/egdaemon/eg/internal/bytesx"
 	"github.com/egdaemon/eg/internal/debugx"
@@ -191,6 +192,21 @@ func (t baremetal) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, hotswapbin
 		dpspath := filepath.Join(ws.RuntimeDir, eg.SocketAnalytics)
 		if err := duckproxyserver.ListenUnix(ctx, dpspath, dpsrv); err != nil && ctx.Err() == nil {
 			log.Println("duckproxy:", err)
+		}
+	}()
+
+	// postgres wire frontend for clients that aren't written in go. it is a client of the native server above.
+	pgdb, err := sql.Open("duckproxy", filepath.Join(ws.RuntimeDir, eg.SocketAnalytics))
+	if err != nil {
+		return errorsx.Wrap(err, "unable to create analytics pgwire")
+	}
+	defer pgdb.Close()
+
+	pgsrv := duckpgwire.New(pgdb, duckpgwire.WithAcquireTimeout(time.Minute))
+	go func() {
+		pgpath := filepath.Join(ws.RuntimeDir, eg.SocketAnalyticsPG)
+		if err := duckpgwire.ListenUnix(ctx, pgpath, pgsrv); err != nil && ctx.Err() == nil {
+			log.Println("duckpgwire:", err)
 		}
 	}()
 

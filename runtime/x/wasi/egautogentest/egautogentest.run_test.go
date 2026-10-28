@@ -39,7 +39,7 @@ type rulergen struct {
 	rules []string
 }
 
-func (t *rulergen) Rules(ensure []string) []string {
+func (t *rulergen) Rules(ensure ...string) []string {
 	return append(append([]string(nil), t.rules...), ensure...)
 }
 
@@ -49,7 +49,7 @@ func TestGenerate(t *testing.T) {
 	t.Run("verifies the response as is", func(t *testing.T) {
 		s := script(t, "package sample\n")
 		g := &fakegen{}
-		o := option{model: "m", client: s}
+		o := option{llm: s}
 
 		require.NoError(t, o.generate(t.Context(), g, fn))
 		require.Equal(t, []string{"package sample\n"}, g.verified)
@@ -59,7 +59,7 @@ func TestGenerate(t *testing.T) {
 	t.Run("gives the rules to the prompt", func(t *testing.T) {
 		s := script(t, "response", "")
 		g := &fakegen{}
-		o := option{model: "m", ensure: []string{"a", "b"}, client: s}
+		o := option{ensure: []string{"a", "b"}, llm: s}
 
 		require.NoError(t, o.generate(t.Context(), g, fn))
 		require.Equal(t, []string{"a", "b"}, g.ensured)
@@ -67,7 +67,7 @@ func TestGenerate(t *testing.T) {
 
 	t.Run("does not judge without rules", func(t *testing.T) {
 		s := script(t, "response")
-		o := option{model: "m", client: s}
+		o := option{llm: s}
 
 		require.NoError(t, o.generate(t.Context(), &fakegen{}, fn))
 		require.Len(t, s.requests, 1)
@@ -76,7 +76,7 @@ func TestGenerate(t *testing.T) {
 	t.Run("retries when verification fails, up to the attempts", func(t *testing.T) {
 		s := script(t, "one", "two", "three")
 		g := &fakegen{verifyfn: func(string) error { return errors.New("failing") }}
-		o := option{model: "m", attempts: 3, client: s}
+		o := option{attempts: 3, llm: s}
 
 		require.NoError(t, o.generate(t.Context(), g, fn))
 		require.Len(t, g.verified, 3)
@@ -93,7 +93,7 @@ func TestGenerate(t *testing.T) {
 			}
 			return nil
 		}}
-		o := option{model: "m", attempts: 3, client: s}
+		o := option{attempts: 3, llm: s}
 
 		require.NoError(t, o.generate(t.Context(), g, fn))
 		require.Len(t, g.verified, 2)
@@ -103,7 +103,7 @@ func TestGenerate(t *testing.T) {
 	t.Run("verifies the reworked response", func(t *testing.T) {
 		s := script(t, "dirty", violationrecord(1, 1, "dirty"), "clean", "")
 		g := &fakegen{}
-		o := option{model: "m", ensure: []string{"be clean"}, revisions: 1, client: s}
+		o := option{ensure: []string{"be clean"}, revisions: 1, llm: s}
 
 		require.NoError(t, o.generate(t.Context(), g, fn))
 		require.Equal(t, []string{"clean"}, g.verified)
@@ -112,7 +112,7 @@ func TestGenerate(t *testing.T) {
 	t.Run("judges against the rules of the generator as well as the given rules", func(t *testing.T) {
 		s := script(t, "response", "")
 		g := &rulergen{rules: []string{"keep the header"}}
-		o := option{model: "m", ensure: []string{"be clean"}, client: s}
+		o := option{ensure: []string{"be clean"}, llm: s}
 
 		require.NoError(t, o.generate(t.Context(), g, fn))
 		require.Len(t, s.requests, 2)
@@ -122,7 +122,7 @@ func TestGenerate(t *testing.T) {
 	t.Run("does not judge when only the generator has rules", func(t *testing.T) {
 		s := script(t, "response")
 		g := &rulergen{rules: []string{"keep the header"}}
-		o := option{model: "m", client: s}
+		o := option{llm: s}
 
 		require.NoError(t, o.generate(t.Context(), g, fn))
 		require.Len(t, s.requests, 1)
@@ -131,7 +131,7 @@ func TestGenerate(t *testing.T) {
 	t.Run("discards a response still violating the rules without verifying it", func(t *testing.T) {
 		s := script(t, "dirty", violationrecord(1, 1, "dirty"))
 		g := &fakegen{}
-		o := option{model: "m", ensure: []string{"be clean"}, client: s}
+		o := option{ensure: []string{"be clean"}, llm: s}
 
 		require.NoError(t, o.generate(t.Context(), g, fn))
 		require.Empty(t, g.verified)

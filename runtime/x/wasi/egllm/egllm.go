@@ -39,7 +39,10 @@ type llm struct {
 }
 
 func New() llm {
-	endpoint := Endpoint()
+	return newClient(Endpoint())
+}
+
+func newClient(endpoint string) llm {
 	c := &http.Client{}
 	if path, ok := socketPath(endpoint); ok {
 		c.Transport = socketTransport(path)

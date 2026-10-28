@@ -13,7 +13,7 @@ func TestRework(t *testing.T) {
 
 	t.Run("keeps a response satisfying the rules without reworking it", func(t *testing.T) {
 		s := script(t, "")
-		o := option{model: "m", ensure: ensure, revisions: 2, client: s}
+		o := option{ensure: ensure, revisions: 2, llm: s}
 
 		got, ok, err := o.rework(t.Context(), "source", "generated")
 		require.NoError(t, err)
@@ -24,7 +24,7 @@ func TestRework(t *testing.T) {
 
 	t.Run("sends the source and the generated response back with the violations", func(t *testing.T) {
 		s := script(t, violationrecord(1, 5, "helper is declared"), "reworked", "")
-		o := option{model: "m", ensure: ensure, revisions: 2, client: s}
+		o := option{ensure: ensure, revisions: 2, llm: s}
 
 		got, ok, err := o.rework(t.Context(), "source", "generated")
 		require.NoError(t, err)
@@ -47,7 +47,7 @@ func TestRework(t *testing.T) {
 	t.Run("fails once the revisions are exhausted", func(t *testing.T) {
 		v := violationrecord(1, 5, "helper is declared")
 		s := script(t, v, "reworked", v, "reworked again", v)
-		o := option{model: "m", ensure: ensure, revisions: 2, client: s}
+		o := option{ensure: ensure, revisions: 2, llm: s}
 
 		_, ok, err := o.rework(t.Context(), "source", "generated")
 		require.NoError(t, err)
@@ -57,7 +57,7 @@ func TestRework(t *testing.T) {
 
 	t.Run("zero revisions fails without reworking", func(t *testing.T) {
 		s := script(t, violationrecord(1, 5, "helper is declared"))
-		o := option{model: "m", ensure: ensure, client: s}
+		o := option{ensure: ensure, llm: s}
 
 		_, ok, err := o.rework(t.Context(), "source", "generated")
 		require.NoError(t, err)
@@ -67,7 +67,7 @@ func TestRework(t *testing.T) {
 
 	t.Run("an undecodable judgement uses a round", func(t *testing.T) {
 		s := script(t, "looks fine to me", "")
-		o := option{model: "m", ensure: ensure, revisions: 2, client: s}
+		o := option{ensure: ensure, revisions: 2, llm: s}
 
 		_, ok, err := o.rework(t.Context(), "source", "generated")
 		require.NoError(t, err)
@@ -77,7 +77,7 @@ func TestRework(t *testing.T) {
 
 	t.Run("numbers the rules and the response for the judge", func(t *testing.T) {
 		s := script(t, "")
-		o := option{model: "m", ensure: ensure, revisions: 2, client: s}
+		o := option{ensure: ensure, revisions: 2, llm: s}
 
 		_, _, err := o.rework(t.Context(), "source", "first\nsecond")
 		require.NoError(t, err)

@@ -25,6 +25,7 @@ import (
 	"github.com/egdaemon/eg/internal/coverage/golangcov"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/iterx"
+	"github.com/egdaemon/eg/runtime/wasi/egenv"
 	"github.com/egdaemon/eg/runtime/wasi/eggit"
 	"github.com/egdaemon/eg/runtime/wasi/shell"
 	"github.com/egdaemon/eg/runtime/x/wasi/eggolang"
@@ -36,7 +37,7 @@ rules:
 {{range .Ensure}}- {{.}}
 {{end}}
 --------------------------------------------------- STYLE EXAMPLES ---------------------------------------------------
-{{.Style}}
+{{.Templates}}
 --------------------------------------------------- USAGE EXAMPLES ---------------------------------------------------
 {{.Usage}}
 ---------------------------------------------------     TYPES      ---------------------------------------------------
@@ -71,7 +72,7 @@ var golangDefaultRules = []string{
 // golangPrompt is the data the golang prompt template is executed with.
 type golangPrompt struct {
 	PromptContext
-	Style        string
+	Templates    string
 	Usage        string
 	Types        string
 	Package      string // package name of the code block.
@@ -86,12 +87,13 @@ type golangPrompt struct {
 
 // golangOption is the resolved configuration of the Golang generator.
 type golangOption struct {
-	seq      iterx.Seq[Fn]
-	style    string
-	filename string
-	packages []string
-	pkgs     *pkgcache
-	callers  *callcache
+	seq       iterx.Seq[Fn]
+	templates []string
+	filename  string
+	dir       string
+	packages  []string
+	pkgs      *pkgcache
+	callers   *callcache
 }
 
 // DefaultGolangFilename is the pattern for the name of the file generated tests are written to.
@@ -117,10 +119,11 @@ func Golang(seq iterx.Seq[Fn]) GolangOptions {
 	}}
 }
 
-// Style sets an example test the generated tests should follow.
-func (t GolangOptions) Style(v string) GolangOptions {
+// Templates adds example tests the generated tests should follow. the packages they
+// import, and those imported by the function's source file and existing tests, are listed in the types block.
+func (t GolangOptions) Templates(v ...string) GolangOptions {
 	return append(t, func(o *golangOption) {
-		o.style = v
+		o.templates = append(o.templates, v...)
 	})
 }
 
@@ -136,6 +139,32 @@ func (t GolangOptions) Filename(pattern string) GolangOptions {
 	return append(t, func(o *golangOption) {
 		o.filename = pattern
 	})
+}
+
+// Directory sets the directory the function's sources are read from and the generated tests are written to,
+// e.g.) the worktree of an eggit.Change. defaults to the current directory.
+func (t GolangOptions) Directory(dir string) GolangOptions {
+	return append(t, func(o *golangOption) {
+		o.dir = dir
+	})
+}
+
+// rebase resolves the path of a function, which coverage reports relative to the workspace, against the configured directory.
+// absolute paths within the workspace are moved into the configured directory, other absolute paths are left alone.
+func (t golangOption) rebase(p string) string {
+	if filepath.IsAbs(p) {
+		rel, err := filepath.Rel(egenv.WorkspaceDirectory(), p)
+		if t.dir == "" || err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+			return p
+		}
+		p = rel
+	}
+
+	if t.dir == "" {
+		return p
+	}
+
+	return filepath.Join(t.dir, p)
 }
 
 // golangFilename resolves the file name pattern for fn.
@@ -170,10 +199,8 @@ func (t GolangOptions) Seq() iterx.Seq[Fn] {
 	return t.resolve().seq
 }
 
-var _ Ruler = GolangOptions(nil)
-
 // Rules are the default rules followed by the given rules, rules already among the defaults are not repeated.
-func (t GolangOptions) Rules(ensure []string) []string {
+func (t GolangOptions) Rules(ensure ...string) []string {
 	rules := slices.Clone(golangDefaultRules)
 	for _, rule := range ensure {
 		if !slices.Contains(rules, rule) {
@@ -186,6 +213,7 @@ func (t GolangOptions) Rules(ensure []string) []string {
 
 func (t GolangOptions) Prompt(c PromptContext) (string, error) {
 	o := t.resolve()
+	c.Fn.Path = o.rebase(c.Fn.Path)
 
 	pkg, err := o.pkgs.load(filepath.Dir(c.Fn.Path))
 	if err != nil {
@@ -202,7 +230,7 @@ func (t GolangOptions) Prompt(c PromptContext) (string, error) {
 		return "", errorsx.Wrap(err, "unable to render function")
 	}
 
-	c.Ensure = t.Rules(c.Ensure)
+	c.Ensure = t.Rules(c.Ensure...)
 
 	dest, existing, err := resolveTestFile(o, filepath.Dir(c.Fn.Path), c.Fn)
 	if err != nil {
@@ -221,12 +249,14 @@ func (t GolangOptions) Prompt(c PromptContext) (string, error) {
 		return "", err
 	}
 
+	discovered := discoverPackages(filepath.Dir(c.Fn.Path), o.packages, importsOf(pkg, decl, existing, o.templates))
+
 	var buf strings.Builder
 	if err := golangPromptTemplate.Execute(&buf, golangPrompt{
 		PromptContext: c,
-		Style:         o.style,
+		Templates:     strings.Join(o.templates, "\n\n"),
 		Usage:         usage,
-		Types:         strings.Join(nonEmpty(collectTypes(pkg, decl), apis), "\n\n"),
+		Types:         strings.Join(nonEmpty(collectTypes(pkg, decl), apis, discovered), "\n\n"),
 		Package:       pkg.name,
 		TestPackage:   testPackage,
 		ImportPath:    importpath,
@@ -247,6 +277,7 @@ func (t GolangOptions) Prompt(c PromptContext) (string, error) {
 // replaced once the generated test passes.
 func (t GolangOptions) Verify(ctx context.Context, fn Fn, artifact string) error {
 	o := t.resolve()
+	fn.Path = o.rebase(fn.Path)
 	dir := filepath.Dir(fn.Path)
 
 	pkg, err := o.pkgs.load(dir)

@@ -7,7 +7,7 @@ import (
 )
 
 func TestCollectUsage(t *testing.T) {
-	pkg, err := loadPackage(".fixtures/example.1")
+	pkg, err := loadPackage(".fixtures/golang/example.1")
 	require.NoError(t, err)
 
 	t.Run("renders the existing tests calling the function", func(t *testing.T) {

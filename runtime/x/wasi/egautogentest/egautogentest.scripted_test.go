@@ -1,56 +1,32 @@
 package egautogentest
 
 import (
-	"encoding/json"
+	"context"
+	"errors"
 	"fmt"
-	"io"
-	"net/http"
-	"net/http/httptest"
 	"testing"
 
 	"github.com/egdaemon/eg/runtime/x/wasi/egllm"
-	"github.com/stretchr/testify/require"
 )
 
-// scripted is an egllm.Client that answers each request with the next reply and records the messages sent.
+// scripted is an egllm.Judge that answers each request with the next reply and records the messages sent.
 type scripted struct {
-	srv      *httptest.Server
+	replies  []string
 	requests [][]egllm.Message
 }
 
-func (t *scripted) Do(r *http.Request) (*http.Response, error) {
-	return http.DefaultClient.Do(r)
+func (t *scripted) Do(_ context.Context, m ...egllm.Message) (string, error) {
+	t.requests = append(t.requests, m)
+
+	if len(t.requests) > len(t.replies) {
+		return "", errors.New("unexpected request")
+	}
+
+	return t.replies[len(t.requests)-1], nil
 }
 
-func (t *scripted) Host() string {
-	return t.srv.URL
-}
-
-func script(t *testing.T, replies ...string) *scripted {
-	s := &scripted{}
-	s.srv = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		raw, err := io.ReadAll(r.Body)
-		require.NoError(t, err)
-
-		var req struct {
-			Messages []egllm.Message `json:"messages"`
-		}
-		require.NoError(t, json.Unmarshal(raw, &req))
-		s.requests = append(s.requests, req.Messages)
-
-		if len(s.requests) > len(replies) {
-			http.Error(w, "unexpected request", http.StatusInternalServerError)
-			return
-		}
-
-		encoded, err := json.Marshal(map[string]any{"choices": []any{map[string]any{"message": map[string]string{"role": "assistant", "content": replies[len(s.requests)-1]}}}})
-		require.NoError(t, err)
-		_, err = w.Write(encoded)
-		require.NoError(t, err)
-	}))
-	t.Cleanup(s.srv.Close)
-
-	return s
+func script(_ *testing.T, replies ...string) *scripted {
+	return &scripted{replies: replies}
 }
 
 func violationrecord(rule int, line int, reason string) string {

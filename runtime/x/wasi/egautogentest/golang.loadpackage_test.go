@@ -8,7 +8,7 @@ import (
 
 func TestLoadPackage(t *testing.T) {
 	t.Run("loads the package name and every go file", func(t *testing.T) {
-		pkg, err := loadPackage(".fixtures/example.1")
+		pkg, err := loadPackage(".fixtures/golang/example.1")
 		require.NoError(t, err)
 		require.Equal(t, "sample", pkg.name)
 		require.Len(t, pkg.files, 2)

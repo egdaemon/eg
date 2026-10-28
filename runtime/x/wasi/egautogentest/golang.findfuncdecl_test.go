@@ -7,7 +7,7 @@ import (
 )
 
 func TestFindFuncDecl(t *testing.T) {
-	pkg, err := loadPackage(".fixtures/example.1")
+	pkg, err := loadPackage(".fixtures/golang/example.1")
 	require.NoError(t, err)
 
 	t.Run("finds a function", func(t *testing.T) {

@@ -64,7 +64,7 @@ func verify(ctx context.Context, _ eg.Op) error {
 	branch := branchname()
 
 	if !env.Boolean(true, _eg.EnvUnsafeGitCloneEnabled) {
-		patch := egenv.CacheDirectory("egpatches", strings.ReplaceAll(branch, "/", "-")+".patch")
+		patch := egenv.WorkspaceDirectory(".egpatch",strings.ReplaceAll(branch, "/", "-")+".patch")
 		return shell.Run(ctx, shell.Newf("test -s %s", patch))
 	}
 

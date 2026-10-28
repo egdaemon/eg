@@ -74,6 +74,16 @@ func TestChange(t *testing.T) {
 		require.Contains(t, gitOutput(t, dir, "worktree", "list"), c.dir)
 	})
 
+	t.Run("recreates a worktree whose directory was removed", func(t *testing.T) {
+		changefixture(t)
+		c := testchange(t)
+		require.NoError(t, c.ensure(t.Context()))
+		require.NoError(t, os.RemoveAll(c.dir))
+
+		require.NoError(t, c.ensure(t.Context()))
+		require.DirExists(t, c.dir)
+	})
+
 	t.Run("concurrent changes are isolated", func(t *testing.T) {
 		dir, remote := changefixture(t)
 		a, b := testchange(t), testchange(t)
@@ -252,9 +262,9 @@ func TestPush(t *testing.T) {
 
 	t.Run("writes a patch carrying the commit instead of pushing when cloning is disabled", func(t *testing.T) {
 		dir, remote := changefixture(t)
-		cache := t.TempDir()
+		workspace := t.TempDir()
 		t.Setenv(_eg.EnvUnsafeGitCloneEnabled, "false")
-		t.Setenv(_eg.EnvComputeCacheDirectory, cache)
+		t.Setenv(_eg.EnvComputeWorkspaceDirectory, workspace)
 		t.Setenv(_eg.EnvGitHeadCommitAuthor, "Jane Doe")
 		t.Setenv(_eg.EnvGitHeadCommitEmail, "jane@example.com")
 		c := testchange(t)
@@ -266,7 +276,7 @@ func TestPush(t *testing.T) {
 
 		require.NoError(t, Push(c)(t.Context(), nil))
 
-		patch := filepath.Join(cache, "egpatches", "feature-x.patch")
+		patch := filepath.Join(workspace, ".egpatch", "feature-x.patch")
 		contents, err := os.ReadFile(patch)
 		require.NoError(t, err)
 		require.Contains(t, string(contents), "Subject: [PATCH 1/2] first")
@@ -283,15 +293,15 @@ func TestPush(t *testing.T) {
 
 	t.Run("writes no patch without changes when cloning is disabled", func(t *testing.T) {
 		changefixture(t)
-		cache := t.TempDir()
+		workspace := t.TempDir()
 		t.Setenv(_eg.EnvUnsafeGitCloneEnabled, "false")
-		t.Setenv(_eg.EnvComputeCacheDirectory, cache)
+		t.Setenv(_eg.EnvComputeWorkspaceDirectory, workspace)
 		c := testchange(t)
 
 		require.NoError(t, Commit(c, NewCommit("msg").Branch("feature/x"))(t.Context(), nil))
 		require.NoError(t, Push(c)(t.Context(), nil))
 
-		require.NoDirExists(t, filepath.Join(cache, "egpatches"))
+		require.NoDirExists(t, filepath.Join(workspace, ".egpatch"))
 	})
 }
 

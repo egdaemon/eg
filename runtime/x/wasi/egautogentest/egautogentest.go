@@ -54,11 +54,10 @@ type PromptContext struct {
 const DefaultRevisions = 3
 
 type option struct {
-	model     string
 	attempts  int // number of generations to try per function, defaults to 1.
 	ensure    []string
 	revisions uint
-	client    egllm.Client
+	llm       egllm.Judge
 }
 
 // Option configures test generation.
@@ -69,7 +68,7 @@ type Option func(*option)
 // matches what the prompt asked for.
 type Ruler interface {
 	// Rules are all the rules the generator applies when it is given ensure.
-	Rules(ensure []string) []string
+	Rules(ensure ...string) []string
 }
 
 // Options is a chainable set of Option.
@@ -80,10 +79,10 @@ func New() Options {
 	return Options(nil)
 }
 
-// Model sets the model used to generate the tests.
-func (t Options) Model(v string) Options {
+// Judge sets the judge used to generate the tests, defaults to egllm.Echo.
+func (t Options) Judge(v egllm.Judge) Options {
 	return append(t, func(o *option) {
-		o.model = v
+		o.llm = v
 	})
 }
 
@@ -112,7 +111,7 @@ func (t Options) Revisions(n uint) Options {
 
 // Run generates tests with g subject to the options.
 func (t Options) Run(g Generator) eg.OpFn {
-	o := option{revisions: DefaultRevisions, client: egllm.New()}
+	o := option{revisions: DefaultRevisions, llm: egllm.Echo()}
 	for _, opt := range t {
 		opt(&o)
 	}
@@ -146,7 +145,11 @@ func (t option) run(g Generator) eg.OpFn {
 		return seq.Err()
 	}
 
-	return egllm.With(t.model, op)
+	if s, ok := t.llm.(egllm.Server); ok {
+		return s.With(op)
+	}
+
+	return op
 }
 
 func (t option) generate(ctx context.Context, g Generator, fn Fn) error {
@@ -165,14 +168,14 @@ func (t option) try(ctx context.Context, g Generator, fn Fn) (bool, error) {
 	// the judge needs to know every rule the prompt asked for, not only the ones given.
 	judge := t
 	if r, ok := g.(Ruler); ok {
-		judge.ensure = r.Rules(t.ensure)
+		judge.ensure = r.Rules(t.ensure...)
 	}
 
 	attempts := max(t.attempts, 1)
 	for attempt := 1; attempt <= attempts; attempt++ {
 		astart := time.Now()
 		log.Printf("autogentest %s attempt %d/%d started\n", fn.Name, attempt, attempts)
-		result, err := egllm.Generate(ctx, t.client, t.model, prompt)
+		result, err := t.llm.Do(ctx, egllm.Message{Role: "user", Content: prompt})
 		if err != nil {
 			return false, err
 		}
@@ -266,7 +269,7 @@ func (t option) judge(ctx context.Context, response string) ([]violation, error)
 		":response:", numbered.String(),
 	).Replace(judgeTemplate)
 
-	judged, err := egllm.Generate(ctx, t.client, t.model, prompt)
+	judged, err := t.llm.Do(ctx, egllm.Message{Role: "user", Content: prompt})
 	if err != nil {
 		return nil, err
 	}
@@ -308,10 +311,8 @@ func (t option) rework(ctx context.Context, source string, generated string) (st
 		revise := strings.NewReplacer(":violations:", described.String()).Replace(reviseTemplate)
 		log.Printf("autogentest round %d/%d: next prompt\n%s\n", round, t.revisions, revise)
 
-		if generated, err = egllm.Chat(
+		if generated, err = t.llm.Do(
 			ctx,
-			t.client,
-			t.model,
 			egllm.Message{Role: "user", Content: source},
 			egllm.Message{Role: "assistant", Content: generated},
 			egllm.Message{Role: "user", Content: revise},

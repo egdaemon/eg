@@ -178,12 +178,21 @@ func Runner() eg.ContainerRunner {
 // in which case the operation is run against that server as is.
 func With(model string, op eg.OpFn) eg.OpFn {
 	if overridden() {
-		return func(ctx context.Context, o eg.Op) error {
-			log.Printf("egllm: using external endpoint %s, skipping server setup\n", Endpoint())
-			return phase("operation", op)(ctx, o)
-		}
+		return external(Endpoint(), op)
 	}
 
+	return managed(model, op)
+}
+
+// external runs op against a server that isn't ours to manage.
+func external(endpoint string, op eg.OpFn) eg.OpFn {
+	return func(ctx context.Context, o eg.Op) error {
+		log.Printf("egllm: using external endpoint %s, skipping server setup\n", endpoint)
+		return phase("operation", op)(ctx, o)
+	}
+}
+
+func managed(model string, op eg.OpFn) eg.OpFn {
 	// the limiter paces the health polling, the other commands are not retried.
 	rt := Runtime().Retry(rate.NewLimiter(rate.Every(5*time.Second), 1))
 	return func(ctx context.Context, o eg.Op) error {

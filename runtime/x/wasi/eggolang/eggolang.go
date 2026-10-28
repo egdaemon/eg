@@ -303,6 +303,7 @@ func recordcoverage(ctx context.Context, covpath string, modules iter.Seq[string
 			return err
 		}
 
+		rep.Path = workspacepath(rep.Path)
 		batch = append(batch, rep)
 
 		if len(batch) == cap(batch) {
@@ -318,6 +319,21 @@ func recordcoverage(ctx context.Context, covpath string, modules iter.Seq[string
 	}
 
 	return nil
+}
+
+// workspacepath reports paths within the workspace relative to it, so they hold wherever the workspace is
+// located, e.g.) a git worktree. other paths are returned as is.
+func workspacepath(path string) string {
+	if !filepath.IsAbs(path) {
+		return path
+	}
+
+	rel, err := filepath.Rel(egenv.WorkspaceDirectory(), path)
+	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		return path
+	}
+
+	return rel
 }
 
 func CacheDirectory(dirs ...string) string {

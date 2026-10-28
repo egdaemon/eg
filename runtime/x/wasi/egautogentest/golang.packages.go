@@ -7,7 +7,9 @@ import (
 	"go/token"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
+	"strconv"
 	"strings"
 
 	"golang.org/x/mod/modfile"
@@ -183,4 +185,55 @@ func packageSignatures(dir string) (string, error) {
 	}
 
 	return strings.Join(lines, "\n"), nil
+}
+
+// importsOf lists the import paths of the templates, the file containing decl, and the existing test file.
+// sources that don't parse are skipped, templates are commonly a bare function without a package clause.
+func importsOf(pkg *gopkg, decl *ast.FuncDecl, existing []byte, templates []string) (imports []string) {
+	collect := func(f *ast.File) {
+		for _, spec := range f.Imports {
+			if v, err := strconv.Unquote(spec.Path.Value); err == nil {
+				imports = append(imports, v)
+			}
+		}
+	}
+
+	for _, src := range append([]string{string(existing)}, templates...) {
+		if !strings.HasPrefix(strings.TrimSpace(src), "package ") {
+			src = "package p\n" + src
+		}
+
+		if f, err := parser.ParseFile(token.NewFileSet(), "", src, parser.ImportsOnly|parser.SkipObjectResolution); err == nil {
+			collect(f)
+		}
+	}
+
+	for _, f := range pkg.files {
+		if decl.Pos() >= f.Pos() && decl.End() <= f.End() {
+			collect(f)
+		}
+	}
+
+	return imports
+}
+
+// discoverPackages renders the exported functions of the imports which can be located, skipping the
+// standard library, the package in fromdir, and the packages already explicitly requested.
+func discoverPackages(fromdir string, requested []string, imports []string) string {
+	skip := append(slices.Clone(requested), importPathOf(fromdir))
+	rendered := make([]string, 0, len(imports))
+	for _, importpath := range imports {
+		first, _, _ := strings.Cut(importpath, "/")
+		if !strings.Contains(first, ".") || slices.Contains(skip, importpath) {
+			continue
+		}
+
+		skip = append(skip, importpath)
+
+		if api, err := collectPackages(fromdir, []string{importpath}); err == nil {
+			rendered = append(rendered, api)
+		}
+	}
+
+	return strings.Join(rendered, "\n\n")
 }

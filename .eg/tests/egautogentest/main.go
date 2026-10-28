@@ -40,11 +40,11 @@ func main() {
 		eg.Module(
 			ctx,
 			egllm.Runner(),
-			egautogentest.New().Model(model).Attempts(3).Ensure(
+			egautogentest.New().Judge(egllm.LLamaCPP(model)).Attempts(3).Ensure(
 				"no helper functions are added",
 				"no global variables or setup code",
 				"you must not change non-test code",
-			).Run(egautogentest.Golang(seq).Style(style)),
+			).Run(egautogentest.Golang(seq).Templates(style)),
 		),
 	)
 

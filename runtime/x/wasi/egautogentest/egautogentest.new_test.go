@@ -3,6 +3,7 @@ package egautogentest
 import (
 	"testing"
 
+	"github.com/egdaemon/eg/runtime/x/wasi/egllm"
 	"github.com/stretchr/testify/require"
 )
 
@@ -24,8 +25,8 @@ func TestNew(t *testing.T) {
 	})
 
 	t.Run("applies chained options", func(t *testing.T) {
-		o := resolveOptions(New().Model("m").Attempts(3))
-		require.Equal(t, "m", o.model)
+		o := resolveOptions(New().Judge(egllm.Echo()).Attempts(3))
+		require.Equal(t, egllm.Echo(), o.llm)
 		require.Equal(t, 3, o.attempts)
 	})
 
@@ -42,8 +43,9 @@ func TestNew(t *testing.T) {
 	})
 
 	t.Run("chaining does not modify the receiver", func(t *testing.T) {
-		base := New().Model("a")
-		base.Model("b")
-		require.Equal(t, "a", resolveOptions(base).model)
+		a, b := &scripted{}, &scripted{}
+		base := New().Judge(a)
+		base.Judge(b)
+		require.Same(t, a, resolveOptions(base).llm)
 	})
 }

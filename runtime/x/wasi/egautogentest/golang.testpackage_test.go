@@ -17,15 +17,15 @@ func TestTestPackageOf(t *testing.T) {
 	}
 
 	examples := []example{
-		{name: "exported function", dir: ".fixtures/example.1", fn: "Greet", expected: "sample_test", importpath: "example.com/sample", external: true},
-		{name: "exported method of an exported type", dir: ".fixtures/example.1", fn: "Account.Rename", expected: "sample_test", importpath: "example.com/sample", external: true},
-		{name: "unexported function", dir: ".fixtures/example.2", fn: "quiet", expected: "sample"},
-		{name: "package within the module", dir: ".fixtures/example.3/api", fn: "Equal", expected: "api_test", importpath: "example.com/mod/api", external: true},
-		{name: "exported method of a generic type", dir: ".fixtures/example.5", fn: "Generic.Method", expected: "sample_test", importpath: "example.com/sample", external: true},
-		{name: "unexported method of an exported type", dir: ".fixtures/example.5", fn: "Public.hidden", expected: "sample"},
-		{name: "exported method of an unexported type", dir: ".fixtures/example.5", fn: "hiddenType.Method", expected: "sample"},
-		{name: "method of an unexported generic type", dir: ".fixtures/example.5", fn: "hiddenGeneric.Value", expected: "sample"},
-		{name: "unexported function beside exported ones", dir: ".fixtures/example.5", fn: "unexported", expected: "sample"},
+		{name: "exported function", dir: ".fixtures/golang/example.1", fn: "Greet", expected: "sample_test", importpath: "example.com/sample", external: true},
+		{name: "exported method of an exported type", dir: ".fixtures/golang/example.1", fn: "Account.Rename", expected: "sample_test", importpath: "example.com/sample", external: true},
+		{name: "unexported function", dir: ".fixtures/golang/example.2", fn: "quiet", expected: "sample"},
+		{name: "package within the module", dir: ".fixtures/golang/example.3/api", fn: "Equal", expected: "api_test", importpath: "example.com/mod/api", external: true},
+		{name: "exported method of a generic type", dir: ".fixtures/golang/example.5", fn: "Generic.Method", expected: "sample_test", importpath: "example.com/sample", external: true},
+		{name: "unexported method of an exported type", dir: ".fixtures/golang/example.5", fn: "Public.hidden", expected: "sample"},
+		{name: "exported method of an unexported type", dir: ".fixtures/golang/example.5", fn: "hiddenType.Method", expected: "sample"},
+		{name: "method of an unexported generic type", dir: ".fixtures/golang/example.5", fn: "hiddenGeneric.Value", expected: "sample"},
+		{name: "unexported function beside exported ones", dir: ".fixtures/golang/example.5", fn: "unexported", expected: "sample"},
 	}
 
 	for _, e := range examples {

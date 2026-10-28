@@ -10,6 +10,7 @@ import (
 	"github.com/egdaemon/eg/runtime/wasi/eggit"
 	"github.com/egdaemon/eg/runtime/wasi/shell"
 	"github.com/egdaemon/eg/runtime/x/wasi/egbug"
+	"github.com/egdaemon/eg/runtime/x/wasi/egdb"
 	"github.com/egdaemon/eg/runtime/x/wasi/eggolang"
 )
 
@@ -40,6 +41,8 @@ func main() {
 		egbug.Log("integration tests initiated"),
 		IntegrationTests,
 		egbug.Log("integration tests completed"),
+		// keep the analytics database of a successful run in the cache for the next run, see egdb.Latest.
+		egdb.Cache,
 	)
 
 	if err != nil {

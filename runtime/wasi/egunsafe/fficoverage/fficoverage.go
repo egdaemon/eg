@@ -71,3 +71,10 @@ func Sample(ctx context.Context, n int32, filters ...coverage.Filter) ([]coverag
 	results, err := sample(ctx, db, n, filters...)
 	return results, errorsx.Wrap(err, "unable to query sample coverage")
 }
+
+// WorstFrom is Worst reading the coverage recorded in q, e.g.) a database file opened with egdb.OpenFile, instead of
+// the analytics database.
+func WorstFrom(ctx context.Context, q sqlx.Queryer, n int32, filters ...coverage.Filter) ([]coverage.Report, error) {
+	results, err := worst(ctx, q, n, filters...)
+	return results, errorsx.Wrap(err, "unable to query worst coverage")
+}

@@ -19,6 +19,7 @@ import (
 	"github.com/egdaemon/eg/internal/iterx"
 	"github.com/egdaemon/eg/runtime/wasi/eg"
 	"github.com/egdaemon/eg/runtime/wasi/egunsafe/fficoverage"
+	"github.com/egdaemon/eg/runtime/x/wasi/egdb"
 	"github.com/egdaemon/eg/runtime/x/wasi/egllm"
 )
 
@@ -377,8 +378,49 @@ func ExcludePaths(globs ...string) coverage.Filter {
 
 // Worst scans recorded coverage for the n functions with the lowest hit counts, of those matching the filters.
 func Worst(n int, filters ...coverage.Filter) iterx.Seq[Fn] {
+	return functions(func(ctx context.Context) ([]coverage.Report, error) {
+		return fficoverage.Worst(ctx, int32(n), filters...)
+	})
+}
+
+// WorstFromWorkload is Worst reading the coverage recorded by the last successful run of the workload, e.g.)
+// eg.DefaultWorkload, instead of the coverage recorded by this run. the run is looked up, see egdb.Latest, while the
+// functions are selected, which fails when the workload has no successful run.
+func WorstFromWorkload(workload string, n int, filters ...coverage.Filter) iterx.Seq[Fn] {
+	return functions(func(ctx context.Context) ([]coverage.Report, error) {
+		path, err := egdb.Latest(ctx, egdb.WithWorkload(workload))
+		if err != nil {
+			return nil, err
+		}
+
+		return worstFromPath(ctx, path, n, filters...)
+	})
+}
+
+// WorstFromPath is Worst reading the coverage recorded in the database file at path, e.g.) the file provided by
+// egdb.Latest, instead of the coverage recorded by this run. the file is opened while the functions are selected.
+func WorstFromPath(path string, n int, filters ...coverage.Filter) iterx.Seq[Fn] {
+	return functions(func(ctx context.Context) ([]coverage.Report, error) {
+		return worstFromPath(ctx, path, n, filters...)
+	})
+}
+
+func worstFromPath(ctx context.Context, path string, n int, filters ...coverage.Filter) (_ []coverage.Report, err error) {
+	db, err := egdb.OpenFile(ctx, path)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		err = errors.Join(err, db.Close())
+	}()
+
+	return fficoverage.WorstFrom(ctx, db, int32(n), filters...)
+}
+
+// functions builds a Seq from the coverage reports.
+func functions(query func(context.Context) ([]coverage.Report, error)) iterx.Seq[Fn] {
 	return iterx.New(func(ctx context.Context, yield func(Fn) bool) error {
-		results, err := fficoverage.Worst(ctx, int32(n), filters...)
+		results, err := query(ctx)
 		if err != nil {
 			return err
 		}
@@ -410,18 +452,7 @@ func From(fns ...Fn) iterx.Seq[Fn] {
 
 // Sample returns a random sample of n functions from recorded coverage data, of those matching the filters.
 func Sample(n int, filters ...coverage.Filter) iterx.Seq[Fn] {
-	return iterx.New(func(ctx context.Context, yield func(Fn) bool) error {
-		results, err := fficoverage.Sample(ctx, int32(n), filters...)
-		if err != nil {
-			return err
-		}
-
-		for _, c := range results {
-			if !yield(Fn{Path: c.Path, Name: c.Fnname, Hits: int(c.Hits)}) {
-				return nil
-			}
-		}
-
-		return nil
+	return functions(func(ctx context.Context) ([]coverage.Report, error) {
+		return fficoverage.Sample(ctx, int32(n), filters...)
 	})
 }

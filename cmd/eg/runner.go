@@ -37,6 +37,7 @@ import (
 	"github.com/egdaemon/eg/internal/wasix"
 	"github.com/egdaemon/eg/interp"
 	"github.com/egdaemon/eg/interp/c8sproxy"
+	"github.com/egdaemon/eg/interp/dbproxy/dbservice"
 	"github.com/egdaemon/eg/interp/events"
 	"github.com/egdaemon/eg/interp/execproxy"
 	"github.com/egdaemon/eg/interp/runtime/wasi/ffiwasinet"
@@ -400,6 +401,7 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 		defer srv.GracefulStop()
 
 		events.NewServiceDispatch(db).Bind(srv)
+		dbservice.NewService(gctx.Context, t.RuntimeDir).Bind(srv)
 		execproxy.NewExecProxy(t.Dir, cmdenv).Bind(srv)
 
 		gpu, err := runners.AgentOptionGPU(envx.Boolean(false, eg.EnvComputeGPU))

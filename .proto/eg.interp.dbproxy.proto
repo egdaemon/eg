@@ -1,0 +1,28 @@
+syntax = "proto3";
+
+package eg.interp.dbproxy;
+
+message ServeRequest {
+  // path of the database file as the module sees it.
+  string path = 1;
+}
+
+message ServeResponse {
+  // name of the socket, within the runtime directory, serving the database.
+  string socket = 1;
+}
+
+message ReleaseRequest {
+  // path of the database file as given to Serve.
+  string path = 1;
+}
+
+message ReleaseResponse {}
+
+// Databases serves database files, separately from the analytics database, for modules.
+service Databases {
+  // Serve the database file read only, over its own socket. serving the same path again shares the socket.
+  rpc Serve(ServeRequest) returns (ServeResponse) {}
+  // Release the database file, once every Serve of the path has been released the socket is closed.
+  rpc Release(ReleaseRequest) returns (ReleaseResponse) {}
+}

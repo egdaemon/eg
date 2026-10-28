@@ -117,8 +117,15 @@ func PatternClean(pattern string) string {
 
 // substitute values in the provided pattern using the environment variable commit.
 // see commit.StringReplace for more details.
+func Pattern(s string) string {
+	return EnvCommit().StringReplace(s)
+}
+
+// substitute values in the provided pattern using the environment variable commit.
+//
+// Deprecated: use Pattern.
 func StringReplace(pattern string) string {
-	return EnvCommit().StringReplace(pattern)
+	return Pattern(pattern)
 }
 
 func EnvCanonicalURI() string {

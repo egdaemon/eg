@@ -43,7 +43,7 @@ func TestNew(t *testing.T) {
 	})
 
 	t.Run("chaining does not modify the receiver", func(t *testing.T) {
-		a, b := &scripted{}, &scripted{}
+		a, b := egllm.Constant(), egllm.Constant()
 		base := New().Judge(a)
 		base.Judge(b)
 		require.Same(t, a, resolveOptions(base).llm)

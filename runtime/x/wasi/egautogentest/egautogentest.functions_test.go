@@ -27,3 +27,13 @@ func TestFunctionsPaths(t *testing.T) {
 	require.NoError(t, seq.Err())
 	require.Equal(t, []string{"authn/authn.go", "authn/b.go", "/workload/other/c.go"}, paths)
 }
+
+func TestFromPaths(t *testing.T) {
+	t.Setenv(_eg.EnvComputeWorkingDirectory, "/workload/eg")
+
+	var paths []string
+	for fn := range From(Fn{Path: "/workload/eg/a.go"}, Fn{Path: "b.go"}, Fn{Path: "/other/c.go"}).Each(t.Context()) {
+		paths = append(paths, fn.Path)
+	}
+	require.Equal(t, []string{"a.go", "b.go", "/other/c.go"}, paths)
+}

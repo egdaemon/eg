@@ -480,10 +480,11 @@ func relativeTo(dir string, p string) string {
 
 // From builds a Seq directly from a fixed set of functions, useful for
 // driving a Generator without recorded coverage data (e.g. in tests or
-// one-off manual runs).
+// one-off manual runs). paths are made relative to the working directory like recorded coverage.
 func From(fns ...Fn) iterx.Seq[Fn] {
 	return iterx.New(func(ctx context.Context, yield func(Fn) bool) error {
 		for _, fn := range fns {
+			fn.Path = relativeTo(egenv.WorkingDirectory(), fn.Path)
 			if !yield(fn) {
 				return nil
 			}

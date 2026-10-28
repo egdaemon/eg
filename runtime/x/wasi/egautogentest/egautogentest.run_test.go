@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/egdaemon/eg/internal/iterx"
+	"github.com/egdaemon/eg/runtime/x/wasi/egllm"
 	"github.com/stretchr/testify/require"
 )
 
@@ -49,17 +50,17 @@ func TestGenerate(t *testing.T) {
 	fn := Fn{Name: "Greet"}
 
 	t.Run("verifies the response as is", func(t *testing.T) {
-		s := script(t, "package sample\n")
+		s := egllm.Constant("package sample\n")
 		g := &fakegen{}
 		o := option{llm: s}
 
 		require.NoError(t, o.generate(t.Context(), g, fn))
 		require.Equal(t, []string{"package sample\n"}, g.verified)
-		require.Equal(t, "prompt for Greet", s.requests[0][0].Content)
+		require.Equal(t, "prompt for Greet", s.Requests()[0][0].Content)
 	})
 
 	t.Run("gives the rules to the prompt", func(t *testing.T) {
-		s := script(t, "response", "")
+		s := egllm.Constant("response", "")
 		g := &fakegen{}
 		o := option{ensure: []string{"a", "b"}, llm: s}
 
@@ -68,25 +69,25 @@ func TestGenerate(t *testing.T) {
 	})
 
 	t.Run("does not judge without rules", func(t *testing.T) {
-		s := script(t, "response")
+		s := egllm.Constant("response")
 		o := option{llm: s}
 
 		require.NoError(t, o.generate(t.Context(), &fakegen{}, fn))
-		require.Len(t, s.requests, 1)
+		require.Len(t, s.Requests(), 1)
 	})
 
 	t.Run("retries when verification fails, up to the attempts", func(t *testing.T) {
-		s := script(t, "one", "two", "three")
+		s := egllm.Constant("one", "two", "three")
 		g := &fakegen{verifyfn: func(string) error { return errors.New("failing") }}
 		o := option{attempts: 3, llm: s}
 
 		require.NoError(t, o.generate(t.Context(), g, fn))
 		require.Len(t, g.verified, 3)
-		require.Len(t, s.requests, 3)
+		require.Len(t, s.Requests(), 3)
 	})
 
 	t.Run("gives only the previous response to the prompt of the retry", func(t *testing.T) {
-		s := script(t, "one", "two", "three")
+		s := egllm.Constant("one", "two", "three")
 		g := &fakegen{verifyfn: func(string) error { return errors.New("failing") }}
 		o := option{attempts: 3, llm: s}
 
@@ -95,7 +96,7 @@ func TestGenerate(t *testing.T) {
 	})
 
 	t.Run("stops retrying once verification passes", func(t *testing.T) {
-		s := script(t, "one", "two")
+		s := egllm.Constant("one", "two")
 		failed := false
 		g := &fakegen{verifyfn: func(string) error {
 			if !failed {
@@ -108,11 +109,11 @@ func TestGenerate(t *testing.T) {
 
 		require.NoError(t, o.generate(t.Context(), g, fn))
 		require.Len(t, g.verified, 2)
-		require.Len(t, s.requests, 2)
+		require.Len(t, s.Requests(), 2)
 	})
 
 	t.Run("verifies the reworked response", func(t *testing.T) {
-		s := script(t, "dirty", violationrecord(1, 1, "dirty"), "clean", "")
+		s := egllm.Constant("dirty", violationrecord(1, 1, "dirty"), "clean", "")
 		g := &fakegen{}
 		o := option{ensure: []string{"be clean"}, revisions: 1, llm: s}
 
@@ -122,26 +123,26 @@ func TestGenerate(t *testing.T) {
 	})
 
 	t.Run("judges against the rules of the generator as well as the given rules", func(t *testing.T) {
-		s := script(t, "response", "")
+		s := egllm.Constant("response", "")
 		g := &rulergen{rules: []string{"keep the header"}}
 		o := option{ensure: []string{"be clean"}, llm: s}
 
 		require.NoError(t, o.generate(t.Context(), g, fn))
-		require.Len(t, s.requests, 2)
-		require.Contains(t, s.requests[1][0].Content, "1. keep the header\n2. be clean\n")
+		require.Len(t, s.Requests(), 2)
+		require.Contains(t, s.Requests()[1][0].Content, "1. keep the header\n2. be clean\n")
 	})
 
 	t.Run("does not judge when only the generator has rules", func(t *testing.T) {
-		s := script(t, "response")
+		s := egllm.Constant("response")
 		g := &rulergen{rules: []string{"keep the header"}}
 		o := option{llm: s}
 
 		require.NoError(t, o.generate(t.Context(), g, fn))
-		require.Len(t, s.requests, 1)
+		require.Len(t, s.Requests(), 1)
 	})
 
 	t.Run("discards a response still violating the rules without verifying it", func(t *testing.T) {
-		s := script(t, "dirty", violationrecord(1, 1, "dirty"))
+		s := egllm.Constant("dirty", violationrecord(1, 1, "dirty"))
 		g := &fakegen{}
 		o := option{ensure: []string{"be clean"}, llm: s}
 

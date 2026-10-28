@@ -893,9 +893,6 @@ func (t statecompleted) Update(ctx context.Context) state {
 		return discard(t.workload, t.metadata, t.bucket, failure(t.metadata, errorsx.Wrap(t.cause, "work failed"), idle(t.metadata)))
 	}
 
-	// a failure to cache must not fail the completion.
-	errorsx.Log(errorsx.Wrap(cacheanalytics(t.ws, t.workload.Workload, analyticspath), "unable to cache analytics"))
-
 	return discard(t.workload, t.metadata, t.bucket, idle(t.metadata))
 }
 

@@ -167,6 +167,7 @@ func (t builtinLocal) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath)
 		runners.AgentOptionCommandLine("--env-file", environpath), // required for tty to work correctly in local mode.
 		runners.AgentOptionHostOS(),
 		runners.AgentOptionEnv(eg.EnvComputeRunID, uid.String()),
+		runners.AgentOptionEnv(eg.EnvComputeWorkloadName, t.Name),
 		runners.AgentOptionEnv(eg.EnvComputeLoggingVerbosity, strconv.Itoa(gctx.Verbosity)),
 	)
 

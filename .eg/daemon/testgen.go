@@ -9,6 +9,7 @@ import (
 	"github.com/egdaemon/eg/runtime/x/wasi/egautogentest"
 	"github.com/egdaemon/eg/runtime/x/wasi/egbug"
 	"github.com/egdaemon/eg/runtime/x/wasi/egfs"
+	"github.com/egdaemon/eg/runtime/x/wasi/eggolang"
 	"github.com/egdaemon/eg/runtime/x/wasi/egpool"
 )
 
@@ -23,7 +24,27 @@ const (
 // Testgen generates tests for the least covered functions as configured by opts, e.g.) the judge and the number
 // of attempts, and pushes them to a branch per function. the functions are generated concurrently,
 // each in its own worktree so they never write the same file.
+// the least covered functions are selected from the coverage recorded by the last successful run of the default
+// workload, instead of running the test suite again. see TestgenOld.
 func Testgen(opts egautogentest.Options) eg.OpFn {
+	return newpool(opts).Run(egautogentest.WorstFromWorkload(_eg.DefaultWorkload, count, egautogentest.Language("go")))
+}
+
+// TestgenOld is Testgen running the test suite and recording its coverage to select the functions, instead of loading
+// the coverage of the last successful run of the default workload, which requires a runner providing the database service.
+func TestgenOld(opts egautogentest.Options) eg.OpFn {
+	return eg.Sequential(
+		eggolang.AutoTest(),
+		egbug.Log("recording coverage initiated"),
+		eggolang.RecordCoverage,
+		egbug.Log("recording coverage completed"),
+		egbug.Log("egautogentest initiated"),
+		newpool(opts).Run(egautogentest.Worst(count, egautogentest.Language("go"))),
+	)
+}
+
+// newpool is the pool generating the tests of the functions it is given.
+func newpool(opts egautogentest.Options) egpool.Pool[egautogentest.Fn] {
 	opts = opts.Ensure(
 		"no helper functions are added",
 		"no global variables or setup code",
@@ -39,15 +60,12 @@ func Testgen(opts egautogentest.Options) eg.OpFn {
 			egfs.StringLazy(egenv.WorkingDirectory("cmd", "eg", "compute", "compute.lan.rm_test.go")),
 		)
 
-	pool := egpool.New(workers, func(fn egautogentest.Fn) eg.OpFn {
+	return egpool.New(workers, func(fn egautogentest.Fn) eg.OpFn {
 		// a relative path is a name, which eggit hashes into the worktree directory.
 		return eggit.Change("egautogen:" + fn.Path + ":" + fn.Name).Op(func(c eggit.Changer) eg.OpFn {
 			return testgen(c, fn, opts.Run(golang.Directory(c.Path()).From(egautogentest.From(fn))))
 		})
 	})
-
-	// the coverage recorded by the last successful run of the default workload, instead of running the test suite again.
-	return pool.Run(egautogentest.WorstFromWorkload(_eg.DefaultWorkload, count, egautogentest.Language("go")))
 }
 
 // testgen runs the op generating the tests of a function and pushes them to their own branch.

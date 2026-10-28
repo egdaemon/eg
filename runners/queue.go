@@ -811,6 +811,7 @@ func (t staterunning) Update(ctx context.Context) state {
 	options = append(options,
 		"--env", fmt.Sprintf("%s=%s", eg.EnvComputeInitiatedTimestamp, ts.UTC().Format(time.RFC3339Nano)),
 		"--env", fmt.Sprintf("%s=%s", eg.EnvComputeWorkload, t.workload.Entry),
+		"--env", fmt.Sprintf("%s=%s", eg.EnvComputeWorkloadName, t.workload.Workload),
 	)
 	// TODO REVISIT using t.ws.RuntimeDir as moduledir.
 	// a failure to watch means the workload cannot be cancelled, it should still run.
@@ -891,6 +892,9 @@ func (t statecompleted) Update(ctx context.Context) state {
 	if t.cause != nil {
 		return discard(t.workload, t.metadata, t.bucket, failure(t.metadata, errorsx.Wrap(t.cause, "work failed"), idle(t.metadata)))
 	}
+
+	// a failure to cache must not fail the completion.
+	errorsx.Log(errorsx.Wrap(cacheanalytics(t.ws, t.workload.Workload, analyticspath), "unable to cache analytics"))
 
 	return discard(t.workload, t.metadata, t.bucket, idle(t.metadata))
 }

@@ -185,6 +185,7 @@ func (t builtinUpload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, find l
 		AccountId:   aid,
 		Description: fmt.Sprintf("builtin workload - %s", t.Name),
 		Entry:       filepath.Join(ws.Module, filepath.Base(entry.Path)),
+		Workload:    t.Name,
 		Ttl:         uint64(t.RuntimeResources.TTL.Milliseconds()),
 		Cores:       t.RuntimeResources.Cores,
 		Memory:      uint64(t.RuntimeResources.Memory),

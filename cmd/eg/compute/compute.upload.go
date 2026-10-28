@@ -184,6 +184,7 @@ func (t upload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, find libp2px.
 		Id:          uuid.Must(uuid.NewV7()).String(),
 		AccountId:   aid,
 		Entry:       filepath.Join(ws.Module, filepath.Base(entry.Path)),
+		Workload:    t.Name,
 		Ttl:         uint64(t.RuntimeResources.TTL.Milliseconds()),
 		Cores:       t.RuntimeResources.Cores,
 		Memory:      uint64(t.RuntimeResources.Memory),

@@ -51,6 +51,7 @@ func TestNormalizeEnvIgnoresLaunchVariance(t *testing.T) {
 		"EG_GIT_BASE_VCS=git@github.com:egdaemon/eg.git",
 		"EG_COMPUTE_TTL=166666h40m0s",
 		"EG_COMPUTE_WORKLOAD=main.wasm",
+		"EG_COMPUTE_WORKLOAD_NAME=foo",
 		"EG_COMPUTE_WORKSPACE_DIRECTORY=/workload/eg/.eg.workload/90cb0d5c/.eg.workspace",
 		"EG_GIT_BASE_URI=https://github.com/egdaemon/eg.git",
 		"EG_GIT_HEAD_URI=https://github.com/egdaemon/eg.git",

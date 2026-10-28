@@ -73,6 +73,7 @@ const (
 	EnvComputeVCS                = "EG_COMPUTE_VCS_URI"                         // vcs uri for the compute workload
 	EnvComputeTTL                = "EG_COMPUTE_TTL"                             // deadline for compute workload
 	EnvComputeWorkload           = "EG_COMPUTE_WORKLOAD"                        // entry path of the workload being run.
+	EnvComputeWorkloadName       = "EG_COMPUTE_WORKLOAD_NAME"                   // module the workload runs (folder name within the module directory), blank for the default workload.
 	EnvComputeInitiatedTimestamp = "EG_COMPUTE_INITIATED_TIMESTAMP"             // RFC3339Nano UTC instant the billed run duration starts at.
 	EnvComputeArch               = "EG_COMPUTE_HOST_ARCH"                       // host machine cpu architecture
 	EnvComputeOS                 = "EG_COMPUTE_HOST_OS"                         // host machine operating system
@@ -154,6 +155,7 @@ const (
 const (
 	DefaultUsername    = "egd" // workload username
 	WorkingDirectory   = "eg"
+	DefaultWorkload    = "default" // name of the default workload, used where the entry path is blank.
 	MountDirectory     = "eg.mnt"
 	WorkloadDirectory  = ".eg.workload"
 	CacheDirectory     = ".eg.cache"     // persistent cache between workloads
@@ -165,6 +167,9 @@ const (
 	EnvironFile        = "environ.env"
 	SocketControl      = "control.socket"
 	SocketAnalytics    = "analytics.socket"
+	// AnalyticsCacheRequest is the file a workload creates in the runtime directory to request that its analytics database is
+	// copied into the cache directory when the workload succeeds, see AnalyticsCachePath.
+	AnalyticsCacheRequest = "analytics.cache"
 )
 
 // generate unique module socket
@@ -174,6 +179,19 @@ func SocketModule() string {
 
 func DefaultModuleDirectory(rel ...string) string {
 	return filepath.Join(filepath.Join(rel...), ".eg")
+}
+
+// AnalyticsCachePath is the path relative to the cache directory of the analytics database of the last successful
+// run of the workload (module name), blank workloads are the default workload.
+// e.g.) AnalyticsCachePath("main.wasm") -> ".eg/main.wasm/latest.db"
+func AnalyticsCachePath(workload string) string {
+	// rooting the path before cleaning prevents the workload from escaping the module directory.
+	name := strings.Trim(filepath.Clean(filepath.Join("/", workload)), "/")
+	if name == "" {
+		name = DefaultWorkload
+	}
+
+	return filepath.Join(DefaultModuleDirectory(), name, "latest.db")
 }
 
 func DefaultCacheDirectory(rel ...string) string {

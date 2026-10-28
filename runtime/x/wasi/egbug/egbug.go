@@ -214,6 +214,7 @@ func normalizeEnv(environ *envx.Builder) *envx.Builder {
 	environ.Setenv(_eg.EnvComputeGPU, "false")
 	environ.Setenv(_eg.EnvComputeTTL, "0s")
 	environ.Setenv(_eg.EnvComputeWorkload, "")
+	environ.Unsetenv(_eg.EnvComputeWorkloadName) // not part of default.env, removed so the digest is unchanged.
 	environ.Setenv(_eg.EnvComputeProfileMode, "")
 	environ.Setenv(_eg.EnvComputeWorkspaceDirectory, _eg.DefaultWorkspaceDirectory())
 	environ.Setenv(_eg.EnvGitBaseURI, _eg.DefaultWorkingDirectory())

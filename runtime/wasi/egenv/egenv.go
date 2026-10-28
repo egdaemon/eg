@@ -53,6 +53,12 @@ func Workload() string {
 	return env.String("", eg.EnvComputeWorkload)
 }
 
+// Read the name of the workload (the module it runs, i.e. the folder name within the module directory)
+// from the environment, empty for the default workload (see eg.DefaultWorkload).
+func WorkloadName() string {
+	return env.String("", eg.EnvComputeWorkloadName)
+}
+
 // returns the current user.
 func User() *user.User {
 	return userx.CurrentUserOrDefault(userx.Root())

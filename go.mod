@@ -24,6 +24,7 @@ require (
 	github.com/egdaemon/wasinet/wazeronet v0.0.0-20260928194155-07f223337a8d
 	github.com/fsnotify/fsnotify v1.10.1
 	github.com/go-git/go-git/v6 v6.0.0-beta.1
+	github.com/gofrs/flock v0.12.1
 	github.com/gofrs/uuid/v5 v5.5.1
 	github.com/golang-jwt/jwt/v4 v4.5.2
 	github.com/google/uuid v1.6.0

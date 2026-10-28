@@ -426,6 +426,12 @@ func recover(_ context.Context, md metadata) error {
 			return nil
 		}
 
+		// cancelled workloads must not come back after a restart.
+		if IsCancelled(filepath.Join(md.dirs.Running, d.Name())) {
+			errorsx.Log(errorsx.Wrap(md.dirs.Discard(filepath.Join(md.dirs.Running, d.Name())), "failed to clear cancelled workload"))
+			return fs.SkipDir
+		}
+
 		// reset the working directory prior to restarting.
 		if err = os.RemoveAll(filepath.Join(md.dirs.Running, d.Name(), workdirname)); err != nil {
 			return err
@@ -479,6 +485,13 @@ func beginwork(ctx context.Context, md metadata, dir string) state {
 	)
 
 	log.Println("initializing runner", dir)
+
+	// cancelled while queued, the control plane already holds the outcome.
+	if IsCancelled(dir) {
+		log.Println("workload cancelled before starting, discarding", dir)
+		errorsx.Log(errorsx.Wrap(md.dirs.Discard(dir), "failed to clear cancelled workload"))
+		return idle(md)
+	}
 
 	if encoded, err = os.ReadFile(filepath.Join(dir, "metadata.json")); err != nil {
 		errorsx.Log(errorsx.Wrap(md.dirs.Discard(dir), "failed to clear invalid workload"))
@@ -800,7 +813,18 @@ func (t staterunning) Update(ctx context.Context) state {
 		"--env", fmt.Sprintf("%s=%s", eg.EnvComputeWorkload, t.workload.Entry),
 	)
 	// TODO REVISIT using t.ws.RuntimeDir as moduledir.
-	err = c8sproxy.PodmanModule(ctx, prepcmd, "eg", fmt.Sprintf("eg-%s", t.ragent.id), t.ws.RuntimeDir, options...)
+	// a failure to watch means the workload cannot be cancelled, it should still run.
+	wctx, stopwatch, err := watchcancel(ctx, t.dir)
+	if err != nil {
+		log.Println("workload cannot be cancelled", err)
+	}
+	defer stopwatch()
+
+	err = c8sproxy.PodmanModule(wctx, prepcmd, "eg", fmt.Sprintf("eg-%s", t.ragent.id), t.ws.RuntimeDir, options...)
+	if errors.Is(context.Cause(wctx), ErrCancelled) {
+		err = ErrCancelled
+	}
+
 	return completed(t.workload, t.metadata, t.bucket, t.ws, time.Since(ts), err)
 }
 
@@ -850,6 +874,12 @@ func (t statecompleted) Update(ctx context.Context) state {
 	defer done()
 
 	t.record(ctx, logpath)
+
+	// cancelled workloads were already completed by the control plane, there is nothing to upload.
+	if errors.Is(t.cause, ErrCancelled) {
+		log.Println("workload cancelled", t.workload.Id)
+		return discard(t.workload, t.metadata, t.bucket, idle(t.metadata))
+	}
 
 	if err = t.metadata.completion.Upload(ctx, t.workload.Id, t.duration, t.cause, logs, analytics); httpx.IsStatusError(err, http.StatusNotFound) != nil {
 		// means we already uploaded the results.

@@ -45,6 +45,10 @@ func HTTP(global *cmdopts.Global, httpl net.Listener, rm *runners.ResourceManage
 	// http.logs.go for the (independently testable) handler implementation.
 	httpmux.Handle("/c/logs/{id}", alice.New(httpx.RouteInvoked, apigate).Then(NewLogsHandler())).Methods(http.MethodGet)
 
+	// POST /c/cancel/{id} cancels a workload, authorized by the same log token as GET /c/logs/{id},
+	// pushed by the control plane. See http.cancel.go for the (independently testable) handler implementation.
+	httpmux.Handle("/c/cancel/{id}", alice.New(httpx.RouteInvoked, apigate).Then(NewCancelHandler())).Methods(http.MethodPost)
+
 	// GET /c/history/{id} and GET /c/history/{id}/logs report the recorded result and logs of a workload this
 	// runner completed, authorized by the same log token. See computeapi for the (independently testable) implementation.
 	historyr := httpmux.PathPrefix("/c/history").Subrouter()

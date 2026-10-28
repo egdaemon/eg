@@ -61,4 +61,17 @@ func TestGolangPackages(t *testing.T) {
 		require.NoError(t, err)
 		require.Contains(t, prompt, "func Vendored(name string) string")
 	})
+
+	t.Run("discovers packages imported by earlier attempts", func(t *testing.T) {
+		prompt, err := Golang(From(fn)).Prompt(PromptContext{Fn: fn, Previous: "package x_test\n\nimport \"example.com/mod/api\"\n\nvar _ = api.Zero[int]"})
+		require.NoError(t, err)
+		require.Contains(t, prompt, "package api // import \"example.com/mod/api\"\n")
+	})
+
+	t.Run("discovers standard library packages", func(t *testing.T) {
+		prompt, err := Golang(From(fn)).Prompt(PromptContext{Fn: fn, Previous: "package x_test\n\nimport \"crypto/ed25519\"\n\nvar _ = ed25519.GenerateKey"})
+		require.NoError(t, err)
+		require.Contains(t, prompt, "package ed25519 // import \"crypto/ed25519\"\n")
+		require.Contains(t, prompt, "func GenerateKey(random io.Reader) (PublicKey, PrivateKey, error)")
+	})
 }

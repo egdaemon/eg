@@ -7,6 +7,7 @@ import (
 	"go/token"
 	"os"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"sort"
 	"strconv"
@@ -40,9 +41,15 @@ func collectPackages(fromdir string, importpaths []string) (string, error) {
 	return strings.Join(rendered, "\n\n"), nil
 }
 
-// resolvePackage finds the directory of the package, looking in the module containing
-// fromdir, then the module's vendor directory, then the module cache.
+// resolvePackage finds the directory of the package, looking in the standard library, the module
+// containing fromdir, then the module's vendor directory, then the module cache.
 func resolvePackage(fromdir string, importpath string) (string, error) {
+	if first, _, _ := strings.Cut(importpath, "/"); !strings.Contains(first, ".") {
+		if dir := filepath.Join(envx.String(runtime.GOROOT(), "GOROOT"), "src", filepath.FromSlash(importpath)); isDir(dir) {
+			return dir, nil
+		}
+	}
+
 	root, err := findModuleRoot(fromdir)
 	if err != nil {
 		return "", err
@@ -208,14 +215,13 @@ func importsOf(pkg *gopkg, decl *ast.FuncDecl, existing []byte, templates []stri
 	return imports
 }
 
-// discoverPackages renders the exported functions of the imports which can be located, skipping the
-// standard library and the package in fromdir.
+// discoverPackages renders the exported functions of the imports which can be located, skipping
+// the package in fromdir.
 func discoverPackages(fromdir string, imports []string) string {
 	skip := []string{importPathOf(fromdir)}
 	rendered := make([]string, 0, len(imports))
 	for _, importpath := range imports {
-		first, _, _ := strings.Cut(importpath, "/")
-		if !strings.Contains(first, ".") || slices.Contains(skip, importpath) {
+		if slices.Contains(skip, importpath) {
 			continue
 		}
 

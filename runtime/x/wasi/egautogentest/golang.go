@@ -299,7 +299,7 @@ func (t GolangOptions) Prompt(c PromptContext) (string, error) {
 		return "", err
 	}
 
-	discovered := discoverPackages(filepath.Dir(c.Fn.Path), importsOf(pkg, decl, existing, templates))
+	discovered := discoverPackages(filepath.Dir(c.Fn.Path), importsOf(pkg, decl, existing, append(slices.Clone(templates), c.Previous)))
 
 	var buf strings.Builder
 	if err := golangPromptTemplate.Execute(&buf, golangPrompt{

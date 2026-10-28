@@ -13,6 +13,7 @@ type fakegen struct {
 	seq      iterx.Seq[Fn]
 	ensured  []string
 	verified []string
+	previous []string
 	verifyfn func(artifact string) error
 }
 
@@ -22,6 +23,7 @@ func (t *fakegen) Seq() iterx.Seq[Fn] {
 
 func (t *fakegen) Prompt(c PromptContext) (string, error) {
 	t.ensured = c.Ensure
+	t.previous = append(t.previous, c.Previous)
 	return "prompt for " + c.Fn.Name, nil
 }
 
@@ -83,6 +85,15 @@ func TestGenerate(t *testing.T) {
 		require.Len(t, s.requests, 3)
 	})
 
+	t.Run("gives only the previous response to the prompt of the retry", func(t *testing.T) {
+		s := script(t, "one", "two", "three")
+		g := &fakegen{verifyfn: func(string) error { return errors.New("failing") }}
+		o := option{attempts: 3, llm: s}
+
+		require.NoError(t, o.generate(t.Context(), g, fn))
+		require.Equal(t, []string{"", "one", "two"}, g.previous)
+	})
+
 	t.Run("stops retrying once verification passes", func(t *testing.T) {
 		s := script(t, "one", "two")
 		failed := false
@@ -107,6 +118,7 @@ func TestGenerate(t *testing.T) {
 
 		require.NoError(t, o.generate(t.Context(), g, fn))
 		require.Equal(t, []string{"clean"}, g.verified)
+		require.Equal(t, []string{"", "clean"}, g.previous)
 	})
 
 	t.Run("judges against the rules of the generator as well as the given rules", func(t *testing.T) {

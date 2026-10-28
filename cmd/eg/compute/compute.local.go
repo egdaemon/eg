@@ -137,6 +137,7 @@ func (t local) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err e
 		Var(eg.EnvComputeRuntimeDirectory, eg.DefaultRuntimeDirectory()).
 		Var(eg.EnvComputeWorkspaceDirectory, eg.DefaultWorkspaceDirectory()).
 		Var(eg.EnvComputeRunID, uid.String()).
+		Var(eg.EnvComputeWorkloadName, t.Name).
 		Var(eg.EnvComputeLoggingVerbosity, strconv.Itoa(gctx.Verbosity)).
 		Var(eg.EnvComputeBin, hotswapbin.String()).
 		Var(eg.EnvUnsafeCacheID, ws.CachedID).

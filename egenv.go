@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/egdaemon/eg/internal/errorsx"
+	"github.com/egdaemon/eg/internal/md5x"
 	"github.com/egdaemon/eg/internal/slicesx"
 	"github.com/egdaemon/eg/internal/stringsx"
 	"github.com/egdaemon/eg/internal/tracex"
@@ -167,9 +168,6 @@ const (
 	EnvironFile        = "environ.env"
 	SocketControl      = "control.socket"
 	SocketAnalytics    = "analytics.socket"
-	// AnalyticsCacheRequest is the file a workload creates in the runtime directory to request that its analytics database is
-	// copied into the cache directory when the workload succeeds, see AnalyticsCachePath.
-	AnalyticsCacheRequest = "analytics.cache"
 )
 
 // generate unique module socket
@@ -182,16 +180,11 @@ func DefaultModuleDirectory(rel ...string) string {
 }
 
 // AnalyticsCachePath is the path relative to the cache directory of the analytics database of the last successful
-// run of the workload (module name), blank workloads are the default workload.
-// e.g.) AnalyticsCachePath("main.wasm") -> ".eg/main.wasm/latest.db"
+// run of the workload (module name), blank workloads are the default workload. the workload is hashed so any
+// name is a safe directory name.
+// e.g.) AnalyticsCachePath("foo") -> ".eg/db/{md5x.String("foo")}/latest.db"
 func AnalyticsCachePath(workload string) string {
-	// rooting the path before cleaning prevents the workload from escaping the module directory.
-	name := strings.Trim(filepath.Clean(filepath.Join("/", workload)), "/")
-	if name == "" {
-		name = DefaultWorkload
-	}
-
-	return filepath.Join(DefaultModuleDirectory(), name, "latest.db")
+	return filepath.Join(DefaultModuleDirectory(), "db", md5x.String(stringsx.First(workload, DefaultWorkload)), "latest.db")
 }
 
 func DefaultCacheDirectory(rel ...string) string {

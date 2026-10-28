@@ -84,7 +84,7 @@ func (t *UploadHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	want := runners.RuntimeResources{Cores: req.Enqueued.Cores, Memory: req.Enqueued.Memory, Vram: req.Enqueued.Vram}
 	if t.RM != nil && !t.RM.Admit(want) {
-		log.Println("rejecting upload request, insufficient capacity", req.Enqueued.VcsUri)
+		log.Printf("rejecting upload request, insufficient capacity %s current=%+v requested=%+v limit=%+v\n", req.Enqueued.VcsUri, t.RM.Snapshot(), want, t.RM.Limit)
 		errorsx.Log(httpx.WriteEmptyJSON(w, http.StatusConflict))
 		return
 	}

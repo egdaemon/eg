@@ -84,7 +84,7 @@ func (t *EnqueueHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	want := runners.RuntimeResources{Cores: req.Enqueued.Cores, Memory: req.Enqueued.Memory, Vram: req.Enqueued.Vram}
 	if !t.RM.Admit(want) {
-		log.Println("rejecting enqueue request, insufficient capacity", req.Enqueued.VcsUri)
+		log.Printf("rejecting enqueue request, insufficient capacity %s current=%+v requested=%+v limit=%+v\n", req.Enqueued.VcsUri, t.RM.Snapshot(), want, t.RM.Limit)
 		errorsx.Log(httpx.WriteEmptyJSON(w, http.StatusConflict))
 		return
 	}

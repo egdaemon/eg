@@ -96,6 +96,55 @@ func cloneBehaviorTests(t *testing.T, cloneFn CloneFn) {
 		// Verify trimming a second time is a no-op: nothing was hidden.
 		require.Equal(t, cleaned, strings.TrimSpace(cleaned)+"\n", "trimmed origin has no hidden whitespace")
 	})
+
+	// regression guard: compute upload resolves the --git-ref (main by default) against the
+	// checkout, a clone only has the source's current branch unless the others are carried over.
+	t.Run("branches of the source remain resolvable", func(t *testing.T) {
+		repo := t.TempDir()
+		initRepo(t, repo, map[string]string{"main.go": "package main"})
+		gitOut(t, repo, "branch", "-M", "main")
+		want := gitOut(t, repo, "rev-parse", "main")
+
+		gitOut(t, repo, "checkout", "-q", "-b", "feature")
+		gitOut(t, repo, "commit", "-q", "--allow-empty", "-m", "feature")
+		head := gitOut(t, repo, "rev-parse", "HEAD")
+		require.NotEqual(t, want, head)
+
+		dir := filepath.Join(t.TempDir(), "clone")
+		require.NoError(t, cloneFn(t.Context(), repo, dir))
+
+		got, err := Commitish(dir, "main")
+		require.NoError(t, err, "a branch other than the one checked out in the source must resolve in the clone")
+		require.Equal(t, want, got)
+
+		got, err = Commitish(dir, "HEAD")
+		require.NoError(t, err)
+		require.Equal(t, head, got, "HEAD must be the commit checked out in the source")
+	})
+
+	t.Run("current branch of the source remains resolvable", func(t *testing.T) {
+		repo := t.TempDir()
+		initRepo(t, repo, map[string]string{"main.go": "package main"})
+		gitOut(t, repo, "checkout", "-q", "-b", "feature")
+		want := gitOut(t, repo, "rev-parse", "feature")
+
+		dir := filepath.Join(t.TempDir(), "clone")
+		require.NoError(t, cloneFn(t.Context(), repo, dir))
+
+		got, err := Commitish(dir, "feature")
+		require.NoError(t, err)
+		require.Equal(t, want, got)
+	})
+}
+
+// gitOut runs git within dir returning its trimmed output.
+func gitOut(t *testing.T, dir string, args ...string) string {
+	t.Helper()
+
+	out, err := exec.Command("git", append([]string{"-C", dir}, args...)...).CombinedOutput()
+	require.NoErrorf(t, err, "git %v: %s", args, out)
+
+	return strings.TrimSpace(string(out))
 }
 
 // initRepo creates a git repository at dir with a single commit containing

@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	_eg "github.com/egdaemon/eg"
+	"github.com/egdaemon/eg/internal/md5x"
 	"github.com/egdaemon/eg/runtime/wasi/eg"
 	"github.com/egdaemon/eg/runtime/wasi/egenv"
 	"github.com/egdaemon/eg/runtime/wasi/egunsafe/ffigit"
@@ -22,14 +23,15 @@ type change struct {
 }
 
 // Change sets up a git worktree at the given path, thereby allowing multiple concurrent changes to occur.
-// an absolute path is used as is, a relative path is relative to the workspace directory, see egenv.WorkspaceDirectory.
+// an absolute path is used as is, a relative path is a name, the worktree is in the .eg/.worktrees directory within the
+// workspace directory, see egenv.WorkspaceDirectory, in a directory named {md5(path)}, md5 formatted as a uuid.
 // the worktree is created from the current HEAD, see change.Base, the first time it is needed and reused afterwards.
 // the worktree's registration and branches live in the repository, so it should be in a directory that outlives the
 // module, such as the workspace, instead of a temporary directory which is discarded with the module's container.
 func Change(path string) change {
 	dir := path
 	if !filepath.IsAbs(dir) {
-		dir = egenv.WorkspaceDirectory(path)
+		dir = egenv.WorkspaceDirectory(".eg", ".worktrees", md5x.String(path))
 	}
 
 	return change{dir: dir, runtime: shell.Runtime()}
@@ -212,6 +214,7 @@ func PushRemote(name string) pushopts {
 // Push returns an op that pushes the branch committed by Commit to the remote. does nothing when nothing was committed.
 // when cloning is disabled (EG_UNSAFE_GIT_CLONE_ENABLED=false), e.g.) eg compute local, there is nothing
 // to push to, so the commits are written as a patch to the workspace directory instead, see egenv.WorkspaceDirectory.
+// the patch is named {md5(branch)}.patch, md5 formatted as a uuid, within the .eg/.patches directory.
 // the patch includes the commit message and author, apply it with git am. the token used to push is read
 // the same way as ffigit.Bearer and is only provided to git through the environment.
 func Push(c Changer, options ...pushopts) eg.OpFn {
@@ -242,10 +245,11 @@ func dopush(ctx context.Context, c Changer, options ...pushopts) error {
 	// without a clone the workload runs against the local checkout, where there is nothing to push to,
 	// so the commits are written as a patch for the runner to hand back.
 	if !env.Boolean(true, _eg.EnvUnsafeGitCloneEnabled) {
-		dir := egenv.WorkspaceDirectory(".egpatch")
+		dir := egenv.WorkspaceDirectory(".eg", ".patches")
 		script = append(script,
 			`base=$(cat "$(git rev-parse --absolute-git-dir)/eg-base" 2>/dev/null || git rev-parse HEAD~1)`,
-			fmt.Sprintf(`dest=%s/"$(echo "$branch" | tr / -)".patch`, shquote(dir)),
+			// md5 of the branch formatted as a uuid, matching md5x.String.
+			fmt.Sprintf(`dest=%s/"$(printf %%s "$branch" | md5sum | cut -c1-32 | sed -E 's/(.{8})(.{4})(.{4})(.{4})(.{12})/\1-\2-\3-\4-\5/')".patch`, shquote(dir)),
 			fmt.Sprintf("mkdir -p %s", shquote(dir)),
 			`git format-patch --stdout --binary "$base..HEAD" > "$dest"`,
 			`echo "patch written to $dest"`,

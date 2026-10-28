@@ -157,6 +157,15 @@ const (
 	strategyDirect                 // runners the control plane suggests, reached through the p2p network.
 )
 
+func (t strategy) String() string {
+	switch t {
+	case strategyLAN:
+		return "local network"
+	default:
+		return "p2p network"
+	}
+}
+
 // priorities orders the enabled strategies, highest priority first. a priority of zero or less
 // disables the strategy, ties favor the local network.
 func priorities(lanpriority, directpriority int) []strategy {
@@ -226,7 +235,11 @@ func (t uploadoptions) p2p(ctx context.Context, chttp *http.Client, db *sql.DB, 
 		errorsx.Log(errorsx.Wrap(lan.RememberCandidates(ctx, db, candidates.Items...), "unable to remember the candidate runners"))
 	}
 
-	var failures error
+	if len(candidates.Items) == 0 {
+		return nil, errorsx.New("the control plane has no runners available that match the workload")
+	}
+
+	var failures []error
 	for _, s := range order {
 		var o outcome
 
@@ -238,7 +251,7 @@ func (t uploadoptions) p2p(ctx context.Context, chttp *http.Client, db *sql.DB, 
 		}
 
 		if err != nil {
-			failures = errorsx.Compact(failures, errorsx.Wrap(err, "upload strategy failed"))
+			failures = append(failures, errorsx.Wrapf(err, "%s upload failed", s))
 			continue
 		}
 		defer o.host.Close()
@@ -247,7 +260,8 @@ func (t uploadoptions) p2p(ctx context.Context, chttp *http.Client, db *sql.DB, 
 		return o.runner, t.follow(ctx, chttp, o)
 	}
 
-	return nil, errorsx.Compact(failures, errorsx.Errorf("no runner accepted the workload, %d candidates", len(candidates.Items)))
+	// every enabled strategy failed, report all of them so the reason for each is visible.
+	return nil, errors.Join(failures...)
 }
 
 // lan uploads to the candidates that were remembered from the local network. it only consults the
@@ -276,7 +290,7 @@ func (t uploadoptions) lan(ctx context.Context, db *sql.DB, candidates []*comput
 	})
 
 	if len(nearby) == 0 {
-		return outcome{}, errorsx.Errorf("none of the %d candidates are known on the local network", len(candidates))
+		return outcome{}, errorsx.Errorf("none of the %d candidates are known on the local network (%d systems remembered)", len(candidates), len(known))
 	}
 
 	p2p, err := libp2px.NewLocalClient()

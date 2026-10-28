@@ -25,6 +25,16 @@ import (
 // be revisited once Unblock is called for that key.
 const ErrRepoBlocked = errorsx.String("repo workload already active")
 
+// ErrCancelled is the cause of a workload that was cancelled. It wraps context.Canceled so
+// it is recorded as a cancelled result.
+var ErrCancelled = fmt.Errorf("workload cancelled: %w", context.Canceled)
+
+// ErrWorkloadNotFound is returned by Cancel when the workload is not in the spool.
+const ErrWorkloadNotFound = errorsx.String("workload not found")
+
+// cancelmarker is the name of the file within a workload's spool directory that requests its cancellation.
+const cancelmarker = "cancelled"
+
 type SpoolOption func(*SpoolDirs)
 
 func SpoolOptionPopLimit(n int) SpoolOption {
@@ -83,6 +93,34 @@ func (t SpoolDirs) Locate(uid uuid.UUID) (dir string, ok bool) {
 	}
 
 	return "", false
+}
+
+// Cancel requests cancellation of the workload uid by touching a marker file within its spool directory.
+// the queue reacts to the marker: running workloads are stopped, queued workloads are never started
+// and recovery discards them. Cancelling an already cancelled workload is a no-op.
+func (t SpoolDirs) Cancel(uid uuid.UUID) error {
+	dir, ok := t.Locate(uid)
+	if !ok {
+		return ErrWorkloadNotFound
+	}
+
+	dst, err := os.OpenFile(filepath.Join(dir, cancelmarker), os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600)
+	if os.IsExist(err) {
+		return nil
+	} else if os.IsNotExist(err) {
+		// the workload completed between locating and marking.
+		return ErrWorkloadNotFound
+	} else if err != nil {
+		return errorsx.Wrap(err, "unable to mark workload cancelled")
+	}
+
+	return dst.Close()
+}
+
+// IsCancelled returns true if the spool directory dir has been marked as cancelled.
+func IsCancelled(dir string) bool {
+	_, err := os.Stat(filepath.Join(dir, cancelmarker))
+	return err == nil
 }
 
 type SpoolPath struct {

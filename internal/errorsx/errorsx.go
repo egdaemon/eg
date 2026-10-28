@@ -63,6 +63,12 @@ func Ignore(err error, ignore ...error) error {
 	return err
 }
 
+// Is reports whether any error in err's tree matches target. thin wrapper over errors.Is
+// so callers don't need to import both packages.
+func Is(err, target error) bool {
+	return errors.Is(err, target)
+}
+
 func NewLimitExceeded(n uint, err error) error {
 	return LimitExceeded{
 		N:     n,

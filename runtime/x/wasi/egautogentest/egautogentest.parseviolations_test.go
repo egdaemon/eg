@@ -13,6 +13,12 @@ func TestParseViolations(t *testing.T) {
 		require.Empty(t, v)
 	})
 
+	t.Run("an empty array means no violations", func(t *testing.T) {
+		v, err := parseViolations("[]\n", 2)
+		require.NoError(t, err)
+		require.Empty(t, v)
+	})
+
 	t.Run("one record", func(t *testing.T) {
 		v, err := parseViolations(`{"rule": 1, "line": 12, "reason": "helper"}`, 2)
 		require.NoError(t, err)

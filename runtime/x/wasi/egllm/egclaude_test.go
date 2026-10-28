@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/egdaemon/eg/internal/egtest"
+	"github.com/egdaemon/eg/internal/httpx"
 	"github.com/egdaemon/eg/runtime/wasi/eg"
 	"github.com/egdaemon/eg/runtime/x/wasi/egllm"
 	"github.com/stretchr/testify/require"
@@ -111,6 +112,36 @@ func TestClaudeDo(t *testing.T) {
 		_, err := egllm.Claude("m").APIKey("secret-key").Endpoint(srv.URL).Do(t.Context(), egllm.Message{Role: "user", Content: "a"})
 		require.Error(t, err)
 		require.NotContains(t, err.Error(), "secret-key")
+	})
+
+	t.Run("errors carry the reason given by the api", func(t *testing.T) {
+		var got sent
+		srv := serve(t, http.StatusBadRequest, `{"type":"error","error":{"type":"invalid_request_error","message":"credit balance is too low"}}`, &got)
+
+		_, err := egllm.Claude("m").APIKey("secret-key").Endpoint(srv.URL).Do(t.Context(), egllm.Message{Role: "user", Content: "a"})
+		var cerr *egllm.ClaudeError
+		require.ErrorAs(t, err, &cerr)
+		require.Equal(t, http.StatusBadRequest, cerr.Status)
+		require.Equal(t, "invalid_request_error", cerr.Type)
+		require.Equal(t, "credit balance is too low", cerr.Message)
+		require.Contains(t, err.Error(), "400 Bad Request")
+		require.Contains(t, err.Error(), "invalid_request_error")
+		require.Contains(t, err.Error(), "credit balance is too low")
+		require.NotContains(t, err.Error(), "secret-key")
+		require.NotNil(t, httpx.IsStatusError(err, http.StatusBadRequest))
+		require.Nil(t, httpx.IsStatusError(err, http.StatusUnauthorized))
+	})
+
+	t.Run("errors fall back to the body when it is not an api error", func(t *testing.T) {
+		var got sent
+		srv := serve(t, http.StatusBadGateway, "  upstream down\n", &got)
+
+		_, err := egllm.Claude("m").APIKey("k").Endpoint(srv.URL).Do(t.Context(), egllm.Message{Role: "user", Content: "a"})
+		var cerr *egllm.ClaudeError
+		require.ErrorAs(t, err, &cerr)
+		require.Empty(t, cerr.Type)
+		require.Equal(t, "upstream down", cerr.Message)
+		require.Contains(t, err.Error(), "upstream down")
 	})
 
 	t.Run("fails without an api key", func(t *testing.T) {

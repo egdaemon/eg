@@ -45,15 +45,15 @@ func (t change) Base(ref string) change {
 
 // Changer provides access to a change's worktree.
 type Changer interface {
-	// Path is the directory of the worktree.
-	Path() string
+	// Path is the directory of the worktree, joined with the given relative paths.
+	Path(rel ...string) string
 	// Runtime is a shell command running within the worktree.
 	Runtime() shell.Command
 }
 
-// Path is the directory of the worktree.
-func (t change) Path() string {
-	return t.dir
+// Path is the directory of the worktree, joined with the given relative paths.
+func (t change) Path(rel ...string) string {
+	return filepath.Join(append([]string{t.dir}, rel...)...)
 }
 
 // Runtime is a shell command running within the worktree.

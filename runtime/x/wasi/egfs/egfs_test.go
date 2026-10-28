@@ -115,3 +115,33 @@ func TestFindFirst(t *testing.T) {
 	require.Equal(t, "dir1/dir2/example.txt", egfs.FindFirst(os.DirFS(testx.Fixture()), "example.txt"))
 	require.Equal(t, "dir1/dir2", egfs.FindFirst(os.DirFS(testx.Fixture()), "dir2"))
 }
+
+func TestString(t *testing.T) {
+	t.Run("reads the file", func(t *testing.T) {
+		p := filepath.Join(t.TempDir(), "a.txt")
+		require.NoError(t, os.WriteFile(p, []byte("hello"), 0600))
+
+		got, err := egfs.String(p)
+		require.NoError(t, err)
+		require.Equal(t, "hello", got)
+	})
+
+	t.Run("missing file errors", func(t *testing.T) {
+		got, err := egfs.String(filepath.Join(t.TempDir(), "missing.txt"))
+		require.ErrorIs(t, err, os.ErrNotExist)
+		require.Empty(t, got)
+	})
+}
+
+func TestStringLazy(t *testing.T) {
+	p := filepath.Join(t.TempDir(), "a.txt")
+	read := egfs.StringLazy(p)
+
+	_, err := read()
+	require.ErrorIs(t, err, os.ErrNotExist, "nothing is read until called")
+
+	require.NoError(t, os.WriteFile(p, []byte("hello"), 0600))
+	got, err := read()
+	require.NoError(t, err)
+	require.Equal(t, "hello", got)
+}

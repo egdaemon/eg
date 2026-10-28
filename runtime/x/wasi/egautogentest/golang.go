@@ -15,9 +15,11 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"reflect"
 	"slices"
 	"sort"
 	"strings"
+	"sync"
 	"text/template"
 
 	"golang.org/x/mod/modfile"
@@ -88,10 +90,9 @@ type golangPrompt struct {
 // golangOption is the resolved configuration of the Golang generator.
 type golangOption struct {
 	seq       iterx.Seq[Fn]
-	templates []string
+	templates []func() (string, error)
 	filename  string
 	dir       string
-	packages  []string
 	pkgs      *pkgcache
 	callers   *callcache
 }
@@ -110,21 +111,70 @@ type GolangOptions []GolangOption
 // already exercise it, into a single prompt for the model. generated tests are
 // only kept if they compile and pass.
 func Golang(seq iterx.Seq[Fn]) GolangOptions {
+	return GolangLazy().From(seq)
+}
+
+// GolangLazy is Golang without its sequence, which is bound with From. configure the shared parts once,
+// e.g.) Templates and Packages, then bind each sequence to a copy of the result, e.g.) a function at a time.
+// the copies share the caches of packages and callers, and the templates are loaded once however many use them.
+// they can be used concurrently.
+func GolangLazy() GolangOptions {
 	pkgs := &pkgcache{loaded: map[string]*gopkg{}}
 	callers := &callcache{built: map[string]*callindex{}}
 	return GolangOptions{func(o *golangOption) {
-		o.seq = seq
 		o.pkgs = pkgs
 		o.callers = callers
 	}}
 }
 
+// From binds the sequence of functions to generate tests for. the receiver is not modified.
+func (t GolangOptions) From(seq iterx.Seq[Fn]) GolangOptions {
+	// clipped so concurrent copies of a shared receiver don't append into the same backing array.
+	return append(slices.Clip(t), func(o *golangOption) {
+		o.seq = seq
+	})
+}
+
+// Template is an example test, either its source or a function loading it. functions are
+// evaluated when the prompt is built, an error fails the prompt.
+type Template interface {
+	~string | func() (string, error)
+}
+
 // Templates adds example tests the generated tests should follow. the packages they
 // import, and those imported by the function's source file and existing tests, are listed in the types block.
-func (t GolangOptions) Templates(v ...string) GolangOptions {
-	return append(t, func(o *golangOption) {
-		o.templates = append(o.templates, v...)
+func (t GolangOptions) Templates[T Template](v ...T) GolangOptions {
+	// the loaders are created here, not by the option, which is applied each time the options are resolved.
+	loaders := make([]func() (string, error), 0, len(v))
+	for _, tmpl := range v {
+		if fn, ok := any(tmpl).(func() (string, error)); ok {
+			// loaded once, by the first prompt that needs it. its result, error included, is kept.
+			loaders = append(loaders, sync.OnceValues(fn))
+			continue
+		}
+
+		src := reflect.ValueOf(tmpl).String()
+		loaders = append(loaders, func() (string, error) { return src, nil })
+	}
+
+	return append(slices.Clip(t), func(o *golangOption) {
+		o.templates = append(o.templates, loaders...)
 	})
+}
+
+// sources evaluates the templates, dropping the empty ones.
+func (o golangOption) sources() (dst []string, err error) {
+	for _, fn := range o.templates {
+		s, err := fn()
+		if err != nil {
+			return nil, err
+		}
+		if s != "" {
+			dst = append(dst, s)
+		}
+	}
+
+	return dst, nil
 }
 
 // Filename sets the pattern for the name of the file generated tests are written to,
@@ -136,7 +186,7 @@ func (t GolangOptions) Templates(v ...string) GolangOptions {
 //
 // defaults to DefaultGolangFilename.
 func (t GolangOptions) Filename(pattern string) GolangOptions {
-	return append(t, func(o *golangOption) {
+	return append(slices.Clip(t), func(o *golangOption) {
 		o.filename = pattern
 	})
 }
@@ -144,7 +194,7 @@ func (t GolangOptions) Filename(pattern string) GolangOptions {
 // Directory sets the directory the function's sources are read from and the generated tests are written to,
 // e.g.) the worktree of an eggit.Change. defaults to the current directory.
 func (t GolangOptions) Directory(dir string) GolangOptions {
-	return append(t, func(o *golangOption) {
+	return append(slices.Clip(t), func(o *golangOption) {
 		o.dir = dir
 	})
 }
@@ -244,19 +294,19 @@ func (t GolangOptions) Prompt(c PromptContext) (string, error) {
 
 	testPackage, importpath, external := testPackageFor(filepath.Dir(c.Fn.Path), pkg, decl, existing)
 
-	apis, err := collectPackages(filepath.Dir(c.Fn.Path), o.packages)
+	templates, err := o.sources()
 	if err != nil {
 		return "", err
 	}
 
-	discovered := discoverPackages(filepath.Dir(c.Fn.Path), o.packages, importsOf(pkg, decl, existing, o.templates))
+	discovered := discoverPackages(filepath.Dir(c.Fn.Path), importsOf(pkg, decl, existing, templates))
 
 	var buf strings.Builder
 	if err := golangPromptTemplate.Execute(&buf, golangPrompt{
 		PromptContext: c,
-		Templates:     strings.Join(o.templates, "\n\n"),
+		Templates:     strings.Join(templates, "\n\n"),
 		Usage:         usage,
-		Types:         strings.Join(nonEmpty(collectTypes(pkg, decl), apis, discovered), "\n\n"),
+		Types:         strings.Join(nonEmpty(collectTypes(pkg, decl), discovered), "\n\n"),
 		Package:       pkg.name,
 		TestPackage:   testPackage,
 		ImportPath:    importpath,
@@ -348,10 +398,14 @@ func writeOverlay(dir string, dest string, src string) (string, error) {
 
 // pkgcache loads each directory's package once.
 type pkgcache struct {
+	mu     sync.Mutex
 	loaded map[string]*gopkg
 }
 
 func (t *pkgcache) load(dir string) (pkg *gopkg, err error) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
 	if pkg, ok := t.loaded[dir]; ok {
 		return pkg, nil
 	}

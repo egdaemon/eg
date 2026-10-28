@@ -30,13 +30,13 @@ func report(ctx context.Context, q sqlx.Queryer, batch ...*coverage.Report) erro
 	return sqlx.Discard(sqlx.Scan(coverage.NewReportBatchInsert(ctx, q, rows...)))
 }
 
-func worst(ctx context.Context, q sqlx.Queryer, n int32) (results []coverage.Report, err error) {
-	err = sqlx.ScanInto(coverage.Worst(ctx, q, int(n)), &results)
+func worst(ctx context.Context, q sqlx.Queryer, n int32, filters ...coverage.Filter) (results []coverage.Report, err error) {
+	err = sqlx.ScanInto(coverage.WorstWhere(ctx, q, int(n), filters...), &results)
 	return results, err
 }
 
-func sample(ctx context.Context, q sqlx.Queryer, n int32) (results []coverage.Report, err error) {
-	err = sqlx.ScanInto(coverage.Sample(ctx, q, int(n)), &results)
+func sample(ctx context.Context, q sqlx.Queryer, n int32, filters ...coverage.Filter) (results []coverage.Report, err error) {
+	err = sqlx.ScanInto(coverage.SampleWhere(ctx, q, int(n), filters...), &results)
 	return results, err
 }
 
@@ -54,20 +54,20 @@ func Report(ctx context.Context, batch ...*Coverage) error {
 	return errorsx.Wrap(report(ctx, db, batch...), "unable to report coverage")
 }
 
-// Worst returns the n functions with the lowest hit counts.
-func Worst(ctx context.Context, n int32) ([]coverage.Report, error) {
+// Worst returns the n functions with the lowest hit counts, of those matching the filters.
+func Worst(ctx context.Context, n int32, filters ...coverage.Filter) ([]coverage.Report, error) {
 	db := dial()
 	defer db.Close()
 
-	results, err := worst(ctx, db, n)
+	results, err := worst(ctx, db, n, filters...)
 	return results, errorsx.Wrap(err, "unable to query worst coverage")
 }
 
-// Sample returns a random sample of n functions.
-func Sample(ctx context.Context, n int32) ([]coverage.Report, error) {
+// Sample returns a random sample of n functions, of those matching the filters.
+func Sample(ctx context.Context, n int32, filters ...coverage.Filter) ([]coverage.Report, error) {
 	db := dial()
 	defer db.Close()
 
-	results, err := sample(ctx, db, n)
+	results, err := sample(ctx, db, n, filters...)
 	return results, errorsx.Wrap(err, "unable to query sample coverage")
 }

@@ -170,6 +170,20 @@ func (t GolangOptions) Seq() iterx.Seq[Fn] {
 	return t.resolve().seq
 }
 
+var _ Ruler = GolangOptions(nil)
+
+// Rules are the default rules followed by the given rules, rules already among the defaults are not repeated.
+func (t GolangOptions) Rules(ensure []string) []string {
+	rules := slices.Clone(golangDefaultRules)
+	for _, rule := range ensure {
+		if !slices.Contains(rules, rule) {
+			rules = append(rules, rule)
+		}
+	}
+
+	return rules
+}
+
 func (t GolangOptions) Prompt(c PromptContext) (string, error) {
 	o := t.resolve()
 
@@ -188,13 +202,7 @@ func (t GolangOptions) Prompt(c PromptContext) (string, error) {
 		return "", errorsx.Wrap(err, "unable to render function")
 	}
 
-	rules := slices.Clone(golangDefaultRules)
-	for _, rule := range c.Ensure {
-		if !slices.Contains(rules, rule) {
-			rules = append(rules, rule)
-		}
-	}
-	c.Ensure = rules
+	c.Ensure = t.Rules(c.Ensure)
 
 	dest, existing, err := resolveTestFile(o, filepath.Dir(c.Fn.Path), c.Fn)
 	if err != nil {

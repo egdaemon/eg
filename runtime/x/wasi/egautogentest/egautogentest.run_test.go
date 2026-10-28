@@ -34,6 +34,15 @@ func (t *fakegen) Verify(ctx context.Context, fn Fn, artifact string) error {
 	return nil
 }
 
+type rulergen struct {
+	fakegen
+	rules []string
+}
+
+func (t *rulergen) Rules(ensure []string) []string {
+	return append(append([]string(nil), t.rules...), ensure...)
+}
+
 func TestGenerate(t *testing.T) {
 	fn := Fn{Name: "Greet"}
 
@@ -98,6 +107,25 @@ func TestGenerate(t *testing.T) {
 
 		require.NoError(t, o.generate(t.Context(), g, fn))
 		require.Equal(t, []string{"clean"}, g.verified)
+	})
+
+	t.Run("judges against the rules of the generator as well as the given rules", func(t *testing.T) {
+		s := script(t, "response", "")
+		g := &rulergen{rules: []string{"keep the header"}}
+		o := option{model: "m", ensure: []string{"be clean"}, client: s}
+
+		require.NoError(t, o.generate(t.Context(), g, fn))
+		require.Len(t, s.requests, 2)
+		require.Contains(t, s.requests[1][0].Content, "1. keep the header\n2. be clean\n")
+	})
+
+	t.Run("does not judge when only the generator has rules", func(t *testing.T) {
+		s := script(t, "response")
+		g := &rulergen{rules: []string{"keep the header"}}
+		o := option{model: "m", client: s}
+
+		require.NoError(t, o.generate(t.Context(), g, fn))
+		require.Len(t, s.requests, 1)
 	})
 
 	t.Run("discards a response still violating the rules without verifying it", func(t *testing.T) {

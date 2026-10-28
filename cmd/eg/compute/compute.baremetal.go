@@ -32,6 +32,7 @@ import (
 	"github.com/egdaemon/eg/internal/wasix"
 	"github.com/egdaemon/eg/interp"
 	"github.com/egdaemon/eg/interp/c8sproxy"
+	"github.com/egdaemon/eg/interp/dbproxy/dbservice"
 	"github.com/egdaemon/eg/interp/events"
 	"github.com/egdaemon/eg/interp/execproxy"
 	"github.com/egdaemon/eg/runners"
@@ -288,6 +289,7 @@ func (t baremetal) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, hotswapbin
 	defer srv.GracefulStop()
 
 	events.NewServiceDispatch(db).Bind(srv)
+	dbservice.NewService(ctx, ws.RuntimeDir).Bind(srv)
 	execproxy.NewExecProxy(
 		t.Dir,
 		errorsx.Must(

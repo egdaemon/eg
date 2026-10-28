@@ -88,16 +88,6 @@ func Latest(ctx context.Context, options ...LatestOption) (_ string, err error) 
 	return path, nil
 }
 
-// Cache requests that the analytics database of this workload is copied into the cache directory when the
-// workload succeeds, making it available to [Latest] in later runs of the workload.
-func Cache(ctx context.Context) error {
-	if err := os.WriteFile(egenv.RuntimeDirectory(eg.AnalyticsCacheRequest), nil, 0600); err != nil {
-		return errorsx.Wrap(err, "unable to request caching of the analytics database")
-	}
-
-	return nil
-}
-
 func (t latest) get(ctx context.Context, path string, query url.Values) (*http.Response, error) {
 	if stringsx.Blank(t.token) {
 		return nil, errorsx.String("access token required")

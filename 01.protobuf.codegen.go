@@ -20,6 +20,9 @@ package eg
 //go:generate protoc --proto_path=.proto --go_opt=Meg.interp.exec.proto=github.com/eg/interp/execproxy --go_opt=paths=source_relative --go_out=interp/execproxy eg.interp.exec.proto
 //go:generate protoc --proto_path=.proto --go-grpc_opt=Meg.interp.exec.proto=github.com/eg/interp/execproxy --go-grpc_opt=paths=source_relative --go-grpc_out=interp/execproxy eg.interp.exec.proto
 
+//go:generate protoc --proto_path=.proto --go_opt=Meg.interp.dbproxy.proto=github.com/egdaemon/eg/interp/dbproxy --go_opt=paths=source_relative --go_out=interp/dbproxy eg.interp.dbproxy.proto
+//go:generate protoc --proto_path=.proto --go-grpc_opt=Meg.interp.dbproxy.proto=github.com/egdaemon/eg/interp/dbproxy --go-grpc_opt=paths=source_relative --go-grpc_out=interp/dbproxy eg.interp.dbproxy.proto
+
 //go:generate protoc --proto_path=.proto --go_opt=Meg.compute.authz.proto=github.com/egciorg/eg/compute --go_opt=paths=source_relative --go_out=compute eg.compute.authz.proto
 
 //go:generate protoc --proto_path=.proto --go_opt=Meg.duckproxy.proto=github.com/egdaemon/eg/duckproxy --go_opt=paths=source_relative --go_out=duckproxy eg.duckproxy.proto

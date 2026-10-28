@@ -1,6 +1,7 @@
 package daemon
 
 import (
+	_eg "github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/runtime/wasi/eg"
 	"github.com/egdaemon/eg/runtime/wasi/egenv"
 	"github.com/egdaemon/eg/runtime/wasi/eggit"
@@ -8,7 +9,6 @@ import (
 	"github.com/egdaemon/eg/runtime/x/wasi/egautogentest"
 	"github.com/egdaemon/eg/runtime/x/wasi/egbug"
 	"github.com/egdaemon/eg/runtime/x/wasi/egfs"
-	"github.com/egdaemon/eg/runtime/x/wasi/eggolang"
 	"github.com/egdaemon/eg/runtime/x/wasi/egpool"
 )
 
@@ -39,19 +39,15 @@ func Testgen(opts egautogentest.Options) eg.OpFn {
 			egfs.StringLazy(egenv.WorkingDirectory("cmd", "eg", "compute", "compute.lan.rm_test.go")),
 		)
 
-	return eg.Sequential(
-		eggolang.AutoTest(),
-		egbug.Log("recording coverage initiated"),
-		eggolang.RecordCoverage,
-		egbug.Log("recording coverage completed"),
-		egbug.Log("egautogentest initiated"),
-		egpool.New(workers, func(fn egautogentest.Fn) eg.OpFn {
-			// a relative path is a name, which eggit hashes into the worktree directory.
-			return eggit.Change("egautogen:" + fn.Path + ":" + fn.Name).Op(func(c eggit.Changer) eg.OpFn {
-				return testgen(c, fn, opts.Run(golang.Directory(c.Path()).From(egautogentest.From(fn))))
-			})
-		}).Run(egautogentest.Worst(count, egautogentest.Language("go"))),
-	)
+	pool := egpool.New(workers, func(fn egautogentest.Fn) eg.OpFn {
+		// a relative path is a name, which eggit hashes into the worktree directory.
+		return eggit.Change("egautogen:" + fn.Path + ":" + fn.Name).Op(func(c eggit.Changer) eg.OpFn {
+			return testgen(c, fn, opts.Run(golang.Directory(c.Path()).From(egautogentest.From(fn))))
+		})
+	})
+
+	// the coverage recorded by the last successful run of the default workload, instead of running the test suite again.
+	return pool.Run(egautogentest.WorstFromWorkload(_eg.DefaultWorkload, count, egautogentest.Language("go")))
 }
 
 // testgen runs the op generating the tests of a function and pushes them to their own branch.

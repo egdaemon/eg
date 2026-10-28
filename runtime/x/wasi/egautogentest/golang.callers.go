@@ -11,6 +11,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 
 	"golang.org/x/mod/modfile"
 
@@ -38,7 +39,26 @@ type callindex struct {
 }
 
 type callcache struct {
+	mu    sync.Mutex
 	built map[string]*callindex
+}
+
+// index is the call index of the module at root, built the first time it's needed.
+func (t *callcache) index(root string) (*callindex, error) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	if idx, ok := t.built[root]; ok {
+		return idx, nil
+	}
+
+	idx, err := buildCallIndex(root)
+	if err != nil {
+		return nil, err
+	}
+
+	t.built[root] = idx
+	return idx, nil
 }
 
 // callers renders up to maxCallerExamples of the statements calling the function name declared
@@ -59,12 +79,9 @@ func (t *callcache) callers(dir string, name string) ([]string, error) {
 		return nil, err
 	}
 
-	idx, ok := t.built[root]
-	if !ok {
-		if idx, err = buildCallIndex(root); err != nil {
-			return nil, err
-		}
-		t.built[root] = idx
+	idx, err := t.index(root)
+	if err != nil {
+		return nil, err
 	}
 
 	rel, err := filepath.Rel(root, absdir)

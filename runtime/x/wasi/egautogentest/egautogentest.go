@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/egdaemon/eg/internal/coverage"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/iterx"
 	"github.com/egdaemon/eg/runtime/wasi/eg"
@@ -354,10 +355,30 @@ func writeTemp(dir string, pattern string, data []byte) (path string, err error)
 	return f.Name(), nil
 }
 
-// Worst scans recorded coverage for the n functions with the lowest hit counts.
-func Worst(n int) iterx.Seq[Fn] {
+// the filters Worst and Sample take narrow the functions they select, filters given together all apply.
+// they apply before the number of functions is limited, so n is the number of functions that match.
+
+// Language selects the functions of files in any of the languages, e.g.) "go", matched on the extension
+// of the file. the name is not case sensitive and an unknown language is an error.
+func Language(names ...string) coverage.Filter {
+	return coverage.QueryLanguage(names...)
+}
+
+// Paths selects the functions of files matching any of the glob patterns. patterns match the whole recorded
+// path, which is relative to the workspace. `*` matches any run of characters including separators, `?` any single character.
+func Paths(globs ...string) coverage.Filter {
+	return coverage.QueryPaths(globs...)
+}
+
+// ExcludePaths removes the functions of files matching any of the glob patterns, see Paths.
+func ExcludePaths(globs ...string) coverage.Filter {
+	return coverage.QueryExcludePaths(globs...)
+}
+
+// Worst scans recorded coverage for the n functions with the lowest hit counts, of those matching the filters.
+func Worst(n int, filters ...coverage.Filter) iterx.Seq[Fn] {
 	return iterx.New(func(ctx context.Context, yield func(Fn) bool) error {
-		results, err := fficoverage.Worst(ctx, int32(n))
+		results, err := fficoverage.Worst(ctx, int32(n), filters...)
 		if err != nil {
 			return err
 		}
@@ -387,10 +408,10 @@ func From(fns ...Fn) iterx.Seq[Fn] {
 	})
 }
 
-// Sample returns a random sample of n functions from recorded coverage data.
-func Sample(n int) iterx.Seq[Fn] {
+// Sample returns a random sample of n functions from recorded coverage data, of those matching the filters.
+func Sample(n int, filters ...coverage.Filter) iterx.Seq[Fn] {
 	return iterx.New(func(ctx context.Context, yield func(Fn) bool) error {
-		results, err := fficoverage.Sample(ctx, int32(n))
+		results, err := fficoverage.Sample(ctx, int32(n), filters...)
 		if err != nil {
 			return err
 		}

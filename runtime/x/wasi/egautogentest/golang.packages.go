@@ -20,15 +20,6 @@ import (
 	"github.com/egdaemon/eg/runtime/x/wasi/eggolang"
 )
 
-// Packages sets the import paths of packages whose exported functions are listed in the prompt,
-// so the model doesn't have to guess which functions exist, e.g.) "github.com/stretchr/testify/require".
-// packages are found within the function's module, its vendor directory, or the module cache.
-func (t GolangOptions) Packages(importpaths ...string) GolangOptions {
-	return append(t, func(o *golangOption) {
-		o.packages = append(o.packages, importpaths...)
-	})
-}
-
 // collectPackages renders the exported function signatures of each of the packages.
 func collectPackages(fromdir string, importpaths []string) (string, error) {
 	rendered := make([]string, 0, len(importpaths))
@@ -218,9 +209,9 @@ func importsOf(pkg *gopkg, decl *ast.FuncDecl, existing []byte, templates []stri
 }
 
 // discoverPackages renders the exported functions of the imports which can be located, skipping the
-// standard library, the package in fromdir, and the packages already explicitly requested.
-func discoverPackages(fromdir string, requested []string, imports []string) string {
-	skip := append(slices.Clone(requested), importPathOf(fromdir))
+// standard library and the package in fromdir.
+func discoverPackages(fromdir string, imports []string) string {
+	skip := []string{importPathOf(fromdir)}
 	rendered := make([]string, 0, len(imports))
 	for _, importpath := range imports {
 		first, _, _ := strings.Cut(importpath, "/")

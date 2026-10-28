@@ -7,6 +7,7 @@ package sqlx
 import (
 	"context"
 	"database/sql"
+	"strings"
 )
 
 // database/sql returns this as an unexported sentinel (errDBClosed), so it
@@ -32,6 +33,11 @@ type Queryer interface {
 	QueryContext(context.Context, string, ...any) (*sql.Rows, error)
 	QueryRowContext(context.Context, string, ...any) *sql.Row
 	ExecContext(context.Context, string, ...any) (sql.Result, error)
+}
+
+// Columns splits a comma separated list of columns, e.g.) a generated ScannerStaticColumns constant.
+func Columns(reference string) []string {
+	return strings.Split(reference, ",")
 }
 
 // Transactioner is a Queryer that can also begin transactions.

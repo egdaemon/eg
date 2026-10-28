@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"strings"
 
@@ -83,6 +84,62 @@ type claudeResponse struct {
 	} `json:"content"`
 }
 
+// claudeErrorBodyLimit is the most of an error response read for diagnostics.
+const claudeErrorBodyLimit = 4096
+
+// ClaudeError is an error response from the anthropic api, it carries the reason the api gave,
+// which the status alone doesn't, e.g.) a depleted credit balance is a 400.
+// it unwraps to the httpx.Error of the response, so the status code can still be checked with httpx.IsStatusError.
+type ClaudeError struct {
+	Status  int    // http status code.
+	Type    string // api error type, e.g.) invalid_request_error. empty when the body isn't an api error.
+	Message string // api error message, or the raw body when it isn't an api error.
+	cause   error
+}
+
+func newClaudeError(resp *http.Response, cause error) *ClaudeError {
+	e := &ClaudeError{Status: resp.StatusCode, cause: cause}
+
+	raw, _ := io.ReadAll(io.LimitReader(resp.Body, claudeErrorBodyLimit))
+
+	var body struct {
+		Error struct {
+			Type    string `json:"type"`
+			Message string `json:"message"`
+		} `json:"error"`
+	}
+
+	if err := json.Unmarshal(raw, &body); err == nil && body.Error.Message != "" {
+		e.Type, e.Message = body.Error.Type, body.Error.Message
+	} else {
+		e.Message = strings.TrimSpace(string(raw))
+	}
+
+	return e
+}
+
+func (t *ClaudeError) Error() string {
+	var b strings.Builder
+	b.WriteString("anthropic api: ")
+	b.WriteString(t.cause.Error())
+
+	if t.Type != "" {
+		b.WriteString(": ")
+		b.WriteString(t.Type)
+	}
+
+	if t.Message != "" {
+		b.WriteString(": ")
+		b.WriteString(t.Message)
+	}
+
+	return b.String()
+}
+
+func (t *ClaudeError) Unwrap() error {
+	return t.cause
+}
+
 func (t claude) Do(ctx context.Context, m ...Message) (string, error) {
 	key := t.key
 	if key == "" {
@@ -131,11 +188,15 @@ func (t claude) Do(ctx context.Context, m ...Message) (string, error) {
 	req.Header.Set("x-api-key", key)
 	req.Header.Set("anthropic-version", anthropicVersion)
 
-	resp, err := httpx.AsError(http.DefaultClient.Do(req))
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return "", err
 	}
 	defer resp.Body.Close()
+
+	if cause := httpx.ErrorCode(resp); cause != nil {
+		return "", newClaudeError(resp, cause)
+	}
 
 	var generated claudeResponse
 	if err := json.NewDecoder(resp.Body).Decode(&generated); err != nil {

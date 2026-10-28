@@ -46,6 +46,23 @@ func Find(tree fs.FS, pattern string) iter.Seq[string] {
 	}
 }
 
+// String returns the contents of the file at the provided path.
+func String(path string) (string, error) {
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return "", err
+	}
+
+	return string(b), nil
+}
+
+// StringLazy returns a function that reads the file at the provided path when called.
+func StringLazy(path string) func() (string, error) {
+	return func() (string, error) {
+		return String(path)
+	}
+}
+
 // FileExists returns true IFF a non-directory file exists at the provided path.
 func FileExists(path string) bool {
 	info, err := os.Stat(path)

@@ -13,7 +13,7 @@ func TestGolangPackages(t *testing.T) {
 	fn := Fn{Path: ".fixtures/golang/example.3/sample.go", Name: "Noop"}
 
 	t.Run("lists the exported functions of a package within the module", func(t *testing.T) {
-		prompt, err := Golang(From(fn)).Packages("example.com/mod/api").Prompt(PromptContext{Fn: fn})
+		prompt, err := Golang(From(fn)).Templates("import \"example.com/mod/api\"\n\nfunc TestX() {}").Prompt(PromptContext{Fn: fn})
 		require.NoError(t, err)
 		require.Less(t, strings.Index(prompt, "TYPES"), strings.Index(prompt, "package api // import"))
 		require.Less(t, strings.Index(prompt, "package api // import"), strings.Index(prompt, "PACKAGE"))
@@ -28,12 +28,6 @@ func TestGolangPackages(t *testing.T) {
 		require.Equal(t, "func Equal(expected, actual interface{}, msgAndArgs ...interface{}) bool\nfunc Zero[T any](v T) bool", signatures)
 	})
 
-	t.Run("finds vendored packages", func(t *testing.T) {
-		prompt, err := Golang(From(fn)).Packages("example.org/lib").Prompt(PromptContext{Fn: fn})
-		require.NoError(t, err)
-		require.Contains(t, prompt, "func Vendored(name string) string")
-	})
-
 	t.Run("finds packages in the module cache", func(t *testing.T) {
 		cache := t.TempDir()
 		t.Setenv("GOMODCACHE", cache)
@@ -42,14 +36,9 @@ func TestGolangPackages(t *testing.T) {
 		require.NoError(t, os.MkdirAll(dir, 0o755))
 		require.NoError(t, os.WriteFile(filepath.Join(dir, "sub.go"), []byte("package sub\n\nfunc Cached() {}\n"), 0o600))
 
-		prompt, err := Golang(From(fn)).Packages("example.org/Cached/sub").Prompt(PromptContext{Fn: fn})
+		prompt, err := Golang(From(fn)).Templates("import \"example.org/Cached/sub\"\n\nfunc TestX() {}").Prompt(PromptContext{Fn: fn})
 		require.NoError(t, err)
 		require.Contains(t, prompt, "func Cached()")
-	})
-
-	t.Run("fails for packages that cannot be found", func(t *testing.T) {
-		_, err := Golang(From(fn)).Packages("example.net/missing").Prompt(PromptContext{Fn: fn})
-		require.Error(t, err)
 	})
 
 	t.Run("omits the section without packages", func(t *testing.T) {
@@ -71,12 +60,5 @@ func TestGolangPackages(t *testing.T) {
 		prompt, err := Golang(From(fn)).Templates(template).Prompt(PromptContext{Fn: fn})
 		require.NoError(t, err)
 		require.Contains(t, prompt, "func Vendored(name string) string")
-	})
-
-	t.Run("does not repeat requested packages", func(t *testing.T) {
-		template := "import \"example.com/mod/api\"\n\nfunc TestX() {}"
-		prompt, err := Golang(From(fn)).Packages("example.com/mod/api").Templates(template).Prompt(PromptContext{Fn: fn})
-		require.NoError(t, err)
-		require.Equal(t, 1, strings.Count(prompt, "package api // import"))
 	})
 }

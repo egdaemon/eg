@@ -128,6 +128,25 @@ func LocalClone(ctx context.Context, repo, dir string) (err error) {
 		return errorsx.Wrapf(fmt.Errorf("%s: %w", strings.TrimSpace(string(out)), err), "unable to detach HEAD: %s", dir)
 	}
 
+	// a clone only creates a local branch for the branch checked out in the source, the others are
+	// remote-tracking refs which are discarded below along with the remote. keep them as local branches
+	// so any branch of the source can still be resolved within the checkout.
+	out, err = execx.RunAs(ctx, username, "git", "-C", dir, "for-each-ref", "--format=%(refname:strip=3)", "refs/remotes/"+git.DefaultRemoteName).CombinedOutput()
+	if err != nil {
+		return errorsx.Wrapf(fmt.Errorf("%s: %w", strings.TrimSpace(string(out)), err), "unable to list branches: %s", dir)
+	}
+
+	for _, branch := range strings.Fields(string(out)) {
+		if branch == "HEAD" {
+			continue
+		}
+
+		out, err = execx.RunAs(ctx, username, "git", "-C", dir, "update-ref", "refs/heads/"+branch, "refs/remotes/"+git.DefaultRemoteName+"/"+branch).CombinedOutput()
+		if err != nil {
+			return errorsx.Wrapf(fmt.Errorf("%s: %w", strings.TrimSpace(string(out)), err), "unable to create branch %s: %s", branch, dir)
+		}
+	}
+
 	if origin != "" {
 		_, err = execx.RunAs(ctx, username, "git", "-C", dir, "remote", "remove", git.DefaultRemoteName).CombinedOutput()
 		if err != nil {

@@ -18,8 +18,7 @@ func main() {
 	ctx, done := context.WithTimeout(context.Background(), egenv.TTL())
 	defer done()
 
-	// judge := egllm.LLamaCPP("ggml-org/Qwen3.8-27B-GGUF:Q4_K_M")
-	judge := egllm.Echo()
+	judge := egllm.LLamaCPP("ggml-org/Qwen3.8-27B-GGUF:Q4_K_M")
 	c1 := eg.Container("eg.ubuntu")
 	err := eg.Perform(
 		ctx,

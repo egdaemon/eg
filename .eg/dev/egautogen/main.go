@@ -15,8 +15,6 @@ import (
 )
 
 const (
-	model = "ggml-org/Qwen3.8-27B-GGUF:Q4_K_M"
-
 	// number of functions sampled from the pool to generate tests for.
 	count = 1
 
@@ -74,7 +72,8 @@ func main() {
 	ctx, done := context.WithTimeout(context.Background(), egenv.TTL())
 	defer done()
 
-	judge := egllm.LLamaCPP(model)
+	// judge := egllm.LLamaCPP("ggml-org/Qwen3.8-27B-GGUF:Q4_K_M")
+	judge := egllm.Claude("claude-sonnet-5-5")
 	change := eggit.Change(egenv.EphemeralDirectory("egautogen"))
 	c1 := eg.Container("eg.ubuntu")
 	err := eg.Perform(
@@ -102,7 +101,7 @@ func main() {
 							).Run(
 								egautogentest.Golang(egautogentest.Worst(count)).
 									Directory(c.Path()).
-									Style(style).
+									Templates(style).
 									Packages(
 										"github.com/stretchr/testify/require",
 										"github.com/stretchr/testify/assert",

@@ -8,6 +8,7 @@ import (
 	"embed"
 	"encoding/hex"
 	"fmt"
+	"io"
 	"io/fs"
 	"log"
 	"os"
@@ -345,6 +346,43 @@ func Sleep(d time.Duration) eg.OpFn {
 	return func(ctx context.Context, op eg.Op) error {
 		time.Sleep(d)
 		return nil
+	}
+}
+
+// utility function for prototyping. blocks until the user answers a y/n prompt on stdin.
+// answering y continues, answering n (or EOF) fails the operation.
+func Wait(prompt string) eg.OpFn {
+	return func(ctx context.Context, op eg.Op) error {
+		answer := make(chan string, 1)
+		go func() {
+			for {
+				log.Printf("%s [y/n]: ", prompt)
+				var s string
+				if _, err := fmt.Fscanln(os.Stdin, &s); err != nil && s == "" {
+					if err == io.EOF {
+						answer <- "n"
+						return
+					}
+					continue
+				}
+
+				switch strings.ToLower(strings.TrimSpace(s)) {
+				case "y", "yes", "n", "no":
+					answer <- strings.ToLower(strings.TrimSpace(s))
+					return
+				}
+			}
+		}()
+
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case a := <-answer:
+			if a[0] != 'y' {
+				return fmt.Errorf("user rejected: %s", prompt)
+			}
+			return nil
+		}
 	}
 }
 

@@ -227,7 +227,7 @@ const judgeTemplate = `
 you are reviewing a response against a numbered list of rules.
 for every place the response violates a rule respond with one JSON object on its own line (JSONL) and nothing else:
 {"rule": <rule number>, "line": <line number within the response>, "reason": "<why the line violates the rule>"}
-if the response satisfies every rule respond with nothing at all.
+if the response satisfies every rule respond with nothing at all, an empty message, not "[]", "none", or any other text.
 you must not respond with prose, code blocks, or an array.
 
 --------------------------------------------------- RULES ---------------------------------------------------
@@ -252,7 +252,12 @@ type violation struct {
 }
 
 // parseViolations decodes the judge's JSONL response, one violation per record.
+// an empty array is accepted as no violations, models often answer that way when there are none.
 func parseViolations(response string, rules int) (violations []violation, err error) {
+	if strings.TrimSpace(response) == "[]" {
+		return nil, nil
+	}
+
 	dec := json.NewDecoder(strings.NewReader(response))
 	for {
 		var v violation

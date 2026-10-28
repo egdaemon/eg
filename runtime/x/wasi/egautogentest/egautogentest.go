@@ -64,6 +64,14 @@ type option struct {
 // Option configures test generation.
 type Option func(*option)
 
+// Ruler is implemented by generators that apply rules of their own in addition to the ones given, e.g.)
+// defaults. responses are judged against the rules it returns, so what the judge considers a violation
+// matches what the prompt asked for.
+type Ruler interface {
+	// Rules are all the rules the generator applies when it is given ensure.
+	Rules(ensure []string) []string
+}
+
 // Options is a chainable set of Option.
 type Options []Option
 
@@ -154,6 +162,12 @@ func (t option) try(ctx context.Context, g Generator, fn Fn) (bool, error) {
 	}
 	log.Printf("autogentest %s: prompt (%d bytes)\n%s\n", fn.Name, len(prompt), prompt)
 
+	// the judge needs to know every rule the prompt asked for, not only the ones given.
+	judge := t
+	if r, ok := g.(Ruler); ok {
+		judge.ensure = r.Rules(t.ensure)
+	}
+
 	attempts := max(t.attempts, 1)
 	for attempt := 1; attempt <= attempts; attempt++ {
 		astart := time.Now()
@@ -166,7 +180,7 @@ func (t option) try(ctx context.Context, g Generator, fn Fn) (bool, error) {
 
 		if len(t.ensure) > 0 {
 			var ok bool
-			if result, ok, err = t.rework(ctx, prompt, result); err != nil {
+			if result, ok, err = judge.rework(ctx, prompt, result); err != nil {
 				return false, err
 			} else if !ok {
 				log.Printf("autogentest %s attempt %d/%d: skipped, result violating rules\n", fn.Name, attempt, attempts)

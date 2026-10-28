@@ -42,6 +42,11 @@ func TestGolangPrompt(t *testing.T) {
 		require.NotContains(t, prompt, "- you must not include *any* comments")
 	})
 
+	t.Run("rules are the default rules followed by the given rules", func(t *testing.T) {
+		rules := Golang(From(fn)).Rules([]string{"mine", golangDefaultRules[0]})
+		require.Equal(t, append(append([]string(nil), golangDefaultRules...), "mine"), rules)
+	})
+
 	t.Run("uses the default rules without rules", func(t *testing.T) {
 		prompt, err := Golang(From(fn)).Prompt(PromptContext{Fn: fn})
 		require.NoError(t, err)

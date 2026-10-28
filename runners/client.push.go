@@ -100,7 +100,7 @@ func TryUpload(ctx context.Context, p2p host.Host, candidates []*compute.Compute
 		} else if recorded != nil {
 			return c, recorded
 		} else {
-			debugx.Println("direct upload declined", c.Id, c.P2Pid)
+			log.Println("direct upload declined, the runner is likely at capacity", c.Id, c.P2Pid)
 		}
 	}
 

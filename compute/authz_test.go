@@ -24,13 +24,14 @@ func TestTokenEncoding(t *testing.T) {
 			Bearer:           "bearer",
 			ComputeRead:      true,
 			ComputeRemaining: 9,
+			Paid:             true,
 		})
 		require.NoError(t, err)
-		require.JSONEq(t, `{"jti":"a","iss":"b","sub":"c","sid":"d","iat":"1761434790000","exp":"1761438390000","nbf":"1761434780000","bearer":"bearer","compute_read":true,"compute_remaining":"9"}`, string(encoded))
+		require.JSONEq(t, `{"jti":"a","iss":"b","sub":"c","sid":"d","iat":"1761434790000","exp":"1761438390000","nbf":"1761434780000","bearer":"bearer","compute_read":true,"compute_remaining":"9","paid":true}`, string(encoded))
 	})
 
 	t.Run("decodes api responses where integers are strings", func(t *testing.T) {
-		const doc = `{"token":{"jti":"a","iss":"b","sub":"c","iat":"1761434790000","exp":"1761438390000","nbf":"1761434780000","compute_remaining":"9"}}`
+		const doc = `{"token":{"jti":"a","iss":"b","sub":"c","iat":"1761434790000","exp":"1761438390000","nbf":"1761434780000","compute_remaining":"9","paid":true}}`
 
 		var out struct {
 			Token compute.Token `json:"token"`
@@ -39,10 +40,11 @@ func TestTokenEncoding(t *testing.T) {
 		require.Equal(t, "a", out.Token.Id)
 		require.EqualValues(t, 1761438390000, out.Token.Expires)
 		require.EqualValues(t, 9, out.Token.ComputeRemaining)
+		require.True(t, out.Token.Paid)
 	})
 
 	t.Run("round trips", func(t *testing.T) {
-		in := compute.Token{Id: "a", AccountId: "b", ProfileId: "c", SessionId: "d", Issued: 1, Expires: 2, NotBefore: 3, ComputeShared: true, ComputeRemaining: 1 << 60}
+		in := compute.Token{Id: "a", AccountId: "b", ProfileId: "c", SessionId: "d", Issued: 1, Expires: 2, NotBefore: 3, ComputeShared: true, ComputeRemaining: 1 << 60, Paid: true}
 		encoded, err := json.Marshal(&in)
 		require.NoError(t, err)
 
@@ -52,6 +54,7 @@ func TestTokenEncoding(t *testing.T) {
 		require.Equal(t, in.Expires, out.Expires)
 		require.Equal(t, in.ComputeRemaining, out.ComputeRemaining)
 		require.True(t, out.ComputeShared)
+		require.True(t, out.Paid)
 	})
 }
 

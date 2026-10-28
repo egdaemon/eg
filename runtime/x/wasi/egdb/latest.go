@@ -145,7 +145,8 @@ func (t latest) download(ctx context.Context, id string, path string) (err error
 	resp, err := t.get(ctx, fmt.Sprintf("/c/history/%s/analytics", url.PathEscape(id)), nil)
 	if err != nil {
 		errorsx.Log(httpx.AutoClose(resp))
-		if httpx.IsStatusError(err, http.StatusNotFound) != nil {
+		// free accounts do not have their analytics stored.
+		if httpx.IsStatusError(err, http.StatusNotFound, http.StatusPaymentRequired) != nil {
 			return errorsx.Wrap(os.ErrNotExist, "analytics database not found")
 		}
 

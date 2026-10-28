@@ -11,6 +11,9 @@ message Authorization {
   bool repository_modify = 6 [ json_name = "repository_modify" ];
   bool compute_shared = 7 [ json_name = "compute_shared" ];
   uint64 compute_remaining = 8 [ json_name = "compute_remaining" ];
+  // paid is derived from the account subscription on every authz mint, it is
+  // never granted.
+  bool paid = 9 [ json_name = "paid" ];
 }
 
 message Token {
@@ -36,6 +39,9 @@ message Token {
   // changed in the DB.
   bool compute_shared = 1007 [ json_name = "compute_shared" ];
   uint64 compute_remaining = 1008 [ json_name = "compute_remaining" ];
+  // paid reports the account has an active subscription. free accounts do not
+  // have it set.
+  bool paid = 1009 [ json_name = "paid" ];
 }
 
 message AuthzRequest {}

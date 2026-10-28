@@ -37,12 +37,12 @@ func main() {
 			eggolang.RecordCoverage,
 			// copies the binary built by AutoInstall into the workspace directory
 			// so the default module's integration tests exercise the new binary.
-			// shell.Op(shell.Newf("install -m 0755 /home/egd/go/bin/eg %s", sharedbin()).Debug()),
+			shell.Op(shell.Newf("install -m 0755 /home/egd/go/bin/eg %s", sharedbin()).Debug()),
 		),
 		egbug.Log("test suite completed"),
-		// egbug.Log("integration tests initiated"),
-		// IntegrationTests,
-		// egbug.Log("integration tests completed"),
+		egbug.Log("integration tests initiated"),
+		IntegrationTests,
+		egbug.Log("integration tests completed"),
 		// keep the analytics database of a successful run in the cache for the next run, see egdb.Latest.
 		egdb.Cache,
 	)

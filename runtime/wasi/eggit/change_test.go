@@ -285,6 +285,9 @@ func TestPush(t *testing.T) {
 		require.Empty(t, gitOutput(t, remote, "branch", "--list"))
 
 		// the whole commits, message and author included, apply to a pristine clone.
+		// am needs a committer, which the environment (e.g. a workload) may not configure.
+		t.Setenv("GIT_COMMITTER_NAME", "committer")
+		t.Setenv("GIT_COMMITTER_EMAIL", "committer@example.com")
 		clone := filepath.Join(t.TempDir(), "clone")
 		gitOutput(t, dir, "clone", dir, clone)
 		gitOutput(t, clone, "am", patch)

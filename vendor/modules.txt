@@ -79,6 +79,9 @@ github.com/BurntSushi/toml/internal
 # github.com/KimMachineGun/automemlimit v1.0.1
 ## explicit; go 1.21.0
 github.com/KimMachineGun/automemlimit/memlimit
+# github.com/Masterminds/squirrel v1.5.4
+## explicit; go 1.14
+github.com/Masterminds/squirrel
 # github.com/Microsoft/go-winio v0.6.3
 ## explicit; go 1.26.0
 github.com/Microsoft/go-winio
@@ -956,6 +959,12 @@ github.com/koron/go-ssdp/internal/ssdplog
 # github.com/kr/fs v0.1.0
 ## explicit
 github.com/kr/fs
+# github.com/lann/builder v0.0.0-20180802200727-47ae307949d0
+## explicit
+github.com/lann/builder
+# github.com/lann/ps v0.0.0-20150810152359-62de8c46ede0
+## explicit
+github.com/lann/ps
 # github.com/libp2p/go-buffer-pool v0.1.0
 ## explicit; go 1.17
 github.com/libp2p/go-buffer-pool

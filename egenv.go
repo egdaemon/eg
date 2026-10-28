@@ -168,6 +168,7 @@ const (
 	EnvironFile        = "environ.env"
 	SocketControl      = "control.socket"
 	SocketAnalytics    = "analytics.socket"
+	SocketAnalyticsPG  = ".s.PGSQL.5432" // postgres wire frontend of the analytics database, the name libpq style clients derive from a directory.
 )
 
 // generate unique module socket

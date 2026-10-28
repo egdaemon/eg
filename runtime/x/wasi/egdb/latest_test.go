@@ -59,3 +59,22 @@ func TestLatestNoSuccessfulRuns(t *testing.T) {
 	_, err := egdb.Latest(context.Background(), egdb.WithEndpoint(srv.URL))
 	require.ErrorIs(t, err, os.ErrNotExist)
 }
+
+func TestLatestAnalyticsNotStored(t *testing.T) {
+	t.Setenv(eg.EnvComputeCacheDirectory, t.TempDir())
+	t.Setenv("EG_GIT_AUTH_ACCESS_TOKEN", "token")
+
+	// free accounts do not have their analytics stored.
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/c/history/":
+			_, _ = w.Write([]byte(`{"items":[{"id":"abc"}]}`))
+		default:
+			w.WriteHeader(http.StatusPaymentRequired)
+		}
+	}))
+	defer srv.Close()
+
+	_, err := egdb.Latest(context.Background(), egdb.WithEndpoint(srv.URL))
+	require.ErrorIs(t, err, os.ErrNotExist)
+}

@@ -93,6 +93,7 @@ type golangOption struct {
 	templates []func() (string, error)
 	filename  string
 	dir       string
+	workspace string
 	pkgs      *pkgcache
 	callers   *callcache
 }
@@ -199,18 +200,22 @@ func (t GolangOptions) Directory(dir string) GolangOptions {
 	})
 }
 
+// Workspace sets the directory the paths of absolute functions are relative to when moved into the directory,
+// see Directory, e.g.) the working directory when coverage is reported from it. defaults to egenv.WorkspaceDirectory.
+func (t GolangOptions) Workspace(dir string) GolangOptions {
+	return append(slices.Clip(t), func(o *golangOption) {
+		o.workspace = dir
+	})
+}
+
 // rebase resolves the path of a function, which coverage reports relative to the workspace, against the configured directory.
 // absolute paths within the workspace are moved into the configured directory, other absolute paths are left alone.
 func (t golangOption) rebase(p string) string {
-	if filepath.IsAbs(p) {
-		rel, err := filepath.Rel(egenv.WorkspaceDirectory(), p)
-		if t.dir == "" || err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
-			return p
-		}
-		p = rel
+	if t.dir == "" {
+		return p
 	}
 
-	if t.dir == "" {
+	if p = relativeTo(t.workspace, p); filepath.IsAbs(p) {
 		return p
 	}
 
@@ -238,6 +243,7 @@ func golangFilename(pattern string, fn Fn) (string, error) {
 
 func (t GolangOptions) resolve() (o golangOption) {
 	o.filename = DefaultGolangFilename
+	o.workspace = egenv.WorkspaceDirectory()
 	for _, opt := range t {
 		opt(&o)
 	}

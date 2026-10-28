@@ -11,6 +11,7 @@ import (
 	"io"
 	"log"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -18,6 +19,7 @@ import (
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/iterx"
 	"github.com/egdaemon/eg/runtime/wasi/eg"
+	"github.com/egdaemon/eg/runtime/wasi/egenv"
 	"github.com/egdaemon/eg/runtime/wasi/egunsafe/fficoverage"
 	"github.com/egdaemon/eg/runtime/x/wasi/egdb"
 	"github.com/egdaemon/eg/runtime/x/wasi/egllm"
@@ -444,7 +446,8 @@ func worstFromPath(ctx context.Context, path string, n int, filters ...coverage.
 	return fficoverage.WorstFrom(ctx, db, int32(n), filters...)
 }
 
-// functions builds a Seq from the coverage reports.
+// functions builds a Seq from the coverage reports. paths within the working directory are made relative to it,
+// coverage can report them absolute, which a Generator working in another directory, such as a worktree, cannot move into it.
 func functions(query func(context.Context) ([]coverage.Report, error)) iterx.Seq[Fn] {
 	return iterx.New(func(ctx context.Context, yield func(Fn) bool) error {
 		results, err := query(ctx)
@@ -453,13 +456,26 @@ func functions(query func(context.Context) ([]coverage.Report, error)) iterx.Seq
 		}
 
 		for _, c := range results {
-			if !yield(Fn{Path: c.Path, Name: c.Fnname, Hits: int(c.Hits)}) {
+			if !yield(Fn{Path: relativeTo(egenv.WorkingDirectory(), c.Path), Name: c.Fnname, Hits: int(c.Hits)}) {
 				return nil
 			}
 		}
 
 		return nil
 	})
+}
+
+func relativeTo(dir string, p string) string {
+	if !filepath.IsAbs(p) {
+		return p
+	}
+
+	rel, err := filepath.Rel(dir, p)
+	if err != nil || !filepath.IsLocal(rel) {
+		return p
+	}
+
+	return rel
 }
 
 // From builds a Seq directly from a fixed set of functions, useful for

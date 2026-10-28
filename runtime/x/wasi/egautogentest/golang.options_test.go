@@ -76,6 +76,13 @@ func TestGolangDirectory(t *testing.T) {
 		require.Equal(t, "/wt/a/b.go", o.rebase("/ws/a/b.go"))
 		require.Equal(t, "/elsewhere/b.go", o.rebase("/elsewhere/b.go"))
 	})
+
+	t.Run("the workspace is configurable", func(t *testing.T) {
+		t.Setenv(_eg.EnvComputeWorkspaceDirectory, "/ws")
+		o := Golang(From()).Directory("/wt").Workspace("/workload/eg").resolve()
+		require.Equal(t, "/wt/authn/authn.go", o.rebase("/workload/eg/authn/authn.go"))
+		require.Equal(t, "/ws/a/b.go", o.rebase("/ws/a/b.go"))
+	})
 }
 
 func TestGolangLazy(t *testing.T) {

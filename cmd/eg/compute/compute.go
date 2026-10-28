@@ -5,6 +5,7 @@ type Cmd struct {
 	Archive    archive    `cmd:"" help:"compiles and creates a workload tar archive from manual inspection/storage"`
 	Upload     upload     `cmd:"" help:"compiles and uploads a workload to the cluster"`
 	Watch      watch      `cmd:"" help:"follow the logs and result of an enqueued workload by id"`
+	Cancel     cancel     `cmd:"" help:"cancel an enqueued or running workload by id"`
 	Local      local      `cmd:"" help:"execute the interpreter on the given directory"`
 	Baremetal  baremetal  `cmd:"" help:"execute the interpreter on the given directory within the host itself, inherently unsafe"`
 	Serve      serve      `cmd:"" help:"run a service within eg, automiacally uses builds and loads the containerfile without the module directory and .eg.env if it exists"`

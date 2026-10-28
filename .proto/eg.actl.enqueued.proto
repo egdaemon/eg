@@ -27,7 +27,9 @@ message Enqueued {
   // runner's secret, presented to the runner to stream the workload's logs.
   // its claims carry the runner's p2p id and relay addresses for dialing it.
   string logs_token = 21 [ json_name = "logs_token" ];
-  reserved 22 to 999;
+  // the module (folder name within the module directory) the workload runs, blank for the default workload.
+  string workload = 22 [ json_name = "workload" ];
+  reserved 23 to 999;
   repeated string labels = 1000 [ json_name = "labels" ];
   // secret manager uris (gcpsm://, awssm://) resolved by the runner into the
   // workload's environment. references only, never secret values.

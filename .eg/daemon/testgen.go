@@ -94,6 +94,7 @@ func testgen(c eggit.Changer, fn egautogentest.Fn, generate eg.OpFn) eg.OpFn {
 		),
 		eggit.Push(c),
 		egbug.Log("submitting branch completed "+name),
+		eggithub.DebugToken,
 		eggithub.PullRequest(
 			c,
 			eggithub.NewPullRequest("test: generate tests for "+name).

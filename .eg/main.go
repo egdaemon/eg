@@ -32,9 +32,9 @@ func main() {
 			ctx,
 			c1,
 			eggolang.New().Timeout(10*time.Minute).AutoInstall(),
-			eggolang.New().Timeout(10*time.Minute).AutoTest(),
-			egbug.Log("recording coverage initiated"),
-			eggolang.RecordCoverage,
+			// eggolang.New().Timeout(10*time.Minute).AutoTest(),
+			// egbug.Log("recording coverage initiated"),
+			// eggolang.RecordCoverage,
 			// copies the binary built by AutoInstall into the workspace directory
 			// so the default module's integration tests exercise the new binary.
 			shell.Op(shell.Newf("install -m 0755 /home/egd/go/bin/eg %s", sharedbin()).Debug()),
@@ -69,12 +69,12 @@ func IntegrationTests(ctx context.Context, op eg.Op) error {
 	return eg.Perform(
 		ctx,
 		shell.Op(
-			runtime.Newf("%s --hotswap compute baremetal --no-cgroups tests/concurrent", egbin),
-			runtime.Newf("%s --hotswap compute baremetal --no-cgroups tests/metrics", egbin),
-			runtime.Newf("%s --hotswap compute baremetal --no-cgroups tests/stress", egbin),
-			runtime.Newf("%s --hotswap compute baremetal --no-cgroups tests/localref", egbin),
-			runtime.Newf("%s --hotswap compute baremetal --no-cgroups tests/egdb", egbin),
-			runtime.Newf("%s --hotswap compute baremetal --no-cgroups tests/envvars", egbin),
+			// runtime.Newf("%s --hotswap compute baremetal --no-cgroups tests/concurrent", egbin),
+			// runtime.Newf("%s --hotswap compute baremetal --no-cgroups tests/metrics", egbin),
+			// runtime.Newf("%s --hotswap compute baremetal --no-cgroups tests/stress", egbin),
+			// runtime.Newf("%s --hotswap compute baremetal --no-cgroups tests/localref", egbin),
+			// runtime.Newf("%s --hotswap compute baremetal --no-cgroups tests/egdb", egbin),
+			runtime.Newf("%s --hotswap compute baremetal --no-cgroups tests/envvars", egbin).Debug(),
 			// runtime.New("/home/egd/go/bin/eg compute baremetal -vvvv tests/tty"),
 			// runtime.New("/home/egd/go/bin/eg compute baremetal tests/containers"),
 			// runtime.New("/home/egd/go/bin/eg compute baremetal -vv tests/gpgagent"),

@@ -25,6 +25,8 @@ import (
 	iterx "github.com/egdaemon/eg/internal/iterx"
 	"github.com/egdaemon/eg/internal/langx"
 	"github.com/egdaemon/eg/internal/wasix"
+	"github.com/go-git/go-git/v6"
+	"github.com/go-git/go-git/v6/plumbing"
 	"github.com/gofrs/uuid/v5"
 	"golang.org/x/tools/go/packages"
 )
@@ -167,7 +169,8 @@ func OptionWorktreeWorking(ctx context.Context, repo string) Option {
 }
 
 // OptionCloneWorking checks out a fully self-contained local clone at HEAD of
-// repo into the workspace's working directory. unlike OptionWorktreeWorking,
+// repo into the workspace's working directory, along with the base branch the
+// repository says it has, see gitx.DefaultBase. unlike OptionWorktreeWorking,
 // the checkout carries its own independent .git directory -- see
 // internal/gitx.LocalClone for why that matters when the working directory
 // gets relocated into a different mount namespace (e.g. a container). falls
@@ -182,7 +185,8 @@ func OptionCloneWorking(ctx context.Context, repo string) Option {
 		defer func() {
 			debugx.Println("cloned working directory checkout", repo, "completed in", time.Since(started))
 		}()
-		errorsx.Never(gitx.LocalClone(ctx, repo, filepath.Join(wctx.Root, eg.WorkingDirectory)))
+		// the head stays what is checked out, the base is what the repository says it is.
+		errorsx.Never(gitx.LocalClone(ctx, repo, filepath.Join(wctx.Root, eg.WorkingDirectory), gitx.SourceBase(repo, git.DefaultRemoteName), plumbing.HEAD.String()))
 	}
 }
 

@@ -79,4 +79,32 @@ func TestExchangeAuthed(t *testing.T) {
 		authed := &authn.Authed{}
 		require.Error(t, authn.ExchangeAuthed(t.Context(), http.DefaultClient, "://bad", strings.NewReader(""), authed))
 	})
+
+	t.Run("reports client error status", func(t *testing.T) {
+		l, err := net.Listen("tcp", "127.0.0.1:0")
+		require.NoError(t, err)
+		srv := &http.Server{Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			http.Error(w, "not found", http.StatusNotFound)
+		})}
+		go srv.Serve(l)
+		t.Cleanup(func() { srv.Close() })
+
+		authed := &authn.Authed{}
+		require.Error(t, authn.ExchangeAuthed(t.Context(), http.DefaultClient, "http://"+l.Addr().String(), strings.NewReader(""), authed))
+	})
+
+	t.Run("decodes response with only signup token", func(t *testing.T) {
+		l, err := net.Listen("tcp", "127.0.0.1:0")
+		require.NoError(t, err)
+		srv := &http.Server{Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			_, _ = w.Write([]byte(`{"signup_token":"abc"}`))
+		})}
+		go srv.Serve(l)
+		t.Cleanup(func() { srv.Close() })
+
+		authed := &authn.Authed{}
+		require.NoError(t, authn.ExchangeAuthed(t.Context(), http.DefaultClient, "http://"+l.Addr().String(), strings.NewReader(""), authed))
+		require.Equal(t, "abc", authed.SignupToken)
+		require.Empty(t, authed.Redirect)
+	})
 }

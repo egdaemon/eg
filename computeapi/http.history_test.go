@@ -91,6 +91,30 @@ func TestHistoryHandler(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, "output", string(b))
 	})
+
+	t.Run("serves the recorded analytics", func(t *testing.T) {
+		srv, db := newHistoryServer(t)
+		id := uuid.Must(uuid.NewV7()).String()
+		analytics := filepath.Join(t.TempDir(), "w.analytics.db")
+		require.NoError(t, os.WriteFile(analytics, []byte("analytics"), 0600))
+		require.NoError(t, computex.EntryUpsert(t.Context(), db, langx.Clone(computex.Entry{}, computex.EntryOptionTestDefaults, computex.EntryOptionID(id), func(e *computex.Entry) {
+			e.AnalyticsPath = analytics
+		})).Scan(&computex.Entry{}))
+
+		resp := historyRequest(t, srv, "/c/history/"+id+"/analytics", logsToken(t, id))
+		require.Equal(t, http.StatusOK, resp.StatusCode)
+		b, err := io.ReadAll(resp.Body)
+		require.NoError(t, err)
+		require.Equal(t, "analytics", string(b))
+	})
+
+	t.Run("no analytics recorded", func(t *testing.T) {
+		srv, db := newHistoryServer(t)
+		id := uuid.Must(uuid.NewV7()).String()
+		require.NoError(t, computex.EntryUpsert(t.Context(), db, langx.Clone(computex.Entry{}, computex.EntryOptionTestDefaults, computex.EntryOptionID(id))).Scan(&computex.Entry{}))
+
+		require.Equal(t, http.StatusNotFound, historyRequest(t, srv, "/c/history/"+id+"/analytics", logsToken(t, id)).StatusCode)
+	})
 }
 
 func logsecret() []byte {

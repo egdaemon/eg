@@ -98,3 +98,29 @@ func RunnerHistoryLogs(ctx context.Context, p2p host.Host, token string, id stri
 	_, err = io.Copy(dst, resp.Body)
 	return errorsx.Wrap(err, "unable to read stored logs")
 }
+
+// RunnerHistoryAnalytics writes the recorded analytics database of a workload from the runner that ran it into dst. a status error of
+// http.StatusNotFound means the runner hasn't recorded it (yet), or the record expired.
+func RunnerHistoryAnalytics(ctx context.Context, p2p host.Host, token string, id string, dst io.Writer) (err error) {
+	resp, closer, err := runnerget(ctx, p2p, token, fmt.Sprintf("/c/history/%s/analytics", url.PathEscape(id)))
+	if err != nil {
+		return err
+	}
+	defer closer()
+
+	_, err = io.Copy(dst, resp.Body)
+	return errorsx.Wrap(err, "unable to read stored analytics")
+}
+
+// RunnerAnalytics writes a snapshot of the analytics database of a running workload from its runner into dst. a status error of
+// http.StatusNotFound means the workload isn't running on the runner.
+func RunnerAnalytics(ctx context.Context, p2p host.Host, token string, id string, dst io.Writer) (err error) {
+	resp, closer, err := runnerget(ctx, p2p, token, fmt.Sprintf("/c/analytics/%s", url.PathEscape(id)))
+	if err != nil {
+		return err
+	}
+	defer closer()
+
+	_, err = io.Copy(dst, resp.Body)
+	return errorsx.Wrap(err, "unable to read analytics")
+}

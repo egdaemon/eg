@@ -28,8 +28,8 @@ func NewHTTPHistory(db *sql.DB, secret jwtx.JWTSecretSource) *HistoryService {
 	}
 }
 
-// HistoryService implements GET /{id} and GET /{id}/logs: the recorded outcome
-// and the logs of a workload this runner completed, until the record expires (computex.DefaultTTL).
+// HistoryService implements GET /{id}, GET /{id}/logs and GET /{id}/analytics: the recorded outcome,
+// the logs and the analytics of a workload this runner completed, until the record expires (computex.DefaultTTL).
 // the request must present a log token (LogClaims) for the workload signed with this runner's secret.
 type HistoryService struct {
 	db     *sql.DB
@@ -42,6 +42,7 @@ func (t *HistoryService) Bind(r *mux.Router) {
 	r.Use(httpx.RouteInvoked)
 
 	r.Path("/{id}/logs").Methods(http.MethodGet).HandlerFunc(t.logs)
+	r.Path("/{id}/analytics").Methods(http.MethodGet).HandlerFunc(t.analytics)
 	r.Path("/{id}").Methods(http.MethodGet).HandlerFunc(t.find)
 }
 
@@ -119,6 +120,50 @@ func (t *HistoryService) logs(w http.ResponseWriter, r *http.Request) {
 	// headers are sent; on failure the stream just ends.
 	_, err = io.Copy(w, f)
 	errorsx.Log(errorsx.Wrap(err, "unable to stream history logs"))
+}
+
+// analytics serves the recorded analytics database of the workload.
+func (t *HistoryService) analytics(w http.ResponseWriter, r *http.Request) {
+	uid, ok := t.authorize(w, r)
+	if !ok {
+		return
+	}
+
+	var rec computex.Entry
+	err := computex.EntryFindByID(r.Context(), t.db, uid.String()).Scan(&rec)
+	if errors.Is(err, sql.ErrNoRows) {
+		errorsx.Log(httpx.WriteEmptyJSON(w, http.StatusNotFound))
+		return
+	} else if err != nil {
+		log.Println(errorsx.Wrap(err, "unable to find history"))
+		errorsx.Log(httpx.WriteEmptyJSON(w, http.StatusInternalServerError))
+		return
+	}
+
+	if rec.AnalyticsPath == "" {
+		errorsx.Log(httpx.WriteEmptyJSON(w, http.StatusNotFound))
+		return
+	}
+
+	f, err := os.Open(rec.AnalyticsPath)
+	if errors.Is(err, os.ErrNotExist) {
+		errorsx.Log(httpx.WriteEmptyJSON(w, http.StatusNotFound))
+		return
+	} else if err != nil {
+		log.Println(errorsx.Wrap(err, "unable to open history analytics"))
+		errorsx.Log(httpx.WriteEmptyJSON(w, http.StatusInternalServerError))
+		return
+	}
+	defer f.Close()
+
+	w.Header().Set("Content-Type", "application/octet-stream")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	w.Header().Set("Cache-Control", "no-store")
+	w.WriteHeader(http.StatusOK)
+
+	// headers are sent; on failure the stream just ends.
+	_, err = io.Copy(w, f)
+	errorsx.Log(errorsx.Wrap(err, "unable to stream history analytics"))
 }
 
 // authorize validates the log token against the workload in the path, writing the failure response when it isn't valid.

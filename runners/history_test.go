@@ -50,3 +50,24 @@ func TestHistoryRecorderKeepLogs(t *testing.T) {
 		require.Error(t, err)
 	})
 }
+
+func TestHistoryRecorderKeepAnalytics(t *testing.T) {
+	t.Run("links the analytics so they outlive the workload's directory", func(t *testing.T) {
+		src := filepath.Join(t.TempDir(), "analytics.db")
+		require.NoError(t, os.WriteFile(src, []byte("analytics"), 0600))
+
+		path, err := historyrecorder{logs: filepath.Join(t.TempDir(), "history")}.keepanalytics("w1", src)
+		require.NoError(t, err)
+		require.Equal(t, "w1.analytics.db", filepath.Base(path))
+
+		require.NoError(t, os.RemoveAll(filepath.Dir(src)), "the workload directory is wiped")
+		b, err := os.ReadFile(path)
+		require.NoError(t, err)
+		require.Equal(t, "analytics", string(b))
+	})
+
+	t.Run("missing analytics report not exist", func(t *testing.T) {
+		_, err := historyrecorder{logs: t.TempDir()}.keepanalytics("w1", filepath.Join(t.TempDir(), "missing.db"))
+		require.ErrorIs(t, err, os.ErrNotExist)
+	})
+}

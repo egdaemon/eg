@@ -13,6 +13,7 @@ import (
 	"github.com/egdaemon/eg/internal/langx"
 	"github.com/egdaemon/eg/internal/slicesx"
 	"github.com/egdaemon/eg/internal/stringsx"
+	"github.com/go-git/go-git/v6/plumbing"
 	"github.com/logrusorgru/aurora"
 	"github.com/mattn/go-isatty"
 )
@@ -88,6 +89,19 @@ func BuildInfo() (_ string, err error) {
 	}
 
 	return stringsx.Join(".", slicesx.Filter(stringsx.Present, info.Main.Path, ts.Format("2006-01-02"), stringsx.DefaultIfBlank(id, Treeish), dirty)...), nil
+}
+
+// BuildCommit returns the commit of the build, or the git zero commit when missing (i.e. `go run`).
+func BuildCommit() string {
+	if info, ok := debug.ReadBuildInfo(); ok {
+		for _, v := range info.Settings {
+			if v.Key == "vcs.revision" && stringsx.Present(v.Value) {
+				return v.Value
+			}
+		}
+	}
+
+	return stringsx.DefaultIfBlank(Treeish, plumbing.ZeroHash.String())
 }
 
 func BuildInfoSafe() string {

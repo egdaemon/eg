@@ -6,18 +6,19 @@ import (
 
 	_eg "github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/internal/coverage"
+	"github.com/egdaemon/eg/internal/iterx"
 	"github.com/stretchr/testify/require"
 )
 
 func TestFunctionsPaths(t *testing.T) {
 	t.Setenv(_eg.EnvComputeWorkingDirectory, "/workload/eg")
 
-	seq := functions(func(context.Context) ([]coverage.Report, error) {
-		return []coverage.Report{
-			{Path: "/workload/eg/authn/authn.go", Fnname: "A", Hits: 2},
-			{Path: "authn/b.go", Fnname: "B"},
-			{Path: "/workload/other/c.go", Fnname: "C"},
-		}, nil
+	seq := functions(func(context.Context) iterx.Seq[coverage.Report] {
+		return iterx.Slice(
+			coverage.Report{Path: "/workload/eg/authn/authn.go", Fnname: "A", Hits: 2},
+			coverage.Report{Path: "authn/b.go", Fnname: "B"},
+			coverage.Report{Path: "/workload/other/c.go", Fnname: "C"},
+		)
 	})
 
 	var paths []string

@@ -67,6 +67,7 @@ type option struct {
 	attempts  int // number of generations to try per function, defaults to 1.
 	ensure    []string
 	revisions uint
+	limit     uint // number of functions to generate tests for, 0 is all of them.
 	llm       egllm.Judge
 }
 
@@ -120,6 +121,14 @@ func (t Options) Revisions(n uint) Options {
 	})
 }
 
+// Limit sets the number of functions of the Generator's seq to generate tests for, e.g.) the 5 least covered
+// of Worst. 0 generates tests for all of them, which is the default.
+func (t Options) Limit(n uint) Options {
+	return append(t, func(o *option) {
+		o.limit = n
+	})
+}
+
 // Run generates tests with g subject to the options.
 func (t Options) Run(g Generator) eg.OpFn {
 	o := option{revisions: DefaultRevisions, llm: egllm.Echo()}
@@ -131,7 +140,9 @@ func (t Options) Run(g Generator) eg.OpFn {
 }
 
 func (t option) run(g Generator) eg.OpFn {
-	seq := g.Seq()
+	seq := iterx.Until(16*time.Minute, g.Seq())
+	seq = iterx.N(t.limit, seq)
+
 	op := func(ctx context.Context, _ eg.Op) error {
 		var passed, failed uint
 		started := time.Now()
@@ -397,7 +408,7 @@ func writeTemp(dir string, pattern string, data []byte) (path string, err error)
 }
 
 // the filters Worst and Sample take narrow the functions they select, filters given together all apply.
-// they apply before the number of functions is limited, so n is the number of functions that match.
+// they apply before the number of functions is limited, see Options.Limit, so the limit is of the functions that match.
 
 // Language selects the functions of files in any of the languages, e.g.) "go", matched on the extension
 // of the file. the name is not case sensitive and an unknown language is an error.
@@ -421,63 +432,54 @@ func Coverage(min, max float32) coverage.Filter {
 	return coverage.QueryCoverage(min, max)
 }
 
-// Worst scans recorded coverage for the n functions with the lowest hit counts, of those matching the filters.
-func Worst(n int, filters ...coverage.Filter) iterx.Seq[Fn] {
-	return functions(func(ctx context.Context) ([]coverage.Report, error) {
-		return fficoverage.Worst(ctx, int32(n), filters...)
+// Worst scans recorded coverage for the functions with the lowest statement coverage first, of those matching the filters.
+// see Options.Limit to bound the number of functions.
+func Worst(filters ...coverage.Filter) iterx.Seq[Fn] {
+	return functions(func(context.Context) iterx.Seq[coverage.Report] {
+		return fficoverage.Worst(filters...)
 	})
 }
 
 // WorstFromWorkload is Worst reading the coverage recorded by the last successful run of the workload, e.g.)
 // eg.DefaultWorkload, instead of the coverage recorded by this run. the run is looked up, see egdb.Latest, while the
 // functions are selected, which fails when the workload has no successful run.
-func WorstFromWorkload(workload string, n int, filters ...coverage.Filter) iterx.Seq[Fn] {
-	return functions(func(ctx context.Context) ([]coverage.Report, error) {
+func WorstFromWorkload(workload string, filters ...coverage.Filter) iterx.Seq[Fn] {
+	return functions(func(ctx context.Context) iterx.Seq[coverage.Report] {
 		path, err := egdb.Latest(ctx, egdb.WithWorkload(workload))
 		if err != nil {
-			return nil, err
+			return iterx.Error[coverage.Report](err)
 		}
 
-		return worstFromPath(ctx, path, n, filters...)
+		return worstFromPath(path, filters...)
 	})
 }
 
 // WorstFromPath is Worst reading the coverage recorded in the database file at path, e.g.) the file provided by
 // egdb.Latest, instead of the coverage recorded by this run. the file is opened while the functions are selected.
-func WorstFromPath(path string, n int, filters ...coverage.Filter) iterx.Seq[Fn] {
-	return functions(func(ctx context.Context) ([]coverage.Report, error) {
-		return worstFromPath(ctx, path, n, filters...)
+func WorstFromPath(path string, filters ...coverage.Filter) iterx.Seq[Fn] {
+	return functions(func(context.Context) iterx.Seq[coverage.Report] {
+		return worstFromPath(path, filters...)
 	})
 }
 
-func worstFromPath(ctx context.Context, path string, n int, filters ...coverage.Filter) (_ []coverage.Report, err error) {
-	db, err := egdb.OpenFile(ctx, path)
-	if err != nil {
-		return nil, err
-	}
-	defer func() {
-		err = errors.Join(err, db.Close())
-	}()
-
-	return fficoverage.WorstFrom(ctx, db, int32(n), filters...)
+// worstFromPath iterates the reports of the database file at path. the file is opened when iteration starts and
+// closed when it ends, including when it stops early.
+func worstFromPath(path string, filters ...coverage.Filter) iterx.Seq[coverage.Report] {
+	return coverage.From(func(ctx context.Context) (*egdb.File, error) { return egdb.OpenFile(ctx, path) }, fficoverage.WorstFrom(filters...))
 }
 
 // functions builds a Seq from the coverage reports. paths within the working directory are made relative to it,
 // coverage can report them absolute, which a Generator working in another directory, such as a worktree, cannot move into it.
-func functions(query func(context.Context) ([]coverage.Report, error)) iterx.Seq[Fn] {
+func functions(query func(context.Context) iterx.Seq[coverage.Report]) iterx.Seq[Fn] {
 	return iterx.New(func(ctx context.Context, yield func(Fn) bool) error {
-		results, err := query(ctx)
-		if err != nil {
-			return err
-		}
-
-		for _, c := range results {
+		reports := query(ctx)
+		for c := range reports.Each(ctx) {
 			if !yield(Fn{Path: relativeTo(egenv.WorkingDirectory(), c.Path), Name: c.Fnname, Hits: int(c.Hits)}) {
 				return nil
 			}
 		}
 
-		return nil
+		return reports.Err()
 	})
 }
 
@@ -512,7 +514,7 @@ func From(fns ...Fn) iterx.Seq[Fn] {
 
 // Sample returns a random sample of n functions from recorded coverage data, of those matching the filters.
 func Sample(n int, filters ...coverage.Filter) iterx.Seq[Fn] {
-	return functions(func(ctx context.Context) ([]coverage.Report, error) {
-		return fficoverage.Sample(ctx, int32(n), filters...)
+	return functions(func(context.Context) iterx.Seq[coverage.Report] {
+		return coverage.From(egdb.Open, fficoverage.Sample(filters...).Limit(uint64(max(n, 0))))
 	})
 }

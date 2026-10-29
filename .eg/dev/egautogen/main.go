@@ -21,6 +21,9 @@ func main() {
 	judge := egllm.LLamaCPP("ggml-org/Qwen3.8-27B-GGUF:Q4_K_M").
 		ReasoningBudget(4096).
 		ReasoningEffort("medium")
+	// the pool runs the judge once per function, so the functions use an unmanaged copy and the
+	// server is started and stopped once around all of them.
+	unmanaged := judge.Endpoint(egllm.Endpoint())
 	c1 := eg.Container("eg.ubuntu")
 	err := eg.Perform(
 		ctx,
@@ -31,7 +34,7 @@ func main() {
 		eg.Module(
 			ctx,
 			c1,
-			daemon.Testgen(egautogentest.New().Judge(judge).Attempts(16)),
+			judge.With(daemon.Testgen(egautogentest.New().Judge(unmanaged).Limit(1).Attempts(16))),
 		),
 	)
 

@@ -42,6 +42,7 @@ type Command struct {
 	attempts   int16
 	retrylimit *rate.Limiter
 	lenient    bool
+	silent     bool
 	entry      entrypoint
 	exec       Execer
 	color      aurora.Aurora
@@ -74,6 +75,13 @@ func (t Command) Directory(d string) Command {
 // directory to run the command in. must be a relative path.
 func (t Command) Lenient(d bool) Command {
 	t.lenient = d
+	return t
+}
+
+// silence the warnings logged when a failure is ignored by Lenient or before a retry, see Attempts.
+// the output of the command itself is not affected, and a failure that is returned is still reported.
+func (t Command) Silent(d bool) Command {
+	t.silent = d
 	return t
 }
 
@@ -254,7 +262,9 @@ func Run(ctx context.Context, cmds ...Command) error {
 			cctx, done := context.WithTimeout(ctx, cmd.timeout)
 			defer done()
 			if cause := cmd.entry(cctx, cmd.user, cmd.group, cmd.cmd, cmd.directory, cmd.environ, cmd.exec); cmd.lenient && cause != nil {
-				log.Println(cmd.color.Yellow("WARN"), "command failed, but lenient mode enable, ignoring", cause)
+				if !cmd.silent {
+					log.Println(cmd.color.Yellow("WARN"), "command failed, but lenient mode enable, ignoring", cause)
+				}
 				return nil
 			} else if cause != nil {
 				return cause
@@ -284,7 +294,7 @@ func retry(ctx context.Context, c Command, do func() error) (err error) {
 			return nil
 		} else {
 			err = errorsx.Compact(err, cause)
-			if i+1 < attempts && ctx.Err() == nil {
+			if i+1 < attempts && ctx.Err() == nil && !c.silent {
 				log.Println(c.color.Yellow("WARN"), fmt.Sprintf("attempt %d failed, retrying: %s", i+1, c.cmd), cause)
 			}
 		}

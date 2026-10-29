@@ -63,6 +63,28 @@ func TestRetry(t *testing.T) {
 				colored: true,
 			},
 			{
+				name:     "lenient failures warn",
+				cmd:      shell.New("false").Lenient(true).UnsafeExec(failures(1)),
+				warnings: 1,
+				colored:  true,
+			},
+			{
+				name:    "silent lenient failures do not warn",
+				cmd:     shell.New("false").Lenient(true).Silent(true).UnsafeExec(failures(1)),
+				colored: true,
+			},
+			{
+				name:    "silent retries do not warn",
+				cmd:     shell.New("false").Silent(true).Attempts(3).UnsafeExec(failures(2)),
+				colored: true,
+			},
+			{
+				name:    "silent does not hide a returned failure",
+				cmd:     shell.New("false").Silent(true).Attempts(2).UnsafeExec(failures(5)),
+				failed:  true,
+				colored: true,
+			},
+			{
 				name:     "colors disabled",
 				cmd:      shell.New("false").Colors(false).Attempts(2).UnsafeExec(failures(1)),
 				warnings: 1,

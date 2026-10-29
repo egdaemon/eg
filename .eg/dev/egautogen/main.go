@@ -10,6 +10,7 @@ import (
 	"github.com/egdaemon/eg/runtime/wasi/egenv"
 	"github.com/egdaemon/eg/runtime/wasi/eggit"
 	"github.com/egdaemon/eg/runtime/x/wasi/egautogentest"
+	"github.com/egdaemon/eg/runtime/x/wasi/eggithub"
 	"github.com/egdaemon/eg/runtime/x/wasi/egllm"
 )
 
@@ -27,6 +28,7 @@ func main() {
 	c1 := eg.Container("eg.ubuntu")
 	err := eg.Perform(
 		ctx,
+		eggithub.DebugToken,
 		eggit.AutoClone,
 		eg.Build(
 			c1.BuildFromFile(".eg/Containerfile"),
@@ -42,3 +44,7 @@ func main() {
 		log.Fatalln(err)
 	}
 }
+
+// 01a188f7-50fb-7497-b1fa-2e90321f8429
+// 01a188f9-6981-7511-949d-a270757e56d7
+// 01a18905-7c0e-748d-9395-c7053efa45c1

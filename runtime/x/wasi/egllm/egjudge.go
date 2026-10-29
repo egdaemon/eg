@@ -23,6 +23,8 @@ type Server interface {
 type llamacpp struct {
 	model    string
 	endpoint string // empty defers to Endpoint().
+	budget   int    // reasoning budget in tokens, zero defers to the server.
+	effort   string // reasoning effort for the chat template, empty defers to the template.
 }
 
 // LLamaCPP is a Judge backed by a llama.cpp server running model, see With.
@@ -37,12 +39,33 @@ func (t llamacpp) Endpoint(v string) llamacpp {
 	return t
 }
 
+// ReasoningBudget caps the tokens the model reasons for before answering each request, e.g.) 2048 for a moderate effort.
+// a --reasoning-budget on the server's command line overrides it. defaults to the server's.
+func (t llamacpp) ReasoningBudget(tokens int) llamacpp {
+	t.budget = tokens
+	return t
+}
+
+// ReasoningEffort sets the chat template's reasoning_effort for each request, e.g.) "medium".
+// the template decides which values are valid, an unsupported one fails the request.
+// defaults to the template's.
+func (t llamacpp) ReasoningEffort(effort string) llamacpp {
+	t.effort = effort
+	return t
+}
+
 func (t llamacpp) Do(ctx context.Context, m ...Message) (string, error) {
-	if t.endpoint == "" {
-		return Chat(ctx, New(), t.model, m...)
+	c := New()
+	if t.endpoint != "" {
+		c = newClient(t.endpoint)
 	}
 
-	return Chat(ctx, newClient(t.endpoint), t.model, m...)
+	r := request{Model: t.model, Messages: m, ReasoningBudgetTokens: t.budget}
+	if t.effort != "" {
+		r.ChatTemplateKwargs = map[string]any{"reasoning_effort": t.effort}
+	}
+
+	return chat(ctx, c, r)
 }
 
 func (t llamacpp) With(ops ...eg.OpFn) eg.OpFn {

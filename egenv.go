@@ -98,6 +98,7 @@ const (
 	EnvComputeAPIEnabled         = "EG_COMPUTE_API_ENABLED"                     // gates the runner's push HTTP surface (POST /c/upload, POST /c/enqueue) and whether the runner advertises itself as uploadable; enabled by default, see the daemon's --uploadable flag.
 	EnvComputeProfileMode        = "EG_COMPUTE_PROFILE_MODE"                    // profile mode (cpu,heap,mem,allocs,block) for module runs.
 	EnvComputeLLMEndpoint        = "EG_COMPUTE_LLM_ENDPOINT"                    // override the base url (http(s):// or unix:///path/to.sock) of the llm server used by egllm, the server must provide llama.cpp's OpenAI-compatible api. defaults to llama.cpp's, which is managed for the duration of the workload.
+	EnvBuildCommit               = "EG_COMMIT"                                  // build arg for the root container carrying the commit of the eg build, busts the container cache each release.
 	EnvRestartOnUpgrade          = "EG_RESTART_ON_UPGRADE"                      // restart the daemon when the eg package is upgraded: auto (default), yes or no. read from daemon.env by the package's postinst.
 )
 

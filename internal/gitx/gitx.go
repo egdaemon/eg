@@ -40,7 +40,6 @@ import (
 	"github.com/egdaemon/eg/internal/slicesx"
 	"github.com/egdaemon/eg/internal/stringsx"
 	"github.com/egdaemon/eg/internal/timex"
-	"github.com/egdaemon/eg/internal/tracex"
 	"github.com/egdaemon/eg/internal/userx"
 )
 
@@ -275,7 +274,7 @@ func Env(repo *git.Repository, remote string, branch string, vcsclone string) (e
 		if !errors.Is(err, plumbing.ErrReferenceNotFound) {
 			return nil, errorsx.Wrapf(err, "base env: %s", uri)
 		}
-		tracex.Println("missing base branch for env, omitting base variables")
+		log.Println("unable to resolve the base branch locally or from the remote, omitting the EG_GIT_BASE_* variables")
 	}
 
 	return append(env, benv...), nil
@@ -299,9 +298,8 @@ func LocalEnv(repo *git.Repository, remote string, branch string) (env []string,
 
 	if benv, err = BaseEnv(repo, uri, eg.DefaultWorkingDirectory(), "main"); err != nil {
 		if errors.Is(err, plumbing.ErrReferenceNotFound) {
-			tracex.Println("missing base branch for local env - change added for baremetal support in github actions")
-			// do nothing, this check was added for baremetal compute.
-			// we'll see if its workable.
+			// added for baremetal support in github actions.
+			log.Println("unable to resolve the base branch locally or from the remote, omitting the EG_GIT_BASE_* variables")
 		} else {
 			return nil, errorsx.Wrapf(err, "base env: %s", uri)
 		}
@@ -385,7 +383,11 @@ func BaseEnv(repo *git.Repository, vcs, uri string, treeish string) (env []strin
 		commit *object.Commit
 	)
 
-	if hash, err = repo.ResolveRevision(plumbing.Revision(treeish)); err != nil {
+	// checkouts like github actions only have remote-tracking refs for the branches other than the one checked out.
+	if hash, err = repo.ResolveRevision(plumbing.Revision(treeish)); errors.Is(err, plumbing.ErrReferenceNotFound) {
+		hash, err = repo.ResolveRevision(plumbing.Revision(git.DefaultRemoteName + "/" + treeish))
+	}
+	if err != nil {
 		return nil, errorsx.Wrapf(err, "unable to resolve git revision: %s", treeish)
 	}
 

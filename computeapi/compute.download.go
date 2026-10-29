@@ -50,7 +50,7 @@ func DownloadAnalytics(ctx context.Context, chttp *http.Client, id string, dst i
 	if errors.Is(err, ErrWorkloadCompleted) {
 		return errorsx.Wrap(NewPushClient(chttp).HistoryAnalytics(ctx, id, dst), "stored workload analytics unavailable")
 	} else if err != nil {
-		return errorsx.Wrap(err, "unable to download workload analytics")
+		return errorsx.Wrap(err, "unable to locate workload on the cluster")
 	}
 
 	p2p, err := dialp2p(ctx, chttp)
@@ -62,10 +62,10 @@ func DownloadAnalytics(ctx context.Context, chttp *http.Client, id string, dst i
 	err = RunnerAnalytics(ctx, p2p, found.LogsToken, found.Id, dst)
 	if httpx.IsStatusError(err, http.StatusNotFound) != nil {
 		// no longer running, the runner keeps the analytics of workloads it completed for a while.
-		err = RunnerHistoryAnalytics(ctx, p2p, found.LogsToken, found.Id, dst)
+		return errorsx.Wrapf(RunnerHistoryAnalytics(ctx, p2p, found.LogsToken, found.Id, dst), "runner has no recorded analytics for workload (/c/history/%s/analytics)", found.Id)
 	}
 
-	return errorsx.Wrap(err, "unable to download workload analytics")
+	return errorsx.Wrap(err, "unable to snapshot running workload analytics")
 }
 
 // dialp2p joins the p2p network through the bootstrap peers of the cluster.

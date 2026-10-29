@@ -27,7 +27,7 @@ func Testgen(opts egautogentest.Options) eg.OpFn {
 				egautogentest.Language("go"),
 				egautogentest.Coverage(0, 80),
 			),
-		).Until(16 * time.Minute).Limit(1),
+		).Until(16 * time.Minute).Limit(16),
 	)
 }
 

@@ -7,7 +7,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	_eg "github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/internal/md5x"
 	"github.com/egdaemon/eg/runtime/wasi/eg"
 	"github.com/egdaemon/eg/runtime/wasi/egenv"
@@ -244,7 +243,7 @@ func dopush(ctx context.Context, c Changer, options ...pushopts) error {
 
 	// without a clone the workload runs against the local checkout, where there is nothing to push to,
 	// so the commits are written as a patch for the runner to hand back.
-	if !env.Boolean(true, _eg.EnvUnsafeGitCloneEnabled) {
+	if !egenv.CloneEnabled() {
 		dir := egenv.WorkspaceDirectory(".eg", ".patches")
 		script = append(script,
 			`base=$(cat "$(git rev-parse --absolute-git-dir)/eg-base" 2>/dev/null || git rev-parse HEAD~1)`,

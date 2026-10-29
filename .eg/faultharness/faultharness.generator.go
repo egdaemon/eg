@@ -21,7 +21,7 @@ type generator struct {
 
 // Seq is the function the fault was raised in.
 func (t generator) Seq() egpool.Seq[egautogentest.Fn] {
-	return egautogentest.From(egautogentest.Fn{Path: t.fault.Path, Name: t.fault.Func})
+	return egautogentest.FromSpecified(egautogentest.Fn{Path: t.fault.Path, Name: t.fault.Func})
 }
 
 // Rules are the rules applied to the response, the ones given and what makes it a reproduction.

@@ -36,7 +36,7 @@ func main() {
 		eg.Module(
 			ctx,
 			c1,
-			judge.With(daemon.Testgen(egautogentest.New().Judge(unmanaged).Limit(1).Attempts(16))),
+			judge.With(daemon.Testgen(egautogentest.New().Judge(unmanaged).Attempts(16))),
 		),
 	)
 

@@ -53,10 +53,10 @@ func TestGolangFilename(t *testing.T) {
 
 func TestGolangOptionsFilename(t *testing.T) {
 	t.Run("defaults to the default pattern", func(t *testing.T) {
-		require.Equal(t, DefaultGolangFilename, Golang(From()).resolve().filename)
+		require.Equal(t, DefaultGolangFilename, Golang(FromSpecified()).resolve().filename)
 	})
 
 	t.Run("overrides the pattern", func(t *testing.T) {
-		require.Equal(t, "x_test.go", Golang(From()).Filename("x_test.go").resolve().filename)
+		require.Equal(t, "x_test.go", Golang(FromSpecified()).Filename("x_test.go").resolve().filename)
 	})
 }

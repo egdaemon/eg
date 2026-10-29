@@ -13,7 +13,7 @@ func TestGolangPackages(t *testing.T) {
 	fn := Fn{Path: ".fixtures/golang/example.3/sample.go", Name: "Noop"}
 
 	t.Run("lists the exported functions of a package within the module", func(t *testing.T) {
-		prompt, err := Golang(From(fn)).Templates("import \"example.com/mod/api\"\n\nfunc TestX() {}").Prompt(PromptContext{Fn: fn})
+		prompt, err := Golang(FromSpecified(fn)).Templates("import \"example.com/mod/api\"\n\nfunc TestX() {}").Prompt(PromptContext{Fn: fn})
 		require.NoError(t, err)
 		require.Less(t, strings.Index(prompt, "     TYPES      "), strings.Index(prompt, "package api // import"))
 		require.Less(t, strings.Index(prompt, "package api // import"), strings.Index(prompt, "     SOURCE     "))
@@ -46,20 +46,20 @@ func TestGolangPackages(t *testing.T) {
 		require.NoError(t, os.MkdirAll(dir, 0o755))
 		require.NoError(t, os.WriteFile(filepath.Join(dir, "sub.go"), []byte("package sub\n\nfunc Cached() {}\n"), 0o600))
 
-		prompt, err := Golang(From(fn)).Templates("import \"example.org/Cached/sub\"\n\nfunc TestX() {}").Prompt(PromptContext{Fn: fn})
+		prompt, err := Golang(FromSpecified(fn)).Templates("import \"example.org/Cached/sub\"\n\nfunc TestX() {}").Prompt(PromptContext{Fn: fn})
 		require.NoError(t, err)
 		require.Contains(t, prompt, "func Cached()")
 	})
 
 	t.Run("omits the section without packages", func(t *testing.T) {
-		prompt, err := Golang(From(fn)).Prompt(PromptContext{Fn: fn})
+		prompt, err := Golang(FromSpecified(fn)).Prompt(PromptContext{Fn: fn})
 		require.NoError(t, err)
 		require.NotContains(t, prompt, "// import")
 	})
 
 	t.Run("discovers packages imported by the templates", func(t *testing.T) {
 		template := "import (\n\t\"testing\"\n\n\t\"example.com/mod/api\"\n\t\"example.net/missing\"\n)\n\nfunc TestX(t *testing.T) {}"
-		prompt, err := Golang(From(fn)).Templates(template).Prompt(PromptContext{Fn: fn})
+		prompt, err := Golang(FromSpecified(fn)).Templates(template).Prompt(PromptContext{Fn: fn})
 		require.NoError(t, err)
 		require.Contains(t, prompt, "package api // import \"example.com/mod/api\"\n")
 		require.NotContains(t, prompt, "// import \"example.net/missing\"")
@@ -67,19 +67,19 @@ func TestGolangPackages(t *testing.T) {
 
 	t.Run("discovers packages from a full file template", func(t *testing.T) {
 		template := "package x\n\nimport \"example.org/lib\"\n\nvar _ = lib.Vendored"
-		prompt, err := Golang(From(fn)).Templates(template).Prompt(PromptContext{Fn: fn})
+		prompt, err := Golang(FromSpecified(fn)).Templates(template).Prompt(PromptContext{Fn: fn})
 		require.NoError(t, err)
 		require.Contains(t, prompt, "func Vendored(name string) string")
 	})
 
 	t.Run("discovers packages imported by earlier attempts", func(t *testing.T) {
-		prompt, err := Golang(From(fn)).Prompt(PromptContext{Fn: fn, Previous: "package x_test\n\nimport \"example.com/mod/api\"\n\nvar _ = api.Zero[int]"})
+		prompt, err := Golang(FromSpecified(fn)).Prompt(PromptContext{Fn: fn, Previous: "package x_test\n\nimport \"example.com/mod/api\"\n\nvar _ = api.Zero[int]"})
 		require.NoError(t, err)
 		require.Contains(t, prompt, "package api // import \"example.com/mod/api\"\n")
 	})
 
 	t.Run("discovers standard library packages", func(t *testing.T) {
-		prompt, err := Golang(From(fn)).Prompt(PromptContext{Fn: fn, Previous: "package x_test\n\nimport \"crypto/ed25519\"\n\nvar _ = ed25519.GenerateKey"})
+		prompt, err := Golang(FromSpecified(fn)).Prompt(PromptContext{Fn: fn, Previous: "package x_test\n\nimport \"crypto/ed25519\"\n\nvar _ = ed25519.GenerateKey"})
 		require.NoError(t, err)
 		require.Contains(t, prompt, "package ed25519 // import \"crypto/ed25519\"\n")
 		require.Contains(t, prompt, "func GenerateKey(random io.Reader) (PublicKey, PrivateKey, error)")
@@ -87,7 +87,7 @@ func TestGolangPackages(t *testing.T) {
 
 	t.Run("orders the packages by import path, the function's own package among them", func(t *testing.T) {
 		template := "import (\n\t\"example.com/mod/api\"\n\t\"crypto/ed25519\"\n)\n\nvar _ = ed25519.GenerateKey"
-		prompt, err := Golang(From(fn)).Templates(template).Prompt(PromptContext{Fn: fn})
+		prompt, err := Golang(FromSpecified(fn)).Templates(template).Prompt(PromptContext{Fn: fn})
 		require.NoError(t, err)
 
 		own, std, api := strings.Index(prompt, "package mod // import"), strings.Index(prompt, "package ed25519 // import"), strings.Index(prompt, "package api // import")

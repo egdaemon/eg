@@ -50,7 +50,7 @@ func ReportSearch(ctx context.Context, q sqlx.Queryer, b squirrel.SelectBuilder)
 // WorstSearchBuilder selects the functions matching the filters, the lowest statement coverage first and the lowest
 // hit count of those equally covered. it is not limited.
 func WorstSearchBuilder(filters ...Filter) squirrel.SelectBuilder {
-	return ReportSearchBuilder(filters...).OrderBy("statements ASC", "hits ASC")
+	return ReportSearchBuilder(filters...).OrderBy("statements ASC", "hits ASC", "RANDOM()")
 }
 
 // SampleSearchBuilder selects the functions matching the filters in a random order. it is not limited.

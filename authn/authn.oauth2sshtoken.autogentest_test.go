@@ -1,6 +1,7 @@
 package authn_test
 
 import (
+	"context"
 	"crypto/ed25519"
 	"crypto/rand"
 	"encoding/base64"
@@ -226,5 +227,63 @@ func TestOAuth2SSHToken(t *testing.T) {
 		require.NotNil(t, tok)
 		require.Equal(t, "hdr-at", tok.AccessToken)
 		require.NotEmpty(t, gotAuthHeader)
+	})
+
+	t.Run("returns error on context cancellation", func(t *testing.T) {
+		_, priv, err := ed25519.GenerateKey(rand.Reader)
+		require.NoError(t, err)
+		signer, err := ssh.NewSignerFromKey(priv)
+		require.NoError(t, err)
+
+		ctx, cancel := context.WithCancel(t.Context())
+		cancel()
+
+		mux := http.NewServeMux()
+		mux.HandleFunc("/oauth/token", func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"access_token": "at",
+				"token_type":   "Bearer",
+			})
+		})
+
+		srv := httptest.NewServer(mux)
+		t.Cleanup(srv.Close)
+
+		endpoint := oauth2.Endpoint{
+			AuthURL:   srv.URL + "/oauth/auth",
+			TokenURL:  srv.URL + "/oauth/token",
+			AuthStyle: oauth2.AuthStyleInParams,
+		}
+
+		_, tok, err := authn.OAuth2SSHToken(ctx, signer, endpoint)
+		require.Error(t, err)
+		require.Nil(t, tok)
+	})
+
+	t.Run("returns error on malformed token response", func(t *testing.T) {
+		_, priv, err := ed25519.GenerateKey(rand.Reader)
+		require.NoError(t, err)
+		signer, err := ssh.NewSignerFromKey(priv)
+		require.NoError(t, err)
+
+		mux := http.NewServeMux()
+		mux.HandleFunc("/oauth/token", func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`not valid json`))
+		})
+
+		srv := httptest.NewServer(mux)
+		t.Cleanup(srv.Close)
+
+		endpoint := oauth2.Endpoint{
+			AuthURL:   srv.URL + "/oauth/auth",
+			TokenURL:  srv.URL + "/oauth/token",
+			AuthStyle: oauth2.AuthStyleInParams,
+		}
+
+		_, tok, err := authn.OAuth2SSHToken(t.Context(), signer, endpoint)
+		require.Error(t, err)
+		require.Nil(t, tok)
 	})
 }

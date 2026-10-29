@@ -79,4 +79,38 @@ func TestExchangeAuthed(t *testing.T) {
 		authed := &authn.Authed{}
 		require.Error(t, authn.ExchangeAuthed(t.Context(), http.DefaultClient, "://bad", strings.NewReader(""), authed))
 	})
+
+	t.Run("decodes a response with identity and profiles", func(t *testing.T) {
+		l, err := net.Listen("tcp", "127.0.0.1:0")
+		require.NoError(t, err)
+		srv := &http.Server{Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			require.Equal(t, http.MethodPost, r.Method)
+			require.Equal(t, "/exchange", r.URL.Path)
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"signup_token":"stok","redirect":"https://ex.com/r","identity":{"id":"uid1"},"profiles":[{"signup_token":"ptok"}]}`))
+		})}
+		go srv.Serve(l)
+		t.Cleanup(func() { srv.Close() })
+
+		authed := &authn.Authed{}
+		require.NoError(t, authn.ExchangeAuthed(t.Context(), http.DefaultClient, "http://"+l.Addr().String()+"/exchange", strings.NewReader(`{"k":"v"}`), authed))
+		require.Equal(t, "stok", authed.SignupToken)
+		require.Equal(t, "https://ex.com/r", authed.Redirect)
+		require.NotNil(t, authed.Identity)
+		require.Len(t, authed.Profiles, 1)
+		require.NotNil(t, authed.Profiles[0])
+	})
+
+	t.Run("reports a 404 response", func(t *testing.T) {
+		l, err := net.Listen("tcp", "127.0.0.1:0")
+		require.NoError(t, err)
+		srv := &http.Server{Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			http.NotFound(w, r)
+		})}
+		go srv.Serve(l)
+		t.Cleanup(func() { srv.Close() })
+
+		authed := &authn.Authed{}
+		require.Error(t, authn.ExchangeAuthed(t.Context(), http.DefaultClient, "http://"+l.Addr().String(), strings.NewReader(""), authed))
+	})
 }

@@ -189,7 +189,7 @@ func (t daemon) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, keygen cmdopt
 		return err
 	}
 
-	if err = runners.BuildRootContainer(ctx, "--build-arg", envx.Format(eg.EnvBuildCommit, cmdopts.BuildInfoSafe())); err != nil {
+	if err = runners.BuildRootContainer(ctx, "--build-arg", envx.Format(eg.EnvBuildCommit, cmdopts.BuildCommit())); err != nil {
 		return err
 	}
 

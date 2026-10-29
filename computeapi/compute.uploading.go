@@ -132,12 +132,32 @@ type uploader struct {
 	candidateslimit uint64 // maximum number of candidates to consider.
 	attemptslimit   int    // maximum number of attempts.
 	attempt         int
-	free            bool  // the control plane answered payment required, only the lan/p2p sources are available.
-	nocluster       bool  // the cluster answered payment required, it is not attempted again.
-	retry           bool  // some candidate failed for a reason that may pass, e.g.) no reservation.
-	cause           error // why the most recent attempt failed.
+	free            bool       // the control plane answered payment required, only the lan/p2p sources are available.
+	nocluster       bool       // the cluster answered payment required, it is not attempted again.
+	retry           bool       // some candidate failed for a reason that may pass, e.g.) no reservation.
+	cause           error      // why the most recent attempt failed.
+	logs            *logwriter // where the workload's logs are written, tracks how much was written so following can resume.
 	result          error
 }
+
+// logwriter counts the bytes written so a log stream interrupted part way can resume from its offset.
+type logwriter struct {
+	dst io.Writer
+	n   int64
+}
+
+func (t *logwriter) Write(p []byte) (n int, err error) {
+	n, err = t.dst.Write(p)
+	t.n += int64(n)
+	return n, err
+}
+
+// streamfailure marks a failure to stream the logs of a workload that was accepted, as opposed to the
+// workload not succeeding.
+type streamfailure struct{ cause error }
+
+func (t streamfailure) Error() string { return t.cause.Error() }
+func (t streamfailure) Unwrap() error { return t.cause }
 
 // Upload uploads the workload and follows it, if enabled, until it completes. candidates are identified and
 // connected to in a cycle until one accepts the workload, the context ends or the attempts are exhausted.
@@ -147,8 +167,14 @@ type uploader struct {
 // states:
 //
 //	identifying -> connecting -> watching -> completed
-//	     ^             |             |
-//	     +--- delay ---+             +-> failed
+//	     ^             |           |  ^  |
+//	     +--- delay ---+           |  |  +-> awaiting -> completed
+//	                               |  |         |
+//	                               v  |         +-> failed
+//	                           watchdelay
+//
+// a workload that was accepted is never uploaded again. when its logs cannot be streamed, e.g.) the runner has
+// no relay reservation yet, following waits and retries before falling back to waiting for the result.
 func Upload(ctx context.Context, httpc *http.Client, db sqlx.Queryer, enq *Enqueued, archive, environ io.ReadSeeker, options ...uploadopt) error {
 	u := &uploader{
 		httpc:           httpc,
@@ -160,6 +186,7 @@ func Upload(ctx context.Context, httpc *http.Client, db sqlx.Queryer, enq *Enque
 		candidateslimit: 8,
 		backoff:         backoff.New(backoff.Exponential(time.Second), backoff.Maximum(32*time.Second)),
 		lanttl:          lan.DefaultTTL,
+		logs:            &logwriter{dst: os.Stdout},
 	}
 
 	for _, opt := range options {
@@ -299,6 +326,16 @@ func (t uploadconnecting) Update(ctx context.Context) uploadstate {
 		}
 
 		debugx.Println("enqueued", spew.Sdump(o.recorded))
+
+		if o.host != nil {
+			log.Printf("enqueued workload(%s) runner(%s) peer(%s)\n", u.enq.Id, o.runner.Id, o.runner.P2Pid)
+		} else {
+			log.Printf("enqueued workload(%s)\n", o.recorded.Id)
+		}
+
+		// the attempts bound consecutive failures, the workload was accepted.
+		u.attempt = 0
+
 		return uploadwatching{u: u, o: o}
 	}
 
@@ -333,26 +370,97 @@ func (t uploaddelay) Update(ctx context.Context) uploadstate {
 }
 
 // uploadwatching follows a workload that was accepted. the workload is never uploaded again, an
-// error here is the result of the workload.
+// error here is the result of the workload unless the logs could not be streamed.
 type uploadwatching struct {
 	u *uploader
 	o outcome // the host is only set when a runner accepted the workload directly.
 }
 
 func (t uploadwatching) Update(ctx context.Context) uploadstate {
-	var err error
+	var (
+		err      error
+		failure  streamfailure
+		retrying bool
+		u        = t.u
+		before   = u.logs.n
+	)
 
 	if t.o.host != nil {
-		defer t.o.host.Close()
-		log.Printf("enqueued workload(%s) runner(%s) peer(%s)\n", t.u.enq.Id, t.o.runner.Id, t.o.runner.P2Pid)
-		if t.u.follow {
-			err = uploadwatch(ctx, t.u.httpc, t.o)
+		defer func() {
+			if !retrying {
+				errorsx.Log(t.o.host.Close())
+			}
+		}()
+	}
+
+	if u.follow && t.o.host != nil {
+		err = uploadwatch(ctx, u.httpc, t.o, u.logs.n, u.logs)
+	} else if u.follow {
+		err = followenqueued(ctx, u.httpc, t.o.recorded.Id, u.logs.n, u.logs)
+	}
+
+	if err == nil {
+		return uploadcompleted{u}
+	}
+
+	if !errors.As(err, &failure) || ctx.Err() != nil {
+		return u.fail(err)
+	}
+
+	// the stream connected and made progress, the failures are no longer consecutive.
+	if u.logs.n > before {
+		u.attempt = 0
+	}
+
+	if reason := retryreason(err); reason != "" && u.attempt < u.attemptslimit {
+		u.attempt++
+		retrying = true
+		debugx.Println("unable to stream workload logs", t.o.recorded.Id, err)
+		return uploadwatchdelay{u: u, o: t.o, reason: reason}
+	}
+
+	log.Println("unable to stream the workload logs, waiting for it to complete", t.o.recorded.Id, err)
+	return uploadawaiting{u: u, id: t.o.recorded.Id}
+}
+
+// uploadwatchdelay waits before following the logs of the workload again.
+type uploadwatchdelay struct {
+	u      *uploader
+	o      outcome
+	reason string
+}
+
+func (t uploadwatchdelay) Update(ctx context.Context) uploadstate {
+	d := t.u.backoff.Backoff(int64(t.u.attempt - 1))
+	log.Printf("(attempt %d/%d - %s) unable to stream the workload logs, %s\n", t.u.attempt, t.u.attemptslimit, d, t.reason)
+
+	timer := time.NewTimer(d)
+	defer timer.Stop()
+
+	select {
+	case <-ctx.Done():
+		if t.o.host != nil {
+			errorsx.Log(t.o.host.Close())
 		}
-	} else {
-		log.Printf("enqueued workload(%s)\n", t.o.recorded.Id)
-		if t.u.follow {
-			err = FollowEnqueued(ctx, t.u.httpc, t.o.recorded.Id)
-		}
+		return t.u.fail(ctx.Err())
+	case <-timer.C:
+		return uploadwatching{u: t.u, o: t.o}
+	}
+}
+
+// uploadawaiting waits for the result of a workload whose logs cannot be streamed, the stored log is printed
+// once it completes when none of it was streamed.
+type uploadawaiting struct {
+	u  *uploader
+	id string
+}
+
+func (t uploadawaiting) Update(ctx context.Context) uploadstate {
+	c := NewPushClient(t.u.httpc)
+
+	err := computex.Await(ctx, t.id, c.HistoryFind)
+	if ctx.Err() == nil && t.u.logs.n == 0 {
+		errorsx.Log(computex.Logs(ctx, t.id, t.u.logs, c.HistoryLogs))
 	}
 
 	if err != nil {
@@ -576,16 +684,16 @@ func uploadenqueue(ctx context.Context, httpc *http.Client, endpoint string, enq
 	return outcome{recorded: e.Enqueued}, nil
 }
 
-// uploadwatch streams the workload's logs and reports how the workload ended, nil when it succeeded.
-// the workload is already enqueued; an error here must not trigger another upload.
-func uploadwatch(ctx context.Context, httpc *http.Client, o outcome) error {
+// uploadwatch streams the workload's logs from the offset and reports how the workload ended, nil when it succeeded.
+// the workload is already enqueued; an error here must not trigger another upload, failing to stream is a streamfailure.
+func uploadwatch(ctx context.Context, httpc *http.Client, o outcome, offset int64, dst io.Writer) error {
 	if stringsx.Blank(o.recorded.LogsToken) {
 		log.Println("runner does not support log streaming", o.runner.Id, o.runner.P2Pid)
 		return computex.Await(ctx, o.recorded.Id, NewPushClient(httpc).HistoryFind)
 	}
 
-	if err := FollowLogs(ctx, o.host, o.recorded.LogsToken, o.recorded.Id, 0, os.Stdout); err != nil {
-		return errorsx.Wrap(err, "unable to stream workload logs")
+	if err := FollowLogs(ctx, o.host, o.recorded.LogsToken, o.recorded.Id, offset, dst); err != nil {
+		return streamfailure{errorsx.Wrap(err, "unable to stream workload logs")}
 	}
 
 	// the runner records the outcome itself, the control plane is only consulted when it can't answer.
@@ -603,14 +711,23 @@ func uploadwatch(ctx context.Context, httpc *http.Client, o outcome) error {
 // schedule the workload on a runner, then dials that runner through the p2p network. when the workload
 // completes before it can be followed its stored log is printed instead.
 func FollowEnqueued(ctx context.Context, chttp *http.Client, id string) (err error) {
+	return followenqueued(ctx, chttp, id, 0, os.Stdout)
+}
+
+// followenqueued follows the logs of the enqueued workload from the offset into dst. failing to stream the logs
+// is a streamfailure.
+func followenqueued(ctx context.Context, chttp *http.Client, id string, offset int64, dst io.Writer) (err error) {
 	// how often the cluster is polled for the workload to be scheduled on a runner.
 	const pollinterval = 2 * time.Second
 
 	log.Println("waiting for the workload to start", id)
 	found, err := NewPushClient(chttp).AwaitLogsToken(ctx, id, pollinterval)
 	if errors.Is(err, ErrWorkloadCompleted) {
-		if err = computex.Logs(ctx, id, os.Stdout, NewPushClient(chttp).HistoryLogs); err != nil {
-			return err
+		// the stored log is the whole log, it would repeat what was already streamed.
+		if offset == 0 {
+			if err = computex.Logs(ctx, id, dst, NewPushClient(chttp).HistoryLogs); err != nil {
+				return err
+			}
 		}
 
 		return computex.Await(ctx, id, NewPushClient(chttp).HistoryFind)
@@ -618,22 +735,22 @@ func FollowEnqueued(ctx context.Context, chttp *http.Client, id string) (err err
 		log.Println("unable to stream the workload logs, waiting for it to complete", err)
 		return computex.Await(ctx, id, NewPushClient(chttp).HistoryFind)
 	} else if err != nil {
-		return errorsx.Wrap(err, "unable to stream workload logs")
+		return streamfailure{errorsx.Wrap(err, "unable to stream workload logs")}
 	}
 
 	meta, err := registration.NewPingClient(chttp).Meta(ctx)
 	if err != nil {
-		return errorsx.Wrap(err, "unable to retrieve p2p bootstrap addresses")
+		return streamfailure{errorsx.Wrap(err, "unable to retrieve p2p bootstrap addresses")}
 	}
 
 	p2p, err := libp2px.NewClient(ctx, libp2px.StringsToPeers(meta.Bootstrap...)...)
 	if err != nil {
-		return errorsx.Wrap(err, "unable to join p2p network")
+		return streamfailure{errorsx.Wrap(err, "unable to join p2p network")}
 	}
 	defer p2p.Close()
 
-	if err = FollowLogs(ctx, p2p, found.LogsToken, found.Id, 0, os.Stdout); err != nil {
-		return errorsx.Wrap(err, "unable to stream workload logs")
+	if err = FollowLogs(ctx, p2p, found.LogsToken, found.Id, offset, dst); err != nil {
+		return streamfailure{errorsx.Wrap(err, "unable to stream workload logs")}
 	}
 
 	return computex.Await(ctx, id, NewPushClient(chttp).HistoryFind)

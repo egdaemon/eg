@@ -429,6 +429,7 @@ func TestRetryable(t *testing.T) {
 		{name: "remote stream reset", err: fmt.Errorf("unable to write request over stream: %w", &network.StreamError{Remote: true}), want: true},
 		{name: "reservation error", err: fmt.Errorf("dial: %w", circuitv2.ReservationError{Status: pbv2.Status_RESERVATION_REFUSED}), want: true},
 		{name: "no reservation", err: errors.New("error opening relay circuit: NO_RESERVATION (204)"), want: true},
+		{name: "unable to open stream", err: fmt.Errorf("unable to open stream to peer: failed to dial: all dials failed\n  * [/p2p-circuit] error opening relay circuit: NO_RESERVATION (204)"), want: true},
 		{name: "rejected upload", err: errors.New("runner rejected upload with status 400: bad"), want: false},
 		{name: "invalid peer", err: errors.New(`invalid peer id "x"`), want: false},
 	} {

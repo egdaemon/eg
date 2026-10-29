@@ -1,6 +1,7 @@
 package authn_test
 
 import (
+	"context"
 	"crypto/ed25519"
 	"crypto/rand"
 	"encoding/base64"
@@ -8,6 +9,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"testing"
 
 	"github.com/egdaemon/eg/authn"
@@ -147,6 +149,158 @@ func TestOAuth2SSHToken(t *testing.T) {
 		}
 
 		_, tok, err := authn.OAuth2SSHToken(t.Context(), signer, endpoint)
+		require.Error(t, err)
+		require.Nil(t, tok)
+	})
+
+	t.Run("sends client credentials in basic auth header when AuthStyleInHeader is used", func(t *testing.T) {
+		_, priv, err := ed25519.GenerateKey(rand.Reader)
+		require.NoError(t, err)
+		signer, err := ssh.NewSignerFromKey(priv)
+		require.NoError(t, err)
+		expectedFingerprint := ssh.FingerprintSHA256(signer.PublicKey())
+
+		var gotAuthHeader string
+		var gotUsername string
+		mux := http.NewServeMux()
+		mux.HandleFunc("/oauth/token", func(w http.ResponseWriter, r *http.Request) {
+			gotAuthHeader = r.Header.Get("Authorization")
+			require.NoError(t, r.ParseForm())
+			gotUsername = r.PostFormValue("username")
+			require.Empty(t, r.PostFormValue("client_id"))
+
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"access_token": "hdr-token",
+				"token_type":   "Bearer",
+			})
+		})
+
+		srv := httptest.NewServer(mux)
+		t.Cleanup(srv.Close)
+
+		endpoint := oauth2.Endpoint{
+			AuthURL:   srv.URL + "/oauth/auth",
+			TokenURL:  srv.URL + "/oauth/token",
+			AuthStyle: oauth2.AuthStyleInHeader,
+		}
+
+		cfg, tok, err := authn.OAuth2SSHToken(t.Context(), signer, endpoint)
+		require.NoError(t, err)
+		require.Equal(t, expectedFingerprint, cfg.ClientID)
+		require.Equal(t, expectedFingerprint, gotUsername)
+		require.NotEmpty(t, gotAuthHeader)
+		require.Contains(t, gotAuthHeader, "Basic ")
+		decoded, derr := base64.StdEncoding.DecodeString(gotAuthHeader[len("Basic "):])
+		require.NoError(t, derr)
+		decodedStr, uerr := url.QueryUnescape(string(decoded))
+		require.NoError(t, uerr)
+		require.Contains(t, decodedStr, expectedFingerprint)
+		require.NotNil(t, tok)
+		require.Equal(t, "hdr-token", tok.AccessToken)
+	})
+
+	t.Run("signature covers the uuid used as client secret", func(t *testing.T) {
+		_, priv, err := ed25519.GenerateKey(rand.Reader)
+		require.NoError(t, err)
+		signer, err := ssh.NewSignerFromKey(priv)
+		require.NoError(t, err)
+
+		var receivedPassword string
+		var receivedClientSecret string
+		mux := http.NewServeMux()
+		mux.HandleFunc("/oauth/token", func(w http.ResponseWriter, r *http.Request) {
+			require.NoError(t, r.ParseForm())
+			receivedPassword = r.PostFormValue("password")
+			receivedClientSecret = r.PostFormValue("client_secret")
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"access_token": "at",
+				"token_type":   "Bearer",
+			})
+		})
+
+		srv := httptest.NewServer(mux)
+		t.Cleanup(srv.Close)
+
+		endpoint := oauth2.Endpoint{
+			AuthURL:   srv.URL + "/oauth/auth",
+			TokenURL:  srv.URL + "/oauth/token",
+			AuthStyle: oauth2.AuthStyleInParams,
+		}
+
+		_, _, err = authn.OAuth2SSHToken(t.Context(), signer, endpoint)
+		require.NoError(t, err)
+
+		uuidBytes, err := uuid.FromString(receivedClientSecret)
+		require.NoError(t, err)
+
+		raw, err := base64.RawURLEncoding.DecodeString(receivedPassword)
+		require.NoError(t, err)
+		var sig ssh.Signature
+		require.NoError(t, ssh.Unmarshal(raw, &sig))
+		require.NoError(t, signer.PublicKey().Verify(uuidBytes[:], &sig))
+	})
+
+	t.Run("returns configured oauth2.Config even when token exchange fails", func(t *testing.T) {
+		_, priv, err := ed25519.GenerateKey(rand.Reader)
+		require.NoError(t, err)
+		signer, err := ssh.NewSignerFromKey(priv)
+		require.NoError(t, err)
+		expectedFingerprint := ssh.FingerprintSHA256(signer.PublicKey())
+
+		mux := http.NewServeMux()
+		mux.HandleFunc("/oauth/token", func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusBadRequest)
+			_, _ = w.Write([]byte(`{"error":"invalid_request"}`))
+		})
+
+		srv := httptest.NewServer(mux)
+		t.Cleanup(srv.Close)
+
+		endpoint := oauth2.Endpoint{
+			AuthURL:   srv.URL + "/oauth/auth",
+			TokenURL:  srv.URL + "/oauth/token",
+			AuthStyle: oauth2.AuthStyleInParams,
+		}
+
+		cfg, tok, err := authn.OAuth2SSHToken(t.Context(), signer, endpoint)
+		require.Error(t, err)
+		require.Nil(t, tok)
+		require.Equal(t, expectedFingerprint, cfg.ClientID)
+		require.Equal(t, endpoint, cfg.Endpoint)
+		_, perr := uuid.FromString(cfg.ClientSecret)
+		require.NoError(t, perr)
+	})
+
+	t.Run("cancelled context returns error", func(t *testing.T) {
+		_, priv, err := ed25519.GenerateKey(rand.Reader)
+		require.NoError(t, err)
+		signer, err := ssh.NewSignerFromKey(priv)
+		require.NoError(t, err)
+
+		ctx, cancel := context.WithCancel(t.Context())
+		cancel()
+
+		mux := http.NewServeMux()
+		mux.HandleFunc("/oauth/token", func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"access_token": "at",
+				"token_type":   "Bearer",
+			})
+		})
+
+		srv := httptest.NewServer(mux)
+		t.Cleanup(srv.Close)
+
+		endpoint := oauth2.Endpoint{
+			AuthURL:   srv.URL + "/oauth/auth",
+			TokenURL:  srv.URL + "/oauth/token",
+			AuthStyle: oauth2.AuthStyleInParams,
+		}
+
+		_, tok, err := authn.OAuth2SSHToken(ctx, signer, endpoint)
 		require.Error(t, err)
 		require.Nil(t, tok)
 	})

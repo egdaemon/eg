@@ -7,10 +7,10 @@ import (
 	"github.com/egdaemon/eg/authn"
 	"github.com/egdaemon/eg/cmd/cmdopts"
 	"github.com/egdaemon/eg/compute"
+	"github.com/egdaemon/eg/computeapi"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/httpx"
 	"github.com/egdaemon/eg/internal/sshx"
-	"github.com/egdaemon/eg/runners"
 )
 
 type cancel struct {
@@ -32,7 +32,7 @@ func (t cancel) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 
 	chttp := authn.New(gctx.Context, tlsc.DefaultClient(), signer, aid, compute.NewAuthzTokenSource)
 
-	if err = runners.NewPushClient(chttp).Cancel(gctx.Context, t.ID); httpx.IsStatusError(err, http.StatusNotFound) != nil {
+	if err = computeapi.NewPushClient(chttp).Cancel(gctx.Context, t.ID); httpx.IsStatusError(err, http.StatusNotFound) != nil {
 		log.Println("workload not found or already completed", t.ID)
 		return nil
 	} else if err != nil {

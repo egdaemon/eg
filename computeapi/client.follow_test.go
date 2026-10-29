@@ -1,4 +1,4 @@
-package runners_test
+package computeapi_test
 
 import (
 	"bytes"
@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/egdaemon/eg/runners"
+	"github.com/egdaemon/eg/computeapi"
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/libp2p/go-libp2p"
 	"github.com/stretchr/testify/require"
@@ -41,7 +41,7 @@ func TestFollowLogs(t *testing.T) {
 		ctx, done := context.WithTimeout(t.Context(), 10*time.Second)
 		defer done()
 
-		require.NoError(t, runners.FollowLogs(ctx, client, token, "w1", 6, &out))
+		require.NoError(t, computeapi.FollowLogs(ctx, client, token, "w1", 6, &out))
 		require.Equal(t, "hello world\n", out.String())
 		require.Equal(t, "/c/logs/w1", path)
 		require.Equal(t, "6", offset)
@@ -53,7 +53,7 @@ func TestFollowLogs(t *testing.T) {
 		require.NoError(t, err)
 		defer client.Close()
 
-		err = runners.FollowLogs(t.Context(), client, logtoken(t, jwt.MapClaims{}), "w1", 0, &bytes.Buffer{})
+		err = computeapi.FollowLogs(t.Context(), client, logtoken(t, jwt.MapClaims{}), "w1", 0, &bytes.Buffer{})
 		require.ErrorContains(t, err, "log token missing runner")
 	})
 
@@ -71,7 +71,7 @@ func TestFollowLogs(t *testing.T) {
 		ctx, done := context.WithTimeout(t.Context(), 10*time.Second)
 		defer done()
 
-		err = runners.FollowLogs(ctx, client, logtoken(t, jwt.MapClaims{"p2p": runner.ID().String()}), "w1", 0, &out)
+		err = computeapi.FollowLogs(ctx, client, logtoken(t, jwt.MapClaims{"p2p": runner.ID().String()}), "w1", 0, &out)
 		require.Error(t, err)
 		require.Empty(t, out.String())
 	})
@@ -91,7 +91,7 @@ func TestFollowLogs(t *testing.T) {
 		ctx, cancel := context.WithCancel(t.Context())
 		result := make(chan error, 1)
 		go func() {
-			result <- runners.FollowLogs(ctx, client, logtoken(t, jwt.MapClaims{"p2p": runner.ID().String()}), "w1", 0, &bytes.Buffer{})
+			result <- computeapi.FollowLogs(ctx, client, logtoken(t, jwt.MapClaims{"p2p": runner.ID().String()}), "w1", 0, &bytes.Buffer{})
 		}()
 
 		time.Sleep(200 * time.Millisecond)

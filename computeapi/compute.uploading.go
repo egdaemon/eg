@@ -344,12 +344,12 @@ func (t uploadwatching) Update(ctx context.Context) uploadstate {
 
 	if t.o.host != nil {
 		defer t.o.host.Close()
-		log.Println("enqueued directly", t.u.enq.Id, t.o.runner.Id, t.o.runner.P2Pid)
+		log.Printf("enqueued workload(%s) runner(%s) peer(%s)\n", t.u.enq.Id, t.o.runner.Id, t.o.runner.P2Pid)
 		if t.u.follow {
 			err = uploadwatch(ctx, t.u.httpc, t.o)
 		}
 	} else {
-		log.Println("enqueued", t.o.recorded.Id)
+		log.Printf("enqueued workload(%s)\n", t.o.recorded.Id)
 		if t.u.follow {
 			err = FollowEnqueued(ctx, t.u.httpc, t.o.recorded.Id)
 		}
@@ -571,7 +571,7 @@ func uploadenqueue(ctx context.Context, httpc *http.Client, endpoint string, enq
 		return outcome{}, errorsx.New("enqueued response missing workload")
 	}
 
-	log.Println("enqueued", spew.Sdump(&e))
+	debugx.Println("enqueued", spew.Sdump(&e))
 
 	return outcome{recorded: e.Enqueued}, nil
 }

@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"github.com/go-git/go-git/v6"
+	"github.com/go-git/go-git/v6/config"
 	"github.com/go-git/go-git/v6/plumbing"
 	"github.com/go-git/go-git/v6/plumbing/client"
 	"github.com/go-git/go-git/v6/plumbing/object"
@@ -285,15 +286,21 @@ func Clone(ctx context.Context, dir, uri, remote, treeish string, opts ...client
 	branchRefName := plumbing.NewBranchReferenceName(treeish)
 
 	if r, err = git.PlainOpen(dir); err == nil {
-		remote, err := r.Remote(remote)
+		rm, err := r.Remote(remote)
 		if err != nil {
 			return errorsx.Wrapf(err, "unable to find remote: '%s'", remote)
 		}
 
-		if err = remote.FetchContext(ctx, &git.FetchOptions{ClientOptions: opts}); errors.Is(err, git.NoErrAlreadyUpToDate) {
-			return nil
-		} else if err != nil {
+		err = rm.FetchContext(ctx, &git.FetchOptions{ClientOptions: opts})
+		uptodate := errors.Is(err, git.NoErrAlreadyUpToDate)
+		if err != nil && !uptodate {
 			return errorsx.Wrap(err, "unable to fetch")
+		}
+
+		fetchBaseOrLog(ctx, r, remote, treeish, opts...)
+
+		if uptodate {
+			return nil
 		}
 
 		w, err := r.Worktree()
@@ -320,12 +327,76 @@ func Clone(ctx context.Context, dir, uri, remote, treeish string, opts ...client
 		ClientOptions:     opts,
 	}
 
-	_, err = git.PlainCloneContext(ctx, dir, cloneOpts)
-	if err = errorsx.Wrapf(err, "unable to clone: %s - %s", uri, treeish); err != nil {
-		return err
+	if r, err = git.PlainCloneContext(ctx, dir, cloneOpts); err != nil {
+		return errorsx.Wrapf(err, "unable to clone: %s - %s", uri, treeish)
 	}
 
+	fetchBaseOrLog(ctx, r, remote, treeish, opts...)
+
 	return nil
+}
+
+// fetchBaseOrLog is fetchBase, a failure is logged and not returned. the base is optional, see baseenv, so not being
+// able to get it, e.g.) the network, mustn't fail the clone.
+func fetchBaseOrLog(ctx context.Context, r *git.Repository, remote, treeish string, opts ...client.Option) {
+	if err := fetchBase(ctx, r, remote, treeish, opts...); err != nil {
+		log.Println(errorsx.Wrap(err, "unable to fetch the base branch"))
+	}
+}
+
+// fetchBase makes the default branch of the remote available as its remote-tracking branch, and the remote's HEAD,
+// which is how DefaultBase finds the base. the single branch clones Clone makes only have the branch cloned, so a
+// workload run from any other ref wouldn't have a base. it is only the one branch fetched, the objects the cloned branch
+// shares with it are already present and not transferred again. history isn't cut, the base is compared with the head.
+func fetchBase(ctx context.Context, r *git.Repository, remote, treeish string, opts ...client.Option) error {
+	rm, err := r.Remote(remote)
+	if err != nil {
+		return errorsx.Wrapf(err, "unable to find remote: '%s'", remote)
+	}
+
+	refs, err := rm.ListContext(ctx, &git.ListOptions{ClientOptions: opts})
+	if err != nil {
+		return errorsx.Wrap(err, "unable to list the remote")
+	}
+
+	base := remoteDefaultBranch(refs)
+	if base == "" {
+		debugx.Println("the remote has no default branch, there is no base to fetch", remote)
+		return nil
+	}
+
+	tracking := plumbing.NewRemoteReferenceName(remote, base)
+
+	// the branch cloned was just fetched.
+	if base != treeish {
+		spec := config.RefSpec(fmt.Sprintf("+%s:%s", plumbing.NewBranchReferenceName(base), tracking))
+		err = rm.FetchContext(ctx, &git.FetchOptions{RemoteName: remote, RefSpecs: []config.RefSpec{spec}, ClientOptions: opts})
+		if err != nil && !errors.Is(err, git.NoErrAlreadyUpToDate) {
+			return errorsx.Wrapf(err, "unable to fetch: %s", base)
+		}
+	}
+
+	return errorsx.Wrap(r.Storer.SetReference(plumbing.NewSymbolicReference(plumbing.NewRemoteHEADReferenceName(remote), tracking)), "unable to record the base")
+}
+
+// remoteDefaultBranch is the name of the branch the HEAD of the remote refers to, from the references it lists.
+// a remote that doesn't say, an older server, has main or master when it has either, blank when it has neither.
+func remoteDefaultBranch(refs []*plumbing.Reference) string {
+	for _, ref := range refs {
+		if ref.Name() == plumbing.HEAD && ref.Type() == plumbing.SymbolicReference {
+			return ref.Target().Short()
+		}
+	}
+
+	for _, candidate := range []string{plumbing.Main.Short(), plumbing.Master.Short()} {
+		for _, ref := range refs {
+			if ref.Name() == plumbing.NewBranchReferenceName(candidate) {
+				return candidate
+			}
+		}
+	}
+
+	return ""
 }
 
 // return the clone uri handling quirks of specific forges.

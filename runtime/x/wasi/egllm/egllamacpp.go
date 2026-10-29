@@ -134,6 +134,24 @@ func waitHealthy(runtime shell.Command, timeout time.Duration) eg.OpFn {
 	}
 }
 
+// debugUnit logs the installed llama-server unit, the checksum of the file and the unit as systemd loaded it,
+// so the flags the server will start with are known before it is started. failures are ignored, this is purely informational.
+func debugUnit(runtime shell.Command) eg.OpFn {
+	return func(ctx context.Context, o eg.Op) error {
+		for _, cmd := range []string{
+			"md5sum /etc/systemd/system/llama-server.service",
+			"systemctl cat llama-server.service --no-pager",
+			"systemctl show llama-server.service --property=ActiveState,SubState,FragmentPath,ExecStart --no-pager",
+		} {
+			if err := shell.Run(ctx, runtime.Newf("%s", cmd).Lenient(true).Attempts(1)); err != nil {
+				log.Printf("egllm: debug command failed: %s: %v\n", cmd, err)
+			}
+		}
+
+		return nil
+	}
+}
+
 // debugSocket logs the state of the llama-server unix socket and its service before polling it.
 // failures are ignored, this is purely informational.
 func debugSocket(ctx context.Context, runtime shell.Command, path string) {
@@ -199,6 +217,7 @@ func managed(model string, op eg.OpFn) eg.OpFn {
 		return around(
 			eg.Sequential(
 				phase("installing llama-server.service", Install(rt)),
+				phase("debugging llama-server.service", debugUnit(rt)),
 				phase(fmt.Sprintf("pulling model %s (cache %s)", model, CacheDirectory("models")), Pull(rt, model)),
 				phase("starting llama-server.service", Serve(rt)),
 				phase(fmt.Sprintf("waiting for llama-server health at %s (timeout 10m)", Endpoint()), waitHealthy(rt, 10*time.Minute)),

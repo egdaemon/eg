@@ -13,16 +13,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func count(t *testing.T, db *sql.DB) (n int, err error) {
-	err = db.QueryRowContext(t.Context(), `SELECT count(*) FROM lan_peers`).Scan(&n)
-	return n, err
-}
-
-func insert(t *testing.T, db *sql.DB, id string) error {
-	_, err := db.ExecContext(t.Context(), `INSERT INTO lan_peers (peer_id) VALUES ($1)`, id)
-	return err
-}
-
 func TestOpenLocked(t *testing.T) {
 	t.Run("processes share the file", func(t *testing.T) {
 		t.Setenv("RUNTIME_DIRECTORY", t.TempDir())
@@ -36,11 +26,14 @@ func TestOpenLocked(t *testing.T) {
 		require.NoError(t, err)
 		defer sharer.Close()
 
-		require.NoError(t, insert(t, owner, "a"))
-		require.NoError(t, insert(t, sharer, "b"))
+		_, err = owner.ExecContext(t.Context(), `INSERT INTO lan_peers (peer_id) VALUES ($1)`, "a")
+		require.NoError(t, err)
+		_, err = sharer.ExecContext(t.Context(), `INSERT INTO lan_peers (peer_id) VALUES ($1)`, "b")
+		require.NoError(t, err)
 
 		for _, db := range []*sql.DB{owner, sharer} {
-			n, err := count(t, db)
+			var n int
+			err := db.QueryRowContext(t.Context(), `SELECT count(*) FROM lan_peers`).Scan(&n)
 			require.NoError(t, err)
 			require.Equal(t, 2, n)
 		}
@@ -57,13 +50,16 @@ func TestOpenLocked(t *testing.T) {
 		require.NoError(t, err)
 		defer sharer.Close()
 
-		require.NoError(t, insert(t, owner, "a"))
-		_, err = count(t, sharer) // the sharer now holds a connection through the owner.
+		_, err = owner.ExecContext(t.Context(), `INSERT INTO lan_peers (peer_id) VALUES ($1)`, "a")
+		require.NoError(t, err)
+		// the sharer now holds a connection through the owner.
+		var n int
+		err = sharer.QueryRowContext(t.Context(), `SELECT count(*) FROM lan_peers`).Scan(&n)
 		require.NoError(t, err)
 
 		require.NoError(t, owner.Close())
 
-		n, err := count(t, sharer)
+		err = sharer.QueryRowContext(t.Context(), `SELECT count(*) FROM lan_peers`).Scan(&n)
 		require.NoError(t, err)
 		require.Equal(t, 1, n)
 
@@ -71,8 +67,9 @@ func TestOpenLocked(t *testing.T) {
 		next, err := migrations.OpenLocked(t.Context(), path)
 		require.NoError(t, err)
 		defer next.Close()
-		require.NoError(t, insert(t, next, "b"))
-		n, err = count(t, sharer)
+		_, err = next.ExecContext(t.Context(), `INSERT INTO lan_peers (peer_id) VALUES ($1)`, "b")
+		require.NoError(t, err)
+		err = sharer.QueryRowContext(t.Context(), `SELECT count(*) FROM lan_peers`).Scan(&n)
 		require.NoError(t, err)
 		require.Equal(t, 2, n)
 	})
@@ -87,21 +84,21 @@ func TestOpenLocked(t *testing.T) {
 
 		var wg sync.WaitGroup
 		for i := range n {
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
+			wg.Go(func() {
 				dbs[i], errs[i] = migrations.OpenLocked(t.Context(), path)
-			}()
+			})
 		}
 		wg.Wait()
 
 		for i := range n {
 			require.NoError(t, errs[i])
 			defer dbs[i].Close()
-			require.NoError(t, insert(t, dbs[i], string(rune('a'+i))))
+			_, err := dbs[i].ExecContext(t.Context(), `INSERT INTO lan_peers (peer_id) VALUES ($1)`, string(rune('a'+i)))
+			require.NoError(t, err)
 		}
 
-		got, err := count(t, dbs[0])
+		var got int
+		err := dbs[0].QueryRowContext(t.Context(), `SELECT count(*) FROM lan_peers`).Scan(&got)
 		require.NoError(t, err)
 		require.Equal(t, n, got)
 	})

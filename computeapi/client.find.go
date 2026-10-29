@@ -1,4 +1,4 @@
-package runners
+package computeapi
 
 import (
 	"context"
@@ -8,8 +8,6 @@ import (
 	"net/http"
 	"net/url"
 	"time"
-
-	"github.com/egdaemon/eg/computeapi"
 
 	"github.com/egdaemon/eg/compute"
 	"github.com/egdaemon/eg/internal/errorsx"
@@ -27,9 +25,9 @@ const ErrLogsUnavailable = errorsx.String("workload logs unavailable")
 
 // Find retrieves the workload as recorded by the control plane. while the workload is
 // running the response carries a log token for streaming its logs from its runner.
-func (t PushClient) Find(ctx context.Context, id string) (_ *computeapi.Enqueued, err error) {
+func (t PushClient) Find(ctx context.Context, id string) (_ *Enqueued, err error) {
 	var (
-		resp computeapi.EnqueuedFindResponse
+		resp EnqueuedFindResponse
 	)
 
 	httpreq, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/c/q/%s", t.host, url.PathEscape(id)), nil)
@@ -58,7 +56,7 @@ func (t PushClient) Find(ctx context.Context, id string) (_ *computeapi.Enqueued
 // supports log streaming, returning the workload carrying its log token. it errors when the
 // workload completes before a token is issued, it started without a token being issued
 // (ErrLogsUnavailable), or ctx ends.
-func (t PushClient) AwaitLogsToken(ctx context.Context, id string, interval time.Duration) (_ *computeapi.Enqueued, err error) {
+func (t PushClient) AwaitLogsToken(ctx context.Context, id string, interval time.Duration) (_ *Enqueued, err error) {
 	tick := time.NewTicker(interval)
 	defer tick.Stop()
 
@@ -106,6 +104,24 @@ func (t PushClient) HistoryLogs(ctx context.Context, id string, dst io.Writer) (
 
 	_, err = io.Copy(dst, httpresp.Body)
 	return errorsx.Wrap(err, "unable to read stored logs")
+}
+
+// HistoryAnalytics writes the stored analytics database of a completed workload into dst. a status error
+// of http.StatusNotFound means the analytics aren't recorded (yet).
+func (t PushClient) HistoryAnalytics(ctx context.Context, id string, dst io.Writer) (err error) {
+	httpreq, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/c/history/%s/analytics", t.host, url.PathEscape(id)), nil)
+	if err != nil {
+		return err
+	}
+
+	httpresp, err := httpx.AsError(t.c.Do(httpreq))
+	defer func() { errorsx.Log(httpx.AutoClose(httpresp)) }()
+	if err != nil {
+		return err
+	}
+
+	_, err = io.Copy(dst, httpresp.Body)
+	return errorsx.Wrap(err, "unable to read stored analytics")
 }
 
 // HistoryFind retrieves the record of a completed workload, including its result.

@@ -18,6 +18,7 @@ import (
 	"reflect"
 	"slices"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"text/template"
@@ -31,32 +32,35 @@ import (
 	"github.com/egdaemon/eg/runtime/wasi/eggit"
 	"github.com/egdaemon/eg/runtime/wasi/shell"
 	"github.com/egdaemon/eg/runtime/x/wasi/eggolang"
+	"golang.org/x/tools/imports"
 )
 
 var golangPromptTemplate = template.Must(template.New("golang").Parse(`
-test the following codeblock using the given coding style and example usage blocks as guidance for how to structure the code.
-rules:
+write a go test file for the function in the FOCUS section. use the TEMPLATES as guidance for the coding style and example usage, TYPES and SOURCE for the code the function works with, and continue the file from the PREAMBLE, your response is the complete file including the preamble.
+---------------------------------------------------     RULES      ---------------------------------------------------
 {{range .Ensure}}- {{.}}
-{{end}}
---------------------------------------------------- STYLE EXAMPLES ---------------------------------------------------
+{{end}}---------------------------------------------------   TEMPLATES    ---------------------------------------------------
 {{.Templates}}
---------------------------------------------------- USAGE EXAMPLES ---------------------------------------------------
-{{.Usage}}
 ---------------------------------------------------     TYPES      ---------------------------------------------------
 {{.Types}}
----------------------------------------------------    PACKAGE     ---------------------------------------------------
-{{if .External}}the code block is exported from package {{.Package}}, so test it as an external caller: your file must declare "package {{.TestPackage}}", import the package under test as "{{.ImportPath}}" and qualify its identifiers with "{{.Package}}."
-{{else}}the code block is in package {{.Package}} and is not part of its public api, so your file must declare "package {{.TestPackage}}" and use it directly.
-{{end}}{{if .Imports}}the file containing it imports:
-{{.Imports}}
-{{end}}{{if .Existing}}---------------------------------------------------  EXISTING TESTS ---------------------------------------------------
+---------------------------------------------------     SOURCE     ---------------------------------------------------
+{{.Source}}
+{{if .Existing}}--------------------------------------------------- EXISTING TESTS ---------------------------------------------------
 the test file {{.ExistingFile}} already exists, your response replaces it so it must keep its package clause and contain all of its existing tests along with the new ones.
 {{.Existing}}
-{{end}}---------------------------------------------------   CODE BLOCK   ---------------------------------------------------
-{{.Codeblock}}
+{{end}}---------------------------------------------------    PREAMBLE    ---------------------------------------------------
+{{.Preamble}}
 ---------------------------------------------------     FOCUS      ---------------------------------------------------
-{{.Fn.Name}}
-`))
+{{.Focus}}
+{{if .Previous}}---------------------------------------------------    PREVIOUS    ---------------------------------------------------
+{{.NumberedPrevious}}
+{{end}}{{if .Violations}}---------------------------------------------------   VIOLATIONS   ---------------------------------------------------
+the previous response violates the following rules, rewrite it so it satisfies every rule while still accomplishing the original request.
+{{.Violations}}
+{{end}}{{if .Results}}--------------------------------------------------- VERIFY RESULTS ---------------------------------------------------
+the previous response failed the compiler and tests, rewrite it so it compiles and passes.
+{{.Results}}
+{{end}}`))
 
 // golangDefaultRules are the rules always applied, rules given by the caller are added to them.
 var golangDefaultRules = []string{
@@ -74,17 +78,14 @@ var golangDefaultRules = []string{
 // golangPrompt is the data the golang prompt template is executed with.
 type golangPrompt struct {
 	PromptContext
-	Templates    string
-	Usage        string
-	Types        string
-	Package      string // package name of the code block.
-	TestPackage  string // package name the generated test file must declare.
-	ImportPath   string // import path of the package, for external tests.
-	External     bool   // the test is in the external package (Package_test), used for public apis.
-	Imports      string // import declarations of the file containing the code block.
-	Codeblock    string
-	Existing     string // contents of the test file being generated, if it already exists.
-	ExistingFile string // name of the test file being generated.
+	Templates        string
+	Types            string
+	Source           string // the file containing the code block.
+	Preamble         string // the start of the generated test file: package clause, imports and the header comment.
+	Focus            string // the code block.
+	Existing         string // contents of the test file being generated, if it already exists.
+	ExistingFile     string // name of the test file being generated.
+	NumberedPrevious string // the previous response with the line numbers the violations refer to.
 }
 
 // golangOption is the resolved configuration of the Golang generator.
@@ -271,7 +272,8 @@ func (t GolangOptions) Prompt(c PromptContext) (string, error) {
 	o := t.resolve()
 	c.Fn.Path = o.rebase(c.Fn.Path)
 
-	pkg, err := o.pkgs.load(filepath.Dir(c.Fn.Path))
+	dir := filepath.Dir(c.Fn.Path)
+	pkg, err := o.pkgs.load(dir)
 	if err != nil {
 		return "", err
 	}
@@ -281,51 +283,192 @@ func (t GolangOptions) Prompt(c PromptContext) (string, error) {
 		return "", fmt.Errorf("unable to locate function %s in %s", c.Fn.Name, c.Fn.Path)
 	}
 
-	codeblock, err := renderNode(pkg.fset, decl)
+	focus, err := renderNode(pkg.fset, decl)
 	if err != nil {
 		return "", errorsx.Wrap(err, "unable to render function")
 	}
 
 	c.Ensure = t.Rules(c.Ensure...)
 
-	dest, existing, err := resolveTestFile(o, filepath.Dir(c.Fn.Path), c.Fn)
+	dest, existing, err := resolveTestFile(o, dir, c.Fn)
 	if err != nil {
 		return "", err
 	}
 
-	usage, err := collectUsageWithCallers(o.callers, pkg, c.Fn, decl.Name.Name)
+	source, err := sourceOf(pkg, decl)
 	if err != nil {
 		return "", err
 	}
 
-	testPackage, importpath, external := testPackageFor(filepath.Dir(c.Fn.Path), pkg, decl, existing)
+	testPackage, importpath, external := testPackageFor(dir, pkg, decl, existing)
 
 	templates, err := o.sources()
 	if err != nil {
 		return "", err
 	}
 
-	discovered := discoverPackages(filepath.Dir(c.Fn.Path), importsOf(pkg, decl, existing, append(slices.Clone(templates), c.Previous)))
+	imports := importsOf(pkg, decl, existing, append(slices.Clone(templates), c.Previous))
 
 	var buf strings.Builder
 	if err := golangPromptTemplate.Execute(&buf, golangPrompt{
-		PromptContext: c,
-		Templates:     strings.Join(templates, "\n\n"),
-		Usage:         usage,
-		Types:         strings.Join(nonEmpty(collectTypes(pkg, decl), discovered), "\n\n"),
-		Package:       pkg.name,
-		TestPackage:   testPackage,
-		ImportPath:    importpath,
-		External:      external,
-		Imports:       collectImports(pkg, decl),
-		Codeblock:     codeblock,
-		Existing:      string(existing),
-		ExistingFile:  filepath.Base(dest),
+		PromptContext:    c,
+		Templates:        strings.Join(templates, "\n\n"),
+		Types:            typesOf(dir, pkg, decl, imports),
+		Source:           source,
+		Preamble:         preambleOf(pkg, decl, existing, testPackage, importpath, external),
+		Focus:            focus,
+		Existing:         string(existing),
+		ExistingFile:     filepath.Base(dest),
+		NumberedPrevious: strings.TrimSuffix(numberLines(c.Previous), "\n"),
 	}); err != nil {
 		return "", errorsx.Wrap(err, "unable to render prompt")
 	}
 
 	return buf.String(), nil
+}
+
+// typesOf renders the types the function works with, a block per package ordered by import path: the types of the
+// function's own package it references and the exported api of the imports which can be located.
+func typesOf(dir string, pkg *gopkg, decl *ast.FuncDecl, imports []string) string {
+	own := importPathOf(dir)
+	blocks := map[string]string{}
+	if types := collectTypes(pkg, decl); types != "" {
+		blocks[own] = packageBlock(pkg.name, own, types)
+	}
+
+	for _, importpath := range imports {
+		if _, ok := blocks[importpath]; ok || importpath == own {
+			continue
+		}
+
+		if api, err := collectPackages(dir, []string{importpath}); err == nil {
+			blocks[importpath] = api
+		}
+	}
+
+	paths := make([]string, 0, len(blocks))
+	for importpath := range blocks {
+		paths = append(paths, importpath)
+	}
+	sort.Strings(paths)
+
+	rendered := make([]string, 0, len(paths))
+	for _, importpath := range paths {
+		rendered = append(rendered, blocks[importpath])
+	}
+
+	return strings.Join(rendered, "\n\n")
+}
+
+// sourceOf is the text of the file containing decl.
+func sourceOf(pkg *gopkg, decl *ast.FuncDecl) (string, error) {
+	for _, f := range pkg.files {
+		if decl.Pos() < f.Pos() || decl.End() > f.End() {
+			continue
+		}
+
+		raw, err := os.ReadFile(pkg.fset.Position(f.Package).Filename)
+		if err != nil {
+			return "", errorsx.Wrap(err, "unable to read source")
+		}
+
+		return strings.TrimSpace(string(raw)), nil
+	}
+
+	return "", fmt.Errorf("unable to locate the file of function %s", decl.Name.Name)
+}
+
+// preambleHeader is the comment which follows the imports of every generated test.
+const preambleHeader = "// DO NOT EDIT: This file was auto generated by egautotest."
+
+// preambleOf is the start of the generated test file: the package clause, the imports and the header comment.
+// an existing test file keeps its own package clause and imports, otherwise the imports are the testing package,
+// the package under test when tested externally, and the imports of the file containing decl.
+func preambleOf(pkg *gopkg, decl *ast.FuncDecl, existing []byte, testPackage string, importpath string, external bool) string {
+	var specs []string
+	if f, err := parser.ParseFile(token.NewFileSet(), "", existing, parser.ImportsOnly|parser.SkipObjectResolution); err == nil && f.Name != nil {
+		testPackage = f.Name.Name
+		specs = importSpecs(token.NewFileSet(), f)
+	} else {
+		specs = []string{`"testing"`}
+		if external {
+			specs = append(specs, strconv.Quote(importpath))
+		}
+
+		for _, f := range pkg.files {
+			if decl.Pos() >= f.Pos() && decl.End() <= f.End() {
+				specs = append(specs, importSpecs(pkg.fset, f)...)
+			}
+		}
+	}
+
+	return formatPreamble(testPackage, specs)
+}
+
+// importSpecs renders the import specs of f, as they are written, skipping blank imports.
+func importSpecs(fset *token.FileSet, f *ast.File) (specs []string) {
+	for _, spec := range f.Imports {
+		if spec.Name != nil && spec.Name.Name == "_" {
+			continue
+		}
+
+		if rendered, err := renderNode(fset, spec); err == nil {
+			specs = append(specs, rendered)
+		}
+	}
+
+	return specs
+}
+
+// formatPreamble writes the package clause, the unique imports with the standard library first, and the header comment.
+func formatPreamble(testPackage string, specs []string) string {
+	var std, other []string
+	for _, spec := range specs {
+		if slices.Contains(std, spec) || slices.Contains(other, spec) {
+			continue
+		}
+
+		if isStd(spec) {
+			std = append(std, spec)
+		} else {
+			other = append(other, spec)
+		}
+	}
+
+	var b strings.Builder
+	fmt.Fprintf(&b, "package %s\n\n", testPackage)
+	if len(std)+len(other) > 0 {
+		b.WriteString("import (\n")
+		for i, group := range [][]string{std, other} {
+			if i > 0 && len(std) > 0 && len(other) > 0 {
+				b.WriteString("\n")
+			}
+
+			sort.Slice(group, func(a, c int) bool { return importPath(group[a]) < importPath(group[c]) })
+			for _, spec := range group {
+				fmt.Fprintf(&b, "\t%s\n", spec)
+			}
+		}
+		b.WriteString(")\n\n")
+	}
+	b.WriteString(preambleHeader)
+
+	if formatted, err := format.Source([]byte(b.String())); err == nil {
+		return strings.TrimSpace(string(formatted))
+	}
+
+	return b.String()
+}
+
+// importPath is the import path of a rendered import spec, which can have a name before it.
+func importPath(spec string) string {
+	return strings.Trim(spec[strings.Index(spec, "\"")+1:], "\"")
+}
+
+// isStd reports whether a rendered import spec is of a standard library package, which have no dot in the first element.
+func isStd(spec string) bool {
+	first, _, _ := strings.Cut(importPath(spec), "/")
+	return !strings.Contains(first, ".")
 }
 
 // Verify keeps the generated test next to the function only if it compiles and passes.
@@ -357,6 +500,7 @@ func (t GolangOptions) Verify(ctx context.Context, fn Fn, artifact string) error
 		return err
 	}
 
+	src = cleanImports(dest, src)
 	tests = addedTests(existing, testPackage, tests)
 
 	tmp, err := writeTemp(dir, ".autogentest.*", src)
@@ -371,13 +515,50 @@ func (t GolangOptions) Verify(ctx context.Context, fn Fn, artifact string) error
 	}
 	defer os.Remove(overlay)
 
-	cmd := eggolang.Runtime().Directory(dir).Newf("go test -count=1 -cover -overlay '%s' -run '^(%s)$' .", overlay, strings.Join(tests, "|"))
+	// commands don't expose their output, so it is also written to a file for the results of a failure.
+	output, err := writeTemp(dir, ".autogentest.output.*", nil)
+	if err != nil {
+		return err
+	}
+	defer os.Remove(output)
+
+	cmd := eggolang.Runtime().Directory(dir).Colors(false).Newf("set -o pipefail; go test -count=1 -cover -overlay '%s' -run '^(%s)$' . |& tee '%s'", overlay, strings.Join(tests, "|"), output)
 	log.Printf("autogentest %s: verifying dest=%s tmp=%s overlay=%s tests=%v\n", fn.Name, dest, tmp, overlay, tests)
 	if err := shell.Run(ctx, cmd.Debug()); err != nil {
-		return err
+		return withResults(err, output)
 	}
 
 	return os.Rename(tmp, dest)
+}
+
+// cleanImports is goimports for the generated test: imports it doesn't use are removed, the standard library
+// packages it uses and doesn't import are added. the preamble's imports are a starting point which the test may not need.
+// best effort, an unusable result is kept as it was and left for the compiler to judge.
+func cleanImports(filename string, src []byte) []byte {
+	cleaned, err := imports.Process(filename, src, &imports.Options{Comments: true, TabIndent: true, TabWidth: 8})
+	if err != nil {
+		log.Printf("autogentest unable to clean imports of %s: %v\n", filename, err)
+		return src
+	}
+
+	return cleaned
+}
+
+// maxResults is the most of the output of a failed verification which is given to the model.
+const maxResults = 8 << 10
+
+// withResults adds the output of the failed command, written to the file at path, to its error.
+func withResults(err error, path string) error {
+	raw, rerr := os.ReadFile(path)
+	if rerr != nil || len(bytes.TrimSpace(raw)) == 0 {
+		return err
+	}
+
+	if len(raw) > maxResults {
+		raw = append(raw[:maxResults:maxResults], "\n..."...)
+	}
+
+	return fmt.Errorf("%w\n%s", err, bytes.TrimSpace(raw))
 }
 
 // writeOverlay writes a go build overlay presenting the file at src as the one at dest.

@@ -3,6 +3,7 @@ package egautogentest
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/egdaemon/eg/internal/iterx"
@@ -15,6 +16,8 @@ type fakegen struct {
 	ensured  []string
 	verified []string
 	previous []string
+	results  []string
+	violated []string
 	verifyfn func(artifact string) error
 }
 
@@ -25,6 +28,8 @@ func (t *fakegen) Seq() iterx.Seq[Fn] {
 func (t *fakegen) Prompt(c PromptContext) (string, error) {
 	t.ensured = c.Ensure
 	t.previous = append(t.previous, c.Previous)
+	t.results = append(t.results, c.Results)
+	t.violated = append(t.violated, c.Violations)
 	return "prompt for " + c.Fn.Name, nil
 }
 
@@ -118,8 +123,8 @@ func TestGenerate(t *testing.T) {
 		o := option{ensure: []string{"be clean"}, revisions: 1, llm: s}
 
 		require.NoError(t, o.generate(t.Context(), g, fn))
-		require.Equal(t, []string{"clean"}, g.verified)
-		require.Equal(t, []string{"", "clean"}, g.previous)
+		require.Equal(t, []string{"dirty", "clean"}, g.verified)
+		require.Equal(t, []string{"", "dirty"}, g.previous)
 	})
 
 	t.Run("judges against the rules of the generator as well as the given rules", func(t *testing.T) {
@@ -141,12 +146,76 @@ func TestGenerate(t *testing.T) {
 		require.Len(t, s.Requests(), 1)
 	})
 
-	t.Run("discards a response still violating the rules without verifying it", func(t *testing.T) {
+	t.Run("verifies before checking the rules, then verifies again after reworking", func(t *testing.T) {
+		s := egllm.Constant("dirty", violationrecord(1, 1, "dirty"), "clean", "")
+		var order []string
+		g := &fakegen{verifyfn: func(a string) error {
+			order = append(order, fmt.Sprintf("verify %s after %d requests", a, len(s.Requests())))
+			return nil
+		}}
+		o := option{ensure: []string{"be clean"}, revisions: 1, llm: s}
+
+		require.NoError(t, o.generate(t.Context(), g, fn))
+		require.Equal(t, []string{"verify dirty after 1 requests", "verify clean after 3 requests"}, order)
+	})
+
+	t.Run("does not check the rules of a response failing verification", func(t *testing.T) {
+		s := egllm.Constant("broken")
+		g := &fakegen{verifyfn: func(string) error { return errors.New("failing") }}
+		o := option{ensure: []string{"be clean"}, llm: s}
+
+		require.NoError(t, o.generate(t.Context(), g, fn))
+		require.Equal(t, []string{"broken"}, g.verified)
+		require.Len(t, s.Requests(), 1)
+	})
+
+	t.Run("discards a revision failing verification and tries again", func(t *testing.T) {
+		s := egllm.Constant("dirty", violationrecord(1, 1, "dirty"), "broken", "clean", "")
+		g := &fakegen{verifyfn: func(a string) error {
+			if a == "broken" {
+				return errors.New("failing")
+			}
+			return nil
+		}}
+		o := option{attempts: 2, ensure: []string{"be clean"}, revisions: 1, llm: s}
+
+		require.NoError(t, o.generate(t.Context(), g, fn))
+		require.Equal(t, []string{"dirty", "broken", "clean"}, g.verified)
+	})
+
+	t.Run("a response still violating the rules was verified", func(t *testing.T) {
 		s := egllm.Constant("dirty", violationrecord(1, 1, "dirty"))
 		g := &fakegen{}
 		o := option{ensure: []string{"be clean"}, llm: s}
 
 		require.NoError(t, o.generate(t.Context(), g, fn))
-		require.Empty(t, g.verified)
+		require.Equal(t, []string{"dirty"}, g.verified)
+	})
+
+	t.Run("gives why the response failed verification to the prompt of the retry", func(t *testing.T) {
+		s := egllm.Constant("one", "two")
+		g := &fakegen{verifyfn: func(a string) error {
+			if a == "one" {
+				return errors.New("does not compile")
+			}
+			return nil
+		}}
+		o := option{attempts: 2, llm: s}
+
+		require.NoError(t, o.generate(t.Context(), g, fn))
+		require.Equal(t, []string{"", "one"}, g.previous)
+		require.Equal(t, []string{"", "does not compile"}, g.results)
+	})
+
+	t.Run("gives the violations to the prompt of the revision", func(t *testing.T) {
+		s := egllm.Constant("dirty", violationrecord(1, 1, "dirty"), "clean", "")
+		g := &fakegen{}
+		o := option{ensure: []string{"be clean"}, revisions: 1, llm: s}
+
+		require.NoError(t, o.generate(t.Context(), g, fn))
+		require.Equal(t, []string{"", "dirty"}, g.previous)
+		require.Equal(t, "", g.violated[0])
+		require.Contains(t, g.violated[1], "rule 1 (be clean) line 1: dirty")
+		require.Equal(t, "prompt for Greet", s.Requests()[2][0].Content)
 	})
 }

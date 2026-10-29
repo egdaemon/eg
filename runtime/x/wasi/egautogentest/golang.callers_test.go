@@ -56,15 +56,6 @@ func TestGolangCallers(t *testing.T) {
 		require.Len(t, cache.built, 1)
 	})
 
-	t.Run("the prompt includes the call sites", func(t *testing.T) {
-		fn := Fn{Path: ".fixtures/golang/example.4/lib/lib.go", Name: "Target"}
-		prompt, err := Golang(From(fn)).Prompt(PromptContext{Fn: fn})
-		require.NoError(t, err)
-		require.Contains(t, prompt, "call sites within the module:")
-		require.Contains(t, prompt, "lib.Target()")
-		require.NotContains(t, prompt, "no existing usage")
-	})
-
 	t.Run("long call sites are cut short", func(t *testing.T) {
 		long := strings.Repeat("x\n", maxCallerLines+5)
 		cut := truncateLines(long, maxCallerLines)

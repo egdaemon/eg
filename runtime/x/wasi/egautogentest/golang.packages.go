@@ -8,7 +8,6 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
-	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -20,6 +19,15 @@ import (
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/runtime/x/wasi/eggolang"
 )
+
+// packageBlock labels the rendered api of a package with its name and import path.
+func packageBlock(name string, importpath string, body string) string {
+	if importpath == "" {
+		return fmt.Sprintf("package %s\n%s", name, body)
+	}
+
+	return fmt.Sprintf("package %s // import %q\n%s", name, importpath, body)
+}
 
 // collectPackages renders the exported function signatures of each of the packages.
 func collectPackages(fromdir string, importpaths []string) (string, error) {
@@ -35,7 +43,7 @@ func collectPackages(fromdir string, importpaths []string) (string, error) {
 			return "", err
 		}
 
-		rendered = append(rendered, fmt.Sprintf("package %s // import %q\n%s", filepath.Base(importpath), importpath, signatures))
+		rendered = append(rendered, packageBlock(filepath.Base(importpath), importpath, signatures))
 	}
 
 	return strings.Join(rendered, "\n\n"), nil
@@ -132,7 +140,8 @@ func findModuleRoot(dir string) (string, error) {
 	}
 }
 
-// packageSignatures lists the exported functions of the package in dir, one signature per line.
+// packageSignatures lists the exported types of the package in dir, each declared in full but for its unexported fields and methods, followed by its exported
+// functions, one signature per line. types and functions are sorted by name.
 // methods and test files are skipped, as are the printf style variants of a function (Equalf for Equal).
 func packageSignatures(dir string) (string, error) {
 	entries, err := os.ReadDir(dir)
@@ -142,6 +151,7 @@ func packageSignatures(dir string) (string, error) {
 
 	fset := token.NewFileSet()
 	decls := map[string]*ast.FuncDecl{}
+	specs := map[string]*ast.TypeSpec{}
 	for _, e := range entries {
 		if e.IsDir() || filepath.Ext(e.Name()) != ".go" || strings.HasSuffix(e.Name(), "_test.go") {
 			continue
@@ -152,9 +162,21 @@ func packageSignatures(dir string) (string, error) {
 			return "", errorsx.Wrapf(err, "unable to parse: %s", filepath.Join(dir, e.Name()))
 		}
 
+		// only what a caller can use, like go doc: unexported declarations, fields and methods are removed.
+		ast.FileExports(f)
+
 		for _, d := range f.Decls {
-			if fd, ok := d.(*ast.FuncDecl); ok && fd.Recv == nil && fd.Name.IsExported() {
-				decls[fd.Name.Name] = fd
+			switch d := d.(type) {
+			case *ast.FuncDecl:
+				if d.Recv == nil && d.Name.IsExported() {
+					decls[d.Name.Name] = d
+				}
+			case *ast.GenDecl:
+				for _, spec := range d.Specs {
+					if ts, ok := spec.(*ast.TypeSpec); ok && ts.Name.IsExported() {
+						specs[ts.Name.Name] = ts
+					}
+				}
 			}
 		}
 	}
@@ -182,7 +204,26 @@ func packageSignatures(dir string) (string, error) {
 		lines = append(lines, rendered)
 	}
 
-	return strings.Join(lines, "\n"), nil
+	typenames := make([]string, 0, len(specs))
+	for name := range specs {
+		typenames = append(typenames, name)
+	}
+	sort.Strings(typenames)
+
+	types := make([]string, 0, len(typenames))
+	for _, name := range typenames {
+		spec := *specs[name]
+		spec.Doc, spec.Comment = nil, nil
+
+		rendered, err := renderNode(fset, &ast.GenDecl{Tok: token.TYPE, Specs: []ast.Spec{&spec}})
+		if err != nil {
+			return "", errorsx.Wrapf(err, "unable to render: %s", name)
+		}
+
+		types = append(types, rendered)
+	}
+
+	return strings.Join(nonEmpty(strings.Join(types, "\n\n"), strings.Join(lines, "\n")), "\n\n"), nil
 }
 
 // importsOf lists the import paths of the templates, the file containing decl, and the existing test file.
@@ -213,24 +254,4 @@ func importsOf(pkg *gopkg, decl *ast.FuncDecl, existing []byte, templates []stri
 	}
 
 	return imports
-}
-
-// discoverPackages renders the exported functions of the imports which can be located, skipping
-// the package in fromdir.
-func discoverPackages(fromdir string, imports []string) string {
-	skip := []string{importPathOf(fromdir)}
-	rendered := make([]string, 0, len(imports))
-	for _, importpath := range imports {
-		if slices.Contains(skip, importpath) {
-			continue
-		}
-
-		skip = append(skip, importpath)
-
-		if api, err := collectPackages(fromdir, []string{importpath}); err == nil {
-			rendered = append(rendered, api)
-		}
-	}
-
-	return strings.Join(rendered, "\n\n")
 }

@@ -54,6 +54,10 @@ type PromptContext struct {
 	Ensure []string
 	// Previous is the response of the attempt before this one for Fn, empty on the first attempt.
 	Previous string
+	// Violations describes the rules Previous violates, empty when it satisfied them.
+	Violations string
+	// Results is why Previous failed verification, e.g.) the output of the compiler and the tests, empty when it passed.
+	Results string
 }
 
 // DefaultRevisions is the number of rework rounds used when none are specified.
@@ -100,7 +104,8 @@ func (t Options) Attempts(n int) Options {
 }
 
 // Ensure adds rules every generated test must satisfy, e.g.) "no helper functions are added".
-// a test violating the rules is sent back to the model to be reworked.
+// rules are checked once the test is verified, a test violating them is sent back to the model to be reworked
+// and the revision is verified again.
 func (t Options) Ensure(rules ...string) Options {
 	return append(t, func(o *option) {
 		o.ensure = append(o.ensure, rules...)
@@ -177,16 +182,27 @@ func (t option) try(ctx context.Context, g Generator, fn Fn) (bool, error) {
 		judge.ensure = r.Rules(t.ensure...)
 	}
 
-	reprompt := func(previous string) (string, error) {
-		return g.Prompt(PromptContext{Fn: fn, Ensure: t.ensure, Previous: previous})
+	reprompt := func(previous string, violations string) (string, error) {
+		return g.Prompt(PromptContext{Fn: fn, Ensure: t.ensure, Previous: previous, Violations: violations})
 	}
 
-	var previous string
+	// the last response and why it failed verification, for the prompt of the next attempt to learn from.
+	var previous, results string
+	verify := func(artifact string) error {
+		previous, results = artifact, ""
+		err := g.Verify(ctx, fn, artifact)
+		if err != nil {
+			results = err.Error()
+		}
+
+		return err
+	}
+
 	attempts := max(t.attempts, 1)
 	for attempt := 1; attempt <= attempts; attempt++ {
 		if attempt > 1 {
 			// let the generator learn from the previous attempt.
-			if prompt, err = g.Prompt(PromptContext{Fn: fn, Ensure: t.ensure, Previous: previous}); err != nil {
+			if prompt, err = g.Prompt(PromptContext{Fn: fn, Ensure: t.ensure, Previous: previous, Results: results}); err != nil {
 				return false, err
 			}
 			log.Printf("autogentest %s attempt %d/%d: prompt (%d bytes)\n%s\n", fn.Name, attempt, attempts, len(prompt), prompt)
@@ -199,22 +215,21 @@ func (t option) try(ctx context.Context, g Generator, fn Fn) (bool, error) {
 			return false, err
 		}
 		log.Printf("autogentest %s attempt %d/%d: model response (%d bytes) in %v\n%s\n", fn.Name, attempt, attempts, len(result), time.Since(astart), result)
-		previous = result
+
+		if err := verify(result); err != nil {
+			log.Printf("autogentest %s attempt %d/%d: skipped, failing result after %v: %v\n", fn.Name, attempt, attempts, time.Since(astart), err)
+			continue
+		}
 
 		if len(t.ensure) > 0 {
 			var ok bool
-			if result, ok, err = judge.rework(ctx, prompt, reprompt, result); err != nil {
+			if result, ok, err = judge.rework(ctx, reprompt, verify, result); err != nil {
 				return false, err
 			} else if !ok {
-				log.Printf("autogentest %s attempt %d/%d: skipped, result violating rules\n", fn.Name, attempt, attempts)
+				log.Printf("autogentest %s attempt %d/%d: skipped, result violating rules or failing after rework\n", fn.Name, attempt, attempts)
 				continue
 			}
 			log.Printf("autogentest %s attempt %d/%d: rules satisfied, final result\n%s\n", fn.Name, attempt, attempts, result)
-		}
-
-		if err := g.Verify(ctx, fn, result); err != nil {
-			log.Printf("autogentest %s attempt %d/%d: skipped, failing result after %v: %v\n", fn.Name, attempt, attempts, time.Since(astart), err)
-			continue
 		}
 
 		log.Printf("autogentest %s attempt %d/%d completed, passing result in %v\n", fn.Name, attempt, attempts, time.Since(astart))
@@ -236,14 +251,6 @@ you must not respond with prose, code blocks, or an array.
 :rules:
 --------------------------------------------------- RESPONSE ---------------------------------------------------
 :response:
-`
-
-const reviseTemplate = `
-your response violates the following rules:
-:violations:
-
-rewrite your response so it satisfies every rule while still accomplishing the original request.
-respond with only the complete file, as plain text without code fences or any other text.
 `
 
 // violation is a single place a response breaks one of the rules.
@@ -277,6 +284,16 @@ func parseViolations(response string, rules int) (violations []violation, err er
 	}
 }
 
+// numberLines prefixes each line of the text with its number, the numbers violations refer to.
+func numberLines(text string) string {
+	var numbered strings.Builder
+	for i, line := range strings.Split(text, "\n") {
+		fmt.Fprintf(&numbered, "%d: %s\n", i+1, line)
+	}
+
+	return numbered.String()
+}
+
 // judge asks the model which of the rules the response violates.
 func (t option) judge(ctx context.Context, response string) ([]violation, error) {
 	var rules strings.Builder
@@ -284,14 +301,9 @@ func (t option) judge(ctx context.Context, response string) ([]violation, error)
 		fmt.Fprintf(&rules, "%d. %s\n", i+1, rule)
 	}
 
-	var numbered strings.Builder
-	for i, line := range strings.Split(response, "\n") {
-		fmt.Fprintf(&numbered, "%d: %s\n", i+1, line)
-	}
-
 	prompt := strings.NewReplacer(
 		":rules:", rules.String(),
-		":response:", numbered.String(),
+		":response:", numberLines(response),
 	).Replace(judgeTemplate)
 
 	judged, err := t.llm.Do(ctx, egllm.Message{Role: "user", Content: prompt})
@@ -307,12 +319,12 @@ func (t option) judge(ctx context.Context, response string) ([]violation, error)
 	return violations, err
 }
 
-// rework checks the generated response against the rules. violations are sent back to the model,
-// with the source material and the response it generated as context, to be reworked until the rules
+// rework checks the verified response against the rules. violations are sent back to the model, in the
+// prompt reprompt renders from the response and the violations, to be reworked until the rules
 // hold or the revisions are exhausted. returns false if the rules still do not hold.
-// a revision can use apis the source never showed the model, so after each one the source is
-// rendered again by reprompt from the revision.
-func (t option) rework(ctx context.Context, source string, reprompt func(previous string) (string, error), generated string) (string, bool, error) {
+// each revision is verified before the rules are checked again, one failing verification returns false.
+// a revision can use apis the prompt never showed the model, which rendering it again from the revision includes.
+func (t option) rework(ctx context.Context, reprompt func(previous string, violations string) (string, error), verify func(generated string) error, generated string) (string, bool, error) {
 	for round := uint(0); round <= t.revisions; round++ {
 		violations, err := t.judge(ctx, generated)
 		if err != nil {
@@ -335,21 +347,20 @@ func (t option) rework(ctx context.Context, source string, reprompt func(previou
 			break
 		}
 
-		revise := strings.NewReplacer(":violations:", described.String()).Replace(reviseTemplate)
+		revise, err := reprompt(generated, described.String())
+		if err != nil {
+			return "", false, err
+		}
 		log.Printf("autogentest round %d/%d: next prompt\n%s\n", round, t.revisions, revise)
 
-		if generated, err = t.llm.Do(
-			ctx,
-			egllm.Message{Role: "user", Content: source},
-			egllm.Message{Role: "assistant", Content: generated},
-			egllm.Message{Role: "user", Content: revise},
-		); err != nil {
+		if generated, err = t.llm.Do(ctx, egllm.Message{Role: "user", Content: revise}); err != nil {
 			return "", false, err
 		}
 		log.Printf("autogentest round %d/%d: revised response\n%s\n", round, t.revisions, generated)
 
-		if source, err = reprompt(generated); err != nil {
-			return "", false, err
+		if err = verify(generated); err != nil {
+			log.Printf("autogentest round %d/%d: revision failed verification: %v\n", round, t.revisions, err)
+			return "", false, nil
 		}
 	}
 

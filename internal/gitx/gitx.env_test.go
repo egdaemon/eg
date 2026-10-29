@@ -1,6 +1,9 @@
 package gitx_test
 
 import (
+	"bytes"
+	"log"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -81,6 +84,34 @@ func TestLocalEnv(t *testing.T) {
 			require.False(t, strings.HasPrefix(k, "EG_GIT_BASE_"), "unexpected base variable: %s", k)
 		}
 	})
+
+	t.Run("a base branch only available as a remote-tracking ref is used", func(t *testing.T) {
+		repo, h := newrepo(t)
+		_ = repo.Storer.RemoveReference(plumbing.NewBranchReferenceName("main"))
+		require.NoError(t, repo.Storer.SetReference(plumbing.NewHashReference(plumbing.NewRemoteReferenceName("origin", "main"), h)))
+
+		environ, err := gitx.LocalEnv(repo, "origin", "HEAD")
+		require.NoError(t, err)
+
+		env := environMap(t, environ)
+		require.Equal(t, testvcs, env["EG_GIT_BASE_VCS"])
+		require.NotEmpty(t, env["EG_GIT_BASE_URI"])
+		require.Equal(t, "main", env["EG_GIT_BASE_REF"])
+		require.Equal(t, h.String(), env["EG_GIT_BASE_COMMIT"])
+	})
+
+	t.Run("a missing base branch is logged", func(t *testing.T) {
+		repo, _ := newrepo(t)
+		_ = repo.Storer.RemoveReference(plumbing.NewBranchReferenceName("main"))
+
+		var logged bytes.Buffer
+		log.SetOutput(&logged)
+		t.Cleanup(func() { log.SetOutput(os.Stderr) })
+
+		_, err := gitx.LocalEnv(repo, "origin", "HEAD")
+		require.NoError(t, err)
+		require.Contains(t, logged.String(), "EG_GIT_BASE_")
+	})
 }
 
 func TestEnv(t *testing.T) {
@@ -116,6 +147,34 @@ func TestEnv(t *testing.T) {
 		for k := range env {
 			require.False(t, strings.HasPrefix(k, "EG_GIT_BASE_"), "unexpected base variable: %s", k)
 		}
+	})
+
+	t.Run("a base branch only available as a remote-tracking ref is used", func(t *testing.T) {
+		repo, h := newEnvRepo(t)
+		_ = repo.Storer.RemoveReference(plumbing.NewBranchReferenceName("main"))
+		require.NoError(t, repo.Storer.SetReference(plumbing.NewHashReference(plumbing.NewRemoteReferenceName("origin", "main"), h)))
+
+		environ, err := gitx.Env(repo, "origin", "HEAD", "")
+		require.NoError(t, err)
+
+		env := environMap(t, environ)
+		require.Equal(t, testvcs, env["EG_GIT_BASE_VCS"])
+		require.NotEmpty(t, env["EG_GIT_BASE_URI"])
+		require.Equal(t, "main", env["EG_GIT_BASE_REF"])
+		require.Equal(t, h.String(), env["EG_GIT_BASE_COMMIT"])
+	})
+
+	t.Run("a missing base branch is logged", func(t *testing.T) {
+		repo, _ := newEnvRepo(t)
+		_ = repo.Storer.RemoveReference(plumbing.NewBranchReferenceName("main"))
+
+		var logged bytes.Buffer
+		log.SetOutput(&logged)
+		t.Cleanup(func() { log.SetOutput(os.Stderr) })
+
+		_, err := gitx.Env(repo, "origin", "HEAD", "")
+		require.NoError(t, err)
+		require.Contains(t, logged.String(), "EG_GIT_BASE_")
 	})
 
 	t.Run("an explicit clone uri takes precedence", func(t *testing.T) {

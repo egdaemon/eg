@@ -31,7 +31,7 @@ func main() {
 		eg.Module(
 			ctx,
 			c1,
-			daemon.TestgenOld(egautogentest.New().Judge(judge).Attempts(16)),
+			daemon.Testgen(egautogentest.New().Judge(judge).Attempts(16)),
 		),
 	)
 

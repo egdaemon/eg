@@ -5,9 +5,11 @@ import (
 	"os/exec"
 	"os/user"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
+	gogit "github.com/go-git/go-git/v6"
 	"github.com/stretchr/testify/require"
 )
 
@@ -131,6 +133,96 @@ func TestClone(t *testing.T) {
 		require.NoError(t, Clone(t.Context(), dst, src, "origin", "main"))
 
 		require.Error(t, Clone(t.Context(), dst, src, "missing", "main"))
+	})
+
+	git := func(t *testing.T, dir string, args ...string) string {
+		t.Helper()
+
+		out, err := exec.Command("git", append([]string{"-C", dir}, args...)...).CombinedOutput()
+		require.NoErrorf(t, err, "git %v: %s", args, out)
+		return strings.TrimSpace(string(out))
+	}
+
+	// base is the base DefaultBase finds in the clone, and the commit it is at.
+	base := func(t *testing.T, dir string) (string, string) {
+		t.Helper()
+
+		repo, err := gogit.PlainOpen(dir)
+		require.NoError(t, err)
+		return DefaultBase(repo, "origin")
+	}
+
+	// a source where main is the default branch and feature is a branch with its own commit.
+	featured := func(t *testing.T) string {
+		src := newMainRepo(t, map[string]string{"a.txt": "a"})
+		git(t, src, "checkout", "-q", "-b", "feature")
+		commitFile(t, src, "f.txt", "f")
+		git(t, src, "checkout", "-q", "main")
+		commitFile(t, src, "m.txt", "m")
+		return src
+	}
+
+	t.Run("a branch other than the default carries the default branch as the base", func(t *testing.T) {
+		src := featured(t)
+		dst := filepath.Join(t.TempDir(), "clone")
+		require.NoError(t, Clone(t.Context(), dst, src, "origin", "feature"))
+		require.FileExists(t, filepath.Join(dst, "f.txt"))
+
+		name, commit := base(t, dst)
+		require.Equal(t, "main", name)
+		require.Equal(t, git(t, src, "rev-parse", "main"), commit)
+		require.Equal(t, commit, git(t, dst, "rev-parse", "origin/main"))
+	})
+
+	t.Run("the base is the branch the remote's HEAD names, not only main or master", func(t *testing.T) {
+		src := featured(t)
+		git(t, src, "branch", "-M", "develop")
+		dst := filepath.Join(t.TempDir(), "clone")
+		require.NoError(t, Clone(t.Context(), dst, src, "origin", "feature"))
+
+		name, commit := base(t, dst)
+		require.Equal(t, "develop", name)
+		require.Equal(t, git(t, src, "rev-parse", "develop"), commit)
+	})
+
+	t.Run("cloning the default branch is its own base", func(t *testing.T) {
+		src := featured(t)
+		dst := filepath.Join(t.TempDir(), "clone")
+		require.NoError(t, Clone(t.Context(), dst, src, "origin", "main"))
+
+		name, commit := base(t, dst)
+		require.Equal(t, "main", name)
+		require.Equal(t, git(t, src, "rev-parse", "main"), commit)
+	})
+
+	t.Run("an existing clone gets the base when it is missing", func(t *testing.T) {
+		src := featured(t)
+		dst := filepath.Join(t.TempDir(), "clone")
+		require.NoError(t, Clone(t.Context(), dst, src, "origin", "feature"))
+
+		git(t, dst, "update-ref", "-d", "refs/remotes/origin/main")
+		git(t, dst, "symbolic-ref", "--delete", "refs/remotes/origin/HEAD")
+		name, _ := base(t, dst)
+		require.Empty(t, name)
+
+		// already up to date is not an error, and still restores the base.
+		require.NoError(t, Clone(t.Context(), dst, src, "origin", "feature"))
+		name, commit := base(t, dst)
+		require.Equal(t, "main", name)
+		require.Equal(t, git(t, src, "rev-parse", "main"), commit)
+	})
+
+	t.Run("a remote without a default branch still clones", func(t *testing.T) {
+		src := featured(t)
+		git(t, src, "branch", "-M", "trunk")
+		git(t, src, "checkout", "-q", "--detach")
+		commitFile(t, src, "d.txt", "d")
+		dst := filepath.Join(t.TempDir(), "clone")
+
+		require.NoError(t, Clone(t.Context(), dst, src, "origin", "feature"))
+		require.FileExists(t, filepath.Join(dst, "f.txt"))
+		name, _ := base(t, dst)
+		require.Empty(t, name)
 	})
 
 	t.Run("unknown sources and branches error", func(t *testing.T) {

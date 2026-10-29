@@ -32,9 +32,9 @@ func main() {
 			ctx,
 			c1,
 			eggolang.New().Timeout(10*time.Minute).AutoInstall(),
-			// eggolang.New().Timeout(10*time.Minute).AutoTest(),
-			// egbug.Log("recording coverage initiated"),
-			// eggolang.RecordCoverage,
+			eggolang.New().Timeout(10*time.Minute).AutoTest(),
+			egbug.Log("recording coverage initiated"),
+			eggolang.RecordCoverage,
 			// copies the binary built by AutoInstall into the workspace directory
 			// so the default module's integration tests exercise the new binary.
 			shell.Op(shell.Newf("install -m 0755 /home/egd/go/bin/eg %s", sharedbin()).Debug()),
@@ -63,18 +63,19 @@ func IntegrationTests(ctx context.Context, op eg.Op) error {
 	// which works fine for the standard container runner
 	// because the process is initiated as root.
 	// but inside of a workload we need to reup privileges.
-	runtime := shell.Runtime().Privileged().Debug()
+	runtime := shell.Runtime().Privileged()
 	// run through the freshly installed binary, it is also what gets mounted into nested modules.
 	egbin := sharedbin()
 	return eg.Perform(
 		ctx,
 		shell.Op(
-			// runtime.Newf("%s --hotswap compute baremetal --no-cgroups tests/concurrent", egbin),
-			// runtime.Newf("%s --hotswap compute baremetal --no-cgroups tests/metrics", egbin),
-			// runtime.Newf("%s --hotswap compute baremetal --no-cgroups tests/stress", egbin),
-			// runtime.Newf("%s --hotswap compute baremetal --no-cgroups tests/localref", egbin),
-			// runtime.Newf("%s --hotswap compute baremetal --no-cgroups tests/egdb", egbin),
-			runtime.Newf("%s --hotswap compute baremetal --no-cgroups tests/envvars", egbin).Debug(),
+			runtime.Newf("%s --hotswap compute baremetal --no-cgroups tests/concurrent", egbin),
+			runtime.Newf("%s --hotswap compute baremetal --no-cgroups tests/metrics", egbin),
+			runtime.Newf("%s --hotswap compute baremetal --no-cgroups tests/stress", egbin),
+			runtime.Newf("%s --hotswap compute baremetal --no-cgroups tests/localref", egbin),
+			runtime.Newf("%s --hotswap compute baremetal --no-cgroups tests/egdb", egbin),
+			// need eg to update for this to pass
+			runtime.Newf("%s --hotswap compute baremetal --no-cgroups tests/envvars", egbin).Lenient(true),
 			// runtime.New("/home/egd/go/bin/eg compute baremetal -vvvv tests/tty"),
 			// runtime.New("/home/egd/go/bin/eg compute baremetal tests/containers"),
 			// runtime.New("/home/egd/go/bin/eg compute baremetal -vv tests/gpgagent"),

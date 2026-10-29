@@ -15,9 +15,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Masterminds/squirrel"
+
+	_eg "github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/internal/coverage"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/iterx"
+	"github.com/egdaemon/eg/internal/sqlx"
 	"github.com/egdaemon/eg/runtime/wasi/eg"
 	"github.com/egdaemon/eg/runtime/wasi/egenv"
 	"github.com/egdaemon/eg/runtime/wasi/egunsafe/fficoverage"
@@ -67,7 +71,6 @@ type option struct {
 	attempts  int // number of generations to try per function, defaults to 1.
 	ensure    []string
 	revisions uint
-	limit     uint // number of functions to generate tests for, 0 is all of them.
 	llm       egllm.Judge
 }
 
@@ -121,14 +124,6 @@ func (t Options) Revisions(n uint) Options {
 	})
 }
 
-// Limit sets the number of functions of the Generator's seq to generate tests for, e.g.) the 5 least covered
-// of Worst. 0 generates tests for all of them, which is the default.
-func (t Options) Limit(n uint) Options {
-	return append(t, func(o *option) {
-		o.limit = n
-	})
-}
-
 // Run generates tests with g subject to the options.
 func (t Options) Run(g Generator) eg.OpFn {
 	o := option{revisions: DefaultRevisions, llm: egllm.Echo()}
@@ -140,8 +135,7 @@ func (t Options) Run(g Generator) eg.OpFn {
 }
 
 func (t option) run(g Generator) eg.OpFn {
-	seq := iterx.Until(16*time.Minute, g.Seq())
-	seq = iterx.N(t.limit, seq)
+	seq := g.Seq()
 
 	op := func(ctx context.Context, _ eg.Op) error {
 		var passed, failed uint
@@ -407,9 +401,6 @@ func writeTemp(dir string, pattern string, data []byte) (path string, err error)
 	return f.Name(), nil
 }
 
-// the filters Worst and Sample take narrow the functions they select, filters given together all apply.
-// they apply before the number of functions is limited, see Options.Limit, so the limit is of the functions that match.
-
 // Language selects the functions of files in any of the languages, e.g.) "go", matched on the extension
 // of the file. the name is not case sensitive and an unknown language is an error.
 func Language(names ...string) coverage.Filter {
@@ -432,46 +423,68 @@ func Coverage(min, max float32) coverage.Filter {
 	return coverage.QueryCoverage(min, max)
 }
 
-// Worst scans recorded coverage for the functions with the lowest statement coverage first, of those matching the filters.
-// see Options.Limit to bound the number of functions.
-func Worst(filters ...coverage.Filter) iterx.Seq[Fn] {
-	return functions(func(context.Context) iterx.Seq[coverage.Report] {
-		return fficoverage.Worst(filters...)
-	})
+// Worst is the query selecting the functions with the lowest statement coverage first, of those matching the filters.
+// it is not run, see From, nor limited, see Seq.Limit.
+func Worst(filters ...coverage.Filter) squirrel.SelectBuilder {
+	return coverage.WorstSearchBuilder(filters...)
 }
 
-// WorstFromWorkload is Worst reading the coverage recorded by the last successful run of the workload, e.g.)
-// eg.DefaultWorkload, instead of the coverage recorded by this run. the run is looked up, see egdb.Latest, while the
-// functions are selected, which fails when the workload has no successful run.
-func WorstFromWorkload(workload string, filters ...coverage.Filter) iterx.Seq[Fn] {
-	return functions(func(ctx context.Context) iterx.Seq[coverage.Report] {
+// Sample is the query selecting the functions matching the filters in a random order. it is not run, see From, nor
+// limited, apply Seq.Limit for a sample of n functions.
+func Sample(filters ...coverage.Filter) squirrel.SelectBuilder {
+	return coverage.SampleSearchBuilder(filters...)
+}
+
+// FromDefault runs sb against the coverage recorded by the last successful run of the default workload, see FromWorkload.
+func FromDefault(sb squirrel.SelectBuilder) Seq {
+	return FromWorkload(_eg.DefaultWorkload, sb)
+}
+
+// FromWorkload runs sb against the coverage recorded by the last successful run of the workload, instead of the
+// coverage recorded by this run, see FromRun. the run is looked up, see egdb.Latest, while the functions are selected,
+// which fails when the workload has no successful run.
+func FromWorkload(workload string, sb squirrel.SelectBuilder) Seq {
+	return Seq{iterx.Lazy(func(ctx context.Context) (iterx.Seq[Fn], io.Closer, error) {
 		path, err := egdb.Latest(ctx, egdb.WithWorkload(workload))
 		if err != nil {
-			return iterx.Error[coverage.Report](err)
+			return nil, nil, err
 		}
 
-		return worstFromPath(path, filters...)
-	})
+		return FromPath(path, sb).Seq, nil, nil
+	})}
 }
 
-// WorstFromPath is Worst reading the coverage recorded in the database file at path, e.g.) the file provided by
-// egdb.Latest, instead of the coverage recorded by this run. the file is opened while the functions are selected.
-func WorstFromPath(path string, filters ...coverage.Filter) iterx.Seq[Fn] {
+// FromPath runs sb against the coverage recorded in the database file at path, e.g.) the file provided by egdb.Latest.
+// the file is opened when iteration starts and closed when it ends, including when it stops early.
+func FromPath(path string, sb squirrel.SelectBuilder) Seq {
+	return Seq{iterx.Lazy(func(ctx context.Context) (iterx.Seq[Fn], io.Closer, error) {
+		f, err := egdb.OpenFile(ctx, path)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		return From(f, sb).Seq, f, nil
+	})}
+}
+
+// From runs sb against q, e.g.) a database opened with egdb.Open. q belongs to the caller and is not closed.
+func From(q sqlx.Queryer, sb squirrel.SelectBuilder) Seq {
 	return functions(func(context.Context) iterx.Seq[coverage.Report] {
-		return worstFromPath(path, filters...)
+		return coverage.Query(q, sb)
 	})
 }
 
-// worstFromPath iterates the reports of the database file at path. the file is opened when iteration starts and
-// closed when it ends, including when it stops early.
-func worstFromPath(path string, filters ...coverage.Filter) iterx.Seq[coverage.Report] {
-	return coverage.From(func(ctx context.Context) (*egdb.File, error) { return egdb.OpenFile(ctx, path) }, fficoverage.WorstFrom(filters...))
+// FromRun runs sb against the coverage recorded by this run.
+func FromRun(sb squirrel.SelectBuilder) Seq {
+	return functions(func(context.Context) iterx.Seq[coverage.Report] {
+		return fficoverage.From(sb)
+	})
 }
 
 // functions builds a Seq from the coverage reports. paths within the working directory are made relative to it,
 // coverage can report them absolute, which a Generator working in another directory, such as a worktree, cannot move into it.
-func functions(query func(context.Context) iterx.Seq[coverage.Report]) iterx.Seq[Fn] {
-	return iterx.New(func(ctx context.Context, yield func(Fn) bool) error {
+func functions(query func(context.Context) iterx.Seq[coverage.Report]) Seq {
+	return Seq{iterx.New(func(ctx context.Context, yield func(Fn) bool) error {
 		reports := query(ctx)
 		for c := range reports.Each(ctx) {
 			if !yield(Fn{Path: relativeTo(egenv.WorkingDirectory(), c.Path), Name: c.Fnname, Hits: int(c.Hits)}) {
@@ -480,7 +493,7 @@ func functions(query func(context.Context) iterx.Seq[coverage.Report]) iterx.Seq
 		}
 
 		return reports.Err()
-	})
+	})}
 }
 
 func relativeTo(dir string, p string) string {
@@ -496,11 +509,11 @@ func relativeTo(dir string, p string) string {
 	return rel
 }
 
-// From builds a Seq directly from a fixed set of functions, useful for
+// FromSpecified builds a Seq directly from a fixed set of functions, useful for
 // driving a Generator without recorded coverage data (e.g. in tests or
 // one-off manual runs). paths are made relative to the working directory like recorded coverage.
-func From(fns ...Fn) iterx.Seq[Fn] {
-	return iterx.New(func(ctx context.Context, yield func(Fn) bool) error {
+func FromSpecified(fns ...Fn) Seq {
+	return Seq{iterx.New(func(ctx context.Context, yield func(Fn) bool) error {
 		for _, fn := range fns {
 			fn.Path = relativeTo(egenv.WorkingDirectory(), fn.Path)
 			if !yield(fn) {
@@ -509,12 +522,5 @@ func From(fns ...Fn) iterx.Seq[Fn] {
 		}
 
 		return nil
-	})
-}
-
-// Sample returns a random sample of n functions from recorded coverage data, of those matching the filters.
-func Sample(n int, filters ...coverage.Filter) iterx.Seq[Fn] {
-	return functions(func(context.Context) iterx.Seq[coverage.Report] {
-		return coverage.From(egdb.Open, fficoverage.Sample(filters...).Limit(uint64(max(n, 0))))
-	})
+	})}
 }

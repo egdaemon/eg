@@ -2,6 +2,8 @@ package iterx
 
 import (
 	"context"
+	"errors"
+	"io"
 	"iter"
 	"time"
 )
@@ -65,6 +67,32 @@ func Until[T any](grace time.Duration, s Seq[T]) Seq[T] {
 				break
 			}
 
+			if !yield(item) {
+				break
+			}
+		}
+
+		return s.Err()
+	})
+}
+
+// Lazy returns a Seq that is resolved when it is consumed instead of when it is built, e.g.) because resolving it
+// opens a connection. the Seq open returns is yielded and its error is the error of the result. the io.Closer open
+// returns, which may be nil, is closed when iteration ends, including when it stops early, and its error is joined
+// to the error of the result. an error from open is the error of the result.
+func Lazy[T any](open func(context.Context) (Seq[T], io.Closer, error)) Seq[T] {
+	return New(func(ctx context.Context, yield func(T) bool) (err error) {
+		s, c, err := open(ctx)
+		if err != nil {
+			return err
+		}
+		if c != nil {
+			defer func() {
+				err = errors.Join(err, c.Close())
+			}()
+		}
+
+		for item := range s.Each(ctx) {
 			if !yield(item) {
 				break
 			}

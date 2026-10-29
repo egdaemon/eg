@@ -22,39 +22,39 @@ func sources(t *testing.T, o GolangOptions) []string {
 
 func TestGolang(t *testing.T) {
 	t.Run("binds the sequence", func(t *testing.T) {
-		seq := From(Fn{Name: "Greet"})
+		seq := FromSpecified(Fn{Name: "Greet"})
 		require.Equal(t, seq, Golang(seq).Seq())
 	})
 
 	t.Run("applies templates", func(t *testing.T) {
-		require.Equal(t, []string{"s"}, sources(t, Golang(From()).Templates("s")))
+		require.Equal(t, []string{"s"}, sources(t, Golang(FromSpecified()).Templates("s")))
 	})
 
 	t.Run("templates accumulate", func(t *testing.T) {
-		require.Equal(t, []string{"a", "b", "c"}, sources(t, Golang(From()).Templates("a", "b").Templates("c")))
+		require.Equal(t, []string{"a", "b", "c"}, sources(t, Golang(FromSpecified()).Templates("a", "b").Templates("c")))
 	})
 
 	t.Run("applies template functions", func(t *testing.T) {
 		fn := func() (string, error) { return "f", nil }
-		require.Equal(t, []string{"s", "f"}, sources(t, Golang(From()).Templates("s").Templates(fn)))
+		require.Equal(t, []string{"s", "f"}, sources(t, Golang(FromSpecified()).Templates("s").Templates(fn)))
 	})
 
 	t.Run("applies named string types", func(t *testing.T) {
 		type source string
-		require.Equal(t, []string{"n"}, sources(t, Golang(From()).Templates(source("n"))))
+		require.Equal(t, []string{"n"}, sources(t, Golang(FromSpecified()).Templates(source("n"))))
 	})
 
 	t.Run("skips empty templates", func(t *testing.T) {
-		require.Equal(t, []string{"a"}, sources(t, Golang(From()).Templates("", "a")))
+		require.Equal(t, []string{"a"}, sources(t, Golang(FromSpecified()).Templates("", "a")))
 	})
 
 	t.Run("template function errors surface", func(t *testing.T) {
-		_, err := Golang(From()).Templates(func() (string, error) { return "", errors.New("boom") }).resolve().sources()
+		_, err := Golang(FromSpecified()).Templates(func() (string, error) { return "", errors.New("boom") }).resolve().sources()
 		require.ErrorContains(t, err, "boom")
 	})
 
 	t.Run("chaining does not modify the receiver", func(t *testing.T) {
-		base := Golang(From()).Templates("a")
+		base := Golang(FromSpecified()).Templates("a")
 		base.Templates("b")
 		require.Equal(t, []string{"a"}, sources(t, base))
 	})
@@ -62,24 +62,24 @@ func TestGolang(t *testing.T) {
 
 func TestGolangDirectory(t *testing.T) {
 	t.Run("defaults to the path as is", func(t *testing.T) {
-		require.Equal(t, "a/b.go", Golang(From()).resolve().rebase("a/b.go"))
-		require.Equal(t, "/ws/a/b.go", Golang(From()).resolve().rebase("/ws/a/b.go"))
+		require.Equal(t, "a/b.go", Golang(FromSpecified()).resolve().rebase("a/b.go"))
+		require.Equal(t, "/ws/a/b.go", Golang(FromSpecified()).resolve().rebase("/ws/a/b.go"))
 	})
 
 	t.Run("relative paths are resolved against the directory", func(t *testing.T) {
-		require.Equal(t, "/wt/a/b.go", Golang(From()).Directory("/wt").resolve().rebase("a/b.go"))
+		require.Equal(t, "/wt/a/b.go", Golang(FromSpecified()).Directory("/wt").resolve().rebase("a/b.go"))
 	})
 
 	t.Run("absolute workspace paths are moved into the directory", func(t *testing.T) {
 		t.Setenv(_eg.EnvComputeWorkspaceDirectory, "/ws")
-		o := Golang(From()).Directory("/wt").resolve()
+		o := Golang(FromSpecified()).Directory("/wt").resolve()
 		require.Equal(t, "/wt/a/b.go", o.rebase("/ws/a/b.go"))
 		require.Equal(t, "/elsewhere/b.go", o.rebase("/elsewhere/b.go"))
 	})
 
 	t.Run("the workspace is configurable", func(t *testing.T) {
 		t.Setenv(_eg.EnvComputeWorkspaceDirectory, "/ws")
-		o := Golang(From()).Directory("/wt").Workspace("/workload/eg").resolve()
+		o := Golang(FromSpecified()).Directory("/wt").Workspace("/workload/eg").resolve()
 		require.Equal(t, "/wt/authn/authn.go", o.rebase("/workload/eg/authn/authn.go"))
 		require.Equal(t, "/ws/a/b.go", o.rebase("/ws/a/b.go"))
 	})
@@ -89,13 +89,13 @@ func TestGolangLazy(t *testing.T) {
 	t.Run("has no sequence until bound", func(t *testing.T) {
 		require.Nil(t, GolangLazy().Seq())
 
-		seq := From(Fn{Name: "Greet"})
+		seq := FromSpecified(Fn{Name: "Greet"})
 		require.Equal(t, seq, GolangLazy().From(seq).Seq())
 	})
 
 	t.Run("binding does not modify the receiver or other bindings", func(t *testing.T) {
 		base := GolangLazy().Templates("a")
-		a, b := From(Fn{Name: "A"}), From(Fn{Name: "B"})
+		a, b := FromSpecified(Fn{Name: "A"}), FromSpecified(Fn{Name: "B"})
 
 		bound := base.From(a)
 		other := base.From(b)
@@ -108,7 +108,7 @@ func TestGolangLazy(t *testing.T) {
 
 	t.Run("bound copies share the caches", func(t *testing.T) {
 		base := GolangLazy()
-		a, b := base.From(From()).resolve(), base.From(From()).resolve()
+		a, b := base.From(FromSpecified()).resolve(), base.From(FromSpecified()).resolve()
 
 		require.Same(t, a.pkgs, b.pkgs)
 		require.Same(t, a.callers, b.callers)
@@ -122,7 +122,7 @@ func TestGolangLazy(t *testing.T) {
 		})
 
 		for range 5 {
-			require.Equal(t, []string{"loaded"}, sources(t, base.From(From())))
+			require.Equal(t, []string{"loaded"}, sources(t, base.From(FromSpecified())))
 		}
 
 		require.EqualValues(t, 1, calls.Load())
@@ -139,7 +139,7 @@ func TestGolangLazy(t *testing.T) {
 			go func() {
 				defer wg.Done()
 
-				seq := From(Fn{Name: fmt.Sprintf("fn%d", i)})
+				seq := FromSpecified(Fn{Name: fmt.Sprintf("fn%d", i)})
 				bound := base.From(seq)
 				require.Equal(t, seq, bound.Seq())
 				require.Equal(t, []string{"a", "b", "c", "d"}, sources(t, bound))
@@ -181,7 +181,7 @@ func TestGolangLazyOptionsConcurrently(t *testing.T) {
 				defer wg.Done()
 
 				dir := fmt.Sprintf("/tmp/%d", i)
-				o := base.Directory(dir).Filename(fmt.Sprintf("%d_test.go", i)).From(From()).resolve()
+				o := base.Directory(dir).Filename(fmt.Sprintf("%d_test.go", i)).From(FromSpecified()).resolve()
 				require.Equal(t, dir, o.dir)
 				require.Equal(t, fmt.Sprintf("%d_test.go", i), o.filename)
 			}()

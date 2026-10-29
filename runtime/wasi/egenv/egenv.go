@@ -21,6 +21,12 @@ func TTL() time.Duration {
 	return env.Duration(time.Hour, eg.EnvComputeTTL)
 }
 
+// CloneEnabled reports whether the repository is cloned from, and so pushed to, a remote. false for `eg compute local`,
+// which works on the local checkout where there is nothing to push to.
+func CloneEnabled() bool {
+	return env.Boolean(true, eg.EnvUnsafeGitCloneEnabled)
+}
+
 // Read the run ID from the environment
 func RunID() string {
 	return env.String("00000000-0000-0000-0000-000000000000", eg.EnvComputeRunID)

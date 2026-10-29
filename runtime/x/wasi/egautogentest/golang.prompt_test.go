@@ -33,33 +33,33 @@ func TestGolangPrompt(t *testing.T) {
 		setup   func(t *testing.T) (PromptContext, GolangOptions)
 	}{
 		{"example.1", "example.1", func(t *testing.T) (PromptContext, GolangOptions) {
-			return PromptContext{Fn: fn}, Golang(From(fn))
+			return PromptContext{Fn: fn}, Golang(FromSpecified(fn))
 		}},
 		{"example.2", "example.2", func(t *testing.T) (PromptContext, GolangOptions) {
 			shout := Fn{Path: ".fixtures/golang/example.2/sample.go", Name: "Shout"}
-			return PromptContext{Fn: shout}, Golang(From(shout))
+			return PromptContext{Fn: shout}, Golang(FromSpecified(shout))
 		}},
 		{"example.2.private", "example.2.private", func(t *testing.T) (PromptContext, GolangOptions) {
 			quiet := Fn{Path: ".fixtures/golang/example.2/sample.go", Name: "quiet"}
-			return PromptContext{Fn: quiet}, Golang(From(quiet))
+			return PromptContext{Fn: quiet}, Golang(FromSpecified(quiet))
 		}},
 		{"example.5", "example.5", func(t *testing.T) (PromptContext, GolangOptions) {
 			exported := Fn{Path: ".fixtures/golang/example.5/sample.go", Name: "Exported"}
-			return PromptContext{Fn: exported}, Golang(From(exported))
+			return PromptContext{Fn: exported}, Golang(FromSpecified(exported))
 		}},
 		{"example.5.method", "example.5.method", func(t *testing.T) (PromptContext, GolangOptions) {
 			method := Fn{Path: ".fixtures/golang/example.5/sample.go", Name: "Generic.Method"}
-			return PromptContext{Fn: method}, Golang(From(method))
+			return PromptContext{Fn: method}, Golang(FromSpecified(method))
 		}},
 		{"example.6", "example.6", func(t *testing.T) (PromptContext, GolangOptions) {
 			run := Fn{Path: ".fixtures/golang/example.6/main.go", Name: "Run"}
-			return PromptContext{Fn: run}, Golang(From(run))
+			return PromptContext{Fn: run}, Golang(FromSpecified(run))
 		}},
 		{"example.1.ensure", "example.1.ensure", func(t *testing.T) (PromptContext, GolangOptions) {
-			return PromptContext{Fn: fn, Ensure: []string{"no helper functions are added", golangDefaultRules[1], "no global variables"}}, Golang(From(fn))
+			return PromptContext{Fn: fn, Ensure: []string{"no helper functions are added", golangDefaultRules[1], "no global variables"}}, Golang(FromSpecified(fn))
 		}},
 		{"example.1.templates", "example.1.templates", func(t *testing.T) (PromptContext, GolangOptions) {
-			return PromptContext{Fn: fn}, Golang(From(fn)).Templates("STYLE SAMPLE", "{{.Fn.Name}} {{ bad")
+			return PromptContext{Fn: fn}, Golang(FromSpecified(fn)).Templates("STYLE SAMPLE", "{{.Fn.Name}} {{ bad")
 		}},
 		{"example.1.generated", "example.1.generated", func(t *testing.T) (PromptContext, GolangOptions) {
 			dir, fn := copy(t)
@@ -67,25 +67,25 @@ func TestGolangPrompt(t *testing.T) {
 			name, err := golangFilename(DefaultGolangFilename, fn)
 			require.NoError(t, err)
 			write(t, dir, name, "package sample\n\nfunc TestExisting() {}\n")
-			return PromptContext{Fn: fn}, Golang(From(fn))
+			return PromptContext{Fn: fn}, Golang(FromSpecified(fn))
 		}},
 		{"prefers the test file next to the function", "example.1", func(t *testing.T) (PromptContext, GolangOptions) {
 			dir, fn := copy(t)
 			name, err := golangFilename(DefaultGolangFilename, fn)
 			require.NoError(t, err)
 			write(t, dir, name, "package sample\n\nfunc TestGenerated() {}\n")
-			return PromptContext{Fn: fn}, Golang(From(fn))
+			return PromptContext{Fn: fn}, Golang(FromSpecified(fn))
 		}},
 		{"example.1.external", "example.1.external", func(t *testing.T) (PromptContext, GolangOptions) {
 			dir, fn := copy(t)
 			write(t, dir, "sample_test.go", "package sample_test\n\nfunc TestExternal() {}\n")
-			return PromptContext{Fn: fn}, Golang(From(fn))
+			return PromptContext{Fn: fn}, Golang(FromSpecified(fn))
 		}},
 		{"example.1.custom", "example.1.custom", func(t *testing.T) (PromptContext, GolangOptions) {
 			dir, fn := copy(t)
 			require.NoError(t, os.Remove(filepath.Join(dir, "sample_test.go")))
 			write(t, dir, "custom_test.go", "package sample\n\nfunc TestCustom() {}\n")
-			return PromptContext{Fn: fn}, Golang(From(fn)).Filename("custom_test.go")
+			return PromptContext{Fn: fn}, Golang(FromSpecified(fn)).Filename("custom_test.go")
 		}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -100,12 +100,12 @@ func TestGolangPrompt(t *testing.T) {
 	}
 
 	t.Run("rules are the default rules followed by the given rules", func(t *testing.T) {
-		rules := Golang(From(fn)).Rules("mine", golangDefaultRules[0])
+		rules := Golang(FromSpecified(fn)).Rules("mine", golangDefaultRules[0])
 		require.Equal(t, append(append([]string(nil), golangDefaultRules...), "mine"), rules)
 	})
 
 	t.Run("unknown function", func(t *testing.T) {
-		_, err := Golang(From(fn)).Prompt(PromptContext{Fn: Fn{Path: fn.Path, Name: "Missing"}})
+		_, err := Golang(FromSpecified(fn)).Prompt(PromptContext{Fn: Fn{Path: fn.Path, Name: "Missing"}})
 		require.Error(t, err)
 	})
 }
@@ -124,7 +124,7 @@ func TestGolangPromptFeedback(t *testing.T) {
 	}
 
 	t.Run("sections are in order and the feedback is left out of a first attempt", func(t *testing.T) {
-		prompt, err := Golang(From(fn)).Prompt(PromptContext{Fn: fn})
+		prompt, err := Golang(FromSpecified(fn)).Prompt(PromptContext{Fn: fn})
 		require.NoError(t, err)
 
 		positions := order(prompt, "RULES", "TEMPLATES", "TYPES", "SOURCE", "PREAMBLE", "FOCUS")
@@ -134,7 +134,7 @@ func TestGolangPromptFeedback(t *testing.T) {
 	})
 
 	t.Run("the previous response, its violations and its verification results follow the focus", func(t *testing.T) {
-		prompt, err := Golang(From(fn)).Prompt(PromptContext{
+		prompt, err := Golang(FromSpecified(fn)).Prompt(PromptContext{
 			Fn:         fn,
 			Previous:   "package sample_test\nfunc TestGreet() {}",
 			Violations: "- rule 1 (be clean) line 2: dirty\n",

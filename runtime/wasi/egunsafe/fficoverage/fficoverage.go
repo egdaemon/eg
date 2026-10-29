@@ -67,5 +67,11 @@ func WorstFrom(filters ...coverage.Filter) squirrel.SelectBuilder {
 // Worst iterates the functions with the lowest statement coverage first, of those matching the filters. the analytics
 // database is dialed when iteration starts and closed when it ends, including when it stops early.
 func Worst(filters ...coverage.Filter) iterx.Seq[coverage.Report] {
-	return coverage.From(func(context.Context) (*sql.DB, error) { return dial(), nil }, WorstFrom(filters...))
+	return From(WorstFrom(filters...))
+}
+
+// From iterates the functions b selects from the analytics database. the database is dialed when iteration starts and
+// closed when it ends, including when it stops early.
+func From(b squirrel.SelectBuilder) iterx.Seq[coverage.Report] {
+	return coverage.From(func(context.Context) (*sql.DB, error) { return dial(), nil }, b)
 }

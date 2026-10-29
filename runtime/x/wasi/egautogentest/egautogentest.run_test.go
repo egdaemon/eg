@@ -51,22 +51,12 @@ func (t *rulergen) Rules(ensure ...string) []string {
 	return append(append([]string(nil), t.rules...), ensure...)
 }
 
-func TestLimit(t *testing.T) {
+func TestRunAllFunctions(t *testing.T) {
 	fns := []Fn{{Name: "One"}, {Name: "Two"}, {Name: "Three"}}
 
-	t.Run("stops after the limit", func(t *testing.T) {
-		s := egllm.Constant("a", "b")
-		g := &fakegen{seq: From(fns...)}
-		o := New().Judge(s).Limit(2)
-
-		require.NoError(t, o.Run(g)(t.Context(), nil))
-		require.Len(t, g.verified, 2)
-		require.Len(t, s.Requests(), 2)
-	})
-
-	t.Run("generates for every function by default", func(t *testing.T) {
+	t.Run("generates for every function", func(t *testing.T) {
 		s := egllm.Constant("a", "b", "c")
-		g := &fakegen{seq: From(fns...)}
+		g := &fakegen{seq: FromSpecified(fns...)}
 		o := New().Judge(s)
 
 		require.NoError(t, o.Run(g)(t.Context(), nil))

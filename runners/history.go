@@ -44,6 +44,13 @@ func (t historyrecorder) record(ctx context.Context, workload *computeapi.Enqueu
 		return err
 	}
 
+	// the analytics live beside the log in the workload's runtime directory, a workload without them is still recorded.
+	if entry.AnalyticsPath, err = t.keepanalytics(workload.Id, filepath.Join(filepath.Dir(logpath), DaemonAnalyticsName)); errors.Is(err, os.ErrNotExist) {
+		entry.AnalyticsPath = ""
+	} else if err != nil {
+		return err
+	}
+
 	if err = computex.EntryUpsert(ctx, t.db, entry).Scan(&entry); err != nil {
 		return errorsx.Wrap(err, "unable to record the workload")
 	}
@@ -54,15 +61,22 @@ func (t historyrecorder) record(ctx context.Context, workload *computeapi.Enqueu
 // keeplogs keeps the log of the workload beyond the workload's directory by linking it into the history
 // directory, copying when linking isn't possible (e.g. the directories are on different filesystems).
 func (t historyrecorder) keeplogs(id string, src string) (path string, err error) {
-	if err = os.MkdirAll(t.logs, 0700); err != nil {
-		return "", errorsx.Wrap(err, "unable to create the history logs directory")
-	}
+	return t.keep(src, filepath.Join(t.logs, filepath.Base(id)+".log"), "logs")
+}
 
-	path = filepath.Join(t.logs, filepath.Base(id)+".log")
+// keepanalytics keeps the analytics of the workload beyond the workload's directory, in the same manner as keeplogs.
+func (t historyrecorder) keepanalytics(id string, src string) (path string, err error) {
+	return t.keep(src, filepath.Join(t.logs, filepath.Base(id)+".analytics.db"), "analytics")
+}
+
+func (t historyrecorder) keep(src string, path string, kind string) (_ string, err error) {
+	if err = os.MkdirAll(t.logs, 0700); err != nil {
+		return "", errorsx.Wrapf(err, "unable to create the history %s directory", kind)
+	}
 
 	// a repeated completion replaces the earlier link.
 	if err = os.Remove(path); err != nil && !errors.Is(err, os.ErrNotExist) {
-		return "", errorsx.Wrap(err, "unable to replace the history logs")
+		return "", errorsx.Wrapf(err, "unable to replace the history %s", kind)
 	}
 
 	if err = os.Link(src, path); err == nil {
@@ -71,19 +85,19 @@ func (t historyrecorder) keeplogs(id string, src string) (path string, err error
 
 	in, err := os.Open(src)
 	if err != nil {
-		return "", errorsx.Wrap(err, "unable to open the logs")
+		return "", errorsx.Wrapf(err, "unable to open the %s", kind)
 	}
 	defer in.Close()
 
 	out, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
 	if err != nil {
-		return "", errorsx.Wrap(err, "unable to create the history logs")
+		return "", errorsx.Wrapf(err, "unable to create the history %s", kind)
 	}
 
 	if _, err = io.Copy(out, in); err != nil {
 		errorsx.Log(out.Close())
-		return "", errorsx.Wrap(err, "unable to copy the logs")
+		return "", errorsx.Wrapf(err, "unable to copy the %s", kind)
 	}
 
-	return path, errorsx.Wrap(out.Close(), "unable to copy the logs")
+	return path, errorsx.Wrapf(out.Close(), "unable to copy the %s", kind)
 }

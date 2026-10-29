@@ -178,7 +178,8 @@ func TestUploadHandler(t *testing.T) {
 
 		w := httptest.NewRecorder()
 		h.ServeHTTP(w, newUploadRequest(t, &enqresp, "candidate-token"))
-		require.Equal(t, http.StatusConflict, w.Code)
+		require.Equal(t, http.StatusServiceUnavailable, w.Code)
+		require.Equal(t, "5", w.Header().Get("Retry-After"))
 		require.False(t, reserver.called)
 
 		requireEmptyDir(t, h.Dirs.Queued)

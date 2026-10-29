@@ -6,9 +6,11 @@ import (
 	"database/sql/driver"
 	"errors"
 	"io"
+	"maps"
 	"net"
 	"os"
 	"path/filepath"
+	"slices"
 	"sync"
 	"syscall"
 	"time"
@@ -48,6 +50,7 @@ type ownedfile struct {
 	connector *duckdb.Connector
 	db        *sql.DB // what the socket serves, it shares the connector.
 	socket    string
+	sessions  *sessions
 	stop      context.CancelFunc
 	done      chan struct{}
 	refs      int
@@ -141,7 +144,7 @@ func (t *sharedconnector) own(socket string) error {
 
 	ctx, stop := context.WithCancel(context.Background())
 	served := sql.OpenDB(connector)
-	tracked := sessions{Listener: l, ctx: ctx}
+	tracked := &sessions{Listener: l, conns: make(map[net.Conn]struct{})}
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
@@ -152,7 +155,7 @@ func (t *sharedconnector) own(socket string) error {
 		}
 	}()
 
-	t.owned = &ownedfile{connector: connector, db: served, socket: socket, stop: stop, done: done}
+	t.owned = &ownedfile{connector: connector, db: served, socket: socket, sessions: tracked, stop: stop, done: done}
 	return nil
 }
 
@@ -184,6 +187,9 @@ func (t *sharedconnector) Close() error {
 	o := t.owned
 	t.owned = nil
 
+	// hang up before cancelling, otherwise a request racing the shutdown is answered with a cancelled
+	// error instead of the connection going away.
+	o.sessions.hangup()
 	o.stop()
 	<-o.done
 	_ = os.Remove(o.socket)
@@ -263,16 +269,53 @@ func (t *proxiedconn) QueryContext(ctx context.Context, query string, args []dri
 // them open and they'd answer with errors instead of letting their connections know to recover.
 type sessions struct {
 	net.Listener
-	ctx context.Context
+
+	m      sync.Mutex
+	conns  map[net.Conn]struct{}
+	closed bool
 }
 
-func (t sessions) Accept() (net.Conn, error) {
+func (t *sessions) Accept() (net.Conn, error) {
 	c, err := t.Listener.Accept()
 	if err != nil {
 		return nil, err
 	}
 
-	context.AfterFunc(t.ctx, func() { _ = c.Close() })
+	t.m.Lock()
+	defer t.m.Unlock()
 
-	return c, nil
+	if t.closed {
+		_ = c.Close()
+		return nil, net.ErrClosed
+	}
+
+	tc := &sessionconn{Conn: c, owner: t}
+	t.conns[tc] = struct{}{}
+
+	return tc, nil
+}
+
+// hangup closes the connections, returning once they are closed.
+func (t *sessions) hangup() {
+	t.m.Lock()
+	t.closed = true
+	conns := slices.Collect(maps.Keys(t.conns))
+	t.m.Unlock()
+
+	for _, c := range conns {
+		_ = c.Close()
+	}
+}
+
+type sessionconn struct {
+	net.Conn
+	owner *sessions
+}
+
+func (t *sessionconn) Close() error {
+	t.owner.m.Lock()
+	delete(t.owner.conns, t)
+	t.owner.m.Unlock()
+
+	return t.Conn.Close()
 }

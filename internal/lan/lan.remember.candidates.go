@@ -7,13 +7,14 @@ import (
 
 	"github.com/egdaemon/eg/compute"
 	"github.com/egdaemon/eg/internal/errorsx"
+	"github.com/egdaemon/eg/internal/sqlx"
 	"github.com/egdaemon/eg/internal/stringsx"
 	"github.com/libp2p/go-libp2p/core/peer"
 )
 
 // RememberCandidates records what the control plane reports about the candidate runners, keeping
 // the addresses and operator settings already known for them. candidates without a peer id are skipped.
-func RememberCandidates(ctx context.Context, db *sql.DB, candidates ...*compute.Compute) (err error) {
+func RememberCandidates(ctx context.Context, db sqlx.Queryer, candidates ...*compute.Compute) (err error) {
 	for _, c := range candidates {
 		if stringsx.Blank(c.P2Pid) {
 			continue

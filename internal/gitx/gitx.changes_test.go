@@ -15,7 +15,7 @@ func TestChanges(t *testing.T) {
 		initRepo(t, repo, map[string]string{"a.txt": "one\n", "b.txt": "one\n"})
 
 		clone = filepath.Join(t.TempDir(), "clone")
-		require.NoError(t, LocalClone(t.Context(), repo, clone))
+		require.NoError(t, LocalClone(t.Context(), repo, clone, "main", "HEAD"))
 
 		return repo, clone
 	}

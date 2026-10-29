@@ -18,7 +18,9 @@ func main() {
 	ctx, done := context.WithTimeout(context.Background(), egenv.TTL())
 	defer done()
 
-	judge := egllm.LLamaCPP("ggml-org/Qwen3.8-27B-GGUF:Q4_K_M")
+	judge := egllm.LLamaCPP("ggml-org/Qwen3.8-27B-GGUF:Q4_K_M").
+		ReasoningBudget(4096).
+		ReasoningEffort("medium")
 	c1 := eg.Container("eg.ubuntu")
 	err := eg.Perform(
 		ctx,
@@ -29,7 +31,7 @@ func main() {
 		eg.Module(
 			ctx,
 			c1,
-			daemon.Faulttest(egautogentest.New().Judge(judge).Attempts(3)),
+			daemon.Faulttest(egautogentest.New().Judge(judge).Attempts(16)),
 		),
 	)
 

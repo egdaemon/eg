@@ -12,5 +12,5 @@ import (
 // as configured by opts, e.g.) the judge and the number of attempts, and pushes them to a branch per fault.
 // the project and credentials come from the environment, see eghoneybadger.
 func Faulttest(opts egautogentest.Options) eg.OpFn {
-	return faultharness.Test(workers, opts, eghoneybadger.New().Limit(10).Faults())
+	return faultharness.Test(1, opts, eghoneybadger.New().Limit(10).Faults())
 }

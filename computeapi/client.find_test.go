@@ -1,4 +1,4 @@
-package runners
+package computeapi
 
 import (
 	"bytes"
@@ -10,16 +10,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/egdaemon/eg/computeapi"
-
 	"github.com/egdaemon/eg/internal/httpx"
 	"github.com/egdaemon/eg/internal/timex"
 	"github.com/stretchr/testify/require"
 )
 
 func TestAwaitLogsToken(t *testing.T) {
-	respond := func(w http.ResponseWriter, e *computeapi.Enqueued) {
-		b, err := json.Marshal(&computeapi.EnqueuedFindResponse{Enqueued: e})
+	respond := func(w http.ResponseWriter, e *Enqueued) {
+		b, err := json.Marshal(&EnqueuedFindResponse{Enqueued: e})
 		require.NoError(t, err)
 		_, _ = w.Write(b)
 	}
@@ -31,10 +29,10 @@ func TestAwaitLogsToken(t *testing.T) {
 		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			require.Equal(t, "/c/q/abc", r.URL.Path)
 			if calls.Add(1) < 3 {
-				respond(w, &computeapi.Enqueued{Id: "abc", CompletedAt: running})
+				respond(w, &Enqueued{Id: "abc", CompletedAt: running})
 				return
 			}
-			respond(w, &computeapi.Enqueued{Id: "abc", CompletedAt: running, LogsToken: "tok"})
+			respond(w, &Enqueued{Id: "abc", CompletedAt: running, LogsToken: "tok"})
 		}))
 		defer srv.Close()
 
@@ -46,7 +44,7 @@ func TestAwaitLogsToken(t *testing.T) {
 
 	t.Run("errors when the workload completed without a token", func(t *testing.T) {
 		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			respond(w, &computeapi.Enqueued{Id: "abc", CompletedAt: time.Now().UTC().Format(time.RFC3339Nano)})
+			respond(w, &Enqueued{Id: "abc", CompletedAt: time.Now().UTC().Format(time.RFC3339Nano)})
 		}))
 		defer srv.Close()
 
@@ -57,7 +55,7 @@ func TestAwaitLogsToken(t *testing.T) {
 
 func TestAwaitLogsTokenGivesUpOnStartedWorkload(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		b, err := json.Marshal(&computeapi.EnqueuedFindResponse{Enqueued: &computeapi.Enqueued{
+		b, err := json.Marshal(&EnqueuedFindResponse{Enqueued: &Enqueued{
 			Id:          "abc",
 			CompletedAt: timex.RFC3339Inf().Format(time.RFC3339Nano),
 			InitiatedAt: time.Now().UTC().Format(time.RFC3339Nano),

@@ -45,6 +45,7 @@ import (
 	"github.com/egdaemon/gdx"
 	"github.com/egdaemon/gdx/konggdx"
 	"github.com/go-git/go-git/v6"
+	"github.com/go-git/go-git/v6/plumbing"
 	"github.com/gofrs/uuid/v5"
 	"github.com/willabides/kongplete"
 
@@ -162,8 +163,8 @@ func main() {
 			"vars_labels":                  envx.String("", "EG_LABELS"),
 			"vars_vcs_uri":                 cmdopts.WorkspaceVCSURI(),
 			"vars_git_default_remote_name": git.DefaultRemoteName,
-			"vars_git_default_reference":   envx.String("main", "GITHUB_REF_NAME"), // github actions environment variable
-			"vars_git_head_reference":      envx.String("HEAD", "GITHUB_SHA"),      // github actions environment variable
+			"vars_git_default_reference":   envx.String(plumbing.Main.Short(), "GITHUB_REF_NAME", eg.EnvGitHeadRef), // github actions, then the run eg is nested in
+			"vars_git_head_reference":      envx.String(plumbing.HEAD.String(), "GITHUB_SHA", eg.EnvGitHeadCommit),  // github actions, then the run eg is nested in
 			"vars_workload_directory":      eg.DefaultModuleDirectory(),
 		},
 		kong.UsageOnError(),

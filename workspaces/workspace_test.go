@@ -10,6 +10,7 @@ import (
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/egdaemon/eg"
+	"github.com/egdaemon/eg/internal/gitx"
 	"github.com/egdaemon/eg/workspaces"
 	git "github.com/go-git/go-git/v6"
 	"github.com/gofrs/uuid/v5"
@@ -144,6 +145,41 @@ func TestNewLocal(t *testing.T) {
 		// "path escapes from parent" -- a real worktree must open cleanly.
 		_, err = git.PlainOpen(ws.WorkingDir)
 		require.NoError(t, err, "git.PlainOpen should succeed against the linked worktree")
+	})
+
+	t.Run("the working dir knows the base of a repository that only has it as a remote-tracking branch", func(t *testing.T) {
+		root := t.TempDir()
+		moduleDir := ".eg"
+		initRepo(t, root, moduleDir)
+
+		// what a ci checkout looks like: a feature branch checked out and the default branch, which isn't
+		// main or master, only as origin/develop.
+		for _, args := range [][]string{
+			{"branch", "-M", "develop"},
+			{"update-ref", "refs/remotes/origin/develop", "develop"},
+			{"symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/develop"},
+			{"checkout", "-q", "-b", "feature"},
+			{"commit", "-q", "--allow-empty", "-m", "feature"},
+			{"branch", "-q", "-D", "develop"},
+		} {
+			out, err := exec.Command("git", append([]string{"-C", root}, args...)...).CombinedOutput()
+			require.NoErrorf(t, err, "git %v: %s", args, out)
+		}
+
+		ws, err := workspaces.NewLocal(t.Context(), uuid.Max, sha256.New(), root, "")
+		require.NoError(t, err)
+
+		repo, err := git.PlainOpen(ws.WorkingDir)
+		require.NoError(t, err)
+
+		name, commit := gitx.DefaultBase(repo, git.DefaultRemoteName)
+		require.Equal(t, "develop", name)
+
+		source, err := git.PlainOpen(root)
+		require.NoError(t, err)
+		want, err := source.ResolveRevision("origin/develop")
+		require.NoError(t, err)
+		require.Equal(t, want.String(), commit)
 	})
 
 	t.Run("falls back to a symlink when root is not a git repository", func(t *testing.T) {

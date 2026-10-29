@@ -1,4 +1,4 @@
-package compute
+package computeapi
 
 import (
 	"bufio"
@@ -9,8 +9,6 @@ import (
 	"strings"
 	"testing"
 	"time"
-
-	"github.com/egdaemon/eg/computeapi"
 
 	"github.com/egdaemon/eg/cmd/migrations"
 
@@ -26,9 +24,8 @@ import (
 )
 
 func TestUploadLAN(t *testing.T) {
-	cmd := upload{uploadoptions: uploadoptions{LANPeerTTL: lan.DefaultTTL}}
-	req := &computeapi.EnqueuedDequeueResponse{
-		Enqueued: &computeapi.Enqueued{Id: uuid.Must(uuid.NewV7()).String(), AccountId: "acct", Entry: "main.wasm"},
+	req := &EnqueuedDequeueResponse{
+		Enqueued: &Enqueued{Id: uuid.Must(uuid.NewV7()).String(), AccountId: "acct", Entry: "main.wasm"},
 	}
 
 	t.Run("uploads to a remembered runner without the control plane's network", func(t *testing.T) {
@@ -46,13 +43,13 @@ func TestUploadLAN(t *testing.T) {
 				return
 			}
 
-			var received computeapi.EnqueuedDequeueResponse
+			var received EnqueuedDequeueResponse
 			require.NoError(t, json.Unmarshal([]byte(r.FormValue("enqueued")), &received))
 			token = r.FormValue("token")
 
 			rec := httptest.NewRecorder()
 			rec.WriteHeader(http.StatusAccepted)
-			require.NoError(t, json.NewEncoder(rec).Encode(proto.Clone(received.Enqueued).(*computeapi.Enqueued)))
+			require.NoError(t, json.NewEncoder(rec).Encode(proto.Clone(received.Enqueued).(*Enqueued)))
 
 			_, _ = io.Copy(io.Discard, r.Body)
 			_ = rec.Result().Write(s)
@@ -74,7 +71,7 @@ func TestUploadLAN(t *testing.T) {
 			{Id: "nearby", P2Pid: runner.ID().String(), Token: "nearby-token"},
 		}
 
-		o, err := cmd.lan(t.Context(), db, candidates, req, strings.NewReader("kernel"), strings.NewReader("environ"))
+		o, _, err := uploadlan(t.Context(), db, lan.DefaultTTL, candidates, req, strings.NewReader("kernel"), strings.NewReader("environ"))
 		require.NoError(t, err)
 		defer o.host.Close()
 
@@ -101,7 +98,7 @@ func TestUploadLAN(t *testing.T) {
 			}
 
 			rec := httptest.NewRecorder()
-			rec.WriteHeader(http.StatusConflict)
+			rec.WriteHeader(http.StatusServiceUnavailable)
 			_, _ = io.Copy(io.Discard, r.Body)
 			_ = rec.Result().Write(s)
 		})
@@ -116,8 +113,9 @@ func TestUploadLAN(t *testing.T) {
 			p.Addrs = lan.EncodeList(addrs)
 		})).Scan(&lan.Peer{}))
 
-		_, err = cmd.lan(t.Context(), db, []*compute.Compute{{Id: "busy", P2Pid: runner.ID().String()}}, req, strings.NewReader("kernel"), strings.NewReader("environ"))
+		_, retry, err := uploadlan(t.Context(), db, lan.DefaultTTL, []*compute.Compute{{Id: "busy", P2Pid: runner.ID().String()}}, req, strings.NewReader("kernel"), strings.NewReader("environ"))
 		require.ErrorContains(t, err, "no runner on the local network accepted")
+		require.True(t, retry, "a decline is retried")
 	})
 
 	t.Run("skips disabled runners", func(t *testing.T) {
@@ -132,7 +130,7 @@ func TestUploadLAN(t *testing.T) {
 			p.Disabled = true
 		})).Scan(&lan.Peer{}))
 
-		_, err = cmd.lan(t.Context(), db, []*compute.Compute{{Id: "disabled", P2Pid: runner.ID().String()}}, req, strings.NewReader("kernel"), strings.NewReader("environ"))
+		_, _, err = uploadlan(t.Context(), db, lan.DefaultTTL, []*compute.Compute{{Id: "disabled", P2Pid: runner.ID().String()}}, req, strings.NewReader("kernel"), strings.NewReader("environ"))
 		require.ErrorContains(t, err, "known on the local network")
 	})
 
@@ -146,7 +144,7 @@ func TestUploadLAN(t *testing.T) {
 		require.NoError(t, lan.PeerUpsert(t.Context(), db, langx.Clone(lan.Peer{}, lan.PeerOptionTestDefaults, lan.PeerOptionID(runner.ID().String()))).Scan(&lan.Peer{}))
 		sqltestx.Exec(t, db, `UPDATE lan_peers SET last_seen = now() - INTERVAL '90 days'`)
 
-		_, err = cmd.lan(t.Context(), db, []*compute.Compute{{Id: "expired", P2Pid: runner.ID().String()}}, req, strings.NewReader("kernel"), strings.NewReader("environ"))
+		_, _, err = uploadlan(t.Context(), db, lan.DefaultTTL, []*compute.Compute{{Id: "expired", P2Pid: runner.ID().String()}}, req, strings.NewReader("kernel"), strings.NewReader("environ"))
 		require.ErrorContains(t, err, "known on the local network")
 	})
 
@@ -155,12 +153,12 @@ func TestUploadLAN(t *testing.T) {
 		require.NoError(t, migrations.Migrate(t.Context(), db))
 		require.NoError(t, lan.PeerUpsert(t.Context(), db, lan.Peer{PeerID: "12D3KooWDpJ7As7BWAwRMfu1VU2WCqNjvq387JEYKDBj4kx6nXTN"}).Scan(&lan.Peer{}))
 
-		_, err := cmd.lan(t.Context(), db, []*compute.Compute{{Id: "nowhere", P2Pid: "12D3KooWDpJ7As7BWAwRMfu1VU2WCqNjvq387JEYKDBj4kx6nXTN"}}, req, strings.NewReader("kernel"), strings.NewReader("environ"))
+		_, _, err := uploadlan(t.Context(), db, lan.DefaultTTL, []*compute.Compute{{Id: "nowhere", P2Pid: "12D3KooWDpJ7As7BWAwRMfu1VU2WCqNjvq387JEYKDBj4kx6nXTN"}}, req, strings.NewReader("kernel"), strings.NewReader("environ"))
 		require.ErrorContains(t, err, "known on the local network")
 	})
 
 	t.Run("fails without a cache", func(t *testing.T) {
-		_, err := cmd.lan(t.Context(), nil, []*compute.Compute{{Id: "a", P2Pid: "b"}}, req, strings.NewReader("kernel"), strings.NewReader("environ"))
+		_, _, err := uploadlan(t.Context(), nil, lan.DefaultTTL, []*compute.Compute{{Id: "a", P2Pid: "b"}}, req, strings.NewReader("kernel"), strings.NewReader("environ"))
 		require.ErrorContains(t, err, "cache is unavailable")
 	})
 }

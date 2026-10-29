@@ -5,6 +5,7 @@ go 1.27.2
 require (
 	cloud.google.com/go/secretmanager v1.22.0
 	github.com/KimMachineGun/automemlimit v1.0.1
+	github.com/Masterminds/squirrel v1.5.4
 	github.com/ProtonMail/go-crypto v1.5.2
 	github.com/alecthomas/kong v1.16.1
 	github.com/alitto/pond/v2 v2.7.3
@@ -24,7 +25,7 @@ require (
 	github.com/egdaemon/wasinet/wazeronet v0.0.0-20260928194155-07f223337a8d
 	github.com/fsnotify/fsnotify v1.10.1
 	github.com/go-git/go-git/v6 v6.0.0-beta.1
-	github.com/gofrs/flock v0.12.1
+	github.com/gofrs/flock v0.13.0
 	github.com/gofrs/uuid/v5 v5.5.1
 	github.com/golang-jwt/jwt/v4 v4.5.2
 	github.com/google/uuid v1.6.0
@@ -85,7 +86,6 @@ require (
 	filippo.io/keygen v0.0.0-20260114151900-8e2790ea4c5b // indirect
 	github.com/Azure/go-ansiterm v0.0.0-20261006220739-8c912ac31dd4 // indirect
 	github.com/BurntSushi/toml v1.6.0 // indirect
-	github.com/Masterminds/squirrel v1.5.4 // indirect
 	github.com/Microsoft/go-winio v0.6.3 // indirect
 	github.com/VividCortex/ewma v1.2.0 // indirect
 	github.com/acarl005/stripansi v0.0.0-20180116102854-5a71ef0e047d // indirect

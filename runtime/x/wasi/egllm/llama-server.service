@@ -8,7 +8,7 @@ EnvironmentFile=/etc/default/llama-server
 RuntimeDirectory=llama-server
 Group=egd
 UMask=0007
-ExecStart=/usr/bin/llama-server -hf ${LLAMA_MODEL} --host /run/llama-server/llama.sock --cache-prompt --cache-reuse 256 -ctk q8_0 -ctv q8_0 -fa on
+ExecStart=/usr/bin/llama-server -hf ${LLAMA_MODEL} --host /run/llama-server/llama.sock --cache-prompt --cache-reuse 256 -ctk q8_0 -ctv q8_0 -fa on -ub 1024 --spec-type draft-mtp --spec-draft-n-max 2 --threads-batch 16 -ngl 999 --log-verbosity 4
 Restart=on-failure
 
 [Install]

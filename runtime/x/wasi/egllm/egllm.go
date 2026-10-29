@@ -103,6 +103,11 @@ type request struct {
 	Messages    []Message `json:"messages"`
 	Stream      bool      `json:"stream"`
 	Temperature float64   `json:"temperature,omitempty"` // zero defers to the server/model default.
+	// ReasoningBudgetTokens caps the tokens the model reasons for before answering, zero defers to the server.
+	// a --reasoning-budget given to the server on its command line overrides it.
+	ReasoningBudgetTokens int `json:"reasoning_budget_tokens,omitempty"`
+	// ChatTemplateKwargs are passed to the model's chat template, e.g.) reasoning_effort.
+	ChatTemplateKwargs map[string]any `json:"chat_template_kwargs,omitempty"`
 }
 
 type response struct {
@@ -120,11 +125,11 @@ func Generate(ctx context.Context, c Client, model string, prompt string) (strin
 // Chat sends the messages, in order, to the llama.cpp server's OpenAI-compatible
 // chat completions endpoint and returns the generated content.
 func Chat(ctx context.Context, c Client, model string, messages ...Message) (string, error) {
-	encoded, err := json.Marshal(request{
-		Model:    model,
-		Stream:   false,
-		Messages: messages,
-	})
+	return chat(ctx, c, request{Model: model, Messages: messages})
+}
+
+func chat(ctx context.Context, c Client, r request) (string, error) {
+	encoded, err := json.Marshal(r)
 	if err != nil {
 		return "", err
 	}

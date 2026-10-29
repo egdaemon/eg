@@ -122,6 +122,12 @@ func QueryExcludePaths(globs ...string) squirrel.Sqlizer {
 	return squirrel.Expr("NOT (?)", anyGlob(globs))
 }
 
+// QueryCoverage matches the functions whose statement coverage is within min and max percent, both inclusive.
+// the range is not validated, the database handles values it does not accept.
+func QueryCoverage(min, max float32) squirrel.Sqlizer {
+	return squirrel.Expr("statements BETWEEN ? AND ?", min, max)
+}
+
 // anyGlob is the disjunction of the glob patterns.
 func anyGlob(globs []string) squirrel.Sqlizer {
 	terms := make(squirrel.Or, 0, len(globs))

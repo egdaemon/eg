@@ -416,6 +416,11 @@ func ExcludePaths(globs ...string) coverage.Filter {
 	return coverage.QueryExcludePaths(globs...)
 }
 
+// Coverage selects the functions whose statement coverage is within min and max percent, both inclusive.
+func Coverage(min, max float32) coverage.Filter {
+	return coverage.QueryCoverage(min, max)
+}
+
 // Worst scans recorded coverage for the n functions with the lowest hit counts, of those matching the filters.
 func Worst(n int, filters ...coverage.Filter) iterx.Seq[Fn] {
 	return functions(func(ctx context.Context) ([]coverage.Report, error) {

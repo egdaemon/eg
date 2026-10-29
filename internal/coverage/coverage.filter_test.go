@@ -21,13 +21,13 @@ func TestFilters(t *testing.T) {
 		hits BIGINT NOT NULL DEFAULT 0
 	)`)
 	sqltestx.Exec(t, db, `INSERT INTO 'eg.metrics.coverage' (path, statements, branches, fnname, hits) VALUES
-		('ui/app.ts', 1, 1, 'render', 0),
-		('ui/app.tsx', 1, 1, 'component', 1),
-		('tools/gen.py', 1, 1, 'generate', 0),
-		('cmd/eg/main.go', 1, 1, 'Main', 2),
-		('vendor/lib/lib.go', 1, 1, 'Vendored', 3),
-		('internal/a/a.go', 1, 1, 'A', 4),
-		('internal/b/b.go', 1, 1, 'B', 5),
+		('ui/app.ts', 0, 1, 'render', 0),
+		('ui/app.tsx', 10, 1, 'component', 1),
+		('tools/gen.py', 20, 1, 'generate', 0),
+		('cmd/eg/main.go', 40, 1, 'Main', 2),
+		('vendor/lib/lib.go', 60, 1, 'Vendored', 3),
+		('internal/a/a.go', 80, 1, 'A', 4),
+		('internal/b/b.go', 100, 1, 'B', 5),
 		('internal/c/c.go', 1, 1, '', 0)`)
 
 	worst := func(t *testing.T, q sqlx.Queryer, n int, filters ...coverage.Filter) ([]string, error) {
@@ -120,6 +120,18 @@ func TestFilters(t *testing.T) {
 		names, err := worst(t, db, 10, coverage.QueryLanguage("go"), coverage.QueryPaths("internal/*", "cmd/*"), coverage.QueryExcludePaths("*/b/*"))
 		require.NoError(t, err)
 		require.Equal(t, []string{"Main", "A"}, names)
+	})
+
+	t.Run("coverage range includes both bounds", func(t *testing.T) {
+		names, err := worst(t, db, 10, coverage.QueryCoverage(10, 60))
+		require.NoError(t, err)
+		require.Equal(t, []string{"generate", "component", "Main", "Vendored"}, names)
+	})
+
+	t.Run("coverage range is limited after it is applied", func(t *testing.T) {
+		names, err := worst(t, db, 2, coverage.QueryCoverage(20, 100))
+		require.NoError(t, err)
+		require.Equal(t, []string{"generate", "Main"}, names)
 	})
 
 	t.Run("nothing matching is not an error", func(t *testing.T) {

@@ -21,7 +21,7 @@ func EntryUpsert(
 	pattern func(ctx context.Context, q sqlx.Queryer, e Entry) NewEntryScannerStaticRow,
 ) {
 	gql.Into("compute_history").Conflict(
-		"ON CONFLICT (id) DO UPDATE SET description = EXCLUDED.description, vcs_uri = EXCLUDED.vcs_uri, vcs_commit = EXCLUDED.vcs_commit, uploaded_by = EXCLUDED.uploaded_by, result = EXCLUDED.result, completed_at = EXCLUDED.completed_at, duration = EXCLUDED.duration, logs_path = EXCLUDED.logs_path, expires_at = EXCLUDED.expires_at",
+		"ON CONFLICT (id) DO UPDATE SET description = EXCLUDED.description, vcs_uri = EXCLUDED.vcs_uri, vcs_commit = EXCLUDED.vcs_commit, uploaded_by = EXCLUDED.uploaded_by, result = EXCLUDED.result, completed_at = EXCLUDED.completed_at, duration = EXCLUDED.duration, logs_path = EXCLUDED.logs_path, analytics_path = EXCLUDED.analytics_path, expires_at = EXCLUDED.expires_at",
 	)
 }
 

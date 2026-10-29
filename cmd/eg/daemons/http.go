@@ -45,11 +45,15 @@ func HTTP(global *cmdopts.Global, httpl net.Listener, rm *runners.ResourceManage
 	// http.logs.go for the (independently testable) handler implementation.
 	httpmux.Handle("/c/logs/{id}", alice.New(httpx.RouteInvoked, apigate).Then(NewLogsHandler())).Methods(http.MethodGet)
 
+	// GET /c/analytics/{id} serves a snapshot of a running workload's analytics database, authorized by the same
+	// log token as GET /c/logs/{id}. See http.analytics.go for the (independently testable) handler implementation.
+	httpmux.Handle("/c/analytics/{id}", alice.New(httpx.RouteInvoked, apigate).Then(NewAnalyticsHandler())).Methods(http.MethodGet)
+
 	// POST /c/cancel/{id} cancels a workload, authorized by the same log token as GET /c/logs/{id},
 	// pushed by the control plane. See http.cancel.go for the (independently testable) handler implementation.
 	httpmux.Handle("/c/cancel/{id}", alice.New(httpx.RouteInvoked, apigate).Then(NewCancelHandler())).Methods(http.MethodPost)
 
-	// GET /c/history/{id} and GET /c/history/{id}/logs report the recorded result and logs of a workload this
+	// GET /c/history/{id} and GET /c/history/{id}/logs and GET /c/history/{id}/analytics report the recorded result, logs and analytics of a workload this
 	// runner completed, authorized by the same log token. See computeapi for the (independently testable) implementation.
 	historyr := httpmux.PathPrefix("/c/history").Subrouter()
 	historyr.Use(apigate)

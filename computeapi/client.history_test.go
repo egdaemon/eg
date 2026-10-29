@@ -34,6 +34,10 @@ func TestRunnerHistory(t *testing.T) {
 			_, _ = rec.WriteString(`{"history":{"result":2}}`)
 		case "/c/history/w1/logs":
 			_, _ = rec.WriteString("from the runner\n")
+		case "/c/history/w1/analytics":
+			_, _ = rec.WriteString("recorded analytics")
+		case "/c/analytics/w1":
+			_, _ = rec.WriteString("live analytics")
 		default:
 			rec.WriteHeader(http.StatusNotFound)
 		}
@@ -61,5 +65,17 @@ func TestRunnerHistory(t *testing.T) {
 		var dst bytes.Buffer
 		require.NoError(t, RunnerHistoryLogs(t.Context(), client, token, "w1", &dst))
 		require.Equal(t, "from the runner\n", dst.String())
+	})
+
+	t.Run("history analytics", func(t *testing.T) {
+		var dst bytes.Buffer
+		require.NoError(t, RunnerHistoryAnalytics(t.Context(), client, token, "w1", &dst))
+		require.Equal(t, "recorded analytics", dst.String())
+	})
+
+	t.Run("analytics", func(t *testing.T) {
+		var dst bytes.Buffer
+		require.NoError(t, RunnerAnalytics(t.Context(), client, token, "w1", &dst))
+		require.Equal(t, "live analytics", dst.String())
 	})
 }

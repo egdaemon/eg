@@ -25,7 +25,14 @@ const (
 // the least covered functions are selected from the coverage recorded by the last successful run of the default
 // workload, instead of running the test suite again. see TestgenOld.
 func Testgen(opts egautogentest.Options) eg.OpFn {
-	return newpool(opts).Run(egautogentest.WorstFromWorkload(_eg.DefaultWorkload, count, egautogentest.Language("go")))
+	return newpool(opts).Run(
+		egautogentest.WorstFromWorkload(
+			_eg.DefaultWorkload,
+			count,
+			egautogentest.Language("go"),
+			egautogentest.Coverage(0, 75),
+		),
+	)
 }
 
 // TestgenOld is Testgen running the test suite and recording its coverage to select the functions, instead of loading
@@ -37,7 +44,13 @@ func TestgenOld(opts egautogentest.Options) eg.OpFn {
 		eggolang.RecordCoverage,
 		egbug.Log("recording coverage completed"),
 		egbug.Log("egautogentest initiated"),
-		newpool(opts).Run(egautogentest.Worst(count, egautogentest.Language("go"))),
+		newpool(opts).Run(
+			egautogentest.Worst(
+				count,
+				egautogentest.Language("go"),
+				egautogentest.Coverage(0, 75),
+			),
+		),
 	)
 }
 

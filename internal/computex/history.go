@@ -36,7 +36,7 @@ func ResultFrom(cause error) int32 {
 	}
 }
 
-// Purge deletes the outcomes that have expired along with their logs.
+// Purge deletes the outcomes that have expired along with their logs and analytics.
 func Purge(ctx context.Context, q sqlx.Queryer) error {
 	var expired []Entry
 
@@ -47,6 +47,10 @@ func Purge(ctx context.Context, q sqlx.Queryer) error {
 	for _, e := range expired {
 		if e.LogsPath != "" {
 			errorsx.Log(errorsx.Wrap(os.Remove(e.LogsPath), "unable to remove expired history logs"))
+		}
+
+		if e.AnalyticsPath != "" {
+			errorsx.Log(errorsx.Wrap(os.Remove(e.AnalyticsPath), "unable to remove expired history analytics"))
 		}
 	}
 

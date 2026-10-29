@@ -6,6 +6,7 @@ import (
 	"log"
 	"mime/multipart"
 	"net/http"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -16,6 +17,7 @@ import (
 	"github.com/egdaemon/eg/internal/httpx"
 	"github.com/egdaemon/eg/internal/stringsx"
 	"github.com/egdaemon/eg/runners"
+	"github.com/gofrs/flock"
 	"github.com/gofrs/uuid/v5"
 )
 
@@ -82,6 +84,47 @@ func (t *EnqueueHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// serialize pushes of the same id. the lock lives outside the spool
+	// directories so the download -> queued rename never moves it, and the kernel
+	// releases it if we crash, so a free lock with a leftover download directory
+	// means a dead upload.
+	lockdir := filepath.Join(filepath.Dir(t.Dirs.Downloading), "l")
+	if err = os.MkdirAll(lockdir, 0700); err != nil {
+		log.Println(errorsx.Wrap(err, "unable to create enqueue lock directory"))
+		errorsx.Log(httpx.WriteEmptyJSON(w, http.StatusInternalServerError))
+		return
+	}
+
+	lock := flock.New(filepath.Join(lockdir, runners.Queued().Dirname(uid)+".lock"))
+	if locked, lerr := lock.TryLock(); lerr != nil {
+		log.Println(errorsx.Wrap(lerr, "unable to lock enqueue request"))
+		errorsx.Log(httpx.WriteEmptyJSON(w, http.StatusInternalServerError))
+		return
+	} else if !locked {
+		// another request for this id is in flight and will admit it.
+		log.Println("enqueue already in progress", uid)
+		w.WriteHeader(http.StatusAccepted)
+		errorsx.Log(errorsx.Wrap(httpx.WriteJSON(w, httpx.GetBuffer(r), req.Enqueued), "unable to write response"))
+		return
+	}
+	defer func() { errorsx.Log(lock.Unlock()) }()
+
+	if dir, ok := t.Dirs.Locate(uid); ok {
+		if dir != filepath.Join(t.Dirs.Downloading, runners.Queued().Dirname(uid)) {
+			log.Println("already enqueued", uid)
+			w.WriteHeader(http.StatusAccepted)
+			errorsx.Log(errorsx.Wrap(httpx.WriteJSON(w, httpx.GetBuffer(r), req.Enqueued), "unable to write response"))
+			return
+		}
+
+		// we hold the lock, so the download is a dead upload. start fresh.
+		if err = t.Dirs.Discard(dir); err != nil {
+			log.Println(errorsx.Wrap(err, "unable to discard stale download"))
+			errorsx.Log(httpx.WriteEmptyJSON(w, http.StatusInternalServerError))
+			return
+		}
+	}
+
 	want := runners.RuntimeResources{Cores: req.Enqueued.Cores, Memory: req.Enqueued.Memory, Vram: req.Enqueued.Vram}
 	if !t.RM.Admit(want) {
 		log.Printf("rejecting enqueue request, insufficient capacity %s current=%+v requested=%+v limit=%+v\n", req.Enqueued.VcsUri, t.RM.Snapshot(), want, t.RM.Limit)
@@ -121,7 +164,10 @@ func (t *EnqueueHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err = t.Dirs.Enqueue(uid); err != nil {
+	if err = t.Dirs.Enqueue(uid); os.IsExist(err) {
+		// lost a race with an enqueue we could not see; the job is already queued.
+		errorsx.Log(errorsx.Wrap(t.Dirs.Discard(filepath.Join(t.Dirs.Downloading, runners.Queued().Dirname(uid))), "unable to discard duplicate download"))
+	} else if err != nil {
 		log.Println(errorsx.Wrap(err, "unable to enqueue for compile"))
 		errorsx.Log(httpx.WriteEmptyJSON(w, http.StatusInternalServerError))
 		return

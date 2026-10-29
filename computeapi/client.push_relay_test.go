@@ -1,4 +1,4 @@
-package runners_test
+package computeapi_test
 
 import (
 	"bufio"
@@ -17,7 +17,6 @@ import (
 
 	"github.com/egdaemon/eg/compute"
 	"github.com/egdaemon/eg/internal/libp2px"
-	"github.com/egdaemon/eg/runners"
 	"github.com/gofrs/uuid/v5"
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/libp2p/go-libp2p"
@@ -158,7 +157,7 @@ func TestUploadViaRelay(t *testing.T) {
 		Enqueued: &computeapi.Enqueued{Id: uuid.Must(uuid.NewV7()).String()},
 	}
 
-	accepted, err := runners.Upload(ctx, client, &compute.Compute{Id: "relayed", P2Pid: runner.ID().String()}, req, bytes.NewReader(kernel), strings.NewReader(""))
+	accepted, err := computeapi.UploadOne(ctx, client, &compute.Compute{Id: "relayed", P2Pid: runner.ID().String()}, req, bytes.NewReader(kernel), strings.NewReader(""))
 	require.NoError(t, err)
 	require.NotNil(t, accepted)
 	require.Equal(t, "recorded", accepted.Id)
@@ -260,7 +259,7 @@ func TestUploadViaCandidateTokenRelay(t *testing.T) {
 		Enqueued: &computeapi.Enqueued{Id: uuid.Must(uuid.NewV7()).String()},
 	}
 
-	accepted, err := runners.Upload(ctx, client, &compute.Compute{Id: "relayed", P2Pid: runner.ID().String(), Token: token}, req, bytes.NewReader(kernel), strings.NewReader(""))
+	accepted, err := computeapi.UploadOne(ctx, client, &compute.Compute{Id: "relayed", P2Pid: runner.ID().String(), Token: token}, req, bytes.NewReader(kernel), strings.NewReader(""))
 	require.NoError(t, err)
 	require.NotNil(t, accepted)
 	require.Equal(t, "recorded", accepted.Id)

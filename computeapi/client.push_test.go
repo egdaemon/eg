@@ -1,4 +1,4 @@
-package runners_test
+package computeapi_test
 
 import (
 	"bufio"
@@ -14,7 +14,6 @@ import (
 	"github.com/egdaemon/eg/computeapi"
 
 	"github.com/egdaemon/eg/compute"
-	"github.com/egdaemon/eg/runners"
 	"github.com/gofrs/uuid/v5"
 	"github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p/core/host"
@@ -71,7 +70,7 @@ func TestTryUpload(t *testing.T) {
 		defer client.Close()
 
 		busy := newRunner(t, client, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.WriteHeader(http.StatusConflict)
+			w.WriteHeader(http.StatusServiceUnavailable)
 		}))
 
 		accepting := newRunner(t, client, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -109,7 +108,7 @@ func TestTryUpload(t *testing.T) {
 			Enqueued: &computeapi.Enqueued{Id: uuid.Must(uuid.NewV7()).String(), AccountId: "acct", Entry: "main.wasm"},
 		}
 
-		accepted, recorded := runners.TryUpload(t.Context(), client, candidates, req, strings.NewReader("kernel contents"), strings.NewReader("environ contents"))
+		accepted, recorded := computeapi.TryUpload(t.Context(), client, candidates, req, strings.NewReader("kernel contents"), strings.NewReader("environ contents"))
 		require.NotNil(t, accepted)
 		require.Equal(t, "accepting", accepted.Id)
 		require.NotNil(t, recorded)
@@ -145,7 +144,7 @@ func TestTryUpload(t *testing.T) {
 			Enqueued: &computeapi.Enqueued{Id: uuid.Must(uuid.NewV7()).String()},
 		}
 
-		accepted, recorded := runners.TryUpload(t.Context(), client, candidates, req, strings.NewReader("kernel contents"), strings.NewReader(""))
+		accepted, recorded := computeapi.TryUpload(t.Context(), client, candidates, req, strings.NewReader("kernel contents"), strings.NewReader(""))
 		require.Nil(t, accepted)
 		require.Nil(t, recorded)
 	})

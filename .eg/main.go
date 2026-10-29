@@ -3,8 +3,10 @@ package main
 import (
 	"context"
 	"log"
+	"os"
 	"time"
 
+	_eg "github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/runtime/wasi/eg"
 	"github.com/egdaemon/eg/runtime/wasi/egenv"
 	"github.com/egdaemon/eg/runtime/wasi/eggit"
@@ -31,6 +33,7 @@ func main() {
 		eg.Module(
 			ctx,
 			c1,
+			checkegdb,
 			eggolang.New().Timeout(10*time.Minute).AutoInstall(),
 			eggolang.New().Timeout(10*time.Minute).AutoTest(),
 			egbug.Log("recording coverage initiated"),
@@ -43,6 +46,7 @@ func main() {
 		egbug.Log("integration tests initiated"),
 		IntegrationTests,
 		egbug.Log("integration tests completed"),
+		checkegdb,
 		// keep the analytics database of a successful run in the cache for the next run, see egdb.Latest.
 		egdb.Cache,
 	)
@@ -81,4 +85,28 @@ func IntegrationTests(ctx context.Context, op eg.Op) error {
 			// runtime.New("/home/egd/go/bin/eg compute baremetal -vv tests/gpgagent"),
 		),
 	)
+}
+
+// checkegdb logs whether the analytics database egdb.Cache snapshots is available where it is run, debugging aid.
+// it never fails the run.
+func checkegdb(ctx context.Context, _ eg.Op) error {
+	path := egenv.CacheDirectory(_eg.AnalyticsCachePath(egenv.WorkloadName()))
+	_, err := os.Stat(path)
+	log.Println("egdb cache file", path, "exists:", err == nil)
+
+	db, err := egdb.Open(ctx)
+	if err != nil {
+		log.Println("egdb unavailable:", err)
+		return nil
+	}
+	defer db.Close()
+
+	var name string
+	if err = db.QueryRowContext(ctx, "SELECT current_database()").Scan(&name); err != nil {
+		log.Println("egdb connected but unusable:", err)
+		return nil
+	}
+
+	log.Println("egdb available, database:", name)
+	return nil
 }

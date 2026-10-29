@@ -4,12 +4,13 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"github.com/egdaemon/eg/jsonx"
 	"io"
 	"log"
 	"mime/multipart"
 	"net/http"
 	"path/filepath"
+
+	"github.com/egdaemon/eg/jsonx"
 
 	"github.com/egdaemon/eg/computeapi"
 
@@ -85,7 +86,8 @@ func (t *UploadHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	want := runners.RuntimeResources{Cores: req.Enqueued.Cores, Memory: req.Enqueued.Memory, Vram: req.Enqueued.Vram}
 	if t.RM != nil && !t.RM.Admit(want) {
 		log.Printf("rejecting upload request, insufficient capacity %s current=%+v requested=%+v limit=%+v\n", req.Enqueued.VcsUri, t.RM.Snapshot(), want, t.RM.Limit)
-		errorsx.Log(httpx.WriteEmptyJSON(w, http.StatusConflict))
+		w.Header().Set("Retry-After", "5") // TODO: long term base this on load.
+		errorsx.Log(httpx.WriteEmptyJSON(w, http.StatusServiceUnavailable))
 		return
 	}
 

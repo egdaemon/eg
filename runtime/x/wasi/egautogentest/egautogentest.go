@@ -19,6 +19,7 @@ import (
 
 	_eg "github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/internal/coverage"
+	"github.com/egdaemon/eg/internal/debugx"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/iterx"
 	"github.com/egdaemon/eg/internal/sqlx"
@@ -179,7 +180,7 @@ func (t option) try(ctx context.Context, g Generator, fn Fn) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	log.Printf("autogentest %s: prompt (%d bytes)\n%s\n", fn.Name, len(prompt), prompt)
+	debugx.Fn(func() { log.Printf("autogentest %s: prompt (%d bytes)\n%s\n", fn.Name, len(prompt), prompt) })
 
 	// the judge needs to know every rule the prompt asked for, not only the ones given.
 	judge := t
@@ -210,7 +211,9 @@ func (t option) try(ctx context.Context, g Generator, fn Fn) (bool, error) {
 			if prompt, err = g.Prompt(PromptContext{Fn: fn, Ensure: t.ensure, Previous: previous, Results: results}); err != nil {
 				return false, err
 			}
-			log.Printf("autogentest %s attempt %d/%d: prompt (%d bytes)\n%s\n", fn.Name, attempt, attempts, len(prompt), prompt)
+			debugx.Fn(func() {
+				log.Printf("autogentest %s attempt %d/%d: prompt (%d bytes)\n%s\n", fn.Name, attempt, attempts, len(prompt), prompt)
+			})
 		}
 
 		astart := time.Now()
@@ -219,7 +222,10 @@ func (t option) try(ctx context.Context, g Generator, fn Fn) (bool, error) {
 		if err != nil {
 			return false, err
 		}
-		log.Printf("autogentest %s attempt %d/%d: model response (%d bytes) in %v\n%s\n", fn.Name, attempt, attempts, len(result), time.Since(astart), result)
+		log.Printf("autogentest %s attempt %d/%d: model response (%d bytes) in %v\n", fn.Name, attempt, attempts, len(result), time.Since(astart))
+		debugx.Fn(func() {
+			log.Printf("autogentest %s attempt %d/%d: model response\n%s\n", fn.Name, attempt, attempts, result)
+		})
 
 		if err := verify(result); err != nil {
 			log.Printf("autogentest %s attempt %d/%d: skipped, failing result after %v: %v\n", fn.Name, attempt, attempts, time.Since(astart), err)
@@ -234,7 +240,9 @@ func (t option) try(ctx context.Context, g Generator, fn Fn) (bool, error) {
 				log.Printf("autogentest %s attempt %d/%d: skipped, result violating rules or failing after rework\n", fn.Name, attempt, attempts)
 				continue
 			}
-			log.Printf("autogentest %s attempt %d/%d: rules satisfied, final result\n%s\n", fn.Name, attempt, attempts, result)
+			debugx.Fn(func() {
+				log.Printf("autogentest %s attempt %d/%d: rules satisfied, final result\n%s\n", fn.Name, attempt, attempts, result)
+			})
 		}
 
 		log.Printf("autogentest %s attempt %d/%d completed, passing result in %v\n", fn.Name, attempt, attempts, time.Since(astart))
@@ -346,7 +354,7 @@ func (t option) rework(ctx context.Context, reprompt func(previous string, viola
 		for _, v := range violations {
 			fmt.Fprintf(&described, "- rule %d (%s) line %d: %s\n", v.Rule, t.ensure[v.Rule-1], v.Line, v.Reason)
 		}
-		log.Printf("autogentest round %d/%d: violations\n%s", round, t.revisions, described.String())
+		debugx.Fn(func() { log.Printf("autogentest round %d/%d: violations\n%s", round, t.revisions, described.String()) })
 
 		if round == t.revisions {
 			break
@@ -356,12 +364,12 @@ func (t option) rework(ctx context.Context, reprompt func(previous string, viola
 		if err != nil {
 			return "", false, err
 		}
-		log.Printf("autogentest round %d/%d: next prompt\n%s\n", round, t.revisions, revise)
+		debugx.Fn(func() { log.Printf("autogentest round %d/%d: next prompt\n%s\n", round, t.revisions, revise) })
 
 		if generated, err = t.llm.Do(ctx, egllm.Message{Role: "user", Content: revise}); err != nil {
 			return "", false, err
 		}
-		log.Printf("autogentest round %d/%d: revised response\n%s\n", round, t.revisions, generated)
+		debugx.Fn(func() { log.Printf("autogentest round %d/%d: revised response\n%s\n", round, t.revisions, generated) })
 
 		if err = verify(generated); err != nil {
 			log.Printf("autogentest round %d/%d: revision failed verification: %v\n", round, t.revisions, err)

@@ -4,6 +4,7 @@ package egpool
 
 import (
 	"context"
+	"time"
 
 	"github.com/egdaemon/eg/internal/asynccompute"
 	"github.com/egdaemon/eg/internal/errorsx"
@@ -53,6 +54,9 @@ func (t Pool[T]) Run(seq Seq[T]) eg.OpFn {
 			asynccompute.Workers[T](t.size),
 			asynccompute.Backlog[T](t.size),
 		)
+
+		// no new items are started within the last minute before the deadline of the context, to let those in flight finish.
+		seq := iterx.Until(time.Minute, seq)
 
 		var queued error
 		for item := range seq.Each(ctx) {

@@ -5,10 +5,12 @@ import (
 	"database/sql"
 	"time"
 
+	"github.com/Masterminds/squirrel"
 	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/duckproxy"
 	"github.com/egdaemon/eg/internal/coverage"
 	"github.com/egdaemon/eg/internal/errorsx"
+	"github.com/egdaemon/eg/internal/iterx"
 	"github.com/egdaemon/eg/internal/sqlx"
 	"github.com/egdaemon/eg/runtime/wasi/egunsafe"
 )
@@ -31,12 +33,7 @@ func report(ctx context.Context, q sqlx.Queryer, batch ...*coverage.Report) erro
 }
 
 func worst(ctx context.Context, q sqlx.Queryer, n int32, filters ...coverage.Filter) (results []coverage.Report, err error) {
-	err = sqlx.ScanInto(coverage.WorstWhere(ctx, q, int(n), filters...), &results)
-	return results, err
-}
-
-func sample(ctx context.Context, q sqlx.Queryer, n int32, filters ...coverage.Filter) (results []coverage.Report, err error) {
-	err = sqlx.ScanInto(coverage.SampleWhere(ctx, q, int(n), filters...), &results)
+	err = sqlx.ScanInto(coverage.ReportSearch(ctx, q, coverage.WorstSearchBuilder(filters...).Limit(uint64(max(n, 0)))), &results)
 	return results, err
 }
 
@@ -54,27 +51,21 @@ func Report(ctx context.Context, batch ...*Coverage) error {
 	return errorsx.Wrap(report(ctx, db, batch...), "unable to report coverage")
 }
 
-// Worst returns the n functions with the lowest hit counts, of those matching the filters.
-func Worst(ctx context.Context, n int32, filters ...coverage.Filter) ([]coverage.Report, error) {
-	db := dial()
-	defer db.Close()
-
-	results, err := worst(ctx, db, n, filters...)
-	return results, errorsx.Wrap(err, "unable to query worst coverage")
+// Sample is the query selecting the functions matching the filters in a random order. it is not run, see
+// coverage.ReportSearch, nor limited, apply Limit for a sample of n functions.
+func Sample(filters ...coverage.Filter) squirrel.SelectBuilder {
+	return coverage.SampleSearchBuilder(filters...)
 }
 
-// Sample returns a random sample of n functions, of those matching the filters.
-func Sample(ctx context.Context, n int32, filters ...coverage.Filter) ([]coverage.Report, error) {
-	db := dial()
-	defer db.Close()
-
-	results, err := sample(ctx, db, n, filters...)
-	return results, errorsx.Wrap(err, "unable to query sample coverage")
+// WorstFrom is the query Worst runs, the functions with the lowest statement coverage first, of those matching the filters.
+// it is not run, see coverage.ReportSearch, so it can be run against another database, e.g.) a database file opened
+// with egdb.OpenFile, or narrowed further, e.g.) limited.
+func WorstFrom(filters ...coverage.Filter) squirrel.SelectBuilder {
+	return coverage.WorstSearchBuilder(filters...)
 }
 
-// WorstFrom is Worst reading the coverage recorded in q, e.g.) a database file opened with egdb.OpenFile, instead of
-// the analytics database.
-func WorstFrom(ctx context.Context, q sqlx.Queryer, n int32, filters ...coverage.Filter) ([]coverage.Report, error) {
-	results, err := worst(ctx, q, n, filters...)
-	return results, errorsx.Wrap(err, "unable to query worst coverage")
+// Worst iterates the functions with the lowest statement coverage first, of those matching the filters. the analytics
+// database is dialed when iteration starts and closed when it ends, including when it stops early.
+func Worst(filters ...coverage.Filter) iterx.Seq[coverage.Report] {
+	return coverage.From(func(context.Context) (*sql.DB, error) { return dial(), nil }, WorstFrom(filters...))
 }

@@ -8,6 +8,7 @@ import (
 
 	_ "github.com/duckdb/duckdb-go/v2"
 	"github.com/egdaemon/eg/internal/coverage"
+	"github.com/egdaemon/eg/internal/sqlx"
 	"github.com/egdaemon/eg/interp/events"
 	"github.com/stretchr/testify/require"
 )
@@ -41,13 +42,13 @@ func TestReportWorstSample(t *testing.T) {
 	worstResults, err := worst(ctx, db, 2)
 	require.NoError(t, err)
 	require.Len(t, worstResults, 2)
-	require.Equal(t, "Bar", worstResults[0].Fnname)
-	require.Equal(t, int64(0), worstResults[0].Hits)
-	require.Equal(t, "Baz", worstResults[1].Fnname)
-	require.Equal(t, int64(2), worstResults[1].Hits)
+	require.Equal(t, "Baz", worstResults[0].Fnname)
+	require.Equal(t, int64(2), worstResults[0].Hits)
+	require.Equal(t, "Bar", worstResults[1].Fnname)
+	require.Equal(t, int64(0), worstResults[1].Hits)
 
-	sampleResults, err := sample(ctx, db, 2)
-	require.NoError(t, err)
+	var sampleResults []coverage.Report
+	require.NoError(t, sqlx.ScanInto(coverage.ReportSearch(ctx, db, Sample().Limit(2)), &sampleResults))
 	require.Len(t, sampleResults, 2)
 	for _, c := range sampleResults {
 		require.NotEmpty(t, c.Fnname)
@@ -123,8 +124,8 @@ func TestWorstSampleFilters(t *testing.T) {
 
 	t.Run("sample is filtered", func(t *testing.T) {
 		for range 5 {
-			results, err := sample(ctx, db, 2, coverage.QueryLanguage("go"), coverage.QueryExcludePaths("vendor/*"))
-			require.NoError(t, err)
+			var results []coverage.Report
+			require.NoError(t, sqlx.ScanInto(coverage.ReportSearch(ctx, db, Sample(coverage.QueryLanguage("go"), coverage.QueryExcludePaths("vendor/*")).Limit(2)), &results))
 			require.Len(t, results, 2)
 			for _, r := range results {
 				require.Contains(t, []string{"Main", "A", "B"}, r.Fnname)

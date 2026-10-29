@@ -14,11 +14,6 @@ import (
 	"github.com/egdaemon/eg/runtime/x/wasi/egpool"
 )
 
-const (
-	// number of functions sampled from the pool to generate tests for.
-	count = 2
-)
-
 // Testgen generates tests for the least covered functions as configured by opts, e.g.) the judge and the number
 // of attempts, and pushes them to a branch per function. the functions are generated concurrently,
 // each in its own worktree so they never write the same file.
@@ -28,7 +23,6 @@ func Testgen(opts egautogentest.Options) eg.OpFn {
 	return newpool(opts).Run(
 		egautogentest.WorstFromWorkload(
 			_eg.DefaultWorkload,
-			count,
 			egautogentest.Language("go"),
 			egautogentest.Coverage(0, 75),
 		),
@@ -46,7 +40,6 @@ func TestgenOld(opts egautogentest.Options) eg.OpFn {
 		egbug.Log("egautogentest initiated"),
 		newpool(opts).Run(
 			egautogentest.Worst(
-				count,
 				egautogentest.Language("go"),
 				egautogentest.Coverage(0, 75),
 			),

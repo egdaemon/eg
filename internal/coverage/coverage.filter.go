@@ -35,11 +35,11 @@ var languages = map[string][]string{
 // they are applied before the number of functions is limited, so the limit is of the functions that match.
 type Filter = squirrel.Sqlizer
 
-// ReportSearchBuilder selects the functions with recorded coverage.
-func ReportSearchBuilder() squirrel.SelectBuilder {
+// ReportSearchBuilder selects the functions with recorded coverage matching the filters.
+func ReportSearchBuilder(filters ...Filter) squirrel.SelectBuilder {
 	return squirrelx.PSQL.Select(sqlx.Columns(ReportScannerStaticColumns)...).From("'eg.metrics.coverage'").Where(
 		squirrel.NotEq{"fnname": ""},
-	)
+	).Where(squirrel.And(filters))
 }
 
 // ReportSearch runs the query and returns a scanner for the results.
@@ -47,22 +47,15 @@ func ReportSearch(ctx context.Context, q sqlx.Queryer, b squirrel.SelectBuilder)
 	return NewReportScannerStatic(b.RunWith(q).QueryContext(ctx))
 }
 
-// WorstWhere is Worst limited to the functions matching the filters.
-func WorstWhere(ctx context.Context, q sqlx.Queryer, n int, filters ...Filter) ReportScanner {
-	return ReportSearch(ctx, q, where(ReportSearchBuilder(), filters).OrderBy("hits ASC").Limit(uint64(max(n, 0))))
+// WorstSearchBuilder selects the functions matching the filters, the lowest statement coverage first and the lowest
+// hit count of those equally covered. it is not limited.
+func WorstSearchBuilder(filters ...Filter) squirrel.SelectBuilder {
+	return ReportSearchBuilder(filters...).OrderBy("statements ASC", "hits ASC")
 }
 
-// SampleWhere is Sample limited to the functions matching the filters.
-func SampleWhere(ctx context.Context, q sqlx.Queryer, n int, filters ...Filter) ReportScanner {
-	return ReportSearch(ctx, q, where(ReportSearchBuilder(), filters).OrderBy("random()").Limit(uint64(max(n, 0))))
-}
-
-func where(b squirrel.SelectBuilder, filters []Filter) squirrel.SelectBuilder {
-	for _, f := range filters {
-		b = b.Where(f)
-	}
-
-	return b
+// SampleSearchBuilder selects the functions matching the filters in a random order. it is not limited.
+func SampleSearchBuilder(filters ...Filter) squirrel.SelectBuilder {
+	return ReportSearchBuilder(filters...).OrderBy("random()")
 }
 
 // QueryLanguage matches the functions of files in any of the languages, e.g.) "go". it is matched

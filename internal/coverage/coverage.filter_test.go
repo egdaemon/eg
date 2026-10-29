@@ -32,7 +32,7 @@ func TestFilters(t *testing.T) {
 
 	worst := func(t *testing.T, q sqlx.Queryer, n int, filters ...coverage.Filter) ([]string, error) {
 		var results []coverage.Report
-		if err := sqlx.ScanInto(coverage.WorstWhere(t.Context(), q, n, filters...), &results); err != nil {
+		if err := sqlx.ScanInto(coverage.ReportSearch(t.Context(), q, coverage.WorstSearchBuilder(filters...).Limit(uint64(n))), &results); err != nil {
 			return nil, err
 		}
 
@@ -43,16 +43,10 @@ func TestFilters(t *testing.T) {
 		return names, nil
 	}
 
-	t.Run("without filters it is the same as Worst", func(t *testing.T) {
-		var expected []coverage.Report
-		require.NoError(t, sqlx.ScanInto(coverage.Worst(t.Context(), db, 4), &expected))
-
-		var got []coverage.Report
-		require.NoError(t, sqlx.ScanInto(coverage.WorstWhere(t.Context(), db, 4), &got))
-		require.Equal(t, len(expected), len(got))
-		for i := range expected {
-			require.Equal(t, expected[i].Hits, got[i].Hits)
-		}
+	t.Run("without filters the lowest statement coverage is first", func(t *testing.T) {
+		names, err := worst(t, db, 4)
+		require.NoError(t, err)
+		require.Equal(t, []string{"render", "component", "generate", "Main"}, names)
 	})
 
 	t.Run("functions without a name are never selected", func(t *testing.T) {
@@ -125,7 +119,7 @@ func TestFilters(t *testing.T) {
 	t.Run("coverage range includes both bounds", func(t *testing.T) {
 		names, err := worst(t, db, 10, coverage.QueryCoverage(10, 60))
 		require.NoError(t, err)
-		require.Equal(t, []string{"generate", "component", "Main", "Vendored"}, names)
+		require.Equal(t, []string{"component", "generate", "Main", "Vendored"}, names)
 	})
 
 	t.Run("coverage range is limited after it is applied", func(t *testing.T) {
@@ -143,7 +137,7 @@ func TestFilters(t *testing.T) {
 	t.Run("sample is filtered and limited", func(t *testing.T) {
 		for range 5 {
 			var results []coverage.Report
-			require.NoError(t, sqlx.ScanInto(coverage.SampleWhere(t.Context(), db, 2, coverage.QueryLanguage("go"), coverage.QueryExcludePaths("vendor/*")), &results))
+			require.NoError(t, sqlx.ScanInto(coverage.ReportSearch(t.Context(), db, coverage.SampleSearchBuilder(coverage.QueryLanguage("go"), coverage.QueryExcludePaths("vendor/*")).Limit(2)), &results))
 			require.Len(t, results, 2)
 			for _, r := range results {
 				require.Contains(t, []string{"Main", "A", "B"}, r.Fnname)

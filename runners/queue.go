@@ -184,7 +184,7 @@ func BuildRootContainer(ctx context.Context, options ...string) error {
 	defer os.RemoveAll(tmpdir)
 	rootc := filepath.Join(tmpdir, "Containerfile")
 
-	return BuildRootContainerPath(ctx, tmpdir, rootc)
+	return BuildRootContainerPath(ctx, tmpdir, rootc, options...)
 }
 
 func BuildRootContainerPath(ctx context.Context, dir, path string, options ...string) (err error) {

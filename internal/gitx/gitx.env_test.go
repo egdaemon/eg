@@ -72,8 +72,10 @@ func TestLocalEnv(t *testing.T) {
 
 	t.Run("a missing base branch omits the base variables", func(t *testing.T) {
 		repo, h := newrepo(t)
-		// ensure there is no main branch regardless of go-git's default branch.
-		_ = repo.Storer.RemoveReference(plumbing.NewBranchReferenceName("main"))
+		// detach HEAD so removing the default branch doesn't take the head with it.
+		require.NoError(t, repo.Storer.SetReference(plumbing.NewHashReference(plumbing.HEAD, h)))
+		_ = repo.Storer.RemoveReference(plumbing.Main)
+		_ = repo.Storer.RemoveReference(plumbing.Master)
 
 		environ, err := gitx.LocalEnv(repo, "origin", "HEAD")
 		require.NoError(t, err)
@@ -87,7 +89,10 @@ func TestLocalEnv(t *testing.T) {
 
 	t.Run("a base branch only available as a remote-tracking ref is used", func(t *testing.T) {
 		repo, h := newrepo(t)
-		_ = repo.Storer.RemoveReference(plumbing.NewBranchReferenceName("main"))
+		// detach HEAD so removing the default branch doesn't take the head with it.
+		require.NoError(t, repo.Storer.SetReference(plumbing.NewHashReference(plumbing.HEAD, h)))
+		_ = repo.Storer.RemoveReference(plumbing.Main)
+		_ = repo.Storer.RemoveReference(plumbing.Master)
 		require.NoError(t, repo.Storer.SetReference(plumbing.NewHashReference(plumbing.NewRemoteReferenceName("origin", "main"), h)))
 
 		environ, err := gitx.LocalEnv(repo, "origin", "HEAD")
@@ -101,8 +106,11 @@ func TestLocalEnv(t *testing.T) {
 	})
 
 	t.Run("a missing base branch is logged", func(t *testing.T) {
-		repo, _ := newrepo(t)
-		_ = repo.Storer.RemoveReference(plumbing.NewBranchReferenceName("main"))
+		repo, h := newrepo(t)
+		// detach HEAD so removing the default branch doesn't take the head with it.
+		require.NoError(t, repo.Storer.SetReference(plumbing.NewHashReference(plumbing.HEAD, h)))
+		_ = repo.Storer.RemoveReference(plumbing.Main)
+		_ = repo.Storer.RemoveReference(plumbing.Master)
 
 		var logged bytes.Buffer
 		log.SetOutput(&logged)
@@ -136,8 +144,10 @@ func TestEnv(t *testing.T) {
 
 	t.Run("a missing base branch omits the base variables", func(t *testing.T) {
 		repo, h := newEnvRepo(t)
-		// ensure there is no main branch regardless of go-git's default branch.
-		_ = repo.Storer.RemoveReference(plumbing.NewBranchReferenceName("main"))
+		// detach HEAD so removing the default branch doesn't take the head with it.
+		require.NoError(t, repo.Storer.SetReference(plumbing.NewHashReference(plumbing.HEAD, h)))
+		_ = repo.Storer.RemoveReference(plumbing.Main)
+		_ = repo.Storer.RemoveReference(plumbing.Master)
 
 		environ, err := gitx.Env(repo, "origin", "HEAD", "")
 		require.NoError(t, err)
@@ -151,7 +161,10 @@ func TestEnv(t *testing.T) {
 
 	t.Run("a base branch only available as a remote-tracking ref is used", func(t *testing.T) {
 		repo, h := newEnvRepo(t)
-		_ = repo.Storer.RemoveReference(plumbing.NewBranchReferenceName("main"))
+		// detach HEAD so removing the default branch doesn't take the head with it.
+		require.NoError(t, repo.Storer.SetReference(plumbing.NewHashReference(plumbing.HEAD, h)))
+		_ = repo.Storer.RemoveReference(plumbing.Main)
+		_ = repo.Storer.RemoveReference(plumbing.Master)
 		require.NoError(t, repo.Storer.SetReference(plumbing.NewHashReference(plumbing.NewRemoteReferenceName("origin", "main"), h)))
 
 		environ, err := gitx.Env(repo, "origin", "HEAD", "")
@@ -165,8 +178,11 @@ func TestEnv(t *testing.T) {
 	})
 
 	t.Run("a missing base branch is logged", func(t *testing.T) {
-		repo, _ := newEnvRepo(t)
-		_ = repo.Storer.RemoveReference(plumbing.NewBranchReferenceName("main"))
+		repo, h := newEnvRepo(t)
+		// detach HEAD so removing the default branch doesn't take the head with it.
+		require.NoError(t, repo.Storer.SetReference(plumbing.NewHashReference(plumbing.HEAD, h)))
+		_ = repo.Storer.RemoveReference(plumbing.Main)
+		_ = repo.Storer.RemoveReference(plumbing.Master)
 
 		var logged bytes.Buffer
 		log.SetOutput(&logged)

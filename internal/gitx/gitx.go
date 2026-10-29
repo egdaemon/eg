@@ -89,7 +89,7 @@ func Worktree(ctx context.Context, repo, dir string) (err error) {
 		log.Println(errorsx.Wrapf(fmt.Errorf("%s: %w", strings.TrimSpace(string(out)), perr), "unable to prune stale worktrees: %s", repo))
 	}
 
-	out, err := gitcmd(ctx, repo, "worktree", "add", "--detach", dir, "HEAD").CombinedOutput()
+	out, err := gitcmd(ctx, repo, "worktree", "add", "--detach", dir, plumbing.HEAD.String()).CombinedOutput()
 	if err != nil {
 		return errorsx.Wrapf(fmt.Errorf("%s: %w", strings.TrimSpace(string(out)), err), "unable to create worktree: %s -> %s", repo, dir)
 	}
@@ -98,15 +98,43 @@ func Worktree(ctx context.Context, repo, dir string) (err error) {
 }
 
 // LocalClone creates a fully self-contained checkout of repo at dir, checked
-// out to a detached HEAD, reflecting only committed state. unlike Worktree,
-// dir gets its own independent .git directory rather than a .git file
-// pointing back into repo's .git/worktrees/<id> -- a linked worktree's gitdir
-// reference is an absolute path into repo's own .git, which breaks once dir
-// is relocated into a different mount namespace (e.g. bind-mounted into a
-// container that doesn't also have repo's .git available at that same path).
-// dir must not already exist.
-func LocalClone(ctx context.Context, repo, dir string) (err error) {
+// out to a detached HEAD at headtreeish (HEAD when blank), reflecting only
+// committed state. unlike Worktree, dir gets its own independent .git directory
+// rather than a .git file pointing back into repo's .git/worktrees/<id> -- a
+// linked worktree's gitdir reference is an absolute path into repo's own .git,
+// which breaks once dir is relocated into a different mount namespace (e.g.
+// bind-mounted into a container that doesn't also have repo's .git available at
+// that same path). dir must not already exist.
+//
+// the objects are hardlinked from repo, and copied when that isn't possible
+// (repo and dir on different filesystems), so the history is complete.
+//
+// the clone has the branches of repo as branches, and the remote-tracking
+// branches of repo as its own, so they can all be resolved within the checkout.
+// when basetreeish is a branch of repo (or of its origin remote) it also exists
+// as a branch of the clone, and is recorded as its init.defaultBranch so the
+// clone knows its own base, see DefaultBase. a base that is blank or isn't a
+// branch is not recorded, any revision of repo resolves in the clone anyway.
+func LocalClone(ctx context.Context, repo, dir, basetreeish, headtreeish string) (err error) {
 	username := RepositoryUsername(repo)
+
+	run := func(args ...string) (string, error) {
+		out, err := execx.RunAs(ctx, username, "git", args...).CombinedOutput()
+		if err != nil {
+			return "", fmt.Errorf("%s: %w", strings.TrimSpace(string(out)), err)
+		}
+
+		return strings.TrimSpace(string(out)), nil
+	}
+
+	// the commit a revision of repo names, revisions can't be mistaken for options.
+	resolve := func(treeish string) (string, error) {
+		if treeish == "" || strings.HasPrefix(treeish, "-") {
+			return "", fmt.Errorf("invalid revision: %q", treeish)
+		}
+
+		return run("-C", repo, "rev-parse", "-q", "--verify", treeish+"^{commit}")
+	}
 
 	origin, err := execx.String(ctx, "git", "-C", repo, "remote", "get-url", git.DefaultRemoteName)
 	if err != nil {
@@ -117,48 +145,111 @@ func LocalClone(ctx context.Context, repo, dir string) (err error) {
 	}
 	origin = strings.TrimSpace(origin)
 
+	headtreeish = stringsx.FirstNonBlank(headtreeish, plumbing.HEAD.String())
+	head, err := resolve(headtreeish)
+	if err != nil {
+		return errorsx.Wrapf(err, "unable to resolve %s: %s", headtreeish, repo)
+	}
+
+	// the base when it is a branch, its tip as the local branch and as the remote-tracking branch, either may be missing.
+	var basename string
+	localbase, _ := resolve(plumbing.NewBranchReferenceName(basetreeish).String())
+	remotebase, _ := resolve(plumbing.NewRemoteReferenceName(git.DefaultRemoteName, basetreeish).String())
+	switch {
+	case stringsx.First(localbase, remotebase) != "":
+		basename = basetreeish
+	case basetreeish != "":
+		debugx.Println("the base isn't a branch, it isn't recorded", basetreeish)
+	}
+
 	out, err := execx.RunAs(ctx, username, "git", "clone", "-q", "--local", repo, dir).CombinedOutput()
 	if err != nil {
-		return errorsx.Wrapf(fmt.Errorf("%s: %w", strings.TrimSpace(string(out)), err), "unable to clone repository: %s -> %s", repo, dir)
+		// hardlinks can't cross filesystems, copy the objects instead. this copies the whole history, which is
+		// the one place copying less would pay off. it can be done by not cloning at all: git init dir, then
+		// git fetch --depth=<rev-list --count base..head> file://<repo> +<head>:<a scratch ref>, and the same with
+		// --depth=1 for the tip of the base, delete the scratch ref, create the branches and the init.defaultBranch
+		// record as below, and check out head. fetching into a ref is what also brings the tags of the carried
+		// commits. it was measured at 4.7 MiB against 24.8 MiB for a repository with 31 commits of history, and it
+		// works when cloning from a clone, which --shallow-exclude does not. not done because the workspace would
+		// then differ with the filesystem: the history is cut, only those tags exist, and the other branches of
+		// the source and any --git-ref other than head and the base can't be resolved.
+		debugx.Println("unable to hardlink the repository, copying", err, strings.TrimSpace(string(out)))
+		out, err = execx.RunAs(ctx, username, "git", "clone", "-q", "--local", "--no-hardlinks", repo, dir).CombinedOutput()
+		if err != nil {
+			return errorsx.Wrapf(fmt.Errorf("%s: %w", strings.TrimSpace(string(out)), err), "unable to clone repository: %s -> %s", repo, dir)
+		}
 	}
 
-	out, err = execx.RunAs(ctx, username, "git", "-C", dir, "checkout", "-q", "--detach", "HEAD").CombinedOutput()
+	if _, err = run("-C", dir, "checkout", "-q", "--detach", head); err != nil {
+		return errorsx.Wrapf(err, "unable to detach HEAD: %s", dir)
+	}
+
+	// a clone sees the branches of the source as remote-tracking ones and only creates a local branch for the
+	// one checked out. mirror the refs of the source under their own names instead, the objects are all present
+	// so nothing is transferred. pruning drops what the source doesn't have, the clone's mirrored origin/*. its
+	// remote HEAD is dropped, what the clone considers its base is recorded explicitly below.
+	_, _ = run("-C", dir, "symbolic-ref", "--delete", plumbing.NewRemoteHEADReferenceName(git.DefaultRemoteName).String())
+	abs, err := filepath.Abs(repo)
 	if err != nil {
-		return errorsx.Wrapf(fmt.Errorf("%s: %w", strings.TrimSpace(string(out)), err), "unable to detach HEAD: %s", dir)
+		return errorsx.Wrapf(err, "unable to resolve repository path: %s", repo)
 	}
 
-	// a clone only creates a local branch for the branch checked out in the source, the others are
-	// remote-tracking refs which are discarded below along with the remote. keep them as local branches
-	// so any branch of the source can still be resolved within the checkout.
-	out, err = execx.RunAs(ctx, username, "git", "-C", dir, "for-each-ref", "--format=%(refname:strip=3)", "refs/remotes/"+git.DefaultRemoteName).CombinedOutput()
-	if err != nil {
-		return errorsx.Wrapf(fmt.Errorf("%s: %w", strings.TrimSpace(string(out)), err), "unable to list branches: %s", dir)
+	branches := plumbing.NewBranchReferenceName("*").String()
+	tracked := plumbing.NewRemoteReferenceName(git.DefaultRemoteName, "*").String()
+	if _, err = run("-C", dir, "fetch", "-q", "--no-tags", "--prune", "file://"+abs, "+"+branches+":"+branches, "+"+tracked+":"+tracked, "^"+plumbing.NewRemoteHEADReferenceName(git.DefaultRemoteName).String()); err != nil {
+		return errorsx.Wrapf(err, "unable to carry the branches: %s -> %s", repo, dir)
 	}
 
-	for _, branch := range strings.Fields(string(out)) {
-		if branch == "HEAD" {
-			continue
+	if basename != "" {
+		// the branch exists locally even if repo only had it as a remote-tracking branch.
+		if localbase == "" {
+			if _, err = run("-C", dir, "update-ref", plumbing.NewBranchReferenceName(basename).String(), remotebase); err != nil {
+				return errorsx.Wrapf(err, "unable to create branch %s: %s", basename, dir)
+			}
 		}
 
-		out, err = execx.RunAs(ctx, username, "git", "-C", dir, "update-ref", "refs/heads/"+branch, "refs/remotes/"+git.DefaultRemoteName+"/"+branch).CombinedOutput()
-		if err != nil {
-			return errorsx.Wrapf(fmt.Errorf("%s: %w", strings.TrimSpace(string(out)), err), "unable to create branch %s: %s", branch, dir)
+		if _, err = run("-C", dir, "config", "init.defaultBranch", basename); err != nil {
+			return errorsx.Wrapf(err, "unable to record the base: %s", dir)
 		}
 	}
 
 	if origin != "" {
-		_, err = execx.RunAs(ctx, username, "git", "-C", dir, "remote", "remove", git.DefaultRemoteName).CombinedOutput()
-		if err != nil {
-			return errorsx.Wrapf(err, "unable to remove origin remote: %s -> %s", repo, dir)
-		}
-
-		_, err = execx.RunAs(ctx, username, "git", "-C", dir, "remote", "add", git.DefaultRemoteName, origin).CombinedOutput()
-		if err != nil {
-			return errorsx.Wrapf(err, "unable to add origin remote: %s -> %s", repo, dir)
+		if _, err = run("-C", dir, "remote", "set-url", git.DefaultRemoteName, origin); err != nil {
+			return errorsx.Wrapf(err, "unable to set the origin remote: %s -> %s", repo, dir)
 		}
 	}
 
 	return nil
+}
+
+// DefaultBase finds the base branch of repo, the one workloads are compared against, and the commit it is at.
+// the repository is asked first: the branch the remote's HEAD points at, then init.defaultBranch, then go-git's
+// defaults, main and master. the first that exists as a branch of repo, or of the remote, wins. both are blank
+// when repo has none.
+func DefaultBase(repo *git.Repository, remote string) (name, commit string) {
+	tracked := plumbing.NewRemoteReferenceName(remote, "").String()
+	heads := plumbing.NewBranchReferenceName("").String()
+
+	candidates := make([]string, 0, 4)
+	if ref, err := repo.Reference(plumbing.NewRemoteHEADReferenceName(remote), false); err == nil && ref.Type() == plumbing.SymbolicReference {
+		candidates = append(candidates, strings.TrimPrefix(strings.TrimPrefix(ref.Target().String(), tracked), heads))
+	}
+
+	if cfg, err := repo.Config(); err == nil && cfg.Init.DefaultBranch != "" {
+		candidates = append(candidates, cfg.Init.DefaultBranch)
+	}
+
+	candidates = append(candidates, plumbing.Main.Short(), plumbing.Master.Short())
+
+	for _, candidate := range candidates {
+		for _, ref := range []plumbing.ReferenceName{plumbing.NewBranchReferenceName(candidate), plumbing.NewRemoteReferenceName(remote, candidate)} {
+			if resolved, err := repo.Reference(ref, true); err == nil {
+				return candidate, resolved.Hash().String()
+			}
+		}
+	}
+
+	return "", ""
 }
 
 // RepositoryUsername returns the username owning the repository at path,
@@ -269,12 +360,9 @@ func Env(repo *git.Repository, remote string, branch string, vcsclone string) (e
 		return nil, err
 	}
 
-	benv, err := BaseEnv(repo, uri, cloneuri, "main")
+	benv, err := baseenv(repo, remote, uri, cloneuri)
 	if err != nil {
-		if !errors.Is(err, plumbing.ErrReferenceNotFound) {
-			return nil, errorsx.Wrapf(err, "base env: %s", uri)
-		}
-		log.Println("unable to resolve the base branch locally or from the remote, omitting the EG_GIT_BASE_* variables")
+		return nil, errorsx.Wrapf(err, "base env: %s", uri)
 	}
 
 	return append(env, benv...), nil
@@ -296,19 +384,40 @@ func LocalEnv(repo *git.Repository, remote string, branch string) (env []string,
 		return nil, errorsx.Wrapf(err, "head env: %s - %s", uri, branch)
 	}
 
-	if benv, err = BaseEnv(repo, uri, eg.DefaultWorkingDirectory(), "main"); err != nil {
-		if errors.Is(err, plumbing.ErrReferenceNotFound) {
-			// added for baremetal support in github actions.
-			log.Println("unable to resolve the base branch locally or from the remote, omitting the EG_GIT_BASE_* variables")
-		} else {
-			return nil, errorsx.Wrapf(err, "base env: %s", uri)
-		}
+	if benv, err = baseenv(repo, remote, uri, eg.DefaultWorkingDirectory()); err != nil {
+		return nil, errorsx.Wrapf(err, "base env: %s", uri)
 	}
 
 	env = append(env, benv...)
 	env = append(env, envx.Format(eg.EnvComputeVCS, uri))
 
 	return env, nil
+}
+
+// SourceBase is DefaultBase for the repository dir is part of, blank when dir isn't in one.
+func SourceBase(dir, remote string) string {
+	repo, err := git.PlainOpenWithOptions(dir, &git.PlainOpenOptions{DetectDotGit: true})
+	if err != nil {
+		debugx.Println("unable to open the repository to find its base", dir, err)
+		return ""
+	}
+
+	name, _ := DefaultBase(repo, remote)
+	return name
+}
+
+// baseenv describes the base branch of repo, nothing when it has none.
+// baremetal runs on github actions failed outright when the checkout had no base (shallow, single branch
+// fetches), so it is tolerated and logged. LocalClone carries the base into the working directory, so reaching
+// this means the checkout run from never had one.
+func baseenv(repo *git.Repository, remote, vcs, uri string) (env []string, err error) {
+	name, _ := DefaultBase(repo, remote)
+	if name == "" {
+		log.Println("unable to resolve the base branch locally or from the remote, omitting the EG_GIT_BASE_* variables")
+		return nil, nil
+	}
+
+	return BaseEnv(repo, vcs, uri, name)
 }
 
 // Description labels a workload for treeish by replacing the eggit style tokens in pattern,
@@ -662,7 +771,7 @@ func Changes(ctx context.Context, clonedir string, repodir string) ([]byte, erro
 		return nil, errorsx.Wrapf(fmt.Errorf("%s: %w", strings.TrimSpace(string(out)), err), "unable to detect changes: %s", clonedir)
 	}
 
-	patch, err := gitcmd(ctx, clonedir, "diff", "--binary", "HEAD").Output()
+	patch, err := gitcmd(ctx, clonedir, "diff", "--binary", plumbing.HEAD.String()).Output()
 	if err != nil {
 		return nil, errorsx.Wrapf(err, "unable to detect changes: %s", clonedir)
 	}

@@ -15,10 +15,7 @@ import (
 
 const (
 	// number of functions sampled from the pool to generate tests for.
-	count = 1
-
-	// number of functions generated at once.
-	workers = 4
+	count = 2
 )
 
 // Testgen generates tests for the least covered functions as configured by opts, e.g.) the judge and the number
@@ -60,7 +57,7 @@ func newpool(opts egautogentest.Options) egpool.Pool[egautogentest.Fn] {
 			egfs.StringLazy(egenv.WorkingDirectory("cmd", "eg", "compute", "compute.lan.rm_test.go")),
 		)
 
-	return egpool.New(workers, func(fn egautogentest.Fn) eg.OpFn {
+	return egpool.New(1, func(fn egautogentest.Fn) eg.OpFn {
 		// a relative path is a name, which eggit hashes into the worktree directory.
 		return eggit.Change("egautogen:" + fn.Path + ":" + fn.Name).Op(func(c eggit.Changer) eg.OpFn {
 			return testgen(c, fn, opts.Run(golang.Directory(c.Path()).From(egautogentest.From(fn))))

@@ -448,7 +448,7 @@ func (t GolangOptions) Verify(ctx context.Context, fn Fn, artifact string) error
 
 	cmd := eggolang.Runtime().Directory(dir).Colors(false).Newf("set -o pipefail; go test -count=1 -cover -overlay '%s' -run '^(%s)$' . |& tee '%s'", overlay, strings.Join(tests, "|"), output)
 	log.Printf("autogentest %s: verifying dest=%s tmp=%s overlay=%s tests=%v\n", fn.Name, dest, tmp, overlay, tests)
-	if err := shell.Run(ctx, cmd.Debug()); err != nil {
+	if err := shell.Run(ctx, cmd); err != nil {
 		return withResults(err, output)
 	}
 

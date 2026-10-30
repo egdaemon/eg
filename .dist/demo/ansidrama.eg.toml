@@ -1,9 +1,6 @@
-# ansidrama script walking through documentation/getting.started.md.
-#   ansidrama record ansidrama.eg.toml
-# Runs the real `eg` commands from the guide in an empty directory at
-# /tmp/.eg.demo; the git repo is created by the first scene. Setup is
-# idempotent: the directory is wiped and recreated on every run. `eg register` and `eg compute upload` really register and upload.
-# `out` is relative to this file's dir.
+# export DEMOPASSPHRASE="..."
+# EDITOR=vim eg secrets edit chachasm://${DEMOPASSPHRASE}@.dist/demo/demo.env
+# eg secrets env --uri "chachasm://${DEMOPASSPHRASE}@.dist/demo/demo.env" ansidrama record .dist/demo/ansidrama.eg.toml
 launch = "d=/tmp/.eg.demo; rm -rf $d && mkdir -p $d && cd $d && PS1='$ ' bash --norc --noprofile -i"
 cols = 84
 rows = 24
@@ -18,6 +15,9 @@ out = "ansidrama.eg.webp"
 env = { COLORTERM = "truecolor", TERM = "screen-256color" }
 wait_cap_ms = 3000
 await_ms = 120000
+# 2x playback: ansidrama has no speed knob, so halve the holds and the per-character
+# typing delay (default 9cs). max_fps=30 floors a frame at ~3.3cs, so 4 is as fast as it goes cleanly.
+type_cs = 4
 quit_keys = ["C-d"]
 
 [chrome]
@@ -27,66 +27,66 @@ padding = 12
 
 [[scene]]
 card = { lines = ["Getting Started", "your first eg module"], fg = "#fef9c3" }
-hold_cs = 250
+hold_cs = 125
 
 # a git repository with a remote, which eg expects
 [[scene]]
 text = "git init -q && git remote add origin https://github.com/egdaemon/demo.git"
-hold_cs = 40
+hold_cs = 20
 [[scene]]
 keys = ["Enter"]
-hold_cs = 80
+hold_cs = 40
 
 # implementing your first module
 [[scene]]
 text = "eg actl bootstrap module"
-hold_cs = 40
+hold_cs = 20
 [[scene]]
 keys = ["Enter"]
 # the prompt is a row of exactly `$`; the command line above it also contains `$`.
 await = { find = '^\$$', row = -1 }
-hold_cs = 80
+hold_cs = 40
 
 [[scene]]
 text = "ls -lha .eg"
-hold_cs = 40
+hold_cs = 20
 [[scene]]
 keys = ["Enter"]
-hold_cs = 300
+hold_cs = 150
 
 # eg compute local needs a commit to resolve HEAD
 [[scene]]
 text = "git add -A && git commit -qm 'initial commit'"
-hold_cs = 40
+hold_cs = 20
 [[scene]]
 keys = ["Enter"]
-hold_cs = 80
+hold_cs = 40
 
 # run it locally
 [[scene]]
 text = "eg compute local"
-hold_cs = 40
+hold_cs = 20
 [[scene]]
 keys = ["Enter"]
 await = { find = '^\$$', row = -1 }
-hold_cs = 300
+hold_cs = 150
 
 # run it remotely
 [[scene]]
-text = "eg register --seed=\"00000000-0000-0000-0000-000000000000\""
-hold_cs = 40
+text = "eg register"
+hold_cs = 20
 [[scene]]
 keys = ["Enter"]
-hold_cs = 300
+hold_cs = 150
 
 [[scene]]
-text = "eg compute upload --account-id '35d233e6-2e76-4f38-92c4-70c8c138b06b'"
-hold_cs = 40
+text = "eg compute upload"
+hold_cs = 20
 [[scene]]
 keys = ["Enter"]
 await = { find = '^\$$', row = -1 }
-hold_cs = 400
+hold_cs = 200
 
 [[scene]]
 card = { lines = ["eg compute local", "eg compute upload"], fg = "#fef9c3" }
-hold_cs = 250
+hold_cs = 125

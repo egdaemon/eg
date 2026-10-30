@@ -11,8 +11,8 @@ import (
 )
 
 func HelloWorld(ctx context.Context, op eg.Op) error {
-	log.Println("debug initiated")
-	defer log.Println("debug completed")
+	log.Println("hello world initiated")
+	defer log.Println("hello world completed")
 	env.Debug(os.Environ()...)
 	return nil
 }

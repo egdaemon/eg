@@ -14,11 +14,13 @@ import (
 	"time"
 
 	_ "github.com/duckdb/duckdb-go/v2"
+	_eg "github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/duckproxy"
 	"github.com/egdaemon/eg/duckproxyserver"
 	"github.com/egdaemon/eg/internal/coverage"
 	"github.com/egdaemon/eg/internal/sqlx"
 	"github.com/egdaemon/eg/interp/events"
+	"github.com/egdaemon/eg/runtime/x/wasi/egcoverage"
 	"github.com/stretchr/testify/require"
 )
 
@@ -73,13 +75,17 @@ func analyticsproxy(t *testing.T) (*sql.DB, func(context.Context, ...*coverage.R
 }
 
 // coveragemodule writes a go module containing a function per entry of hits and the matching
-// coverage profile. returns the go.mod path and the directory containing the profile.
-func coveragemodule(t *testing.T, hits ...int) (gomod string, profiles string) {
+// coverage profile, and points the working and ephemeral directories at them.
+func coveragemodule(t *testing.T, hits ...int) {
 	t.Helper()
 
 	root := t.TempDir()
-	profiles = t.TempDir()
-	gomod = filepath.Join(root, "go.mod")
+	tmp := t.TempDir()
+	profiles := filepath.Join(tmp, ".eg.coverage")
+	require.NoError(t, os.MkdirAll(profiles, 0700))
+	t.Setenv(_eg.EnvComputeWorkingDirectory, root)
+	t.Setenv("TMPDIR", tmp)
+	gomod := filepath.Join(root, "go.mod")
 
 	var (
 		source  strings.Builder
@@ -97,15 +103,14 @@ func coveragemodule(t *testing.T, hits ...int) (gomod string, profiles string) {
 	require.NoError(t, os.WriteFile(filepath.Join(root, "sample.go"), []byte(source.String()), 0600))
 	require.NoError(t, os.WriteFile(filepath.Join(profiles, "sample.cov"), []byte(profile.String()), 0600))
 
-	return gomod, profiles
 }
 
-func TestRecordCoverage(t *testing.T) {
+func TestCoverage(t *testing.T) {
 	t.Run("reports file and function coverage", func(t *testing.T) {
 		db, report := analyticsproxy(t)
-		gomod, profiles := coveragemodule(t, 3, 0)
+		coveragemodule(t, 3, 0)
 
-		require.NoError(t, recordcoverage(t.Context(), profiles, slices.Values([]string{gomod}), report))
+		require.NoError(t, egcoverage.Into(report, Coverage()...)(t.Context(), nil))
 
 		rows, err := db.Query(`SELECT fnname, hits FROM 'eg.metrics.coverage' WHERE fnname != '' ORDER BY fnname`)
 		require.NoError(t, err)
@@ -131,9 +136,9 @@ func TestRecordCoverage(t *testing.T) {
 
 	t.Run("flushes full batches", func(t *testing.T) {
 		db, report := analyticsproxy(t)
-		gomod, profiles := coveragemodule(t, slices.Repeat([]int{1}, 130)...)
+		coveragemodule(t, slices.Repeat([]int{1}, 130)...)
 
-		require.NoError(t, recordcoverage(t.Context(), profiles, slices.Values([]string{gomod}), report))
+		require.NoError(t, egcoverage.Into(report, Coverage()...)(t.Context(), nil))
 
 		var total int
 		require.NoError(t, db.QueryRow(`SELECT count(*) FROM 'eg.metrics.coverage'`).Scan(&total))
@@ -143,7 +148,12 @@ func TestRecordCoverage(t *testing.T) {
 	t.Run("empty profile directory", func(t *testing.T) {
 		db, report := analyticsproxy(t)
 
-		require.NoError(t, recordcoverage(t.Context(), t.TempDir(), slices.Values([]string(nil)), report))
+		tmp := t.TempDir()
+		require.NoError(t, os.MkdirAll(filepath.Join(tmp, ".eg.coverage"), 0700))
+		t.Setenv(_eg.EnvComputeWorkingDirectory, t.TempDir())
+		t.Setenv("TMPDIR", tmp)
+
+		require.NoError(t, egcoverage.Into(report, Coverage()...)(t.Context(), nil))
 
 		var total int
 		require.NoError(t, db.QueryRow(`SELECT count(*) FROM 'eg.metrics.coverage'`).Scan(&total))
@@ -155,21 +165,25 @@ func TestRecordCoverage(t *testing.T) {
 		failing := func(context.Context, ...*coverage.Report) error { return boom }
 
 		t.Run("final flush", func(t *testing.T) {
-			gomod, profiles := coveragemodule(t, 1)
-			require.ErrorIs(t, recordcoverage(t.Context(), profiles, slices.Values([]string{gomod}), failing), boom)
+			coveragemodule(t, 1)
+			require.ErrorIs(t, egcoverage.Into(failing, Coverage()...)(t.Context(), nil), boom)
 		})
 
 		t.Run("full batch", func(t *testing.T) {
-			gomod, profiles := coveragemodule(t, slices.Repeat([]int{1}, 130)...)
-			require.ErrorIs(t, recordcoverage(t.Context(), profiles, slices.Values([]string{gomod}), failing), boom)
+			coveragemodule(t, slices.Repeat([]int{1}, 130)...)
+			require.ErrorIs(t, egcoverage.Into(failing, Coverage()...)(t.Context(), nil), boom)
 		})
 	})
 
 	t.Run("unparsable profile is an error", func(t *testing.T) {
-		profiles := t.TempDir()
+		tmp := t.TempDir()
+		profiles := filepath.Join(tmp, ".eg.coverage")
+		require.NoError(t, os.MkdirAll(profiles, 0700))
+		t.Setenv(_eg.EnvComputeWorkingDirectory, t.TempDir())
+		t.Setenv("TMPDIR", tmp)
 		require.NoError(t, os.WriteFile(filepath.Join(profiles, "bad.cov"), []byte("not a profile"), 0600))
 
-		err := recordcoverage(t.Context(), profiles, slices.Values([]string(nil)), func(context.Context, ...*coverage.Report) error { return nil })
+		err := egcoverage.Into(func(context.Context, ...*coverage.Report) error { return nil }, Coverage()...)(t.Context(), nil)
 		require.ErrorContains(t, err, "unable to parse profiles")
 	})
 }

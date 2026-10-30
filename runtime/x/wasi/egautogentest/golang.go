@@ -24,7 +24,7 @@ import (
 
 	"golang.org/x/mod/modfile"
 
-	"github.com/egdaemon/eg/internal/coverage/golangcov"
+	"github.com/egdaemon/eg/astcodec"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/iterx"
 	"github.com/egdaemon/eg/runtime/wasi/egenv"
@@ -601,7 +601,7 @@ func extractTest(response string, pkgname string) ([]byte, []string, error) {
 func findFuncDecl(pkg *gopkg, name string) *ast.FuncDecl {
 	for _, f := range pkg.files {
 		for _, d := range f.Decls {
-			if fd, ok := d.(*ast.FuncDecl); ok && golangcov.FuncName(fd) == name {
+			if fd, ok := d.(*ast.FuncDecl); ok && astcodec.FuncName(fd) == name {
 				return fd
 			}
 		}
@@ -761,7 +761,7 @@ func isPublicAPI(decl *ast.FuncDecl) bool {
 		return true
 	}
 
-	return ast.IsExported(golangcov.ReceiverName(decl.Recv.List[0].Type))
+	return ast.IsExported(astcodec.ReceiverName(decl.Recv.List[0].Type))
 }
 
 func nonEmpty(values ...string) []string {

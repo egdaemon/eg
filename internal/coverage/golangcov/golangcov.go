@@ -5,7 +5,6 @@ package golangcov
 
 import (
 	"context"
-	"errors"
 	"go/ast"
 	"go/parser"
 	"go/token"
@@ -15,8 +14,10 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/egdaemon/eg/astcodec"
 	"github.com/egdaemon/eg/internal/coverage"
 	"github.com/egdaemon/eg/internal/errorsx"
+	"github.com/egdaemon/eg/internal/iterx"
 	"golang.org/x/mod/modfile"
 	"golang.org/x/tools/cover"
 )
@@ -62,10 +63,6 @@ func Modules(gomods iter.Seq[string]) Resolver {
 	}
 }
 
-// errStopped is returned when the consumer stops iterating.
-// fs.SkipAll can't be used, fs.WalkDir swallows it.
-const errStopped = errorsx.String("iteration stopped")
-
 // Coverage reports per file and per function coverage for the profiles in dir.
 // per function reports require the source, so they're only generated for files
 // resolve can locate. use Files for per file coverage only.
@@ -93,13 +90,13 @@ func Coverage(ctx context.Context, dir string, resolve Resolver) iter.Seq2[*cove
 					Statements: percentCovered(profile.Blocks),
 				}, nil)
 				if !ok {
-					return errStopped
+					return iterx.ErrIterationComplete
 				}
 
 				if resolved {
 					for _, fn := range functions(path, profile) {
 						if !yield(fn, nil) {
-							return errStopped
+							return iterx.ErrIterationComplete
 						}
 					}
 				}
@@ -115,7 +112,7 @@ func Coverage(ctx context.Context, dir string, resolve Resolver) iter.Seq2[*cove
 		})
 
 		// the consumer stopped iterating, yield must not be called again.
-		if err != nil && !errors.Is(err, errStopped) {
+		if errorsx.Ignore(err, iterx.ErrIterationComplete) != nil {
 			yield(nil, err)
 		}
 	}
@@ -153,44 +150,13 @@ func functions(path string, p *cover.Profile) (reports []*coverage.Report) {
 		// profile blocks are sorted by position, so the first is the function's entry.
 		reports = append(reports, &coverage.Report{
 			Path:       path,
-			Fnname:     FuncName(fd),
+			Fnname:     astcodec.FuncName(fd),
 			Hits:       int64(blocks[0].Count),
 			Statements: percentCovered(blocks),
 		})
 	}
 
 	return reports
-}
-
-// FuncName returns the name coverage records for the function; methods are
-// qualified by their receiver's type name, e.g. Type.Method.
-func FuncName(fd *ast.FuncDecl) string {
-	if fd.Recv == nil || len(fd.Recv.List) == 0 {
-		return fd.Name.Name
-	}
-
-	return ReceiverName(fd.Recv.List[0].Type) + "." + fd.Name.Name
-}
-
-// ReceiverName returns the base type name of a receiver expression, stripping
-// pointers and type parameters.
-func ReceiverName(expr ast.Expr) string {
-	for {
-		switch t := expr.(type) {
-		case *ast.StarExpr:
-			expr = t.X
-		case *ast.IndexExpr:
-			expr = t.X
-		case *ast.IndexListExpr:
-			expr = t.X
-		case *ast.ParenExpr:
-			expr = t.X
-		case *ast.Ident:
-			return t.Name
-		default:
-			return ""
-		}
-	}
 }
 
 func before(line, col, oline, ocol int) bool {

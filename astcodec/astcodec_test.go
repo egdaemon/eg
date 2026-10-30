@@ -600,3 +600,53 @@ func TestLoad(t *testing.T) {
 		assert.Empty(t, pkg.Syntax)
 	})
 }
+
+func TestFuncName(t *testing.T) {
+	const src = `package p
+
+func Plain() {}
+func (Value) ByValue() {}
+func (*Pointer) ByPointer() {}
+func (Generic[T]) OneParam() {}
+func (*Pair[K, V]) TwoParams() {}
+func (*(Paren)) Parenthesised() {}
+`
+	f, err := parser.ParseFile(token.NewFileSet(), "p.go", src, 0)
+	require.NoError(t, err)
+
+	var names []string
+	for _, d := range f.Decls {
+		names = append(names, astcodec.FuncName(d.(*ast.FuncDecl)))
+	}
+
+	require.Equal(t, []string{
+		"Plain",
+		"Value.ByValue",
+		"Pointer.ByPointer",
+		"Generic.OneParam",
+		"Pair.TwoParams",
+		"Paren.Parenthesised",
+	}, names)
+}
+
+func TestReceiverName(t *testing.T) {
+	for _, tc := range []struct {
+		expr     string
+		expected string
+	}{
+		{"T", "T"},
+		{"*T", "T"},
+		{"T[A]", "T"},
+		{"*T[A, B]", "T"},
+		{"(T)", "T"},
+		{"*(T)", "T"},
+		{"[]T", ""},
+		{"pkg.T", ""},
+	} {
+		t.Run(tc.expr, func(t *testing.T) {
+			expr, err := parser.ParseExpr(tc.expr)
+			require.NoError(t, err)
+			require.Equal(t, tc.expected, astcodec.ReceiverName(expr))
+		})
+	}
+}

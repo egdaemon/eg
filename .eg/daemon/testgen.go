@@ -9,6 +9,7 @@ import (
 	"github.com/egdaemon/eg/runtime/wasi/shell"
 	"github.com/egdaemon/eg/runtime/x/wasi/egautogentest"
 	"github.com/egdaemon/eg/runtime/x/wasi/egbug"
+	"github.com/egdaemon/eg/runtime/x/wasi/egcoverage"
 	"github.com/egdaemon/eg/runtime/x/wasi/egfs"
 	"github.com/egdaemon/eg/runtime/x/wasi/eggithub"
 	"github.com/egdaemon/eg/runtime/x/wasi/eggolang"
@@ -37,7 +38,7 @@ func TestgenOld(opts egautogentest.Options) eg.OpFn {
 	return eg.Sequential(
 		eggolang.AutoTest(),
 		egbug.Log("recording coverage initiated"),
-		eggolang.RecordCoverage,
+		egcoverage.Report(eggolang.Coverage().MarkGeneratedExt(".gen.go", ".pb.go", ".autogentest_test.go")...),
 		egbug.Log("recording coverage completed"),
 		egbug.Log("egautogentest initiated"),
 		newpool(opts).Run(

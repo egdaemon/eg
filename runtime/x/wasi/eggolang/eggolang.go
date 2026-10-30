@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"go/build"
-	"iter"
 	"os"
 	"path/filepath"
 	"strings"
@@ -24,7 +23,6 @@ import (
 	"github.com/egdaemon/eg/internal/timex"
 	"github.com/egdaemon/eg/runtime/wasi/eg"
 	"github.com/egdaemon/eg/runtime/wasi/egenv"
-	"github.com/egdaemon/eg/runtime/wasi/egunsafe/fficoverage"
 	"github.com/egdaemon/eg/runtime/wasi/shell"
 )
 
@@ -289,51 +287,12 @@ func (t options) autotest(base shell.Command) eg.OpFn {
 	})
 }
 
-// Record the coverage profile into the duckdb database.
-func RecordCoverage(ctx context.Context, _ eg.Op) (err error) {
-	return recordcoverage(ctx, coveragedir(), modfilex.FindModules(egenv.WorkingDirectory()), fficoverage.Report)
-}
-
-func recordcoverage(ctx context.Context, covpath string, modules iter.Seq[string], report func(context.Context, ...*coverage.Report) error) (err error) {
-	// recover metrics
-	batch := make([]*coverage.Report, 0, 128)
-	resolve := golangcov.Modules(modules)
-	for rep, err := range golangcov.Coverage(ctx, covpath, resolve) {
-		if err != nil {
-			return err
-		}
-
-		rep.Path = workspacepath(rep.Path)
-		batch = append(batch, rep)
-
-		if len(batch) == cap(batch) {
-			if err := report(ctx, batch...); err != nil {
-				return err
-			}
-			batch = batch[:0]
-		}
-	}
-
-	if err := report(ctx, batch...); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// workspacepath reports paths within the workspace relative to it, so they hold wherever the workspace is
-// located, e.g.) a git worktree. other paths are returned as is.
-func workspacepath(path string) string {
-	if !filepath.IsAbs(path) {
-		return path
-	}
-
-	rel, err := filepath.Rel(egenv.WorkspaceDirectory(), path)
-	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
-		return path
-	}
-
-	return rel
+// Coverage is the coverage of the profiles AutoTest wrote, with paths relative to the workspace. it is recorded with
+// egcoverage.Report.
+func Coverage() coverage.Options {
+	return coverage.New(func(ctx context.Context) coverage.Seq {
+		return golangcov.Coverage(ctx, coveragedir(), golangcov.Modules(modfilex.FindModules(egenv.WorkingDirectory())))
+	}).Transforms(coverage.TransformPath(egenv.PathWorkspaceRelative))
 }
 
 func CacheDirectory(dirs ...string) string {

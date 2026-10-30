@@ -1,5 +1,5 @@
 // guest used by the interp tests: reports coverage batches over the analytics socket
-// from inside the wasi runtime, one fresh connection per report, as RecordCoverage does.
+// from inside the wasi runtime, one fresh connection per report, as egcoverage.Report does.
 package main
 
 import (

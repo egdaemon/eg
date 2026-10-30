@@ -391,3 +391,34 @@ func RemoveFunction(root ast.Node, pattern func(ast.Decl) bool) ast.Node {
 func Ident(expr ast.Expr) string {
 	return types.ExprString(expr)
 }
+
+// FuncName returns the name coverage records for the function; methods are
+// qualified by their receiver's type name, e.g. Type.Method.
+func FuncName(fd *ast.FuncDecl) string {
+	if fd.Recv == nil || len(fd.Recv.List) == 0 {
+		return fd.Name.Name
+	}
+
+	return ReceiverName(fd.Recv.List[0].Type) + "." + fd.Name.Name
+}
+
+// ReceiverName returns the base type name of a receiver expression, stripping
+// pointers and type parameters.
+func ReceiverName(expr ast.Expr) string {
+	for {
+		switch t := expr.(type) {
+		case *ast.StarExpr:
+			expr = t.X
+		case *ast.IndexExpr:
+			expr = t.X
+		case *ast.IndexListExpr:
+			expr = t.X
+		case *ast.ParenExpr:
+			expr = t.X
+		case *ast.Ident:
+			return t.Name
+		default:
+			return ""
+		}
+	}
+}

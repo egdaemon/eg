@@ -18,7 +18,8 @@ func TestFilters(t *testing.T) {
 		statements FLOAT4 NOT NULL,
 		branches FLOAT4 NOT NULL,
 		fnname TEXT NOT NULL DEFAULT '',
-		hits BIGINT NOT NULL DEFAULT 0
+		hits BIGINT NOT NULL DEFAULT 0,
+		generated BOOLEAN NOT NULL DEFAULT false
 	)`)
 	sqltestx.Exec(t, db, `INSERT INTO 'eg.metrics.coverage' (path, statements, branches, fnname, hits) VALUES
 		('ui/app.ts', 0, 1, 'render', 0),

@@ -11,3 +11,6 @@ func Printf(format string, v ...interface{}) {}
 
 // Print noop. should get optimized out by compiler.
 func Print(v ...interface{}) {}
+
+// Fn noop. should get optimized out by compiler.
+func Fn(d func()) {}

@@ -304,3 +304,28 @@ func (t errWriter) Write([]byte) (int, error) {
 func Writer(err error) io.Writer {
 	return errWriter{err}
 }
+
+// ZeroSilent ignores the error without logging it.
+func ZeroSilent[T any](v T, err error) T {
+	return v
+}
+
+// ZeroDebug logs the error only when debugging is enabled, otherwise ignores it.
+// d is expected to be debugx.Fn, the type must be given explicitly:
+//
+//	errorsx.ZeroDebug[time.Time](debugx.Fn)(time.Parse(time.DateOnly, s))
+func ZeroDebug[T any](d func(func())) func(T, error) T {
+	return func(v T, err error) T {
+		if err == nil {
+			return v
+		}
+
+		d(func() {
+			if cause := log.Output(4, fmt.Sprintln(err)); cause != nil {
+				panic(cause)
+			}
+		})
+
+		return v
+	}
+}

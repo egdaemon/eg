@@ -9,7 +9,7 @@ import (
 	"github.com/egdaemon/eg/runtime/wasi/eg"
 	"github.com/egdaemon/eg/runtime/wasi/egenv"
 	"github.com/egdaemon/eg/runtime/wasi/eggit"
-	"github.com/egdaemon/eg/runtime/x/wasi/egautogentest"
+	"github.com/egdaemon/eg/runtime/x/wasi/egautogen"
 	"github.com/egdaemon/eg/runtime/x/wasi/egllm"
 )
 
@@ -29,7 +29,7 @@ func main() {
 		eg.Module(
 			ctx,
 			c1,
-			daemon.Testgen(egautogentest.New().Judge(judge).Attempts(3)),
+			daemon.Testgen(egautogen.New().Judge(judge).Attempts(3)),
 		),
 	)
 

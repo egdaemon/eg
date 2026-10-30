@@ -7,7 +7,7 @@ import (
 	"github.com/egdaemon/eg/runtime/wasi/eg"
 	"github.com/egdaemon/eg/runtime/wasi/eggit"
 	"github.com/egdaemon/eg/runtime/wasi/shell"
-	"github.com/egdaemon/eg/runtime/x/wasi/egautogentest"
+	"github.com/egdaemon/eg/runtime/x/wasi/egautogen"
 	"github.com/egdaemon/eg/runtime/x/wasi/egbug"
 	"github.com/egdaemon/eg/runtime/x/wasi/egpool"
 )
@@ -28,12 +28,12 @@ type Seq = egpool.Seq[T]
 // Test generates a test case reproducing each fault of seq as configured by opts, e.g.) the judge
 // and the number of attempts, running at most workers at once, each in its own worktree so they
 // never write the same file.
-func Test(workers uint16, opts egautogentest.Options, seq Seq) eg.OpFn {
+func Test(workers uint16, opts egautogen.Options, seq Seq) eg.OpFn {
 	return pool(workers, opts).Run(seq)
 }
 
 // pool is the pool generating the test cases of the faults it is given.
-func pool(workers uint16, opts egautogentest.Options) egpool.Pool[T] {
+func pool(workers uint16, opts egautogen.Options) egpool.Pool[T] {
 	opts = opts.Ensure(
 		"no helper functions are added",
 		"no global variables or setup code",

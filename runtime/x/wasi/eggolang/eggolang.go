@@ -292,7 +292,7 @@ func (t options) autotest(base shell.Command) eg.OpFn {
 func Coverage() coverage.Options {
 	return coverage.New(func(ctx context.Context) coverage.Seq {
 		return golangcov.Coverage(ctx, coveragedir(), golangcov.Modules(modfilex.FindModules(egenv.WorkingDirectory())))
-	}).Transforms(coverage.TransformPath(egenv.PathWorkspaceRelative))
+	}).Transforms(coverage.TransformPath(egenv.PathRelativeWorkspace))
 }
 
 func CacheDirectory(dirs ...string) string {

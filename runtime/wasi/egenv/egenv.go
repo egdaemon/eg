@@ -110,19 +110,24 @@ func WorkspaceDirectory(paths ...string) string {
 	return filepath.Join(env.String(eg.DefaultWorkspaceDirectory(), eg.EnvComputeWorkspaceDirectory), filepath.Join(paths...))
 }
 
-// PathWorkspaceRelative reports paths within the workspace directory relative to it, so they hold wherever the workspace is
-// located, e.g.) a git worktree. relative paths and paths outside the workspace are returned as is.
-func PathWorkspaceRelative(path string) string {
+// PathRelative reports paths within dir relative to it. relative paths and paths outside dir are returned as is.
+func PathRelative(dir string, path string) string {
 	if !filepath.IsAbs(path) {
 		return path
 	}
 
-	rel, err := filepath.Rel(WorkspaceDirectory(), path)
+	rel, err := filepath.Rel(dir, path)
 	if err != nil || !filepath.IsLocal(rel) {
 		return path
 	}
 
 	return rel
+}
+
+// PathRelativeWorkspace reports paths within the workspace directory relative to it, so they hold wherever the workspace is
+// located, e.g.) a git worktree. relative paths and paths outside the workspace are returned as is.
+func PathRelativeWorkspace(path string) string {
+	return PathRelative(WorkspaceDirectory(), path)
 }
 
 // returns the absolute path to the working directory of the module. this directory is the

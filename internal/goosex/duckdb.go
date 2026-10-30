@@ -97,9 +97,10 @@ func (t DuckdbStore) ListMigrations(ctx context.Context, db database.DBTxConn) (
 }
 
 // Up applies every pending migration in fsys (a directory of goose-formatted
-// .sql files) to db.
+// .sql files) to db. Out-of-order migrations are applied because several
+// independent migration sets share the same database.
 func Up(ctx context.Context, db *sql.DB, fsys fs.FS) error {
-	provider, err := goose.NewProvider("", db, fsys, goose.WithStore(DuckdbStore{}))
+	provider, err := goose.NewProvider("", db, fsys, goose.WithStore(DuckdbStore{}), goose.WithAllowOutofOrder(true))
 	if err != nil {
 		return errorsx.Wrap(err, "unable to build migration provider")
 	}

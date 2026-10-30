@@ -38,7 +38,7 @@ eg register
 # manager instead, e.g. gcpsm:// (Google Secret Manager) or awssm:// (AWS Secrets Manager) —
 # see `eg secrets --help` for the full list of supported schemes.
 printf 'EG_ACCOUNT=00000000-0000-0000-0000-000000000000\nEG_ENTROPY_SEED=00000000-0000-0000-0000-000000000001\n' \
-  | eg secrets update file:///tmp/daemon.secret
+  | eg secrets create file:///tmp/daemon.secret
 
 # bootstrap the resources the runner can use.
 eg actl bootstrap env runner | sudo tee /etc/eg/runner.env

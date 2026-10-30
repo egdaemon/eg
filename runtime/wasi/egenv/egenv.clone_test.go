@@ -1,6 +1,7 @@
 package egenv_test
 
 import (
+	"os"
 	"testing"
 
 	"github.com/egdaemon/eg"
@@ -10,6 +11,9 @@ import (
 
 func TestCloneEnabled(t *testing.T) {
 	t.Run("defaults to enabled", func(t *testing.T) {
+		// eg compute local sets the variable to false, ensure it is unset for this case.
+		t.Setenv(eg.EnvUnsafeGitCloneEnabled, "")
+		require.NoError(t, os.Unsetenv(eg.EnvUnsafeGitCloneEnabled))
 		require.True(t, egenv.CloneEnabled())
 	})
 

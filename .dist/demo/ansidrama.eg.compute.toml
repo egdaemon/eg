@@ -1,0 +1,50 @@
+# export DEMOPASSPHRASE="..."
+# EDITOR=vim eg secrets edit chachasm://${DEMOPASSPHRASE}@.dist/demo/demo.env
+# eg secrets env --uri "chachasm://${DEMOPASSPHRASE}@.dist/demo/demo.env" ansidrama record .dist/demo/ansidrama.eg.compute.toml
+launch = ": \"${EG_ACCOUNT:?set EG_ACCOUNT}\" \"${EG_ENTROPY_SEED:?set EG_ENTROPY_SEED}\" && d=/tmp/.eg.demo.compute && rm -rf $d && mkdir -p $d/cache $d/config $d/run && export CACHE_DIRECTORY=$d/cache CONFIGURATION_DIRECTORY=$d/config RUNTIME_DIRECTORY=$d/run && cd $d && PS1='$ ' bash --norc --noprofile -i"
+cols = 100
+rows = 24
+font = "smalti"
+font_px = 16
+card_font_px = 64
+card_subtitle_px = 32
+out = "ansidrama.eg.compute.webp"
+# TERM=screen-* stops eg (via termenv) from querying the terminal for its
+# background colour, which ansidrama's embedded terminal never answers: without
+# this every eg command stalls for 5s, silently, and the next scene types into it.
+env = { COLORTERM = "truecolor", TERM = "screen-256color" }
+wait_cap_ms = 3000
+# registration, and a first-time build of the runner container, can take a while.
+await_ms = 300000
+# 2x playback, see ansidrama.eg.toml.
+type_cs = 4
+quit_keys = ["C-d"]
+
+[chrome]
+style = "macos"
+title = "eg · runner"
+padding = 12
+
+[[scene]]
+card = { lines = ["Self hosted runner", "eg daemon"], fg = "#fef9c3" }
+hold_cs = 125
+
+# EG_ACCOUNT and EG_ENTROPY_SEED are already in the environment, injected by `eg secrets env`.
+[[scene]]
+text = "eg daemon"
+hold_cs = 20
+[[scene]]
+keys = ["Enter"]
+# printed once the runner has registered with the control plane.
+await = "registering daemon with control plane completed"
+hold_cs = 300
+
+# stop the runner; the daemon logs this on a clean shutdown.
+[[scene]]
+keys = ["C-c"]
+await = "running daemon completed"
+hold_cs = 150
+
+[[scene]]
+card = { lines = ["eg daemon", "a runner, up and down"], fg = "#fef9c3" }
+hold_cs = 125

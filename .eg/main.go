@@ -10,6 +10,7 @@ import (
 	"github.com/egdaemon/eg/runtime/wasi/eggit"
 	"github.com/egdaemon/eg/runtime/wasi/shell"
 	"github.com/egdaemon/eg/runtime/x/wasi/egbug"
+	"github.com/egdaemon/eg/runtime/x/wasi/egcoverage"
 	"github.com/egdaemon/eg/runtime/x/wasi/egdb"
 	"github.com/egdaemon/eg/runtime/x/wasi/eggolang"
 )
@@ -34,7 +35,7 @@ func main() {
 			eggolang.New().Timeout(10*time.Minute).AutoInstall(),
 			eggolang.New().Timeout(10*time.Minute).AutoTest(),
 			egbug.Log("recording coverage initiated"),
-			eggolang.RecordCoverage,
+			egcoverage.Report(eggolang.Coverage().MarkGeneratedExt(".gen.go", ".pb.go", ".autogentest_test.go")...),
 			// copies the binary built by AutoInstall into the workspace directory
 			// so the default module's integration tests exercise the new binary.
 			shell.Op(shell.Newf("install -m 0755 /home/egd/go/bin/eg %s", sharedbin()).Debug()),

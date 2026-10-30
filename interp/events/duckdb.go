@@ -3,13 +3,22 @@ package events
 import (
 	context "context"
 	"database/sql"
+	"embed"
+	"io/fs"
 	"log"
 	"time"
 
 	"github.com/egdaemon/eg/internal/debugx"
 	"github.com/egdaemon/eg/internal/errorsx"
+	"github.com/egdaemon/eg/internal/goosex"
 	"github.com/egdaemon/eg/internal/langx"
 )
+
+//go:embed migrations
+var migrationsdir embed.FS
+
+// migrations rooted at the directory's contents, goose expects migration filenames directly at the fs root.
+var migrations = errorsx.Must(fs.Sub(migrationsdir, "migrations"))
 
 func InitializeDB(ctx context.Context, path string) (err error) {
 	debugx.Println("initialize analytics database initiated")
@@ -42,19 +51,7 @@ func PrepareDB(ctx context.Context, db *sql.DB) error {
 		return err
 	}
 
-	if _, err := db.ExecContext(dctx, "CREATE TABLE IF NOT EXISTS 'eg.metrics.custom' (id UUID PRIMARY KEY, name TEXT NOT NULL, name_md5 uuid GENERATED ALWAYS AS (md5(name)), ts TIMESTAMP NOT NULL, metric JSON NOT NULL)"); err != nil {
-		return err
-	}
-
-	if _, err := db.ExecContext(dctx, "CREATE TABLE IF NOT EXISTS 'eg.metrics.operation' (id UUID PRIMARY KEY, name TEXT NOT NULL, name_md5 uuid GENERATED ALWAYS AS (md5(name)), ts TIMESTAMP NOT NULL, module TEXT NOT NULL, op TEXT NOT NULL, milliseconds INTERVAL NOT NULL)"); err != nil {
-		return err
-	}
-
-	if _, err := db.ExecContext(dctx, "CREATE TABLE IF NOT EXISTS 'eg.metrics.coverage' (id UUID PRIMARY KEY DEFAULT uuidv7(), path TEXT NOT NULL, statements FLOAT4 NOT NULL, branches FLOAT4 NOT NULL, fnname TEXT NOT NULL DEFAULT '', hits BIGINT NOT NULL DEFAULT 0)"); err != nil {
-		return err
-	}
-
-	return nil
+	return goosex.Up(dctx, db, migrations)
 }
 
 func RecordMetric(ctx context.Context, db *sql.DB, msgs ...*Message) error {

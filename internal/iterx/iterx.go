@@ -6,7 +6,13 @@ import (
 	"io"
 	"iter"
 	"time"
+
+	"github.com/egdaemon/eg/internal/errorsx"
 )
+
+// ErrIterationComplete signals that the consumer stopped iterating. it is for unwinding callback based walks, e.g.)
+// fs.WalkDir, where fs.SkipAll can't be used because the walk swallows it.
+const ErrIterationComplete = errorsx.String("iteration complete")
 
 // Seq is an iterator over values of type T that also carries an error.
 type Seq[T any] interface {

@@ -10,6 +10,7 @@ import (
 	_eg "github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/runtime/wasi/eg"
+	"github.com/egdaemon/eg/runtime/x/wasi/egcoverage"
 	"github.com/egdaemon/eg/runtime/x/wasi/eggolang"
 )
 
@@ -18,7 +19,7 @@ func ExampleAutoTest() {
 	err := eg.Perform(
 		context.Background(),
 		eggolang.AutoTest(),
-		eggolang.RecordCoverage,
+		egcoverage.Report(eggolang.Coverage()...),
 	)
 	if err != nil {
 		log.Fatalln(err)

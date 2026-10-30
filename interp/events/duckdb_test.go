@@ -51,3 +51,35 @@ func TestLegacyCoverageDispatch(t *testing.T) {
 	require.Equal(t, "", fnname)
 	require.Equal(t, int64(0), hits)
 }
+
+// TestPrepareDBPreservesLegacyCoverage confirms databases created before migrations were tracked, and so
+// before the generated column existed, keep their coverage rows.
+func TestPrepareDBPreservesLegacyCoverage(t *testing.T) {
+	db, err := sql.Open("duckdb", "")
+	require.NoError(t, err)
+	t.Cleanup(func() { db.Close() })
+
+	ctx, done := context.WithTimeout(context.Background(), 10*time.Second)
+	defer done()
+
+	_, err = db.ExecContext(ctx, `CREATE TABLE 'eg.metrics.coverage' (id UUID PRIMARY KEY DEFAULT uuidv7(), path TEXT NOT NULL, statements FLOAT4 NOT NULL, branches FLOAT4 NOT NULL, fnname TEXT NOT NULL DEFAULT '', hits BIGINT NOT NULL DEFAULT 0)`)
+	require.NoError(t, err)
+	_, err = db.ExecContext(ctx, `INSERT INTO 'eg.metrics.coverage' (path, statements, branches, fnname, hits) VALUES ('a.go', 80, 60, 'Fn', 3)`)
+	require.NoError(t, err)
+
+	require.NoError(t, events.PrepareDB(ctx, db))
+
+	var (
+		path      string
+		hits      int64
+		generated bool
+	)
+	require.NoError(t, db.QueryRowContext(ctx, `SELECT path, hits, generated FROM 'eg.metrics.coverage'`).Scan(&path, &hits, &generated))
+	require.Equal(t, "a.go", path)
+	require.EqualValues(t, 3, hits)
+	require.False(t, generated)
+
+	var leftover int
+	require.NoError(t, db.QueryRowContext(ctx, `SELECT count(*) FROM duckdb_tables() WHERE table_name = 'eg.metrics.coverage_old'`).Scan(&leftover))
+	require.Zero(t, leftover)
+}

@@ -41,7 +41,7 @@ func (t BootstrapRepository) Run(gctx *cmdopts.Global) (err error) {
 		return errorsx.Wrap(err, "unable to remove upstream git directory")
 	}
 
-	if err = compile.InitGolang(gctx.Context, egdir, cmdopts.ModPath()); err != nil {
+	if err = compile.InitGolangModule(gctx.Context, egdir, cmdopts.ModPath()); err != nil {
 		return err
 	}
 

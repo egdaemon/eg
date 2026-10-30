@@ -4,76 +4,89 @@
 # /tmp/.eg.demo; the git repo is created by the first scene. Setup is
 # idempotent: the directory is wiped and recreated on every run. `eg register` and `eg compute upload` really register and upload.
 # `out` is relative to this file's dir.
-launch  = "d=/tmp/.eg.demo; rm -rf $d && mkdir -p $d && cd $d && PS1='$ ' bash --norc --noprofile -i"
-cols    = 84
-rows    = 24
-font    = "smalti"
+launch = "d=/tmp/.eg.demo; rm -rf $d && mkdir -p $d && cd $d && PS1='$ ' bash --norc --noprofile -i"
+cols = 84
+rows = 24
+font = "smalti"
 font_px = 16
-card_font_px     = 64
+card_font_px = 64
 card_subtitle_px = 32
-out     = "ansidrama.eg.webp"
-env     = { COLORTERM = "truecolor" }
+out = "ansidrama.eg.webp"
+# TERM=screen-* stops eg (via termenv) from querying the terminal for its
+# background colour, which ansidrama's embedded terminal never answers: without
+# this every eg command stalls for 5s, silently, and the next scene types into it.
+env = { COLORTERM = "truecolor", TERM = "screen-256color" }
 wait_cap_ms = 3000
-await_ms    = 120000
+await_ms = 120000
 quit_keys = ["C-d"]
 
 [chrome]
-style   = "macos"
-title   = "eg · getting started"
+style = "macos"
+title = "eg · getting started"
 padding = 12
 
 [[scene]]
-card    = { lines = ["Getting Started", "your first eg module"], fg = "#fef9c3" }
+card = { lines = ["Getting Started", "your first eg module"], fg = "#fef9c3" }
 hold_cs = 250
 
 # a git repository with a remote, which eg expects
 [[scene]]
-text    = "git init -q && git remote add origin https://github.com/egdaemon/example.git"
+text = "git init -q && git remote add origin https://github.com/egdaemon/demo.git"
 hold_cs = 40
 [[scene]]
-keys    = ["Enter"]
+keys = ["Enter"]
 hold_cs = 80
 
 # implementing your first module
 [[scene]]
-text    = "eg actl bootstrap module"
+text = "eg actl bootstrap module"
 hold_cs = 40
 [[scene]]
-keys    = ["Enter"]
+keys = ["Enter"]
+# the prompt is a row of exactly `$`; the command line above it also contains `$`.
+await = { find = '^\$$', row = -1 }
 hold_cs = 80
 
 [[scene]]
-text    = "ls -lha .eg"
+text = "ls -lha .eg"
 hold_cs = 40
 [[scene]]
-keys    = ["Enter"]
+keys = ["Enter"]
 hold_cs = 300
+
+# eg compute local needs a commit to resolve HEAD
+[[scene]]
+text = "git add -A && git commit -qm 'initial commit'"
+hold_cs = 40
+[[scene]]
+keys = ["Enter"]
+hold_cs = 80
 
 # run it locally
 [[scene]]
-text    = "eg compute local"
+text = "eg compute local"
 hold_cs = 40
 [[scene]]
-keys     = ["Enter"]
-await    = { find = "$ ", row = -1 }
-hold_cs  = 300
+keys = ["Enter"]
+await = { find = '^\$$', row = -1 }
+hold_cs = 300
 
 # run it remotely
 [[scene]]
-text    = "eg register"
+text = "eg register --seed=\"00000000-0000-0000-0000-000000000000\""
 hold_cs = 40
 [[scene]]
-keys    = ["Enter"]
+keys = ["Enter"]
 hold_cs = 300
 
 [[scene]]
-text    = "eg compute upload"
+text = "eg compute upload --account-id '35d233e6-2e76-4f38-92c4-70c8c138b06b'"
 hold_cs = 40
 [[scene]]
-keys     = ["Enter"]
-await    = { find = "$ ", row = -1 }
-hold_cs  = 400
+keys = ["Enter"]
+await = { find = '^\$$', row = -1 }
+hold_cs = 400
 
 [[scene]]
-card    = { lines = ["eg compute local", "eg compute upload"], fg = "#fef9c3" }
+card = { lines = ["eg compute local", "eg compute upload"], fg = "#fef9c3" }
 hold_cs = 250

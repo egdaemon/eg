@@ -155,3 +155,39 @@ func TestFilters(t *testing.T) {
 		require.Error(t, err)
 	})
 }
+
+func TestQueryGenerated(t *testing.T) {
+	db := sqltestx.DuckDB(t)
+	sqltestx.Exec(t, db, `CREATE TABLE 'eg.metrics.coverage' (
+		id UUID PRIMARY KEY DEFAULT uuidv7(),
+		path TEXT NOT NULL,
+		statements FLOAT4 NOT NULL,
+		branches FLOAT4 NOT NULL,
+		fnname TEXT NOT NULL DEFAULT '',
+		hits BIGINT NOT NULL DEFAULT 0,
+		generated BOOLEAN NOT NULL DEFAULT false
+	)`)
+	sqltestx.Exec(t, db, `INSERT INTO 'eg.metrics.coverage' (path, statements, branches, fnname, hits, generated) VALUES
+		('a/a.go', 0, 1, 'Hand', 0, false),
+		('a/a.pb.go', 10, 1, 'Generated', 0, true)`)
+
+	for _, tc := range []struct {
+		name      string
+		generated bool
+		expected  []string
+	}{
+		{"false keeps hand written functions", false, []string{"Hand"}},
+		{"true keeps generated functions", true, []string{"Generated"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var results []coverage.Report
+			require.NoError(t, sqlx.ScanInto(coverage.ReportSearch(t.Context(), db, coverage.WorstSearchBuilder(coverage.QueryGenerated(tc.generated))), &results))
+
+			names := make([]string, 0, len(results))
+			for _, r := range results {
+				names = append(names, r.Fnname)
+			}
+			require.Equal(t, tc.expected, names)
+		})
+	}
+}

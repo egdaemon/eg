@@ -121,6 +121,12 @@ func QueryCoverage(min, max float32) squirrel.Sqlizer {
 	return squirrel.Expr("statements BETWEEN ? AND ?", min, max)
 }
 
+// QueryGenerated matches the functions of generated files when generated is true, and the functions of files that are not
+// generated when it is false. see TransformMarkGenerated.
+func QueryGenerated(generated bool) squirrel.Sqlizer {
+	return squirrel.Expr("generated = ?", generated)
+}
+
 // anyGlob is the disjunction of the glob patterns.
 func anyGlob(globs []string) squirrel.Sqlizer {
 	terms := make(squirrel.Or, 0, len(globs))

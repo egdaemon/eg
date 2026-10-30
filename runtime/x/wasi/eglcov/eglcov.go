@@ -15,12 +15,12 @@ import (
 func Coverage(dir string) coverage.Options {
 	return coverage.New(func(ctx context.Context) coverage.Seq {
 		return lcov.Coverage(ctx, dir)
-	}).Transforms(coverage.TransformPath(egenv.PathWorkspaceRelative))
+	}).Transforms(coverage.TransformPath(egenv.PathRelativeWorkspace))
 }
 
 // CoverageFrom is the coverage of an lcov document, see Coverage.
 func CoverageFrom(r io.Reader) coverage.Options {
 	return coverage.New(func(ctx context.Context) coverage.Seq {
 		return lcov.Parse(ctx, r)
-	}).Transforms(coverage.TransformPath(egenv.PathWorkspaceRelative))
+	}).Transforms(coverage.TransformPath(egenv.PathRelativeWorkspace))
 }

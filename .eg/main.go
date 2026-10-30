@@ -35,7 +35,7 @@ func main() {
 			eggolang.New().Timeout(10*time.Minute).AutoInstall(),
 			eggolang.New().Timeout(10*time.Minute).AutoTest(),
 			egbug.Log("recording coverage initiated"),
-			egcoverage.Report(eggolang.Coverage().MarkGeneratedExt(".gen.go", ".pb.go", ".autogentest_test.go")...),
+			egcoverage.Report(eggolang.Coverage().MarkGeneratedExt(".gen.go", ".pb.go", ".autogen_test.go")...),
 			// copies the binary built by AutoInstall into the workspace directory
 			// so the default module's integration tests exercise the new binary.
 			shell.Op(shell.Newf("install -m 0755 /home/egd/go/bin/eg %s", sharedbin()).Debug()),

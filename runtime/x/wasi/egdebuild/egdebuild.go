@@ -203,7 +203,14 @@ func New(pkg string, distro string, src string, opts ...option) (c Config) {
 		},
 		timeout:    5 * time.Minute,
 		runtimeadj: func(c shell.Command) shell.Command { return c },
-	}, opts...)
+	},
+		// temporary until gpg fixes upstream bugs.
+		// this allows the runner to access the .gnupg directory we mount via compute local
+		Option.Runtime(func(c shell.Command) shell.Command {
+			return c.MaybePrivileged(true)
+		}),
+		langx.Compose(opts...),
+	)
 }
 
 // Basic container for building debian packages. the archive must provide the container file

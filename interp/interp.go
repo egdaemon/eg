@@ -263,6 +263,8 @@ func (t runner) perform(ctx context.Context, wshost workspaces.Context, runid, p
 	).WithEnv(
 		eg.EnvComputeModuleNestedLevel, strconv.Itoa(envx.Int(0, eg.EnvComputeModuleNestedLevel)),
 	).WithEnv(
+		eg.EnvComputeGuestMigrationsEnabled, strconv.FormatBool(envx.Boolean(true, eg.EnvComputeGuestMigrationsEnabled)),
+	).WithEnv(
 		eg.EnvComputeLoggingVerbosity, envx.String("-1", eg.EnvComputeLoggingVerbosity),
 	).WithEnv(
 		"PATH", os.Getenv("PATH"),

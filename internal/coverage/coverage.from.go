@@ -26,7 +26,7 @@ func Query(q sqlx.Queryer, b squirrel.SelectBuilder) iterx.Seq[Report] {
 	})
 }
 
-// From runs b against the database open returns, e.g.) egdb.Open. the database is opened when iteration starts and
+// From runs b against the database open returns, e.g.) egdb.OpenVerify. the database is opened when iteration starts and
 // closed when it ends, including when it stops early.
 func From[D interface {
 	sqlx.Queryer

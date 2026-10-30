@@ -24,7 +24,7 @@ import (
 func Testgen(opts egautogen.Options) eg.OpFn {
 	return newpool(opts).Run(
 		egautogen.FromDefault(
-			egautogen.Worst(egautogen.Language("go").Coverage(0, 80)),
+			egautogen.Worst(egautogen.Language("go").Coverage(0, 80).SkipGenerated()),
 		).Until(16 * time.Minute).Limit(16),
 	)
 }

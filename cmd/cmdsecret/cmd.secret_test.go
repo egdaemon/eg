@@ -38,7 +38,7 @@ func runSecretCLI(t *testing.T, args []string) error {
 }
 
 func TestSecretCmd(t *testing.T) {
-	t.Run("test update and read via cli", func(t *testing.T) {
+	t.Run("test create and read via cli", func(t *testing.T) {
 		tmp := t.TempDir()
 		path := filepath.Join(tmp, "cli.chacha")
 		pass := "clisecret"
@@ -53,7 +53,7 @@ func TestSecretCmd(t *testing.T) {
 			w.Close()
 		}()
 
-		err := runSecretCLI(t, []string{"secret", "update", uri})
+		err := runSecretCLI(t, []string{"secret", "create", uri})
 		os.Stdin = oldStdin
 		require.NoError(t, err)
 
@@ -66,7 +66,7 @@ func TestSecretCmd(t *testing.T) {
 		require.Equal(t, content, string(got))
 	})
 
-	t.Run("test update from file flag", func(t *testing.T) {
+	t.Run("test create from file flag", func(t *testing.T) {
 		tmp := t.TempDir()
 		path := filepath.Join(tmp, "file_input.chacha")
 		inputPath := filepath.Join(tmp, "input.txt")
@@ -75,12 +75,48 @@ func TestSecretCmd(t *testing.T) {
 
 		require.NoError(t, os.WriteFile(inputPath, []byte(content), 0644))
 
-		err := runSecretCLI(t, []string{"secret", "update", uri, "-i", inputPath})
+		err := runSecretCLI(t, []string{"secret", "create", uri, "-i", inputPath})
 		require.NoError(t, err)
 
 		got, err := io.ReadAll(secrets.Read(t.Context(), uri))
 		require.NoError(t, err)
 		require.Equal(t, content, string(got))
+	})
+
+	t.Run("test create refuses to replace an existing secret without overwrite", func(t *testing.T) {
+		tmp := t.TempDir()
+		path := filepath.Join(tmp, "exists.chacha")
+		inputPath := filepath.Join(tmp, "input.txt")
+		uri := "chachasm://secretpassphrase@" + path
+
+		require.NoError(t, secrets.Update(t.Context(), uri, bytes.NewReader([]byte("original"))))
+		require.NoError(t, os.WriteFile(inputPath, []byte("replacement"), 0o600))
+		before, err := os.ReadFile(path)
+		require.NoError(t, err)
+
+		err = runSecretCLI(t, []string{"secret", "create", uri, "-i", inputPath})
+		require.ErrorContains(t, err, "--overwrite")
+		require.NotContains(t, err.Error(), "secretpassphrase")
+
+		after, err := os.ReadFile(path)
+		require.NoError(t, err)
+		require.Equal(t, before, after)
+	})
+
+	t.Run("test create replaces an existing secret with overwrite", func(t *testing.T) {
+		tmp := t.TempDir()
+		path := filepath.Join(tmp, "replace.chacha")
+		inputPath := filepath.Join(tmp, "input.txt")
+		uri := "chachasm://pass@" + path
+
+		require.NoError(t, secrets.Update(t.Context(), uri, bytes.NewReader([]byte("original"))))
+		require.NoError(t, os.WriteFile(inputPath, []byte("replacement"), 0o600))
+
+		require.NoError(t, runSecretCLI(t, []string{"secret", "create", uri, "-i", inputPath, "--overwrite"}))
+
+		got, err := io.ReadAll(secrets.Read(t.Context(), uri))
+		require.NoError(t, err)
+		require.Equal(t, "replacement", string(got))
 	})
 
 	t.Run("test read multiple uris to stdout", func(t *testing.T) {

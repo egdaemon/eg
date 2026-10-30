@@ -12,7 +12,7 @@ import (
 
 type SecretCmd struct {
 	Read   CmdRead   `cmd:"" help:"Read secrets from various schemes."`
-	Update CmdUpdate `cmd:"" help:"Update or create secrets for various schemes."`
+	Create CmdCreate `cmd:"" help:"Create or replace secrets for various schemes."`
 	Edit   CmdEdit   `cmd:"" help:"Interactively edit a secret using $EDITOR."`
 	B64    CmdB64    `cmd:"" name:"b64" help:"Base64 URL encode stdin and write the result to stdout or a file."`
 	Env    CmdEnv    `cmd:"" name:"env" help:"Run a command with environment variables loaded from secret URIs."`
@@ -42,13 +42,26 @@ func (t CmdRead) Run(gctx *cmdopts.Global) error {
 	return nil
 }
 
-type CmdUpdate struct {
-	URI   string `arg:"" help:"Secret URI to update. Examples: chachasm://passphrase@/path/to/file, gcpsm://project-id/secret-name, awssm://secret-name?region=us-east-1"`
-	Input string `name:"input" short:"i" help:"Read content from a file instead of stdin"`
+type CmdCreate struct {
+	URI       string `arg:"" help:"Secret URI to create or replace. Examples: chachasm://passphrase@/path/to/file, gcpsm://project-id/secret-name, awssm://secret-name?region=us-east-1"`
+	Input     string `name:"input" short:"i" help:"Read content from a file instead of stdin"`
+	Overwrite bool   `name:"overwrite" help:"replace the secret when it already exists, by default an existing secret is never changed"`
 }
 
-func (t CmdUpdate) Run(gctx *cmdopts.Global) error {
+func (t CmdCreate) Run(gctx *cmdopts.Global) error {
 	var in io.Reader = os.Stdin
+
+	if !t.Overwrite {
+		exists, err := secrets.Exists(gctx.Context, t.URI)
+		if err != nil {
+			return fmt.Errorf("unable to check whether the secret exists: %w", err)
+		}
+
+		if exists {
+			// the uri can carry the passphrase, so it is not repeated.
+			return fmt.Errorf("the secret already exists, use --overwrite to replace it")
+		}
+	}
 
 	if t.Input != "" {
 		f, err := os.Open(t.Input)
@@ -60,7 +73,7 @@ func (t CmdUpdate) Run(gctx *cmdopts.Global) error {
 	}
 
 	if err := secrets.Update(gctx.Context, t.URI, in); err != nil {
-		return fmt.Errorf("failed to update secret [%s]: %w", t.URI, err)
+		return fmt.Errorf("failed to create secret [%s]: %w", t.URI, err)
 	}
 
 	return nil

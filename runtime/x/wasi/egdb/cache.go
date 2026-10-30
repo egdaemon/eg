@@ -17,7 +17,7 @@ import (
 // to [Latest] in later runs of the workload, including runs that do not go through the control plane.
 // it is intended to be the last operation of the workload: it is only reached when everything before it succeeded.
 func Cache(ctx context.Context, _ eg.Op) error {
-	db, err := Open(ctx)
+	db, err := OpenVerify(ctx)
 	if err != nil {
 		return err
 	}

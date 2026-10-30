@@ -20,7 +20,7 @@ import (
 // SESSIONS_MODE selects what each session does:
 //
 //	dial   - dial the socket and close it, nothing else.
-//	ping   - egdb.Open (connect + ping), a trivial query, and close.
+//	ping   - egdb.OpenVerify (connect + ping), a trivial query, and close.
 //	report - fficoverage.Report of a full batch. (default)
 func session(mode string, i, size int) error {
 	ctx, done := context.WithTimeout(context.Background(), 10*time.Second)
@@ -34,7 +34,7 @@ func session(mode string, i, size int) error {
 		}
 		return c.Close()
 	case "ping":
-		db, err := egdb.Open(ctx)
+		db, err := egdb.OpenVerify(ctx)
 		if err != nil {
 			return err
 		}
@@ -54,7 +54,10 @@ func session(mode string, i, size int) error {
 			})
 		}
 
-		return fficoverage.Report(ctx, batch...)
+		db := egdb.Open(ctx)
+		defer db.Close()
+
+		return fficoverage.Report(ctx, db, batch...)
 	}
 }
 

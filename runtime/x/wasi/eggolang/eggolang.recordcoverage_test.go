@@ -25,7 +25,7 @@ import (
 )
 
 // analyticsproxy starts a duckdb behind a duckproxy unix socket, returns the database and a function
-// that reports coverage to it through a fresh connection, the same way fficoverage.Report does.
+// that reports coverage to it through a fresh connection, the way a guest does.
 func analyticsproxy(t *testing.T) (*sql.DB, func(context.Context, ...*coverage.Report) error) {
 	t.Helper()
 

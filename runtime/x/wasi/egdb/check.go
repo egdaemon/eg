@@ -16,7 +16,7 @@ func Check(ctx context.Context, _ eg.Op) error {
 	_, err := os.Stat(path)
 	log.Println("egdb cache file", path, "exists:", err == nil)
 
-	db, err := Open(ctx)
+	db, err := OpenVerify(ctx)
 	if err != nil {
 		log.Println("egdb unavailable:", err)
 		return nil

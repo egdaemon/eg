@@ -11,7 +11,7 @@ import (
 )
 
 func ExecQuery(ctx context.Context, o eg.Op) error {
-	db, err := egdb.Open(ctx)
+	db, err := egdb.OpenVerify(ctx)
 	if err != nil {
 		return err
 	}
@@ -41,7 +41,7 @@ func ExecQuery(ctx context.Context, o eg.Op) error {
 }
 
 func Transaction(ctx context.Context, o eg.Op) error {
-	db, err := egdb.Open(ctx)
+	db, err := egdb.OpenVerify(ctx)
 	if err != nil {
 		return err
 	}

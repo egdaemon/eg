@@ -25,7 +25,6 @@ import (
 	"github.com/egdaemon/eg/internal/sqlx"
 	"github.com/egdaemon/eg/runtime/wasi/eg"
 	"github.com/egdaemon/eg/runtime/wasi/egenv"
-	"github.com/egdaemon/eg/runtime/wasi/egunsafe/fficoverage"
 	"github.com/egdaemon/eg/runtime/x/wasi/egdb"
 	"github.com/egdaemon/eg/runtime/x/wasi/egllm"
 )
@@ -524,7 +523,7 @@ func From(q sqlx.Queryer, sb squirrel.SelectBuilder) Seq {
 // FromRun runs sb against the coverage recorded by this run.
 func FromRun(sb squirrel.SelectBuilder) Seq {
 	return functions(func(context.Context) iterx.Seq[coverage.Report] {
-		return fficoverage.From(sb)
+		return coverage.From(egdb.OpenVerify, sb)
 	})
 }
 

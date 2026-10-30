@@ -7,6 +7,7 @@ import (
 	"github.com/egdaemon/eg/internal/coverage"
 	"github.com/egdaemon/eg/runtime/wasi/eg"
 	"github.com/egdaemon/eg/runtime/wasi/egunsafe/fficoverage"
+	"github.com/egdaemon/eg/runtime/x/wasi/egdb"
 )
 
 // batchsize is the number of reports sent to the sink at once.
@@ -15,7 +16,18 @@ const batchsize = 128
 // Report records the coverage the options produce into the analytics database. the options are built by the
 // language specific packages, e.g.) eggolang.Coverage and eglcov.Coverage.
 func Report(opts ...coverage.Option) eg.OpFn {
-	return Into(fficoverage.Report, opts...)
+	return eg.OpFn(func(ctx context.Context, op eg.Op) error {
+		// the schema is the guest's to bring up to date, the runner may be older.
+		db, err := egdb.OpenMigrate(ctx)
+		if err != nil {
+			return err
+		}
+		defer db.Close()
+
+		return Into(func(ctx context.Context, batch ...*coverage.Report) error {
+			return fficoverage.Report(ctx, db, batch...)
+		}, opts...)(ctx, op)
+	})
 }
 
 // Into is Report with the sink injected, e.g.) for tests which can't dial the analytics socket.

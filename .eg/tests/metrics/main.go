@@ -9,6 +9,7 @@ import (
 	"github.com/egdaemon/eg/runtime/wasi/egenv"
 	"github.com/egdaemon/eg/runtime/wasi/egmetrics"
 	"github.com/egdaemon/eg/runtime/wasi/egunsafe/fficoverage"
+	"github.com/egdaemon/eg/runtime/x/wasi/egdb"
 )
 
 type MetricCPU struct {
@@ -38,7 +39,10 @@ func modulemetric(ctx context.Context, o eg.Op) error {
 func modulecoverage(ctx context.Context, o eg.Op) error {
 	log.Println("coverage initiated")
 	defer log.Println("coverage completed")
-	return fficoverage.Report(ctx, autocoverage())
+	db := egdb.Open(ctx)
+	defer db.Close()
+
+	return fficoverage.Report(ctx, db, autocoverage())
 }
 
 func main() {
@@ -52,7 +56,10 @@ func main() {
 		log.Fatalln(err)
 	}
 
-	if err := fficoverage.Report(ctx, autocoverage()); err != nil {
+	db := egdb.Open(ctx)
+	defer db.Close()
+
+	if err := fficoverage.Report(ctx, db, autocoverage()); err != nil {
 		log.Fatalln(err)
 	}
 

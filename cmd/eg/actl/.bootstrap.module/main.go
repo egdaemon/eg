@@ -7,7 +7,6 @@ import (
 
 	"github.com/egdaemon/eg/runtime/wasi/eg"
 	"github.com/egdaemon/eg/runtime/wasi/egenv"
-	"github.com/egdaemon/eg/runtime/wasi/eggit"
 	"github.com/egdaemon/eg/runtime/wasi/env"
 )
 
@@ -24,7 +23,6 @@ func main() {
 
 	err := eg.Perform(
 		ctx,
-		eggit.AutoClone,
 		HelloWorld,
 	)
 

@@ -94,5 +94,11 @@ func WorkspaceVCSURI() string {
 		return ""
 	}
 
-	return errorsx.Zero(gitx.CanonicalURI(repo, git.DefaultRemoteName))
+	// a repository without the default remote is an expected state, not an error.
+	uri, err := gitx.CanonicalURI(repo, git.DefaultRemoteName)
+	if err != nil {
+		return ""
+	}
+
+	return uri
 }

@@ -29,7 +29,7 @@ func (t BootstrapModule) Run(gctx *cmdopts.Global) (err error) {
 		return err
 	}
 
-	if err = compile.InitGolang(gctx.Context, egdir, cmdopts.ModPath()); err != nil {
+	if err = compile.InitGolangModule(gctx.Context, egdir, cmdopts.ModPath()); err != nil {
 		return err
 	}
 

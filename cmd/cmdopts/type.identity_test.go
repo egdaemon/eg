@@ -1,7 +1,10 @@
 package cmdopts_test
 
 import (
+	"bytes"
 	"context"
+	"log"
+	"os"
 	"testing"
 
 	"github.com/egdaemon/eg/cmd/migrations"
@@ -9,6 +12,8 @@ import (
 	"github.com/egdaemon/eg/cmd/cmdopts"
 	"github.com/egdaemon/eg/identity"
 	"github.com/egdaemon/eg/internal/sshx"
+	"github.com/go-git/go-git/v6"
+	"github.com/go-git/go-git/v6/config"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/crypto/ssh"
 )
@@ -85,6 +90,44 @@ func TestIdentityAccount(t *testing.T) {
 		account, err = g.Identity().Account(nil, signer, vcsuri)
 		require.NoError(t, err)
 		require.Equal(t, "first", account)
+	})
+}
+
+func TestWorkspaceVCSURI(t *testing.T) {
+	t.Run("repository with an origin remote", func(t *testing.T) {
+		dir := t.TempDir()
+		repo, err := git.PlainInit(dir, false)
+		require.NoError(t, err)
+		_, err = repo.CreateRemote(&config.RemoteConfig{Name: "origin", URLs: []string{"https://github.com/egdaemon/eg.git"}})
+		require.NoError(t, err)
+		t.Chdir(dir)
+
+		require.Equal(t, "git@github.com:egdaemon/eg.git", cmdopts.WorkspaceVCSURI())
+	})
+
+	t.Run("repository without a remote is blank and silent", func(t *testing.T) {
+		dir := t.TempDir()
+		_, err := git.PlainInit(dir, false)
+		require.NoError(t, err)
+		t.Chdir(dir)
+
+		var logged bytes.Buffer
+		log.SetOutput(&logged)
+		t.Cleanup(func() { log.SetOutput(os.Stderr) })
+
+		require.Equal(t, "", cmdopts.WorkspaceVCSURI())
+		require.Empty(t, logged.String())
+	})
+
+	t.Run("directory outside of a repository is blank and silent", func(t *testing.T) {
+		t.Chdir(t.TempDir())
+
+		var logged bytes.Buffer
+		log.SetOutput(&logged)
+		t.Cleanup(func() { log.SetOutput(os.Stderr) })
+
+		require.Equal(t, "", cmdopts.WorkspaceVCSURI())
+		require.Empty(t, logged.String())
 	})
 }
 

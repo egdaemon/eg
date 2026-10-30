@@ -14,7 +14,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/charmbracelet/huh"
+	"charm.land/huh/v2"
 	_ "github.com/duckdb/duckdb-go/v2" // registers the duckdb driver.
 	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/authn"

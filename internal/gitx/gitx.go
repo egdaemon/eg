@@ -609,6 +609,21 @@ func VCSDownloadToken(aid string, vcsuri string, options ...jwtx.Option) jwt.Reg
 	)
 }
 
+// ErrNoCredentials is returned when the credential service has no git credentials configured for the
+// repository of the access token. that is not a failure of the exchange: the work continues without
+// credentials, e.g. a public repository, and anything that really needs them fails at the git step.
+const ErrNoCredentials = errorsx.String("no git credentials are configured for the repository")
+
+// nocredentials reports whether err is ErrNoCredentials, noting that the work continues without them.
+func nocredentials(err error) bool {
+	if !errors.Is(err, ErrNoCredentials) {
+		return false
+	}
+
+	log.Println("no git credentials are configured for the repository, continuing without")
+	return true
+}
+
 // Automatically refresh the git credentials from an access token immediately the first time and then periodically in the background.
 func AutomaticCredentialRefresh(ctx context.Context, c *http.Client, dst string, token string) error {
 	if stringsx.Blank(token) {
@@ -617,7 +632,9 @@ func AutomaticCredentialRefresh(ctx context.Context, c *http.Client, dst string,
 	}
 
 	debugx.Println("periodic git credentials refresh enabled")
-	if err := credentialRefresh(ctx, c, dst, token); err != nil {
+	if err := credentialRefresh(ctx, c, dst, token); nocredentials(err) {
+		return nil
+	} else if err != nil {
 		return errorsx.Wrap(err, "failed to initially fetch access token")
 	}
 
@@ -642,7 +659,11 @@ func RefreshCredentials(ctx context.Context, c *http.Client, dst string, token s
 		return nil
 	}
 
-	return credentialRefresh(ctx, c, dst, token)
+	if err := credentialRefresh(ctx, c, dst, token); !nocredentials(err) {
+		return err
+	}
+
+	return nil
 }
 
 // ExchangeCredentials performs a single, immediate exchange of the given
@@ -650,14 +671,16 @@ func RefreshCredentials(ctx context.Context, c *http.Client, dst string, token s
 // memory rather than written to disk -- for callers that clone in-process
 // right away (e.g. compiling a single workload). Unlike RefreshCredentials a
 // blank token is an error. The returned option is nil when the credentials
-// don't apply to vcsuri (see LoadCredentials).
+// don't apply to vcsuri (see LoadCredentials), or none are configured (see ErrNoCredentials).
 func ExchangeCredentials(ctx context.Context, c *http.Client, vcsuri string, token string) (client.Option, error) {
 	if stringsx.Blank(token) {
 		return nil, errors.New("access token required")
 	}
 
 	encoded, err := credentialExchange(ctx, c, token)
-	if err != nil {
+	if nocredentials(err) {
+		return nil, nil
+	} else if err != nil {
 		return nil, err
 	}
 
@@ -689,7 +712,9 @@ func credentialExchange(ctx context.Context, c *http.Client, token string) ([]by
 	req.Header.Add("Authorization", fmt.Sprintf("BEARER %s", token))
 
 	resp, err := httpx.AsError(c.Do(req))
-	if err != nil {
+	if httpx.IsStatusError(err, http.StatusNotFound) != nil {
+		return nil, ErrNoCredentials
+	} else if err != nil {
 		return nil, errorsx.Wrap(err, "http request failed")
 	}
 	defer resp.Body.Close()

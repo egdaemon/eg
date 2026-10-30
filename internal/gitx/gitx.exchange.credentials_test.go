@@ -56,6 +56,18 @@ func TestExchangeCredentials(t *testing.T) {
 		require.Nil(t, auth)
 	})
 
+	t.Run("no configured credentials yields no auth", func(t *testing.T) {
+		c := &http.Client{Transport: roundtripper(func(r *http.Request) (*http.Response, error) {
+			w := httptest.NewRecorder()
+			w.WriteHeader(http.StatusNotFound)
+			return w.Result(), nil
+		})}
+
+		auth, err := ExchangeCredentials(t.Context(), c, "https://github.com/example/repo.git", "token")
+		require.NoError(t, err)
+		require.Nil(t, auth)
+	})
+
 	t.Run("failed exchanges error", func(t *testing.T) {
 		c := &http.Client{Transport: roundtripper(func(r *http.Request) (*http.Response, error) {
 			w := httptest.NewRecorder()

@@ -66,6 +66,12 @@ func TestRefreshCredentials(t *testing.T) {
 		require.NoFileExists(t, filepath.Join(dir, "vcsaccess.token"))
 	})
 
+	t.Run("no configured credentials is not a failure and writes nothing", func(t *testing.T) {
+		dir := t.TempDir()
+		require.NoError(t, RefreshCredentials(t.Context(), jsonclient(t, http.StatusNotFound, nil, nil), dir, "token"))
+		require.NoFileExists(t, filepath.Join(dir, "vcsaccess.token"))
+	})
+
 	t.Run("unwritable destinations error", func(t *testing.T) {
 		require.Error(t, RefreshCredentials(t.Context(), jsonclient(t, http.StatusOK, httpcreds, nil), filepath.Join(t.TempDir(), "missing"), "token"))
 	})
@@ -92,6 +98,29 @@ func TestAutomaticCredentialRefresh(t *testing.T) {
 	t.Run("a failed initial fetch errors", func(t *testing.T) {
 		err := AutomaticCredentialRefresh(t.Context(), jsonclient(t, http.StatusUnauthorized, nil, nil), t.TempDir(), "token")
 		require.Error(t, err)
+	})
+
+	t.Run("no configured credentials continues without refreshing", func(t *testing.T) {
+		var reqs []*http.Request
+		dir := t.TempDir()
+
+		require.NoError(t, AutomaticCredentialRefresh(t.Context(), jsonclient(t, http.StatusNotFound, nil, &reqs), dir, "token"))
+		require.Len(t, reqs, 1)
+		require.NoFileExists(t, filepath.Join(dir, "vcsaccess.token"))
+		require.Empty(t, Bearer(dir))
+	})
+}
+
+func TestCredentialExchange(t *testing.T) {
+	t.Run("not found means no credentials are configured", func(t *testing.T) {
+		_, err := credentialExchange(t.Context(), jsonclient(t, http.StatusNotFound, nil, nil), "token")
+		require.ErrorIs(t, err, ErrNoCredentials)
+	})
+
+	t.Run("unauthorized is a failure and not a lack of credentials", func(t *testing.T) {
+		_, err := credentialExchange(t.Context(), jsonclient(t, http.StatusUnauthorized, nil, nil), "token")
+		require.Error(t, err)
+		require.NotErrorIs(t, err, ErrNoCredentials)
 	})
 }
 

@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/user"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -63,6 +64,22 @@ func Workload() string {
 // from the environment, empty for the default workload (see eg.DefaultWorkload).
 func WorkloadName() string {
 	return env.String("", eg.EnvComputeWorkloadName)
+}
+
+// Pattern substitutes values from the environment into the provided pattern.
+//
+// %eg.run.id%       -> the run id of the compute workload, see RunID.
+// %eg.account.id%   -> the account id of the compute workload, see AccountID.
+// %eg.workload%     -> the name of the module the workload runs, see WorkloadName.
+// %eg.host.arch%    -> the cpu architecture of the host machine.
+// %eg.host.os%      -> the operating system of the host machine.
+func Pattern(s string) string {
+	s = strings.ReplaceAll(s, "%eg.run.id%", RunID())
+	s = strings.ReplaceAll(s, "%eg.account.id%", AccountID())
+	s = strings.ReplaceAll(s, "%eg.workload%", WorkloadName())
+	s = strings.ReplaceAll(s, "%eg.host.arch%", env.String("", eg.EnvComputeArch))
+	s = strings.ReplaceAll(s, "%eg.host.os%", env.String("", eg.EnvComputeOS))
+	return s
 }
 
 // returns the current user.

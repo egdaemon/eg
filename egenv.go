@@ -173,22 +173,6 @@ const (
 	SocketAnalyticsPG  = ".s.PGSQL.5432" // postgres wire frontend of the analytics database, the name libpq style clients derive from a directory.
 )
 
-// Pattern substitutes values from the environment into the provided pattern.
-//
-// %eg.run.id%       -> the run id of the compute workload.
-// %eg.account.id%   -> the account id of the compute workload.
-// %eg.workload%     -> the name of the module the workload runs.
-// %eg.host.arch%    -> the cpu architecture of the host machine.
-// %eg.host.os%      -> the operating system of the host machine.
-func Pattern(s string) string {
-	s = strings.ReplaceAll(s, "%eg.run.id%", os.Getenv(EnvComputeRunID))
-	s = strings.ReplaceAll(s, "%eg.account.id%", os.Getenv(EnvComputeAccountID))
-	s = strings.ReplaceAll(s, "%eg.workload%", os.Getenv(EnvComputeWorkloadName))
-	s = strings.ReplaceAll(s, "%eg.host.arch%", os.Getenv(EnvComputeArch))
-	s = strings.ReplaceAll(s, "%eg.host.os%", os.Getenv(EnvComputeOS))
-	return s
-}
-
 // generate unique module socket
 func SocketModule() string {
 	return fmt.Sprintf("module.%s.socket", errorsx.Must(uuid.NewV7()).String())

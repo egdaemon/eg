@@ -16,6 +16,7 @@ import (
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/httpx"
 	"github.com/egdaemon/eg/internal/jwtx"
+	"github.com/egdaemon/eg/internal/langx"
 	"github.com/egdaemon/eg/internal/userx"
 	"github.com/gofrs/uuid/v5"
 	"golang.org/x/crypto/ssh"
@@ -97,12 +98,35 @@ type LoginOption func(*url.URL)
 // LoginOptionMachineID asserts the machine id of the runner logging in, the server only trusts it when it matches
 // a runner registered with the key being authenticated. blank ids are not sent.
 func LoginOptionMachineID(mid string) LoginOption {
+	if mid == "" {
+		return loginOptionNoop
+	}
+
+	return loginOptionQuery("mid", mid)
+}
+
+// LoginOptionSubdomain requests the login options from a subdomain of the api host, the server resolves the
+// account from the subdomain (the md5 of the lowercased name is the sso domain id). blank subdomains are ignored.
+func LoginOptionSubdomain(subdomain string) LoginOption {
+	if subdomain == "" {
+		return loginOptionNoop
+	}
+
 	return func(u *url.URL) {
-		if mid != "" {
-			q := u.Query()
-			q.Set("mid", mid)
-			u.RawQuery = q.Encode()
-		}
+		api, _ := url.Parse(eg.EnvAPIHostDefault())
+		u.Host = subdomain + "." + api.Host
+	}
+}
+
+// loginOptionNoop leaves the login options url unchanged.
+func loginOptionNoop(*url.URL) {}
+
+// loginOptionQuery sets the query parameter k to v on the login options url.
+func loginOptionQuery(k, v string) LoginOption {
+	return func(u *url.URL) {
+		q := u.Query()
+		q.Set(k, v)
+		u.RawQuery = q.Encode()
 	}
 }
 
@@ -111,15 +135,13 @@ func LoginOptionMachineID(mid string) LoginOption {
 // unmodified as raw JSON so it can be forwarded directly as the request body
 // of ExchangeAuthed.
 func LoginOptionsToken(ctx context.Context, c *http.Client, accountId string, options ...LoginOption) (token json.RawMessage, err error) {
-	uri, err := url.Parse(fmt.Sprintf("%s/authn/s/", eg.EnvAPIHostDefault()))
+	base, err := url.Parse(fmt.Sprintf("%s/authn/s/", eg.EnvAPIHostDefault()))
 	if err != nil {
 		return nil, err
 	}
-	uri.RawQuery = url.Values{"account_id": {accountId}}.Encode()
-	for _, opt := range options {
-		opt(uri)
-	}
+	base.RawQuery = url.Values{"account_id": {accountId}}.Encode()
 
+	uri := langx.Clone(*base, options...)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, uri.String(), nil)
 	if err != nil {
 		return nil, err

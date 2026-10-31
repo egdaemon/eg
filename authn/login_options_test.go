@@ -254,3 +254,56 @@ func TestLoginOption(t *testing.T) {
 		require.Equal(t, []string{"account-2"}, query["account_id"])
 	})
 }
+
+func TestLoginOptionSubdomain(t *testing.T) {
+	request := func(t *testing.T, options ...authn.LoginOption) *url.URL {
+		var seen *url.URL
+		c := &http.Client{Transport: roundtrip(func(r *http.Request) (*http.Response, error) {
+			seen = r.URL
+			return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{}`)), Header: http.Header{}}, nil
+		})}
+
+		_, err := authn.LoginOptionsToken(t.Context(), c, "account-1", options...)
+		require.NoError(t, err)
+		return seen
+	}
+
+	api, err := url.Parse(eg.EnvAPIHostDefault())
+	require.NoError(t, err)
+
+	t.Run("prefixes the api host", func(t *testing.T) {
+		seen := request(t, authn.LoginOptionSubdomain("acme"))
+		require.Equal(t, "acme."+api.Host, seen.Host)
+		require.Equal(t, api.Scheme, seen.Scheme)
+		require.Equal(t, "/authn/s/", seen.Path)
+		require.Equal(t, "account-1", seen.Query().Get("account_id"))
+	})
+
+	t.Run("blank is ignored", func(t *testing.T) {
+		require.Equal(t, api.Host, request(t, authn.LoginOptionSubdomain("")).Host)
+	})
+
+	t.Run("composes with other options", func(t *testing.T) {
+		seen := request(t, authn.LoginOptionMachineID("machine-1"), authn.LoginOptionSubdomain("acme"))
+		require.Equal(t, "acme."+api.Host, seen.Host)
+		require.Equal(t, "machine-1", seen.Query().Get("mid"))
+		require.Equal(t, "account-1", seen.Query().Get("account_id"))
+	})
+
+	t.Run("idempotent", func(t *testing.T) {
+		once := request(t, authn.LoginOptionSubdomain("acme"))
+		twice := request(t, authn.LoginOptionSubdomain("acme"), authn.LoginOptionSubdomain("acme"))
+		require.Equal(t, once.Host, twice.Host)
+	})
+
+	t.Run("last subdomain wins", func(t *testing.T) {
+		seen := request(t, authn.LoginOptionSubdomain("acme"), authn.LoginOptionSubdomain("other"))
+		require.Equal(t, "other."+api.Host, seen.Host)
+	})
+
+	t.Run("order independent", func(t *testing.T) {
+		a := request(t, authn.LoginOptionSubdomain("acme"), authn.LoginOptionMachineID("machine-1"))
+		b := request(t, authn.LoginOptionMachineID("machine-1"), authn.LoginOptionSubdomain("acme"))
+		require.Equal(t, a.String(), b.String())
+	})
+}

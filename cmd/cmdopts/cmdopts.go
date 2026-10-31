@@ -21,6 +21,7 @@ import (
 	"github.com/egdaemon/eg/internal/grpcx"
 	"github.com/egdaemon/eg/internal/httpx"
 	"github.com/egdaemon/eg/internal/tracex"
+	"github.com/egdaemon/eg/runtime/wasi/env"
 	"github.com/sirupsen/logrus"
 )
 
@@ -107,14 +108,14 @@ func (t TLSConfig) DefaultClient() *http.Client {
 
 	defaultclient := &http.Client{Transport: ctransport}
 	defaultclient = httpx.BindRetryTransport(defaultclient, http.StatusTooManyRequests, http.StatusBadGateway, http.StatusInternalServerError, http.StatusRequestTimeout)
-	defaultclient = httpx.DebugClient(defaultclient)
-	// if env.Boolean(false, eg.EnvLogsNetwork) {
-	// 	return httpx.DebugClient(defaultclient)
-	// }
 
 	if t.Wrap != nil {
 		defaultclient = t.Wrap(defaultclient)
 	}
+
+	debugx.When(env.Boolean(false, eg.EnvLogsNetwork), func() {
+		defaultclient = httpx.DebugClient(defaultclient)
+	})
 
 	return defaultclient
 }

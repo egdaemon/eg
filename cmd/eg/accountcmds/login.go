@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"io"
 	"net/http"
 	"os"
 
@@ -50,19 +49,15 @@ func (t Login) Run(gctx *cmdopts.Global, tlscfg *cmdopts.TLSConfig) (err error) 
 
 func (t Login) run(ctx context.Context, account string, oauthc *http.Client, chttp *http.Client, signer ssh.Signer, choose func([]*authn.Authn) (*authn.Authn, error)) (err error) {
 	var (
-		authed  authn.Authed
-		options io.Reader
+		authed authn.Authed
 	)
 
-	if !stringsx.Blank(account) {
-		token, err := authn.LoginOptionsToken(ctx, oauthc, authn.LoginOptionAccountID(account))
-		if err != nil {
-			return errorsx.Wrap(err, "unable to fetch login options")
-		}
-		options = bytes.NewReader(token)
+	token, err := authn.LoginOptionsToken(ctx, oauthc, authn.LoginOptionAccountID(account))
+	if err != nil {
+		return errorsx.Wrap(err, "unable to fetch login options")
 	}
 
-	if err = loginssh(ctx, oauthc, options, &authed); err != nil {
+	if err = loginssh(ctx, oauthc, bytes.NewReader(token), &authed); err != nil {
 		return err
 	}
 

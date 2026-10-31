@@ -144,11 +144,6 @@ type LoginOptionsClaims struct {
 	AccountID string `json:"account_id"`
 }
 
-// LoginOptionsResponse is the response of the login options endpoint, see LoginOptionsToken.
-type LoginOptionsResponse struct {
-	Token string `json:"token,omitempty"` // jwt signed token representing options
-}
-
 // DecodeLoginOptions reads the claims of a LoginOptionsToken response without verifying them, the server
 // verifies the token when it is forwarded to it. they only decide which flow to follow.
 func DecodeLoginOptions(response []byte) (zero LoginOptionsClaims, err error) {

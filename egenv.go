@@ -183,6 +183,11 @@ const (
 	SocketAnalyticsPG  = ".s.PGSQL.5432" // postgres wire frontend of the analytics database, the name libpq style clients derive from a directory.
 )
 
+// generate unique daemon socket
+func SocketDaemon() string {
+	return fmt.Sprintf("main.%s.socket", errorsx.Must(uuid.NewV7()).String())
+}
+
 // generate unique module socket
 func SocketModule() string {
 	return fmt.Sprintf("module.%s.socket", errorsx.Must(uuid.NewV7()).String())

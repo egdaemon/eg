@@ -99,9 +99,10 @@ func (t daemon) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, keygen cmdopt
 	log.Println("cache directory", t.CacheDir)
 	log.Println("detected runtime configuration", spew.Sdump(t.RuntimeResources))
 
-	if httpl, err = net.Listen("unix", userx.DefaultRuntimeDirectory("main.socket")); err != nil {
+	if httpl, err = net.Listen("unix", userx.DefaultRuntimeDirectory(eg.SocketDaemon())); err != nil {
 		return err
 	}
+	defer httpl.Close()
 
 	if signer, err = t.signer(keygen); err != nil {
 		return errorsx.Wrap(err, "unable to retrieve identity credentials")
@@ -145,7 +146,6 @@ func (t daemon) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, keygen cmdopt
 	if err = daemons.HTTP(gctx, httpl, rm, compiledirs, runners.NewDirectClient(authclient), db, t.Uploadable); err != nil {
 		return err
 	}
-	defer httpl.Close()
 
 	if grpcl, err = daemons.DefaultAgentListener(); err != nil {
 		return err

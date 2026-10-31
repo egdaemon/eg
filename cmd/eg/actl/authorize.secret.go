@@ -2,6 +2,7 @@ package actl
 
 import (
 	"context"
+	"log"
 	"net/http"
 
 	"github.com/egdaemon/eg/authn"
@@ -14,7 +15,7 @@ import (
 )
 
 type AuthorizeSecret struct {
-	Seed       string `arg:"" name:"seed" placeholder:"00000000-0000-0000-0000-000000000000" env:"EG_ENTROPY_SEED"`
+	Seed       string `arg:"" name:"seed" placeholder:"00000000-0000-0000-0000-000000000000" env:"${vars_entropy_seed}"`
 	SSHKeyPath string `name:"sshkeypath" help:"path to ssh key to use" default:"${vars_ssh_key_path}"`
 	Shared     bool   `name:"shared" help:"this setting is only useful for registering global runners and is a noop everywhere else" hidden:"true"`
 }
@@ -53,9 +54,13 @@ func (t AuthorizeSecret) run(ctx context.Context, c *http.Client, account, regid
 	httpc := authn.New(ctx, c, signer, account, compute.NewAuthzTokenSource)
 
 	rc := registration.NewRegistrationClient(httpc)
-	if _, err = rc.Grant(ctx, &registration.RegistrationGrantRequest{Registration: &registration.Registration{Id: regid}, Global: t.Shared}); err != nil {
+	req := &registration.RegistrationGrantRequest{Registration: &registration.Registration{Id: regid}, Global: t.Shared}
+	resp, err := rc.Grant(ctx, req)
+	if err != nil {
 		return err
 	}
+
+	log.Println("registration", TypographyRegistrationCompact(resp.GetRegistration()))
 
 	return nil
 }

@@ -49,6 +49,7 @@ const (
 	EnvPodmanSocket       = "EG_PODMAN_SOCKET"
 	EnvContainerHost      = "CONTAINER_HOST"
 	EnvEGSSHSeed          = "EG_SSH_KEY_SEED"
+	EnvEGEntropySeed      = "EG_ENTROPY_SEED"
 	EnvEGSSHHost          = "EG_SSH_REVERSE_PROXY_HOST"
 	EnvEGSSHProxyDisabled = "EG_SSH_REVERSE_PROXY_DISABLED"
 	EnvEGSSHHostDefault   = "api.egdaemon.com:8090"

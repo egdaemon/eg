@@ -147,7 +147,7 @@ func main() {
 			"vars_eg_runtime_directory":    eg.DefaultMountRoot(eg.RuntimeDirectory),
 			"vars_account_id":              envx.String("", "EG_ACCOUNT"),
 			"vars_machine_id":              envx.String(machineID(), "EG_MACHINE_ID"),
-			"vars_entropy_seed":            envx.String(errorsx.Must(uuid.NewV4()).String(), "EG_ENTROPY_SEED"),
+			"vars_entropy_seed":            envx.String(errorsx.Must(uuid.NewV4()).String(), eg.EnvEGEntropySeed),
 			"vars_ssh_key_path":            cmdopts.DefaultSSHKeyPath(),
 			"vars_machine_ssh_user":        eg.DefaultUsername,
 			"vars_ssh_known_hosts_path":    filepath.Join(userx.HomeDirectoryOrDefault(user.HomeDir), ".ssh", "known_hosts"),

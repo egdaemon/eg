@@ -23,8 +23,8 @@ import (
 )
 
 const (
-	oneprofile  = `{"profiles":[{"token":"t1","profile":{"id":"profile-1","display":"dave","account_id":"acct-001"}}]}`
-	twoprofiles = `{"profiles":[{"token":"t1","profile":{"id":"profile-1","display":"dave","account_id":"acct-001"}},{"token":"t2","profile":{"id":"profile-2","display":"erin","account_id":"acct-002"}}]}`
+	oneprofile  = `{"profiles":[{"token":"t1","profile":{"id":"profile-1","display":"dave","account_id":"acct-001"},"account":{"id":"acct-001"}}]}`
+	twoprofiles = `{"profiles":[{"token":"t1","profile":{"id":"profile-1","display":"dave","account_id":"acct-001"},"account":{"id":"acct-001"}},{"token":"t2","profile":{"id":"profile-2","display":"erin","account_id":"acct-002"},"account":{"id":"acct-002"}}]}`
 	vcsuri      = "git@github.com:u/r.git"
 )
 
@@ -70,7 +70,7 @@ func TestWhoami(t *testing.T) {
 		require.NoError(t, cmd.Run(&cmdopts.Global{Context: t.Context()}, tlsc, ident))
 		require.Contains(t, logged.String(), "repository "+vcsuri)
 		require.Contains(t, logged.String(), "account acct-001 - single")
-		require.Contains(t, logged.String(), "profile profile-1 - dave - account acct-001")
+		require.Contains(t, logged.String(), "profile acct-001 - dave")
 	})
 
 	t.Run("explicit account is reported with its profile", func(t *testing.T) {
@@ -113,7 +113,7 @@ func TestWhoami(t *testing.T) {
 
 		require.NoError(t, cmd.Run(&cmdopts.Global{Context: t.Context(), AccountID: "acct-002"}, tlsc, ident))
 		require.Contains(t, logged.String(), "account acct-002 - flag")
-		require.Contains(t, logged.String(), "profile profile-2 - erin - account acct-002")
+		require.Contains(t, logged.String(), "profile acct-002 - erin")
 	})
 
 	t.Run("ambiguous accounts are listed as candidates", func(t *testing.T) {
@@ -156,8 +156,8 @@ func TestWhoami(t *testing.T) {
 
 		require.NoError(t, cmd.Run(&cmdopts.Global{Context: t.Context()}, tlsc, ident))
 		require.Contains(t, logged.String(), "account ambiguous, candidates:")
-		require.Contains(t, logged.String(), "profile profile-1 - dave - account acct-001")
-		require.Contains(t, logged.String(), "profile profile-2 - erin - account acct-002")
+		require.Contains(t, logged.String(), "profile acct-001 - dave")
+		require.Contains(t, logged.String(), "profile acct-002 - erin")
 	})
 }
 

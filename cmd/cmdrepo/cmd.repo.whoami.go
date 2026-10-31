@@ -1,7 +1,6 @@
 package cmdrepo
 
 import (
-	"encoding/base64"
 	"errors"
 	"log"
 
@@ -9,9 +8,9 @@ import (
 	"github.com/egdaemon/eg/cmd/cmdidentity"
 	"github.com/egdaemon/eg/cmd/cmdopts"
 	"github.com/egdaemon/eg/identity"
+	"github.com/egdaemon/eg/internal/slicesx"
 	"github.com/egdaemon/eg/internal/sshx"
 	"github.com/egdaemon/eg/internal/stringsx"
-	"golang.org/x/crypto/ssh"
 )
 
 type Whoami struct {
@@ -25,9 +24,8 @@ func (t Whoami) Run(gctx *cmdopts.Global, tlscfg *cmdopts.TLSConfig, ident *cmdi
 		return err
 	}
 
-	log.Println("identity", identity.ID(signer.PublicKey()))
-	log.Println("fingerprint", ssh.FingerprintSHA256(signer.PublicKey()))
-	log.Println("base64", base64.URLEncoding.EncodeToString(signer.PublicKey().Marshal()))
+	log.Println("identity", cmdidentity.TypographySSHPublicKey(signer.PublicKey()))
+	log.Println("base64", cmdidentity.TypographySSHPublicKeyB64(signer.PublicKey()))
 	log.Println("repository", stringsx.DefaultIfBlank(t.VcsURI, "none detected"))
 
 	c := tlscfg.DefaultClient()
@@ -43,7 +41,7 @@ func (t Whoami) Run(gctx *cmdopts.Global, tlscfg *cmdopts.TLSConfig, ident *cmdi
 	if ambiguous := (identity.ErrAmbiguous{}); errors.As(err, &ambiguous) {
 		log.Println("account ambiguous, candidates:")
 		for _, p := range r.Candidates {
-			logprofile(p.Profile)
+			log.Println("profile", cmdidentity.TypographyAuthn(p))
 		}
 		log.Println("select one with `eg repo default account <id>`")
 		return nil
@@ -52,27 +50,24 @@ func (t Whoami) Run(gctx *cmdopts.Global, tlscfg *cmdopts.TLSConfig, ident *cmdi
 	}
 
 	log.Println("account", r.Account, "-", r.Source)
+
+	// resolve only reports the candidates when the account is ambiguous, list everything the key is associated with.
+	authed, err := identity.Profiles(gctx.Context, c, signer)
+	if err != nil {
+		return err
+	}
+
+	for _, authd := range authed.Profiles {
+		log.Println("candidate", cmdidentity.TypographyAuthn(authd))
+	}
+
+	r.Profile, _ = slicesx.Find(func(v *authn.Authn) bool { return v.Profile.GetAccountId() == r.Account }, authed.Profiles...)
+
 	if r.Profile == nil {
-		authed, err := identity.Profiles(gctx.Context, c, signer)
-		if err != nil {
-			return err
-		}
-
-		for _, p := range authed.Profiles {
-			if p.Profile.AccountId == r.Account {
-				r.Profile = p
-				break
-			}
-		}
+		return nil
 	}
 
-	if r.Profile != nil {
-		logprofile(r.Profile.Profile)
-	}
+	log.Println("current", cmdidentity.TypographyAuthn(r.Profile))
 
 	return nil
-}
-
-func logprofile(p *authn.Profile) {
-	log.Println("profile", p.Id, "-", stringsx.DefaultIfBlank(p.Display, p.Email), "- account", p.AccountId)
 }

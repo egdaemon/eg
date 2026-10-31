@@ -91,15 +91,17 @@ func ExchangeAuthed(ctx context.Context, chttp *http.Client, endpoint string, bo
 	return nil
 }
 
-// LoginOption adds a parameter to the login options requested by LoginOptionsToken.
-type LoginOption func(url.Values)
+// LoginOption modifies the url of the login options requested by LoginOptionsToken.
+type LoginOption func(*url.URL)
 
 // LoginOptionMachineID asserts the machine id of the runner logging in, the server only trusts it when it matches
 // a runner registered with the key being authenticated. blank ids are not sent.
 func LoginOptionMachineID(mid string) LoginOption {
-	return func(q url.Values) {
+	return func(u *url.URL) {
 		if mid != "" {
+			q := u.Query()
 			q.Set("mid", mid)
+			u.RawQuery = q.Encode()
 		}
 	}
 }
@@ -109,13 +111,16 @@ func LoginOptionMachineID(mid string) LoginOption {
 // unmodified as raw JSON so it can be forwarded directly as the request body
 // of ExchangeAuthed.
 func LoginOptionsToken(ctx context.Context, c *http.Client, accountId string, options ...LoginOption) (token json.RawMessage, err error) {
-	query := url.Values{"account_id": {accountId}}
+	uri, err := url.Parse(fmt.Sprintf("%s/authn/s/", eg.EnvAPIHostDefault()))
+	if err != nil {
+		return nil, err
+	}
+	uri.RawQuery = url.Values{"account_id": {accountId}}.Encode()
 	for _, opt := range options {
-		opt(query)
+		opt(uri)
 	}
 
-	uri := fmt.Sprintf("%s/authn/s/?%s", eg.EnvAPIHostDefault(), query.Encode())
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, uri, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, uri.String(), nil)
 	if err != nil {
 		return nil, err
 	}

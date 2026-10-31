@@ -24,7 +24,7 @@ import (
 func sshsession(ctx context.Context, chttp *http.Client, signer ssh.Signer, endpoint, issuer string) (err error) {
 	token, err := jwt.NewWithClaims(
 		jwtx.NewSSHSigner(),
-		jwtx.NewJWTClaims(identity.ID(signer), jwtx.ClaimsOptionIssuer(issuer)),
+		jwtx.NewJWTClaims(identity.ID(signer.PublicKey()), jwtx.ClaimsOptionIssuer(issuer)),
 	).SignedString(signer)
 	if err != nil {
 		return errorsx.Wrap(err, "unable to sign request")

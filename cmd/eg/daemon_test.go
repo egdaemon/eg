@@ -6,6 +6,7 @@ import (
 
 	"github.com/egdaemon/eg/cmd/cmdopts"
 	"github.com/egdaemon/eg/cmd/eg/actl"
+	"github.com/egdaemon/eg/identity"
 	"github.com/egdaemon/eg/internal/bytesx"
 	"github.com/egdaemon/eg/internal/sshx"
 	"github.com/gofrs/uuid/v5"
@@ -47,10 +48,25 @@ func TestCmdDaemon(t *testing.T) {
 		dsigner, err := daemon{Seed: derived, SSHKeyPath: filepath.Join(t.TempDir(), "id")}.signer(sshx.NewKeyGenSeeded)
 		require.NoError(t, err)
 
+		// registration is keyed by identity.ID, authorize-seed grants it and the
+		// daemon registers under it, so that is what has to match.
+		require.Equal(t, identity.ID(asigner.PublicKey()), identity.ID(dsigner.PublicKey()))
 		require.Equal(t,
 			ssh.FingerprintSHA256(asigner.PublicKey()),
 			ssh.FingerprintSHA256(dsigner.PublicKey()),
 		)
+	})
+
+	t.Run("a key cached at the ssh key path wins over the seed", func(t *testing.T) {
+		keypath := filepath.Join(t.TempDir(), "id")
+
+		first, err := daemon{Seed: "seed-one", SSHKeyPath: keypath}.signer(sshx.NewKeyGenSeeded)
+		require.NoError(t, err)
+
+		second, err := daemon{Seed: "seed-two", SSHKeyPath: keypath}.signer(sshx.NewKeyGenSeeded)
+		require.NoError(t, err)
+
+		require.Equal(t, identity.ID(first.PublicKey()), identity.ID(second.PublicKey()))
 	})
 
 	t.Run("gpu resources", func(t *testing.T) {

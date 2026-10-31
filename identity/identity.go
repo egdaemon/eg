@@ -41,15 +41,16 @@ const (
 // Chooser selects among profiles, see cmdidentity.Choose.
 type Chooser func([]*authn.Authn) (*authn.Authn, error)
 
-// ID the identifier of the signer's key, matches the identity reported by `eg repo whoami`.
-func ID(signer ssh.Signer) string {
-	return md5x.String(ssh.FingerprintSHA256(signer.PublicKey()))
+// ID the identifier of the ssh key, matches the identity reported by `eg repo whoami`
+// and the id a runner is authorized and registered under.
+func ID(k ssh.PublicKey) string {
+	return md5x.String(ssh.FingerprintSHA256(k))
 }
 
 // Remembered returns the account remembered for the repository, blank when none.
 func Remembered(ctx context.Context, db *sql.DB, signer ssh.Signer, vcsuri string) (account string, err error) {
 	var h RepoAccount
-	if err = RepoAccountFind(ctx, db, ID(signer), vcsuri).Scan(&h); errors.Is(err, sql.ErrNoRows) {
+	if err = RepoAccountFind(ctx, db, ID(signer.PublicKey()), vcsuri).Scan(&h); errors.Is(err, sql.ErrNoRows) {
 		return "", nil
 	} else if err != nil {
 		return "", errorsx.Wrap(err, "unable to lookup remembered account")
@@ -60,13 +61,13 @@ func Remembered(ctx context.Context, db *sql.DB, signer ssh.Signer, vcsuri strin
 
 // Remember the account for the repository.
 func Remember(ctx context.Context, db *sql.DB, signer ssh.Signer, vcsuri string, account string) (err error) {
-	h := RepoAccount{Identity: ID(signer), VcsURIMd5: md5x.String(vcsuri), VcsURI: vcsuri, AccountID: account}
+	h := RepoAccount{Identity: ID(signer.PublicKey()), VcsURIMd5: md5x.String(vcsuri), VcsURI: vcsuri, AccountID: account}
 	return errorsx.Wrap(RepoAccountUpsert(ctx, db, h).Scan(&h), "unable to remember account")
 }
 
 // Forget the account remembered for the repository.
 func Forget(ctx context.Context, db *sql.DB, signer ssh.Signer, vcsuri string) (err error) {
-	return errorsx.Wrap(discard(RepoAccountDelete(ctx, db, ID(signer), vcsuri)), "unable to forget account")
+	return errorsx.Wrap(discard(RepoAccountDelete(ctx, db, ID(signer.PublicKey()), vcsuri)), "unable to forget account")
 }
 
 func discard(s RepoAccountScanner) (err error) {

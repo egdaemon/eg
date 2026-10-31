@@ -13,6 +13,7 @@ import (
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/sshx"
 	"github.com/egdaemon/eg/internal/stringsx"
+	"github.com/egdaemon/eg/internal/termx"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/oauth2"
 )
@@ -89,7 +90,7 @@ func (t Signup) Run(gctx *cmdopts.Global, tlscfg *cmdopts.TLSConfig) (err error)
 	case 0:
 		return create()
 	default:
-		if !identity.IsInteractive() {
+		if !termx.IsInteractive() {
 			if len(authed.Profiles) == 1 {
 				return session(ctx, chttp, authed.Profiles[0])
 			}

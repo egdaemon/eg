@@ -55,7 +55,7 @@ func (t Login) run(ctx context.Context, account string, oauthc *http.Client, cht
 	)
 
 	if !stringsx.Blank(account) {
-		token, err := authn.LoginOptionsToken(ctx, oauthc, account)
+		token, err := authn.LoginOptionsToken(ctx, oauthc, authn.LoginOptionAccountID(account))
 		if err != nil {
 			return errorsx.Wrap(err, "unable to fetch login options")
 		}

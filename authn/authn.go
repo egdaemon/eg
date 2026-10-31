@@ -95,13 +95,14 @@ func ExchangeAuthed(ctx context.Context, chttp *http.Client, endpoint string, bo
 // LoginOption modifies the url of the login options requested by LoginOptionsToken.
 type LoginOption func(*url.URL)
 
+// LoginOptionAccountID requests the login options for the given account id. blank ids are not sent.
+func LoginOptionAccountID(id string) LoginOption {
+	return loginOptionQuery("account_id", id)
+}
+
 // LoginOptionMachineID asserts the machine id of the runner logging in, the server only trusts it when it matches
 // a runner registered with the key being authenticated. blank ids are not sent.
 func LoginOptionMachineID(mid string) LoginOption {
-	if mid == "" {
-		return loginOptionNoop
-	}
-
 	return loginOptionQuery("mid", mid)
 }
 
@@ -121,8 +122,12 @@ func LoginOptionSubdomain(subdomain string) LoginOption {
 // loginOptionNoop leaves the login options url unchanged.
 func loginOptionNoop(*url.URL) {}
 
-// loginOptionQuery sets the query parameter k to v on the login options url.
+// loginOptionQuery sets the query parameter k to v on the login options url. blank values are not sent.
 func loginOptionQuery(k, v string) LoginOption {
+	if v == "" {
+		return loginOptionNoop
+	}
+
 	return func(u *url.URL) {
 		q := u.Query()
 		q.Set(k, v)
@@ -131,15 +136,14 @@ func loginOptionQuery(k, v string) LoginOption {
 }
 
 // LoginOptionsToken fetches a signed login options token (carrying, e.g., a
-// requested account id) from the server. The response is passed through
+// requested account id, see LoginOptionAccountID) from the server. The response is passed through
 // unmodified as raw JSON so it can be forwarded directly as the request body
 // of ExchangeAuthed.
-func LoginOptionsToken(ctx context.Context, c *http.Client, accountId string, options ...LoginOption) (token json.RawMessage, err error) {
+func LoginOptionsToken(ctx context.Context, c *http.Client, options ...LoginOption) (token json.RawMessage, err error) {
 	base, err := url.Parse(fmt.Sprintf("%s/authn/s/", eg.EnvAPIHostDefault()))
 	if err != nil {
 		return nil, err
 	}
-	base.RawQuery = url.Values{"account_id": {accountId}}.Encode()
 
 	uri := langx.Clone(*base, options...)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, uri.String(), nil)

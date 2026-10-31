@@ -89,7 +89,7 @@ func (t TokenSourceFromEndpoint) Token() (_ *oauth2.Token, err error) {
 
 	var options io.Reader
 	if t.account != "" {
-		token, err := authn.LoginOptionsToken(ctx, chttp, t.account, authn.LoginOptionMachineID(t.machineid))
+		token, err := authn.LoginOptionsToken(ctx, chttp, authn.LoginOptionAccountID(t.account), authn.LoginOptionMachineID(t.machineid))
 		if err != nil {
 			return nil, errorsx.Wrap(err, "unable to fetch login options")
 		}

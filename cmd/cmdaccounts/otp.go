@@ -1,4 +1,4 @@
-package accountcmds
+package cmdaccounts
 
 import (
 	"context"

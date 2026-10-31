@@ -3,6 +3,7 @@ package compute
 import (
 	"testing"
 
+	"github.com/egdaemon/eg/cmd/cmdidentity"
 	"github.com/egdaemon/eg/cmd/cmdopts"
 	"github.com/stretchr/testify/require"
 )
@@ -23,6 +24,6 @@ func TestBuiltinUpload(t *testing.T) {
 		uploadoptions: uploadoptions{Follow: true},
 	}
 
-	require.NoError(t, cmd.Run(&cmdopts.Global{Context: t.Context(), AccountID: "account"}, tlsc, nil))
+	require.NoError(t, cmd.Run(&cmdopts.Global{Context: t.Context(), AccountID: "account"}, tlsc, cmdidentity.New(t.Context(), "account", cmdidentity.Login), nil))
 	requirevcs(t, "builtin workload - containers/clear", "containers/clear/main.wasm", accepted())
 }

@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/egdaemon/eg/authn"
+	"github.com/egdaemon/eg/cmd/cmdidentity"
 	"github.com/egdaemon/eg/cmd/cmdopts"
 	"github.com/egdaemon/eg/compute"
 	"github.com/egdaemon/eg/computeapi"
@@ -19,13 +20,13 @@ type cancel struct {
 	ID          string `arg:"" name:"id" help:"id of the enqueued workload, printed when it was uploaded"`
 }
 
-func (t cancel) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
+func (t cancel) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, ident *cmdidentity.T) (err error) {
 	signer, err := sshx.AutoCached(sshx.NewKeyGen(), t.SSHKeyPath)
 	if err != nil {
 		return err
 	}
 
-	aid, err := gctx.Identity().Account(tlsc.DefaultClient(), signer, t.VcsURI)
+	aid, err := cmdidentity.AccountID(ident.Resolve(tlsc.DefaultClient(), signer, t.VcsURI, false))
 	if err != nil {
 		return err
 	}

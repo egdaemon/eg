@@ -6,6 +6,7 @@ import (
 	"text/tabwriter"
 
 	"github.com/egdaemon/eg/authn"
+	"github.com/egdaemon/eg/cmd/cmdidentity"
 	"github.com/egdaemon/eg/cmd/cmdopts"
 	"github.com/egdaemon/eg/compute"
 	"github.com/egdaemon/eg/gcpwif"
@@ -28,14 +29,14 @@ type Create struct {
 	Description string `name:"description" help:"optional description"`
 }
 
-func (t Create) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) error {
+func (t Create) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, ident *cmdidentity.T) error {
 	signer, err := sshx.AutoCached(sshx.NewKeyGen(), t.SSHKeyPath)
 	if err != nil {
 		return err
 	}
 
 	// the management routes require the user management permission.
-	aid, err := gctx.Identity().Account(tlsc.DefaultClient(), signer, t.VcsURI)
+	aid, err := cmdidentity.AccountID(ident.Resolve(tlsc.DefaultClient(), signer, t.VcsURI, false))
 	if err != nil {
 		return err
 	}
@@ -63,14 +64,14 @@ type List struct {
 	Query       string `name:"query" short:"q" help:"only list connections whose label, audience, or description contain the text"`
 }
 
-func (t List) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) error {
+func (t List) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, ident *cmdidentity.T) error {
 	signer, err := sshx.AutoCached(sshx.NewKeyGen(), t.SSHKeyPath)
 	if err != nil {
 		return err
 	}
 
 	// the management routes require the user management permission.
-	aid, err := gctx.Identity().Account(tlsc.DefaultClient(), signer, t.VcsURI)
+	aid, err := cmdidentity.AccountID(ident.Resolve(tlsc.DefaultClient(), signer, t.VcsURI, false))
 	if err != nil {
 		return err
 	}
@@ -107,14 +108,14 @@ type Edit struct {
 	Description      string `name:"description" help:"new description"`
 }
 
-func (t Edit) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) error {
+func (t Edit) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, ident *cmdidentity.T) error {
 	signer, err := sshx.AutoCached(sshx.NewKeyGen(), t.SSHKeyPath)
 	if err != nil {
 		return err
 	}
 
 	// the management routes require the user management permission.
-	aid, err := gctx.Identity().Account(tlsc.DefaultClient(), signer, t.VcsURI)
+	aid, err := cmdidentity.AccountID(ident.Resolve(tlsc.DefaultClient(), signer, t.VcsURI, false))
 	if err != nil {
 		return err
 	}
@@ -157,14 +158,14 @@ type Remove struct {
 	Selector
 }
 
-func (t Remove) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) error {
+func (t Remove) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, ident *cmdidentity.T) error {
 	signer, err := sshx.AutoCached(sshx.NewKeyGen(), t.SSHKeyPath)
 	if err != nil {
 		return err
 	}
 
 	// the management routes require the user management permission.
-	aid, err := gctx.Identity().Account(tlsc.DefaultClient(), signer, t.VcsURI)
+	aid, err := cmdidentity.AccountID(ident.Resolve(tlsc.DefaultClient(), signer, t.VcsURI, false))
 	if err != nil {
 		return err
 	}

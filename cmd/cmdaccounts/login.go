@@ -1,4 +1,4 @@
-package accountcmds
+package cmdaccounts
 
 import (
 	"bytes"
@@ -9,8 +9,8 @@ import (
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/egdaemon/eg/authn"
+	"github.com/egdaemon/eg/cmd/cmdidentity"
 	"github.com/egdaemon/eg/cmd/cmdopts"
-	"github.com/egdaemon/eg/identity"
 	"github.com/egdaemon/eg/internal/debugx"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/langx"
@@ -26,7 +26,7 @@ type Login struct {
 	Account    string `name:"account" help:"optional account id to login with, disambiguates when the ssh key is associated with multiple profiles" env:"EG_ACCOUNT"`
 }
 
-func (t Login) Run(gctx *cmdopts.Global, tlscfg *cmdopts.TLSConfig) (err error) {
+func (t Login) Run(gctx *cmdopts.Global, tlscfg *cmdopts.TLSConfig, ident *cmdidentity.T) (err error) {
 	var (
 		signer ssh.Signer
 	)
@@ -44,7 +44,7 @@ func (t Login) Run(gctx *cmdopts.Global, tlscfg *cmdopts.TLSConfig) (err error) 
 		return errorsx.WithStack(err)
 	}
 
-	return t.run(ctx, langx.FirstNonZero(t.Account, gctx.AccountID), cfg.Client(ctx, refreshtoken), chttp, signer, identity.Choose)
+	return t.run(ctx, langx.FirstNonZero(t.Account, gctx.AccountID), cfg.Client(ctx, refreshtoken), chttp, signer, ident.Choose)
 }
 
 func (t Login) run(ctx context.Context, account string, oauthc *http.Client, chttp *http.Client, signer ssh.Signer, choose func([]*authn.Authn) (*authn.Authn, error)) (err error) {

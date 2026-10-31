@@ -1,4 +1,4 @@
-package accountcmds
+package cmdaccounts
 
 import (
 	"context"
@@ -18,10 +18,6 @@ import (
 	"github.com/golang-jwt/jwt/v4"
 	"golang.org/x/crypto/ssh"
 )
-
-func signup(ctx context.Context, chttp *http.Client, authed *authn.Authed) (err error) {
-	return postsession(ctx, chttp, authn.EndpointSignup(), authed.SignupToken)
-}
 
 // sshsession signs the request with the ssh key, the server verifies it against the public key it recorded
 // for the key. the issuer is the id of the sso domain to register with, blank to signup for a new account.

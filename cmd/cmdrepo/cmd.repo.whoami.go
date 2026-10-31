@@ -6,6 +6,7 @@ import (
 	"log"
 
 	"github.com/egdaemon/eg/authn"
+	"github.com/egdaemon/eg/cmd/cmdidentity"
 	"github.com/egdaemon/eg/cmd/cmdopts"
 	"github.com/egdaemon/eg/identity"
 	"github.com/egdaemon/eg/internal/sshx"
@@ -18,7 +19,7 @@ type Whoami struct {
 	SSHKeyPath  string `name:"sshkeypath" help:"path to ssh key to use" default:"${vars_ssh_key_path}"`
 }
 
-func (t Whoami) Run(gctx *cmdopts.Global, tlscfg *cmdopts.TLSConfig) (err error) {
+func (t Whoami) Run(gctx *cmdopts.Global, tlscfg *cmdopts.TLSConfig, ident *cmdidentity.T) (err error) {
 	signer, err := sshx.AutoCached(sshx.NewKeyGen(), t.SSHKeyPath)
 	if err != nil {
 		return err
@@ -27,19 +28,18 @@ func (t Whoami) Run(gctx *cmdopts.Global, tlscfg *cmdopts.TLSConfig) (err error)
 	log.Println("identity", identity.ID(signer))
 	log.Println("fingerprint", ssh.FingerprintSHA256(signer.PublicKey()))
 	log.Println("base64", base64.URLEncoding.EncodeToString(signer.PublicKey().Marshal()))
-
 	log.Println("repository", stringsx.DefaultIfBlank(t.VcsURI, "none detected"))
 
 	c := tlscfg.DefaultClient()
 
-	db, err := gctx.Identity().Store()
+	db, err := ident.Store()
 	if err != nil {
 		return err
 	}
 	defer db.Close()
 
 	// prompts when ambiguous and interactive, the selection is remembered. otherwise the candidates are listed.
-	r, err := identity.Resolve(gctx.Context, db, c, signer, gctx.AccountID, t.VcsURI, identity.Choose, false)
+	r, err := identity.Resolve(gctx.Context, db, c, signer, gctx.AccountID, t.VcsURI, ident.Choose, false)
 	if ambiguous := (identity.ErrAmbiguous{}); errors.As(err, &ambiguous) {
 		log.Println("account ambiguous, candidates:")
 		for _, p := range r.Candidates {

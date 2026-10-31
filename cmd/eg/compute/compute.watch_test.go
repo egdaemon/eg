@@ -265,6 +265,7 @@ func enqueueapi(t *testing.T) (*cmdopts.TLSConfig, func() []url.Values) {
 	})
 	mux.HandleFunc("/c/history/w1/logs", func(w http.ResponseWriter, r *http.Request) { _, _ = w.Write([]byte("done\n")) })
 	mux.HandleFunc("/c/history/w1", func(w http.ResponseWriter, r *http.Request) { json(w, `{"history":{"result":2}}`) })
+	mux.HandleFunc("/c/history/w1/analytics", func(w http.ResponseWriter, r *http.Request) { _, _ = w.Write([]byte("analytics")) })
 
 	srv := httptest.NewServer(mux)
 	t.Cleanup(srv.Close)

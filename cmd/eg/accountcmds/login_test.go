@@ -29,6 +29,10 @@ func TestLoginRun(t *testing.T) {
 		require.NoError(t, err)
 
 		oauthc := httptestx.NewTestClient(func(req *http.Request) *http.Response {
+			if req.URL.Path == "/authn/s/" {
+				require.False(t, req.URL.Query().Has("account_id"))
+				return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(bytes.NewReader([]byte(`{"token":"stub-options-token"}`))), Header: http.Header{}}
+			}
 			require.Equal(t, "/authn/ssh", req.URL.Path)
 			encoded, err := json.Marshal(authn.Authed{})
 			require.NoError(t, err)
@@ -45,6 +49,10 @@ func TestLoginRun(t *testing.T) {
 		require.NoError(t, err)
 
 		oauthc := httptestx.NewTestClient(func(req *http.Request) *http.Response {
+			if req.URL.Path == "/authn/s/" {
+				require.False(t, req.URL.Query().Has("account_id"))
+				return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(bytes.NewReader([]byte(`{"token":"stub-options-token"}`))), Header: http.Header{}}
+			}
 			require.Equal(t, "/authn/ssh", req.URL.Path)
 			encoded, err := json.Marshal(authn.Authed{
 				Profiles: []*authn.Authn{

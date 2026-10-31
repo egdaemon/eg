@@ -13,6 +13,7 @@ import (
 	"github.com/egdaemon/eg/internal/langx"
 	"github.com/egdaemon/eg/internal/sqltestx"
 	"github.com/egdaemon/eg/internal/testx"
+	"github.com/egdaemon/eg/internal/userx"
 	"github.com/stretchr/testify/require"
 )
 
@@ -86,7 +87,7 @@ func TestOpenLAN(t *testing.T) {
 		t.Setenv("RUNTIME_DIRECTORY", runtime)
 
 		dir := t.TempDir()
-		t.Setenv("CACHE_DIRECTORY", dir)
+		t.Setenv(userx.EnvCacheDirectory, dir)
 
 		db, err := openlan(t.Context(), "", lan.DefaultTTL)
 		require.NoError(t, err)

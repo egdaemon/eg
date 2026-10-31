@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/egdaemon/eg/cmd/migrations"
+	"github.com/egdaemon/eg/internal/userx"
 
 	"github.com/egdaemon/eg/cmd/cmdopts"
 	"github.com/egdaemon/eg/identity"
@@ -30,7 +31,7 @@ func TestIdentityAccount(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Run("explicit account wins without any lookup", func(t *testing.T) {
-		t.Setenv("CACHE_DIRECTORY", t.TempDir())
+		t.Setenv(userx.EnvCacheDirectory, t.TempDir())
 		t.Setenv("RUNTIME_DIRECTORY", t.TempDir())
 		g := &cmdopts.Global{Context: context.Background(), AccountID: "explicit"}
 
@@ -45,7 +46,7 @@ func TestIdentityAccount(t *testing.T) {
 	})
 
 	t.Run("explicit account is not overridden by the remembered account", func(t *testing.T) {
-		t.Setenv("CACHE_DIRECTORY", t.TempDir())
+		t.Setenv(userx.EnvCacheDirectory, t.TempDir())
 		t.Setenv("RUNTIME_DIRECTORY", t.TempDir())
 		remember(t, signer, vcsuri, "remembered")
 
@@ -56,7 +57,7 @@ func TestIdentityAccount(t *testing.T) {
 	})
 
 	t.Run("blank vcs uri is rejected", func(t *testing.T) {
-		t.Setenv("CACHE_DIRECTORY", t.TempDir())
+		t.Setenv(userx.EnvCacheDirectory, t.TempDir())
 		t.Setenv("RUNTIME_DIRECTORY", t.TempDir())
 		g := &cmdopts.Global{Context: context.Background()}
 
@@ -65,7 +66,7 @@ func TestIdentityAccount(t *testing.T) {
 	})
 
 	t.Run("remembered account is used without a lookup", func(t *testing.T) {
-		t.Setenv("CACHE_DIRECTORY", t.TempDir())
+		t.Setenv(userx.EnvCacheDirectory, t.TempDir())
 		t.Setenv("RUNTIME_DIRECTORY", t.TempDir())
 		remember(t, signer, vcsuri, "remembered")
 
@@ -77,7 +78,7 @@ func TestIdentityAccount(t *testing.T) {
 	})
 
 	t.Run("result is memoized", func(t *testing.T) {
-		t.Setenv("CACHE_DIRECTORY", t.TempDir())
+		t.Setenv(userx.EnvCacheDirectory, t.TempDir())
 		t.Setenv("RUNTIME_DIRECTORY", t.TempDir())
 		remember(t, signer, vcsuri, "first")
 

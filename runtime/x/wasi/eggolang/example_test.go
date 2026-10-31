@@ -9,6 +9,7 @@ import (
 
 	_eg "github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/internal/envx"
+	"github.com/egdaemon/eg/internal/userx"
 	"github.com/egdaemon/eg/runtime/wasi/eg"
 	"github.com/egdaemon/eg/runtime/x/wasi/egcoverage"
 	"github.com/egdaemon/eg/runtime/x/wasi/eggolang"
@@ -62,7 +63,7 @@ func ExampleNew() {
 }
 
 func ExampleEnv() {
-	os.Setenv("CACHE_DIRECTORY", "/cache")
+	os.Setenv(userx.EnvCacheDirectory, "/cache")
 	os.Setenv(_eg.EnvComputeCacheDirectory, "/cache")
 
 	// the process environment is inherited, the cache directories are set last so they take precedence.

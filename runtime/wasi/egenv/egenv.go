@@ -87,6 +87,11 @@ func User() *user.User {
 	return userx.CurrentUserOrDefault(userx.Root())
 }
 
+// dir joins paths onto the first environment key that is set, falling back to fallback when none are.
+func dir(fallback string, paths []string, keys ...string) string {
+	return filepath.Join(env.String(fallback, keys...), filepath.Join(paths...))
+}
+
 // returns the absolute path to the cache directory, when arguments are provided they are joined
 // joined with the cache directory.
 //
@@ -95,7 +100,7 @@ func User() *user.User {
 //
 // e.g.) CacheDirectory("foo", "bar") -> "/{eg.cache}/foo/bar"
 func CacheDirectory(paths ...string) string {
-	return filepath.Join(env.String(os.TempDir(), eg.EnvComputeCacheDirectory, "CACHE_DIRECTORY"), filepath.Join(paths...))
+	return dir(os.TempDir(), paths, eg.EnvComputeCacheDirectory, userx.EnvCacheDirectory)
 }
 
 // returns the absolute path to the runtime directory, when arguments are provided they are joined
@@ -106,7 +111,7 @@ func CacheDirectory(paths ...string) string {
 //
 // e.g.) RuntimeDirectory("foo", "bar") -> "/{eg.runtime}/foo/bar"
 func RuntimeDirectory(paths ...string) string {
-	return filepath.Join(env.String(os.TempDir(), eg.EnvComputeRuntimeDirectory), filepath.Join(paths...))
+	return dir(os.TempDir(), paths, eg.EnvComputeRuntimeDirectory)
 }
 
 // returns the absolute path to the workspace directory, when arguments are provided they are joined
@@ -116,13 +121,13 @@ func RuntimeDirectory(paths ...string) string {
 //
 // e.g.) WorkspaceDirectory("foo", "bar") -> "/{eg.workspace}/foo/bar"
 func WorkspaceDirectory(paths ...string) string {
-	return filepath.Join(env.String(eg.DefaultWorkspaceDirectory(), eg.EnvComputeWorkspaceDirectory), filepath.Join(paths...))
+	return dir(eg.DefaultWorkspaceDirectory(), paths, eg.EnvComputeWorkspaceDirectory)
 }
 
 // returns the absolute path to the working directory of the module. this directory is the
 // initial working directory of the workload and is used for cloning git repositories etc.
 func WorkingDirectory(paths ...string) string {
-	return filepath.Join(env.String(eg.DefaultWorkingDirectory(), eg.EnvComputeWorkingDirectory), filepath.Join(paths...))
+	return dir(eg.DefaultWorkingDirectory(), paths, eg.EnvComputeWorkingDirectory)
 }
 
 // PathRelative reports paths within dir relative to it. relative paths and paths outside dir are returned as is.
@@ -153,7 +158,7 @@ func PathRelativeWorkspace(path string) string {
 //
 // e.g.) EphemeralDirectory("foo", "bar") -> "/{eg.ephemeral}/foo/bar"
 func EphemeralDirectory(paths ...string) string {
-	return filepath.Join(os.TempDir(), filepath.Join(paths...))
+	return dir(os.TempDir(), paths)
 }
 
 // Extract a time.Duration formatted environment variable from the given keys

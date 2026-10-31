@@ -5,11 +5,12 @@ import (
 	"testing"
 
 	"github.com/egdaemon/eg/cmd/migrations"
+	"github.com/egdaemon/eg/internal/userx"
 	"github.com/stretchr/testify/require"
 )
 
 func TestPath(t *testing.T) {
-	t.Setenv("CACHE_DIRECTORY", "/var/cache/eg-test")
+	t.Setenv(userx.EnvCacheDirectory, "/var/cache/eg-test")
 	require.Equal(t, filepath.Join("/var/cache/eg-test", migrations.CLI), migrations.Path(migrations.CLI))
 	require.Equal(t, filepath.Join("/var/cache/eg-test", migrations.Daemon), migrations.Path(migrations.Daemon))
 	require.NotEqual(t, migrations.Path(migrations.CLI), migrations.Path(migrations.Daemon), "runner and cli use distinct files")

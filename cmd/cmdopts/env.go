@@ -4,5 +4,3 @@ package cmdopts
 const EnvHealthzCode = "EG_HEALTHZ_CODE"
 
 const EnvCacheDir = "EG_CACHE_DIRECTORY"
-
-const EnvSystemdCacheDir = "CACHE_DIRECTORY"

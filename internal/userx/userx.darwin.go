@@ -13,9 +13,9 @@ import (
 func defaultRuntimeDirectory(user *user.User) string {
 	log.Println("darwin runtime directory")
 	if user.Uid == Root().Uid {
-		return envx.String(filepath.Join("/", "run"), "RUNTIME_DIRECTORY", "XDG_RUNTIME_DIR")
+		return envx.String(filepath.Join("/", "run"), EnvRuntimeDirectory, "XDG_RUNTIME_DIR")
 	}
 
 	defaultdir := filepath.Join("/", "run", "user", user.Uid)
-	return envx.String(defaultdir, "RUNTIME_DIRECTORY", "XDG_RUNTIME_DIR")
+	return envx.String(defaultdir, EnvRuntimeDirectory, "XDG_RUNTIME_DIR")
 }

@@ -225,7 +225,7 @@ func (t runner) perform(ctx context.Context, wshost workspaces.Context, runid, p
 
 	hostsslcerts := langx.FirstNonZero(fsx.LocatePhysicalPath("/etc/ssl/certs", "/etc/pki/tls/certs", "/usr/share/ca-certificates"), "/etc/ssl/certs")
 
-	debugx.Println("workload dir", wshost.Root, "->", eg.DefaultWorkloadDirectory())
+	debugx.Println("workload dir", wshost.Root, "->", eg.DefaultRootDirectory())
 	debugx.Println("cache dir", wshost.CacheDir, "->", eg.DefaultCacheDirectory())
 	debugx.Println("runtime dir", wshost.RuntimeDir, "->", eg.DefaultRuntimeDirectory())
 	debugx.Println("working dir", wshost.WorkingDir, "->", eg.DefaultWorkingDirectory())
@@ -241,7 +241,7 @@ func (t runner) perform(ctx context.Context, wshost workspaces.Context, runid, p
 	wazerofs := wazero.NewFSConfig().
 		WithDirMount(hostsslcerts, DefaultSSLCertDir).
 		WithDirMount(os.TempDir(), os.TempDir()).
-		WithDirMount(wshost.Root, eg.DefaultWorkloadDirectory()).
+		WithDirMount(wshost.Root, eg.DefaultRootDirectory()).
 		WithDirMount(wshost.Root, wshost.Root).
 		WithDirMount(wshost.RuntimeDir, eg.DefaultRuntimeDirectory()).
 		WithDirMount(wshost.RuntimeDir, wshost.RuntimeDir).

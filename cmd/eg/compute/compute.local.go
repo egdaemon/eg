@@ -131,7 +131,7 @@ func (t local) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err e
 		FromEnviron(errorsx.Zero(gitx.LocalEnv(repo, t.GitRemote, t.GitReference))...).
 		Var(eg.EnvComputeOS, runtime.GOOS).
 		Var(eg.EnvComputeArch, runtime.GOARCH).
-		Var(eg.EnvComputeWorkloadDirectory, eg.DefaultWorkloadDirectory()).
+		Var(eg.EnvComputeWorkloadDirectory, eg.DefaultRootDirectory()).
 		Var(eg.EnvComputeWorkingDirectory, eg.DefaultWorkingDirectory()).
 		Var(eg.EnvComputeCacheDirectory, eg.DefaultCacheDirectory()).
 		Var(eg.EnvComputeRuntimeDirectory, eg.DefaultRuntimeDirectory()).

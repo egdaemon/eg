@@ -72,7 +72,7 @@ func FileTree(ctx context.Context, op eg.Op) error {
 		ctx,
 		privileged.Newf("echo 'runtime directory: %s' && ls -lhan %s", _eg.DefaultMountRoot(_eg.RuntimeDirectory), _eg.DefaultMountRoot(_eg.RuntimeDirectory)),
 		privileged.Newf("echo 'mount directory: %s' && ls -lhan %s", _eg.DefaultMountRoot(), _eg.DefaultMountRoot()),
-		privileged.Newf("echo 'workload directory: %s' && ls -lhan %s", _eg.DefaultWorkloadDirectory(), _eg.DefaultWorkloadDirectory()),
+		privileged.Newf("echo 'workload directory: %s' && ls -lhan %s", _eg.DefaultRootDirectory(), _eg.DefaultRootDirectory()),
 		privileged.Newf("echo 'cache directory: %s' && ls -lhan %s", egenv.CacheDirectory(), egenv.CacheDirectory()),
 		privileged.Newf("echo 'ephemeral directory: %s' && ls -lhan %s", egenv.EphemeralDirectory(), egenv.EphemeralDirectory()),
 		privileged.Newf("echo 'working directory: %s' && ls -lhan %s", egenv.WorkingDirectory(), egenv.WorkingDirectory()),
@@ -193,7 +193,7 @@ func normalizeEnv(environ *envx.Builder) *envx.Builder {
 	normalizedirprefix := func(key string) {
 		environ.Setenv(
 			key,
-			strings.Replace(os.Getenv(key), dirprefix, _eg.DefaultWorkloadDirectory(), 1),
+			strings.Replace(os.Getenv(key), dirprefix, _eg.DefaultRootDirectory(), 1),
 		)
 	}
 

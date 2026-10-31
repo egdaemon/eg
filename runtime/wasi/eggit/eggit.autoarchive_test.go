@@ -12,18 +12,18 @@ import (
 )
 
 func TestAutoArchive(t *testing.T) {
-	t.Run("archives the working directory into the runtime directory", func(t *testing.T) {
+	t.Run("archives the working directory into the workspace directory", func(t *testing.T) {
 		workdir := t.TempDir()
-		runtimedir := t.TempDir()
+		workspacedir := t.TempDir()
 		gitInit(t, workdir) // simulate AutoClone
 		commit := gitRevParse(t, workdir, "HEAD")
 
 		testx.Tempenvvar(_eg.EnvComputeWorkingDirectory, workdir, func() {
-			testx.Tempenvvar(_eg.EnvComputeRuntimeDirectory, runtimedir, func() {
+			testx.Tempenvvar(_eg.EnvComputeWorkspaceDirectory, workspacedir, func() {
 				testx.Tempenvvar(_eg.EnvGitHeadCommit, commit, func() {
 					require.NoError(t, autoarchive(shell.NewLocal())(t.Context(), nil))
 
-					info, err := os.Stat(egenv.RuntimeDirectory(commit + ".tar.gz"))
+					info, err := os.Stat(egenv.WorkspaceDirectory(commit + ".tar.gz"))
 					require.NoError(t, err)
 					require.Greater(t, info.Size(), int64(0))
 				})

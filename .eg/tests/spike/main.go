@@ -7,6 +7,7 @@ import (
 
 	"github.com/egdaemon/eg/runtime/wasi/eg"
 	"github.com/egdaemon/eg/runtime/wasi/egenv"
+	"github.com/egdaemon/eg/runtime/wasi/egunsafe"
 	"github.com/egdaemon/eg/runtime/wasi/shell"
 	"github.com/egdaemon/eg/runtime/x/wasi/egfs"
 )
@@ -15,7 +16,7 @@ func main() {
 	ctx, done := context.WithTimeout(context.Background(), egenv.TTL())
 	defer done()
 
-	log.Println(egfs.Inspect(ctx, os.DirFS("/eg.mnt/.eg.runtime")))
+	log.Println(egfs.Inspect(ctx, os.DirFS(egunsafe.RuntimeDirectory())))
 	// log.Println(egfs.Inspect(ctx, os.DirFS("/")))
 	log.Println("working", egenv.WorkingDirectory())
 

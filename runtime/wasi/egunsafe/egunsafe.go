@@ -56,8 +56,10 @@ func DialModuleControlSocket(ctx context.Context) (conn *grpc.ClientConn, err er
 	}))
 }
 
+// RuntimeDirectory returns the absolute path to the runtime directory, joined with paths when provided.
+// the runner controls the location through the environment, the default mount is only used when it is unset.
 func RuntimeDirectory(paths ...string) string {
-	return eg.DefaultMountRoot(eg.RuntimeDirectory, filepath.Join(paths...))
+	return filepath.Join(envx.String(eg.DefaultMountRoot(eg.RuntimeDirectory), eg.EnvComputeRuntimeDirectory), filepath.Join(paths...))
 }
 
 func UnroutablePrefix() netip.Prefix {

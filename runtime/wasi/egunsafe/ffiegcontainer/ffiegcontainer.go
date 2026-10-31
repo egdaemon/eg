@@ -69,7 +69,7 @@ func Module(ctx context.Context, name, modulepath string, options []string) erro
 		Image:   name,
 		Name:    cname,
 		Module:  modulepath,
-		Mdir:    eg.DefaultMountRoot(eg.RuntimeDirectory),
+		Mdir:    egunsafe.RuntimeDirectory(),
 		Options: options,
 	})
 	if err != nil {

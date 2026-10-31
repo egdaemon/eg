@@ -99,3 +99,10 @@ func BuildID() string {
 
 	return md5x.FormatString(d)
 }
+
+func When(b bool, d func()) {
+	if b {
+		d()
+		return
+	}
+}

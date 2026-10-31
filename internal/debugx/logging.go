@@ -54,8 +54,5 @@ func Print(v ...interface{}) {
 }
 
 func Fn(d func()) {
-	if std.Writer() != io.Discard {
-		d()
-		return
-	}
+	When(std.Writer() != io.Discard, d)
 }

@@ -3,6 +3,7 @@ package cmdopts
 import (
 	"path/filepath"
 
+	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/userx"
 )
@@ -14,11 +15,13 @@ import (
 // registration, actl authorize, compute upload, etc).
 func DefaultSSHKeyPath() string {
 	user := userx.CurrentUserOrDefault(userx.Root())
-	return filepath.Join(
+	defaultpath := filepath.Join(
 		envx.String(
 			filepath.Join(userx.HomeDirectoryOrDefault(user.HomeDir), ".ssh"),
 			"CONFIGURATION_DIRECTORY",
 		),
 		userx.DefaultDir,
 	)
+
+	return envx.String(defaultpath, eg.EnvEGSSHPath)
 }

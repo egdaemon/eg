@@ -28,7 +28,7 @@ func Cache(ctx context.Context, _ eg.Op) error {
 
 // cachepath is where Cache keeps the copy of the database of this workload, see Latest.
 func cachepath() string {
-	return egenv.CacheDirectory(_eg.AnalyticsCachePath(egenv.WorkloadName()))
+	return egenv.DirectoryCache(_eg.AnalyticsCachePath(egenv.WorkloadName()))
 }
 
 // snapshot writes a consistent copy of the database to path, replacing any earlier copy.

@@ -228,11 +228,11 @@ func Prepare(c eg.ContainerRunner, archive fs.FS) eg.OpFn {
 			}
 		}
 
-		if err := egfs.CloneFS(ctx, egenv.EphemeralDirectory(), relpath, archive); err != nil {
+		if err := egfs.CloneFS(ctx, egenv.DirectoryTemp(), relpath, archive); err != nil {
 			return err
 		}
 
-		return eg.Build(c.BuildFromFile(filepath.Join(egenv.EphemeralDirectory(), relpath)))(ctx, o)
+		return eg.Build(c.BuildFromFile(filepath.Join(egenv.DirectoryTemp(), relpath)))(ctx, o)
 	}
 }
 
@@ -268,7 +268,7 @@ func Runtime(cfg Config, opts ...option) shell.Command {
 func Build(cfg Config, opts ...option) eg.OpFn {
 	cfg = From(cfg, opts...)
 	return func(ctx context.Context, _ eg.Op) error {
-		root := egenv.EphemeralDirectory(fmt.Sprintf("deb.%s", cfg.Name))
+		root := egenv.DirectoryTemp(fmt.Sprintf("deb.%s", cfg.Name))
 		if err := fsx.MkDirs(0755, root); err != nil {
 			return err
 		}
@@ -310,21 +310,21 @@ func Build(cfg Config, opts ...option) eg.OpFn {
 // uploads the generated deb packages using a dput configuration.
 func UploadDPut(gcfg Config, dput fs.FS, opts ...option) eg.OpFn {
 	return func(ctx context.Context, o eg.Op) error {
-		if err := egfs.CloneFS(ctx, egenv.EphemeralDirectory(), "dput.config", dput); err != nil {
+		if err := egfs.CloneFS(ctx, egenv.DirectoryTemp(), "dput.config", dput); err != nil {
 			return err
 		}
 		root := fmt.Sprintf("deb.%s", gcfg.Name)
-		bdir := egenv.EphemeralDirectory(root)
+		bdir := egenv.DirectoryTemp(root)
 		cfg := From(gcfg, opts...)
 		runtime := Runtime(cfg)
 		return shell.Run(
 			ctx,
 			// need to run permission adjustments as privileged since the files were created as the root user.
-			runtime.Newf("chown -R egd:egd %s", egenv.EphemeralDirectory("dput.config")).Privileged(),
+			runtime.Newf("chown -R egd:egd %s", egenv.DirectoryTemp("dput.config")).Privileged(),
 			runtime.Newf(
 				"ls %s/*_source.changes | xargs -I {} dput -f -c %s %s {}",
 				bdir,
-				egenv.EphemeralDirectory("dput.config"),
+				egenv.DirectoryTemp("dput.config"),
 				cfg.Name,
 			),
 		)

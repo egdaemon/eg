@@ -131,7 +131,7 @@ func verifyAssets(version, assets string, patterns ...string) error {
 func Promote(patterns ...string) eg.OpFn {
 	return func(ctx context.Context, o eg.Op) error {
 		var (
-			path    = egenv.EphemeralDirectory("eg.github.release.assets")
+			path    = egenv.DirectoryTemp("eg.github.release.assets")
 			version = PatternVersion()
 		)
 

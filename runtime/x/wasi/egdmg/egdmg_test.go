@@ -25,7 +25,7 @@ func TestBuild(t *testing.T) {
 		rt := shell.Runtime().UnsafeExec(r.Record).As(eg.DefaultUsername)
 
 		b := egdmg.New("eg", egdmg.OptionRuntime(rt), egdmg.OptionMkisofs)
-		require.Error(t, fsx.SymlinkExists(egenv.EphemeralDirectory("Applications")))
+		require.Error(t, fsx.SymlinkExists(egenv.DirectoryTemp("Applications")))
 
 		require.NoError(t, egdmg.Build(b, testx.Fixture("example1"))(t.Context(), egtest.Op()))
 

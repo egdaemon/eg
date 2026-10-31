@@ -24,7 +24,7 @@ import (
 var skel embed.FS
 
 func CacheDirectory(dirs ...string) string {
-	return egenv.CacheDirectory(_eg.DefaultModuleDirectory(), "llama.cpp", filepath.Join(dirs...))
+	return egenv.DirectoryCache(_eg.DefaultModuleDirectory(), "llama.cpp", filepath.Join(dirs...))
 }
 
 type option = func(*envx.Builder)
@@ -83,13 +83,13 @@ func Install(runtime shell.Command) eg.OpFn {
 	const unit = "llama-server.service"
 
 	return func(ctx context.Context, o eg.Op) error {
-		if err := egfs.CloneFS(ctx, egenv.EphemeralDirectory(), unit, skel); err != nil {
+		if err := egfs.CloneFS(ctx, egenv.DirectoryTemp(), unit, skel); err != nil {
 			return err
 		}
 
 		return shell.Run(
 			ctx,
-			runtime.Newf("install -m 0644 %s /etc/systemd/system/%s", egenv.EphemeralDirectory(unit), unit).Privileged(),
+			runtime.Newf("install -m 0644 %s /etc/systemd/system/%s", egenv.DirectoryTemp(unit), unit).Privileged(),
 			runtime.New("systemctl daemon-reload").Privileged(),
 		)
 	}
@@ -174,15 +174,15 @@ func debugSocket(ctx context.Context, runtime shell.Command, path string) {
 func Prepare(c eg.ContainerRunner) eg.OpFn {
 	return func(ctx context.Context, o eg.Op) error {
 		const relpath = "Containerfile"
-		if err := egfs.CloneFS(ctx, egenv.EphemeralDirectory(), relpath, skel); err != nil {
+		if err := egfs.CloneFS(ctx, egenv.DirectoryTemp(), relpath, skel); err != nil {
 			return err
 		}
 
-		if err := egfs.CloneFS(ctx, egenv.EphemeralDirectory(), "llama-server.service", skel); err != nil {
+		if err := egfs.CloneFS(ctx, egenv.DirectoryTemp(), "llama-server.service", skel); err != nil {
 			return err
 		}
 
-		return eg.Build(c.BuildFromFile(filepath.Join(egenv.EphemeralDirectory(), relpath)))(ctx, o)
+		return eg.Build(c.BuildFromFile(filepath.Join(egenv.DirectoryTemp(), relpath)))(ctx, o)
 	}
 }
 

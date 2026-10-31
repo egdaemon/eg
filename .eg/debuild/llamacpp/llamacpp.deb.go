@@ -35,7 +35,7 @@ func init() {
 	gcfg = egdebuild.New(
 		"llama.cpp",
 		"",
-		egenv.CacheDirectory("llamacpp"),
+		egenv.DirectoryCache("llamacpp"),
 		egdebuild.Option.Maintainer(maintainer.Name, maintainer.Email),
 		egdebuild.Option.SigningKeyID(maintainer.GPGFingerprint),
 		egdebuild.Option.ChangeLogDate(c.Committer.When),
@@ -55,7 +55,7 @@ func init() {
 }
 
 func Prepare(ctx context.Context, o eg.Op) error {
-	sruntime := shell.Runtime().Directory(egenv.CacheDirectory())
+	sruntime := shell.Runtime().Directory(egenv.DirectoryCache())
 	return eg.Parallel(
 		shell.Op(
 			sruntime.Newf("test -d llamacpp || git clone -b %s --depth 1 https://github.com/ggml-org/llama.cpp.git llamacpp", tag),

@@ -24,7 +24,7 @@ import (
 )
 
 func CacheDirectory(dirs ...string) string {
-	return egenv.CacheDirectory(_eg.DefaultModuleDirectory(), "dart", filepath.Join(dirs...))
+	return egenv.DirectoryCache(_eg.DefaultModuleDirectory(), "dart", filepath.Join(dirs...))
 }
 
 // attempt to build the dart environment that sets up
@@ -106,7 +106,7 @@ func AutoDownload() eg.OpFn {
 
 		runtime := shell.Runtime().EnvironFrom(denv...)
 
-		for pubspec := range FindRoots(egenv.WorkingDirectory()) {
+		for pubspec := range FindRoots(egenv.DirectoryWorking()) {
 			cmd := stringsx.Join(" ", "dart", "pub", "get")
 			if err := shell.Run(ctx, runtime.New(cmd).Directory(filepath.Dir(pubspec))); err != nil {
 				return errorsx.Wrap(err, "unable to get dependencies")
@@ -138,7 +138,7 @@ func AutoTest(options ...toption) eg.OpFn {
 		runtime := shell.Runtime().EnvironFrom(denv...)
 		timeout := timex.DurationMin(contextx.Until(ctx), timex.DurationFirstNonZero(opts.timeout, shell.DefaultTimeout))
 
-		for pubspec := range FindRoots(egenv.WorkingDirectory()) {
+		for pubspec := range FindRoots(egenv.DirectoryWorking()) {
 			cmd := stringsx.Join(" ", "dart", "test", fmt.Sprintf("--timeout=%s", timeout), flags)
 			if err := shell.Run(ctx, runtime.New(cmd).Directory(filepath.Dir(pubspec)).Timeout(timeout+time.Second)); err != nil {
 				return errorsx.Wrap(err, "unable to run tests")
@@ -162,7 +162,7 @@ func AutoAnalyze() eg.OpFn {
 
 		runtime := shell.Runtime().EnvironFrom(denv...)
 
-		for pubspec := range FindRoots(egenv.WorkingDirectory()) {
+		for pubspec := range FindRoots(egenv.DirectoryWorking()) {
 			cmd := stringsx.Join(" ", "dart", "analyze")
 			if err := shell.Run(ctx, runtime.New(cmd).Directory(filepath.Dir(pubspec))); err != nil {
 				return errorsx.Wrap(err, "unable to run analysis")

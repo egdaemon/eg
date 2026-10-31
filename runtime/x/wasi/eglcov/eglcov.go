@@ -13,7 +13,7 @@ import (
 
 // Coverage is the coverage of the lcov files within a directory, with paths relative to the workspace. lcov paths are
 // relative to the project that wrote them, which is taken to be the parent of dir, e.g.) the project of
-// console/coverage is console. use Root to anchor them elsewhere, e.g.) Coverage(dir).Root(egenv.WorkingDirectory("other")).
+// console/coverage is console. use Root to anchor them elsewhere, e.g.) Coverage(dir).Root(egenv.DirectoryWorking("other")).
 func Coverage(dir string) coverage.Options {
 	return coverage.New(func(ctx context.Context) coverage.Seq {
 		return lcov.Coverage(ctx, dir)

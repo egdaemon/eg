@@ -15,7 +15,7 @@ func Patch(dest string) eg.OpFn {
 	return func(ctx context.Context, _ eg.Op) error {
 		return shell.Run(
 			ctx,
-			shell.Runtime().Directory(egenv.WorkingDirectory()).Newf("git add -N . && git diff HEAD > %s", dest),
+			shell.Runtime().Directory(egenv.DirectoryWorking()).Newf("git add -N . && git diff HEAD > %s", dest),
 		)
 	}
 }

@@ -54,7 +54,7 @@ func Test(ctx context.Context, op eg.Op) error {
 }
 
 func TestModule(ctx context.Context, op eg.Op) error {
-	b := egdmg.New("retrovibe", egdmg.OptionBuildDir(egenv.CacheDirectory(".dist", "retrovibed.darwin.arm64")))
+	b := egdmg.New("retrovibe", egdmg.OptionBuildDir(egenv.DirectoryCache(".dist", "retrovibed.darwin.arm64")))
 	return eg.Perform(
 		ctx,
 		egbug.DirectoryTree(egtarball.Path("example")),

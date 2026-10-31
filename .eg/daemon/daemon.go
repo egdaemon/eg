@@ -14,7 +14,7 @@ func shellruntime() shell.Command {
 	return shell.Runtime().
 		EnvironFrom(eggolang.Env()...).
 		Environ(
-			"CACHE_DIRECTORY", egenv.CacheDirectory(),
+			"CACHE_DIRECTORY", egenv.DirectoryCache(),
 		)
 }
 

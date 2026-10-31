@@ -14,14 +14,14 @@ import (
 )
 
 func CacheDirectory(dirs ...string) string {
-	return egenv.CacheDirectory(_eg.DefaultModuleDirectory(), "yarn", filepath.Join(dirs...))
+	return egenv.DirectoryCache(_eg.DefaultModuleDirectory(), "yarn", filepath.Join(dirs...))
 }
 
 // attempt to build the yarn environment that properly
 func env() ([]string, error) {
 	return envx.Build().FromEnv(os.Environ()...).
 		Var("COREPACK_ENABLE_DOWNLOAD_PROMPT", "0").
-		Var("COREPACK_HOME", egenv.CacheDirectory(_eg.DefaultModuleDirectory(), "corepack")).
+		Var("COREPACK_HOME", egenv.DirectoryCache(_eg.DefaultModuleDirectory(), "corepack")).
 		Var("YARN_CACHE_FOLDER", CacheDirectory()).
 		Var("YARN_ENABLE_GLOBAL_CACHE", envx.VarBool(false)).
 		Environ()

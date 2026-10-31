@@ -18,31 +18,31 @@ func TestCacheDirectory(t *testing.T) {
 	t.Run("CacheDirectory", func(t *testing.T) {
 		t.Run("returns_default_path_when_no_dirs_are_provided", func(t *testing.T) {
 			result := egccache.CacheDirectory()
-			expected := egenv.CacheDirectory(_eg.DefaultModuleDirectory(), "ccache", "")
+			expected := egenv.DirectoryCache(_eg.DefaultModuleDirectory(), "ccache", "")
 			require.Equal(t, expected, result)
 		})
 
 		t.Run("returns_path_with_single_directory", func(t *testing.T) {
 			result := egccache.CacheDirectory("mycache")
-			expected := egenv.CacheDirectory(_eg.DefaultModuleDirectory(), "ccache", "mycache")
+			expected := egenv.DirectoryCache(_eg.DefaultModuleDirectory(), "ccache", "mycache")
 			require.Equal(t, expected, result)
 		})
 
 		t.Run("returns_path_with_multiple_directories", func(t *testing.T) {
 			result := egccache.CacheDirectory("my", "nested", "cache")
-			expected := egenv.CacheDirectory(_eg.DefaultModuleDirectory(), "ccache", filepath.Join("my", "nested", "cache"))
+			expected := egenv.DirectoryCache(_eg.DefaultModuleDirectory(), "ccache", filepath.Join("my", "nested", "cache"))
 			require.Equal(t, expected, result)
 		})
 
 		t.Run("returns_path_with_empty_string_dir", func(t *testing.T) {
 			result := egccache.CacheDirectory("")
-			expected := egenv.CacheDirectory(_eg.DefaultModuleDirectory(), "ccache", "")
+			expected := egenv.DirectoryCache(_eg.DefaultModuleDirectory(), "ccache", "")
 			require.Equal(t, expected, result)
 		})
 
 		t.Run("returns_path_with_absolute_path", func(t *testing.T) {
 			result := egccache.CacheDirectory("/var/tmp/ccache")
-			expected := egenv.CacheDirectory(_eg.DefaultModuleDirectory(), "ccache", "/var/tmp/ccache")
+			expected := egenv.DirectoryCache(_eg.DefaultModuleDirectory(), "ccache", "/var/tmp/ccache")
 			require.Equal(t, expected, result)
 		})
 	})

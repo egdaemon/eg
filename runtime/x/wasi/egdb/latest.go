@@ -69,7 +69,7 @@ func Latest(ctx context.Context, options ...LatestOption) (_ string, err error) 
 	// a blank workload is the default workload; egmeta treats a blank workload filter as no filter.
 	l.workload = stringsx.FirstNonBlank(l.workload, eg.DefaultWorkload)
 
-	path := egenv.CacheDirectory(eg.AnalyticsCachePath(l.workload))
+	path := egenv.DirectoryCache(eg.AnalyticsCachePath(l.workload))
 	if _, err = os.Stat(path); err == nil {
 		return path, nil
 	} else if !os.IsNotExist(err) {

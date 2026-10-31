@@ -32,7 +32,7 @@ func main() {
 
 	// stands in for egautogen.Worst/Sample, which would otherwise
 	// source this from recorded coverage data.
-	var seq = egautogen.FromSpecified(egautogen.Fn{Path: egenv.WorkingDirectory("backoff", "backoff.go"), Name: "DynamicHashHour"})
+	var seq = egautogen.FromSpecified(egautogen.Fn{Path: egenv.DirectoryWorking("backoff", "backoff.go"), Name: "DynamicHashHour"})
 	err := eg.Perform(
 		ctx,
 		eg.Build(eg.DefaultModule()),

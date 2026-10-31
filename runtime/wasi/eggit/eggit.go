@@ -193,7 +193,7 @@ func AutoArchive(ctx context.Context, op eg.Op) error {
 
 func autoarchive(runtime shell.Command) eg.OpFn {
 	return func(ctx context.Context, op eg.Op) error {
-		dir := egenv.WorkingDirectory()
+		dir := egenv.DirectoryWorking()
 		dest := egenv.RuntimeDirectory(EnvCommit().StringReplace("%git.hash%") + ".tar.gz")
 		return archive(runtime, dir, dest)(ctx, op)
 	}

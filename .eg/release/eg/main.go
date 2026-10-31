@@ -32,12 +32,12 @@ func main() {
 				eg.Sequential(
 					shell.Op(
 						// clean up old debians. remove in future version.
-						shell.Newf("rm %s", egenv.CacheDirectory(".dist", "*.deb")).Lenient(true),
+						shell.Newf("rm %s", egenv.DirectoryCache(".dist", "*.deb")).Lenient(true),
 					),
 					debeg.Build,
 					debeg.Upload,
 					shell.Op(
-						shell.Newf("cp %s/*.deb %s", egenv.EphemeralDirectory("deb.eg"), egenv.CacheDirectory(".dist")),
+						shell.Newf("cp %s/*.deb %s", egenv.DirectoryTemp("deb.eg"), egenv.DirectoryCache(".dist")),
 					),
 				),
 			),
@@ -50,7 +50,7 @@ func main() {
 			// ),
 		),
 		eggithub.Draft(
-			egenv.CacheDirectory(".dist", "*.deb"),
+			egenv.DirectoryCache(".dist", "*.deb"),
 		),
 		eggithub.Promote(
 			"eg_*_amd64.deb",

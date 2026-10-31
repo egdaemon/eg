@@ -22,9 +22,9 @@ func Reset(ctx context.Context, op eg.Op) error {
 	privileged := shell.Runtime().Privileged().Directory("/")
 	return shell.Run(
 		ctx,
-		privileged.Newf("du -shc %s", egenv.CacheDirectory()),
-		privileged.New("echo rm -rf -- * .[!.]* .??*").Directory(egenv.CacheDirectory()),
-		privileged.New("rm -rf -- * .[!.]* .??*").Directory(egenv.CacheDirectory()),
+		privileged.Newf("du -shc %s", egenv.DirectoryCache()),
+		privileged.New("echo rm -rf -- * .[!.]* .??*").Directory(egenv.DirectoryCache()),
+		privileged.New("rm -rf -- * .[!.]* .??*").Directory(egenv.DirectoryCache()),
 		privileged.New("podman system prune -a -f"),
 	)
 }

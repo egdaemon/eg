@@ -209,7 +209,7 @@ func (t options) autoinstall(base shell.Command) eg.OpFn {
 		runtime := base.EnvironFrom(goenv...).EnvironFrom(opts.environ...)
 		timeout := timex.DurationMin(contextx.Until(ctx), timex.DurationFirstNonZero(opts.timeout, shell.DefaultTimeout))
 
-		for gomod := range modfilex.FindModules(stringsx.DefaultIfBlank(opts.bctx.Dir, egenv.WorkingDirectory())) {
+		for gomod := range modfilex.FindModules(stringsx.DefaultIfBlank(opts.bctx.Dir, egenv.DirectoryWorking())) {
 			cmd := stringsx.Join(" ", slicesx.Filter(func(s string) bool { return stringsx.Present(s) }, "go", "-C", filepath.Dir(gomod), "install", "-modcacherw", flags, "./...")...)
 			if err := shell.Run(ctx, runtime.New(cmd).Timeout(timeout)); err != nil {
 				return errorsx.Wrap(err, "unable to run tests")
@@ -240,7 +240,7 @@ func (t options) autocompile(base shell.Command) eg.OpFn {
 		runtime := base.EnvironFrom(goenv...).EnvironFrom(opts.environ...)
 		timeout := timex.DurationMin(contextx.Until(ctx), timex.DurationFirstNonZero(opts.timeout, shell.DefaultTimeout))
 
-		for gomod := range modfilex.FindModules(stringsx.DefaultIfBlank(opts.bctx.Dir, egenv.WorkingDirectory())) {
+		for gomod := range modfilex.FindModules(stringsx.DefaultIfBlank(opts.bctx.Dir, egenv.DirectoryWorking())) {
 			cmd := stringsx.Join(" ", "go", "-C", filepath.Dir(gomod), "build", "-modcacherw", flags, "./...")
 			if err := shell.Run(ctx, runtime.New(cmd).Timeout(timeout)); err != nil {
 				return errorsx.Wrap(err, "unable to compile")
@@ -276,7 +276,7 @@ func (t options) autotest(base shell.Command) eg.OpFn {
 		runtime := base.EnvironFrom(goenv...).EnvironFrom(opts.environ...)
 		timeout := timex.DurationMin(contextx.Until(ctx), timex.DurationFirstNonZero(opts.timeout, shell.DefaultTimeout))
 
-		for gomod := range modfilex.FindModules(egenv.WorkingDirectory()) {
+		for gomod := range modfilex.FindModules(egenv.DirectoryWorking()) {
 			cmd := stringsx.Join(" ", "go", "-C", filepath.Dir(gomod), "test", "-modcacherw", fmt.Sprintf("-timeout=%s", timeout), flags, fmt.Sprintf("-coverprofile %s", filepath.Join(covpath, md5x.String(gomod))), "./...")
 			if err := shell.Run(ctx, runtime.New(cmd).Timeout(timeout+time.Second)); err != nil {
 				return errorsx.Wrap(err, "unable to run tests")
@@ -291,12 +291,12 @@ func (t options) autotest(base shell.Command) eg.OpFn {
 // egcoverage.Report.
 func Coverage() coverage.Options {
 	return coverage.New(func(ctx context.Context) coverage.Seq {
-		return golangcov.Coverage(ctx, coveragedir(), golangcov.Modules(modfilex.FindModules(egenv.WorkingDirectory())))
+		return golangcov.Coverage(ctx, coveragedir(), golangcov.Modules(modfilex.FindModules(egenv.DirectoryWorking())))
 	}).Transforms(coverage.TransformPath(egenv.PathRelativeWorkspace))
 }
 
 func CacheDirectory(dirs ...string) string {
-	return egenv.CacheDirectory(_eg.DefaultModuleDirectory(), "golang", filepath.Join(dirs...))
+	return egenv.DirectoryCache(_eg.DefaultModuleDirectory(), "golang", filepath.Join(dirs...))
 }
 
 func CacheBuildDirectory() string {
@@ -333,5 +333,5 @@ func Runtime() shell.Command {
 }
 
 func coveragedir() string {
-	return egenv.EphemeralDirectory(".eg.coverage")
+	return egenv.DirectoryTemp(".eg.coverage")
 }

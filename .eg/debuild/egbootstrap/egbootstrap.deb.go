@@ -31,7 +31,7 @@ func init() {
 	gcfg = egdebuild.New(
 		"egbootstrap",
 		"",
-		egenv.WorkingDirectory(".eg", "debuild", "egbootstrap", "rootfs"),
+		egenv.DirectoryWorking(".eg", "debuild", "egbootstrap", "rootfs"),
 		egdebuild.Option.Maintainer(maintainer.Name, maintainer.Email),
 		egdebuild.Option.SigningKeyID(maintainer.GPGFingerprint),
 		egdebuild.Option.ChangeLogDate(c.Committer.When),

@@ -48,7 +48,7 @@ func (t DefaultAccount) Run(gctx *cmdopts.Global, tlscfg *cmdopts.TLSConfig, ide
 			valid = valid || p.Profile.AccountId == t.ID
 		}
 		if !valid {
-			return fmt.Errorf("the ssh key %s is not associated with account %s", identity.ID(signer), t.ID)
+			return fmt.Errorf("the ssh key %s is not associated with account %s", identity.ID(signer.PublicKey()), t.ID)
 		}
 
 		if err = identity.Remember(gctx.Context, db, signer, vcsuri, t.ID); err != nil {

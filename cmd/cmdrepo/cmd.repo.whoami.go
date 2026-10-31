@@ -25,7 +25,7 @@ func (t Whoami) Run(gctx *cmdopts.Global, tlscfg *cmdopts.TLSConfig, ident *cmdi
 		return err
 	}
 
-	log.Println("identity", identity.ID(signer))
+	log.Println("identity", identity.ID(signer.PublicKey()))
 	log.Println("fingerprint", ssh.FingerprintSHA256(signer.PublicKey()))
 	log.Println("base64", base64.URLEncoding.EncodeToString(signer.PublicKey().Marshal()))
 	log.Println("repository", stringsx.DefaultIfBlank(t.VcsURI, "none detected"))

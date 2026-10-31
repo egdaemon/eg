@@ -39,7 +39,6 @@ import (
 	"github.com/egdaemon/eg/internal/gpgx"
 	"github.com/egdaemon/eg/internal/libp2px"
 	"github.com/egdaemon/eg/internal/osx"
-	"github.com/egdaemon/eg/internal/sshx"
 	"github.com/egdaemon/eg/internal/stringsx"
 	"github.com/egdaemon/eg/internal/tracex"
 	"github.com/egdaemon/eg/internal/userx"
@@ -148,6 +147,7 @@ func main() {
 			"vars_account_id":              envx.String("", "EG_ACCOUNT"),
 			"vars_machine_id":              envx.String(machineID(), "EG_MACHINE_ID"),
 			"vars_entropy_seed":            envx.String(errorsx.Must(uuid.NewV4()).String(), eg.EnvEGEntropySeed),
+			"env_eg_entropy_seed":          eg.EnvEGEntropySeed,
 			"vars_ssh_key_path":            cmdopts.DefaultSSHKeyPath(),
 			"vars_machine_ssh_user":        eg.DefaultUsername,
 			"vars_ssh_known_hosts_path":    filepath.Join(userx.HomeDirectoryOrDefault(user.HomeDir), ".ssh", "known_hosts"),
@@ -176,7 +176,7 @@ func main() {
 			&shellcli.TLSConfig,
 			new(cmdopts.HotswapPath),
 			cmdopts.Entropy(cmdopts.GenerateEntropy),
-			cmdopts.KeyGenSeeded(sshx.NewKeyGenSeeded),
+			cmdopts.KeyGenSeeded(cmdopts.DefaultKeyGenSeeded),
 			libp2px.MDNSLookup(libp2px.DefaultMDNSLookup),
 		),
 		kong.BindTo(shellcli.Context, (*context.Context)(nil)),

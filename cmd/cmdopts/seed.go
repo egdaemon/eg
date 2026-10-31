@@ -36,3 +36,10 @@ func GenerateEntropy(seed string) (string, error) {
 // by authorize-seed and daemon, instead of each calling sshx.NewKeyGenSeeded
 // directly -- same reasoning as Entropy above.
 type KeyGenSeeded func(seed string) *sshx.KeyGen
+
+// DefaultKeyGenSeeded is the production KeyGenSeeded bound in main.go,
+// exported so other modules (which cannot reach internal/sshx) can bind the
+// identical generator.
+func DefaultKeyGenSeeded(seed string) *sshx.KeyGen {
+	return sshx.NewKeyGenSeeded(seed)
+}

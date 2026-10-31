@@ -5,8 +5,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/egdaemon/eg/jsonx"
 	"net/http"
+
+	"github.com/egdaemon/eg/jsonx"
 
 	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/internal/errorsx"

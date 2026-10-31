@@ -1,7 +1,16 @@
 # export DEMOPASSPHRASE="..."
-# EDITOR=vim eg secrets edit chachasm://${DEMOPASSPHRASE}@.dist/demo/demo.env
-# eg secrets env --uri "chachasm://${DEMOPASSPHRASE}@.dist/demo/demo.env" ansidrama record .dist/demo/ansidrama.eg.compute.toml
-launch = ": \"${EG_ACCOUNT:?set EG_ACCOUNT}\" \"${EG_ENTROPY_SEED:?set EG_ENTROPY_SEED}\" && d=/tmp/.eg.demo.compute && rm -rf $d && mkdir -p $d/cache $d/config $d/run && export CACHE_DIRECTORY=$d/cache CONFIGURATION_DIRECTORY=$d/config RUNTIME_DIRECTORY=$d/run && cd $d && PS1='$ ' bash --norc --noprofile -i"
+# EDITOR=vim eg secrets edit chachasm://${DEMOPASSPHRASE}@.dist/demo/demo.daemon.env
+#
+# demo.daemon.env holds the *raw* EG_ACCOUNT and EG_ENTROPY_SEED. `eg actl bootstrap env daemon` derives the
+# seed once; the derived value is what the daemon and `authorize seed` both take.
+#
+# everything under /tmp/.eg.demo.compute is recreated per run, so the first scene (`eg register`) derives the
+# ssh key from EG_ENTROPY_SEED and links it to EG_ACCOUNT; the commands after it reuse that same key. needs
+# network access to the control plane.
+#
+# record:
+# systemd-run --user --pty --wait -p EnvironmentFile=$PWD/demo.daemon.env -p RuntimeDirectory=eg-demo -p CacheDirectory=eg-demo eg secrets env --uri "chachasm://${DEMOPASSPHRASE}@.dist/demo/demo.daemon.env" ansidrama record .dist/demo/ansidrama.eg.compute.toml
+launch = "d=/tmp/.eg.demo.compute; rm -rf $d && mkdir -p $d && cd $d && PS1='$ ' bash --norc --noprofile -i"
 cols = 100
 rows = 24
 font = "smalti"
@@ -29,22 +38,87 @@ padding = 12
 card = { lines = ["Self hosted runner", "eg daemon"], fg = "#fef9c3" }
 hold_cs = 125
 
-# EG_ACCOUNT and EG_ENTROPY_SEED are already in the environment, injected by `eg secrets env`.
 [[scene]]
-text = "eg daemon"
+text = "env | grep EG_"
 hold_cs = 20
 [[scene]]
 keys = ["Enter"]
-# printed once the runner has registered with the control plane.
-await = "registering daemon with control plane completed"
-hold_cs = 300
-
-# stop the runner; the daemon logs this on a clean shutdown.
-[[scene]]
-keys = ["C-c"]
-await = "running daemon completed"
-hold_cs = 150
+await = '(?:\A|\n)\$\n*\z'
+await_ms = 60000
+hold_cs = 100
 
 [[scene]]
-card = { lines = ["eg daemon", "a runner, up and down"], fg = "#fef9c3" }
-hold_cs = 125
+text = "which eg"
+hold_cs = 20
+[[scene]]
+keys = ["Enter"]
+await = '(?:\A|\n)\$\n*\z'
+await_ms = 60000
+hold_cs = 100
+
+# register: derives the ssh key from the seed (the same identity on every run) and links it to the account.
+# EG_ACCOUNT is set, so there is nothing to choose and it does not prompt. match the whole screen for a bare
+# `$` as the last non-empty line (false while the typed command is last, true once the prompt is back).
+[[scene]]
+text = "eg register --account demo"
+hold_cs = 20
+[[scene]]
+keys = ["Enter"]
+await = '(?:\A|\n)\$\n*\z'
+await_ms = 60000
+hold_cs = 100
+
+# register the daemon: authorize takes the raw seed (EG_ENTROPY_SEED, injected by `eg secrets env`) and
+# derives it the same way bootstrap does, so it is never typed or printed. prints nothing on success, so
+# match the whole screen for a bare `$` as the last non-empty line (see the bootstrap scene).
+[[scene]]
+text = "eg actl authorize seed"
+hold_cs = 20
+[[scene]]
+keys = ["Enter"]
+await = '(?:\A|\n)\$\n*\z'
+await_ms = 60000
+hold_cs = 60
+
+
+# EG_ACCOUNT and EG_ENTROPY_SEED are already in the environment, injected by `eg secrets env`.
+# generate the daemon environment: it picks up the account and seed from the environment and derives
+# the seed. written to a file rather than tee'd, the derived seed is a secret and must not be on screen.
+[[scene]]
+text = "eg actl bootstrap env daemon --cores 4 --memory 4GiB > demo.daemon.env"
+hold_cs = 20
+
+[[scene]]
+keys = ["Enter"]
+# prints nothing, so the prompt row depends on what ran before. `row = -1` is the blank bottom row of the
+# terminal and never matches; instead match the whole screen: a bare `$` as the last non-empty line, which
+# is false while the typed command is still the last line and true once the prompt is back.
+await = '(?:\A|\n)\$\n*\z'
+await_ms = 30000
+hold_cs = 40
+
+# run the daemon with that environment. `file:./demo.daemon.env`, `file://demo.daemon.env` reads `demo.daemon.env` as a host.
+[[scene]]
+text = "eg secrets env --uri file:./demo.daemon.env eg daemon --sshkeypath ${RUNTIME_DIRECTORY}/id.d"
+hold_cs = 20
+
+[[scene]]
+keys = ["Enter"]
+await = '45107f2b-cc34-4d1b-b00e-714f9e8b62dc'
+await_ms = 86400000
+
+# [[scene]]
+# keys = ["Enter"]
+# # printed once the runner has registered with the control plane.
+# await = "registering daemon with control plane completed"
+# hold_cs = 300
+
+# # stop the runner; the daemon logs this on a clean shutdown.
+# [[scene]]
+# keys = ["C-c"]
+# await = "running daemon completed"
+# hold_cs = 150
+
+# [[scene]]
+# card = { lines = ["eg daemon", "a runner, up and down"], fg = "#fef9c3" }
+# hold_cs = 125

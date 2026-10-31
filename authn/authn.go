@@ -33,11 +33,11 @@ func EndpointSSHAuth() oauth2.Endpoint {
 }
 
 func EndpointSignup() string {
-	return fmt.Sprintf("%s/authn/signup", eg.EnvAPIHostDefault())
+	return fmt.Sprintf("%s/authn/signup", eg.EnvSSOHostDefault())
 }
 
 func EndpointRegister() string {
-	return fmt.Sprintf("%s/authn/register", eg.EnvAPIHostDefault())
+	return fmt.Sprintf("%s/authn/register", eg.EnvSSOHostDefault())
 }
 
 func EndpointCompute() string {
@@ -168,7 +168,7 @@ func DecodeLoginOptions(response []byte) (zero LoginOptionsClaims, err error) {
 // unmodified as raw JSON so it can be forwarded directly as the request body
 // of ExchangeAuthed.
 func LoginOptionsToken(ctx context.Context, c *http.Client, options ...LoginOption) (token json.RawMessage, err error) {
-	base, err := url.Parse(fmt.Sprintf("%s/authn/s/", eg.EnvAPIHostDefault()))
+	base, err := url.Parse(fmt.Sprintf("%s/authn/s/", eg.EnvSSOHostDefault()))
 	if err != nil {
 		return nil, err
 	}

@@ -80,3 +80,26 @@ func TestCmdEnv(t *testing.T) {
 		require.Equal(t, "one\ntwo\n", buf.String())
 	})
 }
+
+func TestCmdEnvAdditionalEnvironment(t *testing.T) {
+	tmp := t.TempDir()
+	uri := "chachasm://p@" + filepath.Join(tmp, "env.chacha")
+	require.NoError(t, secrets.Update(t.Context(), uri, bytes.NewReader([]byte("FOO=bar\nBAZ=qux"))))
+	t.Setenv("EGTEST_BARE", "fromenv")
+
+	oldStdout := os.Stdout
+	r, w, _ := os.Pipe()
+	os.Stdout = w
+
+	err := runSecretCLI(t, []string{"secret", "env", "--uri", uri, "-e", "EXTRA=1", "-e", "EGTEST_BARE", "-e", "FOO=override"})
+
+	w.Close()
+	os.Stdout = oldStdout
+	require.NoError(t, err)
+
+	var buf bytes.Buffer
+	_, err = io.Copy(&buf, r)
+	require.NoError(t, err)
+
+	require.Equal(t, "FOO=bar\nBAZ=qux\nEXTRA=1\nEGTEST_BARE=fromenv\nFOO=override\n", buf.String())
+}

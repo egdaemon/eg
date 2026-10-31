@@ -26,11 +26,11 @@ func TestLoginOptionsToken(t *testing.T) {
 		require.NoError(t, err)
 		require.JSONEq(t, `{"token":"t"}`, string(token))
 
-		api, err := url.Parse(eg.EnvAPIHostDefault())
+		sso, err := url.Parse(eg.EnvSSOHostDefault())
 		require.NoError(t, err)
 		require.Equal(t, http.MethodGet, seen.Method)
-		require.Equal(t, api.Scheme, seen.URL.Scheme)
-		require.Equal(t, api.Host, seen.URL.Host)
+		require.Equal(t, sso.Scheme, seen.URL.Scheme)
+		require.Equal(t, sso.Host, seen.URL.Host)
 		require.Equal(t, "/authn/s/", seen.URL.Path)
 		require.Equal(t, url.Values{"account_id": {"account-1"}}, seen.URL.Query())
 	})
@@ -279,19 +279,19 @@ func TestLoginOptionSubdomain(t *testing.T) {
 		return seen
 	}
 
-	api, err := url.Parse(eg.EnvAPIHostDefault())
+	sso, err := url.Parse(eg.EnvSSOHostDefault())
 	require.NoError(t, err)
 
 	t.Run("prefixes the sso host", func(t *testing.T) {
 		seen := request(t, authn.LoginOptionSubdomain("acme"))
 		require.Equal(t, "acme.sso.egdaemon.com", seen.Host)
-		require.Equal(t, api.Scheme, seen.Scheme)
+		require.Equal(t, sso.Scheme, seen.Scheme)
 		require.Equal(t, "/authn/s/", seen.Path)
 		require.Equal(t, "account-1", seen.Query().Get("account_id"))
 	})
 
 	t.Run("blank is ignored", func(t *testing.T) {
-		require.Equal(t, api.Host, request(t, authn.LoginOptionSubdomain("")).Host)
+		require.Equal(t, sso.Host, request(t, authn.LoginOptionSubdomain("")).Host)
 	})
 
 	t.Run("composes with other options", func(t *testing.T) {

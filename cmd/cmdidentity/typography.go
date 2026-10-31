@@ -1,10 +1,13 @@
 package cmdidentity
 
 import (
+	"encoding/base64"
 	"fmt"
 
 	"github.com/egdaemon/eg/authn"
+	"github.com/egdaemon/eg/identity"
 	"github.com/egdaemon/eg/internal/stringsx"
+	"golang.org/x/crypto/ssh"
 )
 
 type accountCompact struct {
@@ -13,8 +16,8 @@ type accountCompact struct {
 
 func (t accountCompact) Format(f fmt.State, verb rune) {
 	v := t.a.GetId()
-	if stringsx.Present(t.a.Description) {
-		v = fmt.Sprintf("%.8s - %s", v, t.a.Description)
+	if stringsx.Present(t.a.GetDescription()) {
+		v = fmt.Sprintf("%.8s - %s", v, t.a.GetDescription())
 	}
 
 	// width, precision and flags are applied to the whole value.
@@ -32,7 +35,7 @@ type profileCompact struct {
 }
 
 func (t profileCompact) Format(f fmt.State, verb rune) {
-	_, _ = fmt.Fprintf(f, fmt.FormatString(f, 's'), stringsx.First(t.p.Display, t.p.Id))
+	_, _ = fmt.Fprintf(f, fmt.FormatString(f, 's'), stringsx.First(t.p.GetDisplay(), t.p.GetId()))
 }
 
 // TypographyProfileCompact formats the profile as its shortest human friendly name, the display name falling back to the id.
@@ -70,4 +73,42 @@ func (t sessionTypography) Format(f fmt.State, verb rune) {
 // TypographySession formats the session as its account followed by its profile. both are required.
 func TypographySession(c *authn.Current) fmt.Formatter {
 	return sessionTypography{c: c}
+}
+
+type sshPublicKey struct {
+	k ssh.PublicKey
+}
+
+func (t sshPublicKey) Format(f fmt.State, verb rune) {
+	var v string
+	if t.k != nil {
+		v = fmt.Sprintf("%s - %s", identity.ID(t.k), ssh.FingerprintSHA256(t.k))
+	}
+
+	// width, precision and flags are applied to the whole value.
+	_, _ = fmt.Fprintf(f, fmt.FormatString(f, 's'), v)
+}
+
+// TypographySSHPublicKey formats the ssh public key as its identity followed by its fingerprint.
+func TypographySSHPublicKey(k ssh.PublicKey) fmt.Formatter {
+	return sshPublicKey{k: k}
+}
+
+type sshPublicKeyB64 struct {
+	k ssh.PublicKey
+}
+
+func (t sshPublicKeyB64) Format(f fmt.State, verb rune) {
+	var v string
+	if t.k != nil {
+		v = base64.URLEncoding.EncodeToString(t.k.Marshal())
+	}
+
+	// width, precision and flags are applied to the whole value.
+	_, _ = fmt.Fprintf(f, fmt.FormatString(f, 's'), v)
+}
+
+// TypographySSHPublicKeyB64 formats the ssh public key as its url safe base64 encoded wire format.
+func TypographySSHPublicKeyB64(k ssh.PublicKey) fmt.Formatter {
+	return sshPublicKeyB64{k: k}
 }

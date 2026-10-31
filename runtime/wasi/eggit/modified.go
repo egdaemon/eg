@@ -18,6 +18,7 @@ import (
 	"github.com/egdaemon/eg/internal/slicesx"
 	"github.com/egdaemon/eg/internal/stringsx"
 	"github.com/egdaemon/eg/runtime/wasi/egenv"
+	"github.com/egdaemon/eg/runtime/wasi/egunsafe"
 	"github.com/egdaemon/eg/runtime/wasi/shell"
 )
 
@@ -160,7 +161,7 @@ func NewModified(options ...modifiedoption) modified {
 		runtime: shell.Runtime(),
 		getenv:  os.Getenv,
 		workdir: egenv.DirectoryWorking,
-		rundir:  egenv.RuntimeDirectory,
+		rundir:  egunsafe.RuntimeDirectory,
 	}
 
 	for _, opt := range options {

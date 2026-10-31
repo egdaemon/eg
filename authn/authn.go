@@ -30,6 +30,14 @@ func EndpointSSHAuth() oauth2.Endpoint {
 	}
 }
 
+func EndpointSignup() string {
+	return fmt.Sprintf("%s/authn/signup", eg.EnvAPIHostDefault())
+}
+
+func EndpointRegister() string {
+	return fmt.Sprintf("%s/authn/register", eg.EnvAPIHostDefault())
+}
+
 func EndpointCompute() string {
 	return fmt.Sprintf("%s/c/authz/", eg.EnvAPIHostDefault())
 }
@@ -121,9 +129,17 @@ func LoginOptionsToken(ctx context.Context, c *http.Client, accountId string, op
 }
 
 func AutoTokenState(signer ssh.Signer) (encoded string, err error) {
+	return AutoTokenStateIdentity(signer, "", "")
+}
+
+// AutoTokenStateIdentity is AutoTokenState carrying the display name and email used when the
+// server registers the ssh key for the first time.
+func AutoTokenStateIdentity(signer ssh.Signer, display, email string) (encoded string, err error) {
 	type reqstate struct {
 		ID        string `json:"id"`
 		PublicKey []byte `json:"pkey"`
+		Email     string `json:"email,omitempty"`
+		Display   string `json:"display,omitempty"`
 	}
 
 	id, err := uuid.NewV4()
@@ -133,6 +149,8 @@ func AutoTokenState(signer ssh.Signer) (encoded string, err error) {
 	rawstate := reqstate{
 		ID:        id.String(),
 		PublicKey: signer.PublicKey().Marshal(),
+		Email:     email,
+		Display:   display,
 	}
 
 	if encoded, err = jwtx.EncodeJSON(rawstate); err != nil {

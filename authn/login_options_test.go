@@ -22,7 +22,7 @@ func TestLoginOptionsToken(t *testing.T) {
 			return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"token":"t"}`)), Header: http.Header{}}, nil
 		})}
 
-		token, err := authn.LoginOptionsToken(t.Context(), c, "account-1")
+		token, err := authn.LoginOptionsToken(t.Context(), c, authn.LoginOptionAccountID("account-1"))
 		require.NoError(t, err)
 		require.JSONEq(t, `{"token":"t"}`, string(token))
 
@@ -35,17 +35,16 @@ func TestLoginOptionsToken(t *testing.T) {
 		require.Equal(t, url.Values{"account_id": {"account-1"}}, seen.URL.Query())
 	})
 
-	t.Run("sends a blank account id", func(t *testing.T) {
+	t.Run("does not send a blank account id", func(t *testing.T) {
 		var query url.Values
 		c := &http.Client{Transport: roundtrip(func(r *http.Request) (*http.Response, error) {
 			query = r.URL.Query()
 			return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{}`)), Header: http.Header{}}, nil
 		})}
 
-		_, err := authn.LoginOptionsToken(t.Context(), c, "")
+		_, err := authn.LoginOptionsToken(t.Context(), c, authn.LoginOptionAccountID(""))
 		require.NoError(t, err)
-		require.True(t, query.Has("account_id"))
-		require.Equal(t, "", query.Get("account_id"))
+		require.False(t, query.Has("account_id"))
 	})
 
 	t.Run("escapes the account id", func(t *testing.T) {
@@ -57,7 +56,7 @@ func TestLoginOptionsToken(t *testing.T) {
 			return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{}`)), Header: http.Header{}}, nil
 		})}
 
-		_, err := authn.LoginOptionsToken(t.Context(), c, "a&b=c d/é")
+		_, err := authn.LoginOptionsToken(t.Context(), c, authn.LoginOptionAccountID("a&b=c d/é"))
 		require.NoError(t, err)
 		require.Equal(t, "a&b=c d/é", query.Get("account_id"))
 		require.Len(t, query, 1)
@@ -71,7 +70,7 @@ func TestLoginOptionsToken(t *testing.T) {
 			return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(body)), Header: http.Header{}}, nil
 		})}
 
-		token, err := authn.LoginOptionsToken(t.Context(), c, "account-1")
+		token, err := authn.LoginOptionsToken(t.Context(), c, authn.LoginOptionAccountID("account-1"))
 		require.NoError(t, err)
 		require.Equal(t, body, string(token))
 	})
@@ -81,7 +80,7 @@ func TestLoginOptionsToken(t *testing.T) {
 			return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader("")), Header: http.Header{}}, nil
 		})}
 
-		token, err := authn.LoginOptionsToken(t.Context(), c, "account-1")
+		token, err := authn.LoginOptionsToken(t.Context(), c, authn.LoginOptionAccountID("account-1"))
 		require.NoError(t, err)
 		require.Empty(t, token)
 	})
@@ -92,7 +91,7 @@ func TestLoginOptionsToken(t *testing.T) {
 				return &http.Response{StatusCode: status, Body: io.NopCloser(strings.NewReader(`{}`)), Header: http.Header{}}, nil
 			})}
 
-			token, err := authn.LoginOptionsToken(t.Context(), c, "account-1")
+			token, err := authn.LoginOptionsToken(t.Context(), c, authn.LoginOptionAccountID("account-1"))
 			require.Error(t, err, "status %d", status)
 			require.Nil(t, token)
 		}
@@ -104,7 +103,7 @@ func TestLoginOptionsToken(t *testing.T) {
 			return nil, expected
 		})}
 
-		token, err := authn.LoginOptionsToken(t.Context(), c, "account-1")
+		token, err := authn.LoginOptionsToken(t.Context(), c, authn.LoginOptionAccountID("account-1"))
 		require.ErrorIs(t, err, expected)
 		require.Nil(t, token)
 	})
@@ -117,7 +116,7 @@ func TestLoginOptionsToken(t *testing.T) {
 			return nil, r.Context().Err()
 		})}
 
-		token, err := authn.LoginOptionsToken(ctx, c, "account-1")
+		token, err := authn.LoginOptionsToken(ctx, c, authn.LoginOptionAccountID("account-1"))
 		require.ErrorIs(t, err, context.Canceled)
 		require.Nil(t, token)
 	})
@@ -130,13 +129,25 @@ func TestLoginOptionsToken(t *testing.T) {
 			return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{}`)), Header: http.Header{}}, nil
 		})}
 
-		_, err := authn.LoginOptionsToken(context.WithValue(t.Context(), ctxkey{}, "marker"), c, "account-1")
+		_, err := authn.LoginOptionsToken(context.WithValue(t.Context(), ctxkey{}, "marker"), c, authn.LoginOptionAccountID("account-1"))
 		require.NoError(t, err)
 		require.Equal(t, "marker", seen)
 	})
 }
 
 func TestLoginOption(t *testing.T) {
+	t.Run("without options nothing is sent", func(t *testing.T) {
+		var query url.Values
+		c := &http.Client{Transport: roundtrip(func(r *http.Request) (*http.Response, error) {
+			query = r.URL.Query()
+			return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{}`)), Header: http.Header{}}, nil
+		})}
+
+		_, err := authn.LoginOptionsToken(t.Context(), c)
+		require.NoError(t, err)
+		require.Empty(t, query)
+	})
+
 	t.Run("no options only sends the account id", func(t *testing.T) {
 		var query url.Values
 		c := &http.Client{Transport: roundtrip(func(r *http.Request) (*http.Response, error) {
@@ -144,7 +155,7 @@ func TestLoginOption(t *testing.T) {
 			return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{}`)), Header: http.Header{}}, nil
 		})}
 
-		_, err := authn.LoginOptionsToken(t.Context(), c, "account-1")
+		_, err := authn.LoginOptionsToken(t.Context(), c, authn.LoginOptionAccountID("account-1"))
 		require.NoError(t, err)
 		require.Equal(t, url.Values{"account_id": {"account-1"}}, query)
 	})
@@ -156,7 +167,7 @@ func TestLoginOption(t *testing.T) {
 			return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{}`)), Header: http.Header{}}, nil
 		})}
 
-		_, err := authn.LoginOptionsToken(t.Context(), c, "account-1", authn.LoginOptionMachineID("machine-1"))
+		_, err := authn.LoginOptionsToken(t.Context(), c, authn.LoginOptionAccountID("account-1"), authn.LoginOptionMachineID("machine-1"))
 		require.NoError(t, err)
 		require.Equal(t, url.Values{"account_id": {"account-1"}, "mid": {"machine-1"}}, query)
 	})
@@ -168,7 +179,7 @@ func TestLoginOption(t *testing.T) {
 			return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{}`)), Header: http.Header{}}, nil
 		})}
 
-		_, err := authn.LoginOptionsToken(t.Context(), c, "account-1", authn.LoginOptionMachineID(""))
+		_, err := authn.LoginOptionsToken(t.Context(), c, authn.LoginOptionAccountID("account-1"), authn.LoginOptionMachineID(""))
 		require.NoError(t, err)
 		require.False(t, query.Has("mid"))
 	})
@@ -180,7 +191,7 @@ func TestLoginOption(t *testing.T) {
 			return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{}`)), Header: http.Header{}}, nil
 		})}
 
-		_, err := authn.LoginOptionsToken(t.Context(), c, "account-1", authn.LoginOptionMachineID("machine-1"), authn.LoginOptionMachineID(""))
+		_, err := authn.LoginOptionsToken(t.Context(), c, authn.LoginOptionAccountID("account-1"), authn.LoginOptionMachineID("machine-1"), authn.LoginOptionMachineID(""))
 		require.NoError(t, err)
 		require.Equal(t, "machine-1", query.Get("mid"))
 	})
@@ -192,7 +203,7 @@ func TestLoginOption(t *testing.T) {
 			return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{}`)), Header: http.Header{}}, nil
 		})}
 
-		_, err := authn.LoginOptionsToken(t.Context(), c, "account-1", authn.LoginOptionMachineID("machine-1"), authn.LoginOptionMachineID("machine-2"))
+		_, err := authn.LoginOptionsToken(t.Context(), c, authn.LoginOptionAccountID("account-1"), authn.LoginOptionMachineID("machine-1"), authn.LoginOptionMachineID("machine-2"))
 		require.NoError(t, err)
 		require.Equal(t, []string{"machine-2"}, query["mid"])
 	})
@@ -205,7 +216,7 @@ func TestLoginOption(t *testing.T) {
 			return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{}`)), Header: http.Header{}}, nil
 		})}
 
-		_, err := authn.LoginOptionsToken(t.Context(), c, "account-1",
+		_, err := authn.LoginOptionsToken(t.Context(), c, authn.LoginOptionAccountID("account-1"),
 			func(u *url.URL) {
 				q := u.Query()
 				order = append(order, "first")
@@ -237,7 +248,7 @@ func TestLoginOption(t *testing.T) {
 			return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{}`)), Header: http.Header{}}, nil
 		})}
 
-		_, err := authn.LoginOptionsToken(t.Context(), c, "account-1", func(u *url.URL) { q := u.Query(); q.Set("custom", "v a/l"); u.RawQuery = q.Encode() })
+		_, err := authn.LoginOptionsToken(t.Context(), c, authn.LoginOptionAccountID("account-1"), func(u *url.URL) { q := u.Query(); q.Set("custom", "v a/l"); u.RawQuery = q.Encode() })
 		require.NoError(t, err)
 		require.Equal(t, url.Values{"account_id": {"account-1"}, "custom": {"v a/l"}}, query)
 	})
@@ -249,7 +260,7 @@ func TestLoginOption(t *testing.T) {
 			return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{}`)), Header: http.Header{}}, nil
 		})}
 
-		_, err := authn.LoginOptionsToken(t.Context(), c, "account-1", func(u *url.URL) { q := u.Query(); q.Set("account_id", "account-2"); u.RawQuery = q.Encode() })
+		_, err := authn.LoginOptionsToken(t.Context(), c, authn.LoginOptionAccountID("account-1"), func(u *url.URL) { q := u.Query(); q.Set("account_id", "account-2"); u.RawQuery = q.Encode() })
 		require.NoError(t, err)
 		require.Equal(t, []string{"account-2"}, query["account_id"])
 	})
@@ -263,7 +274,7 @@ func TestLoginOptionSubdomain(t *testing.T) {
 			return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{}`)), Header: http.Header{}}, nil
 		})}
 
-		_, err := authn.LoginOptionsToken(t.Context(), c, "account-1", options...)
+		_, err := authn.LoginOptionsToken(t.Context(), c, append([]authn.LoginOption{authn.LoginOptionAccountID("account-1")}, options...)...)
 		require.NoError(t, err)
 		return seen
 	}

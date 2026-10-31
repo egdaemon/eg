@@ -18,7 +18,6 @@ func main() {
 	log.Println(egfs.Inspect(ctx, os.DirFS("/eg.mnt/.eg.runtime")))
 	// log.Println(egfs.Inspect(ctx, os.DirFS("/")))
 	log.Println("working", egenv.WorkingDirectory())
-	log.Println("workload", egenv.WorkloadDirectory())
 
 	log.Println(egfs.Inspect(ctx, os.DirFS(egenv.WorkingDirectory())))
 	for _, v := range os.Environ() {

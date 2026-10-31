@@ -150,6 +150,30 @@ func PathRelativeWorkspace(path string) string {
 	return PathRelative(WorkspaceDirectory(), path)
 }
 
+// PathRelativeWorking reports paths within the working directory relative to it, so they hold wherever the working directory
+// is located. relative paths and paths outside the working directory are returned as is.
+func PathRelativeWorking(path string) string {
+	return PathRelative(WorkingDirectory(), path)
+}
+
+// PathRelativeCache reports paths within the cache directory relative to it. relative paths and paths outside the
+// cache directory are returned as is.
+func PathRelativeCache(path string) string {
+	return PathRelative(CacheDirectory(), path)
+}
+
+// PathRelativeRuntime reports paths within the runtime directory relative to it. relative paths and paths outside the
+// runtime directory are returned as is.
+func PathRelativeRuntime(path string) string {
+	return PathRelative(RuntimeDirectory(), path)
+}
+
+// PathRelativeEphemeral reports paths within the ephemeral directory relative to it. relative paths and paths outside the
+// ephemeral directory are returned as is.
+func PathRelativeEphemeral(path string) string {
+	return PathRelative(EphemeralDirectory(), path)
+}
+
 // returns the absolute path to the ephemeral directory, when arguments are provided they are joined
 // joined with the ephemeral directory.
 //

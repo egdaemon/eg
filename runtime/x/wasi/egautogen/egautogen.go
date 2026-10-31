@@ -533,7 +533,7 @@ func functions(query func(context.Context) iterx.Seq[coverage.Report]) Seq {
 	return Seq{iterx.New(func(ctx context.Context, yield func(Fn) bool) error {
 		reports := query(ctx)
 		for c := range reports.Each(ctx) {
-			if !yield(Fn{Path: egenv.PathRelative(egenv.WorkingDirectory(), c.Path), Name: c.Fnname, Hits: int(c.Hits)}) {
+			if !yield(Fn{Path: egenv.PathRelativeWorking(c.Path), Name: c.Fnname, Hits: int(c.Hits)}) {
 				return nil
 			}
 		}
@@ -548,7 +548,7 @@ func functions(query func(context.Context) iterx.Seq[coverage.Report]) Seq {
 func FromSpecified(fns ...Fn) Seq {
 	return Seq{iterx.New(func(ctx context.Context, yield func(Fn) bool) error {
 		for _, fn := range fns {
-			fn.Path = egenv.PathRelative(egenv.WorkingDirectory(), fn.Path)
+			fn.Path = egenv.PathRelativeWorking(fn.Path)
 			if !yield(fn) {
 				return nil
 			}

@@ -87,14 +87,6 @@ func User() *user.User {
 	return userx.CurrentUserOrDefault(userx.Root())
 }
 
-// returns the absolute path to the workload directory of the module. this directory is the
-// root directory of the workload.
-//
-// e.g.) WorkloadDirectory("foo", "bar") -> "/{eg.workload}/foo/bar"
-func WorkloadDirectory(paths ...string) string {
-	return filepath.Join(env.String(eg.DefaultWorkloadDirectory(), eg.EnvComputeWorkloadDirectory), filepath.Join(paths...))
-}
-
 // returns the absolute path to the cache directory, when arguments are provided they are joined
 // joined with the cache directory.
 //

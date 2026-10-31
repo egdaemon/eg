@@ -46,8 +46,8 @@ func Prepare(ctx context.Context, o eg.Op) error {
 }
 
 func Build(ctx context.Context, o eg.Op) error {
-	cdir := egenv.CacheDirectory(".dist", "pacman")
-	templatedir := egenv.WorkingDirectory(".dist", "archlinux")
+	cdir := egenv.DirectoryCache(".dist", "pacman")
+	templatedir := egenv.DirectoryWorking(".dist", "archlinux")
 
 	runtime := shell.Runtime().
 		EnvironFrom(eggolang.Env()...).
@@ -78,8 +78,8 @@ func Publish(ctx context.Context, o eg.Op) error {
 		return fmt.Errorf("EG_SSH_KEY_SEED environment variable is required to publish to the AUR")
 	}
 
-	templatedir := egenv.WorkingDirectory(".eg", "archlinux")
-	aurdir := egenv.EphemeralDirectory("aur-egd")
+	templatedir := egenv.DirectoryWorking(".eg", "archlinux")
+	aurdir := egenv.DirectoryTemp("aur-egd")
 	commitmsg := fmt.Sprintf("update egd to %s", eggit.EnvCommit().Hash)
 
 	runtime := shell.Runtime().

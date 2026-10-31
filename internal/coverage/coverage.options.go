@@ -42,7 +42,7 @@ func (t Options) Transforms(o ...Transform) Options {
 }
 
 // Root joins the relative paths of the reports onto dir, before any transform is applied. absolute paths are left
-// as is. dir is expected to carry the workspace prefix already, e.g.) egenv.WorkingDirectory("console").
+// as is. dir is expected to carry the workspace prefix already, e.g.) egenv.DirectoryWorking("console").
 func (t Options) Root(dir string) Options {
 	return append(slices.Clip(t), func(opt *option) {
 		opt.root = dir

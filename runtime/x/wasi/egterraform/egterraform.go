@@ -14,7 +14,7 @@ import (
 )
 
 func CacheDirectory(dirs ...string) string {
-	return egenv.CacheDirectory(_eg.DefaultModuleDirectory(), "terraform", filepath.Join(dirs...))
+	return egenv.DirectoryCache(_eg.DefaultModuleDirectory(), "terraform", filepath.Join(dirs...))
 }
 
 // attempt to build the terraform environment that properly

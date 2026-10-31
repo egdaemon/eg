@@ -58,9 +58,9 @@ func newpool(opts egautogen.Options) egpool.Pool[egautogen.Fn] {
 	golang := egautogen.GolangLazy().
 		Templates(
 			// database, http/api, and cli.
-			egfs.StringLazy(egenv.WorkingDirectory("internal", "sqlx", "sqlx.scan.one_test.go")),
-			egfs.StringLazy(egenv.WorkingDirectory("runtime", "x", "wasi", "egllm", "egllm.socket_test.go")),
-			egfs.StringLazy(egenv.WorkingDirectory("cmd", "eg", "compute", "compute.lan.rm_test.go")),
+			egfs.StringLazy(egenv.DirectoryWorking("internal", "sqlx", "sqlx.scan.one_test.go")),
+			egfs.StringLazy(egenv.DirectoryWorking("runtime", "x", "wasi", "egllm", "egllm.socket_test.go")),
+			egfs.StringLazy(egenv.DirectoryWorking("cmd", "eg", "compute", "compute.lan.rm_test.go")),
 		)
 
 	return egpool.New(1, func(fn egautogen.Fn) eg.OpFn {

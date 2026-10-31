@@ -18,9 +18,9 @@ func main() {
 
 	log.Println(egfs.Inspect(ctx, os.DirFS(egunsafe.RuntimeDirectory())))
 	// log.Println(egfs.Inspect(ctx, os.DirFS("/")))
-	log.Println("working", egenv.WorkingDirectory())
+	log.Println("working", egenv.DirectoryWorking())
 
-	log.Println(egfs.Inspect(ctx, os.DirFS(egenv.WorkingDirectory())))
+	log.Println(egfs.Inspect(ctx, os.DirFS(egenv.DirectoryWorking())))
 	for _, v := range os.Environ() {
 		log.Println(v)
 	}
@@ -31,7 +31,7 @@ func main() {
 		ctx,
 		shell.Op(
 			runtime.Newf("ls -lha ."),
-			runtime.Newf("echo %s", egenv.WorkingDirectory()),
+			runtime.Newf("echo %s", egenv.DirectoryWorking()),
 			runtime.Newf("pwd"),
 		),
 		// eggit.AutoClone,

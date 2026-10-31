@@ -16,7 +16,7 @@ import (
 )
 
 func CacheDirectory(dirs ...string) string {
-	return egenv.CacheDirectory(_eg.DefaultModuleDirectory(), "ccache", filepath.Join(dirs...))
+	return egenv.DirectoryCache(_eg.DefaultModuleDirectory(), "ccache", filepath.Join(dirs...))
 }
 
 type option = func(*envx.Builder)

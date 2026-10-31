@@ -29,7 +29,7 @@ func init() {
 	gcfg = egdebuild.New(
 		"egworkload",
 		"",
-		egenv.WorkingDirectory(".eg", "debuild", "egworkload", "rootfs"),
+		egenv.DirectoryWorking(".eg", "debuild", "egworkload", "rootfs"),
 		egdebuild.Option.Maintainer(maintainer.Name, maintainer.Email),
 		egdebuild.Option.SigningKeyID(maintainer.GPGFingerprint),
 		egdebuild.Option.ChangeLogDate(c.Committer.When),

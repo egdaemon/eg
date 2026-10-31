@@ -36,7 +36,7 @@ func init() {
 	gcfg = egdebuild.New(
 		"duckdb",
 		"",
-		egenv.CacheDirectory("duckdb"),
+		egenv.DirectoryCache("duckdb"),
 		egdebuild.Option.Maintainer(maintainer.Name, maintainer.Email),
 		egdebuild.Option.SigningKeyID(maintainer.GPGFingerprint),
 		egdebuild.Option.ChangeLogDate(c.Committer.When),
@@ -53,7 +53,7 @@ func init() {
 }
 
 func Prepare(ctx context.Context, o eg.Op) error {
-	sruntime := shell.Runtime().Directory(egenv.CacheDirectory())
+	sruntime := shell.Runtime().Directory(egenv.DirectoryCache())
 	return eg.Parallel(
 		shell.Op(
 			sruntime.Newf("test -d duckdb || git clone -b v%s --depth 1 https://github.com/duckdb/duckdb.git duckdb", version),

@@ -24,7 +24,7 @@ func TestInstall(t *testing.T) {
 
 	require.NoError(t, egllm.Install(cmd)(ctx, nil))
 	require.Equal(t, []string{
-		"::bash:-c install -m 0644 " + egenv.EphemeralDirectory("llama-server.service") + " /etc/systemd/system/llama-server.service",
+		"::bash:-c install -m 0644 " + egenv.DirectoryTemp("llama-server.service") + " /etc/systemd/system/llama-server.service",
 		"::bash:-c systemctl daemon-reload",
 	}, rec.Results())
 }

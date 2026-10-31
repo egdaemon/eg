@@ -66,7 +66,7 @@ func main() {
 	defer done()
 
 	var (
-		debcache = egenv.CacheDirectory(".dist")
+		debcache = egenv.DirectoryCache(".dist")
 	)
 
 	if err := os.MkdirAll(debcache, 0700); err != nil {

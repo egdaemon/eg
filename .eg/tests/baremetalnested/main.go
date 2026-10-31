@@ -31,7 +31,7 @@ func Archive(ctx context.Context, op eg.Op) error {
 
 // create the dmg from within a module
 func Dmg(ctx context.Context, op eg.Op) error {
-	b := egdmg.New("retrovibe", egdmg.OptionBuildDir(egenv.CacheDirectory(".dist", "retrovibed.darwin.arm64")))
+	b := egdmg.New("retrovibe", egdmg.OptionBuildDir(egenv.DirectoryCache(".dist", "retrovibed.darwin.arm64")))
 	return eg.Perform(
 		ctx,
 		egdmg.Build(b, os.DirFS(egtarball.Path(tarball))),

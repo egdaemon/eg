@@ -25,7 +25,7 @@ func Pack(ctx context.Context, op eg.Op) error {
 
 func Populate(ctx context.Context, _ eg.Op) error {
 	runtime := shell.Runtime().
-		Environ("CONTENT", egenv.EphemeralDirectory("example.txt")).
+		Environ("CONTENT", egenv.DirectoryTemp("example.txt")).
 		Environ("ARCHIVE", egtarball.Path(archive()))
 	return shell.Run(
 		ctx,

@@ -180,7 +180,7 @@ func New(id string, command string, options ...option) *Builder {
 //	}
 func Build(ctx context.Context, runtime shell.Command, b *Builder) error {
 	var (
-		userdir = egenv.CacheDirectory(_eg.DefaultModuleDirectory(), "flatpak-user")
+		userdir = egenv.DirectoryCache(_eg.DefaultModuleDirectory(), "flatpak-user")
 	)
 
 	if err := egfs.MkDirs(0755, userdir); err != nil {

@@ -159,7 +159,7 @@ func NewModified(options ...modifiedoption) modified {
 	cfg := modified{
 		runtime: shell.Runtime(),
 		getenv:  os.Getenv,
-		workdir: egenv.WorkingDirectory,
+		workdir: egenv.DirectoryWorking,
 		rundir:  egenv.RuntimeDirectory,
 	}
 

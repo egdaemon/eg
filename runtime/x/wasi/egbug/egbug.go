@@ -73,12 +73,12 @@ func FileTree(ctx context.Context, op eg.Op) error {
 		privileged.Newf("echo 'runtime directory: %s' && ls -lhan %s", _eg.DefaultMountRoot(_eg.RuntimeDirectory), _eg.DefaultMountRoot(_eg.RuntimeDirectory)),
 		privileged.Newf("echo 'mount directory: %s' && ls -lhan %s", _eg.DefaultMountRoot(), _eg.DefaultMountRoot()),
 		privileged.Newf("echo 'workload directory: %s' && ls -lhan %s", _eg.DefaultRootDirectory(), _eg.DefaultRootDirectory()),
-		privileged.Newf("echo 'cache directory: %s' && ls -lhan %s", egenv.CacheDirectory(), egenv.CacheDirectory()),
-		privileged.Newf("echo 'ephemeral directory: %s' && ls -lhan %s", egenv.EphemeralDirectory(), egenv.EphemeralDirectory()),
-		privileged.Newf("echo 'working directory: %s' && ls -lhan %s", egenv.WorkingDirectory(), egenv.WorkingDirectory()),
-		// privileged.Newf("tree -a -L 1 %s", egenv.CacheDirectory()),
-		// privileged.Newf("tree -a -L 1 %s", egenv.EphemeralDirectory()),
-		// privileged.Newf("tree -a -L 1 %s", egenv.WorkingDirectory()),
+		privileged.Newf("echo 'cache directory: %s' && ls -lhan %s", egenv.DirectoryCache(), egenv.DirectoryCache()),
+		privileged.Newf("echo 'ephemeral directory: %s' && ls -lhan %s", egenv.DirectoryTemp(), egenv.DirectoryTemp()),
+		privileged.Newf("echo 'working directory: %s' && ls -lhan %s", egenv.DirectoryWorking(), egenv.DirectoryWorking()),
+		// privileged.Newf("tree -a -L 1 %s", egenv.DirectoryCache()),
+		// privileged.Newf("tree -a -L 1 %s", egenv.DirectoryTemp()),
+		// privileged.Newf("tree -a -L 1 %s", egenv.DirectoryWorking()),
 		// privileged.Newf("tree -a -L 1 %s", _eg.DefaultMountRoot()),
 	)
 }

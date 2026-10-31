@@ -33,7 +33,7 @@ func init() {
 	gcfg = egdebuild.New(
 		"eg",
 		"",
-		egenv.CacheDirectory(".dist", "eg"),
+		egenv.DirectoryCache(".dist", "eg"),
 		egdebuild.Option.Maintainer(maintainer.Name, maintainer.Email),
 		egdebuild.Option.SigningKeyID(maintainer.GPGFingerprint),
 		egdebuild.Option.ChangeLogDate(c.Committer.When),
@@ -60,7 +60,7 @@ func init() {
 }
 
 func Prepare(ctx context.Context, o eg.Op) error {
-	debdir := egenv.CacheDirectory(".dist", "eg")
+	debdir := egenv.DirectoryCache(".dist", "eg")
 	sruntime := shell.Runtime()
 	return eg.Sequential(
 		shell.Op(

@@ -23,14 +23,14 @@ func OptionRuntime(s shell.Command) Option {
 }
 
 // directory to construct process the clone and then construct the file tree in.
-// defaults to egenv.EphemeralDirectory
+// defaults to egenv.DirectoryTemp
 func OptionBuildDir(s string) Option {
 	return func(d *Specification) {
 		d.builddir = s
 	}
 }
 
-// directory to place dmg, defaults to egenv.WorkloadDirectory
+// directory to place dmg, defaults to egenv.WorkspaceDirectory
 func OptionOutputDir(s string) Option {
 	return func(d *Specification) {
 		d.outputpath = s
@@ -64,7 +64,7 @@ func New(pattern string, options ...Option) Specification {
 		name:       strings.TrimSuffix(eggit.PatternClean(pattern), "."),
 		cmd:        "hdiutil create -fs HFS+ -volname \"%dmg.volume.name%\" -srcfolder %dmg.src.directory% %dmg.volume.output%",
 		runtime:    shell.Runtime(),
-		builddir:   egenv.EphemeralDirectory(),
+		builddir:   egenv.DirectoryTemp(),
 		outputpath: egenv.WorkspaceDirectory(),
 		outputname: Name(pattern),
 	}, options...)

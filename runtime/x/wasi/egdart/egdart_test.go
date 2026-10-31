@@ -15,25 +15,25 @@ import (
 func TestCacheDirectory(t *testing.T) {
 	t.Run("returns_default_path_when_no_dirs_are_provided", func(t *testing.T) {
 		result := egdart.CacheDirectory()
-		expected := egenv.CacheDirectory(_eg.DefaultModuleDirectory(), "dart", "")
+		expected := egenv.DirectoryCache(_eg.DefaultModuleDirectory(), "dart", "")
 		require.Equal(t, expected, result)
 	})
 
 	t.Run("returns_path_with_single_directory", func(t *testing.T) {
 		result := egdart.CacheDirectory("pub-cache")
-		expected := egenv.CacheDirectory(_eg.DefaultModuleDirectory(), "dart", "pub-cache")
+		expected := egenv.DirectoryCache(_eg.DefaultModuleDirectory(), "dart", "pub-cache")
 		require.Equal(t, expected, result)
 	})
 
 	t.Run("returns_path_with_multiple_directories", func(t *testing.T) {
 		result := egdart.CacheDirectory("my", "nested", "cache")
-		expected := egenv.CacheDirectory(_eg.DefaultModuleDirectory(), "dart", filepath.Join("my", "nested", "cache"))
+		expected := egenv.DirectoryCache(_eg.DefaultModuleDirectory(), "dart", filepath.Join("my", "nested", "cache"))
 		require.Equal(t, expected, result)
 	})
 
 	t.Run("returns_path_with_empty_string_dir", func(t *testing.T) {
 		result := egdart.CacheDirectory("")
-		expected := egenv.CacheDirectory(_eg.DefaultModuleDirectory(), "dart", "")
+		expected := egenv.DirectoryCache(_eg.DefaultModuleDirectory(), "dart", "")
 		require.Equal(t, expected, result)
 	})
 }

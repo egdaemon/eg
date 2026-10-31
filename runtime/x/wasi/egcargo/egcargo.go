@@ -19,7 +19,7 @@ import (
 )
 
 func CacheDirectory(dirs ...string) string {
-	return egenv.CacheDirectory(_eg.DefaultModuleDirectory(), "cargo", filepath.Join(dirs...))
+	return egenv.DirectoryCache(_eg.DefaultModuleDirectory(), "cargo", filepath.Join(dirs...))
 }
 
 // attempt to build the rust environment that sets up
@@ -57,7 +57,7 @@ func AutoTest() eg.OpFn {
 
 		runtime := shell.Runtime().EnvironFrom(cenv...)
 
-		for croot := range findroot(egenv.WorkingDirectory()) {
+		for croot := range findroot(egenv.DirectoryWorking()) {
 			cmd := stringsx.Join(" ", "cargo", "test")
 			if err := shell.Run(ctx, runtime.New(cmd).Directory(croot)); err != nil {
 				return errorsx.Wrap(err, "unable to run tests")

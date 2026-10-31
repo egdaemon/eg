@@ -1,6 +1,6 @@
 package eg
 
-// go:generate protoc --proto_path=.proto --go_opt=Mauthn.proto=github.com/eg/authn --go_opt=paths=source_relative --go_out=authn authn.proto
+//go:generate protoc --proto_path=.proto --go_opt=Mauthn.proto=github.com/egdaemon/eg/authn --go_opt=paths=source_relative --go_out=authn authn.proto
 
 //go:generate protoc --proto_path=.proto --go_opt=Meg.actl.registration.proto=github.com/eg/runners/registration --go_opt=paths=source_relative --go_out=runners/registration eg.actl.registration.proto
 //go:generate protoc --proto_path=.proto --go_opt=Meg.actl.enqueued.proto=github.com/egdaemon/eg/computeapi --go_opt=paths=source_relative --go_out=computeapi eg.actl.enqueued.proto

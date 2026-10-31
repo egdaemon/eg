@@ -68,8 +68,8 @@ func (t Signup) Run(gctx *cmdopts.Global, tlscfg *cmdopts.TLSConfig) (err error)
 			return err
 		}
 
-		// the server resolved no account, signup for a new one.
-		if stringsx.Blank(opts.AccountID) {
+		// the server resolved no sso domain, signup for a new account.
+		if stringsx.Blank(opts.ID) {
 			return sshsession(ctx, chttp, signer, authn.EndpointSignup(), "")
 		}
 

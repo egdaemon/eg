@@ -57,10 +57,6 @@ func (t Whoami) Run(gctx *cmdopts.Global, tlscfg *cmdopts.TLSConfig, ident *cmdi
 		return err
 	}
 
-	for _, authd := range authed.Profiles {
-		log.Println("candidate", cmdidentity.TypographyAuthn(authd))
-	}
-
 	r.Profile, _ = slicesx.Find(func(v *authn.Authn) bool { return v.Profile.GetAccountId() == r.Account }, authed.Profiles...)
 
 	if r.Profile == nil {

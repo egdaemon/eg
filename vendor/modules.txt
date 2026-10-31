@@ -524,7 +524,7 @@ github.com/ebitengine/purego/internal/cgo
 github.com/ebitengine/purego/internal/fakecgo
 github.com/ebitengine/purego/internal/strings
 github.com/ebitengine/purego/internal/xreflect
-# github.com/egdaemon/eg v0.0.0-20261021193502-1257c4c0a358
+# github.com/egdaemon/eg v0.0.0-20261031113436-03129459c8d6
 ## explicit; go 1.27.2
 # github.com/egdaemon/gdx v0.0.0-20261031085230-c2c1dd829dc4
 ## explicit; go 1.25.8
@@ -722,7 +722,7 @@ github.com/google/go-intervals/intervalset
 # github.com/google/gopacket v1.1.19
 ## explicit; go 1.12
 github.com/google/gopacket/routing
-# github.com/google/pprof v0.0.0-20261016150608-1facf8f91b50
+# github.com/google/pprof v0.0.0-20261026192309-dbd0ed30aa88
 ## explicit; go 1.26.0
 github.com/google/pprof/profile
 # github.com/google/s2a-go v0.1.11
@@ -844,7 +844,7 @@ github.com/jackc/pgservicefile
 # github.com/jackc/pgtype v1.14.4
 ## explicit; go 1.13
 github.com/jackc/pgtype
-# github.com/jackc/pgx/v5 v5.11.0
+# github.com/jackc/pgx/v5 v5.12.0
 ## explicit; go 1.25.0
 github.com/jackc/pgx/v5
 github.com/jackc/pgx/v5/internal/iobufpool
@@ -1991,7 +1991,7 @@ go.uber.org/zap/zapcore
 # go.yaml.in/yaml/v2 v2.4.4
 ## explicit; go 1.15
 go.yaml.in/yaml/v2
-# go.yaml.in/yaml/v3 v3.0.5
+# go.yaml.in/yaml/v3 v3.0.6
 ## explicit; go 1.16
 go.yaml.in/yaml/v3
 # golang.org/x/crypto v0.58.0

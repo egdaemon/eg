@@ -80,7 +80,7 @@ keys = ["Enter"]
 hold_cs = 150
 
 [[scene]]
-text = "eg compute upload"
+text = "eg compute upload --cores 3 --memory 4GiB"
 hold_cs = 20
 [[scene]]
 keys = ["Enter"]

@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"log"
-	"os"
 	"path/filepath"
 
 	"github.com/egdaemon/eg/runtime/wasi/eg"
@@ -34,7 +33,7 @@ func Dmg(ctx context.Context, op eg.Op) error {
 	b := egdmg.New("retrovibe", egdmg.OptionBuildDir(egenv.DirectoryCache(".dist", "retrovibed.darwin.arm64")))
 	return eg.Perform(
 		ctx,
-		egdmg.Build(b, os.DirFS(egtarball.Path(tarball))),
+		egdmg.Build(b, egtarball.Path(tarball)),
 	)
 }
 

@@ -4,12 +4,16 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"log"
 	"net/http"
 
 	"charm.land/huh/v2"
+	"github.com/davecgh/go-spew/spew"
 	"github.com/egdaemon/eg/authn"
 	"github.com/egdaemon/eg/cmd/cmdidentity"
 	"github.com/egdaemon/eg/cmd/cmdopts"
+	"github.com/egdaemon/eg/identity"
+	"github.com/egdaemon/eg/internal/debugx"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/huhx"
 	"github.com/egdaemon/eg/internal/sshx"
@@ -86,6 +90,14 @@ func (t Signup) run(ctx context.Context, gctx *cmdopts.Global, oauthc *http.Clie
 		fmt.Printf("requested access to %s, an administrator of the account needs to approve it before you can login. manage it at %s\n", t.Account, t.Endpoint)
 		return nil
 	}
+
+	debugx.Fn(func() {
+		log.Println("-------------------------------------------------------------------")
+		log.Println("REGISTERING WITH", t.SSHKeyPath, identity.ID(signer.PublicKey()))
+		log.Println("authed", spew.Sdump(&authed))
+		log.Println("profiles", len(authed.Profiles))
+		log.Println("-------------------------------------------------------------------")
+	})
 
 	switch len(authed.Profiles) {
 	case 0:

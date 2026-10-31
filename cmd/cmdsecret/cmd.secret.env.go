@@ -11,8 +11,9 @@ import (
 )
 
 type CmdEnv struct {
-	URIs []string `name:"uri" short:"u" help:"Secret URIs containing KEY=VALUE environment variables. Examples: chachasm://passphrase@/path/to/file, gcpsm://project-id/secret-name/version, awssm://secret-name?region=us-east-1"`
-	Cmd  []string `arg:"" passthrough:"" optional:""`
+	URIs        []string `name:"uri" short:"u" help:"Secret URIs containing KEY=VALUE environment variables. Examples: chachasm://passphrase@/path/to/file, gcpsm://project-id/secret-name/version, awssm://secret-name?region=us-east-1"`
+	Environment []string `name:"env" short:"e" help:"define additional environment variables and their values, a bare key is read from the current environment. these override values from the secrets"`
+	Cmd         []string `arg:"" passthrough:"" optional:""`
 }
 
 func (t CmdEnv) Run(gctx *cmdopts.Global) error {
@@ -20,6 +21,8 @@ func (t CmdEnv) Run(gctx *cmdopts.Global) error {
 	if err != nil {
 		return fmt.Errorf("failed to read secrets: %w", err)
 	}
+
+	secretvars = append(secretvars, envx.AutoEnviron(t.Environment...)...)
 
 	if len(t.Cmd) == 0 {
 		for _, v := range secretvars {

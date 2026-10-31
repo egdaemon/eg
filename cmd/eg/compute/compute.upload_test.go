@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/egdaemon/eg"
+	"github.com/egdaemon/eg/cmd/cmdidentity"
 	"github.com/egdaemon/eg/cmd/cmdopts"
 	"github.com/egdaemon/eg/compile"
 	"github.com/stretchr/testify/require"
@@ -46,6 +47,6 @@ if err := eg.Perform(context.Background()); err != nil {
 		uploadoptions: uploadoptions{CacheDir: t.TempDir(), Follow: true},
 	}
 
-	require.NoError(t, cmd.Run(&cmdopts.Global{Context: t.Context(), AccountID: "account"}, tlsc, nil))
+	require.NoError(t, cmd.Run(&cmdopts.Global{Context: t.Context(), AccountID: "account"}, tlsc, cmdidentity.New(t.Context(), "account", cmdidentity.Login), nil))
 	requirevcs(t, "Uploaded: test - HEAD", "main.wasm", accepted())
 }

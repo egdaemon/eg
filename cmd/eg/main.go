@@ -18,16 +18,17 @@ import (
 	"github.com/alecthomas/kong"
 	"github.com/dustin/go-humanize"
 	"github.com/egdaemon/eg"
+	"github.com/egdaemon/eg/cmd/cmdaccounts"
 	"github.com/egdaemon/eg/cmd/cmderrors"
 	"github.com/egdaemon/eg/cmd/cmdgcp"
 	"github.com/egdaemon/eg/cmd/cmdgpg"
+	"github.com/egdaemon/eg/cmd/cmdidentity"
 	"github.com/egdaemon/eg/cmd/cmdmachine"
 	"github.com/egdaemon/eg/cmd/cmdopts"
 	"github.com/egdaemon/eg/cmd/cmdplete"
 	"github.com/egdaemon/eg/cmd/cmdrepo"
 	"github.com/egdaemon/eg/cmd/cmdsecret"
 	"github.com/egdaemon/eg/cmd/cmdssh"
-	"github.com/egdaemon/eg/cmd/eg/accountcmds"
 	"github.com/egdaemon/eg/cmd/eg/compute"
 	"github.com/egdaemon/eg/cmd/eg/daemons"
 	"github.com/egdaemon/eg/internal/bytesx"
@@ -89,9 +90,9 @@ func main() {
 		Wasi               wasiCmd                      `cmd:"" help:"run a standalone wasi module" hidden:"true"`
 		Daemon             daemon                       `cmd:"" help:"run in daemon mode letting the control plane push jobs to machines" hidden:"true"`
 		AgentManagement    actlcmd                      `cmd:"" name:"actl" help:"agent management commands"`
-		Register           accountcmds.Signup           `cmd:"" name:"register" help:"register with an account with eg"`
-		Login              accountcmds.Login            `cmd:"" name:"login" help:"login to a profile"`
-		Browser            accountcmds.OTP              `cmd:"" name:"browser" help:"login to the browser console"`
+		Register           cmdaccounts.Signup           `cmd:"" name:"register" help:"register with an account with eg"`
+		Login              cmdaccounts.Login            `cmd:"" name:"login" help:"login to a profile"`
+		Browser            cmdaccounts.OTP              `cmd:"" name:"browser" help:"login to the browser console"`
 		Repo               cmdrepo.Cmd                  `cmd:"" name:"repo" help:"repository identity and defaults"`
 		DiskUsage          daemons.DiskUsage            `cmd:"" name:"disk-usage" help:"monitors disk usage and executes services when above threshold"`
 		Secrets            cmdsecret.SecretCmd          `cmd:"" name:"secrets" help:"ALPHA: builtin simple secret manager"`
@@ -179,6 +180,9 @@ func main() {
 			libp2px.MDNSLookup(libp2px.DefaultMDNSLookup),
 		),
 		kong.BindTo(shellcli.Context, (*context.Context)(nil)),
+		kong.BindSingletonProvider(func(g *cmdopts.Global) *cmdidentity.T {
+			return cmdidentity.New(g.Context, g.AccountID, cmdidentity.Login)
+		}),
 		kong.TypeMapper(reflect.TypeFor[*net.IP](), kong.MapperFunc(cmdopts.ParseIP)),
 		kong.TypeMapper(reflect.TypeFor[*net.TCPAddr](), kong.MapperFunc(cmdopts.ParseTCPAddr)),
 		kong.TypeMapper(reflect.TypeFor[[]*net.TCPAddr](), kong.MapperFunc(cmdopts.ParseTCPAddrArray)),

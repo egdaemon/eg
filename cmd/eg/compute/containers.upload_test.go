@@ -4,6 +4,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/egdaemon/eg/cmd/cmdidentity"
 	"github.com/egdaemon/eg/cmd/cmdopts"
 	"github.com/stretchr/testify/require"
 )
@@ -24,6 +25,6 @@ func TestContainersUpload(t *testing.T) {
 		uploadoptions: uploadoptions{Follow: true},
 	}
 
-	require.NoError(t, cmd.Run(&cmdopts.Global{Context: t.Context(), AccountID: "account"}, tlsc, nil))
+	require.NoError(t, cmd.Run(&cmdopts.Global{Context: t.Context(), AccountID: "account"}, tlsc, cmdidentity.New(t.Context(), "account", cmdidentity.Login), nil))
 	requirevcs(t, "container workload - Containerfile", "main.wasm", accepted())
 }

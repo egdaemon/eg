@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 
+	"github.com/egdaemon/eg/cmd/cmdidentity"
 	"github.com/egdaemon/eg/cmd/cmdopts"
 	"github.com/egdaemon/eg/identity"
 	"github.com/egdaemon/eg/internal/errorsx"
@@ -17,7 +18,7 @@ type DefaultAccount struct {
 	ID          string `arg:"" optional:"" name:"id" help:"account id to use for this repository, detected when blank"`
 }
 
-func (t DefaultAccount) Run(gctx *cmdopts.Global, tlscfg *cmdopts.TLSConfig) (err error) {
+func (t DefaultAccount) Run(gctx *cmdopts.Global, tlscfg *cmdopts.TLSConfig, ident *cmdidentity.T) (err error) {
 	signer, err := sshx.AutoCached(sshx.NewKeyGen(), t.SSHKeyPath)
 	if err != nil {
 		return err
@@ -30,7 +31,7 @@ func (t DefaultAccount) Run(gctx *cmdopts.Global, tlscfg *cmdopts.TLSConfig) (er
 
 	c := tlscfg.DefaultClient()
 
-	db, err := gctx.Identity().Store()
+	db, err := ident.Store()
 	if err != nil {
 		return err
 	}
@@ -59,7 +60,7 @@ func (t DefaultAccount) Run(gctx *cmdopts.Global, tlscfg *cmdopts.TLSConfig) (er
 	}
 
 	// detect, ignoring the remembered account. persists the result.
-	r, err := identity.Resolve(gctx.Context, db, c, signer, "", vcsuri, identity.Choose, true)
+	r, err := identity.Resolve(gctx.Context, db, c, signer, "", vcsuri, ident.Choose, true)
 	if err != nil {
 		return err
 	}

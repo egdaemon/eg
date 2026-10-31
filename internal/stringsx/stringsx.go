@@ -18,11 +18,7 @@ func Reverse(s string) string {
 
 // DefaultIfBlank uses the default value if the provided string is blank.
 func DefaultIfBlank(s, defaultValue string) string {
-	if strings.TrimSpace(s) != "" {
-		return s
-	}
-
-	return defaultValue
+	return First(s, defaultValue)
 }
 
 // First get the first value from the array.

@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 
 	"github.com/egdaemon/eg/authn"
+	"github.com/egdaemon/eg/cmd/cmdidentity"
 	"github.com/egdaemon/eg/cmd/cmdopts"
 	"github.com/egdaemon/eg/compute"
 	"github.com/egdaemon/eg/computeapi"
@@ -28,13 +29,13 @@ type downloadopts struct {
 	ID          string `arg:"" name:"id" help:"id of the enqueued workload, printed when it was uploaded"`
 }
 
-func (t downloadopts) client(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (_ *http.Client, err error) {
+func (t downloadopts) client(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, ident *cmdidentity.T) (_ *http.Client, err error) {
 	signer, err := sshx.AutoCached(sshx.NewKeyGen(), t.SSHKeyPath)
 	if err != nil {
 		return nil, err
 	}
 
-	aid, err := gctx.Identity().Account(tlsc.DefaultClient(), signer, t.VcsURI)
+	aid, err := cmdidentity.AccountID(ident.Resolve(tlsc.DefaultClient(), signer, t.VcsURI, false))
 	if err != nil {
 		return nil, err
 	}
@@ -46,8 +47,8 @@ type downloadlogs struct {
 	downloadopts `embed:""`
 }
 
-func (t downloadlogs) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
-	chttp, err := t.client(gctx, tlsc)
+func (t downloadlogs) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, ident *cmdidentity.T) (err error) {
+	chttp, err := t.client(gctx, tlsc, ident)
 	if err != nil {
 		return err
 	}
@@ -61,8 +62,8 @@ type downloadanalytics struct {
 	downloadopts `embed:""`
 }
 
-func (t downloadanalytics) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
-	chttp, err := t.client(gctx, tlsc)
+func (t downloadanalytics) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, ident *cmdidentity.T) (err error) {
+	chttp, err := t.client(gctx, tlsc, ident)
 	if err != nil {
 		return err
 	}

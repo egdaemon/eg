@@ -13,7 +13,6 @@ import (
 	"net/url"
 	"strings"
 
-	"charm.land/huh/v2"
 	_ "github.com/duckdb/duckdb-go/v2" // registers the duckdb driver.
 	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/authn"
@@ -39,7 +38,7 @@ const (
 	SourceManual     Source = "manual"     // chosen interactively.
 )
 
-// Chooser selects among profiles, see Choose.
+// Chooser selects among profiles, see cmdidentity.Choose.
 type Chooser func([]*authn.Authn) (*authn.Authn, error)
 
 // ID the identifier of the signer's key, matches the identity reported by `eg repo whoami`.
@@ -235,36 +234,4 @@ func hasRepository(ctx context.Context, c *http.Client, p *authn.Authn, vcsuri s
 	}
 
 	return len(resp.GetItems()) > 0, nil
-}
-
-// Choose presents an interactive picker for selecting among multiple profiles associated with an
-// ssh key. requires a tty since huh renders an interactive prompt.
-func Choose(profiles []*authn.Authn) (*authn.Authn, error) {
-	if !termx.IsInteractive() {
-		return nil, errorsx.Notification(errors.New(
-			"multiple profiles are associated with this ssh key; specify one with --account when not running interactively",
-		))
-	}
-
-	options := make([]huh.Option[*authn.Authn], 0, len(profiles))
-	for _, p := range profiles {
-		label := fmt.Sprintf(
-			"%s (account: %s)",
-			stringsx.DefaultIfBlank(p.Profile.Display, p.Profile.Id),
-			p.Profile.AccountId,
-		)
-		options = append(options, huh.NewOption(label, p))
-	}
-
-	var selected *authn.Authn
-	prompt := huh.NewSelect[*authn.Authn]().
-		Title("select the profile to login with").
-		Options(options...).
-		Value(&selected)
-
-	if err := prompt.Run(); err != nil {
-		return nil, errorsx.WithStack(err)
-	}
-
-	return selected, nil
 }

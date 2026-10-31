@@ -11,8 +11,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/egdaemon/eg/cmd/migrations"
-
 	"golang.org/x/net/http2"
 	"google.golang.org/grpc/grpclog"
 
@@ -32,16 +30,6 @@ type Global struct {
 	Context   context.Context         `kong:"-"`
 	Shutdown  context.CancelCauseFunc `kong:"-"`
 	Cleanup   *sync.WaitGroup         `kong:"-"`
-	identity  *Identity
-}
-
-// Identity the account resolution for this invocation, see Identity.
-func (t *Global) Identity() *Identity {
-	if t.identity == nil {
-		t.identity = &Identity{ctx: t.Context, account: t.AccountID, store: migrations.Path(migrations.CLI)}
-	}
-
-	return t.identity
 }
 
 func (t Global) AfterApply() error {

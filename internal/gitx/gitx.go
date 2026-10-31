@@ -253,6 +253,30 @@ func DefaultBase(repo *git.Repository, remote string) (name, commit string) {
 	return "", ""
 }
 
+// User returns the name and email git is configured to commit with for the repository at dir. the
+// repository's config overrides the global config, either is blank when unset.
+func User(dir string) (name, email string) {
+	if cfg, err := config.LoadConfig(config.GlobalScope); err == nil {
+		name, email = cfg.User.Name, cfg.User.Email
+	} else {
+		debugx.Println("unable to load global git config", err)
+	}
+
+	repo, err := git.PlainOpen(dir)
+	if err != nil {
+		debugx.Println("unable to open repository for git config", err)
+		return name, email
+	}
+
+	cfg, err := repo.Config()
+	if err != nil {
+		debugx.Println("unable to load repository git config", err)
+		return name, email
+	}
+
+	return stringsx.FirstNonBlank(cfg.User.Name, name), stringsx.FirstNonBlank(cfg.User.Email, email)
+}
+
 // RepositoryUsername returns the username owning the repository at path,
 // falling back to the current user when it can't be determined.
 func RepositoryUsername(path string) string {

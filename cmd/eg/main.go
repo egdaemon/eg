@@ -119,6 +119,7 @@ func main() {
 	user := userx.CurrentUserOrDefault(userx.Root())
 	gitdir := envx.String(gitx.DetectRoot(), "EG_GIT_REPOSITORY")
 	gdxsocket := filepath.Join(userx.DefaultRuntimeDirectory(), gdx.DefaultSocket)
+	gitname, gitemail := gitx.User(gitdir)
 
 	go func() {
 		if err := (konggdx.Serve{Socket: gdxsocket}).Run(shellcli.Context); err != nil {
@@ -150,7 +151,8 @@ func main() {
 			"vars_machine_ssh_user":        eg.DefaultUsername,
 			"vars_ssh_known_hosts_path":    filepath.Join(userx.HomeDirectoryOrDefault(user.HomeDir), ".ssh", "known_hosts"),
 			"vars_ssh_key_seed":            eg.EnvEGSSHSeed,
-			"vars_user_name":               stringsx.DefaultIfBlank(user.Name, user.Username),
+			"vars_user_name":               stringsx.FirstNonBlank(gitname, user.Name, user.Username),
+			"vars_user_email":              stringsx.FirstNonBlank(gitemail, fmt.Sprintf("%s@noreply.egdaemon.com", user.Username)),
 			"vars_user_username":           user.Username,
 			"vars_user_home":               userx.HomeDirectoryOrDefault(user.HomeDir),
 			"vars_gpg_directory":           gpgx.DefaultDirectory(userx.HomeDirectoryOrDefault(user.HomeDir)),

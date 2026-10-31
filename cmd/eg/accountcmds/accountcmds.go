@@ -10,31 +10,53 @@ import (
 
 	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/authn"
+	"github.com/egdaemon/eg/identity"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/httpx"
+	"github.com/egdaemon/eg/internal/jwtx"
 	"github.com/egdaemon/eg/internal/stringsx"
+	"github.com/golang-jwt/jwt/v4"
+	"golang.org/x/crypto/ssh"
 )
 
 func signup(ctx context.Context, chttp *http.Client, authed *authn.Authed) (err error) {
+	return postsession(ctx, chttp, authn.EndpointSignup(), authed.SignupToken)
+}
+
+// sshsession signs the request with the ssh key, the server verifies it against the public key it recorded
+// for the key. the issuer is the id of the sso domain to register with, blank to signup for a new account.
+func sshsession(ctx context.Context, chttp *http.Client, signer ssh.Signer, endpoint, issuer string) (err error) {
+	token, err := jwt.NewWithClaims(
+		jwtx.NewSSHSigner(),
+		jwtx.NewJWTClaims(identity.ID(signer), jwtx.ClaimsOptionIssuer(issuer)),
+	).SignedString(signer)
+	if err != nil {
+		return errorsx.Wrap(err, "unable to sign request")
+	}
+
+	return postsession(ctx, chttp, endpoint, token)
+}
+
+func postsession(ctx context.Context, chttp *http.Client, endpoint string, token string) (err error) {
 	var (
 		session authn.Current
 		req     *http.Request
 	)
 
-	req, err = http.NewRequestWithContext(ctx, http.MethodPost, fmt.Sprintf("%s/authn/signup", eg.EnvAPIHostDefault()), nil)
+	req, err = http.NewRequestWithContext(ctx, http.MethodPost, endpoint, nil)
 	if err != nil {
-		return errorsx.Wrap(err, "signup request")
+		return errorsx.Wrap(err, "session request")
 	}
-	authn.BearerAuthorization(req, authed.SignupToken)
+	authn.BearerAuthorization(req, token)
 
 	resp3, err := httpx.AsError(chttp.Do(req))
 	if err != nil {
-		return errorsx.Wrap(err, "signup failed")
+		return errorsx.Wrapf(err, "session request to %s failed", endpoint)
 	}
 	defer httpx.AutoClose(resp3)
 
 	if err = json.NewDecoder(resp3.Body).Decode(&session); err != nil {
-		return errorsx.Wrap(err, "signup bad response")
+		return errorsx.Wrap(err, "session bad response")
 	}
 
 	log.Println("logged in as", session.Profile.Display, "-", session.Profile.Id)

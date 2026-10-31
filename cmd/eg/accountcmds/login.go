@@ -14,7 +14,6 @@ import (
 	"github.com/egdaemon/eg/identity"
 	"github.com/egdaemon/eg/internal/debugx"
 	"github.com/egdaemon/eg/internal/errorsx"
-	"github.com/egdaemon/eg/internal/httpx"
 	"github.com/egdaemon/eg/internal/langx"
 	"github.com/egdaemon/eg/internal/sshx"
 	"github.com/egdaemon/eg/internal/stringsx"
@@ -37,7 +36,7 @@ func (t Login) Run(gctx *cmdopts.Global, tlscfg *cmdopts.TLSConfig) (err error) 
 		return err
 	}
 
-	chttp := httpx.BindRetryTransport(tlscfg.DefaultClient(), http.StatusTooManyRequests, http.StatusBadGateway)
+	chttp := tlscfg.DefaultClient()
 	ctx := context.WithValue(gctx.Context, oauth2.HTTPClient, chttp)
 	cfg := authn.OAuth2SSHConfig(signer, "", authn.EndpointSSHAuth())
 

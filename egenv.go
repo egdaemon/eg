@@ -20,6 +20,7 @@ import (
 var (
 	apiHostDefault          = "https://api.egdaemon.com"
 	consoleHostDefault      = "https://console.egdaemon.com"
+	ssoHostDefault          = "https://sso.egdaemon.com"
 	tlsinsecure             = "false"
 	containerAPIHostDefault = ""
 )
@@ -34,6 +35,10 @@ func EnvAPIHostDefault() string {
 
 func EnvConsoleHostDefault() string {
 	return consoleHostDefault
+}
+
+func EnvSSOHostDefault() string {
+	return ssoHostDefault
 }
 
 func EnvContainerAPIHostDefault() string {

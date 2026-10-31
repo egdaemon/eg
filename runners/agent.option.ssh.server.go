@@ -50,7 +50,7 @@ func sshauthorizedkeys(sshdir string, keypath string) (path string, err error) {
 		return "", errorsx.Wrap(err, "unable to create directory for eg's ssh identity")
 	}
 
-	seed := envx.String(errorsx.Must(uuid.NewV4()).String(), eg.EnvEGSSHSeed, "EG_ENTROPY_SEED")
+	seed := envx.String(errorsx.Must(uuid.NewV4()).String(), eg.EnvEGSSHSeed, eg.EnvEGEntropySeed)
 	signer, err := sshx.AutoCached(sshx.NewKeyGenSeeded(seed), keypath)
 	if err != nil {
 		return "", errorsx.Wrap(err, "unable to load or generate eg's ssh identity")

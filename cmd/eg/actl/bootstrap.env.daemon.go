@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/alecthomas/kong"
+	"github.com/egdaemon/eg"
 	_eg "github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/cmd/cmdopts"
 	"github.com/egdaemon/eg/internal/envx"
@@ -51,7 +52,7 @@ func (t BootstrapEnvDaemon) Run(kctx *kong.Context, gctx *cmdopts.Global, entrop
 	environ := envx.Build().Var(
 		"EG_ACCOUNT", t.AccountID,
 	).Var(
-		"EG_ENTROPY_SEED", seed,
+		eg.EnvEGEntropySeed, seed,
 	).Var(
 		"EG_RESOURCES_CORES", strconv.FormatUint(numericx.Max(uint64(runtime.NumCPU()), t.RuntimeResources.Cores), 10),
 	).Var(

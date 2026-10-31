@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/alecthomas/kong"
+	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/authn"
 	"github.com/egdaemon/eg/cmd/cmdopts"
 	"github.com/egdaemon/eg/cmd/cmdtestx"
@@ -50,7 +51,7 @@ func TestAuthorizeSecretParsing(t *testing.T) {
 	})
 
 	t.Run("seed falls back to the environment", func(t *testing.T) {
-		t.Setenv("EG_ENTROPY_SEED", "env-seed")
+		t.Setenv(eg.EnvEGEntropySeed, "env-seed")
 		genparser := cmdtestx.Genparser(AuthorizeSecret{}, kong.Vars{"vars_ssh_key_path": "/expected/path"})
 
 		kctx, err := genparser(t).Parse([]string{"command"})
@@ -59,7 +60,7 @@ func TestAuthorizeSecretParsing(t *testing.T) {
 	})
 
 	t.Run("explicit seed wins over the environment", func(t *testing.T) {
-		t.Setenv("EG_ENTROPY_SEED", "env-seed")
+		t.Setenv(eg.EnvEGEntropySeed, "env-seed")
 		genparser := cmdtestx.Genparser(AuthorizeSecret{}, kong.Vars{"vars_ssh_key_path": "/expected/path"})
 
 		kctx, err := genparser(t).Parse([]string{"command", "arg-seed"})

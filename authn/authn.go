@@ -19,6 +19,7 @@ import (
 	"github.com/egdaemon/eg/internal/langx"
 	"github.com/egdaemon/eg/internal/userx"
 	"github.com/gofrs/uuid/v5"
+	"github.com/golang-jwt/jwt/v4"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/oauth2"
 )
@@ -133,6 +134,38 @@ func loginOptionQuery(k, v string) LoginOption {
 		q.Set(k, v)
 		u.RawQuery = q.Encode()
 	}
+}
+
+// LoginOptionsClaims are the claims of the signed login options token. the server resolves them from the
+// requested subdomain and account id; a blank AccountID means no account was resolved.
+type LoginOptionsClaims struct {
+	jwt.RegisteredClaims
+	ID        string `json:"id"`
+	AccountID string `json:"account_id"`
+}
+
+// LoginOptionsResponse is the response of the login options endpoint, see LoginOptionsToken.
+type LoginOptionsResponse struct {
+	Token string `json:"token,omitempty"` // jwt signed token representing options
+}
+
+// DecodeLoginOptions reads the claims of a LoginOptionsToken response without verifying them, the server
+// verifies the token when it is forwarded to it. they only decide which flow to follow.
+func DecodeLoginOptions(response []byte) (zero LoginOptionsClaims, err error) {
+	var (
+		resp   LoginOptionsResponse
+		claims LoginOptionsClaims
+	)
+
+	if err = json.Unmarshal(response, &resp); err != nil {
+		return zero, errorsx.Wrap(err, "unable to decode login options")
+	}
+
+	if _, _, err = jwt.NewParser().ParseUnverified(resp.Token, &claims); err != nil {
+		return zero, errorsx.Wrap(err, "unable to decode login options token")
+	}
+
+	return claims, nil
 }
 
 // LoginOptionsToken fetches a signed login options token (carrying, e.g., a

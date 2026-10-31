@@ -1,17 +1,16 @@
 package accountcmds
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"os/exec"
-	"strings"
 
 	"charm.land/huh/v2"
 	"github.com/egdaemon/eg/authn"
 	"github.com/egdaemon/eg/cmd/cmdopts"
 	"github.com/egdaemon/eg/identity"
 	"github.com/egdaemon/eg/internal/errorsx"
-	"github.com/egdaemon/eg/internal/md5x"
 	"github.com/egdaemon/eg/internal/sshx"
 	"github.com/egdaemon/eg/internal/stringsx"
 	"golang.org/x/crypto/ssh"
@@ -54,17 +53,28 @@ func (t Signup) Run(gctx *cmdopts.Global, tlscfg *cmdopts.TLSConfig) (err error)
 
 	oauthc := cfg.Client(ctx, refreshtoken)
 
-	if err = loginssh(ctx, oauthc, nil, &authed); err != nil {
+	token, err := authn.LoginOptionsToken(ctx, oauthc, authn.LoginOptionAccountID(gctx.AccountID), authn.LoginOptionSubdomain(t.Account))
+	if err != nil {
+		return errorsx.Wrap(err, "unable to fetch login options")
+	}
+
+	if err = loginssh(ctx, oauthc, bytes.NewReader(token), &authed); err != nil {
 		return err
 	}
 
 	create := func() error {
-		if stringsx.Blank(t.Account) {
+		opts, err := authn.DecodeLoginOptions(token)
+		if err != nil {
+			return err
+		}
+
+		// the server resolved no account, signup for a new one.
+		if stringsx.Blank(opts.AccountID) {
 			return sshsession(ctx, chttp, signer, authn.EndpointSignup(), "")
 		}
 
-		// when joining an existing account the sso domain id is the md5 of the lowercased account name.
-		if err := sshsession(ctx, chttp, signer, authn.EndpointRegister(), md5x.String(strings.ToLower(t.Account))); err != nil {
+		// otherwise join the account, the issuer is the sso domain the server resolved.
+		if err := sshsession(ctx, chttp, signer, authn.EndpointRegister(), opts.ID); err != nil {
 			return err
 		}
 

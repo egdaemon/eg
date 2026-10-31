@@ -11,7 +11,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"os"
 	"strings"
 
 	"charm.land/huh/v2"
@@ -23,8 +22,8 @@ import (
 	"github.com/egdaemon/eg/internal/httpx"
 	"github.com/egdaemon/eg/internal/md5x"
 	"github.com/egdaemon/eg/internal/stringsx"
+	"github.com/egdaemon/eg/internal/termx"
 	"github.com/egdaemon/eg/repositories"
-	"github.com/mattn/go-isatty"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/oauth2"
 )
@@ -99,11 +98,6 @@ func (t ErrAmbiguous) Error() string {
 	return fmt.Sprintf("multiple profiles are associated with this ssh key; specify one with --account-id: %s", t.Identity)
 }
 
-// IsInteractive true when prompting is possible.
-func IsInteractive() bool {
-	return isatty.IsTerminal(os.Stdin.Fd())
-}
-
 // Resolve determines the account to use. in order:
 //  1. the explicitly provided account.
 //  2. the account remembered for the repository.
@@ -166,7 +160,7 @@ func resolve(ctx context.Context, db *sql.DB, c *http.Client, signer ssh.Signer,
 		}
 	}
 
-	if choose == nil || !IsInteractive() {
+	if choose == nil || !termx.IsInteractive() {
 		return Resolution{Candidates: candidates}, ErrAmbiguous{Identity: profiles.Identity.GetId()}
 	}
 
@@ -246,7 +240,7 @@ func hasRepository(ctx context.Context, c *http.Client, p *authn.Authn, vcsuri s
 // Choose presents an interactive picker for selecting among multiple profiles associated with an
 // ssh key. requires a tty since huh renders an interactive prompt.
 func Choose(profiles []*authn.Authn) (*authn.Authn, error) {
-	if !IsInteractive() {
+	if !termx.IsInteractive() {
 		return nil, errorsx.Notification(errors.New(
 			"multiple profiles are associated with this ssh key; specify one with --account when not running interactively",
 		))

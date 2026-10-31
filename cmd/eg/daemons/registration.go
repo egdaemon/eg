@@ -9,6 +9,7 @@ import (
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/egdaemon/eg/cmd/cmdopts"
+	"github.com/egdaemon/eg/identity"
 	"github.com/egdaemon/eg/internal/debugx"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/jwtx"
@@ -28,7 +29,7 @@ import (
 func genregistration(s ssh.Signer, p2pid peer.ID, runtimecfg *cmdopts.RuntimeResources) *registration.Registration {
 	return &registration.Registration{
 		P2Pid:       p2pid.String(),
-		Description: fmt.Sprintf("%s - %s", systemx.HostnameOrDefault("unknown.eg.lan"), ssh.FingerprintSHA256(s.PublicKey())),
+		Description: fmt.Sprintf("%s - %s", systemx.HostnameOrDefault("unknown.eg.lan"), identity.ID(s.PublicKey())),
 		Os:          runtimecfg.OS,
 		Arch:        runtimecfg.Arch,
 		Cores:       runtimecfg.Cores,
@@ -42,8 +43,9 @@ func genregistration(s ssh.Signer, p2pid peer.ID, runtimecfg *cmdopts.RuntimeRes
 
 func Register(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, runtimecfg *cmdopts.RuntimeResources, aid, machineid string, p2p host.Host, relays *atomic.Pointer[[]peer.AddrInfo], s ssh.Signer) (err error) {
 	fingerprint := ssh.FingerprintSHA256(s.PublicKey())
-	log.Println("registering daemon with control plane initiated", aid, machineid, fingerprint, p2p.ID().String())
-	defer log.Println("registering daemon with control plane completed", aid, machineid, fingerprint)
+	id := identity.ID(s.PublicKey())
+	log.Printf("registering daemon with control plane initiated aid(%s) mid(%s) id(%s) - fingerprint(%s) p2p(%s)\n", aid, machineid, id, fingerprint, p2p.ID().String())
+	defer log.Printf("registering daemon with control plane completed aid(%s) mid(%s) id(%s) - fingerprint(%s) p2p(%s)\n", aid, machineid, id, fingerprint, p2p.ID().String())
 
 	if stringsx.Blank(aid) {
 		return errorsx.String("an account id is required to register the daemon")

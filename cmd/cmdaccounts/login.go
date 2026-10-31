@@ -8,9 +8,11 @@ import (
 	"os"
 
 	"github.com/davecgh/go-spew/spew"
+	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/authn"
 	"github.com/egdaemon/eg/cmd/cmdidentity"
 	"github.com/egdaemon/eg/cmd/cmdopts"
+	"github.com/egdaemon/eg/internal/browserx"
 	"github.com/egdaemon/eg/internal/debugx"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/langx"
@@ -24,6 +26,7 @@ type Login struct {
 	SSHKeyPath string `name:"sshkeypath" help:"path to ssh key to use" default:"${vars_ssh_key_path}"`
 	Seed       string `name:"seed" help:"seed for generating determistic credentials, useful for ci/cd platforms" default:"${vars_entropy_seed}"`
 	Account    string `name:"account" help:"optional account id to login with, disambiguates when the ssh key is associated with multiple profiles" env:"EG_ACCOUNT"`
+	Browser    bool   `name:"browser" help:"open the console in the default browser once logged in"`
 }
 
 func (t Login) Run(gctx *cmdopts.Global, tlscfg *cmdopts.TLSConfig, ident *cmdidentity.T) (err error) {
@@ -63,6 +66,8 @@ func (t Login) run(ctx context.Context, account string, oauthc *http.Client, cht
 
 	debugx.Println("authed", spew.Sdump(&authed))
 
+	var profile *authn.Authn
+
 	switch len(authed.Profiles) {
 	case 0:
 		return errorsx.Notification(fmt.Errorf(
@@ -72,12 +77,20 @@ func (t Login) run(ctx context.Context, account string, oauthc *http.Client, cht
 			stringsx.First(os.Args...),
 		))
 	case 1:
-		return session(ctx, chttp, authed.Profiles[0])
+		profile = authed.Profiles[0]
 	default:
-		profile, err := choose(authed.Profiles)
-		if err != nil {
+		if profile, err = choose(authed.Profiles); err != nil {
 			return err
 		}
-		return session(ctx, chttp, profile)
 	}
+
+	if t.Browser {
+		return browserx.Open(ctx, fmt.Sprintf("%s?lt=%s", eg.EnvConsoleHostDefault(), profile.Token))
+	}
+
+	if err = session(ctx, chttp, profile); err != nil {
+		return err
+	}
+
+	return nil
 }

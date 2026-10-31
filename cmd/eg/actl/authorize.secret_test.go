@@ -49,6 +49,24 @@ func TestAuthorizeSecretParsing(t *testing.T) {
 		require.Error(t, err)
 	})
 
+	t.Run("seed falls back to the environment", func(t *testing.T) {
+		t.Setenv("EG_ENTROPY_SEED", "env-seed")
+		genparser := cmdtestx.Genparser(AuthorizeSecret{}, kong.Vars{"vars_ssh_key_path": "/expected/path"})
+
+		kctx, err := genparser(t).Parse([]string{"command"})
+		require.NoError(t, err)
+		require.Equal(t, "env-seed", kctx.Selected().Positional[0].Target.String())
+	})
+
+	t.Run("explicit seed wins over the environment", func(t *testing.T) {
+		t.Setenv("EG_ENTROPY_SEED", "env-seed")
+		genparser := cmdtestx.Genparser(AuthorizeSecret{}, kong.Vars{"vars_ssh_key_path": "/expected/path"})
+
+		kctx, err := genparser(t).Parse([]string{"command", "arg-seed"})
+		require.NoError(t, err)
+		require.Equal(t, "arg-seed", kctx.Selected().Positional[0].Target.String())
+	})
+
 	t.Run("sshkeypath default resolves at parse time", func(t *testing.T) {
 		genparser := cmdtestx.Genparser(AuthorizeSecret{}, kong.Vars{"vars_ssh_key_path": "/expected/path"})
 

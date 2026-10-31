@@ -13,8 +13,8 @@ type accountCompact struct {
 
 func (t accountCompact) Format(f fmt.State, verb rune) {
 	v := t.a.GetId()
-	if stringsx.Present(t.a.GetDisplay()) {
-		v = fmt.Sprintf("%.8s - %s", v, t.a.GetDisplay())
+	if stringsx.Present(t.a.Description) {
+		v = fmt.Sprintf("%.8s - %s", v, t.a.Description)
 	}
 
 	// width, precision and flags are applied to the whole value.
@@ -32,7 +32,7 @@ type profileCompact struct {
 }
 
 func (t profileCompact) Format(f fmt.State, verb rune) {
-	_, _ = fmt.Fprintf(f, fmt.FormatString(f, 's'), stringsx.First(t.p.GetDisplay(), t.p.GetId()))
+	_, _ = fmt.Fprintf(f, fmt.FormatString(f, 's'), stringsx.First(t.p.Display, t.p.Id))
 }
 
 // TypographyProfileCompact formats the profile as its shortest human friendly name, the display name falling back to the id.
@@ -54,4 +54,20 @@ func (t authnTypography) Format(f fmt.State, verb rune) {
 // TypographyAuthn formats the identity as its account followed by its profile. both are required.
 func TypographyAuthn(a *authn.Authn) fmt.Formatter {
 	return authnTypography{a: a}
+}
+
+type sessionTypography struct {
+	c *authn.Current
+}
+
+func (t sessionTypography) Format(f fmt.State, verb rune) {
+	v := fmt.Sprintf("%v - %v", TypographyAccountCompact(t.c.Account), TypographyProfileCompact(t.c.Profile))
+
+	// width, precision and flags are applied to the whole value.
+	_, _ = fmt.Fprintf(f, fmt.FormatString(f, 's'), v)
+}
+
+// TypographySession formats the session as its account followed by its profile. both are required.
+func TypographySession(c *authn.Current) fmt.Formatter {
+	return sessionTypography{c: c}
 }

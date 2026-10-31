@@ -57,7 +57,7 @@ func TestSignupRun(t *testing.T) {
 			sessions++
 			encoded, err := json.Marshal(authn.Current{
 				Profile: &authn.Profile{Id: "profile-1", Display: "dave"},
-				Account: &authn.Account{Id: "account-1", Display: "dave's account"},
+				Account: &authn.Account{Id: "account-1", Description: "dave's account"},
 			})
 			require.NoError(t, err)
 			return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(bytes.NewReader(encoded)), Header: http.Header{}}
@@ -111,7 +111,7 @@ func TestSignupRun(t *testing.T) {
 			signups++
 			encoded, err := json.Marshal(authn.Current{
 				Profile: &authn.Profile{Id: "profile-1", Display: "dave"},
-				Account: &authn.Account{Id: "account-1", Display: "dave's account"},
+				Account: &authn.Account{Id: "account-1", Description: "dave's account"},
 			})
 			require.NoError(t, err)
 			return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(bytes.NewReader(encoded)), Header: http.Header{}}
@@ -165,7 +165,7 @@ func TestSignupRun(t *testing.T) {
 			registrations++
 			encoded, err := json.Marshal(authn.Current{
 				Profile: &authn.Profile{Id: "profile-1", Display: "dave"},
-				Account: &authn.Account{Id: "account-1", Display: "dave's account"},
+				Account: &authn.Account{Id: "account-1", Description: "dave's account"},
 			})
 			require.NoError(t, err)
 			return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(bytes.NewReader(encoded)), Header: http.Header{}}
@@ -236,7 +236,7 @@ func TestSignupRun(t *testing.T) {
 				return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(bytes.NewReader(options)), Header: http.Header{}}
 			}
 			require.Equal(t, "/authn/ssh", req.URL.Path)
-			encoded, err := json.Marshal(authn.Authed{Profiles: []*authn.Authn{{Token: "token-1", Profile: &authn.Profile{Id: "profile-1", Display: "dave", AccountId: "acct-001"}, Account: &authn.Account{Id: "acct-001", Display: "acme"}}}})
+			encoded, err := json.Marshal(authn.Authed{Profiles: []*authn.Authn{{Token: "token-1", Profile: &authn.Profile{Id: "profile-1", Display: "dave", AccountId: "acct-001"}, Account: &authn.Account{Id: "acct-001", Description: "acme"}}}})
 			require.NoError(t, err)
 			return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(bytes.NewReader(encoded)), Header: http.Header{}}
 		})
@@ -246,7 +246,7 @@ func TestSignupRun(t *testing.T) {
 			requests = append(requests, req.URL.Path+" "+req.Header.Get("Authorization"))
 			encoded, err := json.Marshal(authn.Current{
 				Profile: &authn.Profile{Id: "profile-1", Display: "dave"},
-				Account: &authn.Account{Id: "acct-001", Display: "acme"},
+				Account: &authn.Account{Id: "acct-001", Description: "acme"},
 			})
 			require.NoError(t, err)
 			return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(bytes.NewReader(encoded)), Header: http.Header{}}
@@ -278,7 +278,7 @@ func TestSignupRun(t *testing.T) {
 				return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(bytes.NewReader(options)), Header: http.Header{}}
 			}
 			require.Equal(t, "/authn/ssh", req.URL.Path)
-			encoded, err := json.Marshal(authn.Authed{Profiles: []*authn.Authn{{Token: "token-1", Profile: &authn.Profile{Id: "profile-1", Display: "dave", AccountId: "acct-001"}, Account: &authn.Account{Id: "acct-001", Display: "acme"}}, {Token: "token-2", Profile: &authn.Profile{Id: "profile-2", Display: "erin", AccountId: "acct-002"}, Account: &authn.Account{Id: "acct-002", Display: "globex"}}}})
+			encoded, err := json.Marshal(authn.Authed{Profiles: []*authn.Authn{{Token: "token-1", Profile: &authn.Profile{Id: "profile-1", Display: "dave", AccountId: "acct-001"}, Account: &authn.Account{Id: "acct-001", Description: "acme"}}, {Token: "token-2", Profile: &authn.Profile{Id: "profile-2", Display: "erin", AccountId: "acct-002"}, Account: &authn.Account{Id: "acct-002", Description: "globex"}}}})
 			require.NoError(t, err)
 			return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(bytes.NewReader(encoded)), Header: http.Header{}}
 		})
@@ -288,7 +288,7 @@ func TestSignupRun(t *testing.T) {
 			requests = append(requests, req.URL.Path+" "+req.Header.Get("Authorization"))
 			encoded, err := json.Marshal(authn.Current{
 				Profile: &authn.Profile{Id: "profile-1", Display: "dave"},
-				Account: &authn.Account{Id: "acct-001", Display: "acme"},
+				Account: &authn.Account{Id: "acct-001", Description: "acme"},
 			})
 			require.NoError(t, err)
 			return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(bytes.NewReader(encoded)), Header: http.Header{}}
@@ -320,7 +320,7 @@ func TestSignupRun(t *testing.T) {
 				return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(bytes.NewReader(options)), Header: http.Header{}}
 			}
 			require.Equal(t, "/authn/ssh", req.URL.Path)
-			encoded, err := json.Marshal(authn.Authed{Profiles: []*authn.Authn{{Token: "token-1", Profile: &authn.Profile{Id: "profile-1", Display: "dave", AccountId: "acct-001"}, Account: &authn.Account{Id: "acct-001", Display: "acme"}}, {Token: "token-2", Profile: &authn.Profile{Id: "profile-2", Display: "erin", AccountId: "acct-002"}, Account: &authn.Account{Id: "acct-002", Display: "globex"}}}})
+			encoded, err := json.Marshal(authn.Authed{Profiles: []*authn.Authn{{Token: "token-1", Profile: &authn.Profile{Id: "profile-1", Display: "dave", AccountId: "acct-001"}, Account: &authn.Account{Id: "acct-001", Description: "acme"}}, {Token: "token-2", Profile: &authn.Profile{Id: "profile-2", Display: "erin", AccountId: "acct-002"}, Account: &authn.Account{Id: "acct-002", Description: "globex"}}}})
 			require.NoError(t, err)
 			return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(bytes.NewReader(encoded)), Header: http.Header{}}
 		})
@@ -330,7 +330,7 @@ func TestSignupRun(t *testing.T) {
 			requests = append(requests, req.URL.Path+" "+req.Header.Get("Authorization"))
 			encoded, err := json.Marshal(authn.Current{
 				Profile: &authn.Profile{Id: "profile-1", Display: "dave"},
-				Account: &authn.Account{Id: "acct-001", Display: "acme"},
+				Account: &authn.Account{Id: "acct-001", Description: "acme"},
 			})
 			require.NoError(t, err)
 			return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(bytes.NewReader(encoded)), Header: http.Header{}}
@@ -362,7 +362,7 @@ func TestSignupRun(t *testing.T) {
 				return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(bytes.NewReader(options)), Header: http.Header{}}
 			}
 			require.Equal(t, "/authn/ssh", req.URL.Path)
-			encoded, err := json.Marshal(authn.Authed{Profiles: []*authn.Authn{{Token: "token-1", Profile: &authn.Profile{Id: "profile-1", Display: "dave", AccountId: "acct-001"}, Account: &authn.Account{Id: "acct-001", Display: "acme"}}, {Token: "token-2", Profile: &authn.Profile{Id: "profile-2", Display: "erin", AccountId: "acct-002"}, Account: &authn.Account{Id: "acct-002", Display: "globex"}}}})
+			encoded, err := json.Marshal(authn.Authed{Profiles: []*authn.Authn{{Token: "token-1", Profile: &authn.Profile{Id: "profile-1", Display: "dave", AccountId: "acct-001"}, Account: &authn.Account{Id: "acct-001", Description: "acme"}}, {Token: "token-2", Profile: &authn.Profile{Id: "profile-2", Display: "erin", AccountId: "acct-002"}, Account: &authn.Account{Id: "acct-002", Description: "globex"}}}})
 			require.NoError(t, err)
 			return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(bytes.NewReader(encoded)), Header: http.Header{}}
 		})
@@ -372,7 +372,7 @@ func TestSignupRun(t *testing.T) {
 			requests = append(requests, req.URL.Path+" "+req.Header.Get("Authorization"))
 			encoded, err := json.Marshal(authn.Current{
 				Profile: &authn.Profile{Id: "profile-1", Display: "dave"},
-				Account: &authn.Account{Id: "acct-001", Display: "acme"},
+				Account: &authn.Account{Id: "acct-001", Description: "acme"},
 			})
 			require.NoError(t, err)
 			return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(bytes.NewReader(encoded)), Header: http.Header{}}
@@ -404,7 +404,7 @@ func TestSignupRun(t *testing.T) {
 				return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(bytes.NewReader(options)), Header: http.Header{}}
 			}
 			require.Equal(t, "/authn/ssh", req.URL.Path)
-			encoded, err := json.Marshal(authn.Authed{Profiles: []*authn.Authn{{Token: "token-1", Profile: &authn.Profile{Id: "profile-1", Display: "dave", AccountId: "acct-001"}, Account: &authn.Account{Id: "acct-001", Display: "acme"}}, {Token: "token-2", Profile: &authn.Profile{Id: "profile-2", Display: "erin", AccountId: "acct-002"}, Account: &authn.Account{Id: "acct-002", Display: "globex"}}}})
+			encoded, err := json.Marshal(authn.Authed{Profiles: []*authn.Authn{{Token: "token-1", Profile: &authn.Profile{Id: "profile-1", Display: "dave", AccountId: "acct-001"}, Account: &authn.Account{Id: "acct-001", Description: "acme"}}, {Token: "token-2", Profile: &authn.Profile{Id: "profile-2", Display: "erin", AccountId: "acct-002"}, Account: &authn.Account{Id: "acct-002", Description: "globex"}}}})
 			require.NoError(t, err)
 			return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(bytes.NewReader(encoded)), Header: http.Header{}}
 		})
@@ -414,7 +414,7 @@ func TestSignupRun(t *testing.T) {
 			requests = append(requests, req.URL.Path+" "+req.Header.Get("Authorization"))
 			encoded, err := json.Marshal(authn.Current{
 				Profile: &authn.Profile{Id: "profile-1", Display: "dave"},
-				Account: &authn.Account{Id: "acct-001", Display: "acme"},
+				Account: &authn.Account{Id: "acct-001", Description: "acme"},
 			})
 			require.NoError(t, err)
 			return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(bytes.NewReader(encoded)), Header: http.Header{}}

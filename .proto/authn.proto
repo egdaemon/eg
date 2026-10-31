@@ -12,7 +12,10 @@ message Identity {
 
 message Account {
   string id = 1 [ json_name = "id" ];
-  string display = 2 [ json_name = "display" ];
+  string description = 2 [ json_name = "description" ];
+  string created_at = 3 [ json_name = "created_at" ];
+  string updated_at = 4 [ json_name = "updated_at" ];
+  string disabled_at = 5 [ json_name = "disabled_at" ];
 }
 
 message Profile {

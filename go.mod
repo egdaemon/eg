@@ -19,8 +19,8 @@ require (
 	github.com/dominikbraun/graph v0.23.0
 	github.com/duckdb/duckdb-go/v2 v2.10503.1
 	github.com/dustin/go-humanize v1.1.0
-	github.com/egdaemon/gdx v0.0.0-20260824162813-84291833ef44
-	github.com/egdaemon/gdx/konggdx v0.0.0-20260824162813-84291833ef44
+	github.com/egdaemon/gdx v0.0.0-20261031085230-c2c1dd829dc4
+	github.com/egdaemon/gdx/konggdx v0.0.0-20261031085230-c2c1dd829dc4
 	github.com/egdaemon/wasinet/wasinet v0.0.0-20261027202319-9cfc20f44598
 	github.com/egdaemon/wasinet/wazeronet v0.0.0-20260928194155-07f223337a8d
 	github.com/fsnotify/fsnotify v1.10.1

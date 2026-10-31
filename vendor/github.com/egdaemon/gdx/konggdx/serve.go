@@ -6,6 +6,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"path/filepath"
 
 	"github.com/egdaemon/gdx"
 )
@@ -17,6 +18,10 @@ type Serve struct {
 
 func (t Serve) Run(ctx context.Context) error {
 	os.Remove(t.Socket)
+
+	if err := os.MkdirAll(filepath.Dir(t.Socket), 0700); err != nil {
+		return fmt.Errorf("unable to create gdx debug socket directory: %w", err)
+	}
 
 	l, err := net.Listen("unix", t.Socket)
 	if err != nil {

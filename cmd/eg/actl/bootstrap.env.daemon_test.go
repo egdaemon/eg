@@ -3,8 +3,10 @@ package actl_test
 import (
 	"bytes"
 	"fmt"
+	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 
 	"github.com/alecthomas/kong"
@@ -169,5 +171,64 @@ func TestBootstrapEnvDaemon(t *testing.T) {
 				require.Contains(t, out.String(), c.contains)
 			})
 		}
+	})
+
+	t.Run("custom environment variables are included", func(t *testing.T) {
+		t.Setenv("BOOTSTRAP_TEST_BARE", "from-env")
+
+		dir := t.TempDir()
+		file := filepath.Join(dir, "extra.env")
+		require.NoError(t, os.WriteFile(file, []byte("FROM_FILE=file\nOVERRIDDEN=file\n"), 0o600))
+
+		for _, c := range []struct {
+			name     string
+			args     []string
+			contains []string
+			absent   []string
+		}{
+			{name: "none", absent: []string{"FOO=", "BOOTSTRAP_TEST_BARE", "FROM_FILE"}},
+			{name: "explicit", args: []string{"-e", "FOO=bar"}, contains: []string{"FOO=bar\n"}},
+			{name: "bare key is read from the process environment", args: []string{"--env", "BOOTSTRAP_TEST_BARE"}, contains: []string{"BOOTSTRAP_TEST_BARE=from-env"}},
+			{name: "unset bare key is omitted", args: []string{"-e", "BOOTSTRAP_TEST_UNSET"}, absent: []string{"BOOTSTRAP_TEST_UNSET"}},
+			{name: "repeated", args: []string{"-e", "A=1", "-e", "B=2"}, contains: []string{"A=1\n", "B=2\n"}},
+			{name: "path", args: []string{"--envpath", file}, contains: []string{"FROM_FILE=file", "OVERRIDDEN=file"}},
+			{name: "missing path is a noop", args: []string{"--envpath", filepath.Join(dir, "missing.env")}, absent: []string{"FROM_FILE"}},
+			{name: "env wins over path", args: []string{"--envpath", file, "-e", "OVERRIDDEN=env"}, contains: []string{"OVERRIDDEN=file\nOVERRIDDEN=env\n"}},
+		} {
+			t.Run(c.name, func(t *testing.T) {
+				var out bytes.Buffer
+				genparser := cmdtestx.Genparser(actl.BootstrapEnvDaemon{},
+					cmdopts.RuntimeResources{}.KongVars(),
+					kong.NamedMapper("durationinf", kong.MapperFunc(cmdopts.ParseDurationInf)),
+					kong.Vars{"vars_account_id": "expected-account", "vars_entropy_seed": "expected-seed"},
+					kong.Writers(&out, nil),
+					kong.Bind(cmdopts.Entropy(cmdopts.GenerateEntropy)),
+				)
+
+				require.NoError(t, cmdtestx.Execute(t, genparser(t), append([]string{"command"}, c.args...)...))
+				for _, v := range c.contains {
+					require.Contains(t, out.String(), v)
+				}
+				for _, v := range c.absent {
+					require.NotContains(t, out.String(), v)
+				}
+			})
+		}
+	})
+
+	t.Run("custom environment variables follow the generated ones", func(t *testing.T) {
+		var out bytes.Buffer
+		genparser := cmdtestx.Genparser(actl.BootstrapEnvDaemon{},
+			cmdopts.RuntimeResources{}.KongVars(),
+			kong.NamedMapper("durationinf", kong.MapperFunc(cmdopts.ParseDurationInf)),
+			kong.Vars{"vars_account_id": "expected-account", "vars_entropy_seed": "expected-seed"},
+			kong.Writers(&out, nil),
+			kong.Bind(cmdopts.Entropy(cmdopts.GenerateEntropy)),
+		)
+
+		require.NoError(t, cmdtestx.Execute(t, genparser(t), "command", "-e", "EG_RESTART_ON_UPGRADE=no"))
+		lines := strings.Split(strings.TrimSpace(out.String()), "\n")
+		require.Equal(t, "EG_RESTART_ON_UPGRADE=no", lines[len(lines)-1])
+		require.Contains(t, lines, "EG_RESTART_ON_UPGRADE=auto")
 	})
 }

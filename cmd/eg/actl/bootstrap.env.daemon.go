@@ -28,6 +28,8 @@ type BootstrapEnvDaemon struct {
 	RestartOnUpgrade string        `name:"restart-on-upgrade" help:"restart the daemon when the eg package is upgraded: auto, yes or no" enum:"auto,yes,no" default:"auto"`
 	MDNSAdvertise    bool          `name:"mdns-advertise" help:"advertise this daemon on the local network (multicast dns) so clients on the same network can upload to it directly" negatable:""`
 	LANPeerTTL       time.Duration `name:"lan-peer-ttl" type:"durationinf" help:"how long systems on the local network are remembered after they were last seen, the daemon's default applies when unset"`
+	Environment      []string      `name:"env" short:"e" help:"define environment variables and their values to be included"`
+	EnvironmentPaths []string      `name:"envpath" help:"environment files to include" default:""`
 }
 
 func (t BootstrapEnvDaemon) Run(kctx *kong.Context, gctx *cmdopts.Global, entropy cmdopts.Entropy) (err error) {
@@ -98,6 +100,8 @@ func (t BootstrapEnvDaemon) Run(kctx *kong.Context, gctx *cmdopts.Global, entrop
 	if t.LANPeerTTL > 0 {
 		environ.Var("EG_LAN_PEER_TTL", fmt.Sprintf("\"%s\"", t.LANPeerTTL))
 	}
+
+	environ.FromPath(t.EnvironmentPaths...).FromEnviron(envx.AutoEnviron(t.Environment...)...)
 
 	return environ.CopyTo(kctx.Stdout)
 }

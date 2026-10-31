@@ -107,7 +107,7 @@ func LoginOptionMachineID(mid string) LoginOption {
 	return loginOptionQuery("mid", mid)
 }
 
-// LoginOptionSubdomain requests the login options from a subdomain of the api host, the server resolves the
+// LoginOptionSubdomain requests the login options from a subdomain of the sso host, the server resolves the
 // account from the subdomain (the md5 of the lowercased name is the sso domain id). blank subdomains are ignored.
 func LoginOptionSubdomain(subdomain string) LoginOption {
 	if subdomain == "" {
@@ -115,8 +115,8 @@ func LoginOptionSubdomain(subdomain string) LoginOption {
 	}
 
 	return func(u *url.URL) {
-		api, _ := url.Parse(eg.EnvAPIHostDefault())
-		u.Host = subdomain + "." + api.Host
+		sso, _ := url.Parse(eg.EnvSSOHostDefault())
+		u.Host = subdomain + "." + sso.Host
 	}
 }
 

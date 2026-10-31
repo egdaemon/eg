@@ -282,9 +282,9 @@ func TestLoginOptionSubdomain(t *testing.T) {
 	api, err := url.Parse(eg.EnvAPIHostDefault())
 	require.NoError(t, err)
 
-	t.Run("prefixes the api host", func(t *testing.T) {
+	t.Run("prefixes the sso host", func(t *testing.T) {
 		seen := request(t, authn.LoginOptionSubdomain("acme"))
-		require.Equal(t, "acme."+api.Host, seen.Host)
+		require.Equal(t, "acme.sso.egdaemon.com", seen.Host)
 		require.Equal(t, api.Scheme, seen.Scheme)
 		require.Equal(t, "/authn/s/", seen.Path)
 		require.Equal(t, "account-1", seen.Query().Get("account_id"))
@@ -296,7 +296,7 @@ func TestLoginOptionSubdomain(t *testing.T) {
 
 	t.Run("composes with other options", func(t *testing.T) {
 		seen := request(t, authn.LoginOptionMachineID("machine-1"), authn.LoginOptionSubdomain("acme"))
-		require.Equal(t, "acme."+api.Host, seen.Host)
+		require.Equal(t, "acme.sso.egdaemon.com", seen.Host)
 		require.Equal(t, "machine-1", seen.Query().Get("mid"))
 		require.Equal(t, "account-1", seen.Query().Get("account_id"))
 	})
@@ -309,7 +309,7 @@ func TestLoginOptionSubdomain(t *testing.T) {
 
 	t.Run("last subdomain wins", func(t *testing.T) {
 		seen := request(t, authn.LoginOptionSubdomain("acme"), authn.LoginOptionSubdomain("other"))
-		require.Equal(t, "other."+api.Host, seen.Host)
+		require.Equal(t, "other.sso.egdaemon.com", seen.Host)
 	})
 
 	t.Run("order independent", func(t *testing.T) {

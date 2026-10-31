@@ -10,11 +10,11 @@ import (
 
 	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/authn"
+	"github.com/egdaemon/eg/cmd/cmdidentity"
 	"github.com/egdaemon/eg/identity"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/httpx"
 	"github.com/egdaemon/eg/internal/jwtx"
-	"github.com/egdaemon/eg/internal/stringsx"
 	"github.com/golang-jwt/jwt/v4"
 	"golang.org/x/crypto/ssh"
 )
@@ -55,8 +55,7 @@ func postsession(ctx context.Context, chttp *http.Client, endpoint string, token
 		return errorsx.Wrap(err, "session bad response")
 	}
 
-	log.Println("logged in as", session.Profile.Display, "-", session.Profile.Id)
-	log.Println("account", stringsx.DefaultIfBlank(session.Account.Display, session.Profile.AccountId))
+	log.Println("logged in as", cmdidentity.TypographySession(&session))
 	return nil
 }
 
@@ -70,8 +69,7 @@ func session(ctx context.Context, chttp *http.Client, authed *authn.Authn) (err 
 		return err
 	}
 
-	log.Println("logged in as", session.Profile.Display, "-", session.Profile.Id)
-	log.Println("account", stringsx.DefaultIfBlank(session.Account.Display, session.Profile.AccountId))
+	log.Println("logged in as", cmdidentity.TypographySession(session))
 	return nil
 }
 

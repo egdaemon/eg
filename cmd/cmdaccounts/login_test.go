@@ -68,7 +68,7 @@ func TestLoginRun(t *testing.T) {
 			require.Equal(t, "BEARER the-token", req.Header.Get("Authorization"))
 			encoded, err := json.Marshal(authn.Current{
 				Profile: &authn.Profile{Id: "profile-1", Display: "dave"},
-				Account: &authn.Account{Id: "account-1", Display: "dave's account"},
+				Account: &authn.Account{Id: "account-1", Description: "dave's account"},
 			})
 			require.NoError(t, err)
 			return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(bytes.NewReader(encoded)), Header: http.Header{}}
@@ -113,7 +113,7 @@ func TestLoginRun(t *testing.T) {
 		chttp := httptestx.NewTestClient(func(req *http.Request) *http.Response {
 			encoded, err := json.Marshal(authn.Current{
 				Profile: &authn.Profile{Id: "profile-1", Display: "dave"},
-				Account: &authn.Account{Id: "account-1", Display: "dave's account"},
+				Account: &authn.Account{Id: "account-1", Description: "dave's account"},
 			})
 			require.NoError(t, err)
 			return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(bytes.NewReader(encoded)), Header: http.Header{}}
@@ -142,7 +142,7 @@ func TestLoginRun(t *testing.T) {
 			require.Equal(t, "BEARER token-2", req.Header.Get("Authorization"))
 			encoded, err := json.Marshal(authn.Current{
 				Profile: &authn.Profile{Id: "profile-2", Display: "dave"},
-				Account: &authn.Account{Id: "account-2", Display: "dave's other account"},
+				Account: &authn.Account{Id: "account-2", Description: "dave's other account"},
 			})
 			require.NoError(t, err)
 			return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(bytes.NewReader(encoded)), Header: http.Header{}}

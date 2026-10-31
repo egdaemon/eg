@@ -14,7 +14,7 @@ import (
 )
 
 type AuthorizeSecret struct {
-	Seed       string `arg:"" name:"seed" placeholder:"00000000-0000-0000-0000-000000000000"`
+	Seed       string `arg:"" name:"seed" placeholder:"00000000-0000-0000-0000-000000000000" env:"EG_ENTROPY_SEED"`
 	SSHKeyPath string `name:"sshkeypath" help:"path to ssh key to use" default:"${vars_ssh_key_path}"`
 	Shared     bool   `name:"shared" help:"this setting is only useful for registering global runners and is a noop everywhere else" hidden:"true"`
 }

@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"log"
-	"os"
 	"path/filepath"
 
 	"github.com/egdaemon/eg/runtime/wasi/eg"
@@ -58,7 +57,7 @@ func TestModule(ctx context.Context, op eg.Op) error {
 	return eg.Perform(
 		ctx,
 		egbug.DirectoryTree(egtarball.Path("example")),
-		egdmg.Build(b, os.DirFS(egtarball.Path("example"))),
+		egdmg.Build(b, egtarball.Path("example")),
 	)
 }
 

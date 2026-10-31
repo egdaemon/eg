@@ -8,12 +8,12 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/cmd/cmdopts"
 	"github.com/egdaemon/eg/internal/debugx"
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/fsx"
+	"github.com/egdaemon/eg/internal/userx"
 	"github.com/egdaemon/eg/interp/events"
 	"github.com/egdaemon/eg/runners"
 	"github.com/egdaemon/eg/workspaces"
@@ -22,7 +22,7 @@ import (
 )
 
 func DefaultAgentSocketPath() string {
-	return filepath.Join(envx.String(os.TempDir(), eg.EnvRuntimeDirectory), "agent.socket")
+	return filepath.Join(envx.String(os.TempDir(), userx.EnvRuntimeDirectory), "agent.socket")
 }
 
 func DefaultAgentListener() (n net.Listener, err error) {

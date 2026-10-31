@@ -17,6 +17,7 @@ import (
 	"github.com/egdaemon/eg/cmd/cmdopts"
 	"github.com/egdaemon/eg/computeapi"
 	"github.com/egdaemon/eg/internal/computex"
+	"github.com/egdaemon/eg/internal/userx"
 	"github.com/go-git/go-git/v6"
 	gitconfig "github.com/go-git/go-git/v6/config"
 	"github.com/go-git/go-git/v6/plumbing/object"
@@ -289,7 +290,7 @@ func uploadrepo(t *testing.T) (dir string, sshkey string) {
 	dir = t.TempDir()
 	t.Chdir(dir)
 	t.Setenv("EG_SESSION_TOKEN", "refresh")
-	t.Setenv("CACHE_DIRECTORY", t.TempDir())
+	t.Setenv(userx.EnvCacheDirectory, t.TempDir())
 	t.Setenv("XDG_CACHE_HOME", t.TempDir())
 
 	repo, err := git.PlainInit(dir, false)

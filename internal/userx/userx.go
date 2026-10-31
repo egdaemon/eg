@@ -14,6 +14,11 @@ const (
 	DefaultDir = "eg"
 )
 
+const (
+	EnvRuntimeDirectory = "RUNTIME_DIRECTORY" // standard environment variable for runtime directories.
+	EnvCacheDirectory   = "CACHE_DIRECTORY"   // standard environment variable for cache directories.
+)
+
 func IsRoot(u *user.User) bool {
 	return u.Uid == Root().Uid
 }
@@ -86,12 +91,12 @@ func ConfigDirectory(rel ...string) string {
 func DefaultCacheDirectory(rel ...string) string {
 	user := CurrentUserOrDefault(Root())
 	if user.Uid == Root().Uid {
-		return filepath.Join(envx.String(filepath.Join("/", "var", "cache", DefaultDir), "CACHE_DIRECTORY"), filepath.Join(rel...))
+		return filepath.Join(envx.String(filepath.Join("/", "var", "cache", DefaultDir), EnvCacheDirectory), filepath.Join(rel...))
 	}
 
 	// if no directory is specified
 	defaultdir := filepath.Join(user.HomeDir, ".cache", DefaultDir)
-	return filepath.Join(envx.String(defaultdir, "CACHE_DIRECTORY", "XDG_CACHE_HOME"), filepath.Join(rel...))
+	return filepath.Join(envx.String(defaultdir, EnvCacheDirectory, "XDG_CACHE_HOME"), filepath.Join(rel...))
 }
 
 // DefaultRuntimeDirectory runtime directory for storing data.

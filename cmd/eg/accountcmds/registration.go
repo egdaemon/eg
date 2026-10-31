@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"net/http"
 	"os/exec"
 
 	"charm.land/huh/v2"
@@ -32,7 +33,6 @@ func (t Signup) Run(gctx *cmdopts.Global, tlscfg *cmdopts.TLSConfig) (err error)
 	var (
 		signer       ssh.Signer
 		state        string
-		authed       authn.Authed
 		refreshtoken *oauth2.Token
 	)
 
@@ -52,7 +52,13 @@ func (t Signup) Run(gctx *cmdopts.Global, tlscfg *cmdopts.TLSConfig) (err error)
 		return errorsx.WithStack(err)
 	}
 
-	oauthc := cfg.Client(ctx, refreshtoken)
+	return t.run(ctx, gctx, cfg.Client(ctx, refreshtoken), chttp, signer)
+}
+
+func (t Signup) run(ctx context.Context, gctx *cmdopts.Global, oauthc *http.Client, chttp *http.Client, signer ssh.Signer) (err error) {
+	var (
+		authed authn.Authed
+	)
 
 	token, err := authn.LoginOptionsToken(ctx, oauthc, authn.LoginOptionAccountID(gctx.AccountID), authn.LoginOptionSubdomain(t.Account))
 	if err != nil {
@@ -63,12 +69,12 @@ func (t Signup) Run(gctx *cmdopts.Global, tlscfg *cmdopts.TLSConfig) (err error)
 		return err
 	}
 
-	create := func() error {
-		opts, err := authn.DecodeLoginOptions(token)
-		if err != nil {
-			return err
-		}
+	opts, err := authn.DecodeLoginOptions(token)
+	if err != nil {
+		return err
+	}
 
+	create := func() error {
 		// the server resolved no sso domain, signup for a new account.
 		if stringsx.Blank(opts.ID) {
 			return sshsession(ctx, chttp, signer, authn.EndpointSignup(), "")
@@ -90,7 +96,7 @@ func (t Signup) Run(gctx *cmdopts.Global, tlscfg *cmdopts.TLSConfig) (err error)
 	case 0:
 		return create()
 	default:
-		if !termx.IsInteractive() {
+		if !termx.IsInteractive() || stringsx.Present(opts.AccountID) {
 			if len(authed.Profiles) == 1 {
 				return session(ctx, chttp, authed.Profiles[0])
 			}

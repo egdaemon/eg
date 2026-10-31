@@ -17,8 +17,8 @@ import (
 )
 
 type AuthorizeSecret struct {
-	Seed       string `arg:"" name:"seed" placeholder:"00000000-0000-0000-0000-000000000000" required:"" env:"${env_eg_entropy_seed}"`
 	SSHKeyPath string `name:"sshkeypath" help:"path to ssh key to use" default:"${vars_ssh_key_path}"`
+	Seed       string `arg:"" name:"seed" placeholder:"00000000-0000-0000-0000-000000000000" required:"" env:"${env_eg_entropy_seed}"`
 	Shared     bool   `name:"shared" help:"this setting is only useful for registering global runners and is a noop everywhere else" hidden:"true"`
 }
 
@@ -41,18 +41,19 @@ func (t AuthorizeSecret) Signer(entropy cmdopts.Entropy, keygen cmdopts.KeyGenSe
 
 func (t AuthorizeSecret) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, entropy cmdopts.Entropy, keygen cmdopts.KeyGenSeeded) (err error) {
 	var (
-		signer ssh.Signer
+		asigner ssh.Signer
+		dsigner ssh.Signer
 	)
 
-	if signer, err = t.Signer(entropy, keygen); err != nil {
+	if dsigner, err = t.Signer(entropy, keygen); err != nil {
 		return err
 	}
 
-	if signer, err = sshx.AutoCached(sshx.NewKeyGen(), t.SSHKeyPath); err != nil {
+	if asigner, err = sshx.AutoCached(sshx.NewKeyGenSeeded(t.Seed), t.SSHKeyPath); err != nil {
 		return err
 	}
 
-	return t.run(gctx.Context, tlsc.DefaultClient(), gctx.AccountID, signer.PublicKey(), signer)
+	return t.run(gctx.Context, tlsc.DefaultClient(), gctx.AccountID, dsigner.PublicKey(), asigner)
 }
 
 func (t AuthorizeSecret) run(ctx context.Context, c *http.Client, account string, pub ssh.PublicKey, signer ssh.Signer) (err error) {

@@ -155,6 +155,10 @@ const (
 	EnvUnsafeGcloudADCB64    = "EG_UNSAFE_GOOGLE_APPLICATION_CREDENTIALS_B64" // application default credentials, base64 encoded with the url alphabet (base64.URLEncoding). temporary hack while we deploy remap directory
 )
 
+// TODO: RuntimeDirectory, rename the value to ".eg.d". runner only change now that modules read EnvComputeRuntimeDirectory
+// (see egunsafe.RuntimeDirectory). modules built before that read this constant, so keep the legacy path
+// working for a window: mount the host dir a second time at /eg.mnt/.eg.runtime (runners/queue.go) and symlink
+// {root}/.eg.runtime -> .eg.d (workspaces/workspace.go). plain symlinks inside the container and hard links do not work.
 const (
 	DefaultUsername    = "egd" // workload username
 	WorkingDirectory   = "eg"

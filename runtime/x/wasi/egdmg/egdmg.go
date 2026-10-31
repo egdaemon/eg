@@ -117,7 +117,7 @@ func templateInfoPlist(path string) error {
 }
 
 func root(paths ...string) string {
-	return egenv.WorkspaceDirectory(filepath.Join(paths...))
+	return egenv.WorkspaceDirectory(paths...)
 }
 
 // Path from the given pattern

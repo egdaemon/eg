@@ -191,7 +191,7 @@ func AnalyticsCachePath(workload string) string {
 }
 
 func DefaultCacheDirectory(rel ...string) string {
-	return DefaultWorkloadDirectory(CacheDirectory, filepath.Join(rel...))
+	return DefaultRootDirectory(CacheDirectory, filepath.Join(rel...))
 }
 
 func DefaultRuntimeDirectory(rel ...string) string {
@@ -199,16 +199,16 @@ func DefaultRuntimeDirectory(rel ...string) string {
 }
 
 func DefaultWorkingDirectory(rel ...string) string {
-	return DefaultWorkloadDirectory(WorkingDirectory, filepath.Join(rel...))
+	return DefaultRootDirectory(WorkingDirectory, filepath.Join(rel...))
 }
 
 // default workspace directory
 func DefaultWorkspaceDirectory(rel ...string) string {
-	return DefaultWorkloadDirectory(WorkspaceDirectory, filepath.Join(rel...))
+	return DefaultRootDirectory(WorkspaceDirectory, filepath.Join(rel...))
 }
 
 // default egd directory root. holds the directories accessible by egd.
-func DefaultWorkloadDirectory(rel ...string) string {
+func DefaultRootDirectory(rel ...string) string {
 	return filepath.Join("/", "workload", filepath.Join(rel...))
 }
 

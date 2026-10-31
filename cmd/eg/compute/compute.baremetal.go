@@ -246,7 +246,7 @@ func (t baremetal) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, hotswapbin
 	defer environio.Close()
 
 	modulesenv := envx.Build().FromEnviron(errorsx.Must(cmdenvb.Environ())...).Var(
-		eg.EnvComputeWorkloadDirectory, eg.DefaultWorkloadDirectory(),
+		eg.EnvComputeWorkloadDirectory, eg.DefaultRootDirectory(),
 	).Var(
 		eg.EnvComputeWorkingDirectory, eg.DefaultWorkingDirectory(),
 	).Var(

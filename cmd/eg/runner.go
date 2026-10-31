@@ -178,7 +178,7 @@ func (t module) mounthack(ctx context.Context, runid string, ws workspaces.Conte
 		}
 
 		for _, d := range dirs {
-			rel, err := filepath.Rel(eg.DefaultWorkloadDirectory(), d)
+			rel, err := filepath.Rel(eg.DefaultRootDirectory(), d)
 			if err != nil {
 				log.Println("unable to map directory", d, err)
 				continue

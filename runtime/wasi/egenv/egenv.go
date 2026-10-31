@@ -127,6 +127,12 @@ func WorkspaceDirectory(paths ...string) string {
 	return filepath.Join(env.String(eg.DefaultWorkspaceDirectory(), eg.EnvComputeWorkspaceDirectory), filepath.Join(paths...))
 }
 
+// returns the absolute path to the working directory of the module. this directory is the
+// initial working directory of the workload and is used for cloning git repositories etc.
+func WorkingDirectory(paths ...string) string {
+	return filepath.Join(env.String(eg.DefaultWorkingDirectory(), eg.EnvComputeWorkingDirectory), filepath.Join(paths...))
+}
+
 // PathRelative reports paths within dir relative to it. relative paths and paths outside dir are returned as is.
 func PathRelative(dir string, path string) string {
 	if !filepath.IsAbs(path) {
@@ -145,12 +151,6 @@ func PathRelative(dir string, path string) string {
 // located, e.g.) a git worktree. relative paths and paths outside the workspace are returned as is.
 func PathRelativeWorkspace(path string) string {
 	return PathRelative(WorkspaceDirectory(), path)
-}
-
-// returns the absolute path to the working directory of the module. this directory is the
-// initial working directory of the workload and is used for cloning git repositories etc.
-func WorkingDirectory(paths ...string) string {
-	return filepath.Join(env.String(eg.DefaultWorkingDirectory(), eg.EnvComputeWorkingDirectory), filepath.Join(paths...))
 }
 
 // returns the absolute path to the ephemeral directory, when arguments are provided they are joined

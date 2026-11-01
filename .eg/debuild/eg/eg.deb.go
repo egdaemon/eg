@@ -71,7 +71,7 @@ func Prepare(ctx context.Context, o eg.Op) error {
 }
 
 // container for this package.
-func Runner() eg.ContainerRunner {
+func Runner() eg.C8S {
 	return eg.Container(container)
 }
 

@@ -6,22 +6,19 @@ import (
 	"reflect"
 	"runtime"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/egdaemon/eg"
-	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/interp/events"
 	"github.com/egdaemon/eg/runtime/wasi/egunsafe"
-	"github.com/egdaemon/eg/runtime/wasi/egunsafe/ffiegcontainer"
 	"github.com/egdaemon/eg/runtime/wasi/egunsafe/ffigraph"
 )
 
 // Generally unsafe predefined runner for modules. useful
 // for providing a base line environment but has no long term
 // stability promises.
-func DefaultModule() ContainerRunner {
+func DefaultModule() C8S {
 	path := egunsafe.RuntimeDirectory("eg.default.module")
 	errorsx.Never(eg.PrepareRootContainer(path))
 	return Container("eg").BuildFromFile(path)
@@ -218,141 +215,6 @@ type v interface {
 
 // Deprecated: use V and C.
 type Runner = v
-
-// Run the tasks with the specified container.
-func Container(name string) ContainerRunner {
-	return ContainerRunner{
-		name:  name,
-		built: &sync.Once{},
-	}
-}
-
-type coption []string
-
-func (t coption) workdir(dir string) coption {
-	return []string{"-w", dir}
-}
-
-func (t coption) envvar(k, v string) coption {
-	if v == "" {
-		return []string{"-e", k}
-	}
-
-	return []string{"-e", fmt.Sprintf("%s=%s", k, v)}
-}
-
-func (t coption) literal(options ...string) coption {
-	return options
-}
-
-type ContainerRunner struct {
-	name       string
-	definition string
-	pull       string
-	cmd        []string
-	options    []coption
-	built      *sync.Once
-}
-
-func (t ContainerRunner) Clone() ContainerRunner {
-	dup := t
-	dup.cmd = make([]string, 0, len(t.cmd))
-	dup.options = make([]coption, 0, len(t.options))
-	copy(dup.cmd, t.cmd)
-	copy(dup.options, t.options)
-	return t
-}
-
-func (t ContainerRunner) OptionLiteral(args ...string) ContainerRunner {
-	t.options = append(t.options, coption(nil).literal(args...))
-	return t
-}
-
-// specifies the location of the container file on disk.
-func (t ContainerRunner) BuildFromFile(s string) ContainerRunner {
-	t.definition = s
-	return t
-}
-
-// pull the container from a remote repository.
-func (t ContainerRunner) PullFrom(s string) ContainerRunner {
-	t.pull = s
-	return t
-}
-
-// the command to execute.
-func (t ContainerRunner) Command(s string) ContainerRunner {
-	t.cmd = strings.Split(s, " ")
-	return t
-}
-
-// CompileWith builds the container and
-func (t ContainerRunner) CompileWith(ctx context.Context) (err error) {
-	var opts []string
-	for _, o := range t.options {
-		opts = append(opts, o...)
-	}
-
-	t.built.Do(func() {
-		if t.pull != "" {
-			if err = errorsx.Wrapf(ffiegcontainer.Pull(ctx, t.pull, opts), "unable to pull the container: %s", t.name); err != nil {
-				return
-			}
-		}
-
-		if t.definition != "" {
-			if err = errorsx.Wrapf(ffiegcontainer.Build(ctx, t.name, t.definition, opts), "unable to build the container: %s", t.name); err != nil {
-				return
-			}
-		}
-	})
-
-	return err
-}
-
-func (t ContainerRunner) RunWith(ctx context.Context, mpath string) (err error) {
-	var opts []string
-	for _, o := range t.options {
-		opts = append(opts, o...)
-	}
-
-	return errorsx.Wrapf(ffiegcontainer.Run(ctx, t.name, mpath, t.cmd, opts), "unable to run the container: %s", t.name)
-}
-
-// internal use.
-func (t ContainerRunner) ToModuleRunner() ContainerModuleRunner {
-	return ContainerModuleRunner{ContainerRunner: t}
-}
-
-func (t ContainerRunner) OptionWorkingDirectory(dir string) ContainerRunner {
-	t.options = append(t.options, (coption{}).workdir(dir))
-	return t
-}
-
-func (t ContainerRunner) OptionEnvVar(k string) ContainerRunner {
-	t.options = append(t.options, (coption{}).envvar(k, ""))
-	return t
-}
-
-func (t ContainerRunner) OptionEnv(k, v string) ContainerRunner {
-	t.options = append(t.options, (coption{}).envvar(k, v))
-	return t
-}
-
-type ContainerModuleRunner struct {
-	ContainerRunner
-}
-
-func (t ContainerModuleRunner) RunWith(ctx context.Context, mpath string) (err error) {
-	var opts []string
-	for _, o := range t.options {
-		opts = append(opts, o...)
-	}
-
-	opts = append(opts, "-e", fmt.Sprintf("%s=%d", eg.EnvComputeModuleNestedLevel, envx.Int(-1, eg.EnvComputeModuleNestedLevel)+1))
-
-	return errorsx.Wrapf(ffiegcontainer.Module(ctx, t.name, mpath, opts), "unable to run the module: %s", t.name)
-}
 
 func Build(r C) OpFn {
 	return func(ctx context.Context, o Op) error {

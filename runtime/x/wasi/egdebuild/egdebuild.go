@@ -215,7 +215,7 @@ func New(pkg string, distro string, src string, opts ...option) (c Config) {
 
 // Basic container for building debian packages. the archive must provide the container file
 // to use. if you provide nil archive a default container will be provided but likely wont have dependencies needed.
-func Prepare(c eg.ContainerRunner, archive fs.FS) eg.OpFn {
+func Prepare(c eg.C8S, archive fs.FS) eg.OpFn {
 	return func(ctx context.Context, o eg.Op) error {
 		const relpath = "Containerfile"
 		if archive == nil {
@@ -237,7 +237,7 @@ func Prepare(c eg.ContainerRunner, archive fs.FS) eg.OpFn {
 }
 
 // container for this package.
-func Runner() eg.ContainerRunner {
+func Runner() eg.C8S {
 	return eg.Container(ContainerName)
 }
 

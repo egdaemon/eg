@@ -171,7 +171,7 @@ func debugSocket(ctx context.Context, runtime shell.Command, path string) {
 }
 
 // build llama.cpp container.
-func Prepare(c eg.ContainerRunner) eg.OpFn {
+func Prepare(c eg.C8S) eg.OpFn {
 	return func(ctx context.Context, o eg.Op) error {
 		const relpath = "Containerfile"
 		if err := egfs.CloneFS(ctx, egenv.DirectoryTemp(), relpath, skel); err != nil {
@@ -187,7 +187,7 @@ func Prepare(c eg.ContainerRunner) eg.OpFn {
 }
 
 // container for this package.
-func Runner() eg.ContainerRunner {
+func Runner() eg.C8S {
 	return eg.Container("eg.llamacpp")
 }
 

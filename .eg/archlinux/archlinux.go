@@ -25,7 +25,7 @@ const (
 	AURRepoSSHURI = "ssh://aur@aur.archlinux.org/egd.git"
 )
 
-func Builder(name string) eg.ContainerRunner {
+func Builder(name string) eg.C8S {
 	return eg.Container(name)
 }
 
@@ -36,7 +36,7 @@ func pkgver() string {
 }
 
 // AURRunner is the container used to publish the egd package to the AUR.
-func AURRunner() eg.ContainerRunner {
+func AURRunner() eg.C8S {
 	return Builder(AURContainerName)
 }
 

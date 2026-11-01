@@ -32,7 +32,7 @@ func render(runners ...*compute.Compute) string {
 
 		rows = append(rows, []string{
 			mark,
-			fmt.Sprintf("%v", TypographyRunnerCompact(r)),
+			fmt.Sprintf("%.64v", TypographyRunnerCompact(r)),
 			fmt.Sprintf("%v", TypographyRunnerPlatform(r)),
 			fmt.Sprintf("%d", r.GetCores()),
 			fmt.Sprintf("%v", TypographyBytes(r.GetMemory())),
@@ -57,5 +57,5 @@ func render(runners ...*compute.Compute) string {
 			}
 		})
 
-	return fmt.Sprintf("runners: %d, * shared with other accounts\n\n%s", len(runners), tbl.String())
+	return fmt.Sprintf("runners: %d\n\n%s", len(runners), tbl.String())
 }

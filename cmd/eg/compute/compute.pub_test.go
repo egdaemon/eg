@@ -51,8 +51,8 @@ func TestRender(t *testing.T) {
 	t.Run("should mark the runners shared with other accounts", func(t *testing.T) {
 		out := ansi.Strip(render(runners...))
 
-		require.Regexp(t, `^runners: 2, \* shared with other accounts\n`, out)
-		require.Regexp(t, `\* +│ 0190a1b2 - box +│ linux/amd64 +│ 4 +│ 2.00GiB +│ 0B +│ x,y +│ garbage`, out)
+		require.Regexp(t, `^runners: 2\n`, out)
+		require.Regexp(t, `\* +│ 0190a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b - box +│ linux/amd64 +│ 4 +│ 2.00GiB +│ 0B +│ x,y +│ garbage`, out)
 		require.Regexp(t, `  +│ 1190a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b +│ linux/arm64 +│ 0 +│ 0B +│ 0B +│ +│ garbage`, out)
 	})
 

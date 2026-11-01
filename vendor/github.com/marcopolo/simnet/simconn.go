@@ -13,7 +13,7 @@ import (
 var ErrDeadlineExceeded = errors.New("deadline exceeded")
 
 type PacketReceiver interface {
-	RecvPacket(p Packet)
+	RecvPacket(p *Packet)
 }
 
 // Router handles routing of packets between simulated connections.
@@ -31,9 +31,25 @@ type Packet struct {
 
 func (p *Packet) Hash(h *maphash.Hash) uint64 {
 	h.Reset()
-	h.WriteString(p.To.String())
-	h.WriteString(p.From.String())
+	hashAddr(h, p.To)
+	hashAddr(h, p.From)
 	return h.Sum64()
+}
+
+// hashAddr writes the address bytes to the hash without allocating a string.
+func hashAddr(h *maphash.Hash, addr net.Addr) {
+	switch a := addr.(type) {
+	case *net.UDPAddr:
+		h.Write(a.IP)
+		h.WriteByte(byte(a.Port >> 8))
+		h.WriteByte(byte(a.Port))
+	case *net.TCPAddr:
+		h.Write(a.IP)
+		h.WriteByte(byte(a.Port >> 8))
+		h.WriteByte(byte(a.Port))
+	default:
+		h.WriteString(addr.String())
+	}
 }
 
 // SimConn is a simulated network connection that implements net.PacketConn. It
@@ -57,7 +73,7 @@ type SimConn struct {
 
 	myAddr        *net.UDPAddr
 	myLocalAddr   net.Addr
-	packetsToRead chan Packet
+	packetsToRead chan *Packet
 
 	// Controls whether to block when receiving packets if our buffer is full.
 	// If false, drops packets.
@@ -65,6 +81,7 @@ type SimConn struct {
 
 	readDeadline  time.Time
 	writeDeadline time.Time
+	cancelSignal  <-chan struct{}
 }
 
 // NewSimConn creates a new simulated connection that drops packets if the
@@ -83,7 +100,7 @@ func newSimConn(addr *net.UDPAddr, block bool) *SimConn {
 	c := &SimConn{
 		recvBackPressure: block,
 		myAddr:           addr,
-		packetsToRead:    make(chan Packet, 32),
+		packetsToRead:    make(chan *Packet, 32),
 		closedChan:       make(chan struct{}),
 		deadlineUpdated:  make(chan struct{}, 1),
 	}
@@ -92,6 +109,12 @@ func newSimConn(addr *net.UDPAddr, block bool) *SimConn {
 
 func (c *SimConn) SetUpPacketReceiver(r PacketReceiver) {
 	c.upPacketReceiver = r
+}
+
+func (c *SimConn) setCancelSignal(cancelSignal <-chan struct{}) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.cancelSignal = cancelSignal
 }
 
 type ConnStats struct {
@@ -126,13 +149,15 @@ func (c *SimConn) SetWriteBuffer(n int) error {
 	return nil
 }
 
-func (c *SimConn) RecvPacket(p Packet) {
+func (c *SimConn) RecvPacket(p *Packet) {
 	c.mu.Lock()
 	if c.closed {
 		c.mu.Unlock()
 		return
 	}
+	cancelSignal := c.cancelSignal
 	c.mu.Unlock()
+
 	c.packetsRcvd.Add(1)
 	c.bytesRcvd.Add(int64(len(p.buf)))
 
@@ -142,10 +167,14 @@ func (c *SimConn) RecvPacket(p Packet) {
 		case <-c.closedChan:
 			// if the connection is closed, drop the packet
 			return
+		case <-cancelSignal:
+			return
 		}
 	} else {
 		select {
 		case c.packetsToRead <- p:
+		case <-c.closedChan:
+		case <-cancelSignal:
 		default:
 			// drop the packet if the channel is full
 		}
@@ -174,13 +203,14 @@ func (c *SimConn) ReadFrom(p []byte) (n int, addr net.Addr, err error) {
 		return 0, nil, net.ErrClosed
 	}
 	deadline := c.readDeadline
+	cancelSignal := c.cancelSignal
 	c.mu.Unlock()
 
 	if !deadline.IsZero() && !time.Now().Before(deadline) {
 		return 0, nil, ErrDeadlineExceeded
 	}
 
-	var pkt Packet
+	var pkt *Packet
 	var deadlineTimer <-chan time.Time
 	if !deadline.IsZero() {
 		deadlineTimer = time.After(time.Until(deadline))
@@ -189,6 +219,8 @@ func (c *SimConn) ReadFrom(p []byte) (n int, addr net.Addr, err error) {
 	select {
 	case pkt = <-c.packetsToRead:
 	case <-c.closedChan:
+		return 0, nil, net.ErrClosed
+	case <-cancelSignal:
 		return 0, nil, net.ErrClosed
 	case <-c.deadlineUpdated:
 		return c.ReadFrom(p)
@@ -220,7 +252,7 @@ func (c *SimConn) WriteTo(p []byte, addr net.Addr) (n int, err error) {
 	c.packetsSent.Add(1)
 	c.bytesSent.Add(int64(len(p)))
 
-	pkt := Packet{
+	pkt := &Packet{
 		From: c.myAddr,
 		To:   addr,
 		buf:  slices.Clone(p),

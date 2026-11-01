@@ -25,7 +25,7 @@ func (t runnerCompact) Format(f fmt.State, verb rune) {
 	_, _ = fmt.Fprintf(f, fmt.FormatString(f, 's'), v)
 }
 
-// TypographyRunnerCompact formats the runner as its id when there is no description, otherwise the abbreviated id
+// TypographyRunnerCompact formats the runner as its id when there is no description, otherwise the id
 // followed by the description. width, precision and flags are honored.
 func TypographyRunnerCompact(r *compute.Compute) fmt.Formatter {
 	return runnerCompact{r: r}

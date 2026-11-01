@@ -1,7 +1,6 @@
 package simnet
 
 import (
-	"container/heap"
 	"fmt"
 	"log/slog"
 	"net"
@@ -18,16 +17,17 @@ const (
 	DropReasonFirewalled         DropReason = "Packet firewalled"
 )
 
-type OnDrop func(packet Packet, reason DropReason)
+type OnDrop func(packet *Packet, reason DropReason)
 
 func LogOnDrop(logger *slog.Logger) OnDrop {
-	return func(packet Packet, reason DropReason) {
+	return func(packet *Packet, reason DropReason) {
 		logger.Error("Dropping packet", "from", packet.From, "to", packet.To, "reason", reason)
 	}
 }
 
 type ipPortKey struct {
-	ip    string
+	ip    [16]byte // fixed-size to avoid string allocation
+	ipLen uint8
 	port  uint16
 	isUDP bool
 }
@@ -35,29 +35,25 @@ type ipPortKey struct {
 func (k *ipPortKey) FromNetAddr(addr net.Addr) error {
 	switch addr := addr.(type) {
 	case *net.UDPAddr:
-		*k = ipPortKey{
-			ip:    string(addr.IP),
-			port:  uint16(addr.Port),
-			isUDP: true,
-		}
+		k.ipLen = uint8(copy(k.ip[:], addr.IP))
+		k.port = uint16(addr.Port)
+		k.isUDP = true
 		return nil
 	case *net.TCPAddr:
-		*k = ipPortKey{
-			ip:    string(addr.IP),
-			port:  uint16(addr.Port),
-			isUDP: false,
-		}
+		k.ipLen = uint8(copy(k.ip[:], addr.IP))
+		k.port = uint16(addr.Port)
+		k.isUDP = false
 		return nil
 	default:
-		ip, err := netip.ParseAddrPort(addr.String())
+		ap, err := netip.ParseAddrPort(addr.String())
 		if err != nil {
 			return err
 		}
-		*k = ipPortKey{
-			ip:    string(ip.Addr().AsSlice()),
-			port:  ip.Port(),
-			isUDP: addr.Network() == "udp",
-		}
+		b := ap.Addr().As16()
+		k.ip = b
+		k.ipLen = 16
+		k.port = ap.Port()
+		k.isUDP = addr.Network() == "udp"
 		return nil
 	}
 }
@@ -119,7 +115,7 @@ type PerfectRouter struct {
 	nodes  addrMap[PacketReceiver]
 }
 
-func (r *PerfectRouter) RecvPacket(p Packet) {
+func (r *PerfectRouter) RecvPacket(p *Packet) {
 	conn, ok := r.nodes.Get(p.To)
 	if !ok {
 		if r.OnDrop != nil {
@@ -146,13 +142,16 @@ type VariableLatencyRouter struct {
 	LatencyFunc func(packet *Packet) time.Duration
 	CloseSignal chan struct{}
 
-	packets     chan Packet
+	packets     chan *Packet
 	packetCount int
 	h           packetHeap
 }
 
-func (r *VariableLatencyRouter) RecvPacket(p Packet) {
-	r.packets <- p
+func (r *VariableLatencyRouter) RecvPacket(p *Packet) {
+	select {
+	case r.packets <- p:
+	case <-r.CloseSignal:
+	}
 }
 
 // wgGo is the same as Go 1.25's wg.Go. Remove this when Go 1.26 is out
@@ -165,8 +164,7 @@ func wgGo(wg *sync.WaitGroup, f func()) {
 }
 
 func (r *VariableLatencyRouter) Start(wg *sync.WaitGroup) {
-	r.packets = make(chan Packet, 128)
-	heap.Init(&r.h)
+	r.packets = make(chan *Packet, 128)
 
 	wgGo(wg, func() {
 		var nextDelivery time.Time
@@ -179,10 +177,10 @@ func (r *VariableLatencyRouter) Start(wg *sync.WaitGroup) {
 				return
 			case p := <-r.packets:
 				r.packetCount++
-				latency := r.LatencyFunc(&p)
+				latency := r.LatencyFunc(p)
 				deliveryTime := time.Now().Add(latency)
-				heap.Push(&r.h, packetWithDeliveryTimeAndOrder{
-					Packet:       &p,
+				r.h.push(packetWithDeliveryTimeAndOrder{
+					Packet:       p,
 					order:        r.packetCount,
 					deliveryTime: deliveryTime,
 				})
@@ -193,8 +191,8 @@ func (r *VariableLatencyRouter) Start(wg *sync.WaitGroup) {
 			case <-deliveryTimer.C:
 				now := time.Now()
 				for len(r.h) > 0 && !r.h[0].deliveryTime.After(now) {
-					p := heap.Pop(&r.h).(packetWithDeliveryTimeAndOrder).Packet
-					r.PerfectRouter.RecvPacket(*p)
+					p := r.h.pop().Packet
+					r.PerfectRouter.RecvPacket(p)
 				}
 				if len(r.h) > 0 {
 					nextDelivery = r.h[0].deliveryTime
@@ -214,7 +212,7 @@ type simpleNodeFirewall struct {
 	node              PacketReceiver
 }
 
-func (f *simpleNodeFirewall) MarkPacketSentOut(p Packet) {
+func (f *simpleNodeFirewall) MarkPacketSentOut(p *Packet) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	if f.packetsOutTo == nil {
@@ -223,7 +221,7 @@ func (f *simpleNodeFirewall) MarkPacketSentOut(p Packet) {
 	f.packetsOutTo[p.To.String()] = struct{}{}
 }
 
-func (f *simpleNodeFirewall) IsPacketInAllowed(p Packet) bool {
+func (f *simpleNodeFirewall) IsPacketInAllowed(p *Packet) bool {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	if f.publiclyReachable {
@@ -264,7 +262,7 @@ func (r *SimpleFirewallRouter) SetAddrPubliclyReachable(addr net.Addr) {
 	r.publiclyReachableAddrs[addr.String()] = true
 }
 
-func (r *SimpleFirewallRouter) RecvPacket(p Packet) {
+func (r *SimpleFirewallRouter) RecvPacket(p *Packet) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	toNode, exists := r.nodes[p.To.String()]

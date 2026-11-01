@@ -35,7 +35,6 @@ func NewClient(ctx context.Context, bootstrap ...peer.AddrInfo) (_ host.Host, er
 	}
 
 	ldht, err := dht.New(
-		ctx,
 		self,
 		dht.Datastore(dsync.MutexWrap(ds.NewMapDatastore())),
 		dht.Mode(dht.ModeClient),

@@ -9,12 +9,6 @@ const Mibps = 1_000_000
 
 const DefaultFlowBucketCount = 128
 
-// packetWithDeliveryTime holds a packet along with its delivery time and enqueue time
-type packetWithDeliveryTime struct {
-	Packet
-	DeliveryTime time.Time
-}
-
 // LinkSettings defines the network characteristics for a simulated link direction
 type LinkSettings struct {
 	// BitsPerSecond specifies the bandwidth limit in bits per second
@@ -87,10 +81,11 @@ func (l *Simlink) Start(wg *sync.WaitGroup) {
 }
 
 type linkDriver struct {
-	newPacket   chan Packet
-	q           fqCoDel
-	rateLink    *RateLink
-	closeSignal chan struct{}
+	newPacket     chan *Packet
+	q             fqCoDel
+	rateLink      *RateLink
+	closeSignal   chan struct{}
+	pendingPacket *Packet
 }
 
 func newLinkDriver(
@@ -101,22 +96,46 @@ func newLinkDriver(
 	receiver PacketReceiver,
 	closeSignal chan struct{}) *linkDriver {
 	return &linkDriver{
-		newPacket:   make(chan Packet, 1_024),
+		newPacket:   make(chan *Packet, 32),
 		q:           newFqCoDel(target, interval, quantum, flowCount),
 		closeSignal: closeSignal,
 		rateLink:    NewRateLink(bandwidth, mtu, receiver),
 	}
 }
 
-func (d *linkDriver) RecvPacket(p Packet) {
-	d.newPacket <- p
+func (d *linkDriver) RecvPacket(p *Packet) {
+	select {
+	case d.newPacket <- p:
+	case <-d.closeSignal:
+	}
+}
+
+// processQueue sends the pending packet and dequeues more.
+// Returns the delay before next send, or 0 if nothing pending.
+func (d *linkDriver) processQueue() time.Duration {
+	for {
+		if d.pendingPacket != nil {
+			d.rateLink.RecvPacket(d.pendingPacket)
+			d.pendingPacket = nil
+		}
+
+		p, ok := d.q.Dequeue()
+		if !ok {
+			return 0 // queue empty
+		}
+		d.pendingPacket = p
+		now := time.Now()
+		if d.rateLink.AllowN(now, len(p.buf)) {
+			continue // can send immediately
+		}
+		return d.rateLink.Reserve(now, len(p.buf))
+	}
 }
 
 func (d *linkDriver) Start(wg *sync.WaitGroup) {
 	wgGo(wg, func() {
 		deqTimer := time.NewTimer(0)
 		deqTimer.Stop()
-		var pendingPacket *Packet
 
 		for {
 			select {
@@ -124,27 +143,14 @@ func (d *linkDriver) Start(wg *sync.WaitGroup) {
 				return
 			case packet := <-d.newPacket:
 				d.q.Enqueue(packet)
-				if pendingPacket == nil {
-					deqTimer.Reset(0)
+				if d.pendingPacket == nil {
+					if delay := d.processQueue(); delay > 0 {
+						deqTimer.Reset(delay)
+					}
 				}
 			case <-deqTimer.C:
-				for {
-					if pendingPacket != nil {
-						d.rateLink.RecvPacket(*pendingPacket)
-						pendingPacket = nil
-					}
-
-					p, ok := d.q.Dequeue()
-					if ok {
-						pendingPacket = &p
-						now := time.Now()
-						if d.rateLink.AllowN(now, len(p.buf)) {
-							continue
-						}
-						delayDeq := d.rateLink.Reserve(now, len(p.buf))
-						deqTimer.Reset(delayDeq)
-					}
-					break
+				if delay := d.processQueue(); delay > 0 {
+					deqTimer.Reset(delay)
 				}
 			}
 		}

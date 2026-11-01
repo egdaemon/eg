@@ -449,6 +449,10 @@ func NewRecord(sk ic.PrivKey, value path.Path, seq uint64, eol time.Time, ttl ti
 func newRecord(sk ic.PrivKey, value []byte, seq uint64, eol time.Time, ttl time.Duration, opts ...Option) (*Record, error) {
 	options := processOptions(opts...)
 
+	// TTL is a non-negative cache hint per the IPNS spec; floor it so a negative
+	// duration is never stored, and so the v1 uint64 TTL field cannot underflow.
+	ttl = max(0, ttl)
+
 	node, err := createNode(value, seq, eol, ttl, options.metadata)
 	if err != nil {
 		return nil, err
@@ -481,7 +485,7 @@ func newRecord(sk ic.PrivKey, value []byte, seq uint64, eol time.Time, ttl time.
 		pb.Sequence = &seq
 		pb.Validity = []byte(util.FormatRFC3339(eol))
 		ttlNs := uint64(ttl.Nanoseconds())
-		pb.Ttl = proto.Uint64(ttlNs)
+		pb.Ttl = new(ttlNs)
 
 		// For now we still create V1 signatures. These are deprecated, and not
 		// used during verification anymore (Validate func requires SignatureV2),

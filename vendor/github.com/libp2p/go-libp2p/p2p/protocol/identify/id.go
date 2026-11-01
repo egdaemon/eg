@@ -55,6 +55,10 @@ const (
 	// localhost, private IP or public IP address
 	recentlyConnectedPeerMaxAddrs = 20
 	connectedPeerMaxAddrs         = 500
+	// maxPeerProtocols is the maximum number of protocols we store for a
+	// remote peer. This bounds memory usage when a peer advertises an
+	// excessive number of protocols through chunked identify messages.
+	maxPeerProtocols = 1024
 )
 
 var (
@@ -268,9 +272,7 @@ func (ids *idService) loop(ctx context.Context) {
 	// * this Go routine busy looping over all peers in sendPushes
 	// * another push being queued in the triggerPush channel
 	triggerPush := make(chan struct{}, 1)
-	ids.refCount.Add(1)
-	go func() {
-		defer ids.refCount.Done()
+	ids.refCount.Go(func() {
 
 		for {
 			select {
@@ -280,7 +282,7 @@ func (ids *idService) loop(ctx context.Context) {
 				ids.sendPushes(ctx)
 			}
 		}
-	}()
+	})
 
 	for {
 		select {
@@ -726,6 +728,12 @@ func (ids *idService) consumeMessage(mes *pb.Identify, c network.Conn, isPush bo
 
 	supported, _ := ids.Host.Peerstore().GetProtocols(p)
 	mesProtocols := protocol.ConvertFromStrings(mes.Protocols)
+	if len(mesProtocols) > maxPeerProtocols {
+		log.Debug("peer advertises too many protocols, truncating",
+			"peer", p, "advertised", len(mesProtocols), "limit", maxPeerProtocols)
+		clear(mesProtocols[maxPeerProtocols:])
+		mesProtocols = mesProtocols[:maxPeerProtocols]
+	}
 	added, removed := diff(supported, mesProtocols)
 	ids.Host.Peerstore().SetProtocols(p, mesProtocols...)
 	if isPush {

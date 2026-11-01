@@ -32,6 +32,7 @@ type Simnet struct {
 
 	started     bool
 	closeSignal chan struct{}
+	closeOnce   sync.Once
 	wg          sync.WaitGroup
 	router      VariableLatencyRouter
 	links       []*Simlink
@@ -65,8 +66,11 @@ func (n *Simnet) Start() {
 }
 
 func (n *Simnet) Close() {
-	close(n.closeSignal)
-	n.wg.Wait()
+	n.init()
+	n.closeOnce.Do(func() {
+		close(n.closeSignal)
+		n.wg.Wait()
+	})
 }
 
 func (n *Simnet) init() {
@@ -85,6 +89,7 @@ func (n *Simnet) NewEndpoint(addr *net.UDPAddr, linkSettings NodeBiDiLinkSetting
 		c,
 	)
 	c.SetUpPacketReceiver(link.up)
+	c.setCancelSignal(n.closeSignal)
 	n.router.AddNode(addr, link.down)
 
 	n.links = append(n.links, link)

@@ -14,10 +14,10 @@ func TestTypographyRunnerCompact(t *testing.T) {
 
 	require.Equal(t, id, fmt.Sprintf("%v", TypographyRunnerCompact(&compute.Compute{Id: id})))
 	require.Equal(t, id, fmt.Sprintf("%v", TypographyRunnerCompact(&compute.Compute{Id: id, Description: "  "})))
-	require.Equal(t, "0190a1b2 - box", fmt.Sprintf("%v", TypographyRunnerCompact(&compute.Compute{Id: id, Description: "box"})))
-	require.Equal(t, "0190a1b2 - bo", fmt.Sprintf("%.13v", TypographyRunnerCompact(&compute.Compute{Id: id, Description: "box"})))
+	require.Equal(t, id+" - box", fmt.Sprintf("%v", TypographyRunnerCompact(&compute.Compute{Id: id, Description: "box"})))
+	require.Equal(t, "0190a1b2-c3d4", fmt.Sprintf("%.13v", TypographyRunnerCompact(&compute.Compute{Id: id, Description: "box"})))
 	require.Equal(t, "", fmt.Sprintf("%v", TypographyRunnerCompact(nil)))
-	require.Equal(t, "0190a1b2 - box  |", fmt.Sprintf("%-16v|", TypographyRunnerCompact(&compute.Compute{Id: id, Description: "box"})))
+	require.Equal(t, id+" - box    |", fmt.Sprintf("%-46v|", TypographyRunnerCompact(&compute.Compute{Id: id, Description: "box"})))
 }
 
 func TestTypographyRunnerPlatform(t *testing.T) {

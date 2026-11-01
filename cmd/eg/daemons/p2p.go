@@ -62,7 +62,7 @@ func P2PProxyGated(ctx context.Context, seed []byte, httpl net.Listener, gate Ga
 	dstore := dsync.MutexWrap(ds.NewMapDatastore())
 
 	// Make the DHT
-	ldht, err := dht.New(ctx, self, dht.Datastore(dstore), dht.Mode(dht.ModeClient))
+	ldht, err := dht.New(self, dht.Datastore(dstore), dht.Mode(dht.ModeClient))
 	if err != nil {
 		return nil, errorsx.Wrap(err, "unable to setup dht")
 	}

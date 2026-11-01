@@ -33,6 +33,6 @@ func (l *RateLink) Reserve(now time.Time, packetSize int) time.Duration {
 	return r.DelayFrom(now)
 }
 
-func (l *RateLink) RecvPacket(p Packet) {
+func (l *RateLink) RecvPacket(p *Packet) {
 	l.Receiver.RecvPacket(p)
 }

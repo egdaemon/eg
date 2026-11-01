@@ -40,7 +40,7 @@ func newFqCoDel(target, interval time.Duration, quantum, flowCount int) fqCoDel 
 	}
 }
 
-func (q *fqCoDel) Enqueue(p Packet) {
+func (q *fqCoDel) Enqueue(p *Packet) {
 	bucket := int(p.Hash(&q.hash) % uint64(len(q.flows)))
 
 	fq := q.flows[bucket]
@@ -74,7 +74,7 @@ func (q *fqCoDel) Enqueue(p Packet) {
 /* |                 | Credits Exhausted
 /* +-----------------+
 */
-func (q *fqCoDel) Dequeue() (Packet, bool) {
+func (q *fqCoDel) Dequeue() (*Packet, bool) {
 
 	for !q.newFlows.empty() {
 		fq := q.newFlows.peek()
@@ -153,7 +153,7 @@ func (q *fqCoDel) Dequeue() (Packet, bool) {
 		}
 	}
 
-	return Packet{}, false
+	return nil, false
 }
 
 type linkedList[T any] struct {

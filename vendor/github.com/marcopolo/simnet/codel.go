@@ -25,7 +25,7 @@ type coDelQueue struct {
 }
 
 type packetWithTimestamp struct {
-	Packet
+	*Packet
 	ts time.Time
 }
 
@@ -33,12 +33,12 @@ func newCoDelQueue(target, interval time.Duration) coDelQueue {
 	return coDelQueue{
 		target:   target,
 		interval: interval,
-		q:        newRingBuffer[packetWithTimestamp](128),
+		q:        newRingBuffer[packetWithTimestamp](4),
 	}
 }
 
 // Enqueue adds a packet to the queue
-func (q *coDelQueue) Enqueue(p Packet) {
+func (q *coDelQueue) Enqueue(p *Packet) {
 	q.byteCount += uint64(len(p.buf))
 	q.q.PushBack(packetWithTimestamp{p, time.Now()})
 }
@@ -46,7 +46,7 @@ func (q *coDelQueue) Enqueue(p Packet) {
 // Dequeue removes and returns the next packet when it's ready for delivery
 // This blocks until a packet is available AND its delivery time has been reached
 // Uses a timer that can be reset if a packet with earlier delivery time arrives
-func (q *coDelQueue) Dequeue() (Packet, bool) {
+func (q *coDelQueue) Dequeue() (*Packet, bool) {
 	now := time.Now()
 	p, okayToDrop := q.doDequeue(now)
 
@@ -96,7 +96,7 @@ func (q *coDelQueue) Dequeue() (Packet, bool) {
 		q.lastCount = q.count
 	}
 
-	return p.Packet, len(p.Packet.buf) > 0
+	return p.Packet, p.Packet != nil
 }
 
 func (q *coDelQueue) drop(p packetWithTimestamp) {

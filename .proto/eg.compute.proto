@@ -13,6 +13,7 @@ message Compute {
   string p2pid = 8 [ json_name = "p2p_id" ];
   string token = 9 [ json_name = "token" ]; // signed by the control plane when returned as a candidate, presented to the runner when uploading directly.
   bool uploadable = 10 [ json_name = "uploadable" ]; // runner accepts workloads uploaded directly to it.
+  bool global = 11 [ json_name = "global" ]; // runner is shared with other accounts, read only.
   string os = 900 [ json_name = "os" ];
   string arch = 901 [ json_name = "arch" ]; // the native architecture.
   uint64 cores = 902 [ json_name = "cores" ];

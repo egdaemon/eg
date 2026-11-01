@@ -10,6 +10,7 @@ type Cmd struct {
 	Local      local      `cmd:"" help:"execute the interpreter on the given directory"`
 	Baremetal  baremetal  `cmd:"" help:"execute the interpreter on the given directory within the host itself, inherently unsafe"`
 	Serve      serve      `cmd:"" help:"run a service within eg, automiacally uses builds and loads the containerfile without the module directory and .eg.env if it exists"`
-	LAN        lanCmd     `cmd:"" name:"lan" help:"manage the remembered systems on the local network"`
+	LAN        lanCmd     `cmd:"" name:"lan" help:"manage compute systems on your local network"`
+	Pub        pubCmd     `cmd:"" name:"pub" help:"manage compute systems on your account"`
 	Containers c8scmds    `cmd:"" name:"containers" aliases:"c8s" help:"EXPERIMENTAL: build and upload a container file workload to the cluster"`
 }

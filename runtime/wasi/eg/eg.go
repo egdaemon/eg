@@ -38,6 +38,22 @@ type Op interface {
 
 type OpFn func(context.Context, Op) error
 
+// Op implements Runnable so every OpFn is a Runnable.
+func (t OpFn) Op(ctx context.Context, o Op) error {
+	return t(ctx, o)
+}
+
+// Runnable is the interface form of an OpFn. it allows richer types to be embedded
+// in other interfaces. pass the method value (r.Op) where an OpFn is expected.
+type Runnable interface {
+	Op(context.Context, Op) error
+}
+
+// Fn adapts a bare function into an OpFn, and therefore a Runnable.
+func Fn(fn func(context.Context, Op) error) OpFn {
+	return OpFn(fn)
+}
+
 type runtimeref struct {
 	ptr uintptr
 	do  OpFn

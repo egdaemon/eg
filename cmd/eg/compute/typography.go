@@ -18,7 +18,7 @@ type runnerCompact struct {
 func (t runnerCompact) Format(f fmt.State, verb rune) {
 	v := t.r.GetId()
 	if stringsx.Present(t.r.GetDescription()) {
-		v = fmt.Sprintf("%.8s - %s", v, t.r.GetDescription())
+		v = fmt.Sprintf("%s - %s", v, t.r.GetDescription())
 	}
 
 	// width, precision and flags are applied to the whole value.

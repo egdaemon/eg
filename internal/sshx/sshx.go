@@ -5,13 +5,17 @@ import (
 	"crypto/ed25519"
 	"crypto/x509"
 	"encoding/pem"
+	"errors"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
 
+	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/internal/cryptox"
+	"github.com/egdaemon/eg/internal/envx"
+	"github.com/egdaemon/eg/internal/logx"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -129,6 +133,10 @@ func AutoCached(kg keygen, path string) (s ssh.Signer, err error) {
 
 	if s, err = loadcached(path); err == nil {
 		return s, nil
+	} else if errors.Is(err, os.ErrNotExist) {
+		logx.If(envx.Boolean(false, eg.EnvLogsInfo)).Printf("ssh key missing generating: %s\n", path)
+	} else {
+		return nil, err
 	}
 
 	if privencoded, pubencoded, err = kg.Generate(); err != nil {

@@ -200,11 +200,24 @@ func WhenFn(b func(ctx context.Context) bool, o OpFn) OpFn {
 	}
 }
 
-// interface to workload runners, used to represent containers, vms, or other such runtimes.
-type Runner interface {
+// C is the compilation half of the virtualization layer, it prepares the runtime (build or pull a container, etc).
+type C interface {
 	CompileWith(ctx context.Context) (err error)
+}
+
+// V is the virtualization layer, used to represent containers, vms, or other such runtimes.
+type V interface {
 	RunWith(ctx context.Context, mpath string) (err error)
 }
+
+// v is both halves of the virtualization layer.
+type v interface {
+	V
+	C
+}
+
+// Deprecated: use V and C.
+type Runner = v
 
 // Run the tasks with the specified container.
 func Container(name string) ContainerRunner {
@@ -341,7 +354,7 @@ func (t ContainerModuleRunner) RunWith(ctx context.Context, mpath string) (err e
 	return errorsx.Wrapf(ffiegcontainer.Module(ctx, t.name, mpath, opts), "unable to run the module: %s", t.name)
 }
 
-func Build(r Runner) OpFn {
+func Build(r C) OpFn {
 	return func(ctx context.Context, o Op) error {
 		return r.CompileWith(ctx)
 	}
@@ -349,7 +362,7 @@ func Build(r Runner) OpFn {
 
 // Module executes a set of operations within the provided environment.
 // Important: this method acts as an Instrumentation point by the runtime.
-func Module(ctx context.Context, r Runner, references ...OpFn) OpFn {
+func Module(ctx context.Context, r v, references ...OpFn) OpFn {
 	return func(ctx context.Context, o Op) error {
 		return r.CompileWith(ctx)
 	}
@@ -357,7 +370,7 @@ func Module(ctx context.Context, r Runner, references ...OpFn) OpFn {
 
 // Exec executes command with the given runner
 // Important: this method acts as an Instrumentation point by the runtime.
-func Exec(ctx context.Context, r Runner) OpFn {
+func Exec(ctx context.Context, r v) OpFn {
 	return func(ctx context.Context, o Op) error {
 		return r.CompileWith(ctx)
 	}
@@ -365,7 +378,7 @@ func Exec(ctx context.Context, r Runner) OpFn {
 
 // Deprecated: this is intended for internal use only. do not use.
 // used to replace invocations at runtime.
-func UnsafeRunner(ctx context.Context, r Runner, modulepath string) OpFn {
+func UnsafeRunner(ctx context.Context, r V, modulepath string) OpFn {
 	return func(ctx context.Context, o Op) error {
 		return r.RunWith(ctx, modulepath)
 	}
@@ -373,7 +386,7 @@ func UnsafeRunner(ctx context.Context, r Runner, modulepath string) OpFn {
 
 // Deprecated: this is intended for internal use only. do not use.
 // used to replace the exec invocations at runtime.
-func UnsafeExec(ctx context.Context, r Runner, modulepath string) OpFn {
+func UnsafeExec(ctx context.Context, r V, modulepath string) OpFn {
 	return func(ctx context.Context, o Op) error {
 		return r.RunWith(ctx, modulepath)
 	}

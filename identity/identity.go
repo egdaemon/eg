@@ -89,14 +89,8 @@ type Resolution struct {
 	Candidates []*authn.Authn // the profiles to choose from when the account is ambiguous.
 }
 
-// ErrAmbiguous is returned when the account cannot be determined.
-type ErrAmbiguous struct {
-	Identity string
-}
-
-func (t ErrAmbiguous) Error() string {
-	return fmt.Sprintf("multiple profiles are associated with this ssh key; specify one with --account-id: %s", t.Identity)
-}
+// ErrAmbiguous signals that multiple profiles are associated with an ssh key and none was chosen.
+const ErrAmbiguous = errorsx.String("multiple profiles are associated with this ssh key")
 
 // Resolve determines the account to use. in order:
 //  1. the explicitly provided account.
@@ -161,7 +155,7 @@ func resolve(ctx context.Context, db *sql.DB, c *http.Client, signer ssh.Signer,
 	}
 
 	if choose == nil || !termx.IsInteractive() {
-		return Resolution{Candidates: candidates}, ErrAmbiguous{Identity: profiles.Identity.GetId()}
+		return Resolution{Candidates: candidates}, errorsx.Wrapf(ErrAmbiguous, "identity %s has %d candidate profiles, specify one with --account-id or EG_ACCOUNT", profiles.Identity.GetId(), len(candidates))
 	}
 
 	p, err := choose(candidates)

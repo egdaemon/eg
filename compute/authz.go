@@ -11,6 +11,7 @@ import (
 
 	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/authn"
+	"github.com/egdaemon/eg/identity"
 	"github.com/egdaemon/eg/internal/debugx"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/httpx"
@@ -100,11 +101,12 @@ func (t TokenSourceFromEndpoint) Token() (_ *oauth2.Token, err error) {
 		return nil, errorsx.Wrap(err, "exchange failed")
 	}
 
-	if len(authed.Profiles) == 0 {
+	switch len(authed.Profiles) {
+	case 0:
 		return nil, fmt.Errorf("identity %s is not associated with any profiles", authed.Identity.Id)
-	}
-	if len(authed.Profiles) > 1 {
-		return nil, fmt.Errorf("multiple profiles are associated with this ssh key; specify one with --account-id: %s", authed.Identity.Id)
+	case 1:
+		return nil, errorsx.Wrapf(identity.ErrAmbiguous, "identity %s has %d profiles, specify one with --account-id or EG_ACCOUNT", authed.Identity.Id, len(authed.Profiles))
+	default:
 	}
 
 	session, err := authn.Session(ctx, t.c, authed.Profiles[0].Token)

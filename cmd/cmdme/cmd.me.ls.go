@@ -31,7 +31,7 @@ func (t Ls) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, ident *cmdidentit
 	var current string
 	if r, err := ident.Resolve(c, signer, t.VcsURI, false); err == nil {
 		current = r.Account
-	} else if ambiguous := (identity.ErrAmbiguous{}); !errors.As(err, &ambiguous) {
+	} else if !errors.Is(err, identity.ErrAmbiguous) {
 		errorsx.Log(errorsx.Wrap(err, "unable to determine the current account"))
 	}
 

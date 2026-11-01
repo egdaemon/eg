@@ -3,12 +3,10 @@ package cmdidentity
 import (
 	"charm.land/huh/v2"
 	"github.com/egdaemon/eg/authn"
+	"github.com/egdaemon/eg/identity"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/huhx"
 )
-
-// ErrIdentityAmbiguous signals that multiple profiles match and none could be chosen interactively.
-const ErrIdentityAmbiguous = errorsx.String("multiple profiles are associated with this ssh key; specify one with --account when not running interactively")
 
 // Choose presents an interactive picker for selecting among multiple profiles associated with an
 // ssh key. requires a tty since huh renders an interactive prompt.
@@ -16,7 +14,7 @@ func Choose(prompt *huh.Select[*authn.Authn], profiles ...huh.Option[*authn.Auth
 	var selected *authn.Authn
 	prompt.Options(profiles...).Value(&selected)
 
-	if err := huhx.Prompter().NoTTY(ErrIdentityAmbiguous).Run(prompt); err != nil {
+	if err := huhx.Prompter().NoTTY(errorsx.Wrapf(identity.ErrAmbiguous, "specify one with --account when not running interactively")).Run(prompt); err != nil {
 		return nil, err
 	}
 

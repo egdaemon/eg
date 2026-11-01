@@ -13,6 +13,7 @@ import (
 	"github.com/egdaemon/eg/authn"
 	"github.com/egdaemon/eg/cmd/cmdidentity"
 	"github.com/egdaemon/eg/cmd/cmdopts"
+	"github.com/egdaemon/eg/identity"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/httpx"
 	"github.com/egdaemon/eg/internal/userx"
@@ -171,11 +172,11 @@ func TestLoginRunChoosesThroughIdentity(t *testing.T) {
 		sshkey := filepath.Join(t.TempDir(), "sshkey")
 
 		ident := cmdidentity.New(t.Context(), "", func([]*authn.Authn) (*authn.Authn, error) {
-			return nil, cmdidentity.ErrIdentityAmbiguous
+			return nil, identity.ErrAmbiguous
 		})
 
 		err = Login{SSHKeyPath: sshkey}.Run(&cmdopts.Global{Context: t.Context()}, tlsc, ident)
-		require.ErrorIs(t, err, cmdidentity.ErrIdentityAmbiguous)
+		require.ErrorIs(t, err, identity.ErrAmbiguous)
 
 		m.Lock()
 		defer m.Unlock()

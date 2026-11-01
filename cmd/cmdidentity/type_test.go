@@ -96,7 +96,7 @@ func TestAccountID(t *testing.T) {
 	require.Equal(t, "account", account)
 
 	// a failed resolution can still carry candidates, the account must not leak out.
-	account, err = cmdidentity.AccountID(&identity.Resolution{Account: "account"}, identity.ErrAmbiguous{})
+	account, err = cmdidentity.AccountID(&identity.Resolution{Account: "account"}, identity.ErrAmbiguous)
 	require.Error(t, err)
 	require.Equal(t, "", account)
 }
@@ -122,11 +122,11 @@ func TestChoose(t *testing.T) {
 
 	t.Run("returns the login's failure", func(t *testing.T) {
 		ident := cmdidentity.New(context.Background(), "", func([]*authn.Authn) (*authn.Authn, error) {
-			return nil, cmdidentity.ErrIdentityAmbiguous
+			return nil, identity.ErrAmbiguous
 		})
 
 		chosen, err := ident.Choose(profiles)
-		require.ErrorIs(t, err, cmdidentity.ErrIdentityAmbiguous)
+		require.ErrorIs(t, err, identity.ErrAmbiguous)
 		require.Nil(t, chosen)
 	})
 }

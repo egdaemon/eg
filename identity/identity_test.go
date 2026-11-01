@@ -5,7 +5,6 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
-	"errors"
 	"github.com/egdaemon/eg/cmd/migrations"
 	"io"
 	"net/http"
@@ -129,18 +128,25 @@ func TestResolve(t *testing.T) {
 	t.Run("no repository match without a chooser is ambiguous", func(t *testing.T) {
 		r, err := resolve(ctx, opendb(t), reposhaving(t), testsigner(t), vcsuri, nil, false, lookup(profile("a1"), profile("a2")))
 		require.Error(t, err)
-		require.True(t, errors.As(err, &ErrAmbiguous{}))
+		require.ErrorIs(t, err, ErrAmbiguous)
 		require.Len(t, r.Candidates, 2)
+	})
+
+	t.Run("the ambiguity says which identity and how many candidates", func(t *testing.T) {
+		_, err := resolve(ctx, opendb(t), reposhaving(t), testsigner(t), vcsuri, nil, false, lookup(profile("a1"), profile("a2")))
+		require.ErrorIs(t, err, ErrAmbiguous)
+		require.ErrorContains(t, err, "2 candidate profiles")
+		require.ErrorContains(t, err, "--account-id")
 	})
 
 	t.Run("multiple repository matches are the candidates", func(t *testing.T) {
 		r, err := resolve(ctx, opendb(t), reposhaving(t, "a1", "a3"), testsigner(t), vcsuri, nil, false, lookup(profile("a1"), profile("a2"), profile("a3")))
-		require.True(t, errors.As(err, &ErrAmbiguous{}))
+		require.ErrorIs(t, err, ErrAmbiguous)
 		require.Len(t, r.Candidates, 2)
 	})
 
 	t.Run("blank vcs uri is ambiguous", func(t *testing.T) {
 		_, err := resolve(ctx, opendb(t), nil, testsigner(t), "", nil, false, lookup(profile("a1"), profile("a2")))
-		require.True(t, errors.As(err, &ErrAmbiguous{}))
+		require.ErrorIs(t, err, ErrAmbiguous)
 	})
 }

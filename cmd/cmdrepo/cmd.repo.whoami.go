@@ -38,7 +38,7 @@ func (t Whoami) Run(gctx *cmdopts.Global, tlscfg *cmdopts.TLSConfig, ident *cmdi
 
 	// prompts when ambiguous and interactive, the selection is remembered. otherwise the candidates are listed.
 	r, err := identity.Resolve(gctx.Context, db, c, signer, gctx.AccountID, t.VcsURI, ident.Choose, false)
-	if ambiguous := (identity.ErrAmbiguous{}); errors.As(err, &ambiguous) {
+	if errors.Is(err, identity.ErrAmbiguous) {
 		log.Println("account ambiguous, candidates:")
 		for _, p := range r.Candidates {
 			log.Println("profile", cmdidentity.TypographyAuthn(p))

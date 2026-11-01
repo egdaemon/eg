@@ -8,6 +8,7 @@ package eg
 //go:generate protoc --proto_path=.proto --go_opt=Meg.compute.vcs.proto=github.com/eg/compute --go_opt=paths=source_relative --go_out=compute eg.compute.vcs.proto
 //go:generate protoc --proto_path=.proto --go_opt=Meg.compute.history.proto=github.com/eg/compute --go_opt=paths=source_relative --go_out=compute eg.compute.history.proto
 //go:generate protoc --proto_path=.proto --go_opt=Mmeta.gcp.wif.proto=github.com/egdaemon/eg/gcpwif --go_opt=paths=source_relative --go_out=gcpwif meta.gcp.wif.proto
+//go:generate protoc --proto_path=.proto --go_opt=Mmeta.me.proto=github.com/egdaemon/eg/me --go_opt=Mauthn.proto=github.com/egdaemon/eg/authn --go_opt=paths=source_relative --go_out=me meta.me.proto
 //go:generate protoc --proto_path=.proto --go_opt=Meg.repository.schedule.proto=github.com/egdaemon/eg/schedules --go_opt=paths=source_relative --go_out=schedules eg.repository.schedule.proto
 //go:generate protoc --proto_path=.proto --go_opt=Meg.repository.proto=github.com/egdaemon/eg/repositories --go_opt=paths=source_relative --go_out=repositories eg.repository.proto
 

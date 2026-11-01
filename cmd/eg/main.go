@@ -24,6 +24,7 @@ import (
 	"github.com/egdaemon/eg/cmd/cmdgpg"
 	"github.com/egdaemon/eg/cmd/cmdidentity"
 	"github.com/egdaemon/eg/cmd/cmdmachine"
+	"github.com/egdaemon/eg/cmd/cmdme"
 	"github.com/egdaemon/eg/cmd/cmdopts"
 	"github.com/egdaemon/eg/cmd/cmdplete"
 	"github.com/egdaemon/eg/cmd/cmdrepo"
@@ -98,6 +99,7 @@ func main() {
 		GPG                cmdgpg.Cmd                   `cmd:"" name:"gpg" help:"gpg keyring management"`
 		SSH                cmdssh.Cmd                   `cmd:"" name:"ssh" help:"ssh key management"`
 		Machine            cmdmachine.Cmd               `cmd:"" name:"machine" help:"interact with machines"`
+		Me                 cmdme.Cmd                    `cmd:"" name:"me" help:"manage your own profile"`
 		GCP                cmdgcp.Cmd                   `cmd:"" name:"gcp" help:"gcp integration management"`
 		GDX                konggdx.Commands             `cmd:"" name:"gdx" help:"pull profiles/traces from a running eg debug socket"`
 		InstallCompletions kongplete.InstallCompletions `cmd:"" help:"install shell completions"`

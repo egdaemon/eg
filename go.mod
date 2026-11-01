@@ -4,6 +4,7 @@ go 1.27.2
 
 require (
 	charm.land/huh/v2 v2.0.3
+	charm.land/lipgloss/v2 v2.0.1
 	cloud.google.com/go/secretmanager v1.22.0
 	github.com/KimMachineGun/automemlimit v1.0.1
 	github.com/Masterminds/squirrel v1.5.4
@@ -78,7 +79,6 @@ require (
 	capnproto.org/go/capnp/v3 v3.1.0-alpha.2 // indirect
 	charm.land/bubbles/v2 v2.0.0 // indirect
 	charm.land/bubbletea/v2 v2.0.2 // indirect
-	charm.land/lipgloss/v2 v2.0.1 // indirect
 	cloud.google.com/go/auth v0.24.1-0.20261001053825-dbc26066f70a // indirect
 	cloud.google.com/go/auth/oauth2adapt v0.3.0 // indirect
 	cloud.google.com/go/compute/metadata v0.10.0 // indirect

@@ -1,0 +1,15 @@
+syntax = "proto3";
+
+package meta;
+
+import "authn.proto";
+
+// the profile being edited is always the one in the authenticated token. only
+// the display and email are read from the profile, everything else (including
+// the id and account) is ignored. the display and email are replaced as given.
+message MeProfileUpdateRequest {
+  authn.Profile profile = 1 [ json_name = "profile" ];
+}
+message MeProfileUpdateResponse {
+  authn.Profile profile = 1 [ json_name = "profile" ];
+}

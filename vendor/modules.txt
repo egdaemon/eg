@@ -40,6 +40,7 @@ charm.land/huh/v2/internal/selector
 # charm.land/lipgloss/v2 v2.0.1
 ## explicit; go 1.25.0
 charm.land/lipgloss/v2
+charm.land/lipgloss/v2/table
 # cloud.google.com/go/auth v0.24.1-0.20261001053825-dbc26066f70a
 ## explicit; go 1.26.0
 cloud.google.com/go/auth

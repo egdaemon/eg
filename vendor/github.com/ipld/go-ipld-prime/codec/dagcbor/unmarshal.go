@@ -1,0 +1,374 @@
+package dagcbor
+
+import (
+	"errors"
+	"fmt"
+	"io"
+	"math"
+
+	cid "github.com/ipfs/go-cid"
+	"github.com/polydawn/refmt/cbor"
+	"github.com/polydawn/refmt/shared"
+	"github.com/polydawn/refmt/tok"
+
+	"github.com/ipld/go-ipld-prime/datamodel"
+	cidlink "github.com/ipld/go-ipld-prime/linking/cid"
+	"github.com/ipld/go-ipld-prime/node/basicnode"
+)
+
+var (
+	ErrInvalidMultibase         = errors.New("invalid multibase on IPLD link")
+	ErrAllocationBudgetExceeded = errors.New("message structure demanded too many resources to process")
+	ErrDecodeDepthExceeded      = errors.New("message structure exceeded maximum nesting depth")
+	ErrTrailingBytes            = errors.New("unexpected content after end of cbor object")
+)
+
+const (
+	mapEntryCost  = 8
+	listEntryCost = 4
+)
+
+// This file should be identical to the general feature in the parent package,
+// except for the `case tok.TBytes` block,
+// which has dag-cbor's special sauce for detecting schemafree links.
+
+// DecodeOptions can be used to customize the behavior of a decoding function.
+// The Decode method on this struct fits the codec.Decoder function interface.
+type DecodeOptions struct {
+	// If true, parse DAG-CBOR tag(42) as Link nodes, otherwise reject them
+	AllowLinks bool
+
+	// RelaxedDecode allows some legacy non-canonical CBOR forms that are not
+	// valid DAG-CBOR: non-minimal integer and length encodings, and NaN and
+	// Infinity values.
+	//
+	// Indefinite-length CBOR is always rejected, even in relaxed mode.
+	// Undefined values are coerced to null for compatibility with existing IPLD
+	// data. Non-64-bit floats, unsorted map keys, and duplicate map keys are accepted.
+	RelaxedDecode bool
+
+	// If true, the decoder stops reading from the stream at the end of a full,
+	// valid CBOR object. This may be useful for parsing a stream of undelimited
+	// CBOR objects.
+	// As per standard IPLD behavior, in the default mode the parser considers the
+	// entire block to be part of the CBOR object and will error if there is
+	// extraneous data after the end of the object.
+	DontParseBeyondEnd bool
+
+	// AllocationBudget sets the maximum budget for the decoder. The budget is
+	// decremented as the decoder allocates resources (nodes, map entries, list
+	// elements, string/bytes content). If the budget is exhausted, the decoder
+	// returns ErrAllocationBudgetExceeded.
+	//
+	// When zero, a default budget is used which is generous for typical IPLD
+	// block sizes.
+	AllocationBudget int64
+
+	// MaxCollectionPrealloc sets the maximum size hint passed to
+	// BeginMap/BeginList. CBOR headers declare collection sizes upfront;
+	// this caps the initial allocation while collections grow dynamically
+	// as entries are decoded.
+	//
+	// When zero, a default of 1024 is used.
+	MaxCollectionPrealloc int64
+
+	// MaxDepth sets the maximum nesting depth for decoded structures. If the
+	// decoder encounters a map or list nested beyond this depth, it returns
+	// ErrDecodeDepthExceeded.
+	//
+	// When zero, a default of 1024 is used.
+	MaxDepth int64
+}
+
+const (
+	defaultAllocationBudget      int64 = 1048576 * 10
+	defaultMaxCollectionPrealloc int64 = 1024
+	defaultMaxDepth              int64 = 1024
+)
+
+// Decode deserializes data from the given io.Reader and feeds it into the given datamodel.NodeAssembler.
+// Decode fits the codec.Decoder function interface.
+//
+// The behavior of the decoder can be customized by setting fields in the DecodeOptions struct before calling this method.
+func (cfg DecodeOptions) Decode(na datamodel.NodeAssembler, r io.Reader) error {
+	// Probe for a builtin fast path.  Shortcut to that if possible.
+	// Note: when an assembler implements this interface, it receives only the
+	// reader and none of the fields set on cfg. Implementations are responsible
+	// for enforcing their own equivalents of AllocationBudget,
+	// MaxCollectionPrealloc, MaxDepth and the other DecodeOptions fields.
+	type detectFastPath interface {
+		DecodeDagCbor(io.Reader) error
+	}
+	if na2, ok := na.(detectFastPath); ok {
+		return na2.DecodeDagCbor(r)
+	}
+	// Okay, generic builder path.
+	err := Unmarshal(na, cbor.NewDecoder(cfg.refmtDecodeOptions(), r), cfg)
+
+	if err != nil {
+		return err
+	}
+
+	if cfg.DontParseBeyondEnd {
+		return nil
+	}
+
+	var buf [1]byte
+	_, err = io.ReadFull(r, buf[:])
+	switch err {
+	case io.EOF:
+		return nil
+	case nil:
+		return ErrTrailingBytes
+	default:
+		return err
+	}
+}
+
+// Future work: we would like to remove the Unmarshal function,
+// and in particular, stop seeing types from refmt (like shared.TokenSource) be visible.
+// Right now, some kinds of configuration (e.g. for whitespace and prettyprint) are only available through interacting with the refmt types;
+// we should improve our API so that this can be done with only our own types in this package.
+
+// Unmarshal is a deprecated function.
+// Please consider switching to DecodeOptions.Decode instead.
+func Unmarshal(na datamodel.NodeAssembler, tokSrc shared.TokenSource, options DecodeOptions) error {
+	budget := options.AllocationBudget
+	if budget == 0 {
+		budget = defaultAllocationBudget
+	}
+	return unmarshal1(na, tokSrc, &budget, 0, options)
+}
+
+func (cfg DecodeOptions) refmtDecodeOptions() cbor.DecodeOptions {
+	opts := cbor.DecodeOptions{
+		CoerceUndefToNull: true,
+		RejectIndefinite:  true,
+	}
+	if !cfg.RelaxedDecode {
+		opts.RejectNonMinimalInteger = true
+		opts.RejectNaN = true
+		opts.RejectInfinity = true
+	}
+	return opts
+}
+
+func (cfg DecodeOptions) maxPrealloc() int64 {
+	if cfg.MaxCollectionPrealloc > 0 {
+		return cfg.MaxCollectionPrealloc
+	}
+	return defaultMaxCollectionPrealloc
+}
+
+func (cfg DecodeOptions) maxDepth() int64 {
+	if cfg.MaxDepth > 0 {
+		return cfg.MaxDepth
+	}
+	return defaultMaxDepth
+}
+
+func unmarshal1(na datamodel.NodeAssembler, tokSrc shared.TokenSource, budget *int64, depth int64, options DecodeOptions) error {
+	var tk tok.Token
+	done, err := tokSrc.Step(&tk)
+	if err == io.EOF {
+		return io.ErrUnexpectedEOF
+	}
+	if err != nil {
+		return err
+	}
+	if done && !tk.Type.IsValue() && tk.Type != tok.TNull {
+		return fmt.Errorf("unexpected eof")
+	}
+	return unmarshal2(na, tokSrc, &tk, budget, depth, options)
+}
+
+// starts with the first token already primed.  Necessary to get recursion
+//
+//	to flow right without a peek+unpeek system.
+func unmarshal2(na datamodel.NodeAssembler, tokSrc shared.TokenSource, tk *tok.Token, budget *int64, depth int64, options DecodeOptions) error {
+	// FUTURE: check for schema.TypedNodeBuilder that's going to parse a Link (they can slurp any token kind they want).
+	switch tk.Type {
+	case tok.TMapOpen:
+		if depth >= options.maxDepth() {
+			return ErrDecodeDepthExceeded
+		}
+		expectLen := int64(tk.Length)
+		allocLen := int64(tk.Length)
+		if tk.Length == -1 {
+			expectLen = math.MaxInt64
+			allocLen = 0
+		} else {
+			*budget -= allocLen
+			if *budget < 0 {
+				return ErrAllocationBudgetExceeded
+			}
+			if allocLen > options.maxPrealloc() {
+				allocLen = options.maxPrealloc()
+			}
+		}
+		ma, err := na.BeginMap(allocLen)
+		if err != nil {
+			return err
+		}
+		var observedLen int64
+		var seenKeys map[string]struct{}
+		for {
+			_, err := tokSrc.Step(tk)
+			if err != nil {
+				return err
+			}
+			switch tk.Type {
+			case tok.TMapClose:
+				if expectLen != math.MaxInt64 && observedLen != expectLen {
+					return fmt.Errorf("unexpected mapClose before declared length")
+				}
+				return ma.Finish()
+			case tok.TString:
+				*budget -= int64(len(tk.Str) + mapEntryCost)
+				if *budget < 0 {
+					return ErrAllocationBudgetExceeded
+				}
+				// continue
+			default:
+				return fmt.Errorf("unexpected %s token while expecting map key", tk.Type)
+			}
+			observedLen++
+			if observedLen > expectLen {
+				return fmt.Errorf("unexpected continuation of map elements beyond declared length")
+			}
+			if !options.RelaxedDecode {
+				if seenKeys == nil {
+					seenKeys = make(map[string]struct{})
+				}
+				if _, exists := seenKeys[tk.Str]; exists {
+					return fmt.Errorf("duplicate map key %q", tk.Str)
+				}
+				seenKeys[tk.Str] = struct{}{}
+			}
+			mva, err := ma.AssembleEntry(tk.Str)
+			if err != nil { // return in error if the key was rejected
+				return err
+			}
+			err = unmarshal1(mva, tokSrc, budget, depth+1, options)
+			if err != nil { // return in error if some part of the recursion errored
+				return err
+			}
+		}
+	case tok.TMapClose:
+		return fmt.Errorf("unexpected mapClose token")
+	case tok.TArrOpen:
+		if depth >= options.maxDepth() {
+			return ErrDecodeDepthExceeded
+		}
+		expectLen := int64(tk.Length)
+		allocLen := int64(tk.Length)
+		if tk.Length == -1 {
+			expectLen = math.MaxInt64
+			allocLen = 0
+		} else {
+			*budget -= allocLen
+			if *budget < 0 {
+				return ErrAllocationBudgetExceeded
+			}
+			if allocLen > options.maxPrealloc() {
+				allocLen = options.maxPrealloc()
+			}
+		}
+		la, err := na.BeginList(allocLen)
+		if err != nil {
+			return err
+		}
+		var observedLen int64
+		for {
+			_, err := tokSrc.Step(tk)
+			if err != nil {
+				return err
+			}
+			switch tk.Type {
+			case tok.TArrClose:
+				if expectLen != math.MaxInt64 && observedLen != expectLen {
+					return fmt.Errorf("unexpected arrClose before declared length")
+				}
+				return la.Finish()
+			default:
+				*budget -= listEntryCost
+				if *budget < 0 {
+					return ErrAllocationBudgetExceeded
+				}
+				observedLen++
+				if observedLen > expectLen {
+					return fmt.Errorf("unexpected continuation of array elements beyond declared length")
+				}
+				err := unmarshal2(la.AssembleValue(), tokSrc, tk, budget, depth+1, options)
+				if err != nil { // return in error if some part of the recursion errored
+					return err
+				}
+			}
+		}
+	case tok.TArrClose:
+		return fmt.Errorf("unexpected arrClose token")
+	case tok.TNull:
+		return na.AssignNull()
+	case tok.TString:
+		*budget -= int64(len(tk.Str))
+		if *budget < 0 {
+			return ErrAllocationBudgetExceeded
+		}
+		return na.AssignString(tk.Str)
+	case tok.TBytes:
+		*budget -= int64(len(tk.Bytes))
+		if *budget < 0 {
+			return ErrAllocationBudgetExceeded
+		}
+		if !tk.Tagged {
+			return na.AssignBytes(tk.Bytes)
+		}
+		switch tk.Tag {
+		case linkTag:
+			if !options.AllowLinks {
+				return fmt.Errorf("unhandled cbor tag %d", tk.Tag)
+			}
+			if len(tk.Bytes) < 1 || tk.Bytes[0] != 0 {
+				return ErrInvalidMultibase
+			}
+			elCid, err := cid.Cast(tk.Bytes[1:])
+			if err != nil {
+				return err
+			}
+			return na.AssignLink(cidlink.Link{Cid: elCid})
+		default:
+			return fmt.Errorf("unhandled cbor tag %d", tk.Tag)
+		}
+	case tok.TBool:
+		*budget -= 1
+		if *budget < 0 {
+			return ErrAllocationBudgetExceeded
+		}
+		return na.AssignBool(tk.Bool)
+	case tok.TInt:
+		*budget -= 1
+		if *budget < 0 {
+			return ErrAllocationBudgetExceeded
+		}
+		return na.AssignInt(tk.Int)
+	case tok.TUint:
+		*budget -= 1
+		if *budget < 0 {
+			return ErrAllocationBudgetExceeded
+		}
+		// note that this pushes any overflow errors up the stack when AsInt() may
+		// be called on a UintNode that is too large to cast to an int64
+		if tk.Uint > math.MaxInt64 {
+			return na.AssignNode(basicnode.NewUint(tk.Uint))
+		}
+		return na.AssignInt(int64(tk.Uint))
+	case tok.TFloat64:
+		*budget -= 1
+		if *budget < 0 {
+			return ErrAllocationBudgetExceeded
+		}
+		return na.AssignFloat(tk.Float64)
+	default:
+		panic("unreachable")
+	}
+}

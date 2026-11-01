@@ -3,6 +3,7 @@ package egfs_test
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/egdaemon/eg/internal/testx"
@@ -144,4 +145,35 @@ func TestStringLazy(t *testing.T) {
 	got, err := read()
 	require.NoError(t, err)
 	require.Equal(t, "hello", got)
+}
+
+func TestInstall(t *testing.T) {
+	ctx, done := testx.Context(t)
+	defer done()
+
+	dst := filepath.Join(t.TempDir(), "nested", "example.txt")
+
+	require.NoError(t, egfs.Install(dst, strings.NewReader("first contents"))(ctx, nil))
+	require.NoError(t, egfs.Install(dst, strings.NewReader("second"))(ctx, nil))
+
+	content, err := os.ReadFile(dst)
+	require.NoError(t, err)
+	require.Equal(t, "second", string(content))
+}
+
+func TestInstallPerm(t *testing.T) {
+	ctx, done := testx.Context(t)
+	defer done()
+
+	dst := filepath.Join(t.TempDir(), "example.sh")
+
+	require.NoError(t, egfs.Install(dst, strings.NewReader("#!/bin/sh"))(ctx, nil))
+	info, err := os.Stat(dst)
+	require.NoError(t, err)
+	require.Equal(t, os.FileMode(0644), info.Mode().Perm())
+
+	require.NoError(t, egfs.Install(dst, strings.NewReader("#!/bin/sh"), egfs.Perm(0700))(ctx, nil))
+	info, err = os.Stat(dst)
+	require.NoError(t, err)
+	require.Equal(t, os.FileMode(0700), info.Mode().Perm())
 }

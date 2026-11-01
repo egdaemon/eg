@@ -9,6 +9,7 @@ import (
 func TestStringReplace(t *testing.T) {
 	ex := testcommit1()
 	require.Equal(t, "git hash short: 211a6f2", ex.StringReplace("git hash short: %git.hash.short%"))
+	require.Equal(t, "git hash short: 211a6f2", ex.StringReplace("git hash short: {git.hash.short}"))
 	require.Equal(t, "git hash: 211a6f2a398230a29830a31a9cbf422be74d407f", ex.StringReplace("git hash: %git.hash%"))
 	require.Equal(t, "git commit year: 2006", ex.StringReplace("git commit year: %git.commit.year%"))
 	require.Equal(t, "git commit month: 1", ex.StringReplace("git commit month: %git.commit.month%"))

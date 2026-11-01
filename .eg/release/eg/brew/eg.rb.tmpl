@@ -1,0 +1,16 @@
+class Eg < Formula
+  desc "eg compute and continuous integration"
+  homepage "https://github.com/egdaemon/eg"
+  url "{{ .URL }}"
+  sha256 "{{ .SHA256 }}"
+  version "{{ .Version }}"
+  license :cannot_represent
+
+  def install
+    bin.install "bin/eg"
+  end
+
+  test do
+    system "#{bin}/eg", "--help"
+  end
+end

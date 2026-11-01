@@ -52,9 +52,6 @@ func main() {
 		eggithub.Draft(
 			egenv.DirectoryCache(".dist", "*.deb"),
 		),
-		eggithub.Promote(
-			"eg_*_amd64.deb",
-		),
 	)
 
 	if err != nil {

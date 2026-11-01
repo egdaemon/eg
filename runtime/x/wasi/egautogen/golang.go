@@ -27,6 +27,7 @@ import (
 	"github.com/egdaemon/eg/astcodec"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/iterx"
+	"github.com/egdaemon/eg/internal/patternx"
 	"github.com/egdaemon/eg/runtime/wasi/egenv"
 	"github.com/egdaemon/eg/runtime/wasi/eggit"
 	"github.com/egdaemon/eg/runtime/wasi/shell"
@@ -181,8 +182,8 @@ func (o golangOption) sources() (dst []string, err error) {
 // next to the function's source. the file name must end in _test.go. in addition to the
 // git patterns supported by eggit.StringReplace, the following are replaced:
 //
-//	%fn.file% -> the name of the file declaring the function, without its extension.
-//	%fn.name% -> the lower cased name of the function, methods are Type_method.
+//	{fn.file} (or %fn.file%) -> the name of the file declaring the function, without its extension.
+//	{fn.name} (or %fn.name%) -> the lower cased name of the function, methods are Type_method.
 //
 // defaults to DefaultGolangFilename.
 func (t GolangOptions) Filename(pattern string) GolangOptions {
@@ -223,9 +224,15 @@ func (t golangOption) rebase(p string) string {
 
 // golangFilename resolves the file name pattern for fn.
 func golangFilename(pattern string, fn Fn) (string, error) {
+	patternx.Warn(pattern)
+
+	file := strings.TrimSuffix(filepath.Base(fn.Path), filepath.Ext(fn.Path))
+	fname := strings.ToLower(strings.ReplaceAll(fn.Name, ".", "_"))
 	name := strings.NewReplacer(
-		"%fn.file%", strings.TrimSuffix(filepath.Base(fn.Path), filepath.Ext(fn.Path)),
-		"%fn.name%", strings.ToLower(strings.ReplaceAll(fn.Name, ".", "_")),
+		"%fn.file%", file,
+		"{fn.file}", file,
+		"%fn.name%", fname,
+		"{fn.name}", fname,
 	).Replace(pattern)
 	name = eggit.StringReplace(name)
 

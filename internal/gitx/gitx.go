@@ -38,6 +38,7 @@ import (
 	"github.com/egdaemon/eg/internal/fsx"
 	"github.com/egdaemon/eg/internal/httpx"
 	"github.com/egdaemon/eg/internal/jwtx"
+	"github.com/egdaemon/eg/internal/patternx"
 	"github.com/egdaemon/eg/internal/slicesx"
 	"github.com/egdaemon/eg/internal/stringsx"
 	"github.com/egdaemon/eg/internal/timex"
@@ -517,11 +518,12 @@ func baseenv(repo *git.Repository, remote, vcs, uri string) (env []string, err e
 
 // Description labels a workload for treeish by replacing the eggit style tokens in pattern,
 // so callers position them as they like.
-// %git.hash%           -> the full hex encoded commit id.
-// %git.hash.short%     -> the first 7 characters of the hex encoded commit id.
-// %git.commit.author%  -> the committer's name, falling back to their email and then the environment user.
-// %git.commit.email%   -> the committer's email.
-// %git.ref%            -> the treeish.
+// {git.hash}           -> the full hex encoded commit id.
+// {git.hash.short}     -> the first 7 characters of the hex encoded commit id.
+// {git.commit.author}  -> the committer's name, falling back to their email and then the environment user.
+// {git.commit.email}   -> the committer's email.
+// {git.ref}            -> the treeish.
+// the %token% style of tokens is deprecated, use {token}.
 // commit values are empty when the reference can't be resolved.
 func Description(pattern string, repo *git.Repository, treeish string) string {
 	var (
@@ -541,12 +543,19 @@ func Description(pattern string, repo *git.Repository, treeish string) string {
 		}
 	}
 
+	patternx.Warn(pattern)
+
 	return strings.NewReplacer(
 		"%git.hash%", full,
+		"{git.hash}", full,
 		"%git.hash.short%", full[:min(len(full), 7)],
+		"{git.hash.short}", full[:min(len(full), 7)],
 		"%git.commit.author%", stringsx.First(author, envx.String("unknown", "USER", "USERNAME")),
+		"{git.commit.author}", stringsx.First(author, envx.String("unknown", "USER", "USERNAME")),
 		"%git.commit.email%", email,
+		"{git.commit.email}", email,
 		"%git.ref%", treeish,
+		"{git.ref}", treeish,
 	).Replace(pattern)
 }
 

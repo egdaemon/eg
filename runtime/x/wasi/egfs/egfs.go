@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/egdaemon/eg/internal/errorsx"
+	"github.com/egdaemon/eg/runtime/wasi/eg"
 )
 
 func FindFirst(tree fs.FS, pattern string) string {
@@ -220,4 +221,54 @@ func CloneFS(ctx context.Context, dstdir string, rootdir string, archive fs.FS) 
 
 		return nil
 	})
+}
+
+type installoptions struct {
+	perm fs.FileMode
+}
+
+// InstallOption modifies how Install writes the file.
+type InstallOption func(*installoptions)
+
+// Perm sets the permissions of the installed file, defaults to 0644.
+func Perm(perm fs.FileMode) InstallOption {
+	return func(o *installoptions) {
+		o.perm = perm
+	}
+}
+
+// Install writes the contents of src to dst, creating parent directories as needed
+// and truncating any existing file. src is consumed by the first run of the operation.
+func Install(dst string, src io.Reader, options ...InstallOption) eg.OpFn {
+	cfg := installoptions{perm: 0644}
+	for _, opt := range options {
+		opt(&cfg)
+	}
+
+	return func(ctx context.Context, o eg.Op) (err error) {
+		if err = os.MkdirAll(filepath.Dir(dst), 0755); err != nil {
+			return errorsx.Wrapf(err, "unable to create directory for: %s", dst)
+		}
+
+		df, err := os.OpenFile(dst, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, cfg.perm)
+		if err != nil {
+			return errorsx.Wrapf(err, "unable to open: %s", dst)
+		}
+		defer func() {
+			if cerr := df.Close(); err == nil {
+				err = cerr
+			}
+		}()
+
+		// OpenFile only applies perm when creating and is masked by umask.
+		if err = df.Chmod(cfg.perm); err != nil {
+			return errorsx.Wrapf(err, "unable to set permissions: %s", dst)
+		}
+
+		if _, err = io.Copy(df, src); err != nil {
+			return errorsx.Wrapf(err, "unable to write: %s", dst)
+		}
+
+		return nil
+	}
 }

@@ -13,6 +13,7 @@ import (
 
 	_eg "github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/internal/errorsx"
+	"github.com/egdaemon/eg/internal/patternx"
 	"github.com/egdaemon/eg/runtime/wasi/eg"
 	"github.com/egdaemon/eg/runtime/wasi/egenv"
 	"github.com/egdaemon/eg/runtime/wasi/egunsafe/ffigit"
@@ -74,44 +75,67 @@ type commit struct {
 }
 
 // Replace patterns in a string with their values from information in a git commit.
-// %git.hash%              -> the full hex encoded commit id.
-// %git.hash.short%        -> the first 7 characters of the hex encoded commit id.
-// %git.commit.year%       -> year of the commit.
-// %git.commit.month%      -> month of the commit.
-// %git.commit.day%        -> day of the commit.
-// %git.commit.unix%       -> Unix of the commit.
-// %git.commit.unix.milli% -> UnixMilli of the commit.
-// %git.commit.unix.micro% -> UnixMicro of the commit.
-// %eg.git.canonical.uri%  -> the uri of the repository that eg considers to be the canonical uri.
+// the %token% style of tokens is deprecated, use {token}.
+// {git.hash}               -> the full hex encoded commit id.
+// {git.hash.short}         -> the first 7 characters of the hex encoded commit id.
+// {git.commit.year}        -> year of the commit.
+// {git.commit.month}       -> month of the commit.
+// {git.commit.day}         -> day of the commit.
+// {git.commit.unix}        -> Unix of the commit.
+// {git.commit.unix.milli}  -> UnixMilli of the commit.
+// {git.commit.unix.micro}  -> UnixMicro of the commit.
+// {eg.git.canonical.uri}   -> the uri of the repository that eg considers to be the canonical uri.
 func (c commit) StringReplace(pattern string) string {
+	patternx.Warn(pattern)
 	cwhen := c.Committer.When
 
 	s := strings.ReplaceAll(pattern, "%git.hash%", c.Hash.String())
+	s = strings.ReplaceAll(s, "{git.hash}", c.Hash.String())
 	s = strings.ReplaceAll(s, "%git.hash.short%", fmt.Sprintf("%7s", c.Hash))
+	s = strings.ReplaceAll(s, "{git.hash.short}", fmt.Sprintf("%7s", c.Hash))
 	s = strings.ReplaceAll(s, "%git.commit.year%", strconv.Itoa(cwhen.Year()))
+	s = strings.ReplaceAll(s, "{git.commit.year}", strconv.Itoa(cwhen.Year()))
 	s = strings.ReplaceAll(s, "%git.commit.month%", strconv.Itoa(int(cwhen.Month())))
+	s = strings.ReplaceAll(s, "{git.commit.month}", strconv.Itoa(int(cwhen.Month())))
 	s = strings.ReplaceAll(s, "%git.commit.day%", strconv.Itoa(cwhen.Day()))
+	s = strings.ReplaceAll(s, "{git.commit.day}", strconv.Itoa(cwhen.Day()))
 	s = strings.ReplaceAll(s, "%git.commit.unix%", strconv.Itoa(int(cwhen.Unix())))
+	s = strings.ReplaceAll(s, "{git.commit.unix}", strconv.Itoa(int(cwhen.Unix())))
 	s = strings.ReplaceAll(s, "%git.commit.unix.milli%", strconv.Itoa(int(cwhen.UnixMilli())))
+	s = strings.ReplaceAll(s, "{git.commit.unix.milli}", strconv.Itoa(int(cwhen.UnixMilli())))
 	s = strings.ReplaceAll(s, "%git.commit.unix.micro%", strconv.Itoa(int(cwhen.UnixMicro())))
+	s = strings.ReplaceAll(s, "{git.commit.unix.micro}", strconv.Itoa(int(cwhen.UnixMicro())))
 	s = strings.ReplaceAll(s, "%eg.git.canonical.uri%", EnvCanonicalURI())
+	s = strings.ReplaceAll(s, "{eg.git.canonical.uri}", EnvCanonicalURI())
 
 	return s
 }
 
 // completely clean any git substitutions from the pattern.
 func PatternClean(pattern string) string {
+	patternx.Warn(pattern)
 	s := strings.ReplaceAll(pattern, ".%", "%")
 	s = strings.ReplaceAll(s, "%.", "%")
+	s = strings.ReplaceAll(s, ".{", "{")
+	s = strings.ReplaceAll(s, "}.", "}")
 	s = strings.ReplaceAll(s, "%git.hash%", "")
+	s = strings.ReplaceAll(s, "{git.hash}", "")
 	s = strings.ReplaceAll(s, "%git.hash.short%", "")
+	s = strings.ReplaceAll(s, "{git.hash.short}", "")
 	s = strings.ReplaceAll(s, "%git.commit.year%", "")
+	s = strings.ReplaceAll(s, "{git.commit.year}", "")
 	s = strings.ReplaceAll(s, "%git.commit.month%", "")
+	s = strings.ReplaceAll(s, "{git.commit.month}", "")
 	s = strings.ReplaceAll(s, "%git.commit.day%", "")
+	s = strings.ReplaceAll(s, "{git.commit.day}", "")
 	s = strings.ReplaceAll(s, "%git.commit.unix%", "")
+	s = strings.ReplaceAll(s, "{git.commit.unix}", "")
 	s = strings.ReplaceAll(s, "%git.commit.unix.milli%", "")
+	s = strings.ReplaceAll(s, "{git.commit.unix.milli}", "")
 	s = strings.ReplaceAll(s, "%git.commit.unix.micro%", "")
+	s = strings.ReplaceAll(s, "{git.commit.unix.micro}", "")
 	s = strings.ReplaceAll(s, "%eg.git.canonical.uri%", "")
+	s = strings.ReplaceAll(s, "{eg.git.canonical.uri}", "")
 	return s
 }
 

@@ -8,6 +8,7 @@ import (
 	"github.com/egdaemon/eg/runtime/wasi/eg"
 	"github.com/egdaemon/eg/runtime/wasi/egenv"
 	"github.com/egdaemon/eg/runtime/wasi/eggit"
+	"github.com/egdaemon/eg/runtime/x/wasi/eggithub"
 )
 
 // main defines the setup for the CI process. here is where you define all
@@ -28,6 +29,7 @@ func main() {
 				archlinux.Builder(archlinux.ContainerName),
 				eg.Sequential(
 					archlinux.Build,
+					eggithub.Draft(egenv.DirectoryCache(".dist", "pacman", "*.pkg.tar.*")),
 				),
 			),
 		),

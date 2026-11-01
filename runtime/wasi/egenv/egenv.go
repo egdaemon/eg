@@ -1,6 +1,7 @@
 package egenv
 
 import (
+	"fmt"
 	"log"
 	"os"
 	"os/user"
@@ -12,6 +13,7 @@ import (
 	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
+	"github.com/egdaemon/eg/internal/patternx"
 	"github.com/egdaemon/eg/internal/userx"
 	"github.com/egdaemon/eg/runtime/wasi/env"
 )
@@ -68,18 +70,48 @@ func WorkloadName() string {
 
 // Pattern substitutes values from the environment into the provided pattern.
 //
-// %eg.run.id%       -> the run id of the compute workload, see RunID.
-// %eg.account.id%   -> the account id of the compute workload, see AccountID.
-// %eg.workload%     -> the name of the module the workload runs, see WorkloadName.
-// %eg.host.arch%    -> the cpu architecture of the host machine.
-// %eg.host.os%      -> the operating system of the host machine.
-func Pattern(s string) string {
-	s = strings.ReplaceAll(s, "%eg.run.id%", RunID())
-	s = strings.ReplaceAll(s, "%eg.account.id%", AccountID())
-	s = strings.ReplaceAll(s, "%eg.workload%", WorkloadName())
-	s = strings.ReplaceAll(s, "%eg.host.arch%", env.String("", eg.EnvComputeArch))
-	s = strings.ReplaceAll(s, "%eg.host.os%", env.String("", eg.EnvComputeOS))
-	return s
+// {eg.run.id}       -> the run id of the compute workload, see RunID.
+// {eg.account.id}   -> the account id of the compute workload, see AccountID.
+// {eg.workload}     -> the name of the module the workload runs, see WorkloadName.
+// {eg.host.arch}    -> the cpu architecture of the host machine.
+// {eg.host.os}      -> the operating system of the host machine.
+// {eg.workspace}    -> the workspace directory, see WorkspaceDirectory.
+// {eg.working}      -> the working directory, see DirectoryWorking.
+// {eg.cache}        -> the cache directory, see DirectoryCache.
+// {eg.tmp}          -> the temporary directory of the module, see DirectoryTemp.
+//
+// the %eg.run.id% style of tokens is deprecated, use {eg.run.id}.
+//
+// the tokens are substituted first and the result is then formatted with fmt.Sprintf,
+// e.g.) Pattern("{eg.workspace}/%s", "foo") -> "/workload/.eg.workspace/foo".
+func Pattern(format string, args ...any) string {
+	patternx.Warn(format)
+
+	// substituted values are escaped so they are not interpreted as verbs.
+	escape := func(v string) string {
+		return strings.ReplaceAll(v, "%", "%%")
+	}
+
+	s := strings.ReplaceAll(format, "%eg.run.id%", escape(RunID()))
+	s = strings.ReplaceAll(s, "{eg.run.id}", escape(RunID()))
+	s = strings.ReplaceAll(s, "%eg.account.id%", escape(AccountID()))
+	s = strings.ReplaceAll(s, "{eg.account.id}", escape(AccountID()))
+	s = strings.ReplaceAll(s, "%eg.workload%", escape(WorkloadName()))
+	s = strings.ReplaceAll(s, "{eg.workload}", escape(WorkloadName()))
+	s = strings.ReplaceAll(s, "%eg.host.arch%", escape(env.String("", eg.EnvComputeArch)))
+	s = strings.ReplaceAll(s, "{eg.host.arch}", escape(env.String("", eg.EnvComputeArch)))
+	s = strings.ReplaceAll(s, "%eg.host.os%", escape(env.String("", eg.EnvComputeOS)))
+	s = strings.ReplaceAll(s, "{eg.host.os}", escape(env.String("", eg.EnvComputeOS)))
+	s = strings.ReplaceAll(s, "%eg.workspace%", escape(WorkspaceDirectory()))
+	s = strings.ReplaceAll(s, "{eg.workspace}", escape(WorkspaceDirectory()))
+	s = strings.ReplaceAll(s, "%eg.working%", escape(DirectoryWorking()))
+	s = strings.ReplaceAll(s, "{eg.working}", escape(DirectoryWorking()))
+	s = strings.ReplaceAll(s, "%eg.cache%", escape(DirectoryCache()))
+	s = strings.ReplaceAll(s, "{eg.cache}", escape(DirectoryCache()))
+	s = strings.ReplaceAll(s, "%eg.tmp%", escape(DirectoryTemp()))
+	s = strings.ReplaceAll(s, "{eg.tmp}", escape(DirectoryTemp()))
+
+	return fmt.Sprintf(s, args...)
 }
 
 // User returns the current user.

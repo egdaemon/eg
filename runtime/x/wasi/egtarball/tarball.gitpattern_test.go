@@ -10,12 +10,12 @@ import (
 func TestGitPattern(t *testing.T) {
 	assert.Equal(
 		t,
-		"myprefix.%git.commit.year%.%git.commit.month%.%git.commit.day%%git.hash.short%",
+		"myprefix.{git.commit.year}.{git.commit.month}.{git.commit.day}{git.hash.short}",
 		egtarball.GitPattern("myprefix"),
 	)
 	assert.Equal(
 		t,
-		".%git.commit.year%.%git.commit.month%.%git.commit.day%%git.hash.short%",
+		".{git.commit.year}.{git.commit.month}.{git.commit.day}{git.hash.short}",
 		egtarball.GitPattern(""),
 	)
 }

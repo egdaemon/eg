@@ -56,7 +56,7 @@ func Name(pattern string) string {
 
 // simple template for naming a tarball from git commit information. see eggit.commit.StringReplace for details.
 func GitPattern(prefix string) string {
-	return fmt.Sprintf("%s.%%git.commit.year%%.%%git.commit.month%%.%%git.commit.day%%%%git.hash.short%%", prefix)
+	return fmt.Sprintf("%s.{git.commit.year}.{git.commit.month}.{git.commit.day}{git.hash.short}", prefix)
 }
 
 // Return the path to the archive for the given pattern after Pack has been called.

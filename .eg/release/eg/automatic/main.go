@@ -31,9 +31,7 @@ func main() {
 	err := eg.Perform(
 		ctx,
 		eggit.AutoClone,
-		shell.Op(
-			shell.Env().New("eg login --seed=\"${EG_LOGIN_SEED}\""),
-		),
+		shell.Op(shell.Env().New("eg login")),
 		// every workload drafts into the same release, create it once up front so they don't race to create it.
 		shell.Op(
 			shell.Runtime().

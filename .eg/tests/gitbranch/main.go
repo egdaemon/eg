@@ -24,7 +24,7 @@ import (
 
 // branch names are unique per run so runs of the same commit do not collide.
 func branchname() string {
-	return eggit.StringReplace("egtest/gitbranch-%git.hash.short%-" + env.String("local", _eg.EnvComputeRunID))
+	return eggit.StringReplace("egtest/gitbranch-{git.hash.short}-" + env.String("local", _eg.EnvComputeRunID))
 }
 
 // git command authenticated the same way Push authenticates its push.

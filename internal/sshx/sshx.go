@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/egdaemon/eg/internal/cryptox"
@@ -135,6 +136,10 @@ func AutoCached(kg keygen, path string) (s ssh.Signer, err error) {
 	}
 
 	if s, err = ssh.ParsePrivateKey(privencoded); err != nil {
+		return nil, err
+	}
+
+	if err = os.MkdirAll(filepath.Dir(path), 0700); err != nil {
 		return nil, err
 	}
 

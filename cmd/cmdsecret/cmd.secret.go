@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"io"
+	"log"
 	"os"
 
 	"github.com/egdaemon/eg/cmd/cmdopts"
@@ -19,12 +20,32 @@ type SecretCmd struct {
 }
 
 type CmdRead struct {
-	URIs   []string `arg:"" help:"List of secret URIs to download. Examples: chachasm://passphrase@/path/to/file, gcpsm://project-id/secret-name/version, awssm://secret-name?region=us-east-1"`
-	Output string   `name:"output" short:"o" help:"Write output to a file instead of stdout"`
+	URIs         []string `arg:"" help:"List of secret URIs to download. Examples: chachasm://passphrase@/path/to/file, gcpsm://project-id/secret-name/version, awssm://secret-name?region=us-east-1"`
+	Output       string   `name:"output" short:"o" help:"Write output to a file instead of stdout"`
+	AllowMissing bool     `name:"allow-missing" help:"skip secrets that do not exist, logging a warning instead of failing"`
 }
 
 func (t CmdRead) Run(gctx *cmdopts.Global) error {
 	var out io.Writer = os.Stdout
+
+	uris := t.URIs
+	if t.AllowMissing {
+		uris = make([]string, 0, len(t.URIs))
+		for _, uri := range t.URIs {
+			exists, err := secrets.Exists(gctx.Context, uri)
+			if err != nil {
+				return fmt.Errorf("unable to check whether the secret exists: %w", err)
+			}
+
+			if !exists {
+				// the uri can carry the passphrase, so it is not repeated.
+				log.Println("WARN", "the secret does not exist, skipping")
+				continue
+			}
+
+			uris = append(uris, uri)
+		}
+	}
 
 	if t.Output != "" {
 		f, err := os.Create(t.Output)
@@ -35,7 +56,7 @@ func (t CmdRead) Run(gctx *cmdopts.Global) error {
 		out = f
 	}
 
-	if _, err := io.Copy(out, secrets.NewReader(gctx.Context, t.URIs...)); err != nil {
+	if _, err := io.Copy(out, secrets.NewReader(gctx.Context, uris...)); err != nil {
 		return fmt.Errorf("failed to read secrets: %w", err)
 	}
 

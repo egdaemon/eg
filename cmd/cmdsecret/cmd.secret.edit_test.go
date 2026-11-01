@@ -129,4 +129,148 @@ func TestSecretEditCmd(t *testing.T) {
 		require.ErrorContains(t, err, "passphrase")
 		require.NoFileExists(t, path)
 	})
+
+	t.Run("appends piped input to the secret before the editor opens", func(t *testing.T) {
+		tmp := t.TempDir()
+		path := filepath.Join(tmp, "append.chacha")
+		capture := filepath.Join(tmp, "capture.txt")
+		uri := "chachasm://pass@" + path
+
+		require.NoError(t, secrets.Update(t.Context(), uri, bytes.NewReader([]byte("EG_ACCOUNT=one\n"))))
+
+		editor := filepath.Join(tmp, "editor.sh")
+		require.NoError(t, os.WriteFile(editor, []byte("#!/bin/sh\ncat \"$1\" > \""+capture+"\"\n"), 0o700))
+		t.Setenv("EDITOR", editor)
+
+		oldStdin := os.Stdin
+		r, w, _ := os.Pipe()
+		os.Stdin = r
+		go func() {
+			_, _ = w.Write([]byte("EG_ENTROPY_SEED=two\n"))
+			w.Close()
+		}()
+
+		err := runSecretCLI(t, []string{"secret", "edit", uri})
+		os.Stdin = oldStdin
+		require.NoError(t, err)
+
+		seen, err := os.ReadFile(capture)
+		require.NoError(t, err)
+		require.Equal(t, "EG_ACCOUNT=one\nEG_ENTROPY_SEED=two\n", string(seen))
+
+		// the editor changed nothing, the appended input is still stored.
+		got, err := io.ReadAll(secrets.Read(t.Context(), uri))
+		require.NoError(t, err)
+		require.Equal(t, "EG_ACCOUNT=one\nEG_ENTROPY_SEED=two\n", string(got))
+	})
+
+	t.Run("separates piped input from a secret that does not end in a newline", func(t *testing.T) {
+		tmp := t.TempDir()
+		path := filepath.Join(tmp, "newline.chacha")
+		uri := "chachasm://pass@" + path
+
+		require.NoError(t, secrets.Update(t.Context(), uri, bytes.NewReader([]byte("A=1"))))
+
+		editor := filepath.Join(tmp, "editor.sh")
+		require.NoError(t, os.WriteFile(editor, []byte("#!/bin/sh\nexit 0\n"), 0o700))
+		t.Setenv("EDITOR", editor)
+
+		oldStdin := os.Stdin
+		r, w, _ := os.Pipe()
+		os.Stdin = r
+		go func() {
+			_, _ = w.Write([]byte("B=2\n"))
+			w.Close()
+		}()
+
+		err := runSecretCLI(t, []string{"secret", "edit", uri})
+		os.Stdin = oldStdin
+		require.NoError(t, err)
+
+		got, err := io.ReadAll(secrets.Read(t.Context(), uri))
+		require.NoError(t, err)
+		require.Equal(t, "A=1\nB=2\n", string(got))
+	})
+
+	t.Run("an empty pipe leaves the secret untouched", func(t *testing.T) {
+		tmp := t.TempDir()
+		path := filepath.Join(tmp, "empty.chacha")
+		uri := "chachasm://pass@" + path
+
+		require.NoError(t, secrets.Update(t.Context(), uri, bytes.NewReader([]byte("same"))))
+		before, err := os.ReadFile(path)
+		require.NoError(t, err)
+
+		editor := filepath.Join(tmp, "editor.sh")
+		require.NoError(t, os.WriteFile(editor, []byte("#!/bin/sh\nexit 0\n"), 0o700))
+		t.Setenv("EDITOR", editor)
+
+		oldStdin := os.Stdin
+		r, w, _ := os.Pipe()
+		os.Stdin = r
+		w.Close()
+
+		err = runSecretCLI(t, []string{"secret", "edit", uri})
+		os.Stdin = oldStdin
+		require.NoError(t, err)
+
+		// every encryption uses a fresh salt and nonce, so identical bytes mean it was not rewritten.
+		after, err := os.ReadFile(path)
+		require.NoError(t, err)
+		require.Equal(t, before, after)
+	})
+
+	t.Run("creates a secret that does not exist from piped input", func(t *testing.T) {
+		tmp := t.TempDir()
+		path := filepath.Join(tmp, "created.chacha")
+		uri := "chachasm://pass@" + path
+
+		editor := filepath.Join(tmp, "editor.sh")
+		require.NoError(t, os.WriteFile(editor, []byte("#!/bin/sh\nexit 0\n"), 0o700))
+		t.Setenv("EDITOR", editor)
+
+		oldStdin := os.Stdin
+		r, w, _ := os.Pipe()
+		os.Stdin = r
+		go func() {
+			_, _ = w.Write([]byte("A=1\n"))
+			w.Close()
+		}()
+
+		err := runSecretCLI(t, []string{"secret", "edit", uri})
+		os.Stdin = oldStdin
+		require.NoError(t, err)
+
+		got, err := io.ReadAll(secrets.Read(t.Context(), uri))
+		require.NoError(t, err)
+		require.Equal(t, "A=1\n", string(got))
+	})
+
+	t.Run("appends piped input to a file secret", func(t *testing.T) {
+		tmp := t.TempDir()
+		path := filepath.Join(tmp, "plain.secret")
+		uri := "file://" + path
+
+		require.NoError(t, os.WriteFile(path, []byte("A=1\n"), 0o600))
+
+		editor := filepath.Join(tmp, "editor.sh")
+		require.NoError(t, os.WriteFile(editor, []byte("#!/bin/sh\nexit 0\n"), 0o700))
+		t.Setenv("EDITOR", editor)
+
+		oldStdin := os.Stdin
+		r, w, _ := os.Pipe()
+		os.Stdin = r
+		go func() {
+			_, _ = w.Write([]byte("B=2\n"))
+			w.Close()
+		}()
+
+		err := runSecretCLI(t, []string{"secret", "edit", uri})
+		os.Stdin = oldStdin
+		require.NoError(t, err)
+
+		got, err := os.ReadFile(path)
+		require.NoError(t, err)
+		require.Equal(t, "A=1\nB=2\n", string(got))
+	})
 }

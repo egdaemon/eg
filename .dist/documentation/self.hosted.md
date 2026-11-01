@@ -24,6 +24,8 @@ eg daemon --account="00000000-0000-0000-0000-000000000000" --seed="00000000-0000
 
 currently we only support ubuntu. contact us if you want support on another platform, there are not any blockers for other distributions, we just havent built/published packages for them yet.
 
+the account and signing seed below are kept in a secret. see the [Secrets guide](/docs/secrets) for the supported schemes and more examples.
+
 ```bash
 # install the software.
 apt-get install egworkload
@@ -35,8 +37,7 @@ eg register
 # plaintext --account/--seed flags, store them as a secret and load them into the environment
 # before eg actl bootstrap/eg actl authorize resolve their flags, via `eg secrets env`. this
 # example uses the file:// scheme for simplicity; production usage should use a proper secret
-# manager instead, e.g. gcpsm:// (Google Secret Manager) or awssm:// (AWS Secrets Manager) —
-# see `eg secrets --help` for the full list of supported schemes.
+# manager instead, e.g. gcpsm:// (Google Secret Manager) or awssm:// (AWS Secrets Manager).
 printf 'EG_ACCOUNT=00000000-0000-0000-0000-000000000000\nEG_ENTROPY_SEED=00000000-0000-0000-0000-000000000001\n' \
   | eg secrets create file:///tmp/daemon.secret
 

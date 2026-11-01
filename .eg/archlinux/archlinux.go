@@ -46,7 +46,7 @@ func Prepare(ctx context.Context, o eg.Op) error {
 }
 
 func Build(ctx context.Context, o eg.Op) error {
-	cdir := egenv.DirectoryCache(".dist", "pacman")
+	cdir := egenv.DirectoryWorkload(".dist", "pacman")
 	templatedir := egenv.DirectoryWorking(".dist", "archlinux")
 
 	runtime := shell.Runtime().

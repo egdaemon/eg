@@ -20,7 +20,7 @@ var formula = template.Must(template.New("eg.rb").Parse(formulasrc))
 
 // formulapath is where the rendered formula is written.
 func formulapath() string {
-	return egenv.WorkspaceDirectory("eg.rb")
+	return egenv.DirectoryWorkload(".dist", "eg.rb")
 }
 
 // brew renders the homebrew formula for the archive pattern into formulapath.

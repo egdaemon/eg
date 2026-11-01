@@ -44,4 +44,4 @@ jobs:
     - name: build
       run: |
         CGO_ENABLED=1 CGO_LDFLAGS="-L/opt/homebrew/lib" go build -buildmode=c-shared --tags duckdb_use_lib ./...
-        ~/go/bin/eg compute baremetal -vv release/eg/brew
+        ~/go/bin/eg compute baremetal -vv --draft release/eg/brew

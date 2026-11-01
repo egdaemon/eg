@@ -68,7 +68,7 @@ func verify(ctx context.Context, _ eg.Op) error {
 	if !egenv.CloneEnabled() {
 		// md5 of the branch formatted as a uuid.
 		sum := md5.Sum([]byte(branch))
-		patch := egenv.WorkspaceDirectory(".eg", ".patches", fmt.Sprintf("%x-%x-%x-%x-%x", sum[0:4], sum[4:6], sum[6:8], sum[8:10], sum[10:])+".patch")
+		patch := egenv.DirectoryWorkload(".eg", ".patches", fmt.Sprintf("%x-%x-%x-%x-%x", sum[0:4], sum[4:6], sum[6:8], sum[8:10], sum[10:])+".patch")
 		return shell.Run(ctx, shell.Newf("test -s %s", patch))
 	}
 

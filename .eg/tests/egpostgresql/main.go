@@ -42,7 +42,7 @@ func main() {
 }
 
 func Postgres(ctx context.Context, op eg.Op) (err error) {
-	if err := egfs.CloneFS(ctx, egenv.WorkspaceDirectory(), ".", egpostgresql.TestArchive()); err != nil {
+	if err := egfs.CloneFS(ctx, egenv.DirectoryWorkload(), ".", egpostgresql.TestArchive()); err != nil {
 		return err
 	}
 
@@ -51,7 +51,7 @@ func Postgres(ctx context.Context, op eg.Op) (err error) {
 		egpostgresql.Auto,
 		egpostgresql.RecreateDatabase("test_database"),
 		shell.Op(
-			runtime.New("psql --no-psqlrc -d test_database --file psqlskel/schema.sql").Directory(egenv.WorkspaceDirectory()),
+			runtime.New("psql --no-psqlrc -d test_database --file psqlskel/schema.sql").Directory(egenv.DirectoryWorkload()),
 		),
 		egpostgresql.InsertSuperuser("migrations"),
 		egpostgresql.Trust(egunsafe.HostPrefixes()...),

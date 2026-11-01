@@ -9,6 +9,7 @@ import (
 	"github.com/egdaemon/eg/runtime/wasi/eg"
 	"github.com/egdaemon/eg/runtime/wasi/egenv"
 	"github.com/egdaemon/eg/runtime/wasi/shell"
+	"github.com/egdaemon/eg/runtime/x/wasi/egarch"
 	"github.com/egdaemon/eg/runtime/x/wasi/eggithub"
 	"github.com/egdaemon/eg/runtime/x/wasi/eggolang"
 	"github.com/egdaemon/eg/runtime/x/wasi/egtarball"
@@ -19,6 +20,11 @@ func main() {
 	log.SetFlags(log.Flags() | log.Lshortfile)
 	ctx, done := context.WithTimeout(context.Background(), egenv.TTL())
 	defer done()
+
+	// the archive and formula are arm64 only, an intel host would publish an x86_64 binary under an arm64 name.
+	if arch := egarch.Host(); arch != "arm64" {
+		log.Fatalln("release/eg/brew must run on an arm64 host, got", arch)
+	}
 
 	pattern := egrel.TarDarwin()
 	runtime := shell.Runtime().
@@ -41,7 +47,9 @@ func main() {
 			egtarball.Pack(pattern),
 			egtarball.SHA256Op(pattern),
 			brew(pattern),
-			eggithub.Draft(egtarball.Archive(pattern), formulapath()),
+			eg.When(egenv.Draft(), eggithub.Draft(egtarball.Archive(pattern), formulapath())),
+			// the formula points at the release's download url, which only resolves once it is published.
+			eg.When(egenv.Release(), tap(formulapath())),
 		),
 	)
 

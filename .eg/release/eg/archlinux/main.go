@@ -29,7 +29,7 @@ func main() {
 				archlinux.Builder(archlinux.ContainerName),
 				eg.Sequential(
 					archlinux.Build,
-					eggithub.Draft(egenv.DirectoryCache(".dist", "pacman", "*.pkg.tar.*")),
+					eg.When(egenv.Draft(), eggithub.Draft(egenv.DirectoryWorkload(".dist", "pacman", "*.pkg.tar.*"))),
 				),
 			),
 		),

@@ -4,7 +4,6 @@ import (
 	"context"
 	"log"
 
-	"eg/compute/archlinux"
 	debeg "eg/compute/debuild/eg"
 
 	"github.com/egdaemon/eg/runtime/wasi/eg"
@@ -23,35 +22,23 @@ func main() {
 		eggit.AutoClone,
 		eg.Parallel(
 			debeg.Prepare,
-			archlinux.Prepare,
 		),
 		eg.Parallel(
 			eg.Module(
 				ctx,
 				debeg.Runner(),
 				eg.Sequential(
-					shell.Op(
-						// clean up old debians. remove in future version.
-						shell.Newf("rm %s", egenv.DirectoryCache(".dist", "*.deb")).Lenient(true),
-					),
 					debeg.Build,
 					debeg.Upload,
 					shell.Op(
-						shell.Newf("cp %s/*.deb %s", egenv.DirectoryTemp("deb.eg"), egenv.DirectoryCache(".dist")),
+						shell.Newf("cp %s/*.deb %s", egenv.DirectoryTemp("deb.eg"), egenv.DirectoryWorkload(".dist")),
 					),
 				),
 			),
-			// eg.Module(
-			// 	ctx,
-			// 	archlinux.AURRunner(),
-			// 	eg.Sequential(
-			// 		archlinux.Publish,
-			// 	),
-			// ),
 		),
-		eggithub.Draft(
-			egenv.DirectoryCache(".dist", "*.deb"),
-		),
+		eg.When(egenv.Draft(), eggithub.Draft(
+			egenv.DirectoryWorkload(".dist", "*.deb"),
+		)),
 	)
 
 	if err != nil {

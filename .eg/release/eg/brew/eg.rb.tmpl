@@ -6,6 +6,11 @@ class Eg < Formula
   version "{{ .Version }}"
   license :cannot_represent
 
+  # the archive is built on apple silicon and links libduckdb dynamically.
+  depends_on arch: :arm64
+  depends_on :macos
+  depends_on "duckdb"
+
   def install
     bin.install "bin/eg"
   end

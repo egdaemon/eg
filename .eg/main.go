@@ -56,7 +56,7 @@ func main() {
 // path of the freshly installed eg binary within the workspace directory.
 // the workspace is shared with nested modules, the ephemeral directory is not.
 func sharedbin() string {
-	return egenv.WorkspaceDirectory("eg")
+	return egenv.DirectoryWorkload("eg")
 }
 
 func IntegrationTests(ctx context.Context, op eg.Op) error {

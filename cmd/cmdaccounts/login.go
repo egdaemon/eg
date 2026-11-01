@@ -24,7 +24,7 @@ import (
 
 type Login struct {
 	SSHKeyPath string `name:"sshkeypath" help:"path to ssh key to use" default:"${vars_ssh_key_path}"`
-	Seed       string `name:"seed" help:"seed for generating determistic credentials, useful for ci/cd platforms" default:"${vars_entropy_seed}"`
+	Seed       string `name:"seed" help:"seed for generating determistic credentials, useful for ci/cd platforms" default:"${vars_ssh_key_seed}"`
 	Account    string `name:"account" help:"optional account id to login with, disambiguates when the ssh key is associated with multiple profiles" env:"EG_ACCOUNT"`
 	Browser    bool   `name:"browser" help:"open the console in the default browser once logged in"`
 }

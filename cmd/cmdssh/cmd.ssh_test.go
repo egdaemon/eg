@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/alecthomas/kong"
+	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/cmd/cmdopts"
 	"github.com/egdaemon/eg/cmd/cmdssh"
 	"github.com/stretchr/testify/require"
@@ -24,11 +25,12 @@ func runSSHCLI(t *testing.T, args []string) error {
 	parser, err := kong.New(&cli,
 		kong.Name("eg"),
 		kong.Vars{
-			"vars_entropy_seed": "test-default-seed",
-			"vars_ssh_key_seed": "test-default-seed",
-			"vars_ssh_key_path": filepath.Join(t.TempDir(), "id_ed25519"),
-			"vars_user_name":    "testuser",
-			"vars_user_home":    t.TempDir(),
+			"vars_entropy_seed":   "test-default-seed",
+			"vars_ssh_key_seed":   "test-default-seed",
+			"env_eg_ssh_key_seed": eg.EnvEGSSHSeed,
+			"vars_ssh_key_path":   filepath.Join(t.TempDir(), "id_ed25519"),
+			"vars_user_name":      "testuser",
+			"vars_user_home":      t.TempDir(),
 		},
 		kong.Bind(&cli.Global),
 	)
@@ -79,5 +81,37 @@ func TestCmdKey(t *testing.T) {
 		matches, err := filepath.Glob(path)
 		require.NoError(t, err)
 		require.Len(t, matches, 1)
+	})
+
+	t.Run("seed falls_back_to_the_ssh_key_seed_environment", func(t *testing.T) {
+		t.Setenv(eg.EnvEGSSHSeed, "env-seed")
+		dir := t.TempDir()
+		envpath := filepath.Join(dir, "env_ed25519")
+		argpath := filepath.Join(dir, "arg_ed25519")
+
+		require.NoError(t, runSSHCLI(t, []string{"ssh", "key", "--path", envpath}))
+		require.NoError(t, runSSHCLI(t, []string{"ssh", "key", "--seed", "env-seed", "--path", argpath}))
+
+		envpub, err := os.ReadFile(envpath + ".pub")
+		require.NoError(t, err)
+		argpub, err := os.ReadFile(argpath + ".pub")
+		require.NoError(t, err)
+		require.Equal(t, argpub, envpub)
+	})
+
+	t.Run("explicit_seed_wins_over_the_ssh_key_seed_environment", func(t *testing.T) {
+		t.Setenv(eg.EnvEGSSHSeed, "env-seed")
+		dir := t.TempDir()
+		envpath := filepath.Join(dir, "env_ed25519")
+		argpath := filepath.Join(dir, "arg_ed25519")
+
+		require.NoError(t, runSSHCLI(t, []string{"ssh", "key", "--path", envpath}))
+		require.NoError(t, runSSHCLI(t, []string{"ssh", "key", "--seed", "arg-seed", "--path", argpath}))
+
+		envpub, err := os.ReadFile(envpath + ".pub")
+		require.NoError(t, err)
+		argpub, err := os.ReadFile(argpath + ".pub")
+		require.NoError(t, err)
+		require.NotEqual(t, argpub, envpub)
 	})
 }

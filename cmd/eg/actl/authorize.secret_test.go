@@ -48,7 +48,7 @@ func TestAuthorizeSecretSigner(t *testing.T) {
 
 func TestAuthorizeSecretParsing(t *testing.T) {
 	t.Run("missing seed argument fails to parse", func(t *testing.T) {
-		genparser := cmdtestx.Genparser(AuthorizeSecret{}, kong.Vars{"vars_ssh_key_path": "/expected/path", "env_eg_entropy_seed": eg.EnvEGEntropySeed})
+		genparser := cmdtestx.Genparser(AuthorizeSecret{}, kong.Vars{"vars_ssh_key_path": "/expected/path", "env_eg_entropy_seed": eg.EnvEGEntropySeed, "vars_ssh_key_seed": "default-ssh-seed", "env_eg_ssh_key_seed": eg.EnvEGSSHSeed})
 
 		_, err := genparser(t).Parse([]string{"command"})
 		require.Error(t, err)
@@ -56,7 +56,7 @@ func TestAuthorizeSecretParsing(t *testing.T) {
 
 	t.Run("seed falls back to the environment", func(t *testing.T) {
 		t.Setenv(eg.EnvEGEntropySeed, "env-seed")
-		genparser := cmdtestx.Genparser(AuthorizeSecret{}, kong.Vars{"vars_ssh_key_path": "/expected/path", "env_eg_entropy_seed": eg.EnvEGEntropySeed})
+		genparser := cmdtestx.Genparser(AuthorizeSecret{}, kong.Vars{"vars_ssh_key_path": "/expected/path", "env_eg_entropy_seed": eg.EnvEGEntropySeed, "vars_ssh_key_seed": "default-ssh-seed", "env_eg_ssh_key_seed": eg.EnvEGSSHSeed})
 
 		kctx, err := genparser(t).Parse([]string{"command"})
 		require.NoError(t, err)
@@ -65,15 +65,32 @@ func TestAuthorizeSecretParsing(t *testing.T) {
 
 	t.Run("explicit seed wins over the environment", func(t *testing.T) {
 		t.Setenv(eg.EnvEGEntropySeed, "env-seed")
-		genparser := cmdtestx.Genparser(AuthorizeSecret{}, kong.Vars{"vars_ssh_key_path": "/expected/path", "env_eg_entropy_seed": eg.EnvEGEntropySeed})
+		genparser := cmdtestx.Genparser(AuthorizeSecret{}, kong.Vars{"vars_ssh_key_path": "/expected/path", "env_eg_entropy_seed": eg.EnvEGEntropySeed, "vars_ssh_key_seed": "default-ssh-seed", "env_eg_ssh_key_seed": eg.EnvEGSSHSeed})
 
 		kctx, err := genparser(t).Parse([]string{"command", "arg-seed"})
 		require.NoError(t, err)
 		require.Equal(t, "arg-seed", kctx.Selected().Positional[0].Target.String())
 	})
 
+	t.Run("ssh seed falls back to the ssh key seed environment", func(t *testing.T) {
+		t.Setenv(eg.EnvEGSSHSeed, "env-ssh-seed")
+		genparser := cmdtestx.Genparser(AuthorizeSecret{}, kong.Vars{"vars_ssh_key_path": "/expected/path", "env_eg_entropy_seed": eg.EnvEGEntropySeed, "vars_ssh_key_seed": "default-ssh-seed", "env_eg_ssh_key_seed": eg.EnvEGSSHSeed})
+
+		kctx, err := genparser(t).Parse([]string{"command", "arg-seed"})
+		require.NoError(t, err)
+
+		var found bool
+		for _, flag := range kctx.Selected().Flags {
+			if flag.Name == "sshkeyseed" {
+				found = true
+				require.Equal(t, "env-ssh-seed", flag.Target.String())
+			}
+		}
+		require.True(t, found)
+	})
+
 	t.Run("sshkeypath default resolves at parse time", func(t *testing.T) {
-		genparser := cmdtestx.Genparser(AuthorizeSecret{}, kong.Vars{"vars_ssh_key_path": "/expected/path", "env_eg_entropy_seed": eg.EnvEGEntropySeed})
+		genparser := cmdtestx.Genparser(AuthorizeSecret{}, kong.Vars{"vars_ssh_key_path": "/expected/path", "env_eg_entropy_seed": eg.EnvEGEntropySeed, "vars_ssh_key_seed": "default-ssh-seed", "env_eg_ssh_key_seed": eg.EnvEGSSHSeed})
 
 		_, err := genparser(t).Parse([]string{"command", "00000000-0000-0000-0000-000000000000"})
 		require.NoError(t, err)

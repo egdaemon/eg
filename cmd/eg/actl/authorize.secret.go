@@ -18,6 +18,7 @@ import (
 
 type AuthorizeSecret struct {
 	SSHKeyPath string `name:"sshkeypath" help:"path to ssh key to use" default:"${vars_ssh_key_path}"`
+	SSHSeed    string `name:"sshkeyseed" help:"seed for generating the ssh key used to authenticate" default:"${vars_ssh_key_seed}" env:"${env_eg_ssh_key_seed}"`
 	Seed       string `arg:"" name:"seed" placeholder:"00000000-0000-0000-0000-000000000000" required:"" env:"${env_eg_entropy_seed}"`
 	Shared     bool   `name:"shared" help:"this setting is only useful for registering global runners and is a noop everywhere else" hidden:"true"`
 }
@@ -49,7 +50,7 @@ func (t AuthorizeSecret) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, entr
 		return err
 	}
 
-	if asigner, err = sshx.AutoCached(sshx.NewKeyGenSeeded(t.Seed), t.SSHKeyPath); err != nil {
+	if asigner, err = sshx.AutoCached(sshx.NewKeyGenSeeded(t.SSHSeed), t.SSHKeyPath); err != nil {
 		return err
 	}
 

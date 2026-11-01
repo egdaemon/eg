@@ -197,7 +197,7 @@ func (t upload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, ident *cmdide
 		VcsUri:      errorsx.Zero(gitx.CanonicalURI(repo, t.GitRemote)), // optionally set the vcsuri if we're inside a repository.
 		VcsCommit:   errorsx.Zero(gitx.Commitish(ws.WorkingDir, t.GitReference)),
 		Labels:      append([]string{}, t.RuntimeResources.Labels...),
-		Description: stringsx.FirstNonBlank(t.Name, gitx.Description("Uploaded: %git.commit.author% - %git.ref%", repo, t.GitReference)),
+		Description: stringsx.FirstNonBlank(t.Name, gitx.Description("Uploaded: {git.commit.author} - {git.ref}", repo, t.GitReference)),
 	}
 
 	chttp := authn.New(gctx.Context, tlsc.DefaultClient(), signer, aid, compute.NewAuthzTokenSource)

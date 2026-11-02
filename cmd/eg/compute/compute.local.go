@@ -46,6 +46,7 @@ type local struct {
 	Dirty            bool     `name:"dirty" help:"include user directories and environment variables" hidden:"true"`
 	Wayland          bool     `name:"wayland" help:"bind-mount the host wayland display socket into the container"`
 	GPU              bool     `name:"gpu" help:"enable gpu support, implied by a non zero --vram" hidden:"true"`
+	GithubAuto       bool     `name:"github-token" help:"automatically detect and inject github credentials" negatable:"" default:"true" env:"${env_github_autotoken}"`
 	GCPAuto          bool     `name:"gcp-auto" help:"use the default well known path for gcp's application default credentials"`
 	GCP              string   `name:"gcp" help:"path to gcp's application default credentials"`
 	InvalidateCache  bool     `name:"invalidate-cache" help:"removes workload build cache"`
@@ -124,7 +125,7 @@ func (t local) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err e
 	canonicaluri := errorsx.Zero(gitx.CanonicalURI(repo, t.GitRemote))
 
 	envb := envx.Build().
-		Var(eg.EnvGithubToken, githubToken(gctx.Context, canonicaluri)).
+		Var(eg.EnvGithubToken, githubToken(gctx.Context, t.GithubAuto, canonicaluri)).
 		FromReader(secrets.NewReader(gctx.Context, t.Secrets...)).
 		FromPath(t.EnvironmentPaths...).
 		FromEnv(os.Environ()...).

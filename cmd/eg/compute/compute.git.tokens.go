@@ -16,7 +16,11 @@ import (
 // authenticated. logs a warning, consistent with other experimental
 // local-compute functionality (see runners.AgentOptionGPU), when gh
 // isn't installed or the token lookup fails.
-func githubToken(ctx context.Context, canonicaluri string) string {
+func githubToken(ctx context.Context, enabled bool, canonicaluri string) string {
+	if !enabled {
+		return ""
+	}
+
 	if !strings.Contains(canonicaluri, "github.com") {
 		return ""
 	}

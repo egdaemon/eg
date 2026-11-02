@@ -3,6 +3,7 @@ package actl
 import (
 	"fmt"
 	"log"
+	"math"
 	"runtime"
 	"strconv"
 	"strings"
@@ -12,10 +13,14 @@ import (
 	"github.com/egdaemon/eg"
 	_eg "github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/cmd/cmdopts"
+	"github.com/egdaemon/eg/internal/bytesx"
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
+	"github.com/egdaemon/eg/internal/langx"
 	"github.com/egdaemon/eg/internal/numericx"
 	"github.com/egdaemon/eg/runners"
+	"github.com/shirou/gopsutil/v4/disk"
+	"github.com/shirou/gopsutil/v4/mem"
 )
 
 type BootstrapEnvDaemon struct {
@@ -49,18 +54,32 @@ func (t BootstrapEnvDaemon) Run(kctx *kong.Context, gctx *cmdopts.Global, entrop
 		labels = append(labels, fmt.Sprintf("eg:gpu:%s", gpudriver))
 	}
 
+	// requested resources are capped at what the machine physically has.
+	physmemory, physdisk := uint64(math.MaxUint64), uint64(math.MaxUint64)
+	if vm, err := mem.VirtualMemory(); err != nil {
+		log.Println("unable to detect memory:", err)
+	} else {
+		physmemory = vm.Total
+	}
+
+	if du, err := disk.Usage("/"); err != nil {
+		log.Println("unable to detect disk:", err)
+	} else {
+		physdisk = du.Total
+	}
+
 	environ := envx.Build().Var(
 		eg.EnvAccount, t.AccountID,
 	).Var(
 		eg.EnvEGEntropySeed, seed,
 	).Var(
-		"EG_RESOURCES_CORES", strconv.FormatUint(numericx.Max(uint64(runtime.NumCPU()), t.RuntimeResources.Cores), 10),
+		"EG_RESOURCES_CORES", strconv.FormatUint(numericx.Min(t.RuntimeResources.Cores, uint64(runtime.NumCPU())), 10),
 	).Var(
-		"EG_RESOURCES_MEMORY", strconv.FormatUint(uint64(t.RuntimeResources.Memory), 10),
+		"EG_RESOURCES_MEMORY", strconv.FormatUint(numericx.Min(uint64(t.RuntimeResources.Memory), physmemory), 10),
 	).Var(
-		"EG_RESOURCES_DISK", fmt.Sprintf("\"%s\"", string(errorsx.Zero(t.RuntimeResources.Disk.MarshalText()))),
+		"EG_RESOURCES_DISK", fmt.Sprintf("\"%s\"", string(errorsx.Zero(bytesx.Unit(numericx.Min(uint64(t.RuntimeResources.Disk), physdisk)).MarshalText()))),
 	).Var(
-		"EG_RESOURCES_VRAM", strconv.FormatUint(numericx.Max(uint64(t.RuntimeResources.Vram), gpuvram), 10),
+		"EG_RESOURCES_VRAM", strconv.FormatUint(numericx.Min(langx.FirstNonZero(uint64(t.RuntimeResources.Vram), gpuvram), gpuvram), 10),
 	)
 
 	environ.Var(_eg.EnvRestartOnUpgrade, t.RestartOnUpgrade)

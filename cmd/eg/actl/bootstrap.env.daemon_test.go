@@ -16,6 +16,9 @@ import (
 	"github.com/egdaemon/eg/cmd/eg/actl"
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/secrets"
+	"github.com/dustin/go-humanize"
+	"github.com/shirou/gopsutil/v4/disk"
+	"github.com/shirou/gopsutil/v4/mem"
 	"github.com/stretchr/testify/require"
 )
 
@@ -139,6 +142,45 @@ func TestBootstrapEnvDaemon(t *testing.T) {
 				}
 			})
 		}
+	})
+
+	t.Run("cores and memory honor the requested values", func(t *testing.T) {
+		var out bytes.Buffer
+		genparser := cmdtestx.Genparser(actl.BootstrapEnvDaemon{},
+			cmdopts.RuntimeResources{Cores: uint64(runtime.NumCPU())}.KongVars(),
+			kong.Vars{"vars_account_id": "expected-account", "vars_entropy_seed": "expected-seed"},
+			kong.Writers(&out, nil),
+			kong.Bind(cmdopts.Entropy(cmdopts.GenerateEntropy)),
+		)
+
+		require.NoError(t, cmdtestx.Execute(t, genparser(t), "command", "--cores", "1", "--memory", "4GiB"))
+		require.Contains(t, out.String(), "EG_RESOURCES_CORES=1\n")
+		require.Contains(t, out.String(), "EG_RESOURCES_MEMORY=4294967296\n")
+	})
+
+	t.Run("physical resources cap the requested values", func(t *testing.T) {
+		vm, err := mem.VirtualMemory()
+		require.NoError(t, err)
+		du, err := disk.Usage("/")
+		require.NoError(t, err)
+
+		var out bytes.Buffer
+		genparser := cmdtestx.Genparser(actl.BootstrapEnvDaemon{},
+			cmdopts.RuntimeResources{Cores: 1}.KongVars(),
+			kong.Vars{"vars_account_id": "expected-account", "vars_entropy_seed": "expected-seed"},
+			kong.Writers(&out, nil),
+			kong.Bind(cmdopts.Entropy(cmdopts.GenerateEntropy)),
+		)
+
+		require.NoError(t, cmdtestx.Execute(t, genparser(t), "command",
+			"--cores", fmt.Sprint(runtime.NumCPU()+100),
+			"--memory", "100PiB",
+			"--disk", "100PiB",
+		))
+		require.Contains(t, out.String(), fmt.Sprintf("EG_RESOURCES_CORES=%d\n", runtime.NumCPU()))
+		require.Contains(t, out.String(), fmt.Sprintf("EG_RESOURCES_MEMORY=%d\n", vm.Total))
+		require.NotContains(t, out.String(), "EG_RESOURCES_DISK=\"100 PiB\"")
+		require.Contains(t, out.String(), fmt.Sprintf("EG_RESOURCES_DISK=\"%s\"", humanize.IBytes(du.Total)))
 	})
 
 	t.Run("restart on upgrade", func(t *testing.T) {

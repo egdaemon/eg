@@ -178,6 +178,7 @@ func main() {
 			"vars_git_default_reference":   envx.String(plumbing.Main.Short(), "GITHUB_REF_NAME", eg.EnvGitHeadRef), // github actions, then the run eg is nested in
 			"vars_git_head_reference":      envx.String(plumbing.HEAD.String(), "GITHUB_SHA", eg.EnvGitHeadCommit),  // github actions, then the run eg is nested in
 			"vars_workload_directory":      eg.DefaultModuleDirectory(),
+			"env_github_autotoken":         eg.EnvComputeAutoGithubToken,
 		},
 		kong.UsageOnError(),
 		kong.Bind(

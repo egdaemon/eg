@@ -71,6 +71,7 @@ const (
 )
 
 const (
+	EnvComputeAutoGithubToken        = "EG_COMPUTE_AUTO_GH_TOKEN"                   // environment flag preventing github token from being sent
 	EnvGithubToken                   = "GH_TOKEN"                                   // standard environment variable for github token
 	EnvCI                            = "CI"                                         // standard ci/cd environment variable flag
 	EnvComputeTLSInsecure            = "EG_COMPUTE_TLS_INSECURE"                    // used to pass TLS insecure flag to container.

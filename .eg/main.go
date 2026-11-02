@@ -70,13 +70,13 @@ func IntegrationTests(ctx context.Context, op eg.Op) error {
 	return eg.Perform(
 		ctx,
 		shell.Op(
+			// envvars is the most likely to break.
+			runtime.Newf("%s --hotswap compute baremetal --no-cgroups tests/envvars", egbin),
 			runtime.Newf("%s --hotswap compute baremetal --no-cgroups tests/concurrent", egbin),
 			runtime.Newf("%s --hotswap compute baremetal --no-cgroups tests/metrics", egbin),
 			runtime.Newf("%s --hotswap compute baremetal --no-cgroups tests/stress", egbin),
 			runtime.Newf("%s --hotswap compute baremetal --no-cgroups tests/localref", egbin),
 			runtime.Newf("%s --hotswap compute baremetal --no-cgroups tests/egdb", egbin),
-			// need eg to update for this to pass
-			runtime.Newf("%s --hotswap compute baremetal --no-cgroups tests/envvars", egbin).Lenient(true),
 			// runtime.New("/home/egd/go/bin/eg compute baremetal -vvvv tests/tty"),
 			// runtime.New("/home/egd/go/bin/eg compute baremetal tests/containers"),
 			// runtime.New("/home/egd/go/bin/eg compute baremetal -vv tests/gpgagent"),

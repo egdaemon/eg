@@ -256,25 +256,15 @@ func (t baremetal) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, hotswapbin
 	}
 	defer environio.Close()
 
-	modulesenv := envx.Build().FromEnviron(errorsx.Must(cmdenvb.Environ())...).Var(
-		eg.EnvComputeWorkloadDirectory, eg.DefaultRootDirectory(),
-	).Var(
-		eg.EnvComputeWorkingDirectory, eg.DefaultWorkingDirectory(),
-	).Var(
-		eg.EnvComputeCacheDirectory, eg.DefaultCacheDirectory(),
-	).Var(
-		eg.EnvComputeRuntimeDirectory, eg.DefaultRuntimeDirectory(),
-	).Var(
-		eg.EnvComputeWorkspaceDirectory, eg.DefaultWorkspaceDirectory(),
-	)
-
-	if err = modulesenv.CopyTo(environio); err != nil {
-		return errorsx.Wrap(err, "unable to generate environment")
-	}
-
 	var inherited []string
 	if !t.Clean {
 		inherited = os.Environ()
+	}
+
+	modulesenv := moduleenv(envx.Build().FromEnviron(errorsx.Must(cmdenvb.Environ())...), inherited...)
+
+	if err = modulesenv.CopyTo(environio); err != nil {
+		return errorsx.Wrap(err, "unable to generate environment")
 	}
 
 	// tune bare metal environment.

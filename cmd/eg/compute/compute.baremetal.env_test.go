@@ -63,3 +63,88 @@ func TestBaremetalEnv(t *testing.T) {
 		}
 	})
 }
+
+func TestModuleEnv(t *testing.T) {
+	// the environment derived from the repository of the workspace, a nested workload is cloned from the path of the
+	// workload that launched it.
+	local, err := envx.Build().
+		Var(eg.EnvComputeVCS, "git@:workload/eg").
+		Var(eg.EnvGitHeadVCS, "git@:workload/eg").
+		Var(eg.EnvGitBaseVCS, "git@:workload/eg").
+		Var(eg.EnvGitHeadCommit, "1111111111111111111111111111111111111111").
+		Var("A", "1").
+		Environ()
+	require.NoError(t, err)
+
+	// the environment of the workload that launched this one.
+	parent, err := envx.Build().
+		Var("HOME", "/home/example").
+		Var(eg.EnvComputeVCS, "git@github.com:egdaemon/eg.git").
+		Var(eg.EnvGitHeadVCS, "git@github.com:egdaemon/eg.git").
+		Var(eg.EnvGitBaseVCS, "git@github.com:egdaemon/eg.git").
+		Var(eg.EnvGitHeadCommit, "2222222222222222222222222222222222222222").
+		Var(eg.EnvComputeWorkspaceDirectory, "/w/.eg.workload/m.aaaaaaaa.d/.eg.workspace").
+		Environ()
+	require.NoError(t, err)
+
+	final := func(environ []string) map[string]string {
+		// the last entry of a key wins, as it does for the wasm module configuration.
+		m := map[string]string{}
+		for _, e := range environ {
+			k, v, _ := strings.Cut(e, "=")
+			m[k] = v
+		}
+		return m
+	}
+
+	t.Run("the vcs of the parent wins over the one derived from the workspace", func(t *testing.T) {
+		environ, err := moduleenv(envx.Build().FromEnviron(local...), parent...).Environ()
+		require.NoError(t, err)
+
+		m := final(environ)
+		require.Equal(t, "git@github.com:egdaemon/eg.git", m[eg.EnvComputeVCS])
+		require.Equal(t, "git@github.com:egdaemon/eg.git", m[eg.EnvGitHeadVCS])
+		require.Equal(t, "git@github.com:egdaemon/eg.git", m[eg.EnvGitBaseVCS])
+	})
+
+	t.Run("nothing else of the parent survives", func(t *testing.T) {
+		environ, err := moduleenv(envx.Build().FromEnviron(local...), parent...).Environ()
+		require.NoError(t, err)
+
+		m := final(environ)
+		require.Equal(t, "1111111111111111111111111111111111111111", m[eg.EnvGitHeadCommit])
+		require.Equal(t, "1", m["A"])
+		require.NotContains(t, m, "HOME")
+	})
+
+	t.Run("the directories are those of the container", func(t *testing.T) {
+		environ, err := moduleenv(envx.Build().FromEnviron(local...), parent...).Environ()
+		require.NoError(t, err)
+
+		m := final(environ)
+		require.Equal(t, eg.DefaultRootDirectory(), m[eg.EnvComputeWorkloadDirectory])
+		require.Equal(t, eg.DefaultWorkingDirectory(), m[eg.EnvComputeWorkingDirectory])
+		require.Equal(t, eg.DefaultCacheDirectory(), m[eg.EnvComputeCacheDirectory])
+		require.Equal(t, eg.DefaultRuntimeDirectory(), m[eg.EnvComputeRuntimeDirectory])
+		require.Equal(t, eg.DefaultWorkspaceDirectory(), m[eg.EnvComputeWorkspaceDirectory])
+	})
+
+	t.Run("without an inherited environment the vcs of the workspace is kept", func(t *testing.T) {
+		environ, err := moduleenv(envx.Build().FromEnviron(local...)).Environ()
+		require.NoError(t, err)
+
+		m := final(environ)
+		require.Equal(t, "git@:workload/eg", m[eg.EnvComputeVCS])
+		require.Equal(t, "git@:workload/eg", m[eg.EnvGitHeadVCS])
+		require.Equal(t, "git@:workload/eg", m[eg.EnvGitBaseVCS])
+	})
+
+	t.Run("a blank inherited vcs does not replace the one of the workspace", func(t *testing.T) {
+		environ, err := moduleenv(envx.Build().FromEnviron(local...), eg.EnvComputeVCS+"=", eg.EnvGitHeadVCS).Environ()
+		require.NoError(t, err)
+
+		m := final(environ)
+		require.Equal(t, "git@:workload/eg", m[eg.EnvComputeVCS])
+		require.Equal(t, "git@:workload/eg", m[eg.EnvGitHeadVCS])
+	})
+}

@@ -32,8 +32,8 @@ func TestRender(t *testing.T) {
 		out := ansi.Strip(render(ident, profiles[0].Account, profiles...))
 
 		require.Regexp(t, `^identity: u1 - bob - bob@example.com\naccount: 0190a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b - acme\nprofile: p1 - alice - alice@acme.test\n`, out)
-		require.Regexp(t, `\* +│ 0190a1b2 - acme +│ alice +│ alice@acme.test`, out)
-		require.Regexp(t, `  +│ 1190a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b +│ alice2 +│ alice@other.test`, out)
+		require.Regexp(t, `\* +│ p1 +│ 0190a1b2 - acme +│ alice +│ alice@acme.test`, out)
+		require.Regexp(t, `  +│ p2 +│ 1190a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b +│ alice2 +│ alice@other.test`, out)
 	})
 
 	t.Run("should list every profile when the current account is unknown", func(t *testing.T) {

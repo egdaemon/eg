@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
 
 	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/authn"
@@ -30,6 +31,18 @@ func (t *StatusError) Error() string {
 func BadRequest(err error) bool {
 	var status *StatusError
 	return errors.As(err, &status) && status.Code == http.StatusBadRequest
+}
+
+// Forbidden reports whether err is the api refusing the change, for example disabling the current profile.
+func Forbidden(err error) bool {
+	var status *StatusError
+	return errors.As(err, &status) && status.Code == http.StatusForbidden
+}
+
+// NotFound reports whether err is the api not finding the profile for the ssh identity.
+func NotFound(err error) bool {
+	var status *StatusError
+	return errors.As(err, &status) && status.Code == http.StatusNotFound
 }
 
 func endpoint() string {
@@ -60,6 +73,42 @@ func UpdateProfile(ctx context.Context, c *http.Client, display string, email st
 
 	if resp.StatusCode >= http.StatusBadRequest {
 		return nil, errorsx.Wrap(&StatusError{Code: resp.StatusCode, Status: resp.Status}, "unable to update profile")
+	}
+
+	if err = json.NewDecoder(resp.Body).Decode(&out); err != nil {
+		return nil, errorsx.Wrap(err, "unable to decode response")
+	}
+
+	return out.GetProfile(), nil
+}
+
+// EnableProfile enables the profile, it must share an ssh identity with the profile of the token.
+func EnableProfile(ctx context.Context, c *http.Client, id string) (*authn.Profile, error) {
+	return profileAccess(ctx, c, http.MethodPut, id, "unable to enable profile")
+}
+
+// DisableProfile disables the profile, it must share an ssh identity with the profile of the token.
+// the profile of the token cannot be disabled.
+func DisableProfile(ctx context.Context, c *http.Client, id string) (*authn.Profile, error) {
+	return profileAccess(ctx, c, http.MethodDelete, id, "unable to disable profile")
+}
+
+func profileAccess(ctx context.Context, c *http.Client, method string, id string, msg string) (*authn.Profile, error) {
+	var out MeProfileUpdateResponse
+
+	req, err := http.NewRequestWithContext(ctx, method, fmt.Sprintf("%s/profile/%s", endpoint(), url.PathEscape(id)), nil)
+	if err != nil {
+		return nil, errorsx.Wrap(err, "unable to create request")
+	}
+
+	resp, err := c.Do(req)
+	if err != nil {
+		return nil, errorsx.Wrap(err, "request failed")
+	}
+	defer httpx.AutoClose(resp)
+
+	if resp.StatusCode >= http.StatusBadRequest {
+		return nil, errorsx.Wrap(&StatusError{Code: resp.StatusCode, Status: resp.Status}, msg)
 	}
 
 	if err = json.NewDecoder(resp.Body).Decode(&out); err != nil {

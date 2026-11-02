@@ -119,3 +119,60 @@ func TestEditRun(t *testing.T) {
 	// the email was not specified, it keeps its current value.
 	require.JSONEq(t, `{"profile":{"display":"alice","email":"old@example.com"}}`, body)
 }
+
+func TestAccessRun(t *testing.T) {
+	t.Setenv("EG_SESSION_TOKEN", "stub-refresh-token")
+
+	var (
+		m            sync.Mutex
+		method, path string
+	)
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/oauth2/ssh/token", func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprint(w, `{"access_token":"stub-access-token","token_type":"bearer","expires_in":3600}`)
+	})
+	mux.HandleFunc("/authn/s/", func(w http.ResponseWriter, r *http.Request) { fmt.Fprint(w, `{}`) })
+	mux.HandleFunc("/authn/ssh", func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprint(w, `{"profiles":[{"token":"the-token","profile":{"id":"profile-1","account_id":"account-1","display":"old","email":"old@example.com"}}]}`)
+	})
+	mux.HandleFunc("/authn/current", func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprint(w, `{"token":"stub-session-token","profile":{"id":"profile-1"},"account":{"id":"account-1"}}`)
+	})
+	mux.HandleFunc("/m/authz/", func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprintf(w, `{"token":{"iss":"account-1","bearer":"meta-bearer","expires":%d}}`, time.Now().Add(time.Hour).UnixMilli())
+	})
+	mux.HandleFunc("/me/", func(w http.ResponseWriter, r *http.Request) {
+		m.Lock()
+		defer m.Unlock()
+		method, path = r.Method, r.URL.Path
+		fmt.Fprint(w, `{"profile":{"id":"profile-2","account_id":"account-1","display":"bob","email":"bob@example.com"}}`)
+	})
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		mux.ServeHTTP(w, r)
+	}))
+	t.Cleanup(srv.Close)
+
+	dst := errorsx.Must(url.Parse(srv.URL))
+	tlsc := &cmdopts.TLSConfig{Wrap: func(client *http.Client) *http.Client {
+		client.Transport = httpx.RewriteHostTransport(dst, client.Transport)
+		return client
+	}}
+	gctx := &cmdopts.Global{Context: t.Context(), AccountID: "account-1"}
+	ident := cmdidentity.New(t.Context(), "account-1", nil)
+	keypath := filepath.Join(t.TempDir(), "sshkey")
+
+	require.NoError(t, Enable{SSHKeyPath: keypath, Profile: "profile-2"}.Run(gctx, tlsc, ident))
+	m.Lock()
+	require.Equal(t, http.MethodPut, method)
+	require.Equal(t, "/me/profile/profile-2", path)
+	m.Unlock()
+
+	require.NoError(t, Disable{SSHKeyPath: keypath, Profile: "profile-2"}.Run(gctx, tlsc, ident))
+	m.Lock()
+	defer m.Unlock()
+	require.Equal(t, http.MethodDelete, method)
+	require.Equal(t, "/me/profile/profile-2", path)
+}

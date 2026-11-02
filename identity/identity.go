@@ -83,9 +83,9 @@ func discard(s RepoAccountScanner) (err error) {
 
 // Resolution is the outcome of Resolve.
 type Resolution struct {
-	Account    string
 	Source     Source
-	Profile    *authn.Authn   // the profile when known.
+	Identity   *authn.Identity
+	Current    *authn.Authn   // the resolved profile, only the account is populated when it was not looked up.
 	Candidates []*authn.Authn // the profiles to choose from when the account is ambiguous.
 }
 
@@ -104,7 +104,7 @@ const ErrAmbiguous = errorsx.String("multiple profiles are associated with this 
 // the remembered account. detected and selected accounts are remembered.
 func Resolve(ctx context.Context, db *sql.DB, c *http.Client, signer ssh.Signer, account string, vcsuri string, choose Chooser, refresh bool) (zero Resolution, err error) {
 	if !stringsx.Blank(account) {
-		return Resolution{Account: account, Source: SourceFlag}, nil
+		return Resolution{Identity: &authn.Identity{Id: ID(signer.PublicKey())}, Current: &authn.Authn{Account: &authn.Account{Id: account}}, Source: SourceFlag}, nil
 	}
 
 	return resolve(ctx, db, c, signer, vcsuri, choose, refresh, func() (*authn.Authed, error) {
@@ -119,7 +119,7 @@ func resolve(ctx context.Context, db *sql.DB, c *http.Client, signer ssh.Signer,
 		if account, cause := Remembered(ctx, db, signer, vcsuri); cause != nil {
 			errorsx.Log(cause)
 		} else if account != "" {
-			return Resolution{Account: account, Source: SourceCache}, nil
+			return Resolution{Identity: &authn.Identity{Id: ID(signer.PublicKey())}, Current: &authn.Authn{Account: &authn.Account{Id: account}}, Source: SourceCache}, nil
 		}
 	}
 
@@ -140,7 +140,7 @@ func resolve(ctx context.Context, db *sql.DB, c *http.Client, signer ssh.Signer,
 		return zero, fmt.Errorf("identity %s is not associated with any profiles", profiles.Identity.GetId())
 	case 1:
 		p := profiles.Profiles[0]
-		return Resolution{Account: p.Profile.AccountId, Source: SourceSingle, Profile: p}, nil
+		return Resolution{Identity: profiles.Identity, Current: p, Source: SourceSingle}, nil
 	}
 
 	candidates := profiles.Profiles
@@ -148,14 +148,14 @@ func resolve(ctx context.Context, db *sql.DB, c *http.Client, signer ssh.Signer,
 		if matched := WithRepository(ctx, c, candidates, vcsuri); len(matched) == 1 {
 			p := matched[0]
 			remember(p.Profile.AccountId)
-			return Resolution{Account: p.Profile.AccountId, Source: SourceRepository, Profile: p}, nil
+			return Resolution{Identity: profiles.Identity, Current: p, Source: SourceRepository}, nil
 		} else if len(matched) > 1 {
 			candidates = matched
 		}
 	}
 
 	if choose == nil || !termx.IsInteractive() {
-		return Resolution{Candidates: candidates}, errorsx.Wrapf(ErrAmbiguous, "identity %s has %d candidate profiles, specify one with --account-id or EG_ACCOUNT", profiles.Identity.GetId(), len(candidates))
+		return Resolution{Identity: profiles.Identity, Candidates: candidates}, errorsx.Wrapf(ErrAmbiguous, "identity %s has %d candidate profiles, specify one with --account-id or EG_ACCOUNT", profiles.Identity.GetId(), len(candidates))
 	}
 
 	p, err := choose(candidates)
@@ -163,7 +163,7 @@ func resolve(ctx context.Context, db *sql.DB, c *http.Client, signer ssh.Signer,
 		return zero, err
 	}
 	remember(p.Profile.AccountId)
-	return Resolution{Account: p.Profile.AccountId, Source: SourceManual, Profile: p}, nil
+	return Resolution{Identity: profiles.Identity, Current: p, Source: SourceManual}, nil
 }
 
 // Profiles lists every profile associated with the signer's key.

@@ -49,7 +49,8 @@ func (t Whoami) Run(gctx *cmdopts.Global, tlscfg *cmdopts.TLSConfig, ident *cmdi
 		return err
 	}
 
-	log.Println("account", r.Account, "-", r.Source)
+	account := r.Current.Account.Id
+	log.Println("account", account, "-", r.Source)
 
 	// resolve only reports the candidates when the account is ambiguous, list everything the key is associated with.
 	authed, err := identity.Profiles(gctx.Context, c, signer)
@@ -57,13 +58,13 @@ func (t Whoami) Run(gctx *cmdopts.Global, tlscfg *cmdopts.TLSConfig, ident *cmdi
 		return err
 	}
 
-	r.Profile, _ = slicesx.Find(func(v *authn.Authn) bool { return v.Profile.GetAccountId() == r.Account }, authed.Profiles...)
+	current, _ := slicesx.Find(func(v *authn.Authn) bool { return v.Profile.GetAccountId() == account }, authed.Profiles...)
 
-	if r.Profile == nil {
+	if current == nil {
 		return nil
 	}
 
-	log.Println("current", cmdidentity.TypographyAuthn(r.Profile))
+	log.Println("current", cmdidentity.TypographyAuthn(current))
 
 	return nil
 }

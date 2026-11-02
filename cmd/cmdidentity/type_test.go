@@ -28,7 +28,7 @@ func TestResolve(t *testing.T) {
 		// a nil client would panic if the network were used.
 		r, err := ident.Resolve(nil, signer, vcsuri, false)
 		require.NoError(t, err)
-		require.Equal(t, "explicit", r.Account)
+		require.Equal(t, "explicit", r.Current.Account.Id)
 		require.Equal(t, identity.SourceFlag, r.Source)
 	})
 
@@ -40,7 +40,7 @@ func TestResolve(t *testing.T) {
 		ident := cmdidentity.New(context.Background(), "explicit", nil)
 		r, err := ident.Resolve(nil, signer, vcsuri, false)
 		require.NoError(t, err)
-		require.Equal(t, "explicit", r.Account)
+		require.Equal(t, "explicit", r.Current.Account.Id)
 	})
 
 	t.Run("blank vcs uri is rejected", func(t *testing.T) {
@@ -60,7 +60,7 @@ func TestResolve(t *testing.T) {
 		ident := cmdidentity.New(context.Background(), "", nil)
 		r, err := ident.Resolve(nil, signer, vcsuri, false)
 		require.NoError(t, err)
-		require.Equal(t, "remembered", r.Account)
+		require.Equal(t, "remembered", r.Current.Account.Id)
 		require.Equal(t, identity.SourceCache, r.Source)
 	})
 
@@ -72,12 +72,12 @@ func TestResolve(t *testing.T) {
 		ident := cmdidentity.New(context.Background(), "", nil)
 		r, err := ident.Resolve(nil, signer, vcsuri, false)
 		require.NoError(t, err)
-		require.Equal(t, "first", r.Account)
+		require.Equal(t, "first", r.Current.Account.Id)
 
 		remember(t, signer, vcsuri, "second")
 		r, err = ident.Resolve(nil, signer, vcsuri, false)
 		require.NoError(t, err)
-		require.Equal(t, "first", r.Account)
+		require.Equal(t, "first", r.Current.Account.Id)
 	})
 }
 
@@ -91,12 +91,12 @@ func remember(t *testing.T, signer ssh.Signer, vcsuri, account string) {
 }
 
 func TestAccountID(t *testing.T) {
-	account, err := cmdidentity.AccountID(&identity.Resolution{Account: "account"}, nil)
+	account, err := cmdidentity.AccountID(&identity.Resolution{Current: &authn.Authn{Account: &authn.Account{Id: "account"}}}, nil)
 	require.NoError(t, err)
 	require.Equal(t, "account", account)
 
 	// a failed resolution can still carry candidates, the account must not leak out.
-	account, err = cmdidentity.AccountID(&identity.Resolution{Account: "account"}, identity.ErrAmbiguous)
+	account, err = cmdidentity.AccountID(&identity.Resolution{Current: &authn.Authn{Account: &authn.Account{Id: "account"}}}, identity.ErrAmbiguous)
 	require.Error(t, err)
 	require.Equal(t, "", account)
 }

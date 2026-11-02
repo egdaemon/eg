@@ -87,5 +87,5 @@ func AccountID(r *identity.Resolution, err error) (string, error) {
 		return "", err
 	}
 
-	return r.Account, nil
+	return r.Current.Account.Id, nil
 }

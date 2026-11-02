@@ -26,7 +26,7 @@ func testsigner(t *testing.T) ssh.Signer {
 }
 
 func profile(account string) *authn.Authn {
-	return &authn.Authn{Token: "token-" + account, Profile: &authn.Profile{Id: "profile-" + account, AccountId: account}}
+	return &authn.Authn{Token: "token-" + account, Account: &authn.Account{Id: account}, Profile: &authn.Profile{Id: "profile-" + account, AccountId: account}}
 }
 
 func lookup(profiles ...*authn.Authn) func() (*authn.Authed, error) {
@@ -91,7 +91,7 @@ func TestResolve(t *testing.T) {
 	t.Run("single profile", func(t *testing.T) {
 		r, err := resolve(ctx, opendb(t), nil, testsigner(t), vcsuri, nil, false, lookup(profile("a1")))
 		require.NoError(t, err)
-		require.Equal(t, "a1", r.Account)
+		require.Equal(t, "a1", r.Current.Account.Id)
 		require.Equal(t, SourceSingle, r.Source)
 	})
 
@@ -100,7 +100,7 @@ func TestResolve(t *testing.T) {
 		signer := testsigner(t)
 		r, err := resolve(ctx, db, reposhaving(t, "a2"), signer, vcsuri, nil, false, lookup(profile("a1"), profile("a2")))
 		require.NoError(t, err)
-		require.Equal(t, "a2", r.Account)
+		require.Equal(t, "a2", r.Current.Account.Id)
 		require.Equal(t, SourceRepository, r.Source)
 
 		// the second resolution is answered by the cache without consulting the server.
@@ -109,7 +109,7 @@ func TestResolve(t *testing.T) {
 			return nil, nil
 		})
 		require.NoError(t, err)
-		require.Equal(t, "a2", r.Account)
+		require.Equal(t, "a2", r.Current.Account.Id)
 		require.Equal(t, SourceCache, r.Source)
 	})
 
@@ -119,7 +119,7 @@ func TestResolve(t *testing.T) {
 		require.NoError(t, Remember(ctx, db, signer, vcsuri, "stale"))
 		r, err := resolve(ctx, db, reposhaving(t, "a1"), signer, vcsuri, nil, true, lookup(profile("a1"), profile("a2")))
 		require.NoError(t, err)
-		require.Equal(t, "a1", r.Account)
+		require.Equal(t, "a1", r.Current.Account.Id)
 		got, err := Remembered(ctx, db, signer, vcsuri)
 		require.NoError(t, err)
 		require.Equal(t, "a1", got)

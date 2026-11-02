@@ -65,6 +65,6 @@ func (t DefaultAccount) Run(gctx *cmdopts.Global, tlscfg *cmdopts.TLSConfig, ide
 		return err
 	}
 
-	log.Println("account", r.Account, "-", r.Source, "- will be used for", vcsuri)
+	log.Println("account", r.Current.Account.Id, "-", r.Source, "- will be used for", vcsuri)
 	return nil
 }

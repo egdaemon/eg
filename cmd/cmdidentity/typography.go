@@ -10,6 +10,17 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
+type typographgyid string
+
+func (t typographgyid) Format(f fmt.State, verb rune) {
+	// width, precision and flags are applied to the whole value.
+	_, _ = fmt.Fprintf(f, fmt.FormatString(f, 's'), string(t))
+}
+
+func TypographyID[T ~string](id T) fmt.Formatter {
+	return typographgyid(string(id))
+}
+
 type accountCompact struct {
 	a *authn.Account
 }

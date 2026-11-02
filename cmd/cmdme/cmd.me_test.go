@@ -26,22 +26,39 @@ func TestRender(t *testing.T) {
 		{Account: &authn.Account{Id: "1190a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b"}, Profile: &authn.Profile{Id: "p2", AccountId: "1190a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b", Display: "alice2", Email: "alice@other.test"}},
 	}
 
-	t.Run("should show the current profile before the table with the current row marked", func(t *testing.T) {
-		out := ansi.Strip(render("0190a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b", profiles...))
+	ident := &authn.Identity{Id: "ident-1", Uid: "u1", Display: "bob", Email: "bob@example.com"}
 
-		require.Regexp(t, `^current: 0190a1b2 - acme - alice\n`, out)
+	t.Run("should show the full session before the table with the current row marked", func(t *testing.T) {
+		out := ansi.Strip(render(ident, profiles[0].Account, profiles...))
+
+		require.Regexp(t, `^identity: u1 - bob - bob@example.com\naccount: 0190a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b - acme\nprofile: p1 - alice - alice@acme.test\n`, out)
 		require.Regexp(t, `\* +│ 0190a1b2 - acme +│ alice +│ alice@acme.test`, out)
 		require.Regexp(t, `  +│ 1190a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b +│ alice2 +│ alice@other.test`, out)
 	})
 
 	t.Run("should list every profile when the current account is unknown", func(t *testing.T) {
-		out := ansi.Strip(render("", profiles...))
+		out := ansi.Strip(render(ident, nil, profiles...))
 
-		require.Contains(t, out, "current: unknown")
+		require.Regexp(t, `^identity: u1 - bob - bob@example.com\naccount: \nprofile: \n`, out)
 		require.Contains(t, out, "alice@acme.test")
 		require.Contains(t, out, "alice@other.test")
 		require.NotContains(t, out, "*")
 	})
+}
+
+func TestRenderOrder(t *testing.T) {
+	profiles := []*authn.Authn{
+		{Account: &authn.Account{Id: "a2"}, Profile: &authn.Profile{Id: "p1", AccountId: "a2", Email: "p1@test"}},
+		{Account: &authn.Account{Id: "a1"}, Profile: &authn.Profile{Id: "p3", AccountId: "a1", Email: "p3@test"}},
+		{Account: &authn.Account{Id: "a2"}, Profile: &authn.Profile{Id: "p0", AccountId: "a2", Email: "p0@test"}},
+		{Account: &authn.Account{Id: "a1"}, Profile: &authn.Profile{Id: "p2", AccountId: "a1", Email: "p2@test"}},
+	}
+
+	out := ansi.Strip(render(&authn.Identity{Uid: "u1"}, &authn.Account{Id: "a1"}, profiles...))
+
+	require.Regexp(t, `(?s)p2@test.*p3@test.*p0@test.*p1@test`, out)
+	// the callers slice is not reordered.
+	require.Equal(t, "p1", profiles[0].Profile.Id)
 }
 
 func TestEditRun(t *testing.T) {

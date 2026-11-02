@@ -3,6 +3,7 @@ package cmdme
 import (
 	"errors"
 	"fmt"
+	"slices"
 
 	"charm.land/lipgloss/v2"
 	"charm.land/lipgloss/v2/table"
@@ -10,6 +11,7 @@ import (
 	"github.com/egdaemon/eg/cmd/cmdidentity"
 	"github.com/egdaemon/eg/cmd/cmdopts"
 	"github.com/egdaemon/eg/identity"
+	"github.com/egdaemon/eg/internal/cmpx"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/sshx"
 )
@@ -27,11 +29,8 @@ func (t Ls) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, ident *cmdidentit
 
 	c := tlsc.DefaultClient()
 
-	// the account being acted as. not being able to determine it is not fatal, the listing is still useful.
-	var current string
-	if r, err := ident.Resolve(c, signer, t.VcsURI, false); err == nil {
-		current = r.Account
-	} else if !errors.Is(err, identity.ErrAmbiguous) {
+	r, err := ident.Resolve(c, signer, t.VcsURI, false)
+	if !errors.Is(err, identity.ErrAmbiguous) {
 		errorsx.Log(errorsx.Wrap(err, "unable to determine the current account"))
 	}
 
@@ -40,35 +39,43 @@ func (t Ls) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, ident *cmdidentit
 		return err
 	}
 
-	_, _ = lipgloss.Println(render(current, authed.Profiles...))
+	_, _ = lipgloss.Println(render(authed.Identity, r.Current.GetAccount(), authed.Profiles...))
 
 	return nil
 }
 
 // render the current profile followed by a table of every profile. the current profile is
 // marked in the table as well as styled so it remains visible without color.
-func render(current string, profiles ...*authn.Authn) string {
+func render(ident *authn.Identity, current *authn.Account, idents ...*authn.Authn) string {
 	var (
 		bold    = lipgloss.NewStyle().Bold(true)
 		marked  = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("2"))
-		rows    = make([][]string, 0, len(profiles))
+		rows    = make([][]string, 0, len(idents))
 		focused = -1
-		summary = "current: unknown, select an account with --account-id"
+		session = cmdidentity.UXSessionFull(ident, nil)
 	)
 
-	for i, p := range profiles {
+	// the current account first, then by profile id.
+	iscurrent := func(v *authn.Authn) bool {
+		return current.GetId() != "" && v.GetProfile().GetAccountId() == current.GetId()
+	}
+
+	order := cmpx.For[*authn.Authn]().Bool(iscurrent).String(func(v *authn.Authn) string { return v.GetProfile().GetId() })
+	idents = slices.SortedStableFunc(slices.Values(idents), order.Compare)
+
+	for i, id := range idents {
 		mark := ""
-		if p.GetProfile().GetAccountId() == current && current != "" {
+		if id.GetProfile().GetAccountId() == current.GetId() && current.GetId() != "" {
 			mark = "*"
 			focused = i
-			summary = fmt.Sprintf("current: %v", cmdidentity.TypographyAuthn(p))
+			session = cmdidentity.UXSessionFull(ident, id)
 		}
 
 		rows = append(rows, []string{
 			mark,
-			fmt.Sprintf("%v", cmdidentity.TypographyAccountCompact(p.GetAccount())),
-			fmt.Sprintf("%v", cmdidentity.TypographyProfileCompact(p.GetProfile())),
-			p.GetProfile().GetEmail(),
+			fmt.Sprintf("%v", cmdidentity.TypographyAccountCompact(id.GetAccount())),
+			fmt.Sprintf("%v", cmdidentity.TypographyProfileCompact(id.GetProfile())),
+			id.GetProfile().GetEmail(),
 		})
 	}
 
@@ -87,5 +94,5 @@ func render(current string, profiles ...*authn.Authn) string {
 			}
 		})
 
-	return summary + "\n\n" + tbl.String()
+	return fmt.Sprintf("%v", session) + "\n\n" + tbl.String()
 }

@@ -1,6 +1,6 @@
 # export DEMOPASSPHRASE="..."
 # EDITOR=vim eg secrets edit chachasm://${DEMOPASSPHRASE}@.dist/demo/demo.env
-# eg secrets env --uri "chachasm://${DEMOPASSPHRASE}@.dist/demo/demo.env" ansidrama record .dist/demo/ansidrama.eg.toml
+# systemd-run --user --pty --wait --working-directory=$PWD --setenv=EG_SSH_KEY_PATH=$PWD/.eg.demo/.ssh/eg --setenv=PATH -p RuntimeDirectory=eg-demo-daemon -p CacheDirectory=eg-demo-daemon eg secrets env --uri "chachasm://${DEMOPASSPHRASE}@.dist/demo/demo.env" ansidrama record .dist/demo/ansidrama.eg.toml
 launch = "d=/tmp/.eg.demo; rm -rf $d && mkdir -p $d && cd $d && PS1='$ ' bash --norc --noprofile -i"
 cols = 84
 rows = 24
@@ -12,7 +12,9 @@ out = "ansidrama.eg.webp"
 # TERM=screen-* stops eg (via termenv) from querying the terminal for its
 # background colour, which ansidrama's embedded terminal never answers: without
 # this every eg command stalls for 5s, silently, and the next scene types into it.
-env = { COLORTERM = "truecolor", TERM = "screen-256color" }
+#
+# GIT_* give `git commit` an identity, HOME is overridden so there is no ~/.gitconfig.
+env = { COLORTERM = "truecolor", TERM = "screen-256color", GIT_AUTHOR_NAME = "Yu Sune", GIT_AUTHOR_EMAIL = "hopefully@egdaemon.com", GIT_COMMITTER_NAME = "Yu Sune", GIT_COMMITTER_EMAIL = "hopefully@egdaemon.com" }
 wait_cap_ms = 3000
 await_ms = 120000
 # 2x playback: ansidrama has no speed knob, so halve the holds and the per-character
@@ -64,7 +66,7 @@ hold_cs = 40
 
 # run it locally
 [[scene]]
-text = "eg compute local"
+text = "eg compute local --cores 4 --memory 4GiB"
 hold_cs = 20
 [[scene]]
 keys = ["Enter"]
@@ -80,7 +82,7 @@ keys = ["Enter"]
 hold_cs = 150
 
 [[scene]]
-text = "eg compute upload --cores 3 --memory 4GiB"
+text = "eg compute upload --cores 4 --memory 4GiB"
 hold_cs = 20
 [[scene]]
 keys = ["Enter"]

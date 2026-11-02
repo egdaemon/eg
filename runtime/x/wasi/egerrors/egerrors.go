@@ -5,8 +5,18 @@ import (
 	"context"
 	"errors"
 
+	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/runtime/wasi/eg"
 )
+
+// Compact returns the first error in the set, if any.
+func Compact(errs ...error) error {
+	return errorsx.Compact(errs...)
+}
+
+func Zero[T any](v T, err error) T {
+	return errorsx.Zero(v, err)
+}
 
 func matches(err error, errs []error) bool {
 	if len(errs) == 0 {

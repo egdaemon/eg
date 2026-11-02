@@ -620,12 +620,13 @@ func uploaddirect(ctx context.Context, httpc *http.Client, candidates []*compute
 
 	meta, err := registration.NewPingClient(httpc).Meta(ctx)
 	if err != nil {
-		return outcome{}, false, errorsx.Wrap(err, "unable to retrieve p2p bootstrap addresses")
+		// the control plane or the bootstrap peers being unreachable is transient.
+		return outcome{}, true, errorsx.Wrap(err, "unable to retrieve p2p bootstrap addresses")
 	}
 
 	p2p, err := libp2px.NewClient(ctx, libp2px.StringsToPeers(meta.Bootstrap...)...)
 	if err != nil {
-		return outcome{}, false, errorsx.Wrap(err, "unable to join p2p network")
+		return outcome{}, true, errorsx.Wrap(err, "unable to join p2p network")
 	}
 
 	accepted, recorded, retry := tryupload(ctx, p2p, candidates, req, archive, environ)

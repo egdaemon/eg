@@ -46,7 +46,7 @@ hold_cs = 100
 # EG_ACCOUNT is set, so there is nothing to choose and it does not prompt. match the whole screen for a bare
 # `$` as the last non-empty line (false while the typed command is last, true once the prompt is back).
 [[scene]]
-text = "eg register --account demo"
+text = "eg register"
 hold_cs = 20
 [[scene]]
 keys = ["Enter"]
@@ -71,7 +71,7 @@ hold_cs = 60
 # generate the daemon environment: it picks up the account and seed from the environment and derives
 # the seed. written to a file rather than tee'd, the derived seed is a secret and must not be on screen.
 [[scene]]
-text = "eg actl bootstrap env daemon --cores 4 --memory 4GiB > demo.daemon.env"
+text = "pwd; eg actl bootstrap env daemon --cores 4 --memory 4GiB > demo.daemon.env; cat demo.daemon.env"
 hold_cs = 20
 
 [[scene]]
@@ -85,7 +85,7 @@ hold_cs = 40
 
 # run the daemon with that environment. `file:./demo.daemon.env`, `file://demo.daemon.env` reads `demo.daemon.env` as a host.
 [[scene]]
-text = "eg secrets env --uri file:./demo.daemon.env eg daemon --sshkeypath ${RUNTIME_DIRECTORY}/id.d"
+text = "eg secrets env --uri file:./demo.daemon.env eg daemon"
 hold_cs = 20
 
 [[scene]]

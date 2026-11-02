@@ -1,15 +1,10 @@
 # export DEMOPASSPHRASE="..."
 # EDITOR=vim eg secrets edit chachasm://${DEMOPASSPHRASE}@.dist/demo/demo.daemon.env
-#
-# demo.daemon.env holds the *raw* EG_ACCOUNT and EG_ENTROPY_SEED. `eg actl bootstrap env daemon` derives the
-# seed once; the derived value is what the daemon and `authorize seed` both take.
-#
-# everything under /tmp/.eg.demo.compute is recreated per run, so the first scene (`eg register`) derives the
-# ssh key from EG_ENTROPY_SEED and links it to EG_ACCOUNT; the commands after it reuse that same key. needs
-# network access to the control plane.
-#
+# 
 # record:
-# systemd-run --user --pty --wait -p EnvironmentFile=$PWD/demo.daemon.env -p RuntimeDirectory=eg-demo -p CacheDirectory=eg-demo eg secrets env --uri "chachasm://${DEMOPASSPHRASE}@.dist/demo/demo.daemon.env" ansidrama record .dist/demo/ansidrama.eg.compute.toml
+# cargo install --git https://github.com/oetiker/ansidrama --path . --root ~/.local
+# run from the eg root. the secrets are decrypted inside the unit by `eg secrets env`, systemd cannot read the encrypted file as an EnvironmentFile.
+# systemd-run --user --pty --wait --working-directory=$PWD --setenv=HOME=$PWD/.eg.demo.d --setenv=PATH -p RuntimeDirectory=eg-demo-daemon -p CacheDirectory=eg-demo-daemon eg secrets env --uri "chachasm://${DEMOPASSPHRASE}@.dist/demo/demo.daemon.env" ansidrama record .dist/demo/ansidrama.eg.compute.toml
 launch = "d=/tmp/.eg.demo.compute; rm -rf $d && mkdir -p $d && cd $d && PS1='$ ' bash --norc --noprofile -i"
 cols = 100
 rows = 24
@@ -37,15 +32,6 @@ padding = 12
 [[scene]]
 card = { lines = ["Self hosted runner", "eg daemon"], fg = "#fef9c3" }
 hold_cs = 125
-
-[[scene]]
-text = "env | grep EG_"
-hold_cs = 20
-[[scene]]
-keys = ["Enter"]
-await = '(?:\A|\n)\$\n*\z'
-await_ms = 60000
-hold_cs = 100
 
 [[scene]]
 text = "which eg"

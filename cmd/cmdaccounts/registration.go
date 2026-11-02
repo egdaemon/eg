@@ -26,7 +26,7 @@ type Signup struct {
 	SSHKeyPath string `name:"sshkeypath" help:"path to ssh key to use" default:"${vars_ssh_key_path}"`
 	Seed       string `name:"seed" help:"seed for generating determistic credentials, useful for ci/cd platforms" default:"${vars_ssh_key_seed}"`
 	Endpoint   string `name:"endpoint" help:"specify the endpoint to connect to" default:"${vars_console_endpoint}" hidden:"true"`
-	Account    string `name:"account" help:"optional name of the account you want to register with can be found at https://console.egdaemon.com/s/settings"`
+	Account    string `name:"account" help:"optional account id or login domain of the account you want to register with, the login domain can be found at https://console.egdaemon.com/s/settings"`
 	Name       string `name:"name" help:"display name for the profile, defaults to the git user.name then the current user" default:"${vars_user_name}"`
 	Email      string `name:"email" help:"contact email for the profile, defaults to the git user.email then the current user at noreply.egdaemon.com" default:"${vars_user_email}"`
 }
@@ -62,7 +62,13 @@ func (t Signup) run(ctx context.Context, gctx *cmdopts.Global, oauthc *http.Clie
 		authed authn.Authed
 	)
 
-	token, err := authn.LoginOptionsToken(ctx, oauthc, authn.LoginOptionAccountID(gctx.AccountID), authn.LoginOptionSubdomain(t.Account))
+	// the account flag is an account id or the login domain of an account, the global account is always an id.
+	options, err := authn.LoginOptionsFrom(t.Account, authn.LoginOptionAccountID(gctx.AccountID))
+	if err != nil {
+		return err
+	}
+
+	token, err := authn.LoginOptionsToken(ctx, oauthc, options...)
 	if err != nil {
 		return errorsx.Wrap(err, "unable to fetch login options")
 	}

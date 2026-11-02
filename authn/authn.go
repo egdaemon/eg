@@ -11,12 +11,14 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"slices"
 
 	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/httpx"
 	"github.com/egdaemon/eg/internal/jwtx"
 	"github.com/egdaemon/eg/internal/langx"
+	"github.com/egdaemon/eg/internal/stringsx"
 	"github.com/egdaemon/eg/internal/userx"
 	"github.com/gofrs/uuid/v5"
 	"github.com/golang-jwt/jwt/v4"
@@ -117,6 +119,25 @@ func LoginOptionSubdomain(subdomain string) LoginOption {
 	return func(u *url.URL) {
 		sso, _ := url.Parse(eg.EnvSSOHostDefault())
 		u.Host = subdomain + "." + sso.Host
+	}
+}
+
+// LoginOptionsFrom builds the login options for an account that is either an account id or the login domain of an
+// account. the defaults (the global account id) are always sent, the account is applied on top of them. a nil uuid
+// is rejected.
+func LoginOptionsFrom(account string, defaults ...LoginOption) ([]LoginOption, error) {
+	if stringsx.Blank(account) {
+		return defaults, nil
+	}
+
+	id, err := uuid.FromString(account)
+	switch {
+	case err == nil && id.IsNil():
+		return nil, errorsx.Notification(errorsx.String("account must be the account id or a eg login domain"))
+	case err == nil:
+		return slices.Concat(defaults, []LoginOption{LoginOptionAccountID(id.String())}), nil
+	default:
+		return slices.Concat(defaults, []LoginOption{LoginOptionSubdomain(account)}), nil
 	}
 }
 

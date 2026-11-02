@@ -7,11 +7,13 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/egdaemon/eg/authn"
 	"github.com/egdaemon/eg/internal/httptestx"
 	"github.com/egdaemon/eg/internal/sshx"
+	"github.com/golang-jwt/jwt/v4"
 	"github.com/stretchr/testify/require"
 )
 
@@ -214,5 +216,85 @@ func TestLoginRun(t *testing.T) {
 
 		err = Login{SSHKeyPath: "/path/to/key"}.run(context.Background(), "", oauthc, chttp, signer, nopicker(t))
 		require.Error(t, err)
+	})
+
+	t.Run("account flag that is an account id is sent as the account id", func(t *testing.T) {
+		signer, err := sshx.SignerFromGenerator(sshx.NewKeyGenSeeded(t.Name()))
+		require.NoError(t, err)
+
+		signed, err := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{"account_id": "da832aa9-fb97-434e-98c2-008130552c9d"}).SignedString([]byte("secret"))
+		require.NoError(t, err)
+		options, err := json.Marshal(&authn.LoginOptionsResponse{Token: signed})
+		require.NoError(t, err)
+
+		oauthc := httptestx.NewTestClient(func(req *http.Request) *http.Response {
+			if req.URL.Path == "/authn/s/" {
+				require.Equal(t, "da832aa9-fb97-434e-98c2-008130552c9d", req.URL.Query().Get("account_id"))
+				require.True(t, strings.HasPrefix(req.URL.Host, "sso."), req.URL.Host)
+				return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(bytes.NewReader(options)), Header: http.Header{}}
+			}
+			encoded, err := json.Marshal(authn.Authed{})
+			require.NoError(t, err)
+			return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(bytes.NewReader(encoded)), Header: http.Header{}}
+		})
+
+		err = Login{SSHKeyPath: "/path/to/key", Account: "da832aa9-fb97-434e-98c2-008130552c9d"}.run(context.Background(), "da832aa9-fb97-434e-98c2-008130552c9d", oauthc, oauthc, signer, nopicker(t))
+		require.ErrorContains(t, err, "not associated with any profiles")
+	})
+
+	t.Run("account flag that is the nil uuid is rejected without a request", func(t *testing.T) {
+		signer, err := sshx.SignerFromGenerator(sshx.NewKeyGenSeeded(t.Name()))
+		require.NoError(t, err)
+
+		oauthc := httptestx.NewTestClient(func(req *http.Request) *http.Response {
+			t.Fatalf("unexpected request: %s %s", req.Method, req.URL.Path)
+			return nil
+		})
+
+		nilid := "00000000-0000-0000-0000-000000000000"
+		err = Login{SSHKeyPath: "/path/to/key", Account: nilid}.run(context.Background(), nilid, oauthc, oauthc, signer, nopicker(t))
+		require.ErrorContains(t, err, "account must be the account id or a eg login domain")
+	})
+
+	t.Run("account flag that is a login domain is sent as the subdomain", func(t *testing.T) {
+		signer, err := sshx.SignerFromGenerator(sshx.NewKeyGenSeeded(t.Name()))
+		require.NoError(t, err)
+
+		signed, err := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{"id": "domain-1", "account_id": "da832aa9-fb97-434e-98c2-008130552c9d"}).SignedString([]byte("secret"))
+		require.NoError(t, err)
+		options, err := json.Marshal(&authn.LoginOptionsResponse{Token: signed})
+		require.NoError(t, err)
+
+		oauthc := httptestx.NewTestClient(func(req *http.Request) *http.Response {
+			if req.URL.Path == "/authn/s/" {
+				require.True(t, strings.HasPrefix(req.URL.Host, "demo.sso."), req.URL.Host)
+				require.Equal(t, "11111111-1111-1111-1111-111111111111", req.URL.Query().Get("account_id"), "the global account is always sent")
+				return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(bytes.NewReader(options)), Header: http.Header{}}
+			}
+			encoded, err := json.Marshal(authn.Authed{})
+			require.NoError(t, err)
+			return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(bytes.NewReader(encoded)), Header: http.Header{}}
+		})
+
+		err = Login{SSHKeyPath: "/path/to/key", Account: "demo"}.run(context.Background(), "11111111-1111-1111-1111-111111111111", oauthc, oauthc, signer, nopicker(t))
+		require.ErrorContains(t, err, "not associated with any profiles")
+	})
+
+	t.Run("account flag that is an unknown login domain fails", func(t *testing.T) {
+		signer, err := sshx.SignerFromGenerator(sshx.NewKeyGenSeeded(t.Name()))
+		require.NoError(t, err)
+
+		signed, err := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{}).SignedString([]byte("secret"))
+		require.NoError(t, err)
+		options, err := json.Marshal(&authn.LoginOptionsResponse{Token: signed})
+		require.NoError(t, err)
+
+		oauthc := httptestx.NewTestClient(func(req *http.Request) *http.Response {
+			require.Equal(t, "/authn/s/", req.URL.Path, "must not continue to the ssh exchange")
+			return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(bytes.NewReader(options)), Header: http.Header{}}
+		})
+
+		err = Login{SSHKeyPath: "/path/to/key", Account: "typo"}.run(context.Background(), "11111111-1111-1111-1111-111111111111", oauthc, oauthc, signer, nopicker(t))
+		require.ErrorContains(t, err, "no account found for 'typo'")
 	})
 }

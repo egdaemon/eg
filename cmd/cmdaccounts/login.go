@@ -15,7 +15,6 @@ import (
 	"github.com/egdaemon/eg/internal/browserx"
 	"github.com/egdaemon/eg/internal/debugx"
 	"github.com/egdaemon/eg/internal/errorsx"
-	"github.com/egdaemon/eg/internal/langx"
 	"github.com/egdaemon/eg/internal/sshx"
 	"github.com/egdaemon/eg/internal/stringsx"
 	"golang.org/x/crypto/ssh"
@@ -25,7 +24,7 @@ import (
 type Login struct {
 	SSHKeyPath string `name:"sshkeypath" help:"path to ssh key to use" default:"${vars_ssh_key_path}"`
 	Seed       string `name:"seed" help:"seed for generating determistic credentials, useful for ci/cd platforms" default:"${vars_ssh_key_seed}"`
-	Account    string `name:"account" help:"optional account id to login with, disambiguates when the ssh key is associated with multiple profiles" env:"EG_ACCOUNT"`
+	Account    string `name:"account" help:"optional account id or login domain to login with, disambiguates when the ssh key is associated with multiple profiles" env:"EG_ACCOUNT"`
 	Browser    bool   `name:"browser" help:"open the console in the default browser once logged in"`
 }
 
@@ -47,7 +46,7 @@ func (t Login) Run(gctx *cmdopts.Global, tlscfg *cmdopts.TLSConfig, ident *cmdid
 		return errorsx.WithStack(err)
 	}
 
-	return t.run(ctx, langx.FirstNonZero(t.Account, gctx.AccountID), cfg.Client(ctx, refreshtoken), chttp, signer, ident.Choose)
+	return t.run(ctx, gctx.AccountID, cfg.Client(ctx, refreshtoken), chttp, signer, ident.Choose)
 }
 
 func (t Login) run(ctx context.Context, account string, oauthc *http.Client, chttp *http.Client, signer ssh.Signer, choose func([]*authn.Authn) (*authn.Authn, error)) (err error) {
@@ -55,9 +54,27 @@ func (t Login) run(ctx context.Context, account string, oauthc *http.Client, cht
 		authed authn.Authed
 	)
 
-	token, err := authn.LoginOptionsToken(ctx, oauthc, authn.LoginOptionAccountID(account))
+	// the account flag is an account id or the login domain of an account, the global account (EG_ACCOUNT) is always an id and always sent.
+	options, err := authn.LoginOptionsFrom(t.Account, authn.LoginOptionAccountID(account))
+	if err != nil {
+		return err
+	}
+
+	token, err := authn.LoginOptionsToken(ctx, oauthc, options...)
 	if err != nil {
 		return errorsx.Wrap(err, "unable to fetch login options")
+	}
+
+	if !stringsx.Blank(t.Account) {
+		opts, err := authn.DecodeLoginOptions(token)
+		if err != nil {
+			return err
+		}
+
+		// the server ignores unknown login domains, which would otherwise login without the requested account.
+		if stringsx.Blank(opts.AccountID) {
+			return errorsx.Notification(fmt.Errorf("you requested the account '%s'. None was found.", t.Account))
+		}
 	}
 
 	if err = loginssh(ctx, oauthc, bytes.NewReader(token), &authed); err != nil {

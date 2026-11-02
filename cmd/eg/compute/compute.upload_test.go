@@ -47,6 +47,6 @@ if err := eg.Perform(context.Background()); err != nil {
 		uploadoptions: uploadoptions{CacheDir: t.TempDir(), Follow: true},
 	}
 
-	require.NoError(t, cmd.Run(&cmdopts.Global{Context: t.Context(), AccountID: "account"}, tlsc, cmdidentity.New(t.Context(), "account", cmdidentity.Login), nil))
+	require.NoError(t, cmd.Run(&cmdopts.Global{Context: t.Context(), AccountID: "account"}, tlsc, cmdidentity.New(t.Context(), "account", "", cmdidentity.Login), nil))
 	requirevcs(t, "Uploaded: test - HEAD", "main.wasm", accepted())
 }

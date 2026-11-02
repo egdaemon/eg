@@ -58,7 +58,7 @@ func TestWhoami(t *testing.T) {
 		t.Cleanup(func() { log.SetOutput(os.Stderr) })
 
 		// the chooser must never be reached, the tests are not interactive.
-		ident := cmdidentity.New(t.Context(), "", func([]*authn.Authn) (*authn.Authn, error) {
+		ident := cmdidentity.New(t.Context(), "", "", func([]*authn.Authn) (*authn.Authn, error) {
 			t.Fatal("unexpected chooser invocation")
 			return nil, nil
 		})
@@ -102,7 +102,7 @@ func TestWhoami(t *testing.T) {
 		t.Cleanup(func() { log.SetOutput(os.Stderr) })
 
 		// the chooser must never be reached, the tests are not interactive.
-		ident := cmdidentity.New(t.Context(), "", func([]*authn.Authn) (*authn.Authn, error) {
+		ident := cmdidentity.New(t.Context(), "", "", func([]*authn.Authn) (*authn.Authn, error) {
 			t.Fatal("unexpected chooser invocation")
 			return nil, nil
 		})
@@ -145,7 +145,7 @@ func TestWhoami(t *testing.T) {
 		t.Cleanup(func() { log.SetOutput(os.Stderr) })
 
 		// the chooser must never be reached, the tests are not interactive.
-		ident := cmdidentity.New(t.Context(), "", func([]*authn.Authn) (*authn.Authn, error) {
+		ident := cmdidentity.New(t.Context(), "", "", func([]*authn.Authn) (*authn.Authn, error) {
 			t.Fatal("unexpected chooser invocation")
 			return nil, nil
 		})
@@ -191,7 +191,7 @@ func TestDefaultAccount(t *testing.T) {
 		t.Cleanup(func() { log.SetOutput(os.Stderr) })
 
 		// the chooser must never be reached, the tests are not interactive.
-		ident := cmdidentity.New(t.Context(), "", func([]*authn.Authn) (*authn.Authn, error) {
+		ident := cmdidentity.New(t.Context(), "", "", func([]*authn.Authn) (*authn.Authn, error) {
 			t.Fatal("unexpected chooser invocation")
 			return nil, nil
 		})
@@ -232,7 +232,7 @@ func TestDefaultAccount(t *testing.T) {
 		t.Cleanup(func() { log.SetOutput(os.Stderr) })
 
 		// the chooser must never be reached, the tests are not interactive.
-		ident := cmdidentity.New(t.Context(), "", func([]*authn.Authn) (*authn.Authn, error) {
+		ident := cmdidentity.New(t.Context(), "", "", func([]*authn.Authn) (*authn.Authn, error) {
 			t.Fatal("unexpected chooser invocation")
 			return nil, nil
 		})
@@ -284,7 +284,7 @@ func TestDefaultAccount(t *testing.T) {
 		t.Cleanup(func() { log.SetOutput(os.Stderr) })
 
 		// the chooser must never be reached, the tests are not interactive.
-		ident := cmdidentity.New(t.Context(), "", func([]*authn.Authn) (*authn.Authn, error) {
+		ident := cmdidentity.New(t.Context(), "", "", func([]*authn.Authn) (*authn.Authn, error) {
 			t.Fatal("unexpected chooser invocation")
 			return nil, nil
 		})
@@ -326,7 +326,7 @@ func TestDefaultAccount(t *testing.T) {
 		t.Cleanup(func() { log.SetOutput(os.Stderr) })
 
 		// the chooser must never be reached, the tests are not interactive.
-		ident := cmdidentity.New(t.Context(), "", func([]*authn.Authn) (*authn.Authn, error) {
+		ident := cmdidentity.New(t.Context(), "", "", func([]*authn.Authn) (*authn.Authn, error) {
 			t.Fatal("unexpected chooser invocation")
 			return nil, nil
 		})

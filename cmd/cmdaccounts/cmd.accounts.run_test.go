@@ -67,7 +67,7 @@ func TestLoginRunChoosesThroughIdentity(t *testing.T) {
 		}}
 		sshkey := filepath.Join(t.TempDir(), "sshkey")
 
-		ident := cmdidentity.New(t.Context(), "", func([]*authn.Authn) (*authn.Authn, error) {
+		ident := cmdidentity.New(t.Context(), "", "", func([]*authn.Authn) (*authn.Authn, error) {
 			t.Fatal("unexpected chooser invocation")
 			return nil, nil
 		})
@@ -119,7 +119,7 @@ func TestLoginRunChoosesThroughIdentity(t *testing.T) {
 		sshkey := filepath.Join(t.TempDir(), "sshkey")
 
 		var offered []*authn.Authn
-		ident := cmdidentity.New(t.Context(), "", func(profiles []*authn.Authn) (*authn.Authn, error) {
+		ident := cmdidentity.New(t.Context(), "", "", func(profiles []*authn.Authn) (*authn.Authn, error) {
 			offered = profiles
 			return profiles[1], nil
 		})
@@ -171,7 +171,7 @@ func TestLoginRunChoosesThroughIdentity(t *testing.T) {
 		}}
 		sshkey := filepath.Join(t.TempDir(), "sshkey")
 
-		ident := cmdidentity.New(t.Context(), "", func([]*authn.Authn) (*authn.Authn, error) {
+		ident := cmdidentity.New(t.Context(), "", "", func([]*authn.Authn) (*authn.Authn, error) {
 			return nil, identity.ErrAmbiguous
 		})
 

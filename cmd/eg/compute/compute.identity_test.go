@@ -25,7 +25,7 @@ func TestWorkloadCommandsResolveTheAccountThroughIdentity(t *testing.T) {
 
 		cmd := watch{SSHKeyPath: sshkey, ID: "w1"}
 
-		require.NoError(t, cmd.Run(&cmdopts.Global{Context: t.Context(), AccountID: "account"}, tlsc, cmdidentity.New(t.Context(), "account", nil)))
+		require.NoError(t, cmd.Run(&cmdopts.Global{Context: t.Context(), AccountID: "account"}, tlsc, cmdidentity.New(t.Context(), "account", "", nil)))
 	})
 
 	t.Run("download logs writes the stored log", func(t *testing.T) {
@@ -35,7 +35,7 @@ func TestWorkloadCommandsResolveTheAccountThroughIdentity(t *testing.T) {
 
 		cmd := downloadlogs{downloadopts{SSHKeyPath: sshkey, ID: "w1", Output: output}}
 
-		require.NoError(t, cmd.Run(&cmdopts.Global{Context: t.Context(), AccountID: "account"}, tlsc, cmdidentity.New(t.Context(), "account", nil)))
+		require.NoError(t, cmd.Run(&cmdopts.Global{Context: t.Context(), AccountID: "account"}, tlsc, cmdidentity.New(t.Context(), "account", "", nil)))
 
 		b, err := os.ReadFile(output)
 		require.NoError(t, err)
@@ -49,7 +49,7 @@ func TestWorkloadCommandsResolveTheAccountThroughIdentity(t *testing.T) {
 
 		cmd := downloadanalytics{downloadopts{SSHKeyPath: sshkey, ID: "w1", Output: output}}
 
-		require.NoError(t, cmd.Run(&cmdopts.Global{Context: t.Context(), AccountID: "account"}, tlsc, cmdidentity.New(t.Context(), "account", nil)))
+		require.NoError(t, cmd.Run(&cmdopts.Global{Context: t.Context(), AccountID: "account"}, tlsc, cmdidentity.New(t.Context(), "account", "", nil)))
 
 		b, err := os.ReadFile(output)
 		require.NoError(t, err)
@@ -62,7 +62,7 @@ func TestWorkloadCommandsResolveTheAccountThroughIdentity(t *testing.T) {
 
 		cmd := watch{SSHKeyPath: sshkey, ID: "w1"}
 
-		err := cmd.Run(&cmdopts.Global{Context: t.Context()}, tlsc, cmdidentity.New(t.Context(), "", nil))
+		err := cmd.Run(&cmdopts.Global{Context: t.Context()}, tlsc, cmdidentity.New(t.Context(), "", "", nil))
 		require.ErrorContains(t, err, "a repository is required")
 	})
 }
@@ -111,7 +111,7 @@ func TestCancelRun(t *testing.T) {
 
 		cmd := cancel{SSHKeyPath: sshkey, ID: "w1"}
 
-		require.NoError(t, cmd.Run(&cmdopts.Global{Context: t.Context(), AccountID: "account"}, tlsc, cmdidentity.New(t.Context(), "account", nil)))
+		require.NoError(t, cmd.Run(&cmdopts.Global{Context: t.Context(), AccountID: "account"}, tlsc, cmdidentity.New(t.Context(), "account", "", nil)))
 
 		m.Lock()
 		defer m.Unlock()

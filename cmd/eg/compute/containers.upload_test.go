@@ -25,6 +25,6 @@ func TestContainersUpload(t *testing.T) {
 		uploadoptions: uploadoptions{Follow: true},
 	}
 
-	require.NoError(t, cmd.Run(&cmdopts.Global{Context: t.Context(), AccountID: "account"}, tlsc, cmdidentity.New(t.Context(), "account", cmdidentity.Login), nil))
+	require.NoError(t, cmd.Run(&cmdopts.Global{Context: t.Context(), AccountID: "account"}, tlsc, cmdidentity.New(t.Context(), "account", "", cmdidentity.Login), nil))
 	requirevcs(t, "container workload - Containerfile", "main.wasm", accepted())
 }

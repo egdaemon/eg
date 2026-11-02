@@ -29,7 +29,7 @@ func TestRender(t *testing.T) {
 	ident := &authn.Identity{Id: "ident-1", Uid: "u1", Display: "bob", Email: "bob@example.com"}
 
 	t.Run("should show the full session before the table with the current row marked", func(t *testing.T) {
-		out := ansi.Strip(render(ident, profiles[0].Account, profiles...))
+		out := ansi.Strip(render(ident, profiles[0], profiles...))
 
 		require.Regexp(t, `^identity: u1 - bob - bob@example.com\naccount: 0190a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b - acme\nprofile: p1 - alice - alice@acme.test\n`, out)
 		require.Regexp(t, `\* +│ p1 +│ 0190a1b2 - acme +│ alice +│ alice@acme.test`, out)
@@ -107,7 +107,7 @@ func TestEditRun(t *testing.T) {
 		return client
 	}}
 	gctx := &cmdopts.Global{Context: t.Context(), AccountID: "account-1"}
-	ident := cmdidentity.New(t.Context(), "account-1", nil)
+	ident := cmdidentity.New(t.Context(), "account-1", "", nil)
 
 	require.NoError(t, Edit{SSHKeyPath: filepath.Join(t.TempDir(), "sshkey"), Display: "alice"}.Run(gctx, tlsc, ident))
 
@@ -161,7 +161,7 @@ func TestAccessRun(t *testing.T) {
 		return client
 	}}
 	gctx := &cmdopts.Global{Context: t.Context(), AccountID: "account-1"}
-	ident := cmdidentity.New(t.Context(), "account-1", nil)
+	ident := cmdidentity.New(t.Context(), "account-1", "", nil)
 	keypath := filepath.Join(t.TempDir(), "sshkey")
 
 	require.NoError(t, Enable{SSHKeyPath: keypath, Profile: "profile-2"}.Run(gctx, tlsc, ident))

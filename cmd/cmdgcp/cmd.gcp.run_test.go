@@ -109,7 +109,7 @@ func TestRun(t *testing.T) {
 				return client
 			}}
 			gctx := &cmdopts.Global{Context: t.Context(), AccountID: "account-1"}
-			ident := cmdidentity.New(t.Context(), "account-1", nil)
+			ident := cmdidentity.New(t.Context(), "account-1", "", nil)
 
 			require.NoError(t, c.run(gctx, tlsc, ident, filepath.Join(t.TempDir(), "sshkey")))
 

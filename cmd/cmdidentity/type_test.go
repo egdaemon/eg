@@ -23,7 +23,7 @@ func TestResolve(t *testing.T) {
 	t.Run("explicit account wins without any lookup", func(t *testing.T) {
 		t.Setenv(userx.EnvCacheDirectory, t.TempDir())
 		t.Setenv("RUNTIME_DIRECTORY", t.TempDir())
-		ident := cmdidentity.New(context.Background(), "explicit", nil)
+		ident := cmdidentity.New(context.Background(), "explicit", "", nil)
 
 		// a nil client would panic if the network were used.
 		r, err := ident.Resolve(nil, signer, vcsuri, false)
@@ -37,7 +37,7 @@ func TestResolve(t *testing.T) {
 		t.Setenv("RUNTIME_DIRECTORY", t.TempDir())
 		remember(t, signer, vcsuri, "remembered")
 
-		ident := cmdidentity.New(context.Background(), "explicit", nil)
+		ident := cmdidentity.New(context.Background(), "explicit", "", nil)
 		r, err := ident.Resolve(nil, signer, vcsuri, false)
 		require.NoError(t, err)
 		require.Equal(t, "explicit", r.Current.Account.Id)
@@ -46,7 +46,7 @@ func TestResolve(t *testing.T) {
 	t.Run("blank vcs uri is rejected", func(t *testing.T) {
 		t.Setenv(userx.EnvCacheDirectory, t.TempDir())
 		t.Setenv("RUNTIME_DIRECTORY", t.TempDir())
-		ident := cmdidentity.New(context.Background(), "", nil)
+		ident := cmdidentity.New(context.Background(), "", "", nil)
 
 		_, err := ident.Resolve(nil, signer, "", false)
 		require.ErrorContains(t, err, "a repository is required")
@@ -57,7 +57,7 @@ func TestResolve(t *testing.T) {
 		t.Setenv("RUNTIME_DIRECTORY", t.TempDir())
 		remember(t, signer, vcsuri, "remembered")
 
-		ident := cmdidentity.New(context.Background(), "", nil)
+		ident := cmdidentity.New(context.Background(), "", "", nil)
 		r, err := ident.Resolve(nil, signer, vcsuri, false)
 		require.NoError(t, err)
 		require.Equal(t, "remembered", r.Current.Account.Id)
@@ -69,7 +69,7 @@ func TestResolve(t *testing.T) {
 		t.Setenv("RUNTIME_DIRECTORY", t.TempDir())
 		remember(t, signer, vcsuri, "first")
 
-		ident := cmdidentity.New(context.Background(), "", nil)
+		ident := cmdidentity.New(context.Background(), "", "", nil)
 		r, err := ident.Resolve(nil, signer, vcsuri, false)
 		require.NoError(t, err)
 		require.Equal(t, "first", r.Current.Account.Id)
@@ -109,7 +109,7 @@ func TestChoose(t *testing.T) {
 
 	t.Run("delegates to the login the identity was built with", func(t *testing.T) {
 		var offered []*authn.Authn
-		ident := cmdidentity.New(context.Background(), "", func(p []*authn.Authn) (*authn.Authn, error) {
+		ident := cmdidentity.New(context.Background(), "", "", func(p []*authn.Authn) (*authn.Authn, error) {
 			offered = p
 			return p[1], nil
 		})
@@ -121,7 +121,7 @@ func TestChoose(t *testing.T) {
 	})
 
 	t.Run("returns the login's failure", func(t *testing.T) {
-		ident := cmdidentity.New(context.Background(), "", func([]*authn.Authn) (*authn.Authn, error) {
+		ident := cmdidentity.New(context.Background(), "", "", func([]*authn.Authn) (*authn.Authn, error) {
 			return nil, identity.ErrAmbiguous
 		})
 
@@ -135,7 +135,7 @@ func TestStore(t *testing.T) {
 	t.Run("opens the shared database", func(t *testing.T) {
 		t.Setenv(userx.EnvCacheDirectory, t.TempDir())
 		t.Setenv("RUNTIME_DIRECTORY", t.TempDir())
-		ident := cmdidentity.New(context.Background(), "", nil)
+		ident := cmdidentity.New(context.Background(), "", "", nil)
 
 		db, err := ident.Store()
 		require.NoError(t, err)
@@ -148,7 +148,7 @@ func TestStore(t *testing.T) {
 		t.Setenv("RUNTIME_DIRECTORY", t.TempDir())
 		signer, err := sshx.SignerFromGenerator(sshx.NewKeyGenSeeded(t.Name()))
 		require.NoError(t, err)
-		ident := cmdidentity.New(context.Background(), "", nil)
+		ident := cmdidentity.New(context.Background(), "", "", nil)
 
 		db, err := ident.Store()
 		require.NoError(t, err)

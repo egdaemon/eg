@@ -451,6 +451,8 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 			c8sproxy.ServiceProxyOptionContainerOptions(
 				ragent.Options()...,
 			),
+			// builds create their own network namespace as well, they take the options of hostnet.
+			c8sproxy.ServiceProxyOptionBuildOptions(runners.ZeroAgent(hostnet).Options()...),
 		).Bind(srv)
 
 		go func() {

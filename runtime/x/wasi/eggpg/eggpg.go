@@ -118,7 +118,7 @@ func autokeyringhome(o *option) {
 	root := md5x.FormatString(md5x.Digest("gnupg", egenv.RunID(), o.seed))
 	o.keyringhome = langx.FirstNonZero(
 		o.keyringhome,
-		egenv.WorkspaceDirectory(fmt.Sprintf("gnupg.%s", root)),
+		egenv.DirectoryWorkload(fmt.Sprintf("gnupg.%s", root)),
 	)
 }
 

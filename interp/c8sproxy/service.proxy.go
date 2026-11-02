@@ -38,15 +38,31 @@ func ServiceProxyOptionContainerOptions(v ...string) ServiceProxyOption {
 	}
 }
 
+// ServiceProxyOptionBuildOptions provides options to every container build, they are applied before those of the request.
+func ServiceProxyOptionBuildOptions(v ...string) ServiceProxyOption {
+	return func(ps *ProxyService) {
+		ps.buildopts = v
+	}
+}
+
 func ServiceProxyOptionBaremetal(ps *ProxyService) {
 	ps.remap = func(s string) (n string) {
 		old := s
 		defer func() {
 			debugx.Println("remapped", ps.ws.RuntimeDir, old, "->", n)
 		}()
-		s = strings.Replace(s, eg.RuntimeDirectory, ps.ws.RuntimeDir, 1)
-		if after, ok := strings.CutPrefix(s, "/eg.mnt/"); ok {
-			return filepath.Join(after)
+
+		// baremetal workloads are provided the host directories, which need no remapping.
+		if rel, err := filepath.Rel(ps.ws.Root, s); err == nil && filepath.IsLocal(rel) {
+			return s
+		}
+
+		// the host directories mirror those of the container, resolve the paths of the container within the root.
+		// the runtime directory is the one outside of the root directory of the container, see the TODO in egenv.go.
+		for _, guest := range []string{eg.DefaultRootDirectory(), eg.DefaultMountRoot()} {
+			if rel, err := filepath.Rel(guest, s); err == nil && filepath.IsLocal(rel) {
+				return filepath.Join(ps.ws.Root, rel)
+			}
 		}
 
 		return s
@@ -70,6 +86,7 @@ type ProxyService struct {
 	remap         func(s string) string
 	cmdenv        []string
 	containeropts []string
+	buildopts     []string
 }
 
 func (t *ProxyService) Bind(host grpc.ServiceRegistrar) {
@@ -85,6 +102,13 @@ func (t *ProxyService) prepcmd(cmd *exec.Cmd) *exec.Cmd {
 	return cmd
 }
 
+// buildoptions are the options of the container build.
+func (t *ProxyService) buildoptions(req *c8s.BuildRequest) []string {
+	options := make([]string, 0, len(t.buildopts)+len(req.Options))
+	options = append(options, t.buildopts...)
+	return append(options, req.Options...)
+}
+
 // Build implements ProxyServer.
 func (t *ProxyService) Build(ctx context.Context, req *c8s.BuildRequest) (_ *c8s.BuildResponse, err error) {
 	debugx.Println("PROXY CONTAINER BUILD INITIATED", errorsx.Zero(os.Getwd()), t.ws.Root)
@@ -92,7 +116,7 @@ func (t *ProxyService) Build(ctx context.Context, req *c8s.BuildRequest) (_ *c8s
 	var (
 		cmd *exec.Cmd
 	)
-
+	log.Println("DERP DERP")
 	abspath := t.remap(req.Definition)
 	if !filepath.IsAbs(abspath) {
 		abspath = filepath.Join(t.ws.WorkingDir, req.Definition)
@@ -108,7 +132,7 @@ func (t *ProxyService) Build(ctx context.Context, req *c8s.BuildRequest) (_ *c8s
 	// determine the working directory from the request if specified or the definition file's path.
 	wdir := slicesx.FindOrZero(func(s string) bool { return !stringsx.Blank(s) }, req.Directory, filepath.Dir(abspath))
 
-	if cmd, err = podmanx.Build(ctx, req.Name, wdir, abspath, req.Options...); err != nil {
+	if cmd, err = podmanx.Build(ctx, req.Name, wdir, abspath, t.buildoptions(req)...); err != nil {
 		log.Println("unable to create build command", err)
 		return nil, err
 	}

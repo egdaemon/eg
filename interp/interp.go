@@ -48,6 +48,13 @@ func OptionEnviron(s ...string) Option {
 
 type runtimefn func(r runner, host wazero.HostModuleBuilder) wazero.HostModuleBuilder
 
+// moduleenviron is the environment the runner provides to the module, read from its runtime directory.
+func moduleenviron(wshost workspaces.Context) []string {
+	// in a container the runtime directory of the workspace is mounted at the default mount root. baremetal runs
+	// on the host, where the default mount root is that of the workload that launched it, if it exists at all.
+	return errorsx.Zero(envx.FromPath(filepath.Join(wshost.RuntimeDir, eg.EnvironFile)))
+}
+
 // Remote uses the api to implement particular actions like building and running containers.
 // may not be necessary.
 func Remote(ctx context.Context, wshost workspaces.Context, aid string, runid string, svc grpc.ClientConnInterface, module string, options ...Option) error {
@@ -282,7 +289,7 @@ func (t runner) perform(ctx context.Context, wshost workspaces.Context, runid, p
 		wazerofs,
 	).WithSysNanotime().WithSysWalltime().WithRandSource(rand.Reader)
 
-	environ := errorsx.Zero(envx.FromPath(eg.DefaultMountRoot(eg.RuntimeDirectory, eg.EnvironFile)))
+	environ := moduleenviron(wshost)
 	// envx.Debug(t.environ...)
 	// envx.Debug(environ...)
 	mcfg = wasix.Environ(mcfg, t.environ...)

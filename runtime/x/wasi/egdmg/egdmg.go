@@ -30,7 +30,7 @@ func OptionBuildDir(s string) Option {
 	}
 }
 
-// directory to place dmg, defaults to egenv.WorkspaceDirectory
+// directory to place dmg, defaults to egenv.DirectoryWorkload
 func OptionOutputDir(s string) Option {
 	return func(d *Specification) {
 		d.outputpath = s
@@ -65,7 +65,7 @@ func New(pattern string, options ...Option) Specification {
 		cmd:        "hdiutil create -fs HFS+ -volname \"%dmg.volume.name%\" -srcfolder %dmg.src.directory% %dmg.volume.output%",
 		runtime:    shell.Runtime(),
 		builddir:   egenv.DirectoryTemp(),
-		outputpath: egenv.WorkspaceDirectory(),
+		outputpath: egenv.DirectoryWorkload(),
 		outputname: Name(pattern),
 	}, options...)
 }
@@ -117,7 +117,7 @@ func templateInfoPlist(path string) error {
 }
 
 func root(paths ...string) string {
-	return egenv.WorkspaceDirectory(paths...)
+	return egenv.DirectoryWorkload(paths...)
 }
 
 // Path from the given pattern

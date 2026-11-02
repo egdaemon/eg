@@ -22,6 +22,20 @@ func TestOptions(t *testing.T) {
 		require.Equal(t, []string{"A=1", "B=2", "C=3"}, c.environ)
 	})
 
+	t.Run("Bin", func(t *testing.T) {
+		require.Equal(t, []string{"GOBIN=/workspace/bin"}, langx.Clone(config{}, New().Bin("/workspace/bin")...).environ)
+	})
+
+	t.Run("Bin_keeps_the_other_environment", func(t *testing.T) {
+		c := langx.Clone(config{}, New().Environ("A=1").Bin("/workspace/bin").Environ("B=2")...)
+		require.Equal(t, []string{"A=1", "GOBIN=/workspace/bin", "B=2"}, c.environ)
+	})
+
+	t.Run("Bin_last_one_is_listed_last", func(t *testing.T) {
+		c := langx.Clone(config{}, New().Bin("/first").Bin("/second")...)
+		require.Equal(t, []string{"GOBIN=/first", "GOBIN=/second"}, c.environ)
+	})
+
 	t.Run("Verbose", func(t *testing.T) {
 		require.Equal(t, "-v", langx.Clone(config{}, New().Verbose(true)...).verbose)
 		require.Empty(t, langx.Clone(config{}, New().Verbose(true).Verbose(false)...).verbose)

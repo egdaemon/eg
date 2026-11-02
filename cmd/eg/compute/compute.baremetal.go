@@ -50,6 +50,7 @@ import (
 
 type baremetal struct {
 	cmdopts.RuntimeResources
+	cmdopts.Publishing
 	Dir             string   `name:"directory" help:"root directory of the repository" default:"${vars_eg_root_directory}"`
 	GitRemote       string   `name:"git-remote" help:"name of the git remote to use" default:"${vars_git_default_remote_name}"`
 	GitReference    string   `name:"git-ref" help:"name of the branch or commit to checkout" default:"${vars_git_head_reference}"`
@@ -65,20 +66,27 @@ type baremetal struct {
 
 func (t baremetal) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, hotswapbin *cmdopts.HotswapPath) (err error) {
 	var (
-		ws         workspaces.Context
-		repo       *git.Repository
-		environio  *os.File
-		aid        = envx.String(uuid.Nil.String(), eg.EnvComputeAccountID)
-		uid        = uuid.Must(uuid.NewV7())
-		descr      = envx.String("", eg.EnvComputeVCS)
-		cc         grpc.ClientConnInterface
-		cgroups                        = envx.Toggle(runners.AgentOptionNoop, runners.AgentOptionCommandLine("--cgroups", "disabled"), !t.Cgroups || envx.Int(0, eg.EnvComputeModuleNestedLevel) > 0) // disable cgroups
-		hostnet                        = envx.Toggle(runners.AgentOptionCommandLine("--network", "host"), runners.AgentOptionNoop, envx.Boolean(false, eg.EnvExperimentalDisableHostNetwork))         // ipv4 group bullshit. pretty sure its a podman 4 issue that was resolved in podman 5. this is 'safe' to do because we are already in a container.
+		ws        workspaces.Context
+		repo      *git.Repository
+		environio *os.File
+		aid       = envx.String(uuid.Nil.String(), eg.EnvComputeAccountID)
+		uid       = uuid.Must(uuid.NewV7())
+		descr     = envx.String("", eg.EnvComputeVCS)
+		cc        grpc.ClientConnInterface
+		cgroups   = envx.Toggle(runners.AgentOptionNoop, runners.AgentOptionCommandLine("--cgroups", "disabled"), !t.Cgroups)                                            // disable cgroups
+		hostnet   = envx.Toggle(runners.AgentOptionCommandLine("--network", "host"), runners.AgentOptionNoop, envx.Boolean(false, eg.EnvExperimentalDisableHostNetwork)) // ipv4 group bullshit. pretty sure its a podman 4 issue that was resolved in podman 5. this is 'safe' to do because we are already in a container.
+		// unset means the host, 0 is the first container which is already nested. defaulting to 0 cannot tell them apart.
+		// a nested workload builds within a container, which does not allow the container runtime to create the containers of the build, e.g.) mount proc.
+		isolation = envx.Toggle(runners.AgentOptionNoop, runners.AgentOptionCommandLine("--isolation", "chroot"), envx.Int(-1, eg.EnvComputeModuleNestedLevel) >= 0)
+		// a nested module container cannot mount a fresh proc, the outer container's proc is partially masked. share the outer pid namespace so the runtime binds it instead.
+		pidhost                        = envx.Toggle(runners.AgentOptionNoop, runners.AgentOptionCommandLine("--pid", "host"), envx.Int(-1, eg.EnvComputeModuleNestedLevel) >= 0)
 		mountegbin runners.AgentOption = runners.AgentOptionEGBin(
 			envx.String(errorsx.Must(exec.LookPath(os.Args[0])), eg.EnvComputeBinAlt),
 		)
 		cmdenv []string
 	)
+
+	log.Println("isolation enabled", envx.Int(-1, eg.EnvComputeModuleNestedLevel) >= 0)
 
 	// clean up the eg environment ensuring a clean starting state.
 	resetenv := func() error {
@@ -109,7 +117,8 @@ func (t baremetal) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, hotswapbin
 	runtimex.Umask(0002)
 
 	if ws, err = workspaces.NewLocal(
-		ctx, uuid.Must(uuid.NewV7()),
+		ctx,
+		uuid.Must(uuid.NewV7()),
 		md5x.Digest(errorsx.Zero(cmdopts.BuildInfo())),
 		t.Dir,
 		t.Workload,
@@ -226,6 +235,8 @@ func (t baremetal) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, hotswapbin
 		Var(eg.EnvComputeBin, hotswapbin.String()).
 		Var(eg.EnvExperimentalBaremetal, strconv.FormatBool(true)).    // temporary while we flesh out the needed changes
 		Var(eg.EnvUnsafeGitCloneEnabled, strconv.FormatBool(t.Clone)). // hack to disable cloning
+		Var(eg.EnvWorkloadDraft, strconv.FormatBool(t.Draft)).
+		Var(eg.EnvWorkloadRelease, strconv.FormatBool(t.Release)).
 		Var(eg.EnvComputeLoggingVerbosity, strconv.Itoa(gctx.Verbosity)).
 		Var(eg.EnvComputeModuleNestedLevel, strconv.Itoa(0)).
 		Var(eg.EnvComputeTTL, t.RuntimeResources.TTL.String()).
@@ -261,26 +272,13 @@ func (t baremetal) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, hotswapbin
 		return errorsx.Wrap(err, "unable to generate environment")
 	}
 
-	// tune bare metal environment.
-	cmdenvb.Var(
-		eg.EnvComputeWorkloadDirectory, ws.Root,
-	).Var(
-		eg.EnvComputeRuntimeDirectory, ws.RuntimeDir,
-	).Var(
-		eg.EnvComputeCacheDirectory, ws.CacheDir,
-	).Var(
-		eg.EnvComputeWorkspaceDirectory, ws.WorkspaceDir,
-	).Var(
-		eg.EnvComputeWorkingDirectory, ws.WorkingDir,
-	).Var(
-		eg.EnvComputeDefaultGroup, defaultgroup(),
-	)
-
+	var inherited []string
 	if !t.Clean {
-		cmdenvb.FromEnviron(
-			os.Environ()...,
-		)
+		inherited = os.Environ()
 	}
+
+	// tune bare metal environment.
+	cmdenvb = baremetalenv(cmdenvb, ws, inherited...)
 
 	if cmdenv, err = cmdenvb.Environ(); err != nil {
 		return err
@@ -331,6 +329,7 @@ func (t baremetal) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, hotswapbin
 		),
 		runners.AgentOptionHostOS(),
 		cgroups,
+		pidhost,
 		mountegbin,
 		hostnet,
 	)
@@ -341,6 +340,8 @@ func (t baremetal) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, hotswapbin
 		c8sproxy.ServiceProxyOptionContainerOptions(
 			ragent.Options()...,
 		),
+		// builds create their own network namespace as well, they take the options of hostnet.
+		c8sproxy.ServiceProxyOptionBuildOptions(runners.ZeroAgent(hostnet, isolation).Options()...),
 		c8sproxy.ServiceProxyOptionBaremetal,
 	).Bind(srv)
 

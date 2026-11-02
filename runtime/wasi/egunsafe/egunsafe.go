@@ -15,6 +15,7 @@ import (
 	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/wasinet/wasinet"
+	"github.com/gofrs/uuid/v5"
 	"google.golang.org/grpc"
 )
 
@@ -60,6 +61,13 @@ func DialModuleControlSocket(ctx context.Context) (conn *grpc.ClientConn, err er
 // the runner controls the location through the environment, the default mount is only used when it is unset.
 func RuntimeDirectory(paths ...string) string {
 	return filepath.Join(envx.String(eg.DefaultMountRoot(eg.RuntimeDirectory), eg.EnvComputeRuntimeDirectory), filepath.Join(paths...))
+}
+
+// ModuleRuntimeDirectory is the name of the directory of a workload run, named after the last 4 bytes of the run id,
+// the random part of a v7 uuid. the name is kept short as the sockets within the run's directory are close to the
+// length limit of a unix socket path.
+func ModuleRuntimeDirectory(id uuid.UUID) string {
+	return fmt.Sprintf("m.%x.d", id[12:])
 }
 
 func UnroutablePrefix() netip.Prefix {

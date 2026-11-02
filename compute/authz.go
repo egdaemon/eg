@@ -4,14 +4,14 @@ import (
 	"bytes"
 	context "context"
 	"fmt"
-	"github.com/egdaemon/eg/jsonx"
 	"io"
 	"net/http"
 	"time"
 
+	"github.com/egdaemon/eg/jsonx"
+
 	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/authn"
-	"github.com/egdaemon/eg/identity"
 	"github.com/egdaemon/eg/internal/debugx"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/httpx"
@@ -41,6 +41,11 @@ func (t *Token) UnmarshalJSON(b []byte) error {
 func NewAuthzTokenSource(c *http.Client, signer ssh.Signer, endpoint string, account string) TokenSourceFromEndpoint {
 	return TokenSourceFromEndpoint{c: c, signer: signer, endpoint: endpoint, account: account}
 }
+
+// errAmbiguous is identity.ErrAmbiguous. identity registers the cgo duckdb driver, which cannot be built for the
+// wasm workloads that import this package (via gitx), so the sentinel is repeated here. errors.Is matches them
+// as they are equal values of the same type.
+const errAmbiguous = errorsx.String("multiple profiles are associated with this ssh key")
 
 type TokenSourceFromEndpoint struct {
 	c         *http.Client
@@ -102,11 +107,11 @@ func (t TokenSourceFromEndpoint) Token() (_ *oauth2.Token, err error) {
 	}
 
 	switch len(authed.Profiles) {
+	case 1:
 	case 0:
 		return nil, fmt.Errorf("identity %s is not associated with any profiles", authed.Identity.Id)
-	case 1:
-		return nil, errorsx.Wrapf(identity.ErrAmbiguous, "identity %s has %d profiles, specify one with --account-id or EG_ACCOUNT", authed.Identity.Id, len(authed.Profiles))
 	default:
+		return nil, errorsx.Wrapf(errAmbiguous, "identity %s has %d profiles, specify one with --account-id or EG_ACCOUNT", authed.Identity.Id, len(authed.Profiles))
 	}
 
 	session, err := authn.Session(ctx, t.c, authed.Profiles[0].Token)

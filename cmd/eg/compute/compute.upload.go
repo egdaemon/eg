@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strconv"
 
 	"github.com/egdaemon/eg/computeapi"
 
@@ -38,6 +39,7 @@ import (
 
 type upload struct {
 	cmdopts.RuntimeResources
+	cmdopts.Publishing
 	HostedCompute    bool `name:"shared-compute" help:"allow hosted compute" default:"true"`
 	uploadoptions    `embed:""`
 	SSHKeyPath       string   `name:"sshkeypath" help:"path to ssh key to use" default:"${vars_ssh_key_path}"`
@@ -132,6 +134,8 @@ func (t upload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, ident *cmdide
 	envb := envx.Build().
 		Var(eg.EnvComputeArch, t.Arch).
 		Var(eg.EnvComputeOS, t.OS).
+		Var(eg.EnvWorkloadDraft, strconv.FormatBool(t.Draft)).
+		Var(eg.EnvWorkloadRelease, strconv.FormatBool(t.Release)).
 		FromReader(secrets.NewReader(gctx.Context, t.Secrets...)).
 		FromEnviron(envx.Dirty(t.Dirty)...).
 		FromPath(t.EnvironmentPaths...).

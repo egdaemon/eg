@@ -30,6 +30,18 @@ func CloneEnabled() bool {
 	return env.Boolean(true, eg.EnvUnsafeGitCloneEnabled)
 }
 
+// Draft reports whether the workload may upload its artifacts to a draft release, set by `eg compute --draft`.
+// workloads build into the workspace by default and only push when this is true.
+func Draft() bool {
+	return env.Boolean(false, eg.EnvWorkloadDraft)
+}
+
+// Release reports whether the workload may publish the release, set by `eg compute --release`.
+// publishing builds on a draft, so it is only true when Draft is.
+func Release() bool {
+	return Draft() && env.Boolean(false, eg.EnvWorkloadRelease)
+}
+
 // Read the run ID from the environment
 func RunID() string {
 	return env.String("00000000-0000-0000-0000-000000000000", eg.EnvComputeRunID)
@@ -70,20 +82,21 @@ func WorkloadName() string {
 
 // Pattern substitutes values from the environment into the provided pattern.
 //
-// {eg.run.id}       -> the run id of the compute workload, see RunID.
-// {eg.account.id}   -> the account id of the compute workload, see AccountID.
-// {eg.workload}     -> the name of the module the workload runs, see WorkloadName.
-// {eg.host.arch}    -> the cpu architecture of the host machine.
-// {eg.host.os}      -> the operating system of the host machine.
-// {eg.workspace}    -> the workspace directory, see WorkspaceDirectory.
-// {eg.working}      -> the working directory, see DirectoryWorking.
-// {eg.cache}        -> the cache directory, see DirectoryCache.
-// {eg.tmp}          -> the temporary directory of the module, see DirectoryTemp.
+// {eg.run.id}        -> the run id of the compute workload, see RunID.
+// {eg.account.id}    -> the account id of the compute workload, see AccountID.
+// {eg.workload}      -> the workload directory, see DirectoryWorkload.
+// {eg.workload.name} -> the name of the module the workload runs, see WorkloadName.
+// {eg.host.arch}     -> the cpu architecture of the host machine.
+// {eg.host.os}       -> the operating system of the host machine.
+// {eg.working}       -> the working directory, see DirectoryWorking.
+// {eg.cache}         -> the cache directory, see DirectoryCache.
+// {eg.tmp}           -> the temporary directory of the module, see DirectoryTemp.
 //
-// the %eg.run.id% style of tokens is deprecated, use {eg.run.id}.
+// the %eg.token% style of tokens is deprecated, use the braces. %eg.run.id% is {eg.run.id}, %eg.workload% is
+// {eg.workload.name} and %eg.workspace% is {eg.workload}.
 //
 // the tokens are substituted first and the result is then formatted with fmt.Sprintf,
-// e.g.) Pattern("{eg.workspace}/%s", "foo") -> "/workload/.eg.workspace/foo".
+// e.g.) Pattern("{eg.workload}/%s", "foo") -> "/workload/.eg.workspace/foo".
 func Pattern(format string, args ...any) string {
 	patternx.Warn(format)
 
@@ -97,13 +110,13 @@ func Pattern(format string, args ...any) string {
 	s = strings.ReplaceAll(s, "%eg.account.id%", escape(AccountID()))
 	s = strings.ReplaceAll(s, "{eg.account.id}", escape(AccountID()))
 	s = strings.ReplaceAll(s, "%eg.workload%", escape(WorkloadName()))
-	s = strings.ReplaceAll(s, "{eg.workload}", escape(WorkloadName()))
+	s = strings.ReplaceAll(s, "{eg.workload.name}", escape(WorkloadName()))
 	s = strings.ReplaceAll(s, "%eg.host.arch%", escape(env.String("", eg.EnvComputeArch)))
 	s = strings.ReplaceAll(s, "{eg.host.arch}", escape(env.String("", eg.EnvComputeArch)))
 	s = strings.ReplaceAll(s, "%eg.host.os%", escape(env.String("", eg.EnvComputeOS)))
 	s = strings.ReplaceAll(s, "{eg.host.os}", escape(env.String("", eg.EnvComputeOS)))
-	s = strings.ReplaceAll(s, "%eg.workspace%", escape(WorkspaceDirectory()))
-	s = strings.ReplaceAll(s, "{eg.workspace}", escape(WorkspaceDirectory()))
+	s = strings.ReplaceAll(s, "%eg.workspace%", escape(DirectoryWorkload()))
+	s = strings.ReplaceAll(s, "{eg.workload}", escape(DirectoryWorkload()))
 	s = strings.ReplaceAll(s, "%eg.working%", escape(DirectoryWorking()))
 	s = strings.ReplaceAll(s, "{eg.working}", escape(DirectoryWorking()))
 	s = strings.ReplaceAll(s, "%eg.cache%", escape(DirectoryCache()))
@@ -163,7 +176,20 @@ func RuntimeDirectory(paths ...string) string {
 //
 // paths are joined onto the directory.
 // e.g.) WorkspaceDirectory("foo", "bar") -> "/workload/.eg.workspace/foo/bar"
+//
+// Deprecated: use DirectoryWorkload.
 func WorkspaceDirectory(paths ...string) string {
+	return DirectoryWorkload(paths...)
+}
+
+// DirectoryWorkload returns the absolute path to the workload directory, EG_COMPUTE_WORKSPACE_DIRECTORY, falling
+// back to eg.DefaultWorkspaceDirectory() when it is not set.
+//
+// lifecycle: shared by every module and lives for the duration of a single workload.
+//
+// paths are joined onto the directory.
+// e.g.) DirectoryWorkload("foo", "bar") -> "/workload/.eg.workspace/foo/bar"
+func DirectoryWorkload(paths ...string) string {
 	return dir(eg.DefaultWorkspaceDirectory(), paths, eg.EnvComputeWorkspaceDirectory)
 }
 
@@ -203,7 +229,7 @@ func PathRelative(dir string, path string) string {
 // PathRelativeWorkspace reports paths within the workspace directory relative to it, so they hold wherever the workspace is
 // located, e.g.) a git worktree. relative paths and paths outside the workspace are returned as is.
 func PathRelativeWorkspace(path string) string {
-	return PathRelative(WorkspaceDirectory(), path)
+	return PathRelative(DirectoryWorkload(), path)
 }
 
 // PathRelativeWorking reports paths within the working directory relative to it, so they hold wherever the working directory

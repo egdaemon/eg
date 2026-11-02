@@ -26,7 +26,7 @@ import (
 )
 
 func root(paths ...string) string {
-	return egenv.WorkspaceDirectory(paths...)
+	return egenv.DirectoryWorkload(paths...)
 }
 
 // Path generate a unique directory for the contents that will be inside the archive can be
@@ -98,7 +98,19 @@ func SHA256Op(pattern string) eg.OpFn {
 	}
 }
 
+// tarcompressionflag selects the tar compression flag from the archive's extension.
+// unrecognized extensions use xz, which is what Pack has always produced.
+func tarcompressionflag(name string) string {
+	switch lower := strings.ToLower(name); {
+	case strings.HasSuffix(lower, ".tar.gz"), strings.HasSuffix(lower, ".tgz"):
+		return "-z"
+	default:
+		return "-J"
+	}
+}
+
 // create a tarball from the contents of the archive's folder.
+// the compression is selected from the extension of the archive's name, .tar.gz/.tgz is gzip, everything else is xz.
 func Pack(pattern string) eg.OpFn {
 	return func(ctx context.Context, o eg.Op) error {
 		dir := Path(pattern)
@@ -107,7 +119,7 @@ func Pack(pattern string) eg.OpFn {
 
 		return shell.Run(
 			ctx,
-			shell.Newf("tar -C %s -Jcvf %s .", dir, archive),
+			shell.Newf("tar -C %s %s -cvf %s .", dir, tarcompressionflag(name), archive),
 		)
 	}
 }

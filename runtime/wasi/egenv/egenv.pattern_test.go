@@ -30,7 +30,18 @@ func TestPattern(t *testing.T) {
 	require.Equal(t, "/tmp/example", egenv.Pattern("%eg.tmp%"))
 	require.Equal(t, "/ws/eg.rb", egenv.Pattern("%eg.workspace%/eg.rb"))
 	require.Equal(t, "run-1", egenv.Pattern("{eg.run.id}"))
-	require.Equal(t, "/ws/eg.rb", egenv.Pattern("{eg.workspace}/eg.rb"))
+	require.Equal(t, "acct-1", egenv.Pattern("{eg.account.id}"))
+	require.Equal(t, "build", egenv.Pattern("{eg.workload.name}"))
+	require.Equal(t, "amd64", egenv.Pattern("{eg.host.arch}"))
+	require.Equal(t, "linux", egenv.Pattern("{eg.host.os}"))
+	require.Equal(t, "/ws", egenv.Pattern("{eg.workload}"))
+	require.Equal(t, "/wd", egenv.Pattern("{eg.working}"))
+	require.Equal(t, "/cache", egenv.Pattern("{eg.cache}"))
+	require.Equal(t, "/tmp/example", egenv.Pattern("{eg.tmp}"))
+	require.Equal(t, "/ws/eg.rb", egenv.Pattern("{eg.workload}/eg.rb"))
+	require.Equal(t, "build-linux-amd64-run-1", egenv.Pattern("{eg.workload.name}-{eg.host.os}-{eg.host.arch}-{eg.run.id}"))
+	// the brace form of the names before the workload rename are not tokens.
+	require.Equal(t, "{eg.workspace}", egenv.Pattern("{eg.workspace}"))
 	require.Equal(t, "{eg.unknown}", egenv.Pattern("{eg.unknown}"))
 	require.Equal(t, "build-linux-amd64-run-1", egenv.Pattern("%eg.workload%-%eg.host.os%-%eg.host.arch%-%eg.run.id%"))
 	require.Equal(t, "run-1.run-1", egenv.Pattern("%eg.run.id%.%eg.run.id%"))
@@ -44,6 +55,7 @@ func TestPatternDefaults(t *testing.T) {
 	t.Setenv(_eg.EnvComputeWorkloadName, "")
 	require.Equal(t, "00000000-0000-0000-0000-000000000000", egenv.Pattern("%eg.run.id%"))
 	require.Equal(t, "v", egenv.Pattern("v%eg.workload%"))
+	require.Equal(t, "v", egenv.Pattern("v{eg.workload.name}"))
 }
 
 func TestPatternFormat(t *testing.T) {
@@ -51,6 +63,7 @@ func TestPatternFormat(t *testing.T) {
 	t.Setenv(_eg.EnvComputeWorkspaceDirectory, "/ws")
 
 	require.Equal(t, "/ws/foo", egenv.Pattern("%eg.workspace%/%s", "foo"))
+	require.Equal(t, "/ws/foo", egenv.Pattern("{eg.workload}/%s", "foo"))
 	require.Equal(t, "run-1-3", egenv.Pattern("%eg.run.id%-%d", 3))
 	// values containing percent signs are not interpreted as verbs.
 	t.Setenv(_eg.EnvComputeWorkspaceDirectory, "/100%/ws")

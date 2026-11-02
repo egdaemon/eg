@@ -23,7 +23,7 @@ func TestAutoArchive(t *testing.T) {
 				testx.Tempenvvar(_eg.EnvGitHeadCommit, commit, func() {
 					require.NoError(t, autoarchive(shell.NewLocal())(t.Context(), nil))
 
-					info, err := os.Stat(egenv.WorkspaceDirectory(commit + ".tar.gz"))
+					info, err := os.Stat(egenv.DirectoryWorkload(commit + ".tar.gz"))
 					require.NoError(t, err)
 					require.Greater(t, info.Size(), int64(0))
 				})

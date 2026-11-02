@@ -201,7 +201,7 @@ func (t GolangOptions) Directory(dir string) GolangOptions {
 }
 
 // Workspace sets the directory the paths of absolute functions are relative to when moved into the directory,
-// see Directory, e.g.) the working directory when coverage is reported from it. defaults to egenv.WorkspaceDirectory.
+// see Directory, e.g.) the working directory when coverage is reported from it. defaults to egenv.DirectoryWorkload.
 func (t GolangOptions) Workspace(dir string) GolangOptions {
 	return append(slices.Clip(t), func(o *golangOption) {
 		o.workspace = dir
@@ -249,7 +249,7 @@ func golangFilename(pattern string, fn Fn) (string, error) {
 
 func (t GolangOptions) resolve() (o golangOption) {
 	o.filename = DefaultGolangFilename
-	o.workspace = egenv.WorkspaceDirectory()
+	o.workspace = egenv.DirectoryWorkload()
 	for _, opt := range t {
 		opt(&o)
 	}

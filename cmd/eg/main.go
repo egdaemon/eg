@@ -156,6 +156,8 @@ func main() {
 			"vars_ssh_known_hosts_path":    filepath.Join(userx.HomeDirectoryOrDefault(user.HomeDir), ".ssh", "known_hosts"),
 			"vars_ssh_key_seed":            envx.String(autoentropy, eg.EnvEGSSHSeed, eg.EnvEGEntropySeed),
 			"env_eg_ssh_key_seed":          eg.EnvEGSSHSeed,
+			"env_eg_workload_draft":        eg.EnvWorkloadDraft,
+			"env_eg_workload_release":      eg.EnvWorkloadRelease,
 			"vars_user_name":               stringsx.FirstNonBlank(gitname, user.Name, user.Username),
 			"vars_user_email":              stringsx.FirstNonBlank(gitemail, fmt.Sprintf("%s@noreply.egdaemon.com", user.Username)),
 			"vars_user_username":           user.Username,

@@ -62,7 +62,7 @@ func TestNewLocal(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, ws)
 
-		expectedRoot := filepath.Join(root, eg.WorkloadDirectory, "ffffffff")
+		expectedRoot := filepath.Join(root, eg.WorkloadDirectory, "m.ffffffff.d")
 		require.Equal(t, expectedCID, ws.CachedID)
 		require.Equal(t, moduleName, ws.Module)
 		require.Equal(t, expectedRoot, ws.Root)
@@ -101,7 +101,7 @@ func TestNewLocal(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, ws)
 
-		expectedRoot := filepath.Join(root, eg.WorkloadDirectory, "ffffffff")
+		expectedRoot := filepath.Join(root, eg.WorkloadDirectory, "m.ffffffff.d")
 		require.Equal(t, expectedCID, ws.CachedID)
 		require.Equal(t, moduleName, ws.Module)
 		require.Equal(t, expectedRoot, ws.Root)
@@ -216,7 +216,7 @@ func TestNewQueued(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, ws)
 
-		expectedRoot := filepath.Join(root, eg.WorkloadDirectory, "ffffffff")
+		expectedRoot := filepath.Join(root, eg.WorkloadDirectory, "m.ffffffff.d")
 		require.Equal(t, expectedCID, ws.CachedID)
 		require.Equal(t, moduleName, ws.Module)
 		require.Equal(t, expectedRoot, ws.Root)
@@ -255,7 +255,7 @@ func TestNewQueued(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, ws)
 
-		expectedRoot := filepath.Join(root, eg.WorkloadDirectory, "ffffffff")
+		expectedRoot := filepath.Join(root, eg.WorkloadDirectory, "m.ffffffff.d")
 		require.Equal(t, expectedCID, ws.CachedID)
 		require.Equal(t, moduleName, ws.Module)
 		require.Equal(t, expectedRoot, ws.Root)
@@ -296,7 +296,7 @@ func TestNewBuiltin(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, ws)
 
-		expectedRoot := filepath.Join(root, eg.WorkloadDirectory, "ffffffff")
+		expectedRoot := filepath.Join(root, eg.WorkloadDirectory, "m.ffffffff.d")
 		require.Equal(t, expectedCID, ws.CachedID)
 		require.Equal(t, moduleName, ws.Module)
 		require.Equal(t, expectedRoot, ws.Root)
@@ -335,7 +335,7 @@ func TestNewBuiltin(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, ws)
 
-		expectedRoot := filepath.Join(root, eg.WorkloadDirectory, "ffffffff")
+		expectedRoot := filepath.Join(root, eg.WorkloadDirectory, "m.ffffffff.d")
 		require.Equal(t, expectedCID, ws.CachedID)
 		require.Equal(t, moduleName, ws.Module)
 		require.Equal(t, expectedRoot, ws.Root)

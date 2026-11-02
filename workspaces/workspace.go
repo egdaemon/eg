@@ -3,7 +3,6 @@ package workspaces
 
 import (
 	"context"
-	"fmt"
 	"hash"
 	"io"
 	"io/fs"
@@ -25,6 +24,7 @@ import (
 	iterx "github.com/egdaemon/eg/internal/iterx"
 	"github.com/egdaemon/eg/internal/langx"
 	"github.com/egdaemon/eg/internal/wasix"
+	"github.com/egdaemon/eg/runtime/wasi/egunsafe"
 	"github.com/go-git/go-git/v6"
 	"github.com/go-git/go-git/v6/plumbing"
 	"github.com/gofrs/uuid/v5"
@@ -216,13 +216,25 @@ func OptionCompose(opts ...Option) Option {
 }
 
 // NewLocal creates the workspace for a local run of eg using a unique root directory specific to that run.
+// the roots of all runs live together in a .eg.workload directory. a run launched by another, which provides that
+// run's root in the environment, places its root beside it instead of within its clone, so the path does not grow
+// for each nesting.
 func NewLocal(ctx context.Context, uid uuid.UUID, cid hash.Hash, cwd string, name string, options ...Option) (zero Context, err error) {
-	workloadroot := filepath.Join(eg.WorkloadDirectory, fmt.Sprintf("%x", uid.Bytes()[12:16]))
+	root := envx.String(cwd, eg.EnvComputeWorkloadDirectory)
+	workloadroot := egunsafe.ModuleRuntimeDirectory(uid)
+	// detect nested environments and root the workload appropriately.
+	// when we detect a nested environment we use the grandparent as our base.
+	if grandparent := filepath.Dir(root); filepath.Base(grandparent) == eg.WorkloadDirectory {
+		workloadroot = filepath.Join(grandparent, workloadroot)
+	} else { // root environment
+		workloadroot = filepath.Join(cwd, eg.WorkloadDirectory, workloadroot)
+	}
+
 	return New(
 		ctx,
 		cid,
 		cwd,
-		filepath.Join(cwd, workloadroot),
+		workloadroot,
 		name,
 		OptionSymlinkCache(filepath.Join(cwd, eg.CacheDirectory)),
 		OptionCloneWorking(ctx, cwd),
@@ -231,8 +243,7 @@ func NewLocal(ctx context.Context, uid uuid.UUID, cid hash.Hash, cwd string, nam
 }
 
 func NewBuiltin(ctx context.Context, uid uuid.UUID, cid hash.Hash, cwd string, name string, options ...Option) (zero Context, err error) {
-	workloadroot := filepath.Join(eg.WorkloadDirectory, fmt.Sprintf("%x", uid.Bytes()[12:16]))
-	root := filepath.Join(cwd, workloadroot)
+	root := filepath.Join(cwd, eg.WorkloadDirectory, egunsafe.ModuleRuntimeDirectory(uid))
 	return New(
 		ctx,
 		cid,

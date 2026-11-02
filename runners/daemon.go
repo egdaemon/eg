@@ -202,6 +202,11 @@ func AgentOptionPublish(ports ...int) AgentOption {
 	}
 }
 
+// ZeroAgent applies the options to an agent that has nothing else, for the options they provide to a container.
+func ZeroAgent(options ...AgentOption) Agent {
+	return langx.Clone(Agent{}, options...)
+}
+
 func NewRunner(ctx context.Context, ws workspaces.Context, id string, options ...AgentOption) (_ *Agent) {
 	r := langx.Clone(Agent{
 		id: id,

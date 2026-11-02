@@ -37,6 +37,7 @@ import (
 
 type local struct {
 	cmdopts.RuntimeResources
+	cmdopts.Publishing
 	Dir              string   `name:"directory" help:"root directory of the repository" default:"${vars_eg_root_directory}"`
 	ModuleDir        string   `name:"moduledir" help:"must be a subdirectory in the provided directory" default:"${vars_workload_directory}" hidden:"true"`
 	Debug            bool     `name:"debug" help:"keep workspace around to debug issues, requires manual cleanup"`
@@ -145,6 +146,8 @@ func (t local) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err e
 		Var(eg.EnvComputeInitiatedTimestamp, time.Now().UTC().Format(time.RFC3339Nano)).
 		Var(eg.EnvComputeGPU, strconv.FormatBool(t.gpu())).
 		Var(eg.EnvUnsafeGitCloneEnabled, strconv.FormatBool(false)). // hack to disable cloning
+		Var(eg.EnvWorkloadDraft, strconv.FormatBool(t.Draft)).
+		Var(eg.EnvWorkloadRelease, strconv.FormatBool(t.Release)).
 		Var(eg.EnvComputeProfileMode, t.Profile)
 
 	if t.Dirty {

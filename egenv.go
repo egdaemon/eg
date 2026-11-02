@@ -155,6 +155,11 @@ const (
 )
 
 const (
+	EnvWorkloadDraft   = "EG_WORKLOAD_DRAFT"   // set by --draft, the workload may upload its artifacts to a draft release.
+	EnvWorkloadRelease = "EG_WORKLOAD_RELEASE" // set by --release, the workload may publish the release. requires EnvWorkloadDraft.
+)
+
+const (
 	EnvUnsafeCacheID         = "EG_UNSAFE_CACHE_ID"
 	EnvUnsafeGitCloneEnabled = "EG_UNSAFE_GIT_CLONE_ENABLED"
 	EnvUnsafeRemapDirectory  = "EG_UNSAFE_REMAP_DIRECTORY"                    // list of directories to remap, seperated by ':'.

@@ -2,11 +2,15 @@ package cmdsecret_test
 
 import (
 	"bytes"
+	"context"
 	"io"
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
+	"github.com/egdaemon/eg/cmd/cmdopts"
+	"github.com/egdaemon/eg/cmd/cmdsecret"
 	"github.com/egdaemon/eg/secrets"
 	"github.com/stretchr/testify/require"
 )
@@ -102,4 +106,28 @@ func TestCmdEnvAdditionalEnvironment(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Equal(t, "FOO=bar\nBAZ=qux\nEXTRA=1\nEGTEST_BARE=fromenv\nFOO=override\n", buf.String())
+}
+
+func TestCmdEnvGracefulShutdown(t *testing.T) {
+	t.Run("cancelling the context lets the command finish instead of killing it", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(t.Context())
+		defer cancel()
+
+		oldStdout := os.Stdout
+		r, w, _ := os.Pipe()
+		os.Stdout = w
+
+		time.AfterFunc(100*time.Millisecond, cancel)
+		err := cmdsecret.CmdEnv{Cmd: []string{"sh", "-c", "sleep 0.5; echo finished"}}.Run(&cmdopts.Global{Context: ctx})
+
+		w.Close()
+		os.Stdout = oldStdout
+		require.NoError(t, err)
+
+		var buf bytes.Buffer
+		_, err = io.Copy(&buf, r)
+		require.NoError(t, err)
+
+		require.Equal(t, "finished\n", buf.String())
+	})
 }

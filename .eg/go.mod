@@ -4,7 +4,7 @@ go 1.27.2
 
 require (
 	cloud.google.com/go/secretmanager v1.22.0
-	github.com/egdaemon/eg v0.0.0-20261031113436-03129459c8d6
+	github.com/egdaemon/eg v0.0.0-20261102224728-e980edb01f7f
 	github.com/egdaemon/wasinet/wasinet v0.0.0-20261027202319-9cfc20f44598
 	google.golang.org/api v0.307.0
 	google.golang.org/grpc v1.84.0
@@ -32,7 +32,7 @@ require (
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/gofrs/uuid/v5 v5.5.1 // indirect
 	github.com/golang-jwt/jwt/v4 v4.5.2 // indirect
-	github.com/google/pprof v0.0.0-20261026192309-dbd0ed30aa88 // indirect
+	github.com/google/pprof v0.0.0-20261102214848-0031fcd306b0 // indirect
 	github.com/google/s2a-go v0.1.11 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/googleapis/enterprise-certificate-proxy v0.3.23 // indirect

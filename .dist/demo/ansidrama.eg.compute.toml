@@ -4,7 +4,7 @@
 # record:
 # cargo install --git https://github.com/oetiker/ansidrama --path . --root ~/.local
 # run from the eg root. the secrets are decrypted inside the unit by `eg secrets env`, systemd cannot read the encrypted file as an EnvironmentFile.
-# systemd-run --user --pty --wait --working-directory=$PWD --setenv=HOME=$PWD/.eg.demo.d --setenv=PATH -p RuntimeDirectory=eg-demo-daemon -p CacheDirectory=eg-demo-daemon eg secrets env --uri "chachasm://${DEMOPASSPHRASE}@.dist/demo/demo.daemon.env" ansidrama record .dist/demo/ansidrama.eg.compute.toml
+# time systemd-run --user --pty --wait --working-directory=$PWD --setenv=EG_SSH_KEY_PATH=$PWD/.eg.demo.d/id --setenv=PATH -p RuntimeDirectory=eg-demo-daemon -p CacheDirectory=eg-demo-daemon eg secrets env --uri "chachasm://${DEMOPASSPHRASE}@.dist/demo/demo.daemon.env" ansidrama record .dist/demo/ansidrama.eg.compute.toml
 launch = "d=/tmp/.eg.demo.compute; rm -rf $d && mkdir -p $d && cd $d && PS1='$ ' bash --norc --noprofile -i"
 cols = 100
 rows = 24
@@ -71,7 +71,7 @@ hold_cs = 60
 # generate the daemon environment: it picks up the account and seed from the environment and derives
 # the seed. written to a file rather than tee'd, the derived seed is a secret and must not be on screen.
 [[scene]]
-text = "pwd; eg actl bootstrap env daemon --cores 4 --memory 4GiB > demo.daemon.env; cat demo.daemon.env"
+text = "eg actl bootstrap env daemon --mdns-advertise --compilers 2 --workers 2 --cores 4 --memory 4GiB > demo.daemon.env"
 hold_cs = 20
 
 [[scene]]
@@ -90,21 +90,19 @@ hold_cs = 20
 
 [[scene]]
 keys = ["Enter"]
-await = '45107f2b-cc34-4d1b-b00e-714f9e8b62dc'
-await_ms = 86400000
+# the daemon logs `queue.go:897: completion done` once it has run the uploaded workload and finished
+# recording and uploading the result, which is the last thing it does for the workload.
+await = 'queue\.go:\d+: completion done'
+await_ms = 600000
+# linger on the finished workload before stopping the runner.
+hold_cs = 300
 
-# [[scene]]
-# keys = ["Enter"]
-# # printed once the runner has registered with the control plane.
-# await = "registering daemon with control plane completed"
-# hold_cs = 300
+# stop the runner; the daemon logs this on a clean shutdown.
+[[scene]]
+keys = ["C-c"]
+await = 'daemon\.go:\d+: running daemon completed'
+hold_cs = 150
 
-# # stop the runner; the daemon logs this on a clean shutdown.
-# [[scene]]
-# keys = ["C-c"]
-# await = "running daemon completed"
-# hold_cs = 150
-
-# [[scene]]
-# card = { lines = ["eg daemon", "a runner, up and down"], fg = "#fef9c3" }
-# hold_cs = 125
+[[scene]]
+card = { lines = ["eg daemon", "a runner, up and down"], fg = "#fef9c3" }
+hold_cs = 800

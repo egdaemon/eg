@@ -172,7 +172,7 @@ require (
 	github.com/google/go-containerregistry v0.21.1 // indirect
 	github.com/google/go-intervals v0.0.2 // indirect
 	github.com/google/gopacket v1.1.19 // indirect
-	github.com/google/pprof v0.0.0-20261026192309-dbd0ed30aa88 // indirect
+	github.com/google/pprof v0.0.0-20261102214848-0031fcd306b0 // indirect
 	github.com/google/s2a-go v0.1.11 // indirect
 	github.com/googleapis/enterprise-certificate-proxy v0.3.23 // indirect
 	github.com/googleapis/gax-go/v2 v2.26.2 // indirect

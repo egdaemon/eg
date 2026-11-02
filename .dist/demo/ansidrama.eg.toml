@@ -1,6 +1,6 @@
 # export DEMOPASSPHRASE="..."
 # EDITOR=vim eg secrets edit chachasm://${DEMOPASSPHRASE}@.dist/demo/demo.env
-# systemd-run --user --pty --wait --working-directory=$PWD --setenv=EG_SSH_KEY_PATH=$PWD/.eg.demo/.ssh/eg --setenv=PATH -p RuntimeDirectory=eg-demo-daemon -p CacheDirectory=eg-demo-daemon eg secrets env --uri "chachasm://${DEMOPASSPHRASE}@.dist/demo/demo.env" ansidrama record .dist/demo/ansidrama.eg.toml
+# time systemd-run --user --pty --wait --working-directory=$PWD --setenv=EG_SSH_KEY_PATH=$PWD/.eg.demo/.ssh/eg --setenv=PATH -p RuntimeDirectory=eg-demo -p CacheDirectory=eg-demo eg secrets env --uri "chachasm://${DEMOPASSPHRASE}@.dist/demo/demo.env" ansidrama record .dist/demo/ansidrama.eg.toml
 launch = "d=/tmp/.eg.demo; rm -rf $d && mkdir -p $d && cd $d && PS1='$ ' bash --norc --noprofile -i"
 cols = 84
 rows = 24
@@ -48,13 +48,6 @@ keys = ["Enter"]
 # the prompt is a row of exactly `$`; the command line above it also contains `$`.
 await = { find = '^\$$', row = -1 }
 hold_cs = 40
-
-[[scene]]
-text = "ls -lha .eg"
-hold_cs = 20
-[[scene]]
-keys = ["Enter"]
-hold_cs = 150
 
 # eg compute local needs a commit to resolve HEAD
 [[scene]]

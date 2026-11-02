@@ -263,19 +263,17 @@ func User(dir string) (name, email string) {
 		debugx.Println("unable to load global git config", err)
 	}
 
-	repo, err := git.PlainOpen(dir)
-	if err != nil {
+	if repo, err := git.PlainOpen(dir); err != nil {
 		debugx.Println("unable to open repository for git config", err)
-		return name, email
-	}
-
-	cfg, err := repo.Config()
-	if err != nil {
+	} else if cfg, err := repo.Config(); err != nil {
 		debugx.Println("unable to load repository git config", err)
-		return name, email
+	} else {
+		name = stringsx.FirstNonBlank(cfg.User.Name, name)
+		email = stringsx.FirstNonBlank(cfg.User.Email, email)
 	}
 
-	return stringsx.FirstNonBlank(cfg.User.Name, name), stringsx.FirstNonBlank(cfg.User.Email, email)
+	return envx.String(name, "GIT_AUTHOR_NAME", "GIT_COMMITTER_NAME"),
+		envx.String(email, "GIT_AUTHOR_EMAIL", "GIT_COMMITTER_EMAIL")
 }
 
 // RepositoryUsername returns the username owning the repository at path,

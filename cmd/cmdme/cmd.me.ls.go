@@ -73,6 +73,7 @@ func render(ident *authn.Identity, current *authn.Account, idents ...*authn.Auth
 
 		rows = append(rows, []string{
 			mark,
+			id.GetProfile().GetId(),
 			fmt.Sprintf("%v", cmdidentity.TypographyAccountCompact(id.GetAccount())),
 			fmt.Sprintf("%v", cmdidentity.TypographyProfileCompact(id.GetProfile())),
 			id.GetProfile().GetEmail(),
@@ -81,7 +82,7 @@ func render(ident *authn.Identity, current *authn.Account, idents ...*authn.Auth
 
 	tbl := table.New().
 		Border(lipgloss.NormalBorder()).
-		Headers("", "ACCOUNT", "PROFILE", "EMAIL").
+		Headers("", "ID", "ACCOUNT", "NAME", "EMAIL").
 		Rows(rows...).
 		StyleFunc(func(row, col int) lipgloss.Style {
 			switch {

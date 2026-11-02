@@ -53,6 +53,8 @@ func Build(ctx context.Context, o eg.Op) error {
 		EnvironFrom(eggolang.Env()...).
 		EnvironFrom(egccache.Env()...).
 		Environ("PKGDEST", cdir).
+		// build the checked out commit instead of the upstream default branch.
+		Environ("EG_SOURCE_URL", "git+file://"+egenv.DirectoryWorking()).
 		Environ("BUILDDIR", filepath.Join("/", "tmp", "build")).
 		Environ("SRCDEST", filepath.Join("/", "tmp", "src")).
 		Environ("PACKAGER", fmt.Sprintf("%s <%s>", maintainer.Name, maintainer.Email))
@@ -89,15 +91,14 @@ func Publish(ctx context.Context, o eg.Op) error {
 		Environ("GIT_COMMITTER_EMAIL", maintainer.Email).
 		Environ("PKGVER", pkgver())
 
-	return eg.Sequential(
-		shell.Op(
-			// generate into a default ssh key name so ssh/git pick it up automatically.
-			runtime.New(`eg ssh key --seed "$EG_SSH_KEY_SEED" --path "$HOME/.ssh/id_ed25519"`),
-			runtime.Newf("if [ -d %s/.git ]; then git -C %s pull --ff-only origin master; else git clone %s %s; fi", aurdir, aurdir, AURRepoSSHURI, aurdir),
-			runtime.Newf("envsubst '$PKGVER' < %s/PKGBUILD > %s/PKGBUILD", templatedir, aurdir),
-			runtime.New("makepkg --printsrcinfo > .SRCINFO").Directory(aurdir),
-			runtime.New("git add PKGBUILD .SRCINFO").Directory(aurdir),
-			runtime.Newf("git diff --cached --quiet || (git commit -m %q && git push origin master)", commitmsg).Directory(aurdir),
-		),
-	)(ctx, o)
+	return shell.Run(
+		ctx,
+		// generate into a default ssh key name so ssh/git pick it up automatically.
+		runtime.New("eg ssh key --path ~/.ssh/id_ed25519"),
+		runtime.Newf("if [ -d %s/.git ]; then git -C %s pull --ff-only origin master; else git clone %s %s; fi", aurdir, aurdir, AURRepoSSHURI, aurdir),
+		runtime.Newf("envsubst '$PKGVER' < %s/PKGBUILD > %s/PKGBUILD", templatedir, aurdir),
+		runtime.New("makepkg --printsrcinfo > .SRCINFO").Directory(aurdir),
+		runtime.New("git add PKGBUILD .SRCINFO").Directory(aurdir),
+		runtime.Newf("git diff --cached --quiet || (git commit -m %q && git push origin master)", commitmsg).Directory(aurdir),
+	)
 }

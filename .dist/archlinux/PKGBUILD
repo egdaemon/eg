@@ -16,7 +16,8 @@ makedepends=(
   'btrfs-progs'
 )
 
-source=("${pkgname}::git+https://github.com/egdaemon/eg.git")
+# EG_SOURCE_URL lets the ci workload build the commit being released instead of whatever is on github.
+source=("${pkgname}::${EG_SOURCE_URL:-git+https://github.com/egdaemon/eg.git}")
 sha1sums=('SKIP')
 
 pkgver() {

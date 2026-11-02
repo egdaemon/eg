@@ -1,6 +1,7 @@
 package cmdgpg_test
 
 import (
+	"github.com/egdaemon/eg"
 	"path/filepath"
 	"testing"
 
@@ -26,6 +27,8 @@ func runGPGCLI(t *testing.T, args []string) error {
 			"vars_entropy_seed":  "test-default-seed",
 			"vars_gpg_directory": t.TempDir(),
 			"vars_user_name":     "testuser",
+			"env_eg_account":     eg.EnvAccount,
+			"env_eg_profile":     eg.EnvProfile,
 		},
 		kong.Bind(&cli.Global),
 	)

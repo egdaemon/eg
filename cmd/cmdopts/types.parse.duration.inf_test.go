@@ -1,6 +1,7 @@
 package cmdopts_test
 
 import (
+	"github.com/egdaemon/eg"
 	"math"
 	"testing"
 	"time"
@@ -21,6 +22,7 @@ func parseDurationInfFlag(t *testing.T, args []string) (time.Duration, error) {
 
 	parser, err := kong.New(&cli,
 		kong.Name("test"),
+		kong.Vars{"env_eg_account": eg.EnvAccount, "env_eg_profile": eg.EnvProfile},
 		kong.NamedMapper("durationinf", kong.MapperFunc(cmdopts.ParseDurationInf)),
 	)
 	require.NoError(t, err)

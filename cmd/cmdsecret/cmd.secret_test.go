@@ -3,6 +3,7 @@ package cmdsecret_test
 import (
 	"bytes"
 	"encoding/base64"
+	"github.com/egdaemon/eg"
 	"io"
 	"os"
 	"path/filepath"
@@ -25,6 +26,7 @@ func runSecretCLI(t *testing.T, args []string) error {
 
 	parser, err := kong.New(&cli,
 		kong.Name("eg"),
+		kong.Vars{"env_eg_account": eg.EnvAccount, "env_eg_profile": eg.EnvProfile},
 		kong.Bind(&cli.Global),
 	)
 	require.NoError(t, err)

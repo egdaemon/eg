@@ -4,6 +4,7 @@ package cmdtestx
 
 import (
 	"context"
+	"github.com/egdaemon/eg"
 	"sync"
 	"testing"
 
@@ -27,7 +28,7 @@ func Genparser[T any](cmd T, opts ...kong.Option) func(t *testing.T) *kong.Kong 
 		cli.Context, cli.Shutdown = context.WithCancelCause(context.Background())
 		cli.Cleanup = &sync.WaitGroup{}
 
-		return kong.Must(&cli, append(opts, kong.Bind(&cli.Global))...)
+		return kong.Must(&cli, append(opts, kong.Vars{"env_eg_account": eg.EnvAccount, "env_eg_profile": eg.EnvProfile}, kong.Bind(&cli.Global))...)
 	}
 }
 

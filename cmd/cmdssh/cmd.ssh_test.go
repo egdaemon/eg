@@ -28,6 +28,8 @@ func runSSHCLI(t *testing.T, args []string) error {
 			"vars_entropy_seed":   "test-default-seed",
 			"vars_ssh_key_seed":   "test-default-seed",
 			"env_eg_ssh_key_seed": eg.EnvEGSSHSeed,
+			"env_eg_account":      eg.EnvAccount,
+			"env_eg_profile":      eg.EnvProfile,
 			"vars_ssh_key_path":   filepath.Join(t.TempDir(), "id_ed25519"),
 			"vars_user_name":      "testuser",
 			"vars_user_home":      t.TempDir(),

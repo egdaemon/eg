@@ -56,7 +56,7 @@ func newtestclient(t *testing.T, accountID string, wif http.HandlerFunc) *http.C
 	signer, err := sshx.SignerFromGenerator(sshx.NewKeyGenSeeded(t.Name()))
 	require.NoError(t, err)
 
-	return authn.New(t.Context(), &http.Client{Transport: httpx.RewriteHostTransport(errorsx.Must(url.Parse(srv.URL)), nil)}, signer, "", compute.NewAuthzTokenSource, authn.OptionEndpoint(authn.EndpointMetaAuthz()))
+	return authn.New(t.Context(), &http.Client{Transport: httpx.RewriteHostTransport(errorsx.Must(url.Parse(srv.URL)), nil)}, signer, "", "", compute.NewAuthzTokenSource, authn.OptionEndpoint(authn.EndpointMetaAuthz()))
 }
 
 func TestClient(t *testing.T) {

@@ -46,6 +46,8 @@ func EnvContainerAPIHostDefault() string {
 }
 
 const (
+	EnvAccount            = "EG_ACCOUNT" // hint to force select a account to login to.
+	EnvProfile            = "EG_PROFILE" // hint to force select a profile to login to.
 	EnvPodmanSocket       = "EG_PODMAN_SOCKET"
 	EnvContainerHost      = "CONTAINER_HOST"
 	EnvEGEntropySeed      = "EG_ENTROPY_SEED"

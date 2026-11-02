@@ -31,7 +31,7 @@ func (t pubRemove) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, ident *cmd
 		return err
 	}
 
-	chttp := authn.New(gctx.Context, tlsc.DefaultClient(), signer, aid, compute.NewAuthzTokenSource)
+	chttp := authn.New(gctx.Context, tlsc.DefaultClient(), signer, aid, gctx.ProfileID, compute.NewAuthzTokenSource)
 
 	return t.remove(gctx.Context, computeapi.NewPushClient(chttp))
 }

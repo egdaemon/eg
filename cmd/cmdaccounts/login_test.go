@@ -295,6 +295,6 @@ func TestLoginRun(t *testing.T) {
 		})
 
 		err = Login{SSHKeyPath: "/path/to/key", Account: "typo"}.run(context.Background(), "11111111-1111-1111-1111-111111111111", oauthc, oauthc, signer, nopicker(t))
-		require.ErrorContains(t, err, "no account found for 'typo'")
+		require.ErrorContains(t, err, "you requested the account 'typo'. None was found.")
 	})
 }

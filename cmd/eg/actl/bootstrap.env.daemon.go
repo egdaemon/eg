@@ -20,7 +20,7 @@ import (
 
 type BootstrapEnvDaemon struct {
 	cmdopts.RuntimeResources
-	AccountID        string        `name:"account" help:"account to register runner with" default:"${vars_account_id}" env:"EG_ACCOUNT" required:"true"`
+	AccountID        string        `name:"account" help:"account to register runner with" default:"${vars_account_id}" env:"${env_eg_account}" required:"true"`
 	Seed             string        `name:"seed" help:"used to ensure a consistent secret is used, this is a sensitive value" default:"${vars_entropy_seed}" placeholder:"00000000-0000-0000-0000-000000000000"`
 	Workers          uint64        `name:"workers" help:"specify the maximum concurrent workload capacity" default:"${vars_cores_minimum_default}"`
 	Compilers        uint64        `name:"compilers" help:"specify the maximum number of workloads compiled concurrently, the daemon's default applies when unset"`
@@ -50,7 +50,7 @@ func (t BootstrapEnvDaemon) Run(kctx *kong.Context, gctx *cmdopts.Global, entrop
 	}
 
 	environ := envx.Build().Var(
-		"EG_ACCOUNT", t.AccountID,
+		eg.EnvAccount, t.AccountID,
 	).Var(
 		eg.EnvEGEntropySeed, seed,
 	).Var(

@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/alecthomas/kong"
+	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/cmd/cmdopts"
 	"github.com/egdaemon/eg/cmd/cmdtestx"
 	"github.com/egdaemon/eg/cmd/eg/actl"
@@ -36,7 +37,7 @@ func TestBootstrapEnvDaemon(t *testing.T) {
 		uri := "file://" + filepath.Join(t.TempDir(), "daemon.secret")
 
 		var secretcontent bytes.Buffer
-		require.NoError(t, envx.Build().Var("EG_ACCOUNT", "expected-account").CopyTo(&secretcontent))
+		require.NoError(t, envx.Build().Var(eg.EnvAccount, "expected-account").CopyTo(&secretcontent))
 		require.NoError(t, secrets.Update(t.Context(), uri, &secretcontent))
 
 		// this is exactly what `cmdsecret.CmdEnv.Run()` does with the secret URIs before

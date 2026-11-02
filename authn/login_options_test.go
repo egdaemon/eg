@@ -35,6 +35,22 @@ func TestLoginOptionsToken(t *testing.T) {
 		require.Equal(t, url.Values{"account_id": {"account-1"}}, seen.URL.Query())
 	})
 
+	t.Run("requests the options of the profile and does not send a blank one", func(t *testing.T) {
+		var query url.Values
+		c := &http.Client{Transport: roundtrip(func(r *http.Request) (*http.Response, error) {
+			query = r.URL.Query()
+			return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"token":"t"}`)), Header: http.Header{}}, nil
+		})}
+
+		_, err := authn.LoginOptionsToken(t.Context(), c, authn.LoginOptionAccountID("account-1"), authn.LoginOptionProfileID("profile-1"))
+		require.NoError(t, err)
+		require.Equal(t, url.Values{"account_id": {"account-1"}, "profile_id": {"profile-1"}}, query)
+
+		_, err = authn.LoginOptionsToken(t.Context(), c, authn.LoginOptionProfileID(""))
+		require.NoError(t, err)
+		require.False(t, query.Has("profile_id"))
+	})
+
 	t.Run("does not send a blank account id", func(t *testing.T) {
 		var query url.Values
 		c := &http.Client{Transport: roundtrip(func(r *http.Request) (*http.Response, error) {

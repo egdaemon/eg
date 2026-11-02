@@ -60,7 +60,7 @@ func TestAuthorizeManualRun(t *testing.T) {
 			},
 		})
 
-		err := AuthorizeManual{ID: "the-id", Shared: true}.run(context.Background(), c, "", signer)
+		err := AuthorizeManual{ID: "the-id", Shared: true}.run(context.Background(), c, "", "", signer)
 		require.NoError(t, err)
 		require.Equal(t, "the-id", granted.Registration.Id)
 		require.True(t, granted.Global)
@@ -75,7 +75,7 @@ func TestAuthorizeManualRun(t *testing.T) {
 			},
 		})
 
-		err := AuthorizeManual{ID: "the-id"}.run(context.Background(), c, "", signer)
+		err := AuthorizeManual{ID: "the-id"}.run(context.Background(), c, "", "", signer)
 		require.Error(t, err)
 		require.ErrorContains(t, err, "not associated with any profiles")
 	})
@@ -95,7 +95,7 @@ func TestAuthorizeManualRun(t *testing.T) {
 			},
 		})
 
-		err := AuthorizeManual{ID: "the-id"}.run(context.Background(), c, "", signer)
+		err := AuthorizeManual{ID: "the-id"}.run(context.Background(), c, "", "", signer)
 		require.Error(t, err)
 		require.ErrorContains(t, err, "specify one with --account")
 	})
@@ -121,7 +121,7 @@ func TestAuthorizeManualRun(t *testing.T) {
 			},
 		})
 
-		err := AuthorizeManual{ID: "the-id"}.run(context.Background(), c, "account-1", signer)
+		err := AuthorizeManual{ID: "the-id"}.run(context.Background(), c, "account-1", "", signer)
 		require.NoError(t, err)
 		require.True(t, loginOptionsCalled)
 	})
@@ -140,7 +140,7 @@ func TestAuthorizeManualRun(t *testing.T) {
 			},
 		})
 
-		err := AuthorizeManual{ID: "the-id"}.run(context.Background(), c, "", signer)
+		err := AuthorizeManual{ID: "the-id"}.run(context.Background(), c, "", "", signer)
 		require.Error(t, err)
 	})
 }

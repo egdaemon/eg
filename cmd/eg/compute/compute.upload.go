@@ -204,7 +204,7 @@ func (t upload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, ident *cmdide
 		Description: stringsx.FirstNonBlank(t.Name, gitx.Description("Uploaded: {git.commit.author} - {git.ref}", repo, t.GitReference)),
 	}
 
-	chttp := authn.New(gctx.Context, tlsc.DefaultClient(), signer, aid, compute.NewAuthzTokenSource)
+	chttp := authn.New(gctx.Context, tlsc.DefaultClient(), signer, aid, gctx.ProfileID, compute.NewAuthzTokenSource)
 
 	return t.submit(gctx.Context, chttp, t.Endpoint, lancache, enq, archiveio, environio)
 }

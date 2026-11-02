@@ -40,7 +40,7 @@ func (t downloadopts) client(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, iden
 		return nil, err
 	}
 
-	return authn.New(gctx.Context, tlsc.DefaultClient(), signer, aid, compute.NewAuthzTokenSource), nil
+	return authn.New(gctx.Context, tlsc.DefaultClient(), signer, aid, gctx.ProfileID, compute.NewAuthzTokenSource), nil
 }
 
 type downloadlogs struct {

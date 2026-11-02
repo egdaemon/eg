@@ -31,7 +31,7 @@ func (t cancel) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, ident *cmdide
 		return err
 	}
 
-	chttp := authn.New(gctx.Context, tlsc.DefaultClient(), signer, aid, compute.NewAuthzTokenSource)
+	chttp := authn.New(gctx.Context, tlsc.DefaultClient(), signer, aid, gctx.ProfileID, compute.NewAuthzTokenSource)
 
 	if err = computeapi.NewPushClient(chttp).Cancel(gctx.Context, t.ID); httpx.IsStatusError(err, http.StatusNotFound) != nil {
 		log.Println("workload not found or already completed", t.ID)

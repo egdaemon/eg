@@ -43,7 +43,7 @@ func TestNew(t *testing.T) {
 			base   = &http.Client{}
 		)
 
-		authn.New(t.Context(), base, signer, "account-1", func(c *http.Client, s ssh.Signer, endpoint string, account string) oauth2.TokenSource {
+		authn.New(t.Context(), base, signer, "account-1", "", func(c *http.Client, s ssh.Signer, endpoint string, account string, profile string) oauth2.TokenSource {
 			got = tokenauthz{c: c, signer: s, endpoint: endpoint, account: account}
 			return oauth2.StaticTokenSource(&oauth2.Token{AccessToken: "token"})
 		})
@@ -57,7 +57,7 @@ func TestNew(t *testing.T) {
 	t.Run("should use the endpoint option", func(t *testing.T) {
 		var got tokenauthz
 
-		authn.New(t.Context(), &http.Client{}, newsigner(t), "", func(c *http.Client, s ssh.Signer, endpoint string, account string) oauth2.TokenSource {
+		authn.New(t.Context(), &http.Client{}, newsigner(t), "", "", func(c *http.Client, s ssh.Signer, endpoint string, account string, profile string) oauth2.TokenSource {
 			got = tokenauthz{endpoint: endpoint, account: account}
 			return oauth2.StaticTokenSource(&oauth2.Token{AccessToken: "token"})
 		}, authn.OptionEndpoint(authn.EndpointMetaAuthz()))
@@ -74,7 +74,7 @@ func TestNew(t *testing.T) {
 			return &http.Response{StatusCode: http.StatusOK, Body: http.NoBody, Header: http.Header{}}, nil
 		})}
 
-		c := authn.New(t.Context(), base, newsigner(t), "account-1", func(*http.Client, ssh.Signer, string, string) oauth2.TokenSource {
+		c := authn.New(t.Context(), base, newsigner(t), "account-1", "", func(*http.Client, ssh.Signer, string, string, string) oauth2.TokenSource {
 			return oauth2.StaticTokenSource(&oauth2.Token{AccessToken: "token", TokenType: "Bearer"})
 		})
 
@@ -92,7 +92,7 @@ func TestNew(t *testing.T) {
 		c := authn.New(context.Background(), &http.Client{Transport: roundtrip(func(r *http.Request) (*http.Response, error) {
 			t.Fatal("request must not be sent without a token")
 			return nil, nil
-		})}, newsigner(t), "account-1", func(*http.Client, ssh.Signer, string, string) oauth2.TokenSource {
+		})}, newsigner(t), "account-1", "", func(*http.Client, ssh.Signer, string, string, string) oauth2.TokenSource {
 			return tokenerror{}
 		})
 

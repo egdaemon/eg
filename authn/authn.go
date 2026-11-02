@@ -103,6 +103,12 @@ func LoginOptionAccountID(id string) LoginOption {
 	return loginOptionQuery("account_id", id)
 }
 
+// LoginOptionProfileID asserts the profile to use when the identity has multiple profiles in the account,
+// blank ids are not sent.
+func LoginOptionProfileID(id string) LoginOption {
+	return loginOptionQuery("profile_id", id)
+}
+
 // LoginOptionMachineID asserts the machine id of the runner logging in, the server only trusts it when it matches
 // a runner registered with the key being authenticated. blank ids are not sent.
 func LoginOptionMachineID(mid string) LoginOption {

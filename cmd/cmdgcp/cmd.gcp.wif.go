@@ -41,7 +41,7 @@ func (t Create) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, ident *cmdide
 		return err
 	}
 
-	c := authn.New(gctx.Context, tlsc.DefaultClient(), signer, aid, compute.NewAuthzTokenSource, authn.OptionEndpoint(authn.EndpointMetaAuthz()))
+	c := authn.New(gctx.Context, tlsc.DefaultClient(), signer, aid, gctx.ProfileID, compute.NewAuthzTokenSource, authn.OptionEndpoint(authn.EndpointMetaAuthz()))
 
 	// an empty label defaults to the account id on the server.
 	conn, err := gcpwif.Create(gctx.Context, c, &gcpwif.GCPWIFConnection{
@@ -76,7 +76,7 @@ func (t List) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, ident *cmdident
 		return err
 	}
 
-	c := authn.New(gctx.Context, tlsc.DefaultClient(), signer, aid, compute.NewAuthzTokenSource, authn.OptionEndpoint(authn.EndpointMetaAuthz()))
+	c := authn.New(gctx.Context, tlsc.DefaultClient(), signer, aid, gctx.ProfileID, compute.NewAuthzTokenSource, authn.OptionEndpoint(authn.EndpointMetaAuthz()))
 
 	w := tabwriter.NewWriter(os.Stdout, 0, 4, 2, ' ', 0)
 	fmt.Fprintln(w, "LABEL\tAUDIENCE\tIMPERSONATE\tDESCRIPTION")
@@ -120,7 +120,7 @@ func (t Edit) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, ident *cmdident
 		return err
 	}
 
-	c := authn.New(gctx.Context, tlsc.DefaultClient(), signer, aid, compute.NewAuthzTokenSource, authn.OptionEndpoint(authn.EndpointMetaAuthz()))
+	c := authn.New(gctx.Context, tlsc.DefaultClient(), signer, aid, gctx.ProfileID, compute.NewAuthzTokenSource, authn.OptionEndpoint(authn.EndpointMetaAuthz()))
 
 	var req gcpwif.GCPWIFUpdateRequest
 	if t.Audience != "" {
@@ -170,7 +170,7 @@ func (t Remove) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, ident *cmdide
 		return err
 	}
 
-	c := authn.New(gctx.Context, tlsc.DefaultClient(), signer, aid, compute.NewAuthzTokenSource, authn.OptionEndpoint(authn.EndpointMetaAuthz()))
+	c := authn.New(gctx.Context, tlsc.DefaultClient(), signer, aid, gctx.ProfileID, compute.NewAuthzTokenSource, authn.OptionEndpoint(authn.EndpointMetaAuthz()))
 
 	l := langx.FirstNonZero(t.Label, gctx.AccountID)
 	if l == "" {

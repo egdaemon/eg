@@ -29,7 +29,7 @@ func (t Disable) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, ident *cmdid
 		return err
 	}
 
-	c := authn.New(gctx.Context, tlsc.DefaultClient(), signer, aid, compute.NewAuthzTokenSource, authn.OptionEndpoint(authn.EndpointMetaAuthz()))
+	c := authn.New(gctx.Context, tlsc.DefaultClient(), signer, aid, gctx.ProfileID, compute.NewAuthzTokenSource, authn.OptionEndpoint(authn.EndpointMetaAuthz()))
 
 	p, err := me.DisableProfile(gctx.Context, c, t.Profile)
 	if err != nil {

@@ -25,7 +25,7 @@ func (t watch) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, ident *cmdiden
 		return err
 	}
 
-	chttp := authn.New(gctx.Context, tlsc.DefaultClient(), signer, aid, compute.NewAuthzTokenSource)
+	chttp := authn.New(gctx.Context, tlsc.DefaultClient(), signer, aid, gctx.ProfileID, compute.NewAuthzTokenSource)
 
 	return followenqueued(gctx.Context, chttp, t.ID)
 }

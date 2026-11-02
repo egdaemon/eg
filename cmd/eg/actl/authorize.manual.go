@@ -27,11 +27,11 @@ func (t AuthorizeManual) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err
 		return err
 	}
 
-	return t.run(gctx.Context, tlsc.DefaultClient(), gctx.AccountID, signer)
+	return t.run(gctx.Context, tlsc.DefaultClient(), gctx.AccountID, gctx.ProfileID, signer)
 }
 
-func (t AuthorizeManual) run(ctx context.Context, c *http.Client, account string, signer ssh.Signer) (err error) {
-	httpc := authn.New(ctx, c, signer, account, compute.NewAuthzTokenSource)
+func (t AuthorizeManual) run(ctx context.Context, c *http.Client, account string, profile string, signer ssh.Signer) (err error) {
+	httpc := authn.New(ctx, c, signer, account, profile, compute.NewAuthzTokenSource)
 
 	rc := registration.NewRegistrationClient(httpc)
 	if _, err = rc.Grant(ctx, &registration.RegistrationGrantRequest{Registration: &registration.Registration{Id: t.ID}, Global: t.Shared}); err != nil {

@@ -199,7 +199,7 @@ func (t builtinUpload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, ident 
 		Labels:      append([]string{}, t.RuntimeResources.Labels...),
 	}
 
-	chttp := authn.New(gctx.Context, tlsc.DefaultClient(), signer, aid, compute.NewAuthzTokenSource)
+	chttp := authn.New(gctx.Context, tlsc.DefaultClient(), signer, aid, gctx.ProfileID, compute.NewAuthzTokenSource)
 
 	return t.submit(gctx.Context, chttp, t.Endpoint, lancache, enq, archiveio, environio)
 }

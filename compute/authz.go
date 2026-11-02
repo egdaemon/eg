@@ -38,8 +38,8 @@ func (t *Token) UnmarshalJSON(b []byte) error {
 	return jsonx.Unmarshal(b, t)
 }
 
-func NewAuthzTokenSource(c *http.Client, signer ssh.Signer, endpoint string, account string) TokenSourceFromEndpoint {
-	return TokenSourceFromEndpoint{c: c, signer: signer, endpoint: endpoint, account: account}
+func NewAuthzTokenSource(c *http.Client, signer ssh.Signer, endpoint string, account string, profile string) TokenSourceFromEndpoint {
+	return TokenSourceFromEndpoint{c: c, signer: signer, endpoint: endpoint, account: account, profile: profile}
 }
 
 // errAmbiguous is identity.ErrAmbiguous. identity registers the cgo duckdb driver, which cannot be built for the
@@ -52,6 +52,7 @@ type TokenSourceFromEndpoint struct {
 	endpoint  string
 	signer    ssh.Signer
 	account   string
+	profile   string
 	machineid string
 }
 
@@ -94,8 +95,8 @@ func (t TokenSourceFromEndpoint) Token() (_ *oauth2.Token, err error) {
 	chttp := cfg.Client(context.WithValue(ctx, oauth2.HTTPClient, t.c), refreshtoken)
 
 	var options io.Reader
-	if t.account != "" {
-		token, err := authn.LoginOptionsToken(ctx, chttp, authn.LoginOptionAccountID(t.account), authn.LoginOptionMachineID(t.machineid))
+	if t.account != "" || t.profile != "" {
+		token, err := authn.LoginOptionsToken(ctx, chttp, authn.LoginOptionAccountID(t.account), authn.LoginOptionProfileID(t.profile), authn.LoginOptionMachineID(t.machineid))
 		if err != nil {
 			return nil, errorsx.Wrap(err, "unable to fetch login options")
 		}
@@ -111,7 +112,7 @@ func (t TokenSourceFromEndpoint) Token() (_ *oauth2.Token, err error) {
 	case 0:
 		return nil, fmt.Errorf("identity %s is not associated with any profiles", authed.Identity.Id)
 	default:
-		return nil, errorsx.Wrapf(errAmbiguous, "identity %s has %d profiles, specify one with --account-id or EG_ACCOUNT", authed.Identity.Id, len(authed.Profiles))
+		return nil, errorsx.Wrapf(errAmbiguous, "identity %s has %d profiles, specify one with --account-id or EG_ACCOUNT, or pick a profile with --profile-id or EG_PROFILE", authed.Identity.Id, len(authed.Profiles))
 	}
 
 	session, err := authn.Session(ctx, t.c, authed.Profiles[0].Token)

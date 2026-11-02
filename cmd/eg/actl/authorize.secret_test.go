@@ -121,7 +121,7 @@ func TestAuthorizeSecretRun(t *testing.T) {
 			},
 		})
 
-		err = AuthorizeSecret{Shared: true}.run(context.Background(), c, "", signer.PublicKey(), signer)
+		err = AuthorizeSecret{Shared: true}.run(context.Background(), c, "", "", signer.PublicKey(), signer)
 		require.NoError(t, err)
 		require.Equal(t, identity.ID(signer.PublicKey()), granted.Registration.Id)
 		require.True(t, granted.Global)
@@ -140,7 +140,7 @@ func TestAuthorizeSecretRun(t *testing.T) {
 			},
 		})
 
-		err = AuthorizeSecret{}.run(context.Background(), c, "", signer.PublicKey(), signer)
+		err = AuthorizeSecret{}.run(context.Background(), c, "", "", signer.PublicKey(), signer)
 		require.Error(t, err)
 		require.ErrorContains(t, err, "not associated with any profiles")
 	})
@@ -164,7 +164,7 @@ func TestAuthorizeSecretRun(t *testing.T) {
 			},
 		})
 
-		err = AuthorizeSecret{}.run(context.Background(), c, "", signer.PublicKey(), signer)
+		err = AuthorizeSecret{}.run(context.Background(), c, "", "", signer.PublicKey(), signer)
 		require.Error(t, err)
 		require.ErrorContains(t, err, "specify one with --account")
 	})
@@ -194,7 +194,7 @@ func TestAuthorizeSecretRun(t *testing.T) {
 			},
 		})
 
-		err = AuthorizeSecret{}.run(context.Background(), c, "account-1", signer.PublicKey(), signer)
+		err = AuthorizeSecret{}.run(context.Background(), c, "account-1", "", signer.PublicKey(), signer)
 		require.NoError(t, err)
 		require.True(t, loginOptionsCalled)
 	})
@@ -217,7 +217,7 @@ func TestAuthorizeSecretRun(t *testing.T) {
 			},
 		})
 
-		err = AuthorizeSecret{}.run(context.Background(), c, "", signer.PublicKey(), signer)
+		err = AuthorizeSecret{}.run(context.Background(), c, "", "", signer.PublicKey(), signer)
 		require.Error(t, err)
 	})
 }

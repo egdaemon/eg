@@ -54,11 +54,11 @@ func (t AuthorizeSecret) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, entr
 		return err
 	}
 
-	return t.run(gctx.Context, tlsc.DefaultClient(), gctx.AccountID, dsigner.PublicKey(), asigner)
+	return t.run(gctx.Context, tlsc.DefaultClient(), gctx.AccountID, gctx.ProfileID, dsigner.PublicKey(), asigner)
 }
 
-func (t AuthorizeSecret) run(ctx context.Context, c *http.Client, account string, pub ssh.PublicKey, signer ssh.Signer) (err error) {
-	httpc := authn.New(ctx, c, signer, account, compute.NewAuthzTokenSource)
+func (t AuthorizeSecret) run(ctx context.Context, c *http.Client, account string, profile string, pub ssh.PublicKey, signer ssh.Signer) (err error) {
+	httpc := authn.New(ctx, c, signer, account, profile, compute.NewAuthzTokenSource)
 
 	rc := registration.NewRegistrationClient(httpc)
 	req := &registration.RegistrationGrantRequest{Registration: &registration.Registration{Id: identity.ID(pub)}, Global: t.Shared}

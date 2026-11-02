@@ -135,6 +135,10 @@ func main() {
 		kong.Name("eg"),
 		kong.Description("cli for eg"),
 		kong.Vars{
+			"env_eg_account":               eg.EnvAccount,
+			"vars_account_id":              envx.String("", eg.EnvAccount),
+			"env_eg_profile":               eg.EnvProfile,
+			"vars_profile_id":              envx.String("", eg.EnvProfile),
 			"vars_timestamp_started":       time.Now().UTC().Format(time.RFC3339),
 			"vars_endpoint":                eg.EnvAPIHostDefault(),
 			"vars_console_endpoint":        eg.EnvConsoleHostDefault(),
@@ -147,7 +151,6 @@ func main() {
 			"vars_gdx_default_output":      "-",
 			"vars_eg_root_directory":       stringsx.FirstNonBlank(envx.String("", eg.EnvComputeWorkingDirectory), gitdir, eg.DefaultWorkingDirectory()),
 			"vars_eg_runtime_directory":    eg.DefaultMountRoot(eg.RuntimeDirectory),
-			"vars_account_id":              envx.String("", "EG_ACCOUNT"),
 			"vars_machine_id":              envx.String(machineID(), "EG_MACHINE_ID"),
 			"vars_entropy_seed":            envx.String(autoentropy, eg.EnvEGEntropySeed),
 			"env_eg_entropy_seed":          eg.EnvEGEntropySeed,

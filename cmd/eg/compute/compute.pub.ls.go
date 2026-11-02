@@ -35,7 +35,7 @@ func (t pubList) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, ident *cmdid
 		return err
 	}
 
-	chttp := authn.New(gctx.Context, tlsc.DefaultClient(), signer, aid, compute.NewAuthzTokenSource)
+	chttp := authn.New(gctx.Context, tlsc.DefaultClient(), signer, aid, gctx.ProfileID, compute.NewAuthzTokenSource)
 
 	runners, err := t.list(gctx.Context, computeapi.NewPushClient(chttp))
 	if err != nil {

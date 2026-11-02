@@ -11,7 +11,7 @@ import (
 // TokenAuthz builds the token source that exchanges the signer's identity for an authorization
 // token from the endpoint, see compute.NewAuthzTokenSource. generic over the token source it
 // returns so constructors can return their own type.
-type TokenAuthz[T oauth2.TokenSource] func(c *http.Client, signer ssh.Signer, endpoint string, account string) T
+type TokenAuthz[T oauth2.TokenSource] func(c *http.Client, signer ssh.Signer, endpoint string, account string, profile string) T
 
 type config struct {
 	endpoint string
@@ -30,8 +30,9 @@ func OptionEndpoint(endpoint string) Option {
 // New builds an http client for the eg api that authorizes requests with tokens from ts. c is the
 // base client the token requests and the authorized requests are made with, signer is the identity
 // to authenticate as, and aid is the account to authorize as, it may be empty when the signer maps
-// to a single profile.
-func New[T oauth2.TokenSource](ctx context.Context, c *http.Client, signer ssh.Signer, aid string, ts TokenAuthz[T], options ...Option) *http.Client {
+// to a single profile. pid is the profile to authorize as, it may be empty when the signer maps to a single
+// profile in the account.
+func New[T oauth2.TokenSource](ctx context.Context, c *http.Client, signer ssh.Signer, aid string, pid string, ts TokenAuthz[T], options ...Option) *http.Client {
 	cfg := config{endpoint: EndpointCompute()}
 	for _, opt := range options {
 		opt(&cfg)
@@ -39,6 +40,6 @@ func New[T oauth2.TokenSource](ctx context.Context, c *http.Client, signer ssh.S
 
 	return oauth2.NewClient(
 		context.WithValue(ctx, oauth2.HTTPClient, c),
-		ts(c, signer, cfg.endpoint, aid),
+		ts(c, signer, cfg.endpoint, aid, pid),
 	)
 }

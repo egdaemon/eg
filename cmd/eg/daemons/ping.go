@@ -30,7 +30,7 @@ func Ping(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, runtimecfg *cmdopts.Run
 		return errorsx.String("an account id is required to register the daemon")
 	}
 
-	authclient := authn.New(gctx.Context, tlsc.DefaultClient(), s, aid, compute.NewAuthzTokenSource)
+	authclient := authn.New(gctx.Context, tlsc.DefaultClient(), s, aid, gctx.ProfileID, compute.NewAuthzTokenSource)
 
 	rc := registration.NewPingClient(authclient)
 

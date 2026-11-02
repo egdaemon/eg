@@ -2,6 +2,7 @@ package cmdgcp
 
 import (
 	"fmt"
+	"github.com/egdaemon/eg/internal/userx"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -20,6 +21,10 @@ import (
 // every wif command resolves the account through the injected identity, an explicit account needs no lookup,
 // and then talks to the wif routes with the meta token.
 func TestRun(t *testing.T) {
+	// the identities are remembered in the cache, keep it out of the user's.
+	t.Setenv(userx.EnvCacheDirectory, t.TempDir())
+	t.Setenv("RUNTIME_DIRECTORY", t.TempDir())
+
 	cases := []struct {
 		name   string
 		run    func(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, ident *cmdidentity.T, sshkey string) error
@@ -81,7 +86,7 @@ func TestRun(t *testing.T) {
 			})
 			mux.HandleFunc("/authn/s/", func(w http.ResponseWriter, r *http.Request) { fmt.Fprint(w, `{}`) })
 			mux.HandleFunc("/authn/ssh", func(w http.ResponseWriter, r *http.Request) {
-				fmt.Fprint(w, `{"profiles":[{"token":"the-token","profile":{"id":"profile-1"}}]}`)
+				fmt.Fprint(w, `{"profiles":[{"token":"the-token","profile":{"id":"profile-1","account_id":"account-1"}}]}`)
 			})
 			mux.HandleFunc("/authn/current", func(w http.ResponseWriter, r *http.Request) {
 				fmt.Fprint(w, `{"token":"stub-session-token","profile":{"id":"profile-1"},"account":{"id":"account-1"}}`)

@@ -190,7 +190,7 @@ func main() {
 		),
 		kong.BindTo(shellcli.Context, (*context.Context)(nil)),
 		kong.BindSingletonProvider(func(g *cmdopts.Global) *cmdidentity.T {
-			return cmdidentity.New(g.Context, g.AccountID, cmdidentity.Login)
+			return cmdidentity.New(g.Context, g.AccountID, g.ProfileID, cmdidentity.Login)
 		}),
 		kong.TypeMapper(reflect.TypeFor[*net.IP](), kong.MapperFunc(cmdopts.ParseIP)),
 		kong.TypeMapper(reflect.TypeFor[*net.TCPAddr](), kong.MapperFunc(cmdopts.ParseTCPAddr)),

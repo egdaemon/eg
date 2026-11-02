@@ -20,27 +20,17 @@ func TestResolve(t *testing.T) {
 	signer, err := sshx.SignerFromGenerator(sshx.NewKeyGenSeeded(t.Name()))
 	require.NoError(t, err)
 
-	t.Run("explicit account wins without any lookup", func(t *testing.T) {
+	t.Run("explicit account that is remembered is used without any lookup", func(t *testing.T) {
 		t.Setenv(userx.EnvCacheDirectory, t.TempDir())
 		t.Setenv("RUNTIME_DIRECTORY", t.TempDir())
+		remember(t, signer, vcsuri, "explicit")
 		ident := cmdidentity.New(context.Background(), "explicit", "", nil)
 
 		// a nil client would panic if the network were used.
-		r, err := ident.Resolve(nil, signer, vcsuri, false)
+		r, err := ident.With(identity.QueryEnvironment("explicit", "", vcsuri)).Resolve(nil, signer)
 		require.NoError(t, err)
 		require.Equal(t, "explicit", r.Current.Account.Id)
 		require.Equal(t, identity.SourceFlag, r.Source)
-	})
-
-	t.Run("explicit account is not overridden by the remembered account", func(t *testing.T) {
-		t.Setenv(userx.EnvCacheDirectory, t.TempDir())
-		t.Setenv("RUNTIME_DIRECTORY", t.TempDir())
-		remember(t, signer, vcsuri, "remembered")
-
-		ident := cmdidentity.New(context.Background(), "explicit", "", nil)
-		r, err := ident.Resolve(nil, signer, vcsuri, false)
-		require.NoError(t, err)
-		require.Equal(t, "explicit", r.Current.Account.Id)
 	})
 
 	t.Run("blank vcs uri is rejected", func(t *testing.T) {
@@ -48,7 +38,7 @@ func TestResolve(t *testing.T) {
 		t.Setenv("RUNTIME_DIRECTORY", t.TempDir())
 		ident := cmdidentity.New(context.Background(), "", "", nil)
 
-		_, err := ident.Resolve(nil, signer, "", false)
+		_, err := ident.With(identity.QueryVCSAuto("", "", "")).Resolve(nil, signer)
 		require.ErrorContains(t, err, "a repository is required")
 	})
 
@@ -58,7 +48,7 @@ func TestResolve(t *testing.T) {
 		remember(t, signer, vcsuri, "remembered")
 
 		ident := cmdidentity.New(context.Background(), "", "", nil)
-		r, err := ident.Resolve(nil, signer, vcsuri, false)
+		r, err := ident.With(identity.QueryVCSAuto("", "", vcsuri)).Resolve(nil, signer)
 		require.NoError(t, err)
 		require.Equal(t, "remembered", r.Current.Account.Id)
 		require.Equal(t, identity.SourceCache, r.Source)
@@ -69,13 +59,13 @@ func TestResolve(t *testing.T) {
 		t.Setenv("RUNTIME_DIRECTORY", t.TempDir())
 		remember(t, signer, vcsuri, "first")
 
-		ident := cmdidentity.New(context.Background(), "", "", nil)
-		r, err := ident.Resolve(nil, signer, vcsuri, false)
+		ident := cmdidentity.New(context.Background(), "", "", nil).With(identity.QueryVCSAuto("", "", vcsuri))
+		r, err := ident.Resolve(nil, signer)
 		require.NoError(t, err)
 		require.Equal(t, "first", r.Current.Account.Id)
 
 		remember(t, signer, vcsuri, "second")
-		r, err = ident.Resolve(nil, signer, vcsuri, false)
+		r, err = ident.Resolve(nil, signer)
 		require.NoError(t, err)
 		require.Equal(t, "first", r.Current.Account.Id)
 	})
@@ -87,7 +77,7 @@ func remember(t *testing.T, signer ssh.Signer, vcsuri, account string) {
 	db, err := migrations.OpenLocked(context.Background(), migrations.Path(migrations.CLI))
 	require.NoError(t, err)
 	defer db.Close()
-	require.NoError(t, identity.Remember(context.Background(), db, signer, vcsuri, account))
+	require.NoError(t, identity.Remember(context.Background(), db, signer, vcsuri, &authn.Identity{}, &authn.Authn{Account: &authn.Account{Id: account}, Profile: &authn.Profile{Id: "profile-" + account, AccountId: account}}, true))
 }
 
 func TestAccountID(t *testing.T) {
@@ -152,14 +142,17 @@ func TestStore(t *testing.T) {
 
 		db, err := ident.Store()
 		require.NoError(t, err)
-		require.NoError(t, identity.Remember(context.Background(), db, signer, "git@github.com:u/r.git", "remembered"))
+		require.NoError(t, identity.Remember(context.Background(), db, signer, "git@github.com:u/r.git", &authn.Identity{}, &authn.Authn{Account: &authn.Account{Id: "remembered"}, Profile: &authn.Profile{Id: "profile-remembered", AccountId: "remembered"}}, true))
 		require.NoError(t, db.Close())
 
 		db, err = ident.Store()
 		require.NoError(t, err)
 		defer db.Close()
-		account, err := identity.Remembered(context.Background(), db, signer, "git@github.com:u/r.git")
-		require.NoError(t, err)
-		require.Equal(t, "remembered", account)
+		found := identity.RepoIdentitySearch(context.Background(), db, identity.Remembered(context.Background(), signer).Where(identity.QueryVCSURI("git@github.com:u/r.git")))
+		defer found.Close()
+		require.True(t, found.Next())
+		var h identity.RepoIdentity
+		require.NoError(t, found.Scan(&h))
+		require.Equal(t, "remembered", h.AccountID)
 	})
 }

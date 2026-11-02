@@ -37,7 +37,7 @@ func (t Whoami) Run(gctx *cmdopts.Global, tlscfg *cmdopts.TLSConfig, ident *cmdi
 	defer db.Close()
 
 	// prompts when ambiguous and interactive, the selection is remembered. otherwise the candidates are listed.
-	r, err := identity.Resolve(gctx.Context, db, c, signer, gctx.AccountID, t.VcsURI, ident.Choose, false)
+	r, err := identity.QueryVCSAuto(gctx.AccountID, gctx.ProfileID, t.VcsURI).Resolve(gctx.Context, db, c, signer, ident.Choose)
 	if errors.Is(err, identity.ErrAmbiguous) {
 		log.Println("account ambiguous, candidates:")
 		for _, p := range r.Candidates {
@@ -53,7 +53,7 @@ func (t Whoami) Run(gctx *cmdopts.Global, tlscfg *cmdopts.TLSConfig, ident *cmdi
 	log.Println("account", account, "-", r.Source)
 
 	// resolve only reports the candidates when the account is ambiguous, list everything the key is associated with.
-	authed, err := identity.Profiles(gctx.Context, c, signer)
+	authed, err := identity.Profiles(gctx.Context, c, signer, gctx.AccountID, gctx.ProfileID)
 	if err != nil {
 		return err
 	}

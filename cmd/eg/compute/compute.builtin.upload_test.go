@@ -1,6 +1,7 @@
 package compute
 
 import (
+	"github.com/egdaemon/eg/internal/userx"
 	"testing"
 
 	"github.com/egdaemon/eg/cmd/cmdidentity"
@@ -11,6 +12,10 @@ import (
 // every command that uploads a workload must satisfy what the enqueue endpoint enforces,
 // see enqueueapi.
 func TestBuiltinUpload(t *testing.T) {
+	// the identities are remembered in the cache, keep it out of the user's.
+	t.Setenv(userx.EnvCacheDirectory, t.TempDir())
+	t.Setenv("RUNTIME_DIRECTORY", t.TempDir())
+
 	tlsc, accepted := enqueueapi(t)
 	dir, sshkey := uploadrepo(t)
 

@@ -232,7 +232,9 @@ func enqueueapi(t *testing.T) (*cmdopts.TLSConfig, func() []url.Values) {
 		json(w, `{"access_token":"access","token_type":"BEARER","refresh_token":"refresh","expires_in":3600}`)
 	})
 	mux.HandleFunc("/authn/s/", func(w http.ResponseWriter, r *http.Request) { json(w, `{}`) })
-	mux.HandleFunc("/authn/ssh", func(w http.ResponseWriter, r *http.Request) { json(w, `{"profiles":[{"token":"profile"}]}`) })
+	mux.HandleFunc("/authn/ssh", func(w http.ResponseWriter, r *http.Request) {
+		json(w, `{"profiles":[{"token":"profile","profile":{"id":"profile-1","account_id":"account"}}]}`)
+	})
 	mux.HandleFunc("/authn/current", func(w http.ResponseWriter, r *http.Request) { json(w, `{"token":"session"}`) })
 	mux.HandleFunc("/c/authz/", func(w http.ResponseWriter, r *http.Request) {
 		json(w, fmt.Sprintf(`{"token":{"expires":%d,"bearer":"bearer"}}`, time.Now().Add(time.Hour).UnixMilli()))

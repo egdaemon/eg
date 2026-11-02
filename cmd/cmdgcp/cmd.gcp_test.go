@@ -29,7 +29,7 @@ func newtestclient(t *testing.T, accountID string, wif http.HandlerFunc) *http.C
 		fmt.Fprint(w, `{"access_token":"stub-access-token","token_type":"bearer","expires_in":3600}`)
 	})
 	mux.HandleFunc("/authn/ssh", func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprint(w, `{"profiles":[{"token":"the-token","profile":{"id":"profile-1"}}]}`)
+		fmt.Fprint(w, `{"profiles":[{"token":"the-token","profile":{"id":"profile-1","account_id":"account-1"}}]}`)
 	})
 	mux.HandleFunc("/authn/current", func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprint(w, `{"token":"stub-session-token","profile":{"id":"profile-1"},"account":{"id":"account-1"}}`)

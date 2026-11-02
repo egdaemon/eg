@@ -29,13 +29,13 @@ func (t Edit) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, ident *cmdident
 		return err
 	}
 
-	aid, err := cmdidentity.AccountID(ident.Resolve(tlsc.DefaultClient(), signer, t.VcsURI, false))
+	aid, err := cmdidentity.AccountID(ident.With(identity.QueryEnvironment(gctx.AccountID, gctx.ProfileID, t.VcsURI)).Resolve(tlsc.DefaultClient(), signer))
 	if err != nil {
 		return err
 	}
 
 	// the api replaces the display and email with what is sent, anything not specified keeps its current value.
-	authed, err := identity.Profiles(gctx.Context, tlsc.DefaultClient(), signer)
+	authed, err := identity.Profiles(gctx.Context, tlsc.DefaultClient(), signer, gctx.AccountID, gctx.ProfileID)
 	if err != nil {
 		return err
 	}

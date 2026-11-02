@@ -4,10 +4,12 @@ import (
 	"fmt"
 	"log"
 
+	"github.com/egdaemon/eg/authn"
 	"github.com/egdaemon/eg/cmd/cmdidentity"
 	"github.com/egdaemon/eg/cmd/cmdopts"
 	"github.com/egdaemon/eg/identity"
 	"github.com/egdaemon/eg/internal/errorsx"
+	"github.com/egdaemon/eg/internal/slicesx"
 	"github.com/egdaemon/eg/internal/sshx"
 	"github.com/egdaemon/eg/internal/stringsx"
 )
@@ -38,20 +40,17 @@ func (t DefaultAccount) Run(gctx *cmdopts.Global, tlscfg *cmdopts.TLSConfig, ide
 	defer db.Close()
 
 	if !stringsx.Blank(t.ID) {
-		authed, err := identity.Profiles(gctx.Context, c, signer)
+		authed, err := identity.Profiles(gctx.Context, c, signer, "", "")
 		if err != nil {
 			return err
 		}
 
-		valid := false
-		for _, p := range authed.Profiles {
-			valid = valid || p.Profile.AccountId == t.ID
-		}
+		selected, valid := slicesx.Find(func(v *authn.Authn) bool { return v.GetProfile().GetAccountId() == t.ID }, authed.Profiles...)
 		if !valid {
 			return fmt.Errorf("the ssh key %s is not associated with account %s", identity.ID(signer.PublicKey()), t.ID)
 		}
 
-		if err = identity.Remember(gctx.Context, db, signer, vcsuri, t.ID); err != nil {
+		if err = identity.Remember(gctx.Context, db, signer, vcsuri, authed.Identity, selected, true); err != nil {
 			return err
 		}
 
@@ -59,8 +58,12 @@ func (t DefaultAccount) Run(gctx *cmdopts.Global, tlscfg *cmdopts.TLSConfig, ide
 		return nil
 	}
 
-	// detect, ignoring the remembered account. persists the result.
-	r, err := identity.Resolve(gctx.Context, db, c, signer, "", vcsuri, ident.Choose, true)
+	// detect again, the remembered identities are forgotten first. persists the result.
+	if err = identity.Forget(gctx.Context, db, signer, vcsuri); err != nil {
+		return err
+	}
+
+	r, err := identity.QueryVCSAuto("", "", vcsuri).Resolve(gctx.Context, db, c, signer, ident.Choose)
 	if err != nil {
 		return err
 	}

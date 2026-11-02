@@ -2,11 +2,13 @@ package cmdme
 
 import (
 	"fmt"
+	"github.com/egdaemon/eg/internal/userx"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -54,7 +56,7 @@ func TestRenderOrder(t *testing.T) {
 		{Account: &authn.Account{Id: "a1"}, Profile: &authn.Profile{Id: "p2", AccountId: "a1", Email: "p2@test"}},
 	}
 
-	out := ansi.Strip(render(&authn.Identity{Uid: "u1"}, &authn.Account{Id: "a1"}, profiles...))
+	out := ansi.Strip(render(&authn.Identity{Uid: "u1"}, &authn.Authn{Account: &authn.Account{Id: "a1"}}, profiles...))
 
 	require.Regexp(t, `(?s)p2@test.*p3@test.*p0@test.*p1@test`, out)
 	// the callers slice is not reordered.
@@ -62,6 +64,10 @@ func TestRenderOrder(t *testing.T) {
 }
 
 func TestEditRun(t *testing.T) {
+	// the identities are remembered in the cache, keep it out of the user's.
+	t.Setenv(userx.EnvCacheDirectory, t.TempDir())
+	t.Setenv("RUNTIME_DIRECTORY", t.TempDir())
+
 	t.Setenv("EG_SESSION_TOKEN", "stub-refresh-token")
 
 	var (
@@ -121,6 +127,10 @@ func TestEditRun(t *testing.T) {
 }
 
 func TestAccessRun(t *testing.T) {
+	// the identities are remembered in the cache, keep it out of the user's.
+	t.Setenv(userx.EnvCacheDirectory, t.TempDir())
+	t.Setenv("RUNTIME_DIRECTORY", t.TempDir())
+
 	t.Setenv("EG_SESSION_TOKEN", "stub-refresh-token")
 
 	var (
@@ -175,4 +185,18 @@ func TestAccessRun(t *testing.T) {
 	defer m.Unlock()
 	require.Equal(t, http.MethodDelete, method)
 	require.Equal(t, "/me/profile/profile-2", path)
+}
+
+func TestRenderProfileHint(t *testing.T) {
+	profiles := []*authn.Authn{
+		{Account: &authn.Account{Id: "a1", Description: "acme"}, Profile: &authn.Profile{Id: "p1", AccountId: "a1", Display: "alice", Email: "p1@test"}},
+		{Account: &authn.Account{Id: "a1", Description: "acme"}, Profile: &authn.Profile{Id: "p2", AccountId: "a1", Display: "alice2", Email: "p2@test"}},
+	}
+
+	out := ansi.Strip(render(&authn.Identity{Uid: "u1"}, &authn.Authn{Account: profiles[1].Account, Profile: &authn.Profile{Id: "p2", AccountId: "a1"}}, profiles...))
+
+	// only the requested profile is marked even though both belong to the current account.
+	require.Equal(t, 1, strings.Count(out, "*"), out)
+	require.Regexp(t, `\* +│ p2 +│`, out)
+	require.Regexp(t, `profile: p2 - alice2 - p2@test\n`, out)
 }

@@ -2,6 +2,7 @@ package compute
 
 import (
 	"errors"
+	"github.com/egdaemon/eg/identity"
 	"log"
 	"os"
 	"path/filepath"
@@ -181,7 +182,7 @@ func (t upload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, ident *cmdide
 	ainfo := errorsx.Zero(os.Stat(archiveio.Name()))
 	log.Println("archive metadata", ainfo.Name(), bytesx.Unit(ainfo.Size()))
 
-	aid, err := cmdidentity.AccountID(ident.Resolve(tlsc.DefaultClient(), signer, errorsx.Zero(gitx.CanonicalURI(repo, t.GitRemote)), false))
+	aid, err := cmdidentity.AccountID(ident.With(identity.QueryVCSAuto(gctx.AccountID, gctx.ProfileID, errorsx.Zero(gitx.CanonicalURI(repo, t.GitRemote)))).Resolve(tlsc.DefaultClient(), signer))
 	if err != nil {
 		return err
 	}

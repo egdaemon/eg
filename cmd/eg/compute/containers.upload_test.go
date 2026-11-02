@@ -1,6 +1,7 @@
 package compute
 
 import (
+	"github.com/egdaemon/eg/internal/userx"
 	"os"
 	"testing"
 
@@ -12,6 +13,10 @@ import (
 // every command that uploads a workload must satisfy what the enqueue endpoint enforces,
 // see enqueueapi.
 func TestContainersUpload(t *testing.T) {
+	// the identities are remembered in the cache, keep it out of the user's.
+	t.Setenv(userx.EnvCacheDirectory, t.TempDir())
+	t.Setenv("RUNTIME_DIRECTORY", t.TempDir())
+
 	tlsc, accepted := enqueueapi(t)
 	_, sshkey := uploadrepo(t)
 	require.NoError(t, os.WriteFile("Containerfile", []byte("FROM scratch\n"), 0600))

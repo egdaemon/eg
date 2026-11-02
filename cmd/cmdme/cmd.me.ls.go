@@ -29,24 +29,24 @@ func (t Ls) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, ident *cmdidentit
 
 	c := tlsc.DefaultClient()
 
-	r, err := ident.Resolve(c, signer, t.VcsURI, false)
+	r, err := ident.With(identity.QueryEnvironment(gctx.AccountID, gctx.ProfileID, t.VcsURI)).Resolve(c, signer)
 	if !errors.Is(err, identity.ErrAmbiguous) {
 		errorsx.Log(errorsx.Wrap(err, "unable to determine the current account"))
 	}
 
-	authed, err := identity.Profiles(gctx.Context, c, signer)
+	authed, err := identity.Profiles(gctx.Context, c, signer, "", "")
 	if err != nil {
 		return err
 	}
 
-	_, _ = lipgloss.Println(render(authed.Identity, r.Current.GetAccount(), authed.Profiles...))
+	_, _ = lipgloss.Println(render(authed.Identity, r.Current, authed.Profiles...))
 
 	return nil
 }
 
 // render the current profile followed by a table of every profile. the current profile is
 // marked in the table as well as styled so it remains visible without color.
-func render(ident *authn.Identity, current *authn.Account, idents ...*authn.Authn) string {
+func render(ident *authn.Identity, current *authn.Authn, idents ...*authn.Authn) string {
 	var (
 		bold    = lipgloss.NewStyle().Bold(true)
 		marked  = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("2"))
@@ -55,9 +55,14 @@ func render(ident *authn.Identity, current *authn.Account, idents ...*authn.Auth
 		session = cmdidentity.UXSessionFull(ident, nil)
 	)
 
-	// the current account first, then by profile id.
+	// the current profile first, then by profile id. the profile when it is known, otherwise every profile of the
+	// current account.
 	iscurrent := func(v *authn.Authn) bool {
-		return current.GetId() != "" && v.GetProfile().GetAccountId() == current.GetId()
+		if current.GetProfile().GetId() != "" {
+			return v.GetProfile().GetId() == current.GetProfile().GetId()
+		}
+
+		return current.GetAccount().GetId() != "" && v.GetProfile().GetAccountId() == current.GetAccount().GetId()
 	}
 
 	order := cmpx.For[*authn.Authn]().Bool(iscurrent).String(func(v *authn.Authn) string { return v.GetProfile().GetId() })
@@ -65,7 +70,7 @@ func render(ident *authn.Identity, current *authn.Account, idents ...*authn.Auth
 
 	for i, id := range idents {
 		mark := ""
-		if id.GetProfile().GetAccountId() == current.GetId() && current.GetId() != "" {
+		if iscurrent(id) {
 			mark = "*"
 			focused = i
 			session = cmdidentity.UXSessionFull(ident, id)

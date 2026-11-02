@@ -2,6 +2,7 @@ package compute
 
 import (
 	"context"
+	"github.com/egdaemon/eg/identity"
 
 	"charm.land/lipgloss/v2"
 	"github.com/egdaemon/eg/authn"
@@ -30,7 +31,7 @@ func (t pubList) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, ident *cmdid
 		return err
 	}
 
-	aid, err := cmdidentity.AccountID(ident.Resolve(tlsc.DefaultClient(), signer, t.VcsURI, false))
+	aid, err := cmdidentity.AccountID(ident.With(identity.QueryVCSAuto(gctx.AccountID, gctx.ProfileID, t.VcsURI)).Resolve(tlsc.DefaultClient(), signer))
 	if err != nil {
 		return err
 	}

@@ -2,6 +2,7 @@ package cmdgcp
 
 import (
 	"fmt"
+	"github.com/egdaemon/eg/identity"
 	"os"
 	"text/tabwriter"
 
@@ -36,7 +37,7 @@ func (t Create) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, ident *cmdide
 	}
 
 	// the management routes require the user management permission.
-	aid, err := cmdidentity.AccountID(ident.Resolve(tlsc.DefaultClient(), signer, t.VcsURI, false))
+	aid, err := cmdidentity.AccountID(ident.With(identity.QueryVCSAuto(gctx.AccountID, gctx.ProfileID, t.VcsURI)).Resolve(tlsc.DefaultClient(), signer))
 	if err != nil {
 		return err
 	}
@@ -71,7 +72,7 @@ func (t List) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, ident *cmdident
 	}
 
 	// the management routes require the user management permission.
-	aid, err := cmdidentity.AccountID(ident.Resolve(tlsc.DefaultClient(), signer, t.VcsURI, false))
+	aid, err := cmdidentity.AccountID(ident.With(identity.QueryVCSAuto(gctx.AccountID, gctx.ProfileID, t.VcsURI)).Resolve(tlsc.DefaultClient(), signer))
 	if err != nil {
 		return err
 	}
@@ -115,7 +116,7 @@ func (t Edit) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, ident *cmdident
 	}
 
 	// the management routes require the user management permission.
-	aid, err := cmdidentity.AccountID(ident.Resolve(tlsc.DefaultClient(), signer, t.VcsURI, false))
+	aid, err := cmdidentity.AccountID(ident.With(identity.QueryVCSAuto(gctx.AccountID, gctx.ProfileID, t.VcsURI)).Resolve(tlsc.DefaultClient(), signer))
 	if err != nil {
 		return err
 	}
@@ -165,7 +166,7 @@ func (t Remove) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, ident *cmdide
 	}
 
 	// the management routes require the user management permission.
-	aid, err := cmdidentity.AccountID(ident.Resolve(tlsc.DefaultClient(), signer, t.VcsURI, false))
+	aid, err := cmdidentity.AccountID(ident.With(identity.QueryVCSAuto(gctx.AccountID, gctx.ProfileID, t.VcsURI)).Resolve(tlsc.DefaultClient(), signer))
 	if err != nil {
 		return err
 	}

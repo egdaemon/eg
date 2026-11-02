@@ -1,6 +1,7 @@
 package compute
 
 import (
+	"github.com/egdaemon/eg/identity"
 	"log"
 	"net/http"
 
@@ -26,7 +27,7 @@ func (t cancel) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, ident *cmdide
 		return err
 	}
 
-	aid, err := cmdidentity.AccountID(ident.Resolve(tlsc.DefaultClient(), signer, t.VcsURI, false))
+	aid, err := cmdidentity.AccountID(ident.With(identity.QueryVCSAuto(gctx.AccountID, gctx.ProfileID, t.VcsURI)).Resolve(tlsc.DefaultClient(), signer))
 	if err != nil {
 		return err
 	}

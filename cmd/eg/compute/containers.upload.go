@@ -4,6 +4,7 @@ import (
 	"embed"
 	"errors"
 	"fmt"
+	"github.com/egdaemon/eg/identity"
 	"log"
 	"os"
 	"path/filepath"
@@ -187,7 +188,7 @@ func (t c8sUpload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, ident *cmd
 	ainfo := errorsx.Zero(os.Stat(archiveio.Name()))
 	log.Println("archive metadata", ainfo.Name(), ainfo.Size())
 
-	aid, err := cmdidentity.AccountID(ident.Resolve(tlsc.DefaultClient(), signer, errorsx.Zero(gitx.CanonicalURI(repo, t.GitRemote)), false))
+	aid, err := cmdidentity.AccountID(ident.With(identity.QueryVCSAuto(gctx.AccountID, gctx.ProfileID, errorsx.Zero(gitx.CanonicalURI(repo, t.GitRemote)))).Resolve(tlsc.DefaultClient(), signer))
 	if err != nil {
 		return err
 	}

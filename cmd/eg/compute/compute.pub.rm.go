@@ -2,6 +2,7 @@ package compute
 
 import (
 	"context"
+	"github.com/egdaemon/eg/identity"
 	"net/http"
 
 	"github.com/egdaemon/eg/authn"
@@ -26,7 +27,7 @@ func (t pubRemove) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, ident *cmd
 		return err
 	}
 
-	aid, err := cmdidentity.AccountID(ident.Resolve(tlsc.DefaultClient(), signer, t.VcsURI, false))
+	aid, err := cmdidentity.AccountID(ident.With(identity.QueryVCSAuto(gctx.AccountID, gctx.ProfileID, t.VcsURI)).Resolve(tlsc.DefaultClient(), signer))
 	if err != nil {
 		return err
 	}

@@ -69,7 +69,7 @@ func TestWhoami(t *testing.T) {
 
 		require.NoError(t, cmd.Run(&cmdopts.Global{Context: t.Context()}, tlsc, ident))
 		require.Contains(t, logged.String(), "repository "+vcsuri)
-		require.Contains(t, logged.String(), "account acct-001 - single")
+		require.Contains(t, logged.String(), "account acct-001 - cached")
 		require.Contains(t, logged.String(), "current acct-001 - dave")
 	})
 
@@ -83,7 +83,10 @@ func TestWhoami(t *testing.T) {
 			fmt.Fprint(w, `{"access_token":"access","token_type":"BEARER","refresh_token":"refresh","expires_in":3600}`)
 		})
 		mux.HandleFunc("/authn/s/", func(w http.ResponseWriter, r *http.Request) { fmt.Fprint(w, `{}`) })
-		mux.HandleFunc("/authn/ssh", func(w http.ResponseWriter, r *http.Request) { fmt.Fprint(w, twoprofiles) })
+		// the server narrows the profiles to the requested account.
+		mux.HandleFunc("/authn/ssh", func(w http.ResponseWriter, r *http.Request) {
+			fmt.Fprint(w, `{"profiles":[{"token":"t2","profile":{"id":"profile-2","display":"erin","account_id":"acct-002"},"account":{"id":"acct-002"}}]}`)
+		})
 
 		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("Content-Type", "application/json")
@@ -112,7 +115,7 @@ func TestWhoami(t *testing.T) {
 		cmd.VcsURI = vcsuri
 
 		require.NoError(t, cmd.Run(&cmdopts.Global{Context: t.Context(), AccountID: "acct-002"}, tlsc, ident))
-		require.Contains(t, logged.String(), "account acct-002 - flag")
+		require.Contains(t, logged.String(), "account acct-002 - cached")
 		require.Contains(t, logged.String(), "current acct-002 - erin")
 	})
 
@@ -250,9 +253,12 @@ func TestDefaultAccount(t *testing.T) {
 		require.NoError(t, err)
 		defer db.Close()
 
-		remembered, err := identity.Remembered(t.Context(), db, signer, vcsuri)
-		require.NoError(t, err)
-		require.Equal(t, "acct-002", remembered)
+		found := identity.RepoIdentitySearch(t.Context(), db, identity.Remembered(t.Context(), signer).Where(identity.QueryVCSURI(vcsuri)).Where(identity.QueryDefault()))
+		defer found.Close()
+		require.True(t, found.Next())
+		var remembered identity.RepoIdentity
+		require.NoError(t, found.Scan(&remembered))
+		require.Equal(t, "acct-002", remembered.AccountID)
 	})
 
 	t.Run("an account the key is not associated with is rejected", func(t *testing.T) {
@@ -336,13 +342,13 @@ func TestDefaultAccount(t *testing.T) {
 		require.NoError(t, err)
 		db, err := ident.Store()
 		require.NoError(t, err)
-		require.NoError(t, identity.Remember(t.Context(), db, signer, vcsuri, "remembered"))
+		require.NoError(t, identity.Remember(t.Context(), db, signer, vcsuri, &authn.Identity{}, &authn.Authn{Account: &authn.Account{Id: "remembered"}, Profile: &authn.Profile{Id: "profile-remembered", AccountId: "remembered"}}, true))
 		require.NoError(t, db.Close())
 
 		cmd := DefaultAccount{SSHKeyPath: sshkey}
 		cmd.VcsURI = vcsuri
 
 		require.NoError(t, cmd.Run(&cmdopts.Global{Context: t.Context()}, tlsc, ident))
-		require.Contains(t, logged.String(), "account acct-001 - single - will be used for "+vcsuri)
+		require.Contains(t, logged.String(), "account acct-001 - cached - will be used for "+vcsuri)
 	})
 }

@@ -3,6 +3,8 @@ package cmdme
 import (
 	"log"
 
+	"github.com/egdaemon/eg/identity"
+
 	"github.com/egdaemon/eg/authn"
 	"github.com/egdaemon/eg/cmd/cmdidentity"
 	"github.com/egdaemon/eg/cmd/cmdopts"
@@ -24,7 +26,7 @@ func (t Disable) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, ident *cmdid
 		return err
 	}
 
-	aid, err := cmdidentity.AccountID(ident.Resolve(tlsc.DefaultClient(), signer, t.VcsURI, false))
+	aid, err := cmdidentity.AccountID(ident.With(identity.QueryEnvironment(gctx.AccountID, gctx.ProfileID, t.VcsURI)).Resolve(tlsc.DefaultClient(), signer))
 	if err != nil {
 		return err
 	}

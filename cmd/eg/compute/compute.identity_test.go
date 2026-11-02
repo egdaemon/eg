@@ -2,6 +2,7 @@ package compute
 
 import (
 	"fmt"
+	"github.com/egdaemon/eg/internal/userx"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -19,6 +20,10 @@ import (
 // the commands acting on an enqueued workload resolve the account through the injected identity, an explicit account
 // needs no repository.
 func TestWorkloadCommandsResolveTheAccountThroughIdentity(t *testing.T) {
+	// the identities are remembered in the cache, keep it out of the user's.
+	t.Setenv(userx.EnvCacheDirectory, t.TempDir())
+	t.Setenv("RUNTIME_DIRECTORY", t.TempDir())
+
 	t.Run("watch follows a completed workload", func(t *testing.T) {
 		tlsc, _ := enqueueapi(t)
 		_, sshkey := uploadrepo(t)
@@ -68,6 +73,10 @@ func TestWorkloadCommandsResolveTheAccountThroughIdentity(t *testing.T) {
 }
 
 func TestCancelRun(t *testing.T) {
+	// the identities are remembered in the cache, keep it out of the user's.
+	t.Setenv(userx.EnvCacheDirectory, t.TempDir())
+	t.Setenv("RUNTIME_DIRECTORY", t.TempDir())
+
 	t.Run("posts the cancel for the workload", func(t *testing.T) {
 		var (
 			m             sync.Mutex
@@ -85,7 +94,9 @@ func TestCancelRun(t *testing.T) {
 			json(w, `{"access_token":"access","token_type":"BEARER","refresh_token":"refresh","expires_in":3600}`)
 		})
 		mux.HandleFunc("/authn/s/", func(w http.ResponseWriter, r *http.Request) { json(w, `{}`) })
-		mux.HandleFunc("/authn/ssh", func(w http.ResponseWriter, r *http.Request) { json(w, `{"profiles":[{"token":"profile"}]}`) })
+		mux.HandleFunc("/authn/ssh", func(w http.ResponseWriter, r *http.Request) {
+			json(w, `{"profiles":[{"token":"profile","profile":{"id":"profile-1","account_id":"account"}}]}`)
+		})
 		mux.HandleFunc("/authn/current", func(w http.ResponseWriter, r *http.Request) { json(w, `{"token":"session"}`) })
 		mux.HandleFunc("/c/authz/", func(w http.ResponseWriter, r *http.Request) {
 			json(w, fmt.Sprintf(`{"token":{"expires":%d,"bearer":"bearer"}}`, time.Now().Add(time.Hour).UnixMilli()))

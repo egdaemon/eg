@@ -62,6 +62,17 @@ func (c *conn) Close() error {
 	return err
 }
 
+// shutdown shuts down one direction of the connection, reporting errors the way Close does.
+func (c *conn) shutdown(how int) error {
+	if !c.ok() {
+		return syscall.EINVAL
+	}
+	if err := c.fd.shutdown(how); err != nil {
+		return &net.OpError{Op: "close", Net: c.fd.net, Source: c.fd.laddr, Addr: c.fd.raddr, Err: err}
+	}
+	return nil
+}
+
 // LocalAddr returns the local network address.
 // The Addr returned is shared by all invocations of LocalAddr, so
 // do not modify it.

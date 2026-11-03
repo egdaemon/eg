@@ -11,6 +11,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/egdaemon/eg"
 	"github.com/mattn/go-isatty"
 )
 
@@ -26,6 +27,29 @@ func defaultpath() string {
 	}
 
 	return "/dev/tty"
+}
+
+// override is the terminal device chosen by the caller, e.g.) a flag. it takes precedence over the environment.
+var override string
+
+// SetPath selects the terminal device to use instead of the default, an empty path clears the selection.
+// a selected device, from here or the environment, is the only one consulted: stdin being a terminal
+// no longer counts, which means a path that does not exist is how to say there is no terminal.
+func SetPath(p string) {
+	override = p
+}
+
+// devicepath is the terminal device to open and whether it was chosen rather than defaulted.
+func devicepath() (string, bool) {
+	if override != "" {
+		return override, true
+	}
+
+	if p := os.Getenv(eg.EnvTTY); p != "" {
+		return p, true
+	}
+
+	return ttypath, false
 }
 
 func isterminal(f *os.File) bool {
@@ -88,13 +112,14 @@ func (t *drain) Close() error {
 // closing it never closes stdin.
 func Input(ctx context.Context) io.ReadCloser {
 	in := stdin()
-	if isterminal(in) {
+	path, chosen := devicepath()
+	if !chosen && isterminal(in) {
 		if f, err := dup(in); err == nil {
 			return f
 		}
 	}
 
-	if tty, err := os.Open(ttypath); err == nil {
+	if tty, err := os.Open(path); err == nil {
 		return tty
 	}
 
@@ -103,4 +128,22 @@ func Input(ctx context.Context) io.ReadCloser {
 	}
 
 	return io.NopCloser(in)
+}
+
+// Available reports whether there is a terminal for the user to type on: stdin when that is a terminal,
+// otherwise the controlling terminal of the process. it is false for cron, ci and the like, where
+// Input would fall back to stdin and an interactive program has nobody to talk to.
+func Available() bool {
+	path, chosen := devicepath()
+	if !chosen && isterminal(stdin()) {
+		return true
+	}
+
+	tty, err := os.Open(path)
+	if err != nil {
+		return false
+	}
+	defer tty.Close()
+
+	return true
 }

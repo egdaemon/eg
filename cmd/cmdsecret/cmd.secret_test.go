@@ -47,6 +47,9 @@ func TestSecretCmd(t *testing.T) {
 		content := "hello-from-cli"
 		uri := "chachasm://" + pass + "@" + path
 
+		// piped stdin with a terminal available opens the editor, there is nobody to close it.
+		t.Setenv(eg.EnvTTY, "/nonexistent/tty")
+
 		oldStdin := os.Stdin
 		r, w, _ := os.Pipe()
 		os.Stdin = r

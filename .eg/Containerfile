@@ -1,4 +1,4 @@
-FROM ubuntu:resolute
+FROM ubuntu:resolute AS builder
 ARG DEBIAN_FRONTEND=noninteractive
 
 ARG GOBIN=/usr/bin
@@ -24,6 +24,7 @@ RUN go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
 RUN go install github.com/onsi/ginkgo/v2/...@latest
 RUN go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.0.2
 RUN sh /usr/share/eg/install/genieql.sh
+
 RUN which genieql
 RUN which goose
 RUN which goimports
@@ -31,6 +32,20 @@ RUN which gh
 RUN which protoc
 RUN which protoc-gen-go-grpc
 RUN which protoc-gen-go
+
+FROM ubuntu:resolute
+ARG DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && apt-get -y install ca-certificates curl git sudo netavark python3 python3-venv uidmap dbus-user-session fuse-overlayfs tree iproute2 gh podman rsync vim dpkg pinentry-tty pciutils llama.cpp
+
+COPY --from=builder /usr/bin/goose /usr/bin/goose
+COPY --from=builder /usr/bin/gomodifytags /usr/bin/gomodifytags
+COPY --from=builder /usr/bin/goimports /usr/bin/goimports
+COPY --from=builder /usr/bin/protoc-gen-go /usr/bin/protoc-gen-go
+COPY --from=builder /usr/bin/protoc-gen-go-grpc /usr/bin/protoc-gen-go-grpc
+COPY --from=builder /usr/bin/ginkgo /usr/bin/ginkgo
+COPY --from=builder /usr/bin/golangci-lint /usr/bin/golangci-lint
+COPY --from=builder /usr/local/bin/genieql /usr/bin/genieql
 
 RUN systemd-tmpfiles --create
 RUN systemd-tmpfiles --clean

@@ -48,6 +48,7 @@ func EnvContainerAPIHostDefault() string {
 const (
 	EnvAccount            = "EG_ACCOUNT" // hint to force select a account to login to.
 	EnvProfile            = "EG_PROFILE" // hint to force select a profile to login to.
+	EnvTTY                = "EG_TTY"     // path of the terminal device to open interactive programs on, instead of the controlling terminal. a path that does not exist means no terminal.
 	EnvPodmanSocket       = "EG_PODMAN_SOCKET"
 	EnvContainerHost      = "CONTAINER_HOST"
 	EnvEGEntropySeed      = "EG_ENTROPY_SEED"

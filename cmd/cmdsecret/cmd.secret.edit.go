@@ -6,10 +6,8 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 
 	"github.com/egdaemon/eg/cmd/cmdopts"
-	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/iox"
 	"github.com/egdaemon/eg/internal/ttyx"
@@ -50,18 +48,8 @@ func (t CmdEdit) Run(gctx *cmdopts.Global) error {
 		return fmt.Errorf("failed to write to temp file: %w", err)
 	}
 
-	editor := envx.String("vi", "EDITOR")
-
-	// the user types on the terminal, stdin may have been consumed as input.
-	editorin := ttyx.Input(gctx.Context)
-	defer editorin.Close()
-
-	cmd := exec.CommandContext(gctx.Context, editor, fbuf.Name())
-	cmd.Stdin = editorin
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("editor failed: %w", err)
+	if err := runeditor(gctx.Context, fbuf.Name()); err != nil {
+		return err
 	}
 
 	edited, err := os.Open(fbuf.Name())

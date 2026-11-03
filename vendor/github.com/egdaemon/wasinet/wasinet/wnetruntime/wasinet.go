@@ -194,11 +194,6 @@ func (t network) Listen(ctx context.Context, fd, backlog int) error {
 	return unix.Listen(fd, backlog)
 }
 
-func (t network) Accept(ctx context.Context, fd int) (nfd int, sa unix.Sockaddr, err error) {
-	// slog.Log(ctx, slog.LevelDebug, "sock_accept", slog.Int("fd", fd))
-	return unix.Accept(fd)
-}
-
 func (t network) LocalAddr(ctx context.Context, fd int) (unix.Sockaddr, error) {
 	// slog.Log(ctx, slog.LevelDebug, "sock_localaddr", slog.Int("fd", fd))
 	return unix.Getsockname(fd)

@@ -25,22 +25,43 @@ func (t network) Open(ctx context.Context, af, socktype, protocol int) (fd int, 
 		unix.Close(fd)
 	}()
 
-	// syscall.SOCK_NONBLOCK|syscall.SOCK_CLOEXEC are required by golang's runtime for the pollfd to operate correctly.
-	// as a result we unconditionally set them here.
+	if err = nonblockcloexec(fd); err != nil {
+		return -1, err
+	}
 
+	return fd, nil
+}
+
+func (t network) Accept(ctx context.Context, fd int) (nfd int, sa unix.Sockaddr, err error) {
+	// slog.Log(ctx, slog.LevelDebug, "sock_accept", slog.Int("fd", fd))
+	if nfd, sa, err = unix.Accept(fd); err != nil {
+		return nfd, sa, err
+	}
+
+	if err = nonblockcloexec(nfd); err != nil {
+		unix.Close(nfd)
+		return -1, nil, err
+	}
+
+	return nfd, sa, nil
+}
+
+// nonblockcloexec sets the flags linux passes to socket and accept4, which darwin lacks.
+// syscall.SOCK_NONBLOCK|syscall.SOCK_CLOEXEC are required by golang's runtime for the pollfd to operate correctly.
+func nonblockcloexec(fd int) error {
 	if err := unix.SetNonblock(fd, true); err != nil {
-		return -1, fmt.Errorf("failed to set non-blocking: %w", err)
+		return fmt.Errorf("failed to set non-blocking: %w", err)
 	}
 
 	flags, err := unix.FcntlInt(uintptr(fd), unix.F_GETFD, 0)
 	if err != nil {
-		return -1, fmt.Errorf("failed to get FD flags for CLOEXEC: %w", err)
+		return fmt.Errorf("failed to get FD flags for CLOEXEC: %w", err)
 	}
 	if _, err := unix.FcntlInt(uintptr(fd), unix.F_SETFD, flags|unix.FD_CLOEXEC); err != nil {
-		return -1, fmt.Errorf("failed to set CLOEXEC: %w", err)
+		return fmt.Errorf("failed to set CLOEXEC: %w", err)
 	}
 
-	return fd, nil
+	return nil
 }
 
 func (t network) SetSocketOption(ctx context.Context, fd int, level, name int, value []byte) error {

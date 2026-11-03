@@ -539,7 +539,7 @@ github.com/egdaemon/gdx/internal/langx
 github.com/egdaemon/gdx/konggdx
 github.com/egdaemon/gdx/konggdx/cmdopts
 github.com/egdaemon/gdx/konggdx/userx
-# github.com/egdaemon/wasinet/wasinet v0.0.0-20261103182433-1cd1b3637a0c
+# github.com/egdaemon/wasinet/wasinet v0.0.0-20261103201433-2f9a9bae892d
 ## explicit; go 1.26.0
 github.com/egdaemon/wasinet/wasinet
 github.com/egdaemon/wasinet/wasinet/autohijack

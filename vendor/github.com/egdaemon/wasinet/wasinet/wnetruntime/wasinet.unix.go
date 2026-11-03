@@ -18,6 +18,13 @@ func (t network) Open(ctx context.Context, af, socktype, protocol int) (fd int, 
 	return unix.Socket(af, socktype|syscall.SOCK_NONBLOCK|syscall.SOCK_CLOEXEC, protocol)
 }
 
+func (t network) Accept(ctx context.Context, fd int) (nfd int, sa unix.Sockaddr, err error) {
+	// slog.Log(ctx, slog.LevelDebug, "sock_accept", slog.Int("fd", fd))
+	// linux does not inherit O_NONBLOCK from the listener, and a blocking socket stalls every
+	// goroutine in the guest once its buffer fills, so the flags Open sets are set here too.
+	return unix.Accept4(fd, syscall.SOCK_NONBLOCK|syscall.SOCK_CLOEXEC)
+}
+
 func (t network) SetSocketOption(ctx context.Context, fd int, level, name int, value []byte) error {
 	switch name {
 	case syscall.SO_LINGER, syscall.SO_RCVTIMEO, syscall.SO_SNDTIMEO:

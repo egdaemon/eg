@@ -7,8 +7,15 @@ message ExecRequest {
   string cmd = 2;
   repeated string arguments = 3;
   repeated string environment = 4;
+  // id names proc/{id} within the runtime directory, where the guest listens
+  // on the command's stdin, stdout and stderr sockets. read by execproxy/v2.
+  string id = 5;
 }
-message ExecResponse {}
+
+message ExecResponse {
+  // exit is the command's exit code, reported by execproxy/v2 for requests with an id.
+  int32 exit = 1;
+}
 
 service Proxy {
   rpc Exec(ExecRequest) returns (ExecResponse) {}

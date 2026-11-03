@@ -41,7 +41,7 @@ import (
 	"github.com/egdaemon/eg/interp/c8sproxy"
 	"github.com/egdaemon/eg/interp/dbproxy/dbservice"
 	"github.com/egdaemon/eg/interp/events"
-	"github.com/egdaemon/eg/interp/execproxy"
+	"github.com/egdaemon/eg/interp/execproxy/v2"
 	"github.com/egdaemon/eg/interp/runtime/wasi/ffiwasinet"
 	"github.com/egdaemon/eg/runners"
 	"github.com/egdaemon/eg/runtime/wasi/egunsafe/egworkloads"
@@ -419,7 +419,7 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 
 		events.NewServiceDispatch(db).Bind(srv)
 		dbservice.NewService(gctx.Context, t.RuntimeDir).Bind(srv)
-		execproxy.NewExecProxy(t.Dir, cmdenv).Bind(srv)
+		execproxy.Auto(t.Dir, t.RuntimeDir, cmdenv).Bind(srv)
 
 		gpu, err := runners.AgentOptionGPU(envx.Boolean(false, eg.EnvComputeGPU))
 		if err != nil {
@@ -501,7 +501,7 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 			return errorsx.Wrap(err, "failed to generate module command environment")
 		}
 
-		execproxy.NewExecProxy(t.Dir, cmdenv).Bind(srv)
+		execproxy.Auto(t.Dir, t.RuntimeDir, cmdenv).Bind(srv)
 		go func() {
 			errorsx.Log(errorsx.Wrap(srv.Serve(control), "unable to serve control socket"))
 		}()

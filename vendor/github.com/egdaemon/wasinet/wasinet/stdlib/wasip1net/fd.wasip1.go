@@ -189,11 +189,10 @@ func (fd *netFD) Close() error {
 	)
 }
 
+// shutdown goes straight to the host: sysfd is a host socket that wasi's own fd table doesn't hold,
+// so shutting down pfd through wasi only ever fails with EBADF.
 func (fd *netFD) shutdown(how int) error {
-	err := errorsx.Compact(
-		fd.pfd.Shutdown(how),
-		wasip1syscall.Shutdown(fd.sysfd, how),
-	)
+	err := wasip1syscall.Shutdown(fd.sysfd, how)
 	runtime.KeepAlive(fd)
 	return wrapSyscallError("shutdown", err)
 }
@@ -227,12 +226,32 @@ func (fd *netFD) Read(p []byte) (n int, err error) {
 	return n, err
 }
 
+// Write sends all of p. the host socket is non-blocking, so a send is partial or EAGAIN
+// whenever its send buffer is full; the loop yields until the remainder is accepted.
+// a zero length p is still sent once, which matters for datagrams.
 func (fd *netFD) Write(p []byte) (nn int, err error) {
+	var (
+		n int
+	)
+
 	if fd.rsockaddr == nil {
 		return 0, errMissingAddress
 	}
 
-	nn, err = wasip1syscall.SendToSingle(fd.sysfd, p, nil, fd.rsockaddr, 0)
+	for {
+		n, err = wasip1syscall.SendToSingle(fd.sysfd, p[nn:], nil, fd.rsockaddr, 0)
+		nn += n
+		switch ffierrors.Errno(err) {
+		case syscall.EINTR, syscall.EAGAIN:
+			runtime.Gosched()
+			continue
+		}
+
+		if err != nil || nn >= len(p) {
+			break
+		}
+	}
+
 	runtime.KeepAlive(fd)
 	return nn, wrapSyscallError(writeSyscallName, err)
 }

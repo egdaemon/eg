@@ -2,7 +2,7 @@
 # EDITOR=vim eg secrets edit chachasm://${DEMOPASSPHRASE}@.dist/demo/demo.env
 # time systemd-run --user --pty --wait --working-directory=$PWD --setenv=EG_SSH_KEY_PATH=$PWD/.eg.demo/.ssh/eg --setenv=PATH -p RuntimeDirectory=eg-demo -p CacheDirectory=eg-demo eg secrets env --uri "chachasm://${DEMOPASSPHRASE}@.dist/demo/demo.env" ansidrama record .dist/demo/ansidrama.eg.toml
 launch = "d=/tmp/.eg.demo; rm -rf $d && mkdir -p $d && cd $d && PS1='$ ' bash --norc --noprofile -i"
-cols = 84
+cols = 128
 rows = 24
 font = "smalti"
 font_px = 16

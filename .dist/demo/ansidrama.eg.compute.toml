@@ -6,7 +6,7 @@
 # run from the eg root. the secrets are decrypted inside the unit by `eg secrets env`, systemd cannot read the encrypted file as an EnvironmentFile.
 # time systemd-run --user --pty --wait --working-directory=$PWD --setenv=EG_SSH_KEY_PATH=$PWD/.eg.demo.d/id --setenv=PATH -p RuntimeDirectory=eg-demo-daemon -p CacheDirectory=eg-demo-daemon eg secrets env --uri "chachasm://${DEMOPASSPHRASE}@.dist/demo/demo.daemon.env" ansidrama record .dist/demo/ansidrama.eg.compute.toml
 launch = "d=/tmp/.eg.demo.compute; rm -rf $d && mkdir -p $d && cd $d && PS1='$ ' bash --norc --noprofile -i"
-cols = 100
+cols = 128
 rows = 24
 font = "smalti"
 font_px = 16

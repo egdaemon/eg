@@ -1,7 +1,7 @@
 // Package shell is the second version of the shell entrypoint. it interprets commands inside the guest with
 // egdaemon/sh, so expansion, redirects, pipes and builtins stay in the sandbox and only the external commands
-// they run reach the host, through execproxy/v2. only used with EG_EXPERIMENTAL_GUEST_SHELL, which requires
-// EG_EXPERIMENTAL_PROC_SOCKETS on the host.
+// they run reach the module, through execproxy/v2. only used with EG_EXPERIMENTAL_GUEST_SHELL, which requires
+// EG_EXPERIMENTAL_PROC_SOCKETS for the module.
 package shell
 
 import (
@@ -25,8 +25,8 @@ import (
 )
 
 // Run interprets cmd in directory, relative to the working directory, with environ added to the guest's
-// environment. external commands run on the host as user and group; when both are empty they run as the
-// host's own user.
+// environment. external commands run in the module as user and group; when both are empty they run as the
+// module's own user.
 func Run(ctx context.Context, user string, group string, cmd string, directory string, environ []string) (err error) {
 	var (
 		file *syntax.File
@@ -53,7 +53,7 @@ func Run(ctx context.Context, user string, group string, cmd string, directory s
 		interp.StdIO(nil, os.Stdout, os.Stderr),
 		interp.OpenHandler(open),
 		interp.ExecHandlers(func(interp.ExecHandlerFunc) interp.ExecHandlerFunc {
-			return host(v1.NewProxyClient(cc), user, group)
+			return module(v1.NewProxyClient(cc), user, group)
 		}),
 	); err != nil {
 		return err
@@ -62,8 +62,8 @@ func Run(ctx context.Context, user string, group string, cmd string, directory s
 	return r.Run(ctx, file)
 }
 
-// host runs each external command on the host with the interpreter's directory and stdio.
-func host(c v1.ProxyClient, user string, group string) interp.ExecHandlerFunc {
+// module runs each external command in the module with the interpreter's directory and stdio.
+func module(c v1.ProxyClient, user string, group string) interp.ExecHandlerFunc {
 	return func(ctx context.Context, args []string) (err error) {
 		var (
 			hc   = interp.HandlerCtx(ctx)
@@ -95,9 +95,9 @@ func host(c v1.ProxyClient, user string, group string) interp.ExecHandlerFunc {
 	}
 }
 
-// changed reports the exported variables whose value differs from the guest's own environment. the host supplies
-// the rest, so a variable the command never touched keeps the host's value. PWD and OLDPWD are guest paths, and
-// the host derives them from the command's directory.
+// changed reports the exported variables whose value differs from the guest's own environment. the module
+// supplies the rest, so a variable the command never touched keeps the module's value. PWD and OLDPWD are guest
+// paths, and the module derives them from the command's directory.
 func changed(env expand.Environ) (environ []string) {
 	env.Each(func(name string, vr expand.Variable) bool {
 		switch name {

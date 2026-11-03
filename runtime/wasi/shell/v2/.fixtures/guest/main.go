@@ -16,10 +16,10 @@ import (
 
 // SHELL_MODE selects the check:
 //
-//	pipeline     - a builtin piped into a host command, redirected to a file in the guest.
-//	substitution - the output of host commands substituted into guest arithmetic.
-//	devnull      - /dev/null, which the guest has no mount for, and a failing host command reaching ||.
-//	exit         - a host command's exit code is returned as the interpreter's exit status.
+//	pipeline     - a builtin piped into a module command, redirected to a file in the guest.
+//	substitution - the output of module commands substituted into guest arithmetic.
+//	devnull      - /dev/null, which the guest has no mount for, and a failing module command reaching ||.
+//	exit         - a module command's exit code is returned as the interpreter's exit status.
 func main() {
 	var (
 		err error

@@ -311,7 +311,7 @@ func retry(ctx context.Context, c Command, do func() error) (err error) {
 	return err
 }
 
-// auto returns the in-guest interpreter when EG_EXPERIMENTAL_GUEST_SHELL is set and bash on the host otherwise.
+// auto returns the in-guest interpreter when EG_EXPERIMENTAL_GUEST_SHELL is set and bash in the module otherwise.
 func auto() entrypoint {
 	if envx.Boolean(false, _eg.EnvExperimentalGuestShell) {
 		return func(ctx context.Context, user string, group string, cmd string, directory string, environ []string, _ Execer) error {

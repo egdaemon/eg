@@ -56,19 +56,19 @@ func TestRun(t *testing.T) {
 		return string(b)
 	}
 
-	t.Run("pipes a builtin into a host command", func(t *testing.T) {
+	t.Run("pipes a builtin into a module command", func(t *testing.T) {
 		workdir := native(t)
 		require.NoError(t, Run(t.Context(), "", "", "echo hello | tr a-z A-Z > out", "", nil))
 		require.Equal(t, "HELLO\n", read(t, filepath.Join(workdir, "out")))
 	})
 
-	t.Run("substitutes the output of host commands", func(t *testing.T) {
+	t.Run("substitutes the output of module commands", func(t *testing.T) {
 		workdir := native(t)
 		require.NoError(t, Run(t.Context(), "", "", `n=$(printf abc | wc -c); echo $((n + 1)) > out`, "", nil))
 		require.Equal(t, "4\n", read(t, filepath.Join(workdir, "out")))
 	})
 
-	t.Run("reports a host command's exit code", func(t *testing.T) {
+	t.Run("reports a module command's exit code", func(t *testing.T) {
 		native(t)
 		err := Run(t.Context(), "", "", "sh -c 'exit 3'", "", nil)
 		status, ok := errors.AsType[interp.ExitStatus](err)
@@ -76,19 +76,19 @@ func TestRun(t *testing.T) {
 		require.Equal(t, interp.ExitStatus(3), status)
 	})
 
-	t.Run("a failing host command reaches ||", func(t *testing.T) {
+	t.Run("a failing module command reaches ||", func(t *testing.T) {
 		workdir := native(t)
 		require.NoError(t, Run(t.Context(), "", "", "ls does-not-exist 2>/dev/null || echo fallback > out", "", nil))
 		require.Equal(t, "fallback\n", read(t, filepath.Join(workdir, "out")))
 	})
 
-	t.Run("sends the command's environment and exported variables to the host", func(t *testing.T) {
+	t.Run("sends the command's environment and exported variables to the module", func(t *testing.T) {
 		workdir := native(t)
 		require.NoError(t, Run(t.Context(), "", "", `export B=2; sh -c 'echo "$A $B"' > out`, "", []string{"A=1"}))
 		require.Equal(t, "1 2\n", read(t, filepath.Join(workdir, "out")))
 	})
 
-	t.Run("runs host commands in the directory relative to the working directory", func(t *testing.T) {
+	t.Run("runs module commands in the directory relative to the working directory", func(t *testing.T) {
 		workdir := native(t)
 		require.NoError(t, os.Mkdir(filepath.Join(workdir, "sub"), 0700))
 		require.NoError(t, Run(t.Context(), "", "", "sh -c 'pwd -P' > ../out", "sub", nil))
@@ -97,7 +97,7 @@ func TestRun(t *testing.T) {
 		require.Equal(t, expected+"\n", read(t, filepath.Join(workdir, "out")))
 	})
 
-	t.Run("cd moves later host commands", func(t *testing.T) {
+	t.Run("cd moves later module commands", func(t *testing.T) {
 		workdir := native(t)
 		require.NoError(t, os.Mkdir(filepath.Join(workdir, "sub"), 0700))
 		require.NoError(t, Run(t.Context(), "", "", "cd sub && touch made", "", nil))
@@ -109,7 +109,7 @@ func TestRun(t *testing.T) {
 		require.Error(t, Run(t.Context(), "", "", "if then", "", nil))
 	})
 
-	t.Run("cancellation stops the host command", func(t *testing.T) {
+	t.Run("cancellation stops the module command", func(t *testing.T) {
 		native(t)
 		ctx, done := context.WithTimeout(t.Context(), 200*time.Millisecond)
 		defer done()

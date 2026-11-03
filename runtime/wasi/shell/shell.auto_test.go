@@ -11,7 +11,7 @@ import (
 )
 
 func TestAuto(t *testing.T) {
-	t.Run("defaults to bash on the host", func(t *testing.T) {
+	t.Run("defaults to bash in the module", func(t *testing.T) {
 		t.Setenv(_eg.EnvExperimentalGuestShell, "")
 		cmd := shell.New("echo hello")
 		rec := shell.NewRecorder(&cmd)
@@ -19,7 +19,7 @@ func TestAuto(t *testing.T) {
 		require.True(t, strings.HasSuffix(rec.Result(), "bash -c echo hello"), rec.Result())
 	})
 
-	// builtins and redirects need no host, so the command completes without bash or an exec proxy.
+	// builtins and redirects never leave the guest, so the command completes without bash or an exec proxy.
 	t.Run("experiment interprets in the guest", func(t *testing.T) {
 		workdir := t.TempDir()
 		t.Setenv(_eg.EnvExperimentalGuestShell, "true")

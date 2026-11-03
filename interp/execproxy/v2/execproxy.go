@@ -2,9 +2,6 @@
 // in the runtime directory, and is only served with EG_EXPERIMENTAL_PROC_SOCKETS.
 package execproxy
 
-//go:generate protoc --proto_path=. --go_opt=Meg.interp.exec.v2.proto=github.com/egdaemon/eg/interp/execproxy/v2;execproxy --go_opt=paths=source_relative --go_out=. eg.interp.exec.v2.proto
-//go:generate protoc --proto_path=. --go-grpc_opt=Meg.interp.exec.v2.proto=github.com/egdaemon/eg/interp/execproxy/v2;execproxy --go-grpc_opt=paths=source_relative --go-grpc_out=. eg.interp.exec.v2.proto
-
 import (
 	context "context"
 	"errors"
@@ -22,7 +19,7 @@ import (
 	"google.golang.org/grpc"
 )
 
-// Auto serves v1 alone unless EG_EXPERIMENTAL_PROC_SOCKETS is set.
+// Auto returns v2 when EG_EXPERIMENTAL_PROC_SOCKETS is set and v1 otherwise.
 func Auto(root string, runtimedir string, environ []string) interface{ Bind(grpc.ServiceRegistrar) } {
 	if !envx.Boolean(false, eg.EnvExperimentalProcSockets) {
 		return v1.NewExecProxy(root, environ)
@@ -33,7 +30,6 @@ func Auto(root string, runtimedir string, environ []string) interface{ Bind(grpc
 
 func NewProxy(root string, runtimedir string, environ []string) *Proxy {
 	return &Proxy{
-		v1:         v1.NewExecProxy(root, environ),
 		dir:        root,
 		runtimedir: runtimedir,
 		environ:    environ,
@@ -41,21 +37,20 @@ func NewProxy(root string, runtimedir string, environ []string) *Proxy {
 }
 
 type Proxy struct {
-	UnimplementedProxyServer
-	v1         *v1.ExecProxy
+	v1.UnimplementedProxyServer
 	dir        string
 	runtimedir string
 	environ    []string
 }
 
-// Bind registers v1 alongside this proxy, guests still run commands without stdio through it.
 func (t *Proxy) Bind(host grpc.ServiceRegistrar) {
-	t.v1.Bind(host)
-	RegisterProxyServer(host, t)
+	v1.RegisterProxyServer(host, t)
 }
 
-// Exec runs the command with the guest's sockets in proc/{id} as its stdio and returns its exit code.
-func (t *Proxy) Exec(ctx context.Context, req *ExecRequest) (resp *ExecResponse, err error) {
+// Exec runs the command with the guest's sockets in proc/{id} as its stdio and returns its exit code. a
+// request without an id comes from a guest that predates v2: the command inherits the host's stdio and a
+// failed exit is an error, which is how those guests detect failure.
+func (t *Proxy) Exec(ctx context.Context, req *v1.ExecRequest) (resp *v1.ExecResponse, err error) {
 	var (
 		cmd   *exec.Cmd = exec.CommandContext(ctx, req.Cmd, req.Arguments...)
 		stdio []*os.File
@@ -67,6 +62,14 @@ func (t *Proxy) Exec(ctx context.Context, req *ExecRequest) (resp *ExecResponse,
 	}
 
 	cmd.Env = append(t.environ, req.Environment...)
+
+	if req.Id == "" {
+		cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
+		if err = execx.MaybeRun(cmd); err != nil {
+			return nil, err
+		}
+		return &v1.ExecResponse{}, nil
+	}
 
 	if stdio, err = t.stdio(req.Id); err != nil {
 		return nil, err
@@ -85,7 +88,7 @@ func (t *Proxy) Exec(ctx context.Context, req *ExecRequest) (resp *ExecResponse,
 		}
 	}
 
-	return &ExecResponse{Exit: exitcode(cmd.ProcessState)}, nil
+	return &v1.ExecResponse{Exit: exitcode(cmd.ProcessState)}, nil
 }
 
 // stdio connects to the guest's stdin, stdout and stderr sockets for the process id. the sockets are handed

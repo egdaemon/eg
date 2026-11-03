@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	v1 "github.com/egdaemon/eg/interp/execproxy"
 	"github.com/egdaemon/eg/interp/execproxy/v2"
 	"github.com/egdaemon/eg/runtime/wasi/egunsafe"
 	"github.com/egdaemon/wasinet/wasinet"
@@ -46,7 +47,7 @@ func main() {
 	}
 
 	run := func(stdin io.Reader, stdout io.Writer, cmd string, args ...string) int32 {
-		code, err := execproxy.Run(ctx, execproxy.NewProxyClient(cc), listen, egunsafe.RuntimeDirectory(), &execproxy.ExecRequest{Dir: ".", Cmd: cmd, Arguments: args}, stdin, stdout, &stderr)
+		code, err := execproxy.Run(ctx, v1.NewProxyClient(cc), listen, egunsafe.RuntimeDirectory(), &v1.ExecRequest{Dir: ".", Cmd: cmd, Arguments: args}, stdin, stdout, &stderr)
 		if err != nil {
 			log.Fatalln("stream failed", cmd, err)
 		}

@@ -9,6 +9,8 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+
+	v1 "github.com/egdaemon/eg/interp/execproxy"
 )
 
 // stdionames are the sockets of a process within proc/{id}, in the order the host connects to them.
@@ -17,7 +19,7 @@ var stdionames = []string{"stdin", "stdout", "stderr"}
 // Run executes req through c with its stdio connected to stdin, stdout and stderr, and returns its exit code.
 // it assigns req.Id and listens on proc/{id} within runtimedir, the caller's view of the host's runtime
 // directory; the guest passes a listen backed by wasinet.
-func Run(ctx context.Context, c ProxyClient, listen func(path string) (net.Listener, error), runtimedir string, req *ExecRequest, stdin io.Reader, stdout io.Writer, stderr io.Writer) (code int32, err error) {
+func Run(ctx context.Context, c v1.ProxyClient, listen func(path string) (net.Listener, error), runtimedir string, req *v1.ExecRequest, stdin io.Reader, stdout io.Writer, stderr io.Writer) (code int32, err error) {
 	var (
 		id        = make([]byte, 4)
 		proc      string
@@ -25,7 +27,7 @@ func Run(ctx context.Context, c ProxyClient, listen func(path string) (net.Liste
 		conns     []net.Conn
 		l         net.Listener
 		conn      net.Conn
-		resp      *ExecResponse
+		resp      *v1.ExecResponse
 		exited    = make(chan error, 1)
 		wg        sync.WaitGroup
 	)

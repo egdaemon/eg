@@ -419,7 +419,7 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 
 		events.NewServiceDispatch(db).Bind(srv)
 		dbservice.NewService(gctx.Context, t.RuntimeDir).Bind(srv)
-		execproxy.NewExecProxy(t.Dir, t.RuntimeDir, cmdenv).Bind(srv)
+		execproxy.Auto(t.Dir, t.RuntimeDir, cmdenv).Bind(srv)
 
 		gpu, err := runners.AgentOptionGPU(envx.Boolean(false, eg.EnvComputeGPU))
 		if err != nil {
@@ -501,7 +501,7 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 			return errorsx.Wrap(err, "failed to generate module command environment")
 		}
 
-		execproxy.NewExecProxy(t.Dir, t.RuntimeDir, cmdenv).Bind(srv)
+		execproxy.Auto(t.Dir, t.RuntimeDir, cmdenv).Bind(srv)
 		go func() {
 			errorsx.Log(errorsx.Wrap(srv.Serve(control), "unable to serve control socket"))
 		}()

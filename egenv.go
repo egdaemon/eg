@@ -281,4 +281,5 @@ const (
 	EnvExperimentalDisableHostNetwork = "EG_EXPERIMENTAL_DISABLE_HOST_NETWORK"
 	EnvExperimentalBaremetal          = "EG_EXPERIMENTAL_BAREMETAL"
 	EnvExperimentalBindMount          = "EG_EXPERIMENTAL_BIND_MOUNT"
+	EnvExperimentalProcSockets        = "EG_EXPERIMENTAL_PROC_SOCKETS" // execproxy.Auto serves ProcProxy, which carries a command's stdio over unix sockets in the runtime directory.
 )

@@ -12,12 +12,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/egdaemon/eg"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
 
-func TestExec(t *testing.T) {
+func TestProcProxy(t *testing.T) {
 	type result struct {
 		code   int32
 		stdout string
@@ -27,14 +28,14 @@ func TestExec(t *testing.T) {
 	// client serves a proxy rooted at root and returns a client for it along with its runtime directory.
 	client := func(t *testing.T, root string, environ ...string) (ProxyClient, string) {
 		// unix socket paths are length limited, t.TempDir can exceed it.
-		runtimedir, err := os.MkdirTemp("", "execproxy")
+		runtimedir, err := os.MkdirTemp("", "procproxy")
 		require.NoError(t, err)
 		t.Cleanup(func() { os.RemoveAll(runtimedir) })
 		socket := filepath.Join(runtimedir, "exec.sock")
 		l, err := net.Listen("unix", socket)
 		require.NoError(t, err)
 		srv := grpc.NewServer()
-		NewExecProxy(root, runtimedir, environ).Bind(srv)
+		NewProcProxy(root, runtimedir, environ).Bind(srv)
 		go srv.Serve(l)
 		t.Cleanup(srv.Stop)
 
@@ -194,11 +195,23 @@ func TestExec(t *testing.T) {
 		require.ErrorContains(t, err, "unable to connect the stdio of process missing")
 	})
 
-	t.Run("without an id a failed exit is an error", func(t *testing.T) {
+	t.Run("without an id it runs as ExecProxy does", func(t *testing.T) {
 		c, _ := client(t, t.TempDir())
 		_, err := c.Exec(t.Context(), &ExecRequest{Cmd: "sh", Arguments: []string{"-c", "exit 3"}})
 		require.Error(t, err)
 		_, err = c.Exec(t.Context(), &ExecRequest{Cmd: "true"})
 		require.NoError(t, err)
+	})
+}
+
+func TestAuto(t *testing.T) {
+	t.Run("defaults to ExecProxy", func(t *testing.T) {
+		t.Setenv(eg.EnvExperimentalProcSockets, "")
+		require.IsType(t, &ExecProxy{}, Auto(t.TempDir(), t.TempDir(), nil))
+	})
+
+	t.Run("experiment selects ProcProxy", func(t *testing.T) {
+		t.Setenv(eg.EnvExperimentalProcSockets, "true")
+		require.IsType(t, &ProcProxy{}, Auto(t.TempDir(), t.TempDir(), nil))
 	})
 }

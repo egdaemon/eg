@@ -35,7 +35,8 @@ func Command(ctx context.Context, dir string, environ []string, cmd string, args
 
 // Stream runs cmd on the host with its stdio connected to stdin, stdout and stderr, and returns its exit code.
 // the guest listens on proc/{id}/{stdin,stdout,stderr} in the runtime directory and the host connects the
-// command to them, so its output arrives as it is written.
+// command to them, so its output arrives as it is written. requires EG_EXPERIMENTAL_PROC_SOCKETS on the host;
+// without it the host ignores the id and runs the command with its own stdio.
 func Stream(ctx context.Context, dir string, environ []string, cmd string, args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer) (code int32, err error) {
 	var (
 		id        = make([]byte, 4)

@@ -29,9 +29,9 @@ type ExecRequest struct {
 	Cmd         string   `protobuf:"bytes,2,opt,name=cmd,proto3" json:"cmd,omitempty"`
 	Arguments   []string `protobuf:"bytes,3,rep,name=arguments,proto3" json:"arguments,omitempty"`
 	Environment []string `protobuf:"bytes,4,rep,name=environment,proto3" json:"environment,omitempty"`
-	// id names the directory proc/{id} within the runtime directory, where the
-	// guest listens on the stdin, stdout and stderr sockets of the command.
-	// without it the command inherits the host's stdio.
+	// id names the directory proc/{id} within the runtime directory where the
+	// guest listens on the command's stdin, stdout and stderr sockets. only
+	// ProcProxy reads it; without it the command inherits the host's stdio.
 	Id string `protobuf:"bytes,5,opt,name=id,proto3" json:"id,omitempty"`
 }
 
@@ -107,7 +107,7 @@ type ExecResponse struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	// exit is the command's exit code, reported only for requests with an id.
+	// exit is the command's exit code, reported by ProcProxy for requests with an id.
 	Exit int32 `protobuf:"varint,1,opt,name=exit,proto3" json:"exit,omitempty"`
 }
 

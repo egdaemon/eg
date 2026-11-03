@@ -30,7 +30,7 @@ func TestStream(t *testing.T) {
 		l, err := net.Listen("unix", filepath.Join(rundir, eg.SocketControl))
 		require.NoError(t, err)
 		srv := grpc.NewServer()
-		execproxy.NewExecProxy(t.TempDir(), rundir, os.Environ()).Bind(srv)
+		execproxy.NewProcProxy(t.TempDir(), rundir, os.Environ()).Bind(srv)
 		go srv.Serve(l)
 		t.Cleanup(srv.Stop)
 		return rundir

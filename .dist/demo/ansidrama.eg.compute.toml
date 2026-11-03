@@ -33,15 +33,6 @@ padding = 12
 card = { lines = ["Self hosted runner", "eg daemon"], fg = "#fef9c3" }
 hold_cs = 125
 
-[[scene]]
-text = "which eg"
-hold_cs = 20
-[[scene]]
-keys = ["Enter"]
-await = '(?:\A|\n)\$\n*\z'
-await_ms = 60000
-hold_cs = 100
-
 # register: derives the ssh key from the seed (the same identity on every run) and links it to the account.
 # EG_ACCOUNT is set, so there is nothing to choose and it does not prompt. match the whole screen for a bare
 # `$` as the last non-empty line (false while the typed command is last, true once the prompt is back).

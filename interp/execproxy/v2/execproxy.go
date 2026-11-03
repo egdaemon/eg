@@ -21,11 +21,11 @@ import (
 
 // Auto returns v2 when EG_EXPERIMENTAL_PROC_SOCKETS is set and v1 otherwise.
 func Auto(root string, runtimedir string, environ []string) interface{ Bind(grpc.ServiceRegistrar) } {
-	if !envx.Boolean(false, eg.EnvExperimentalProcSockets) {
-		return v1.NewExecProxy(root, environ)
+	if envx.Boolean(false, eg.EnvExperimentalProcSockets) {
+		return NewProxy(root, runtimedir, environ)
 	}
 
-	return NewProxy(root, runtimedir, environ)
+	return v1.NewExecProxy(root, environ)
 }
 
 func NewProxy(root string, runtimedir string, environ []string) *Proxy {

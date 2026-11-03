@@ -10,6 +10,27 @@ message ExecRequest {
 }
 message ExecResponse {}
 
+// StreamRequest is one frame sent guest -> host. The first frame is exec,
+// followed by any number of stdin frames; closing the send side closes the
+// command's stdin.
+message StreamRequest {
+  oneof body {
+    ExecRequest exec = 1;
+    bytes stdin = 2;
+  }
+}
+
+// StreamResponse is one frame sent host -> guest. stdout and stderr frames
+// arrive as the command writes them; exit is the terminal frame.
+message StreamResponse {
+  oneof body {
+    bytes stdout = 1;
+    bytes stderr = 2;
+    int32 exit = 3;
+  }
+}
+
 service Proxy {
   rpc Exec(ExecRequest) returns (ExecResponse) {}
+  rpc Stream(stream StreamRequest) returns (stream StreamResponse) {}
 }

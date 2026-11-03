@@ -1,0 +1,22 @@
+syntax = "proto3";
+
+package eg.interp.exec.v2;
+
+// ExecRequest runs a command whose stdio is the unix sockets the guest
+// listens on at proc/{id}/{stdin,stdout,stderr} within the runtime directory.
+message ExecRequest {
+  string id = 1;
+  string dir = 2;
+  string cmd = 3;
+  repeated string arguments = 4;
+  repeated string environment = 5;
+}
+
+message ExecResponse {
+  // exit is the command's exit code, 128 plus the signal when one killed it.
+  int32 exit = 1;
+}
+
+service Proxy {
+  rpc Exec(ExecRequest) returns (ExecResponse) {}
+}

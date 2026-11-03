@@ -7,16 +7,8 @@ message ExecRequest {
   string cmd = 2;
   repeated string arguments = 3;
   repeated string environment = 4;
-  // id names the directory proc/{id} within the runtime directory where the
-  // guest listens on the command's stdin, stdout and stderr sockets. only
-  // ProcProxy reads it; without it the command inherits the host's stdio.
-  string id = 5;
 }
-
-message ExecResponse {
-  // exit is the command's exit code, reported by ProcProxy for requests with an id.
-  int32 exit = 1;
-}
+message ExecResponse {}
 
 service Proxy {
   rpc Exec(ExecRequest) returns (ExecResponse) {}

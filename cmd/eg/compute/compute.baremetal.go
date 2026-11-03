@@ -35,7 +35,7 @@ import (
 	"github.com/egdaemon/eg/interp/c8sproxy"
 	"github.com/egdaemon/eg/interp/dbproxy/dbservice"
 	"github.com/egdaemon/eg/interp/events"
-	"github.com/egdaemon/eg/interp/execproxy"
+	"github.com/egdaemon/eg/interp/execproxy/v2"
 	"github.com/egdaemon/eg/runners"
 	"github.com/egdaemon/eg/secrets"
 	"github.com/egdaemon/eg/transpile"

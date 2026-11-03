@@ -1,5 +1,5 @@
-// guest used by the ffiexec tests: runs host commands through ffiexec.Stream from inside
-// the wasi runtime and exits non-zero when their output or exit code is wrong.
+// guest used by the execproxy tests: runs host commands through Run from inside the wasi runtime
+// and exits non-zero when their output or exit code is wrong.
 package main
 
 import (
@@ -8,11 +8,15 @@ import (
 	"crypto/rand"
 	"io"
 	"log"
+	"net"
 	"os"
 	"strings"
 	"time"
 
-	"github.com/egdaemon/eg/runtime/wasi/egunsafe/ffiexec"
+	"github.com/egdaemon/eg/interp/execproxy/v2"
+	"github.com/egdaemon/eg/runtime/wasi/egunsafe"
+	"github.com/egdaemon/wasinet/wasinet"
+	"google.golang.org/grpc"
 )
 
 // STREAM_MODE selects the check:
@@ -25,13 +29,24 @@ func main() {
 	var (
 		stdout bytes.Buffer
 		stderr bytes.Buffer
+		cc     *grpc.ClientConn
+		err    error
 	)
 
 	ctx, done := context.WithTimeout(context.Background(), 30*time.Second)
 	defer done()
 
+	if cc, err = egunsafe.DialModuleControlSocket(ctx); err != nil {
+		log.Fatalln("unable to dial the control socket", err)
+	}
+	defer cc.Close()
+
+	listen := func(path string) (net.Listener, error) {
+		return wasinet.Listen(ctx, "unix", path)
+	}
+
 	run := func(stdin io.Reader, stdout io.Writer, cmd string, args ...string) int32 {
-		code, err := ffiexec.Stream(ctx, ".", nil, cmd, args, stdin, stdout, &stderr)
+		code, err := execproxy.Run(ctx, execproxy.NewProxyClient(cc), listen, egunsafe.RuntimeDirectory(), &execproxy.ExecRequest{Dir: ".", Cmd: cmd, Arguments: args}, stdin, stdout, &stderr)
 		if err != nil {
 			log.Fatalln("stream failed", cmd, err)
 		}

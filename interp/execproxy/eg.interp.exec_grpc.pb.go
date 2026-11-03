@@ -19,8 +19,7 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	Proxy_Exec_FullMethodName   = "/eg.interp.exec.Proxy/Exec"
-	Proxy_Stream_FullMethodName = "/eg.interp.exec.Proxy/Stream"
+	Proxy_Exec_FullMethodName = "/eg.interp.exec.Proxy/Exec"
 )
 
 // ProxyClient is the client API for Proxy service.
@@ -28,7 +27,6 @@ const (
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type ProxyClient interface {
 	Exec(ctx context.Context, in *ExecRequest, opts ...grpc.CallOption) (*ExecResponse, error)
-	Stream(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[StreamRequest, StreamResponse], error)
 }
 
 type proxyClient struct {
@@ -49,25 +47,11 @@ func (c *proxyClient) Exec(ctx context.Context, in *ExecRequest, opts ...grpc.Ca
 	return out, nil
 }
 
-func (c *proxyClient) Stream(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[StreamRequest, StreamResponse], error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &Proxy_ServiceDesc.Streams[0], Proxy_Stream_FullMethodName, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	x := &grpc.GenericClientStream[StreamRequest, StreamResponse]{ClientStream: stream}
-	return x, nil
-}
-
-// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
-type Proxy_StreamClient = grpc.BidiStreamingClient[StreamRequest, StreamResponse]
-
 // ProxyServer is the server API for Proxy service.
 // All implementations must embed UnimplementedProxyServer
 // for forward compatibility.
 type ProxyServer interface {
 	Exec(context.Context, *ExecRequest) (*ExecResponse, error)
-	Stream(grpc.BidiStreamingServer[StreamRequest, StreamResponse]) error
 	mustEmbedUnimplementedProxyServer()
 }
 
@@ -80,9 +64,6 @@ type UnimplementedProxyServer struct{}
 
 func (UnimplementedProxyServer) Exec(context.Context, *ExecRequest) (*ExecResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method Exec not implemented")
-}
-func (UnimplementedProxyServer) Stream(grpc.BidiStreamingServer[StreamRequest, StreamResponse]) error {
-	return status.Error(codes.Unimplemented, "method Stream not implemented")
 }
 func (UnimplementedProxyServer) mustEmbedUnimplementedProxyServer() {}
 func (UnimplementedProxyServer) testEmbeddedByValue()               {}
@@ -123,13 +104,6 @@ func _Proxy_Exec_Handler(srv interface{}, ctx context.Context, dec func(interfac
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Proxy_Stream_Handler(srv interface{}, stream grpc.ServerStream) error {
-	return srv.(ProxyServer).Stream(&grpc.GenericServerStream[StreamRequest, StreamResponse]{ServerStream: stream})
-}
-
-// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
-type Proxy_StreamServer = grpc.BidiStreamingServer[StreamRequest, StreamResponse]
-
 // Proxy_ServiceDesc is the grpc.ServiceDesc for Proxy service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -142,13 +116,6 @@ var Proxy_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _Proxy_Exec_Handler,
 		},
 	},
-	Streams: []grpc.StreamDesc{
-		{
-			StreamName:    "Stream",
-			Handler:       _Proxy_Stream_Handler,
-			ServerStreams: true,
-			ClientStreams: true,
-		},
-	},
+	Streams:  []grpc.StreamDesc{},
 	Metadata: "eg.interp.exec.proto",
 }

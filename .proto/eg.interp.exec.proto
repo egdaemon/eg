@@ -7,30 +7,17 @@ message ExecRequest {
   string cmd = 2;
   repeated string arguments = 3;
   repeated string environment = 4;
-}
-message ExecResponse {}
-
-// StreamRequest is one frame sent guest -> host. The first frame is exec,
-// followed by any number of stdin frames; closing the send side closes the
-// command's stdin.
-message StreamRequest {
-  oneof body {
-    ExecRequest exec = 1;
-    bytes stdin = 2;
-  }
+  // id names the directory proc/{id} within the runtime directory, where the
+  // guest listens on the stdin, stdout and stderr sockets of the command.
+  // without it the command inherits the host's stdio.
+  string id = 5;
 }
 
-// StreamResponse is one frame sent host -> guest. stdout and stderr frames
-// arrive as the command writes them; exit is the terminal frame.
-message StreamResponse {
-  oneof body {
-    bytes stdout = 1;
-    bytes stderr = 2;
-    int32 exit = 3;
-  }
+message ExecResponse {
+  // exit is the command's exit code, reported only for requests with an id.
+  int32 exit = 1;
 }
 
 service Proxy {
   rpc Exec(ExecRequest) returns (ExecResponse) {}
-  rpc Stream(stream StreamRequest) returns (stream StreamResponse) {}
 }

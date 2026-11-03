@@ -296,6 +296,7 @@ func (t baremetal) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, hotswapbin
 	dbservice.NewService(ctx, ws.RuntimeDir).Bind(srv)
 	execproxy.NewExecProxy(
 		t.Dir,
+		ws.RuntimeDir,
 		errorsx.Must(
 			envx.Build().
 				FromEnviron(gitenv...).

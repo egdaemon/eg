@@ -139,11 +139,12 @@ func TestInitGolangTidy(t *testing.T) {
 }
 
 func TestEnsureRequiredPackages(t *testing.T) {
-	t.Run("fetches_defaults_and_extras_with_a_writable_cache", func(t *testing.T) {
+	t.Run("fetches_defaults_and_extras_then_tidies_with_a_writable_cache", func(t *testing.T) {
 		invoked := stubgo(t)
 		require.NoError(t, compile.EnsureRequiredPackages(t.Context(), t.TempDir(), "example.com/extra"))
 		require.Equal(t, []string{
 			"get -modcacherw google.golang.org/genproto@latest github.com/egdaemon/eg/runtime/autowasinet github.com/egdaemon/eg/interp/events example.com/extra",
+			"mod tidy -modcacherw",
 		}, invoked())
 	})
 }

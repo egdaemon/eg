@@ -22,6 +22,11 @@ type Ls struct {
 }
 
 func (t Ls) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, ident *cmdidentity.T) (err error) {
+	var (
+		r       *identity.Resolution
+		current *authn.Authn
+	)
+
 	signer, err := sshx.AutoCached(sshx.NewKeyGen(), t.SSHKeyPath)
 	if err != nil {
 		return err
@@ -29,8 +34,10 @@ func (t Ls) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, ident *cmdidentit
 
 	c := tlsc.DefaultClient()
 
-	r, err := ident.With(identity.QueryEnvironment(gctx.AccountID, gctx.ProfileID, t.VcsURI)).Resolve(c, signer)
-	if !errors.Is(err, identity.ErrAmbiguous) {
+	// the profile being acted as. not being able to determine it is not fatal, the listing is still useful.
+	if r, err = ident.With(identity.QueryEnvironment(gctx.AccountID, gctx.ProfileID, t.VcsURI)).Resolve(c, signer); err == nil {
+		current = r.Current
+	} else if !errors.Is(err, identity.ErrAmbiguous) {
 		errorsx.Log(errorsx.Wrap(err, "unable to determine the current account"))
 	}
 
@@ -39,7 +46,7 @@ func (t Ls) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, ident *cmdidentit
 		return err
 	}
 
-	_, _ = lipgloss.Println(render(authed.Identity, r.Current, authed.Profiles...))
+	_, _ = lipgloss.Println(render(authed.Identity, current, authed.Profiles...))
 
 	return nil
 }

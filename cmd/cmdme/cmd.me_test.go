@@ -200,3 +200,48 @@ func TestRenderProfileHint(t *testing.T) {
 	require.Regexp(t, `\* +│ p2 +│`, out)
 	require.Regexp(t, `profile: p2 - alice2 - p2@test\n`, out)
 }
+
+func TestLsRun(t *testing.T) {
+	// the identities are remembered in the cache, keep it out of the user's.
+	t.Setenv(userx.EnvCacheDirectory, t.TempDir())
+	t.Setenv("RUNTIME_DIRECTORY", t.TempDir())
+
+	t.Setenv("EG_SESSION_TOKEN", "stub-refresh-token")
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/oauth2/ssh/token", func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprint(w, `{"access_token":"stub-access-token","token_type":"bearer","expires_in":3600}`)
+	})
+	mux.HandleFunc("/authn/s/", func(w http.ResponseWriter, r *http.Request) { fmt.Fprint(w, `{}`) })
+	mux.HandleFunc("/authn/ssh", func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprint(w, `{"profiles":[{"token":"the-token","profile":{"id":"profile-1","account_id":"account-1","display":"alice","email":"alice@example.com"}}]}`)
+	})
+	mux.HandleFunc("/authn/current", func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprint(w, `{"token":"stub-session-token","profile":{"id":"profile-1"},"account":{"id":"account-1"}}`)
+	})
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		mux.ServeHTTP(w, r)
+	}))
+	t.Cleanup(srv.Close)
+
+	dst := errorsx.Must(url.Parse(srv.URL))
+	tlsc := &cmdopts.TLSConfig{Wrap: func(client *http.Client) *http.Client {
+		client.Transport = httpx.RewriteHostTransport(dst, client.Transport)
+		return client
+	}}
+	keypath := filepath.Join(t.TempDir(), "sshkey")
+
+	t.Run("lists the profiles of the current account", func(t *testing.T) {
+		gctx := &cmdopts.Global{Context: t.Context(), AccountID: "account-1"}
+		require.NoError(t, Ls{SSHKeyPath: keypath}.Run(gctx, tlsc, cmdidentity.New(t.Context(), "account-1", "", nil)))
+	})
+
+	// without an account or a repository the current account cannot be resolved, which used to dereference a nil
+	// resolution.
+	t.Run("lists the profiles when the current account cannot be determined", func(t *testing.T) {
+		gctx := &cmdopts.Global{Context: t.Context()}
+		require.NoError(t, Ls{SSHKeyPath: keypath}.Run(gctx, tlsc, cmdidentity.New(t.Context(), "", "", nil)))
+	})
+}

@@ -232,7 +232,8 @@ func EnsureRequiredPackages(ctx context.Context, dir string, packages ...string)
 		return errorsx.Wrapf(err, "unable to download default packages: %s - %s", cmd.Dir, cmd.String())
 	}
 
-	return nil
+	// go get only records go.sum entries for the packages it is given, and the build is -mod=readonly.
+	return InitGolangTidy(ctx, dir)
 }
 
 func FromTranspiled(ctx context.Context, ws workspaces.Context, m ...transpile.Compiled) (modules []transpile.Compiled, err error) {

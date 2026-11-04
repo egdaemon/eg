@@ -1,7 +1,7 @@
 // Package shell is the second version of the shell entrypoint. it interprets commands inside the guest with
-// egdaemon/sh, so expansion, redirects, pipes and builtins stay in the sandbox and only the external commands
-// they run reach the module, through execproxy/v2. only used with EG_EXPERIMENTAL_GUEST_SHELL, which requires
-// EG_EXPERIMENTAL_PROC_SOCKETS for the module.
+// egdaemon/sh, so expansion, redirects, pipes, builtins and the bash and sh scripts a command starts stay in the
+// sandbox, and only the other external commands reach the module, through execproxy/v2. only used with
+// EG_EXPERIMENTAL_GUEST_SHELL, which requires EG_EXPERIMENTAL_PROC_SOCKETS for the module.
 package shell
 
 import (
@@ -52,7 +52,7 @@ func Run(ctx context.Context, user string, group string, cmd string, directory s
 		interp.Dir(directory),
 		interp.StdIO(nil, os.Stdout, os.Stderr),
 		interp.OpenHandler(open),
-		interp.ExecHandlers(func(interp.ExecHandlerFunc) interp.ExecHandlerFunc {
+		interp.ExecHandlers(scripts, func(interp.ExecHandlerFunc) interp.ExecHandlerFunc {
 			return module(v1.NewProxyClient(cc), user, group)
 		}),
 	); err != nil {

@@ -50,6 +50,16 @@ func TestRun(t *testing.T) {
 		return workdir
 	}
 
+	// guest points the guest helpers at a module that does not exist, so a command only succeeds if it never
+	// leaves the guest.
+	guest := func(t *testing.T) (workdir string) {
+		workdir = t.TempDir()
+		t.Setenv(eg.EnvComputeRuntimeDirectory, workdir)
+		t.Setenv(eg.EnvComputeModuleSocket, filepath.Join(workdir, "missing.socket"))
+		t.Setenv(eg.EnvComputeWorkingDirectory, workdir)
+		return workdir
+	}
+
 	read := func(t *testing.T, path string) string {
 		b, err := os.ReadFile(path)
 		require.NoError(t, err)
@@ -70,7 +80,7 @@ func TestRun(t *testing.T) {
 
 	t.Run("reports a module command's exit code", func(t *testing.T) {
 		native(t)
-		err := Run(t.Context(), "", "", "sh -c 'exit 3'", "", nil)
+		err := Run(t.Context(), "", "", "env sh -c 'exit 3'", "", nil)
 		status, ok := errors.AsType[interp.ExitStatus](err)
 		require.True(t, ok, err)
 		require.Equal(t, interp.ExitStatus(3), status)
@@ -84,14 +94,14 @@ func TestRun(t *testing.T) {
 
 	t.Run("sends the command's environment and exported variables to the module", func(t *testing.T) {
 		workdir := native(t)
-		require.NoError(t, Run(t.Context(), "", "", `export B=2; sh -c 'echo "$A $B"' > out`, "", []string{"A=1"}))
+		require.NoError(t, Run(t.Context(), "", "", `export B=2; env sh -c 'echo "$A $B"' > out`, "", []string{"A=1"}))
 		require.Equal(t, "1 2\n", read(t, filepath.Join(workdir, "out")))
 	})
 
 	t.Run("runs module commands in the directory relative to the working directory", func(t *testing.T) {
 		workdir := native(t)
 		require.NoError(t, os.Mkdir(filepath.Join(workdir, "sub"), 0700))
-		require.NoError(t, Run(t.Context(), "", "", "sh -c 'pwd -P' > ../out", "sub", nil))
+		require.NoError(t, Run(t.Context(), "", "", "env sh -c 'pwd -P' > ../out", "sub", nil))
 		expected, err := filepath.EvalSymlinks(filepath.Join(workdir, "sub"))
 		require.NoError(t, err)
 		require.Equal(t, expected+"\n", read(t, filepath.Join(workdir, "out")))
@@ -102,6 +112,60 @@ func TestRun(t *testing.T) {
 		require.NoError(t, os.Mkdir(filepath.Join(workdir, "sub"), 0700))
 		require.NoError(t, Run(t.Context(), "", "", "cd sub && touch made", "", nil))
 		require.FileExists(t, filepath.Join(workdir, "sub", "made"))
+	})
+
+	t.Run("bash -c runs in the guest with its name and parameters", func(t *testing.T) {
+		workdir := guest(t)
+		require.NoError(t, Run(t.Context(), "", "", `bash -c 'echo "$0 $1 $#" > out' name arg`, "", nil))
+		require.Equal(t, "name arg 1\n", read(t, filepath.Join(workdir, "out")))
+	})
+
+	t.Run("sh applies its set options", func(t *testing.T) {
+		workdir := guest(t)
+		err := Run(t.Context(), "", "", "sh -e -c 'false; echo unreachable > out'", "", nil)
+		status, ok := errors.AsType[interp.ExitStatus](err)
+		require.True(t, ok, err)
+		require.Equal(t, interp.ExitStatus(1), status)
+		require.NoFileExists(t, filepath.Join(workdir, "out"))
+	})
+
+	t.Run("a script's exit status is the command's", func(t *testing.T) {
+		workdir := guest(t)
+		require.NoError(t, Run(t.Context(), "", "", "sh -c 'exit 4'; echo $? > out", "", nil))
+		require.Equal(t, "4\n", read(t, filepath.Join(workdir, "out")))
+	})
+
+	t.Run("a shebang script runs in the guest", func(t *testing.T) {
+		workdir := guest(t)
+		require.NoError(t, os.WriteFile(filepath.Join(workdir, "run.sh"), []byte("#!/usr/bin/env bash\necho \"$0 $1\" > out\n"), 0600))
+		require.NoError(t, Run(t.Context(), "", "", "./run.sh arg", "", nil))
+		require.Equal(t, "./run.sh arg\n", read(t, filepath.Join(workdir, "out")))
+	})
+
+	t.Run("sh reads its script from stdin", func(t *testing.T) {
+		workdir := guest(t)
+		require.NoError(t, Run(t.Context(), "", "", "echo 'echo piped > out' | sh", "", nil))
+		require.Equal(t, "piped\n", read(t, filepath.Join(workdir, "out")))
+	})
+
+	t.Run("a script's commands reach the module", func(t *testing.T) {
+		workdir := native(t)
+		require.NoError(t, Run(t.Context(), "", "", `sh -c 'n=$(printf abc | wc -c); echo $((n + 1))' > out`, "", nil))
+		require.Equal(t, "4\n", read(t, filepath.Join(workdir, "out")))
+	})
+
+	t.Run("a script the guest cannot read goes to the module", func(t *testing.T) {
+		guest(t)
+		err := Run(t.Context(), "", "", "sh /does/not/exist", "", nil)
+		_, ok := errors.AsType[interp.ExitStatus](err)
+		require.False(t, ok, err)
+	})
+
+	t.Run("unsupported shell options go to the module", func(t *testing.T) {
+		guest(t)
+		err := Run(t.Context(), "", "", "bash --norc -c 'true'", "", nil)
+		_, ok := errors.AsType[interp.ExitStatus](err)
+		require.False(t, ok, err)
 	})
 
 	t.Run("invalid syntax", func(t *testing.T) {
@@ -124,7 +188,7 @@ func TestRun(t *testing.T) {
 		}
 
 		wasm := interptest.Build(t, "./runtime/wasi/shell/v2/.fixtures/guest")
-		for _, mode := range []string{"pipeline", "substitution", "devnull", "exit"} {
+		for _, mode := range []string{"pipeline", "substitution", "devnull", "exit", "script"} {
 			t.Run(mode, func(t *testing.T) {
 				require.NoError(t, interptest.Run(t, wasm, serve(t), time.Minute, "SHELL_MODE="+mode, eg.EnvComputeWorkingDirectory+"="+eg.DefaultRuntimeDirectory("work")))
 			})

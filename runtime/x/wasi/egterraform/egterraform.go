@@ -3,14 +3,12 @@
 package egterraform
 
 import (
-	"os"
 	"path/filepath"
 
 	_eg "github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/runtime/wasi/egenv"
-	"github.com/egdaemon/eg/runtime/wasi/shell"
 )
 
 func CacheDirectory(dirs ...string) string {
@@ -19,7 +17,7 @@ func CacheDirectory(dirs ...string) string {
 
 // attempt to build the terraform environment that properly
 func env() ([]string, error) {
-	return envx.Build().FromEnv(os.Environ()...).
+	return envx.Build().
 		Var("TF_PLUGIN_CACHE_DIR", CacheDirectory("plugins")).
 		Var("TF_IN_AUTOMATION", envx.VarBool(true)).
 		Environ()
@@ -28,10 +26,4 @@ func env() ([]string, error) {
 // attempt to build the terraform environment that properly
 func Env() []string {
 	return errorsx.Must(env())
-}
-
-// Create a shell runtime that properly
-// sets up the yarn environment for caching.
-func Runtime() shell.Command {
-	return shell.Runtime().EnvironFrom(Env()...)
 }

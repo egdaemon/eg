@@ -1,0 +1,1458 @@
+// Copyright (c) 2017, Daniel Martí <mvdan@mvdan.cc>
+// See LICENSE for licensing information
+
+package interp
+
+import (
+	"bufio"
+	"bytes"
+	"context"
+	"errors"
+	"fmt"
+	"os"
+	"path/filepath"
+	"slices"
+	"strconv"
+	"strings"
+	"time"
+	"unicode/utf8"
+
+	"golang.org/x/term"
+
+	"github.com/egdaemon/sh/v3/expand"
+	"github.com/egdaemon/sh/v3/internal"
+	"github.com/egdaemon/sh/v3/syntax"
+)
+
+// TODO: given the categories below, perhaps this should be more like:
+//
+//   func IsBuiltin(lang syntax.LangVariant, name string) bool
+//
+// or perhaps some API that also lets the user iterate through the builtins?
+//
+// Also, should we move this to the syntax package too?
+// It's not a syntactical property strictly speaking,
+// but it's also odd to require importing the interp package for it.
+
+// IsBuiltin returns true if the given word is a POSIX Shell
+// or Bash builtin.
+func IsBuiltin(name string) bool {
+	switch name {
+	case
+		// POSIX Shell regular built-ins, that is, the utilities which the shell
+		// must provide as built-ins, from section 1.d obtained in September 2025 from:
+		// https://pubs.opengroup.org/onlinepubs/9699919799/utilities/V3_chap02.html#tag_18_09_01_01
+		"alias",
+		"bg",
+		"cd",
+		"command",
+		"false",
+		"fc",
+		"fg",
+		"getopts",
+		"hash",
+		"jobs",
+		"kill",
+		"newgrp",
+		"pwd",
+		"read",
+		"true",
+		"umask",
+		"unalias",
+		"wait",
+
+		// POSIX Shell special built-ins, obtained in September 2025 from:
+		// https://pubs.opengroup.org/onlinepubs/9699919799/utilities/V3_chap02.html#tag_18_14
+		"break",
+		":",
+		"continue",
+		".",
+		"eval",
+		"exec",
+		"exit",
+		"export",   // NOTE: our parser treats this as a keyword
+		"readonly", // NOTE: our parser treats this as a keyword
+		"return",
+		"set",
+		"shift",
+		"times",
+		"trap",
+		"unset",
+
+		// Bash built-ins which are not present in POSIX, obtained in September 2025 from:
+		// https://man.archlinux.org/man/bash.1.en#SHELL_BUILTIN_COMMANDS
+		"source",
+		"bind",
+		"builtin",
+		"caller",
+		"compgen",
+		"complete",
+		"compopt",
+		"declare", // NOTE: our parser treats this as a keyword
+		"typeset", // NOTE: our parser treats this as a keyword
+		"dirs",
+		"disown",
+		"enable",
+		"history",
+		"help",
+		"let", // NOTE: our parser treats this as a keyword
+		"local",
+		"logout",
+		"mapfile",
+		"readarray",
+		"popd",
+		"pushd",
+		"shopt",
+		"suspend",
+		"type",
+		"ulimit",
+
+		// POSIX utilities which the shell need not provide as built-ins,
+		// so they are separate executables found via PATH, but which we
+		// implement as built-ins just like Bash does. Obtained in September
+		// 2025 from https://pubs.opengroup.org/onlinepubs/9699919799/utilities/contents.html
+		"echo",
+		"printf",
+		"test",
+		"[": // NOTE: an alias for "test", not documented separately
+		return true
+	}
+	return false
+}
+
+// atoi is like [strconv.ParseInt](s, 10, 64), but it ignores errors and trims whitespace.
+func atoi(s string) int64 {
+	s = strings.TrimSpace(s)
+	n, _ := strconv.ParseInt(s, 10, 64)
+	return n
+}
+
+type errBuiltinExitStatus exitStatus
+
+func (e errBuiltinExitStatus) Error() string {
+	return fmt.Sprintf("builtin exit status %d", e.code)
+}
+
+// Builtin allows [ExecHandlerFunc] implementations to execute any builtin,
+// which can be useful for an exec handler to wrap or combine builtin calls.
+//
+// Note that a non-nil error may be returned in cases where the builtin
+// alters the control flow of the runner, even if the builtin did not fail.
+// For example, this is the case with `exit 0` or `return`.
+func (hc HandlerContext) Builtin(ctx context.Context, args []string) error {
+	if hc.kind != handlerKindExec {
+		return fmt.Errorf("HandlerContext.Builtin can only be called via an ExecHandlerFunc")
+	}
+	exit := hc.runner.builtin(ctx, hc.Pos, args[0], args[1:])
+	if exit != (exitStatus{}) {
+		return errBuiltinExitStatus(exit)
+	}
+	return nil
+}
+
+func (r *Runner) builtin(ctx context.Context, pos syntax.Pos, name string, args []string) (exit exitStatus) {
+	failf := func(code uint8, format string, args ...any) exitStatus {
+		r.errf(format, args...)
+		exit.code = code
+		return exit
+	}
+	// fatal reports an error like that of an expansion, such as a limit.
+	fatal := func(err error) exitStatus {
+		r.expandErr(fmt.Errorf("%s: %w", name, err))
+		return exit
+	}
+	// checkVar fails the builtin after a variable error, which is
+	// already reported; see [Runner.varErr].
+	checkVar := func(err error) {
+		if err != nil {
+			exit.code = 1
+		}
+	}
+	// The builtin and command builtins jump back here to run another builtin,
+	// as recursing could overflow the stack with a long chain of them.
+dispatch:
+	switch name {
+	case ":", "true":
+	case "false":
+		exit.code = 1
+	case "help":
+		return r.runHelp(args)
+	case "jobs":
+		return r.jobsBuiltin(args)
+	case "kill":
+		return r.killBuiltin(args)
+	case "disown":
+		return r.disownBuiltin(args)
+	case "fg", "bg":
+		// Like a non-interactive Bash, as nothing is ever stopped.
+		return failf(1, "%s: no job control\n", name)
+	case "times":
+		// js/wasm has no per-process CPU accounting at all, so report zeros
+		// in bash's format — shell user/sys, then children user/sys — rather
+		// than fail.
+		// TODO: report real times on platforms that can, via os/exec's
+		// ProcessState or syscall.Getrusage. Not urgent; nothing depends on
+		// the values being non-zero.
+		r.out("0m0.000s 0m0.000s\n0m0.000s 0m0.000s\n")
+	case "exit":
+		switch len(args) {
+		case 0:
+			exit = r.lastExit
+		case 1:
+			n, err := strconv.Atoi(args[0])
+			if err != nil {
+				return failf(2, "invalid exit status code: %q\n", args[0])
+			}
+			exit.code = uint8(n)
+		default:
+			return failf(1, "exit cannot take multiple arguments\n")
+		}
+		exit.exiting = true
+	case "set":
+		if err := Params(args...)(r); err != nil {
+			return failf(2, "set: %v\n", err)
+		}
+		r.updateExpandOpts()
+	case "shift":
+		n := 1
+		switch len(args) {
+		case 0:
+		case 1:
+			if n2, err := strconv.Atoi(args[0]); err == nil {
+				n = n2
+				break
+			}
+			fallthrough
+		default:
+			return failf(2, "usage: shift [n]\n")
+		}
+		if n < 0 {
+			return failf(1, "shift: %d: shift count out of range\n", n)
+		}
+		if n > len(r.Params) {
+			// Like Bash, fail silently and leave the parameters alone.
+			exit.code = 1
+			break
+		}
+		r.Params = r.Params[n:]
+	case "unset":
+		vars := true
+		funcs := true
+		nameref := false
+	unsetOpts:
+		for i, arg := range args {
+			switch arg {
+			case "-v":
+				funcs = false
+			case "-f":
+				vars = false
+			case "-n":
+				nameref = true
+			default:
+				args = args[i:]
+				break unsetOpts
+			}
+		}
+
+		for _, arg := range args {
+			if name, sub, ok := cutElemSubscript(arg); vars && ok {
+				checkVar(r.unsetElem(name, sub))
+				if r.stop(ctx) {
+					break // an error in the subscript
+				}
+			} else if vars && r.lookupVar(arg).Declared() {
+				checkVar(r.delVar(arg, nameref))
+			} else if _, ok := r.Funcs[arg]; ok && funcs {
+				r.unshareFuncs()
+				delete(r.Funcs, arg)
+			}
+		}
+	case "echo":
+		newline, doExpand := true, false
+	echoOpts:
+		for len(args) > 0 {
+			switch args[0] {
+			case "-n":
+				newline = false
+			case "-e":
+				doExpand = true
+			case "-E": // default
+			default:
+				break echoOpts
+			}
+			args = args[1:]
+		}
+		for i, arg := range args {
+			if i > 0 {
+				r.out(" ")
+			}
+			if doExpand {
+				arg, _, _ = expand.Format(r.ecfg, arg, nil)
+			}
+			r.out(arg)
+		}
+		if newline {
+			r.out("\n")
+		}
+	case "printf":
+		if len(args) == 0 {
+			return failf(2, "usage: printf format [arguments]\n")
+		}
+		format, args := args[0], args[1:]
+		for {
+			s, n, err := expand.Format(r.ecfg, format, args)
+			if _, ok := errors.AsType[internal.FatalError](err); ok {
+				return fatal(err)
+			} else if err != nil {
+				return failf(1, "%v\n", err)
+			}
+			r.out(s)
+			args = args[n:]
+			if n == 0 || len(args) == 0 {
+				break
+			}
+		}
+	case "break", "continue":
+		if !r.inLoop {
+			return failf(0, "%s is only useful in a loop\n", name)
+		}
+		enclosing := &r.breakEnclosing
+		if name == "continue" {
+			enclosing = &r.contnEnclosing
+		}
+		switch len(args) {
+		case 0:
+			*enclosing = 1
+		case 1:
+			if n, err := strconv.Atoi(args[0]); err == nil {
+				*enclosing = n
+				break
+			}
+			fallthrough
+		default:
+			return failf(2, "usage: %s [n]\n", name)
+		}
+	case "pwd":
+		evalSymlinks := false
+		for len(args) > 0 {
+			switch args[0] {
+			case "-L":
+				evalSymlinks = false
+			case "-P":
+				evalSymlinks = true
+			default:
+				return failf(2, "invalid option: %q\n", args[0])
+			}
+			args = args[1:]
+		}
+		pwd := r.envGet("PWD")
+		if evalSymlinks {
+			var err error
+			pwd, err = filepath.EvalSymlinks(pwd)
+			if err != nil {
+				exit.fatal(err) // perhaps overly dramatic?
+				return exit
+			}
+		}
+		r.outf("%s\n", pwd)
+	case "cd":
+		var path string
+		switch len(args) {
+		case 0:
+			path = r.envGet("HOME")
+		case 1:
+			path = args[0]
+
+			// replicate the commonly implemented behavior of `cd -`
+			// ref: https://www.man7.org/linux/man-pages/man1/cd.1p.html#OPERANDS
+			if path == "-" {
+				path = r.envGet("OLDPWD")
+				r.outf("%s\n", path)
+			}
+		default:
+			return failf(2, "usage: cd [dir]\n")
+		}
+		exit.code = r.changeDir(ctx, "cd", path)
+	case "wait":
+		fp := flagParser{remaining: args}
+		for fp.more() {
+			switch flag := fp.flag(); flag {
+			case "-n", "-p":
+				return failf(2, "wait: unsupported option %q\n", flag)
+			default:
+				return failf(2, "wait: invalid option %q\n", flag)
+			}
+		}
+		if len(args) == 0 {
+			// Note that "wait" without arguments always returns exit status zero.
+			for i := range r.bgProcs {
+				if bg := &r.bgProcs[i]; !bg.hidden {
+					if !waitDone(ctx, bg.done, &exit) {
+						return exit
+					}
+					bg.hidden = true
+				}
+			}
+			for _, done := range r.pipeProcSubsts {
+				if !waitDone(ctx, done, &exit) {
+					return exit
+				}
+			}
+			r.pipeProcSubsts = nil
+			break
+		}
+		for _, arg := range args {
+			var bg *bgProc
+			if strings.HasPrefix(arg, "%") {
+				var err error
+				if bg, err = r.findJob(arg); err != nil {
+					return failf(127, "wait: %v\n", err)
+				}
+			} else if bg, _ = r.lookupBgProc(arg); bg == nil {
+				return failf(1, "wait: pid %s is not a child of this shell\n", arg)
+			}
+			if !waitDone(ctx, bg.done, &exit) {
+				return exit
+			}
+			exit = *bg.exit
+			bg.hidden = true
+		}
+	case "builtin":
+		if len(args) < 1 {
+			break
+		}
+		if !IsBuiltin(args[0]) {
+			exit.code = 1
+			return exit
+		}
+		name, args = args[0], args[1:]
+		goto dispatch
+	case "type":
+		anyNotFound := false
+		mode := ""
+		fp := flagParser{remaining: args}
+		for fp.more() {
+			switch flag := fp.flag(); flag {
+			case "-a", "-f", "--help":
+				return failf(3, "type: NOT IMPLEMENTED\n")
+			case "-p", "-P", "-t":
+				mode = flag
+			default:
+				return failf(2, "type: invalid option %q\n", flag)
+			}
+		}
+		args := fp.args()
+		for _, arg := range args {
+			if mode == "-p" || mode == "-P" {
+				if path, err := LookPathDir(r.Dir, r.writeEnv, arg); err == nil {
+					r.outf("%s\n", path)
+				} else {
+					anyNotFound = true
+				}
+				continue
+			}
+			if syntax.IsKeyword(arg) {
+				if mode == "-t" {
+					r.out("keyword\n")
+				} else {
+					r.outf("%s is a shell keyword\n", arg)
+				}
+				continue
+			}
+			if als, ok := r.alias[arg]; ok && r.opts[optExpandAliases] {
+				var buf bytes.Buffer
+				if len(als.args) > 0 {
+					printer := syntax.NewPrinter()
+					printer.Print(&buf, &syntax.CallExpr{
+						Args: als.args,
+					})
+				}
+				if als.blank {
+					buf.WriteByte(' ')
+				}
+				if mode == "-t" {
+					r.out("alias\n")
+				} else {
+					r.outf("%s is aliased to `%s'\n", arg, &buf)
+				}
+				continue
+			}
+			if _, ok := r.Funcs[arg]; ok {
+				if mode == "-t" {
+					r.out("function\n")
+				} else {
+					r.outf("%s is a function\n", arg)
+				}
+				continue
+			}
+			if IsBuiltin(arg) {
+				if mode == "-t" {
+					r.out("builtin\n")
+				} else {
+					r.outf("%s is a shell builtin\n", arg)
+				}
+				continue
+			}
+			if path, err := LookPathDir(r.Dir, r.writeEnv, arg); err == nil {
+				if mode == "-t" {
+					r.out("file\n")
+				} else {
+					r.outf("%s is %s\n", arg, path)
+				}
+				continue
+			}
+			if mode != "-t" {
+				r.errf("type: %s: not found\n", arg)
+			}
+			anyNotFound = true
+		}
+		if anyNotFound {
+			exit.code = 1
+		}
+	case "hash":
+		// TODO: implement. for now, having this as a no-op is better than nothing.
+	case "eval":
+		src := strings.Join(args, " ")
+		p := syntax.NewParser()
+		file, err := p.Parse(strings.NewReader(src), "")
+		if err != nil {
+			return failf(1, "eval: %v\n", err)
+		}
+		if !r.enterCall(name, &r.evalDepth) {
+			return r.exit
+		}
+		r.scriptStmts(ctx, file.Stmts)
+		r.evalDepth--
+		exit = r.exit
+	case "source", ".":
+		if len(args) < 1 {
+			return failf(2, "%v: source: need filename\n", pos)
+		}
+		path, err := scriptFromPathDir(r.Dir, r.writeEnv, args[0])
+		if err != nil {
+			// If the script was not found in PATH or there was any error, pass
+			// the source path to the open handler so it has a chance to look
+			// at files it manages (eg: virtual filesystem), and also allow
+			// it to look for the sourced script in the current directory.
+			path = args[0]
+		}
+		f, err := r.open(ctx, path, os.O_RDONLY, 0, false)
+		if err != nil {
+			return failf(1, "source: %v\n", err)
+		}
+		defer f.Close()
+		p := syntax.NewParser()
+		file, err := p.Parse(f, path)
+		if err != nil {
+			return failf(1, "source: %v\n", err)
+		}
+
+		if !r.enterCall(name, &r.callDepth) {
+			return r.exit
+		}
+
+		// Keep the current versions of some fields we might modify.
+		oldParams := r.Params
+		oldSourceSetParams := r.sourceSetParams
+		oldInSource := r.inSource
+
+		// If we run "source file args...", set said args as parameters.
+		// Otherwise, keep the current parameters.
+		sourceArgs := len(args[1:]) > 0
+		if sourceArgs {
+			r.Params = args[1:]
+			r.sourceSetParams = false
+		}
+		// We want to track if the sourced file explicitly sets the
+		// parameters.
+		r.sourceSetParams = false
+		r.inSource = true // know that we're inside a sourced script.
+		r.scriptStmts(ctx, file.Stmts)
+
+		// If we modified the parameters and the sourced file didn't
+		// explicitly set them, we restore the old ones.
+		if sourceArgs && !r.sourceSetParams {
+			r.Params = oldParams
+		}
+		r.sourceSetParams = oldSourceSetParams
+		r.inSource = oldInSource
+		r.callDepth--
+
+		exit = r.exit
+		exit.returning = false
+	case "[":
+		if len(args) == 0 || args[len(args)-1] != "]" {
+			return failf(2, "%v: [: missing matching ]\n", pos)
+		}
+		args = args[:len(args)-1]
+		fallthrough
+	case "test":
+		// Like Bash, two arguments must be "!" or a unary operator and a word.
+		if len(args) == 2 {
+			if op := testUnaryOp(args[0]); op == illegalTok || op == syntax.TsParen {
+				return failf(2, "%v: %s: unary operator expected\n", pos, args[0])
+			}
+		}
+		parseErr := false
+		p := testParser{
+			rem: args,
+			err: func(err error) {
+				r.errf("%v: %v\n", pos, err)
+				parseErr = true
+			},
+		}
+		p.next()
+		expr := p.classicTest("[", false)
+		if parseErr {
+			exit.code = 2
+			return exit
+		}
+		exit.oneIf(r.bashTest(ctx, expr, true) == "")
+	case "exec":
+		// TODO: Consider unix.Exec, i.e. actually replacing
+		// the process. It's in theory what a shell should do,
+		// but in practice it would kill the entire Go process
+		// and it's not available on Windows.
+		if len(args) == 0 {
+			r.keepRedirs = true
+			break
+		}
+		r.exit.exiting = true
+		r.exec(ctx, pos, args)
+		exit = r.exit
+	case "command":
+		show := false
+		fp := flagParser{remaining: args}
+		for fp.more() {
+			switch flag := fp.flag(); flag {
+			case "-v":
+				show = true
+			default:
+				return failf(2, "command: invalid option %q\n", flag)
+			}
+		}
+		args = fp.args()
+		if len(args) == 0 {
+			break
+		}
+		if !show {
+			if IsBuiltin(args[0]) {
+				name, args = args[0], args[1:]
+				goto dispatch
+			}
+			r.exec(ctx, pos, args)
+			exit = r.exit
+			return exit
+		}
+		last := uint8(0)
+		for _, arg := range args {
+			last = 0
+			if r.Funcs[arg] != nil || IsBuiltin(arg) {
+				r.outf("%s\n", arg)
+			} else if path, err := LookPathDir(r.Dir, r.writeEnv, arg); err == nil {
+				r.outf("%s\n", path)
+			} else {
+				last = 1
+			}
+		}
+		exit.code = last
+	case "dirs":
+		for i, dir := range slices.Backward(r.dirStack) {
+			r.outf("%s", dir)
+			if i > 0 {
+				r.out(" ")
+			}
+		}
+		r.out("\n")
+	case "pushd":
+		change := true
+		if len(args) > 0 && args[0] == "-n" {
+			change = false
+			args = args[1:]
+		}
+		swap := func() string {
+			oldtop := r.dirStack[len(r.dirStack)-1]
+			top := r.dirStack[len(r.dirStack)-2]
+			r.dirStack[len(r.dirStack)-1] = top
+			r.dirStack[len(r.dirStack)-2] = oldtop
+			return top
+		}
+		switch len(args) {
+		case 0:
+			if !change {
+				break
+			}
+			if len(r.dirStack) < 2 {
+				return failf(1, "pushd: no other directory\n")
+			}
+			newtop := swap()
+			if code := r.changeDir(ctx, "pushd", newtop); code != 0 {
+				exit.code = code
+				return exit
+			}
+			r.builtin(ctx, syntax.Pos{}, "dirs", nil)
+		case 1:
+			if change {
+				if code := r.changeDir(ctx, "pushd", args[0]); code != 0 {
+					exit.code = code
+					return exit
+				}
+				r.dirStack = append(r.dirStack, r.Dir)
+			} else {
+				r.dirStack = append(r.dirStack, args[0])
+				swap()
+			}
+			r.builtin(ctx, syntax.Pos{}, "dirs", nil)
+		default:
+			return failf(2, "pushd: too many arguments\n")
+		}
+	case "popd":
+		change := true
+		if len(args) > 0 && args[0] == "-n" {
+			change = false
+			args = args[1:]
+		}
+		switch len(args) {
+		case 0:
+			if len(r.dirStack) < 2 {
+				return failf(1, "popd: directory stack empty\n")
+			}
+			oldtop := r.dirStack[len(r.dirStack)-1]
+			r.dirStack = r.dirStack[:len(r.dirStack)-1]
+			if change {
+				newtop := r.dirStack[len(r.dirStack)-1]
+				if code := r.changeDir(ctx, "popd", newtop); code != 0 {
+					exit.code = code
+					return exit
+				}
+			} else {
+				r.dirStack[len(r.dirStack)-1] = oldtop
+			}
+			r.builtin(ctx, syntax.Pos{}, "dirs", nil)
+		default:
+			return failf(2, "popd: invalid argument\n")
+		}
+	case "return":
+		if !r.inFunc && !r.inSource {
+			return failf(1, "return: can only be done from a func or sourced script\n")
+		}
+		switch len(args) {
+		case 0:
+		case 1:
+			n, err := strconv.Atoi(args[0])
+			if err != nil {
+				return failf(2, "invalid return status code: %q\n", args[0])
+			}
+			exit.code = uint8(n)
+		default:
+			return failf(2, "return: too many arguments\n")
+		}
+		exit.returning = true
+	case "read":
+		var prompt string
+		raw := false
+		silent := false
+		readArray := false
+		delim := int('\n')
+		nchars := -1
+		fp := flagParser{remaining: args}
+		for fp.more() {
+			switch flag := fp.flag(); flag {
+			case "-s":
+				silent = true
+			case "-r":
+				raw = true
+			case "-a":
+				readArray = true
+			case "-p", "-d", "-n", "-N":
+				value, ok := fp.optValue()
+				if !ok {
+					return failf(2, "read: %s: option requires an argument\n", flag)
+				}
+				switch flag {
+				case "-p":
+					prompt = value
+				case "-d":
+					// Like Bash, only the first byte is used,
+					// and an empty delimiter means NUL.
+					delim = 0
+					if value != "" {
+						delim = int(value[0])
+					}
+				case "-n", "-N":
+					n, err := strconv.Atoi(value)
+					if err != nil || n < 0 {
+						return failf(1, "read: invalid number %q\n", value)
+					}
+					nchars = n
+					if flag == "-N" {
+						delim = -1
+					}
+				}
+			default:
+				return failf(2, "read: invalid option %q\n", flag)
+			}
+		}
+
+		args := fp.args()
+		for _, name := range args {
+			if !syntax.ValidName(name) {
+				return failf(2, "read: invalid identifier %q\n", name)
+			}
+		}
+
+		if prompt != "" {
+			r.out(prompt)
+		}
+
+		var line []byte
+		var err error
+		fd, terminal := -1, false
+		if silent {
+			fd, terminal = stdinTerminal(r.stdin)
+		}
+		if terminal {
+			// Only a terminal echoes what we read, so it is the only case
+			// where we need to read without echoing.
+			// TODO: support -d, -n, and -N here too.
+			line, err = term.ReadPassword(fd)
+		} else {
+			line, err = r.readLine(ctx, raw, delim, nchars)
+		}
+		if err == errReadTooLarge {
+			return fatal(err)
+		}
+		var values []string
+		if delim < 0 || (len(args) == 0 && !readArray) {
+			// Bare "read" and "read -N" assign the whole input without any
+			// field splitting, only discarding backslash escapes unless raw.
+			val := string(line)
+			if !raw {
+				var sb strings.Builder
+				esc := false
+				for i := range len(val) {
+					if val[i] == '\\' && !esc {
+						esc = true
+						continue
+					}
+					sb.WriteByte(val[i])
+					esc = false
+				}
+				val = sb.String()
+			}
+			values = []string{val}
+		} else {
+			max := len(args)
+			if readArray {
+				max = -1 // all fields, without joining the last ones
+			}
+			values = expand.ReadFields(r.ecfg, string(line), max, raw)
+		}
+		switch {
+		case readArray:
+			arrayName := shellReplyVar
+			if len(args) > 0 {
+				arrayName = args[0]
+			}
+			arrayName, _ = r.resolveName(arrayName)
+			checkVar(r.setVar(arrayName, expand.Variable{
+				Set:  true,
+				Kind: expand.Indexed,
+				List: values,
+			}))
+		case len(args) == 0:
+			checkVar(r.setVarString(shellReplyVar, values[0]))
+		default:
+			for i, name := range args {
+				val := ""
+				if i < len(values) {
+					val = values[i]
+				}
+				checkVar(r.setVarString(name, val))
+			}
+		}
+
+		// We can get data back from readLine and an error at the same time, so
+		// check err after we process the data.
+		if err != nil {
+			exit.code = 1
+			return exit
+		}
+
+	case "getopts":
+		if len(args) < 2 {
+			return failf(2, "getopts: usage: getopts optstring name [arg ...]\n")
+		}
+		optind, _ := strconv.Atoi(r.envGet("OPTIND"))
+		if optind-1 != r.optState.argidx {
+			if optind < 1 {
+				optind = 1
+			}
+			r.optState = getopts{argidx: optind - 1}
+		}
+		optstr := args[0]
+		name := args[1]
+		if !syntax.ValidName(name) {
+			return failf(2, "getopts: invalid identifier: %q\n", name)
+		}
+		args = args[2:]
+		if len(args) == 0 {
+			args = r.Params
+		}
+		diagnostics := !strings.HasPrefix(optstr, ":")
+
+		opt, optarg, done := r.optState.next(optstr, args)
+
+		if r.setVarString(name, string(opt)) != nil {
+			exit.code = 2
+			return exit
+		}
+		r.delVar("OPTARG", false)
+		switch {
+		case opt == '?' && diagnostics && !done:
+			r.errf("getopts: illegal option -- %q\n", optarg)
+		case opt == ':' && diagnostics:
+			r.errf("getopts: option requires an argument -- %q\n", optarg)
+		default:
+			if optarg != "" {
+				r.setVarString("OPTARG", optarg)
+			}
+		}
+		if optind-1 != r.optState.argidx {
+			r.setVarString("OPTIND", strconv.FormatInt(int64(r.optState.argidx+1), 10))
+		}
+
+		exit.oneIf(done)
+
+	case "shopt":
+		mode := ""
+		quiet := false
+		posixOpts := false
+		fp := flagParser{remaining: args}
+		for fp.more() {
+			switch flag := fp.flag(); flag {
+			case "-s", "-u":
+				mode = flag
+			case "-o":
+				posixOpts = true
+			case "-q":
+				quiet = true
+			case "-p":
+				return failf(2, "shopt: unsupported option %q\n", flag)
+			default:
+				return failf(2, "shopt: invalid option %q\n", flag)
+			}
+		}
+		args := fp.args()
+		if len(args) == 0 {
+			if quiet {
+				// Querying with no names is a no-op, like in Bash.
+				break
+			}
+			if posixOpts {
+				for i, opt := range &posixOptsTable {
+					r.printOptLine(opt.name, r.opts[i], true)
+				}
+			} else {
+				for i, opt := range bashOptsTable {
+					r.printOptLine(opt.name, r.opts[len(posixOptsTable)+i], opt.supported)
+				}
+			}
+			break
+		}
+		allSet := true
+		for _, arg := range args {
+			opt, supported := (*bool)(nil), true
+			if posixOpts {
+				opt = r.posixOptByName(arg)
+			} else {
+				opt, supported = r.bashOptByName(arg)
+			}
+			if opt == nil {
+				return failf(1, "shopt: invalid option name %q\n", arg)
+			}
+
+			switch mode {
+			case "-s", "-u":
+				if !supported {
+					return failf(1, "shopt: unsupported option %q\n", arg)
+				}
+				*opt = mode == "-s"
+			default: // ""
+				if quiet {
+					// Query the option's current state without printing;
+					// the exit status below is 0 if all are set, 1 otherwise.
+					if !*opt {
+						allSet = false
+					}
+				} else {
+					r.printOptLine(arg, *opt, supported)
+				}
+			}
+		}
+		exit.oneIf(quiet && mode == "" && !allSet)
+		r.updateExpandOpts()
+
+	case "alias":
+		show := func(name string, als alias) {
+			var buf bytes.Buffer
+			if len(als.args) > 0 {
+				printer := syntax.NewPrinter()
+				printer.Print(&buf, &syntax.CallExpr{
+					Args: als.args,
+				})
+			}
+			if als.blank {
+				buf.WriteByte(' ')
+			}
+			r.outf("alias %s='%s'\n", name, &buf)
+		}
+
+		if len(args) == 0 {
+			for name, als := range r.alias {
+				show(name, als)
+			}
+		}
+	argsLoop:
+		for _, arg := range args {
+			name, src, ok := strings.Cut(arg, "=")
+			if !ok {
+				als, ok := r.alias[name]
+				if !ok {
+					r.errf("alias: %q not found\n", name)
+					continue
+				}
+				show(name, als)
+				continue
+			}
+
+			// TODO: parse any CallExpr perhaps, or even any Stmt
+			parser := syntax.NewParser()
+			var words []*syntax.Word
+			for w, err := range parser.WordsSeq(strings.NewReader(src)) {
+				if err != nil {
+					r.errf("alias: could not parse %q: %v\n", src, err)
+					continue argsLoop
+				}
+				words = append(words, w)
+			}
+
+			r.unshareAlias()
+			if r.alias == nil {
+				r.alias = make(map[string]alias)
+			}
+			r.alias[name] = alias{
+				args:  words,
+				blank: strings.TrimRight(src, " \t") != src,
+			}
+		}
+	case "unalias":
+		r.unshareAlias()
+		for _, name := range args {
+			delete(r.alias, name)
+		}
+
+	case "trap":
+		fp := flagParser{remaining: args}
+		callback := "-"
+		for fp.more() {
+			switch flag := fp.flag(); flag {
+			case "-l", "-p":
+				return failf(2, "trap: %q: NOT IMPLEMENTED flag\n", flag)
+			case "-":
+				// default signal
+			default:
+				r.errf("trap: %q: invalid option\n", flag)
+				r.errf("trap: usage: trap [-lp] [[arg] signal_spec ...]\n")
+				exit.code = 2
+				return exit
+			}
+		}
+		args := fp.args()
+		switch len(args) {
+		case 0:
+			// Print non-default signals
+			if r.callbackExit != "" {
+				r.outf("trap -- %q EXIT\n", r.callbackExit)
+			}
+			if r.callbackErr != "" {
+				r.outf("trap -- %q ERR\n", r.callbackErr)
+			}
+			for n, callback := range r.callbackSignals {
+				if callback != "" {
+					r.outf("trap -- %q SIG%s\n", callback, signalNames[n])
+				}
+			}
+		case 1:
+			// assume it's a signal, the default will be restored
+		default:
+			callback = args[0]
+			args = args[1:]
+		}
+		// For now, treat both empty and - the same since ERR and EXIT have no
+		// default callback.
+		if callback == "-" {
+			callback = ""
+		}
+		for _, arg := range args {
+			switch arg {
+			case "ERR":
+				r.callbackErr = callback
+			case "EXIT":
+				r.callbackExit = callback
+			default:
+				// parseSignal accepts "0" for the kill builtin, which is EXIT here.
+				sig, ok := parseSignal(arg)
+				switch {
+				case !ok:
+					return failf(2, "trap: %s: invalid signal specification\n", arg)
+				case sig == 0:
+					r.callbackExit = callback
+				default:
+					r.callbackSignals[sig] = callback
+				}
+			}
+		}
+
+	case "readarray", "mapfile":
+		dropDelim := false
+		delim := "\n"
+		fp := flagParser{remaining: args}
+		for fp.more() {
+			switch flag := fp.flag(); flag {
+			case "-t":
+				// Remove the delim from each line read
+				dropDelim = true
+			case "-d":
+				if len(fp.remaining) == 0 {
+					return failf(2, "%s: -d: option requires an argument\n", name)
+				}
+				delim = fp.value()
+				if delim == "" {
+					// Bash sets the delim to an ASCII NUL if provided with an empty
+					// string.
+					delim = "\x00"
+				}
+			default:
+				return failf(2, "%s: invalid option %q\n", name, flag)
+			}
+		}
+
+		args := fp.args()
+		var arrayName string
+		switch len(args) {
+		case 0:
+			arrayName = "MAPFILE"
+		case 1:
+			if !syntax.ValidName(args[0]) {
+				return failf(2, "%s: invalid identifier %q\n", name, args[0])
+			}
+			arrayName = args[0]
+		default:
+			return failf(2, "%s: Only one array name may be specified, %v\n", name, args)
+		}
+
+		vr := expand.Variable{Set: true, Kind: expand.Indexed}
+		scanner := bufio.NewScanner(r.stdin)
+		scanner.Split(mapfileSplit(delim[0], dropDelim))
+		size := 0
+		for scanner.Scan() {
+			if size += len(scanner.Bytes()); size > internal.MaxExpandSize {
+				return fatal(errReadTooLarge)
+			} else if len(vr.List) > internal.MaxExpandFields {
+				break // [Runner.setVarIn] fails
+			}
+			vr.List = append(vr.List, scanner.Text())
+		}
+		if err := scanner.Err(); err != nil {
+			return failf(2, "%s: unable to read, %v\n", name, err)
+		}
+		arrayName, _ = r.resolveName(arrayName)
+		checkVar(r.setVar(arrayName, vr))
+
+	default:
+		return failf(2, "%s: unsupported builtin\n", name)
+	}
+	return exit
+}
+
+// mapfileSplit returns a suitable Split function for a [bufio.Scanner];
+// the code is mostly stolen from [bufio.ScanLines].
+func mapfileSplit(delim byte, dropDelim bool) bufio.SplitFunc {
+	return func(data []byte, atEOF bool) (advance int, token []byte, err error) {
+		if atEOF && len(data) == 0 {
+			return 0, nil, nil
+		}
+		if i := bytes.IndexByte(data, delim); i >= 0 {
+			// We have a full newline-terminated line.
+			if dropDelim {
+				return i + 1, data[0:i], nil
+			} else {
+				return i + 1, data[0 : i+1], nil
+			}
+		}
+		// If we're at EOF, we have a final, non-terminated line. Return it.
+		if atEOF {
+			return len(data), data, nil
+		}
+		// Request more data.
+		return 0, nil, nil
+	}
+}
+
+func (r *Runner) printOptLine(name string, enabled, supported bool) {
+	state := r.optStatusText(enabled)
+	if supported {
+		r.outf("%s\t%s\n", name, state)
+		return
+	}
+	r.outf("%s\t%s\t(%q not supported)\n", name, state, r.optStatusText(!enabled))
+}
+
+// errReadTooLarge is like the size limit of an expansion,
+// for builtins which read input into variables.
+var errReadTooLarge = internal.Fatalf("input would exceed %d bytes", internal.MaxExpandSize)
+
+// readLine reads from stdin until delim, or EOF if delim is -1,
+// or until nchars characters if nchars is not negative.
+// Unless raw, it drops line continuations and keeps other escapes.
+func (r *Runner) readLine(ctx context.Context, raw bool, delim, nchars int) ([]byte, error) {
+	if r.stdin == nil {
+		return nil, errors.New("interp: can't read, there's no stdin")
+	}
+	if nchars == 0 {
+		return nil, nil
+	}
+
+	var line []byte
+	esc := false
+	charStart := 0 // where the character being read starts in line
+
+	stopc := make(chan struct{})
+	stop := context.AfterFunc(ctx, func() {
+		r.stdin.SetReadDeadline(time.Now())
+		close(stopc)
+	})
+	defer func() {
+		if !stop() {
+			// The AfterFunc was started.
+			// Wait for it to complete, and reset the file's deadline.
+			<-stopc
+			r.stdin.SetReadDeadline(time.Time{})
+		}
+	}()
+	for {
+		// Read one byte at a time, so that we don't consume
+		// any input past what we return.
+		var buf [1]byte
+		n, err := r.stdin.Read(buf[:])
+		if n > 0 {
+			b := buf[0]
+			switch {
+			case !raw && b == '\\' && !esc:
+				line = append(line, b)
+				charStart = len(line)
+				esc = true
+			case !raw && b == '\n' && esc:
+				// line continuation; drop the trailing backslash
+				line = line[:len(line)-1]
+				charStart = len(line)
+				esc = false
+			case !esc && int(b) == delim:
+				return line, nil
+			default:
+				line = append(line, b)
+				esc = false
+				// Count characters rather than bytes, like Bash in a UTF-8 locale.
+				if utf8.FullRune(line[charStart:]) {
+					charStart = len(line)
+					if nchars--; nchars == 0 {
+						return line, nil
+					}
+				}
+			}
+			if len(line) > internal.MaxExpandSize {
+				return nil, errReadTooLarge
+			}
+		}
+		if err != nil {
+			return line, err
+		}
+	}
+}
+
+func (r *Runner) changeDir(ctx context.Context, cmd, path string) uint8 {
+	if path == "" {
+		r.errf("%s: empty directory path\n", cmd)
+		return 1
+	}
+	apath := r.absPath(path)
+	info, err := r.stat(ctx, apath)
+	if err != nil || !info.IsDir() {
+		r.errf("%s: no such file or directory: %q\n", cmd, path)
+		return 1
+	}
+	if r.access(ctx, apath, AccessExec) != nil {
+		r.errf("%s: permission denied: %q\n", cmd, path)
+		return 1
+	}
+	r.Dir = apath
+	r.setVarString("OLDPWD", r.envGet("PWD"))
+	r.setVarString("PWD", apath)
+	return 0
+}
+
+func absPath(dir, path string) string {
+	if path == "" {
+		return ""
+	}
+	ps := internal.PathsFor(dir)
+	if !ps.IsAbs(path) {
+		path = ps.Join(dir, path)
+	}
+	// Note that [filepath.Join] cleans its result, but an already absolute
+	// path needs cleaning too, such as turning "/a/../b" into "/b".
+	return ps.Clean(path)
+}
+
+func (r *Runner) absPath(path string) string {
+	return absPath(r.Dir, path)
+}
+
+// flagParser is used to parse builtin flags.
+//
+// It's similar to the getopts implementation, but with some key differences.
+// First, the API is designed for Go loops, making it easier to use directly.
+// Second, it doesn't require the awkward ":ab" syntax that getopts uses.
+// Third, it supports "-a" flags as well as "+a".
+type flagParser struct {
+	current   string
+	remaining []string
+}
+
+func (p *flagParser) more() bool {
+	if p.current != "" {
+		// We're still parsing part of "-ab".
+		return true
+	}
+	if len(p.remaining) == 0 {
+		// Nothing left.
+		p.remaining = nil
+		return false
+	}
+	arg := p.remaining[0]
+	if arg == "--" {
+		// We explicitly stop parsing flags.
+		p.remaining = p.remaining[1:]
+		return false
+	}
+	if len(arg) == 0 || (arg[0] != '-' && arg[0] != '+') {
+		// The next argument is not a flag.
+		return false
+	}
+	// More flags to come.
+	return true
+}
+
+func (p *flagParser) flag() string {
+	arg := p.current
+	if arg == "" {
+		arg = p.remaining[0]
+		p.remaining = p.remaining[1:]
+	} else {
+		p.current = ""
+	}
+	if len(arg) > 2 {
+		// We have "-ab", so return "-a" and keep "-b".
+		p.current = arg[:1] + arg[2:]
+		arg = arg[:2]
+	}
+	return arg
+}
+
+func (p *flagParser) value() string {
+	if len(p.remaining) == 0 {
+		return ""
+	}
+	arg := p.remaining[0]
+	p.remaining = p.remaining[1:]
+	return arg
+}
+
+// optValue returns the argument to the last flag, attached or not.
+func (p *flagParser) optValue() (string, bool) {
+	if p.current != "" {
+		value := p.current[1:]
+		p.current = ""
+		return value, true
+	}
+	if len(p.remaining) == 0 {
+		return "", false
+	}
+	return p.value(), true
+}
+
+func (p *flagParser) args() []string { return p.remaining }
+
+type getopts struct {
+	argidx  int
+	runeidx int
+}
+
+func (g *getopts) next(optstr string, args []string) (opt rune, optarg string, done bool) {
+	if len(args) == 0 || g.argidx >= len(args) {
+		return '?', "", true
+	}
+	arg := []rune(args[g.argidx])
+	if len(arg) < 2 || arg[0] != '-' || arg[1] == '-' {
+		return '?', "", true
+	}
+
+	opts := arg[1:]
+	if g.runeidx >= len(opts) {
+		// The arguments changed since the last call.
+		g.runeidx = 0
+	}
+	opt = opts[g.runeidx]
+
+	i := strings.IndexRune(optstr, opt)
+	if i >= 0 && i+1 < len(optstr) && optstr[i+1] == ':' {
+		// the option requires an argument
+		if g.runeidx+1 < len(opts) {
+			// attached to the option in the same word, like -bval
+			optarg = string(opts[g.runeidx+1:])
+		} else if g.argidx+1 < len(args) {
+			// the word that follows
+			optarg = args[g.argidx+1]
+			g.argidx++
+		} else {
+			// missing argument
+			g.argidx++
+			g.runeidx = 0
+			return ':', string(opt), false
+		}
+		g.argidx++
+		g.runeidx = 0
+		return opt, optarg, false
+	}
+
+	if g.runeidx+1 < len(opts) {
+		g.runeidx++
+	} else {
+		g.argidx++
+		g.runeidx = 0
+	}
+	if i < 0 {
+		// invalid option
+		return '?', string(opt), false
+	}
+	return opt, "", false
+}
+
+// optStatusText returns a shell option's status text display
+func (r *Runner) optStatusText(status bool) string {
+	if status {
+		return "on"
+	}
+	return "off"
+}

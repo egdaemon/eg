@@ -1,0 +1,114 @@
+package interp
+
+import (
+	"bytes"
+	"fmt"
+	"io"
+	"strings"
+
+	"github.com/egdaemon/sh/v3/syntax"
+)
+
+// tracer prints expressions like a shell would do if its
+// options '-o' is set to either 'xtrace' or its shorthand, '-x'.
+type tracer struct {
+	buf       bytes.Buffer
+	printer   *syntax.Printer
+	output    io.Writer
+	needsPlus bool
+}
+
+func (r *Runner) tracer() *tracer {
+	if !r.opts[optXTrace] {
+		return nil
+	}
+
+	return &tracer{
+		printer:   syntax.NewPrinter(),
+		output:    r.stderr,
+		needsPlus: true,
+	}
+}
+
+// string writes s to tracer.buf if tracer is non-nil,
+// prepending "+" if tracer.needsPlus is true.
+func (t *tracer) string(s string) {
+	if t == nil {
+		return
+	}
+
+	if t.needsPlus {
+		t.buf.WriteString("+ ")
+	}
+	t.needsPlus = false
+	t.buf.WriteString(s)
+}
+
+func (t *tracer) stringf(f string, a ...any) {
+	if t == nil {
+		return
+	}
+
+	t.string(fmt.Sprintf(f, a...))
+}
+
+// expr prints x to tracer.buf if tracer is non-nil,
+// prepending "+" if tracer.isFirstPrint is true.
+func (t *tracer) expr(x syntax.Node) {
+	if t == nil {
+		return
+	}
+
+	if t.needsPlus {
+		t.buf.WriteString("+ ")
+	}
+	t.needsPlus = false
+	if err := t.printer.Print(&t.buf, x); err != nil {
+		panic(err)
+	}
+}
+
+// flush writes the contents of tracer.buf to the tracer.stdout.
+func (t *tracer) flush() {
+	if t == nil {
+		return
+	}
+
+	t.output.Write(t.buf.Bytes())
+	t.buf.Reset()
+}
+
+// newLineFlush is like flush, but with extra new line before tracer.buf gets flushed.
+func (t *tracer) newLineFlush() {
+	if t == nil {
+		return
+	}
+
+	t.buf.WriteString("\n")
+	t.flush()
+	// reset state
+	t.needsPlus = true
+}
+
+// quoteBash quotes s as a single Bash word.
+// Null bytes are dropped, as Bash strings cannot hold them.
+func quoteBash(s string) string {
+	qs, err := syntax.Quote(strings.ReplaceAll(s, "\x00", ""), syntax.LangBash)
+	if err != nil { // should never happen
+		panic(err)
+	}
+	return qs
+}
+
+// call prints the fields of a command, each quoted as a separate Bash word.
+func (t *tracer) call(fields []string) {
+	if t == nil {
+		return
+	}
+	for i, field := range fields {
+		if i > 0 {
+			t.string(" ")
+		}
+		t.string(quoteBash(field))
+	}
+}

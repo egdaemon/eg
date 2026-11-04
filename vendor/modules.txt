@@ -539,6 +539,15 @@ github.com/egdaemon/gdx/internal/langx
 github.com/egdaemon/gdx/konggdx
 github.com/egdaemon/gdx/konggdx/cmdopts
 github.com/egdaemon/gdx/konggdx/userx
+# github.com/egdaemon/sh/v3 v3.14.1-0.20261103040545-e33e887fd27a
+## explicit; go 1.26.0
+github.com/egdaemon/sh/v3/expand
+github.com/egdaemon/sh/v3/fileutil
+github.com/egdaemon/sh/v3/internal
+github.com/egdaemon/sh/v3/internal/arithm
+github.com/egdaemon/sh/v3/interp
+github.com/egdaemon/sh/v3/pattern
+github.com/egdaemon/sh/v3/syntax
 # github.com/egdaemon/wasinet/wasinet v0.0.0-20261103201433-2f9a9bae892d
 ## explicit; go 1.26.0
 github.com/egdaemon/wasinet/wasinet

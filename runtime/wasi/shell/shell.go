@@ -13,11 +13,13 @@ import (
 	"golang.org/x/time/rate"
 
 	_eg "github.com/egdaemon/eg"
+	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/stringsx"
 	"github.com/egdaemon/eg/internal/userx"
 	"github.com/egdaemon/eg/runtime/wasi/eg"
 	"github.com/egdaemon/eg/runtime/wasi/egunsafe/ffiexec"
+	v2 "github.com/egdaemon/eg/runtime/wasi/shell/v2"
 )
 
 const (
@@ -204,7 +206,7 @@ func New(cmd string) Command {
 		group:      stringsx.First(defaultgroup(u), _eg.DefaultUsername),
 		cmd:        cmd,
 		timeout:    DefaultTimeout,
-		entry:      run,
+		entry:      auto(),
 		exec:       ffiexec.Command,
 		attempts:   1,
 		retrylimit: defaultRetryLimiter(),
@@ -307,6 +309,17 @@ func retry(ctx context.Context, c Command, do func() error) (err error) {
 	}
 
 	return err
+}
+
+// auto returns the in-guest interpreter when EG_EXPERIMENTAL_GUEST_SHELL is set and bash in the module otherwise.
+func auto() entrypoint {
+	if envx.Boolean(false, _eg.EnvExperimentalGuestShell) {
+		return func(ctx context.Context, user string, group string, cmd string, directory string, environ []string, _ Execer) error {
+			return v2.Run(ctx, user, group, cmd, directory, environ)
+		}
+	}
+
+	return run
 }
 
 func run(ctx context.Context, user string, group string, cmd string, directory string, environ []string, exec Execer) (err error) {

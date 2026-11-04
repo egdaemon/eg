@@ -13,11 +13,11 @@ import (
 	v1 "github.com/egdaemon/eg/interp/execproxy"
 )
 
-// stdionames are the sockets of a process within proc/{id}, in the order the host connects to them.
+// stdionames are the sockets of a process within proc/{id}, in the order the module connects to them.
 var stdionames = []string{"stdin", "stdout", "stderr"}
 
 // Run executes req through c with its stdio connected to stdin, stdout and stderr, and returns its exit code.
-// it assigns req.Id and listens on proc/{id} within runtimedir, the caller's view of the host's runtime
+// it assigns req.Id and listens on proc/{id} within runtimedir, the caller's view of the module's runtime
 // directory; the guest passes a listen backed by wasinet.
 func Run(ctx context.Context, c v1.ProxyClient, listen func(path string) (net.Listener, error), runtimedir string, req *v1.ExecRequest, stdin io.Reader, stdout io.Writer, stderr io.Writer) (code int32, err error) {
 	var (

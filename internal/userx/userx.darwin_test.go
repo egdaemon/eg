@@ -3,7 +3,6 @@
 package userx
 
 import (
-	"os"
 	"os/user"
 	"path/filepath"
 	"testing"
@@ -12,23 +11,23 @@ import (
 )
 
 func TestDefaultRuntimeDirectory(t *testing.T) {
-	u := &user.User{Uid: "501"}
+	u := &user.User{Uid: "501", HomeDir: "/Users/someone"}
 
 	// sockets are bound in the runtime directory, and darwin limits a unix socket path to 103 bytes.
 	const sunpath = 103
 
-	t.Run("the user's temporary directory", func(t *testing.T) {
+	t.Run("a run directory within the user's cache directory", func(t *testing.T) {
 		t.Setenv(EnvRuntimeDirectory, "")
 		t.Setenv("XDG_RUNTIME_DIR", "")
-		require.Equal(t, os.TempDir(), defaultRuntimeDirectory(u))
+		require.Equal(t, "/Users/someone/.cache/eg/run", defaultRuntimeDirectory(u))
 	})
 
-	t.Run("exists and fits the longest socket", func(t *testing.T) {
+	t.Run("fits the longest socket for the current user", func(t *testing.T) {
 		t.Setenv(EnvRuntimeDirectory, "")
 		t.Setenv("XDG_RUNTIME_DIR", "")
-		dir := defaultRuntimeDirectory(u)
-		require.DirExists(t, dir)
-		require.LessOrEqual(t, len(filepath.Join(dir, "main.01900000-0000-7000-8000-000000000000.socket")), sunpath)
+		current, err := user.Current()
+		require.NoError(t, err)
+		require.LessOrEqual(t, len(filepath.Join(defaultRuntimeDirectory(current), "main.01900000-0000-7000-8000-000000000000.socket")), sunpath)
 	})
 
 	t.Run("root uses /var/run", func(t *testing.T) {

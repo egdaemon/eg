@@ -48,7 +48,7 @@ func (t *Proxy) Bind(host grpc.ServiceRegistrar) {
 }
 
 // Exec runs the command with the guest's sockets in proc/{id} as its stdio and returns its exit code. a
-// request without an id comes from a guest that predates v2: the command inherits the host's stdio and a
+// request without an id comes from a guest that predates v2: the command inherits the module's stdio and a
 // failed exit is an error, which is how those guests detect failure.
 func (t *Proxy) Exec(ctx context.Context, req *v1.ExecRequest) (resp *v1.ExecResponse, err error) {
 	var (

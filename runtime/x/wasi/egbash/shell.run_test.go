@@ -66,6 +66,19 @@ func TestRun(t *testing.T) {
 		return string(b)
 	}
 
+	t.Run("coreutils run in the guest", func(t *testing.T) {
+		workdir := guest(t)
+		require.NoError(t, Run(t.Context(), "", "", "echo hello world | cat > out", "", nil))
+		require.Equal(t, "hello world\n", read(t, filepath.Join(workdir, "out")))
+	})
+
+	t.Run("coreutils manage files in the guest", func(t *testing.T) {
+		workdir := guest(t)
+		require.NoError(t, Run(t.Context(), "", "", "mkdir -p a/b && echo hi > a/b/f && cp a/b/f c && mv c out && rm -r a", "", nil))
+		require.Equal(t, "hi\n", read(t, filepath.Join(workdir, "out")))
+		require.NoDirExists(t, filepath.Join(workdir, "a"))
+	})
+
 	t.Run("pipes a builtin into a module command", func(t *testing.T) {
 		workdir := native(t)
 		require.NoError(t, Run(t.Context(), "", "", "echo hello | tr a-z A-Z > out", "", nil))
@@ -88,7 +101,7 @@ func TestRun(t *testing.T) {
 
 	t.Run("a failing module command reaches ||", func(t *testing.T) {
 		workdir := native(t)
-		require.NoError(t, Run(t.Context(), "", "", "ls does-not-exist 2>/dev/null || echo fallback > out", "", nil))
+		require.NoError(t, Run(t.Context(), "", "", "grep x does-not-exist 2>/dev/null || echo fallback > out", "", nil))
 		require.Equal(t, "fallback\n", read(t, filepath.Join(workdir, "out")))
 	})
 
@@ -193,54 +206,15 @@ func TestRun(t *testing.T) {
 				require.NoError(t, interptest.Run(t, wasm, serve(t), time.Minute, "SHELL_MODE="+mode, eg.EnvComputeWorkingDirectory+"="+eg.DefaultRuntimeDirectory("work")))
 			})
 		}
-	})
 
-	t.Run("wasi module set", func(t *testing.T) {
-		if testing.Short() {
-			t.Skip("builds and runs a wasip1 guest")
-		}
-
-		wasm := interptest.Build(t, "./runtime/x/wasi/egbash/.fixtures/guest")
-		module := interptest.Build(t, "./interp/runtime/wasi/ffiwasi/.fixtures/module")
-
-		// modules links the module fixture into a new module directory as each of names.
-		modules := func(t *testing.T, names ...string) string {
-			dir := t.TempDir()
-			for _, name := range names {
-				require.NoError(t, os.Symlink(module, filepath.Join(dir, name+".wasi")))
-			}
-			return dir
-		}
-
-		// run runs the guest in mode with the module set in moddir, the runtime directory rundir and its work
-		// directory as the working directory.
-		run := func(t *testing.T, rundir string, moddir string, mode string) error {
-			return interptest.RunModules(t, wasm, rundir, moddir, filepath.Join(rundir, "work"), time.Minute, "SHELL_MODE="+mode, eg.EnvComputeWorkingDirectory+"="+eg.DefaultRuntimeDirectory("work"))
-		}
-
-		// isolated is a runtime directory without a module socket, so a command only succeeds if it never leaves
-		// the runtime.
-		isolated := func(t *testing.T) string {
+		// the runtime directory has no module socket, so the coreutils only succeed if they never leave the guest.
+		t.Run("coreutils", func(t *testing.T) {
 			// unix socket paths are length limited, t.TempDir can exceed it.
 			rundir, err := os.MkdirTemp("", "shell")
 			require.NoError(t, err)
 			t.Cleanup(func() { os.RemoveAll(rundir) })
 			require.NoError(t, os.Mkdir(filepath.Join(rundir, "work"), 0700))
-			return rundir
-		}
-
-		for _, mode := range []string{"wasi", "wasienv", "wasiexit"} {
-			t.Run(mode, func(t *testing.T) {
-				require.NoError(t, run(t, isolated(t), modules(t, "tee", "env", "code"), mode))
-			})
-		}
-
-		t.Run("commands outside of the set reach the module", func(t *testing.T) {
-			require.NoError(t, run(t, serve(t), modules(t, "tee"), "pipeline"))
-		})
-
-		t.Run("commands outside of the set fail without the module", func(t *testing.T) {
-			require.Error(t, run(t, isolated(t), modules(t, "tee"), "pipeline"))
+			require.NoError(t, interptest.Run(t, wasm, rundir, time.Minute, "SHELL_MODE=coreutils", eg.EnvComputeWorkingDirectory+"="+eg.DefaultRuntimeDirectory("work")))
 		})
 	})
 }

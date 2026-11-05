@@ -548,6 +548,9 @@ github.com/egdaemon/sh/v3/internal/arithm
 github.com/egdaemon/sh/v3/interp
 github.com/egdaemon/sh/v3/pattern
 github.com/egdaemon/sh/v3/syntax
+# github.com/egdaemon/sh/x v0.0.0-20261105214501-670d7cac9c3b
+## explicit; go 1.26.0
+github.com/egdaemon/sh/x/coreutils
 # github.com/egdaemon/wasinet/wasinet v0.0.0-20261103201433-2f9a9bae892d
 ## explicit; go 1.26.0
 github.com/egdaemon/wasinet/wasinet
@@ -1678,6 +1681,32 @@ github.com/tklauser/go-sysconf
 # github.com/tklauser/numcpus v0.11.0
 ## explicit; go 1.24.0
 github.com/tklauser/numcpus
+# github.com/u-root/u-root v0.15.1-0.20251208185023-2f8c7e763cf8
+## explicit; go 1.24.0
+github.com/u-root/u-root/pkg/core
+github.com/u-root/u-root/pkg/core/base64
+github.com/u-root/u-root/pkg/core/cat
+github.com/u-root/u-root/pkg/core/chmod
+github.com/u-root/u-root/pkg/core/cp
+github.com/u-root/u-root/pkg/core/find
+github.com/u-root/u-root/pkg/core/gzip
+github.com/u-root/u-root/pkg/core/ls
+github.com/u-root/u-root/pkg/core/mkdir
+github.com/u-root/u-root/pkg/core/mktemp
+github.com/u-root/u-root/pkg/core/mv
+github.com/u-root/u-root/pkg/core/rm
+github.com/u-root/u-root/pkg/core/shasum
+github.com/u-root/u-root/pkg/core/tar
+github.com/u-root/u-root/pkg/core/touch
+github.com/u-root/u-root/pkg/core/xargs
+github.com/u-root/u-root/pkg/gzip
+github.com/u-root/u-root/pkg/ls
+github.com/u-root/u-root/pkg/tarutil
+github.com/u-root/u-root/pkg/upath
+github.com/u-root/u-root/pkg/uroot/unixflag
+# github.com/u-root/uio v0.0.0-20240224005618-d2acac8f3701
+## explicit; go 1.21
+github.com/u-root/uio/uio
 # github.com/ulikunitz/xz v0.5.15
 ## explicit; go 1.12
 github.com/ulikunitz/xz

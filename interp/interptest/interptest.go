@@ -17,6 +17,7 @@ import (
 	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/duckproxyserver"
 	"github.com/egdaemon/eg/interp/events"
+	"github.com/egdaemon/eg/interp/runtime/wasi/ffiwasi"
 	"github.com/egdaemon/eg/interp/runtime/wasi/ffiwasinet"
 	"github.com/egdaemon/wasinet/wasinet/wnetruntime"
 	"github.com/stretchr/testify/require"
@@ -89,6 +90,13 @@ func StartAnalytics(t *testing.T, opts ...duckproxyserver.Option) Analytics {
 // set as KEY=VALUE pairs. a non zero exit is returned as an error.
 func Run(t *testing.T, wasm string, rundir string, timeout time.Duration, environ ...string) error {
 	t.Helper()
+	return RunModules(t, wasm, rundir, t.TempDir(), rundir, timeout, environ...)
+}
+
+// RunModules is Run with the *.wasi modules in moddir loaded into the runtime the way interp loads them. their
+// commands resolve relative directories against workdir, the host path of the guest's working directory.
+func RunModules(t *testing.T, wasm string, rundir string, moddir string, workdir string, timeout time.Duration, environ ...string) error {
+	t.Helper()
 
 	ctx, done := context.WithTimeout(context.Background(), timeout)
 	defer done()
@@ -105,6 +113,14 @@ func Run(t *testing.T, wasm string, rundir string, timeout time.Duration, enviro
 	).Instantiate(ctx)
 	require.NoError(t, err)
 
+	mounts := wazero.NewFSConfig().WithDirMount(rundir, eg.DefaultRuntimeDirectory())
+
+	modules, err := ffiwasi.Load(ctx, rt, moddir, mounts, workdir, rundir)
+	require.NoError(t, err)
+
+	_, err = modules.Export(rt.NewHostModuleBuilder("env")).Instantiate(ctx)
+	require.NoError(t, err)
+
 	bin, err := os.ReadFile(wasm)
 	require.NoError(t, err)
 
@@ -112,7 +128,7 @@ func Run(t *testing.T, wasm string, rundir string, timeout time.Duration, enviro
 	require.NoError(t, err)
 
 	cfg := wazero.NewModuleConfig().
-		WithFSConfig(wazero.NewFSConfig().WithDirMount(rundir, eg.DefaultRuntimeDirectory())).
+		WithFSConfig(mounts).
 		WithStdout(os.Stdout).
 		WithStderr(os.Stderr).
 		WithSysNanotime().

@@ -9,6 +9,9 @@ DH_VERBOSE=1
 override_dh_auto_build:
 	echo "DH AUTO BUILD OVERRIDE pkg version '${DEB_VERSION}'"
 	install -D -m 0644 src/coreutils.wasm linux/usr/share/eg/coreutils.wasm
+	# eg's runtime runs the command a module's name gives, so each utility links to the one multicall module.
+	mkdir -p linux/etc/eg/wasi.mod.d
+	xargs -a src/utilities -I{} ln -s /usr/share/eg/coreutils.wasm linux/etc/eg/wasi.mod.d/{}.wasi
 
 override_dh_usrlocal:
 	echo "DH usrlocal override due to overly restrict rules"

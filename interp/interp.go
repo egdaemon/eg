@@ -164,14 +164,14 @@ func Remote(ctx context.Context, wshost workspaces.Context, aid string, runid st
 	return r.perform(ctx, wshost, runid, module, runtimeenv)
 }
 
-// mounts the workspace directories into the guest under an empty read-only root.
+// Mounts the workspace directories into the guest under an empty read-only root.
 // we map twice so that baremetal can work. shell commands are run on the host itself so we need the host path.
 // but inside wazero we need to be able to access the standard paths.
 // the call decide which paths the environment variables rsolve to.
 // we also need to ensure we mount the working directory so pwd works correctly.
 // the root lets guests that resolve paths from / (wasi-libc programs such as coreutils) reach the nested mounts,
 // and everything outside of them is missing or read-only.
-func mounts(wshost workspaces.Context) wazero.FSConfig {
+func Mounts(wshost workspaces.Context) wazero.FSConfig {
 	return wazero.NewFSConfig().
 		WithFSMount(embed.FS{}, "/").
 		WithDirMount(os.TempDir(), os.TempDir()).
@@ -265,7 +265,7 @@ func (t runner) perform(ctx context.Context, wshost workspaces.Context, runid, p
 	debugx.Println("system tls certs", hostsslcerts)
 	debugx.Println("------------------------------------------------------")
 
-	wazerofs := mounts(wshost).WithDirMount(hostsslcerts, DefaultSSLCertDir)
+	wazerofs := Mounts(wshost).WithDirMount(hostsslcerts, DefaultSSLCertDir)
 
 	mcfg := wazero.NewModuleConfig().WithEnv(
 		"SSL_CERT_DIR", DefaultSSLCertDir,

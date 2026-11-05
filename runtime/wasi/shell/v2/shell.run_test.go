@@ -14,6 +14,7 @@ import (
 	"github.com/egdaemon/eg/interp/interptest"
 	"github.com/egdaemon/sh/v3/interp"
 	"github.com/stretchr/testify/require"
+	"github.com/tetratelabs/wazero"
 	"google.golang.org/grpc"
 )
 
@@ -33,7 +34,7 @@ func serve(t *testing.T) (runtimedir string) {
 	l, err = net.Listen("unix", filepath.Join(runtimedir, eg.SocketControl))
 	require.NoError(t, err)
 	srv := grpc.NewServer()
-	execproxy.NewProxy(filepath.Join(runtimedir, "work"), runtimedir, os.Environ()).Bind(srv)
+	execproxy.NewProxy(filepath.Join(runtimedir, "work"), runtimedir, os.Environ(), wazero.NewFSConfig()).Bind(srv)
 	go srv.Serve(l)
 	t.Cleanup(srv.Stop)
 	return runtimedir

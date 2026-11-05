@@ -43,7 +43,7 @@ func TestMounts(t *testing.T) {
 		require.NoError(t, err)
 
 		_, err = rt.InstantiateWithConfig(ctx, bin, wazero.NewModuleConfig().
-			WithFSConfig(mounts(ws)).
+			WithFSConfig(Mounts(ws)).
 			WithArgs(append([]string{"guest"}, args...)...).
 			WithStderr(os.Stderr))
 		return err

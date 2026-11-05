@@ -1,7 +1,8 @@
 // Package shell is the second version of the shell entrypoint. it interprets commands inside the guest with
 // egdaemon/sh, so expansion, redirects, pipes, builtins and the bash and sh scripts a command starts stay in the
-// sandbox, and only the other external commands reach the module, through execproxy/v2. only used with
-// EG_EXPERIMENTAL_GUEST_SHELL, which requires EG_EXPERIMENTAL_PROC_SOCKETS for the module.
+// sandbox, and only the other external commands reach the module, through execproxy/v2. with
+// EG_EXPERIMENTAL_COREUTILS, coreutils commands run in the module's coreutils.wasm instead of as native binaries.
+// only used with EG_EXPERIMENTAL_GUEST_SHELL, which requires EG_EXPERIMENTAL_PROC_SOCKETS for the module.
 package shell
 
 import (
@@ -12,6 +13,8 @@ import (
 	"path/filepath"
 	"strings"
 
+	_eg "github.com/egdaemon/eg"
+	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/iox"
 	v1 "github.com/egdaemon/eg/interp/execproxy"
 	"github.com/egdaemon/eg/interp/execproxy/v2"
@@ -52,9 +55,7 @@ func Run(ctx context.Context, user string, group string, cmd string, directory s
 		interp.Dir(directory),
 		interp.StdIO(nil, os.Stdout, os.Stderr),
 		interp.OpenHandler(open),
-		interp.ExecHandlers(scripts, func(interp.ExecHandlerFunc) interp.ExecHandlerFunc {
-			return module(v1.NewProxyClient(cc), user, group)
-		}),
+		interp.ExecHandlers(handlers(v1.NewProxyClient(cc), user, group)...),
 	); err != nil {
 		return err
 	}
@@ -62,37 +63,55 @@ func Run(ctx context.Context, user string, group string, cmd string, directory s
 	return r.Run(ctx, file)
 }
 
-// module runs each external command in the module with the interpreter's directory and stdio.
+// handlers are the interpreter's exec handlers: scripts run in the guest, coreutils commands run in
+// coreutils.wasm with EG_EXPERIMENTAL_COREUTILS, and every other command runs natively in the module.
+func handlers(c v1.ProxyClient, user string, group string) (h []func(interp.ExecHandlerFunc) interp.ExecHandlerFunc) {
+	h = append(h, scripts)
+
+	if envx.Boolean(false, _eg.EnvExperimentalCoreutils) {
+		h = append(h, coreutils(c))
+	}
+
+	return append(h, func(interp.ExecHandlerFunc) interp.ExecHandlerFunc {
+		return module(c, user, group)
+	})
+}
+
+// module runs each external command natively in the module as user and group.
 func module(c v1.ProxyClient, user string, group string) interp.ExecHandlerFunc {
 	return func(ctx context.Context, args []string) (err error) {
-		var (
-			hc   = interp.HandlerCtx(ctx)
-			code int32
-		)
-
-		listen := func(path string) (net.Listener, error) {
-			return wasinet.Listen(ctx, "unix", path)
-		}
-
 		if user != "" || group != "" {
 			args = append([]string{"sudo", "-E", "-H", "-u", user, "-g", group}, args...)
 		}
 
-		if code, err = execproxy.Run(ctx, c, listen, egunsafe.RuntimeDirectory(), &v1.ExecRequest{
-			Dir:         egenv.PathRelativeWorking(hc.Dir),
-			Cmd:         args[0],
-			Arguments:   args[1:],
-			Environment: changed(hc.Env),
-		}, hc.Stdin, hc.Stdout, hc.Stderr); err != nil {
-			return err
-		}
-
-		if code != 0 {
-			return interp.ExitStatus(code)
-		}
-
-		return nil
+		return run(ctx, c, &v1.ExecRequest{Cmd: args[0], Arguments: args[1:]})
 	}
+}
+
+// run executes req in the module with the interpreter's directory, environment and stdio, and returns a non-zero
+// exit as the interpreter's exit status.
+func run(ctx context.Context, c v1.ProxyClient, req *v1.ExecRequest) (err error) {
+	var (
+		hc   = interp.HandlerCtx(ctx)
+		code int32
+	)
+
+	listen := func(path string) (net.Listener, error) {
+		return wasinet.Listen(ctx, "unix", path)
+	}
+
+	req.Dir = egenv.PathRelativeWorking(hc.Dir)
+	req.Environment = changed(hc.Env)
+
+	if code, err = execproxy.Run(ctx, c, listen, egunsafe.RuntimeDirectory(), req, hc.Stdin, hc.Stdout, hc.Stderr); err != nil {
+		return err
+	}
+
+	if code != 0 {
+		return interp.ExitStatus(code)
+	}
+
+	return nil
 }
 
 // changed reports the exported variables whose value differs from the guest's own environment. the module

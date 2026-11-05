@@ -13,9 +13,11 @@ import (
 	"time"
 
 	"github.com/egdaemon/eg"
+	"github.com/egdaemon/eg/internal/langx"
 	v1 "github.com/egdaemon/eg/interp/execproxy"
 	"github.com/egdaemon/eg/interp/interptest"
 	"github.com/stretchr/testify/require"
+	"github.com/tetratelabs/wazero"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
@@ -30,7 +32,7 @@ func serve(t *testing.T, root string, environ ...string) string {
 	l, err := net.Listen("unix", filepath.Join(runtimedir, eg.SocketControl))
 	require.NoError(t, err)
 	srv := grpc.NewServer()
-	NewProxy(root, runtimedir, environ).Bind(srv)
+	NewProxy(root, runtimedir, environ, wazero.NewFSConfig()).Bind(srv)
 	go srv.Serve(l)
 	t.Cleanup(srv.Stop)
 	return runtimedir
@@ -180,11 +182,110 @@ func TestExec(t *testing.T) {
 func TestAuto(t *testing.T) {
 	t.Run("defaults to v1", func(t *testing.T) {
 		t.Setenv(eg.EnvExperimentalProcSockets, "")
-		require.IsType(t, &v1.ExecProxy{}, Auto(t.TempDir(), t.TempDir(), nil))
+		require.IsType(t, &v1.ExecProxy{}, Auto(t.TempDir(), t.TempDir(), nil, wazero.NewFSConfig()))
 	})
 
 	t.Run("experiment selects v2", func(t *testing.T) {
 		t.Setenv(eg.EnvExperimentalProcSockets, "true")
-		require.IsType(t, &Proxy{}, Auto(t.TempDir(), t.TempDir(), nil))
+		require.IsType(t, &Proxy{}, Auto(t.TempDir(), t.TempDir(), nil, wazero.NewFSConfig()))
+	})
+}
+
+func TestWasm(t *testing.T) {
+	type result struct {
+		code   int32
+		stdout string
+	}
+
+	wasm := interptest.Build(t, "./interp/execproxy/v2/.fixtures/wasm")
+
+	// serve binds a proxy whose coreutils module is the fixture at path, with mounts as the guest's.
+	serve := func(t *testing.T, root string, mounts wazero.FSConfig, path string, environ ...string) string {
+		runtimedir, err := os.MkdirTemp("", "execproxy")
+		require.NoError(t, err)
+		t.Cleanup(func() { os.RemoveAll(runtimedir) })
+
+		l, err := net.Listen("unix", filepath.Join(runtimedir, eg.SocketControl))
+		require.NoError(t, err)
+		p := NewProxy(root, runtimedir, environ, mounts)
+		p.wasms["coreutils"] = compiler(p.runtime, path)
+		srv := grpc.NewServer()
+		p.Bind(srv)
+		go srv.Serve(l)
+		t.Cleanup(srv.Stop)
+		return runtimedir
+	}
+
+	run := func(t *testing.T, runtimedir string, stdin io.Reader, req *v1.ExecRequest) (result, error) {
+		var (
+			stdout bytes.Buffer
+			stderr bytes.Buffer
+		)
+		listen := func(path string) (net.Listener, error) {
+			return net.Listen("unix", path)
+		}
+		req.Wasm = langx.FirstNonZero(req.Wasm, "coreutils")
+		code, err := Run(t.Context(), dial(t, runtimedir), listen, runtimedir, req, stdin, &stdout, &stderr)
+		return result{code: code, stdout: stdout.String()}, err
+	}
+
+	t.Run("connects the module to the command's stdio", func(t *testing.T) {
+		r, err := run(t, serve(t, t.TempDir(), wazero.NewFSConfig(), wasm), strings.NewReader("hello"), &v1.ExecRequest{Cmd: "cat"})
+		require.NoError(t, err)
+		require.Equal(t, result{stdout: "hello"}, r)
+	})
+
+	t.Run("resolves relative paths against the command's directory", func(t *testing.T) {
+		root := t.TempDir()
+		require.NoError(t, os.MkdirAll(filepath.Join(root, "sub"), 0700))
+		require.NoError(t, os.WriteFile(filepath.Join(root, "sub", "file"), []byte("relative"), 0600))
+		r, err := run(t, serve(t, root, wazero.NewFSConfig(), wasm), nil, &v1.ExecRequest{Cmd: "cat", Arguments: []string{"file"}, Dir: "sub"})
+		require.NoError(t, err)
+		require.Equal(t, result{stdout: "relative"}, r)
+	})
+
+	t.Run("writes relative paths into the command's directory", func(t *testing.T) {
+		root := t.TempDir()
+		_, err := run(t, serve(t, root, wazero.NewFSConfig(), wasm), nil, &v1.ExecRequest{Cmd: "write", Arguments: []string{"file", "written"}, Dir: "."})
+		require.NoError(t, err)
+		b, err := os.ReadFile(filepath.Join(root, "file"))
+		require.NoError(t, err)
+		require.Equal(t, "written", string(b))
+	})
+
+	t.Run("reaches the guest's mounts", func(t *testing.T) {
+		mounted := t.TempDir()
+		require.NoError(t, os.WriteFile(filepath.Join(mounted, "file"), []byte("mounted"), 0600))
+		r, err := run(t, serve(t, t.TempDir(), wazero.NewFSConfig().WithDirMount(mounted, "/workload"), wasm), nil, &v1.ExecRequest{Cmd: "cat", Arguments: []string{"/workload/file"}})
+		require.NoError(t, err)
+		require.Equal(t, result{stdout: "mounted"}, r)
+	})
+
+	t.Run("returns the module's exit code", func(t *testing.T) {
+		r, err := run(t, serve(t, t.TempDir(), wazero.NewFSConfig(), wasm), nil, &v1.ExecRequest{Cmd: "exit", Arguments: []string{"3"}})
+		require.NoError(t, err)
+		require.Equal(t, int32(3), r.code)
+	})
+
+	t.Run("passes the proxy and request environment", func(t *testing.T) {
+		runtimedir := serve(t, t.TempDir(), wazero.NewFSConfig(), wasm, "A=proxy")
+		r, err := run(t, runtimedir, nil, &v1.ExecRequest{Cmd: "env", Arguments: []string{"A"}})
+		require.NoError(t, err)
+		require.Equal(t, "proxy\n", r.stdout)
+		r, err = run(t, runtimedir, nil, &v1.ExecRequest{Cmd: "env", Arguments: []string{"B"}, Environment: []string{"B=request"}})
+		require.NoError(t, err)
+		require.Equal(t, "request\n", r.stdout)
+	})
+
+	t.Run("runs natively when the module is not installed", func(t *testing.T) {
+		runtimedir := serve(t, t.TempDir(), wazero.NewFSConfig(), filepath.Join(t.TempDir(), "missing.wasm"))
+		r, err := run(t, runtimedir, nil, &v1.ExecRequest{Cmd: "sh", Arguments: []string{"-c", "echo native"}})
+		require.NoError(t, err)
+		require.Equal(t, result{stdout: "native\n"}, r)
+	})
+
+	t.Run("rejects an unknown module", func(t *testing.T) {
+		_, err := run(t, serve(t, t.TempDir(), wazero.NewFSConfig(), wasm), nil, &v1.ExecRequest{Cmd: "cat", Wasm: "unknown"})
+		require.Error(t, err)
 	})
 }

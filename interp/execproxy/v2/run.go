@@ -11,8 +11,10 @@ import (
 	"sync"
 
 	v1 "github.com/egdaemon/eg/interp/execproxy"
-	"github.com/egdaemon/eg/interp/execproxy/v2/proc"
 )
+
+// stdionames are the sockets of a process within proc/{id}, in the order the module connects to them.
+var stdionames = []string{"stdin", "stdout", "stderr"}
 
 // Run executes req through c with its stdio connected to stdin, stdout and stderr, and returns its exit code.
 // it assigns req.Id and listens on proc/{id} within runtimedir, the caller's view of the module's runtime
@@ -20,7 +22,7 @@ import (
 func Run(ctx context.Context, c v1.ProxyClient, listen func(path string) (net.Listener, error), runtimedir string, req *v1.ExecRequest, stdin io.Reader, stdout io.Writer, stderr io.Writer) (code int32, err error) {
 	var (
 		id        = make([]byte, 4)
-		dir       string
+		proc      string
 		listeners []net.Listener
 		conns     []net.Conn
 		l         net.Listener
@@ -33,14 +35,14 @@ func Run(ctx context.Context, c v1.ProxyClient, listen func(path string) (net.Li
 	// unix socket paths are length limited, so the id is kept short.
 	rand.Read(id)
 	req.Id = hex.EncodeToString(id)
-	dir = proc.Dir(runtimedir, req.Id)
-	if err = os.MkdirAll(dir, 0700); err != nil {
+	proc = filepath.Join(runtimedir, "proc", req.Id)
+	if err = os.MkdirAll(proc, 0700); err != nil {
 		return -1, err
 	}
-	defer os.RemoveAll(dir)
+	defer os.RemoveAll(proc)
 
-	for _, name := range proc.Names {
-		if l, err = listen(filepath.Join(dir, name)); err != nil {
+	for _, name := range stdionames {
+		if l, err = listen(filepath.Join(proc, name)); err != nil {
 			return -1, err
 		}
 		defer l.Close()

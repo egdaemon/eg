@@ -1,0 +1,22 @@
+FROM ubuntu:resolute
+ARG DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update
+RUN apt-get install -y software-properties-common build-essential ca-certificates curl sudo podman netavark rsync vim dput devscripts dh-make dput git uidmap dbus-user-session tree debhelper rustup
+RUN add-apt-repository -n ppa:longsleep/golang-backports
+RUN add-apt-repository -n ppa:egdaemon/eg
+
+RUN apt-get update
+RUN apt-get -y install golang-1.27 egworkload
+
+RUN ln -s /usr/lib/go-1.27/bin/go /usr/local/bin/go
+
+RUN systemd-sysusers
+RUN systemd-tmpfiles --create
+
+# BEGIN HACKS
+RUN echo "cache buster 585ca506-2797-505a-ae80-b41535886d78"
+RUN rm -rf /run/containers/storage /run/libpod
+# required until we update the shell to explicitly pass all env keys instead of using -E
+RUN update-alternatives --set sudo /usr/bin/sudo.ws
+# END HACKS

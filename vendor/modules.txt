@@ -548,7 +548,7 @@ github.com/egdaemon/sh/v3/internal/arithm
 github.com/egdaemon/sh/v3/interp
 github.com/egdaemon/sh/v3/pattern
 github.com/egdaemon/sh/v3/syntax
-# github.com/egdaemon/sh/x v0.0.0-20261105214501-670d7cac9c3b
+# github.com/egdaemon/sh/x v0.0.0-20261105220106-700f29e4a1a9
 ## explicit; go 1.26.0
 github.com/egdaemon/sh/x/coreutils
 # github.com/egdaemon/wasinet/wasinet v0.0.0-20261103201433-2f9a9bae892d

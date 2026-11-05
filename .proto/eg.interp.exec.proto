@@ -10,9 +10,6 @@ message ExecRequest {
   // id names proc/{id} within the runtime directory, where the guest listens
   // on the command's stdin, stdout and stderr sockets. read by execproxy/v2.
   string id = 5;
-  // wasm names the WASM module that runs cmd instead of a native binary,
-  // currently only coreutils. read by execproxy/v2.
-  string wasm = 6;
 }
 
 message ExecResponse {

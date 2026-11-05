@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/egdaemon/eg/runtime/wasi/egenv"
-	"github.com/egdaemon/eg/runtime/wasi/shell/v2"
+	"github.com/egdaemon/eg/runtime/x/wasi/egbash"
 	"github.com/egdaemon/sh/v3/interp"
 )
 
@@ -21,6 +21,9 @@ import (
 //	devnull      - /dev/null, which the guest has no mount for, and a failing module command reaching ||.
 //	exit         - a module command's exit code is returned as the interpreter's exit status.
 //	script       - a shebang script written by the guest runs in the guest, and its module commands reach the module.
+//	wasi         - a command from the runtime's module set runs in the runtime, writing relative to its directory.
+//	wasienv      - a module set command sees the guest's environment and the command's changes to it.
+//	wasiexit     - a module set command's exit code is returned as the interpreter's exit status.
 func main() {
 	var (
 		err error
@@ -33,7 +36,7 @@ func main() {
 		var (
 			b []byte
 		)
-		if err = shell.Run(ctx, "", "", script, "", nil); err != nil {
+		if err = egbash.Run(ctx, "", "", script, "", nil); err != nil {
 			log.Fatalln("run failed", script, err)
 		}
 		if b, err = os.ReadFile(egenv.WorkingDirectory("out")); err != nil {
@@ -54,7 +57,16 @@ func main() {
 	case "script":
 		expect(`printf '#!/bin/sh\nn=$(printf abc | wc -c); echo "$0 $1 $((n + 1))" > out\n' > run.sh; ./run.sh arg`, "./run.sh arg 4\n")
 	case "exit":
-		err = shell.Run(ctx, "", "", "env sh -c 'exit 3'", "", nil)
+		err = egbash.Run(ctx, "", "", "env sh -c 'exit 3'", "", nil)
+		if status, ok := errors.AsType[interp.ExitStatus](err); !ok || status != 3 {
+			log.Fatalln("unexpected result", err)
+		}
+	case "wasi":
+		expect("echo hello world | tee out", "hello world\n")
+	case "wasienv":
+		expect("A=changed env A > out; env SHELL_MODE >> out", "changed\nwasienv\n")
+	case "wasiexit":
+		err = egbash.Run(ctx, "", "", "code 3", "", nil)
 		if status, ok := errors.AsType[interp.ExitStatus](err); !ok || status != 3 {
 			log.Fatalln("unexpected result", err)
 		}

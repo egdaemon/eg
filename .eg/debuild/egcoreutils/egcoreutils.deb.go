@@ -41,7 +41,7 @@ func init() {
 		egdebuild.Option.SigningKeyID(maintainer.GPGFingerprint),
 		egdebuild.Option.ChangeLogDate(c.Committer.When),
 		egdebuild.Option.Version(fmt.Sprintf("%s.:autopatch:", version)),
-		egdebuild.Option.Description("egcoreutils", "uutils coreutils compiled to WebAssembly (wasm32-wasip1) for eg's guest shell"),
+		egdebuild.Option.Description("egcoreutils", "uutils coreutils compiled to WebAssembly (wasm32-wasip1), installed into eg's module set"),
 		egdebuild.Option.Debian(errorsx.Must(fs.Sub(debskel, ".debskel"))),
 		egdebuild.Option.Architecture("all"),
 		egdebuild.Option.Runtime(func(c shell.Command) shell.Command {
@@ -67,8 +67,10 @@ func Runner() eg.ContainerRunner {
 	return eg.Container(container)
 }
 
-// Compile builds coreutils.wasm into the package's source directory. launchpad's rust has no wasm32 standard
-// library, so the package ships the module built here instead of building it from source.
+// Compile builds coreutils.wasm, and the list of utilities it provides, into the package's source directory.
+// launchpad's rust has no wasm32 standard library, so the package ships the module built here instead of building
+// it from source. nice and realpath are left off the list: the module can neither start a process nor report its
+// working directory.
 func Compile(ctx context.Context, o eg.Op) error {
 	runtime := egcargo.Runtime().
 		Environ("RUSTUP_HOME", egcargo.CacheDirectory("rustup")).
@@ -80,6 +82,7 @@ func Compile(ctx context.Context, o eg.Op) error {
 		runtime.Newf("rustup run %s cargo build --release --locked --target %s --no-default-features --features feat_wasm", toolchain, target).Timeout(30*time.Minute),
 		runtime.Newf("install -D -m 0644 target/%s/release/coreutils.wasm %s/coreutils.wasm", target, dist),
 		runtime.Newf("install -m 0644 LICENSE %s/LICENSE", dist),
+		runtime.Newf("rustup run %s util/show-utils.sh --no-default-features --features feat_wasm | tr ' ' '\\n' | grep -v -x -e nice -e realpath > %s/utilities", toolchain, dist),
 	)
 }
 

@@ -1,9 +1,9 @@
-// Package shell is the second version of the shell entrypoint. it interprets commands inside the guest with
-// egdaemon/sh, so expansion, redirects, pipes, builtins and the bash and sh scripts a command starts stay in the
-// sandbox, and only the other external commands reach the module, through execproxy/v2. with
-// EG_EXPERIMENTAL_COREUTILS, coreutils commands run in the module's coreutils.wasm instead of as native binaries.
-// only used with EG_EXPERIMENTAL_GUEST_SHELL, which requires EG_EXPERIMENTAL_PROC_SOCKETS for the module.
-package shell
+// Package egbash interprets shell commands inside the guest with egdaemon/sh, so expansion, redirects, pipes,
+// builtins and the bash and sh scripts a command starts stay in the sandbox. commands the runtime has a WASI
+// module for run in that module, inside the runtime, and only the rest reach the module through execproxy/v2.
+// eg/shell runs through it with EG_EXPERIMENTAL_GUEST_SHELL, which requires EG_EXPERIMENTAL_PROC_SOCKETS for the
+// module.
+package egbash
 
 import (
 	"context"
@@ -13,23 +13,24 @@ import (
 	"path/filepath"
 	"strings"
 
-	_eg "github.com/egdaemon/eg"
-	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/iox"
 	v1 "github.com/egdaemon/eg/interp/execproxy"
 	"github.com/egdaemon/eg/interp/execproxy/v2"
 	"github.com/egdaemon/eg/runtime/wasi/egenv"
 	"github.com/egdaemon/eg/runtime/wasi/egunsafe"
+	"github.com/egdaemon/eg/runtime/wasi/egunsafe/ffiwasi"
 	"github.com/egdaemon/sh/v3/expand"
 	"github.com/egdaemon/sh/v3/interp"
 	"github.com/egdaemon/sh/v3/syntax"
 	"github.com/egdaemon/wasinet/wasinet"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 // Run interprets cmd in directory, relative to the working directory, with environ added to the guest's
-// environment. external commands run in the module as user and group; when both are empty they run as the
-// module's own user.
+// environment. external commands the runtime has no WASI module for run in the module as user and group; when
+// both are empty they run as the module's own user.
 func Run(ctx context.Context, user string, group string, cmd string, directory string, environ []string) (err error) {
 	var (
 		file *syntax.File
@@ -55,7 +56,9 @@ func Run(ctx context.Context, user string, group string, cmd string, directory s
 		interp.Dir(directory),
 		interp.StdIO(nil, os.Stdout, os.Stderr),
 		interp.OpenHandler(open),
-		interp.ExecHandlers(handlers(v1.NewProxyClient(cc), user, group)...),
+		interp.ExecHandlers(scripts, wasi, func(interp.ExecHandlerFunc) interp.ExecHandlerFunc {
+			return module(v1.NewProxyClient(cc), user, group)
+		}),
 	); err != nil {
 		return err
 	}
@@ -63,21 +66,25 @@ func Run(ctx context.Context, user string, group string, cmd string, directory s
 	return r.Run(ctx, file)
 }
 
-// handlers are the interpreter's exec handlers: scripts run in the guest, coreutils commands run in
-// coreutils.wasm with EG_EXPERIMENTAL_COREUTILS, and every other command runs natively in the module.
-func handlers(c v1.ProxyClient, user string, group string) (h []func(interp.ExecHandlerFunc) interp.ExecHandlerFunc) {
-	h = append(h, scripts)
+// wasi runs the commands the runtime has a WASI module for in that module, so they never leave the runtime, and
+// gives the rest to next. the module starts with the guest's environment, which the command's changes override,
+// and PWD set to the command's directory, which modules whose runtime keeps a working directory, as Go's does,
+// resolve relative paths against.
+func wasi(next interp.ExecHandlerFunc) interp.ExecHandlerFunc {
+	return func(ctx context.Context, args []string) (err error) {
+		var (
+			environ = append(os.Environ(), "PWD="+interp.HandlerCtx(ctx).Dir)
+		)
 
-	if envx.Boolean(false, _eg.EnvExperimentalCoreutils) {
-		h = append(h, coreutils(c))
+		if err = run(ctx, ffiwasi.Proxy{}, &v1.ExecRequest{Cmd: args[0], Arguments: args[1:], Environment: environ}); status.Code(err) == codes.NotFound {
+			return next(ctx, args)
+		}
+
+		return err
 	}
-
-	return append(h, func(interp.ExecHandlerFunc) interp.ExecHandlerFunc {
-		return module(c, user, group)
-	})
 }
 
-// module runs each external command natively in the module as user and group.
+// module runs each external command in the module as user and group.
 func module(c v1.ProxyClient, user string, group string) interp.ExecHandlerFunc {
 	return func(ctx context.Context, args []string) (err error) {
 		if user != "" || group != "" {
@@ -88,8 +95,8 @@ func module(c v1.ProxyClient, user string, group string) interp.ExecHandlerFunc 
 	}
 }
 
-// run executes req in the module with the interpreter's directory, environment and stdio, and returns a non-zero
-// exit as the interpreter's exit status.
+// run executes req through c with the interpreter's directory and stdio, the environment it changed appended to
+// req's, and returns a non-zero exit as the interpreter's exit status.
 func run(ctx context.Context, c v1.ProxyClient, req *v1.ExecRequest) (err error) {
 	var (
 		hc   = interp.HandlerCtx(ctx)
@@ -101,7 +108,7 @@ func run(ctx context.Context, c v1.ProxyClient, req *v1.ExecRequest) (err error)
 	}
 
 	req.Dir = egenv.PathRelativeWorking(hc.Dir)
-	req.Environment = changed(hc.Env)
+	req.Environment = append(req.Environment, changed(hc.Env)...)
 
 	if code, err = execproxy.Run(ctx, c, listen, egunsafe.RuntimeDirectory(), req, hc.Stdin, hc.Stdout, hc.Stderr); err != nil {
 		return err

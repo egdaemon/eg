@@ -1,4 +1,4 @@
-// module used by the wasm tests in place of coreutils.wasm: a multicall binary that dispatches on its name.
+// module used by the module set tests in place of coreutils: a multicall binary that dispatches on its name.
 package main
 
 import (
@@ -12,9 +12,10 @@ import (
 // os.Args[0] selects the command:
 //
 //	cat [path...]       - copies the files, or stdin without any, to stdout.
+//	tee path            - copies stdin to stdout and path.
 //	write path content  - writes content to path.
 //	env name            - prints the variable.
-//	exit code           - exits with code.
+//	code n              - exits with n.
 func main() {
 	var (
 		err error
@@ -23,11 +24,13 @@ func main() {
 	switch os.Args[0] {
 	case "cat":
 		err = cat(os.Args[1:]...)
+	case "tee":
+		err = tee(os.Args[1])
 	case "write":
 		err = os.WriteFile(os.Args[1], []byte(os.Args[2]), 0600)
 	case "env":
 		fmt.Println(os.Getenv(os.Args[1]))
-	case "exit":
+	case "code":
 		code, _ := strconv.Atoi(os.Args[1])
 		os.Exit(code)
 	default:
@@ -37,6 +40,17 @@ func main() {
 	if err != nil {
 		log.Fatalln(err)
 	}
+}
+
+func tee(path string) error {
+	f, err := os.Create(path)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	_, err = io.Copy(io.MultiWriter(os.Stdout, f), os.Stdin)
+	return err
 }
 
 func cat(paths ...string) error {

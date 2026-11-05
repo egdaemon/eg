@@ -1,4 +1,4 @@
-package shell
+package egbash
 
 import (
 	"context"
@@ -14,7 +14,6 @@ import (
 	"github.com/egdaemon/eg/interp/interptest"
 	"github.com/egdaemon/sh/v3/interp"
 	"github.com/stretchr/testify/require"
-	"github.com/tetratelabs/wazero"
 	"google.golang.org/grpc"
 )
 
@@ -34,7 +33,7 @@ func serve(t *testing.T) (runtimedir string) {
 	l, err = net.Listen("unix", filepath.Join(runtimedir, eg.SocketControl))
 	require.NoError(t, err)
 	srv := grpc.NewServer()
-	execproxy.NewProxy(filepath.Join(runtimedir, "work"), runtimedir, os.Environ(), wazero.NewFSConfig()).Bind(srv)
+	execproxy.NewProxy(filepath.Join(runtimedir, "work"), runtimedir, os.Environ()).Bind(srv)
 	go srv.Serve(l)
 	t.Cleanup(srv.Stop)
 	return runtimedir
@@ -188,11 +187,60 @@ func TestRun(t *testing.T) {
 			t.Skip("builds and runs a wasip1 guest")
 		}
 
-		wasm := interptest.Build(t, "./runtime/wasi/shell/v2/.fixtures/guest")
+		wasm := interptest.Build(t, "./runtime/x/wasi/egbash/.fixtures/guest")
 		for _, mode := range []string{"pipeline", "substitution", "devnull", "exit", "script"} {
 			t.Run(mode, func(t *testing.T) {
 				require.NoError(t, interptest.Run(t, wasm, serve(t), time.Minute, "SHELL_MODE="+mode, eg.EnvComputeWorkingDirectory+"="+eg.DefaultRuntimeDirectory("work")))
 			})
 		}
+	})
+
+	t.Run("wasi module set", func(t *testing.T) {
+		if testing.Short() {
+			t.Skip("builds and runs a wasip1 guest")
+		}
+
+		wasm := interptest.Build(t, "./runtime/x/wasi/egbash/.fixtures/guest")
+		module := interptest.Build(t, "./interp/runtime/wasi/ffiwasi/.fixtures/module")
+
+		// modules links the module fixture into a new module directory as each of names.
+		modules := func(t *testing.T, names ...string) string {
+			dir := t.TempDir()
+			for _, name := range names {
+				require.NoError(t, os.Symlink(module, filepath.Join(dir, name+".wasi")))
+			}
+			return dir
+		}
+
+		// run runs the guest in mode with the module set in moddir, the runtime directory rundir and its work
+		// directory as the working directory.
+		run := func(t *testing.T, rundir string, moddir string, mode string) error {
+			return interptest.RunModules(t, wasm, rundir, moddir, filepath.Join(rundir, "work"), time.Minute, "SHELL_MODE="+mode, eg.EnvComputeWorkingDirectory+"="+eg.DefaultRuntimeDirectory("work"))
+		}
+
+		// isolated is a runtime directory without a module socket, so a command only succeeds if it never leaves
+		// the runtime.
+		isolated := func(t *testing.T) string {
+			// unix socket paths are length limited, t.TempDir can exceed it.
+			rundir, err := os.MkdirTemp("", "shell")
+			require.NoError(t, err)
+			t.Cleanup(func() { os.RemoveAll(rundir) })
+			require.NoError(t, os.Mkdir(filepath.Join(rundir, "work"), 0700))
+			return rundir
+		}
+
+		for _, mode := range []string{"wasi", "wasienv", "wasiexit"} {
+			t.Run(mode, func(t *testing.T) {
+				require.NoError(t, run(t, isolated(t), modules(t, "tee", "env", "code"), mode))
+			})
+		}
+
+		t.Run("commands outside of the set reach the module", func(t *testing.T) {
+			require.NoError(t, run(t, serve(t), modules(t, "tee"), "pipeline"))
+		})
+
+		t.Run("commands outside of the set fail without the module", func(t *testing.T) {
+			require.Error(t, run(t, isolated(t), modules(t, "tee"), "pipeline"))
+		})
 	})
 }

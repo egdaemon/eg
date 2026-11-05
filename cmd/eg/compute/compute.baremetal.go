@@ -302,7 +302,6 @@ func (t baremetal) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, hotswapbin
 				FromEnviron(gitenv...).
 				FromEnviron(os.Environ()...).Environ(),
 		),
-		interp.Mounts(ws),
 	).Bind(srv)
 
 	canonicaluri := errorsx.Zero(gitx.CanonicalURI(repo, t.GitRemote))

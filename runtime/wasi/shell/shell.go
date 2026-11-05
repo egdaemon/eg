@@ -19,7 +19,7 @@ import (
 	"github.com/egdaemon/eg/internal/userx"
 	"github.com/egdaemon/eg/runtime/wasi/eg"
 	"github.com/egdaemon/eg/runtime/wasi/egunsafe/ffiexec"
-	v2 "github.com/egdaemon/eg/runtime/wasi/shell/v2"
+	"github.com/egdaemon/eg/runtime/x/wasi/egbash"
 )
 
 const (
@@ -315,7 +315,7 @@ func retry(ctx context.Context, c Command, do func() error) (err error) {
 func auto() entrypoint {
 	if envx.Boolean(false, _eg.EnvExperimentalGuestShell) {
 		return func(ctx context.Context, user string, group string, cmd string, directory string, environ []string, _ Execer) error {
-			return v2.Run(ctx, user, group, cmd, directory, environ)
+			return egbash.Run(ctx, user, group, cmd, directory, environ)
 		}
 	}
 

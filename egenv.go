@@ -283,6 +283,5 @@ const (
 	EnvExperimentalBaremetal          = "EG_EXPERIMENTAL_BAREMETAL"
 	EnvExperimentalBindMount          = "EG_EXPERIMENTAL_BIND_MOUNT"
 	EnvExperimentalProcSockets        = "EG_EXPERIMENTAL_PROC_SOCKETS" // interp/execproxy/v2 carries a command's stdio over unix sockets in the runtime directory.
-	EnvExperimentalGuestShell         = "EG_EXPERIMENTAL_GUEST_SHELL"  // runtime/wasi/shell/v2 interprets commands in the guest, requires EG_EXPERIMENTAL_PROC_SOCKETS for the module.
-	EnvExperimentalCoreutils          = "EG_EXPERIMENTAL_COREUTILS"    // runtime/wasi/shell/v2 runs coreutils commands in coreutils.wasm, requires EG_EXPERIMENTAL_GUEST_SHELL.
+	EnvExperimentalGuestShell         = "EG_EXPERIMENTAL_GUEST_SHELL"  // runtime/x/wasi/egbash interprets commands in the guest, requires EG_EXPERIMENTAL_PROC_SOCKETS for the module.
 )

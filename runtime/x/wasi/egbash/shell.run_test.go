@@ -79,6 +79,44 @@ func TestRun(t *testing.T) {
 		require.NoDirExists(t, filepath.Join(workdir, "a"))
 	})
 
+	// the flags below are ones eg's packages and workloads pass. u-root does not support them yet, so these are
+	// skipped until it does, or until the commands stop going to x/coreutils.
+	t.Run("tar archives a directory with -C", func(t *testing.T) {
+		t.Skip("u-root's tar has no -C: egtarball and release/eg/targz pass it")
+		workdir := guest(t)
+		require.NoError(t, Run(t.Context(), "", "", "mkdir -p src out && echo hi > src/f && tar -C src -czf a.tgz . && tar -C out -xzf a.tgz", "", nil))
+		require.Equal(t, "hi\n", read(t, filepath.Join(workdir, "out", "f")))
+	})
+
+	t.Run("cp -a copies a directory with its modes", func(t *testing.T) {
+		t.Skip("u-root's cp has no -a")
+		workdir := guest(t)
+		require.NoError(t, os.MkdirAll(filepath.Join(workdir, "src"), 0700))
+		require.NoError(t, os.WriteFile(filepath.Join(workdir, "src", "f"), []byte("hi"), 0750))
+		require.NoError(t, Run(t.Context(), "", "", "cp -a src dst", "", nil))
+		info, err := os.Stat(filepath.Join(workdir, "dst", "f"))
+		require.NoError(t, err)
+		require.Equal(t, os.FileMode(0750), info.Mode().Perm())
+	})
+
+	t.Run("chmod -R changes a directory's tree", func(t *testing.T) {
+		t.Skip("u-root's chmod has no -R")
+		workdir := guest(t)
+		require.NoError(t, os.MkdirAll(filepath.Join(workdir, "src", "sub"), 0700))
+		require.NoError(t, os.WriteFile(filepath.Join(workdir, "src", "sub", "f"), []byte("hi"), 0600))
+		require.NoError(t, Run(t.Context(), "", "", "chmod -R 755 src", "", nil))
+		info, err := os.Stat(filepath.Join(workdir, "src", "sub", "f"))
+		require.NoError(t, err)
+		require.Equal(t, os.FileMode(0755), info.Mode().Perm())
+	})
+
+	t.Run("ls fails on a missing path", func(t *testing.T) {
+		t.Skip("u-root's ls reports a missing path but exits 0")
+		workdir := guest(t)
+		require.NoError(t, Run(t.Context(), "", "", "ls does-not-exist 2>/dev/null || echo fallback > out", "", nil))
+		require.Equal(t, "fallback\n", read(t, filepath.Join(workdir, "out")))
+	})
+
 	t.Run("pipes a builtin into a module command", func(t *testing.T) {
 		workdir := native(t)
 		require.NoError(t, Run(t.Context(), "", "", "echo hello | tr a-z A-Z > out", "", nil))

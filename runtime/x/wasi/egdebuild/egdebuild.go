@@ -115,6 +115,13 @@ func (option) Distro(s string) option {
 	}
 }
 
+// architecture of the debian package, all for packages whose files are the same on every architecture.
+func (option) Architecture(arch string) option {
+	return func(c *Config) {
+		c.Architecture = arch
+	}
+}
+
 func (option) DependsBuild(deps ...string) option {
 	return func(c *Config) {
 		c.Dependency.Build = deps

@@ -1,7 +1,8 @@
 // Package egbash interprets shell commands inside the guest with egdaemon/sh, so expansion, redirects, pipes,
 // builtins, the bash and sh scripts a command starts and the coreutils egdaemon/sh/x provides stay in the
-// sandbox, and only the other external commands reach the module, through execproxy/v2. eg/shell runs through it
-// with EG_EXPERIMENTAL_GUEST_SHELL, which requires EG_EXPERIMENTAL_PROC_SOCKETS for the module.
+// sandbox. the coreutils egdaemon/sh/x lacks run in the runtime's coreutils reactor, when the runtime has one,
+// and only the other external commands reach the module, through execproxy/v2. eg/shell runs through it with
+// EG_EXPERIMENTAL_GUEST_SHELL, which requires EG_EXPERIMENTAL_PROC_SOCKETS for the module.
 package egbash
 
 import (
@@ -17,12 +18,15 @@ import (
 	"github.com/egdaemon/eg/interp/execproxy/v2"
 	"github.com/egdaemon/eg/runtime/wasi/egenv"
 	"github.com/egdaemon/eg/runtime/wasi/egunsafe"
+	"github.com/egdaemon/eg/runtime/wasi/egunsafe/fficoreutils"
 	"github.com/egdaemon/sh/v3/expand"
 	"github.com/egdaemon/sh/v3/interp"
 	"github.com/egdaemon/sh/v3/syntax"
 	"github.com/egdaemon/sh/x/coreutils"
 	"github.com/egdaemon/wasinet/wasinet"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 // Run interprets cmd in directory, relative to the working directory, with environ added to the guest's
@@ -53,7 +57,7 @@ func Run(ctx context.Context, user string, group string, cmd string, directory s
 		interp.Dir(directory),
 		interp.StdIO(nil, os.Stdout, os.Stderr),
 		interp.OpenHandler(open),
-		interp.ExecHandlers(scripts, coreutils.ExecHandler, func(interp.ExecHandlerFunc) interp.ExecHandlerFunc {
+		interp.ExecHandlers(scripts, coreutils.ExecHandler, utilities, func(interp.ExecHandlerFunc) interp.ExecHandlerFunc {
 			return module(v1.NewProxyClient(cc), user, group)
 		}),
 	); err != nil {
@@ -61,6 +65,23 @@ func Run(ctx context.Context, user string, group string, cmd string, directory s
 	}
 
 	return r.Run(ctx, file)
+}
+
+// utilities runs the coreutils the runtime provides in the runtime, in the command's directory, and gives every
+// other command to next. the runtime's instances share the guest's mounts and environment, so the command's own
+// environment changes do not reach them.
+func utilities(next interp.ExecHandlerFunc) interp.ExecHandlerFunc {
+	return func(ctx context.Context, args []string) (err error) {
+		var (
+			hc = interp.HandlerCtx(ctx)
+		)
+
+		if err = run(ctx, fficoreutils.Proxy{}, &v1.ExecRequest{Dir: hc.Dir, Cmd: args[0], Arguments: args[1:]}); status.Code(err) == codes.NotFound {
+			return next(ctx, args)
+		}
+
+		return err
+	}
 }
 
 // module runs each external command in the module as user and group, in the interpreter's directory and with the

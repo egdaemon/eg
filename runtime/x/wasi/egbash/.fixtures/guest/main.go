@@ -22,6 +22,9 @@ import (
 //	exit         - a module command's exit code is returned as the interpreter's exit status.
 //	script       - a shebang script written by the guest runs in the guest, and its module commands reach the module.
 //	coreutils    - files created, piped through cat, copied, moved and removed by the coreutils in the guest.
+//	reactor      - utilities of the runtime's coreutils, one run in the command's directory and one with a builtin piped into it.
+//	uutils       - a pipeline and a sequence of uutils commands, which reuse the runtime's reactor instances.
+//	reactorexit  - a utility's exit code is returned as the interpreter's exit status.
 func main() {
 	var (
 		err error
@@ -56,6 +59,17 @@ func main() {
 		expect(`printf '#!/bin/sh\nn=$(printf abc | wc -c); echo "$0 $1 $((n + 1))" > out\n' > run.sh; ./run.sh arg`, "./run.sh arg 4\n")
 	case "coreutils":
 		expect("mkdir -p a/b && echo hello world | cat > a/b/f && cp a/b/f c && mv c out && rm -r a", "hello world\n")
+	case "reactor":
+		// the Go fixture loses the output of an instance reused after it read a socket, which the coreutils reactor
+		// does not (see uutils), so upper runs last.
+		expect("where > out; echo hello | upper >> out", egenv.WorkingDirectory()+"\nHELLO\n")
+	case "uutils":
+		expect("echo hello | tr a-z A-Z > out; basename /x/y >> out; echo a b | wc -w >> out", "HELLO\ny\n2\n")
+	case "reactorexit":
+		err = egbash.Run(ctx, "", "", "code 3", "", nil)
+		if status, ok := errors.AsType[interp.ExitStatus](err); !ok || status != 3 {
+			log.Fatalln("unexpected result", err)
+		}
 	case "exit":
 		err = egbash.Run(ctx, "", "", "env sh -c 'exit 3'", "", nil)
 		if status, ok := errors.AsType[interp.ExitStatus](err); !ok || status != 3 {

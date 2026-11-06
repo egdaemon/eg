@@ -1,4 +1,4 @@
-// module used by the module set tests in place of coreutils: a multicall binary that dispatches on its name.
+// module used by the loader tests: a multicall binary that dispatches on its name.
 package main
 
 import (

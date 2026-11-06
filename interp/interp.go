@@ -27,8 +27,8 @@ import (
 	"github.com/egdaemon/eg/interp/runtime/wasi/ffiexec"
 	"github.com/egdaemon/eg/interp/runtime/wasi/ffigit"
 	"github.com/egdaemon/eg/interp/runtime/wasi/ffigraph"
-	"github.com/egdaemon/eg/interp/runtime/wasi/ffiwasi"
 	"github.com/egdaemon/eg/interp/runtime/wasi/ffiwasinet"
+	"github.com/egdaemon/eg/interp/runtime/wasi/wasimod"
 	"github.com/egdaemon/eg/interp/wasidebug"
 	"github.com/egdaemon/eg/workspaces"
 	"github.com/egdaemon/wasinet/wasinet/wnetruntime"
@@ -327,17 +327,18 @@ func (t runner) perform(ctx context.Context, wshost workspaces.Context, runid, p
 		wasidebug.Host(wasinet)
 	}
 
-	wasimods, err := ffiwasi.Load(ctx, runtime, ffiwasi.Directory(), wazerofs, wshost.WorkingDir, wshost.RuntimeDir)
-	if err != nil {
-		return errorsx.Wrap(err, "unable to load the wasi modules")
-	}
-
-	hostenv, err := wasimods.Export(rtb(t, runtime.NewHostModuleBuilder("env"))).
+	hostenv, err := rtb(t, runtime.NewHostModuleBuilder("env")).
 		Instantiate(ctx)
 	if err != nil {
 		return errorsx.Wrap(err, "failed to setup host environment")
 	}
 	defer hostenv.Close(ctx)
+
+	wasimods, err := wasimod.Load(ctx, runtime, wasimod.Directory(), mcfg)
+	if err != nil {
+		return errorsx.Wrap(err, "unable to load the wasi modules")
+	}
+	defer wasimods.Close(ctx)
 
 	if tracedebug {
 		wasidebug.Host(hostenv)

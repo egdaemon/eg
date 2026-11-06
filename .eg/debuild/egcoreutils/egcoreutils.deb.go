@@ -22,6 +22,7 @@ import (
 var debskel embed.FS
 
 const (
+	// git@github.com:uutils/coreutils.git
 	container = "eg.deb.egcoreutils"
 	version   = "0.12.0"                                   // uutils release tag.
 	commit    = "dc1efd89948a9ca4c78c3a4b9a6ac891019a8c69" // commit of the release tag.

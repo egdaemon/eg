@@ -87,7 +87,7 @@ func main() {
 		Version            cmdopts.Version              `cmd:"" help:"display versioning information"`
 		Compute            compute.Cmd                  `cmd:"" help:"commands for running compute workloads"`
 		Module             module                       `cmd:"" help:"executes a compiled module directly" hidden:"true"`
-		Wasi               wasiCmd                      `cmd:"" help:"run a standalone wasi module" hidden:"true"`
+		Wasi               Wasi                         `cmd:"" help:"wasi related commmands"`
 		Daemon             daemon                       `cmd:"" help:"run in daemon mode letting the control plane push jobs to machines" hidden:"true"`
 		AgentManagement    actlcmd                      `cmd:"" name:"actl" help:"agent management commands"`
 		Register           cmdaccounts.Signup           `cmd:"" name:"register" help:"register with an account with eg"`

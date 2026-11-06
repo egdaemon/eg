@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"crypto/rand"
 	"database/sql"
 	"errors"
 	"fmt"
@@ -21,7 +20,6 @@ import (
 	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/cmd/cmdopts"
 	"github.com/egdaemon/eg/cmd/eg/daemons"
-	"github.com/egdaemon/eg/compile"
 	"github.com/egdaemon/eg/duckpgwire"
 	"github.com/egdaemon/eg/duckproxyserver"
 	"github.com/egdaemon/eg/internal/bytesx"
@@ -36,19 +34,15 @@ import (
 	"github.com/egdaemon/eg/internal/runtimex"
 	"github.com/egdaemon/eg/internal/stringsx"
 	"github.com/egdaemon/eg/internal/userx"
-	"github.com/egdaemon/eg/internal/wasix"
 	"github.com/egdaemon/eg/interp"
 	"github.com/egdaemon/eg/interp/c8sproxy"
 	"github.com/egdaemon/eg/interp/dbproxy/dbservice"
 	"github.com/egdaemon/eg/interp/events"
 	"github.com/egdaemon/eg/interp/execproxy/v2"
-	"github.com/egdaemon/eg/interp/runtime/wasi/ffiwasinet"
 	"github.com/egdaemon/eg/runners"
 	"github.com/egdaemon/eg/runtime/wasi/egunsafe/egworkloads"
 	"github.com/egdaemon/eg/workspaces"
 	"github.com/gofrs/uuid/v5"
-	"github.com/tetratelabs/wazero"
-	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
@@ -541,96 +535,4 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 		t.Module,
 		interp.OptionEnviron(cmdenv...),
 	)
-}
-
-type wasiCmd struct {
-	Dir       string `name:"directory" help:"root directory of the repository" default:"${vars_git_directory}"`
-	Module    string `arg:"" help:"name of the module to run"`
-	ModuleDir string `name:"moduledir" help:"deprecated removed once infrastructure is updated" hidden:"true" default:"${vars_workload_directory}"`
-}
-
-func (t wasiCmd) Run(gctx *cmdopts.Global) (err error) {
-	var (
-		ws workspaces.Context
-	)
-
-	ctx, done := context.WithCancel(gctx.Context)
-	defer done()
-
-	if ws, err = workspaces.FromEnv(gctx.Context, t.Dir, t.Module); err != nil {
-		return err
-	}
-
-	mpath := filepath.Join(ws.RuntimeDir, "test.wasm")
-	debugx.Println("wasipath", ws.RuntimeDir, mpath)
-	if err = compile.Run(ctx, t.Dir, t.Module, mpath); err != nil {
-		return err
-	}
-	wruntime := wazero.NewRuntimeWithConfig(
-		ctx,
-		wazero.NewRuntimeConfigInterpreter(),
-	)
-
-	mcfg := wazero.NewModuleConfig().
-		// Instructs WASI sched_yield to actually yield the host thread
-		WithOsyield(runtime.Gosched).
-		// Enables actual sleeping for WASI nanosleep calls
-		WithSysNanosleep().
-		WithStdin(os.Stdin).
-		WithStderr(os.Stderr).
-		WithStdout(os.Stdout).
-		WithFSConfig(
-			wazero.NewFSConfig().
-				WithDirMount("/etc/resolv.conf", "/etc/resolv.conf"),
-		).
-		WithSysNanotime().
-		WithSysWalltime().
-		WithRandSource(rand.Reader)
-
-	environ := errorsx.Zero(envx.Build().FromEnviron(os.Environ()...).Environ())
-	// envx.Debug(environ...)
-	mcfg = wasix.Environ(mcfg, environ...)
-
-	wasienv, err := wasi_snapshot_preview1.NewBuilder(wruntime).Instantiate(ctx)
-	if err != nil {
-		return err
-	}
-	defer wasienv.Close(ctx)
-
-	wasinet, err := ffiwasinet.Wazero(wruntime).Instantiate(ctx)
-	if err != nil {
-		return err
-	}
-	defer wasinet.Close(ctx)
-
-	hostenv, err := wruntime.
-		NewHostModuleBuilder("env").
-		Instantiate(ctx)
-	if err != nil {
-		return err
-	}
-	defer hostenv.Close(ctx)
-
-	log.Println("interp initiated", mpath)
-	defer log.Println("interp completed", mpath)
-	wasi, err := os.ReadFile(mpath)
-	if err != nil {
-		return err
-	}
-
-	c, err := wruntime.CompileModule(ctx, wasi)
-	if err != nil {
-		return err
-	}
-	defer c.Close(ctx)
-
-	// wasidebug.Module(c)
-
-	m, err := wruntime.InstantiateModule(ctx, c, mcfg.WithName(mpath))
-	if err != nil {
-		return err
-	}
-	defer m.Close(ctx)
-
-	return nil
 }

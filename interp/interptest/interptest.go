@@ -6,6 +6,7 @@ package interptest
 import (
 	"context"
 	"database/sql"
+	"embed"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -17,6 +18,7 @@ import (
 	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/duckproxyserver"
 	"github.com/egdaemon/eg/interp/events"
+	"github.com/egdaemon/eg/interp/runtime/wasi/fficoreutils"
 	"github.com/egdaemon/eg/interp/runtime/wasi/ffiwasinet"
 	"github.com/egdaemon/wasinet/wasinet/wnetruntime"
 	"github.com/stretchr/testify/require"
@@ -25,15 +27,16 @@ import (
 )
 
 // Build compiles the main package at pkg (relative to the module root, e.g. "./runtime/.../.fixtures/guest")
-// for wasip1 and returns the path of the module. the test is skipped when it cannot be built.
-func Build(t *testing.T, pkg string) string {
+// for wasip1 with flags, e.g. -buildmode=c-shared for a reactor, and returns the path of the module. the test is
+// skipped when it cannot be built.
+func Build(t *testing.T, pkg string, flags ...string) string {
 	t.Helper()
 
 	_, file, _, ok := runtime.Caller(0)
 	require.True(t, ok)
 
 	out := filepath.Join(t.TempDir(), "guest.wasm")
-	cmd := exec.Command("go", "build", "-o", out, pkg)
+	cmd := exec.Command("go", append(append([]string{"build"}, flags...), "-o", out, pkg)...)
 	cmd.Dir = filepath.Dir(filepath.Dir(filepath.Dir(file)))
 	cmd.Env = append(os.Environ(), "GOOS=wasip1", "GOARCH=wasm")
 	if b, err := cmd.CombinedOutput(); err != nil {
@@ -89,6 +92,13 @@ func StartAnalytics(t *testing.T, opts ...duckproxyserver.Option) Analytics {
 // set as KEY=VALUE pairs. a non zero exit is returned as an error.
 func Run(t *testing.T, wasm string, rundir string, timeout time.Duration, environ ...string) error {
 	t.Helper()
+	return RunCoreutils(t, wasm, rundir, "", timeout, environ...)
+}
+
+// RunCoreutils is Run with the coreutils reactor at coreutils, which provides no utilities when the file does not
+// exist, serving the guest as the interpreter's runtime does.
+func RunCoreutils(t *testing.T, wasm string, rundir string, coreutils string, timeout time.Duration, environ ...string) error {
+	t.Helper()
 
 	ctx, done := context.WithTimeout(context.Background(), timeout)
 	defer done()
@@ -105,19 +115,13 @@ func Run(t *testing.T, wasm string, rundir string, timeout time.Duration, enviro
 	).Instantiate(ctx)
 	require.NoError(t, err)
 
-	bin, err := os.ReadFile(wasm)
-	require.NoError(t, err)
-
-	compiled, err := rt.CompileModule(ctx, bin)
-	require.NoError(t, err)
-
+	// an empty read-only root under the runtime directory, as the interpreter mounts.
 	cfg := wazero.NewModuleConfig().
-		WithFSConfig(wazero.NewFSConfig().WithDirMount(rundir, eg.DefaultRuntimeDirectory())).
+		WithFSConfig(wazero.NewFSConfig().WithFSMount(embed.FS{}, "/").WithDirMount(rundir, eg.DefaultRuntimeDirectory())).
 		WithStdout(os.Stdout).
 		WithStderr(os.Stderr).
 		WithSysNanotime().
-		WithSysWalltime().
-		WithName(filepath.Base(wasm))
+		WithSysWalltime()
 
 	for _, kv := range environ {
 		for i := range kv {
@@ -128,6 +132,19 @@ func Run(t *testing.T, wasm string, rundir string, timeout time.Duration, enviro
 		}
 	}
 
-	_, err = rt.InstantiateModule(ctx, compiled, cfg)
+	reactor, err := fficoreutils.Load(ctx, rt, coreutils, cfg, fficoreutils.Streams{Stdout: os.Stdout, Stderr: os.Stderr})
+	require.NoError(t, err)
+	defer reactor.Close(context.Background())
+
+	_, err = reactor.Export(rt.NewHostModuleBuilder("env"), rundir).Instantiate(ctx)
+	require.NoError(t, err)
+
+	bin, err := os.ReadFile(wasm)
+	require.NoError(t, err)
+
+	compiled, err := rt.CompileModule(ctx, bin)
+	require.NoError(t, err)
+
+	_, err = rt.InstantiateModule(ctx, compiled, cfg.WithName(filepath.Base(wasm)))
 	return err
 }

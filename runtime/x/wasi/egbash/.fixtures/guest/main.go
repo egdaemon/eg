@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/egdaemon/eg/runtime/wasi/egenv"
-	"github.com/egdaemon/eg/runtime/wasi/shell/v2"
+	"github.com/egdaemon/eg/runtime/x/wasi/egbash"
 	"github.com/egdaemon/sh/v3/interp"
 )
 
@@ -21,6 +21,7 @@ import (
 //	devnull      - /dev/null, which the guest has no mount for, and a failing module command reaching ||.
 //	exit         - a module command's exit code is returned as the interpreter's exit status.
 //	script       - a shebang script written by the guest runs in the guest, and its module commands reach the module.
+//	coreutils    - files created, piped through cat, copied, moved and removed by the coreutils in the guest.
 func main() {
 	var (
 		err error
@@ -33,7 +34,7 @@ func main() {
 		var (
 			b []byte
 		)
-		if err = shell.Run(ctx, "", "", script, "", nil); err != nil {
+		if err = egbash.Run(ctx, "", "", script, "", nil); err != nil {
 			log.Fatalln("run failed", script, err)
 		}
 		if b, err = os.ReadFile(egenv.WorkingDirectory("out")); err != nil {
@@ -53,8 +54,10 @@ func main() {
 		expect("echo hidden > /dev/null; ls does-not-exist 2>/dev/null || echo fallback > out", "fallback\n")
 	case "script":
 		expect(`printf '#!/bin/sh\nn=$(printf abc | wc -c); echo "$0 $1 $((n + 1))" > out\n' > run.sh; ./run.sh arg`, "./run.sh arg 4\n")
+	case "coreutils":
+		expect("mkdir -p a/b && echo hello world | cat > a/b/f && cp a/b/f c && mv c out && rm -r a", "hello world\n")
 	case "exit":
-		err = shell.Run(ctx, "", "", "env sh -c 'exit 3'", "", nil)
+		err = egbash.Run(ctx, "", "", "env sh -c 'exit 3'", "", nil)
 		if status, ok := errors.AsType[interp.ExitStatus](err); !ok || status != 3 {
 			log.Fatalln("unexpected result", err)
 		}

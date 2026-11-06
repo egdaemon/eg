@@ -5,7 +5,6 @@ package execproxy
 import (
 	context "context"
 	"errors"
-	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -13,8 +12,8 @@ import (
 
 	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/internal/envx"
-	"github.com/egdaemon/eg/internal/errorsx"
 	v1 "github.com/egdaemon/eg/interp/execproxy"
+	"github.com/egdaemon/eg/interp/execproxy/v2/proc"
 	"github.com/egdaemon/eg/runtime/x/wasi/execx"
 	"google.golang.org/grpc"
 )
@@ -71,7 +70,7 @@ func (t *Proxy) Exec(ctx context.Context, req *v1.ExecRequest) (resp *v1.ExecRes
 		return &v1.ExecResponse{}, nil
 	}
 
-	if stdio, err = t.stdio(req.Id); err != nil {
+	if stdio, err = proc.Dial(t.runtimedir, req.Id); err != nil {
 		return nil, err
 	}
 	defer func() {
@@ -89,42 +88,6 @@ func (t *Proxy) Exec(ctx context.Context, req *v1.ExecRequest) (resp *v1.ExecRes
 	}
 
 	return &v1.ExecResponse{Exit: exitcode(cmd.ProcessState)}, nil
-}
-
-// stdio connects to the guest's stdin, stdout and stderr sockets for the process id. the sockets are handed
-// to the command as files, so its output reaches the guest without passing through this process.
-func (t *Proxy) stdio(id string) (files []*os.File, err error) {
-	var (
-		conn net.Conn
-		f    *os.File
-	)
-
-	if !filepath.IsLocal(id) || filepath.Base(id) != id {
-		return nil, errorsx.Errorf("invalid process id: %q", id)
-	}
-
-	for _, name := range stdionames {
-		if conn, err = net.Dial("unix", filepath.Join(t.runtimedir, "proc", id, name)); err != nil {
-			break
-		}
-
-		f, err = conn.(*net.UnixConn).File()
-		conn.Close()
-		if err != nil {
-			break
-		}
-
-		files = append(files, f)
-	}
-
-	if err != nil {
-		for _, f = range files {
-			f.Close()
-		}
-		return nil, errorsx.Wrapf(err, "unable to connect the stdio of process %s", id)
-	}
-
-	return files, nil
 }
 
 // exitcode reports a process killed by a signal as 128 plus the signal, like a shell does.

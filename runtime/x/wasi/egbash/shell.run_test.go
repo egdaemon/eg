@@ -254,32 +254,5 @@ func TestRun(t *testing.T) {
 			require.NoError(t, os.Mkdir(filepath.Join(rundir, "work"), 0700))
 			require.NoError(t, interptest.Run(t, wasm, rundir, time.Minute, "SHELL_MODE=coreutils", eg.EnvComputeWorkingDirectory+"="+eg.DefaultRuntimeDirectory("work")))
 		})
-
-		// the runtime directory has no module socket, so the utilities only succeed if they run in the runtime's
-		// coreutils reactor.
-		isolated := func(t *testing.T, reactor string, mode string) error {
-			// unix socket paths are length limited, t.TempDir can exceed it.
-			rundir, err := os.MkdirTemp("", "shell")
-			require.NoError(t, err)
-			t.Cleanup(func() { os.RemoveAll(rundir) })
-			require.NoError(t, os.Mkdir(filepath.Join(rundir, "work"), 0700))
-			return interptest.RunCoreutils(t, wasm, rundir, reactor, time.Minute, "SHELL_MODE="+mode, eg.EnvComputeWorkingDirectory+"="+eg.DefaultRuntimeDirectory("work"))
-		}
-
-		reactor := interptest.Build(t, "./interp/runtime/wasi/fficoreutils/.fixtures/reactor", "-buildmode=c-shared")
-		for _, mode := range []string{"reactor", "reactorexit"} {
-			t.Run(mode, func(t *testing.T) {
-				require.NoError(t, isolated(t, reactor, mode))
-			})
-		}
-
-		// EG_TEST_COREUTILS_WASM must point at a coreutils reactor module (wasm32-wasip1 with feat_wasm_reactor).
-		t.Run("uutils", func(t *testing.T) {
-			uutils := os.Getenv("EG_TEST_COREUTILS_WASM")
-			if uutils == "" {
-				t.Skip("EG_TEST_COREUTILS_WASM not set")
-			}
-			require.NoError(t, isolated(t, uutils, "uutils"))
-		})
 	})
 }

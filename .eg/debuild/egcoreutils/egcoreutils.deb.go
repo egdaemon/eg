@@ -22,10 +22,9 @@ import (
 var debskel embed.FS
 
 const (
-	// git@github.com:uutils/coreutils.git
 	container = "eg.deb.egcoreutils"
-	version   = "0.12.0"                                   // uutils release tag.
-	commit    = "dc1efd89948a9ca4c78c3a4b9a6ac891019a8c69" // commit of the release tag.
+	version   = "0.12.0"                                   // uutils release the fork is based on.
+	commit    = "0d10f1d3b3b10b7c5084f4564409d0238832a328" // egdaemon/coreutils commit with the reactor and uu_chdir.
 	toolchain = "1.93.1"                                   // rust toolchain, at least the 1.88 uutils requires.
 	target    = "wasm32-wasip1"
 )
@@ -56,8 +55,8 @@ func Prepare(ctx context.Context, o eg.Op) error {
 	sruntime := shell.Runtime().Directory(egenv.DirectoryCache())
 	return eg.Parallel(
 		shell.Op(
-			sruntime.Newf("test -d uutils || git clone -b %s --depth 1 https://github.com/uutils/coreutils.git uutils", version),
-			sruntime.Newf("test \"$(git -C uutils rev-parse HEAD)\" = %s", commit),
+			sruntime.Newf("test -d coreutils || (git init -q coreutils && git -C coreutils fetch -q --depth 1 https://github.com/egdaemon/coreutils.git %s && git -C coreutils checkout -q FETCH_HEAD)", commit),
+			sruntime.Newf("test \"$(git -C coreutils rev-parse HEAD)\" = %s", commit),
 		),
 		egdebuild.Prepare(Runner(), errorsx.Must(fs.Sub(debskel, ".debskel"))),
 	)(ctx, o)
@@ -68,17 +67,17 @@ func Runner() eg.ContainerRunner {
 	return eg.Container(container)
 }
 
-// Compile builds coreutils.wasm into the package's source directory. launchpad's rust has no wasm32 standard
+// Compile builds the coreutils reactor, coreutils.wasm, into the package's source directory. launchpad's rust has no wasm32 standard
 // library, so the package ships the module built here instead of building it from source.
 func Compile(ctx context.Context, o eg.Op) error {
 	runtime := egcargo.Runtime().
 		Environ("RUSTUP_HOME", egcargo.CacheDirectory("rustup")).
-		Directory(egenv.DirectoryCache("uutils"))
+		Directory(egenv.DirectoryCache("coreutils"))
 	dist := egenv.DirectoryCache("egcoreutils", "dist")
 	return shell.Run(
 		ctx,
 		runtime.Newf("rustup toolchain install %s --profile minimal --target %s", toolchain, target),
-		runtime.Newf("rustup run %s cargo build --release --locked --target %s --no-default-features --features feat_wasm", toolchain, target).Timeout(30*time.Minute),
+		runtime.Newf("rustup run %s cargo rustc --lib --crate-type cdylib --release --locked --target %s --no-default-features --features \"feat_wasm feat_wasm_reactor\"", toolchain, target).Timeout(30*time.Minute),
 		runtime.Newf("install -D -m 0644 target/%s/release/coreutils.wasm %s/coreutils.wasm", target, dist),
 		runtime.Newf("install -m 0644 LICENSE %s/LICENSE", dist),
 	)

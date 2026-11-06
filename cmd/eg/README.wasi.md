@@ -37,8 +37,12 @@ EG_COREUTILS_WASM=<path> go generate ./runtime/x/wasi/unsafecoreutils
 
 ### notes
 
-- utilities run on a single shared instance of the module, calls are serialized. A call that blocks (waiting on
-  stdin, `sleep`) blocks every other call until it finishes.
+- utilities run on a pool of instances of the module. A call takes an idle instance, or instantiates one when every
+  instance is busy, so calls that block (waiting on stdin, `sleep`) don't hold up the others, and a pipeline's
+  utilities run at the same time. An instance a call fails on is closed instead of reused.
+- a call's deadline stops it, including a `sleep` it's blocked in. A call started through the guest's sockets
+  (`fficoreutils.Proxy`) also stops when it's blocked reading or writing them. A call made with `Run` reads and
+  writes stdio its caller owns, so a deadline can't end a read blocked on that.
 - the module's directories are fixed paths (`/eg.mnt/...`, `/workload/...`), so the command needs them to exist
   and be writable.
 

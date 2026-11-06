@@ -3,12 +3,14 @@ package fficoreutils_test
 import (
 	"bytes"
 	"context"
+	"embed"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/egdaemon/eg/interp/runtime/wasi/fficoreutils"
 	"github.com/stretchr/testify/require"
@@ -47,7 +49,7 @@ func TestRunFromGuest(t *testing.T) {
 	// the reactor has no stdio of its own, everything below is provided by the guest.
 	host := fficoreutils.New(
 		rt, compiled,
-		wazero.NewModuleConfig().WithFSConfig(wazero.NewFSConfig().WithDirMount(dir, "/work")),
+		wazero.NewModuleConfig().WithFSConfig(wazero.NewFSConfig().WithFSMount(embed.FS{}, "/").WithDirMount(dir, "/work")),
 		fficoreutils.Streams{},
 	)
 	defer host.Close(ctx)
@@ -97,7 +99,7 @@ func TestCallStreamsConcurrent(t *testing.T) {
 
 	r := fficoreutils.New(
 		rt, compiled,
-		wazero.NewModuleConfig().WithFSConfig(wazero.NewFSConfig().WithDirMount(dir, "/work")),
+		wazero.NewModuleConfig().WithFSConfig(wazero.NewFSConfig().WithFSMount(embed.FS{}, "/").WithDirMount(dir, "/work")),
 		fficoreutils.Streams{},
 	)
 	defer r.Close(ctx)
@@ -111,7 +113,7 @@ func TestCallStreamsConcurrent(t *testing.T) {
 			defer wg.Done()
 			var out, errout bytes.Buffer
 			cctx := fficoreutils.WithStreams(ctx, fficoreutils.Streams{Stdout: &out, Stderr: &errout})
-			code, err := r.Call(cctx, "ls", []string{"--help"})
+			code, err := r.Call(cctx, "", "ls", []string{"--help"})
 			require.NoError(t, err)
 			require.Zero(t, code, errout.String())
 			require.Contains(t, out.String(), "Usage: ls")
@@ -126,7 +128,7 @@ func TestCallStreamsConcurrent(t *testing.T) {
 				Stdout: &out,
 				Stderr: &errout,
 			})
-			code, err := r.Call(cctx, "cat", nil)
+			code, err := r.Call(cctx, "", "cat", nil)
 			require.NoError(t, err)
 			require.Zero(t, code, errout.String())
 			require.Equal(t, "from stdin\n", out.String())
@@ -136,7 +138,7 @@ func TestCallStreamsConcurrent(t *testing.T) {
 			// fails: the message goes to this call's stderr, the exit code does not leak.
 			var out, errout bytes.Buffer
 			cctx := fficoreutils.WithStreams(ctx, fficoreutils.Streams{Stdout: &out, Stderr: &errout})
-			code, err := r.Call(cctx, "cat", []string{"/work/missing"})
+			code, err := r.Call(cctx, "", "cat", []string{"/work/missing"})
 			require.NoError(t, err)
 			require.NotZero(t, code)
 			require.Empty(t, out.String())
@@ -144,4 +146,47 @@ func TestCallStreamsConcurrent(t *testing.T) {
 		}()
 	}
 	wg.Wait()
+}
+
+// the Go fixture's own sleep is unreliable inside an exported call, so sleeps are tested against the coreutils
+// reactor.
+func TestCallSleep(t *testing.T) {
+	reactor := os.Getenv("EG_TEST_COREUTILS_WASM")
+	if reactor == "" {
+		t.Skip("EG_TEST_COREUTILS_WASM not set")
+	}
+
+	ctx := context.Background()
+	rt := wazero.NewRuntimeWithConfig(ctx, wazero.NewRuntimeConfig().WithCloseOnContextDone(true))
+	defer rt.Close(ctx)
+
+	_, err := wasi_snapshot_preview1.NewBuilder(rt).Instantiate(ctx)
+	require.NoError(t, err)
+
+	r, err := fficoreutils.Load(ctx, rt, reactor, wazero.NewModuleConfig().WithFSConfig(wazero.NewFSConfig().WithFSMount(embed.FS{}, "/")), fficoreutils.Streams{})
+	require.NoError(t, err)
+	defer r.Close(ctx)
+
+	t.Run("sleeps for the duration", func(t *testing.T) {
+		ts := time.Now()
+		code, err := r.Call(ctx, "", "sleep", []string{"0.2"})
+		require.NoError(t, err)
+		require.Zero(t, code)
+		require.GreaterOrEqual(t, time.Since(ts), 200*time.Millisecond)
+		require.Less(t, time.Since(ts), 5*time.Second)
+	})
+
+	t.Run("a deadline ends the sleep", func(t *testing.T) {
+		dctx, done := context.WithTimeout(ctx, 300*time.Millisecond)
+		defer done()
+
+		ts := time.Now()
+		_, err := r.Call(dctx, "", "sleep", []string{"30"})
+		require.Error(t, err)
+		require.Less(t, time.Since(ts), 5*time.Second)
+
+		code, err := r.Call(ctx, "", "true", nil)
+		require.NoError(t, err)
+		require.Zero(t, code)
+	})
 }

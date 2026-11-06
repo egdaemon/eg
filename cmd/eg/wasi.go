@@ -55,7 +55,8 @@ func (t wasiCmdRun) Run(gctx *cmdopts.Global) (err error) {
 	}
 	wruntime := wazero.NewRuntimeWithConfig(
 		ctx,
-		wazero.NewRuntimeConfigInterpreter(),
+		// closing modules when their context is done is what stops a coreutils call at its deadline.
+		wazero.NewRuntimeConfigInterpreter().WithCloseOnContextDone(true),
 	)
 
 	// the well known directories, same layout as interp.
@@ -102,35 +103,24 @@ func (t wasiCmdRun) Run(gctx *cmdopts.Global) (err error) {
 	}
 	defer wasinet.Close(ctx)
 
-	hostbuilder := wruntime.NewHostModuleBuilder("env")
-	if t.Coreutils != "" {
-		raw, err := os.ReadFile(t.Coreutils)
-		if err != nil {
-			return errorsx.Wrap(err, "unable to read coreutils module")
-		}
-
-		coreutils, err := wruntime.CompileModule(ctx, raw)
-		if err != nil {
-			return errorsx.Wrap(err, "unable to compile coreutils module")
-		}
-		defer coreutils.Close(ctx)
-
-		reactor := fficoreutils.New(
-			wruntime,
-			coreutils,
-			wazero.NewModuleConfig().
-				WithSysNanotime().
-				WithSysWalltime().
-				WithRandSource(rand.Reader).
-				WithFSConfig(wazerofs),
-			fficoreutils.Streams{},
-		)
-		defer reactor.Close(ctx)
-
-		hostbuilder = hostbuilder.
-			NewFunctionBuilder().WithFunc(reactor.Run()).
-			Export("github.com/egdaemon/eg/runtime/wasi/runtime/fficoreutils.Run")
+	// without --coreutils the reactor provides no utilities, and guests still find its host functions.
+	reactor, err := fficoreutils.Load(
+		ctx,
+		wruntime,
+		t.Coreutils,
+		wazero.NewModuleConfig().
+			WithSysNanotime().
+			WithSysWalltime().
+			WithRandSource(rand.Reader).
+			WithFSConfig(wazerofs),
+		fficoreutils.Streams{},
+	)
+	if err != nil {
+		return err
 	}
+	defer reactor.Close(ctx)
+
+	hostbuilder := reactor.Export(wruntime.NewHostModuleBuilder("env"), ws.RuntimeDir)
 
 	hostenv, err := hostbuilder.
 		Instantiate(ctx)

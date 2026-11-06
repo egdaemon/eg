@@ -3,17 +3,20 @@ package main
 import (
 	"context"
 	"crypto/rand"
+	"embed"
 	"log"
 	"os"
 	"path/filepath"
 	"runtime"
 
+	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/cmd/cmdopts"
 	"github.com/egdaemon/eg/compile"
 	"github.com/egdaemon/eg/internal/debugx"
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/wasix"
+	"github.com/egdaemon/eg/interp/runtime/wasi/fficoreutils"
 	"github.com/egdaemon/eg/interp/runtime/wasi/ffiwasinet"
 	"github.com/egdaemon/eg/interp/wasidebug"
 	"github.com/egdaemon/eg/workspaces"
@@ -29,6 +32,8 @@ type Wasi struct {
 type wasiCmdRun struct {
 	Dir    string `name:"directory" help:"root directory of the repository" default:"${vars_git_directory}"`
 	Module string `arg:"" help:"name of the module to run"`
+	// path to a coreutils reactor module, when set guests can call the coreutils package.
+	Coreutils string `name:"coreutils" help:"path to a coreutils reactor wasi module to expose to the guest" type:"existingfile" default:""`
 }
 
 func (t wasiCmdRun) Run(gctx *cmdopts.Global) (err error) {
@@ -53,6 +58,21 @@ func (t wasiCmdRun) Run(gctx *cmdopts.Global) (err error) {
 		wazero.NewRuntimeConfigInterpreter(),
 	)
 
+	// the well known directories, same layout as interp.
+	wazerofs := wazero.NewFSConfig().
+		WithFSMount(embed.FS{}, "/").
+		WithDirMount(os.TempDir(), os.TempDir()).
+		WithDirMount(ws.Root, eg.DefaultRootDirectory()).
+		WithDirMount(ws.Root, ws.Root).
+		WithDirMount(ws.RuntimeDir, eg.DefaultRuntimeDirectory()).
+		WithDirMount(ws.RuntimeDir, ws.RuntimeDir).
+		WithDirMount(ws.CacheDir, eg.DefaultCacheDirectory()).
+		WithDirMount(ws.CacheDir, ws.CacheDir).
+		WithDirMount(ws.WorkspaceDir, eg.DefaultWorkspaceDirectory()).
+		WithDirMount(ws.WorkspaceDir, ws.WorkspaceDir).
+		WithDirMount(ws.WorkingDir, eg.DefaultWorkingDirectory()).
+		WithDirMount(ws.WorkingDir, ws.WorkingDir)
+
 	mcfg := wazero.NewModuleConfig().
 		// Instructs WASI sched_yield to actually yield the host thread
 		WithOsyield(runtime.Gosched).
@@ -61,10 +81,7 @@ func (t wasiCmdRun) Run(gctx *cmdopts.Global) (err error) {
 		WithStdin(os.Stdin).
 		WithStderr(os.Stderr).
 		WithStdout(os.Stdout).
-		WithFSConfig(
-			wazero.NewFSConfig().
-				WithDirMount("/etc/resolv.conf", "/etc/resolv.conf"),
-		).
+		WithFSConfig(wazerofs).
 		WithSysNanotime().
 		WithSysWalltime().
 		WithRandSource(rand.Reader)
@@ -85,8 +102,37 @@ func (t wasiCmdRun) Run(gctx *cmdopts.Global) (err error) {
 	}
 	defer wasinet.Close(ctx)
 
-	hostenv, err := wruntime.
-		NewHostModuleBuilder("env").
+	hostbuilder := wruntime.NewHostModuleBuilder("env")
+	if t.Coreutils != "" {
+		raw, err := os.ReadFile(t.Coreutils)
+		if err != nil {
+			return errorsx.Wrap(err, "unable to read coreutils module")
+		}
+
+		coreutils, err := wruntime.CompileModule(ctx, raw)
+		if err != nil {
+			return errorsx.Wrap(err, "unable to compile coreutils module")
+		}
+		defer coreutils.Close(ctx)
+
+		reactor := fficoreutils.New(
+			wruntime,
+			coreutils,
+			wazero.NewModuleConfig().
+				WithSysNanotime().
+				WithSysWalltime().
+				WithRandSource(rand.Reader).
+				WithFSConfig(wazerofs),
+			fficoreutils.Streams{},
+		)
+		defer reactor.Close(ctx)
+
+		hostbuilder = hostbuilder.
+			NewFunctionBuilder().WithFunc(reactor.Run()).
+			Export("github.com/egdaemon/eg/runtime/wasi/runtime/fficoreutils.Run")
+	}
+
+	hostenv, err := hostbuilder.
 		Instantiate(ctx)
 	if err != nil {
 		return err
@@ -108,7 +154,9 @@ func (t wasiCmdRun) Run(gctx *cmdopts.Global) (err error) {
 
 	// wasidebug.Module(c)
 
-	m, err := wruntime.InstantiateModule(ctx, c, mcfg.WithName(mpath))
+	// coreutils calls made by the module use its stdio.
+	sctx := fficoreutils.WithStreams(ctx, fficoreutils.Streams{Stdin: os.Stdin, Stdout: os.Stdout, Stderr: os.Stderr})
+	m, err := wruntime.InstantiateModule(sctx, c, mcfg.WithName(mpath))
 	if err != nil {
 		return err
 	}

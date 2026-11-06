@@ -80,3 +80,94 @@ func TestDependsBuild(t *testing.T) {
 		require.Equal(t, []string{"dep1"}, cfg.Dependency.Build)
 	})
 }
+
+func TestSuggests(t *testing.T) {
+	t.Run("sets suggests dependencies on new config", func(t *testing.T) {
+		cfg := egdebuild.New("testpkg", "ubuntu", "/src", egdebuild.Option.Suggests("doc-pkg", "dev-pkg"))
+		require.Equal(t, []string{"doc-pkg", "dev-pkg"}, cfg.Dependency.Suggests)
+	})
+
+	t.Run("sets a single suggests dependency", func(t *testing.T) {
+		cfg := egdebuild.New("testpkg", "ubuntu", "/src", egdebuild.Option.Suggests("extra-tool"))
+		require.Equal(t, []string{"extra-tool"}, cfg.Dependency.Suggests)
+	})
+
+	t.Run("replaces existing suggests dependencies", func(t *testing.T) {
+		base := egdebuild.Config{Dependency: egdebuild.Dependency{Suggests: []string{"old-sugg"}}}
+		cfg := egdebuild.From(base, egdebuild.Option.Suggests("new1", "new2"))
+		require.Equal(t, []string{"new1", "new2"}, cfg.Dependency.Suggests)
+	})
+
+	t.Run("clears suggests dependencies when called with no arguments", func(t *testing.T) {
+		base := egdebuild.Config{Dependency: egdebuild.Dependency{Suggests: []string{"old-sugg"}}}
+		cfg := egdebuild.From(base, egdebuild.Option.Suggests())
+		require.Empty(t, cfg.Dependency.Suggests)
+	})
+
+	t.Run("does not affect build dependencies", func(t *testing.T) {
+		base := egdebuild.Config{Dependency: egdebuild.Dependency{Build: []string{"gcc"}}}
+		cfg := egdebuild.From(base, egdebuild.Option.Suggests("sugg1"))
+		require.Equal(t, []string{"gcc"}, cfg.Dependency.Build)
+		require.Equal(t, []string{"sugg1"}, cfg.Dependency.Suggests)
+	})
+
+	t.Run("does not affect runtime dependencies", func(t *testing.T) {
+		base := egdebuild.Config{Dependency: egdebuild.Dependency{Runtime: []string{"libc6"}}}
+		cfg := egdebuild.From(base, egdebuild.Option.Suggests("sugg1"))
+		require.Equal(t, []string{"libc6"}, cfg.Dependency.Runtime)
+		require.Equal(t, []string{"sugg1"}, cfg.Dependency.Suggests)
+	})
+
+	t.Run("does not affect recommends", func(t *testing.T) {
+		base := egdebuild.Config{Dependency: egdebuild.Dependency{Recommends: []string{"reco-dep"}}}
+		cfg := egdebuild.From(base, egdebuild.Option.Suggests("sugg1"))
+		require.Equal(t, []string{"reco-dep"}, cfg.Dependency.Recommends)
+		require.Equal(t, []string{"sugg1"}, cfg.Dependency.Suggests)
+	})
+
+	t.Run("preserves other config fields", func(t *testing.T) {
+		base := egdebuild.Config{
+			Name:         "mypkg",
+			Version:      "2.0.0",
+			Architecture: "arm64",
+			Distro:       "debian",
+		}
+		cfg := egdebuild.From(base, egdebuild.Option.Suggests("suggest-a", "suggest-b"))
+		require.Equal(t, "mypkg", cfg.Name)
+		require.Equal(t, "2.0.0", cfg.Version)
+		require.Equal(t, "arm64", cfg.Architecture)
+		require.Equal(t, "debian", cfg.Distro)
+		require.Equal(t, []string{"suggest-a", "suggest-b"}, cfg.Dependency.Suggests)
+	})
+
+	t.Run("applies multiple suggests options with last one winning", func(t *testing.T) {
+		cfg := egdebuild.New("testpkg", "ubuntu", "/src",
+			egdebuild.Option.Suggests("first", "second"),
+			egdebuild.Option.Suggests("third"),
+		)
+		require.Equal(t, []string{"third"}, cfg.Dependency.Suggests)
+	})
+
+	t.Run("sets empty slice when no deps provided on fresh config", func(t *testing.T) {
+		cfg := egdebuild.New("testpkg", "ubuntu", "/src", egdebuild.Option.Suggests())
+		require.Empty(t, cfg.Dependency.Suggests)
+	})
+
+	t.Run("replaces with empty slice clearing all suggests", func(t *testing.T) {
+		base := egdebuild.Config{Dependency: egdebuild.Dependency{Suggests: []string{"a", "b", "c"}}}
+		cfg := egdebuild.From(base, egdebuild.Option.Suggests())
+		require.Empty(t, cfg.Dependency.Suggests)
+		require.Nil(t, cfg.Dependency.Suggests)
+	})
+
+	t.Run("preserves suggests through multiple unrelated option applications", func(t *testing.T) {
+		base := egdebuild.Config{Dependency: egdebuild.Dependency{Suggests: []string{"kept"}}}
+		cfg := egdebuild.From(base,
+			egdebuild.Option.Distro("ubuntu"),
+			egdebuild.Option.Version("3.0.0"),
+		)
+		require.Equal(t, []string{"kept"}, cfg.Dependency.Suggests)
+		require.Equal(t, "ubuntu", cfg.Distro)
+		require.Equal(t, "3.0.0", cfg.Version)
+	})
+}

@@ -28,6 +28,7 @@ import (
 	"github.com/egdaemon/eg/interp/runtime/wasi/ffigit"
 	"github.com/egdaemon/eg/interp/runtime/wasi/ffigraph"
 	"github.com/egdaemon/eg/interp/runtime/wasi/ffiwasinet"
+	"github.com/egdaemon/eg/interp/runtime/wasi/wasimod"
 	"github.com/egdaemon/eg/interp/wasidebug"
 	"github.com/egdaemon/eg/workspaces"
 	"github.com/egdaemon/wasinet/wasinet/wnetruntime"
@@ -332,6 +333,12 @@ func (t runner) perform(ctx context.Context, wshost workspaces.Context, runid, p
 		return errorsx.Wrap(err, "failed to setup host environment")
 	}
 	defer hostenv.Close(ctx)
+
+	wasimods, err := wasimod.Load(ctx, runtime, wasimod.Directory(), mcfg)
+	if err != nil {
+		return errorsx.Wrap(err, "unable to load the wasi modules")
+	}
+	defer wasimods.Close(ctx)
 
 	if tracedebug {
 		wasidebug.Host(hostenv)

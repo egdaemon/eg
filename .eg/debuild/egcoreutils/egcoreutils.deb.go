@@ -24,7 +24,7 @@ var debskel embed.FS
 const (
 	container = "eg.deb.egcoreutils"
 	version   = "0.12.0"                                   // uutils release the fork is based on.
-	commit    = "0d10f1d3b3b10b7c5084f4564409d0238832a328" // egdaemon/coreutils commit with the reactor and uu_chdir.
+	commit    = "925623bca4d45d80cecdbf859f9b64c4783f7083" // egdaemon/coreutils commit with the reactor and uu_chdir.
 	toolchain = "1.93.1"                                   // rust toolchain, at least the 1.88 uutils requires.
 	target    = "wasm32-wasip1"
 )

@@ -36,13 +36,13 @@ type keygen interface {
 // PublicKeyPath generates the path to the public key on disk for
 // a client.
 func PublicKeyPath() string {
-	return userx.DefaultUserDirLocation(DefaultNotaryKey) + ".pub"
+	return userx.DefaultUserConfigLocation(DefaultNotaryKey) + ".pub"
 }
 
 // PrivateKeyPath generates the path to the private key on disk for
 // a client.
 func PrivateKeyPath() string {
-	return userx.DefaultUserDirLocation(DefaultNotaryKey)
+	return userx.DefaultUserConfigLocation(DefaultNotaryKey)
 }
 
 // ClearAutoSignerKey clears the autosigner from disk.
@@ -56,7 +56,7 @@ func ClearAutoSignerKey() error {
 // NewAutoSigner - loads or generates a ssh key to sign RPC requests with.
 // this method is only for use by clients and the new key will need to be added to the cluster.
 func NewAutoSigner(comment string, kgen keygen) (s Signer, err error) {
-	return newAutoSignerPath(userx.DefaultUserDirLocation(DefaultNotaryKey), comment, kgen)
+	return newAutoSignerPath(userx.DefaultUserConfigLocation(DefaultNotaryKey), comment, kgen)
 }
 
 // AutoSignerInfo returns the fingerprint and authorized ssh key.

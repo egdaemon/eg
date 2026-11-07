@@ -7,6 +7,7 @@ import (
 
 	"github.com/egdaemon/eg/internal/debugx"
 	"github.com/egdaemon/eg/internal/envx"
+	"github.com/egdaemon/eg/internal/stringsx"
 	"github.com/egdaemon/eg/internal/tracex"
 )
 
@@ -58,29 +59,30 @@ func CurrentUsername(d string) string {
 	return u.Username
 }
 
-// DefaultUserDirLocation returns the user directory location.
-func DefaultUserDirLocation(name string) string {
+// DefaultUserConfigLocation looks for rel in the user's config directories. never falls back to the system directory,
+// callers create files at the returned path.
+func DefaultUserConfigLocation(rel string) string {
 	user := CurrentUserOrDefault(Root())
-
-	envconfig := filepath.Join(os.Getenv("XDG_CONFIG_HOME"), DefaultDir)
-	home := filepath.Join(user.HomeDir, ".config", DefaultDir)
-
-	return DefaultDirectory(name, envconfig, home)
+	return DefaultDirectory(
+		rel,
+		DefaultConfigDirectory(DefaultDir),
+		filepath.Join(user.HomeDir, ".config", DefaultDir),
+	)
 }
 
-// DefaultDirLocation looks for a directory one of the default directory locations.
-func DefaultDirLocation(rel string) string {
+// DefaultConfigLocation looks for rel in the user's config directories, then the system directory.
+func DefaultConfigLocation(rel string) string {
 	user := CurrentUserOrDefault(Root())
-
-	env := filepath.Join(os.Getenv("XDG_CONFIG_HOME"), DefaultDir)
-	home := filepath.Join(user.HomeDir, ".config", DefaultDir)
-	system := filepath.Join("/etc", DefaultDir)
-
-	return DefaultDirectory(rel, env, home, system)
+	return DefaultDirectory(
+		rel,
+		DefaultConfigDirectory(DefaultDir),
+		filepath.Join(user.HomeDir, ".config", DefaultDir),
+		filepath.Join("/etc", DefaultDir),
+	)
 }
 
-// ConfigDirectory standard config directory for storing data.
-func ConfigDirectory(rel ...string) string {
+// DefaultConfigDirectory standard config directory for storing data.
+func DefaultConfigDirectory(rel ...string) string {
 	user := CurrentUserOrDefault(Root())
 	// if no directory is specified
 	defaultdir := filepath.Join(user.HomeDir, ".config")
@@ -109,6 +111,10 @@ func DefaultRuntimeDirectory(rel ...string) string {
 // that root directory joined with the relative path provided.
 func DefaultDirectory(rel string, roots ...string) (path string) {
 	for _, root := range roots {
+		if stringsx.Blank(root) {
+			continue
+		}
+
 		path = filepath.Join(root, rel)
 		if _, err := os.Stat(root); err == nil {
 			return path

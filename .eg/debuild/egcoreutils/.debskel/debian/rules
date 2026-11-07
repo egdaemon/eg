@@ -9,9 +9,9 @@ DH_VERBOSE=1
 override_dh_auto_build:
 	echo "DH AUTO BUILD OVERRIDE pkg version '${DEB_VERSION}'"
 	install -D -m 0644 src/coreutils.wasm linux/usr/share/eg/coreutils.wasm
-	# the guest runtime loads its coreutils reactor from its module directory.
+	# guests import the reactor as the egcoreutils module, which the runtime loads from its module directory.
 	mkdir -p linux/etc/eg/wasi.mod.d
-	ln -s /usr/share/eg/coreutils.wasm linux/etc/eg/wasi.mod.d/coreutils.wasi
+	ln -s /usr/share/eg/coreutils.wasm linux/etc/eg/wasi.mod.d/egcoreutils.wasi
 
 override_dh_usrlocal:
 	echo "DH usrlocal override due to overly restrict rules"

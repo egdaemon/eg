@@ -16,8 +16,8 @@ import (
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/wasix"
-	"github.com/egdaemon/eg/interp/runtime/wasi/fficoreutils"
 	"github.com/egdaemon/eg/interp/runtime/wasi/ffiwasinet"
+	"github.com/egdaemon/eg/interp/runtime/wasi/wasimod"
 	"github.com/egdaemon/eg/interp/wasidebug"
 	"github.com/egdaemon/eg/workspaces"
 	"github.com/tetratelabs/wazero"
@@ -32,8 +32,6 @@ type Wasi struct {
 type wasiCmdRun struct {
 	Dir    string `name:"directory" help:"root directory of the repository" default:"${vars_git_directory}"`
 	Module string `arg:"" help:"name of the module to run"`
-	// path to a coreutils reactor module, when set guests can call the coreutils package.
-	Coreutils string `name:"coreutils" help:"path to a coreutils reactor wasi module to expose to the guest" type:"existingfile" default:""`
 }
 
 func (t wasiCmdRun) Run(gctx *cmdopts.Global) (err error) {
@@ -103,31 +101,11 @@ func (t wasiCmdRun) Run(gctx *cmdopts.Global) (err error) {
 	}
 	defer wasinet.Close(ctx)
 
-	// without --coreutils the reactor provides no utilities, and guests still find its host functions.
-	reactor, err := fficoreutils.Load(
-		ctx,
-		wruntime,
-		t.Coreutils,
-		wazero.NewModuleConfig().
-			WithSysNanotime().
-			WithSysWalltime().
-			WithRandSource(rand.Reader).
-			WithFSConfig(wazerofs),
-		fficoreutils.Streams{},
-	)
+	wasimods, err := wasimod.Load(ctx, wruntime, wasimod.Directory(), mcfg)
 	if err != nil {
-		return err
+		return errorsx.Wrap(err, "unable to load the wasi modules")
 	}
-	defer reactor.Close(ctx)
-
-	hostbuilder := reactor.Export(wruntime.NewHostModuleBuilder("env"), ws.RuntimeDir)
-
-	hostenv, err := hostbuilder.
-		Instantiate(ctx)
-	if err != nil {
-		return err
-	}
-	defer hostenv.Close(ctx)
+	defer wasimods.Close(ctx)
 
 	log.Println("interp initiated", mpath)
 	defer log.Println("interp completed", mpath)
@@ -144,9 +122,7 @@ func (t wasiCmdRun) Run(gctx *cmdopts.Global) (err error) {
 
 	// wasidebug.Module(c)
 
-	// coreutils calls made by the module use its stdio.
-	sctx := fficoreutils.WithStreams(ctx, fficoreutils.Streams{Stdin: os.Stdin, Stdout: os.Stdout, Stderr: os.Stderr})
-	m, err := wruntime.InstantiateModule(sctx, c, mcfg.WithName(mpath))
+	m, err := wruntime.InstantiateModule(ctx, c, mcfg.WithName(mpath))
 	if err != nil {
 		return err
 	}

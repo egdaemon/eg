@@ -23,7 +23,6 @@ import (
 	"github.com/egdaemon/eg/internal/md5x"
 	"github.com/egdaemon/eg/internal/wasix"
 	"github.com/egdaemon/eg/interp/c8s"
-	"github.com/egdaemon/eg/interp/runtime/wasi/fficoreutils"
 	"github.com/egdaemon/eg/interp/runtime/wasi/ffiegcontainer"
 	"github.com/egdaemon/eg/interp/runtime/wasi/ffiexec"
 	"github.com/egdaemon/eg/interp/runtime/wasi/ffigit"
@@ -329,13 +328,7 @@ func (t runner) perform(ctx context.Context, wshost workspaces.Context, runid, p
 		wasidebug.Host(wasinet)
 	}
 
-	coreutils, err := fficoreutils.Load(ctx, runtime, filepath.Join(wasimod.Directory(), fficoreutils.Module), mcfg, fficoreutils.Streams{Stdin: inpr, Stdout: outpw, Stderr: errpw})
-	if err != nil {
-		return errorsx.Wrap(err, "unable to load coreutils")
-	}
-	defer coreutils.Close(ctx)
-
-	hostenv, err := coreutils.Export(rtb(t, runtime.NewHostModuleBuilder("env")), wshost.RuntimeDir).
+	hostenv, err := rtb(t, runtime.NewHostModuleBuilder("env")).
 		Instantiate(ctx)
 	if err != nil {
 		return errorsx.Wrap(err, "failed to setup host environment")

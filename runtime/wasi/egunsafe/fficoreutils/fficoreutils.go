@@ -105,8 +105,10 @@ func (t *Cmd) Run() (err error) {
 			cw.CloseWrite()
 		}
 	}()
-	wg.Go(func() { io.Copy(langx.FirstNonZero(t.Stdout, io.Discard), conns[1]) })
-	wg.Go(func() { io.Copy(langx.FirstNonZero(t.Stderr, io.Discard), conns[2]) })
+	// closing a connection once its copy stops tells the reactor the reader is gone, so a utility
+	// writing to a closed pipe, like yes into head, exits instead of waiting for a reader forever.
+	wg.Go(func() { io.Copy(langx.FirstNonZero(t.Stdout, io.Discard), conns[1]); conns[1].Close() })
+	wg.Go(func() { io.Copy(langx.FirstNonZero(t.Stderr, io.Discard), conns[2]); conns[2].Close() })
 
 	// the reactor can not block until the utility exits: the guest is a single thread, and has to copy the
 	// utility's stdio meanwhile.

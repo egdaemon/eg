@@ -4,401 +4,399 @@ package unsafecoreutils
 
 import (
 	"context"
-
-	"github.com/egdaemon/eg/runtime/wasi/egunsafe/fficoreutils"
 )
 
 // Arch runs the coreutils arch utility.
 func Arch(ctx context.Context, args ...string) error {
-	return fficoreutils.Run(ctx, "arch", args...)
+	return run(ctx, "arch", args...)
 }
 
 // B2sum runs the coreutils b2sum utility.
 func B2sum(ctx context.Context, args ...string) error {
-	return fficoreutils.Run(ctx, "b2sum", args...)
+	return run(ctx, "b2sum", args...)
 }
 
 // Base32 runs the coreutils base32 utility.
 func Base32(ctx context.Context, args ...string) error {
-	return fficoreutils.Run(ctx, "base32", args...)
+	return run(ctx, "base32", args...)
 }
 
 // Base64 runs the coreutils base64 utility.
 func Base64(ctx context.Context, args ...string) error {
-	return fficoreutils.Run(ctx, "base64", args...)
+	return run(ctx, "base64", args...)
 }
 
 // Basename runs the coreutils basename utility.
 func Basename(ctx context.Context, args ...string) error {
-	return fficoreutils.Run(ctx, "basename", args...)
+	return run(ctx, "basename", args...)
 }
 
 // Basenc runs the coreutils basenc utility.
 func Basenc(ctx context.Context, args ...string) error {
-	return fficoreutils.Run(ctx, "basenc", args...)
+	return run(ctx, "basenc", args...)
 }
 
 // Cat runs the coreutils cat utility.
 func Cat(ctx context.Context, args ...string) error {
-	return fficoreutils.Run(ctx, "cat", args...)
+	return run(ctx, "cat", args...)
 }
 
 // Cksum runs the coreutils cksum utility.
 func Cksum(ctx context.Context, args ...string) error {
-	return fficoreutils.Run(ctx, "cksum", args...)
+	return run(ctx, "cksum", args...)
 }
 
 // Comm runs the coreutils comm utility.
 func Comm(ctx context.Context, args ...string) error {
-	return fficoreutils.Run(ctx, "comm", args...)
+	return run(ctx, "comm", args...)
 }
 
 // Cp runs the coreutils cp utility.
 func Cp(ctx context.Context, args ...string) error {
-	return fficoreutils.Run(ctx, "cp", args...)
+	return run(ctx, "cp", args...)
 }
 
 // Csplit runs the coreutils csplit utility.
 func Csplit(ctx context.Context, args ...string) error {
-	return fficoreutils.Run(ctx, "csplit", args...)
+	return run(ctx, "csplit", args...)
 }
 
 // Cut runs the coreutils cut utility.
 func Cut(ctx context.Context, args ...string) error {
-	return fficoreutils.Run(ctx, "cut", args...)
+	return run(ctx, "cut", args...)
 }
 
 // Date runs the coreutils date utility.
 func Date(ctx context.Context, args ...string) error {
-	return fficoreutils.Run(ctx, "date", args...)
+	return run(ctx, "date", args...)
 }
 
 // Dd runs the coreutils dd utility.
 func Dd(ctx context.Context, args ...string) error {
-	return fficoreutils.Run(ctx, "dd", args...)
+	return run(ctx, "dd", args...)
 }
 
 // Dir runs the coreutils dir utility.
 func Dir(ctx context.Context, args ...string) error {
-	return fficoreutils.Run(ctx, "dir", args...)
+	return run(ctx, "dir", args...)
 }
 
 // Dircolors runs the coreutils dircolors utility.
 func Dircolors(ctx context.Context, args ...string) error {
-	return fficoreutils.Run(ctx, "dircolors", args...)
+	return run(ctx, "dircolors", args...)
 }
 
 // Dirname runs the coreutils dirname utility.
 func Dirname(ctx context.Context, args ...string) error {
-	return fficoreutils.Run(ctx, "dirname", args...)
+	return run(ctx, "dirname", args...)
 }
 
 // Echo runs the coreutils echo utility.
 func Echo(ctx context.Context, args ...string) error {
-	return fficoreutils.Run(ctx, "echo", args...)
+	return run(ctx, "echo", args...)
 }
 
 // Expand runs the coreutils expand utility.
 func Expand(ctx context.Context, args ...string) error {
-	return fficoreutils.Run(ctx, "expand", args...)
+	return run(ctx, "expand", args...)
 }
 
 // Expr runs the coreutils expr utility.
 func Expr(ctx context.Context, args ...string) error {
-	return fficoreutils.Run(ctx, "expr", args...)
+	return run(ctx, "expr", args...)
 }
 
 // Factor runs the coreutils factor utility.
 func Factor(ctx context.Context, args ...string) error {
-	return fficoreutils.Run(ctx, "factor", args...)
+	return run(ctx, "factor", args...)
 }
 
 // False runs the coreutils false utility.
 func False(ctx context.Context, args ...string) error {
-	return fficoreutils.Run(ctx, "false", args...)
+	return run(ctx, "false", args...)
 }
 
 // Fmt runs the coreutils fmt utility.
 func Fmt(ctx context.Context, args ...string) error {
-	return fficoreutils.Run(ctx, "fmt", args...)
+	return run(ctx, "fmt", args...)
 }
 
 // Fold runs the coreutils fold utility.
 func Fold(ctx context.Context, args ...string) error {
-	return fficoreutils.Run(ctx, "fold", args...)
+	return run(ctx, "fold", args...)
 }
 
 // Head runs the coreutils head utility.
 func Head(ctx context.Context, args ...string) error {
-	return fficoreutils.Run(ctx, "head", args...)
+	return run(ctx, "head", args...)
 }
 
 // Hostid runs the coreutils hostid utility.
 func Hostid(ctx context.Context, args ...string) error {
-	return fficoreutils.Run(ctx, "hostid", args...)
+	return run(ctx, "hostid", args...)
 }
 
 // Join runs the coreutils join utility.
 func Join(ctx context.Context, args ...string) error {
-	return fficoreutils.Run(ctx, "join", args...)
+	return run(ctx, "join", args...)
 }
 
 // Link runs the coreutils link utility.
 func Link(ctx context.Context, args ...string) error {
-	return fficoreutils.Run(ctx, "link", args...)
+	return run(ctx, "link", args...)
 }
 
 // Ln runs the coreutils ln utility.
 func Ln(ctx context.Context, args ...string) error {
-	return fficoreutils.Run(ctx, "ln", args...)
+	return run(ctx, "ln", args...)
 }
 
 // Ls runs the coreutils ls utility.
 func Ls(ctx context.Context, args ...string) error {
-	return fficoreutils.Run(ctx, "ls", args...)
+	return run(ctx, "ls", args...)
 }
 
 // Md5sum runs the coreutils md5sum utility.
 func Md5sum(ctx context.Context, args ...string) error {
-	return fficoreutils.Run(ctx, "md5sum", args...)
+	return run(ctx, "md5sum", args...)
 }
 
 // Mkdir runs the coreutils mkdir utility.
 func Mkdir(ctx context.Context, args ...string) error {
-	return fficoreutils.Run(ctx, "mkdir", args...)
+	return run(ctx, "mkdir", args...)
 }
 
 // Mktemp runs the coreutils mktemp utility.
 func Mktemp(ctx context.Context, args ...string) error {
-	return fficoreutils.Run(ctx, "mktemp", args...)
+	return run(ctx, "mktemp", args...)
 }
 
 // Mv runs the coreutils mv utility.
 func Mv(ctx context.Context, args ...string) error {
-	return fficoreutils.Run(ctx, "mv", args...)
+	return run(ctx, "mv", args...)
 }
 
 // Nice runs the coreutils nice utility.
 func Nice(ctx context.Context, args ...string) error {
-	return fficoreutils.Run(ctx, "nice", args...)
+	return run(ctx, "nice", args...)
 }
 
 // Nl runs the coreutils nl utility.
 func Nl(ctx context.Context, args ...string) error {
-	return fficoreutils.Run(ctx, "nl", args...)
+	return run(ctx, "nl", args...)
 }
 
 // Nproc runs the coreutils nproc utility.
 func Nproc(ctx context.Context, args ...string) error {
-	return fficoreutils.Run(ctx, "nproc", args...)
+	return run(ctx, "nproc", args...)
 }
 
 // Numfmt runs the coreutils numfmt utility.
 func Numfmt(ctx context.Context, args ...string) error {
-	return fficoreutils.Run(ctx, "numfmt", args...)
+	return run(ctx, "numfmt", args...)
 }
 
 // Od runs the coreutils od utility.
 func Od(ctx context.Context, args ...string) error {
-	return fficoreutils.Run(ctx, "od", args...)
+	return run(ctx, "od", args...)
 }
 
 // Paste runs the coreutils paste utility.
 func Paste(ctx context.Context, args ...string) error {
-	return fficoreutils.Run(ctx, "paste", args...)
+	return run(ctx, "paste", args...)
 }
 
 // Pathchk runs the coreutils pathchk utility.
 func Pathchk(ctx context.Context, args ...string) error {
-	return fficoreutils.Run(ctx, "pathchk", args...)
+	return run(ctx, "pathchk", args...)
 }
 
 // Pr runs the coreutils pr utility.
 func Pr(ctx context.Context, args ...string) error {
-	return fficoreutils.Run(ctx, "pr", args...)
+	return run(ctx, "pr", args...)
 }
 
 // Printenv runs the coreutils printenv utility.
 func Printenv(ctx context.Context, args ...string) error {
-	return fficoreutils.Run(ctx, "printenv", args...)
+	return run(ctx, "printenv", args...)
 }
 
 // Printf runs the coreutils printf utility.
 func Printf(ctx context.Context, args ...string) error {
-	return fficoreutils.Run(ctx, "printf", args...)
+	return run(ctx, "printf", args...)
 }
 
 // Ptx runs the coreutils ptx utility.
 func Ptx(ctx context.Context, args ...string) error {
-	return fficoreutils.Run(ctx, "ptx", args...)
+	return run(ctx, "ptx", args...)
 }
 
 // Pwd runs the coreutils pwd utility.
 func Pwd(ctx context.Context, args ...string) error {
-	return fficoreutils.Run(ctx, "pwd", args...)
+	return run(ctx, "pwd", args...)
 }
 
 // Readlink runs the coreutils readlink utility.
 func Readlink(ctx context.Context, args ...string) error {
-	return fficoreutils.Run(ctx, "readlink", args...)
+	return run(ctx, "readlink", args...)
 }
 
 // Realpath runs the coreutils realpath utility.
 func Realpath(ctx context.Context, args ...string) error {
-	return fficoreutils.Run(ctx, "realpath", args...)
+	return run(ctx, "realpath", args...)
 }
 
 // Rm runs the coreutils rm utility.
 func Rm(ctx context.Context, args ...string) error {
-	return fficoreutils.Run(ctx, "rm", args...)
+	return run(ctx, "rm", args...)
 }
 
 // Rmdir runs the coreutils rmdir utility.
 func Rmdir(ctx context.Context, args ...string) error {
-	return fficoreutils.Run(ctx, "rmdir", args...)
+	return run(ctx, "rmdir", args...)
 }
 
 // Seq runs the coreutils seq utility.
 func Seq(ctx context.Context, args ...string) error {
-	return fficoreutils.Run(ctx, "seq", args...)
+	return run(ctx, "seq", args...)
 }
 
 // Sha1sum runs the coreutils sha1sum utility.
 func Sha1sum(ctx context.Context, args ...string) error {
-	return fficoreutils.Run(ctx, "sha1sum", args...)
+	return run(ctx, "sha1sum", args...)
 }
 
 // Sha224sum runs the coreutils sha224sum utility.
 func Sha224sum(ctx context.Context, args ...string) error {
-	return fficoreutils.Run(ctx, "sha224sum", args...)
+	return run(ctx, "sha224sum", args...)
 }
 
 // Sha256sum runs the coreutils sha256sum utility.
 func Sha256sum(ctx context.Context, args ...string) error {
-	return fficoreutils.Run(ctx, "sha256sum", args...)
+	return run(ctx, "sha256sum", args...)
 }
 
 // Sha384sum runs the coreutils sha384sum utility.
 func Sha384sum(ctx context.Context, args ...string) error {
-	return fficoreutils.Run(ctx, "sha384sum", args...)
+	return run(ctx, "sha384sum", args...)
 }
 
 // Sha512sum runs the coreutils sha512sum utility.
 func Sha512sum(ctx context.Context, args ...string) error {
-	return fficoreutils.Run(ctx, "sha512sum", args...)
+	return run(ctx, "sha512sum", args...)
 }
 
 // Shred runs the coreutils shred utility.
 func Shred(ctx context.Context, args ...string) error {
-	return fficoreutils.Run(ctx, "shred", args...)
+	return run(ctx, "shred", args...)
 }
 
 // Shuf runs the coreutils shuf utility.
 func Shuf(ctx context.Context, args ...string) error {
-	return fficoreutils.Run(ctx, "shuf", args...)
+	return run(ctx, "shuf", args...)
 }
 
 // Sleep runs the coreutils sleep utility.
 func Sleep(ctx context.Context, args ...string) error {
-	return fficoreutils.Run(ctx, "sleep", args...)
+	return run(ctx, "sleep", args...)
 }
 
 // Sort runs the coreutils sort utility.
 func Sort(ctx context.Context, args ...string) error {
-	return fficoreutils.Run(ctx, "sort", args...)
+	return run(ctx, "sort", args...)
 }
 
 // Split runs the coreutils split utility.
 func Split(ctx context.Context, args ...string) error {
-	return fficoreutils.Run(ctx, "split", args...)
+	return run(ctx, "split", args...)
 }
 
 // Sum runs the coreutils sum utility.
 func Sum(ctx context.Context, args ...string) error {
-	return fficoreutils.Run(ctx, "sum", args...)
+	return run(ctx, "sum", args...)
 }
 
 // Tac runs the coreutils tac utility.
 func Tac(ctx context.Context, args ...string) error {
-	return fficoreutils.Run(ctx, "tac", args...)
+	return run(ctx, "tac", args...)
 }
 
 // Tail runs the coreutils tail utility.
 func Tail(ctx context.Context, args ...string) error {
-	return fficoreutils.Run(ctx, "tail", args...)
+	return run(ctx, "tail", args...)
 }
 
 // Tee runs the coreutils tee utility.
 func Tee(ctx context.Context, args ...string) error {
-	return fficoreutils.Run(ctx, "tee", args...)
+	return run(ctx, "tee", args...)
 }
 
 // Test runs the coreutils test utility.
 func Test(ctx context.Context, args ...string) error {
-	return fficoreutils.Run(ctx, "test", args...)
+	return run(ctx, "test", args...)
 }
 
 // Touch runs the coreutils touch utility.
 func Touch(ctx context.Context, args ...string) error {
-	return fficoreutils.Run(ctx, "touch", args...)
+	return run(ctx, "touch", args...)
 }
 
 // Tr runs the coreutils tr utility.
 func Tr(ctx context.Context, args ...string) error {
-	return fficoreutils.Run(ctx, "tr", args...)
+	return run(ctx, "tr", args...)
 }
 
 // True runs the coreutils true utility.
 func True(ctx context.Context, args ...string) error {
-	return fficoreutils.Run(ctx, "true", args...)
+	return run(ctx, "true", args...)
 }
 
 // Truncate runs the coreutils truncate utility.
 func Truncate(ctx context.Context, args ...string) error {
-	return fficoreutils.Run(ctx, "truncate", args...)
+	return run(ctx, "truncate", args...)
 }
 
 // Tsort runs the coreutils tsort utility.
 func Tsort(ctx context.Context, args ...string) error {
-	return fficoreutils.Run(ctx, "tsort", args...)
+	return run(ctx, "tsort", args...)
 }
 
 // Tty runs the coreutils tty utility.
 func Tty(ctx context.Context, args ...string) error {
-	return fficoreutils.Run(ctx, "tty", args...)
+	return run(ctx, "tty", args...)
 }
 
 // Uname runs the coreutils uname utility.
 func Uname(ctx context.Context, args ...string) error {
-	return fficoreutils.Run(ctx, "uname", args...)
+	return run(ctx, "uname", args...)
 }
 
 // Unexpand runs the coreutils unexpand utility.
 func Unexpand(ctx context.Context, args ...string) error {
-	return fficoreutils.Run(ctx, "unexpand", args...)
+	return run(ctx, "unexpand", args...)
 }
 
 // Uniq runs the coreutils uniq utility.
 func Uniq(ctx context.Context, args ...string) error {
-	return fficoreutils.Run(ctx, "uniq", args...)
+	return run(ctx, "uniq", args...)
 }
 
 // Unlink runs the coreutils unlink utility.
 func Unlink(ctx context.Context, args ...string) error {
-	return fficoreutils.Run(ctx, "unlink", args...)
+	return run(ctx, "unlink", args...)
 }
 
 // Vdir runs the coreutils vdir utility.
 func Vdir(ctx context.Context, args ...string) error {
-	return fficoreutils.Run(ctx, "vdir", args...)
+	return run(ctx, "vdir", args...)
 }
 
 // Wc runs the coreutils wc utility.
 func Wc(ctx context.Context, args ...string) error {
-	return fficoreutils.Run(ctx, "wc", args...)
+	return run(ctx, "wc", args...)
 }
 
 // Yes runs the coreutils yes utility.
 func Yes(ctx context.Context, args ...string) error {
-	return fficoreutils.Run(ctx, "yes", args...)
+	return run(ctx, "yes", args...)
 }

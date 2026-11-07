@@ -22,16 +22,6 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-// Run executes the coreutils utility with the given arguments (argv[0] is supplied by the host).
-// the utility uses this module's stdio, which the host wires up when it runs the module.
-func Run(ctx context.Context, name string, args ...string) error {
-	nameptr, namelen := ffiguest.String(name)
-	argsptr, argslen, argssize := ffiguest.StringArray(args...)
-
-	code := run(ffiguest.ContextDeadline(ctx), nameptr, namelen, argsptr, argslen, argssize)
-	return ffiguest.Error(code, errorsx.Errorf("%s exited with code %d", name, code))
-}
-
 // Cmd mirrors exec.Cmd for the egcoreutils reactor. the utility's stdio is the unix sockets the reactor listens
 // on in proc/{id}/fd, and its working directory is proc/{id}/cwd.
 type Cmd struct {

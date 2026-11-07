@@ -18,7 +18,7 @@ import (
 
 // Directory the guest's runtime loads its modules from.
 func Directory() string {
-	return userx.DefaultDirLocation("wasi.mod.d")
+	return userx.DefaultConfigLocation("wasi.mod.d")
 }
 
 // Modules loaded into a runtime.

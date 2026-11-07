@@ -34,7 +34,7 @@ func main() {
 		var (
 			b []byte
 		)
-		if err = egbash.Run(ctx, "", "", script, "", nil); err != nil {
+		if err = egbash.Run(ctx, egbash.New(script)); err != nil {
 			log.Fatalln("run failed", script, err)
 		}
 		if b, err = os.ReadFile(egenv.WorkingDirectory("out")); err != nil {
@@ -57,7 +57,7 @@ func main() {
 	case "coreutils":
 		expect("mkdir -p a/b && echo hello world | cat > a/b/f && cp a/b/f c && mv c out && rm -r a", "hello world\n")
 	case "exit":
-		err = egbash.Run(ctx, "", "", "env sh -c 'exit 3'", "", nil)
+		err = egbash.Run(ctx, egbash.New("env sh -c 'exit 3'"))
 		if status, ok := errors.AsType[interp.ExitStatus](err); !ok || status != 3 {
 			log.Fatalln("unexpected result", err)
 		}

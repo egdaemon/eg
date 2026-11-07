@@ -3,24 +3,45 @@ package ffiguest
 import (
 	"context"
 	"math"
+	"syscall"
 	"unsafe"
 
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/interp/runtime/wasi/ffierrors"
 )
 
+// Error describes a non-zero code the host returned, nil for 0. the code is a syscall.Errno in the error's chain,
+// so callers can recover it with errors.As.
 func Error(code uint32, msg error) error {
 	if code == 0 {
 		return nil
 	}
 
-	cause := errorsx.Wrapf(msg, "wasi host error: %d", code)
+	cause := errorsx.Wrapf(hosterror{msg: msg, code: syscall.Errno(code)}, "wasi host error: %d", code)
 	switch code {
 	case ffierrors.ErrUnrecoverable:
 		return errorsx.NewUnrecoverable(cause)
 	default:
 		return cause
 	}
+}
+
+// hosterror reads as msg and carries the host's code.
+type hosterror struct {
+	msg  error
+	code syscall.Errno
+}
+
+func (t hosterror) Error() string {
+	if t.msg == nil {
+		return t.code.Error()
+	}
+
+	return t.msg.Error()
+}
+
+func (t hosterror) Unwrap() []error {
+	return []error{t.msg, t.code}
 }
 
 func String(s string) (unsafe.Pointer, uint32) {

@@ -62,21 +62,29 @@ func CurrentUsername(d string) string {
 func DefaultUserDirLocation(name string) string {
 	user := CurrentUserOrDefault(Root())
 
-	envconfig := filepath.Join(os.Getenv("XDG_CONFIG_HOME"), DefaultDir)
 	home := filepath.Join(user.HomeDir, ".config", DefaultDir)
 
-	return DefaultDirectory(name, envconfig, home)
+	return DefaultDirectory(name, append(xdgconfig(), home)...)
+}
+
+// xdgconfig is the eg directory within XDG_CONFIG_HOME, none when it is unset. joining an unset variable would be the
+// relative path DefaultDir, found in any working directory containing it.
+func xdgconfig() []string {
+	if dir := os.Getenv("XDG_CONFIG_HOME"); dir != "" {
+		return []string{filepath.Join(dir, DefaultDir)}
+	}
+
+	return nil
 }
 
 // DefaultDirLocation looks for a directory one of the default directory locations.
 func DefaultDirLocation(rel string) string {
 	user := CurrentUserOrDefault(Root())
 
-	env := filepath.Join(os.Getenv("XDG_CONFIG_HOME"), DefaultDir)
 	home := filepath.Join(user.HomeDir, ".config", DefaultDir)
 	system := filepath.Join("/etc", DefaultDir)
 
-	return DefaultDirectory(rel, env, home, system)
+	return DefaultDirectory(rel, append(xdgconfig(), home, system)...)
 }
 
 // ConfigDirectory standard config directory for storing data.

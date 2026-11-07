@@ -315,7 +315,7 @@ func retry(ctx context.Context, c Command, do func() error) (err error) {
 func auto() entrypoint {
 	if envx.Boolean(false, _eg.EnvExperimentalGuestShell) {
 		return func(ctx context.Context, user string, group string, cmd string, directory string, environ []string, _ Execer) error {
-			return egbash.Run(ctx, user, group, cmd, directory, environ)
+			return egbash.Run(ctx, egbash.New(cmd).User(user).Group(group).Directory(directory).EnvironFrom(environ...))
 		}
 	}
 

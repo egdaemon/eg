@@ -13,7 +13,7 @@ import (
 
 func TestLoad(t *testing.T) {
 	module := filepath.Join(t.TempDir(), "module.wasm")
-	cmd := exec.Command("go", "build", "-o", module, "./.fixtures/module")
+	cmd := exec.Command("go", "build", "-o", module, "./.xfixtures/module")
 	cmd.Env = append(os.Environ(), "GOOS=wasip1", "GOARCH=wasm")
 	if b, err := cmd.CombinedOutput(); err != nil {
 		t.Skipf("unable to build the wasip1 module: %v\n%s", err, b)
@@ -49,6 +49,25 @@ func TestLoad(t *testing.T) {
 		require.NotNil(t, rt.Module("cat"))
 		require.False(t, rt.Module("cat").IsClosed())
 		require.NotNil(t, rt.Module("cat").ExportedFunction("_start"))
+	})
+
+	t.Run("runs a reactor's _initialize", func(t *testing.T) {
+		reactor := filepath.Join(t.TempDir(), "reactor.wasm")
+		cmd := exec.Command("go", "build", "-buildmode=c-shared", "-o", reactor, "./.xfixtures/reactor")
+		cmd.Env = append(os.Environ(), "GOOS=wasip1", "GOARCH=wasm")
+		if b, err := cmd.CombinedOutput(); err != nil {
+			t.Skipf("unable to build the wasip1 reactor: %v\n%s", err, b)
+		}
+
+		dir := t.TempDir()
+		require.NoError(t, os.Symlink(reactor, filepath.Join(dir, "reactor.wasi")))
+		rt := runtime(t)
+		_, err := load(t, rt, dir)
+		require.NoError(t, err)
+
+		res, err := rt.Module("reactor").ExportedFunction("initialized").Call(t.Context())
+		require.NoError(t, err)
+		require.Equal(t, []uint64{1}, res)
 	})
 
 	t.Run("instantiates links under their own names", func(t *testing.T) {
@@ -93,7 +112,7 @@ func TestLoad(t *testing.T) {
 		dir := t.TempDir()
 		require.NoError(t, os.Symlink(filepath.Join(dir, "missing.wasm"), filepath.Join(dir, "cat.wasi")))
 		_, err := load(t, runtime(t), dir)
-		require.ErrorContains(t, err, "unable to resolve module")
+		require.ErrorContains(t, err, "unable to read module")
 	})
 
 	t.Run("rejects two modules with the same name", func(t *testing.T) {

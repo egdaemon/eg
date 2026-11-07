@@ -18,7 +18,6 @@ import (
 	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/duckproxyserver"
 	"github.com/egdaemon/eg/interp/events"
-	"github.com/egdaemon/eg/interp/runtime/wasi/fficoreutils"
 	"github.com/egdaemon/eg/interp/runtime/wasi/ffiwasinet"
 	"github.com/egdaemon/wasinet/wasinet/wnetruntime"
 	"github.com/stretchr/testify/require"
@@ -92,13 +91,6 @@ func StartAnalytics(t *testing.T, opts ...duckproxyserver.Option) Analytics {
 // set as KEY=VALUE pairs. a non zero exit is returned as an error.
 func Run(t *testing.T, wasm string, rundir string, timeout time.Duration, environ ...string) error {
 	t.Helper()
-	return RunCoreutils(t, wasm, rundir, "", timeout, environ...)
-}
-
-// RunCoreutils is Run with the coreutils reactor at coreutils, which provides no utilities when the file does not
-// exist, serving the guest as the interpreter's runtime does.
-func RunCoreutils(t *testing.T, wasm string, rundir string, coreutils string, timeout time.Duration, environ ...string) error {
-	t.Helper()
 
 	ctx, done := context.WithTimeout(context.Background(), timeout)
 	defer done()
@@ -131,13 +123,6 @@ func RunCoreutils(t *testing.T, wasm string, rundir string, coreutils string, ti
 			}
 		}
 	}
-
-	reactor, err := fficoreutils.Load(ctx, rt, coreutils, cfg, fficoreutils.Streams{Stdout: os.Stdout, Stderr: os.Stderr})
-	require.NoError(t, err)
-	defer reactor.Close(context.Background())
-
-	_, err = reactor.Export(rt.NewHostModuleBuilder("env"), rundir).Instantiate(ctx)
-	require.NoError(t, err)
 
 	bin, err := os.ReadFile(wasm)
 	require.NoError(t, err)

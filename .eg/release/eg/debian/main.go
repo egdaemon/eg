@@ -41,13 +41,6 @@ func main() {
 					),
 				),
 			),
-			// eg.Module(
-			// 	ctx,
-			// 	archlinux.AURRunner(),
-			// 	eg.Sequential(
-			// 		archlinux.Publish,
-			// 	),
-			// ),
 		),
 		eggithub.Draft(
 			egenv.DirectoryCache(".dist", "*.deb"),

@@ -42,9 +42,9 @@ func main() {
 				),
 		),
 		uploads.Run(egpool.Slice(
-			"eg compute upload --ttl=1h --arch=amd64 --cores=8 --memory=12g release/eg/targz",
-			"eg compute upload --ttl=3h --arch=arm64 --cores=3 --memory=3g release/eg/targz",
-			"eg compute upload --arch=amd64 --cores=8 --memory=6g -e EG_SSH_KEY_SEED=${EG_SSH_KEY_SEED} release/eg/archlinux",
+			// "eg compute upload --ttl=1h --arch=amd64 --cores=8 --memory=12g release/eg/targz",
+			// "eg compute upload --ttl=3h --arch=arm64 --cores=3 --memory=3g release/eg/targz",
+			// "eg compute upload --arch=amd64 --cores=8 --memory=6g -e EG_SSH_KEY_SEED=${EG_SSH_KEY_SEED} release/eg/archlinux",
 			"eg compute upload --arch=amd64 --cores=8 --memory=6g -e EG_GPG_KEYRING_NAME=\"${EG_GPG_KEYRING_NAME}\" -e EG_GPG_KEYRING_EMAIL=\"${EG_GPG_KEYRING_EMAIL}\" -e EG_GPG_KEYRING_SEED=\"${EG_GPG_KEYRING_SEED}\" release/eg/debian",
 		)),
 		egx.Retry(0).Delay(30*time.Second).Run(

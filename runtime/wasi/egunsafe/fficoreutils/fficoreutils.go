@@ -23,7 +23,7 @@ import (
 )
 
 // Cmd mirrors exec.Cmd for the egcoreutils reactor. the utility's stdio is the unix sockets the reactor listens
-// on in proc/{id}/fd, and its working directory is proc/{id}/cwd.
+// on in proc/{id}/fd, and its working directory is the path in proc/{id}/cwd.
 type Cmd struct {
 	Path   string
 	Args   []string  // includes the command name as Args[0], like exec.Cmd
@@ -74,7 +74,8 @@ func (t *Cmd) Run() (err error) {
 	if err = errorsx.Compact(
 		os.WriteFile(proc("cmdline"), []byte(strings.Join(t.Args, "\x00")), 0600),
 		os.WriteFile(proc("environ"), []byte(strings.Join(env, "\x00")), 0600),
-		os.Symlink(cwd, proc("cwd")),
+		// a file rather than a link: wasi does not permit links to absolute paths.
+		os.WriteFile(proc("cwd"), []byte(cwd), 0600),
 	); err != nil {
 		return err
 	}

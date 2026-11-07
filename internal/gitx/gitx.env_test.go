@@ -61,7 +61,7 @@ func TestLocalEnv(t *testing.T) {
 		env := environMap(t, environ)
 		require.Equal(t, vcs, env["EG_GIT_HEAD_VCS"])
 		require.Equal(t, "/workload/eg", env["EG_GIT_HEAD_URI"])
-		require.Equal(t, "HEAD", env["EG_GIT_HEAD_REF"])
+		require.Equal(t, "master", env["EG_GIT_HEAD_REF"])
 		require.Equal(t, h.String(), env["EG_GIT_HEAD_COMMIT"])
 		require.Equal(t, vcs, env["EG_GIT_BASE_VCS"])
 		require.Equal(t, "/workload/eg", env["EG_GIT_BASE_URI"])
@@ -132,7 +132,7 @@ func TestEnv(t *testing.T) {
 
 		env := environMap(t, environ)
 		require.Equal(t, h.String(), env["EG_GIT_HEAD_COMMIT"])
-		require.Equal(t, "HEAD", env["EG_GIT_HEAD_REF"])
+		require.Equal(t, "master", env["EG_GIT_HEAD_REF"])
 		require.Equal(t, "Jane", env["EG_GIT_HEAD_COMMIT_AUTHOR"])
 		require.Equal(t, "jane@example.com", env["EG_GIT_HEAD_COMMIT_EMAIL"])
 		require.Equal(t, "https://github.com/egdaemon/eg.git", env["EG_GIT_HEAD_URI"])
@@ -205,6 +205,35 @@ func TestEnv(t *testing.T) {
 		repo, _ := newEnvRepo(t)
 		_, err := gitx.Env(repo, "missing", "HEAD", "")
 		require.Error(t, err)
+	})
+}
+
+func TestHeadEnvRef(t *testing.T) {
+	t.Run("HEAD records the branch it points at", func(t *testing.T) {
+		repo, h := newEnvRepo(t)
+		require.NoError(t, repo.Storer.SetReference(plumbing.NewHashReference(plumbing.NewBranchReferenceName("feature"), h)))
+		require.NoError(t, repo.Storer.SetReference(plumbing.NewSymbolicReference(plumbing.HEAD, plumbing.NewBranchReferenceName("feature"))))
+
+		environ, err := gitx.HeadEnv(repo, testvcs, "/workload/eg", "HEAD")
+		require.NoError(t, err)
+		require.Equal(t, "feature", environMap(t, environ)["EG_GIT_HEAD_REF"])
+	})
+
+	t.Run("a detached HEAD stays HEAD", func(t *testing.T) {
+		repo, h := newEnvRepo(t)
+		require.NoError(t, repo.Storer.SetReference(plumbing.NewHashReference(plumbing.HEAD, h)))
+
+		environ, err := gitx.HeadEnv(repo, testvcs, "/workload/eg", "HEAD")
+		require.NoError(t, err)
+		require.Equal(t, "HEAD", environMap(t, environ)["EG_GIT_HEAD_REF"])
+	})
+
+	t.Run("an explicit reference is kept", func(t *testing.T) {
+		repo, h := newEnvRepo(t)
+
+		environ, err := gitx.HeadEnv(repo, testvcs, "/workload/eg", h.String())
+		require.NoError(t, err)
+		require.Equal(t, h.String(), environMap(t, environ)["EG_GIT_HEAD_REF"])
 	})
 }
 

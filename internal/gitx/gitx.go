@@ -576,7 +576,7 @@ func HeadEnv(repo *git.Repository, vcs, uri string, treeish string) (env []strin
 	).Var(
 		eg.EnvGitHeadURI, uri,
 	).Var(
-		eg.EnvGitHeadRef, treeish,
+		eg.EnvGitHeadRef, headref(repo, treeish),
 	).Var(
 		eg.EnvGitHeadCommit, commit.Hash.String(),
 	).Var(
@@ -586,6 +586,21 @@ func HeadEnv(repo *git.Repository, vcs, uri string, treeish string) (env []strin
 	).Var(
 		eg.EnvGitHeadCommitTimestamp, commit.Committer.When.Format(time.RFC3339),
 	).Environ()
+}
+
+// headref is the branch HEAD points at when treeish is HEAD, nested runs inherit EG_GIT_HEAD_REF as their
+// default reference and clone it as a branch. a detached HEAD has no branch and stays HEAD.
+func headref(repo *git.Repository, treeish string) string {
+	if treeish != plumbing.HEAD.String() {
+		return treeish
+	}
+
+	head, err := repo.Head()
+	if err != nil || !head.Name().IsBranch() {
+		return treeish
+	}
+
+	return head.Name().Short()
 }
 
 func BaseEnv(repo *git.Repository, vcs, uri string, treeish string) (env []string, err error) {

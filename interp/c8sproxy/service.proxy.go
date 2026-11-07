@@ -116,7 +116,7 @@ func (t *ProxyService) Build(ctx context.Context, req *c8s.BuildRequest) (_ *c8s
 	var (
 		cmd *exec.Cmd
 	)
-	log.Println("DERP DERP")
+
 	abspath := t.remap(req.Definition)
 	if !filepath.IsAbs(abspath) {
 		abspath = filepath.Join(t.ws.WorkingDir, req.Definition)

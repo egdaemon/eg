@@ -22,10 +22,11 @@ The modules see the same directories as the module (the well known workspace dir
 from the coreutils repository (see its `README.wasi.md`):
 
 ```
-cargo rustc --lib --crate-type cdylib --release --target wasm32-wasip1 --no-default-features --features "feat_wasm feat_wasm_reactor"
+cargo rustc --lib --crate-type cdylib --release --target wasm32-wasip1 --no-default-features --features "feat_wasm feat_wasm_reactor" && \
+  install -D -m 0644 target/wasm32-wasip1/release/coreutils.wasm ~/.config/eg/wasi.mod.d/egcoreutils.wasi
 ```
 
-the module is written to `target/wasm32-wasip1/release/coreutils.wasm`.
+builds the reactor and installs it into the wasi module directory as `egcoreutils.wasi`.
 
 ### regenerating the shims
 

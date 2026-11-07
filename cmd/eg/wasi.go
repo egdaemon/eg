@@ -15,11 +15,14 @@ import (
 	"github.com/egdaemon/eg/internal/debugx"
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
+	"github.com/egdaemon/eg/internal/md5x"
 	"github.com/egdaemon/eg/internal/wasix"
 	"github.com/egdaemon/eg/interp/runtime/wasi/ffiwasinet"
 	"github.com/egdaemon/eg/interp/runtime/wasi/wasimod"
 	"github.com/egdaemon/eg/interp/wasidebug"
 	"github.com/egdaemon/eg/workspaces"
+	"github.com/egdaemon/wasinet/wasinet/wnetruntime"
+	"github.com/gofrs/uuid/v5"
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
 )
@@ -42,13 +45,14 @@ func (t wasiCmdRun) Run(gctx *cmdopts.Global) (err error) {
 	ctx, done := context.WithCancel(gctx.Context)
 	defer done()
 
-	if ws, err = workspaces.FromEnv(gctx.Context, t.Dir, t.Module); err != nil {
-		return err
+	if ws, err = workspaces.NewLocal(gctx.Context, uuid.Must(uuid.NewV7()), md5x.Digest(cmdopts.BuildInfoSafe()), t.Dir, t.Module); err != nil {
+		return errorsx.Wrap(err, "unable to setup workspace")
 	}
 
 	mpath := filepath.Join(ws.RuntimeDir, "test.wasm")
 	debugx.Println("wasipath", ws.RuntimeDir, mpath)
-	if err = compile.Run(ctx, t.Dir, t.Module, mpath); err != nil {
+	// the module directory is its own go module.
+	if err = compile.Run(ctx, eg.DefaultModuleDirectory(t.Dir), t.Module, mpath); err != nil {
 		return err
 	}
 	wruntime := wazero.NewRuntimeWithConfig(
@@ -85,7 +89,13 @@ func (t wasiCmdRun) Run(gctx *cmdopts.Global) (err error) {
 		WithSysWalltime().
 		WithRandSource(rand.Reader)
 
-	environ := errorsx.Zero(envx.Build().FromEnviron(os.Environ()...).Environ())
+	// the host's PWD is not mounted, the guest's working directory is the workload's as in interp.
+	environ := errorsx.Zero(
+		envx.Build().
+			FromEnviron(os.Environ()...).
+			Var("PWD", eg.DefaultWorkingDirectory()).
+			Environ(),
+	)
 	// envx.Debug(environ...)
 	mcfg = wasix.Environ(mcfg, environ...)
 
@@ -95,7 +105,17 @@ func (t wasiCmdRun) Run(gctx *cmdopts.Global) (err error) {
 	}
 	defer wasienv.Close(ctx)
 
-	wasinet, err := ffiwasinet.Wazero(wruntime).Instantiate(ctx)
+	// sockets bypass the filesystem mounts, so wasinet remaps their paths itself.
+	wasinet, err := ffiwasinet.Wazero(
+		wruntime,
+		wnetruntime.OptionFSPrefixes(
+			wnetruntime.FSPrefix{Host: ws.Root, Guest: eg.DefaultRootDirectory()},
+			wnetruntime.FSPrefix{Host: ws.RuntimeDir, Guest: eg.DefaultRuntimeDirectory()},
+			wnetruntime.FSPrefix{Host: ws.CacheDir, Guest: eg.DefaultCacheDirectory()},
+			wnetruntime.FSPrefix{Host: ws.WorkspaceDir, Guest: eg.DefaultWorkspaceDirectory()},
+			wnetruntime.FSPrefix{Host: ws.WorkingDir, Guest: eg.DefaultWorkingDirectory()},
+		),
+	).Instantiate(ctx)
 	if err != nil {
 		return err
 	}

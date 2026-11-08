@@ -261,7 +261,7 @@ func TestOpen(t *testing.T) {
 	require.NoError(t, os.WriteFile(path, blob, 0600))
 
 	t.Run("opens a local archive", func(t *testing.T) {
-		archive, err := egiso.Open(t.Context(), path, toc)
+		archive, err := egiso.Open(t.Context(), http.DefaultClient, path, toc)
 		require.NoError(t, err)
 		defer archive.Close()
 
@@ -271,7 +271,7 @@ func TestOpen(t *testing.T) {
 	})
 
 	t.Run("refuses a location that is not a path or an https URL", func(t *testing.T) {
-		_, err := egiso.Open(t.Context(), "http://example.com/root.egiso", toc)
+		_, err := egiso.Open(t.Context(), http.DefaultClient, "http://example.com/root.egiso", toc)
 		require.ErrorContains(t, err, "unsupported egiso location")
 	})
 }

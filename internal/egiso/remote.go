@@ -11,16 +11,12 @@ import (
 )
 
 // Remote reads the archive at the URL with range requests, so only the parts that are read are
-// fetched. A nil client uses http.DefaultClient.
+// fetched.
 func Remote(ctx context.Context, c *http.Client, url string) (_ *io.SectionReader, err error) {
 	var (
 		req  *http.Request
 		resp *http.Response
 	)
-
-	if c == nil {
-		c = http.DefaultClient
-	}
 
 	if req, err = http.NewRequestWithContext(ctx, http.MethodHead, url, nil); err != nil {
 		return nil, err

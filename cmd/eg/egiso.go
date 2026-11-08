@@ -23,7 +23,7 @@ type egisoCmdUsers struct {
 	TOC      string `name:"toc" help:"digest of the egiso's table of contents" required:""`
 }
 
-func (t egisoCmdUsers) Run(gctx *cmdopts.Global) (err error) {
+func (t egisoCmdUsers) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 	var (
 		toc     digest.Digest
 		archive *egiso.Archive
@@ -35,7 +35,7 @@ func (t egisoCmdUsers) Run(gctx *cmdopts.Global) (err error) {
 		return errorsx.Wrap(err, "invalid --toc")
 	}
 
-	if archive, err = egiso.Open(gctx.Context, t.Location, toc); err != nil {
+	if archive, err = egiso.Open(gctx.Context, tlsc.DefaultClient(), t.Location, toc); err != nil {
 		return err
 	}
 	defer archive.Close()

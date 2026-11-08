@@ -12,6 +12,7 @@ import (
 	"context"
 	"io"
 	"io/fs"
+	"net/http"
 	"net/url"
 	"os"
 	"path"
@@ -36,9 +37,9 @@ type Archive struct {
 	named  func() (names, error)
 }
 
-// Open opens the egiso at location, a local path or an https URL read with range requests, pinned
-// to the digest of its table of contents.
-func Open(ctx context.Context, location string, toc digest.Digest) (_ *Archive, err error) {
+// Open opens the egiso at location, a local path or an https URL read with range requests through
+// c, pinned to the digest of its table of contents.
+func Open(ctx context.Context, c *http.Client, location string, toc digest.Digest) (_ *Archive, err error) {
 	var (
 		u  *url.URL
 		f  *os.File
@@ -53,7 +54,7 @@ func Open(ctx context.Context, location string, toc digest.Digest) (_ *Archive, 
 
 	switch u.Scheme {
 	case "https":
-		if sr, err = Remote(ctx, nil, location); err != nil {
+		if sr, err = Remote(ctx, c, location); err != nil {
 			return nil, err
 		}
 		return New(sr, toc)

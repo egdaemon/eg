@@ -3,6 +3,9 @@
 // checked against the digest the table records for it before any of it is returned. The archive
 // is a read-only fs.FS whose symlinks resolve within the archive; a file's FileInfo.Sys is its
 // *estargz.TOCEntry, which holds the owner (UID, GID, Uname, Gname) the image records.
+//
+// A Tree mounts archives and host directories at paths, and exposes the owners of each mount's files
+// as the environment's virtual users through that mount's own Owners.
 package egiso
 
 import (

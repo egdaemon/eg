@@ -3,10 +3,6 @@
 // checked against the digest the table records for it before any of it is returned. The archive
 // is a read-only fs.FS whose symlinks resolve within the archive; a file's FileInfo.Sys is its
 // *estargz.TOCEntry, which holds the owner (UID, GID, Uname, Gname) the image records.
-//
-// Ownership comes from the table of contents alone, so the archive file is owned by whichever host
-// user opens it. The virtual users commands run as (Privileged, Default and named local users) map
-// to the accounts the archive defines in its own /etc/passwd and /etc/group, never the host's.
 package egiso
 
 import (

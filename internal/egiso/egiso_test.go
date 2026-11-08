@@ -140,6 +140,19 @@ func TestArchive(t *testing.T) {
 		require.Equal(t, fs.FileMode(0600), info.Mode().Perm())
 	})
 
+	t.Run("lists the root without estargz's prefetch landmark", func(t *testing.T) {
+		entries, err := fs.ReadDir(archive, ".")
+		require.NoError(t, err)
+		names := []string{}
+		for _, e := range entries {
+			names = append(names, e.Name())
+		}
+		require.Equal(t, []string{"bin", "etc", "home", "usr"}, names)
+
+		_, err = archive.Open(estargz.NoPrefetchLandmark)
+		require.ErrorIs(t, err, fs.ErrNotExist)
+	})
+
 	t.Run("lists a directory in name order", func(t *testing.T) {
 		entries, err := fs.ReadDir(archive, "home/egd")
 		require.NoError(t, err)

@@ -183,6 +183,9 @@ func (t *Archive) stat(op string, name string, follow bool) (fs.FileInfo, error)
 // own name.
 func (t *Archive) entries(dir *estargz.TOCEntry) (entries []fs.DirEntry) {
 	dir.ForeachChild(func(base string, child *estargz.TOCEntry) bool {
+		if landmark(child.Name) {
+			return true
+		}
 		if resolved, ok := t.r.Lookup(child.Name); ok {
 			child = resolved
 		}
@@ -225,7 +228,7 @@ func (t *Archive) resolve(op string, name string, follow bool) (*estargz.TOCEntr
 			continue
 		}
 
-		if e, found = t.r.Lookup(path.Join(append(dir, component)...)); !found {
+		if e, found = t.r.Lookup(path.Join(append(dir, component)...)); !found || landmark(e.Name) {
 			return nil, &fs.PathError{Op: op, Path: name, Err: fs.ErrNotExist}
 		}
 
@@ -249,6 +252,12 @@ func (t *Archive) resolve(op string, name string, follow bool) (*estargz.TOCEntr
 
 	e, _ = t.r.Lookup(path.Join(dir...))
 	return e, nil
+}
+
+// landmark reports whether the entry is one of the markers estargz adds at the archive's root for
+// prefetching, which are not files of the image.
+func landmark(name string) bool {
+	return name == estargz.PrefetchLandmark || name == estargz.NoPrefetchLandmark
 }
 
 // info names an entry by the path it was opened with: a symlink or hardlink describes its target

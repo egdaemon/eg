@@ -43,6 +43,9 @@ func image(t *testing.T, extra ...*tar.Header) (blob []byte, toc digest.Digest, 
 	}
 	write(&tar.Header{Typeflag: tar.TypeDir, Name: "etc/", Mode: 0755}, nil)
 	write(&tar.Header{Typeflag: tar.TypeReg, Name: "etc/hostname", Mode: 0644, Uid: 0, Gid: 0, Uname: "root", Gname: "root"}, []byte("egd\n"))
+	write(&tar.Header{Typeflag: tar.TypeReg, Name: "etc/passwd", Mode: 0644}, []byte("root:x:0:0:root:/root:/bin/sh\negd:x:1000:1000::/home/egd:/bin/sh\nbob:x:1001:1001::/home/bob:/bin/sh\n"))
+	write(&tar.Header{Typeflag: tar.TypeReg, Name: "etc/group", Mode: 0644}, []byte("root:x:0:\negd:x:1000:\nbob:x:1001:\ndocker:x:999:egd\n"))
+	write(&tar.Header{Typeflag: tar.TypeReg, Name: "etc/orphan", Mode: 0644, Uid: 2000, Gid: 2000}, nil)
 	write(&tar.Header{Typeflag: tar.TypeDir, Name: "usr/", Mode: 0755}, nil)
 	write(&tar.Header{Typeflag: tar.TypeDir, Name: "usr/bin/", Mode: 0755}, nil)
 	write(&tar.Header{Typeflag: tar.TypeReg, Name: "usr/bin/tool", Mode: 0755}, []byte("#!/bin/sh\n"))
@@ -172,6 +175,86 @@ func TestArchive(t *testing.T) {
 	t.Run("refuses an invalid path", func(t *testing.T) {
 		_, err := archive.Open("/etc/hostname")
 		require.ErrorIs(t, err, fs.ErrInvalid)
+	})
+}
+
+func TestUsers(t *testing.T) {
+	blob, toc, _ := image(t)
+	// the archive file is owned by the test's own user, which is neither root nor egd.
+	location := filepath.Join(t.TempDir(), "root.egiso")
+	require.NoError(t, os.WriteFile(location, blob, 0600))
+	archive, err := egiso.Open(t.Context(), location, toc)
+	require.NoError(t, err)
+	defer archive.Close()
+
+	users, err := archive.Users("bob")
+	require.NoError(t, err)
+
+	t.Run("maps the default user to the archive's egd", func(t *testing.T) {
+		a, err := users.Lookup(egiso.Default)
+		require.NoError(t, err)
+		require.Equal(t, egiso.Account{Name: egiso.Default, UID: 1000, GID: 1000, Groups: []int{999}, Home: "/home/egd"}, a)
+	})
+
+	t.Run("maps the privileged user to the archive's root", func(t *testing.T) {
+		a, err := users.Lookup(egiso.Privileged)
+		require.NoError(t, err)
+		require.Equal(t, 0, a.UID)
+		require.Equal(t, 0, a.GID)
+	})
+
+	t.Run("maps a local user to the archive's account of the same name", func(t *testing.T) {
+		a, err := users.Lookup("bob")
+		require.NoError(t, err)
+		require.Equal(t, 1001, a.UID)
+	})
+
+	t.Run("refuses a virtual user that is not mapped", func(t *testing.T) {
+		_, err := users.Lookup("alice")
+		require.ErrorContains(t, err, "alice is not mapped")
+	})
+
+	t.Run("refuses a local user the archive has no account for", func(t *testing.T) {
+		_, err := archive.Users("alice")
+		require.ErrorContains(t, err, "the archive has no account for alice")
+	})
+
+	t.Run("reports the virtual user that owns a file, whoever owns the archive", func(t *testing.T) {
+		info, err := fs.Stat(archive, "home/egd/large")
+		require.NoError(t, err)
+		owner, err := users.Owner(info)
+		require.NoError(t, err)
+		require.Equal(t, egiso.Default, owner)
+
+		info, err = fs.Stat(archive, "etc/hostname")
+		require.NoError(t, err)
+		owner, err = users.Owner(info)
+		require.NoError(t, err)
+		require.Equal(t, egiso.Privileged, owner)
+	})
+
+	t.Run("refuses a file owned by a uid no virtual user maps to", func(t *testing.T) {
+		info, err := fs.Stat(archive, "etc/orphan")
+		require.NoError(t, err)
+		_, err = users.Owner(info)
+		require.ErrorContains(t, err, "uid 2000")
+	})
+
+	t.Run("refuses an archive without accounts", func(t *testing.T) {
+		var (
+			buf bytes.Buffer
+			out bytes.Buffer
+		)
+		tw := tar.NewWriter(&buf)
+		require.NoError(t, tw.WriteHeader(&tar.Header{Typeflag: tar.TypeDir, Name: "etc/", Mode: 0755}))
+		require.NoError(t, tw.Close())
+		toc, err := egiso.Build(section(buf.Bytes()), &out)
+		require.NoError(t, err)
+		empty, err := egiso.New(section(out.Bytes()), toc)
+		require.NoError(t, err)
+
+		_, err = empty.Users()
+		require.ErrorContains(t, err, "unable to read the archive's accounts")
 	})
 }
 

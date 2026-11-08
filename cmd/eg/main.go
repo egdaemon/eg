@@ -88,6 +88,7 @@ func main() {
 		Compute            compute.Cmd                  `cmd:"" help:"commands for running compute workloads"`
 		Module             module                       `cmd:"" help:"executes a compiled module directly" hidden:"true"`
 		Wasi               Wasi                         `cmd:"" help:"wasi related commmands"`
+		Egiso              Egiso                        `cmd:"" name:"egiso" help:"inspect egiso images" hidden:"true"`
 		Daemon             daemon                       `cmd:"" help:"run in daemon mode letting the control plane push jobs to machines" hidden:"true"`
 		AgentManagement    actlcmd                      `cmd:"" name:"actl" help:"agent management commands"`
 		Register           cmdaccounts.Signup           `cmd:"" name:"register" help:"register with an account with eg"`

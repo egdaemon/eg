@@ -43,6 +43,9 @@ func image(t *testing.T, extra ...*tar.Header) (blob []byte, toc digest.Digest, 
 	}
 	write(&tar.Header{Typeflag: tar.TypeDir, Name: "etc/", Mode: 0755}, nil)
 	write(&tar.Header{Typeflag: tar.TypeReg, Name: "etc/hostname", Mode: 0644, Uid: 0, Gid: 0, Uname: "root", Gname: "root"}, []byte("egd\n"))
+	write(&tar.Header{Typeflag: tar.TypeReg, Name: "etc/passwd", Mode: 0644}, []byte("root:x:0:0:root:/root:/bin/sh\negd:x:1000:1000::/home/egd:/bin/sh\nbob:x:1001:1001::/home/bob:/bin/sh\n"))
+	write(&tar.Header{Typeflag: tar.TypeReg, Name: "etc/group", Mode: 0644}, []byte("root:x:0:\negd:x:1000:\nbob:x:1001:\ndocker:x:999:egd\n"))
+	write(&tar.Header{Typeflag: tar.TypeReg, Name: "etc/orphan", Mode: 0644, Uid: 2000, Gid: 2000}, nil)
 	write(&tar.Header{Typeflag: tar.TypeDir, Name: "usr/", Mode: 0755}, nil)
 	write(&tar.Header{Typeflag: tar.TypeDir, Name: "usr/bin/", Mode: 0755}, nil)
 	write(&tar.Header{Typeflag: tar.TypeReg, Name: "usr/bin/tool", Mode: 0755}, []byte("#!/bin/sh\n"))
@@ -185,6 +188,43 @@ func TestArchive(t *testing.T) {
 	t.Run("refuses an invalid path", func(t *testing.T) {
 		_, err := archive.Open("/etc/hostname")
 		require.ErrorIs(t, err, fs.ErrInvalid)
+	})
+}
+
+func TestAccounts(t *testing.T) {
+	blob, toc, _ := image(t)
+	archive, err := egiso.New(section(blob), toc)
+	require.NoError(t, err)
+	users, groups, err := archive.Accounts()
+	require.NoError(t, err)
+
+	t.Run("lists every uid that owns files or that /etc/passwd defines", func(t *testing.T) {
+		require.Equal(t, []egiso.Account{
+			{ID: 0, Name: "root", Files: 12},
+			{ID: 1000, Name: "egd", Files: 3},
+			{ID: 1001, Name: "bob", Files: 0},
+			{ID: 2000, Name: "", Files: 1},
+		}, users)
+	})
+
+	t.Run("lists every gid that owns files or that /etc/group defines", func(t *testing.T) {
+		require.Equal(t, []egiso.Account{
+			{ID: 0, Name: "root", Files: 12},
+			{ID: 999, Name: "docker", Files: 0},
+			{ID: 1000, Name: "egd", Files: 3},
+			{ID: 1001, Name: "bob", Files: 0},
+			{ID: 2000, Name: "", Files: 1},
+		}, groups)
+	})
+
+	t.Run("names an id the image does not define from its table of contents", func(t *testing.T) {
+		blob, toc, _ := image(t, &tar.Header{Typeflag: tar.TypeReg, Name: "etc/svc", Mode: 0644, Uid: 3000, Gid: 3000, Uname: "svc", Gname: "svc"})
+		archive, err := egiso.New(section(blob), toc)
+		require.NoError(t, err)
+		users, groups, err := archive.Accounts()
+		require.NoError(t, err)
+		require.Contains(t, users, egiso.Account{ID: 3000, Name: "svc", Files: 1})
+		require.Contains(t, groups, egiso.Account{ID: 3000, Name: "svc", Files: 1})
 	})
 }
 

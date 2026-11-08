@@ -65,3 +65,19 @@ func moduleenv(b *envx.Builder, inherited ...string) *envx.Builder {
 		eg.EnvComputeWorkspaceDirectory, eg.DefaultWorkspaceDirectory(),
 	)
 }
+
+// hostmoduleenv is the environment provided to a module that runs its commands on the host. it is moduleenv with
+// the directories of the workspace in place of those of the container.
+func hostmoduleenv(b *envx.Builder, ws workspaces.Context, inherited ...string) *envx.Builder {
+	return moduleenv(b, inherited...).Var(
+		eg.EnvComputeWorkloadDirectory, ws.Root,
+	).Var(
+		eg.EnvComputeRuntimeDirectory, ws.RuntimeDir,
+	).Var(
+		eg.EnvComputeCacheDirectory, ws.CacheDir,
+	).Var(
+		eg.EnvComputeWorkspaceDirectory, ws.WorkspaceDir,
+	).Var(
+		eg.EnvComputeWorkingDirectory, ws.WorkingDir,
+	)
+}

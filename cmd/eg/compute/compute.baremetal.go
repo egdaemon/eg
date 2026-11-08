@@ -69,6 +69,7 @@ func (t baremetal) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, hotswapbin
 		ws        workspaces.Context
 		repo      *git.Repository
 		environio *os.File
+		hostenvio *os.File
 		aid       = envx.String(uuid.Nil.String(), eg.EnvComputeAccountID)
 		uid       = uuid.Must(uuid.NewV7())
 		descr     = envx.String("", eg.EnvComputeVCS)
@@ -250,11 +251,18 @@ func (t baremetal) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, hotswapbin
 		Var(eg.EnvComputeArch, runtime.GOARCH).
 		FromEnviron(gitenv...)
 
-	environpath := filepath.Join(ws.RuntimeDir, eg.EnvironFile)
+	// the module reads the environment file of the runtime directory, it runs commands on the host and needs the
+	// host directories. the containers of the workload are provided their own file with the directories of the container.
+	environpath := filepath.Join(ws.RuntimeDir, "container."+eg.EnvironFile)
 	if environio, err = os.Create(environpath); err != nil {
 		return errorsx.Wrap(err, "unable to open the environment variable file")
 	}
 	defer environio.Close()
+
+	if hostenvio, err = os.Create(filepath.Join(ws.RuntimeDir, eg.EnvironFile)); err != nil {
+		return errorsx.Wrap(err, "unable to open the host environment variable file")
+	}
+	defer hostenvio.Close()
 
 	var inherited []string
 	if !t.Clean {
@@ -265,6 +273,10 @@ func (t baremetal) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, hotswapbin
 
 	if err = modulesenv.CopyTo(environio); err != nil {
 		return errorsx.Wrap(err, "unable to generate environment")
+	}
+
+	if err = hostmoduleenv(envx.Build().FromEnviron(errorsx.Must(cmdenvb.Environ())...), ws, inherited...).CopyTo(hostenvio); err != nil {
+		return errorsx.Wrap(err, "unable to generate host environment")
 	}
 
 	// tune bare metal environment.

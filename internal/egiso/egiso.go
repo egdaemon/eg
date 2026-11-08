@@ -17,6 +17,7 @@ import (
 	"path"
 	"slices"
 	"strings"
+	"sync"
 	"syscall"
 
 	"github.com/containerd/stargz-snapshotter/estargz"
@@ -32,6 +33,7 @@ type Archive struct {
 	r      *estargz.Reader
 	v      estargz.TOCEntryVerifier
 	closer io.Closer
+	named  func() (names, error)
 }
 
 // Open opens the egiso at location, a local path or an https URL read with range requests, pinned
@@ -89,7 +91,9 @@ func New(sr *io.SectionReader, toc digest.Digest) (_ *Archive, err error) {
 		return nil, errorsx.Wrap(err, "unable to verify the egiso")
 	}
 
-	return &Archive{r: r, v: v}, nil
+	a := &Archive{r: r, v: v}
+	a.named = sync.OnceValues(func() (names, error) { return directory(a) })
+	return a, nil
 }
 
 // Build converts the tar archive to an egiso written to w, returning the digest of its table of

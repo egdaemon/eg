@@ -131,13 +131,16 @@ func (t Tree) Owner(name string) (user string, group string, err error) {
 		return Privileged, Privileged, nil
 	}
 
-	uid, gid, ok := source(st)
+	m, _, _ := t.mount(name)
+	id, ok, err := source(m.src, st)
+	if err != nil {
+		return "", "", err
+	}
 	if !ok {
 		return "", "", errorsx.Errorf("%s has no owner in its source", name)
 	}
 
-	m, _, _ := t.mount(name)
-	return m.users.Lookup(uid), m.groups.Lookup(gid), nil
+	return m.users.Lookup(id.uid, id.user), m.groups.Lookup(id.gid, id.group), nil
 }
 
 // mount returns the mount name belongs to, the one at its longest prefix, and name within it.

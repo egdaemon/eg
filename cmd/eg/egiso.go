@@ -56,6 +56,6 @@ func accounts(w io.Writer, column string, ids []egiso.Account) {
 	owners := egiso.NewOwners()
 	fmt.Fprintf(w, "%s\tNAME\tFILES\tEXPOSED AS\n", column)
 	for _, a := range ids {
-		fmt.Fprintf(w, "%d\t%s\t%d\t%s\n", a.ID, a.Name, a.Files, owners.Lookup(a.ID))
+		fmt.Fprintf(w, "%d\t%s\t%d\t%s\n", a.ID, a.Name, a.Files, owners.Lookup(a.ID, a.Name))
 	}
 }

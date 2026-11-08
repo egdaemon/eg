@@ -21,13 +21,18 @@ type Account struct {
 	Files int    // files, directories and links the id owns
 }
 
+// names are the names an archive's /etc/passwd and /etc/group give its ids.
+type names struct {
+	users  map[int]string
+	groups map[int]string
+}
+
 // Accounts lists the archive's users and groups by id, for setting up the Owners of a mount.
 func (t *Archive) Accounts() (users []Account, groups []Account, err error) {
 	var (
-		uids   = map[int]*Account{}
-		gids   = map[int]*Account{}
-		passwd []user.User
-		group  []user.Group
+		uids  = map[int]*Account{}
+		gids  = map[int]*Account{}
+		named names
 	)
 
 	account := func(ids map[int]*Account, id int) *Account {
@@ -60,21 +65,56 @@ func (t *Archive) Accounts() (users []Account, groups []Account, err error) {
 		return nil, nil, errorsx.Wrap(err, "unable to read the archive's owners")
 	}
 
-	if passwd, err = defined(t, "etc/passwd", user.ParsePasswd); err != nil {
+	if named, err = t.named(); err != nil {
 		return nil, nil, err
 	}
-	for _, u := range passwd {
-		account(uids, u.Uid).Name = u.Name
+	for id, name := range named.users {
+		account(uids, id).Name = name
 	}
-
-	if group, err = defined(t, "etc/group", user.ParseGroup); err != nil {
-		return nil, nil, err
-	}
-	for _, g := range group {
-		account(gids, g.Gid).Name = g.Name
+	for id, name := range named.groups {
+		account(gids, id).Name = name
 	}
 
 	return sorted(uids), sorted(gids), nil
+}
+
+// owner names the uid and gid that own an entry: by the archive's /etc/passwd and /etc/group, else
+// by the names its table of contents records.
+func (t *Archive) owner(e *estargz.TOCEntry) (uname string, gname string, err error) {
+	var (
+		named names
+	)
+
+	if named, err = t.named(); err != nil {
+		return "", "", err
+	}
+	return langx.FirstNonZero(named.users[e.UID], e.Uname), langx.FirstNonZero(named.groups[e.GID], e.Gname), nil
+}
+
+// directory reads the names the archive's /etc/passwd and /etc/group give its ids.
+func directory(archive *Archive) (named names, err error) {
+	var (
+		passwd []user.User
+		group  []user.Group
+	)
+
+	named = names{users: map[int]string{}, groups: map[int]string{}}
+
+	if passwd, err = defined(archive, "etc/passwd", user.ParsePasswd); err != nil {
+		return named, err
+	}
+	for _, u := range passwd {
+		named.users[u.Uid] = u.Name
+	}
+
+	if group, err = defined(archive, "etc/group", user.ParseGroup); err != nil {
+		return named, err
+	}
+	for _, g := range group {
+		named.groups[g.Gid] = g.Name
+	}
+
+	return named, nil
 }
 
 // defined parses one of the archive's account files, a missing one defines nothing.

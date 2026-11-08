@@ -12,56 +12,81 @@ import (
 	"time"
 
 	"github.com/egdaemon/eg/internal/egiso"
+	"github.com/egdaemon/eg/internal/langx"
 	"github.com/stretchr/testify/require"
 )
 
 func TestOwners(t *testing.T) {
 	t.Run("exposes root as privileged and every other id as the default user", func(t *testing.T) {
 		o := egiso.NewOwners()
-		require.Equal(t, egiso.Privileged, o.Lookup(0))
-		require.Equal(t, egiso.Default, o.Lookup(1000))
-		require.Equal(t, egiso.Default, o.Lookup(5001))
+		require.Equal(t, egiso.Privileged, o.Lookup(0, ""))
+		require.Equal(t, egiso.Default, o.Lookup(1000, ""))
+		require.Equal(t, egiso.Default, o.Lookup(5001, ""))
 	})
 
 	t.Run("exposes every id as one virtual user", func(t *testing.T) {
 		o := egiso.NewOwners().Privileged(egiso.Default).Standard(egiso.Default)
-		require.Equal(t, egiso.Default, o.Lookup(0))
-		require.Equal(t, egiso.Default, o.Lookup(1000))
+		require.Equal(t, egiso.Default, o.Lookup(0, ""))
+		require.Equal(t, egiso.Default, o.Lookup(1000, ""))
 	})
 
 	t.Run("maps many ids to one virtual user", func(t *testing.T) {
 		o := egiso.NewOwners().Map(1001, "bob").Map(1002, "bob")
-		require.Equal(t, "bob", o.Lookup(1001))
-		require.Equal(t, "bob", o.Lookup(1002))
-		require.Equal(t, egiso.Default, o.Lookup(1003))
+		require.Equal(t, "bob", o.Lookup(1001, ""))
+		require.Equal(t, "bob", o.Lookup(1002, ""))
+		require.Equal(t, egiso.Default, o.Lookup(1003, ""))
 	})
 
 	t.Run("maps an id over the privileged default", func(t *testing.T) {
 		o := egiso.NewOwners().Map(0, egiso.Default)
-		require.Equal(t, egiso.Default, o.Lookup(0))
+		require.Equal(t, egiso.Default, o.Lookup(0, ""))
+	})
+
+	t.Run("maps an id by the name its source gives it", func(t *testing.T) {
+		o := egiso.NewOwners().Name("bob", "carol")
+		require.Equal(t, "carol", o.Lookup(1001, "bob"))
+		require.Equal(t, egiso.Default, o.Lookup(1002, "alice"))
+		require.Equal(t, egiso.Default, o.Lookup(1003, ""))
+	})
+
+	t.Run("maps an id by its number over its name", func(t *testing.T) {
+		o := egiso.NewOwners().Name("bob", "carol").Map(1001, "alice")
+		require.Equal(t, "alice", o.Lookup(1001, "bob"))
+	})
+
+	t.Run("never maps an id its source does not name by the empty name", func(t *testing.T) {
+		o := egiso.NewOwners().Name("", "carol")
+		require.Equal(t, egiso.Default, o.Lookup(1001, ""))
 	})
 
 	t.Run("leaves the owners it was derived from unchanged", func(t *testing.T) {
 		base := egiso.NewOwners().Map(1001, "bob")
-		derived := base.Map(1001, "alice").Standard("carol")
-		require.Equal(t, "bob", base.Lookup(1001))
-		require.Equal(t, egiso.Default, base.Lookup(1002))
-		require.Equal(t, "alice", derived.Lookup(1001))
-		require.Equal(t, "carol", derived.Lookup(1002))
+		derived := base.Map(1001, "alice").Standard("carol").Name("dave", "erin")
+		require.Equal(t, "bob", base.Lookup(1001, ""))
+		require.Equal(t, egiso.Default, base.Lookup(1002, ""))
+		require.Equal(t, "alice", derived.Lookup(1001, ""))
+		require.Equal(t, "carol", derived.Lookup(1002, ""))
+		require.Equal(t, egiso.Default, base.Lookup(1004, "dave"))
+		require.Equal(t, "erin", derived.Lookup(1004, "dave"))
 	})
 }
 
-// archive builds an egiso holding the entries, with the uids and gids they give.
+// archive builds an egiso holding the entries, with the uids and gids they give. A file holds its
+// own name, except the account files, which name 0 and 1000.
 func archive(t *testing.T, entries ...*tar.Header) *egiso.Archive {
 	var (
-		buf bytes.Buffer
-		out bytes.Buffer
+		buf      bytes.Buffer
+		out      bytes.Buffer
+		accounts = map[string]string{
+			"etc/passwd": "root:x:0:0:root:/root:/bin/sh\negd:x:1000:1000::/home/egd:/bin/sh\n",
+			"etc/group":  "root:x:0:\negd:x:1000:\n",
+		}
 	)
 
 	tw := tar.NewWriter(&buf)
 	for _, h := range entries {
 		h.ModTime = time.Unix(1700000000, 0)
-		body := []byte(h.Name)
+		body := []byte(langx.FirstNonZero(accounts[h.Name], h.Name))
 		if h.Typeflag != tar.TypeReg {
 			body = nil
 		}
@@ -93,13 +118,15 @@ func TestTree(t *testing.T) {
 	root := archive(t,
 		&tar.Header{Typeflag: tar.TypeDir, Name: "etc/", Mode: 0755},
 		&tar.Header{Typeflag: tar.TypeReg, Name: "etc/hostname", Mode: 0644},
+		&tar.Header{Typeflag: tar.TypeReg, Name: "etc/passwd", Mode: 0644},
+		&tar.Header{Typeflag: tar.TypeReg, Name: "etc/group", Mode: 0644},
 		&tar.Header{Typeflag: tar.TypeDir, Name: "home/", Mode: 0755},
 		&tar.Header{Typeflag: tar.TypeDir, Name: "home/egd/", Mode: 0700, Uid: 1000, Gid: 1000},
 		&tar.Header{Typeflag: tar.TypeReg, Name: "home/egd/notes", Mode: 0600, Uid: 1000, Gid: 1000},
 	)
 	tools := archive(t,
 		&tar.Header{Typeflag: tar.TypeDir, Name: "bin/", Mode: 0755},
-		&tar.Header{Typeflag: tar.TypeReg, Name: "bin/build", Mode: 0755, Uid: 5000, Gid: 5000},
+		&tar.Header{Typeflag: tar.TypeReg, Name: "bin/build", Mode: 0755, Uid: 5000, Gid: 5000, Uname: "builder", Gname: "builders"},
 		&tar.Header{Typeflag: tar.TypeReg, Name: "bin/test", Mode: 0755, Uid: 5001, Gid: 5001},
 	)
 	shared := hosted(map[string]int{"a": 0, "b": 1001, "c": 1002, "d": 1003, "e": 1004})
@@ -198,6 +225,37 @@ func TestTree(t *testing.T) {
 			names = append(names, e.Name())
 		}
 		require.Equal(t, []string{"etc", "home", "opt", "srv"}, names)
+	})
+
+	t.Run("exposes an image's owners by the names its /etc/passwd and /etc/group give them", func(t *testing.T) {
+		named := tree.Mount(".", root, egiso.NewOwners().Name("egd", "bob"), egiso.NewOwners().Name("egd", "carol"))
+		user, group, err := named.Owner("home/egd/notes")
+		require.NoError(t, err)
+		require.Equal(t, "bob", user)
+		require.Equal(t, "carol", group)
+
+		user, _, err = named.Owner("etc/hostname")
+		require.NoError(t, err)
+		require.Equal(t, egiso.Privileged, user)
+	})
+
+	t.Run("exposes an image's owners by the names its table of contents records", func(t *testing.T) {
+		named := tree.Mount("opt/tools", tools, egiso.NewOwners().Name("builder", "bob"), egiso.NewOwners().Name("builders", "carol"))
+		user, group, err := named.Owner("opt/tools/bin/build")
+		require.NoError(t, err)
+		require.Equal(t, "bob", user)
+		require.Equal(t, "carol", group)
+
+		user, _, err = named.Owner("opt/tools/bin/test")
+		require.NoError(t, err)
+		require.Equal(t, egiso.Default, user)
+	})
+
+	t.Run("exposes a host directory's owners by the names the host gives them", func(t *testing.T) {
+		named := tree.Mount("srv/shared", shared, egiso.NewOwners().Name("root", "bob"), egiso.NewOwners())
+		user, _, err := named.Owner("srv/shared/a")
+		require.NoError(t, err)
+		require.Equal(t, "bob", user)
 	})
 
 	t.Run("exposes every file of a mount as one virtual user", func(t *testing.T) {

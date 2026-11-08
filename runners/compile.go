@@ -64,7 +64,7 @@ func compileEntrypoint(ctx context.Context, ws workspaces.Context) (*transpile.C
 // stage, see CompileN) -- AccessToken is exchanged for short-lived git
 // credentials, mirroring how egmeta's own /c/dequeue handler populates it for
 // the polling flow (see computeapi/http.queue.go's dequeue handler) -- clones
-// the uri/ref named by the submitted environ (see eg.EnvironFile) and
+// the uri/commit named by the submitted environ (see eg.EnvironFile) and
 // compiles it, then enqueues the compiled workload into rundirs and removes
 // the compile job directory.
 func compileWorkload(ctx context.Context, c *http.Client, dir string, rundirs SpoolDirs) (err error) {
@@ -160,7 +160,7 @@ func (t statecompiling) Update(ctx context.Context) state {
 	clonedir := filepath.Join(t.dir, "src")
 	environpath := filepath.Join(t.dir, eg.EnvironFile)
 
-	// clone from the uri and ref submitted with the workload, the same ones
+	// clone from the uri and commit submitted with the workload, the same ones
 	// the workload itself clones from (see eggit.AutoClone).
 	submitted, err := envx.Build().FromPath(environpath).Environ()
 	if err != nil {
@@ -168,9 +168,10 @@ func (t statecompiling) Update(ctx context.Context) state {
 	}
 
 	environ := envx.NewEnvironFromStrings(submitted...)
-	uri, ref := environ.String("", eg.EnvGitHeadURI), environ.String("", eg.EnvGitHeadRef)
-	if stringsx.Blank(uri) || stringsx.Blank(ref) {
-		return compilefailed(t.compilejob, errorsx.Errorf("submitted environment missing %s or %s", eg.EnvGitHeadURI, eg.EnvGitHeadRef))
+	// the commit is preferred, the ref is what older submissions have.
+	uri, commit := environ.String("", eg.EnvGitHeadURI), environ.String("", eg.EnvGitHeadCommit, eg.EnvGitHeadRef)
+	if stringsx.Blank(uri) || stringsx.Blank(commit) {
+		return compilefailed(t.compilejob, errorsx.Errorf("submitted environment missing %s or %s", eg.EnvGitHeadURI, eg.EnvGitHeadCommit))
 	}
 
 	if err = os.MkdirAll(clonedir, 0700); err != nil {
@@ -190,7 +191,7 @@ func (t statecompiling) Update(ctx context.Context) state {
 		opts = append(opts, auth)
 	}
 
-	if err = gitx.Clone(ctx, clonedir, uri, git.DefaultRemoteName, ref, opts...); err != nil {
+	if err = gitx.Clone(ctx, clonedir, uri, git.DefaultRemoteName, commit, opts...); err != nil {
 		return compilefailed(t.compilejob, errorsx.Wrap(err, "unable to clone repository"))
 	}
 

@@ -301,7 +301,76 @@ func RepositoryUsername(path string) string {
 	return u.Username
 }
 
+// Clone makes the working tree in dir the treeish from the remote at uri. the commit, the full hexadecimal hash, is preferred
+// and callers should pass it whenever they have it, a hash is the only treeish that is unambiguous: a branch can move, and a
+// reference like HEAD isn't one the remote has. anything else is a branch name and is cloned as the branch.
 func Clone(ctx context.Context, dir, uri, remote, treeish string, opts ...client.Option) (err error) {
+	if commit := plumbing.NewHash(treeish); plumbing.IsHash(treeish) && !commit.IsZero() {
+		return cloneCommit(ctx, dir, uri, remote, treeish, opts...)
+	}
+
+	return cloneBranch(ctx, dir, uri, remote, treeish, opts...)
+}
+
+// cloneCommit makes the working tree in dir the commit, the full hexadecimal hash, from the remote at uri. only the history
+// of the commit is fetched, like a single branch clone, which means the server must allow fetching a commit it didn't advertise.
+func cloneCommit(ctx context.Context, dir, uri, remote, treeish string, opts ...client.Option) (err error) {
+	var (
+		r *git.Repository
+	)
+
+	commit := plumbing.NewHash(treeish)
+
+	if r, err = git.PlainOpen(dir); errors.Is(err, git.ErrRepositoryNotExists) {
+		log.Println(errorsx.Wrapf(err, "repository is missing attempting clone: %s", uri))
+
+		if r, err = git.PlainInit(dir, false); err != nil {
+			return errorsx.Wrapf(err, "unable to initialize: %s", dir)
+		}
+
+		if _, err = r.CreateRemote(&config.RemoteConfig{Name: remote, URLs: []string{uri}}); err != nil {
+			return errorsx.Wrapf(err, "unable to add remote: '%s'", remote)
+		}
+	} else if err != nil {
+		return errorsx.Wrapf(err, "unable to open: %s", dir)
+	}
+
+	rm, err := r.Remote(remote)
+	if err != nil {
+		return errorsx.Wrapf(err, "unable to find remote: '%s'", remote)
+	}
+
+	spec := config.RefSpec(fmt.Sprintf("+%s:refs/eg/head", commit))
+	err = rm.FetchContext(ctx, &git.FetchOptions{RemoteName: remote, RefSpecs: []config.RefSpec{spec}, ClientOptions: opts})
+	if err != nil && !errors.Is(err, git.NoErrAlreadyUpToDate) {
+		return errorsx.Wrapf(err, "unable to fetch the commit: %s - %s", uri, treeish)
+	}
+
+	w, err := r.Worktree()
+	if err != nil {
+		return err
+	}
+
+	if err = w.Checkout(&git.CheckoutOptions{Hash: commit, Force: true}); err != nil {
+		return errorsx.Wrapf(err, "unable to checkout '%s'", treeish)
+	}
+
+	submodules, err := w.Submodules()
+	if err != nil {
+		return errorsx.Wrap(err, "unable to read the submodules")
+	}
+
+	err = submodules.UpdateContext(ctx, &git.SubmoduleUpdateOptions{Init: true, RecurseSubmodules: git.DefaultSubmoduleRecursionDepth, ClientOptions: opts})
+	if err != nil {
+		return errorsx.Wrap(err, "unable to update the submodules")
+	}
+
+	fetchBaseOrLog(ctx, r, remote, treeish, opts...)
+
+	return nil
+}
+
+func cloneBranch(ctx context.Context, dir, uri, remote, treeish string, opts ...client.Option) (err error) {
 	var (
 		r *git.Repository
 	)

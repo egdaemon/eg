@@ -106,6 +106,72 @@ func TestClone(t *testing.T) {
 		require.FileExists(t, filepath.Join(dst, "a.txt"))
 	})
 
+	t.Run("clones the commit", func(t *testing.T) {
+		src := newMainRepo(t, map[string]string{"a.txt": "a"})
+		out, err := exec.Command("git", "-C", src, "config", "uploadpack.allowReachableSHA1InWant", "true").CombinedOutput()
+		require.NoErrorf(t, err, "%s", out)
+		older, err := exec.Command("git", "-C", src, "rev-parse", "HEAD").CombinedOutput()
+		require.NoError(t, err)
+		commitFile(t, src, "b.txt", "b")
+		dst := filepath.Join(t.TempDir(), "clone")
+
+		require.NoError(t, Clone(t.Context(), dst, src, "origin", strings.TrimSpace(string(older))))
+		require.FileExists(t, filepath.Join(dst, "a.txt"))
+		require.NoFileExists(t, filepath.Join(dst, "b.txt"))
+		head, err := exec.Command("git", "-C", dst, "rev-parse", "HEAD").CombinedOutput()
+		require.NoError(t, err)
+		require.Equal(t, string(older), string(head))
+	})
+
+	t.Run("clones a commit that is only on another branch", func(t *testing.T) {
+		src := newMainRepo(t, map[string]string{"a.txt": "a"})
+		out, err := exec.Command("git", "-C", src, "config", "uploadpack.allowReachableSHA1InWant", "true").CombinedOutput()
+		require.NoErrorf(t, err, "%s", out)
+		out, err = exec.Command("git", "-C", src, "checkout", "-q", "-b", "feature").CombinedOutput()
+		require.NoErrorf(t, err, "%s", out)
+		commitFile(t, src, "f.txt", "f")
+		tip, err := exec.Command("git", "-C", src, "rev-parse", "HEAD").CombinedOutput()
+		require.NoError(t, err)
+		out, err = exec.Command("git", "-C", src, "checkout", "-q", "main").CombinedOutput()
+		require.NoErrorf(t, err, "%s", out)
+		dst := filepath.Join(t.TempDir(), "clone")
+
+		require.NoError(t, Clone(t.Context(), dst, src, "origin", strings.TrimSpace(string(tip))))
+		require.FileExists(t, filepath.Join(dst, "f.txt"))
+		head, err := exec.Command("git", "-C", dst, "rev-parse", "HEAD").CombinedOutput()
+		require.NoError(t, err)
+		require.Equal(t, string(tip), string(head))
+	})
+
+	t.Run("an existing clone moves to a newer commit", func(t *testing.T) {
+		src := newMainRepo(t, map[string]string{"a.txt": "a"})
+		out, err := exec.Command("git", "-C", src, "config", "uploadpack.allowReachableSHA1InWant", "true").CombinedOutput()
+		require.NoErrorf(t, err, "%s", out)
+		older, err := exec.Command("git", "-C", src, "rev-parse", "HEAD").CombinedOutput()
+		require.NoError(t, err)
+		dst := filepath.Join(t.TempDir(), "clone")
+		require.NoError(t, Clone(t.Context(), dst, src, "origin", strings.TrimSpace(string(older))))
+
+		// already up to date is not an error.
+		require.NoError(t, Clone(t.Context(), dst, src, "origin", strings.TrimSpace(string(older))))
+
+		commitFile(t, src, "b.txt", "b")
+		newer, err := exec.Command("git", "-C", src, "rev-parse", "HEAD").CombinedOutput()
+		require.NoError(t, err)
+
+		require.NoError(t, Clone(t.Context(), dst, src, "origin", strings.TrimSpace(string(newer))))
+		require.FileExists(t, filepath.Join(dst, "b.txt"))
+		head, err := exec.Command("git", "-C", dst, "rev-parse", "HEAD").CombinedOutput()
+		require.NoError(t, err)
+		require.Equal(t, string(newer), string(head))
+	})
+
+	t.Run("an unknown commit errors", func(t *testing.T) {
+		src := newMainRepo(t, map[string]string{"a.txt": "a"})
+
+		require.Error(t, Clone(t.Context(), filepath.Join(t.TempDir(), "clone"), src, "origin", "0123456789abcdef0123456789abcdef01234567"))
+	})
+
 	t.Run("an existing clone is fetched and checked out", func(t *testing.T) {
 		src := newMainRepo(t, map[string]string{"a.txt": "a"})
 		dst := filepath.Join(t.TempDir(), "clone")

@@ -30,7 +30,7 @@ import (
 // eg/compile package's example.1 fixture as its .eg module, so
 // compileWorkload can clone+compile it without a VCS auth token or network
 // access to a real forge.
-func newLocalSourceRepo(t *testing.T) (uri, ref string) {
+func newLocalSourceRepo(t *testing.T) (uri, ref string) { // ref is the commit.
 	t.Helper()
 
 	dir := t.TempDir()
@@ -58,7 +58,13 @@ func newLocalSourceRepo(t *testing.T) (uri, ref string) {
 	head, err := repo.Head()
 	require.NoError(t, err)
 
-	return dir, head.Name().Short()
+	// the commit is cloned by hash, which the source must allow.
+	cfg, err := repo.Config()
+	require.NoError(t, err)
+	cfg.Raw.Section("uploadpack").SetOption("allowReachableSHA1InWant", "true")
+	require.NoError(t, repo.SetConfig(cfg))
+
+	return dir, head.Hash().String()
 }
 
 func TestCompileWorkload(t *testing.T) {
@@ -86,7 +92,7 @@ func TestCompileWorkload(t *testing.T) {
 		encoded, err := json.Marshal(&req)
 		require.NoError(t, err)
 		require.NoError(t, compiledirs.Download(uid, "metadata.json", bytes.NewReader(encoded)))
-		require.NoError(t, compiledirs.Download(uid, eg.EnvironFile, strings.NewReader(fmt.Sprintf("%s=%s\n%s=%s\n", eg.EnvGitHeadURI, uri, eg.EnvGitHeadRef, ref))))
+		require.NoError(t, compiledirs.Download(uid, eg.EnvironFile, strings.NewReader(fmt.Sprintf("%s=%s\n%s=%s\n", eg.EnvGitHeadURI, uri, eg.EnvGitHeadCommit, ref))))
 		require.NoError(t, compiledirs.Enqueue(uid))
 
 		dir, err := compiledirs.Dequeue()
@@ -153,7 +159,7 @@ func TestCompileWorkload(t *testing.T) {
 		encoded, err := json.Marshal(&req)
 		require.NoError(t, err)
 		require.NoError(t, compiledirs.Download(uid, "metadata.json", bytes.NewReader(encoded)))
-		require.NoError(t, compiledirs.Download(uid, eg.EnvironFile, strings.NewReader(fmt.Sprintf("%s=%s\n%s=%s\n", eg.EnvGitHeadURI, missing, eg.EnvGitHeadRef, "main"))))
+		require.NoError(t, compiledirs.Download(uid, eg.EnvironFile, strings.NewReader(fmt.Sprintf("%s=%s\n%s=%s\n", eg.EnvGitHeadURI, missing, eg.EnvGitHeadCommit, "0123456789abcdef0123456789abcdef01234567"))))
 		require.NoError(t, compiledirs.Enqueue(uid))
 
 		dir, err := compiledirs.Dequeue()
@@ -194,7 +200,7 @@ func TestCompileWorkload(t *testing.T) {
 		encoded, err := json.Marshal(&req)
 		require.NoError(t, err)
 		require.NoError(t, compiledirs.Download(uid, "metadata.json", bytes.NewReader(encoded)))
-		require.NoError(t, compiledirs.Download(uid, eg.EnvironFile, strings.NewReader(fmt.Sprintf("%s=%s\n%s=%s\n", eg.EnvGitHeadURI, uri, eg.EnvGitHeadRef, ref))))
+		require.NoError(t, compiledirs.Download(uid, eg.EnvironFile, strings.NewReader(fmt.Sprintf("%s=%s\n%s=%s\n", eg.EnvGitHeadURI, uri, eg.EnvGitHeadCommit, ref))))
 		require.NoError(t, compiledirs.Enqueue(uid))
 
 		dir, err := compiledirs.Dequeue()
@@ -232,7 +238,7 @@ func TestCompileWorkload(t *testing.T) {
 		encoded, err := json.Marshal(&req)
 		require.NoError(t, err)
 		require.NoError(t, compiledirs.Download(uid, "metadata.json", bytes.NewReader(encoded)))
-		require.NoError(t, compiledirs.Download(uid, eg.EnvironFile, strings.NewReader(fmt.Sprintf("%s=%s\n%s=%s\n", eg.EnvGitHeadURI, missing, eg.EnvGitHeadRef, "main"))))
+		require.NoError(t, compiledirs.Download(uid, eg.EnvironFile, strings.NewReader(fmt.Sprintf("%s=%s\n%s=%s\n", eg.EnvGitHeadURI, missing, eg.EnvGitHeadCommit, "0123456789abcdef0123456789abcdef01234567"))))
 		require.NoError(t, compiledirs.Enqueue(uid))
 
 		dir, err := compiledirs.Dequeue()
@@ -271,7 +277,7 @@ func TestCompileWorkload(t *testing.T) {
 		encoded, err := json.Marshal(&req)
 		require.NoError(t, err)
 		require.NoError(t, compiledirs.Download(uid, "metadata.json", bytes.NewReader(encoded)))
-		require.NoError(t, compiledirs.Download(uid, eg.EnvironFile, strings.NewReader(fmt.Sprintf("%s=%s\n%s=%s\n", eg.EnvGitHeadURI, uri, eg.EnvGitHeadRef, ref))))
+		require.NoError(t, compiledirs.Download(uid, eg.EnvironFile, strings.NewReader(fmt.Sprintf("%s=%s\n%s=%s\n", eg.EnvGitHeadURI, uri, eg.EnvGitHeadCommit, ref))))
 		require.NoError(t, compiledirs.Enqueue(uid))
 
 		dir, err := compiledirs.Dequeue()
@@ -287,6 +293,38 @@ func TestCompileWorkload(t *testing.T) {
 		outgoing, err := os.ReadFile(filepath.Join(unpacked, eg.EnvironFile))
 		require.NoError(t, err)
 		require.Contains(t, string(outgoing), eg.EnvGitHeadURI+"="+uri)
+	})
+
+	t.Run("clones the head ref when the submitted environ has no commit", func(t *testing.T) {
+		uri, ref := newLocalSourceRepo(t)
+
+		compiledirs := NewSpoolDir(t.TempDir())
+		rundirs := NewSpoolDir(t.TempDir())
+
+		repo, err := git.PlainOpen(uri)
+		require.NoError(t, err)
+		head, err := repo.Head()
+		require.NoError(t, err)
+
+		vcsaccess := &http.Client{Transport: roundtripper(func(r *http.Request) (*http.Response, error) {
+			w := httptest.NewRecorder()
+			require.NoError(t, json.NewEncoder(w).Encode(&compute.GitCredentialsHTTP{Username: "git", Password: "short-lived"}))
+			return w.Result(), nil
+		})}
+
+		uid := uuid.Must(uuid.NewV7())
+		req := computeapi.EnqueuedDequeueResponse{Enqueued: &computeapi.Enqueued{VcsUri: uri, VcsCommit: ref, Cores: 1}, AccessToken: "token"}
+		encoded, err := json.Marshal(&req)
+		require.NoError(t, err)
+		require.NoError(t, compiledirs.Download(uid, "metadata.json", bytes.NewReader(encoded)))
+		require.NoError(t, compiledirs.Download(uid, eg.EnvironFile, strings.NewReader(fmt.Sprintf("%s=%s\n%s=%s\n", eg.EnvGitHeadURI, uri, eg.EnvGitHeadRef, head.Name().Short()))))
+		require.NoError(t, compiledirs.Enqueue(uid))
+
+		dir, err := compiledirs.Dequeue()
+		require.NoError(t, err)
+
+		require.NoError(t, compileWorkload(t.Context(), vcsaccess, dir, rundirs))
+		require.FileExists(t, filepath.Join(rundirs.Queued, filepath.Base(dir), "archive.tar.gz"))
 	})
 
 	t.Run("fails when the submitted environ lacks the head uri/ref", func(t *testing.T) {
@@ -329,7 +367,7 @@ func TestCompileWorkload(t *testing.T) {
 		encoded, err := json.Marshal(&req)
 		require.NoError(t, err)
 		require.NoError(t, compiledirs.Download(uid, "metadata.json", bytes.NewReader(encoded)))
-		require.NoError(t, compiledirs.Download(uid, eg.EnvironFile, strings.NewReader(fmt.Sprintf("%s=%s\n%s=%s\n", eg.EnvGitHeadURI, uri, eg.EnvGitHeadRef, ref))))
+		require.NoError(t, compiledirs.Download(uid, eg.EnvironFile, strings.NewReader(fmt.Sprintf("%s=%s\n%s=%s\n", eg.EnvGitHeadURI, uri, eg.EnvGitHeadCommit, ref))))
 		require.NoError(t, compiledirs.Enqueue(uid))
 
 		dir, err := compiledirs.Dequeue()
@@ -434,7 +472,7 @@ func TestCompileWorkloadReserved(t *testing.T) {
 		dir := spool(t, compiledirs, uid, &computeapi.EnqueuedDequeueResponse{
 			Enqueued:    &computeapi.Enqueued{Id: uid.String(), VcsUri: uri, VcsCommit: ref, Cores: 1},
 			AccessToken: "token",
-		}, fmt.Sprintf("%s=%s\n%s=%s\n", eg.EnvGitHeadURI, uri, eg.EnvGitHeadRef, ref))
+		}, fmt.Sprintf("%s=%s\n%s=%s\n", eg.EnvGitHeadURI, uri, eg.EnvGitHeadCommit, ref))
 
 		require.NoError(t, compileWorkloadReserved(t.Context(), vcsaccess, cp.Client(t), dir, rundirs))
 		require.Equal(t, []string{StatusCompiling, "reserved", StatusQueued}, cp.Calls())
@@ -501,7 +539,7 @@ func TestCompileWorkloadReserved(t *testing.T) {
 		dir := spool(t, compiledirs, uid, &computeapi.EnqueuedDequeueResponse{
 			Enqueued:    &computeapi.Enqueued{Id: uid.String(), VcsUri: missing},
 			AccessToken: "token",
-		}, fmt.Sprintf("%s=%s\n%s=%s\n", eg.EnvGitHeadURI, missing, eg.EnvGitHeadRef, "main"))
+		}, fmt.Sprintf("%s=%s\n%s=%s\n", eg.EnvGitHeadURI, missing, eg.EnvGitHeadCommit, "0123456789abcdef0123456789abcdef01234567"))
 
 		require.Error(t, compileWorkloadReserved(t.Context(), vcsaccess, cp.Client(t), dir, rundirs))
 		require.Equal(t, []string{StatusCompiling, StatusFailed}, cp.Calls())
@@ -527,7 +565,7 @@ func TestCompileWorkloadReserved(t *testing.T) {
 		dir := spool(t, compiledirs, uid, &computeapi.EnqueuedDequeueResponse{
 			Enqueued:    &computeapi.Enqueued{VcsUri: uri, VcsCommit: ref, Cores: 1},
 			AccessToken: "token",
-		}, fmt.Sprintf("%s=%s\n%s=%s\n", eg.EnvGitHeadURI, uri, eg.EnvGitHeadRef, ref))
+		}, fmt.Sprintf("%s=%s\n%s=%s\n", eg.EnvGitHeadURI, uri, eg.EnvGitHeadCommit, ref))
 
 		require.Error(t, compileWorkload(t.Context(), vcsaccess, dir, rundirs))
 
@@ -552,7 +590,7 @@ func TestCompileWorkloadReserved(t *testing.T) {
 
 		dir := spool(t, compiledirs, uid, &computeapi.EnqueuedDequeueResponse{
 			Enqueued: &computeapi.Enqueued{Id: uid.String(), VcsUri: uri, VcsCommit: ref, Cores: 1},
-		}, fmt.Sprintf("%s=%s\n%s=%s\n", eg.EnvGitHeadURI, uri, eg.EnvGitHeadRef, ref))
+		}, fmt.Sprintf("%s=%s\n%s=%s\n", eg.EnvGitHeadURI, uri, eg.EnvGitHeadCommit, ref))
 
 		require.Error(t, compileWorkloadReserved(t.Context(), vcsaccess, cp.Client(t), dir, rundirs))
 		require.Equal(t, []string{StatusCompiling, StatusFailed}, cp.Calls())
@@ -584,7 +622,7 @@ func TestCompileN(t *testing.T) {
 		})
 		require.NoError(t, err)
 		require.NoError(t, compiledirs.Download(succeeds, "metadata.json", bytes.NewReader(encoded)))
-		require.NoError(t, compiledirs.Download(succeeds, eg.EnvironFile, strings.NewReader(fmt.Sprintf("%s=%s\n%s=%s\n", eg.EnvGitHeadURI, uri, eg.EnvGitHeadRef, ref))))
+		require.NoError(t, compiledirs.Download(succeeds, eg.EnvironFile, strings.NewReader(fmt.Sprintf("%s=%s\n%s=%s\n", eg.EnvGitHeadURI, uri, eg.EnvGitHeadCommit, ref))))
 		require.NoError(t, compiledirs.Enqueue(succeeds))
 
 		// fails, missing the head uri/ref.
@@ -640,7 +678,7 @@ func TestCompileN(t *testing.T) {
 		})
 		require.NoError(t, err)
 		require.NoError(t, compiledirs.Download(uid, "metadata.json", bytes.NewReader(encoded)))
-		require.NoError(t, compiledirs.Download(uid, eg.EnvironFile, strings.NewReader(fmt.Sprintf("%s=%s\n%s=%s\n", eg.EnvGitHeadURI, uri, eg.EnvGitHeadRef, ref))))
+		require.NoError(t, compiledirs.Download(uid, eg.EnvironFile, strings.NewReader(fmt.Sprintf("%s=%s\n%s=%s\n", eg.EnvGitHeadURI, uri, eg.EnvGitHeadCommit, ref))))
 		require.NoError(t, compiledirs.Enqueue(uid))
 
 		// claimed and partially cloned when the previous process was

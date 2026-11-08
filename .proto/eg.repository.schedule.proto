@@ -13,7 +13,8 @@ message Schedule {
   string vcs_uri = 8 [ json_name = "vcs_uri" ];
   string cron = 9 [ json_name = "cron" ];
   string mimetype = 10 [ json_name = "mimetype" ];
-  reserved 11 to 99;
+  string paused_at = 11 [ json_name = "paused_at" ];
+  reserved 12 to 99;
   string entry = 100 [ json_name = "entrypoint" ];
   string arch = 101 [ json_name = "arch" ];
   string os = 102 [ json_name = "os" ];

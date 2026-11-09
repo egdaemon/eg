@@ -4,6 +4,13 @@
 // into it.
 package egvm
 
+import (
+	"path/filepath"
+	"runtime"
+
+	"github.com/egdaemon/eg/internal/userx"
+)
+
 // Root is the tag of the shared directory vminit mounts as the root of the commands it runs.
 const Root = "root"
 
@@ -22,4 +29,23 @@ type Machine struct {
 	CPUs    uint
 	Memory  uint64 // bytes
 	Shares  []Share
+}
+
+// Directory holds the machine image cells boot: an uncompressed arm64 kernel, Image, and an
+// initramfs holding vminit and the modules it loads, initramfs.
+func Directory() string {
+	return userx.DefaultConfigLocation("egvm.d")
+}
+
+// New describes a machine booting the image in dir, as large as the host, with root as the root of
+// its commands.
+func New(dir string, root string) Machine {
+	return Machine{
+		Kernel:  filepath.Join(dir, "Image"),
+		Initrd:  filepath.Join(dir, "initramfs"),
+		Cmdline: "console=hvc0 quiet",
+		CPUs:    uint(runtime.NumCPU()),
+		Memory:  4 << 30,
+		Shares:  []Share{{Tag: Root, Dir: root}},
+	}
 }

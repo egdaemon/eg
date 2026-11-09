@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
-	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -38,7 +37,7 @@ func TestExec(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, kernels, 1)
 
-	// initramfs holds vminit and the modules virtio-fs and vsock need, loaded in name order.
+	// initramfs builds vminit into the machine's initramfs.
 	initramfs := func(t *testing.T) string {
 		var (
 			buf bytes.Buffer
@@ -49,29 +48,9 @@ func TestExec(t *testing.T) {
 		cmd.Env = append(os.Environ(), "GOOS=linux", "GOARCH=arm64", "CGO_ENABLED=0")
 		b, err := cmd.CombinedOutput()
 		require.NoError(t, err, string(b))
-
-		read := func(name string) []byte {
-			b, err := os.ReadFile(name)
-			require.NoError(t, err)
-			return b
-		}
-		module := func(name string) []byte {
-			return read(filepath.Join(kernels[0], name))
-		}
-
-		require.NoError(t, egvm.Initramfs(&buf,
-			egvm.File{Name: "proc", Mode: fs.ModeDir | 0755},
-			egvm.File{Name: "sys", Mode: fs.ModeDir | 0755},
-			egvm.File{Name: "dev", Mode: fs.ModeDir | 0755},
-			egvm.File{Name: "root", Mode: fs.ModeDir | 0755},
-			egvm.File{Name: "modules", Mode: fs.ModeDir | 0755},
-			egvm.File{Name: "modules/1.fuse.ko", Mode: 0644, Data: module("fs/fuse/fuse.ko")},
-			egvm.File{Name: "modules/2.virtiofs.ko", Mode: 0644, Data: module("fs/fuse/virtiofs.ko")},
-			egvm.File{Name: "modules/3.vsock.ko", Mode: 0644, Data: module("net/vmw_vsock/vsock.ko")},
-			egvm.File{Name: "modules/4.vmw_vsock_virtio_transport_common.ko", Mode: 0644, Data: module("net/vmw_vsock/vmw_vsock_virtio_transport_common.ko")},
-			egvm.File{Name: "modules/5.vmw_vsock_virtio_transport.ko", Mode: 0644, Data: module("net/vmw_vsock/vmw_vsock_virtio_transport.ko")},
-			egvm.File{Name: "init", Mode: 0755, Data: read(vminit)},
-		))
+		b, err = os.ReadFile(vminit)
+		require.NoError(t, err)
+		require.NoError(t, egvm.MachineInitramfs(&buf, b, kernels[0]))
 
 		path := filepath.Join(t.TempDir(), "initramfs")
 		require.NoError(t, os.WriteFile(path, buf.Bytes(), 0600))
@@ -117,8 +96,7 @@ func TestExec(t *testing.T) {
 		return archive
 	}
 
-	// mounted serves an upper over the image over NFS and mounts it on the host, so the machine can
-	// share it.
+	// mounted mounts an upper over the image, so the machine can share it.
 	mounted := func(t *testing.T, archive *egiso.Archive) (string, string) {
 		upperdir := t.TempDir()
 		dir, err := os.OpenRoot(upperdir)
@@ -126,22 +104,10 @@ func TestExec(t *testing.T) {
 		t.Cleanup(func() { dir.Close() })
 
 		tree := egiso.Tree{}.Mount(".", archive, egiso.NewOwners(), egiso.NewOwners())
-		fsys := egiso.NewSysFS(egiso.NewUpper(tree, dir), egiso.Default, egiso.Default)
-
-		l, err := net.Listen("tcp", "127.0.0.1:0")
-		require.NoError(t, err)
-		go egiso.ServeNFS(l, fsys)
-		t.Cleanup(func() { l.Close() })
-
-		port := l.Addr().(*net.TCPAddr).Port
 		mnt := t.TempDir()
-		b, err := exec.Command("mount_nfs", "-o", fmt.Sprintf("vers=3,tcp,port=%d,mountport=%d,nolocks,noresvport,locallocks,soft,timeo=10", port, port), "127.0.0.1:/", mnt).CombinedOutput()
-		require.NoError(t, err, string(b))
-		t.Cleanup(func() {
-			if b, err := exec.Command("umount", "-f", mnt).CombinedOutput(); err != nil {
-				t.Logf("unable to unmount %s: %v\n%s", mnt, err, b)
-			}
-		})
+		unmount, err := egvm.Mount(egiso.NewSysFS(egiso.NewUpper(tree, dir), egiso.Default, egiso.Default), mnt)
+		require.NoError(t, err)
+		t.Cleanup(func() { require.NoError(t, unmount()) })
 		return mnt, upperdir
 	}
 

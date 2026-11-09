@@ -22,22 +22,40 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-// Cmd mirrors exec.Cmd for the egcoreutils reactor. the utility's stdio is the unix sockets the reactor listens
-// on in proc/{id}/fd, and its working directory is the path in proc/{id}/cwd.
+// Cmd mirrors exec.Cmd for a reactor. the utility's stdio is the unix sockets the reactor listens on in
+// proc/{id}/fd, and its working directory is the path in proc/{id}/cwd.
 type Cmd struct {
-	Path   string
-	Args   []string  // includes the command name as Args[0], like exec.Cmd
-	Env    []string  // nil uses the module's environment, like exec.Cmd
-	Dir    string    // empty uses the module's working directory
-	Stdin  io.Reader // nil is an empty stdin
-	Stdout io.Writer // nil discards
-	Stderr io.Writer // nil discards
-	ctx    context.Context
+	Path    string
+	Args    []string  // includes the command name as Args[0], like exec.Cmd
+	Env     []string  // nil uses the module's environment, like exec.Cmd
+	Dir     string    // empty uses the module's working directory
+	Stdin   io.Reader // nil is an empty stdin
+	Stdout  io.Writer // nil discards
+	Stderr  io.Writer // nil discards
+	ctx     context.Context
+	reactor Reactor
 }
 
-// Command returns the Cmd to execute the named utility with the given arguments.
+// Reactor runs the commands a guest describes in proc/{id}: Init starts one, and Wait reports its exit code,
+// ffierrors.ErrPending while it runs. Either reports ffierrors.ErrNotFound or ffierrors.ErrNotImplemented for a
+// command the reactor does not provide.
+type Reactor struct {
+	Name string
+	Init func(id uint64) uint32
+	Wait func(id uint64) uint32
+}
+
+// Coreutils is the egcoreutils reactor.
+var Coreutils = Reactor{Name: "coreutils", Init: execveatinit, Wait: execveatwait}
+
+// Command returns the Cmd to execute the named utility with the given arguments in the reactor.
+func (t Reactor) Command(ctx context.Context, name string, args ...string) *Cmd {
+	return &Cmd{Path: name, Args: append([]string{name}, args...), ctx: ctx, reactor: t}
+}
+
+// Command returns the Cmd to execute the named utility with the given arguments in egcoreutils.
 func Command(ctx context.Context, name string, args ...string) *Cmd {
-	return &Cmd{Path: name, Args: append([]string{name}, args...), ctx: ctx}
+	return Coreutils.Command(ctx, name, args...)
 }
 
 // Run executes the command and waits for it, a non zero exit is returned as an error.
@@ -80,10 +98,10 @@ func (t *Cmd) Run() (err error) {
 		return err
 	}
 
-	switch code := execveatinit(id); code {
+	switch code := t.reactor.Init(id); code {
 	case 0:
 	case ffierrors.ErrNotFound, ffierrors.ErrNotImplemented:
-		return status.Errorf(codes.NotFound, "coreutils does not provide %s", t.Path)
+		return status.Errorf(codes.NotFound, "%s does not provide %s", t.reactor.Name, t.Path)
 	default:
 		return ffiguest.Error(code, errorsx.Errorf("unable to start %s", t.Path))
 	}
@@ -113,7 +131,7 @@ func (t *Cmd) Run() (err error) {
 	// the reactor can not block until the utility exits: the guest is a single thread, and has to copy the
 	// utility's stdio meanwhile.
 	for {
-		switch code := execveatwait(id); code {
+		switch code := t.reactor.Wait(id); code {
 		case ffierrors.ErrPending:
 			select {
 			case <-t.ctx.Done():

@@ -103,9 +103,9 @@ func serve(fd int) error {
 		}
 
 		go func(conn *os.File) {
-			h, err := egvm.ReadHeader(conn)
-			if err != nil || h.Stream > egvm.StreamControl {
-				fmt.Println("egvm: invalid connection", h, err)
+			h, cause := egvm.ReadHeader(conn)
+			if cause != nil || h.Stream > egvm.StreamControl {
+				fmt.Println("egvm: invalid connection", h, cause)
 				conn.Close()
 				return
 			}

@@ -18,6 +18,7 @@ import (
 	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/duckproxyserver"
 	"github.com/egdaemon/eg/interp/events"
+	"github.com/egdaemon/eg/interp/runtime/wasi/ffiegvm"
 	"github.com/egdaemon/eg/interp/runtime/wasi/ffiwasinet"
 	"github.com/egdaemon/wasinet/wasinet/wnetruntime"
 	"github.com/stretchr/testify/require"
@@ -105,6 +106,10 @@ func Run(t *testing.T, wasm string, rundir string, timeout time.Duration, enviro
 		rt,
 		wnetruntime.OptionFSPrefixes(wnetruntime.FSPrefix{Host: rundir, Guest: eg.DefaultRuntimeDirectory()}),
 	).Instantiate(ctx)
+	require.NoError(t, err)
+
+	// outside of a machine the guest has no machine to run commands in.
+	_, err = ffiegvm.NewProcs(ctx, rundir, nil).Export(rt.NewHostModuleBuilder("env")).Instantiate(ctx)
 	require.NoError(t, err)
 
 	// an empty read-only root under the runtime directory, as the interpreter mounts.

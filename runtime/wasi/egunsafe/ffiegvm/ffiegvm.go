@@ -1,4 +1,7 @@
-// Package ffiegvm asks the host to run a module in a virtual machine whose root is an egiso.
+// Package ffiegvm asks the host to run a module in a virtual machine whose root is an egiso, and a module running
+// in one to run commands in it: Execveatinit and Execveatwait run the commands a guest describes in proc/{id} in
+// the machine, the way the egcoreutils reactor runs utilities, and report ffierrors.ErrNotImplemented outside of
+// one.
 package ffiegvm
 
 import (

@@ -28,7 +28,6 @@ func Debug(runtime shell.Command) eg.OpFn {
 func Test(ctx context.Context, op eg.Op) error {
 	return eg.Sequential(
 		shell.Op(
-			// shell.New("systemctl status podman.socket"),
 			shell.Newf("mkdir -p %s", filepath.Join(egtarball.Path("example"), "Contents")),
 			shell.Newf("echo \"derp\" | tee %s/hello.world.txt", egtarball.Path("example")),
 			shell.Newf("echo \"derp\" | tee %s/Info.plist", filepath.Join(egtarball.Path("example"), "Contents")),
@@ -53,7 +52,7 @@ func Test(ctx context.Context, op eg.Op) error {
 }
 
 func TestModule(ctx context.Context, op eg.Op) error {
-	b := egdmg.New("retrovibe", egdmg.OptionBuildDir(egenv.DirectoryCache(".dist", "retrovibed.darwin.arm64")))
+	b := egdmg.New("example", egdmg.OptionBuildDir(egenv.DirectoryWorkload(".dist", "example.darwin.arm64")))
 	return eg.Perform(
 		ctx,
 		egbug.DirectoryTree(egtarball.Path("example")),
@@ -73,18 +72,24 @@ func main() {
 		egbug.Log("baremetal tarball"),
 		Test,
 		egbug.Log("baremetal basic sanity checks"),
-		egbug.DebugFailure(
-			// ensure that the user isnt egd
-			shell.Op(
-				shell.New("test $(id -nu) != egd"),
-				shell.New("test $(id -ng) != egd"),
-			),
-			Debug(shell.Runtime()),
-		),
 		// test for cache directory and runtime.
 		// test for git commit details.
 		egbug.DebugFailure(
-			egbug.EnsureEnv("26941e25a2adf90a2298f05ded6f1243", egbug.EgEnviron()...),
+			eg.Sequential(
+				egbug.EnsureEnv("2ff85b3300938e3efdb0567eb216de33", egbug.EgEnviron()...),
+				shell.Op(
+					// baremetal must not use the container directory layout.
+					shell.Newf("test '%s' != '/workload/.eg.workspace'", egenv.DirectoryWorkload()),
+					shell.Newf("test '%s' != '/workload/eg'", egenv.DirectoryWorking()),
+					shell.Newf("test '%s' != '/workload/.eg.cache'", egenv.DirectoryCache()),
+					shell.Newf("test '%s' != '/workload/.eg.runtime'", egenv.RuntimeDirectory()),
+					// and every directory must exist on the host.
+					shell.Newf("test -d '%s'", egenv.DirectoryWorkload()),
+					shell.Newf("test -d '%s'", egenv.DirectoryWorking()),
+					shell.Newf("test -d '%s'", egenv.DirectoryCache()),
+					shell.Newf("test -d '%s'", egenv.RuntimeDirectory()),
+				),
+			),
 			egbug.Log("baremetal environment has drifted"),
 		),
 		eg.Module(
@@ -100,7 +105,20 @@ func main() {
 					Debug(shell.Runtime()),
 				),
 				egbug.DebugFailure(
-					egbug.EnsureEnv("15dbf130e4ed546fa5b9e8799b170cdc", egbug.EgEnviron()...),
+					eg.Sequential(
+						egbug.EnsureEnv("92570199637f3732b241968f689f74d2", egbug.EgEnviron()...),
+						shell.Op(
+							// the container module must use the container directory layout.
+							shell.Newf("test '%s' = '/workload/.eg.workspace'", egenv.DirectoryWorkload()),
+							shell.Newf("test '%s' = '/workload/eg'", egenv.DirectoryWorking()),
+							shell.Newf("test '%s' = '/workload/.eg.cache'", egenv.DirectoryCache()),
+							shell.Newf("test '%s' = '/eg.mnt/.eg.runtime'", egenv.RuntimeDirectory()),
+							shell.Newf("test -d '%s'", egenv.DirectoryWorkload()),
+							shell.Newf("test -d '%s'", egenv.DirectoryWorking()),
+							shell.Newf("test -d '%s'", egenv.DirectoryCache()),
+							shell.Newf("test -d '%s'", egenv.RuntimeDirectory()),
+						),
+					),
 					egbug.Log("container module environment has drifted"),
 				),
 				TestModule,

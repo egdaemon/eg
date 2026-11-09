@@ -64,19 +64,21 @@ func IntegrationTests(ctx context.Context, op eg.Op) error {
 	// which works fine for the standard container runner
 	// because the process is initiated as root.
 	// but inside of a workload we need to reup privileges.
-	runtime := shell.Runtime().Privileged()
+	runtime := shell.Runtime().
+		Privileged().
+		Timeout(egenv.TTL())
 	// run through the freshly installed binary, it is also what gets mounted into nested modules.
 	egbin := sharedbin()
 	return eg.Perform(
 		ctx,
 		shell.Op(
 			// envvars is the most likely to break.
-			runtime.Newf("%s --hotswap compute baremetal --no-cgroups tests/envvars", egbin),
-			runtime.Newf("%s --hotswap compute baremetal --no-cgroups tests/concurrent", egbin),
-			runtime.Newf("%s --hotswap compute baremetal --no-cgroups tests/metrics", egbin),
-			runtime.Newf("%s --hotswap compute baremetal --no-cgroups tests/stress", egbin),
-			runtime.Newf("%s --hotswap compute baremetal --no-cgroups tests/localref", egbin),
-			runtime.Newf("%s --hotswap compute baremetal --no-cgroups tests/egdb", egbin),
+			runtime.Newf("%s --hotswap compute local tests/envvars", egbin),
+			runtime.Newf("%s --hotswap compute local tests/concurrent", egbin),
+			runtime.Newf("%s --hotswap compute local tests/metrics", egbin),
+			runtime.Newf("%s --hotswap compute local tests/stress", egbin),
+			runtime.Newf("%s --hotswap compute local tests/localref", egbin),
+			runtime.Newf("%s --hotswap compute local tests/egdb", egbin),
 			// runtime.New("/home/egd/go/bin/eg compute baremetal -vvvv tests/tty"),
 			// runtime.New("/home/egd/go/bin/eg compute baremetal tests/containers"),
 			// runtime.New("/home/egd/go/bin/eg compute baremetal -vv tests/gpgagent"),

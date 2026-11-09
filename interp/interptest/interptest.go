@@ -19,6 +19,7 @@ import (
 	"github.com/egdaemon/eg/duckproxyserver"
 	"github.com/egdaemon/eg/interp/events"
 	"github.com/egdaemon/eg/interp/runtime/wasi/ffiwasinet"
+	"github.com/egdaemon/eg/interp/runtime/wasi/wasimod"
 	"github.com/egdaemon/wasinet/wasinet/wnetruntime"
 	"github.com/stretchr/testify/require"
 	"github.com/tetratelabs/wazero"
@@ -123,6 +124,11 @@ func Run(t *testing.T, wasm string, rundir string, timeout time.Duration, enviro
 			}
 		}
 	}
+
+	// the modules of the wasi module directory, egcoreutils among them, as the interpreter loads.
+	mods, err := wasimod.Load(ctx, rt, wasimod.Directory(), cfg)
+	require.NoError(t, err)
+	defer mods.Close(context.Background())
 
 	bin, err := os.ReadFile(wasm)
 	require.NoError(t, err)

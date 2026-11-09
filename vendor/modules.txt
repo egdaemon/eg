@@ -101,6 +101,15 @@ github.com/Azure/go-ansiterm/winterm
 ## explicit; go 1.18
 github.com/BurntSushi/toml
 github.com/BurntSushi/toml/internal
+# github.com/Code-Hex/go-infinity-channel v1.0.0
+## explicit; go 1.18
+github.com/Code-Hex/go-infinity-channel
+# github.com/Code-Hex/vz/v3 v3.8.0
+## explicit; go 1.25.0
+github.com/Code-Hex/vz/v3
+github.com/Code-Hex/vz/v3/internal/objc
+github.com/Code-Hex/vz/v3/internal/progress
+github.com/Code-Hex/vz/v3/internal/sliceutil
 # github.com/KimMachineGun/automemlimit v1.0.1
 ## explicit; go 1.21.0
 github.com/KimMachineGun/automemlimit/memlimit

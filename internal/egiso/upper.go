@@ -10,6 +10,7 @@ import (
 	"strings"
 	"sync"
 	"syscall"
+	"time"
 
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/langx"
@@ -113,13 +114,35 @@ func (t *Upper) ReadDir(name string) ([]fs.DirEntry, error) {
 
 // OpenFile opens the named file for writing with the flags of os.OpenFile, copying it up first.
 // A file it creates has mode perm and is owned by user and group.
-func (t *Upper) OpenFile(name string, flag int, perm fs.FileMode, user string, group string) (_ *os.File, err error) {
-	var (
-		f *os.File
-	)
+func (t *Upper) OpenFile(name string, flag int, perm fs.FileMode, user string, group string) (*os.File, error) {
+	dir, rel, flag, err := t.prepare(name, flag, perm, user, group)
+	if err != nil {
+		return nil, err
+	}
+	return dir.OpenFile(rel, flag, perm)
+}
 
+// Chtimes sets the named file's access and modification times, copying it up first.
+func (t *Upper) Chtimes(name string, atime time.Time, mtime time.Time) error {
 	if m, rel, ok := t.bound(name); ok {
-		return m.root.OpenFile(rel, flag, perm)
+		return m.root.Chtimes(rel, atime, mtime)
+	}
+
+	t.m.Lock()
+	defer t.m.Unlock()
+
+	if _, err := t.copied("chtimes", name); err != nil {
+		return err
+	}
+	return t.dir.Chtimes(name, atime, mtime)
+}
+
+// prepare readies name to be opened with flag: within a Bind mount as it is, otherwise by copying
+// it up or creating it in the upper. It returns the host directory to open it in, its name there,
+// and the flags to open it with.
+func (t *Upper) prepare(name string, flag int, perm fs.FileMode, user string, group string) (_ *os.Root, _ string, _ int, err error) {
+	if m, rel, ok := t.bound(name); ok {
+		return m.root, rel, flag, nil
 	}
 
 	t.m.Lock()
@@ -128,23 +151,19 @@ func (t *Upper) OpenFile(name string, flag int, perm fs.FileMode, user string, g
 	_, up, err := t.lstat("open", name)
 	switch {
 	case err == nil && flag&os.O_CREATE != 0 && flag&os.O_EXCL != 0:
-		return nil, &fs.PathError{Op: "open", Path: name, Err: fs.ErrExist}
-	case err == nil:
-		if !up {
-			if err = t.copyup(name); err != nil {
-				return nil, err
-			}
-		}
-		return t.dir.OpenFile(name, flag, 0)
+		return nil, "", 0, &fs.PathError{Op: "open", Path: name, Err: fs.ErrExist}
+	case err == nil && !up:
+		err = t.copyup(name)
 	case errorsx.Is(err, fs.ErrNotExist) && flag&os.O_CREATE != 0:
-		err = t.create(name, perm.Perm(), user, group, func() (cause error) {
-			f, cause = t.dir.OpenFile(name, flag|os.O_EXCL, 0600)
-			return cause
+		err = t.create(name, perm.Perm(), user, group, func() error {
+			return t.dir.WriteFile(name, nil, 0600)
 		})
-		return f, err
-	default:
-		return nil, err
 	}
+	if err != nil {
+		return nil, "", 0, err
+	}
+
+	return t.dir, name, flag &^ (os.O_CREATE | os.O_EXCL), nil
 }
 
 // Mkdir creates the named directory with mode perm, owned by user and group.
@@ -342,6 +361,22 @@ func (t *Upper) Chown(name string, user string, group string) error {
 	a.group = langx.FirstNonZero(group, a.group)
 	t.attrs[name] = a
 	return nil
+}
+
+// host returns the host directory holding name and its name there, when a Bind mount or the upper
+// holds it.
+func (t *Upper) host(name string) (*os.Root, string, bool) {
+	if m, rel, ok := t.bound(name); ok {
+		return m.root, rel, true
+	}
+
+	t.m.Lock()
+	defer t.m.Unlock()
+
+	if _, up, err := t.lstat("open", name); err == nil && up {
+		return t.dir, name, true
+	}
+	return nil, "", false
 }
 
 // bound returns the Bind mount name is within.

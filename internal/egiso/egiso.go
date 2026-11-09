@@ -321,6 +321,25 @@ func (t *file) Read(p []byte) (n int, err error) {
 	return n, nil
 }
 
+// Seek sets the offset of the next Read.
+func (t *file) Seek(offset int64, whence int) (int64, error) {
+	switch whence {
+	case io.SeekStart:
+	case io.SeekCurrent:
+		offset += t.offset
+	case io.SeekEnd:
+		offset += t.e.Size
+	default:
+		return t.offset, &fs.PathError{Op: "seek", Path: t.name, Err: fs.ErrInvalid}
+	}
+	if offset < 0 {
+		return t.offset, &fs.PathError{Op: "seek", Path: t.name, Err: fs.ErrInvalid}
+	}
+
+	t.offset = offset
+	return offset, nil
+}
+
 // load reads the chunk holding off and checks it against the digest the table of contents records.
 func (t *file) load(off int64) (err error) {
 	var (

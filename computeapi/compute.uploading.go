@@ -21,6 +21,7 @@ import (
 	"github.com/egdaemon/eg/internal/httpx"
 	"github.com/egdaemon/eg/internal/iox"
 	"github.com/egdaemon/eg/internal/lan"
+	"github.com/egdaemon/eg/internal/langx"
 	"github.com/egdaemon/eg/internal/libp2px"
 	"github.com/egdaemon/eg/internal/slicesx"
 	"github.com/egdaemon/eg/internal/sqlx"
@@ -448,6 +449,9 @@ func (t uploadwatchdelay) Update(ctx context.Context) uploadstate {
 	}
 }
 
+// awaitgrace is how long past the workload's ttl its result is waited for, the ttl bounds how long it can run.
+const awaitgrace = 5 * time.Minute
+
 // uploadawaiting waits for the result of a workload whose logs cannot be streamed, the stored log is printed
 // once it completes when none of it was streamed.
 type uploadawaiting struct {
@@ -458,7 +462,7 @@ type uploadawaiting struct {
 func (t uploadawaiting) Update(ctx context.Context) uploadstate {
 	c := NewPushClient(t.u.httpc)
 
-	err := computex.Await(ctx, t.id, c.HistoryFind)
+	err := computex.AwaitFor(ctx, t.id, time.Duration(langx.Autoderef(t.u.enq).Ttl)+awaitgrace, c.HistoryFind)
 	if ctx.Err() == nil && t.u.logs.n == 0 {
 		errorsx.Log(computex.Logs(ctx, t.id, t.u.logs, c.HistoryLogs))
 	}
@@ -734,7 +738,10 @@ func followenqueued(ctx context.Context, chttp *http.Client, id string, offset i
 		return computex.Await(ctx, id, NewPushClient(chttp).HistoryFind)
 	} else if errors.Is(err, ErrLogsUnavailable) {
 		log.Println("unable to stream the workload logs, waiting for it to complete", err)
-		return computex.Await(ctx, id, NewPushClient(chttp).HistoryFind)
+		// the ttl bounds how long the workload can run, without it only the grace period is waited.
+		enq, ferr := NewPushClient(chttp).Find(ctx, id)
+		debugx.Println("unable to retrieve the workload ttl", id, ferr)
+		return computex.AwaitFor(ctx, id, time.Duration(langx.Autoderef(enq).Ttl)+awaitgrace, NewPushClient(chttp).HistoryFind)
 	} else if err != nil {
 		return streamfailure{errorsx.Wrap(err, "unable to stream workload logs")}
 	}

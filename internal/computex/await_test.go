@@ -88,3 +88,33 @@ func (t *writer) Write(p []byte) (int, error) {
 	*t = append(*t, p...)
 	return len(p), nil
 }
+
+func TestAwaitFor(t *testing.T) {
+	t.Run("polls past the grace of await until the workload completes", func(t *testing.T) {
+		var calls int
+		find := func(ctx context.Context, id string) (*compute.History, error) {
+			if calls++; calls < 12 {
+				return nil, httpx.Error{Code: http.StatusNotFound}
+			}
+			return &compute.History{Id: id, Result: computex.ResultCompleted}, nil
+		}
+		require.NoError(t, computex.AwaitFor(t.Context(), "w1", 2*time.Second, find))
+		require.Equal(t, 12, calls)
+	})
+
+	t.Run("not recorded once the duration elapses", func(t *testing.T) {
+		find := func(ctx context.Context, id string) (*compute.History, error) {
+			return nil, httpx.Error{Code: http.StatusNotFound}
+		}
+		require.ErrorIs(t, computex.AwaitFor(t.Context(), "w1", 100*time.Millisecond, find), computex.ErrNotRecorded)
+	})
+
+	t.Run("the caller's context ending is not not recorded", func(t *testing.T) {
+		ctx, done := context.WithTimeout(t.Context(), 100*time.Millisecond)
+		defer done()
+		find := func(ctx context.Context, id string) (*compute.History, error) {
+			return nil, httpx.Error{Code: http.StatusNotFound}
+		}
+		require.ErrorIs(t, computex.AwaitFor(ctx, "w1", time.Minute, find), context.DeadlineExceeded)
+	})
+}

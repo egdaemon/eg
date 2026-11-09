@@ -41,7 +41,7 @@ func Await(ctx context.Context, id string, finds ...Finder) (err error) {
 	}
 
 	for i, find := range finds {
-		if err = await(ctx, id, find); !errors.As(err, &Unavailable{}) && !errors.Is(err, ErrNotRecorded) {
+		if err = await(ctx, id, find, awaitattempts, awaitdelay); !errors.As(err, &Unavailable{}) && !errors.Is(err, ErrNotRecorded) {
 			return err
 		}
 
@@ -53,16 +53,47 @@ func Await(ctx context.Context, id string, finds ...Finder) (err error) {
 	return err
 }
 
-// await polls a single finder. failing to retrieve the record is Unavailable, and a record that never appears
-// is ErrNotRecorded.
-func await(ctx context.Context, id string, find Finder) (err error) {
-	// the history record is written by the completion and can trail the end of the log stream.
-	const (
-		attempts = 10
-		delay    = time.Second
-	)
+// AwaitFor is Await for a workload that may still be running, i.e.) its logs could not be streamed. rather than
+// the short grace Await allows for a record trailing the end of a log stream, each finder is polled until the
+// workload reaches a terminal state or the duration elapses, in which case the result is ErrNotRecorded.
+func AwaitFor(ctx context.Context, id string, d time.Duration, finds ...Finder) (err error) {
+	if len(finds) == 0 {
+		return errorsx.String("no history sources provided")
+	}
 
-	for range attempts {
+	tctx, done := context.WithTimeout(ctx, d)
+	defer done()
+
+	for i, find := range finds {
+		if err = await(tctx, id, find, 0, min(awaitlongdelay, d/20)); !errors.As(err, &Unavailable{}) && !errors.Is(err, ErrNotRecorded) {
+			break
+		}
+
+		if i < len(finds)-1 {
+			log.Println("history unavailable, falling back to the next source", id, err)
+		}
+	}
+
+	// only the deadline ended, the caller is still going.
+	if ctx.Err() == nil && tctx.Err() != nil && errors.Is(err, context.DeadlineExceeded) {
+		return errorsx.Wrapf(ErrNotRecorded, "workload %s", id)
+	}
+
+	return err
+}
+
+const (
+	// the history record is written by the completion and can trail the end of the log stream.
+	awaitattempts = 10
+	awaitdelay    = time.Second
+	// how often a workload that may still be running is polled.
+	awaitlongdelay = 5 * time.Second
+)
+
+// await polls a single finder, attempts of zero polls until the context ends. failing to retrieve the record
+// is Unavailable, and a record that never appears is ErrNotRecorded.
+func await(ctx context.Context, id string, find Finder, attempts int, delay time.Duration) (err error) {
+	for i := 0; attempts == 0 || i < attempts; i++ {
 		var h *compute.History
 
 		// not found and unknown results mean the completion hasn't been recorded yet.

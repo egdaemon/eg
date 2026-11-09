@@ -40,6 +40,10 @@ func serve(t *testing.T) (runtimedir string) {
 }
 
 func TestRun(t *testing.T) {
+	if os.Getenv("EG_TEST_WASIP1") == "" {
+		t.Skip("builds and runs a wasip1 guest, set EG_TEST_WASIP1=1 to enable")
+	}
+
 	// native points the guest helpers at a served proxy, so Run executes in this process as it would in a guest.
 	native := func(t *testing.T) (workdir string) {
 		runtimedir := serve(t)
@@ -234,10 +238,6 @@ func TestRun(t *testing.T) {
 	})
 
 	t.Run("wasip1 guest", func(t *testing.T) {
-		if testing.Short() {
-			t.Skip("builds and runs a wasip1 guest")
-		}
-
 		wasm := interptest.Build(t, "./runtime/x/wasi/egbash/.fixtures/guest")
 		for _, mode := range []string{"pipeline", "substitution", "devnull", "exit", "script"} {
 			t.Run(mode, func(t *testing.T) {

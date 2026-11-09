@@ -507,6 +507,8 @@ func retryreason(err error) string {
 		return "the runner has no relay reservation"
 	case errors.Is(err, network.ErrReset):
 		return "the runner reset the stream"
+	case errors.Is(err, context.DeadlineExceeded):
+		return "the runner did not answer in time"
 	default:
 		return ""
 	}

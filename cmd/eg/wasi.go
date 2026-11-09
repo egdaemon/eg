@@ -17,6 +17,7 @@ import (
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/md5x"
 	"github.com/egdaemon/eg/internal/wasix"
+	"github.com/egdaemon/eg/interp/runtime/wasi/fficoreutils"
 	"github.com/egdaemon/eg/interp/runtime/wasi/ffiwasinet"
 	"github.com/egdaemon/eg/interp/runtime/wasi/wasimod"
 	"github.com/egdaemon/eg/interp/wasidebug"
@@ -126,6 +127,12 @@ func (t wasiCmdRun) Run(gctx *cmdopts.Global) (err error) {
 		return errorsx.Wrap(err, "unable to load the wasi modules")
 	}
 	defer wasimods.Close(ctx)
+
+	coreutils, err := fficoreutils.Unavailable(ctx, wruntime)
+	if err != nil {
+		return errorsx.Wrap(err, "unable to stand in for the coreutils reactor")
+	}
+	defer coreutils.Close(ctx)
 
 	log.Println("interp initiated", mpath)
 	defer log.Println("interp completed", mpath)

@@ -18,6 +18,7 @@ import (
 	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/duckproxyserver"
 	"github.com/egdaemon/eg/interp/events"
+	"github.com/egdaemon/eg/interp/runtime/wasi/fficoreutils"
 	"github.com/egdaemon/eg/interp/runtime/wasi/ffiwasinet"
 	"github.com/egdaemon/wasinet/wasinet/wnetruntime"
 	"github.com/stretchr/testify/require"
@@ -105,6 +106,9 @@ func Run(t *testing.T, wasm string, rundir string, timeout time.Duration, enviro
 		rt,
 		wnetruntime.OptionFSPrefixes(wnetruntime.FSPrefix{Host: rundir, Guest: eg.DefaultRuntimeDirectory()}),
 	).Instantiate(ctx)
+	require.NoError(t, err)
+
+	_, err = fficoreutils.Unavailable(ctx, rt)
 	require.NoError(t, err)
 
 	// an empty read-only root under the runtime directory, as the interpreter mounts.

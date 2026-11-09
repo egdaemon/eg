@@ -23,6 +23,7 @@ import (
 	"github.com/egdaemon/eg/internal/md5x"
 	"github.com/egdaemon/eg/internal/wasix"
 	"github.com/egdaemon/eg/interp/c8s"
+	"github.com/egdaemon/eg/interp/runtime/wasi/fficoreutils"
 	"github.com/egdaemon/eg/interp/runtime/wasi/ffiegcontainer"
 	"github.com/egdaemon/eg/interp/runtime/wasi/ffiexec"
 	"github.com/egdaemon/eg/interp/runtime/wasi/ffigit"
@@ -340,6 +341,12 @@ func (t runner) perform(ctx context.Context, wshost workspaces.Context, runid, p
 		return errorsx.Wrap(err, "unable to load the wasi modules")
 	}
 	defer wasimods.Close(ctx)
+
+	coreutils, err := fficoreutils.Unavailable(ctx, runtime)
+	if err != nil {
+		return errorsx.Wrap(err, "unable to stand in for the coreutils reactor")
+	}
+	defer coreutils.Close(ctx)
 
 	if tracedebug {
 		wasidebug.Host(hostenv)

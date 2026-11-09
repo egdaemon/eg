@@ -4,6 +4,7 @@ import (
 	"io"
 	"io/fs"
 	"maps"
+	"os"
 	"path"
 	"slices"
 	"strings"
@@ -17,7 +18,7 @@ import (
 // exposing the owners of its files as virtual users through its own Owners. A path belongs to the
 // mount at its longest prefix, and symlinks resolve within that mount. Directories leading to a
 // mount point that no mount provides appear as directories owned by Privileged. Mount a host
-// directory through an os.Root's FS, which keeps its symlinks inside it.
+// directory with Bind, which keeps its symlinks inside it and lets the environment write to it.
 type Tree struct {
 	mounts []mount
 }
@@ -25,6 +26,7 @@ type Tree struct {
 type mount struct {
 	at     string
 	src    fs.FS
+	root   *os.Root // the host directory a Bind mounts, which writes go to
 	users  Owners
 	groups Owners
 }
@@ -32,8 +34,18 @@ type mount struct {
 // Mount mounts src at the path at, "." for the root, exposing its files' uids through users and
 // their gids through groups. A later mount at the same path replaces the earlier one.
 func (t Tree) Mount(at string, src fs.FS, users Owners, groups Owners) Tree {
-	t.mounts = slices.DeleteFunc(slices.Clone(t.mounts), func(m mount) bool { return m.at == at })
-	t.mounts = append(t.mounts, mount{at: at, src: src, users: users, groups: groups})
+	return t.attach(mount{at: at, src: src, users: users, groups: groups})
+}
+
+// Bind mounts the host directory dir at the path at, like Mount, and the environment's writes
+// within it go to dir as the host user, so the host user can change and delete what it writes.
+func (t Tree) Bind(at string, dir *os.Root, users Owners, groups Owners) Tree {
+	return t.attach(mount{at: at, src: dir.FS(), root: dir, users: users, groups: groups})
+}
+
+func (t Tree) attach(m mount) Tree {
+	t.mounts = slices.DeleteFunc(slices.Clone(t.mounts), func(o mount) bool { return o.at == m.at })
+	t.mounts = append(t.mounts, m)
 	return t
 }
 
@@ -52,14 +64,36 @@ func (t Tree) Open(name string) (fs.File, error) {
 	return m.src.Open(rel)
 }
 
-// Stat describes the named file.
+// Stat describes the named file, following a final symlink within its mount.
 func (t Tree) Stat(name string) (fs.FileInfo, error) {
+	return t.stat("stat", name, fs.Stat)
+}
+
+// Lstat describes the named file without following a final symlink.
+func (t Tree) Lstat(name string) (fs.FileInfo, error) {
+	return t.stat("lstat", name, fs.Lstat)
+}
+
+// ReadLink returns the target of the named symlink.
+func (t Tree) ReadLink(name string) (string, error) {
 	if !fs.ValidPath(name) {
-		return nil, &fs.PathError{Op: "stat", Path: name, Err: fs.ErrInvalid}
+		return "", &fs.PathError{Op: "readlink", Path: name, Err: fs.ErrInvalid}
+	}
+
+	m, rel, ok := t.mount(name)
+	if !ok {
+		return "", &fs.PathError{Op: "readlink", Path: name, Err: fs.ErrNotExist}
+	}
+	return fs.ReadLink(m.src, rel)
+}
+
+func (t Tree) stat(op string, name string, stat func(fs.FS, string) (fs.FileInfo, error)) (fs.FileInfo, error) {
+	if !fs.ValidPath(name) {
+		return nil, &fs.PathError{Op: op, Path: name, Err: fs.ErrInvalid}
 	}
 
 	if m, rel, ok := t.mount(name); ok {
-		st, err := fs.Stat(m.src, rel)
+		st, err := stat(m.src, rel)
 		if err == nil {
 			return info{FileInfo: st, name: path.Base(name)}, nil
 		}
@@ -72,7 +106,7 @@ func (t Tree) Stat(name string) (fs.FileInfo, error) {
 		return synthetic(path.Base(name)), nil
 	}
 
-	return nil, &fs.PathError{Op: "stat", Path: name, Err: fs.ErrNotExist}
+	return nil, &fs.PathError{Op: op, Path: name, Err: fs.ErrNotExist}
 }
 
 // ReadDir lists the named directory, sorted by name: its own entries, with the mount points within
@@ -120,9 +154,10 @@ func (t Tree) ReadDir(name string) ([]fs.DirEntry, error) {
 	return listing, nil
 }
 
-// Owner returns the virtual user and group the named file is exposed as owned by.
+// Owner returns the virtual user and group the named file, not following a final symlink, is
+// exposed as owned by.
 func (t Tree) Owner(name string) (user string, group string, err error) {
-	st, err := t.Stat(name)
+	st, err := t.Lstat(name)
 	if err != nil {
 		return "", "", err
 	}

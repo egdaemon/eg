@@ -1,19 +1,35 @@
 package egvm
 
 import (
+	"bufio"
 	"context"
+	"crypto/rand"
+	"encoding/binary"
 	"io"
+	"net"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/Code-Hex/vz/v3"
 	"github.com/egdaemon/eg/internal/errorsx"
+	"github.com/egdaemon/eg/interp/execproxy"
+	"google.golang.org/protobuf/encoding/protodelim"
 )
 
-// Run boots the machine with Virtualization.framework, copying its console to console, and waits
-// for it to stop. Cancelling ctx stops it. The process needs the com.apple.security.virtualization
-// entitlement.
-func Run(ctx context.Context, m Machine, console io.Writer) (err error) {
+// VM is a running machine.
+type VM struct {
+	vm      *vz.VirtualMachine
+	socket  *vz.VirtioSocketDevice
+	stopped chan struct{}
+	err     error
+	closers []io.Closer
+	copied  chan struct{}
+}
+
+// Boot starts the machine with Virtualization.framework, copying its console to console. The
+// process needs the com.apple.security.virtualization entitlement.
+func Boot(m Machine, console io.Writer) (_ *VM, err error) {
 	var (
 		config *vz.VirtualMachineConfiguration
 		vm     *vz.VirtualMachine
@@ -22,43 +38,140 @@ func Run(ctx context.Context, m Machine, console io.Writer) (err error) {
 	// the console's input is a pipe nothing writes to; its output is copied to console.
 	in, stdin, err := os.Pipe()
 	if err != nil {
-		return err
+		return nil, err
 	}
-	defer in.Close()
-	defer stdin.Close()
 	stdout, out, err := os.Pipe()
 	if err != nil {
-		return err
+		return nil, errorsx.Compact(err, in.Close(), stdin.Close())
 	}
-	defer stdout.Close()
-	defer out.Close()
+	t := &VM{stopped: make(chan struct{}), copied: make(chan struct{}), closers: []io.Closer{in, stdin, out, stdout}}
+	defer func() {
+		if err != nil {
+			t.close()
+		}
+	}()
 
 	if config, err = configure(m, in, out); err != nil {
-		return err
+		return nil, err
 	}
 	if vm, err = vz.NewVirtualMachine(config); err != nil {
-		return errorsx.Wrap(err, "unable to create the machine")
+		return nil, errorsx.Wrap(err, "unable to create the machine")
 	}
 
-	copied := make(chan struct{})
 	go func() {
-		defer close(copied)
+		defer close(t.copied)
 		_, cause := io.Copy(console, stdout)
 		errorsx.Log(errorsx.Ignore(cause, os.ErrClosed))
 	}()
 
 	if err = vm.Start(); err != nil {
-		return errorsx.Wrap(err, "unable to start the machine")
+		return nil, errorsx.Wrap(err, "unable to start the machine")
 	}
-	err = wait(ctx, vm)
 
+	t.vm, t.socket = vm, vm.SocketDevices()[0]
+	go func() {
+		defer close(t.stopped)
+		t.err = wait(vm)
+	}()
+
+	return t, nil
+}
+
+// Exec runs req in the machine with stdin, stdout and stderr as its stdio, waits for it, and
+// returns its exit code. It waits for the machine to serve commands. Cancelling ctx kills the
+// command.
+func (t *VM) Exec(ctx context.Context, req *execproxy.ExecRequest, stdin io.Reader, stdout io.Writer, stderr io.Writer) (code int32, err error) {
+	var (
+		id      uint64
+		control net.Conn
+		streams [3]net.Conn
+		resp    execproxy.ExecResponse
+		wg      sync.WaitGroup
+	)
+
+	if err = binary.Read(rand.Reader, binary.BigEndian, &id); err != nil {
+		return -1, err
+	}
+
+	if control, err = t.connect(ctx, id, StreamControl); err != nil {
+		return -1, err
+	}
+	defer control.Close()
+	stop := context.AfterFunc(ctx, func() { control.Close() })
+	defer stop()
+
+	if _, err = protodelim.MarshalTo(control, req); err != nil {
+		return -1, errorsx.Wrap(err, "unable to send the command")
+	}
+
+	for i := range streams {
+		if streams[i], err = t.connect(ctx, id, uint8(i)); err != nil {
+			return -1, err
+		}
+		defer streams[i].Close()
+	}
+
+	// the stdin stream is a connection of its own, so closing it is the command's end of input.
+	go func() {
+		if stdin != nil {
+			io.Copy(streams[StreamStdin], stdin)
+		}
+		streams[StreamStdin].Close()
+	}()
+	wg.Go(func() { io.Copy(stdout, streams[StreamStdout]) })
+	wg.Go(func() { io.Copy(stderr, streams[StreamStderr]) })
+
+	if err = protodelim.UnmarshalFrom(bufio.NewReader(control), &resp); err != nil {
+		if ctx.Err() != nil {
+			return -1, ctx.Err()
+		}
+		return -1, errorsx.Wrap(err, "unable to read the command's exit")
+	}
+	wg.Wait()
+
+	return resp.Exit, nil
+}
+
+// connect opens the stream of command id, retrying until the machine serves commands.
+func (t *VM) connect(ctx context.Context, id uint64, stream uint8) (net.Conn, error) {
+	for {
+		conn, err := t.socket.Connect(Port)
+		if err == nil {
+			if err = WriteHeader(conn, id, stream); err != nil {
+				return nil, errorsx.Compact(err, conn.Close())
+			}
+			return conn, nil
+		}
+
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case <-t.stopped:
+			return nil, errorsx.Compact(errorsx.New("the machine stopped"), t.err)
+		case <-time.After(10 * time.Millisecond):
+		}
+	}
+}
+
+// Close stops the machine and waits for it.
+func (t *VM) Close() error {
+	if t.vm.CanStop() {
+		errorsx.Log(t.vm.Stop())
+	}
+	<-t.stopped
+	t.close()
+	return t.err
+}
+
+func (t *VM) close() {
+	for _, c := range t.closers {
+		c.Close()
+	}
 	// the framework holds its own handle on the console, so the copy may never see the end of it.
-	out.Close()
 	select {
-	case <-copied:
+	case <-t.copied:
 	case <-time.After(time.Second):
 	}
-	return err
 }
 
 func configure(m Machine, in *os.File, out *os.File) (_ *vz.VirtualMachineConfiguration, err error) {
@@ -69,6 +182,7 @@ func configure(m Machine, in *os.File, out *os.File) (_ *vz.VirtualMachineConfig
 		entropy  *vz.VirtioEntropyDeviceConfiguration
 		console  *vz.FileHandleSerialPortAttachment
 		serial   *vz.VirtioConsoleDeviceSerialPortConfiguration
+		socket   *vz.VirtioSocketDeviceConfiguration
 		shares   = make([]vz.DirectorySharingDeviceConfiguration, 0, len(m.Shares))
 	)
 
@@ -95,6 +209,11 @@ func configure(m Machine, in *os.File, out *os.File) (_ *vz.VirtualMachineConfig
 		return nil, errorsx.Wrap(err, "unable to create the console")
 	}
 	config.SetSerialPortsVirtualMachineConfiguration([]*vz.VirtioConsoleDeviceSerialPortConfiguration{serial})
+
+	if socket, err = vz.NewVirtioSocketDeviceConfiguration(); err != nil {
+		return nil, errorsx.Wrap(err, "unable to create the socket device")
+	}
+	config.SetSocketDevicesVirtualMachineConfiguration([]vz.SocketDeviceConfiguration{socket})
 
 	for _, s := range m.Shares {
 		device, err := share(s)
@@ -131,20 +250,15 @@ func share(s Share) (_ *vz.VirtioFileSystemDeviceConfiguration, err error) {
 	return device, nil
 }
 
-// wait returns once the machine stops, stopping it when ctx is done.
-func wait(ctx context.Context, vm *vz.VirtualMachine) error {
-	for {
-		select {
-		case <-ctx.Done():
-			errorsx.Log(vm.Stop())
-			return ctx.Err()
-		case state := <-vm.StateChangedNotify():
-			switch state {
-			case vz.VirtualMachineStateStopped:
-				return nil
-			case vz.VirtualMachineStateError:
-				return errorsx.New("the machine stopped with an error")
-			}
+// wait returns once the machine stops.
+func wait(vm *vz.VirtualMachine) error {
+	for state := range vm.StateChangedNotify() {
+		switch state {
+		case vz.VirtualMachineStateStopped:
+			return nil
+		case vz.VirtualMachineStateError:
+			return errorsx.New("the machine stopped with an error")
 		}
 	}
+	return nil
 }

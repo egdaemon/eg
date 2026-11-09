@@ -1,9 +1,10 @@
 // Package egvm boots small Linux virtual machines, so Linux binaries can run where the host kernel
 // is not Linux. A machine shares host directories with the guest over virtio-fs; the guest's init
-// (vminit) mounts the one tagged root, runs a command chrooted into it, and powers the machine off.
+// (vminit) mounts the one tagged root and runs the commands the host sends it over vsock chrooted
+// into it.
 package egvm
 
-// Root is the tag of the shared directory vminit mounts as the root of the command it runs.
+// Root is the tag of the shared directory vminit mounts as the root of the commands it runs.
 const Root = "root"
 
 // Share is a host directory the guest mounts over virtio-fs by its tag.

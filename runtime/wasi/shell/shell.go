@@ -13,6 +13,7 @@ import (
 	"golang.org/x/time/rate"
 
 	_eg "github.com/egdaemon/eg"
+	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/stringsx"
 	"github.com/egdaemon/eg/internal/userx"
@@ -94,6 +95,12 @@ func (t Command) Timeout(d time.Duration) Command {
 // append a set of environment variables in the form KEY=VALUE to the environment.
 func (t Command) EnvironFrom(environ ...string) Command {
 	t.environ = append(t.environ, environ...)
+	return t
+}
+
+// append a set of environment variables in the form KEY=VALUE to the environment.
+func (t Command) EnvironCopy(keysOrEnviron ...string) Command {
+	t.environ = append(t.environ, envx.AutoEnviron(keysOrEnviron...)...)
 	return t
 }
 

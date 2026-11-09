@@ -11,7 +11,6 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"os/exec"
 	"os/user"
 	"path/filepath"
 	"strconv"
@@ -87,11 +86,13 @@ func Commitish(dir, treeish string) (_ string, err error) {
 // go-git has no API to create a linked worktree (only to open one), so this
 // shells out to the system git binary.
 func Worktree(ctx context.Context, repo, dir string) (err error) {
-	if out, perr := gitcmd(ctx, repo, "worktree", "prune").CombinedOutput(); perr != nil {
+	username := RepositoryUsername(repo)
+
+	if out, perr := execx.RunAs(ctx, username, "git", "-C", repo, "worktree", "prune").CombinedOutput(); perr != nil {
 		log.Println(errorsx.Wrapf(fmt.Errorf("%s: %w", strings.TrimSpace(string(out)), perr), "unable to prune stale worktrees: %s", repo))
 	}
 
-	out, err := gitcmd(ctx, repo, "worktree", "add", "--detach", dir, plumbing.HEAD.String()).CombinedOutput()
+	out, err := execx.RunAs(ctx, username, "git", "-C", repo, "worktree", "add", "--detach", dir, plumbing.HEAD.String()).CombinedOutput()
 	if err != nil {
 		return errorsx.Wrapf(fmt.Errorf("%s: %w", strings.TrimSpace(string(out)), err), "unable to create worktree: %s -> %s", repo, dir)
 	}
@@ -952,15 +953,6 @@ func Bearer(dir string) string {
 	return ""
 }
 
-// gitcmd builds a `git -C repo <args>` invocation, run as the current user --
-// repo is frequently bind-mounted into the workload container and owned by
-// a different uid than whatever this process runs as, which trips git's
-// "dubious ownership" safe.directory check (CVE-2022-24765 mitigation) when
-// run directly. see execx.RunAs.
-func gitcmd(ctx context.Context, repo string, args ...string) *exec.Cmd {
-	return execx.RunAs(ctx, userx.CurrentUsername(eg.DefaultUsername), "git", append([]string{"-C", repo}, args...)...)
-}
-
 // Changes returns a patch of the changes made within clonedir, a clone of the repository at repodir,
 // e.g.) the changes a workload made, which would otherwise be lost with the clone. new files
 // are included. the patch is empty if there are no changes, or if clonedir is not a separate clone,
@@ -977,12 +969,14 @@ func Changes(ctx context.Context, clonedir string, repodir string) ([]byte, erro
 		}
 	}
 
+	username := RepositoryUsername(clonedir)
+
 	// intent to add so new files are reported by diff.
-	if out, err := gitcmd(ctx, clonedir, "add", "-N", ".").CombinedOutput(); err != nil {
+	if out, err := execx.RunAs(ctx, username, "git", "-C", clonedir, "add", "-N", ".").CombinedOutput(); err != nil {
 		return nil, errorsx.Wrapf(fmt.Errorf("%s: %w", strings.TrimSpace(string(out)), err), "unable to detect changes: %s", clonedir)
 	}
 
-	patch, err := gitcmd(ctx, clonedir, "diff", "--binary", plumbing.HEAD.String()).Output()
+	patch, err := execx.RunAs(ctx, username, "git", "-C", clonedir, "diff", "--binary", plumbing.HEAD.String()).Output()
 	if err != nil {
 		return nil, errorsx.Wrapf(err, "unable to detect changes: %s", clonedir)
 	}
@@ -1008,9 +1002,10 @@ func ApplyPatch(ctx context.Context, repodir string, patch []byte) error {
 		return errors.Join(err, os.Remove(patchfile.Name()))
 	}
 
+	username := RepositoryUsername(repodir)
 	apply := func(options ...string) error {
 		args := append([]string{"apply"}, append(options, patchfile.Name())...)
-		if out, err := gitcmd(ctx, repodir, args...).CombinedOutput(); err != nil {
+		if out, err := execx.RunAs(ctx, username, "git", append([]string{"-C", repodir}, args...)...).CombinedOutput(); err != nil {
 			return errorsx.Wrapf(fmt.Errorf("%s: %w", strings.TrimSpace(string(out)), err), "git %s failed", strings.Join(args, " "))
 		}
 

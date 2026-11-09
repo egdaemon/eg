@@ -476,6 +476,13 @@ func AutoEnviron(keysOrEnviron ...string) (environ []string) {
 	return environ
 }
 
+// FromAutoEnv appends the variables described by keysOrEnviron, see AutoEnviron. entries in the form KEY=VALUE
+// are used as is, anything else is a key that is copied from the process environment when it is set.
+func (t *Builder) FromAutoEnv(keysOrEnviron ...string) *Builder {
+	t.environ = append(t.environ, AutoEnviron(keysOrEnviron...)...)
+	return t
+}
+
 // extract the key/value pairs from the os.Environ.
 // empty keys are passed as k=
 func (t *Builder) FromEnv(keys ...string) *Builder {

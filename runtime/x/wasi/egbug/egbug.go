@@ -150,7 +150,7 @@ func APTPackage(packages ...string) eg.OpFn {
 
 const (
 	EnvUnsafeDigest = "EG_UNSAFE_ENVVARS_DIGEST"
-	defaultDigest   = "c32779191eb62f3fcfa44daa360d814a"
+	defaultDigest   = "7bdff99dea1d0e9185962aed4cc0e677"
 )
 
 //go:embed default.env

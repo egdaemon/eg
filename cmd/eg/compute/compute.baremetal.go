@@ -77,16 +77,16 @@ func (t baremetal) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, hotswapbin
 		hostnet   = envx.Toggle(runners.AgentOptionCommandLine("--network", "host"), runners.AgentOptionNoop, envx.Boolean(false, eg.EnvExperimentalDisableHostNetwork)) // ipv4 group bullshit. pretty sure its a podman 4 issue that was resolved in podman 5. this is 'safe' to do because we are already in a container.
 		// unset means the host, 0 is the first container which is already nested. defaulting to 0 cannot tell them apart.
 		// a nested workload builds within a container, which does not allow the container runtime to create the containers of the build, e.g.) mount proc.
-		isolation = envx.Toggle(runners.AgentOptionNoop, runners.AgentOptionCommandLine("--isolation", "chroot"), envx.Int(-1, eg.EnvComputeModuleNestedLevel) >= 0)
+		isolation = envx.Toggle(runners.AgentOptionNoop, runners.AgentOptionCommandLine("--isolation", "chroot"), runners.Nested())
 		// a nested module container cannot mount a fresh proc, the outer container's proc is partially masked. share the outer pid namespace so the runtime binds it instead.
-		pidhost                        = envx.Toggle(runners.AgentOptionNoop, runners.AgentOptionCommandLine("--pid", "host"), envx.Int(-1, eg.EnvComputeModuleNestedLevel) >= 0)
+		pidhost                        = envx.Toggle(runners.AgentOptionNoop, runners.AgentOptionCommandLine("--pid", "host"), runners.Nested())
 		mountegbin runners.AgentOption = runners.AgentOptionEGBin(
 			envx.String(errorsx.Must(exec.LookPath(os.Args[0])), eg.EnvComputeBinAlt),
 		)
 		cmdenv []string
 	)
 
-	log.Println("isolation enabled", envx.Int(-1, eg.EnvComputeModuleNestedLevel) >= 0)
+	log.Println("isolation enabled", runners.Nested())
 
 	// clean up the eg environment ensuring a clean starting state.
 	resetenv := func() error {

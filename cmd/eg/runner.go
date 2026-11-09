@@ -534,5 +534,6 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 		cc,
 		t.Module,
 		interp.OptionEnviron(cmdenv...),
+		interp.OptionHTTPClient(tlsc.DefaultClient()),
 	)
 }

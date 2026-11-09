@@ -6,10 +6,12 @@ import (
 	"embed"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strconv"
 	"sync"
 
@@ -24,6 +26,7 @@ import (
 	"github.com/egdaemon/eg/internal/wasix"
 	"github.com/egdaemon/eg/interp/c8s"
 	"github.com/egdaemon/eg/interp/runtime/wasi/ffiegcontainer"
+	"github.com/egdaemon/eg/interp/runtime/wasi/ffiegvm"
 	"github.com/egdaemon/eg/interp/runtime/wasi/ffiexec"
 	"github.com/egdaemon/eg/interp/runtime/wasi/ffigit"
 	"github.com/egdaemon/eg/interp/runtime/wasi/ffigraph"
@@ -33,9 +36,12 @@ import (
 	"github.com/egdaemon/eg/workspaces"
 	"github.com/egdaemon/wasinet/wasinet/wnetruntime"
 	"github.com/gofrs/uuid/v5"
+	"github.com/opencontainers/go-digest"
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/experimental"
 	"github.com/tetratelabs/wazero/experimental/logging"
+	experimentalsys "github.com/tetratelabs/wazero/experimental/sys"
+	"github.com/tetratelabs/wazero/experimental/sysfs"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
 	"google.golang.org/grpc"
 )
@@ -45,6 +51,20 @@ type Option func(*runner)
 func OptionEnviron(s ...string) Option {
 	return func(r *runner) {
 		r.environ = s
+	}
+}
+
+// OptionHTTPClient is the client egiso images are fetched with.
+func OptionHTTPClient(c *http.Client) Option {
+	return func(r *runner) {
+		r.client = c
+	}
+}
+
+// OptionRoot mounts root at / in place of the empty read-only root.
+func OptionRoot(root experimentalsys.FS) Option {
+	return func(r *runner) {
+		r.root = root
 	}
 }
 
@@ -63,6 +83,8 @@ func Remote(ctx context.Context, wshost workspaces.Context, aid string, runid st
 	var (
 		r = runner{
 			initonce: &sync.Once{},
+			root:     &sysfs.AdaptFS{FS: embed.FS{}},
+			client:   http.DefaultClient,
 		}
 	)
 	for _, opt := range options {
@@ -133,6 +155,21 @@ func Remote(ctx context.Context, wshost workspaces.Context, aid string, runid st
 			}
 			return nil
 		})).Export("github.com/egdaemon/eg/runtime/wasi/runtime/ffiegcontainer.Run").
+			NewFunctionBuilder().WithFunc(ffiegvm.Run(func(ctx context.Context, location string, toc string, modulepath string, environ ...string) (err error) {
+			var (
+				pinned digest.Digest
+			)
+
+			if pinned, err = digest.Parse(toc); err != nil {
+				return errorsx.Wrapf(err, "invalid table of contents digest for %s", location)
+			}
+
+			path := fsx.LocateFirst(
+				filepath.Join(wshost.Root, wshost.BuildDir, modulepath),
+				eg.DefaultMountRoot(eg.RuntimeDirectory, modulepath),
+			)
+			return Cell(ctx, wshost, aid, runid, svc, r.client, path, location, pinned, append(slices.Clone(r.environ), environ...)...)
+		})).Export("github.com/egdaemon/eg/runtime/wasi/runtime/ffiegvm.Run").
 			NewFunctionBuilder().WithFunc(ffiexec.Exec(func(cmd *exec.Cmd) *exec.Cmd {
 			if !filepath.IsAbs(cmd.Dir) {
 				cmd.Dir = filepath.Join(wshost.WorkingDir, cmd.Dir)
@@ -165,16 +202,16 @@ func Remote(ctx context.Context, wshost workspaces.Context, aid string, runid st
 	return r.perform(ctx, wshost, runid, module, runtimeenv)
 }
 
-// mounts the workspace directories into the guest under an empty read-only root.
+// mounts the workspace directories into the guest under root.
 // we map twice so that baremetal can work. shell commands are run on the host itself so we need the host path.
 // but inside wazero we need to be able to access the standard paths.
 // the call decide which paths the environment variables rsolve to.
 // we also need to ensure we mount the working directory so pwd works correctly.
 // the root lets guests that resolve paths from / (wasi-libc programs such as coreutils) reach the nested mounts,
 // and everything outside of them is missing or read-only.
-func mounts(wshost workspaces.Context) wazero.FSConfig {
-	return wazero.NewFSConfig().
-		WithFSMount(embed.FS{}, "/").
+func mounts(wshost workspaces.Context, root experimentalsys.FS) wazero.FSConfig {
+	return wazero.NewFSConfig().(sysfs.FSConfig).
+		WithSysFSMount(root, "/").
 		WithDirMount(os.TempDir(), os.TempDir()).
 		WithDirMount(wshost.Root, eg.DefaultRootDirectory()).
 		WithDirMount(wshost.Root, wshost.Root).
@@ -191,6 +228,8 @@ func mounts(wshost workspaces.Context) wazero.FSConfig {
 type runner struct {
 	environ  []string
 	initonce *sync.Once
+	root     experimentalsys.FS
+	client   *http.Client
 }
 
 func (t runner) perform(ctx context.Context, wshost workspaces.Context, runid, path string, rtb runtimefn) (err error) {
@@ -267,7 +306,7 @@ func (t runner) perform(ctx context.Context, wshost workspaces.Context, runid, p
 	debugx.Println("system tls certs", hostsslcerts)
 	debugx.Println("------------------------------------------------------")
 
-	wazerofs := mounts(wshost).WithDirMount(hostsslcerts, DefaultSSLCertDir)
+	wazerofs := mounts(wshost, t.root).WithDirMount(hostsslcerts, DefaultSSLCertDir)
 
 	mcfg := wazero.NewModuleConfig().WithEnv(
 		"SSL_CERT_DIR", DefaultSSLCertDir,

@@ -6,6 +6,7 @@ require (
 	charm.land/huh/v2 v2.0.3
 	charm.land/lipgloss/v2 v2.0.1
 	cloud.google.com/go/secretmanager v1.22.0
+	github.com/Code-Hex/vz/v3 v3.8.0
 	github.com/KimMachineGun/automemlimit v1.0.1
 	github.com/Masterminds/squirrel v1.5.4
 	github.com/ProtonMail/go-crypto v1.5.2
@@ -29,6 +30,7 @@ require (
 	github.com/egdaemon/wasinet/wasinet v0.0.0-20261103201433-2f9a9bae892d
 	github.com/egdaemon/wasinet/wazeronet v0.0.0-20260928194155-07f223337a8d
 	github.com/fsnotify/fsnotify v1.10.1
+	github.com/go-git/go-billy/v5 v5.6.0
 	github.com/go-git/go-git/v6 v6.0.0-beta.1
 	github.com/gofrs/flock v0.13.0
 	github.com/gofrs/uuid/v5 v5.5.1
@@ -63,6 +65,7 @@ require (
 	github.com/stretchr/testify v1.12.1
 	github.com/tetratelabs/wazero v1.12.0
 	github.com/willabides/kongplete v0.4.0
+	github.com/willscott/go-nfs v0.0.4
 	go.podman.io/podman/v6 v6.0.0-20260602192321-9e13b9ea52a4
 	go.uber.org/automaxprocs v1.6.0
 	golang.org/x/crypto v0.58.0
@@ -95,6 +98,7 @@ require (
 	filippo.io/keygen v1.0.0 // indirect
 	github.com/Azure/go-ansiterm v0.0.0-20261006220739-8c912ac31dd4 // indirect
 	github.com/BurntSushi/toml v1.6.0 // indirect
+	github.com/Code-Hex/go-infinity-channel v1.0.0 // indirect
 	github.com/Microsoft/go-winio v0.6.3 // indirect
 	github.com/VividCortex/ewma v1.2.0 // indirect
 	github.com/acarl005/stripansi v0.0.0-20180116102854-5a71ef0e047d // indirect
@@ -296,6 +300,7 @@ require (
 	github.com/quic-go/qpack v0.6.0 // indirect
 	github.com/quic-go/quic-go v0.62.0 // indirect
 	github.com/quic-go/webtransport-go v0.13.0 // indirect
+	github.com/rasky/go-xdr v0.0.0-20170124162913-1a41d1a06c93 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/riywo/loginshell v0.0.0-20200815045211-7d26008be1ab // indirect
 	github.com/rogpeppe/go-internal v1.16.0 // indirect
@@ -322,6 +327,7 @@ require (
 	github.com/vbatts/tar-split v0.12.3 // indirect
 	github.com/vbauerster/mpb/v8 v8.12.1 // indirect
 	github.com/whyrusleeping/go-keyspace v0.0.0-20160322163242-5b898ac5add1 // indirect
+	github.com/willscott/go-nfs-client v0.0.0-20240104095149-b44639837b00 // indirect
 	github.com/wlynxg/anet v0.0.5 // indirect
 	github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e // indirect
 	github.com/yusufpapurcu/wmi v1.2.4 // indirect

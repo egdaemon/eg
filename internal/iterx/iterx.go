@@ -108,6 +108,41 @@ func Lazy[T any](open func(context.Context) (Seq[T], io.Closer, error)) Seq[T] {
 	})
 }
 
+// EmptySeq returns a Seq that yields nothing and has no error, the zero value for Concat.
+func EmptySeq[T any]() Seq[T] {
+	return New(func(ctx context.Context, yield func(T) bool) error {
+		return nil
+	})
+}
+
+// Concat returns a Seq that yields every item of each Seq in order, the next is not started until the previous
+// has been drained. it ends at the first error, which is the error of the result, the remaining Seqs are not run.
+// it also ends when the consumer stops.
+func Concat[T any](seqs ...Seq[T]) Seq[T] {
+	return New(func(ctx context.Context, yield func(T) bool) error {
+		for _, s := range seqs {
+			stopped := false
+
+			for item := range s.Each(ctx) {
+				if !yield(item) {
+					stopped = true
+					break
+				}
+			}
+
+			if err := s.Err(); err != nil {
+				return err
+			}
+
+			if stopped {
+				return nil
+			}
+		}
+
+		return nil
+	})
+}
+
 // Error returns a Seq that yields nothing and immediately returns err.
 func Error[T any](err error) Seq[T] {
 	return New(func(ctx context.Context, yield func(T) bool) error {

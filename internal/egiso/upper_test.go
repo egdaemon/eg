@@ -209,9 +209,24 @@ func TestUpper(t *testing.T) {
 		require.ErrorIs(t, err, fs.ErrNotExist)
 	})
 
-	t.Run("refuses to rename a directory of the tree with EXDEV", func(t *testing.T) {
+	t.Run("renames a directory of the tree with everything in it", func(t *testing.T) {
 		u, _ := upper(t)
-		require.ErrorIs(t, u.Rename("etc/apt", "etc/apt2"), syscall.EXDEV)
+		require.NoError(t, u.Remove("home/egd/notes"))
+		write(t, u, "home/egd/todo", os.O_WRONLY|os.O_CREATE, "todo")
+		require.NoError(t, u.Rename("home", "users"))
+
+		require.Equal(t, "todo", read(t, u, "users/egd/todo"))
+		require.Equal(t, []string{".cache", "todo"}, names(t, u, "users/egd"))
+		_, err := u.Lstat("home")
+		require.ErrorIs(t, err, fs.ErrNotExist)
+
+		user, _, err := u.Owner("users/egd")
+		require.NoError(t, err)
+		require.Equal(t, egiso.Default, user)
+
+		require.NoError(t, u.Rename("etc", "config"))
+		require.Equal(t, "etc/apt/sources", read(t, u, "config/apt/sources"))
+		require.Equal(t, []string{"apt", "hostname"}, names(t, u, "config"))
 	})
 
 	t.Run("refuses to rename a file over a directory", func(t *testing.T) {

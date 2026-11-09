@@ -222,9 +222,9 @@ func (t *Upper) Remove(name string) error {
 	return t.whiteout(name)
 }
 
-// Rename renames oldname to newname, replacing a file or empty directory at newname. Like overlayfs without
-// redirect_dir, it refuses to rename a directory the tree has with EXDEV, which tools such as mv
-// handle by copying.
+// Rename renames oldname to newname, replacing a file or empty directory at newname. A directory
+// that shows the tree's entries is copied up with everything in it first. Renaming into or out of
+// a Bind mount fails with EXDEV.
 func (t *Upper) Rename(oldname string, newname string) error {
 	var (
 		dst fs.FileInfo
@@ -247,9 +247,7 @@ func (t *Upper) Rename(oldname string, newname string) error {
 	if err != nil {
 		return err
 	}
-	if st.IsDir() && t.merges(oldname, up) {
-		return &os.LinkError{Op: "rename", Old: oldname, New: newname, Err: syscall.EXDEV}
-	}
+	deep := st.IsDir() && t.merges(oldname, up)
 
 	dst, dup, err = t.lstat("rename", newname)
 	switch {
@@ -265,7 +263,12 @@ func (t *Upper) Rename(oldname string, newname string) error {
 		return err
 	}
 
-	if !up {
+	switch {
+	case deep:
+		if err = t.copytree(oldname); err != nil {
+			return err
+		}
+	case !up:
 		if err = t.copyup(oldname); err != nil {
 			return err
 		}
@@ -513,6 +516,38 @@ func (t *Upper) copyup(name string) (err error) {
 
 	t.attrs[name] = attrs{user: user, group: group, mode: st.Mode()}
 	return nil
+}
+
+// copytree copies the directory name and everything it lists into the upper, and makes it opaque so
+// it no longer shows the tree's entries.
+func (t *Upper) copytree(name string) error {
+	entries, err := t.readdir(name)
+	if err != nil {
+		return err
+	}
+	if !t.exists(name) {
+		if err = t.copyup(name); err != nil {
+			return err
+		}
+	}
+
+	for _, e := range entries {
+		child := path.Join(name, e.Name())
+		st, up, err := t.lstat("copyup", child)
+		switch {
+		case err != nil:
+			return err
+		case st.IsDir():
+			err = t.copytree(child)
+		case !up:
+			err = t.copyup(child)
+		}
+		if err != nil {
+			return err
+		}
+	}
+
+	return t.dir.WriteFile(path.Join(name, opaque), nil, 0600)
 }
 
 // copied returns the attrs of name in the upper, copying it up first.

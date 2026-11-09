@@ -243,25 +243,6 @@ func Reserve(ctx context.Context, p2p host.Host, relays ...peer.AddrInfo) error 
 	return nil
 }
 
-// CircuitAddrs returns circuit addresses for reaching a peer through each relay
-// this host is directly connected to.
-func CircuitAddrs(p2p host.Host) (addrs []multiaddr.Multiaddr) {
-	for _, c := range p2p.Network().Conns() {
-		if c.Stat().Limited {
-			continue
-		}
-
-		circuit, err := multiaddr.NewMultiaddr(fmt.Sprintf("/p2p/%s/p2p-circuit", c.RemotePeer()))
-		if err != nil {
-			continue
-		}
-
-		addrs = append(addrs, c.RemoteMultiaddr().Encapsulate(circuit))
-	}
-
-	return addrs
-}
-
 // RelayCircuitAddrs returns circuit addresses for reaching a peer through the
 // given relay addresses (each including the relay's /p2p/ id).
 func RelayCircuitAddrs(relays ...string) (addrs []multiaddr.Multiaddr) {

@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"context"
 	"fmt"
-	"github.com/egdaemon/eg/jsonx"
 	"io"
 	"log"
 	"net/http"
@@ -12,6 +11,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/egdaemon/eg/jsonx"
 
 	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/compute"
@@ -207,12 +208,10 @@ func dialRunner(ctx context.Context, p2p host.Host, p2pid string, token string) 
 
 	// tokens only carry the peer id; without addresses the routed host
 	// falls back to a dht lookup. reach the runner through the relay holding its
-	// reservation (carried by the token), and the relays we're connected
-	// to, instead. hole punching upgrades it to a direct connection.
+	// reservation (carried by the token). hole punching upgrades it to a direct connection.
 	if len(p2p.Peerstore().Addrs(pid)) == 0 {
 		relay, _ := tokenClaims(token)
-		addrs := append(libp2px.RelayCircuitAddrs(relay...), libp2px.CircuitAddrs(p2p)...)
-		p2p.Peerstore().AddAddrs(pid, addrs, peerstore.TempAddrTTL)
+		p2p.Peerstore().AddAddrs(pid, libp2px.RelayCircuitAddrs(relay...), peerstore.TempAddrTTL)
 	}
 
 	debugx.Println("dialing runner", pid, p2p.Peerstore().Addrs(pid))

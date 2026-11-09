@@ -8,6 +8,7 @@ import (
 	"github.com/egdaemon/eg/runtime/wasi/egenv"
 	"github.com/egdaemon/eg/runtime/wasi/eggit"
 	"github.com/egdaemon/eg/runtime/wasi/shell"
+	"github.com/egdaemon/eg/runtime/x/wasi/eggithub"
 	"github.com/egdaemon/eg/runtime/x/wasi/egpool"
 )
 
@@ -24,6 +25,7 @@ func main() {
 		ctx,
 		eggit.AutoClone,
 		shell.Op(shell.Env().New("eg login")),
+		eggithub.DraftClean(0),
 		// every workload drafts into the same release, create it once up front so they don't race to create it.
 		// shell.Op(
 		// 	shell.Runtime().
@@ -33,13 +35,15 @@ func main() {
 		// 			eggithub.PatternVersion(), eggit.EnvCommit().Hash.String(), eggithub.PatternVersion(),
 		// 		),
 		// ),
+		// TODO:
+		// egbug.Env,
+		// eggpg.Seed(eggpg.Options()...),
+		// eggpg.Debug(eggpg.Options()...),
 		uploads.Run(egpool.Slice(
-			// "eg compute upload --ttl=1h --arch=amd64 --cores=8 --memory=12g release/eg/targz",
 			// "eg compute upload --ttl=3h --arch=arm64 --cores=3 --memory=3g release/eg/targz",
-			// "eg compute upload --arch=amd64 --cores=8 --memory=6g -e EG_SSH_KEY_SEED=${EG_SSH_KEY_SEED} release/eg/archlinux",
-			"eg version",
-			"env",
-			"eg compute upload --arch=amd64 --cores=8 --memory=6g release/eg/debian",
+			"eg compute upload --arch=amd64 --cores=8 --memory=18g release/eg/targz",
+			// "eg compute upload --arch=amd64 --cores=8 --memory=18g release/eg/archlinux",
+			// "eg compute upload --arch=amd64 --cores=8 --memory=18g release/eg/debian",
 		)),
 		// egx.Retry(0).Delay(30*time.Second).Run(
 		// 	eggithub.Promote(

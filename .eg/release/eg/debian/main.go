@@ -28,20 +28,16 @@ func main() {
 				ctx,
 				debeg.Runner(),
 				eg.Sequential(
-					shell.Op(
-						// clean up old debians. remove in future version.
-						shell.Newf("rm %s", egenv.DirectoryCache(".dist", "*.deb")).Lenient(true),
-					),
 					debeg.Build,
 					debeg.Upload,
 					shell.Op(
-						shell.Newf("cp %s/*.deb %s", egenv.DirectoryTemp("deb.eg"), egenv.DirectoryCache(".dist")),
+						shell.Newf("cp %s/*.deb %s", egenv.DirectoryTemp("deb.eg"), egenv.DirectoryWorkload(".dist")),
 					),
 				),
 			),
 		),
 		eggithub.Draft(
-			egenv.DirectoryCache(".dist", "*.deb"),
+			egenv.DirectoryWorkload(".dist", "*.deb"),
 		),
 	)
 

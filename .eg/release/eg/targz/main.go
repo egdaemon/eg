@@ -2,8 +2,10 @@ package main
 
 import (
 	"context"
-	egrel "eg/compute/release/eg"
 	"log"
+
+	debeg "eg/compute/debuild/eg"
+	egrel "eg/compute/release/eg"
 
 	"github.com/egdaemon/eg/runtime/wasi/eg"
 	"github.com/egdaemon/eg/runtime/wasi/egenv"
@@ -28,16 +30,15 @@ func main() {
 	err := eg.Perform(
 		ctx,
 		eggit.AutoClone,
-		eg.Build(eg.DefaultModule()),
+		debeg.Prepare,
 		eg.Module(
 			ctx,
-			eg.DefaultModule(),
+			debeg.Runner(),
 			shell.Op(
 				runtime.Newf("rsync -a --mkpath .dist/linux/ %s/", dir),
 				runtime.New("go install ./cmd/eg").Environ("GOBIN", dir+"/usr/bin"),
-				// egtarball.Pack produces .tar.xz, we publish .tar.gz.
-				runtime.Newf("tar -C %s -zcvf %s .", dir, egtarball.Archive(archive)),
 			),
+			egtarball.Pack(archive),
 			egtarball.SHA256Op(archive),
 			eggithub.Draft(egtarball.Archive(archive)),
 		),

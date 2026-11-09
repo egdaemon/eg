@@ -138,7 +138,7 @@ func LocalClone(ctx context.Context, repo, dir, basetreeish, headtreeish string)
 		return run("-C", repo, "rev-parse", "-q", "--verify", treeish+"^{commit}")
 	}
 
-	origin, err := execx.String(ctx, "git", "-C", repo, "remote", "get-url", git.DefaultRemoteName)
+	origin, err := run("-C", repo, "remote", "get-url", git.DefaultRemoteName)
 	if err != nil {
 		debugx.Println("unable to determine repository origin remote", err)
 		// source repo has no origin remote — git clone --local handles this fine,

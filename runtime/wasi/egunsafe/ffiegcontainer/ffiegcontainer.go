@@ -78,22 +78,3 @@ func Module(ctx context.Context, name, modulepath string, options []string) erro
 
 	return nil
 }
-
-// Cell runs the module at modulepath with the egiso at location, pinned to toc, the digest of its
-// table of contents, as its root in place of a container.
-func Cell(ctx context.Context, location, toc, modulepath string, options []string) error {
-	cc, err := egunsafe.DialControlSocket(ctx)
-	if err != nil {
-		return err
-	}
-	containers := c8s.NewProxyClient(cc)
-
-	_, err = containers.Module(ctx, &c8s.ModuleRequest{
-		Image:   location,
-		Toc:     toc,
-		Module:  modulepath,
-		Mdir:    egunsafe.RuntimeDirectory(),
-		Options: options,
-	})
-	return errorsx.Wrapf(err, "unable to run the module in the cell: %s", location)
-}

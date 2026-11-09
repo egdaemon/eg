@@ -6,10 +6,12 @@ import (
 	"embed"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strconv"
 	"sync"
 
@@ -24,6 +26,7 @@ import (
 	"github.com/egdaemon/eg/internal/wasix"
 	"github.com/egdaemon/eg/interp/c8s"
 	"github.com/egdaemon/eg/interp/runtime/wasi/ffiegcontainer"
+	"github.com/egdaemon/eg/interp/runtime/wasi/ffiegvm"
 	"github.com/egdaemon/eg/interp/runtime/wasi/ffiexec"
 	"github.com/egdaemon/eg/interp/runtime/wasi/ffigit"
 	"github.com/egdaemon/eg/interp/runtime/wasi/ffigraph"
@@ -33,6 +36,7 @@ import (
 	"github.com/egdaemon/eg/workspaces"
 	"github.com/egdaemon/wasinet/wasinet/wnetruntime"
 	"github.com/gofrs/uuid/v5"
+	"github.com/opencontainers/go-digest"
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/experimental"
 	"github.com/tetratelabs/wazero/experimental/logging"
@@ -47,6 +51,13 @@ type Option func(*runner)
 func OptionEnviron(s ...string) Option {
 	return func(r *runner) {
 		r.environ = s
+	}
+}
+
+// OptionHTTPClient is the client egiso images are fetched with.
+func OptionHTTPClient(c *http.Client) Option {
+	return func(r *runner) {
+		r.client = c
 	}
 }
 
@@ -73,6 +84,7 @@ func Remote(ctx context.Context, wshost workspaces.Context, aid string, runid st
 		r = runner{
 			initonce: &sync.Once{},
 			root:     &sysfs.AdaptFS{FS: embed.FS{}},
+			client:   http.DefaultClient,
 		}
 	)
 	for _, opt := range options {
@@ -143,6 +155,21 @@ func Remote(ctx context.Context, wshost workspaces.Context, aid string, runid st
 			}
 			return nil
 		})).Export("github.com/egdaemon/eg/runtime/wasi/runtime/ffiegcontainer.Run").
+			NewFunctionBuilder().WithFunc(ffiegvm.Run(func(ctx context.Context, location string, toc string, modulepath string, environ ...string) (err error) {
+			var (
+				pinned digest.Digest
+			)
+
+			if pinned, err = digest.Parse(toc); err != nil {
+				return errorsx.Wrapf(err, "invalid table of contents digest for %s", location)
+			}
+
+			path := fsx.LocateFirst(
+				filepath.Join(wshost.Root, wshost.BuildDir, modulepath),
+				eg.DefaultMountRoot(eg.RuntimeDirectory, modulepath),
+			)
+			return Cell(ctx, wshost, aid, runid, svc, r.client, path, location, pinned, append(slices.Clone(r.environ), environ...)...)
+		})).Export("github.com/egdaemon/eg/runtime/wasi/runtime/ffiegvm.Run").
 			NewFunctionBuilder().WithFunc(ffiexec.Exec(func(cmd *exec.Cmd) *exec.Cmd {
 			if !filepath.IsAbs(cmd.Dir) {
 				cmd.Dir = filepath.Join(wshost.WorkingDir, cmd.Dir)
@@ -202,6 +229,7 @@ type runner struct {
 	environ  []string
 	initonce *sync.Once
 	root     experimentalsys.FS
+	client   *http.Client
 }
 
 func (t runner) perform(ctx context.Context, wshost workspaces.Context, runid, path string, rtb runtimefn) (err error) {

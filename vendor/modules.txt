@@ -599,6 +599,9 @@ github.com/go-git/gcfg/v2
 github.com/go-git/gcfg/v2/scanner
 github.com/go-git/gcfg/v2/token
 github.com/go-git/gcfg/v2/types
+# github.com/go-git/go-billy/v5 v5.6.0
+## explicit; go 1.20
+github.com/go-git/go-billy/v5
 # github.com/go-git/go-billy/v6 v6.0.0-beta.1
 ## explicit; go 1.25.0
 github.com/go-git/go-billy/v6
@@ -796,6 +799,11 @@ github.com/hashicorp/go-multierror
 # github.com/hashicorp/golang-lru v1.0.2
 ## explicit; go 1.12
 github.com/hashicorp/golang-lru/simplelru
+# github.com/hashicorp/golang-lru/v2 v2.0.7
+## go 1.18
+github.com/hashicorp/golang-lru/v2
+github.com/hashicorp/golang-lru/v2/internal
+github.com/hashicorp/golang-lru/v2/simplelru
 # github.com/huin/goupnp v1.3.0
 ## explicit; go 1.14
 github.com/huin/goupnp
@@ -1558,6 +1566,9 @@ github.com/quic-go/webtransport-go
 # github.com/radovskyb/watcher v1.0.7
 ## explicit
 github.com/radovskyb/watcher
+# github.com/rasky/go-xdr v0.0.0-20170124162913-1a41d1a06c93
+## explicit
+github.com/rasky/go-xdr/xdr2
 # github.com/rivo/uniseg v0.4.7
 ## explicit; go 1.18
 github.com/rivo/uniseg
@@ -1731,6 +1742,16 @@ github.com/whyrusleeping/go-keyspace
 ## explicit; go 1.17
 github.com/willabides/kongplete
 github.com/willabides/kongplete/internal/positionalpredictor
+# github.com/willscott/go-nfs v0.0.4
+## explicit; go 1.19
+github.com/willscott/go-nfs
+github.com/willscott/go-nfs/file
+github.com/willscott/go-nfs/helpers
+# github.com/willscott/go-nfs-client v0.0.0-20240104095149-b44639837b00
+## explicit; go 1.19
+github.com/willscott/go-nfs-client/nfs/rpc
+github.com/willscott/go-nfs-client/nfs/util
+github.com/willscott/go-nfs-client/nfs/xdr
 # github.com/wlynxg/anet v0.0.5
 ## explicit; go 1.20
 github.com/wlynxg/anet

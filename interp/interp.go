@@ -36,6 +36,8 @@ import (
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/experimental"
 	"github.com/tetratelabs/wazero/experimental/logging"
+	experimentalsys "github.com/tetratelabs/wazero/experimental/sys"
+	"github.com/tetratelabs/wazero/experimental/sysfs"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
 	"google.golang.org/grpc"
 )
@@ -45,6 +47,13 @@ type Option func(*runner)
 func OptionEnviron(s ...string) Option {
 	return func(r *runner) {
 		r.environ = s
+	}
+}
+
+// OptionRoot mounts root at / in place of the empty read-only root.
+func OptionRoot(root experimentalsys.FS) Option {
+	return func(r *runner) {
+		r.root = root
 	}
 }
 
@@ -63,6 +72,7 @@ func Remote(ctx context.Context, wshost workspaces.Context, aid string, runid st
 	var (
 		r = runner{
 			initonce: &sync.Once{},
+			root:     &sysfs.AdaptFS{FS: embed.FS{}},
 		}
 	)
 	for _, opt := range options {
@@ -165,16 +175,16 @@ func Remote(ctx context.Context, wshost workspaces.Context, aid string, runid st
 	return r.perform(ctx, wshost, runid, module, runtimeenv)
 }
 
-// mounts the workspace directories into the guest under an empty read-only root.
+// mounts the workspace directories into the guest under root.
 // we map twice so that baremetal can work. shell commands are run on the host itself so we need the host path.
 // but inside wazero we need to be able to access the standard paths.
 // the call decide which paths the environment variables rsolve to.
 // we also need to ensure we mount the working directory so pwd works correctly.
 // the root lets guests that resolve paths from / (wasi-libc programs such as coreutils) reach the nested mounts,
 // and everything outside of them is missing or read-only.
-func mounts(wshost workspaces.Context) wazero.FSConfig {
-	return wazero.NewFSConfig().
-		WithFSMount(embed.FS{}, "/").
+func mounts(wshost workspaces.Context, root experimentalsys.FS) wazero.FSConfig {
+	return wazero.NewFSConfig().(sysfs.FSConfig).
+		WithSysFSMount(root, "/").
 		WithDirMount(os.TempDir(), os.TempDir()).
 		WithDirMount(wshost.Root, eg.DefaultRootDirectory()).
 		WithDirMount(wshost.Root, wshost.Root).
@@ -191,6 +201,7 @@ func mounts(wshost workspaces.Context) wazero.FSConfig {
 type runner struct {
 	environ  []string
 	initonce *sync.Once
+	root     experimentalsys.FS
 }
 
 func (t runner) perform(ctx context.Context, wshost workspaces.Context, runid, path string, rtb runtimefn) (err error) {
@@ -267,7 +278,7 @@ func (t runner) perform(ctx context.Context, wshost workspaces.Context, runid, p
 	debugx.Println("system tls certs", hostsslcerts)
 	debugx.Println("------------------------------------------------------")
 
-	wazerofs := mounts(wshost).WithDirMount(hostsslcerts, DefaultSSLCertDir)
+	wazerofs := mounts(wshost, t.root).WithDirMount(hostsslcerts, DefaultSSLCertDir)
 
 	mcfg := wazero.NewModuleConfig().WithEnv(
 		"SSL_CERT_DIR", DefaultSSLCertDir,

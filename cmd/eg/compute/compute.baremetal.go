@@ -44,6 +44,7 @@ import (
 	"github.com/gofrs/uuid/v5"
 
 	"github.com/KimMachineGun/automemlimit/memlimit"
+	"github.com/opencontainers/go-digest"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
@@ -346,6 +347,9 @@ func (t baremetal) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, hotswapbin
 		// builds create their own network namespace as well, they take the options of hostnet.
 		c8sproxy.ServiceProxyOptionBuildOptions(runners.ZeroAgent(hostnet, isolation).Options()...),
 		c8sproxy.ServiceProxyOptionBaremetal,
+		c8sproxy.ServiceProxyOptionCell(func(ctx context.Context, module string, location string, toc digest.Digest, environ ...string) error {
+			return interp.Cell(ctx, ws, aid, uid.String(), cc, tlsc.DefaultClient(), module, location, toc, append(cmdenv, environ...)...)
+		}),
 	).Bind(srv)
 
 	go func() {

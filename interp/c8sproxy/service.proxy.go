@@ -20,6 +20,7 @@ import (
 	"github.com/egdaemon/eg/internal/stringsx"
 	"github.com/egdaemon/eg/interp/c8s"
 	"github.com/egdaemon/eg/workspaces"
+	"github.com/opencontainers/go-digest"
 	"golang.org/x/exp/slices"
 	"google.golang.org/grpc"
 )
@@ -42,6 +43,14 @@ func ServiceProxyOptionContainerOptions(v ...string) ServiceProxyOption {
 func ServiceProxyOptionBuildOptions(v ...string) ServiceProxyOption {
 	return func(ps *ProxyService) {
 		ps.buildopts = v
+	}
+}
+
+// ServiceProxyOptionCell runs the module of a cell, a ModuleRequest that names an egiso by the digest
+// of its table of contents, with run in place of a container.
+func ServiceProxyOptionCell(run func(ctx context.Context, module string, location string, toc digest.Digest, environ ...string) error) ServiceProxyOption {
+	return func(ps *ProxyService) {
+		ps.cell = run
 	}
 }
 
@@ -87,6 +96,7 @@ type ProxyService struct {
 	cmdenv        []string
 	containeropts []string
 	buildopts     []string
+	cell          func(ctx context.Context, module string, location string, toc digest.Digest, environ ...string) error
 }
 
 func (t *ProxyService) Bind(host grpc.ServiceRegistrar) {
@@ -211,6 +221,10 @@ func (t *ProxyService) Module(ctx context.Context, req *c8s.ModuleRequest) (_ *c
 
 		// fsx.PrintFS(os.DirFS(path))
 		// log.Println("resolved\n", filepath.Join(t.ws.Root, t.ws.BuildDir, req.Module), "\n", eg.DefaultMountRoot(eg.RuntimeDirectory, req.Module), "->", path)
+		if stringsx.Present(req.Toc) {
+			return t.runcell(ctx, path, req)
+		}
+
 		req.Options = append(req.Options, "--volume", fmt.Sprintf("%s:%s:ro", path, eg.ModuleMount()))
 	}
 
@@ -222,6 +236,35 @@ func (t *ProxyService) Module(ctx context.Context, req *c8s.ModuleRequest) (_ *c
 	// envx.Debug(options...)
 
 	if err = PodmanModule(ctx, t.prepcmd, req.Image, req.Name, req.Mdir, options...); err != nil {
+		return nil, err
+	}
+
+	return &c8s.ModuleResponse{}, nil
+}
+
+// runcell runs the module at path in the cell req names, with the variables its options set.
+func (t *ProxyService) runcell(ctx context.Context, path string, req *c8s.ModuleRequest) (_ *c8s.ModuleResponse, err error) {
+	var (
+		toc     digest.Digest
+		environ []string
+	)
+
+	if t.cell == nil {
+		return nil, errorsx.Errorf("cells are not supported by this runner: %s", req.Image)
+	}
+
+	if toc, err = digest.Parse(req.Toc); err != nil {
+		return nil, errorsx.Wrapf(err, "invalid table of contents digest for %s", req.Image)
+	}
+
+	for i := 0; i+1 < len(req.Options); i++ {
+		if req.Options[i] == "-e" || req.Options[i] == "--env" {
+			environ = append(environ, req.Options[i+1])
+			i++
+		}
+	}
+
+	if err = t.cell(ctx, path, req.Image, toc, append(slices.Clone(t.cmdenv), environ...)...); err != nil {
 		return nil, err
 	}
 

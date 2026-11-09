@@ -43,6 +43,7 @@ import (
 	"github.com/egdaemon/eg/runtime/wasi/egunsafe/egworkloads"
 	"github.com/egdaemon/eg/workspaces"
 	"github.com/gofrs/uuid/v5"
+	"github.com/opencontainers/go-digest"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
@@ -447,6 +448,9 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 			),
 			// builds create their own network namespace as well, they take the options of hostnet.
 			c8sproxy.ServiceProxyOptionBuildOptions(runners.ZeroAgent(hostnet).Options()...),
+			c8sproxy.ServiceProxyOptionCell(func(ctx context.Context, module string, location string, toc digest.Digest, environ ...string) error {
+				return interp.Cell(ctx, ws, aid, uid, cc, tlsc.DefaultClient(), module, location, toc, environ...)
+			}),
 		).Bind(srv)
 
 		go func() {

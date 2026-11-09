@@ -31,6 +31,9 @@ message ModuleRequest {
   string mdir = 3;
   repeated string options = 4;
   string module = 5;
+  // digest of the table of contents of the egiso named by image. when set, the module runs under
+  // wazero with the egiso as its root instead of in a container.
+  string toc = 6;
 }
 message ModuleResponse {}
 

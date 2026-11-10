@@ -28,15 +28,15 @@ import (
 )
 
 type archive struct {
-	Dir             string   `name:"directory" help:"root directory of the repository" default:"${vars_eg_root_directory}"`
-	Environment     []string `name:"env" short:"e" help:"define environment variables and their values to be included"`
-	Dirty           bool     `name:"dirty" help:"include all host environment variables"`
-	GitRemote       string   `name:"git-remote" help:"name of the git remote to use" default:"${vars_git_default_remote_name}"`
-	GitReference    string   `name:"git-ref" help:"name of the branch or commit to checkout" default:"${vars_git_head_reference}"`
-	GitClone        string   `name:"git-clone-uri" help:"clone uri"`
-	InvalidateCache bool     `name:"invalidate-cache" help:"removes workload build cache, the archive contains everything built for the workspace so invalidating it limits the archive to the module"`
-	Output          string   `name:"output" short:"o" help:"file to store archive to. default is to write to stdout" default:"-"`
-	Name            string   `arg:"" name:"module" help:"name of the module to run, i.e. the folder name within moduledir" default:"" predictor:"eg.workload"`
+	Dir             string        `name:"directory" help:"root directory of the repository" default:"${vars_eg_root_directory}"`
+	Environment     []string      `name:"env" short:"e" help:"define environment variables and their values to be included"`
+	Dirty           bool          `name:"dirty" help:"include all host environment variables"`
+	GitRemote       string        `name:"git-remote" help:"name of the git remote to use" default:"${vars_git_default_remote_name}"`
+	GitReference    string        `name:"git-ref" help:"name of the branch or commit to checkout" default:"${vars_git_head_reference}"`
+	GitClone        string        `name:"git-clone-uri" help:"clone uri"`
+	InvalidateCache bool          `name:"invalidate-cache" help:"removes workload build cache, the archive contains everything built for the workspace so invalidating it limits the archive to the module"`
+	Output          cmdopts.IOOut `name:"output" short:"o" help:"file to store archive to. default is to write to stdout" default:"-"`
+	Name            string        `arg:"" name:"module" help:"name of the module to run, i.e. the folder name within moduledir" default:"" predictor:"eg.workload"`
 }
 
 func (t archive) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
@@ -143,12 +143,11 @@ func (t archive) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) 
 	ainfo := errorsx.Zero(os.Stat(archiveio.Name()))
 	log.Println("archive metadata", ainfo.Name(), bytesx.Unit(ainfo.Size()))
 
-	var dst io.WriteCloser = os.Stdout
-	if stringsx.Present(t.Output) && t.Output != "-" {
-		if dst, err = os.Create(t.Output); err != nil {
-			return errorsx.Wrap(err, "unable to create archive")
-		}
+	dst, err := t.Output.Open(os.Stdout)
+	if err != nil {
+		return errorsx.Wrap(err, "unable to create archive")
 	}
+	defer dst.Close()
 
 	if _, err = io.Copy(dst, archiveio); err != nil {
 		return errorsx.Wrap(err, "unable to create archive")

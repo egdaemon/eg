@@ -191,6 +191,7 @@ func main() {
 			libp2px.MDNSLookup(libp2px.DefaultMDNSLookup),
 		),
 		kong.BindTo(shellcli.Context, (*context.Context)(nil)),
+		kong.BindTo(os.Stdin, (*cmdopts.Stdin)(nil)),
 		kong.BindSingletonProvider(func(g *cmdopts.Global) *cmdidentity.T {
 			return cmdidentity.New(g.Context, g.AccountID, g.ProfileID, cmdidentity.Login)
 		}),

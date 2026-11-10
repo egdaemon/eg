@@ -25,7 +25,9 @@ func TestSpooledArgs(t *testing.T) {
 		require.NoError(t, err)
 		_, err = k.Parse([]string{"spooled"})
 		require.NoError(t, err)
-		require.Equal(t, "-", cli.Spooled.Archive)
+		archive, err := cli.Spooled.Archive.MarshalText()
+		require.NoError(t, err)
+		require.Equal(t, "-", string(archive))
 		require.Empty(t, cli.Spooled.Spool)
 	})
 
@@ -37,7 +39,9 @@ func TestSpooledArgs(t *testing.T) {
 		require.NoError(t, err)
 		_, err = k.Parse([]string{"spooled", "--spool", "/tmp/spool", "workload.tar.gz"})
 		require.NoError(t, err)
-		require.Equal(t, "workload.tar.gz", cli.Spooled.Archive)
+		archive, err := cli.Spooled.Archive.MarshalText()
+		require.NoError(t, err)
+		require.Equal(t, "workload.tar.gz", string(archive))
 		require.Equal(t, "/tmp/spool", cli.Spooled.Spool)
 	})
 }
@@ -134,7 +138,9 @@ func TestSpooledRun(t *testing.T) {
 		require.NoError(t, dst.Close())
 
 		spool := t.TempDir()
-		require.NoError(t, spooled{Archive: archive, Spool: spool}.Run(&cmdopts.Global{Context: ctx}, new(cmdopts.HotswapPath)))
+		var input cmdopts.IOIn
+		require.NoError(t, input.UnmarshalText([]byte(archive)))
+		require.NoError(t, spooled{Archive: input, Spool: spool}.Run(&cmdopts.Global{Context: ctx}, new(cmdopts.HotswapPath), bytes.NewReader(nil)))
 
 		queued, err := os.ReadDir(filepath.Join(spool, "q"))
 		require.NoError(t, err)
@@ -155,17 +161,9 @@ func TestSpooledRun(t *testing.T) {
 		require.NoError(t, tw.Close())
 		require.NoError(t, gw.Close())
 
-		stdin := filepath.Join(t.TempDir(), "stdin")
-		require.NoError(t, os.WriteFile(stdin, buf.Bytes(), 0600))
-		in, err := os.Open(stdin)
-		require.NoError(t, err)
-		defer in.Close()
-
-		orig := os.Stdin
-		os.Stdin = in
-		defer func() { os.Stdin = orig }()
-
-		require.NoError(t, spooled{Archive: "-", Spool: t.TempDir()}.Run(&cmdopts.Global{Context: ctx}, new(cmdopts.HotswapPath)))
+		var input cmdopts.IOIn
+		require.NoError(t, input.UnmarshalText([]byte("-")))
+		require.NoError(t, spooled{Archive: input, Spool: t.TempDir()}.Run(&cmdopts.Global{Context: ctx}, new(cmdopts.HotswapPath), &buf))
 	})
 
 	t.Run("a failing workload fails the command", func(t *testing.T) {
@@ -184,13 +182,17 @@ func TestSpooledRun(t *testing.T) {
 
 		archive := filepath.Join(t.TempDir(), "workload.tar.gz")
 		require.NoError(t, os.WriteFile(archive, buf.Bytes(), 0600))
-		require.Error(t, spooled{Archive: archive, Spool: t.TempDir()}.Run(&cmdopts.Global{Context: ctx}, new(cmdopts.HotswapPath)))
+		var input cmdopts.IOIn
+		require.NoError(t, input.UnmarshalText([]byte(archive)))
+		require.Error(t, spooled{Archive: input, Spool: t.TempDir()}.Run(&cmdopts.Global{Context: ctx}, new(cmdopts.HotswapPath), bytes.NewReader(nil)))
 	})
 
 	t.Run("a missing archive fails the command", func(t *testing.T) {
 		ctx, cancel := context.WithTimeout(t.Context(), 2*time.Minute)
 		defer cancel()
 
-		require.Error(t, spooled{Archive: filepath.Join(t.TempDir(), "missing.tar.gz"), Spool: t.TempDir()}.Run(&cmdopts.Global{Context: ctx}, new(cmdopts.HotswapPath)))
+		var input cmdopts.IOIn
+		require.NoError(t, input.UnmarshalText([]byte(filepath.Join(t.TempDir(), "missing.tar.gz"))))
+		require.Error(t, spooled{Archive: input, Spool: t.TempDir()}.Run(&cmdopts.Global{Context: ctx}, new(cmdopts.HotswapPath), bytes.NewReader(nil)))
 	})
 }

@@ -6,6 +6,7 @@ import (
 	"compress/gzip"
 	"context"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"os/exec"
@@ -21,6 +22,7 @@ import (
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/httpx"
 	"github.com/egdaemon/eg/internal/iox"
+	"github.com/egdaemon/eg/internal/langx"
 	"github.com/egdaemon/eg/internal/podmanx"
 	"github.com/egdaemon/eg/internal/stringsx"
 	"github.com/egdaemon/eg/jsonx"
@@ -33,9 +35,9 @@ import (
 // exercise the runner path which `eg compute local` bypasses.
 type spooled struct {
 	cmdopts.RuntimeResources
-	Archive string `arg:"" name:"archive" help:"workload archive to run, as produced by eg compute archive. '-' reads from stdin" default:"-"`
-	Spool   string `name:"spool" help:"spool directory to use. defaults to a temporary directory removed on exit" default:""`
-	Entry   string `name:"entry" help:"module to run, a path prefix within the archive, i.e. tests/stress matches tests/stress/main.wasm. required when the archive contains more than one module" default:""`
+	Archive cmdopts.IOIn `arg:"" name:"archive" help:"workload archive to run, as produced by eg compute archive. '-' reads from stdin" default:"-"`
+	Spool   string       `name:"spool" help:"spool directory to use. defaults to a temporary directory removed on exit" default:""`
+	Entry   string       `name:"entry" help:"module to run, a path prefix within the archive, i.e. tests/stress matches tests/stress/main.wasm. required when the archive contains more than one module" default:""`
 }
 
 // completion is the local equivalent of the control plane, it records the outcome of the workload
@@ -60,7 +62,7 @@ func (t *spooledcompletion) Upload(ctx context.Context, id string, duration time
 	return nil
 }
 
-func (t spooled) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err error) {
+func (t spooled) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath, stdin cmdopts.Stdin) (err error) {
 	var (
 		uid      = uuid.Must(uuid.NewV7())
 		archived *os.File
@@ -81,15 +83,11 @@ func (t spooled) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err
 	}
 	defer archived.Close()
 
-	var src io.Reader = os.Stdin
-	if t.Archive != "" && t.Archive != "-" {
-		in, err := os.Open(t.Archive)
-		if err != nil {
-			return errorsx.Wrap(err, "unable to open archive")
-		}
-		defer in.Close()
-		src = in
+	src, err := t.Archive.Open(stdin)
+	if err != nil {
+		return errorsx.Wrap(err, "unable to open archive")
 	}
+	defer src.Close()
 
 	if _, err = io.Copy(archived, src); err != nil {
 		return errorsx.Wrap(err, "unable to read archive")
@@ -112,10 +110,13 @@ func (t spooled) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err
 		Id:     uid.String(),
 		Entry:  entry,
 		Arch:   runtime.GOARCH,
+		Ttl:    uint64(langx.FirstNonZero(t.RuntimeResources.TTL, time.Hour)),
 		Cores:  t.RuntimeResources.Cores,
 		Memory: uint64(t.RuntimeResources.Memory),
 		Vram:   uint64(t.RuntimeResources.Vram),
 	}
+
+	log.Println("spooled workload", enq.Id, "entry", enq.Entry, "ttl", time.Duration(enq.Ttl))
 
 	// stage the workload identically to runners.DownloadClient.
 	if err = dirs.Download(uid, "archive.tar.gz", archived); err != nil {
@@ -174,7 +175,6 @@ func (t spooled) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err
 		runners.QueueOptionCompletion(cc),
 		runners.QueueOptionAgentOptions(
 			agentopt,
-			// nested containers cannot write the sysctls netavark needs for a bridge network, share the outer network like compute local.
 			envx.Toggle(runners.AgentOptionNoop, runners.AgentOptionCommandLine("--network", "host"), runners.Nested() && !envx.Boolean(false, eg.EnvExperimentalDisableHostNetwork)),
 		),
 		runners.QueueOptionLogVerbosity(gctx.Verbosity),

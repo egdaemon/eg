@@ -5,10 +5,13 @@ import (
 	"log"
 	"time"
 
-	"github.com/egdaemon/eg/interp/runtime/wasi/ffigit"
+	egrel "eg/compute/release/eg"
+
+	_eg "github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/runtime/wasi/eg"
 	"github.com/egdaemon/eg/runtime/wasi/egenv"
 	"github.com/egdaemon/eg/runtime/wasi/eggit"
+	"github.com/egdaemon/eg/runtime/wasi/egunsafe/ffigit"
 	"github.com/egdaemon/eg/runtime/wasi/shell"
 	"github.com/egdaemon/eg/runtime/x/wasi/eggithub"
 	"github.com/egdaemon/eg/runtime/x/wasi/egpool"

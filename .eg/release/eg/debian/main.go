@@ -31,7 +31,7 @@ func main() {
 					debeg.Build,
 					debeg.Upload,
 					shell.Op(
-						shell.Newf("cp %s/*.deb %s", egenv.DirectoryTemp("deb.eg"), egenv.DirectoryWorkload(".dist")),
+						shell.Newf("rsync -a --mkpath %s/*.deb %s/", egenv.DirectoryTemp("deb.eg"), egenv.DirectoryWorkload(".dist")),
 					),
 				),
 			),

@@ -1,14 +1,22 @@
 package shell_test
 
 import (
+	"fmt"
+	"os/user"
 	"testing"
 
+	"github.com/egdaemon/eg"
+	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/testx"
 	"github.com/egdaemon/eg/runtime/wasi/shell"
 	"github.com/stretchr/testify/require"
 )
 
 func TestShellCommands(t *testing.T) {
+	current, err := user.Current()
+	require.NoError(t, err)
+	group := envx.String(current.Username, eg.EnvComputeDefaultGroup)
+
 	type example struct {
 		cmd      shell.Command
 		expected string
@@ -20,7 +28,7 @@ func TestShellCommands(t *testing.T) {
 		},
 		{
 			cmd:      shell.New("psql --no-psqlrc -U postgres -d postgres -q -At -c \"SELECT pg_reload_conf();\""),
-			expected: "::sudo:-E -H -u egd -g egd bash -o pipefail -c psql --no-psqlrc -U postgres -d postgres -q -At -c \"SELECT pg_reload_conf();\"",
+			expected: fmt.Sprintf("::sudo:-E -H -u %s -g %s bash -o pipefail -c psql --no-psqlrc -U postgres -d postgres -q -At -c \"SELECT pg_reload_conf();\"", current.Username, group),
 		},
 	}
 

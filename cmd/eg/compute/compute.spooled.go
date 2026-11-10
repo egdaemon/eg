@@ -32,6 +32,7 @@ import (
 // spool and queue the daemon uses for workloads pushed by the upload client. its purpose is to
 // exercise the runner path which `eg compute local` bypasses.
 type spooled struct {
+	cmdopts.RuntimeResources
 	Archive string `arg:"" name:"archive" help:"workload archive to run, as produced by eg compute archive. '-' reads from stdin" default:"-"`
 	Spool   string `name:"spool" help:"spool directory to use. defaults to a temporary directory removed on exit" default:""`
 	Entry   string `name:"entry" help:"path of the compiled module within the archive, i.e. <module>/main.wasm. detected from the archive when blank" default:""`
@@ -109,14 +110,13 @@ func (t spooled) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err
 		}
 	}
 
-	res := runners.NewRuntimeResources()
 	enq := &computeapi.Enqueued{
 		Id:     uid.String(),
 		Entry:  entry,
 		Arch:   runtime.GOARCH,
-		Cores:  res.Cores,
-		Memory: res.Memory,
-		Vram:   res.Vram,
+		Cores:  t.RuntimeResources.Cores,
+		Memory: uint64(t.RuntimeResources.Memory),
+		Vram:   uint64(t.RuntimeResources.Vram),
 	}
 
 	// stage the workload identically to runners.DownloadClient.
@@ -147,7 +147,14 @@ func (t spooled) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err
 		return errorsx.Wrap(err, "unable to connect to podman")
 	}
 
-	if err = runners.BuildRootContainer(ctx, "--build-arg", envx.Format(eg.EnvBuildCommit, cmdopts.BuildCommit())); err != nil {
+	buildopts := []string{"--build-arg", envx.Format(eg.EnvBuildCommit, cmdopts.BuildCommit())}
+
+	// nested containers cannot create the systemd scopes crun needs, build without a container runtime.
+	if runners.Nested() {
+		buildopts = append(buildopts, "--isolation", "chroot")
+	}
+
+	if err = runners.BuildRootContainer(ctx, buildopts...); err != nil {
 		return err
 	}
 
@@ -156,14 +163,22 @@ func (t spooled) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err
 
 	cc := &spooledcompletion{id: enq.Id, cancel: cancel}
 
-	err = runners.QueueN(
+	// a single worker, the queue's pool, capacity handling and recovery of interrupted workloads are not needed
+	// to run the one workload staged above.
+	err = runners.RunOne(
 		ctx,
-		1,
+		0,
+		0,
 		httpx.NewFixedStatusClient(http.StatusNotImplemented),
-		dirs,
-		runners.NewResourceManager(res),
+		runners.NewResourceManager(runners.NewRuntimeResources()),
+		&dirs,
+		make(chan error, 1),
 		runners.QueueOptionCompletion(cc),
-		runners.QueueOptionAgentOptions(agentopt),
+		runners.QueueOptionAgentOptions(
+			agentopt,
+			// nested containers cannot write the sysctls netavark needs for a bridge network, share the outer network like compute local.
+			envx.Toggle(runners.AgentOptionNoop, runners.AgentOptionCommandLine("--network", "host"), runners.Nested() && !envx.Boolean(false, eg.EnvExperimentalDisableHostNetwork)),
+		),
 		runners.QueueOptionLogVerbosity(gctx.Verbosity),
 	)
 

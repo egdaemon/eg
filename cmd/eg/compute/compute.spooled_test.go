@@ -4,9 +4,11 @@ import (
 	"archive/tar"
 	"bytes"
 	"compress/gzip"
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/alecthomas/kong"
 	"github.com/egdaemon/eg/cmd/cmdopts"
@@ -18,7 +20,7 @@ func TestSpooledArgs(t *testing.T) {
 		var cli struct {
 			Spooled spooled `cmd:""`
 		}
-		k, err := kong.New(&cli)
+		k, err := kong.New(&cli, cmdopts.RuntimeResources{Arch: "amd64", OS: "linux"}.KongVars())
 		require.NoError(t, err)
 		_, err = k.Parse([]string{"spooled"})
 		require.NoError(t, err)
@@ -30,7 +32,7 @@ func TestSpooledArgs(t *testing.T) {
 		var cli struct {
 			Spooled spooled `cmd:""`
 		}
-		k, err := kong.New(&cli)
+		k, err := kong.New(&cli, cmdopts.RuntimeResources{Arch: "amd64", OS: "linux"}.KongVars())
 		require.NoError(t, err)
 		_, err = k.Parse([]string{"spooled", "--spool", "/tmp/spool", "workload.tar.gz"})
 		require.NoError(t, err)
@@ -91,6 +93,9 @@ func TestSpooledRun(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Run("runs an archive file through the queue", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(t.Context(), 2*time.Minute)
+		defer cancel()
+
 		archive := filepath.Join(t.TempDir(), "workload.tar.gz")
 		dst, err := os.Create(archive)
 		require.NoError(t, err)
@@ -105,7 +110,7 @@ func TestSpooledRun(t *testing.T) {
 		require.NoError(t, dst.Close())
 
 		spool := t.TempDir()
-		require.NoError(t, spooled{Archive: archive, Spool: spool}.Run(&cmdopts.Global{Context: t.Context()}, new(cmdopts.HotswapPath)))
+		require.NoError(t, spooled{Archive: archive, Spool: spool}.Run(&cmdopts.Global{Context: ctx}, new(cmdopts.HotswapPath)))
 
 		queued, err := os.ReadDir(filepath.Join(spool, "q"))
 		require.NoError(t, err)
@@ -113,6 +118,9 @@ func TestSpooledRun(t *testing.T) {
 	})
 
 	t.Run("runs an archive from stdin through the queue", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(t.Context(), 2*time.Minute)
+		defer cancel()
+
 		var buf bytes.Buffer
 		gw := gzip.NewWriter(&buf)
 		tw := tar.NewWriter(gw)
@@ -133,10 +141,13 @@ func TestSpooledRun(t *testing.T) {
 		os.Stdin = in
 		defer func() { os.Stdin = orig }()
 
-		require.NoError(t, spooled{Archive: "-", Spool: t.TempDir()}.Run(&cmdopts.Global{Context: t.Context()}, new(cmdopts.HotswapPath)))
+		require.NoError(t, spooled{Archive: "-", Spool: t.TempDir()}.Run(&cmdopts.Global{Context: ctx}, new(cmdopts.HotswapPath)))
 	})
 
 	t.Run("a failing workload fails the command", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(t.Context(), 2*time.Minute)
+		defer cancel()
+
 		var buf bytes.Buffer
 		gw := gzip.NewWriter(&buf)
 		tw := tar.NewWriter(gw)
@@ -149,10 +160,13 @@ func TestSpooledRun(t *testing.T) {
 
 		archive := filepath.Join(t.TempDir(), "workload.tar.gz")
 		require.NoError(t, os.WriteFile(archive, buf.Bytes(), 0600))
-		require.Error(t, spooled{Archive: archive, Spool: t.TempDir()}.Run(&cmdopts.Global{Context: t.Context()}, new(cmdopts.HotswapPath)))
+		require.Error(t, spooled{Archive: archive, Spool: t.TempDir()}.Run(&cmdopts.Global{Context: ctx}, new(cmdopts.HotswapPath)))
 	})
 
 	t.Run("a missing archive fails the command", func(t *testing.T) {
-		require.Error(t, spooled{Archive: filepath.Join(t.TempDir(), "missing.tar.gz"), Spool: t.TempDir()}.Run(&cmdopts.Global{Context: t.Context()}, new(cmdopts.HotswapPath)))
+		ctx, cancel := context.WithTimeout(t.Context(), 2*time.Minute)
+		defer cancel()
+
+		require.Error(t, spooled{Archive: filepath.Join(t.TempDir(), "missing.tar.gz"), Spool: t.TempDir()}.Run(&cmdopts.Global{Context: ctx}, new(cmdopts.HotswapPath)))
 	})
 }

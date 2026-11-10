@@ -127,37 +127,109 @@ func CloneV2(cachedir string, dir string, runtimedir string) func(
 			return 1
 		}
 
-		environ := envx.NewEnvironFromStrings(env...)
-		// envx.Debug(env...)
-		autoauth := func() client.Option {
-			if auth, err := gitx.LoadCredentials(ctx, uri, runtimedir); auth != nil {
-				log.Println("git access token detected", auth)
-				return auth
-			} else if err != nil {
-				log.Println("unable to load git credentials", err)
-			}
-
-			if username, password := environ.String("", gitx.EnvAuthHTTPUsername), environ.String("", gitx.EnvAuthHTTPPassword); !stringsx.Blank(username) && !stringsx.Blank(password) {
-				log.Println("git http auth detected")
-				return client.WithHTTPAuth(&githttp.BasicAuth{Username: username, Password: password})
-			}
-
-			log.Println("no auth detected")
-			// go-git invokes every option, a nil option panics. a nil auth is a noop.
-			return client.WithHTTPAuth(nil)
-		}
-
-		// this is a hack to disable cloning in local environment. we need to work on improving
-		// go-git to support this case cleanly.
-		if environ.Boolean(true, eg.EnvUnsafeGitCloneEnabled) {
-			if err := gitx.Clone(ctx, cachedir, dir, uri, remote, treeish, autoauth()); err != nil {
-				log.Println(errorsx.Wrap(err, "clone failed"))
-				return 1
-			}
-		} else {
-			log.Printf("skipping clone due to %s flag being false", eg.EnvUnsafeGitCloneEnabled)
-		}
-
-		return 0
+		return clone(ctx, cachedir, dir, runtimedir, uri, remote, treeish, env)
 	}
+}
+
+// CloneV3 is CloneV2 with the destination provided by the guest. a blank destination is rejected, otherwise
+// the destination is a path of the guest and is mapped to the host by remap.
+func CloneV3(cachedir string, runtimedir string, remap func(string) string) func(
+	ctx context.Context,
+	m api.Module,
+	deadline int64, // context.Context
+	dstptr uint32, dstlen uint32, // string
+	uriptr uint32, urilen uint32, // string
+	remoteptr uint32, remotelen uint32, // string
+	treeishptr uint32, treeishlen uint32, // string
+	envoffset uint32, envlen uint32, envsize uint32, // []string
+) (errcode uint32) {
+	return func(
+		gctx context.Context,
+		m api.Module,
+		deadline int64,
+		dstptr, dstlen uint32,
+		uriptr, urilen uint32,
+		remoteptr, remotelen uint32,
+		treeishptr, treeishlen uint32,
+		envoffset uint32, envlen uint32, envsize uint32, // []string
+	) (errcode uint32) {
+		ctx, done := ffi.ReadMicroDeadline(gctx, deadline)
+		defer done()
+
+		var (
+			err     error
+			dst     string
+			uri     string
+			remote  string
+			treeish string
+			env     []string
+		)
+
+		if dst, err = ffi.ReadString(m.Memory(), dstptr, dstlen); err != nil {
+			log.Println("unable to read destination", err)
+			return 1
+		}
+
+		if stringsx.Blank(dst) {
+			log.Println("unable to clone, destination not specified")
+			return 1
+		}
+
+		if uri, err = ffi.ReadString(m.Memory(), uriptr, urilen); err != nil {
+			log.Println("unable to read uri", err)
+			return 1
+		}
+
+		if remote, err = ffi.ReadString(m.Memory(), remoteptr, remotelen); err != nil {
+			log.Println("unable to read remote", err)
+			return 1
+		}
+
+		if treeish, err = ffi.ReadString(m.Memory(), treeishptr, treeishlen); err != nil {
+			log.Println("unable to read treeish", err)
+			return 1
+		}
+
+		if env, err = ffi.ReadStringArray(m.Memory(), envoffset, envlen, envsize); err != nil {
+			log.Println("unable to read environment variables", err)
+			return 1
+		}
+
+		return clone(ctx, cachedir, remap(dst), runtimedir, uri, remote, treeish, env)
+	}
+}
+
+func clone(ctx context.Context, cachedir, dir, runtimedir, uri, remote, treeish string, env []string) (errcode uint32) {
+	environ := envx.NewEnvironFromStrings(env...)
+	// envx.Debug(env...)
+	autoauth := func() client.Option {
+		if auth, err := gitx.LoadCredentials(ctx, uri, runtimedir); auth != nil {
+			log.Println("git access token detected", auth)
+			return auth
+		} else if err != nil {
+			log.Println("unable to load git credentials", err)
+		}
+
+		if username, password := environ.String("", gitx.EnvAuthHTTPUsername), environ.String("", gitx.EnvAuthHTTPPassword); !stringsx.Blank(username) && !stringsx.Blank(password) {
+			log.Println("git http auth detected")
+			return client.WithHTTPAuth(&githttp.BasicAuth{Username: username, Password: password})
+		}
+
+		log.Println("no auth detected")
+		// go-git invokes every option, a nil option panics. a nil auth is a noop.
+		return client.WithHTTPAuth(nil)
+	}
+
+	// this is a hack to disable cloning in local environment. we need to work on improving
+	// go-git to support this case cleanly.
+	if environ.Boolean(true, eg.EnvUnsafeGitCloneEnabled) {
+		if err := gitx.Clone(ctx, cachedir, dir, uri, remote, treeish, autoauth()); err != nil {
+			log.Println(errorsx.Wrap(err, "clone failed"))
+			return 1
+		}
+	} else {
+		log.Printf("skipping clone due to %s flag being false", eg.EnvUnsafeGitCloneEnabled)
+	}
+
+	return 0
 }

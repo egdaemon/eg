@@ -46,34 +46,14 @@ func ServiceProxyOptionBuildOptions(v ...string) ServiceProxyOption {
 }
 
 func ServiceProxyOptionBaremetal(ps *ProxyService) {
-	ps.remap = func(s string) (n string) {
-		old := s
-		defer func() {
-			debugx.Println("remapped", ps.ws.RuntimeDir, old, "->", n)
-		}()
-
-		// baremetal workloads are provided the host directories, which need no remapping.
-		if rel, err := filepath.Rel(ps.ws.Root, s); err == nil && filepath.IsLocal(rel) {
-			return s
-		}
-
-		// the host directories mirror those of the container, resolve the paths of the container within the root.
-		// the runtime directory is the one outside of the root directory of the container, see the TODO in egenv.go.
-		for _, guest := range []string{eg.DefaultRootDirectory(), eg.DefaultMountRoot()} {
-			if rel, err := filepath.Rel(guest, s); err == nil && filepath.IsLocal(rel) {
-				return filepath.Join(ps.ws.Root, rel)
-			}
-		}
-
-		return s
-	}
+	ps.remap = workspaces.RemapBaremetal(ps.ws)
 }
 
 func NewServiceProxy(l *log.Logger, ws workspaces.Context, options ...ServiceProxyOption) *ProxyService {
 	svc := langx.Clone(ProxyService{
 		log:   l,
 		ws:    ws,
-		remap: func(s string) string { return s }, // noop default
+		remap: workspaces.RemapPassthrough,
 	}, options...)
 
 	return &svc

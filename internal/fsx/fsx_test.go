@@ -89,3 +89,18 @@ func TestRemoveAll(t *testing.T) {
 		require.FileExists(t, filepath.Join(target, "main.go"))
 	})
 }
+
+func TestRelative(t *testing.T) {
+	rel, ok := fsx.Relative("/a/b", "/a/b/c/d")
+	require.True(t, ok)
+	require.Equal(t, "c/d", rel)
+
+	rel, ok = fsx.Relative("/a/b", "/a/b")
+	require.True(t, ok)
+	require.Equal(t, ".", rel)
+
+	for _, path := range []string{"/a/b/../c", "/a/b-other/x", "/a", "/x", "c/d"} {
+		_, ok = fsx.Relative("/a/b", path)
+		require.False(t, ok, path)
+	}
+}

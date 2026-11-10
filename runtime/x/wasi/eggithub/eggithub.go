@@ -3,11 +3,13 @@ package eggithub
 import (
 	"context"
 	"fmt"
+	"log"
 	"path/filepath"
 	"strings"
 	"time"
 
 	_eg "github.com/egdaemon/eg"
+	"github.com/egdaemon/eg/internal/debugx"
 	"github.com/egdaemon/eg/internal/fsx"
 	"github.com/egdaemon/eg/runtime/wasi/eg"
 	"github.com/egdaemon/eg/runtime/wasi/egenv"
@@ -154,6 +156,9 @@ func Promote(patterns ...string) eg.OpFn {
 			}
 
 			if err := verifyAssets(version, lines, patterns...); err != nil {
+				debugx.Fn(func() {
+					log.Println(err)
+				})
 				return err
 			}
 		}

@@ -173,8 +173,13 @@ func Commitish(ctx context.Context, treeish string) string {
 	return ffigit.Commitish(ctx, treeish)
 }
 
-// clone a git repository from the given uri, remote and treeish, the commit is preferred.
-func Clone(ctx context.Context, uri, remote, commit string) error {
+// clone a git repository from the given uri, remote and treeish into dir, the commit is preferred.
+// dir is required, a relative dir is relative to the working directory.
+func Clone(ctx context.Context, dir, uri, remote, commit string) error {
+	if strings.TrimSpace(dir) == "" {
+		return fmt.Errorf("unable to clone destination not specified: %s", dir)
+	}
+
 	if strings.TrimSpace(uri) == "" {
 		return fmt.Errorf("unable to clone url not specified: %s", uri)
 	}
@@ -183,12 +188,19 @@ func Clone(ctx context.Context, uri, remote, commit string) error {
 		return fmt.Errorf("unable to clone remote not specified: %s", remote)
 	}
 
-	return ffigit.Clone(ctx, uri, remote, commit)
+	return ffigit.Clone(ctx, dir, uri, remote, commit)
+}
+
+// CloneOp returns an operation that clones a git repository, see Clone.
+func CloneOp(dir, uri, remote, commit string) eg.OpFn {
+	return func(ctx context.Context, _ eg.Op) error {
+		return Clone(ctx, dir, uri, remote, commit)
+	}
 }
 
 // clone the repository specified by the eg environment variables into the working directory.
 func AutoClone(ctx context.Context, _ eg.Op) error {
-	if err := Clone(ctx, env.String("", _eg.EnvGitHeadURI), env.String("origin", "EG_GIT_HEAD_REMOTE"), env.String("main", _eg.EnvGitHeadCommit, _eg.EnvGitHeadRef)); err != nil {
+	if err := Clone(ctx, egenv.DirectoryWorking(), env.String("", _eg.EnvGitHeadURI), env.String("origin", "EG_GIT_HEAD_REMOTE"), env.String("main", _eg.EnvGitHeadCommit, _eg.EnvGitHeadRef)); err != nil {
 		return err
 	}
 

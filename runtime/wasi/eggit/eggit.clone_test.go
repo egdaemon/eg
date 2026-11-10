@@ -9,18 +9,28 @@ import (
 )
 
 func TestClone(t *testing.T) {
+	t.Run("blank destination", func(t *testing.T) {
+		err := Clone(t.Context(), " ", "https://example.com/repo.git", "origin", "main")
+		require.ErrorContains(t, err, "destination not specified")
+	})
+
+	t.Run("op blank destination", func(t *testing.T) {
+		err := CloneOp(" ", "https://example.com/repo.git", "origin", "main")(t.Context(), nil)
+		require.ErrorContains(t, err, "destination not specified")
+	})
+
 	t.Run("blank uri", func(t *testing.T) {
-		err := Clone(t.Context(), " ", "origin", "main")
+		err := Clone(t.Context(), "/wd", " ", "origin", "main")
 		require.ErrorContains(t, err, "url not specified")
 	})
 
 	t.Run("blank remote", func(t *testing.T) {
-		err := Clone(t.Context(), "https://example.com/repo.git", "\t", "main")
+		err := Clone(t.Context(), "/wd", "https://example.com/repo.git", "\t", "main")
 		require.ErrorContains(t, err, "remote not specified")
 	})
 
 	t.Run("host call unavailable outside of wasi", func(t *testing.T) {
-		err := Clone(t.Context(), "https://example.com/repo.git", "origin", "main")
+		err := Clone(t.Context(), "/wd", "https://example.com/repo.git", "origin", "main")
 		require.Error(t, err)
 	})
 

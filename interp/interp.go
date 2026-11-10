@@ -192,6 +192,9 @@ func Remote(ctx context.Context, wshost workspaces.Context, aid string, runid st
 			ffigit.CloneV2(fsx.JoinIfPresent(r.repocache, aid), wshost.WorkingDir, wshost.RuntimeDir),
 		).Export("github.com/egdaemon/eg/runtime/wasi/runtime/ffigit.CloneV2").
 			NewFunctionBuilder().WithFunc(
+			ffigit.CloneV3(fsx.JoinIfPresent(r.repocache, aid), wshost.RuntimeDir, workspaces.Remap(wshost)),
+		).Export("github.com/egdaemon/eg/runtime/wasi/runtime/ffigit.CloneV3").
+			NewFunctionBuilder().WithFunc(
 			ffigit.Bearer(wshost.RuntimeDir),
 		).Export("github.com/egdaemon/eg/runtime/wasi/runtime/ffigit.Bearer").
 			NewFunctionBuilder().WithFunc(

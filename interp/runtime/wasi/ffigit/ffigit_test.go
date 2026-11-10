@@ -74,3 +74,68 @@ func TestCloneV2(t *testing.T) {
 		require.Len(t, mirrors, 1, "the repository should be mirrored in the cache")
 	})
 }
+
+func TestCloneV3(t *testing.T) {
+	// a repository with a single commit to clone.
+	src := t.TempDir()
+	run := func(args ...string) string {
+		cmd := exec.Command("git", append([]string{"-C", src}, args...)...)
+		out, err := cmd.CombinedOutput()
+		require.NoErrorf(t, err, "git %v: %s", args, out)
+		return strings.TrimSpace(string(out))
+	}
+	run("init", "-q")
+	run("config", "user.email", "test@example.com")
+	run("config", "user.name", "test")
+	require.NoError(t, os.WriteFile(filepath.Join(src, "main.go"), []byte("package main"), 0644))
+	run("add", ".")
+	run("commit", "-q", "-m", "init")
+	commit := run("rev-parse", "HEAD")
+	uri, remote := "file://"+src, "origin"
+
+	call := func(t *testing.T, cachedir string, remap func(string) string, dst string) (errcode uint32) {
+		ctx := t.Context()
+		rt := wazero.NewRuntime(ctx)
+		defer rt.Close(ctx)
+		m, err := rt.InstantiateWithConfig(ctx, memorymodule, wazero.NewModuleConfig())
+		require.NoError(t, err)
+
+		dstptr, uriptr, remoteptr, treeishptr := uint32(0), uint32(1024), uint32(2048), uint32(3072)
+		require.True(t, m.Memory().WriteString(dstptr, dst))
+		require.True(t, m.Memory().WriteString(uriptr, uri))
+		require.True(t, m.Memory().WriteString(remoteptr, remote))
+		require.True(t, m.Memory().WriteString(treeishptr, commit))
+
+		return ffigit.CloneV3(cachedir, t.TempDir(), remap)(
+			ctx, m, time.Now().Add(time.Minute).UnixMicro(),
+			dstptr, uint32(len(dst)),
+			uriptr, uint32(len(uri)),
+			remoteptr, uint32(len(remote)),
+			treeishptr, uint32(len(commit)),
+			0, 0, 8,
+		)
+	}
+
+	t.Run("destinations are remapped to the host", func(t *testing.T) {
+		host := t.TempDir()
+		remap := func(s string) string { return filepath.Join(host, s) }
+
+		require.Zero(t, call(t, t.TempDir(), remap, "/guest/cache/repo"))
+
+		_, err := os.Stat(filepath.Join(host, "guest", "cache", "repo", "main.go"))
+		require.NoError(t, err, "the clone should be at the remapped host path")
+		_, err = os.Stat(filepath.Join("/guest", "cache", "repo"))
+		require.ErrorIs(t, err, os.ErrNotExist, "the guest path should not be used on the host")
+	})
+
+	t.Run("blank destinations are rejected", func(t *testing.T) {
+		host := t.TempDir()
+		remap := func(s string) string { return filepath.Join(host, s) }
+
+		require.NotZero(t, call(t, t.TempDir(), remap, ""))
+
+		entries, err := os.ReadDir(host)
+		require.NoError(t, err)
+		require.Empty(t, entries, "nothing should be cloned")
+	})
+}

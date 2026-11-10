@@ -13,6 +13,7 @@ import (
 	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
+	"github.com/egdaemon/eg/internal/fsx"
 	"github.com/egdaemon/eg/internal/patternx"
 	"github.com/egdaemon/eg/internal/userx"
 	"github.com/egdaemon/eg/runtime/wasi/env"
@@ -218,12 +219,11 @@ func PathRelative(dir string, path string) string {
 		return path
 	}
 
-	rel, err := filepath.Rel(dir, path)
-	if err != nil || !filepath.IsLocal(rel) {
-		return path
+	if rel, ok := fsx.Relative(dir, path); ok {
+		return rel
 	}
 
-	return rel
+	return path
 }
 
 // PathRelativeWorkspace reports paths within the workspace directory relative to it, so they hold wherever the workspace is

@@ -32,7 +32,7 @@ type archive struct {
 	Environment  []string `name:"env" short:"e" help:"define environment variables and their values to be included"`
 	Dirty        bool     `name:"dirty" help:"include all host environment variables"`
 	GitRemote    string   `name:"git-remote" help:"name of the git remote to use" default:"${vars_git_default_remote_name}"`
-	GitReference string   `name:"git-ref" help:"name of the branch or commit to checkout" default:"${vars_git_default_reference}"`
+	GitReference string   `name:"git-ref" help:"name of the branch or commit to checkout" default:"${vars_git_head_reference}"`
 	GitClone     string   `name:"git-clone-uri" help:"clone uri"`
 	Output       string   `name:"output" short:"o" help:"file to store archive to. default is to write to stdout" default:"-"`
 	Name         string   `arg:"" name:"module" help:"name of the module to run, i.e. the folder name within moduledir" default:"" predictor:"eg.workload"`

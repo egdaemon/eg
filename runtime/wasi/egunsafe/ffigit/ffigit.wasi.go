@@ -30,10 +30,9 @@ func bearer(
 	tokenptr unsafe.Pointer, tokenlen uint32,
 ) (errcode uint32)
 
-//go:wasmimport env github.com/egdaemon/eg/runtime/wasi/runtime/ffigit.CloneV3
-func clone3(
+//go:wasmimport env github.com/egdaemon/eg/runtime/wasi/runtime/ffigit.CloneV2
+func clone2(
 	deadline int64, // context.Context
-	dstptr unsafe.Pointer, dstlen uint32, // string
 	uriptr unsafe.Pointer, urilen uint32, // string
 	remoteptr unsafe.Pointer, remotelen uint32, // string
 	treeishptr unsafe.Pointer, treeishlen uint32, // string

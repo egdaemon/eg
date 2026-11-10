@@ -49,16 +49,14 @@ func Commitish(ctx context.Context, treeish string) string {
 	return string(ffiguest.BytesRead(revisionptr, revisionlen))
 }
 
-func Clone(ctx context.Context, dir, uri, remote, branch string) error {
-	dirptr, dirlen := ffiguest.String(dir)
+func Clone(ctx context.Context, uri, remote, branch string) error {
 	uriptr, urilen := ffiguest.String(uri)
 	remoteptr, remotelen := ffiguest.String(remote)
 	treeishptr, treeishlen := ffiguest.String(branch)
 	envptr, envsize, envlen := ffiguest.StringArray(os.Environ()...)
 
-	errcode := clone3(
+	errcode := clone2(
 		ffiguest.ContextDeadline(ctx),
-		dirptr, dirlen,
 		uriptr, urilen,
 		remoteptr, remotelen,
 		treeishptr, treeishlen,

@@ -46,7 +46,6 @@ type builtinUpload struct {
 	Dir           string   `name:"directory" help:"root directory of the repository" default:"${vars_eg_root_directory}"`
 	Name          string   `arg:"" name:"module" help:"name of the module to run, i.e. the folder name within moduledir" default:"" predictor:"eg.workload.builtin"`
 	Environment   []string `name:"env" short:"e" help:"define environment variables and their values to be included"`
-	Dirty         bool     `name:"dirty" help:"include all environment variables"`
 	Endpoint      string   `name:"endpoint" help:"specify the endpoint to upload to" default:"${vars_endpoint}/c/q/" hidden:"true"`
 	GitRemote     string   `name:"git-remote" help:"name of the git remote to use" default:"${vars_git_default_remote_name}"`
 	GitReference  string   `name:"git-ref" help:"name of the branch or commit to checkout" default:"${vars_git_default_reference}"`
@@ -146,7 +145,6 @@ func (t builtinUpload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, ident 
 	t.GitClone = stringsx.First(t.GitClone, errorsx.Zero(gitx.QuirkCloneURI(repo, t.GitRemote)))
 
 	envb := envx.Build().
-		FromEnviron(envx.Dirty(t.Dirty)...).
 		FromEnviron(t.Environment...).
 		FromEnviron(errorsx.Zero(gitx.Env(repo, t.GitRemote, t.GitReference, t.GitClone))...)
 

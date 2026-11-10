@@ -25,6 +25,7 @@ import (
 	"github.com/go-git/go-git/v6/plumbing/object"
 	githttp "github.com/go-git/go-git/v6/plumbing/transport/http"
 	gitssh "github.com/go-git/go-git/v6/plumbing/transport/ssh"
+	"github.com/gofrs/flock"
 	"github.com/golang-jwt/jwt/v4"
 	"golang.org/x/crypto/ssh"
 
@@ -37,6 +38,7 @@ import (
 	"github.com/egdaemon/eg/internal/fsx"
 	"github.com/egdaemon/eg/internal/httpx"
 	"github.com/egdaemon/eg/internal/jwtx"
+	"github.com/egdaemon/eg/internal/md5x"
 	"github.com/egdaemon/eg/internal/patternx"
 	"github.com/egdaemon/eg/internal/slicesx"
 	"github.com/egdaemon/eg/internal/stringsx"
@@ -305,7 +307,114 @@ func RepositoryUsername(path string) string {
 // Clone makes the working tree in dir the treeish from the remote at uri. the commit, the full hexadecimal hash, is preferred
 // and callers should pass it whenever they have it, a hash is the only treeish that is unambiguous: a branch can move, and a
 // reference like HEAD isn't one the remote has. anything else is a branch name and is cloned as the branch.
-func Clone(ctx context.Context, dir, uri, remote, treeish string, opts ...client.Option) (err error) {
+//
+// when cachedir is not blank a bare mirror of uri is kept there, so repeated clones only fetch what is new. opts, the
+// credentials, are used to update the mirror so a private repository still requires them. a dir that is already a repository
+// is updated directly, it is already incremental. the remote of dir is always uri. submodules and the base branch are
+// resolved against the mirror, so relative submodule urls aren't supported with a cachedir.
+func Clone(ctx context.Context, cachedir, dir, uri, remote, treeish string, opts ...client.Option) (err error) {
+	if stringsx.Blank(cachedir) {
+		return clone(ctx, dir, uri, remote, treeish, opts...)
+	}
+
+	if _, err = git.PlainOpen(dir); err == nil {
+		return clone(ctx, dir, uri, remote, treeish, opts...)
+	}
+
+	mirror := filepath.Join(cachedir, md5x.String(uri)+".git")
+	if err = os.MkdirAll(cachedir, 0700); err != nil {
+		log.Println(errorsx.Wrap(err, "unable to create the repository cache, cloning without it"))
+		return clone(ctx, dir, uri, remote, treeish, opts...)
+	}
+
+	lock := flock.New(mirror + ".lock")
+	if err = lock.Lock(); err != nil {
+		log.Println(errorsx.Wrap(err, "unable to lock the repository cache, cloning without it"))
+		return clone(ctx, dir, uri, remote, treeish, opts...)
+	}
+	defer lock.Unlock()
+
+	if err = syncMirror(ctx, mirror, uri, remote, opts...); err != nil {
+		log.Println(errorsx.Wrap(err, "repository cache failed, rebuilding"))
+		if err = os.RemoveAll(mirror); err == nil {
+			err = syncMirror(ctx, mirror, uri, remote, opts...)
+		}
+	}
+
+	if err != nil {
+		log.Println(errorsx.Wrap(err, "repository cache unavailable, cloning without it"))
+		return clone(ctx, dir, uri, remote, treeish, opts...)
+	}
+
+	if err = clone(ctx, dir, "file://"+mirror, remote, treeish); err != nil {
+		return err
+	}
+
+	r, err := git.PlainOpen(dir)
+	if err != nil {
+		return errorsx.Wrapf(err, "unable to open: %s", dir)
+	}
+
+	rc, err := r.Config()
+	if err != nil {
+		return err
+	}
+
+	rc.Remotes[remote].URLs = []string{uri}
+
+	return errorsx.Wrap(r.SetConfig(rc), "unable to restore the remote")
+}
+
+// syncMirror makes the bare repository at mirror a mirror of the references of the remote at uri, whatever is going to be
+// cloned from it. only what is new is transferred.
+func syncMirror(ctx context.Context, mirror, uri, remote string, opts ...client.Option) (err error) {
+	var (
+		r *git.Repository
+	)
+
+	if r, err = git.PlainOpen(mirror); errors.Is(err, git.ErrRepositoryNotExists) {
+		if r, err = git.PlainInit(mirror, true); err != nil {
+			return errorsx.Wrapf(err, "unable to initialize: %s", mirror)
+		}
+
+		if _, err = r.CreateRemote(&config.RemoteConfig{Name: remote, URLs: []string{uri}}); err != nil {
+			return errorsx.Wrapf(err, "unable to add remote: '%s'", remote)
+		}
+
+		// the mirror is cloned from locally, by commit.
+		rc, err := r.Config()
+		if err != nil {
+			return err
+		}
+		rc.Raw.Section("uploadpack").SetOption("allowAnySHA1InWant", "true")
+		if err = r.SetConfig(rc); err != nil {
+			return errorsx.Wrap(err, "unable to configure the mirror")
+		}
+	} else if err != nil {
+		return errorsx.Wrapf(err, "unable to open: %s", mirror)
+	}
+
+	rm, err := r.Remote(remote)
+	if err != nil {
+		return errorsx.Wrapf(err, "unable to find remote: '%s'", remote)
+	}
+
+	// the base is optional, see baseenv, not being able to find it mustn't fail the mirror.
+	if refs, lerr := rm.ListContext(ctx, &git.ListOptions{ClientOptions: opts}); lerr != nil {
+		debugx.Println("unable to list the remote", lerr)
+	} else if base := remoteDefaultBranch(refs); base != "" {
+		errorsx.Log(r.Storer.SetReference(plumbing.NewSymbolicReference(plumbing.HEAD, plumbing.NewBranchReferenceName(base))))
+	}
+
+	err = rm.FetchContext(ctx, &git.FetchOptions{RemoteName: remote, RefSpecs: []config.RefSpec{"+refs/*:refs/*"}, ClientOptions: opts})
+	if err != nil && !errors.Is(err, git.NoErrAlreadyUpToDate) {
+		return errorsx.Wrapf(err, "unable to fetch: %s", uri)
+	}
+
+	return nil
+}
+
+func clone(ctx context.Context, dir, uri, remote, treeish string, opts ...client.Option) (err error) {
 	if commit := plumbing.NewHash(treeish); !plumbing.IsHash(treeish) || commit.IsZero() {
 		return cloneBranch(ctx, dir, uri, remote, treeish, opts...)
 	}

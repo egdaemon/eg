@@ -2,11 +2,12 @@ package compute
 
 import (
 	"errors"
-	"github.com/egdaemon/eg/identity"
 	"log"
 	"os"
 	"path/filepath"
 	"strconv"
+
+	"github.com/egdaemon/eg/identity"
 
 	"github.com/egdaemon/eg/computeapi"
 
@@ -48,7 +49,6 @@ type upload struct {
 	Name             string   `arg:"" name:"module" help:"name of the module to run, i.e. the folder name within moduledir" default:"" predictor:"eg.workload"`
 	EnvironmentPaths []string `name:"envpath" help:"environment files to pass to the module" default:""`
 	Environment      []string `name:"env" short:"e" help:"define environment variables and their values to be included"`
-	Dirty            bool     `name:"dirty" help:"include all environment variables"`
 	Endpoint         string   `name:"endpoint" help:"specify the endpoint to upload to" default:"${vars_endpoint}/c/q/" hidden:"true"`
 	GitRemote        string   `name:"git-remote" help:"name of the git remote to use" default:"${vars_git_default_remote_name}"`
 	GitReference     string   `name:"git-ref" help:"name of the branch or commit to checkout" default:"${vars_git_default_reference}"`
@@ -56,10 +56,6 @@ type upload struct {
 	GCPAuto          bool     `name:"gcp-auto" help:"have the runner issue the account's gcp credentials (workload identity) to the workload"`
 	Secrets          []string `name:"secret" help:"List of secret URIs to use. Examples: chachasm://passphrase@/path/to/file, gcpsm://project-id/secret-name/version, awssm://secret-name?region=us-east-1"`
 }
-
-// bounds the number of runners we attempt to upload to directly before
-// falling back to the cluster.
-const directCandidates = 8
 
 func (t upload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, ident *cmdidentity.T, find libp2px.MDNSLookup) (err error) {
 	var (
@@ -138,7 +134,6 @@ func (t upload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, ident *cmdide
 		Var(eg.EnvWorkloadDraft, strconv.FormatBool(t.Draft)).
 		Var(eg.EnvWorkloadRelease, strconv.FormatBool(t.Release)).
 		FromReader(secrets.NewReader(gctx.Context, t.Secrets...)).
-		FromEnviron(envx.Dirty(t.Dirty)...).
 		FromPath(t.EnvironmentPaths...).
 		FromEnviron(envx.AutoEnviron(t.Environment...)...).
 		FromEnviron(errorsx.Zero(gitx.Env(repo, t.GitRemote, t.GitReference, t.GitClone))...)

@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/egdaemon/eg/internal/md5x"
 	gogit "github.com/go-git/go-git/v6"
 	"github.com/stretchr/testify/require"
 )
@@ -102,7 +103,7 @@ func TestClone(t *testing.T) {
 		src := newMainRepo(t, map[string]string{"a.txt": "a"})
 		dst := filepath.Join(t.TempDir(), "clone")
 
-		require.NoError(t, Clone(t.Context(), dst, src, "origin", "main"))
+		require.NoError(t, Clone(t.Context(), "", dst, src, "origin", "main"))
 		require.FileExists(t, filepath.Join(dst, "a.txt"))
 	})
 
@@ -115,7 +116,7 @@ func TestClone(t *testing.T) {
 		commitFile(t, src, "b.txt", "b")
 		dst := filepath.Join(t.TempDir(), "clone")
 
-		require.NoError(t, Clone(t.Context(), dst, src, "origin", strings.TrimSpace(string(older))))
+		require.NoError(t, Clone(t.Context(), "", dst, src, "origin", strings.TrimSpace(string(older))))
 		require.FileExists(t, filepath.Join(dst, "a.txt"))
 		require.NoFileExists(t, filepath.Join(dst, "b.txt"))
 		head, err := exec.Command("git", "-C", dst, "rev-parse", "HEAD").CombinedOutput()
@@ -136,7 +137,7 @@ func TestClone(t *testing.T) {
 		require.NoErrorf(t, err, "%s", out)
 		dst := filepath.Join(t.TempDir(), "clone")
 
-		require.NoError(t, Clone(t.Context(), dst, src, "origin", strings.TrimSpace(string(tip))))
+		require.NoError(t, Clone(t.Context(), "", dst, src, "origin", strings.TrimSpace(string(tip))))
 		require.FileExists(t, filepath.Join(dst, "f.txt"))
 		head, err := exec.Command("git", "-C", dst, "rev-parse", "HEAD").CombinedOutput()
 		require.NoError(t, err)
@@ -150,16 +151,16 @@ func TestClone(t *testing.T) {
 		older, err := exec.Command("git", "-C", src, "rev-parse", "HEAD").CombinedOutput()
 		require.NoError(t, err)
 		dst := filepath.Join(t.TempDir(), "clone")
-		require.NoError(t, Clone(t.Context(), dst, src, "origin", strings.TrimSpace(string(older))))
+		require.NoError(t, Clone(t.Context(), "", dst, src, "origin", strings.TrimSpace(string(older))))
 
 		// already up to date is not an error.
-		require.NoError(t, Clone(t.Context(), dst, src, "origin", strings.TrimSpace(string(older))))
+		require.NoError(t, Clone(t.Context(), "", dst, src, "origin", strings.TrimSpace(string(older))))
 
 		commitFile(t, src, "b.txt", "b")
 		newer, err := exec.Command("git", "-C", src, "rev-parse", "HEAD").CombinedOutput()
 		require.NoError(t, err)
 
-		require.NoError(t, Clone(t.Context(), dst, src, "origin", strings.TrimSpace(string(newer))))
+		require.NoError(t, Clone(t.Context(), "", dst, src, "origin", strings.TrimSpace(string(newer))))
 		require.FileExists(t, filepath.Join(dst, "b.txt"))
 		head, err := exec.Command("git", "-C", dst, "rev-parse", "HEAD").CombinedOutput()
 		require.NoError(t, err)
@@ -169,23 +170,23 @@ func TestClone(t *testing.T) {
 	t.Run("an unknown commit errors", func(t *testing.T) {
 		src := newMainRepo(t, map[string]string{"a.txt": "a"})
 
-		require.Error(t, Clone(t.Context(), filepath.Join(t.TempDir(), "clone"), src, "origin", "0123456789abcdef0123456789abcdef01234567"))
+		require.Error(t, Clone(t.Context(), "", filepath.Join(t.TempDir(), "clone"), src, "origin", "0123456789abcdef0123456789abcdef01234567"))
 	})
 
 	t.Run("an existing clone is fetched and checked out", func(t *testing.T) {
 		src := newMainRepo(t, map[string]string{"a.txt": "a"})
 		dst := filepath.Join(t.TempDir(), "clone")
-		require.NoError(t, Clone(t.Context(), dst, src, "origin", "main"))
+		require.NoError(t, Clone(t.Context(), "", dst, src, "origin", "main"))
 
 		// already up to date is not an error.
-		require.NoError(t, Clone(t.Context(), dst, src, "origin", "main"))
+		require.NoError(t, Clone(t.Context(), "", dst, src, "origin", "main"))
 
 		// point the clone's origin at the source so the fetch sees new commits.
 		out, err := exec.Command("git", "-C", dst, "remote", "set-url", "origin", src).CombinedOutput()
 		require.NoErrorf(t, err, "%s", out)
 		commitFile(t, src, "b.txt", "b")
 
-		require.NoError(t, Clone(t.Context(), dst, src, "origin", "main"))
+		require.NoError(t, Clone(t.Context(), "", dst, src, "origin", "main"))
 		out, err = exec.Command("git", "-C", dst, "rev-parse", "origin/main").CombinedOutput()
 		require.NoErrorf(t, err, "%s", out)
 		expected, err := exec.Command("git", "-C", src, "rev-parse", "main").CombinedOutput()
@@ -196,9 +197,9 @@ func TestClone(t *testing.T) {
 	t.Run("an existing clone without the remote errors", func(t *testing.T) {
 		src := newMainRepo(t, map[string]string{"a.txt": "a"})
 		dst := filepath.Join(t.TempDir(), "clone")
-		require.NoError(t, Clone(t.Context(), dst, src, "origin", "main"))
+		require.NoError(t, Clone(t.Context(), "", dst, src, "origin", "main"))
 
-		require.Error(t, Clone(t.Context(), dst, src, "missing", "main"))
+		require.Error(t, Clone(t.Context(), "", dst, src, "missing", "main"))
 	})
 
 	git := func(t *testing.T, dir string, args ...string) string {
@@ -231,7 +232,7 @@ func TestClone(t *testing.T) {
 	t.Run("a branch other than the default carries the default branch as the base", func(t *testing.T) {
 		src := featured(t)
 		dst := filepath.Join(t.TempDir(), "clone")
-		require.NoError(t, Clone(t.Context(), dst, src, "origin", "feature"))
+		require.NoError(t, Clone(t.Context(), "", dst, src, "origin", "feature"))
 		require.FileExists(t, filepath.Join(dst, "f.txt"))
 
 		name, commit := base(t, dst)
@@ -244,7 +245,7 @@ func TestClone(t *testing.T) {
 		src := featured(t)
 		git(t, src, "branch", "-M", "develop")
 		dst := filepath.Join(t.TempDir(), "clone")
-		require.NoError(t, Clone(t.Context(), dst, src, "origin", "feature"))
+		require.NoError(t, Clone(t.Context(), "", dst, src, "origin", "feature"))
 
 		name, commit := base(t, dst)
 		require.Equal(t, "develop", name)
@@ -254,7 +255,7 @@ func TestClone(t *testing.T) {
 	t.Run("cloning the default branch is its own base", func(t *testing.T) {
 		src := featured(t)
 		dst := filepath.Join(t.TempDir(), "clone")
-		require.NoError(t, Clone(t.Context(), dst, src, "origin", "main"))
+		require.NoError(t, Clone(t.Context(), "", dst, src, "origin", "main"))
 
 		name, commit := base(t, dst)
 		require.Equal(t, "main", name)
@@ -264,7 +265,7 @@ func TestClone(t *testing.T) {
 	t.Run("an existing clone gets the base when it is missing", func(t *testing.T) {
 		src := featured(t)
 		dst := filepath.Join(t.TempDir(), "clone")
-		require.NoError(t, Clone(t.Context(), dst, src, "origin", "feature"))
+		require.NoError(t, Clone(t.Context(), "", dst, src, "origin", "feature"))
 
 		git(t, dst, "update-ref", "-d", "refs/remotes/origin/main")
 		git(t, dst, "symbolic-ref", "--delete", "refs/remotes/origin/HEAD")
@@ -272,7 +273,7 @@ func TestClone(t *testing.T) {
 		require.Empty(t, name)
 
 		// already up to date is not an error, and still restores the base.
-		require.NoError(t, Clone(t.Context(), dst, src, "origin", "feature"))
+		require.NoError(t, Clone(t.Context(), "", dst, src, "origin", "feature"))
 		name, commit := base(t, dst)
 		require.Equal(t, "main", name)
 		require.Equal(t, git(t, src, "rev-parse", "main"), commit)
@@ -285,7 +286,7 @@ func TestClone(t *testing.T) {
 		commitFile(t, src, "d.txt", "d")
 		dst := filepath.Join(t.TempDir(), "clone")
 
-		require.NoError(t, Clone(t.Context(), dst, src, "origin", "feature"))
+		require.NoError(t, Clone(t.Context(), "", dst, src, "origin", "feature"))
 		require.FileExists(t, filepath.Join(dst, "f.txt"))
 		name, _ := base(t, dst)
 		require.Empty(t, name)
@@ -294,7 +295,81 @@ func TestClone(t *testing.T) {
 	t.Run("unknown sources and branches error", func(t *testing.T) {
 		src := newMainRepo(t, map[string]string{"a.txt": "a"})
 
-		require.Error(t, Clone(t.Context(), filepath.Join(t.TempDir(), "clone"), filepath.Join(t.TempDir(), "missing"), "origin", "main"))
-		require.Error(t, Clone(t.Context(), filepath.Join(t.TempDir(), "clone"), src, "origin", "nope"))
+		require.Error(t, Clone(t.Context(), "", filepath.Join(t.TempDir(), "clone"), filepath.Join(t.TempDir(), "missing"), "origin", "main"))
+		require.Error(t, Clone(t.Context(), "", filepath.Join(t.TempDir(), "clone"), src, "origin", "nope"))
+	})
+
+	t.Run("with a cache", func(t *testing.T) {
+		t.Run("the first clone populates the mirror and keeps the original origin", func(t *testing.T) {
+			src := newMainRepo(t, map[string]string{"a.txt": "a"})
+			cachedir := t.TempDir()
+			dst := filepath.Join(t.TempDir(), "clone")
+
+			require.NoError(t, Clone(t.Context(), cachedir, dst, src, "origin", "main"))
+			require.FileExists(t, filepath.Join(dst, "a.txt"))
+			require.DirExists(t, filepath.Join(cachedir, md5x.String(src)+".git"))
+			require.Equal(t, src, git(t, dst, "remote", "get-url", "origin"))
+		})
+
+		t.Run("a commit is cloned and keeps the original origin", func(t *testing.T) {
+			src := newMainRepo(t, map[string]string{"a.txt": "a"})
+			git(t, src, "config", "uploadpack.allowReachableSHA1InWant", "true")
+			older := git(t, src, "rev-parse", "HEAD")
+			commitFile(t, src, "b.txt", "b")
+			cachedir := t.TempDir()
+			dst := filepath.Join(t.TempDir(), "clone")
+
+			require.NoError(t, Clone(t.Context(), cachedir, dst, src, "origin", older))
+			require.FileExists(t, filepath.Join(dst, "a.txt"))
+			require.NoFileExists(t, filepath.Join(dst, "b.txt"))
+			require.Equal(t, older, git(t, dst, "rev-parse", "HEAD"))
+			require.Equal(t, src, git(t, dst, "remote", "get-url", "origin"))
+		})
+
+		t.Run("a newer commit is fetched into the existing mirror", func(t *testing.T) {
+			src := newMainRepo(t, map[string]string{"a.txt": "a"})
+			git(t, src, "config", "uploadpack.allowReachableSHA1InWant", "true")
+			older := git(t, src, "rev-parse", "HEAD")
+			cachedir := t.TempDir()
+			require.NoError(t, Clone(t.Context(), cachedir, filepath.Join(t.TempDir(), "first"), src, "origin", older))
+
+			commitFile(t, src, "b.txt", "b")
+			newer := git(t, src, "rev-parse", "HEAD")
+			dst := filepath.Join(t.TempDir(), "second")
+
+			require.NoError(t, Clone(t.Context(), cachedir, dst, src, "origin", newer))
+			require.FileExists(t, filepath.Join(dst, "b.txt"))
+			require.Equal(t, newer, git(t, dst, "rev-parse", "HEAD"))
+		})
+
+		t.Run("a branch picks up commits pushed after the mirror was made", func(t *testing.T) {
+			src := newMainRepo(t, map[string]string{"a.txt": "a"})
+			cachedir := t.TempDir()
+			require.NoError(t, Clone(t.Context(), cachedir, filepath.Join(t.TempDir(), "first"), src, "origin", "main"))
+
+			commitFile(t, src, "b.txt", "b")
+			dst := filepath.Join(t.TempDir(), "second")
+
+			require.NoError(t, Clone(t.Context(), cachedir, dst, src, "origin", "main"))
+			require.FileExists(t, filepath.Join(dst, "b.txt"))
+			require.Equal(t, git(t, src, "rev-parse", "main"), git(t, dst, "rev-parse", "HEAD"))
+		})
+
+		t.Run("a corrupt mirror is rebuilt", func(t *testing.T) {
+			src := newMainRepo(t, map[string]string{"a.txt": "a"})
+			cachedir := t.TempDir()
+			require.NoError(t, Clone(t.Context(), cachedir, filepath.Join(t.TempDir(), "first"), src, "origin", "main"))
+			require.NoError(t, os.WriteFile(filepath.Join(cachedir, md5x.String(src)+".git", "HEAD"), []byte("garbage"), 0600))
+			dst := filepath.Join(t.TempDir(), "second")
+
+			require.NoError(t, Clone(t.Context(), cachedir, dst, src, "origin", "main"))
+			require.FileExists(t, filepath.Join(dst, "a.txt"))
+		})
+
+		t.Run("an unknown branch errors", func(t *testing.T) {
+			src := newMainRepo(t, map[string]string{"a.txt": "a"})
+
+			require.Error(t, Clone(t.Context(), t.TempDir(), filepath.Join(t.TempDir(), "clone"), src, "origin", "nope"))
+		})
 	})
 }

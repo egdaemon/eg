@@ -47,10 +47,10 @@ func main() {
 		// eggpg.Seed(eggpg.Options()...),
 		// eggpg.Debug(eggpg.Options()...),
 		uploads.Run(egpool.Slice(
-			"eg compute upload --no-follow --ttl=3h --arch=arm64 --cores=3 --memory=3g release/eg/targz",
+			// "eg compute upload --no-follow --ttl=3h --arch=arm64 --cores=3 --memory=3g release/eg/targz",
 			"eg compute upload --no-follow --arch=amd64 --cores=8 --memory=18g release/eg/targz",
-			"eg compute upload --no-follow --arch=amd64 --cores=8 --memory=18g release/eg/archlinux",
-			"eg compute upload --no-follow --arch=amd64 --cores=8 --memory=18g release/eg/debian",
+			// "eg compute upload --no-follow --arch=amd64 --cores=8 --memory=18g release/eg/archlinux",
+			// "eg compute upload --no-follow --arch=amd64 --cores=8 --memory=18g release/eg/debian",
 		)),
 		egx.Retry(0).Delay(30*time.Second).Run(
 			eggithub.Promote(

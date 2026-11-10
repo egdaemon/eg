@@ -37,7 +37,6 @@ func main() {
 			debeg.Runner(),
 			shell.Op(
 				runtime.Newf("rsync -a --mkpath .dist/linux/ %s/", dir),
-				// runtime.New("go install ./cmd/eg").Environ("GOBIN", dir+"/usr/bin"),
 			),
 			eggolang.New().Bin(filepath.Join(dir, "usr", "bin")).Timeout(egenv.TTL()).AutoInstall(),
 			shell.Op(

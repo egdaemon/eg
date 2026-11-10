@@ -306,11 +306,11 @@ func RepositoryUsername(path string) string {
 // and callers should pass it whenever they have it, a hash is the only treeish that is unambiguous: a branch can move, and a
 // reference like HEAD isn't one the remote has. anything else is a branch name and is cloned as the branch.
 func Clone(ctx context.Context, dir, uri, remote, treeish string, opts ...client.Option) (err error) {
-	if commit := plumbing.NewHash(treeish); plumbing.IsHash(treeish) && !commit.IsZero() {
-		return cloneCommit(ctx, dir, uri, remote, treeish, opts...)
+	if commit := plumbing.NewHash(treeish); !plumbing.IsHash(treeish) || commit.IsZero() {
+		return cloneBranch(ctx, dir, uri, remote, treeish, opts...)
 	}
 
-	return cloneBranch(ctx, dir, uri, remote, treeish, opts...)
+	return cloneCommit(ctx, dir, uri, remote, treeish, opts...)
 }
 
 // cloneCommit makes the working tree in dir the commit, the full hexadecimal hash, from the remote at uri. only the history

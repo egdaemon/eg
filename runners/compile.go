@@ -20,6 +20,7 @@ import (
 	"github.com/egdaemon/eg/compile"
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
+	"github.com/egdaemon/eg/internal/fsx"
 	"github.com/egdaemon/eg/internal/gitx"
 	"github.com/egdaemon/eg/internal/httpx"
 	"github.com/egdaemon/eg/internal/slicesx"
@@ -130,10 +131,9 @@ type compilejob struct {
 
 func compilebegin(md compilemetadata, dir string) state {
 	var (
-		err       error
-		encoded   []byte
-		req       computeapi.EnqueuedDequeueResponse
-		repocache string
+		err     error
+		encoded []byte
+		req     computeapi.EnqueuedDequeueResponse
 	)
 
 	log.Println("compiling workload initiated", dir)
@@ -150,13 +150,9 @@ func compilebegin(md compilemetadata, dir string) state {
 		return md.done(dir, errors.New("invalid workload missing enqueued information"))
 	}
 
-	// the mirrors are partitioned by account.
-	if stringsx.Present(md.repocache) {
-		repocache = filepath.Join(md.repocache, req.Enqueued.AccountId)
-	}
 	job := compilejob{compilemetadata: md, dir: dir, token: ReadCandidateToken(dir), req: &req}
 
-	return status(md.authclient, job.token, StatusCompiling, req.Enqueued, statecompiling{cachedir: repocache, compilejob: job})
+	return status(md.authclient, job.token, StatusCompiling, req.Enqueued, statecompiling{compilejob: job})
 }
 
 func compilefailed(job compilejob, cause error) state {
@@ -165,7 +161,6 @@ func compilefailed(job compilejob, cause error) state {
 
 // statecompiling clones and compiles the workload's source into its archive.
 type statecompiling struct {
-	cachedir string
 	compilejob
 }
 
@@ -210,7 +205,7 @@ func (t statecompiling) Update(ctx context.Context) state {
 		opts = append(opts, auth)
 	}
 
-	if err = gitx.Clone(ctx, t.cachedir, clonedir, uri, git.DefaultRemoteName, commit, opts...); err != nil {
+	if err = gitx.Clone(ctx, fsx.JoinIfPresent(t.repocache, t.req.Enqueued.AccountId), clonedir, uri, git.DefaultRemoteName, commit, opts...); err != nil {
 		return compilefailed(t.compilejob, errorsx.Wrap(err, "unable to clone repository"))
 	}
 

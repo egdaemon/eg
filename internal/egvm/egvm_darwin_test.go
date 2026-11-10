@@ -78,7 +78,7 @@ func TestExec(t *testing.T) {
 			return b
 		}
 
-		for _, dir := range []string{"bin/", "lib/", "etc/", "tmp/"} {
+		for _, dir := range []string{"bin/", "lib/", "etc/", "tmp/", "dev/", "proc/", "sys/"} {
 			write(&tar.Header{Typeflag: tar.TypeDir, Name: dir, Mode: 0755}, nil)
 		}
 		write(&tar.Header{Typeflag: tar.TypeReg, Name: "bin/busybox", Mode: 0755}, host("bin/busybox"))
@@ -96,19 +96,15 @@ func TestExec(t *testing.T) {
 		return archive
 	}
 
-	// mounted mounts an upper over the image, so the machine can share it.
-	mounted := func(t *testing.T, archive *egiso.Archive) (string, string) {
+	// root puts an upper over the image.
+	root := func(t *testing.T, archive *egiso.Archive) (*egiso.SysFS, string) {
 		upperdir := t.TempDir()
 		dir, err := os.OpenRoot(upperdir)
 		require.NoError(t, err)
 		t.Cleanup(func() { dir.Close() })
 
 		tree := egiso.Tree{}.Mount(".", archive, egiso.NewOwners(), egiso.NewOwners())
-		mnt := t.TempDir()
-		unmount, err := egvm.Mount(egiso.NewSysFS(egiso.NewUpper(tree, dir), egiso.Default, egiso.Default), mnt)
-		require.NoError(t, err)
-		t.Cleanup(func() { require.NoError(t, unmount()) })
-		return mnt, upperdir
+		return egiso.NewSysFS(egiso.NewUpper(tree, dir), egiso.Default, egiso.Default), upperdir
 	}
 
 	var (
@@ -116,14 +112,14 @@ func TestExec(t *testing.T) {
 	)
 
 	archive := image(t)
-	mnt, upperdir := mounted(t, archive)
+	fsys, upperdir := root(t, archive)
 	vm, err := egvm.Boot(egvm.Machine{
 		Kernel:  filepath.Join(alpine, "Image"),
 		Initrd:  initramfs(t),
-		Cmdline: "console=hvc0 quiet",
+		Cmdline: "console=hvc0 quiet init=/bin/sh",
 		CPUs:    2,
 		Memory:  512 << 20,
-		Shares:  []egvm.Share{{Tag: egvm.Root, Dir: mnt}},
+		Root:    fsys,
 	}, &console)
 	if err != nil && strings.Contains(err.Error(), "entitlement") {
 		t.Skipf("the test binary is not signed with vz.entitlements: %v", err)
@@ -146,6 +142,12 @@ func TestExec(t *testing.T) {
 		code, stdout, _ := run(t, t.Context(), nil, "sh", "-c", "cat /etc/hostname && uname -s")
 		require.Equal(t, int32(0), code)
 		require.Equal(t, "egvm\nLinux\n", stdout)
+	})
+
+	t.Run("hands pid 1 to the init on the kernel's command line", func(t *testing.T) {
+		code, stdout, _ := run(t, t.Context(), nil, "cat", "/proc/1/cmdline")
+		require.Equal(t, int32(0), code)
+		require.Equal(t, "/bin/sh\x00", stdout)
 	})
 
 	t.Run("writes go to the upper and leave the image as it is", func(t *testing.T) {

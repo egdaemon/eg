@@ -1,18 +1,24 @@
 //go:build linux
 
 // Command vminit is the init of an egvm machine. It loads the kernel modules in /modules in name
-// order, mounts the virtio-fs share tagged root, chroots into it, and serves commands on vsock port
-// egvm.Port until the host stops the machine.
+// order, mounts the root the host serves over NFS, and execs the root's init, the init= of the
+// kernel's command line, as the machine's pid 1. Before it does, it starts itself again twice; both
+// outlive the switch. One forwards the guest's NFS client to the host over vsock. The other, the
+// agent, serves commands on vsock port egvm.Port inside the root.
 package main
 
 import (
 	"bufio"
 	"errors"
 	"fmt"
+	"io"
+	"net"
 	"os"
 	"os/exec"
 	"path"
 	"path/filepath"
+	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"syscall"
@@ -23,17 +29,34 @@ import (
 	"google.golang.org/protobuf/encoding/protodelim"
 )
 
+// defaultpath is the PATH of commands whose environment does not set one.
+const defaultpath = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+
 func main() {
-	fmt.Println("egvm:", run())
+	// boot starts vminit again under these names, with the descriptors each needs.
+	switch os.Args[0] {
+	case "nfs":
+		fmt.Println("egvm: nfs:", forward(os.NewFile(3, "nfs")))
+		os.Exit(1)
+	case "agent":
+		fmt.Println("egvm: agent:", agent(os.NewFile(3, "switch"), os.NewFile(4, "switched")))
+		os.Exit(1)
+	}
+
+	fmt.Println("egvm:", boot())
 	unix.Sync()
 	if err := unix.Reboot(unix.LINUX_REBOOT_CMD_POWER_OFF); err != nil {
 		fmt.Println("egvm: unable to power off", err)
 	}
 }
 
-func run() error {
+// boot only returns when the machine fails to start the root's init.
+func boot() error {
 	var (
-		fd int
+		rootinit = "/usr/sbin/init"
+		nfs      net.Listener
+		listener *os.File
+		cmdline  []byte
 	)
 
 	for _, m := range []struct{ source, target, fstype string }{
@@ -41,8 +64,18 @@ func run() error {
 		{"sysfs", "/sys", "sysfs"},
 		{"devtmpfs", "/dev", "devtmpfs"},
 	} {
-		if err := mount(m.source, m.target, m.fstype); err != nil {
+		if err := mount(m.source, m.target, m.fstype, ""); err != nil {
 			return err
+		}
+	}
+
+	cmdline, err := os.ReadFile("/proc/cmdline")
+	if err != nil {
+		return err
+	}
+	for _, param := range strings.Fields(string(cmdline)) {
+		if v, ok := strings.CutPrefix(param, "init="); ok {
+			rootinit = v
 		}
 	}
 
@@ -56,15 +89,86 @@ func run() error {
 		}
 	}
 
-	if err = mount("root", "/root", "virtiofs"); err != nil {
+	if err = loopback(); err != nil {
 		return err
 	}
-	if err = unix.Chroot("/root"); err != nil {
-		return fmt.Errorf("unable to chroot into the share: %w", err)
+	if nfs, err = net.Listen("tcp", net.JoinHostPort("127.0.0.1", strconv.Itoa(egvm.NFSPort))); err != nil {
+		return fmt.Errorf("unable to listen for nfs: %w", err)
+	}
+	if listener, err = nfs.(*net.TCPListener).File(); err != nil {
+		return err
+	}
+
+	switching, switchw, err := os.Pipe()
+	if err != nil {
+		return err
+	}
+	switchedr, switched, err := os.Pipe()
+	if err != nil {
+		return err
+	}
+
+	// the forwarder never forks, so the commands the agent forks always have it to page themselves in over NFS.
+	for _, child := range []*exec.Cmd{
+		{Path: "/init", Args: []string{"nfs"}, Stdout: os.Stdout, Stderr: os.Stderr, ExtraFiles: []*os.File{listener}},
+		{Path: "/init", Args: []string{"agent"}, Stdout: os.Stdout, Stderr: os.Stderr, ExtraFiles: []*os.File{switching, switched}},
+	} {
+		if err = child.Start(); err != nil {
+			return fmt.Errorf("unable to start %s: %w", child.Args[0], err)
+		}
+	}
+	listener.Close()
+	switching.Close()
+	switched.Close()
+
+	options := fmt.Sprintf("vers=3,proto=tcp,port=%d,mountport=%d,mountproto=tcp,nolock,addr=127.0.0.1,mountaddr=127.0.0.1", egvm.NFSPort, egvm.NFSPort)
+	if err = mount("127.0.0.1:/", "/root", "nfs", options); err != nil {
+		return err
+	}
+	for _, dir := range []string{"/dev", "/proc", "/sys"} {
+		if err = unix.Mount(dir, "/root"+dir, "", unix.MS_MOVE, ""); err != nil {
+			return fmt.Errorf("unable to move %s into the root: %w", dir, err)
+		}
+	}
+
+	// the agent enters the root before it moves over the initramfs, which hides the root's path.
+	switchw.Close()
+	if _, err = io.Copy(io.Discard, switchedr); err != nil {
+		return err
+	}
+
+	if err = unix.Chdir("/root"); err != nil {
+		return err
+	}
+	if err = unix.Mount(".", "/", "", unix.MS_MOVE, ""); err != nil {
+		return fmt.Errorf("unable to move the root over the initramfs: %w", err)
+	}
+	if err = unix.Chroot("."); err != nil {
+		return err
 	}
 	if err = unix.Chdir("/"); err != nil {
 		return err
 	}
+
+	return fmt.Errorf("unable to exec %s: %w", rootinit, unix.Exec(rootinit, []string{rootinit}, os.Environ()))
+}
+
+// agent enters the root once switching closes, closes switched, and serves commands.
+func agent(switching *os.File, switched *os.File) (err error) {
+	var (
+		fd int
+	)
+
+	if _, err = io.Copy(io.Discard, switching); err != nil {
+		return err
+	}
+	if err = unix.Chroot("/root"); err != nil {
+		return fmt.Errorf("unable to enter the root: %w", err)
+	}
+	if err = unix.Chdir("/"); err != nil {
+		return err
+	}
+	switched.Close()
 
 	if fd, err = unix.Socket(unix.AF_VSOCK, unix.SOCK_STREAM|unix.SOCK_CLOEXEC, 0); err != nil {
 		return fmt.Errorf("unable to create the vsock listener: %w", err)
@@ -77,6 +181,62 @@ func run() error {
 	}
 
 	return serve(fd)
+}
+
+// forward connects each connection the listener nfs accepts to the host's NFS server.
+func forward(nfs *os.File) error {
+	l, err := net.FileListener(nfs)
+	if err != nil {
+		return err
+	}
+
+	for {
+		conn, err := l.Accept()
+		if err != nil {
+			return err
+		}
+
+		go func() {
+			defer conn.Close()
+
+			fd, cause := unix.Socket(unix.AF_VSOCK, unix.SOCK_STREAM|unix.SOCK_CLOEXEC, 0)
+			if cause != nil {
+				fmt.Println("egvm: unable to create an nfs connection", cause)
+				return
+			}
+			host := os.NewFile(uintptr(fd), "nfs")
+			defer host.Close()
+			if cause = unix.Connect(fd, &unix.SockaddrVM{CID: unix.VMADDR_CID_HOST, Port: egvm.NFSPort}); cause != nil {
+				fmt.Println("egvm: unable to connect to the host's nfs", cause)
+				return
+			}
+
+			go func() {
+				io.Copy(host, conn)
+				host.Close()
+			}()
+			io.Copy(conn, host)
+		}()
+	}
+}
+
+// loopback brings up lo, which the guest's NFS client reaches the agent on.
+func loopback() error {
+	fd, err := unix.Socket(unix.AF_INET, unix.SOCK_DGRAM|unix.SOCK_CLOEXEC, 0)
+	if err != nil {
+		return err
+	}
+	defer unix.Close(fd)
+
+	ifr, err := unix.NewIfreq("lo")
+	if err != nil {
+		return err
+	}
+	ifr.SetUint16(unix.IFF_UP | unix.IFF_LOOPBACK | unix.IFF_RUNNING)
+	if err = unix.IoctlIfreq(fd, unix.SIOCSIFFLAGS, ifr); err != nil {
+		return fmt.Errorf("unable to bring up lo: %w", err)
+	}
+	return nil
 }
 
 // command collects the connections of a command as they arrive.
@@ -152,6 +312,9 @@ func execute(streams [4]*os.File) {
 	cmd := &exec.Cmd{Path: lookpath(req.Cmd, req.Environment), Args: append([]string{req.Cmd}, req.Arguments...)}
 	cmd.Dir = req.Dir
 	cmd.Env = req.Environment
+	if !slices.ContainsFunc(cmd.Env, func(kv string) bool { return strings.HasPrefix(kv, "PATH=") }) {
+		cmd.Env = append(cmd.Env, "PATH="+defaultpath)
+	}
 	cmd.Stdin, cmd.Stdout, cmd.Stderr = streams[egvm.StreamStdin], streams[egvm.StreamStdout], streams[egvm.StreamStderr]
 
 	if err := cmd.Start(); err != nil {
@@ -180,7 +343,7 @@ func execute(streams [4]*os.File) {
 // no directory holds, is returned as it is, and fails to start.
 func lookpath(name string, environ []string) string {
 	var (
-		dirs = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+		dirs = defaultpath
 	)
 
 	if strings.Contains(name, "/") {
@@ -218,11 +381,11 @@ func exitcode(err error) int32 {
 	return int32(exit.ExitCode())
 }
 
-func mount(source string, target string, fstype string) error {
+func mount(source string, target string, fstype string, options string) error {
 	if err := os.MkdirAll(target, 0755); err != nil {
 		return err
 	}
-	if err := unix.Mount(source, target, fstype, 0, ""); err != nil {
+	if err := unix.Mount(source, target, fstype, 0, options); err != nil {
 		return fmt.Errorf("unable to mount %s at %s: %w", fstype, target, err)
 	}
 	return nil

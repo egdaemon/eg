@@ -31,8 +31,8 @@ func Initramfs(w io.Writer, files ...File) error {
 	return entry(w, 0, 0, "TRAILER!!!", nil)
 }
 
-// MachineInitramfs writes the initramfs machines boot to w: vminit as its init, and the modules virtio-fs and
-// vsock need, loaded in this order, from kernel, the kernel's modules (lib/modules/<release>/kernel).
+// MachineInitramfs writes the initramfs machines boot to w: vminit as its init, and the modules the NFS root,
+// virtio-fs and vsock need, loaded in this order, from kernel, the kernel's modules (lib/modules/<release>/kernel).
 func MachineInitramfs(w io.Writer, vminit []byte, kernel string) error {
 	var (
 		files = []File{
@@ -46,6 +46,12 @@ func MachineInitramfs(w io.Writer, vminit []byte, kernel string) error {
 	)
 
 	for i, m := range []string{
+		"net/sunrpc/sunrpc.ko",
+		"fs/nfs_common/grace.ko",
+		"fs/lockd/lockd.ko",
+		"fs/netfs/netfs.ko",
+		"fs/nfs/nfs.ko",
+		"fs/nfs/nfsv3.ko",
 		"fs/fuse/fuse.ko",
 		"fs/fuse/virtiofs.ko",
 		"net/vmw_vsock/vsock.ko",
@@ -56,7 +62,7 @@ func MachineInitramfs(w io.Writer, vminit []byte, kernel string) error {
 		if err != nil {
 			return err
 		}
-		files = append(files, File{Name: fmt.Sprintf("modules/%d.%s", i, filepath.Base(m)), Mode: 0644, Data: b})
+		files = append(files, File{Name: fmt.Sprintf("modules/%02d.%s", i, filepath.Base(m)), Mode: 0644, Data: b})
 	}
 
 	return Initramfs(w, files...)

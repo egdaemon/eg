@@ -8,6 +8,10 @@ import (
 // Port is the vsock port vminit serves commands on.
 const Port = 1024
 
+// NFSPort is the vsock port the host serves the machine's root on. vminit forwards the guest's NFS client to it from
+// the same port on the guest's loopback.
+const NFSPort = 2049
+
 // The streams of a command, each its own connection to vminit. A connection starts with a header naming the command
 // and the stream it carries. The control stream carries the command's execproxy.ExecRequest from the host and its
 // execproxy.ExecResponse back, both length delimited; the host closing it before the response kills the command.

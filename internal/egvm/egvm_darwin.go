@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/Code-Hex/vz/v3"
+	"github.com/egdaemon/eg/internal/egiso"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/interp/execproxy"
 	"google.golang.org/protobuf/encoding/protodelim"
@@ -33,6 +34,7 @@ func Boot(m Machine, console io.Writer) (_ *VM, err error) {
 	var (
 		config *vz.VirtualMachineConfiguration
 		vm     *vz.VirtualMachine
+		nfs    *vz.VirtioSocketListener
 	)
 
 	// the console's input is a pipe nothing writes to; its output is copied to console.
@@ -57,6 +59,13 @@ func Boot(m Machine, console io.Writer) (_ *VM, err error) {
 	if vm, err = vz.NewVirtualMachine(config); err != nil {
 		return nil, errorsx.Wrap(err, "unable to create the machine")
 	}
+
+	// the root is served before the machine starts, so vminit's first mount finds it.
+	if nfs, err = vm.SocketDevices()[0].Listen(NFSPort); err != nil {
+		return nil, errorsx.Wrap(err, "unable to listen for the machine's root")
+	}
+	t.closers = append(t.closers, nfs)
+	go egiso.ServeNFS(nfs, m.Root)
 
 	go func() {
 		defer close(t.copied)

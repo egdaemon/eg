@@ -4,6 +4,7 @@ import (
 	"archive/tar"
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"io/fs"
@@ -127,15 +128,19 @@ func TestExec(t *testing.T) {
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, vm.Close()) })
 
+	// run reports the command's exit code from the ExitError Exec returns for it.
 	run := func(t *testing.T, ctx context.Context, stdin io.Reader, cmd string, args ...string) (int32, string, string) {
 		var (
 			stdout bytes.Buffer
 			stderr bytes.Buffer
 		)
 
-		code, cause := vm.Exec(ctx, &execproxy.ExecRequest{Cmd: cmd, Arguments: args, Dir: "/", Environment: []string{"PATH=/bin"}}, stdin, &stdout, &stderr)
+		cause := vm.Exec(ctx, &execproxy.ExecRequest{Cmd: cmd, Arguments: args, Dir: "/", Environment: []string{"PATH=/bin"}}, egvm.ExecOptionStdin(stdin), egvm.ExecOptionStdout(&stdout), egvm.ExecOptionStderr(&stderr))
+		if exit, ok := errors.AsType[egvm.ExitError](cause); ok {
+			return exit.Code, stdout.String(), stderr.String()
+		}
 		require.NoError(t, cause, console.String())
-		return code, stdout.String(), stderr.String()
+		return 0, stdout.String(), stderr.String()
 	}
 
 	t.Run("runs the image's linux binaries with the egiso as their root", func(t *testing.T) {
@@ -187,10 +192,18 @@ func TestExec(t *testing.T) {
 			stdout bytes.Buffer
 		)
 
-		code, cause := vm.Exec(t.Context(), &execproxy.ExecRequest{Cmd: "sh", Arguments: []string{"-c", "pwd; echo $EGVM"}, Dir: "/etc", Environment: []string{"PATH=/bin", "EGVM=set"}}, nil, &stdout, io.Discard)
+		cause := vm.Exec(t.Context(), &execproxy.ExecRequest{Cmd: "sh", Arguments: []string{"-c", "pwd; echo $EGVM"}, Dir: "/etc", Environment: []string{"PATH=/bin", "EGVM=set"}}, egvm.ExecOptionStdout(&stdout))
 		require.NoError(t, cause)
-		require.Equal(t, int32(0), code)
 		require.Equal(t, "/etc\nset\n", stdout.String())
+	})
+
+	t.Run("runs with no stdio options", func(t *testing.T) {
+		require.NoError(t, vm.Exec(t.Context(), &execproxy.ExecRequest{Cmd: "sh", Arguments: []string{"-c", "echo out; echo err >&2"}, Dir: "/", Environment: []string{"PATH=/bin"}}))
+	})
+
+	t.Run("returns an ExitError for a command that fails", func(t *testing.T) {
+		cause := vm.Exec(t.Context(), &execproxy.ExecRequest{Cmd: "sh", Arguments: []string{"-c", "exit 3"}, Dir: "/", Environment: []string{"PATH=/bin"}})
+		require.ErrorIs(t, cause, egvm.ExitError{Code: 3})
 	})
 
 	t.Run("exits 127 for a command the image does not hold", func(t *testing.T) {
@@ -218,7 +231,7 @@ func TestExec(t *testing.T) {
 		ctx, done := context.WithTimeout(t.Context(), 300*time.Millisecond)
 		defer done()
 
-		_, cause := vm.Exec(ctx, &execproxy.ExecRequest{Cmd: "sh", Arguments: []string{"-c", "sleep 1; echo late > /tmp/late"}, Dir: "/", Environment: []string{"PATH=/bin"}}, nil, io.Discard, io.Discard)
+		cause := vm.Exec(ctx, &execproxy.ExecRequest{Cmd: "sh", Arguments: []string{"-c", "sleep 1; echo late > /tmp/late"}, Dir: "/", Environment: []string{"PATH=/bin"}})
 		require.ErrorIs(t, cause, context.DeadlineExceeded)
 
 		time.Sleep(1500 * time.Millisecond)

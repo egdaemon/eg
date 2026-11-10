@@ -2,13 +2,14 @@
 // is not Linux. A machine's root is an egiso the host serves over NFS; the guest's init (vminit)
 // mounts it and hands the machine to the root's own init, as a container runtime starts an image
 // with /usr/sbin/init. The kernel's command line tells the root's systemd what the machine attaches:
-// the virtio-fs shares to mount and the network to configure. vminit keeps running beside the root's
+// the virtio-fs devices to mount and the network to configure. vminit keeps running beside the root's
 // init, forwarding NFS and running the commands the host sends it over vsock.
 package egvm
 
 import (
 	"encoding/base64"
 	"fmt"
+	"io"
 	"runtime"
 	"strings"
 
@@ -17,20 +18,12 @@ import (
 	"github.com/egdaemon/eg/internal/userx"
 )
 
-// Share is a host directory the machine mounts over virtio-fs at Path.
-type Share struct {
-	Tag     string
-	Dir     string
-	Path    string
-	Options string
-}
-
-// Mount is a mount of the machine's own, which systemd orders after the shares it lies under.
-type Mount struct {
-	What    string
-	Where   string
-	Type    string
-	Options string
+// mount is a host directory the machine attaches as the virtio-fs device tag and mounts at path.
+type mount struct {
+	tag      string
+	dir      string
+	path     string
+	readonly bool
 }
 
 // Machine describes a virtual machine: the image it boots, its size, its root, and what it mounts.
@@ -41,8 +34,7 @@ type Machine struct {
 	memory uint64
 	root   *egiso.SysFS
 	nfs    []egiso.NFSOption
-	shares []Share
-	mounts []Mount
+	mounts []mount
 }
 
 // Option changes the machine New describes.
@@ -87,23 +79,70 @@ func OptionAccounts(users []egiso.Account, groups []egiso.Account) Option {
 	}
 }
 
-// OptionShare attaches the share's directory to the machine and mounts it.
-func OptionShare(s Share) Option {
+// OptionMountReadWrite mounts the host directory dir in the machine at path.
+func OptionMountReadWrite(dir string, path string) Option {
+	return optionMount(dir, path, false)
+}
+
+// OptionMountReadOnly mounts the host directory dir in the machine at path, read only.
+func OptionMountReadOnly(dir string, path string) Option {
+	return optionMount(dir, path, true)
+}
+
+func optionMount(dir string, path string, readonly bool) Option {
 	return func(m *Machine) {
-		m.shares = append(m.shares, s)
+		m.mounts = append(m.mounts, mount{tag: fmt.Sprintf("egvm%d", len(m.mounts)), dir: dir, path: path, readonly: readonly})
 	}
 }
 
-// OptionMount mounts what at where once the machine's shares are mounted.
-func OptionMount(mnt Mount) Option {
-	return func(m *Machine) {
-		m.mounts = append(m.mounts, mnt)
+// ExitError is the exit code of a command that exited with other than 0.
+type ExitError struct {
+	Code int32
+}
+
+func (t ExitError) Error() string {
+	return fmt.Sprintf("exit code %d", t.Code)
+}
+
+// stdio is a command's standard streams.
+type stdio struct {
+	stdin  io.Reader
+	stdout io.Writer
+	stderr io.Writer
+}
+
+// ExecOption changes the stdio of a command Exec runs.
+type ExecOption func(*stdio)
+
+// ExecOptionStdin feeds r to the command until r ends.
+func ExecOptionStdin(r io.Reader) ExecOption {
+	return func(s *stdio) {
+		s.stdin = r
 	}
+}
+
+// ExecOptionStdout copies the command's stdout to w.
+func ExecOptionStdout(w io.Writer) ExecOption {
+	return func(s *stdio) {
+		s.stdout = w
+	}
+}
+
+// ExecOptionStderr copies the command's stderr to w.
+func ExecOptionStderr(w io.Writer) ExecOption {
+	return func(s *stdio) {
+		s.stderr = w
+	}
+}
+
+// newstdio is a command's stdio: no input, and output discarded, unless options say otherwise.
+func newstdio(options ...ExecOption) stdio {
+	return langx.Clone(stdio{stdout: io.Discard, stderr: io.Discard}, options...)
 }
 
 // cmdline is the machine's kernel command line. Container images hold no udev to announce the
 // console, so systemd starts no getty on it: one would wait out its device's timeout before the
-// machine boots. systemd-fstab-generator mounts the shares and mounts from systemd.mount-extra, and
+// machine boots. systemd-fstab-generator mounts the virtio-fs devices from systemd.mount-extra, and
 // systemd-network-generator configures the machine's NAT device for networkd from ip=. The
 // tmpfiles.extra credential points resolv.conf at resolved, replacing the empty placeholder image
 // builds leave behind.
@@ -122,11 +161,12 @@ func (t Machine) cmdline() string {
 		}
 	)
 
-	for _, s := range t.shares {
-		params = append(params, fmt.Sprintf("systemd.mount-extra=%s:%s:virtiofs:%s", s.Tag, s.Path, s.Options))
-	}
 	for _, m := range t.mounts {
-		params = append(params, fmt.Sprintf("systemd.mount-extra=%s:%s:%s:%s", m.What, m.Where, m.Type, m.Options))
+		mode := "rw"
+		if m.readonly {
+			mode = "ro"
+		}
+		params = append(params, fmt.Sprintf("systemd.mount-extra=%s:%s:virtiofs:%s", m.tag, m.path, mode))
 	}
 
 	return strings.Join(params, " ")

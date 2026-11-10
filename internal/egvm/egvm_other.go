@@ -19,8 +19,8 @@ func Boot(m Machine, console io.Writer) (*VM, error) {
 }
 
 // Exec fails: machines need Virtualization.framework.
-func (t *VM) Exec(ctx context.Context, req *execproxy.ExecRequest, stdin io.Reader, stdout io.Writer, stderr io.Writer) (int32, error) {
-	return -1, errorsx.String("egvm machines need macOS")
+func (t *VM) Exec(ctx context.Context, req *execproxy.ExecRequest, options ...ExecOption) error {
+	return errorsx.String("egvm machines need macOS")
 }
 
 // Close does nothing.

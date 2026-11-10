@@ -431,7 +431,7 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 				runners.AgentMountReadWrite(eg.DefaultMountRoot(), eg.DefaultMountRoot()),
 				runners.AgentMountReadWrite("/var/lib/containers", "/var/lib/containers"),
 			),
-			runners.AgentOptionEGBin(errorsx.Must(exec.LookPath(eg.DefaultMountRoot(eg.RuntimeDirectory, eg.BinaryBin)))),
+			runners.AgentOptionEGBin(stringsx.First(errorsx.ZeroSilent(exec.LookPath(eg.DefaultMountRoot(eg.RuntimeDirectory, eg.BinaryBin))), errorsx.Must(exec.LookPath(os.Args[0])))),
 			runners.AgentOptionHostOS(),
 			runners.AgentOptionCommandLine("--cgroups", "disabled"),
 			hostnet,

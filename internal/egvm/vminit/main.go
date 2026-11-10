@@ -4,7 +4,7 @@
 // order, mounts the root the host serves over NFS, and execs the root's init, the init= of the
 // kernel's command line, as the machine's pid 1. Before it does, it starts itself again twice; both
 // outlive the switch. One forwards the guest's NFS client to the host over vsock. The other, the
-// agent, serves commands on vsock port egvm.Port inside the root.
+// agent, serves commands on vsock port egvm.Port inside the root once the root's init answers them.
 package main
 
 import (
@@ -22,6 +22,7 @@ import (
 	"strings"
 	"sync"
 	"syscall"
+	"time"
 
 	"github.com/egdaemon/eg/internal/egvm"
 	"github.com/egdaemon/eg/interp/execproxy"
@@ -53,10 +54,8 @@ func main() {
 // boot only returns when the machine fails to start the root's init.
 func boot() error {
 	var (
-		rootinit = "/usr/sbin/init"
 		nfs      net.Listener
 		listener *os.File
-		cmdline  []byte
 	)
 
 	for _, m := range []struct{ source, target, fstype string }{
@@ -69,14 +68,9 @@ func boot() error {
 		}
 	}
 
-	cmdline, err := os.ReadFile("/proc/cmdline")
+	rootinit, err := initpath()
 	if err != nil {
 		return err
-	}
-	for _, param := range strings.Fields(string(cmdline)) {
-		if v, ok := strings.CutPrefix(param, "init="); ok {
-			rootinit = v
-		}
 	}
 
 	modules, err := filepath.Glob("/modules/*.ko")
@@ -159,12 +153,17 @@ func boot() error {
 	return fmt.Errorf("unable to exec %s: %w", rootinit, unix.Exec(rootinit, []string{rootinit}, os.Environ()))
 }
 
-// agent enters the root once switching closes, closes switched, and serves commands.
+// agent enters the root once switching closes, closes switched, and serves commands once the
+// root's init answers them.
 func agent(switching *os.File, switched *os.File) (err error) {
 	var (
-		fd int
+		rootinit string
+		fd       int
 	)
 
+	if rootinit, err = initpath(); err != nil {
+		return err
+	}
 	if _, err = io.Copy(io.Discard, switching); err != nil {
 		return err
 	}
@@ -175,6 +174,10 @@ func agent(switching *os.File, switched *os.File) (err error) {
 		return err
 	}
 	switched.Close()
+
+	if err = answering(rootinit); err != nil {
+		return err
+	}
 
 	if fd, err = unix.Socket(unix.AF_VSOCK, unix.SOCK_STREAM|unix.SOCK_CLOEXEC, 0); err != nil {
 		return fmt.Errorf("unable to create the vsock listener: %w", err)
@@ -187,6 +190,53 @@ func agent(switching *os.File, switched *os.File) (err error) {
 	}
 
 	return serve(fd)
+}
+
+// initpath is the root's init: the init= of the kernel's command line, else /usr/sbin/init.
+func initpath() (string, error) {
+	var (
+		rootinit = "/usr/sbin/init"
+	)
+
+	cmdline, err := os.ReadFile("/proc/cmdline")
+	if err != nil {
+		return "", err
+	}
+	for _, param := range strings.Fields(string(cmdline)) {
+		if v, ok := strings.CutPrefix(param, "init="); ok {
+			rootinit = v
+		}
+	}
+	return rootinit, nil
+}
+
+// answering returns once pid 1 is rootinit and, when rootinit is systemd, once systemd listens on
+// the private socket systemctl talks to it over; until then systemctl reports the machine offline.
+func answering(rootinit string) error {
+	var (
+		want os.FileInfo
+		pid1 os.FileInfo
+		exe  string
+		err  error
+	)
+
+	if want, err = os.Stat(rootinit); err != nil {
+		return fmt.Errorf("unable to find the root's init %s: %w", rootinit, err)
+	}
+	for pid1, err = os.Stat("/proc/1/exe"); err != nil || !os.SameFile(pid1, want); pid1, err = os.Stat("/proc/1/exe") {
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	if exe, err = filepath.EvalSymlinks(rootinit); err != nil {
+		return err
+	}
+	if filepath.Base(exe) != "systemd" {
+		return nil
+	}
+	for _, err = os.Stat("/run/systemd/private"); err != nil; _, err = os.Stat("/run/systemd/private") {
+		time.Sleep(10 * time.Millisecond)
+	}
+	return nil
 }
 
 // forward connects each connection the listener nfs accepts to the host's NFS server.

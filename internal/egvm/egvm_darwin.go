@@ -87,11 +87,12 @@ func Boot(m Machine, console io.Writer) (_ *VM, err error) {
 	return t, nil
 }
 
-// Exec runs req in the machine with stdin, stdout and stderr as its stdio, waits for it, and
-// returns its exit code. It waits for the machine to serve commands. Cancelling ctx kills the
-// command.
-func (t *VM) Exec(ctx context.Context, req *execproxy.ExecRequest, stdin io.Reader, stdout io.Writer, stderr io.Writer) (code int32, err error) {
+// Exec runs req in the machine and waits for it, with no input and its output discarded unless
+// options say otherwise. A command that exits with other than 0 returns an ExitError. It waits for
+// the machine to serve commands. Cancelling ctx kills the command.
+func (t *VM) Exec(ctx context.Context, req *execproxy.ExecRequest, options ...ExecOption) (err error) {
 	var (
+		stdio   = newstdio(options...)
 		id      uint64
 		control net.Conn
 		streams [3]net.Conn
@@ -100,46 +101,49 @@ func (t *VM) Exec(ctx context.Context, req *execproxy.ExecRequest, stdin io.Read
 	)
 
 	if err = binary.Read(rand.Reader, binary.BigEndian, &id); err != nil {
-		return -1, err
+		return err
 	}
 
 	if control, err = t.connect(ctx, id, StreamControl); err != nil {
-		return -1, err
+		return err
 	}
 	defer control.Close()
 	stop := context.AfterFunc(ctx, func() { control.Close() })
 	defer stop()
 
 	if _, err = protodelim.MarshalTo(control, req); err != nil {
-		return -1, errorsx.Wrap(err, "unable to send the command")
+		return errorsx.Wrap(err, "unable to send the command")
 	}
 
 	for i := range streams {
 		if streams[i], err = t.connect(ctx, id, uint8(i)); err != nil {
-			return -1, err
+			return err
 		}
 		defer streams[i].Close()
 	}
 
 	// the stdin stream is a connection of its own, so closing it is the command's end of input.
 	go func() {
-		if stdin != nil {
-			io.Copy(streams[StreamStdin], stdin)
+		if stdio.stdin != nil {
+			io.Copy(streams[StreamStdin], stdio.stdin)
 		}
 		streams[StreamStdin].Close()
 	}()
-	wg.Go(func() { io.Copy(stdout, streams[StreamStdout]) })
-	wg.Go(func() { io.Copy(stderr, streams[StreamStderr]) })
+	wg.Go(func() { io.Copy(stdio.stdout, streams[StreamStdout]) })
+	wg.Go(func() { io.Copy(stdio.stderr, streams[StreamStderr]) })
 
 	if err = protodelim.UnmarshalFrom(bufio.NewReader(control), &resp); err != nil {
 		if ctx.Err() != nil {
-			return -1, ctx.Err()
+			return ctx.Err()
 		}
-		return -1, errorsx.Wrap(err, "unable to read the command's exit")
+		return errorsx.Wrap(err, "unable to read the command's exit")
 	}
 	wg.Wait()
 
-	return resp.Exit, nil
+	if resp.Exit != 0 {
+		return ExitError{Code: resp.Exit}
+	}
+	return nil
 }
 
 // connect opens the stream of command id, retrying until the machine serves commands.
@@ -197,7 +201,7 @@ func configure(m Machine, in *os.File, out *os.File) (_ *vz.VirtualMachineConfig
 		network  *vz.VirtioNetworkDeviceConfiguration
 		mac      *vz.MACAddress
 		device   *vz.VirtioFileSystemDeviceConfiguration
-		shares   = make([]vz.DirectorySharingDeviceConfiguration, 0, len(m.shares))
+		devices  = make([]vz.DirectorySharingDeviceConfiguration, 0, len(m.mounts))
 	)
 
 	if boot, err = vz.NewLinuxBootLoader(filepath.Join(m.dir, "Image"), vz.WithInitrd(filepath.Join(m.dir, "initramfs")), vz.WithCommandLine(m.cmdline())); err != nil {
@@ -241,13 +245,13 @@ func configure(m Machine, in *os.File, out *os.File) (_ *vz.VirtualMachineConfig
 	network.SetMACAddress(mac)
 	config.SetNetworkDevicesVirtualMachineConfiguration([]*vz.VirtioNetworkDeviceConfiguration{network})
 
-	for _, s := range m.shares {
-		if device, err = share(s); err != nil {
+	for _, mnt := range m.mounts {
+		if device, err = share(mnt); err != nil {
 			return nil, err
 		}
-		shares = append(shares, device)
+		devices = append(devices, device)
 	}
-	config.SetDirectorySharingDevicesVirtualMachineConfiguration(shares)
+	config.SetDirectorySharingDevicesVirtualMachineConfiguration(devices)
 
 	if _, err = config.Validate(); err != nil {
 		return nil, errorsx.Wrap(err, "invalid machine configuration")
@@ -255,21 +259,21 @@ func configure(m Machine, in *os.File, out *os.File) (_ *vz.VirtualMachineConfig
 	return config, nil
 }
 
-func share(s Share) (_ *vz.VirtioFileSystemDeviceConfiguration, err error) {
+func share(mnt mount) (_ *vz.VirtioFileSystemDeviceConfiguration, err error) {
 	var (
 		dir    *vz.SharedDirectory
 		single *vz.SingleDirectoryShare
 		device *vz.VirtioFileSystemDeviceConfiguration
 	)
 
-	if dir, err = vz.NewSharedDirectory(s.Dir, false); err != nil {
-		return nil, errorsx.Wrapf(err, "unable to share %s", s.Dir)
+	if dir, err = vz.NewSharedDirectory(mnt.dir, mnt.readonly); err != nil {
+		return nil, errorsx.Wrapf(err, "unable to share %s", mnt.dir)
 	}
 	if single, err = vz.NewSingleDirectoryShare(dir); err != nil {
-		return nil, errorsx.Wrapf(err, "unable to share %s", s.Dir)
+		return nil, errorsx.Wrapf(err, "unable to share %s", mnt.dir)
 	}
-	if device, err = vz.NewVirtioFileSystemDeviceConfiguration(s.Tag); err != nil {
-		return nil, errorsx.Wrapf(err, "unable to create the virtio-fs device %s", s.Tag)
+	if device, err = vz.NewVirtioFileSystemDeviceConfiguration(mnt.tag); err != nil {
+		return nil, errorsx.Wrapf(err, "unable to create the virtio-fs device %s", mnt.tag)
 	}
 	device.SetDirectoryShare(single)
 	return device, nil

@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"log"
 	"os"
 	"path/filepath"
@@ -66,7 +65,6 @@ func (t vm) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, hotswapbin *cmdop
 		machine   *egvm.VM
 		environ   []string
 		verbosity string
-		code      int32
 		users     []egiso.Account
 		groups    []egiso.Account
 	)
@@ -171,37 +169,21 @@ func (t vm) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, hotswapbin *cmdop
 	// the machine has the image's own accounts, so the image's files keep their owners.
 	root := egiso.NewSysFS(egiso.NewUpper(egiso.Tree{}.Mount(".", archive, egiso.Identity(users), egiso.Identity(groups)), upper), egiso.Default, egiso.Default)
 
-	shares := []egvm.Share{
-		{Tag: "cache", Dir: ws.CacheDir, Path: eg.DefaultMountRoot(eg.CacheDirectory), Options: "defaults"},
-		{Tag: "runtime", Dir: ws.RuntimeDir, Path: eg.DefaultMountRoot(eg.RuntimeDirectory), Options: "defaults"},
-		{Tag: "working", Dir: ws.WorkingDir, Path: eg.DefaultMountRoot(eg.WorkingDirectory), Options: "defaults"},
-		{Tag: "workspace", Dir: ws.WorkspaceDir, Path: eg.DefaultMountRoot(eg.WorkspaceDirectory), Options: "defaults"},
-		{Tag: "module", Dir: filepath.Join(ws.Root, ws.BuildDir, ws.Module, eg.ModuleDir), Path: eg.DefaultMountRoot(eg.RuntimeDirectory, ws.Module, eg.ModuleDir), Options: "ro"},
-	}
-
-	options := make([]egvm.Option, 0, len(shares)+2)
-	options = append(options, egvm.OptionAccounts(users, groups))
-	for _, s := range shares {
-		options = append(options, egvm.OptionShare(s))
-	}
-
-	// local mounts the eg running the command at egbin; in the machine, that eg is the image's.
-	if err = os.WriteFile(filepath.Join(ws.RuntimeDir, eg.BinaryBin), nil, 0755); err != nil {
-		return errorsx.Wrap(err, "unable to create the machine's egbin")
-	}
-	options = append(options, egvm.OptionMount(egvm.Mount{What: "/usr/bin/eg", Where: eg.DefaultMountRoot(eg.RuntimeDirectory, eg.BinaryBin), Type: "none", Options: "bind,ro"}))
-
-	if machine, err = egvm.Boot(egvm.New(root, options...), log.Writer()); err != nil {
+	if machine, err = egvm.Boot(egvm.New(
+		root,
+		egvm.OptionAccounts(users, groups),
+		egvm.OptionMountReadWrite(ws.CacheDir, eg.DefaultMountRoot(eg.CacheDirectory)),
+		egvm.OptionMountReadWrite(ws.RuntimeDir, eg.DefaultMountRoot(eg.RuntimeDirectory)),
+		egvm.OptionMountReadWrite(ws.WorkingDir, eg.DefaultMountRoot(eg.WorkingDirectory)),
+		egvm.OptionMountReadWrite(ws.WorkspaceDir, eg.DefaultMountRoot(eg.WorkspaceDirectory)),
+		egvm.OptionMountReadOnly(filepath.Join(ws.Root, ws.BuildDir, ws.Module, eg.ModuleDir), eg.DefaultMountRoot(eg.RuntimeDirectory, ws.Module, eg.ModuleDir)),
+	), log.Writer()); err != nil {
 		return err
 	}
 	defer func() { err = errorsx.Compact(err, machine.Close()) }()
 
-	// podman execs into a started container; the machine's mounts and network are systemd's to finish
-	// first, once systemd answers.
-	for code = -1; code != 0; time.Sleep(10 * time.Millisecond) {
-		if code, err = machine.Exec(gctx.Context, &execproxy.ExecRequest{Cmd: "systemctl", Arguments: []string{"start", "local-fs.target", "systemd-networkd-wait-online.service"}, Dir: "/"}, nil, io.Discard, io.Discard); err != nil {
-			return errorsx.Wrap(err, "unable to wait for the machine's mounts")
-		}
+	if err = machine.Exec(gctx.Context, &execproxy.ExecRequest{Cmd: "systemctl", Arguments: []string{"is-system-running", "--wait"}, Dir: "/"}); err != nil {
+		return errorsx.Wrap(err, "the machine did not finish booting")
 	}
 
 	if gctx.Verbosity > 0 {
@@ -214,17 +196,13 @@ func (t vm) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, hotswapbin *cmdop
 		}
 
 		// TODO REVISIT using t.ws.RuntimeDir as moduledir, as local does.
-		code, err = machine.Exec(gctx.Context, &execproxy.ExecRequest{
+		if err = machine.Exec(gctx.Context, &execproxy.ExecRequest{
 			Cmd:         envx.String("eg", eg.EnvComputeBin),
 			Arguments:   slicesx.Filter(stringsx.Present, verbosity, "module", "--directory", eg.DefaultWorkingDirectory(), "--moduledir", ws.RuntimeDir, eg.ModuleMount()),
 			Dir:         "/",
 			Environment: environ,
-		}, os.Stdin, log.Writer(), log.Writer())
-		if err != nil {
+		}, egvm.ExecOptionStdin(os.Stdin), egvm.ExecOptionStdout(log.Writer()), egvm.ExecOptionStderr(log.Writer())); err != nil {
 			return errorsx.Wrap(err, "module execution failed")
-		}
-		if code != 0 {
-			return errorsx.Errorf("module execution failed: exit code %d", code)
 		}
 	}
 

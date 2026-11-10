@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strconv"
@@ -164,6 +165,11 @@ func (t vm) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, hotswapbin *cmdop
 
 	if users, groups, err = archive.Accounts(); err != nil {
 		return err
+	}
+
+	// local mounts the eg running the command at egbin; machines share directories, not files.
+	if err = iox.Copy(errorsx.Must(exec.LookPath(os.Args[0])), filepath.Join(ws.RuntimeDir, eg.BinaryBin)); err != nil {
+		return errorsx.Wrap(err, "unable to place egbin")
 	}
 
 	// the machine has the image's own accounts, so the image's files keep their owners.

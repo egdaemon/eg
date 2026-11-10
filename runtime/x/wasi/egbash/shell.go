@@ -1,6 +1,6 @@
 // Package egbash interprets shell commands inside the guest with egdaemon/sh, so expansion, redirects, pipes,
-// builtins, the bash and sh scripts a command starts and the coreutils egdaemon/sh/x and egcoreutils provide stay
-// in the sandbox. in a machine (egvm) the other external commands run in the machine. eg/shell runs through it
+// builtins, the bash and sh scripts a command starts and the coreutils egdaemon/sh/x provides stay in the
+// sandbox, and only the other external commands reach the module, through execproxy/v2. eg/shell runs through it
 // with EG_EXPERIMENTAL_GUEST_SHELL, which requires EG_EXPERIMENTAL_PROC_SOCKETS for the module.
 package egbash
 
@@ -18,18 +18,12 @@ import (
 	"github.com/egdaemon/eg/runtime/wasi/egenv"
 	"github.com/egdaemon/eg/runtime/wasi/egunsafe"
 	"github.com/egdaemon/eg/runtime/wasi/egunsafe/fficoreutils"
-	"github.com/egdaemon/eg/runtime/wasi/egunsafe/ffiegvm"
 	"github.com/egdaemon/sh/v3/expand"
 	"github.com/egdaemon/sh/v3/interp"
 	"github.com/egdaemon/sh/v3/syntax"
 	"github.com/egdaemon/sh/x/coreutils"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
-
-// machine runs the commands coreutils does not provide when the module runs in a machine (egvm).
-var machine = fficoreutils.Reactor{Name: "the machine", Init: ffiegvm.Execveatinit, Wait: ffiegvm.Execveatwait}
 
 // interpret interprets cmd in directory, relative to the working directory, with environ added to the guest's
 // environment. external commands other than the coreutils run in the module as user and group; when both are
@@ -60,28 +54,13 @@ func interpret(ctx context.Context, user string, group string, cmd string, direc
 		interp.StdIO(nil, os.Stdout, os.Stderr),
 		interp.OpenHandler(open),
 		interp.ExecHandlers(coreutils.ExecHandler, func(interp.ExecHandlerFunc) interp.ExecHandlerFunc {
-			return func(ctx context.Context, args []string) (err error) {
-				var (
-					hc = interp.HandlerCtx(ctx)
-				)
-
-				run := func(r fficoreutils.Reactor) error {
-					cmd := r.Command(ctx, args[0], args[1:]...)
-					cmd.Dir = hc.Dir
-					cmd.Env = exported(hc.Env)
-					cmd.Stdin, cmd.Stdout, cmd.Stderr = hc.Stdin, hc.Stdout, hc.Stderr
-					return cmd.Run()
-				}
-
-				if err = run(fficoreutils.Coreutils); status.Code(err) != codes.NotFound {
-					return exitstatus(err)
-				}
-
-				if cause := run(machine); status.Code(cause) != codes.NotFound {
-					return exitstatus(cause)
-				}
-
-				return err
+			return func(ctx context.Context, args []string) error {
+				hc := interp.HandlerCtx(ctx)
+				cmd := fficoreutils.Command(ctx, args[0], args[1:]...)
+				cmd.Dir = hc.Dir
+				cmd.Env = exported(hc.Env)
+				cmd.Stdin, cmd.Stdout, cmd.Stderr = hc.Stdin, hc.Stdout, hc.Stderr
+				return exitstatus(cmd.Run())
 			}
 		}),
 	); err != nil {

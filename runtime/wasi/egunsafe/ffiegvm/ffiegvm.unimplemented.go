@@ -17,15 +17,3 @@ func run(
 ) uint32 {
 	return ffierrors.ErrNotImplemented
 }
-
-func Execveatinit(
-	id uint64, // proc/{id}
-) uint32 {
-	return ffierrors.ErrNotImplemented
-}
-
-func Execveatwait(
-	id uint64, // proc/{id}
-) uint32 {
-	return ffierrors.ErrNotImplemented
-}

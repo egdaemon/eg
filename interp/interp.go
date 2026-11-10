@@ -61,13 +61,6 @@ func OptionHTTPClient(c *http.Client) Option {
 	}
 }
 
-// OptionMachine runs the commands the module does not otherwise provide with exec.
-func OptionMachine(exec ffiegvm.Exec) Option {
-	return func(r *runner) {
-		r.machine = exec
-	}
-}
-
 // OptionRoot mounts root at / in place of the empty read-only root.
 func OptionRoot(root experimentalsys.FS) Option {
 	return func(r *runner) {
@@ -103,7 +96,7 @@ func Remote(ctx context.Context, wshost workspaces.Context, aid string, runid st
 	containers := c8s.NewProxyClient(svc)
 
 	runtimeenv := func(r runner, host wazero.HostModuleBuilder) wazero.HostModuleBuilder {
-		return ffiegvm.NewProcs(ctx, wshost.RuntimeDir, r.machine).Export(host).
+		return host.
 			NewFunctionBuilder().WithFunc(ffigraph.NoopTrace).Export("github.com/egdaemon/eg/runtime/wasi/runtime/graph.Trace").
 			NewFunctionBuilder().WithFunc(ffigraph.Analysing(false)).Export("github.com/egdaemon/eg/runtime/wasi/runtime/graph.Analysing").
 			NewFunctionBuilder().WithFunc(ffigraph.NoopTraceEventPush).Export("github.com/egdaemon/eg/runtime/wasi/runtime/graph.Push").
@@ -217,35 +210,19 @@ func Remote(ctx context.Context, wshost workspaces.Context, aid string, runid st
 // the root lets guests that resolve paths from / (wasi-libc programs such as coreutils) reach the nested mounts,
 // and everything outside of them is missing or read-only.
 func mounts(wshost workspaces.Context, root experimentalsys.FS) wazero.FSConfig {
-	cfg := wazero.NewFSConfig().(sysfs.FSConfig).
+	return wazero.NewFSConfig().(sysfs.FSConfig).
 		WithSysFSMount(root, "/").
-		WithDirMount(os.TempDir(), os.TempDir())
-	for _, m := range workspace(wshost) {
-		cfg = cfg.WithDirMount(m.host, m.guest)
-	}
-	return cfg
-}
-
-// directory is a host directory the module sees at guest.
-type directory struct {
-	host  string
-	guest string
-}
-
-// workspace is where the module sees the workspace's directories: at their default paths and at their host paths.
-func workspace(wshost workspaces.Context) []directory {
-	return []directory{
-		{wshost.Root, eg.DefaultRootDirectory()},
-		{wshost.Root, wshost.Root},
-		{wshost.RuntimeDir, eg.DefaultRuntimeDirectory()},
-		{wshost.RuntimeDir, wshost.RuntimeDir},
-		{wshost.CacheDir, eg.DefaultCacheDirectory()},
-		{wshost.CacheDir, wshost.CacheDir},
-		{wshost.WorkspaceDir, eg.DefaultWorkspaceDirectory()},
-		{wshost.WorkspaceDir, wshost.WorkspaceDir},
-		{wshost.WorkingDir, eg.DefaultWorkingDirectory()},
-		{wshost.WorkingDir, wshost.WorkingDir},
-	}
+		WithDirMount(os.TempDir(), os.TempDir()).
+		WithDirMount(wshost.Root, eg.DefaultRootDirectory()).
+		WithDirMount(wshost.Root, wshost.Root).
+		WithDirMount(wshost.RuntimeDir, eg.DefaultRuntimeDirectory()).
+		WithDirMount(wshost.RuntimeDir, wshost.RuntimeDir).
+		WithDirMount(wshost.CacheDir, eg.DefaultCacheDirectory()).
+		WithDirMount(wshost.CacheDir, wshost.CacheDir).
+		WithDirMount(wshost.WorkspaceDir, eg.DefaultWorkspaceDirectory()).
+		WithDirMount(wshost.WorkspaceDir, wshost.WorkspaceDir).
+		WithDirMount(wshost.WorkingDir, eg.DefaultWorkingDirectory()).
+		WithDirMount(wshost.WorkingDir, wshost.WorkingDir)
 }
 
 type runner struct {
@@ -253,7 +230,6 @@ type runner struct {
 	initonce *sync.Once
 	root     experimentalsys.FS
 	client   *http.Client
-	machine  ffiegvm.Exec
 }
 
 func (t runner) perform(ctx context.Context, wshost workspaces.Context, runid, path string, rtb runtimefn) (err error) {

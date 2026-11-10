@@ -16,3 +16,15 @@ message History {
 }
 
 message HistoryFindResponse { History history = 1 [ json_name = "history" ]; }
+
+message SearchHistoryRequest {
+  string query = 1 [ json_name = "query" ];
+  uint64 offset = 2 [ json_name = "offset" ];
+  uint64 limit = 3 [ json_name = "limit" ];
+  string vcs_uri = 4 [ json_name = "vcs_uri" ];
+}
+
+message SearchHistoryResponse {
+  SearchHistoryRequest next = 1 [ json_name = "next" ];
+  repeated History items = 2 [ json_name = "items" ];
+}

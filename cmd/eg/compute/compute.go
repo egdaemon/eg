@@ -12,5 +12,7 @@ type Cmd struct {
 	Serve      serve      `cmd:"" help:"run a service within eg, automiacally uses builds and loads the containerfile without the module directory and .eg.env if it exists"`
 	LAN        lanCmd     `cmd:"" name:"lan" help:"manage compute systems on your local network"`
 	Pub        pubCmd     `cmd:"" name:"pub" help:"manage compute systems on your account"`
+	History    historyCmd `cmd:"" name:"history" help:"list the completed workloads of the account, result is ✔ completed, ✖ failed or ⏹ cancelled"`
+	Ls         lsCmd      `cmd:"" name:"ls" help:"list the active workloads of the account, state is ⏸ queued or ▶ running"`
 	Containers c8scmds    `cmd:"" name:"containers" aliases:"c8s" help:"EXPERIMENTAL: build and upload a container file workload to the cluster"`
 }

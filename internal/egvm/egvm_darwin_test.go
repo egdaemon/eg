@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
-	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -29,33 +28,44 @@ import (
 //
 //	go test -c -o egvm.test ./internal/egvm && codesign -f -s - --entitlements internal/egvm/vz.entitlements egvm.test && ./egvm.test -test.v
 func TestExec(t *testing.T) {
-	alpine := os.Getenv("EG_TEST_ALPINE")
+	var (
+		alpine   = os.Getenv("EG_TEST_ALPINE")
+		initrd   = filepath.Join(alpine, "initrd")
+		console  bytes.Buffer
+		kernels  []string
+		archive  *egiso.Archive
+		root     *egiso.SysFS
+		upperdir string
+		vm       *egvm.VM
+		err      error
+	)
+
 	if alpine == "" {
 		t.Skip("EG_TEST_ALPINE is not set")
 	}
-	initrd := filepath.Join(alpine, "initrd")
-	kernels, err := filepath.Glob(filepath.Join(alpine, "modules", "*", "kernel"))
+	kernels, err = filepath.Glob(filepath.Join(alpine, "modules", "*", "kernel"))
 	require.NoError(t, err)
 	require.Len(t, kernels, 1)
 
-	// initramfs builds vminit into the machine's initramfs.
-	initramfs := func(t *testing.T) string {
+	// directory is a machine image of Alpine's kernel and an initramfs holding this vminit.
+	directory := func(t *testing.T) string {
 		var (
 			buf bytes.Buffer
+			dir = t.TempDir()
 		)
 
 		vminit := filepath.Join(t.TempDir(), "init")
 		cmd := exec.Command("go", "build", "-o", vminit, "./vminit")
 		cmd.Env = append(os.Environ(), "GOOS=linux", "GOARCH=arm64", "CGO_ENABLED=0")
-		b, err := cmd.CombinedOutput()
-		require.NoError(t, err, string(b))
-		b, err = os.ReadFile(vminit)
-		require.NoError(t, err)
+		b, cause := cmd.CombinedOutput()
+		require.NoError(t, cause, string(b))
+		b, cause = os.ReadFile(vminit)
+		require.NoError(t, cause)
 		require.NoError(t, egvm.MachineInitramfs(&buf, b, kernels[0]))
 
-		path := filepath.Join(t.TempDir(), "initramfs")
-		require.NoError(t, os.WriteFile(path, buf.Bytes(), 0600))
-		return path
+		require.NoError(t, os.WriteFile(filepath.Join(dir, "initramfs"), buf.Bytes(), 0600))
+		require.NoError(t, os.Symlink(filepath.Join(alpine, "Image"), filepath.Join(dir, "Image")))
+		return dir
 	}
 
 	// image is an egiso of Alpine's busybox and musl.
@@ -70,12 +80,12 @@ func TestExec(t *testing.T) {
 			h.Size = int64(len(data))
 			h.ModTime = time.Unix(1700000000, 0)
 			require.NoError(t, tw.WriteHeader(h))
-			_, err := tw.Write(data)
-			require.NoError(t, err)
+			_, cause := tw.Write(data)
+			require.NoError(t, cause)
 		}
 		host := func(name string) []byte {
-			b, err := os.ReadFile(filepath.Join(initrd, name))
-			require.NoError(t, err)
+			b, cause := os.ReadFile(filepath.Join(initrd, name))
+			require.NoError(t, cause)
 			return b
 		}
 
@@ -90,39 +100,27 @@ func TestExec(t *testing.T) {
 		write(&tar.Header{Typeflag: tar.TypeReg, Name: "etc/hostname", Mode: 0644}, []byte("egvm\n"))
 		require.NoError(t, tw.Close())
 
-		toc, err := egiso.Build(io.NewSectionReader(bytes.NewReader(buf.Bytes()), 0, int64(buf.Len())), &out)
-		require.NoError(t, err)
-		archive, err := egiso.New(io.NewSectionReader(bytes.NewReader(out.Bytes()), 0, int64(out.Len())), toc)
-		require.NoError(t, err)
-		return archive
+		toc, cause := egiso.Build(io.NewSectionReader(bytes.NewReader(buf.Bytes()), 0, int64(buf.Len())), &out)
+		require.NoError(t, cause)
+		a, cause := egiso.New(io.NewSectionReader(bytes.NewReader(out.Bytes()), 0, int64(out.Len())), toc)
+		require.NoError(t, cause)
+		return a
 	}
 
-	// root serves an upper over the image.
-	root := func(t *testing.T, archive *egiso.Archive) (func(net.Listener) error, string) {
-		upperdir := t.TempDir()
-		dir, err := os.OpenRoot(upperdir)
-		require.NoError(t, err)
-		t.Cleanup(func() { dir.Close() })
+	// upper is the image under a writable upper in a directory of its own.
+	upper := func(t *testing.T, a *egiso.Archive) (*egiso.SysFS, string) {
+		dir := t.TempDir()
+		r, cause := os.OpenRoot(dir)
+		require.NoError(t, cause)
+		t.Cleanup(func() { r.Close() })
 
-		tree := egiso.Tree{}.Mount(".", archive, egiso.NewOwners(), egiso.NewOwners())
-		fsys := egiso.NewSysFS(egiso.NewUpper(tree, dir), egiso.Default, egiso.Default)
-		return func(l net.Listener) error { return egiso.ServeNFS(l, fsys) }, upperdir
+		tree := egiso.Tree{}.Mount(".", a, egiso.NewOwners(), egiso.NewOwners())
+		return egiso.NewSysFS(egiso.NewUpper(tree, r), egiso.Default, egiso.Default), dir
 	}
 
-	var (
-		console bytes.Buffer
-	)
-
-	archive := image(t)
-	fsys, upperdir := root(t, archive)
-	vm, err := egvm.Boot(egvm.Machine{
-		Kernel:  filepath.Join(alpine, "Image"),
-		Initrd:  initramfs(t),
-		Cmdline: "console=hvc0 quiet init=/bin/sh",
-		CPUs:    2,
-		Memory:  512 << 20,
-		Root:    fsys,
-	}, &console)
+	archive = image(t)
+	root, upperdir = upper(t, archive)
+	vm, err = egvm.Boot(egvm.New(root, egvm.OptionDirectory(directory(t)), egvm.OptionInit("/bin/sh")), &console)
 	if err != nil && strings.Contains(err.Error(), "entitlement") {
 		t.Skipf("the test binary is not signed with vz.entitlements: %v", err)
 	}
@@ -135,8 +133,8 @@ func TestExec(t *testing.T) {
 			stderr bytes.Buffer
 		)
 
-		code, err := vm.Exec(ctx, &execproxy.ExecRequest{Cmd: cmd, Arguments: args, Dir: "/", Environment: []string{"PATH=/bin"}}, stdin, &stdout, &stderr)
-		require.NoError(t, err, console.String())
+		code, cause := vm.Exec(ctx, &execproxy.ExecRequest{Cmd: cmd, Arguments: args, Dir: "/", Environment: []string{"PATH=/bin"}}, stdin, &stdout, &stderr)
+		require.NoError(t, cause, console.String())
 		return code, stdout.String(), stderr.String()
 	}
 
@@ -156,14 +154,14 @@ func TestExec(t *testing.T) {
 		code, _, stderr := run(t, t.Context(), nil, "sh", "-c", "echo written > /etc/written && mkdir -p /srv && echo data > /srv/data")
 		require.Equal(t, int32(0), code, stderr)
 
-		b, err := os.ReadFile(filepath.Join(upperdir, "etc", "written"))
-		require.NoError(t, err)
+		b, cause := os.ReadFile(filepath.Join(upperdir, "etc", "written"))
+		require.NoError(t, cause)
 		require.Equal(t, "written\n", string(b))
-		b, err = os.ReadFile(filepath.Join(upperdir, "srv", "data"))
-		require.NoError(t, err)
+		b, cause = os.ReadFile(filepath.Join(upperdir, "srv", "data"))
+		require.NoError(t, cause)
 		require.Equal(t, "data\n", string(b))
-		_, err = fs.Stat(archive, "etc/written")
-		require.ErrorIs(t, err, fs.ErrNotExist)
+		_, cause = fs.Stat(archive, "etc/written")
+		require.ErrorIs(t, cause, fs.ErrNotExist)
 	})
 
 	t.Run("returns the command's exit code", func(t *testing.T) {
@@ -189,8 +187,8 @@ func TestExec(t *testing.T) {
 			stdout bytes.Buffer
 		)
 
-		code, err := vm.Exec(t.Context(), &execproxy.ExecRequest{Cmd: "sh", Arguments: []string{"-c", "pwd; echo $EGVM"}, Dir: "/etc", Environment: []string{"PATH=/bin", "EGVM=set"}}, nil, &stdout, io.Discard)
-		require.NoError(t, err)
+		code, cause := vm.Exec(t.Context(), &execproxy.ExecRequest{Cmd: "sh", Arguments: []string{"-c", "pwd; echo $EGVM"}, Dir: "/etc", Environment: []string{"PATH=/bin", "EGVM=set"}}, nil, &stdout, io.Discard)
+		require.NoError(t, cause)
 		require.Equal(t, int32(0), code)
 		require.Equal(t, "/etc\nset\n", stdout.String())
 	})
@@ -220,11 +218,11 @@ func TestExec(t *testing.T) {
 		ctx, done := context.WithTimeout(t.Context(), 300*time.Millisecond)
 		defer done()
 
-		_, err := vm.Exec(ctx, &execproxy.ExecRequest{Cmd: "sh", Arguments: []string{"-c", "sleep 1; echo late > /tmp/late"}, Dir: "/", Environment: []string{"PATH=/bin"}}, nil, io.Discard, io.Discard)
-		require.ErrorIs(t, err, context.DeadlineExceeded)
+		_, cause := vm.Exec(ctx, &execproxy.ExecRequest{Cmd: "sh", Arguments: []string{"-c", "sleep 1; echo late > /tmp/late"}, Dir: "/", Environment: []string{"PATH=/bin"}}, nil, io.Discard, io.Discard)
+		require.ErrorIs(t, cause, context.DeadlineExceeded)
 
 		time.Sleep(1500 * time.Millisecond)
-		_, err = os.Stat(filepath.Join(upperdir, "tmp", "late"))
-		require.ErrorIs(t, err, fs.ErrNotExist)
+		_, cause = os.Stat(filepath.Join(upperdir, "tmp", "late"))
+		require.ErrorIs(t, cause, fs.ErrNotExist)
 	})
 }

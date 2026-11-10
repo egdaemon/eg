@@ -5,9 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/fs"
 	"log"
-	"net"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -38,9 +36,9 @@ import (
 )
 
 // vm runs a workload the way local does, in a machine booted from an egiso in place of the root
-// container. The egiso is the machine's root, under a writable upper kept in the workspace's
-// runtime directory; its own systemd boots the machine, and its /etc/fstab mounts the workspace's
-// directories where a container mounts them as volumes.
+// container. The egiso is the machine's root, under a writable upper kept in the workspace; its own
+// systemd boots the machine and mounts the workspace's directories where a container mounts them as
+// volumes.
 type vm struct {
 	Dir              string   `name:"directory" help:"root directory of the repository" default:"${vars_eg_root_directory}"`
 	Debug            bool     `name:"debug" help:"keep workspace around to debug issues, requires manual cleanup"`
@@ -65,8 +63,6 @@ func (t vm) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, hotswapbin *cmdop
 		archive   *egiso.Archive
 		upperdir  string
 		upper     *os.Root
-		fstab     *os.File
-		network   *os.File
 		machine   *egvm.VM
 		environ   []string
 		verbosity string
@@ -173,71 +169,29 @@ func (t vm) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, hotswapbin *cmdop
 	}
 
 	// the machine has the image's own accounts, so the image's files keep their owners.
-	root := egiso.NewUpper(egiso.Tree{}.Mount(".", archive, egiso.Identity(users), egiso.Identity(groups)), upper)
-	sysfs := egiso.NewSysFS(root, egiso.Default, egiso.Default)
-	serve := func(l net.Listener) error {
-		return egiso.ServeNFS(l, sysfs, egiso.NFSOptionAccounts(users, groups))
+	root := egiso.NewSysFS(egiso.NewUpper(egiso.Tree{}.Mount(".", archive, egiso.Identity(users), egiso.Identity(groups)), upper), egiso.Default, egiso.Default)
+
+	shares := []egvm.Share{
+		{Tag: "cache", Dir: ws.CacheDir, Path: eg.DefaultMountRoot(eg.CacheDirectory), Options: "defaults"},
+		{Tag: "runtime", Dir: ws.RuntimeDir, Path: eg.DefaultMountRoot(eg.RuntimeDirectory), Options: "defaults"},
+		{Tag: "working", Dir: ws.WorkingDir, Path: eg.DefaultMountRoot(eg.WorkingDirectory), Options: "defaults"},
+		{Tag: "workspace", Dir: ws.WorkspaceDir, Path: eg.DefaultMountRoot(eg.WorkspaceDirectory), Options: "defaults"},
+		{Tag: "module", Dir: filepath.Join(ws.Root, ws.BuildDir, ws.Module, eg.ModuleDir), Path: eg.DefaultMountRoot(eg.RuntimeDirectory, ws.Module, eg.ModuleDir), Options: "ro"},
 	}
 
-	// the shares the machine mounts where local mounts its volumes.
-	shares := []struct {
-		egvm.Share
-		guest   string
-		options string
-	}{
-		{egvm.Share{Tag: "cache", Dir: ws.CacheDir}, eg.DefaultMountRoot(eg.CacheDirectory), "defaults"},
-		{egvm.Share{Tag: "runtime", Dir: ws.RuntimeDir}, eg.DefaultMountRoot(eg.RuntimeDirectory), "defaults"},
-		{egvm.Share{Tag: "working", Dir: ws.WorkingDir}, eg.DefaultMountRoot(eg.WorkingDirectory), "defaults"},
-		{egvm.Share{Tag: "workspace", Dir: ws.WorkspaceDir}, eg.DefaultMountRoot(eg.WorkspaceDirectory), "defaults"},
-		{egvm.Share{Tag: "module", Dir: filepath.Join(ws.Root, ws.BuildDir, ws.Module, eg.ModuleDir)}, eg.DefaultMountRoot(eg.RuntimeDirectory, ws.Module, eg.ModuleDir), "ro"},
-	}
-
-	if fstab, err = root.OpenFile("etc/fstab", os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0644, egiso.Privileged, egiso.Privileged); err != nil {
-		return errorsx.Wrap(err, "unable to open the machine's fstab")
-	}
-	defer fstab.Close()
-
-	devices := make([]egvm.Share, 0, len(shares))
+	options := make([]egvm.Option, 0, len(shares)+2)
+	options = append(options, egvm.OptionAccounts(users, groups))
 	for _, s := range shares {
-		if _, err = fmt.Fprintf(fstab, "%s %s virtiofs %s 0 0\n", s.Tag, s.guest, s.options); err != nil {
-			return errorsx.Wrap(err, "unable to write the machine's fstab")
-		}
-		devices = append(devices, s.Share)
+		options = append(options, egvm.OptionShare(s))
 	}
+
 	// local mounts the eg running the command at egbin; in the machine, that eg is the image's.
 	if err = os.WriteFile(filepath.Join(ws.RuntimeDir, eg.BinaryBin), nil, 0755); err != nil {
 		return errorsx.Wrap(err, "unable to create the machine's egbin")
 	}
-	if _, err = fmt.Fprintf(fstab, "/usr/bin/eg %s none bind,ro 0 0\n", eg.DefaultMountRoot(eg.RuntimeDirectory, eg.BinaryBin)); err != nil {
-		return errorsx.Wrap(err, "unable to write the machine's fstab")
-	}
-	if err = fstab.Close(); err != nil {
-		return errorsx.Wrap(err, "unable to write the machine's fstab")
-	}
+	options = append(options, egvm.OptionMount(egvm.Mount{What: "/usr/bin/eg", Where: eg.DefaultMountRoot(eg.RuntimeDirectory, eg.BinaryBin), Type: "none", Options: "bind,ro"}))
 
-	// the image's networkd leases the machine's address from its NAT, and the image's resolved answers
-	// its names, where podman sets up a container's network itself.
-	if network, err = root.OpenFile("etc/systemd/network/10-eg.network", os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644, egiso.Privileged, egiso.Privileged); err != nil {
-		return errorsx.Wrap(err, "unable to open the machine's network")
-	}
-	defer network.Close()
-	if _, err = io.WriteString(network, "[Match]\nType=ether\n\n[Network]\nDHCP=yes\n"); err != nil {
-		return errorsx.Wrap(err, "unable to write the machine's network")
-	}
-	if err = network.Close(); err != nil {
-		return errorsx.Wrap(err, "unable to write the machine's network")
-	}
-	if err = root.Symlink("/usr/lib/systemd/system/systemd-networkd.service", "etc/systemd/system/multi-user.target.wants/systemd-networkd.service", egiso.Privileged, egiso.Privileged); err != nil {
-		return errorsx.Wrap(err, "unable to enable the machine's networkd")
-	}
-	if err = errorsx.Ignore(root.Remove("etc/resolv.conf"), fs.ErrNotExist); err != nil {
-		return errorsx.Wrap(err, "unable to replace the machine's resolv.conf")
-	}
-	if err = root.Symlink("../run/systemd/resolve/stub-resolv.conf", "etc/resolv.conf", egiso.Privileged, egiso.Privileged); err != nil {
-		return errorsx.Wrap(err, "unable to replace the machine's resolv.conf")
-	}
-
-	if machine, err = egvm.Boot(egvm.New(egvm.Directory(), serve, devices...), log.Writer()); err != nil {
+	if machine, err = egvm.Boot(egvm.New(root, options...), log.Writer()); err != nil {
 		return err
 	}
 	defer func() { err = errorsx.Compact(err, machine.Close()) }()

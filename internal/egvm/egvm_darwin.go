@@ -8,10 +8,12 @@ import (
 	"io"
 	"net"
 	"os"
+	"path/filepath"
 	"sync"
 	"time"
 
 	"github.com/Code-Hex/vz/v3"
+	"github.com/egdaemon/eg/internal/egiso"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/interp/execproxy"
 	"google.golang.org/protobuf/encoding/protodelim"
@@ -64,7 +66,7 @@ func Boot(m Machine, console io.Writer) (_ *VM, err error) {
 		return nil, errorsx.Wrap(err, "unable to listen for the machine's root")
 	}
 	t.closers = append(t.closers, nfs)
-	go m.Root(nfs)
+	go egiso.ServeNFS(nfs, m.root, m.nfs...)
 
 	go func() {
 		defer close(t.copied)
@@ -194,13 +196,14 @@ func configure(m Machine, in *os.File, out *os.File) (_ *vz.VirtualMachineConfig
 		nat      *vz.NATNetworkDeviceAttachment
 		network  *vz.VirtioNetworkDeviceConfiguration
 		mac      *vz.MACAddress
-		shares   = make([]vz.DirectorySharingDeviceConfiguration, 0, len(m.Shares))
+		device   *vz.VirtioFileSystemDeviceConfiguration
+		shares   = make([]vz.DirectorySharingDeviceConfiguration, 0, len(m.shares))
 	)
 
-	if boot, err = vz.NewLinuxBootLoader(m.Kernel, vz.WithInitrd(m.Initrd), vz.WithCommandLine(m.Cmdline)); err != nil {
+	if boot, err = vz.NewLinuxBootLoader(filepath.Join(m.dir, "Image"), vz.WithInitrd(filepath.Join(m.dir, "initramfs")), vz.WithCommandLine(m.cmdline())); err != nil {
 		return nil, errorsx.Wrap(err, "unable to create the boot loader")
 	}
-	if config, err = vz.NewVirtualMachineConfiguration(boot, m.CPUs, m.Memory); err != nil {
+	if config, err = vz.NewVirtualMachineConfiguration(boot, m.cpus, m.memory); err != nil {
 		return nil, errorsx.Wrap(err, "unable to create the machine configuration")
 	}
 	if platform, err = vz.NewGenericPlatformConfiguration(); err != nil {
@@ -238,9 +241,8 @@ func configure(m Machine, in *os.File, out *os.File) (_ *vz.VirtualMachineConfig
 	network.SetMACAddress(mac)
 	config.SetNetworkDevicesVirtualMachineConfiguration([]*vz.VirtioNetworkDeviceConfiguration{network})
 
-	for _, s := range m.Shares {
-		device, err := share(s)
-		if err != nil {
+	for _, s := range m.shares {
+		if device, err = share(s); err != nil {
 			return nil, err
 		}
 		shares = append(shares, device)

@@ -190,19 +190,22 @@ func agent(switching *os.File, switched *os.File) (err error) {
 }
 
 // forward connects each connection the listener nfs accepts to the host's NFS server.
-func forward(nfs *os.File) error {
-	l, err := net.FileListener(nfs)
-	if err != nil {
+func forward(nfs *os.File) (err error) {
+	var (
+		l    net.Listener
+		conn net.Conn
+	)
+
+	if l, err = net.FileListener(nfs); err != nil {
 		return err
 	}
 
 	for {
-		conn, err := l.Accept()
-		if err != nil {
+		if conn, err = l.Accept(); err != nil {
 			return err
 		}
 
-		go func() {
+		go func(conn net.Conn) {
 			defer conn.Close()
 
 			fd, cause := unix.Socket(unix.AF_VSOCK, unix.SOCK_STREAM|unix.SOCK_CLOEXEC, 0)
@@ -222,7 +225,7 @@ func forward(nfs *os.File) error {
 				host.Close()
 			}()
 			io.Copy(conn, host)
-		}()
+		}(conn)
 	}
 }
 

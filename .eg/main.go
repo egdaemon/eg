@@ -33,7 +33,7 @@ func main() {
 			ctx,
 			c1,
 			eggolang.New().Timeout(10*time.Minute).AutoInstall(),
-			eggolang.New().Timeout(10*time.Minute).AutoTest(),
+			eggolang.New().Timeout(egenv.TTL()).AutoTest(),
 			egbug.Log("recording coverage initiated"),
 			egcoverage.Report(eggolang.Coverage().MarkGeneratedExt(".gen.go", ".pb.go", ".autogen_test.go")...),
 			// copies the binary built by AutoInstall into the workspace directory

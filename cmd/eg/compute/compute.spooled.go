@@ -176,6 +176,8 @@ func (t spooled) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err
 		runners.QueueOptionCompletion(cc),
 		runners.QueueOptionAgentOptions(
 			agentopt,
+			// nested containers cannot create the systemd scopes crun needs, same as the runner for the containers it launches.
+			envx.Toggle(runners.AgentOptionNoop, runners.AgentOptionCommandLine("--cgroups", "disabled"), runners.Nested()),
 			// nested containers cannot write the sysctls netavark needs for a bridge network, share the outer network like compute local.
 			envx.Toggle(runners.AgentOptionNoop, runners.AgentOptionCommandLine("--network", "host"), runners.Nested() && !envx.Boolean(false, eg.EnvExperimentalDisableHostNetwork)),
 		),

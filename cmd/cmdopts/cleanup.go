@@ -6,8 +6,23 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"slices"
 	"sync"
 )
+
+// CleanupSignals - the set of signals that trigger Cleanup. It is bound into kong
+// so a command can adjust it from a BeforeApply/AfterApply hook, e.g. removing
+// os.Interrupt to handle SIGINT itself. Cleanup is started after parsing completes.
+type CleanupSignals struct {
+	Sigs []os.Signal
+}
+
+// Remove - stops the provided signals from triggering Cleanup.
+func (t *CleanupSignals) Remove(sigs ...os.Signal) {
+	t.Sigs = slices.DeleteFunc(t.Sigs, func(s os.Signal) bool {
+		return slices.Contains(sigs, s)
+	})
+}
 
 // Cleanup - waits for one of the provided signals, or for the provided context's
 // done event to be received. Once received the cleanup function is executed and

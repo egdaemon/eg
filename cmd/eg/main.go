@@ -116,9 +116,8 @@ func main() {
 	shellcli.Context, shellcli.Shutdown = context.WithCancelCause(shellcli.Context)
 	log.SetFlags(log.Lshortfile | log.LUTC | log.Ltime)
 	log.SetPrefix(fmt.Sprintf("[%d]", os.Getpid()))
-	go cmdopts.Cleanup(shellcli.Context, shellcli.Shutdown, shellcli.Cleanup, func() {
-		log.Println("waiting for systems to shutdown")
-	}, os.Kill, syscall.SIGTERM, os.Interrupt)
+	// commands may adjust the signals from a kong hook, cleanup starts after parsing.
+	cleanupsigs := &cmdopts.CleanupSignals{Sigs: []os.Signal{os.Kill, syscall.SIGTERM, os.Interrupt}}
 	user := userx.CurrentUserOrDefault(userx.Root())
 	gitdir := envx.String(gitx.DetectRoot(), "EG_GIT_REPOSITORY")
 	gdxsocket := filepath.Join(userx.DefaultRuntimeDirectory(), gdx.DefaultSocket)
@@ -185,6 +184,7 @@ func main() {
 		kong.Bind(
 			&shellcli.Global,
 			&shellcli.TLSConfig,
+			cleanupsigs,
 			new(cmdopts.HotswapPath),
 			cmdopts.Entropy(cmdopts.GenerateEntropy),
 			cmdopts.KeyGenSeeded(cmdopts.DefaultKeyGenSeeded),
@@ -221,6 +221,10 @@ func main() {
 		log.Println(cmderrors.Sprint(err))
 		os.Exit(1)
 	}
+
+	go cmdopts.Cleanup(shellcli.Context, shellcli.Shutdown, shellcli.Cleanup, func() {
+		log.Println("waiting for systems to shutdown")
+	}, cleanupsigs.Sigs...)
 
 	if envx.Boolean(false, eg.EnvLogsDebug) {
 		log.Println("api host", eg.EnvAPIHostDefault())

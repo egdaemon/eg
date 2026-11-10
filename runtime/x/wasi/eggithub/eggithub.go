@@ -10,6 +10,8 @@ import (
 
 	_eg "github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/internal/debugx"
+	"github.com/egdaemon/eg/internal/envx"
+	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/fsx"
 	"github.com/egdaemon/eg/runtime/wasi/eg"
 	"github.com/egdaemon/eg/runtime/wasi/egenv"
@@ -41,6 +43,19 @@ func DownloadURL(pattern string) string {
 	canon = strings.ReplaceAll(canon, "git@", "https://")                                                // https://github.com:egdaemon/eg/releases/download/%release%/%archive%
 
 	return canon
+}
+
+// Env returns the environment entries (KEY=VALUE) needed for gh to authenticate, currently GH_TOKEN
+// sourced from the GitHub token eg provides. pass them to a shell command's EnvironFrom:
+//
+//	gh := shell.Env().EnvironFrom(eggithub.Env()...)
+//	shell.Run(ctx, gh.New("gh workflow run release.yml --ref main").Attempts(3))
+//
+// for local environments `eg compute local` auto-detects a GitHub token via `gh auth token` when the
+// repository's remote is github.com and the gh cli is installed. override it explicitly with
+// e.g.) eg compute local -e GH_TOKEN=<token>, needed for environments without gh.
+func Env() []string {
+	return errorsx.Must(envx.Build().Var(_eg.EnvGithubToken, ffigit.Bearer()).Environ())
 }
 
 // Draft creates (or reuses) a draft release for PatternVersion and uploads

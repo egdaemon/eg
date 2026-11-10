@@ -191,6 +191,9 @@ func configure(m Machine, in *os.File, out *os.File) (_ *vz.VirtualMachineConfig
 		console  *vz.FileHandleSerialPortAttachment
 		serial   *vz.VirtioConsoleDeviceSerialPortConfiguration
 		socket   *vz.VirtioSocketDeviceConfiguration
+		nat      *vz.NATNetworkDeviceAttachment
+		network  *vz.VirtioNetworkDeviceConfiguration
+		mac      *vz.MACAddress
 		shares   = make([]vz.DirectorySharingDeviceConfiguration, 0, len(m.Shares))
 	)
 
@@ -222,6 +225,18 @@ func configure(m Machine, in *os.File, out *os.File) (_ *vz.VirtualMachineConfig
 		return nil, errorsx.Wrap(err, "unable to create the socket device")
 	}
 	config.SetSocketDevicesVirtualMachineConfiguration([]vz.SocketDeviceConfiguration{socket})
+
+	if nat, err = vz.NewNATNetworkDeviceAttachment(); err != nil {
+		return nil, errorsx.Wrap(err, "unable to create the network attachment")
+	}
+	if network, err = vz.NewVirtioNetworkDeviceConfiguration(nat); err != nil {
+		return nil, errorsx.Wrap(err, "unable to create the network device")
+	}
+	if mac, err = vz.NewRandomLocallyAdministeredMACAddress(); err != nil {
+		return nil, errorsx.Wrap(err, "unable to create the network device's address")
+	}
+	network.SetMACAddress(mac)
+	config.SetNetworkDevicesVirtualMachineConfiguration([]*vz.VirtioNetworkDeviceConfiguration{network})
 
 	for _, s := range m.Shares {
 		device, err := share(s)

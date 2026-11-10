@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"log"
 	"net"
 	"os"
@@ -65,6 +66,7 @@ func (t vm) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, hotswapbin *cmdop
 		upperdir  string
 		upper     *os.Root
 		fstab     *os.File
+		network   *os.File
 		machine   *egvm.VM
 		environ   []string
 		verbosity string
@@ -213,15 +215,37 @@ func (t vm) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, hotswapbin *cmdop
 		return errorsx.Wrap(err, "unable to write the machine's fstab")
 	}
 
+	// the image's networkd leases the machine's address from its NAT, and the image's resolved answers
+	// its names, where podman sets up a container's network itself.
+	if network, err = root.OpenFile("etc/systemd/network/10-eg.network", os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644, egiso.Privileged, egiso.Privileged); err != nil {
+		return errorsx.Wrap(err, "unable to open the machine's network")
+	}
+	defer network.Close()
+	if _, err = io.WriteString(network, "[Match]\nType=ether\n\n[Network]\nDHCP=yes\n"); err != nil {
+		return errorsx.Wrap(err, "unable to write the machine's network")
+	}
+	if err = network.Close(); err != nil {
+		return errorsx.Wrap(err, "unable to write the machine's network")
+	}
+	if err = root.Symlink("/usr/lib/systemd/system/systemd-networkd.service", "etc/systemd/system/multi-user.target.wants/systemd-networkd.service", egiso.Privileged, egiso.Privileged); err != nil {
+		return errorsx.Wrap(err, "unable to enable the machine's networkd")
+	}
+	if err = errorsx.Ignore(root.Remove("etc/resolv.conf"), fs.ErrNotExist); err != nil {
+		return errorsx.Wrap(err, "unable to replace the machine's resolv.conf")
+	}
+	if err = root.Symlink("../run/systemd/resolve/stub-resolv.conf", "etc/resolv.conf", egiso.Privileged, egiso.Privileged); err != nil {
+		return errorsx.Wrap(err, "unable to replace the machine's resolv.conf")
+	}
+
 	if machine, err = egvm.Boot(egvm.New(egvm.Directory(), serve, devices...), log.Writer()); err != nil {
 		return err
 	}
 	defer func() { err = errorsx.Compact(err, machine.Close()) }()
 
-	// podman execs into a started container; the machine's mounts are systemd's to finish first, once
-	// systemd answers.
+	// podman execs into a started container; the machine's mounts and network are systemd's to finish
+	// first, once systemd answers.
 	for code = -1; code != 0; time.Sleep(10 * time.Millisecond) {
-		if code, err = machine.Exec(gctx.Context, &execproxy.ExecRequest{Cmd: "systemctl", Arguments: []string{"start", "local-fs.target"}, Dir: "/"}, nil, io.Discard, io.Discard); err != nil {
+		if code, err = machine.Exec(gctx.Context, &execproxy.ExecRequest{Cmd: "systemctl", Arguments: []string{"start", "local-fs.target", "systemd-networkd-wait-online.service"}, Dir: "/"}, nil, io.Discard, io.Discard); err != nil {
 			return errorsx.Wrap(err, "unable to wait for the machine's mounts")
 		}
 	}

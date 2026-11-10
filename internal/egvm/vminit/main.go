@@ -131,6 +131,12 @@ func boot() error {
 		}
 	}
 
+	// the root sees /sys read only, as a container does, so its systemd configures devices without
+	// the udev container images leave out.
+	if err = unix.Mount("", "/root/sys", "", unix.MS_REMOUNT|unix.MS_BIND|unix.MS_RDONLY, ""); err != nil {
+		return fmt.Errorf("unable to make the root's /sys read only: %w", err)
+	}
+
 	// the agent enters the root before it moves over the initramfs, which hides the root's path.
 	switchw.Close()
 	if _, err = io.Copy(io.Discard, switchedr); err != nil {

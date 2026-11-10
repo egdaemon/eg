@@ -309,7 +309,7 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 	).Var(
 		eg.EnvComputeRuntimeDirectory, eg.DefaultRuntimeDirectory(),
 	).Var(
-		eg.EnvComputeWorkloadDirectory, eg.DefaultWorkspaceDirectory(),
+		eg.EnvComputeWorkspaceDirectory, eg.DefaultWorkspaceDirectory(),
 	).Var(
 		"PAGER", "cat", // no paging in this environmenet.
 	)

@@ -329,13 +329,17 @@ func envval[T any](fallback T, m func(string) string, parse func(string) (T, err
 }
 
 func PrintEnv(envs ...string) string {
-	sort.Strings(envs)
-	s := fmt.Sprintln("DEBUG ENVIRONMENT INITIATED")
-	for _, e := range envs {
-		s += fmt.Sprintln(e)
+	cpy := make([]string, len(envs))
+	copy(cpy, envs)
+	sort.Strings(cpy)
+
+	var s strings.Builder
+	fmt.Fprintln(&s, "DEBUG ENVIRONMENT INITIATED")
+	for _, e := range cpy {
+		fmt.Fprintln(&s, e)
 	}
-	s += fmt.Sprintln("DEBUG ENVIRONMENT COMPLETED")
-	return s
+	fmt.Fprintln(&s, "DEBUG ENVIRONMENT COMPLETED")
+	return s.String()
 }
 
 func Debug(envs ...string) {

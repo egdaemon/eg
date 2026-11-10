@@ -19,6 +19,11 @@ func Fixture(path ...string) string {
 	return filepath.Join(".fixtures", filepath.Join(path...))
 }
 
+// XFixture is Fixture for the .xfixtures directory of the package, static examples and the programs that tests build.
+func XFixture(path ...string) string {
+	return filepath.Join(".xfixtures", filepath.Join(path...))
+}
+
 // Read a file at the given path.
 func Read(path ...string) io.Reader {
 	return bytes.NewReader(errorsx.Must(os.ReadFile(filepath.Join(path...))))

@@ -24,7 +24,7 @@ import (
 )
 
 func TestMounts(t *testing.T) {
-	wasm := interptest.Build(t, "./interp/.fixtures/mounts")
+	wasm := interptest.Build(t, "./interp/.xfixtures/mounts")
 
 	workspace := func(t *testing.T) workspaces.Context {
 		return workspaces.Context{

@@ -241,6 +241,15 @@ type runner struct {
 	repocache string
 }
 
+func (t runner) modulenv(mcfg wazero.ModuleConfig, wshost workspaces.Context) wazero.ModuleConfig {
+	hostenviron := moduleenviron(wshost)
+	// envx.Debug(t.environ...)
+	// envx.Debug(hostenviron...)
+	mcfg = wasix.Environ(mcfg, hostenviron...)
+	mcfg = wasix.Environ(mcfg, t.environ...)
+	return mcfg
+}
+
 func (t runner) perform(ctx context.Context, wshost workspaces.Context, runid, path string, rtb runtimefn) (err error) {
 	const (
 		DefaultSSLCertDir = "/etc/ssl/certs"
@@ -346,12 +355,7 @@ func (t runner) perform(ctx context.Context, wshost workspaces.Context, runid, p
 	).WithFSConfig(
 		wazerofs,
 	).WithSysNanotime().WithSysWalltime().WithRandSource(rand.Reader)
-
-	environ := moduleenviron(wshost)
-	// envx.Debug(t.environ...)
-	// envx.Debug(environ...)
-	mcfg = wasix.Environ(mcfg, t.environ...)
-	mcfg = wasix.Environ(mcfg, environ...)
+	mcfg = t.modulenv(mcfg, wshost)
 
 	wasienv, err := wasi_snapshot_preview1.NewBuilder(runtime).Instantiate(ctx)
 	if err != nil {

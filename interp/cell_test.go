@@ -25,7 +25,7 @@ func TestCell(t *testing.T) {
 		out bytes.Buffer
 	)
 
-	wasm := interptest.Build(t, "./interp/.fixtures/cell")
+	wasm := interptest.Build(t, "./interp/.xfixtures/cell")
 
 	tw := tar.NewWriter(&buf)
 	require.NoError(t, tw.WriteHeader(&tar.Header{Typeflag: tar.TypeDir, Name: "etc/", Mode: 0755}))

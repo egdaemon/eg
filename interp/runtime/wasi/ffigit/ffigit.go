@@ -143,7 +143,8 @@ func CloneV2(dir string, runtimedir string) func(
 			}
 
 			log.Println("no auth detected")
-			return nil
+			// go-git invokes every option, a nil option panics. a nil auth is a noop.
+			return client.WithHTTPAuth(nil)
 		}
 
 		// this is a hack to disable cloning in local environment. we need to work on improving

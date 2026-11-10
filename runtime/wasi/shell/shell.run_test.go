@@ -15,6 +15,6 @@ func TestRun(t *testing.T) {
 		cmd := shell.New("echo hello")
 		rec := shell.NewRecorder(&cmd)
 		require.NoError(t, shell.Run(t.Context(), cmd))
-		require.True(t, strings.HasSuffix(rec.Result(), "bash -c echo hello"), rec.Result())
+		require.True(t, strings.HasSuffix(rec.Result(), "bash -o pipefail -c echo hello"), rec.Result())
 	})
 }

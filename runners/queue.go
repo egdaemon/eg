@@ -81,14 +81,17 @@ func (t noopcompletion) Upload(ctx context.Context, id string, duration time.Dur
 	return nil
 }
 
-type localdownloader struct{}
+// localdownloader waits for workloads to appear in the queued directory of dirs.
+type localdownloader struct {
+	dirs SpoolDirs
+}
 
 func (t localdownloader) Download(ctx context.Context) (err error) {
 	var (
 		pending *fsnotify.Watcher
 	)
 
-	dirs := DefaultSpoolDirs()
+	dirs := t.dirs
 
 	if pending, err = fsnotify.NewWatcher(); err != nil {
 		return errorsx.Wrap(err, "failed to watch queued directory")
@@ -229,7 +232,7 @@ func RunOne(ctx context.Context, id int, delay time.Duration, authclient *http.C
 					reload:     reload,
 					completion: noopcompletion{},
 					authclient: authclient,
-					downloader: localdownloader{},
+					downloader: localdownloader{dirs: *dirs},
 					failure: func(cause error) {
 						log.Println(cause)
 					},
@@ -286,7 +289,7 @@ func QueueN(ctx context.Context, n int, authclient *http.Client, dirs SpoolDirs,
 				reload:     reload,
 				completion: noopcompletion{},
 				authclient: authclient,
-				downloader: localdownloader{},
+				downloader: localdownloader{dirs: dirs},
 				dirs:       &dirs,
 			},
 			options...,

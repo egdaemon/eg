@@ -16,11 +16,11 @@ func TestShellCommands(t *testing.T) {
 	examples := []example{
 		{
 			cmd:      shell.New("echo \"hello world\"").User("derp").Group("derp"),
-			expected: "::sudo:-E -H -u derp -g derp bash -c echo \"hello world\"",
+			expected: "::sudo:-E -H -u derp -g derp bash -o pipefail -c echo \"hello world\"",
 		},
 		{
 			cmd:      shell.New("psql --no-psqlrc -U postgres -d postgres -q -At -c \"SELECT pg_reload_conf();\""),
-			expected: "::sudo:-E -H -u egd -g egd bash -c psql --no-psqlrc -U postgres -d postgres -q -At -c \"SELECT pg_reload_conf();\"",
+			expected: "::sudo:-E -H -u egd -g egd bash -o pipefail -c psql --no-psqlrc -U postgres -d postgres -q -At -c \"SELECT pg_reload_conf();\"",
 		},
 	}
 

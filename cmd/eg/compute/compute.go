@@ -3,6 +3,7 @@ package compute
 type Cmd struct {
 	Builtin    cmdbuiltin `cmd:"" help:"EXPERIMENTAL: run builtin workloads like cache clearing and standalone containers/wasi workloads"`
 	Archive    archive    `cmd:"" help:"compiles and creates a workload tar archive from manual inspection/storage"`
+	Spooled    spooled    `cmd:"" help:"EXPERIMENTAL: run a workload archive read from stdin through the daemon's spool and queue, i.e. eg compute archive <module> | eg compute spooled"`
 	Upload     upload     `cmd:"" help:"compiles and uploads a workload to the cluster"`
 	Watch      watch      `cmd:"" help:"follow the logs and result of an enqueued workload by id"`
 	Download   download   `cmd:"" help:"download the logs or analytics of a workload by id"`

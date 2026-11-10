@@ -79,6 +79,8 @@ func IntegrationTests(ctx context.Context, op eg.Op) error {
 			runtime.Newf("%s --hotswap compute local tests/stress", egbin),
 			runtime.Newf("%s --hotswap compute local tests/localref", egbin),
 			runtime.Newf("%s --hotswap compute local tests/egdb", egbin),
+			// exercises the runner path (spool, queue, archive unpack) which compute local bypasses.
+			runtime.Newf("%s --hotswap compute archive tests/stress | %s --hotswap compute spooled", egbin, egbin),
 			// runtime.New("/home/egd/go/bin/eg compute baremetal -vvvv tests/tty"),
 			// runtime.New("/home/egd/go/bin/eg compute baremetal tests/containers"),
 			// runtime.New("/home/egd/go/bin/eg compute baremetal -vv tests/gpgagent"),

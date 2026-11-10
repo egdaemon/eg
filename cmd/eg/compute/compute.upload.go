@@ -51,7 +51,7 @@ type upload struct {
 	Environment      []string `name:"env" short:"e" help:"define environment variables and their values to be included"`
 	Endpoint         string   `name:"endpoint" help:"specify the endpoint to upload to" default:"${vars_endpoint}/c/q/" hidden:"true"`
 	GitRemote        string   `name:"git-remote" help:"name of the git remote to use" default:"${vars_git_default_remote_name}"`
-	GitReference     string   `name:"git-ref" help:"name of the branch or commit to checkout" default:"${vars_git_default_reference}"`
+	GitReference     string   `name:"git-ref" help:"name of the branch or commit to checkout" default:"${vars_git_head_reference}"`
 	GitClone         string   `name:"git-clone-uri" help:"clone uri"`
 	GCPAuto          bool     `name:"gcp-auto" help:"have the runner issue the account's gcp credentials (workload identity) to the workload"`
 	Secrets          []string `name:"secret" help:"List of secret URIs to use. Examples: chachasm://passphrase@/path/to/file, gcpsm://project-id/secret-name/version, awssm://secret-name?region=us-east-1"`

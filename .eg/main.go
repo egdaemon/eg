@@ -73,12 +73,12 @@ func IntegrationTests(ctx context.Context, op eg.Op) error {
 		ctx,
 		shell.Op(
 			// envvars is the most likely to break.
-			// runtime.Newf("%s --hotswap compute local tests/envvars", egbin),
-			// runtime.Newf("%s --hotswap compute local tests/concurrent", egbin),
-			// runtime.Newf("%s --hotswap compute local tests/metrics", egbin),
-			// runtime.Newf("%s --hotswap compute local tests/stress", egbin),
-			// runtime.Newf("%s --hotswap compute local tests/localref", egbin),
-			// runtime.Newf("%s --hotswap compute local tests/egdb", egbin),
+			runtime.Newf("%s --hotswap compute local tests/envvars", egbin),
+			runtime.Newf("%s --hotswap compute local tests/concurrent", egbin),
+			runtime.Newf("%s --hotswap compute local tests/metrics", egbin),
+			runtime.Newf("%s --hotswap compute local tests/stress", egbin),
+			runtime.Newf("%s --hotswap compute local tests/localref", egbin),
+			runtime.Newf("%s --hotswap compute local tests/egdb", egbin),
 			// exercises the runner path (spool, queue, archive unpack) which compute local bypasses.
 			runtime.Newf("%s --hotswap compute archive --invalidate-cache tests/stress | %s --hotswap compute spooled", egbin, egbin),
 			// runtime.New("/home/egd/go/bin/eg compute baremetal -vvvv tests/tty"),

@@ -35,6 +35,17 @@ func NewOwners() Owners {
 	return Owners{privileged: Privileged, standard: Default}
 }
 
+// Identity exposes every account as its own name, for a root whose machine has its own accounts:
+// the egiso as a machine's root, rather than an environment's.
+func Identity(accounts []Account) Owners {
+	owners := NewOwners()
+	owners.ids = make(map[int]string, len(accounts))
+	for _, a := range accounts {
+		owners.ids[a.ID] = a.Name
+	}
+	return owners
+}
+
 // Privileged sets the virtual user that owns what id 0 owns in the source.
 func (t Owners) Privileged(virtual string) Owners {
 	t.privileged = virtual

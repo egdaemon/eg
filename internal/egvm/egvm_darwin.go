@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/Code-Hex/vz/v3"
-	"github.com/egdaemon/eg/internal/egiso"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/interp/execproxy"
 	"google.golang.org/protobuf/encoding/protodelim"
@@ -65,7 +64,7 @@ func Boot(m Machine, console io.Writer) (_ *VM, err error) {
 		return nil, errorsx.Wrap(err, "unable to listen for the machine's root")
 	}
 	t.closers = append(t.closers, nfs)
-	go egiso.ServeNFS(nfs, m.Root)
+	go m.Root(nfs)
 
 	go func() {
 		defer close(t.copied)

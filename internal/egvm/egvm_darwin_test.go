@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -96,15 +97,16 @@ func TestExec(t *testing.T) {
 		return archive
 	}
 
-	// root puts an upper over the image.
-	root := func(t *testing.T, archive *egiso.Archive) (*egiso.SysFS, string) {
+	// root serves an upper over the image.
+	root := func(t *testing.T, archive *egiso.Archive) (func(net.Listener) error, string) {
 		upperdir := t.TempDir()
 		dir, err := os.OpenRoot(upperdir)
 		require.NoError(t, err)
 		t.Cleanup(func() { dir.Close() })
 
 		tree := egiso.Tree{}.Mount(".", archive, egiso.NewOwners(), egiso.NewOwners())
-		return egiso.NewSysFS(egiso.NewUpper(tree, dir), egiso.Default, egiso.Default), upperdir
+		fsys := egiso.NewSysFS(egiso.NewUpper(tree, dir), egiso.Default, egiso.Default)
+		return func(l net.Listener) error { return egiso.ServeNFS(l, fsys) }, upperdir
 	}
 
 	var (

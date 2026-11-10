@@ -6,7 +6,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"github.com/egdaemon/eg/jsonx"
 	"io"
 	"io/fs"
 	"iter"
@@ -20,6 +19,8 @@ import (
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/egdaemon/eg/jsonx"
 
 	"github.com/egdaemon/eg/computeapi"
 
@@ -572,11 +573,12 @@ type stateinit struct {
 func (t stateinit) Update(ctx context.Context) state {
 	var (
 		containerdir  = userx.DefaultCacheDirectory("wcache", cacheprefix(t.workload), t.bucket, "containers")
+		repocache     = userx.DefaultCacheDirectory("wcache", cacheprefix(t.workload), "repos")
 		logpath       = filepath.Join(t.ws.RuntimeDir, DaemonLogName)
 		analyticspath = filepath.Join(t.ws.RuntimeDir, DaemonAnalyticsName)
 	)
 
-	if err := fsx.MkDirs(0770, containerdir); err != nil {
+	if err := fsx.MkDirs(0770, containerdir, repocache); err != nil {
 		return completed(t.workload, t.metadata, t.bucket, t.ws, 0, errorsx.Wrap(err, "unable to setup container and cache directories"))
 	}
 
@@ -781,6 +783,7 @@ func (t staterunning) Update(ctx context.Context) state {
 		err          error
 		logdst       *os.File
 		containerdir = userx.DefaultCacheDirectory("wcache", cacheprefix(t.workload), t.bucket, "containers")
+		repocache    = userx.DefaultCacheDirectory("wcache", cacheprefix(t.workload), "repos")
 		logpath      = filepath.Join(t.ws.RuntimeDir, DaemonLogName)
 	)
 
@@ -792,6 +795,7 @@ func (t staterunning) Update(ctx context.Context) state {
 	options := append(
 		t.ragent.Options(),
 		"--volume", AgentMountReadWrite(containerdir, "/var/lib/containers"),
+		"--volume", AgentMountReadWrite(repocache, eg.DefaultMountRoot("repos")),
 		"--volume", AgentMountReadOnly(filepath.Join(t.ws.RuntimeDir, t.workload.Entry), eg.ModuleMount()),
 		"--volume", AgentMountReadWrite(t.ws.RuntimeDir, eg.DefaultMountRoot(eg.RuntimeDirectory)),
 		"--volume", AgentMountReadWrite(t.ws.WorkingDir, eg.DefaultMountRoot(eg.WorkingDirectory)),

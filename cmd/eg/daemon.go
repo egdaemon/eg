@@ -50,6 +50,7 @@ type daemon struct {
 	EnvVars       []string      `name:"env" short:"e" help:"environment variables to import"`
 	MDNSAdvertise bool          `name:"mdns-advertise" help:"advertise this daemon on the local network (multicast dns) so clients on the same network can upload to it directly, requires --uploadable" default:"false" negatable:"" env:"EG_MDNS_ADVERTISE"`
 	LANPeerTTL    time.Duration `name:"lan-peer-ttl" type:"durationinf" help:"how long peers that reached this daemon are remembered after they were last seen" default:"720h" env:"EG_LAN_PEER_TTL"`
+	RepoCache     bool          `name:"repo-cache" help:"mirror cloned repositories in the workload cache so repeat clones are incremental" hidden:"" default:"false" env:"EG_EXPERIMENTAL_REPO_CACHE"`
 	Uploadable    bool          `name:"uploadable" help:"accept workloads pushed directly to this runner (POST /c/upload, POST /c/enqueue) and advertise it to the control plane" default:"true" negatable:"" env:"EG_COMPUTE_API_ENABLED"`
 }
 
@@ -74,12 +75,15 @@ func gpuresources(rr cmdopts.RuntimeResources, driver string, vram uint64) cmdop
 // allowing the control plane to interogate
 func (t daemon) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, keygen cmdopts.KeyGenSeeded) (err error) {
 	var (
-		signer     ssh.Signer
-		httpl      net.Listener
-		grpcl      net.Listener
-		authclient *http.Client
-		p2p        host.Host
+		signer        ssh.Signer
+		httpl         net.Listener
+		grpcl         net.Listener
+		authclient    *http.Client
+		p2p           host.Host
+		crepocacheopt runners.CompileOption = runners.CompileOptionNoop
+		repocacheopt  runners.AgentOption   = runners.AgentOptionNoop
 	)
+
 	log.Println("running daemon initiated")
 	defer log.Println("running daemon completed")
 
@@ -173,7 +177,13 @@ func (t daemon) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, keygen cmdopt
 		go runners.AutoDownload(gctx.Context, authclient, rm)
 	}
 
-	go runners.AutoCompileReserved(gctx.Context, tlsc.DefaultClient(), authclient, compiledirs, rundirs)
+	if t.RepoCache {
+		crepocacheopt = runners.CompileOptionRepoCache(userx.DefaultCacheDirectory("repos"))
+		// we'll do this later.
+		// repocacheopt = runners.AgentOptionEnv(eg.EnvComputeRepoCache, eg.DefaultMountRoot("repos"))
+	}
+
+	go runners.AutoCompileReserved(gctx.Context, tlsc.DefaultClient(), authclient, compiledirs, rundirs, crepocacheopt)
 
 	if _, found := os.LookupEnv("SSH_AUTH_SOCK"); !found {
 		if err = daemons.SSHAgent(gctx, t.SSHAgentPath); err != nil {
@@ -213,6 +223,7 @@ func (t daemon) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, keygen cmdopt
 			runners.AgentOptionVolumes(t.MountDirs...),
 			runners.AgentOptionEnvKeys(t.EnvVars...),
 			runners.AgentOptionEnv(eg.EnvComputeTLSInsecure, strconv.FormatBool(tlsc.Insecure)),
+			repocacheopt,
 		),
 		runners.QueueOptionLogVerbosity(gctx.Verbosity),
 		runners.QueueOptionGPU(t.RuntimeResources.Vram > 0),

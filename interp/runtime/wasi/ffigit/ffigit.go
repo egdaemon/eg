@@ -78,7 +78,7 @@ func Bearer(runtimedir string) func(
 	}
 }
 
-func CloneV2(dir string, runtimedir string) func(
+func CloneV2(cachedir string, dir string, runtimedir string) func(
 	ctx context.Context,
 	m api.Module,
 	deadline int64, // context.Context
@@ -150,7 +150,7 @@ func CloneV2(dir string, runtimedir string) func(
 		// this is a hack to disable cloning in local environment. we need to work on improving
 		// go-git to support this case cleanly.
 		if environ.Boolean(true, eg.EnvUnsafeGitCloneEnabled) {
-			if err := gitx.Clone(ctx, dir, uri, remote, treeish, autoauth()); err != nil {
+			if err := gitx.Clone(ctx, cachedir, dir, uri, remote, treeish, autoauth()); err != nil {
 				log.Println(errorsx.Wrap(err, "clone failed"))
 				return 1
 			}

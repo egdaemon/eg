@@ -16,6 +16,7 @@ import (
 	"github.com/egdaemon/eg/internal/fsx"
 	"github.com/egdaemon/eg/internal/httpx"
 	"github.com/egdaemon/eg/internal/iox"
+	"github.com/egdaemon/eg/internal/langx"
 
 	"github.com/alitto/pond/v2"
 )
@@ -44,8 +45,8 @@ func AutoCompile(ctx context.Context, c *http.Client, compiledirs, rundirs Spool
 // CandidateTokenFile) are reserved with the control plane once compiled, and
 // their progress reported, using authclient (the runner's authenticated
 // client). c is still used to exchange access tokens for git credentials.
-func AutoCompileReserved(ctx context.Context, c *http.Client, authclient *http.Client, compiledirs, rundirs SpoolDirs) {
-	if err := compileN(ctx, compilecapacity(), c, authclient, compiledirs, rundirs); err != nil {
+func AutoCompileReserved(ctx context.Context, c *http.Client, authclient *http.Client, compiledirs, rundirs SpoolDirs, options ...CompileOption) {
+	if err := compileN(ctx, compilecapacity(), c, authclient, compiledirs, rundirs, options...); err != nil {
 		log.Println(errorsx.Wrap(err, "compile pool stopped"))
 	}
 }
@@ -59,7 +60,7 @@ func CompileN(ctx context.Context, n int, c *http.Client, compiledirs, rundirs S
 	return compileN(ctx, n, c, httpx.NewFixedStatusClient(http.StatusNotImplemented), compiledirs, rundirs)
 }
 
-func compileN(ctx context.Context, n int, c *http.Client, authclient *http.Client, compiledirs, rundirs SpoolDirs) error {
+func compileN(ctx context.Context, n int, c *http.Client, authclient *http.Client, compiledirs, rundirs SpoolDirs, options ...CompileOption) error {
 	if cause := compilerecover(ctx, compiledirs); cause != nil {
 		log.Println("compile recovery failed, continuing", cause)
 	}
@@ -69,7 +70,7 @@ func compileN(ctx context.Context, n int, c *http.Client, authclient *http.Clien
 
 	for i := 0; i < pool.MaxConcurrency(); i++ {
 		workers = append(workers, pool.SubmitErr(func() error {
-			return compileOne(ctx, c, authclient, compiledirs, rundirs)
+			return compileOne(ctx, c, authclient, compiledirs, rundirs, options...)
 		}))
 	}
 
@@ -123,13 +124,13 @@ func compilerecover(_ context.Context, compiledirs SpoolDirs) error {
 // failed compile is simply discarded (terminal for that job), unlike a
 // load-based rejection which is handled synchronously by the /c/enqueue
 // handler before a job ever reaches this stage.
-func compileOne(ctx context.Context, c *http.Client, authclient *http.Client, compiledirs, rundirs SpoolDirs) error {
+func compileOne(ctx context.Context, c *http.Client, authclient *http.Client, compiledirs, rundirs SpoolDirs, options ...CompileOption) error {
 	var (
 		idle compileidle
 		w    = backoff.Chan()
 	)
 
-	md := compilemetadata{
+	md := langx.Clone(compilemetadata{
 		c:          c,
 		authclient: authclient,
 		rundirs:    rundirs,
@@ -142,7 +143,7 @@ func compileOne(ctx context.Context, c *http.Client, authclient *http.Client, co
 
 			return compilediscard{compiledirs: compiledirs, dir: dir, cause: cause, next: idle}
 		},
-	}
+	}, options...)
 
 	idle = compileidle{
 		compilemetadata: md,

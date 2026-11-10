@@ -68,6 +68,13 @@ func OptionRoot(root experimentalsys.FS) Option {
 	}
 }
 
+// OptionRepoCache is the root directory repositories are mirrored in so clones are incremental, blank disables caching.
+func OptionRepoCache(root string) Option {
+	return func(r *runner) {
+		r.repocache = root
+	}
+}
+
 type runtimefn func(r runner, host wazero.HostModuleBuilder) wazero.HostModuleBuilder
 
 // moduleenviron is the environment the runner provides to the module, read from its runtime directory.
@@ -81,15 +88,12 @@ func moduleenviron(wshost workspaces.Context) []string {
 // may not be necessary.
 func Remote(ctx context.Context, wshost workspaces.Context, aid string, runid string, svc grpc.ClientConnInterface, module string, options ...Option) error {
 	var (
-		r = runner{
+		r = langx.Clone(runner{
 			initonce: &sync.Once{},
 			root:     &sysfs.AdaptFS{FS: embed.FS{}},
 			client:   http.DefaultClient,
-		}
+		}, options...)
 	)
-	for _, opt := range options {
-		opt(&r)
-	}
 
 	debugx.Println("interp workspace context", spew.Sdump(wshost))
 
@@ -185,7 +189,7 @@ func Remote(ctx context.Context, wshost workspaces.Context, aid string, runid st
 			ffigit.Commitish(wshost.WorkingDir),
 		).Export("github.com/egdaemon/eg/runtime/wasi/runtime/ffigit.Commitish").
 			NewFunctionBuilder().WithFunc(
-			ffigit.CloneV2(wshost.WorkingDir, wshost.RuntimeDir),
+			ffigit.CloneV2(fsx.JoinIfPresent(r.repocache, aid), wshost.WorkingDir, wshost.RuntimeDir),
 		).Export("github.com/egdaemon/eg/runtime/wasi/runtime/ffigit.CloneV2").
 			NewFunctionBuilder().WithFunc(
 			ffigit.Bearer(wshost.RuntimeDir),
@@ -230,6 +234,8 @@ type runner struct {
 	initonce *sync.Once
 	root     experimentalsys.FS
 	client   *http.Client
+	// repocache is the root directory repositories are mirrored in, blank disables caching.
+	repocache string
 }
 
 func (t runner) perform(ctx context.Context, wshost workspaces.Context, runid, path string, rtb runtimefn) (err error) {

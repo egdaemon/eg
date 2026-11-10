@@ -6,12 +6,13 @@ import (
 	"crypto/md5"
 	"encoding/json"
 	"errors"
-	"github.com/egdaemon/eg/jsonx"
 	"log"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/egdaemon/eg/jsonx"
 
 	"github.com/egdaemon/eg/computeapi"
 
@@ -98,10 +99,22 @@ func compileWorkloadReserved(ctx context.Context, c *http.Client, authclient *ht
 	return err
 }
 
+type CompileOption func(*compilemetadata)
+
+func CompileOptionNoop(*compilemetadata) {}
+
+// CompileOptionRepoCache is the root directory the repositories compiled workloads are cloned from are mirrored in, so repeat clones are incremental.
+func CompileOptionRepoCache(root string) CompileOption {
+	return func(m *compilemetadata) {
+		m.repocache = root
+	}
+}
+
 type compilemetadata struct {
 	c          *http.Client
 	authclient *http.Client
 	rundirs    SpoolDirs
+	repocache  string // root directory repositories are mirrored in, blank disables caching.
 	// done transitions out of a workload once it has been handed off (cause is
 	// nil) or failed.
 	done func(dir string, cause error) state
@@ -117,9 +130,10 @@ type compilejob struct {
 
 func compilebegin(md compilemetadata, dir string) state {
 	var (
-		err     error
-		encoded []byte
-		req     computeapi.EnqueuedDequeueResponse
+		err       error
+		encoded   []byte
+		req       computeapi.EnqueuedDequeueResponse
+		repocache string
 	)
 
 	log.Println("compiling workload initiated", dir)
@@ -136,9 +150,13 @@ func compilebegin(md compilemetadata, dir string) state {
 		return md.done(dir, errors.New("invalid workload missing enqueued information"))
 	}
 
+	// the mirrors are partitioned by account.
+	if stringsx.Present(md.repocache) {
+		repocache = filepath.Join(md.repocache, req.Enqueued.AccountId)
+	}
 	job := compilejob{compilemetadata: md, dir: dir, token: ReadCandidateToken(dir), req: &req}
 
-	return status(md.authclient, job.token, StatusCompiling, req.Enqueued, statecompiling{compilejob: job})
+	return status(md.authclient, job.token, StatusCompiling, req.Enqueued, statecompiling{cachedir: repocache, compilejob: job})
 }
 
 func compilefailed(job compilejob, cause error) state {
@@ -147,6 +165,7 @@ func compilefailed(job compilejob, cause error) state {
 
 // statecompiling clones and compiles the workload's source into its archive.
 type statecompiling struct {
+	cachedir string
 	compilejob
 }
 
@@ -191,7 +210,7 @@ func (t statecompiling) Update(ctx context.Context) state {
 		opts = append(opts, auth)
 	}
 
-	if err = gitx.Clone(ctx, clonedir, uri, git.DefaultRemoteName, commit, opts...); err != nil {
+	if err = gitx.Clone(ctx, t.cachedir, clonedir, uri, git.DefaultRemoteName, commit, opts...); err != nil {
 		return compilefailed(t.compilejob, errorsx.Wrap(err, "unable to clone repository"))
 	}
 

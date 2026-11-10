@@ -91,6 +91,7 @@ const (
 	EnvComputeWorkloadDirectory      = "EG_COMPUTE_WORKLOAD_DIRECTORY"              // root directory for workloads
 	EnvComputeWorkingDirectory       = "EG_COMPUTE_WORKING_DIRECTORY"               // working directory for workloads
 	EnvComputeCacheDirectory         = "EG_COMPUTE_CACHE_DIRECTORY"                 // cache directory for workloads
+	EnvComputeRepoCache              = "EG_COMPUTE_REPO_CACHE"                      // root directory repositories are mirrored in, blank disables caching.
 	EnvComputeRuntimeDirectory       = "EG_COMPUTE_RUNTIME_DIRECTORY"               // runtime directory for workloads
 	EnvComputeWorkspaceDirectory     = "EG_COMPUTE_WORKSPACE_DIRECTORY"             // workspace directory for workloads
 	EnvComputeWorkloadCapacity       = "EG_COMPUTE_WORKLOAD_CAPACITY"               // upper bound for the maximum number of workloads that can be run concurrently
@@ -283,5 +284,6 @@ const (
 	EnvExperimentalBaremetal          = "EG_EXPERIMENTAL_BAREMETAL"
 	EnvExperimentalBindMount          = "EG_EXPERIMENTAL_BIND_MOUNT"
 	EnvExperimentalProcSockets        = "EG_EXPERIMENTAL_PROC_SOCKETS" // interp/execproxy/v2 carries a command's stdio over unix sockets in the runtime directory.
+	EnvExperimentalRepoCache          = "EG_EXPERIMENTAL_REPO_CACHE"   // runner mirrors cloned repositories in the workload cache so repeat clones are incremental.
 	EnvExperimentalGuestShell         = "EG_EXPERIMENTAL_GUEST_SHELL"  // runtime/x/wasi/egbash interprets commands in the guest, requires EG_EXPERIMENTAL_PROC_SOCKETS for the module.
 )

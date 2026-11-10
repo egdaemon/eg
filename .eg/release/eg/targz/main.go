@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"log"
+	"path/filepath"
 
 	debeg "eg/compute/debuild/eg"
 	egrel "eg/compute/release/eg"
@@ -36,7 +37,11 @@ func main() {
 			debeg.Runner(),
 			shell.Op(
 				runtime.Newf("rsync -a --mkpath .dist/linux/ %s/", dir),
-				runtime.New("go install ./cmd/eg").Environ("GOBIN", dir+"/usr/bin"),
+				// runtime.New("go install ./cmd/eg").Environ("GOBIN", dir+"/usr/bin"),
+			),
+			eggolang.New().Bin(filepath.Join(dir, "usr", "bin")).Timeout(egenv.TTL()).AutoInstall(),
+			shell.Op(
+				runtime.Newf("tree -L 3 %s/", dir),
 			),
 			egtarball.Pack(archive),
 			egtarball.SHA256Op(archive),

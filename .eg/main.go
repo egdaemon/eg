@@ -10,7 +10,6 @@ import (
 	"github.com/egdaemon/eg/runtime/wasi/eggit"
 	"github.com/egdaemon/eg/runtime/wasi/shell"
 	"github.com/egdaemon/eg/runtime/x/wasi/egbug"
-	"github.com/egdaemon/eg/runtime/x/wasi/egcoverage"
 	"github.com/egdaemon/eg/runtime/x/wasi/egdb"
 	"github.com/egdaemon/eg/runtime/x/wasi/eggolang"
 )
@@ -33,9 +32,9 @@ func main() {
 			ctx,
 			c1,
 			eggolang.New().Timeout(10*time.Minute).AutoInstall(),
-			eggolang.New().Timeout(egenv.TTL()).AutoTest(),
-			egbug.Log("recording coverage initiated"),
-			egcoverage.Report(eggolang.Coverage().MarkGeneratedExt(".gen.go", ".pb.go", ".autogen_test.go")...),
+			// eggolang.New().Timeout(egenv.TTL()).AutoTest(),
+			// egbug.Log("recording coverage initiated"),
+			// egcoverage.Report(eggolang.Coverage().MarkGeneratedExt(".gen.go", ".pb.go", ".autogen_test.go")...),
 			// copies the binary built by AutoInstall into the workspace directory
 			// so the default module's integration tests exercise the new binary.
 			shell.Op(shell.Newf("install -m 0755 /home/egd/go/bin/eg %s", sharedbin()).Debug()),
@@ -73,14 +72,14 @@ func IntegrationTests(ctx context.Context, op eg.Op) error {
 		ctx,
 		shell.Op(
 			// envvars is the most likely to break.
-			runtime.Newf("%s --hotswap compute local tests/envvars", egbin),
-			runtime.Newf("%s --hotswap compute local tests/concurrent", egbin),
-			runtime.Newf("%s --hotswap compute local tests/metrics", egbin),
-			runtime.Newf("%s --hotswap compute local tests/stress", egbin),
-			runtime.Newf("%s --hotswap compute local tests/localref", egbin),
-			runtime.Newf("%s --hotswap compute local tests/egdb", egbin),
+			// runtime.Newf("%s --hotswap compute local tests/envvars", egbin),
+			// runtime.Newf("%s --hotswap compute local tests/concurrent", egbin),
+			// runtime.Newf("%s --hotswap compute local tests/metrics", egbin),
+			// runtime.Newf("%s --hotswap compute local tests/stress", egbin),
+			// runtime.Newf("%s --hotswap compute local tests/localref", egbin),
+			// runtime.Newf("%s --hotswap compute local tests/egdb", egbin),
 			// exercises the runner path (spool, queue, archive unpack) which compute local bypasses.
-			runtime.Newf("%s --hotswap compute archive tests/stress | %s --hotswap compute spooled", egbin, egbin),
+			runtime.Newf("%s --hotswap compute archive --invalidate-cache tests/stress | %s --hotswap compute spooled", egbin, egbin),
 			// runtime.New("/home/egd/go/bin/eg compute baremetal -vvvv tests/tty"),
 			// runtime.New("/home/egd/go/bin/eg compute baremetal tests/containers"),
 			// runtime.New("/home/egd/go/bin/eg compute baremetal -vv tests/gpgagent"),

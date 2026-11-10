@@ -35,7 +35,7 @@ type spooled struct {
 	cmdopts.RuntimeResources
 	Archive string `arg:"" name:"archive" help:"workload archive to run, as produced by eg compute archive. '-' reads from stdin" default:"-"`
 	Spool   string `name:"spool" help:"spool directory to use. defaults to a temporary directory removed on exit" default:""`
-	Entry   string `name:"entry" help:"path of the compiled module within the archive, i.e. <module>/main.wasm. detected from the archive when blank" default:""`
+	Entry   string `name:"entry" help:"module to run, a path prefix within the archive, i.e. tests/stress matches tests/stress/main.wasm. required when the archive contains more than one module" default:""`
 }
 
 // completion is the local equivalent of the control plane, it records the outcome of the workload
@@ -99,15 +99,13 @@ func (t spooled) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err
 		return errorsx.Wrap(err, "unable to rewind archive")
 	}
 
-	entry := t.Entry
-	if entry == "" {
-		if entry, err = spooledentry(archived); err != nil {
-			return err
-		}
+	entry, err := spooledentry(archived, t.Entry)
+	if err != nil {
+		return err
+	}
 
-		if err = iox.Rewind(archived); err != nil {
-			return errorsx.Wrap(err, "unable to rewind archive")
-		}
+	if err = iox.Rewind(archived); err != nil {
+		return errorsx.Wrap(err, "unable to rewind archive")
 	}
 
 	enq := &computeapi.Enqueued{
@@ -176,8 +174,6 @@ func (t spooled) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err
 		runners.QueueOptionCompletion(cc),
 		runners.QueueOptionAgentOptions(
 			agentopt,
-			// nested containers cannot create the systemd scopes crun needs, same as the runner for the containers it launches.
-			envx.Toggle(runners.AgentOptionNoop, runners.AgentOptionCommandLine("--cgroups", "disabled"), runners.Nested()),
 			// nested containers cannot write the sysctls netavark needs for a bridge network, share the outer network like compute local.
 			envx.Toggle(runners.AgentOptionNoop, runners.AgentOptionCommandLine("--network", "host"), runners.Nested() && !envx.Boolean(false, eg.EnvExperimentalDisableHostNetwork)),
 		),
@@ -191,12 +187,21 @@ func (t spooled) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err
 	return errorsx.Compact(err, errorsx.Errorf("queue stopped before the workload completed"))
 }
 
-// spooledentry locates the compiled module within the archive.
-func spooledentry(r io.Reader) (_ string, err error) {
+// spooledentry locates the compiled module to run within the archive. the archive holds everything built for the
+// workspace, so it can have several modules, e.g.) the modules of earlier builds. the real upload sends the entry
+// along with the archive, there is nothing in the archive to say which it is, so prefix selects: a path prefix of whole
+// path segments, tests/stress matches tests/stress/main.wasm but not tests/stress2/main.wasm. the modules generated
+// for a module, within its .wasm.d directory, are never the entry. without a prefix the archive must hold one module.
+func spooledentry(r io.Reader, prefix string) (_ string, err error) {
 	var (
 		found []string
 		gzr   *gzip.Reader
 	)
+
+	prefix = strings.TrimSuffix(filepath.Clean(prefix), "/")
+	if prefix == "." {
+		prefix = ""
+	}
 
 	if gzr, err = gzip.NewReader(r); err != nil {
 		return "", errorsx.Wrap(err, "unable to read archive")
@@ -212,13 +217,20 @@ func spooledentry(r io.Reader) (_ string, err error) {
 			return "", errorsx.Wrap(err, "unable to read archive")
 		}
 
-		if header.Typeflag == tar.TypeReg && strings.HasSuffix(header.Name, ".wasm") {
-			found = append(found, filepath.Clean(header.Name))
+		name := filepath.Clean(header.Name)
+		if header.Typeflag != tar.TypeReg || !strings.HasSuffix(name, ".wasm") || strings.Contains(name, ".wasm.d/") {
+			continue
 		}
+
+		if prefix != "" && name != prefix && !strings.HasPrefix(name, prefix+"/") {
+			continue
+		}
+
+		found = append(found, name)
 	}
 
 	if len(found) != 1 {
-		return "", errorsx.Errorf("unable to detect entry point, found %v, use --entry", found)
+		return "", errorsx.Errorf("unable to detect entry point, found %v, use --entry to select a module by path prefix", found)
 	}
 
 	return found[0], nil

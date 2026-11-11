@@ -27,7 +27,6 @@ import (
 	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/backoff"
 	"github.com/egdaemon/eg/internal/debugx"
-	"github.com/egdaemon/eg/internal/egvm"
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/execx"
@@ -49,7 +48,6 @@ import (
 	"github.com/egdaemon/eg/workspaces"
 	"github.com/fsnotify/fsnotify"
 	"github.com/gofrs/uuid/v5"
-	"github.com/opencontainers/go-digest"
 
 	"github.com/alitto/pond/v2"
 )
@@ -790,17 +788,12 @@ func (t staterunning) Update(ctx context.Context) state {
 		containerdir = userx.DefaultCacheDirectory("wcache", cacheprefix(t.workload), t.bucket, "containers")
 		repocache    = userx.DefaultCacheDirectory("wcache", cacheprefix(t.workload), "repos")
 		logpath      = filepath.Join(t.ws.RuntimeDir, DaemonLogName)
-		environ      []string
 	)
 
 	if logdst, err = os.OpenFile(logpath, os.O_WRONLY|os.O_APPEND, 0); err != nil {
 		return completed(t.workload, t.metadata, t.bucket, t.ws, 0, err)
 	}
 	defer logdst.Close()
-
-	if environ, err = envx.FromPath(filepath.Join(t.ws.RuntimeDir, eg.EnvironFile)); err != nil {
-		return completed(t.workload, t.metadata, t.bucket, t.ws, 0, errorsx.Wrap(err, "unable to read the workload's environment"))
-	}
 
 	options := append(
 		t.ragent.Options(),
@@ -835,44 +828,12 @@ func (t staterunning) Update(ctx context.Context) state {
 	}
 	defer stopwatch()
 
-	if envx.NewEnvironFromStrings(environ...).String(eg.RuntimePodman, eg.EnvComputeRuntime) == eg.RuntimeVM {
-		err = t.machine(wctx, logger.Writer(), repocache, environ, ts)
-	} else {
-		err = c8sproxy.PodmanModule(wctx, prepcmd, "eg", fmt.Sprintf("eg-%s", t.ragent.id), t.ws.RuntimeDir, options...)
-	}
+	err = c8sproxy.PodmanModule(wctx, prepcmd, "eg", fmt.Sprintf("eg-%s", t.ragent.id), t.ws.RuntimeDir, options...)
 	if errors.Is(context.Cause(wctx), ErrCancelled) {
 		err = ErrCancelled
 	}
 
 	return completed(t.workload, t.metadata, t.bucket, t.ws, time.Since(ts), err)
-}
-
-// machine runs the workload in a machine booted from the egiso its environment names, in place of
-// the eg container.
-func (t staterunning) machine(ctx context.Context, logger io.Writer, repocache string, environ []string, ts time.Time) (err error) {
-	var (
-		m    *Machine
-		vars = envx.NewEnvironFromStrings(environ...)
-	)
-
-	if m, err = NewMachine(ctx, http.DefaultClient, t.ws, vars.String("", eg.EnvComputeEgiso), digest.Digest(vars.String("", eg.EnvComputeEgisoTOC)), logger,
-		egvm.OptionMountReadWrite(repocache, eg.DefaultMountRoot("repos")),
-	); err != nil {
-		return err
-	}
-	defer func() { err = errorsx.Compact(err, m.Close()) }()
-
-	return m.Module(
-		ctx,
-		filepath.Join(t.ws.RuntimeDir, t.workload.Entry),
-		[]string{
-			envx.Format(eg.EnvComputeInitiatedTimestamp, ts.UTC().Format(time.RFC3339Nano)),
-			envx.Format(eg.EnvComputeWorkload, t.workload.Entry),
-			envx.Format(eg.EnvComputeWorkloadName, t.workload.Workload),
-		},
-		egvm.ExecOptionStdout(logger),
-		egvm.ExecOptionStderr(logger),
-	)
 }
 
 func completed(workload *computeapi.Enqueued, md metadata, bucket string, ws workspaces.Context, duration time.Duration, cause error) statecompleted {

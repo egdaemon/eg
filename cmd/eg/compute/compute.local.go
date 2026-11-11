@@ -37,7 +37,6 @@ import (
 
 type local struct {
 	cmdopts.RuntimeResources
-	cmdopts.Runtime
 	cmdopts.Publishing
 	Dir              string   `name:"directory" help:"root directory of the repository" default:"${vars_eg_root_directory}"`
 	ModuleDir        string   `name:"moduledir" help:"must be a subdirectory in the provided directory" default:"${vars_workload_directory}" hidden:"true"`
@@ -68,27 +67,43 @@ func (t local) gpu() bool {
 	return t.GPU || t.RuntimeResources.Vram > 0
 }
 
-func (t local) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, hotswapbin *cmdopts.HotswapPath) (err error) {
+// workload is a workspace whose modules compiled, ready for a runtime to run them.
+type workload struct {
+	ws           workspaces.Context
+	uid          uuid.UUID
+	canonicaluri string
+	envb         *envx.Builder
+	modules      []transpile.Compiled
+}
+
+// environ writes the environment file the workload's modules read.
+func (t workload) environ() (err error) {
 	var (
-		homedir    = userx.HomeDirectoryOrDefault("/root")
-		ws         workspaces.Context
-		repo       *git.Repository
-		uid        = uuid.Must(uuid.NewV7())
-		environio  *os.File
-		gnupghome  runners.AgentOption
-		gpu        runners.AgentOption
-		sshmount   runners.AgentOption = runners.AgentOptionNoop
-		gcpcreds   runners.AgentOption = runners.AgentOptionNoop
-		sshenvvar  runners.AgentOption = runners.AgentOptionNoop
-		envvar     runners.AgentOption = runners.AgentOptionNoop
-		mounthome  runners.AgentOption = runners.AgentOptionNoop
-		wayland    runners.AgentOption = runners.AgentOptionNoop
-		privileged runners.AgentOption = runners.AgentOptionNoop
-		cgroups                        = envx.Toggle(runners.AgentOptionNoop, runners.AgentOptionCommandLine("--cgroups", "disabled"), runners.Nested() && !t.Cgroups) // disable cgroups
-		// nested containers cannot write the sysctls netavark needs for a bridge network (read-only /proc/sys), share the outer network instead.
-		hostnet                        = envx.Toggle(runners.AgentOptionNoop, runners.AgentOptionCommandLine("--network", "host"), runners.Nested() && !envx.Boolean(false, eg.EnvExperimentalDisableHostNetwork))
-		mountegbin runners.AgentOption = runners.AgentOptionEGBin(errorsx.Must(exec.LookPath(os.Args[0])))
-		platform                       = podmanx.AutoPlatform(t.Arch)
+		f *os.File
+	)
+
+	if f, err = os.Create(filepath.Join(t.ws.RuntimeDir, eg.EnvironFile)); err != nil {
+		return errorsx.Wrap(err, "unable to open the environment variable file")
+	}
+	defer f.Close()
+
+	return errorsx.Wrap(t.envb.CopyTo(f), "unable to generate environment")
+}
+
+// runner runs a workload's modules in a runtime: it adds what the runtime needs to their
+// environment, writes the environment file, and runs each module.
+type runner func(ctx context.Context, w workload) error
+
+func (t local) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) error {
+	return t.run(gctx, hotswapbin, t.podman)
+}
+
+// run compiles the workload's modules, runs them with rt, and applies the changes they made.
+func (t local) run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath, rt runner) (err error) {
+	var (
+		ws   workspaces.Context
+		repo *git.Repository
+		uid  = uuid.Must(uuid.NewV7())
 	)
 
 	contextx.WaitGroupAdd(gctx.Context, 1)
@@ -111,12 +126,6 @@ func (t local) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, hotswapbin *cm
 	}
 
 	defer ws.Cleanup(context.Background())
-
-	environpath := filepath.Join(ws.RuntimeDir, eg.EnvironFile)
-	if environio, err = os.Create(environpath); err != nil {
-		return errorsx.Wrap(err, "unable to open the environment variable file")
-	}
-	defer environio.Close()
 
 	if repo, err = git.PlainOpen(ws.WorkingDir); err != nil {
 		return errorsx.Wrapf(err, "unable to open git repository: %s", ws.WorkingDir)
@@ -152,30 +161,6 @@ func (t local) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, hotswapbin *cm
 		Var(eg.EnvWorkloadRelease, strconv.FormatBool(t.Release)).
 		Var(eg.EnvComputeProfileMode, t.Profile)
 
-	if t.Dirty {
-		mounthome = runners.AgentOptionAutoMountHome(homedir)
-	}
-
-	if t.GCPAuto {
-		gcpcreds = runners.AgentOptionGcloudCredentials(gctx.Context, envb, envx.String(userx.DefaultConfigDirectory("gcloud", "application_default_credentials.json"), eg.EnvGoogleApplicationCredentials))
-	} else if stringsx.Present(t.GCP) {
-		gcpcreds = runners.AgentOptionGcloudCredentials(gctx.Context, envb, t.GCP)
-	}
-
-	if gpu, err = runners.AgentOptionGPU(t.gpu()); err != nil {
-		return err
-	}
-
-	gnupghome = runners.AgentOptionLocalGPGAgent(gctx.Context, envb)
-
-	if t.Wayland {
-		wayland = runners.AgentOptionWayland(gctx.Context, envb)
-	}
-
-	if err = envb.CopyTo(environio); err != nil {
-		return errorsx.Wrap(err, "unable to generate environment")
-	}
-
 	// envx.Debug(errorsx.Zero(envb.Environ())...)
 	log.Println("cacheid", ws.CachedID)
 
@@ -200,24 +185,69 @@ func (t local) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, hotswapbin *cm
 	debugx.Println("modules", modules)
 	debugx.Println("runtime resources", spew.Sdump(t.RuntimeResources))
 
-	if t.Runtime.Runtime == eg.RuntimeVM {
-		if err = t.machine(gctx.Context, tlsc.DefaultClient(), ws, modules...); err != nil {
-			return err
-		}
-
-		return t.patch(gctx.Context, ws)
-	}
-
-	ctx, err := podmanx.WithClient(gctx.Context)
-	if err != nil {
-		return errorsx.Wrap(err, "unable to connect to podman")
-	}
-
-	if err = runners.BuildRootContainerPath(gctx.Context, t.Dir, filepath.Join(ws.RuntimeDir, "Containerfile"), "--build-arg", envx.Format(eg.EnvBuildCommit, cmdopts.BuildCommit()), "--platform", platform); err != nil {
+	if err = rt(gctx.Context, workload{ws: ws, uid: uid, canonicaluri: canonicaluri, envb: envb, modules: modules}); err != nil {
 		return err
 	}
 
-	if err = wasix.WarmCacheDirectory(gctx.Context, filepath.Join(ws.Root, ws.BuildDir), ws.CacheDirWazero); err != nil {
+	return t.patch(gctx.Context, ws)
+}
+
+// podman runs the workload's modules in containers built from the repository's Containerfile.
+func (t local) podman(ctx context.Context, w workload) (err error) {
+	var (
+		homedir     = userx.HomeDirectoryOrDefault("/root")
+		ws          = w.ws
+		environpath = filepath.Join(ws.RuntimeDir, eg.EnvironFile)
+		pctx        context.Context
+		gnupghome   runners.AgentOption
+		gpu         runners.AgentOption
+		sshmount    runners.AgentOption = runners.AgentOptionNoop
+		gcpcreds    runners.AgentOption = runners.AgentOptionNoop
+		sshenvvar   runners.AgentOption = runners.AgentOptionNoop
+		envvar      runners.AgentOption = runners.AgentOptionNoop
+		mounthome   runners.AgentOption = runners.AgentOptionNoop
+		wayland     runners.AgentOption = runners.AgentOptionNoop
+		privileged  runners.AgentOption = runners.AgentOptionNoop
+		cgroups                         = envx.Toggle(runners.AgentOptionNoop, runners.AgentOptionCommandLine("--cgroups", "disabled"), runners.Nested() && !t.Cgroups) // disable cgroups
+		// nested containers cannot write the sysctls netavark needs for a bridge network (read-only /proc/sys), share the outer network instead.
+		hostnet                        = envx.Toggle(runners.AgentOptionNoop, runners.AgentOptionCommandLine("--network", "host"), runners.Nested() && !envx.Boolean(false, eg.EnvExperimentalDisableHostNetwork))
+		mountegbin runners.AgentOption = runners.AgentOptionEGBin(errorsx.Must(exec.LookPath(os.Args[0])))
+		platform                       = podmanx.AutoPlatform(t.Arch)
+	)
+
+	if t.Dirty {
+		mounthome = runners.AgentOptionAutoMountHome(homedir)
+	}
+
+	if t.GCPAuto {
+		gcpcreds = runners.AgentOptionGcloudCredentials(ctx, w.envb, envx.String(userx.DefaultConfigDirectory("gcloud", "application_default_credentials.json"), eg.EnvGoogleApplicationCredentials))
+	} else if stringsx.Present(t.GCP) {
+		gcpcreds = runners.AgentOptionGcloudCredentials(ctx, w.envb, t.GCP)
+	}
+
+	if gpu, err = runners.AgentOptionGPU(t.gpu()); err != nil {
+		return err
+	}
+
+	gnupghome = runners.AgentOptionLocalGPGAgent(ctx, w.envb)
+
+	if t.Wayland {
+		wayland = runners.AgentOptionWayland(ctx, w.envb)
+	}
+
+	if err = w.environ(); err != nil {
+		return err
+	}
+
+	if pctx, err = podmanx.WithClient(ctx); err != nil {
+		return errorsx.Wrap(err, "unable to connect to podman")
+	}
+
+	if err = runners.BuildRootContainerPath(ctx, t.Dir, filepath.Join(ws.RuntimeDir, "Containerfile"), "--build-arg", envx.Format(eg.EnvBuildCommit, cmdopts.BuildCommit()), "--platform", platform); err != nil {
+		return err
+	}
+
+	if err = wasix.WarmCacheDirectory(ctx, filepath.Join(ws.Root, ws.BuildDir), ws.CacheDirWazero); err != nil {
 		log.Println("unable to prewarm wasi directory cache", err)
 	}
 
@@ -226,9 +256,9 @@ func (t local) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, hotswapbin *cm
 	}
 
 	ragent := runners.NewRunner(
-		gctx.Context,
+		ctx,
 		ws,
-		uid.String(),
+		w.uid.String(),
 		privileged,
 		cgroups,
 		hostnet,
@@ -243,7 +273,7 @@ func (t local) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, hotswapbin *cm
 			runners.AgentMountReadWrite(ws.WorkingDir, eg.DefaultMountRoot(eg.WorkingDirectory)),
 			runners.AgentMountReadWrite(ws.WorkspaceDir, eg.DefaultMountRoot(eg.WorkspaceDirectory)),
 		),
-		runners.AgentOptionLocalComputeCachingVolumes(canonicaluri),
+		runners.AgentOptionLocalComputeCachingVolumes(w.canonicaluri),
 		runners.AgentOptionEnvironFile(environpath), // ensure we pick up the environment file with the container.
 		runners.AgentOptionHostOS(t.ContainerArgs...),
 		runners.AgentOptionPublish(t.Ports...),
@@ -256,7 +286,7 @@ func (t local) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, hotswapbin *cm
 		wayland,   // must come after the runtime directory mount to ensure correct mounting order.
 	)
 
-	for _, m := range modules {
+	for _, m := range w.modules {
 		options := append(
 			ragent.Options(),
 			runners.AgentOptionVolumeSpecs(
@@ -276,12 +306,12 @@ func (t local) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, hotswapbin *cm
 		}
 
 		// TODO REVISIT using t.ws.RuntimeDir as moduledir.
-		if err := c8sproxy.PodmanModule(ctx, prepcmd, eg.WorkingDirectory, fmt.Sprintf("eg-%s", uid.String()), ws.RuntimeDir, options...); err != nil {
+		if err = c8sproxy.PodmanModule(pctx, prepcmd, eg.WorkingDirectory, fmt.Sprintf("eg-%s", w.uid.String()), ws.RuntimeDir, options...); err != nil {
 			return errorsx.Wrap(err, "module execution failed")
 		}
 	}
 
-	return t.patch(gctx.Context, ws)
+	return nil
 }
 
 // patch applies the changes the workload made to its working directory to the worktree, or prints

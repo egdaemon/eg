@@ -8,32 +8,47 @@ import (
 	"path/filepath"
 
 	"github.com/egdaemon/eg"
+	"github.com/egdaemon/eg/cmd/cmdopts"
 	"github.com/egdaemon/eg/internal/egvm"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/runners"
-	"github.com/egdaemon/eg/transpile"
-	"github.com/egdaemon/eg/workspaces"
-	"github.com/opencontainers/go-digest"
 )
 
-// machine runs the modules in a machine booted from the egiso, in place of the root container.
-func (t local) machine(ctx context.Context, c *http.Client, ws workspaces.Context, modules ...transpile.Compiled) (err error) {
-	var (
-		m *runners.Machine
-	)
+// vm runs a workload as local does, in a machine booted from an egiso in place of podman's
+// containers.
+type vm struct {
+	local
+	Egiso string `name:"egiso" help:"path or https URL of the egiso the machine boots, with the digest of its table of contents as its fragment" required:""`
+}
 
-	if m, err = runners.NewMachine(ctx, c, ws, t.Egiso, digest.Digest(t.TOC), log.Writer(),
-		egvm.OptionMountReadOnly(filepath.Join(ws.Root, ws.BuildDir, ws.Module, eg.ModuleDir), eg.DefaultMountRoot(eg.RuntimeDirectory, ws.Module, eg.ModuleDir)),
-	); err != nil {
-		return err
-	}
-	defer func() { err = errorsx.Compact(err, m.Close()) }()
+func (t vm) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, hotswapbin *cmdopts.HotswapPath) error {
+	return t.local.run(gctx, hotswapbin, t.machine(tlsc.DefaultClient()))
+}
 
-	for _, module := range modules {
-		if err = m.Module(ctx, module.Path, nil, egvm.ExecOptionStdin(os.Stdin), egvm.ExecOptionStdout(log.Writer()), egvm.ExecOptionStderr(log.Writer())); err != nil {
-			return errorsx.Wrap(err, "module execution failed")
+// machine runs the workload's modules in a machine booted from the egiso, fetched through c.
+func (t vm) machine(c *http.Client) runner {
+	return func(ctx context.Context, w workload) (err error) {
+		var (
+			m *runners.Machine
+		)
+
+		if err = w.environ(); err != nil {
+			return err
 		}
-	}
 
-	return nil
+		if m, err = runners.NewMachine(ctx, c, w.ws, t.Egiso, log.Writer(),
+			egvm.OptionMountReadOnly(filepath.Join(w.ws.Root, w.ws.BuildDir, w.ws.Module, eg.ModuleDir), eg.DefaultMountRoot(eg.RuntimeDirectory, w.ws.Module, eg.ModuleDir)),
+		); err != nil {
+			return err
+		}
+		defer func() { err = errorsx.Compact(err, m.Close()) }()
+
+		for _, module := range w.modules {
+			if err = m.Module(ctx, module.Path, nil, egvm.ExecOptionStdin(os.Stdin), egvm.ExecOptionStdout(log.Writer()), egvm.ExecOptionStderr(log.Writer())); err != nil {
+				return errorsx.Wrap(err, "module execution failed")
+			}
+		}
+
+		return nil
+	}
 }

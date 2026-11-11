@@ -8,8 +8,6 @@ Group=egd
 IOSchedulingClass=best-effort
 IOSchedulingPriority=5
 PrivateMounts=yes
-# hands egd the service's cgroup, which the systemd of a --runtime=vm machine manages.
-Delegate=yes
 IPAddressDeny=link-local
 IPAddressDeny=multicast
 # mDNS discovery: allow only the mDNS multicast groups (IPv4, IPv6) through the

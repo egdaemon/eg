@@ -20,7 +20,6 @@ import (
 	"github.com/egdaemon/eg/internal/stringsx"
 	"github.com/egdaemon/eg/interp/execproxy"
 	"github.com/egdaemon/eg/workspaces"
-	"github.com/opencontainers/go-digest"
 )
 
 // Machine runs a workload's modules in a machine booted from an egiso, with the workspace's
@@ -32,9 +31,9 @@ type Machine struct {
 	vm      *egvm.VM
 }
 
-// NewMachine boots a machine from the egiso at location, under a writable upper kept in the
-// workspace, and returns once its systemd finished booting.
-func NewMachine(ctx context.Context, c *http.Client, ws workspaces.Context, location string, toc digest.Digest, console io.Writer, options ...egvm.Option) (_ *Machine, err error) {
+// NewMachine boots a machine from the egiso uri names, as egiso.OpenURI opens it, under a writable
+// upper kept in the workspace, and returns once its systemd finished booting.
+func NewMachine(ctx context.Context, c *http.Client, ws workspaces.Context, uri string, console io.Writer, options ...egvm.Option) (_ *Machine, err error) {
 	var (
 		t        = &Machine{ws: ws}
 		upperdir string
@@ -48,7 +47,7 @@ func NewMachine(ctx context.Context, c *http.Client, ws workspaces.Context, loca
 		}
 	}()
 
-	if t.archive, err = egiso.Open(ctx, c, location, toc); err != nil {
+	if t.archive, err = egiso.OpenURI(ctx, c, uri); err != nil {
 		return nil, err
 	}
 

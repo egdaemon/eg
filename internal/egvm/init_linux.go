@@ -271,8 +271,8 @@ func start(root string, rootinit string) (err error) {
 	return fmt.Errorf("unable to exec %s: %w", rootinit, unix.Exec(rootinit, []string{rootinit}, []string{"container=egvm", "CREDENTIALS_DIRECTORY=" + credentials}))
 }
 
-// devices mounts the root's /dev: the host's character devices containers are given, its own
-// pseudo terminals and shared memory.
+// devices mounts the root's /dev: the host's character devices containers are given, with fuse, as
+// the runner gives its containers for eg module's bindfs, and its own pseudo terminals.
 func devices(root string) (err error) {
 	var (
 		dev = filepath.Join(root, "dev")
@@ -281,7 +281,7 @@ func devices(root string) (err error) {
 	if err = mountat("tmpfs", dev, "tmpfs", unix.MS_NOSUID|unix.MS_NOEXEC, "mode=755"); err != nil {
 		return err
 	}
-	for _, name := range []string{"null", "zero", "full", "random", "urandom", "tty"} {
+	for _, name := range []string{"null", "zero", "full", "random", "urandom", "tty", "fuse"} {
 		if err = os.WriteFile(filepath.Join(dev, name), nil, 0666); err != nil {
 			return err
 		}

@@ -45,6 +45,8 @@ func init() {
 			"locales",           // required to generate en_US.UTF-8 so tools invoked within workloads (e.g. perl/debuild) don't fall back to the C locale.
 			"systemd-container", // required for machinectl to be present for use within shell.New(...) commands. which allows invoking systemctl --user commands.
 			"waypipe",           // required to support --wayland passthrough.
+			"passt",             // pasta connects a --runtime=vm machine's network.
+			"uidmap",            // newuidmap and newgidmap map a --runtime=vm machine's ids to egd's subordinate ids.
 		),
 		egdebuild.Option.Suggests(
 			"openssh-server", // allows ssh access into workload containers, i.e. eg compute serve --ssh.

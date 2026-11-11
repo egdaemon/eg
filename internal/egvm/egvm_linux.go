@@ -73,8 +73,9 @@ func Boot(m Machine, console io.Writer) (_ *VM, err error) {
 		return nil, errorsx.Wrap(err, "unable to create the machine's root")
 	}
 
-	// the network namespace file goes where rootless podman keeps its own, which pasta may read.
-	t.netns = filepath.Join(envx.String(t.dir, "XDG_RUNTIME_DIR"), "netns", filepath.Base(t.dir))
+	// the network namespace file goes where rootless podman keeps its own, which pasta may read: the
+	// user's runtime directory, which a service such as eg-daemon is not told of.
+	t.netns = filepath.Join(envx.String(filepath.Join("/", "run", "user", strconv.Itoa(os.Getuid())), "XDG_RUNTIME_DIR"), "netns", filepath.Base(t.dir))
 	if err = os.MkdirAll(filepath.Dir(t.netns), 0700); err != nil {
 		return nil, errorsx.Wrap(err, "unable to create the network namespace directory")
 	}

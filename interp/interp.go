@@ -337,6 +337,10 @@ func (t runner) perform(ctx context.Context, wshost workspaces.Context, runid, p
 	).WithEnv(
 		eg.EnvComputeModuleNestedLevel, strconv.Itoa(envx.Int(0, eg.EnvComputeModuleNestedLevel)),
 	).WithEnv(
+		eg.EnvComputeMemoryLimit, envx.String("", eg.EnvComputeMemoryLimit),
+	).WithEnv(
+		eg.EnvComputeCoresLimit, envx.String("", eg.EnvComputeCoresLimit),
+	).WithEnv(
 		eg.EnvComputeGuestMigrationsEnabled, strconv.FormatBool(envx.Boolean(true, eg.EnvComputeGuestMigrationsEnabled)),
 	).WithEnv(
 		eg.EnvComputeLoggingVerbosity, envx.String("-1", eg.EnvComputeLoggingVerbosity),

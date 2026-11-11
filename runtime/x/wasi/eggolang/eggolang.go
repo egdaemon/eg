@@ -10,6 +10,7 @@ import (
 	"time"
 
 	_eg "github.com/egdaemon/eg"
+	"github.com/egdaemon/eg/internal/bytesx"
 	"github.com/egdaemon/eg/internal/contextx"
 	"github.com/egdaemon/eg/internal/coverage"
 	"github.com/egdaemon/eg/internal/coverage/golangcov"
@@ -17,6 +18,7 @@ import (
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/langx"
 	"github.com/egdaemon/eg/internal/md5x"
+	"github.com/egdaemon/eg/internal/memlimitx"
 	"github.com/egdaemon/eg/internal/modfilex"
 	"github.com/egdaemon/eg/internal/slicesx"
 	"github.com/egdaemon/eg/internal/stringsx"
@@ -27,14 +29,15 @@ import (
 )
 
 type config struct {
-	flags     []string
-	environ   []string
-	bctx      build.Context
-	timeout   time.Duration
-	coverage  string // coverage mode, test only.
-	count     string // test only.
-	randomize string // test only.
-	verbose   string // test only.
+	flags       []string
+	environ     []string
+	bctx        build.Context
+	timeout     time.Duration
+	coverage    string // coverage mode, test only.
+	count       string // test only.
+	randomize   string // test only.
+	verbose     string // test only.
+	parallelism uint   // test only. maximum number of concurrent builds (-p), at least 1 (zero only for an unset config).
 }
 
 type option = func(*config)
@@ -122,6 +125,14 @@ func (t options) Count(n int) options {
 	})
 }
 
+// The maximum number of concurrent builds (go test -p), test only. defaults to a value derived from the
+// cores and memory available to the workload. always at least 1, values below are raised to 1.
+func (t options) Parallelism(n uint) options {
+	return append(t, func(o *config) {
+		o.parallelism = max(1, n)
+	})
+}
+
 func countflag(n int) string {
 	if n == 0 {
 		return ""
@@ -153,6 +164,13 @@ func (t options) Verbose(b bool) options {
 	})
 }
 
+// newconfig applies the options on top of the defaults derived from the environment.
+func newconfig(opts ...option) config {
+	return langx.Clone(config{
+		parallelism: defaultparallelism(),
+	}, opts...)
+}
+
 // flags shared by every go command.
 func (t config) buildflags() (opts []string) {
 	opts = append(opts, t.flags...)
@@ -161,6 +179,17 @@ func (t config) buildflags() (opts []string) {
 	}
 
 	return opts
+}
+
+// defaultparallelism is the go build parallelism (-p). go defaults to the number of cpus, which ignores
+// the memory limit of the container; coverage instrumented test binaries are linked concurrently at
+// several hundred MiB each (with its ld child) and can exhaust the cgroup. it is
+// min(cores, memory / 1GiB), at least 1. when the limits are unknown it falls back to 1GiB and 1 core.
+func defaultparallelism() uint {
+	cores := envx.Int(1, _eg.EnvComputeCoresLimit)
+	memory := langx.FirstNonZero(errorsx.ZeroSilent(memlimitx.FromEnviron(_eg.EnvComputeMemoryLimit)()), uint64(bytesx.GiB))
+
+	return uint(max(1, min(cores, int(memory/uint64(bytesx.GiB)))))
 }
 
 // flags for go test.
@@ -173,6 +202,7 @@ func (t config) testflags() (dst []string) {
 		return append(dst, o)
 	}
 	dst = t.buildflags()
+	dst = append(dst, fmt.Sprintf("-p %d", t.parallelism))
 	dst = ignoreEmpty(dst, t.randomize)
 	dst = ignoreEmpty(dst, t.count)
 	dst = ignoreEmpty(dst, t.verbose)
@@ -201,7 +231,7 @@ func (t options) AutoInstall() eg.OpFn {
 }
 
 func (t options) autoinstall(base shell.Command) eg.OpFn {
-	opts := langx.Clone(config{}, t...)
+	opts := newconfig(t...)
 	flags := stringsx.Join(" ", opts.buildflags()...)
 
 	return eg.OpFn(func(ctx context.Context, _ eg.Op) (err error) {
@@ -232,7 +262,7 @@ func (t options) AutoCompile() eg.OpFn {
 }
 
 func (t options) autocompile(base shell.Command) eg.OpFn {
-	opts := langx.Clone(config{}, t...)
+	opts := newconfig(t...)
 	flags := stringsx.Join(" ", opts.buildflags()...)
 
 	return eg.OpFn(func(ctx context.Context, _ eg.Op) (err error) {
@@ -263,7 +293,7 @@ func (t options) AutoTest() eg.OpFn {
 }
 
 func (t options) autotest(base shell.Command) eg.OpFn {
-	opts := langx.Clone(config{coverage: "-covermode count"}, t...)
+	opts := newconfig(append(options{func(o *config) { o.coverage = "-covermode count" }}, t...)...)
 	flags := stringsx.Join(" ", opts.testflags()...)
 
 	return eg.OpFn(func(ctx context.Context, _ eg.Op) (err error) {

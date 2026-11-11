@@ -42,6 +42,8 @@ func TestOptions(t *testing.T) {
 	})
 
 	t.Run("testflags_skips_blank_values", func(t *testing.T) {
-		require.Equal(t, []string{"-covermode count"}, langx.Clone(config{coverage: "-covermode count"}, New()...).testflags())
+		c := newconfig(New().Parallelism(1)...)
+		c.coverage = "-covermode count"
+		require.Equal(t, []string{"-p 1", "-covermode count"}, c.testflags())
 	})
 }

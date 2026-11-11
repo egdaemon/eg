@@ -30,6 +30,7 @@ import (
 	"github.com/egdaemon/eg/internal/fsx"
 	"github.com/egdaemon/eg/internal/gcpx"
 	"github.com/egdaemon/eg/internal/gitx"
+	"github.com/egdaemon/eg/internal/memlimitx"
 	"github.com/egdaemon/eg/internal/podmanx"
 	"github.com/egdaemon/eg/internal/runtimex"
 	"github.com/egdaemon/eg/internal/stringsx"
@@ -326,9 +327,13 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 			return errorsx.Wrap(err, "unable to set cpu limits")
 		}
 
-		if vmemlimit, err = memlimit.Set(memlimit.WithProvider(memlimit.FromCgroup)); err != nil {
+		if vmemlimit, err = memlimit.Set(memlimitx.Chain(memlimit.FromCgroup, memlimit.FromSystem, memlimit.Limit(bytesx.GiB))); err != nil {
 			return errorsx.Wrap(err, "unable to set max limits")
 		}
+
+		// advertise the detected resources to the module's commands, and nested modules.
+		cmdenvb = cmdenvb.Var(eg.EnvComputeMemoryLimit, strconv.FormatInt(vmemlimit, 10))
+		cmdenvb = cmdenvb.Var(eg.EnvComputeCoresLimit, strconv.Itoa(runtime.GOMAXPROCS(-1)))
 
 		// ensure the environment is up and running.
 		if err = systemReady(gctx.Context); err != nil {

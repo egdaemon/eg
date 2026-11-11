@@ -9,8 +9,9 @@ import (
 
 func TestTestFlags(t *testing.T) {
 	t.Run("includes_all_flags_in_order", func(t *testing.T) {
-		c := langx.Clone(config{coverage: "-covermode count"}, New().Flags("-race").Randomize(7).Count(3).Verbose(true)...)
-		require.Equal(t, []string{"-race", "-shuffle 7", "-count 3", "-v", "-covermode count"}, c.testflags())
+		c := newconfig(New().Flags("-race").Parallelism(1).Randomize(7).Count(3).Verbose(true)...)
+		c.coverage = "-covermode count"
+		require.Equal(t, []string{"-race", "-p 1", "-shuffle 7", "-count 3", "-v", "-covermode count"}, c.testflags())
 	})
 
 	t.Run("Randomize_maps_seed_to_flag", func(t *testing.T) {

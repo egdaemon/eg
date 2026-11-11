@@ -13,6 +13,8 @@ message History {
   // 0 unknown, 1 failure, 2 completed, 3 cancelled.
   int32 result = 7 [ json_name = "result" ];
   string uploaded_by = 8 [ json_name = "uploaded_by" ];
+  string vcs_uri = 9 [ json_name = "vcs_uri" ];
+  string vcs_commit = 10 [ json_name = "vcs_commit" ];
 }
 
 message HistoryFindResponse { History history = 1 [ json_name = "history" ]; }

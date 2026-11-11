@@ -69,6 +69,8 @@ func renderHistory(items ...*compute.History) string {
 			fmt.Sprintf("%v", TypographyHistoryResult(h)),
 			fmt.Sprintf("%v", TypographyDuration(time.Duration(h.GetDuration()))),
 			fmt.Sprintf("%.64v", TypographyHistoryCompact(h)),
+			h.GetVcsUri(),
+			fmt.Sprintf("%.8v", h.GetVcsCommit()),
 			fmt.Sprintf("%v", TypographyTimestamp(h.GetInitiatedAt())),
 			fmt.Sprintf("%v", TypographyTimestamp(h.GetCompletedAt())),
 		})
@@ -76,7 +78,7 @@ func renderHistory(items ...*compute.History) string {
 
 	tbl := table.New().
 		Border(lipgloss.NormalBorder()).
-		Headers("RESULT", "DURATION", "WORKLOAD", "INITIATED", "COMPLETED").
+		Headers("RESULT", "DURATION", "WORKLOAD", "VCS", "COMMIT", "INITIATED", "COMPLETED").
 		Rows(rows...).
 		StyleFunc(func(row, col int) lipgloss.Style {
 			if row == table.HeaderRow {

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/charmbracelet/x/ansi"
+	"github.com/egdaemon/eg/cmd/cmdopts"
 	"github.com/egdaemon/eg/computeapi"
 	"github.com/egdaemon/eg/internal/timex"
 	"github.com/stretchr/testify/require"
@@ -21,6 +22,7 @@ func TestLsList(t *testing.T) {
 		srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			offsets = append(offsets, r.URL.Query().Get("offset"))
 			require.Equal(t, "build", r.URL.Query().Get("query"))
+			require.Equal(t, "https://example.com/r.git", r.URL.Query().Get("vcs_uri"))
 			if r.URL.Query().Get("offset") == "0" {
 				_, _ = w.Write([]byte(`{"next":{"offset":"1","limit":"100"},"items":[{"id":"a","description":"first"}]}`))
 				return
@@ -35,7 +37,7 @@ func TestLsList(t *testing.T) {
 			return (&net.Dialer{}).DialContext(ctx, network, srv.Listener.Addr().String())
 		}
 
-		items, err := lsCmd{Query: "build", Limit: 100}.list(t.Context(), computeapi.NewWorkloadClient(srv.Client()))
+		items, err := lsCmd{VCS: cmdopts.VCS{VcsURI: "https://example.com/r.git"}, Query: "build", Limit: 100}.list(t.Context(), computeapi.NewWorkloadClient(srv.Client()))
 		require.NoError(t, err)
 		require.Equal(t, []string{"0", "1"}, offsets)
 		require.Len(t, items, 2)

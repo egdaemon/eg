@@ -26,6 +26,11 @@ type lsCmd struct {
 }
 
 func (t lsCmd) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, ident *cmdidentity.T) (err error) {
+	// '-' is the escape hatch for removing the default detected repository from the filter.
+	if t.VcsURI == "-" {
+		t.VcsURI = ""
+	}
+
 	signer, err := sshx.AutoCached(sshx.NewKeyGen(), t.SSHKeyPath)
 	if err != nil {
 		return err
@@ -50,7 +55,7 @@ func (t lsCmd) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, ident *cmdiden
 
 // list retrieves every active workload of the account matching the filters, following the pages.
 func (t lsCmd) list(ctx context.Context, c *computeapi.WorkloadClient) (items []*computeapi.Enqueued, err error) {
-	req := &computeapi.EnqueuedSearchRequest{Query: t.Query, Os: t.OS, Arch: t.Arch, Limit: t.Limit}
+	req := &computeapi.EnqueuedSearchRequest{Query: t.Query, Os: t.OS, Arch: t.Arch, VcsUri: t.VcsURI, Limit: t.Limit}
 
 	for {
 		resp, err := c.Search(ctx, req)

@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 
 	"github.com/egdaemon/eg/identity"
 
@@ -41,6 +42,7 @@ import (
 
 type upload struct {
 	cmdopts.RuntimeResources
+	cmdopts.Runtime
 	cmdopts.Publishing
 	HostedCompute    bool `name:"shared-compute" help:"allow hosted compute" default:"true"`
 	uploadoptions    `embed:""`
@@ -65,6 +67,11 @@ func (t upload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, ident *cmdide
 		tmpdir               string
 		archiveio, environio *os.File
 	)
+
+	// the runner fetches the egiso itself, so it can not be a path on this machine.
+	if t.Runtime.Runtime == eg.RuntimeVM && !strings.HasPrefix(t.Egiso, "https://") {
+		return errorsx.New("--runtime=vm uploads need an https --egiso the runner can fetch")
+	}
 
 	if signer, err = sshx.AutoCached(sshx.NewKeyGen(), t.SSHKeyPath); err != nil {
 		return err
@@ -136,7 +143,8 @@ func (t upload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, ident *cmdide
 		FromReader(secrets.NewReader(gctx.Context, t.Secrets...)).
 		FromPath(t.EnvironmentPaths...).
 		FromEnviron(envx.AutoEnviron(t.Environment...)...).
-		FromEnviron(errorsx.Zero(gitx.Env(repo, t.GitRemote, t.GitReference, t.GitClone))...)
+		FromEnviron(errorsx.Zero(gitx.Env(repo, t.GitRemote, t.GitReference, t.GitClone))...).
+		FromEnviron(t.Runtime.Environ()...)
 
 	if t.GCPAuto {
 		envb = envb.Var(eg.EnvGCPWorkloadIdentityEnabled, "true")

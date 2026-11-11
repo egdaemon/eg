@@ -104,6 +104,9 @@ const (
 	EnvComputeBinAlt                 = "EG_COMPUTE_BIN_ALTERNATE"                   // absolute path to an alternate binary to inject into the host environment when hotswapping.
 	EnvComputeContainerImpure        = "EG_COMPUTE_C8S_IMPURE"                      // informs the container runner that the container depends on the repository being present.
 	EnvComputeGPU                    = "EG_COMPUTE_GPU"                             // enable gpu support for the compute workload, propagated to nested module containers.
+	EnvComputeRuntime                = "EG_COMPUTE_RUNTIME"                         // what the workload's modules run in: RuntimePodman when blank, or RuntimeVM.
+	EnvComputeEgiso                  = "EG_COMPUTE_EGISO"                           // path or https url of the egiso the RuntimeVM runtime boots.
+	EnvComputeEgisoTOC               = "EG_COMPUTE_EGISO_TOC"                       // digest of the egiso's table of contents.
 	EnvComputeModuleSocket           = "EG_COMPUTE_MODULE_SOCKET"                   // socket providing functionality that is scoped to an individual module. primarily command execution.
 	EnvComputeDefaultGroup           = "EG_COMPUTE_DEFAULT_GROUP"                   // override the group assigned to the user. mainly used by baremetal.
 	EnvComputeAPIEnabled             = "EG_COMPUTE_API_ENABLED"                     // gates the runner's push HTTP surface (POST /c/upload, POST /c/enqueue) and whether the runner advertises itself as uploadable; enabled by default, see the daemon's --uploadable flag.
@@ -191,6 +194,12 @@ const (
 	SocketControl      = "control.socket"
 	SocketAnalytics    = "analytics.socket"
 	SocketAnalyticsPG  = ".s.PGSQL.5432" // postgres wire frontend of the analytics database, the name libpq style clients derive from a directory.
+)
+
+// what a workload's modules run in.
+const (
+	RuntimePodman = "podman" // a container built from the repository's Containerfile.
+	RuntimeVM     = "vm"     // a machine booted from an egiso.
 )
 
 // generate unique daemon socket

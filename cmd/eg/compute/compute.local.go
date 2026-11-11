@@ -37,6 +37,7 @@ import (
 
 type local struct {
 	cmdopts.RuntimeResources
+	cmdopts.Runtime
 	cmdopts.Publishing
 	Dir              string   `name:"directory" help:"root directory of the repository" default:"${vars_eg_root_directory}"`
 	ModuleDir        string   `name:"moduledir" help:"must be a subdirectory in the provided directory" default:"${vars_workload_directory}" hidden:"true"`
@@ -67,7 +68,7 @@ func (t local) gpu() bool {
 	return t.GPU || t.RuntimeResources.Vram > 0
 }
 
-func (t local) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err error) {
+func (t local) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, hotswapbin *cmdopts.HotswapPath) (err error) {
 	var (
 		homedir    = userx.HomeDirectoryOrDefault("/root")
 		ws         workspaces.Context
@@ -92,11 +93,6 @@ func (t local) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err e
 
 	contextx.WaitGroupAdd(gctx.Context, 1)
 	go contextx.WaitGroupDone(gctx.Context)
-
-	ctx, err := podmanx.WithClient(gctx.Context)
-	if err != nil {
-		return errorsx.Wrap(err, "unable to connect to podman")
-	}
 
 	if ws, err = workspaces.NewLocal(
 		gctx.Context,
@@ -204,6 +200,19 @@ func (t local) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err e
 	debugx.Println("modules", modules)
 	debugx.Println("runtime resources", spew.Sdump(t.RuntimeResources))
 
+	if t.Runtime.Runtime == eg.RuntimeVM {
+		if err = t.machine(gctx.Context, tlsc.DefaultClient(), ws, modules...); err != nil {
+			return err
+		}
+
+		return t.patch(gctx.Context, ws)
+	}
+
+	ctx, err := podmanx.WithClient(gctx.Context)
+	if err != nil {
+		return errorsx.Wrap(err, "unable to connect to podman")
+	}
+
 	if err = runners.BuildRootContainerPath(gctx.Context, t.Dir, filepath.Join(ws.RuntimeDir, "Containerfile"), "--build-arg", envx.Format(eg.EnvBuildCommit, cmdopts.BuildCommit()), "--platform", platform); err != nil {
 		return err
 	}
@@ -272,7 +281,13 @@ func (t local) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err e
 		}
 	}
 
-	patch, err := gitx.Changes(gctx.Context, ws.WorkingDir, t.Dir)
+	return t.patch(gctx.Context, ws)
+}
+
+// patch applies the changes the workload made to its working directory to the worktree, or prints
+// them when auto patching is disabled.
+func (t local) patch(ctx context.Context, ws workspaces.Context) error {
+	patch, err := gitx.Changes(ctx, ws.WorkingDir, t.Dir)
 	if err != nil {
 		return err
 	}
@@ -282,5 +297,5 @@ func (t local) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err e
 		return err
 	}
 
-	return gitx.ApplyPatch(gctx.Context, t.Dir, patch)
+	return gitx.ApplyPatch(ctx, t.Dir, patch)
 }

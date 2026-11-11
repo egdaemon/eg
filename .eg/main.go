@@ -81,6 +81,10 @@ func IntegrationTests(ctx context.Context, op eg.Op) error {
 			runtime.Newf("%s --hotswap compute local tests/egdb", egbin),
 			// exercises the runner path (spool, queue, archive unpack) which compute local bypasses.
 			runtime.Newf("%s --hotswap compute archive --invalidate-cache tests/stress | %s --hotswap compute spooled", egbin, egbin),
+			// baremetal inherits the environment of this workload, which carries the container directory layout.
+			// regression: chdir /workload/.eg.cache: no such file or directory
+			runtime.Newf("%s --hotswap compute baremetal --no-podman tests/baremetal", egbin),
+			runtime.Newf("%s --hotswap compute baremetal tests/baremetal-virtualization", egbin),
 			// runtime.New("/home/egd/go/bin/eg compute baremetal -vvvv tests/tty"),
 			// runtime.New("/home/egd/go/bin/eg compute baremetal tests/containers"),
 			// runtime.New("/home/egd/go/bin/eg compute baremetal -vv tests/gpgagent"),

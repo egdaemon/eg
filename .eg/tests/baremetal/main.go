@@ -3,63 +3,16 @@ package main
 import (
 	"context"
 	"log"
-	"path/filepath"
 
 	"github.com/egdaemon/eg/runtime/wasi/eg"
 	"github.com/egdaemon/eg/runtime/wasi/egenv"
 	"github.com/egdaemon/eg/runtime/wasi/shell"
 	"github.com/egdaemon/eg/runtime/x/wasi/egbug"
-	"github.com/egdaemon/eg/runtime/x/wasi/egdmg"
-	"github.com/egdaemon/eg/runtime/x/wasi/egtarball"
 )
 
-func Debug(runtime shell.Command) eg.OpFn {
-	return eg.Sequential(
-		egbug.Log("---------------------------- failed inspection initiated ----------------------------"),
-		shell.Op(
-			runtime.New("env | sort"),
-			runtime.New("id"),
-		),
-		egbug.Log("---------------------------- failed inspection completed ----------------------------"),
-	)
-}
-
-// test case for baremetal. minimic the original use case of darwin builds.
-func Test(ctx context.Context, op eg.Op) error {
-	return eg.Sequential(
-		shell.Op(
-			shell.Newf("mkdir -p %s", filepath.Join(egtarball.Path("example"), "Contents")),
-			shell.Newf("echo \"derp\" | tee %s/hello.world.txt", egtarball.Path("example")),
-			shell.Newf("echo \"derp\" | tee %s/Info.plist", filepath.Join(egtarball.Path("example"), "Contents")),
-		),
-		eg.Module(
-			ctx,
-			eg.DefaultModule(),
-			eg.Sequential(
-				egtarball.Pack("example"),
-				egtarball.SHA256Op("example"),
-			),
-		),
-		egbug.DebugFailure(
-			// ensure the tar archive has the expected files.
-			shell.Op(
-				shell.Newf("tar tf %s | md5sum", egtarball.Archive("example")),
-				shell.Newf("test \"$(tar tf %s | md5sum)\" = \"c22870ddb29fce64f00a4c3570644acb  -\"", egtarball.Archive("example")),
-			),
-			egbug.Log("tar archive is missing contents"),
-		),
-	)(ctx, op)
-}
-
-func TestModule(ctx context.Context, op eg.Op) error {
-	b := egdmg.New("example", egdmg.OptionBuildDir(egenv.DirectoryWorkload(".dist", "example.darwin.arm64")))
-	return eg.Perform(
-		ctx,
-		egbug.DirectoryTree(egtarball.Path("example")),
-		egdmg.Build(b, egtarball.Path("example")),
-	)
-}
-
+// baremetal shell behavior only. runs without podman, no containers are available so only the host layout is verified.
+// regression test for the container directory layout (/workload/...) leaking into the host,
+// which surfaced as: chdir /workload/.eg.cache: no such file or directory
 func main() {
 	log.SetFlags(log.Flags() | log.Lshortfile)
 	ctx, done := context.WithTimeout(context.Background(), egenv.TTL())
@@ -67,13 +20,6 @@ func main() {
 
 	err := eg.Perform(
 		ctx,
-		egbug.Log("init"),
-		eg.Build(eg.DefaultModule()),
-		egbug.Log("baremetal tarball"),
-		Test,
-		egbug.Log("baremetal basic sanity checks"),
-		// test for cache directory and runtime.
-		// test for git commit details.
 		egbug.DebugFailure(
 			eg.Sequential(
 				egbug.EnsureEnv("2ff85b3300938e3efdb0567eb216de33", egbug.EgEnviron()...),
@@ -83,46 +29,18 @@ func main() {
 					shell.Newf("test '%s' != '/workload/eg'", egenv.DirectoryWorking()),
 					shell.Newf("test '%s' != '/workload/.eg.cache'", egenv.DirectoryCache()),
 					shell.Newf("test '%s' != '/workload/.eg.runtime'", egenv.RuntimeDirectory()),
-					// and every directory must exist on the host.
+					// every directory must exist on the host.
 					shell.Newf("test -d '%s'", egenv.DirectoryWorkload()),
 					shell.Newf("test -d '%s'", egenv.DirectoryWorking()),
 					shell.Newf("test -d '%s'", egenv.DirectoryCache()),
 					shell.Newf("test -d '%s'", egenv.RuntimeDirectory()),
+					// shell commands are executed on the host, they must be able to enter the directories.
+					shell.Newf("test \"$(pwd -P)\" = \"$(realpath '%s')\"", egenv.DirectoryWorkload()).Directory(egenv.DirectoryWorkload()),
+					shell.Newf("test \"$(pwd -P)\" = \"$(realpath '%s')\"", egenv.DirectoryWorking()).Directory(egenv.DirectoryWorking()),
+					shell.Newf("test \"$(pwd -P)\" = \"$(realpath '%s')\"", egenv.DirectoryCache()).Directory(egenv.DirectoryCache()),
 				),
 			),
 			egbug.Log("baremetal environment has drifted"),
-		),
-		eg.Module(
-			ctx,
-			eg.DefaultModule(),
-			eg.Sequential(
-				egbug.DebugFailure(
-					// ensure that the user isnt egd
-					shell.Op(
-						shell.New("test $(id -nu) = egd"),
-						shell.New("test $(id -ng) = egd"),
-					),
-					Debug(shell.Runtime()),
-				),
-				egbug.DebugFailure(
-					eg.Sequential(
-						egbug.EnsureEnv("92570199637f3732b241968f689f74d2", egbug.EgEnviron()...),
-						shell.Op(
-							// the container module must use the container directory layout.
-							shell.Newf("test '%s' = '/workload/.eg.workspace'", egenv.DirectoryWorkload()),
-							shell.Newf("test '%s' = '/workload/eg'", egenv.DirectoryWorking()),
-							shell.Newf("test '%s' = '/workload/.eg.cache'", egenv.DirectoryCache()),
-							shell.Newf("test '%s' = '/eg.mnt/.eg.runtime'", egenv.RuntimeDirectory()),
-							shell.Newf("test -d '%s'", egenv.DirectoryWorkload()),
-							shell.Newf("test -d '%s'", egenv.DirectoryWorking()),
-							shell.Newf("test -d '%s'", egenv.DirectoryCache()),
-							shell.Newf("test -d '%s'", egenv.RuntimeDirectory()),
-						),
-					),
-					egbug.Log("container module environment has drifted"),
-				),
-				TestModule,
-			),
 		),
 	)
 

@@ -10,7 +10,11 @@ import (
 	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/cmd/cmdopts"
 	"github.com/egdaemon/eg/internal/egvm"
+	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
+	"github.com/egdaemon/eg/internal/podmanx"
+	"github.com/egdaemon/eg/internal/stringsx"
+	"github.com/egdaemon/eg/internal/userx"
 	"github.com/egdaemon/eg/runners"
 )
 
@@ -18,7 +22,7 @@ import (
 // containers.
 type vm struct {
 	local
-	Egiso string `name:"egiso" help:"path or https URL of the egiso the machine boots, with the digest of its table of contents as its fragment" required:""`
+	Egiso string `name:"egiso" help:"path or https URL of the egiso the machine boots, with the digest of its table of contents as its fragment, built from the default root container when absent"`
 }
 
 func (t vm) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, hotswapbin *cmdopts.HotswapPath) error {
@@ -29,14 +33,21 @@ func (t vm) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, hotswapbin *cmdop
 func (t vm) machine(c *http.Client) runner {
 	return func(ctx context.Context, w workload) (err error) {
 		var (
-			m *runners.Machine
+			m   *runners.Machine
+			uri = t.Egiso
 		)
 
 		if err = w.environ(); err != nil {
 			return err
 		}
 
-		if m, err = runners.NewMachine(ctx, c, w.ws, t.Egiso, log.Writer(),
+		if stringsx.Blank(uri) {
+			if uri, err = runners.BuildRootEgiso(ctx, userx.DefaultCacheDirectory("egiso"), t.Dir, filepath.Join(w.ws.RuntimeDir, "Containerfile"), "--build-arg", envx.Format(eg.EnvBuildCommit, cmdopts.BuildCommit()), "--platform", podmanx.AutoPlatform(t.Arch)); err != nil {
+				return err
+			}
+		}
+
+		if m, err = runners.NewMachine(ctx, c, w.ws, uri, log.Writer(),
 			egvm.OptionMountReadOnly(filepath.Join(w.ws.Root, w.ws.BuildDir, w.ws.Module, eg.ModuleDir), eg.DefaultMountRoot(eg.RuntimeDirectory, w.ws.Module, eg.ModuleDir)),
 		); err != nil {
 			return err

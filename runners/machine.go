@@ -15,11 +15,13 @@ import (
 	"github.com/egdaemon/eg/internal/egvm"
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
+	"github.com/egdaemon/eg/internal/execx"
 	"github.com/egdaemon/eg/internal/iox"
 	"github.com/egdaemon/eg/internal/slicesx"
 	"github.com/egdaemon/eg/internal/stringsx"
 	"github.com/egdaemon/eg/interp/execproxy"
 	"github.com/egdaemon/eg/workspaces"
+	"github.com/opencontainers/go-digest"
 )
 
 // Machine runs a workload's modules in a machine booted from an egiso, with the workspace's
@@ -89,6 +91,72 @@ func NewMachine(ctx context.Context, c *http.Client, ws workspaces.Context, uri 
 	}
 
 	return t, nil
+}
+
+// BuildRootEgiso builds the root container as BuildRootContainerPath does and returns the uri of an
+// egiso of its filesystem, which it keeps in cache under the image's id so it builds one per image.
+func BuildRootEgiso(ctx context.Context, cache, dir, path string, options ...string) (_ string, err error) {
+	var (
+		id     string
+		cid    string
+		tar    *os.File
+		st     os.FileInfo
+		out    *os.File
+		toc    digest.Digest
+		cached []byte
+	)
+
+	if err = BuildRootContainerPath(ctx, dir, path, options...); err != nil {
+		return "", err
+	}
+
+	if id, err = execx.String(ctx, "podman", "image", "inspect", "--format", "{{.Id}}", "eg"); err != nil {
+		return "", errorsx.Wrap(err, "unable to identify the root container")
+	}
+	location := filepath.Join(cache, strings.TrimSpace(id)+".egiso")
+
+	// the table of contents is written once its egiso is complete.
+	if cached, err = os.ReadFile(location + ".toc"); err == nil {
+		return location + "#" + string(cached), nil
+	}
+
+	if err = os.MkdirAll(cache, 0700); err != nil {
+		return "", errorsx.Wrap(err, "unable to create the egiso cache")
+	}
+
+	if tar, err = os.CreateTemp(cache, "root.*.tar"); err != nil {
+		return "", errorsx.Wrap(err, "unable to create the root container's archive")
+	}
+	defer func() { err = errorsx.Compact(err, tar.Close(), os.Remove(tar.Name())) }()
+
+	if cid, err = execx.String(ctx, "podman", "create", "eg"); err != nil {
+		return "", errorsx.Wrap(err, "unable to create the root container")
+	}
+	cid = strings.TrimSpace(cid)
+	defer func() { err = errorsx.Compact(err, exec.Command("podman", "rm", cid).Run()) }()
+
+	if err = exec.CommandContext(ctx, "podman", "export", "-o", tar.Name(), cid).Run(); err != nil {
+		return "", errorsx.Wrap(err, "unable to export the root container")
+	}
+
+	if st, err = tar.Stat(); err != nil {
+		return "", err
+	}
+
+	if out, err = os.Create(location); err != nil {
+		return "", errorsx.Wrap(err, "unable to create the egiso")
+	}
+	defer out.Close()
+
+	if toc, err = egiso.Build(io.NewSectionReader(tar, 0, st.Size()), out); err != nil {
+		return "", errorsx.Wrap(err, "unable to build the egiso")
+	}
+
+	if err = os.WriteFile(location+".toc", []byte(toc), 0600); err != nil {
+		return "", errorsx.Wrap(err, "unable to record the egiso's table of contents")
+	}
+
+	return location + "#" + toc.String(), nil
 }
 
 // Module runs the module at path in the machine, as c8sproxy.PodmanModule runs it in a container,

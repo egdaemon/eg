@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"log/slog"
 	"net"
 	"os"
 	"os/exec"
@@ -327,7 +328,7 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 			return errorsx.Wrap(err, "unable to set cpu limits")
 		}
 
-		if vmemlimit, err = memlimit.Set(memlimitx.Chain(memlimit.FromCgroup, memlimit.FromSystem, memlimit.Limit(bytesx.GiB))); err != nil {
+		if vmemlimit, err = memlimit.Set(memlimitx.Chain(memlimit.FromCgroup, memlimit.FromSystem, memlimit.Limit(bytesx.GiB)), memlimit.WithLogger(slog.Default())); err != nil {
 			return errorsx.Wrap(err, "unable to set max limits")
 		}
 

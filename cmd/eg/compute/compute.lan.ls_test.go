@@ -12,7 +12,7 @@ import (
 
 	"github.com/alecthomas/kong"
 	"github.com/egdaemon/eg/cmd/cmdopts"
-	"github.com/egdaemon/eg/cmd/cmdtestx"
+	"github.com/egdaemon/eg/cmd/cmdtestx/v2"
 	"github.com/egdaemon/eg/internal/iterx"
 	"github.com/egdaemon/eg/internal/lan"
 	"github.com/egdaemon/eg/internal/langx"
@@ -124,16 +124,15 @@ func TestLanList(t *testing.T) {
 		require.NoError(t, err)
 
 		var out bytes.Buffer
-		genparser := cmdtestx.Genparser(lanList{},
+		harness := cmdtestx.New(t, &lanList{}).Options(
 			kong.NamedMapper("durationinf", kong.MapperFunc(cmdopts.ParseDurationInf)),
 			kong.Vars{"vars_cache_directory": t.TempDir()},
 			kong.Writers(&out, nil),
 			kong.Bind(libp2px.MDNSLookup(func(ctx context.Context, timeout time.Duration) iterx.Seq[peer.AddrInfo] {
 				return iterx.Slice(peer.AddrInfo{ID: found})
-			})),
-		)
+			})))
 
-		require.NoError(t, cmdtestx.Execute(t, genparser(t), "command", "--database", filepath.Join(dir, migrations.CLI), "--scan", "--scan-timeout", "10s", "--lan-peer-ttl", "48h"))
+		require.NoError(t, harness.Run("--database", filepath.Join(dir, migrations.CLI), "--scan", "--scan-timeout", "10s", "--lan-peer-ttl", "48h"))
 		require.Contains(t, out.String(), "remembered")
 		require.Contains(t, out.String(), found.String(), "what the scan found is listed")
 	})

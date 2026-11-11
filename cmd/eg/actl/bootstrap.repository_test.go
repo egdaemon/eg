@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/alecthomas/kong"
-	"github.com/egdaemon/eg/cmd/cmdtestx"
+	"github.com/egdaemon/eg/cmd/cmdtestx/v2"
 	"github.com/egdaemon/eg/cmd/eg/actl"
 	"github.com/go-git/go-git/v6"
 	"github.com/go-git/go-git/v6/plumbing/object"
@@ -18,8 +18,8 @@ func TestBootstrapRepository(t *testing.T) {
 		dir := t.TempDir()
 		require.NoError(t, os.MkdirAll(filepath.Join(dir, ".eg"), 0o700))
 
-		genparser := cmdtestx.Genparser(actl.BootstrapRepository{}, kong.Vars{"vars_git_directory": dir, "vars_workload_directory": ".eg", "vars_git_default_reference": "refs/heads/main"})
-		err := cmdtestx.Execute(t, genparser(t), "command", filepath.Join(t.TempDir(), "missing"))
+		harness := cmdtestx.New(t, &actl.BootstrapRepository{}).Options(kong.Vars{"vars_git_directory": dir, "vars_workload_directory": ".eg", "vars_git_default_reference": "refs/heads/main"})
+		err := harness.Run(filepath.Join(t.TempDir(), "missing"))
 		require.ErrorContains(t, err, "directory already exists")
 
 		var uf interface{ UserFriendly() }
@@ -29,8 +29,8 @@ func TestBootstrapRepository(t *testing.T) {
 	t.Run("fails when the repository cannot be cloned", func(t *testing.T) {
 		dir := t.TempDir()
 
-		genparser := cmdtestx.Genparser(actl.BootstrapRepository{}, kong.Vars{"vars_git_directory": dir, "vars_workload_directory": ".eg", "vars_git_default_reference": "refs/heads/main"})
-		err := cmdtestx.Execute(t, genparser(t), "command", filepath.Join(t.TempDir(), "missing"))
+		harness := cmdtestx.New(t, &actl.BootstrapRepository{}).Options(kong.Vars{"vars_git_directory": dir, "vars_workload_directory": ".eg", "vars_git_default_reference": "refs/heads/main"})
+		err := harness.Run(filepath.Join(t.TempDir(), "missing"))
 		require.ErrorContains(t, err, "unable to clone repository")
 		require.NoDirExists(t, filepath.Join(dir, ".eg", ".git"))
 	})
@@ -48,8 +48,8 @@ func TestBootstrapRepository(t *testing.T) {
 		require.NoError(t, err)
 
 		dir := t.TempDir()
-		genparser := cmdtestx.Genparser(actl.BootstrapRepository{}, kong.Vars{"vars_git_directory": dir, "vars_workload_directory": ".eg", "vars_git_default_reference": "refs/heads/main"})
-		err = cmdtestx.Execute(t, genparser(t), "command", src, "--branch", "refs/heads/does-not-exist")
+		harness := cmdtestx.New(t, &actl.BootstrapRepository{}).Options(kong.Vars{"vars_git_directory": dir, "vars_workload_directory": ".eg", "vars_git_default_reference": "refs/heads/main"})
+		err = harness.Run(src, "--branch", "refs/heads/does-not-exist")
 		require.ErrorContains(t, err, "unable to clone repository")
 	})
 
@@ -70,8 +70,8 @@ func TestBootstrapRepository(t *testing.T) {
 		// without a git root the workspace is created in the current directory.
 		dir := t.TempDir()
 		t.Chdir(dir)
-		genparser := cmdtestx.Genparser(actl.BootstrapRepository{}, kong.Vars{"vars_git_directory": dir, "vars_workload_directory": ".eg", "vars_git_default_reference": head.Name().String()})
-		require.NoError(t, cmdtestx.Execute(t, genparser(t), "command", src))
+		harness := cmdtestx.New(t, &actl.BootstrapRepository{}).Options(kong.Vars{"vars_git_directory": dir, "vars_workload_directory": ".eg", "vars_git_default_reference": head.Name().String()})
+		require.NoError(t, harness.Run(src))
 
 		egdir := filepath.Join(dir, ".eg")
 		require.FileExists(t, filepath.Join(egdir, "main.go"))
@@ -95,8 +95,8 @@ func TestBootstrapRepository(t *testing.T) {
 
 		dir := t.TempDir()
 		require.NoError(t, os.MkdirAll(filepath.Join(dir, ".git"), 0o700))
-		genparser := cmdtestx.Genparser(actl.BootstrapRepository{}, kong.Vars{"vars_git_directory": dir, "vars_workload_directory": ".eg", "vars_git_default_reference": head.Name().String()})
-		require.NoError(t, cmdtestx.Execute(t, genparser(t), "command", src))
+		harness := cmdtestx.New(t, &actl.BootstrapRepository{}).Options(kong.Vars{"vars_git_directory": dir, "vars_workload_directory": ".eg", "vars_git_default_reference": head.Name().String()})
+		require.NoError(t, harness.Run(src))
 
 		work, err := os.ReadFile(filepath.Join(dir, "go.work"))
 		require.NoError(t, err)

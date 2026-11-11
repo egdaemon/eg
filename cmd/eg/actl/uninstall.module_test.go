@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/alecthomas/kong"
-	"github.com/egdaemon/eg/cmd/cmdtestx"
+	"github.com/egdaemon/eg/cmd/cmdtestx/v2"
 	"github.com/egdaemon/eg/cmd/eg/actl"
 	"github.com/stretchr/testify/require"
 )
@@ -15,8 +15,8 @@ func TestUninstallModule(t *testing.T) {
 	t.Run("errors when there is no module", func(t *testing.T) {
 		dir := t.TempDir()
 
-		genparser := cmdtestx.Genparser(actl.UninstallModule{}, kong.Vars{"vars_git_directory": dir, "vars_workload_directory": ".eg"})
-		err := cmdtestx.Execute(t, genparser(t), "command")
+		harness := cmdtestx.New(t, &actl.UninstallModule{}).Options(kong.Vars{"vars_git_directory": dir, "vars_workload_directory": ".eg"})
+		err := harness.Run()
 		require.ErrorContains(t, err, "no eg module found")
 
 		var uf interface{ UserFriendly() }
@@ -31,8 +31,8 @@ func TestUninstallModule(t *testing.T) {
 			require.NoError(t, os.WriteFile(filepath.Join(egdir, name), []byte("x"), 0o600))
 		}
 
-		genparser := cmdtestx.Genparser(actl.UninstallModule{}, kong.Vars{"vars_git_directory": dir, "vars_workload_directory": ".eg"})
-		require.NoError(t, cmdtestx.Execute(t, genparser(t), "command"))
+		harness := cmdtestx.New(t, &actl.UninstallModule{}).Options(kong.Vars{"vars_git_directory": dir, "vars_workload_directory": ".eg"})
+		require.NoError(t, harness.Run())
 		require.NoDirExists(t, egdir)
 	})
 
@@ -42,8 +42,8 @@ func TestUninstallModule(t *testing.T) {
 		require.NoError(t, os.MkdirAll(filepath.Join(egdir, "release"), 0o700))
 		require.NoError(t, os.WriteFile(filepath.Join(egdir, "main.go"), []byte("x"), 0o600))
 
-		genparser := cmdtestx.Genparser(actl.UninstallModule{}, kong.Vars{"vars_git_directory": dir, "vars_workload_directory": ".eg"})
-		err := cmdtestx.Execute(t, genparser(t), "command")
+		harness := cmdtestx.New(t, &actl.UninstallModule{}).Options(kong.Vars{"vars_git_directory": dir, "vars_workload_directory": ".eg"})
+		err := harness.Run()
 		require.ErrorContains(t, err, "use --force")
 		require.DirExists(t, egdir)
 
@@ -56,8 +56,8 @@ func TestUninstallModule(t *testing.T) {
 		egdir := filepath.Join(dir, ".eg")
 		require.NoError(t, os.MkdirAll(filepath.Join(egdir, "release"), 0o700))
 
-		genparser := cmdtestx.Genparser(actl.UninstallModule{}, kong.Vars{"vars_git_directory": dir, "vars_workload_directory": ".eg"})
-		require.NoError(t, cmdtestx.Execute(t, genparser(t), "command", "--force"))
+		harness := cmdtestx.New(t, &actl.UninstallModule{}).Options(kong.Vars{"vars_git_directory": dir, "vars_workload_directory": ".eg"})
+		require.NoError(t, harness.Run("--force"))
 		require.NoDirExists(t, egdir)
 	})
 }

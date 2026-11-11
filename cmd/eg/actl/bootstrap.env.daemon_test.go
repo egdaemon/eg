@@ -10,13 +10,13 @@ import (
 	"testing"
 
 	"github.com/alecthomas/kong"
+	"github.com/dustin/go-humanize"
 	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/cmd/cmdopts"
-	"github.com/egdaemon/eg/cmd/cmdtestx"
+	"github.com/egdaemon/eg/cmd/cmdtestx/v2"
 	"github.com/egdaemon/eg/cmd/eg/actl"
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/secrets"
-	"github.com/dustin/go-humanize"
 	"github.com/shirou/gopsutil/v4/disk"
 	"github.com/shirou/gopsutil/v4/mem"
 	"github.com/stretchr/testify/require"
@@ -25,14 +25,13 @@ import (
 func TestBootstrapEnvDaemon(t *testing.T) {
 	t.Run("account default resolves from vars_account_id at parse time", func(t *testing.T) {
 		var out bytes.Buffer
-		genparser := cmdtestx.Genparser(actl.BootstrapEnvDaemon{},
+		harness := cmdtestx.New(t, &actl.BootstrapEnvDaemon{}).Options(
 			cmdopts.RuntimeResources{}.KongVars(),
 			kong.Vars{"vars_account_id": "expected-account", "vars_entropy_seed": "expected-seed"},
 			kong.Writers(&out, nil),
-			kong.Bind(cmdopts.Entropy(cmdopts.GenerateEntropy)),
-		)
+			kong.Bind(cmdopts.Entropy(cmdopts.GenerateEntropy)))
 
-		require.NoError(t, cmdtestx.Execute(t, genparser(t), "command"))
+		require.NoError(t, harness.Run())
 		require.Contains(t, out.String(), "EG_ACCOUNT=expected-account")
 	})
 
@@ -52,14 +51,13 @@ func TestBootstrapEnvDaemon(t *testing.T) {
 		require.Contains(t, secretvars, "EG_ACCOUNT=expected-account")
 
 		var out bytes.Buffer
-		genparser := cmdtestx.Genparser(actl.BootstrapEnvDaemon{},
+		harness := cmdtestx.New(t, &actl.BootstrapEnvDaemon{}).Options(
 			cmdopts.RuntimeResources{}.KongVars(),
 			kong.Vars{"vars_account_id": "expected-account", "vars_entropy_seed": "expected-seed"},
 			kong.Writers(&out, nil),
-			kong.Bind(cmdopts.Entropy(cmdopts.GenerateEntropy)),
-		)
+			kong.Bind(cmdopts.Entropy(cmdopts.GenerateEntropy)))
 
-		require.NoError(t, cmdtestx.Execute(t, genparser(t), "command"))
+		require.NoError(t, harness.Run())
 		require.Contains(t, out.String(), "EG_ACCOUNT=expected-account")
 	})
 
@@ -69,9 +67,10 @@ func TestBootstrapEnvDaemon(t *testing.T) {
 		// later inside Run() -- proving the value has to be in place ahead of flag
 		// resolution, exactly what `eg secrets env -- eg actl bootstrap-env daemon ...`
 		// exists to guarantee.
-		genparser := cmdtestx.Genparser(actl.BootstrapEnvDaemon{}, cmdopts.RuntimeResources{}.KongVars())
+		harness := cmdtestx.New(t, &actl.BootstrapEnvDaemon{}).Options(cmdopts.RuntimeResources{}.KongVars())
 
-		require.Panics(t, func() { genparser(t) })
+		_, err := harness.Parse()
+		require.Error(t, err)
 	})
 
 	t.Run("lan settings are only emitted when requested", func(t *testing.T) {
@@ -87,15 +86,14 @@ func TestBootstrapEnvDaemon(t *testing.T) {
 		} {
 			t.Run(c.name, func(t *testing.T) {
 				var out bytes.Buffer
-				genparser := cmdtestx.Genparser(actl.BootstrapEnvDaemon{},
+				harness := cmdtestx.New(t, &actl.BootstrapEnvDaemon{}).Options(
 					cmdopts.RuntimeResources{}.KongVars(),
 					kong.NamedMapper("durationinf", kong.MapperFunc(cmdopts.ParseDurationInf)),
 					kong.Vars{"vars_account_id": "expected-account", "vars_entropy_seed": "expected-seed"},
 					kong.Writers(&out, nil),
-					kong.Bind(cmdopts.Entropy(cmdopts.GenerateEntropy)),
-				)
+					kong.Bind(cmdopts.Entropy(cmdopts.GenerateEntropy)))
 
-				require.NoError(t, cmdtestx.Execute(t, genparser(t), append([]string{"command"}, c.args...)...))
+				require.NoError(t, harness.Run(c.args...))
 				for _, v := range c.contains {
 					require.Contains(t, out.String(), v)
 				}
@@ -125,15 +123,14 @@ func TestBootstrapEnvDaemon(t *testing.T) {
 		} {
 			t.Run(c.name, func(t *testing.T) {
 				var out bytes.Buffer
-				genparser := cmdtestx.Genparser(actl.BootstrapEnvDaemon{},
+				harness := cmdtestx.New(t, &actl.BootstrapEnvDaemon{}).Options(
 					cmdopts.RuntimeResources{Cores: cores}.KongVars(),
 					kong.NamedMapper("durationinf", kong.MapperFunc(cmdopts.ParseDurationInf)),
 					kong.Vars{"vars_account_id": "expected-account", "vars_entropy_seed": "expected-seed"},
 					kong.Writers(&out, nil),
-					kong.Bind(cmdopts.Entropy(cmdopts.GenerateEntropy)),
-				)
+					kong.Bind(cmdopts.Entropy(cmdopts.GenerateEntropy)))
 
-				require.NoError(t, cmdtestx.Execute(t, genparser(t), append([]string{"command"}, c.args...)...))
+				require.NoError(t, harness.Run(c.args...))
 				for _, v := range c.contains {
 					require.Contains(t, out.String(), v)
 				}
@@ -146,14 +143,13 @@ func TestBootstrapEnvDaemon(t *testing.T) {
 
 	t.Run("cores and memory honor the requested values", func(t *testing.T) {
 		var out bytes.Buffer
-		genparser := cmdtestx.Genparser(actl.BootstrapEnvDaemon{},
+		harness := cmdtestx.New(t, &actl.BootstrapEnvDaemon{}).Options(
 			cmdopts.RuntimeResources{Cores: uint64(runtime.NumCPU())}.KongVars(),
 			kong.Vars{"vars_account_id": "expected-account", "vars_entropy_seed": "expected-seed"},
 			kong.Writers(&out, nil),
-			kong.Bind(cmdopts.Entropy(cmdopts.GenerateEntropy)),
-		)
+			kong.Bind(cmdopts.Entropy(cmdopts.GenerateEntropy)))
 
-		require.NoError(t, cmdtestx.Execute(t, genparser(t), "command", "--cores", "1", "--memory", "4GiB"))
+		require.NoError(t, harness.Run("--cores", "1", "--memory", "4GiB"))
 		require.Contains(t, out.String(), "EG_RESOURCES_CORES=1\n")
 		require.Contains(t, out.String(), "EG_RESOURCES_MEMORY=4294967296\n")
 	})
@@ -165,14 +161,13 @@ func TestBootstrapEnvDaemon(t *testing.T) {
 		require.NoError(t, err)
 
 		var out bytes.Buffer
-		genparser := cmdtestx.Genparser(actl.BootstrapEnvDaemon{},
+		harness := cmdtestx.New(t, &actl.BootstrapEnvDaemon{}).Options(
 			cmdopts.RuntimeResources{Cores: 1}.KongVars(),
 			kong.Vars{"vars_account_id": "expected-account", "vars_entropy_seed": "expected-seed"},
 			kong.Writers(&out, nil),
-			kong.Bind(cmdopts.Entropy(cmdopts.GenerateEntropy)),
-		)
+			kong.Bind(cmdopts.Entropy(cmdopts.GenerateEntropy)))
 
-		require.NoError(t, cmdtestx.Execute(t, genparser(t), "command",
+		require.NoError(t, harness.Run(
 			"--cores", fmt.Sprint(runtime.NumCPU()+100),
 			"--memory", "100PiB",
 			"--disk", "100PiB",
@@ -197,15 +192,14 @@ func TestBootstrapEnvDaemon(t *testing.T) {
 		} {
 			t.Run(c.name, func(t *testing.T) {
 				var out bytes.Buffer
-				genparser := cmdtestx.Genparser(actl.BootstrapEnvDaemon{},
+				harness := cmdtestx.New(t, &actl.BootstrapEnvDaemon{}).Options(
 					cmdopts.RuntimeResources{}.KongVars(),
 					kong.NamedMapper("durationinf", kong.MapperFunc(cmdopts.ParseDurationInf)),
 					kong.Vars{"vars_account_id": "expected-account", "vars_entropy_seed": "expected-seed"},
 					kong.Writers(&out, nil),
-					kong.Bind(cmdopts.Entropy(cmdopts.GenerateEntropy)),
-				)
+					kong.Bind(cmdopts.Entropy(cmdopts.GenerateEntropy)))
 
-				err := cmdtestx.Execute(t, genparser(t), append([]string{"command"}, c.args...)...)
+				err := harness.Run(c.args...)
 				if c.invalid {
 					require.Error(t, err)
 					return
@@ -240,15 +234,14 @@ func TestBootstrapEnvDaemon(t *testing.T) {
 		} {
 			t.Run(c.name, func(t *testing.T) {
 				var out bytes.Buffer
-				genparser := cmdtestx.Genparser(actl.BootstrapEnvDaemon{},
+				harness := cmdtestx.New(t, &actl.BootstrapEnvDaemon{}).Options(
 					cmdopts.RuntimeResources{}.KongVars(),
 					kong.NamedMapper("durationinf", kong.MapperFunc(cmdopts.ParseDurationInf)),
 					kong.Vars{"vars_account_id": "expected-account", "vars_entropy_seed": "expected-seed"},
 					kong.Writers(&out, nil),
-					kong.Bind(cmdopts.Entropy(cmdopts.GenerateEntropy)),
-				)
+					kong.Bind(cmdopts.Entropy(cmdopts.GenerateEntropy)))
 
-				require.NoError(t, cmdtestx.Execute(t, genparser(t), append([]string{"command"}, c.args...)...))
+				require.NoError(t, harness.Run(c.args...))
 				for _, v := range c.contains {
 					require.Contains(t, out.String(), v)
 				}
@@ -261,15 +254,14 @@ func TestBootstrapEnvDaemon(t *testing.T) {
 
 	t.Run("custom environment variables follow the generated ones", func(t *testing.T) {
 		var out bytes.Buffer
-		genparser := cmdtestx.Genparser(actl.BootstrapEnvDaemon{},
+		harness := cmdtestx.New(t, &actl.BootstrapEnvDaemon{}).Options(
 			cmdopts.RuntimeResources{}.KongVars(),
 			kong.NamedMapper("durationinf", kong.MapperFunc(cmdopts.ParseDurationInf)),
 			kong.Vars{"vars_account_id": "expected-account", "vars_entropy_seed": "expected-seed"},
 			kong.Writers(&out, nil),
-			kong.Bind(cmdopts.Entropy(cmdopts.GenerateEntropy)),
-		)
+			kong.Bind(cmdopts.Entropy(cmdopts.GenerateEntropy)))
 
-		require.NoError(t, cmdtestx.Execute(t, genparser(t), "command", "-e", "EG_RESTART_ON_UPGRADE=no"))
+		require.NoError(t, harness.Run("-e", "EG_RESTART_ON_UPGRADE=no"))
 		lines := strings.Split(strings.TrimSpace(out.String()), "\n")
 		require.Equal(t, "EG_RESTART_ON_UPGRADE=no", lines[len(lines)-1])
 		require.Contains(t, lines, "EG_RESTART_ON_UPGRADE=auto")

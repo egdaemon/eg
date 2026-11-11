@@ -10,7 +10,7 @@ import (
 
 	"github.com/alecthomas/kong"
 	"github.com/egdaemon/eg/authn"
-	"github.com/egdaemon/eg/cmd/cmdtestx"
+	"github.com/egdaemon/eg/cmd/cmdtestx/v2"
 	"github.com/egdaemon/eg/internal/sshx"
 	"github.com/egdaemon/eg/runners/registration"
 	"github.com/stretchr/testify/require"
@@ -19,16 +19,16 @@ import (
 
 func TestAuthorizeManualParsing(t *testing.T) {
 	t.Run("missing id argument fails to parse", func(t *testing.T) {
-		genparser := cmdtestx.Genparser(AuthorizeManual{}, kong.Vars{"vars_ssh_key_path": "/expected/path"})
+		harness := cmdtestx.New(t, &AuthorizeManual{}).Options(kong.Vars{"vars_ssh_key_path": "/expected/path"})
 
-		_, err := genparser(t).Parse([]string{"command"})
+		_, err := harness.Parse()
 		require.Error(t, err)
 	})
 
 	t.Run("sshkeypath default resolves at parse time", func(t *testing.T) {
-		genparser := cmdtestx.Genparser(AuthorizeManual{}, kong.Vars{"vars_ssh_key_path": "/expected/path"})
+		harness := cmdtestx.New(t, &AuthorizeManual{}).Options(kong.Vars{"vars_ssh_key_path": "/expected/path"})
 
-		_, err := genparser(t).Parse([]string{"command", "the-id"})
+		_, err := harness.Parse("the-id")
 		require.NoError(t, err)
 	})
 }

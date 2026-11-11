@@ -10,7 +10,7 @@ import (
 
 	"github.com/alecthomas/kong"
 	"github.com/egdaemon/eg/cmd/cmdopts"
-	"github.com/egdaemon/eg/cmd/cmdtestx"
+	"github.com/egdaemon/eg/cmd/cmdtestx/v2"
 	"github.com/egdaemon/eg/internal/lan"
 	"github.com/egdaemon/eg/internal/langx"
 	"github.com/egdaemon/eg/internal/sqltestx"
@@ -90,8 +90,8 @@ func TestLanUpdate(t *testing.T) {
 		require.NoError(t, lan.PeerUpsert(t.Context(), db, langx.Clone(lan.Peer{}, lan.PeerOptionTestDefaults, lan.PeerOptionID("a"))).Scan(&lan.Peer{}))
 		require.NoError(t, db.Close())
 
-		genparser := cmdtestx.Genparser(lanUpdate{}, kong.NamedMapper("durationinf", kong.MapperFunc(cmdopts.ParseDurationInf)), kong.Vars{"vars_cache_directory": t.TempDir()})
-		require.NoError(t, cmdtestx.Execute(t, genparser(t), "command", "a", "--database", filepath.Join(dir, migrations.Daemon), "--disable", "--ttl", "infinity", "--description", "x"))
+		harness := cmdtestx.New(t, &lanUpdate{}).Options(kong.NamedMapper("durationinf", kong.MapperFunc(cmdopts.ParseDurationInf)), kong.Vars{"vars_cache_directory": t.TempDir()})
+		require.NoError(t, harness.Run("a", "--database", filepath.Join(dir, migrations.Daemon), "--disable", "--ttl", "infinity", "--description", "x"))
 
 		db = testx.MustT(migrations.Open(t.Context(), filepath.Join(dir, migrations.Daemon)))(t)
 		defer db.Close()
@@ -104,15 +104,15 @@ func TestLanUpdate(t *testing.T) {
 	})
 
 	t.Run("rejects invalid flags", func(t *testing.T) {
-		genparser := cmdtestx.Genparser(lanUpdate{}, kong.NamedMapper("durationinf", kong.MapperFunc(cmdopts.ParseDurationInf)), kong.Vars{"vars_cache_directory": t.TempDir()})
+		harness := cmdtestx.New(t, &lanUpdate{}).Options(kong.NamedMapper("durationinf", kong.MapperFunc(cmdopts.ParseDurationInf)), kong.Vars{"vars_cache_directory": t.TempDir()})
 
-		_, err := genparser(t).Parse([]string{"command"})
+		_, err := harness.Parse()
 		require.Error(t, err, "peer id is required")
 
-		_, err = genparser(t).Parse([]string{"command", "a", "--disable", "--enable"})
+		_, err = harness.Parse("a", "--disable", "--enable")
 		require.Error(t, err, "disable and enable are exclusive")
 
-		_, err = genparser(t).Parse([]string{"command", "a", "--ttl", "1h", "--reset-ttl"})
+		_, err = harness.Parse("a", "--ttl", "1h", "--reset-ttl")
 		require.Error(t, err, "ttl and reset-ttl are exclusive")
 	})
 }

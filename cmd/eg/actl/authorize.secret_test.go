@@ -12,7 +12,7 @@ import (
 	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/authn"
 	"github.com/egdaemon/eg/cmd/cmdopts"
-	"github.com/egdaemon/eg/cmd/cmdtestx"
+	"github.com/egdaemon/eg/cmd/cmdtestx/v2"
 	"github.com/egdaemon/eg/identity"
 	"github.com/egdaemon/eg/internal/sshx"
 	"github.com/egdaemon/eg/runners/registration"
@@ -48,39 +48,39 @@ func TestAuthorizeSecretSigner(t *testing.T) {
 
 func TestAuthorizeSecretParsing(t *testing.T) {
 	t.Run("missing seed argument fails to parse", func(t *testing.T) {
-		genparser := cmdtestx.Genparser(AuthorizeSecret{}, kong.Vars{"vars_ssh_key_path": "/expected/path", "env_eg_entropy_seed": eg.EnvEGEntropySeed, "vars_ssh_key_seed": "default-ssh-seed", "env_eg_ssh_key_seed": eg.EnvEGSSHSeed})
+		harness := cmdtestx.New(t, &AuthorizeSecret{}).Options(kong.Vars{"vars_ssh_key_path": "/expected/path", "env_eg_entropy_seed": eg.EnvEGEntropySeed, "vars_ssh_key_seed": "default-ssh-seed", "env_eg_ssh_key_seed": eg.EnvEGSSHSeed})
 
-		_, err := genparser(t).Parse([]string{"command"})
+		_, err := harness.Parse()
 		require.Error(t, err)
 	})
 
 	t.Run("seed falls back to the environment", func(t *testing.T) {
 		t.Setenv(eg.EnvEGEntropySeed, "env-seed")
-		genparser := cmdtestx.Genparser(AuthorizeSecret{}, kong.Vars{"vars_ssh_key_path": "/expected/path", "env_eg_entropy_seed": eg.EnvEGEntropySeed, "vars_ssh_key_seed": "default-ssh-seed", "env_eg_ssh_key_seed": eg.EnvEGSSHSeed})
+		harness := cmdtestx.New(t, &AuthorizeSecret{}).Options(kong.Vars{"vars_ssh_key_path": "/expected/path", "env_eg_entropy_seed": eg.EnvEGEntropySeed, "vars_ssh_key_seed": "default-ssh-seed", "env_eg_ssh_key_seed": eg.EnvEGSSHSeed})
 
-		kctx, err := genparser(t).Parse([]string{"command"})
+		kctx, err := harness.Parse()
 		require.NoError(t, err)
-		require.Equal(t, "env-seed", kctx.Selected().Positional[0].Target.String())
+		require.Equal(t, "env-seed", kctx.Model.Positional[0].Target.String())
 	})
 
 	t.Run("explicit seed wins over the environment", func(t *testing.T) {
 		t.Setenv(eg.EnvEGEntropySeed, "env-seed")
-		genparser := cmdtestx.Genparser(AuthorizeSecret{}, kong.Vars{"vars_ssh_key_path": "/expected/path", "env_eg_entropy_seed": eg.EnvEGEntropySeed, "vars_ssh_key_seed": "default-ssh-seed", "env_eg_ssh_key_seed": eg.EnvEGSSHSeed})
+		harness := cmdtestx.New(t, &AuthorizeSecret{}).Options(kong.Vars{"vars_ssh_key_path": "/expected/path", "env_eg_entropy_seed": eg.EnvEGEntropySeed, "vars_ssh_key_seed": "default-ssh-seed", "env_eg_ssh_key_seed": eg.EnvEGSSHSeed})
 
-		kctx, err := genparser(t).Parse([]string{"command", "arg-seed"})
+		kctx, err := harness.Parse("arg-seed")
 		require.NoError(t, err)
-		require.Equal(t, "arg-seed", kctx.Selected().Positional[0].Target.String())
+		require.Equal(t, "arg-seed", kctx.Model.Positional[0].Target.String())
 	})
 
 	t.Run("ssh seed falls back to the ssh key seed environment", func(t *testing.T) {
 		t.Setenv(eg.EnvEGSSHSeed, "env-ssh-seed")
-		genparser := cmdtestx.Genparser(AuthorizeSecret{}, kong.Vars{"vars_ssh_key_path": "/expected/path", "env_eg_entropy_seed": eg.EnvEGEntropySeed, "vars_ssh_key_seed": "default-ssh-seed", "env_eg_ssh_key_seed": eg.EnvEGSSHSeed})
+		harness := cmdtestx.New(t, &AuthorizeSecret{}).Options(kong.Vars{"vars_ssh_key_path": "/expected/path", "env_eg_entropy_seed": eg.EnvEGEntropySeed, "vars_ssh_key_seed": "default-ssh-seed", "env_eg_ssh_key_seed": eg.EnvEGSSHSeed})
 
-		kctx, err := genparser(t).Parse([]string{"command", "arg-seed"})
+		kctx, err := harness.Parse("arg-seed")
 		require.NoError(t, err)
 
 		var found bool
-		for _, flag := range kctx.Selected().Flags {
+		for _, flag := range kctx.Flags() {
 			if flag.Name == "sshkeyseed" {
 				found = true
 				require.Equal(t, "env-ssh-seed", flag.Target.String())
@@ -90,9 +90,9 @@ func TestAuthorizeSecretParsing(t *testing.T) {
 	})
 
 	t.Run("sshkeypath default resolves at parse time", func(t *testing.T) {
-		genparser := cmdtestx.Genparser(AuthorizeSecret{}, kong.Vars{"vars_ssh_key_path": "/expected/path", "env_eg_entropy_seed": eg.EnvEGEntropySeed, "vars_ssh_key_seed": "default-ssh-seed", "env_eg_ssh_key_seed": eg.EnvEGSSHSeed})
+		harness := cmdtestx.New(t, &AuthorizeSecret{}).Options(kong.Vars{"vars_ssh_key_path": "/expected/path", "env_eg_entropy_seed": eg.EnvEGEntropySeed, "vars_ssh_key_seed": "default-ssh-seed", "env_eg_ssh_key_seed": eg.EnvEGSSHSeed})
 
-		_, err := genparser(t).Parse([]string{"command", "00000000-0000-0000-0000-000000000000"})
+		_, err := harness.Parse("00000000-0000-0000-0000-000000000000")
 		require.NoError(t, err)
 	})
 }

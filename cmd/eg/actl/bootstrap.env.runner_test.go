@@ -9,7 +9,7 @@ import (
 
 	"github.com/alecthomas/kong"
 	"github.com/egdaemon/eg/cmd/cmdopts"
-	"github.com/egdaemon/eg/cmd/cmdtestx"
+	"github.com/egdaemon/eg/cmd/cmdtestx/v2"
 	"github.com/egdaemon/eg/cmd/eg/actl"
 	"github.com/egdaemon/eg/internal/bytesx"
 	"github.com/egdaemon/eg/internal/netx"
@@ -19,12 +19,11 @@ import (
 func TestBootstrapEnvRunner(t *testing.T) {
 	t.Run("defaults resolve to the host's own resources", func(t *testing.T) {
 		var out bytes.Buffer
-		genparser := cmdtestx.Genparser(actl.BootstrapEnvRunner{},
+		harness := cmdtestx.New(t, &actl.BootstrapEnvRunner{}).Options(
 			cmdopts.RuntimeResources{}.KongVars(),
-			kong.Writers(&out, nil),
-		)
+			kong.Writers(&out, nil))
 
-		require.NoError(t, cmdtestx.Execute(t, genparser(t), "command"))
+		require.NoError(t, harness.Run())
 		require.Contains(t, out.String(), fmt.Sprintf("EG_RUNNER_CPU=%d", runtime.NumCPU()))
 		require.Contains(t, out.String(), "EG_RUNNER_MEMORY=")
 		require.Contains(t, out.String(), "EG_RUNNER_VRAM=")
@@ -32,12 +31,11 @@ func TestBootstrapEnvRunner(t *testing.T) {
 
 	t.Run("cores flag below the host's actual core count wins", func(t *testing.T) {
 		var out bytes.Buffer
-		genparser := cmdtestx.Genparser(actl.BootstrapEnvRunner{},
+		harness := cmdtestx.New(t, &actl.BootstrapEnvRunner{}).Options(
 			cmdopts.RuntimeResources{}.KongVars(),
-			kong.Writers(&out, nil),
-		)
+			kong.Writers(&out, nil))
 
-		require.NoError(t, cmdtestx.Execute(t, genparser(t), "command", "--cores=1"))
+		require.NoError(t, harness.Run("--cores=1"))
 		require.Contains(t, out.String(), "EG_RUNNER_CPU=1")
 	})
 
@@ -45,23 +43,21 @@ func TestBootstrapEnvRunner(t *testing.T) {
 		requested := uint64(runtime.NumCPU()) + 1000
 
 		var out bytes.Buffer
-		genparser := cmdtestx.Genparser(actl.BootstrapEnvRunner{},
+		harness := cmdtestx.New(t, &actl.BootstrapEnvRunner{}).Options(
 			cmdopts.RuntimeResources{}.KongVars(),
-			kong.Writers(&out, nil),
-		)
+			kong.Writers(&out, nil))
 
-		require.NoError(t, cmdtestx.Execute(t, genparser(t), "command", "--cores="+strconv.FormatUint(requested, 10)))
+		require.NoError(t, harness.Run("--cores="+strconv.FormatUint(requested, 10)))
 		require.Contains(t, out.String(), fmt.Sprintf("EG_RUNNER_CPU=%d", runtime.NumCPU()))
 	})
 
 	t.Run("memory flag larger than the host's available memory is capped at what the host actually has", func(t *testing.T) {
 		var out bytes.Buffer
-		genparser := cmdtestx.Genparser(actl.BootstrapEnvRunner{},
+		harness := cmdtestx.New(t, &actl.BootstrapEnvRunner{}).Options(
 			cmdopts.RuntimeResources{}.KongVars(),
-			kong.Writers(&out, nil),
-		)
+			kong.Writers(&out, nil))
 
-		require.NoError(t, cmdtestx.Execute(t, genparser(t), "command", "--memory=2Pi"))
+		require.NoError(t, harness.Run("--memory=2Pi"))
 		// requesting far more than the host has must not simply echo the request back
 		require.NotContains(t, out.String(), fmt.Sprintf("EG_RUNNER_MEMORY=%v", bytesx.Unit(2*bytesx.PiB)))
 		require.Contains(t, out.String(), "EG_RUNNER_MEMORY=")
@@ -69,12 +65,11 @@ func TestBootstrapEnvRunner(t *testing.T) {
 
 	t.Run("vram flag larger than any detectable GPU's vram is capped at what was actually detected", func(t *testing.T) {
 		var out bytes.Buffer
-		genparser := cmdtestx.Genparser(actl.BootstrapEnvRunner{},
+		harness := cmdtestx.New(t, &actl.BootstrapEnvRunner{}).Options(
 			cmdopts.RuntimeResources{}.KongVars(),
-			kong.Writers(&out, nil),
-		)
+			kong.Writers(&out, nil))
 
-		require.NoError(t, cmdtestx.Execute(t, genparser(t), "command", "--vram=2Pi"))
+		require.NoError(t, harness.Run("--vram=2Pi"))
 		require.NotContains(t, out.String(), fmt.Sprintf("EG_RUNNER_VRAM=%v", bytesx.Unit(2*bytesx.PiB)))
 		require.Contains(t, out.String(), "EG_RUNNER_VRAM=")
 	})
@@ -86,12 +81,11 @@ func TestBootstrapEnvRunner(t *testing.T) {
 
 		for _, args := range [][]string{nil, {"--lan"}} {
 			var out bytes.Buffer
-			genparser := cmdtestx.Genparser(actl.BootstrapEnvRunner{},
+			harness := cmdtestx.New(t, &actl.BootstrapEnvRunner{}).Options(
 				cmdopts.RuntimeResources{}.KongVars(),
-				kong.Writers(&out, nil),
-			)
+				kong.Writers(&out, nil))
 
-			require.NoError(t, cmdtestx.Execute(t, genparser(t), append([]string{"command"}, args...)...))
+			require.NoError(t, harness.Run(args...))
 			require.Contains(t, out.String(), "EG_RUNNER_DEFAULT_NETWORK_INTERFACE=")
 		}
 	})
@@ -109,12 +103,11 @@ func TestBootstrapEnvRunner(t *testing.T) {
 		} {
 			t.Run(c.name, func(t *testing.T) {
 				var out bytes.Buffer
-				genparser := cmdtestx.Genparser(actl.BootstrapEnvRunner{},
+				harness := cmdtestx.New(t, &actl.BootstrapEnvRunner{}).Options(
 					cmdopts.RuntimeResources{}.KongVars(),
-					kong.Writers(&out, nil),
-				)
+					kong.Writers(&out, nil))
 
-				require.NoError(t, cmdtestx.Execute(t, genparser(t), append([]string{"command"}, c.args...)...))
+				require.NoError(t, harness.Run(c.args...))
 				for _, v := range c.contains {
 					require.Contains(t, out.String(), v)
 				}

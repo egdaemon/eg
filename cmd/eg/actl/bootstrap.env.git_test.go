@@ -9,19 +9,19 @@ import (
 
 	"github.com/alecthomas/kong"
 	"github.com/egdaemon/eg/authn"
-	"github.com/egdaemon/eg/cmd/cmdtestx"
+	"github.com/egdaemon/eg/cmd/cmdtestx/v2"
 	"github.com/stretchr/testify/require"
 )
 
 func TestBootstrapEnvGitParsing(t *testing.T) {
 	t.Run("defaults to the local config of the repository directory", func(t *testing.T) {
-		genparser := cmdtestx.Genparser(BootstrapEnvGit{}, kong.Vars{"vars_git_directory": "/expected/repo", "vars_ssh_key_path": "/expected/key", "vars_vcs_uri": ""})
+		harness := cmdtestx.New(t, &BootstrapEnvGit{}).Options(kong.Vars{"vars_git_directory": "/expected/repo", "vars_ssh_key_path": "/expected/key", "vars_vcs_uri": ""})
 
-		kctx, err := genparser(t).Parse([]string{"command"})
+		kctx, err := harness.Parse()
 		require.NoError(t, err)
 
 		var global, directory bool
-		for _, flag := range kctx.Selected().Flags {
+		for _, flag := range kctx.Flags() {
 			switch flag.Name {
 			case "global":
 				global = flag.Target.Bool()
@@ -34,13 +34,13 @@ func TestBootstrapEnvGitParsing(t *testing.T) {
 	})
 
 	t.Run("global flag", func(t *testing.T) {
-		genparser := cmdtestx.Genparser(BootstrapEnvGit{}, kong.Vars{"vars_git_directory": "/expected/repo", "vars_ssh_key_path": "/expected/key", "vars_vcs_uri": ""})
+		harness := cmdtestx.New(t, &BootstrapEnvGit{}).Options(kong.Vars{"vars_git_directory": "/expected/repo", "vars_ssh_key_path": "/expected/key", "vars_vcs_uri": ""})
 
-		kctx, err := genparser(t).Parse([]string{"command", "--global"})
+		kctx, err := harness.Parse("--global")
 		require.NoError(t, err)
 
 		var global bool
-		for _, flag := range kctx.Selected().Flags {
+		for _, flag := range kctx.Flags() {
 			if flag.Name == "global" {
 				global = flag.Target.Bool()
 			}

@@ -9,7 +9,7 @@ import (
 
 	"github.com/alecthomas/kong"
 	"github.com/egdaemon/eg/cmd/cmdopts"
-	"github.com/egdaemon/eg/cmd/cmdtestx"
+	"github.com/egdaemon/eg/cmd/cmdtestx/v2"
 	"github.com/egdaemon/eg/internal/lan"
 	"github.com/egdaemon/eg/internal/langx"
 	"github.com/egdaemon/eg/internal/sqltestx"
@@ -53,8 +53,8 @@ func TestLanRemove(t *testing.T) {
 		}
 		require.NoError(t, db.Close())
 
-		genparser := cmdtestx.Genparser(lanRemove{}, kong.NamedMapper("durationinf", kong.MapperFunc(cmdopts.ParseDurationInf)), kong.Vars{"vars_cache_directory": t.TempDir()})
-		require.NoError(t, cmdtestx.Execute(t, genparser(t), "command", "a", "--database", filepath.Join(dir, migrations.CLI)))
+		harness := cmdtestx.New(t, &lanRemove{}).Options(kong.NamedMapper("durationinf", kong.MapperFunc(cmdopts.ParseDurationInf)), kong.Vars{"vars_cache_directory": t.TempDir()})
+		require.NoError(t, harness.Run("a", "--database", filepath.Join(dir, migrations.CLI)))
 
 		db = testx.MustT(migrations.Open(t.Context(), filepath.Join(dir, migrations.CLI)))(t)
 		defer db.Close()
@@ -63,9 +63,9 @@ func TestLanRemove(t *testing.T) {
 	})
 
 	t.Run("requires at least one peer id", func(t *testing.T) {
-		genparser := cmdtestx.Genparser(lanRemove{}, kong.NamedMapper("durationinf", kong.MapperFunc(cmdopts.ParseDurationInf)), kong.Vars{"vars_cache_directory": t.TempDir()})
+		harness := cmdtestx.New(t, &lanRemove{}).Options(kong.NamedMapper("durationinf", kong.MapperFunc(cmdopts.ParseDurationInf)), kong.Vars{"vars_cache_directory": t.TempDir()})
 
-		_, err := genparser(t).Parse([]string{"command"})
+		_, err := harness.Parse()
 		require.Error(t, err)
 	})
 }

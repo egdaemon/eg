@@ -59,15 +59,17 @@ func (t *Harness) Options(opts ...kong.Option) *Harness {
 	return t
 }
 
-// Run builds the parser, parses args and runs the resolved command.
-func (t *Harness) Run(args ...string) error {
+// Parse builds the parser and parses args without running the command, returning the
+// kong context so callers can inspect resolved flags and positional arguments. an error
+// building the parser (e.g. an unresolved kong.Vars) is returned as well.
+func (t *Harness) Parse(args ...string) (*kong.Context, error) {
 	t.t.Helper()
 
 	lookup := make(map[string]string, len(t.environ))
 	for _, kv := range t.environ {
 		k, v, ok := strings.Cut(kv, "=")
 		if !ok || k == "" {
-			return fmt.Errorf("malformed environment variable %q, expected KEY=value", kv)
+			return nil, fmt.Errorf("malformed environment variable %q, expected KEY=value", kv)
 		}
 
 		lookup[k] = v
@@ -90,10 +92,17 @@ func (t *Harness) Run(args ...string) error {
 	opts = append(opts, t.opts...)
 	parser, err := kong.New(t.cmd, append(opts, kong.Resolvers(resolver))...)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	kctx, err := parser.Parse(args)
+	return parser.Parse(args)
+}
+
+// Run builds the parser, parses args and runs the resolved command.
+func (t *Harness) Run(args ...string) error {
+	t.t.Helper()
+
+	kctx, err := t.Parse(args...)
 	if err != nil {
 		return err
 	}

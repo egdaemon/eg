@@ -12,7 +12,7 @@ import (
 
 	"github.com/alecthomas/kong"
 	"github.com/egdaemon/eg/cmd/cmdopts"
-	"github.com/egdaemon/eg/cmd/cmdtestx"
+	"github.com/egdaemon/eg/cmd/cmdtestx/v2"
 	"github.com/egdaemon/eg/internal/iterx"
 	"github.com/egdaemon/eg/internal/lan"
 	"github.com/egdaemon/eg/internal/langx"
@@ -93,16 +93,15 @@ func TestLanScan(t *testing.T) {
 		require.NoError(t, err)
 
 		var out bytes.Buffer
-		genparser := cmdtestx.Genparser(lanScan{},
+		harness := cmdtestx.New(t, &lanScan{}).Options(
 			kong.NamedMapper("durationinf", kong.MapperFunc(cmdopts.ParseDurationInf)),
 			kong.Vars{"vars_cache_directory": t.TempDir()},
 			kong.Writers(&out, nil),
 			kong.Bind(libp2px.MDNSLookup(func(ctx context.Context, timeout time.Duration) iterx.Seq[peer.AddrInfo] {
 				return iterx.Slice(peer.AddrInfo{ID: found})
-			})),
-		)
+			})))
 
-		require.NoError(t, cmdtestx.Execute(t, genparser(t), "command", "--cache-directory", dir, "--scan-timeout", "10s", "--lan-peer-ttl", "48h"))
+		require.NoError(t, harness.Run("--cache-directory", dir, "--scan-timeout", "10s", "--lan-peer-ttl", "48h"))
 		require.Contains(t, out.String(), found.String())
 
 		db := testx.MustT(migrations.Open(t.Context(), filepath.Join(dir, migrations.CLI)))(t)
@@ -111,9 +110,9 @@ func TestLanScan(t *testing.T) {
 	})
 
 	t.Run("only applies to the client database", func(t *testing.T) {
-		genparser := cmdtestx.Genparser(lanScan{}, kong.NamedMapper("durationinf", kong.MapperFunc(cmdopts.ParseDurationInf)), kong.Vars{"vars_cache_directory": t.TempDir()})
+		harness := cmdtestx.New(t, &lanScan{}).Options(kong.NamedMapper("durationinf", kong.MapperFunc(cmdopts.ParseDurationInf)), kong.Vars{"vars_cache_directory": t.TempDir()})
 
-		_, err := genparser(t).Parse([]string{"command", "--runner"})
+		_, err := harness.Parse("--runner")
 		require.Error(t, err)
 	})
 }

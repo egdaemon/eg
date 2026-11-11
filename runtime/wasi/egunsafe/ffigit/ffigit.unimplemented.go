@@ -40,3 +40,14 @@ func clone2(
 ) (errcode uint32) {
 	return ffierrors.ErrNotImplemented
 }
+
+func clone3(
+	deadline int64, // context.Context
+	dstptr unsafe.Pointer, dstlen uint32, // string
+	uriptr unsafe.Pointer, urilen uint32, // string
+	remoteptr unsafe.Pointer, remotelen uint32, // string
+	treeishptr unsafe.Pointer, treeishlen uint32, // string
+	envptr unsafe.Pointer, envsize, envlen uint32, // []string
+) (errcode uint32) {
+	return ffierrors.ErrNotImplemented
+}

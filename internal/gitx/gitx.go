@@ -25,6 +25,7 @@ import (
 	"github.com/go-git/go-git/v6/plumbing/object"
 	githttp "github.com/go-git/go-git/v6/plumbing/transport/http"
 	gitssh "github.com/go-git/go-git/v6/plumbing/transport/ssh"
+	"github.com/go-git/go-git/v6/storage/memory"
 	"github.com/gofrs/flock"
 	"github.com/golang-jwt/jwt/v4"
 	"golang.org/x/crypto/ssh"
@@ -306,7 +307,7 @@ func RepositoryUsername(path string) string {
 
 // Clone makes the working tree in dir the treeish from the remote at uri. the commit, the full hexadecimal hash, is preferred
 // and callers should pass it whenever they have it, a hash is the only treeish that is unambiguous: a branch can move, and a
-// reference like HEAD isn't one the remote has. anything else is a branch name and is cloned as the branch.
+// reference like HEAD isn't one the remote has. anything else is a branch name and is cloned as the branch, unless the remote has no such branch and has a tag of the name, then it is the tag and the working tree is detached at its commit.
 //
 // when cachedir is not blank a bare mirror of uri is kept there, so repeated clones only fetch what is new. opts, the
 // credentials, are used to update the mirror so a private repository still requires them. a dir that is already a repository
@@ -415,21 +416,56 @@ func syncMirror(ctx context.Context, mirror, uri, remote string, opts ...client.
 }
 
 func clone(ctx context.Context, dir, uri, remote, treeish string, opts ...client.Option) (err error) {
-	if commit := plumbing.NewHash(treeish); !plumbing.IsHash(treeish) || commit.IsZero() {
-		return cloneBranch(ctx, dir, uri, remote, treeish, opts...)
+	if commit := plumbing.NewHash(treeish); plumbing.IsHash(treeish) && !commit.IsZero() {
+		// only the history of the commit is fetched, like a single branch clone, which means the server must allow
+		// fetching a commit it didn't advertise.
+		spec := config.RefSpec(fmt.Sprintf("+%s:refs/eg/head", commit))
+		return cloneFetched(ctx, dir, uri, remote, treeish, spec, func(*git.Repository) (plumbing.Hash, error) { return commit, nil }, opts...)
 	}
 
-	return cloneCommit(ctx, dir, uri, remote, treeish, opts...)
+	// a name is a branch unless the remote has a tag of the name and no branch. failing to list the remote isn't
+	// fatal, the clone will report the problem.
+	rm := git.NewRemote(memory.NewStorage(), &config.RemoteConfig{Name: remote, URLs: []string{uri}})
+	if refs, lerr := rm.ListContext(ctx, &git.ListOptions{ClientOptions: opts}); lerr != nil {
+		debugx.Println("unable to list the remote", lerr)
+	} else {
+		var istag bool
+		for _, ref := range refs {
+			if ref.Name().Short() != treeish {
+				continue
+			}
+
+			if ref.Name().IsBranch() {
+				return cloneBranch(ctx, dir, uri, remote, treeish, opts...)
+			}
+
+			istag = istag || ref.Name().IsTag()
+		}
+
+		if istag {
+			// the working tree is detached, like checking out a tag. resolving peels annotated tags to their commit.
+			name := plumbing.NewTagReferenceName(treeish)
+			spec := config.RefSpec(fmt.Sprintf("+%s:%s", name, name))
+			return cloneFetched(ctx, dir, uri, remote, treeish, spec, func(r *git.Repository) (plumbing.Hash, error) {
+				h, err := r.ResolveRevision(plumbing.Revision(name))
+				if err != nil {
+					return plumbing.ZeroHash, errorsx.Wrapf(err, "unable to resolve the tag: %s", treeish)
+				}
+
+				return *h, nil
+			}, opts...)
+		}
+	}
+
+	return cloneBranch(ctx, dir, uri, remote, treeish, opts...)
 }
 
-// cloneCommit makes the working tree in dir the commit, the full hexadecimal hash, from the remote at uri. only the history
-// of the commit is fetched, like a single branch clone, which means the server must allow fetching a commit it didn't advertise.
-func cloneCommit(ctx context.Context, dir, uri, remote, treeish string, opts ...client.Option) (err error) {
+// cloneFetched fetches spec from the remote at uri into the repository in dir, creating it when missing, and makes the working
+// tree the commit resolve finds once it is fetched.
+func cloneFetched(ctx context.Context, dir, uri, remote, treeish string, spec config.RefSpec, resolve func(*git.Repository) (plumbing.Hash, error), opts ...client.Option) (err error) {
 	var (
 		r *git.Repository
 	)
-
-	commit := plumbing.NewHash(treeish)
 
 	if r, err = git.PlainOpen(dir); errors.Is(err, git.ErrRepositoryNotExists) {
 		log.Println(errorsx.Wrapf(err, "repository is missing attempting clone: %s", uri))
@@ -450,10 +486,14 @@ func cloneCommit(ctx context.Context, dir, uri, remote, treeish string, opts ...
 		return errorsx.Wrapf(err, "unable to find remote: '%s'", remote)
 	}
 
-	spec := config.RefSpec(fmt.Sprintf("+%s:refs/eg/head", commit))
 	err = rm.FetchContext(ctx, &git.FetchOptions{RemoteName: remote, RefSpecs: []config.RefSpec{spec}, ClientOptions: opts})
 	if err != nil && !errors.Is(err, git.NoErrAlreadyUpToDate) {
-		return errorsx.Wrapf(err, "unable to fetch the commit: %s - %s", uri, treeish)
+		return errorsx.Wrapf(err, "unable to fetch: %s - %s", uri, treeish)
+	}
+
+	commit, err := resolve(r)
+	if err != nil {
+		return err
 	}
 
 	w, err := r.Worktree()

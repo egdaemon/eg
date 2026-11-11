@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -189,12 +188,7 @@ func Clone(ctx context.Context, dir, uri, remote, commit string) error {
 		return fmt.Errorf("unable to clone remote not specified: %s", remote)
 	}
 
-	// TODO: remove once the host provides CloneV3, until then the host only clones into the working directory.
-	if filepath.Clean(dir) != egenv.DirectoryWorking() {
-		return fmt.Errorf("unable to clone into %s: only the working directory is supported", dir)
-	}
-
-	return ffigit.Clone(ctx, uri, remote, commit)
+	return ffigit.Clone(ctx, dir, uri, remote, commit)
 }
 
 // CloneOp returns an operation that clones a git repository, see Clone.

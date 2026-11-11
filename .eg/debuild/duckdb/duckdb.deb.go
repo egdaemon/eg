@@ -24,6 +24,8 @@ var debskel embed.FS
 const (
 	container = "eg.deb.duckdb"
 	version   = "1.5.2"
+	// commit of the v1.5.2 tag. eggit.Clone only understands branches and commits, so the tag is pinned by its commit.
+	commit = "8a5851971fae891f292c2714d86046ee018e9737"
 )
 
 var (
@@ -55,11 +57,13 @@ func init() {
 func Prepare(ctx context.Context, o eg.Op) error {
 	sruntime := shell.Runtime().Directory(egenv.DirectoryCache())
 	return eg.Parallel(
-		shell.Op(
-			sruntime.Newf("test -d duckdb || git clone -b v%s --depth 1 https://github.com/duckdb/duckdb.git duckdb", version),
-			sruntime.New("md5sum duckdb/src/include/duckdb.h"),
-			sruntime.New("echo \"fcdba922a5ef1ac7373134cb915d204b  duckdb/src/include/duckdb.h\" > duckdb.md5"),
-			sruntime.New("md5sum -c duckdb.md5"),
+		eg.Sequential(
+			eggit.CloneOp(egenv.DirectoryCache("duckdb"), "https://github.com/duckdb/duckdb.git", "origin", commit),
+			shell.Op(
+				sruntime.New("md5sum duckdb/src/include/duckdb.h"),
+				sruntime.New("echo \"fcdba922a5ef1ac7373134cb915d204b  duckdb/src/include/duckdb.h\" > duckdb.md5"),
+				sruntime.New("md5sum -c duckdb.md5"),
+			),
 		),
 		egdebuild.Prepare(Runner(), errorsx.Must(fs.Sub(debskel, ".debskel"))),
 	)(ctx, o)

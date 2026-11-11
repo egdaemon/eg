@@ -91,9 +91,20 @@ func TestCloneV3(t *testing.T) {
 	run("add", ".")
 	run("commit", "-q", "-m", "init")
 	commit := run("rev-parse", "HEAD")
+	run("tag", "v1.0.0")
+	run("tag", "-a", "-m", "annotated", "v1.0.1")
+
+	// a branch which diverges from the tags.
+	run("checkout", "-q", "-b", "feature/branch")
+	require.NoError(t, os.WriteFile(filepath.Join(src, "feature.go"), []byte("package main"), 0644))
+	run("add", ".")
+	run("commit", "-q", "-m", "feature")
+	branchcommit := run("rev-parse", "HEAD")
+	run("checkout", "-q", "-")
+
 	uri, remote := "file://"+src, "origin"
 
-	call := func(t *testing.T, cachedir string, remap func(string) string, dst string) (errcode uint32) {
+	call := func(t *testing.T, cachedir string, remap func(string) string, dst string, treeish string) (errcode uint32) {
 		ctx := t.Context()
 		rt := wazero.NewRuntime(ctx)
 		defer rt.Close(ctx)
@@ -104,14 +115,14 @@ func TestCloneV3(t *testing.T) {
 		require.True(t, m.Memory().WriteString(dstptr, dst))
 		require.True(t, m.Memory().WriteString(uriptr, uri))
 		require.True(t, m.Memory().WriteString(remoteptr, remote))
-		require.True(t, m.Memory().WriteString(treeishptr, commit))
+		require.True(t, m.Memory().WriteString(treeishptr, treeish))
 
 		return ffigit.CloneV3(cachedir, t.TempDir(), remap)(
 			ctx, m, time.Now().Add(time.Minute).UnixMicro(),
 			dstptr, uint32(len(dst)),
 			uriptr, uint32(len(uri)),
 			remoteptr, uint32(len(remote)),
-			treeishptr, uint32(len(commit)),
+			treeishptr, uint32(len(treeish)),
 			0, 0, 8,
 		)
 	}
@@ -120,7 +131,7 @@ func TestCloneV3(t *testing.T) {
 		host := t.TempDir()
 		remap := func(s string) string { return filepath.Join(host, s) }
 
-		require.Zero(t, call(t, t.TempDir(), remap, "/guest/cache/repo"))
+		require.Zero(t, call(t, t.TempDir(), remap, "/guest/cache/repo", commit))
 
 		_, err := os.Stat(filepath.Join(host, "guest", "cache", "repo", "main.go"))
 		require.NoError(t, err, "the clone should be at the remapped host path")
@@ -132,10 +143,65 @@ func TestCloneV3(t *testing.T) {
 		host := t.TempDir()
 		remap := func(s string) string { return filepath.Join(host, s) }
 
-		require.NotZero(t, call(t, t.TempDir(), remap, ""))
+		require.NotZero(t, call(t, t.TempDir(), remap, "", commit))
 
 		entries, err := os.ReadDir(host)
 		require.NoError(t, err)
 		require.Empty(t, entries, "nothing should be cloned")
+	})
+
+	t.Run("treeish", func(t *testing.T) {
+		for _, cached := range []bool{false, true} {
+			cached := cached
+			name := "without a cache"
+			if cached {
+				name = "with a cache"
+			}
+
+			t.Run(name, func(t *testing.T) {
+				host := t.TempDir()
+				remap := func(s string) string { return filepath.Join(host, s) }
+				cachedir := ""
+				if cached {
+					cachedir = t.TempDir()
+				}
+
+				tests := []struct {
+					name    string
+					treeish string
+					head    string
+					file    string
+					missing string
+				}{
+					{name: "commit", treeish: commit, head: commit, file: "main.go", missing: "feature.go"},
+					{name: "branch", treeish: "feature/branch", head: branchcommit, file: "feature.go"},
+					{name: "lightweight tag", treeish: "v1.0.0", head: commit, file: "main.go", missing: "feature.go"},
+					{name: "annotated tag", treeish: "v1.0.1", head: commit, file: "main.go", missing: "feature.go"},
+				}
+
+				for _, tc := range tests {
+					t.Run(tc.name, func(t *testing.T) {
+						dst := "/guest/" + strings.ReplaceAll(tc.name, " ", "-")
+						require.Zero(t, call(t, cachedir, remap, dst, tc.treeish))
+
+						out, err := exec.Command("git", "-C", remap(dst), "rev-parse", "HEAD").CombinedOutput()
+						require.NoErrorf(t, err, "%s", out)
+						require.Equal(t, tc.head, strings.TrimSpace(string(out)))
+
+						_, err = os.Stat(filepath.Join(remap(dst), tc.file))
+						require.NoError(t, err)
+
+						if tc.missing != "" {
+							_, err = os.Stat(filepath.Join(remap(dst), tc.missing))
+							require.ErrorIs(t, err, os.ErrNotExist)
+						}
+					})
+				}
+
+				t.Run("unknown treeish", func(t *testing.T) {
+					require.NotZero(t, call(t, cachedir, remap, "/guest/unknown", "does-not-exist"))
+				})
+			})
+		}
 	})
 }

@@ -1,0 +1,58 @@
+// Copyright 2019 the Go-FUSE Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+package fs
+
+import (
+	"context"
+	"syscall"
+
+	"github.com/hanwen/go-fuse/v2/fuse"
+	"golang.org/x/sys/unix"
+)
+
+func setBlocks(out *fuse.Attr) {
+	if out.Blksize > 0 {
+		return
+	}
+
+	out.Blksize = 4096
+	pages := (out.Size + 4095) / 4096
+	out.Blocks = pages * 8
+}
+
+func setStatxBlocks(out *fuse.Statx) {
+	if out.Blksize > 0 {
+		return
+	}
+
+	out.Blksize = 4096
+	pages := (out.Size + 4095) / 4096
+	out.Blocks = pages * 8
+}
+
+func (f *LoopbackFile) Statx(ctx context.Context, flags uint32, mask uint32, out *fuse.StatxOut) syscall.Errno {
+	return f.withFd(func(fd int) syscall.Errno {
+		st := unix.Statx_t{}
+		err := unix.Statx(fd, "", int(flags), int(mask), &st)
+		if err != nil {
+			return ToErrno(err)
+		}
+		out.FromStatx(&st)
+
+		return OK
+	})
+}
+
+var _ = (FileWritever)((*LoopbackFile)(nil))
+
+func (f *LoopbackFile) Writev(ctx context.Context, data [][]byte, off int64) (uint32, syscall.Errno) {
+	var n int
+	errno := f.withFd(func(fd int) syscall.Errno {
+		var err error
+		n, err = unix.Pwritev(fd, data, off)
+		return ToErrno(err)
+	})
+	return uint32(max(n, 0)), errno
+}

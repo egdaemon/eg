@@ -1,0 +1,96 @@
+// Copyright 2016 the Go-FUSE Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+// Random odds and ends.
+
+package fuse
+
+import (
+	"errors"
+	"fmt"
+	"log"
+	"os"
+	"syscall"
+	"time"
+)
+
+var notifyNames = []string{
+	"OK",
+	"NOTIFY_POLL",
+	"NOTIFY_INVAL_INODE",
+	"NOTIFY_INVAL_ENTRY",
+	"NOTIFY_STORE_CACHE",
+	"NOTIFY_RETRIEVE_CACHE",
+	"NOTIFY_DELETE",
+	"NOTIFY_RESEND",
+	"NOTIFY_INC_EPOCH",
+	"NOTIFY_PRUNE",
+}
+
+func (code Status) String() string {
+	if code <= 0 {
+		idx := int(-code)
+		if idx < len(notifyNames) {
+			return notifyNames[idx]
+		}
+
+		return fmt.Sprintf("negative(%d)", code)
+	}
+	return fmt.Sprintf("%d=%v", int(code), syscall.Errno(code))
+}
+
+func (code Status) Ok() bool {
+	return code == OK
+}
+
+// ToStatus extracts an errno number from Go error objects.  If it
+// fails, it logs an error and returns ENOSYS.
+func ToStatus(err error) Status {
+	if err == nil {
+		return OK
+	}
+
+	switch err {
+	case os.ErrPermission:
+		return EPERM
+	case os.ErrExist:
+		return Status(syscall.EEXIST)
+	case os.ErrNotExist:
+		return ENOENT
+	case os.ErrInvalid:
+		return EINVAL
+	}
+
+	var errno syscall.Errno
+	if errors.As(err, &errno) {
+		return Status(errno)
+	}
+	log.Println("can't convert error type:", err)
+	return ENOTSUP
+}
+
+func CurrentOwner() *Owner {
+	return &Owner{
+		Uid: uint32(os.Getuid()),
+		Gid: uint32(os.Getgid()),
+	}
+}
+
+// UtimeToTimespec converts a "Time" pointer as passed to Utimens to a
+// "Timespec" that can be passed to the utimensat syscall.
+// A nil pointer is converted to the special UTIME_OMIT value.
+//
+// Deprecated: use unix.TimeToTimespec from the x/sys/unix package instead.
+func UtimeToTimespec(t *time.Time) (ts syscall.Timespec) {
+	if t == nil {
+		ts.Nsec = _UTIME_OMIT
+	} else {
+		ts = syscall.NsecToTimespec(t.UnixNano())
+		// Go bug https://github.com/golang/go/issues/12777
+		if ts.Nsec < 0 {
+			ts.Nsec = 0
+		}
+	}
+	return ts
+}

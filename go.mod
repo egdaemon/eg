@@ -38,6 +38,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/mux v1.8.1
 	github.com/gorilla/websocket v1.5.3
+	github.com/hanwen/go-fuse/v2 v2.12.1
 	github.com/ipfs/go-datastore v0.9.2
 	github.com/ipfs/go-log/v2 v2.9.2
 	github.com/jackc/pgx/v5 v5.12.0

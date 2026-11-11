@@ -71,7 +71,7 @@ func Draft(patterns ...string) eg.OpFn {
 
 		runtime := shell.Runtime().Environ(
 			_eg.EnvGithubToken, ffigit.Bearer(),
-		)
+		).Timeout(egenv.TTL())
 
 		if shell.Run(ctx, runtime.Newf("gh release view %s", version)) != nil {
 			return shell.Run(
@@ -80,7 +80,7 @@ func Draft(patterns ...string) eg.OpFn {
 			)
 		}
 
-		return Upload(version, patterns...)(ctx, o)
+		return UploadRuntime(runtime, version, patterns...)(ctx, o)
 	}
 }
 

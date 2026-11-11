@@ -1,7 +1,6 @@
 package cmdopts
 
 import (
-	"fmt"
 	"strconv"
 	"strings"
 	"time"
@@ -32,9 +31,9 @@ func (t RuntimeResources) KongVars() kong.Vars {
 		"vars_arch":                   t.Arch,
 		"vars_os":                     t.OS,
 		"vars_cores_minimum_default":  strconv.FormatUint(t.Cores, 10),
-		"vars_memory_minimum_default": fmt.Sprintf("%v", t.Memory),
-		"vars_disk_minimum_default":   fmt.Sprintf("%v", t.Disk),
-		"vars_vram_minimum_default":   fmt.Sprintf("%v", t.Vram),
+		"vars_memory_minimum_default": t.Memory.String(),
+		"vars_disk_minimum_default":   t.Disk.String(),
+		"vars_vram_minimum_default":   t.Vram.String(),
 		"vars_labels":                 strings.Join(t.Labels, ","),
 	}
 }

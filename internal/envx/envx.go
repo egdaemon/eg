@@ -4,6 +4,7 @@ package envx
 import (
 	"bufio"
 	"bytes"
+	"encoding"
 	"encoding/base64"
 	"encoding/hex"
 	"errors"
@@ -13,6 +14,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"reflect"
 	"sort"
 	"strconv"
 	"strings"
@@ -93,10 +95,6 @@ func Hex(fallback []byte, keys ...string) []byte {
 // Base64 read value as a base64 encoded string
 func Base64(fallback []byte, keys ...string) []byte {
 	return NewEnviron(os.Getenv).Base64(fallback, keys...)
-}
-
-func Base64URL(fallback []byte, keys ...string) []byte {
-	return NewEnviron(os.Getenv).Base64URL(fallback, keys...)
 }
 
 func URL(fallback string, keys ...string) *url.URL {
@@ -269,11 +267,6 @@ func (t environ) Base64(fallback []byte, keys ...string) []byte {
 	return t.base64(fallback, keys, base64.RawStdEncoding.WithPadding('='), base64.URLEncoding)
 }
 
-// Base64URL read value as a url base64 encoded string
-func (t environ) Base64URL(fallback []byte, keys ...string) []byte {
-	return t.base64(fallback, keys, base64.URLEncoding)
-}
-
 // base64 decodes the value with the first encoding that succeeds, failing with the error of the first encoding.
 func (t environ) base64(fallback []byte, keys []string, encs ...*base64.Encoding) []byte {
 	return envval(fallback, t.m, func(s string) ([]byte, error) {
@@ -357,7 +350,9 @@ func FromReader(r io.Reader) (environ []string, err error) {
 			continue
 		}
 
-		environ = append(environ, Format(k, v))
+		if encoded := Format(k, v); encoded != "" {
+			environ = append(environ, encoded)
+		}
 	}
 
 	return environ, scanner.Err()
@@ -422,12 +417,27 @@ func (t Builder) Environ() ([]string, error) {
 	return t.environ, t.failed
 }
 
-// set a single variable to a value.
-func (t *Builder) Var(k, v string) *Builder {
-	if encoded := Format(k, v); encoded != "" {
-		t.environ = append(t.environ, fmt.Sprintf("%s=%s", k, v))
+// set a single variable to a value, see Format for how values and options are applied.
+// variables that format to an empty value are ignored.
+func (t *Builder) Var(k string, v any, options ...func(*formatopts)) *Builder {
+	encoded := format(k, v, options...)
+	if encoded == "" {
+		return t
 	}
+
+	// quoting normalizes the value, otherwise the value is used as is.
+	if langx.Clone(formatopts{}, options...).quote {
+		t.environ = append(t.environ, encoded)
+	} else {
+		t.environ = append(t.environ, fmt.Sprintf("%s=%s", k, formatvalue(v)))
+	}
+
 	return t
+}
+
+// Var is the typed form of Builder.Var, the value is checked at compile time.
+func Var[T Value](b *Builder, k string, v T, options ...func(*formatopts)) *Builder {
+	return b.Var(k, v, options...)
 }
 
 // extract environment variables from a file on disk.
@@ -595,6 +605,8 @@ func (t *Builder) Unsetenv(k string) error {
 type formatoption func(*formatopts)
 type formatopts struct {
 	transformer func(string) string // transforms that result in empty strings are ignored.
+	omitzero    bool                // values that are the zero value of their type are ignored.
+	quote       bool                // values are wrapped in double quotes.
 }
 
 func allowAll(s string) string {
@@ -602,11 +614,44 @@ func allowAll(s string) string {
 }
 
 func ignoreEmptyVariables(s string) string {
-	if strings.HasSuffix(s, "=") {
+	// only the first '=' separates the key, padded values (i.e. base64) legitimately end with '='.
+	if _, v, _ := strings.Cut(s, "="); v == "" {
 		return ""
 	}
 
 	return s
+}
+
+// FormatOmitZero ignores variables whose value is the zero value of its type, i.e. 0, false, 0s, an empty
+// string or slice, and the zero time.
+func FormatOmitZero(f *formatopts) {
+	f.omitzero = true
+}
+
+// FormatAllowEmpty keeps variables whose value is empty, they are written as KEY=.
+func FormatAllowEmpty(f *formatopts) {
+	f.transformer = allowAll
+}
+
+// FormatQuote wraps the value in double quotes, escaping any backslashes and double quotes within it, so values
+// containing whitespace are safe for systemd's EnvironmentFile and for sourcing by a shell. a value that is
+// already wrapped in double quotes isn't quoted twice.
+func FormatQuote(f *formatopts) {
+	f.quote = true
+}
+
+// iszero reports if v is the zero value of its type, empty slices are considered zero.
+func iszero(v any) bool {
+	switch x := v.(type) {
+	case nil:
+		return true
+	case []byte:
+		return len(x) == 0
+	case interface{ IsZero() bool }: // time.Time
+		return x.IsZero()
+	default:
+		return reflect.ValueOf(v).IsZero()
+	}
 }
 
 func FormatOptionTransforms(transforms ...func(string) string) formatoption {
@@ -623,45 +668,138 @@ func FormatOptionTransforms(transforms ...func(string) string) formatoption {
 	}
 }
 
-// set many keys to the same value.
-func Vars(v string, keys ...string) (environ []string) {
+// set many keys to the same value, see Format for how values are encoded.
+func Vars[T Value](v T, keys ...string) (environ []string) {
 	environ = make([]string, 0, len(keys))
 	for _, k := range keys {
-		environ = append(environ, Format(k, v))
+		if encoded := Format(k, v); encoded != "" {
+			environ = append(environ, encoded)
+		}
 	}
 
 	return environ
 }
 
-// format a boolean value to true/false strings.
-func VarBool(b bool) string {
-	return strconv.FormatBool(b)
+// Value is the set of types that can be encoded as an environment variable's value.
+// types with a String or MarshalText method (i.e. fmt.Stringer, encoding.TextMarshaler) are additionally
+// supported by Builder.Var.
+type Value interface {
+	~string | ~bool | numericx.Integer | numericx.Float | time.Duration | time.Time | []byte
 }
 
 // format a environment variable in k=v.
-// - doesn't currently escape values. it may in the future.
-// - if the key or value are an empty string it'll return an empty string. it will log if debugging is enabled.
-func Format[T ~string](k string, v T, options ...func(*formatopts)) string {
+//   - strings are used as is, booleans, integers and floats use their base 10 representation.
+//   - []byte is encoded as a padded url safe base64 string (see Base64, which decodes it), empty slices are considered empty.
+//   - time.Duration uses its String format (e.g. 1h30m0s), time.Time is formatted as an RFC3339Nano (ISO 8601) UTC
+//     timestamp, the zero time is considered empty.
+//   - doesn't currently escape values. it may in the future.
+//   - if the variable is empty after the transformers have been applied it'll return an empty string.
+//     it will log if debugging is enabled.
+func Format[T Value](k string, v T, options ...func(*formatopts)) string {
+	return format(k, v, options...)
+}
+
+func format(k string, value any, options ...func(*formatopts)) string {
 	opts := langx.Clone(formatopts{
 		transformer: ignoreEmptyVariables,
 	}, options...)
 
+	if opts.omitzero && iszero(value) {
+		debugx.Println("ignoring variable", k, "zero")
+		return ""
+	}
+
+	v := formatvalue(value)
 	evar := strings.TrimSpace(opts.transformer(fmt.Sprintf("%s=%s", k, v)))
 	if evar == "" {
 		debugx.Println("ignoring variable", k, "empty")
+		return ""
 	}
 
-	return fmt.Sprintf("%s=%s", k, strings.TrimPrefix(strings.TrimSuffix(string(v), "\""), "\""))
+	v = strings.TrimPrefix(strings.TrimSuffix(v, "\""), "\"")
+	if opts.quote {
+		v = fmt.Sprintf("\"%s\"", strings.NewReplacer(`\`, `\\`, `"`, `\"`).Replace(v))
+	}
+
+	return fmt.Sprintf("%s=%s", k, v)
 }
 
-// see format
-func FormatBool(k string, v bool, options ...func(*formatopts)) string {
-	return Format(k, strconv.FormatBool(v), options...)
+type slice struct {
+	sep    string
+	values []string
 }
 
-// see format
-func FormatInt[T numericx.Integer](k string, v T, options ...func(*formatopts)) string {
-	return Format(k, fmt.Sprintf("%d", v), options...)
+func (t slice) String() string {
+	return strings.Join(t.values, t.sep)
+}
+
+// SliceFormat joins the values with sep, each value is encoded as described by Format and values that
+// encode to an empty string are dropped. the result is a fmt.Stringer so it can be given to Builder.Var.
+func SliceFormat[T Value](sep string, values ...T) fmt.Stringer {
+	encoded := make([]string, 0, len(values))
+	for _, v := range values {
+		if s := formatvalue(v); s != "" {
+			encoded = append(encoded, s)
+		}
+	}
+
+	return slice{sep: sep, values: encoded}
+}
+
+// formatvalue encodes v as the string used as an environment variable's value.
+// named types that aren't a fmt.Stringer fall back to fmt.Sprint, which matches the base 10 formatting for
+// strings, bools and integers.
+func formatvalue(v any) string {
+	switch x := v.(type) {
+	case nil:
+		return ""
+	case string:
+		return x
+	case time.Time:
+		if x.IsZero() {
+			return ""
+		}
+
+		return x.UTC().Format(time.RFC3339Nano)
+	case []byte:
+		return base64.URLEncoding.EncodeToString(x)
+	case bool:
+		return strconv.FormatBool(x)
+	case int:
+		return strconv.FormatInt(int64(x), 10)
+	case int8:
+		return strconv.FormatInt(int64(x), 10)
+	case int16:
+		return strconv.FormatInt(int64(x), 10)
+	case int32:
+		return strconv.FormatInt(int64(x), 10)
+	case int64:
+		return strconv.FormatInt(x, 10)
+	case uint:
+		return strconv.FormatUint(uint64(x), 10)
+	case uint8:
+		return strconv.FormatUint(uint64(x), 10)
+	case uint16:
+		return strconv.FormatUint(uint64(x), 10)
+	case uint32:
+		return strconv.FormatUint(uint64(x), 10)
+	case uint64:
+		return strconv.FormatUint(x, 10)
+	case float32:
+		return strconv.FormatFloat(float64(x), 'f', -1, 32)
+	case float64:
+		return strconv.FormatFloat(x, 'f', -1, 64)
+	case fmt.Stringer: // time.Duration and friends.
+		return x.String()
+	case encoding.TextMarshaler: // bytesx.Unit and friends.
+		if text, err := x.MarshalText(); err == nil {
+			return string(text)
+		}
+
+		return ""
+	default:
+		return fmt.Sprint(v)
+	}
 }
 
 // returns the os.Environ or an empty slice if b is false.

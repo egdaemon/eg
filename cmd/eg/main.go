@@ -16,7 +16,6 @@ import (
 	"time"
 
 	"github.com/alecthomas/kong"
-	"github.com/dustin/go-humanize"
 	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/cmd/cmdaccounts"
 	"github.com/egdaemon/eg/cmd/cmderrors"
@@ -168,17 +167,21 @@ func main() {
 			"vars_gpg_directory":           gpgx.DefaultDirectory(userx.HomeDirectoryOrDefault(user.HomeDir)),
 			"vars_os":                      runtime.GOOS,
 			"vars_arch":                    runtime.GOARCH,
-			"vars_cores_minimum_default":   strconv.FormatUint(envx.Uint64(uint64(float64(runtime.NumCPU())*0.8), "EG_RESOURCES_CORES"), 10),
-			"vars_memory_minimum_default":  humanize.IBytes(envx.Bytes(0, "EG_RESOURCES_MEMORY")),
-			"vars_disk_minimum_default":    humanize.IBytes(envx.Bytes(0, "EG_RESOURCES_DISK")),
-			"vars_vram_minimum_default":    humanize.IBytes(envx.Bytes(0*bytesx.GiB, "EG_RESOURCES_VRAM")),
-			"vars_labels":                  envx.String("", "EG_LABELS"),
+			"vars_cores_minimum_default":   strconv.FormatUint(envx.Uint64(uint64(float64(runtime.NumCPU())*0.8), eg.EnvComputeResourceCores), 10),
+			"vars_memory_minimum_default":  bytesx.Unit(envx.Bytes(0, eg.EnvComputeResourceMemory)).String(),
+			"vars_disk_minimum_default":    bytesx.Unit(envx.Bytes(0, eg.EnvComputeResourceDisk)).String(),
+			"vars_vram_minimum_default":    bytesx.Unit(envx.Bytes(0*bytesx.GiB, eg.EnvComputeResourceVram)).String(),
+			"vars_labels":                  envx.String("", eg.EnvComputeResourceLabels),
 			"vars_vcs_uri":                 cmdopts.WorkspaceVCSURI(),
 			"vars_git_default_remote_name": git.DefaultRemoteName,
 			"vars_git_default_reference":   envx.String(plumbing.Main.Short(), "GITHUB_REF_NAME", eg.EnvGitHeadRef), // github actions, then the run eg is nested in
 			"vars_git_head_reference":      envx.String(plumbing.HEAD.String(), "GITHUB_SHA", eg.EnvGitHeadCommit),  // github actions, then the run eg is nested in
 			"vars_workload_directory":      eg.DefaultModuleDirectory(),
 			"env_github_autotoken":         eg.EnvComputeAutoGithubToken,
+			"env_eg_compute_api_enabled":   eg.EnvComputeAPIEnabled,
+			"env_eg_lan_peer_ttl":          eg.EnvLANPeerTTL,
+			"env_eg_lan_mdns_advertise":    eg.EnvLANMDNSAdvertise,
+			"env_eg_compute_vcs_cache":     eg.EnvComputeVCSCache,
 		},
 		kong.UsageOnError(),
 		kong.Bind(

@@ -222,7 +222,7 @@ func InstallCredentials(ctx context.Context, src string) (string, error) {
 
 	uid, gid := errorsx.Zero(strconv.Atoi(egdu.Uid)), errorsx.Zero(strconv.Atoi(egdu.Gid))
 
-	return install(ctx, filepath.Join(egdu.HomeDir, ".config", "gcloud"), src, envx.Base64URL(nil, eg.EnvUnsafeGcloudADCB64), syncInterval, func(path string) error {
+	return install(ctx, filepath.Join(egdu.HomeDir, ".config", "gcloud"), src, envx.Base64(nil, eg.EnvUnsafeGcloudADCB64), syncInterval, func(path string) error {
 		return os.Chown(path, uid, gid)
 	})
 }

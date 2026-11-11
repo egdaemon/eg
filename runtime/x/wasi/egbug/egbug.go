@@ -150,7 +150,7 @@ func APTPackage(packages ...string) eg.OpFn {
 
 const (
 	EnvUnsafeDigest = "EG_UNSAFE_ENVVARS_DIGEST"
-	defaultDigest   = "7bdff99dea1d0e9185962aed4cc0e677"
+	defaultDigest   = "6b4c189e90a5594dfc7a39ce45ce4959"
 )
 
 //go:embed default.env
@@ -217,6 +217,8 @@ func normalizeEnv(environ *envx.Builder) *envx.Builder {
 	environ.Setenv(_eg.EnvComputeWorkload, "")
 	environ.Unsetenv(_eg.EnvComputeWorkloadName) // not part of default.env, removed so the digest is unchanged.
 	environ.Setenv(_eg.EnvComputeProfileMode, "")
+	environ.Setenv(_eg.EnvComputeCoresLimit, "42")
+	environ.Setenv(_eg.EnvComputeMemoryLimit, "42")
 	environ.Setenv(_eg.EnvComputeWorkspaceDirectory, _eg.DefaultWorkspaceDirectory())
 	environ.Setenv(_eg.EnvGitBaseURI, _eg.DefaultWorkingDirectory())
 	environ.Setenv(_eg.EnvGitHeadURI, _eg.DefaultWorkingDirectory())
@@ -272,7 +274,6 @@ func normalizeEnv(environ *envx.Builder) *envx.Builder {
 // the process and from baremetal is removed by normalizeEnv.
 // use EnsureEnv when you need an exact digest over specific keys.
 func EnsureEnvAuto(ctx context.Context, op eg.Op) error {
-
 	// expected hash with normalized values.
 	// if this needs to change it means we might be breaking
 	// existing builds.

@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/egdaemon/eg/internal/bytesx"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/jaypipes/ghw"
 	"github.com/logrusorgru/aurora"
@@ -27,7 +28,7 @@ func AgentOptionHostOS(cli ...string) AgentOption {
 
 // DetectGPU returns the driver and vram of the gpu with the most vram available on the host, if any.
 // the zero values are returned when no gpu (or its vram) could be detected.
-func DetectGPU() (driver string, vram uint64, err error) {
+func DetectGPU() (driver string, vram bytesx.Unit, err error) {
 	gpus, err := ghw.GPU()
 	if err != nil {
 		return "", 0, errorsx.Wrap(err, "unable to determine hardware capability")
@@ -48,8 +49,8 @@ func DetectGPU() (driver string, vram uint64, err error) {
 			continue
 		}
 
-		if cvram > vram {
-			driver, vram = card.DeviceInfo.Driver, cvram
+		if _cvram := bytesx.Unit(cvram); _cvram > vram {
+			driver, vram = card.DeviceInfo.Driver, _cvram
 		}
 	}
 

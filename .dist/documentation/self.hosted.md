@@ -92,9 +92,9 @@ EG_ENTROPY_SEED=00000000-0000-0000-0000-000000000001
 # bootstrap raises cores to the detected cpu count and vram to the detected gpu memory,
 # and writes memory and disk from its flags.
 EG_RESOURCES_CORES=8
-EG_RESOURCES_MEMORY=17179869184
-EG_RESOURCES_DISK="100GiB"
-EG_RESOURCES_VRAM=0
+EG_RESOURCES_MEMORY="16 GiB"
+EG_RESOURCES_DISK="100 GiB"
+EG_RESOURCES_VRAM="0 B"
 
 # (--label) comma separated labels (up to 10) assigned to this runner, used to target it from workloads.
 EG_LABELS="gpu,fast-disk"
@@ -114,10 +114,10 @@ EG_COMPUTE_API_ENABLED=true
 
 # (--mdns-advertise) advertise this daemon on the local network (multicast dns) so clients on the same network
 # can upload to it directly. requires EG_COMPUTE_API_ENABLED. default false.
-EG_MDNS_ADVERTISE=true
+EG_LAN_MDNS_ADVERTISE=true
 
 # (--lan-peer-ttl) how long peers on the local network are remembered after they were last seen. default 720h.
-EG_LAN_PEER_TTL="720h"
+EG_LAN_PEER_TTL=720h
 
 # (--restart-on-upgrade) restart a running daemon when the eg package is upgraded: auto (default), yes or no.
 # auto currently behaves like yes. a stopped daemon is never started.

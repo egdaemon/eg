@@ -48,10 +48,10 @@ type daemon struct {
 	CacheDir      string        `name:"directory" help:"local cache directory" default:"${vars_cache_directory}"`
 	MountDirs     []string      `name:"mounts" short:"m" help:"folders to mount using podman mount specs" default:""`
 	EnvVars       []string      `name:"env" short:"e" help:"environment variables to import"`
-	MDNSAdvertise bool          `name:"mdns-advertise" help:"advertise this daemon on the local network (multicast dns) so clients on the same network can upload to it directly, requires --uploadable" default:"false" negatable:"" env:"EG_MDNS_ADVERTISE"`
-	LANPeerTTL    time.Duration `name:"lan-peer-ttl" type:"durationinf" help:"how long peers that reached this daemon are remembered after they were last seen" default:"720h" env:"EG_LAN_PEER_TTL"`
-	RepoCache     bool          `name:"repo-cache" help:"mirror cloned repositories in the workload cache so repeat clones are incremental" hidden:"" default:"false" env:"EG_EXPERIMENTAL_REPO_CACHE"`
-	Uploadable    bool          `name:"uploadable" help:"accept workloads pushed directly to this runner (POST /c/upload, POST /c/enqueue) and advertise it to the control plane" default:"true" negatable:"" env:"EG_COMPUTE_API_ENABLED"`
+	MDNSAdvertise bool          `name:"mdns-advertise" help:"advertise this daemon on the local network (multicast dns) so clients on the same network can upload to it directly, requires --uploadable" default:"false" negatable:"" env:"${env_eg_lan_mdns_advertise}"`
+	LANPeerTTL    time.Duration `name:"lan-peer-ttl" type:"durationinf" help:"how long peers that reached this daemon are remembered after they were last seen" default:"720h" env:"${env_eg_lan_peer_ttl}"`
+	VCSCache      bool          `name:"vcs-cache" help:"mirror cloned repositories in the workload cache so repeat clones are incremental" hidden:"" default:"false" env:"${env_eg_compute_vcs_cache}"`
+	Uploadable    bool          `name:"uploadable" help:"accept workloads pushed directly to this runner (POST /c/upload, POST /c/enqueue) and advertise it to the control plane" default:"true" negatable:"" env:"${env_eg_compute_api_enabled}"`
 }
 
 func (t daemon) signer(keygen cmdopts.KeyGenSeeded) (ssh.Signer, error) {
@@ -61,8 +61,8 @@ func (t daemon) signer(keygen cmdopts.KeyGenSeeded) (ssh.Signer, error) {
 // gpuresources merges the detected gpu into the configured runtime resources so the
 // control plane sees the gpu even when the daemon wasn't configured via bootstrap.
 // mirrors actl bootstrap env daemon.
-func gpuresources(rr cmdopts.RuntimeResources, driver string, vram uint64) cmdopts.RuntimeResources {
-	rr.Vram = bytesx.Unit(numericx.Max(uint64(rr.Vram), vram))
+func gpuresources(rr cmdopts.RuntimeResources, driver string, vram bytesx.Unit) cmdopts.RuntimeResources {
+	rr.Vram = numericx.Max(rr.Vram, vram)
 
 	if label := fmt.Sprintf("eg:gpu:%s", driver); driver != "" && !slices.Contains(rr.Labels, label) {
 		rr.Labels = append(slices.Clone(rr.Labels), label)
@@ -177,7 +177,7 @@ func (t daemon) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, keygen cmdopt
 		go runners.AutoDownload(gctx.Context, authclient, rm)
 	}
 
-	if t.RepoCache {
+	if t.VCSCache {
 		crepocacheopt = runners.CompileOptionRepoCache(userx.DefaultCacheDirectory("repos"))
 		// we'll do this later.
 		// repocacheopt = runners.AgentOptionEnv(eg.EnvComputeRepoCache, eg.DefaultMountRoot("repos"))

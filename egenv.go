@@ -94,6 +94,19 @@ const (
 	EnvComputeWorkingDirectory       = "EG_COMPUTE_WORKING_DIRECTORY"               // working directory for workloads
 	EnvComputeCacheDirectory         = "EG_COMPUTE_CACHE_DIRECTORY"                 // cache directory for workloads
 	EnvComputeRepoCache              = "EG_COMPUTE_REPO_CACHE"                      // root directory repositories are mirrored in, blank disables caching.
+	EnvLANPeerTTL                    = "EG_LAN_PEER_TTL"                            // how long peers on the local network are remembered after they were last seen.
+	EnvLANMDNSAdvertise              = "EG_LAN_MDNS_ADVERTISE"                      // advertise the daemon on the local network (multicast dns).
+	EnvComputeVCSCache               = "EG_COMPUTE_VCS_CACHE"                       // runner mirrors cloned repositories in the workload cache so repeat clones are incremental (experimental).
+	EnvComputeResourceCores          = "EG_RESOURCES_CORES"                         // cores the runner makes available to workloads.
+	EnvComputeResourceMemory         = "EG_RESOURCES_MEMORY"                        // memory in bytes the runner makes available to workloads.
+	EnvComputeResourceDisk           = "EG_RESOURCES_DISK"                          // disk space the runner makes available to workloads.
+	EnvComputeResourceVram           = "EG_RESOURCES_VRAM"                          // gpu memory the runner makes available to workloads.
+	EnvComputeResourceLabels         = "EG_LABELS"                                  // comma separated labels the runner advertises.
+	EnvRunnerCPU                     = "EG_RUNNER_CPU"                              // cpus the runner container is limited to, read by the eg-runner units (--cpus).
+	EnvRunnerMemory                  = "EG_RUNNER_MEMORY"                           // memory the runner container is limited to in podman's format (i.e. 4g), read by the eg-runner units (--memory).
+	EnvRunnerVRAM                    = "EG_RUNNER_VRAM"                             // gpu memory available to the runner container.
+	EnvRunnerNetwork                 = "EG_RUNNER_NETWORK"                          // podman network the runner container is attached to, the eg-runner units default to egnet.
+	EnvRunnerDefaultNetworkInterface = "EG_RUNNER_DEFAULT_NETWORK_INTERFACE"        // host interface the egnet-lan network is attached to, see eg-runner-build.service.
 	EnvComputeRuntimeDirectory       = "EG_COMPUTE_RUNTIME_DIRECTORY"               // runtime directory for workloads
 	EnvComputeWorkspaceDirectory     = "EG_COMPUTE_WORKSPACE_DIRECTORY"             // workspace directory for workloads
 	EnvComputeWorkloadCapacity       = "EG_COMPUTE_WORKLOAD_CAPACITY"               // upper bound for the maximum number of workloads that can be run concurrently
@@ -286,6 +299,5 @@ const (
 	EnvExperimentalBaremetal          = "EG_EXPERIMENTAL_BAREMETAL"
 	EnvExperimentalBindMount          = "EG_EXPERIMENTAL_BIND_MOUNT"
 	EnvExperimentalProcSockets        = "EG_EXPERIMENTAL_PROC_SOCKETS" // interp/execproxy/v2 carries a command's stdio over unix sockets in the runtime directory.
-	EnvExperimentalRepoCache          = "EG_EXPERIMENTAL_REPO_CACHE"   // runner mirrors cloned repositories in the workload cache so repeat clones are incremental.
 	EnvExperimentalGuestShell         = "EG_EXPERIMENTAL_GUEST_SHELL"  // runtime/x/wasi/egbash interprets commands in the guest, requires EG_EXPERIMENTAL_PROC_SOCKETS for the module.
 )

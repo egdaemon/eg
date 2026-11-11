@@ -1,12 +1,11 @@
 package actl
 
 import (
-	"fmt"
 	"log"
 	"runtime"
-	"strconv"
 
 	"github.com/alecthomas/kong"
+	_eg "github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/cmd/cmdopts"
 	"github.com/egdaemon/eg/internal/bytesx"
 	"github.com/egdaemon/eg/internal/envx"
@@ -24,33 +23,30 @@ type BootstrapEnvRunner struct {
 
 func (t BootstrapEnvRunner) Run(kctx *kong.Context, gctx *cmdopts.Global) (err error) {
 	available := uint64(float64(memory.TotalMemory()) * 0.9)
-	memory := bytesx.Unit(numericx.Min(langx.FirstNonZero(uint64(t.RuntimeResources.Memory), available), available))
+	memory := numericx.Min(langx.FirstNonZero(t.RuntimeResources.Memory, bytesx.Unit(available)), bytesx.Unit(available))
 
 	_, gpuvram, err := runners.DetectGPU()
 	if err != nil {
 		log.Println("unable to detect gpu:", err)
 	}
 
-	vram := bytesx.Unit(numericx.Min(langx.FirstNonZero(uint64(t.RuntimeResources.Vram), gpuvram), gpuvram))
+	vram := numericx.Min(langx.FirstNonZero(t.RuntimeResources.Vram, gpuvram), gpuvram)
 
-	environ := envx.Build().Var(
-		"EG_RUNNER_CPU", strconv.FormatUint(numericx.Min(langx.FirstNonZero(t.RuntimeResources.Cores, uint64(runtime.NumCPU())), uint64(runtime.NumCPU())), 10),
-	).Var(
-		"EG_RUNNER_MEMORY", fmt.Sprintf("%v", memory),
-	).Var(
-		"EG_RUNNER_VRAM", fmt.Sprintf("%v", vram),
-	)
+	environ := envx.Build()
+	environ.Var(_eg.EnvRunnerCPU, numericx.Min(langx.FirstNonZero(t.RuntimeResources.Cores, uint64(runtime.NumCPU())), uint64(runtime.NumCPU())), envx.FormatOmitZero)
+	environ.Var(_eg.EnvRunnerMemory, memory, envx.FormatOmitZero, envx.FormatQuote)
+	environ.Var(_eg.EnvRunnerVRAM, vram, envx.FormatOmitZero, envx.FormatQuote)
 
 	// the interface the egnet-lan network is attached to, see eg-runner-build.service.
 	if iface, err := netx.DefaultRouteInterface(); err != nil {
 		log.Println("unable to detect the default network interface:", err)
 	} else {
-		environ.Var("EG_RUNNER_DEFAULT_NETWORK_INTERFACE", iface)
+		environ.Var(_eg.EnvRunnerDefaultNetworkInterface, iface, envx.FormatOmitZero, envx.FormatQuote)
 	}
 
 	// the runner units default to the egnet bridge when this is unset.
 	if t.LAN {
-		environ.Var("EG_RUNNER_NETWORK", "egnet-lan")
+		environ.Var(_eg.EnvRunnerNetwork, "egnet-lan")
 	}
 
 	return environ.CopyTo(kctx.Stdout)

@@ -8,11 +8,14 @@ import (
 	"testing"
 
 	"github.com/alecthomas/kong"
+	"github.com/docker/go-units"
 	"github.com/egdaemon/eg/cmd/cmdopts"
 	"github.com/egdaemon/eg/cmd/cmdtestx/v2"
 	"github.com/egdaemon/eg/cmd/eg/actl"
 	"github.com/egdaemon/eg/internal/bytesx"
+	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/netx"
+	"github.com/egdaemon/eg/runners"
 	"github.com/stretchr/testify/require"
 )
 
@@ -26,7 +29,21 @@ func TestBootstrapEnvRunner(t *testing.T) {
 		require.NoError(t, harness.Run())
 		require.Contains(t, out.String(), fmt.Sprintf("EG_RUNNER_CPU=%d", runtime.NumCPU()))
 		require.Contains(t, out.String(), "EG_RUNNER_MEMORY=")
-		require.Contains(t, out.String(), "EG_RUNNER_VRAM=")
+	})
+
+	t.Run("memory is written quoted in a format podman accepts for --memory", func(t *testing.T) {
+		var out bytes.Buffer
+		harness := cmdtestx.New(t, &actl.BootstrapEnvRunner{}).Options(
+			cmdopts.RuntimeResources{}.KongVars(),
+			kong.Writers(&out, nil))
+
+		require.NoError(t, harness.Run("--memory=1536MiB"))
+		require.Contains(t, out.String(), "EG_RUNNER_MEMORY=\"1536 MiB\"\n")
+
+		// podman parses --memory with go-units.
+		parsed, err := units.RAMInBytes("1536 MiB")
+		require.NoError(t, err)
+		require.EqualValues(t, 1536*bytesx.MiB, parsed)
 	})
 
 	t.Run("cores flag below the host's actual core count wins", func(t *testing.T) {
@@ -71,13 +88,34 @@ func TestBootstrapEnvRunner(t *testing.T) {
 
 		require.NoError(t, harness.Run("--vram=2Pi"))
 		require.NotContains(t, out.String(), fmt.Sprintf("EG_RUNNER_VRAM=%v", bytesx.Unit(2*bytesx.PiB)))
-		require.Contains(t, out.String(), "EG_RUNNER_VRAM=")
+		require.NotContains(t, out.String(), "2 PiB")
+	})
+
+	t.Run("vram is only written, and quoted, when a gpu is available", func(t *testing.T) {
+		_, gpuvram, err := runners.DetectGPU()
+		require.NoError(t, err)
+
+		var out bytes.Buffer
+		harness := cmdtestx.New(t, &actl.BootstrapEnvRunner{}).Options(
+			cmdopts.RuntimeResources{}.KongVars(),
+			kong.Writers(&out, nil))
+
+		require.NoError(t, harness.Run())
+		if gpuvram == 0 {
+			require.NotContains(t, out.String(), "EG_RUNNER_VRAM")
+			return
+		}
+
+		require.Contains(t, out.String(), fmt.Sprintf("EG_RUNNER_VRAM=\"%s\"\n", errorsx.Must(gpuvram.MarshalText())))
 	})
 
 	t.Run("the default network interface is written with or without lan", func(t *testing.T) {
 		if _, err := netx.DefaultRouteInterface(); err != nil {
 			t.Skip("host has no default route:", err)
 		}
+
+		iface, err := netx.DefaultRouteInterface()
+		require.NoError(t, err)
 
 		for _, args := range [][]string{nil, {"--lan"}} {
 			var out bytes.Buffer
@@ -86,7 +124,7 @@ func TestBootstrapEnvRunner(t *testing.T) {
 				kong.Writers(&out, nil))
 
 			require.NoError(t, harness.Run(args...))
-			require.Contains(t, out.String(), "EG_RUNNER_DEFAULT_NETWORK_INTERFACE=")
+			require.Contains(t, out.String(), fmt.Sprintf("EG_RUNNER_DEFAULT_NETWORK_INTERFACE=\"%s\"\n", iface))
 		}
 	})
 

@@ -10,12 +10,13 @@ import (
 	"testing"
 
 	"github.com/alecthomas/kong"
-	"github.com/dustin/go-humanize"
 	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/cmd/cmdopts"
 	"github.com/egdaemon/eg/cmd/cmdtestx/v2"
 	"github.com/egdaemon/eg/cmd/eg/actl"
+	"github.com/egdaemon/eg/internal/bytesx"
 	"github.com/egdaemon/eg/internal/envx"
+	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/secrets"
 	"github.com/shirou/gopsutil/v4/disk"
 	"github.com/shirou/gopsutil/v4/mem"
@@ -73,16 +74,16 @@ func TestBootstrapEnvDaemon(t *testing.T) {
 		require.Error(t, err)
 	})
 
-	t.Run("lan settings are only emitted when requested", func(t *testing.T) {
+	t.Run("lan settings", func(t *testing.T) {
 		for _, c := range []struct {
 			name     string
 			args     []string
 			contains []string
 			absent   []string
 		}{
-			{name: "defaults", absent: []string{"EG_MDNS_ADVERTISE", "EG_LAN_PEER_TTL"}},
-			{name: "enabled", args: []string{"--mdns-advertise", "--lan-peer-ttl", "48h"}, contains: []string{"EG_MDNS_ADVERTISE=true", `EG_LAN_PEER_TTL="48h0m0s"`}},
-			{name: "negated", args: []string{"--no-mdns-advertise"}, absent: []string{"EG_MDNS_ADVERTISE"}},
+			{name: "defaults", contains: []string{"EG_LAN_MDNS_ADVERTISE=false"}, absent: []string{"EG_LAN_PEER_TTL"}},
+			{name: "enabled", args: []string{"--mdns-advertise", "--lan-peer-ttl", "48h"}, contains: []string{"EG_LAN_MDNS_ADVERTISE=true", "EG_LAN_PEER_TTL=48h0m0s"}},
+			{name: "negated", args: []string{"--no-mdns-advertise"}, contains: []string{"EG_LAN_MDNS_ADVERTISE=false"}},
 		} {
 			t.Run(c.name, func(t *testing.T) {
 				var out bytes.Buffer
@@ -104,7 +105,38 @@ func TestBootstrapEnvDaemon(t *testing.T) {
 		}
 	})
 
-	t.Run("scheduling and api settings are only emitted when requested", func(t *testing.T) {
+	t.Run("vcs cache", func(t *testing.T) {
+		for _, c := range []struct {
+			name     string
+			args     []string
+			contains []string
+			absent   []string
+		}{
+			{name: "defaults", contains: []string{"EG_COMPUTE_VCS_CACHE=false"}},
+			{name: "enabled", args: []string{"--vcs-cache"}, contains: []string{"EG_COMPUTE_VCS_CACHE=true"}},
+			{name: "negated", args: []string{"--no-vcs-cache"}, contains: []string{"EG_COMPUTE_VCS_CACHE=false"}},
+		} {
+			t.Run(c.name, func(t *testing.T) {
+				var out bytes.Buffer
+				harness := cmdtestx.New(t, &actl.BootstrapEnvDaemon{}).Options(
+					cmdopts.RuntimeResources{}.KongVars(),
+					kong.NamedMapper("durationinf", kong.MapperFunc(cmdopts.ParseDurationInf)),
+					kong.Vars{"vars_account_id": "expected-account", "vars_entropy_seed": "expected-seed"},
+					kong.Writers(&out, nil),
+					kong.Bind(cmdopts.Entropy(cmdopts.GenerateEntropy)))
+
+				require.NoError(t, harness.Run(c.args...))
+				for _, v := range c.contains {
+					require.Contains(t, out.String(), v)
+				}
+				for _, v := range c.absent {
+					require.NotContains(t, out.String(), v)
+				}
+			})
+		}
+	})
+
+	t.Run("scheduling and api settings", func(t *testing.T) {
 		// mirrors vars_cores_minimum_default from cmd/eg/main.go, varies by machine.
 		cores := max(uint64(float64(runtime.NumCPU())*0.8), 1)
 
@@ -115,10 +147,10 @@ func TestBootstrapEnvDaemon(t *testing.T) {
 			absent   []string
 		}{
 			// workers defaults to vars_cores_minimum_default, so it is always emitted.
-			{name: "defaults", contains: []string{fmt.Sprintf("EG_COMPUTE_WORKLOAD_CAPACITY=%d", cores)}, absent: []string{"EG_COMPUTE_COMPILE_CAPACITY", "EG_COMPUTE_WORKLOAD_TARGET_LOAD", "EG_COMPUTE_API_ENABLED"}},
+			{name: "defaults", contains: []string{fmt.Sprintf("EG_COMPUTE_WORKLOAD_CAPACITY=%d", cores), "EG_COMPUTE_API_ENABLED=true"}, absent: []string{"EG_COMPUTE_COMPILE_CAPACITY", "EG_COMPUTE_WORKLOAD_TARGET_LOAD"}},
 			{name: "workers", args: []string{"--workers", "2"}, contains: []string{"EG_COMPUTE_WORKLOAD_CAPACITY=2"}},
-			{name: "enabled", args: []string{"--compilers", "3", "--target-load", "0.65"}, contains: []string{"EG_COMPUTE_COMPILE_CAPACITY=3", "EG_COMPUTE_WORKLOAD_TARGET_LOAD=0.65"}, absent: []string{"EG_COMPUTE_API_ENABLED"}},
-			{name: "api explicitly enabled", args: []string{"--api"}, absent: []string{"EG_COMPUTE_API_ENABLED"}},
+			{name: "enabled", args: []string{"--compilers", "3", "--target-load", "0.65"}, contains: []string{"EG_COMPUTE_COMPILE_CAPACITY=3", "EG_COMPUTE_WORKLOAD_TARGET_LOAD=0.65"}},
+			{name: "api explicitly enabled", args: []string{"--api"}, contains: []string{"EG_COMPUTE_API_ENABLED=true"}},
 			{name: "api disabled", args: []string{"--no-api"}, contains: []string{"EG_COMPUTE_API_ENABLED=false"}},
 		} {
 			t.Run(c.name, func(t *testing.T) {
@@ -141,6 +173,18 @@ func TestBootstrapEnvDaemon(t *testing.T) {
 		}
 	})
 
+	t.Run("labels are quoted", func(t *testing.T) {
+		var out bytes.Buffer
+		harness := cmdtestx.New(t, &actl.BootstrapEnvDaemon{}).Options(
+			cmdopts.RuntimeResources{Cores: uint64(runtime.NumCPU())}.KongVars(),
+			kong.Vars{"vars_account_id": "expected-account", "vars_entropy_seed": "expected-seed"},
+			kong.Writers(&out, nil),
+			kong.Bind(cmdopts.Entropy(cmdopts.GenerateEntropy)))
+
+		require.NoError(t, harness.Run("--label", "fast disk", "--label", "prod"))
+		require.Contains(t, out.String(), "EG_LABELS=\"fast disk,prod") // the detected gpu label may follow.
+	})
+
 	t.Run("cores and memory honor the requested values", func(t *testing.T) {
 		var out bytes.Buffer
 		harness := cmdtestx.New(t, &actl.BootstrapEnvDaemon{}).Options(
@@ -151,7 +195,7 @@ func TestBootstrapEnvDaemon(t *testing.T) {
 
 		require.NoError(t, harness.Run("--cores", "1", "--memory", "4GiB"))
 		require.Contains(t, out.String(), "EG_RESOURCES_CORES=1\n")
-		require.Contains(t, out.String(), "EG_RESOURCES_MEMORY=4294967296\n")
+		require.Contains(t, out.String(), "EG_RESOURCES_MEMORY=\"4 GiB\"\n")
 	})
 
 	t.Run("physical resources cap the requested values", func(t *testing.T) {
@@ -173,9 +217,9 @@ func TestBootstrapEnvDaemon(t *testing.T) {
 			"--disk", "100PiB",
 		))
 		require.Contains(t, out.String(), fmt.Sprintf("EG_RESOURCES_CORES=%d\n", runtime.NumCPU()))
-		require.Contains(t, out.String(), fmt.Sprintf("EG_RESOURCES_MEMORY=%d\n", vm.Total))
+		require.Contains(t, out.String(), fmt.Sprintf("EG_RESOURCES_MEMORY=\"%s\"\n", errorsx.Must(bytesx.Unit(vm.Total).MarshalText())))
 		require.NotContains(t, out.String(), "EG_RESOURCES_DISK=\"100 PiB\"")
-		require.Contains(t, out.String(), fmt.Sprintf("EG_RESOURCES_DISK=\"%s\"", humanize.IBytes(du.Total)))
+		require.Contains(t, out.String(), fmt.Sprintf("EG_RESOURCES_DISK=\"%s\"", errorsx.Must(bytesx.Unit(du.Total).MarshalText())))
 	})
 
 	t.Run("restart on upgrade", func(t *testing.T) {

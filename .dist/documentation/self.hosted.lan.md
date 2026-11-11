@@ -127,7 +127,7 @@ sudo -u egd eg compute lan upd --runner --cache-directory /var/cache/eg-daemon <
 ```
 | setting                             | flag                                                                          | environment                           | default        |
 | ----------------------------------- | ----------------------------------------------------------------------------- | ------------------------------------- | -------------- |
-| advertise the daemon on the network | `eg daemon --mdns-advertise`                                                  | `EG_MDNS_ADVERTISE`                   | off            |
+| advertise the daemon on the network | `eg daemon --mdns-advertise`                                                  | `EG_LAN_MDNS_ADVERTISE`               | off            |
 | runner container network            | `eg actl bootstrap env runner --lan`                                          | `EG_RUNNER_NETWORK`                   | egnet          |
 | local network priority              | `eg compute upload --lan`                                                     | `EG_LAN_PRIORITY`                     | 2              |
 | p2p network priority                | `eg compute upload --p2p`                                                     | `EG_P2P_PRIORITY`                     | 1              |

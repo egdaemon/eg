@@ -291,9 +291,9 @@ func Base64(fallback []byte, keys ...string) []byte {
 	return envx.Base64(fallback, keys...)
 }
 
-// Base64URL read value as a url base64 encoded string
+// Base64URL read value as a base64 encoded string, see Base64.
 func Base64URL(fallback []byte, keys ...string) []byte {
-	return envx.Base64URL(fallback, keys...)
+	return envx.Base64(fallback, keys...)
 }
 
 // Int retrieve a integer flag from the environment, checks each key in order

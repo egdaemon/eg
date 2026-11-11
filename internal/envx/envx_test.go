@@ -1,13 +1,14 @@
 package envx_test
 
 import (
-	"crypto/rand"
 	"encoding/base64"
 	"encoding/hex"
-	"io"
+	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -135,17 +136,6 @@ func TestBase64FallsBackToURL(t *testing.T) {
 	require.Equal(t, []byte{0xff}, envx.Base64([]byte{0xff}, key))
 }
 
-func TestBase64URL(t *testing.T) {
-	const key = "d1e2f3a4-b5c6-7890-defa-901234567890"
-	raw := make([]byte, 1024)
-	_, err := io.ReadFull(rand.Reader, raw)
-	require.NoError(t, err)
-
-	t.Setenv(key, base64.URLEncoding.EncodeToString(raw))
-	require.Equal(t, raw, envx.Base64URL(nil, key))
-	require.Equal(t, []byte{0xff}, envx.Base64URL([]byte{0xff}, "missing-key-base64url"))
-}
-
 func TestURL(t *testing.T) {
 	const key = "c9d0e1f2-a3b4-5678-cdef-789012345678"
 	t.Setenv(key, "https://example.com/path")
@@ -199,19 +189,172 @@ func TestVars(t *testing.T) {
 	require.Contains(t, result, "KEY2=e7f8a9b0-c1d2-3456-efab-567890123456")
 }
 
-func TestVarBool(t *testing.T) {
-	require.Equal(t, "true", envx.VarBool(true))
-	require.Equal(t, "false", envx.VarBool(false))
+func TestFormat(t *testing.T) {
+	type named string
+	instant := time.Date(2026, 11, 11, 13, 4, 5, 123456789, time.FixedZone("x", 2*60*60))
+
+	for _, c := range []struct {
+		name     string
+		actual   string
+		expected string
+	}{
+		{name: "string", actual: envx.Format("K", "value"), expected: "K=value"},
+		{name: "named string", actual: envx.Format("K", named("value")), expected: "K=value"},
+		{name: "empty string is ignored", actual: envx.Format("K", ""), expected: ""},
+		{name: "empty string allowed", actual: envx.Format("K", "", envx.FormatOptionTransforms(func(s string) string { return s })), expected: "K="},
+		{name: "true", actual: envx.Format("ENABLED", true), expected: "ENABLED=true"},
+		{name: "false", actual: envx.Format("ENABLED", false), expected: "ENABLED=false"},
+		{name: "int", actual: envx.Format("COUNT", 42), expected: "COUNT=42"},
+		{name: "negative int", actual: envx.Format("COUNT", -1), expected: "COUNT=-1"},
+		{name: "uint64", actual: envx.Format("COUNT", uint64(math.MaxUint64)), expected: "COUNT=18446744073709551615"},
+		{name: "int8", actual: envx.Format("COUNT", int8(-8)), expected: "COUNT=-8"},
+		{name: "float64", actual: envx.Format("RATIO", 0.25), expected: "RATIO=0.25"},
+		{name: "float32", actual: envx.Format("RATIO", float32(1.5)), expected: "RATIO=1.5"},
+		{name: "duration", actual: envx.Format("TTL", 90*time.Minute), expected: "TTL=1h30m0s"},
+		{name: "zero duration", actual: envx.Format("TTL", time.Duration(0)), expected: "TTL=0s"},
+		{name: "time is utc rfc3339nano", actual: envx.Format("AT", instant), expected: "AT=2026-11-11T11:04:05.123456789Z"},
+		{name: "bytes are url base64", actual: envx.Format("KEY", []byte{0xfb, 0xff, 0xfe, 0x01}), expected: "KEY=-__-AQ=="},
+		{name: "empty bytes are ignored", actual: envx.Format("KEY", []byte{}), expected: ""},
+		{name: "zero time is ignored", actual: envx.Format("AT", time.Time{}), expected: ""},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			require.Equal(t, c.expected, c.actual)
+		})
+	}
+
+	t.Run("omit zero", func(t *testing.T) {
+		for _, c := range []struct {
+			name     string
+			actual   string
+			expected string
+		}{
+			{name: "empty string", actual: envx.Format("K", "", envx.FormatOmitZero), expected: ""},
+			{name: "string", actual: envx.Format("K", "v", envx.FormatOmitZero), expected: "K=v"},
+			{name: "zero int", actual: envx.Format("K", 0, envx.FormatOmitZero), expected: ""},
+			{name: "int", actual: envx.Format("K", 3, envx.FormatOmitZero), expected: "K=3"},
+			{name: "false", actual: envx.Format("K", false, envx.FormatOmitZero), expected: ""},
+			{name: "true", actual: envx.Format("K", true, envx.FormatOmitZero), expected: "K=true"},
+			{name: "zero float", actual: envx.Format("K", 0.0, envx.FormatOmitZero), expected: ""},
+			{name: "zero duration", actual: envx.Format("K", time.Duration(0), envx.FormatOmitZero), expected: ""},
+			{name: "duration", actual: envx.Format("K", time.Second, envx.FormatOmitZero), expected: "K=1s"},
+			{name: "zero time", actual: envx.Format("K", time.Time{}, envx.FormatOmitZero), expected: ""},
+			{name: "empty bytes", actual: envx.Format("K", []byte{}, envx.FormatOmitZero), expected: ""},
+			{name: "bytes", actual: envx.Format("K", []byte{1}, envx.FormatOmitZero), expected: "K=AQ=="},
+			{name: "zero is kept without the option", actual: envx.Format("K", 0), expected: "K=0"},
+		} {
+			t.Run(c.name, func(t *testing.T) {
+				require.Equal(t, c.expected, c.actual)
+			})
+		}
+
+		env, err := envx.Build().
+			Var("TTL", time.Duration(0), envx.FormatOmitZero).
+			Var("ON", false, envx.FormatOmitZero).
+			Var("KEPT", 0).
+			Var("SET", time.Minute, envx.FormatOmitZero).
+			Environ()
+		require.NoError(t, err)
+		require.Equal(t, []string{"KEPT=0", "SET=1m0s"}, env)
+	})
+
+	t.Run("quote", func(t *testing.T) {
+		for _, c := range []struct {
+			name     string
+			actual   string
+			expected string
+		}{
+			{name: "whitespace", actual: envx.Format("K", "100 GiB", envx.FormatQuote), expected: `K="100 GiB"`},
+			{name: "plain", actual: envx.Format("K", "v", envx.FormatQuote), expected: `K="v"`},
+			{name: "already quoted", actual: envx.Format("K", `"v"`, envx.FormatQuote), expected: `K="v"`},
+			{name: "escapes", actual: envx.Format("K", `a"b\c`, envx.FormatQuote), expected: `K="a\"b\\c"`},
+			{name: "number", actual: envx.Format("K", 3, envx.FormatQuote), expected: `K="3"`},
+			{name: "duration", actual: envx.Format("K", time.Second, envx.FormatQuote), expected: `K="1s"`},
+			{name: "empty is still ignored", actual: envx.Format("K", "", envx.FormatQuote), expected: ""},
+			{name: "omit zero", actual: envx.Format("K", 0, envx.FormatQuote, envx.FormatOmitZero), expected: ""},
+		} {
+			t.Run(c.name, func(t *testing.T) {
+				require.Equal(t, c.expected, c.actual)
+			})
+		}
+
+		env, err := envx.Build().
+			Var("A", "100 GiB", envx.FormatQuote).
+			Var("B", "100 GiB").
+			Var("C", "", envx.FormatQuote).
+			Var("D", "", envx.FormatAllowEmpty).
+			Environ()
+		require.NoError(t, err)
+		require.Equal(t, []string{`A="100 GiB"`, "B=100 GiB", "D="}, env)
+	})
+
+	t.Run("duration round trips", func(t *testing.T) {
+		t.Setenv("0b1c2d3e-ttl", "48h0m0s")
+		t.Setenv("0b1c2d3e-bytes", strings.TrimPrefix(envx.Format("0b1c2d3e-bytes", []byte{0xfb, 0xff, 0xfe, 0x01}), "0b1c2d3e-bytes="))
+		require.Equal(t, []byte{0xfb, 0xff, 0xfe, 0x01}, envx.Base64(nil, "0b1c2d3e-bytes"))
+		require.Equal(t, "0b1c2d3e-ttl=48h0m0s", envx.Format("0b1c2d3e-ttl", 48*time.Hour))
+		require.Equal(t, 48*time.Hour, envx.Duration(0, "0b1c2d3e-ttl"))
+	})
 }
 
-func TestFormatBool(t *testing.T) {
-	require.Equal(t, "ENABLED=true", envx.FormatBool("ENABLED", true))
-	require.Equal(t, "ENABLED=false", envx.FormatBool("ENABLED", false))
+type marshaler struct{}
+
+func (marshaler) MarshalText() ([]byte, error) { return []byte("100 GiB"), nil }
+
+type stringer struct{}
+
+func (stringer) String() string { return "stringer-value" }
+
+func TestBuilderVarValues(t *testing.T) {
+	instant := time.Date(2026, 11, 11, 13, 4, 5, 0, time.UTC)
+
+	env, err := envx.Build().
+		Var("S", "value").
+		Var("B", true).
+		Var("I", 42).
+		Var("U", uint16(7)).
+		Var("F", 0.5).
+		Var("D", 90*time.Minute).
+		Var("T", instant).
+		Var("X", stringer{}).
+		Var("M", marshaler{}).
+		Var("QUOTED", "\"48h0m0s\"").
+		Var("EMPTY", "").
+		Var("ZERO", time.Time{}).
+		Environ()
+	require.NoError(t, err)
+	require.Equal(t, []string{
+		"S=value",
+		"B=true",
+		"I=42",
+		"U=7",
+		"F=0.5",
+		"D=1h30m0s",
+		"T=2026-11-11T13:04:05Z",
+		"X=stringer-value",
+		"M=100 GiB",
+		"QUOTED=\"48h0m0s\"",
+	}, env)
+
+	allowed, err := envx.Build().
+		Var("EMPTY", "", envx.FormatOptionTransforms(func(s string) string { return s })).
+		Var("IGNORED", "").
+		Environ()
+	require.NoError(t, err)
+	require.Equal(t, []string{"EMPTY="}, allowed)
+
+	typed, err := envx.Var(envx.Var(envx.Build(), "N", 3), "D", time.Second).Environ()
+	require.NoError(t, err)
+	require.Equal(t, []string{"N=3", "D=1s"}, typed)
 }
 
-func TestFormatInt(t *testing.T) {
-	require.Equal(t, "COUNT=42", envx.FormatInt("COUNT", 42))
-	require.Equal(t, "COUNT=-1", envx.FormatInt("COUNT", -1))
+func TestVarsAndReaderSkipEmpty(t *testing.T) {
+	require.Empty(t, envx.Vars("", "KEY1", "KEY2"))
+	require.Equal(t, []string{"KEY1=true", "KEY2=true"}, envx.Vars(true, "KEY1", "KEY2"))
+	require.Equal(t, []string{"KEY1=1h30m0s", "KEY2=1h30m0s"}, envx.Vars(90*time.Minute, "KEY1", "KEY2"))
+
+	environ, err := envx.FromReader(strings.NewReader("A=1\nEMPTY=\nB=2\n"))
+	require.NoError(t, err)
+	require.Equal(t, []string{"A=1", "B=2"}, environ)
 }
 
 func TestFormatOptionTransforms(t *testing.T) {
@@ -249,4 +392,28 @@ func TestFromPath(t *testing.T) {
 func TestCopyToWriteFailure(t *testing.T) {
 	b := envx.Build().FromEnviron("KEY=val")
 	require.ErrorIs(t, b.CopyTo(errorsx.Writer(os.ErrPermission)), os.ErrPermission)
+}
+
+func TestSliceFormat(t *testing.T) {
+	for _, c := range []struct {
+		name     string
+		actual   fmt.Stringer
+		expected string
+	}{
+		{name: "strings", actual: envx.SliceFormat(",", "a", "b", "c"), expected: "a,b,c"},
+		{name: "single", actual: envx.SliceFormat(",", "a"), expected: "a"},
+		{name: "none", actual: envx.SliceFormat[string](","), expected: ""},
+		{name: "empty values are dropped", actual: envx.SliceFormat(",", "a", "", "b"), expected: "a,b"},
+		{name: "ints", actual: envx.SliceFormat(":", 1, 2, 3), expected: "1:2:3"},
+		{name: "bools", actual: envx.SliceFormat(" ", true, false), expected: "true false"},
+		{name: "durations", actual: envx.SliceFormat(",", time.Second, 90*time.Minute), expected: "1s,1h30m0s"},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			require.Equal(t, c.expected, c.actual.String())
+		})
+	}
+
+	env, err := envx.Build().Var("LABELS", envx.SliceFormat(",", "a", "b")).Var("NONE", envx.SliceFormat[string](",")).Environ()
+	require.NoError(t, err)
+	require.Equal(t, []string{"LABELS=a,b"}, env)
 }

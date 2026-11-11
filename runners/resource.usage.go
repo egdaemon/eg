@@ -21,7 +21,7 @@ func NewRuntimeResources() RuntimeResources {
 	return RuntimeResources{
 		Cores:  uint64(runtime.NumCPU()),
 		Memory: memory.TotalMemory(),
-		Vram:   vram,
+		Vram:   uint64(vram),
 	}
 }
 

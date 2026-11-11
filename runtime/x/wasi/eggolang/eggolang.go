@@ -95,7 +95,9 @@ func (t options) Environ(envvars ...string) options {
 // Specify the GOBIN directory, where the golang binary's get placed.
 func (t options) Bin(dir string) options {
 	return append(t, func(o *config) {
-		o.environ = append(o.environ, envx.Format("GOBIN", dir))
+		if encoded := envx.Format("GOBIN", dir); encoded != "" {
+			o.environ = append(o.environ, encoded)
+		}
 	})
 }
 

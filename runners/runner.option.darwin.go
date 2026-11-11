@@ -6,6 +6,7 @@ import (
 	"errors"
 	"log"
 
+	"github.com/egdaemon/eg/internal/bytesx"
 	"github.com/logrusorgru/aurora"
 )
 
@@ -29,6 +30,6 @@ func AgentOptionGPU(enabled bool) (AgentOption, error) {
 }
 
 // DetectGPU darwin does not currently support gpu detection.
-func DetectGPU() (driver string, vram uint64, err error) {
+func DetectGPU() (driver string, vram bytesx.Unit, err error) {
 	return "", 0, nil
 }

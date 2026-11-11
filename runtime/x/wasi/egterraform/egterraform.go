@@ -19,7 +19,7 @@ func CacheDirectory(dirs ...string) string {
 func env() ([]string, error) {
 	return envx.Build().
 		Var("TF_PLUGIN_CACHE_DIR", CacheDirectory("plugins")).
-		Var("TF_IN_AUTOMATION", envx.VarBool(true)).
+		Var("TF_IN_AUTOMATION", true).
 		Environ()
 }
 

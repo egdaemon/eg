@@ -23,7 +23,7 @@ func env() ([]string, error) {
 		Var("COREPACK_ENABLE_DOWNLOAD_PROMPT", "0").
 		Var("COREPACK_HOME", egenv.DirectoryCache(_eg.DefaultModuleDirectory(), "corepack")).
 		Var("YARN_CACHE_FOLDER", CacheDirectory()).
-		Var("YARN_ENABLE_GLOBAL_CACHE", envx.VarBool(false)).
+		Var("YARN_ENABLE_GLOBAL_CACHE", false).
 		Environ()
 }
 

@@ -702,7 +702,9 @@ func LocalEnv(repo *git.Repository, remote string, branch string) (env []string,
 	}
 
 	env = append(env, benv...)
-	env = append(env, envx.Format(eg.EnvComputeVCS, uri))
+	if encoded := envx.Format(eg.EnvComputeVCS, uri); encoded != "" {
+		env = append(env, encoded)
+	}
 
 	return env, nil
 }

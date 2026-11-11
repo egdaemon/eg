@@ -5,8 +5,6 @@ import (
 	"log"
 	"math"
 	"runtime"
-	"strconv"
-	"strings"
 	"time"
 
 	"github.com/alecthomas/kong"
@@ -33,6 +31,7 @@ type BootstrapEnvDaemon struct {
 	API              bool          `name:"api" help:"accept workloads pushed directly to this runner (POST /c/upload, POST /c/enqueue) and advertise it to the control plane" default:"true" negatable:""`
 	RestartOnUpgrade string        `name:"restart-on-upgrade" help:"restart the daemon when the eg package is upgraded: auto, yes or no" enum:"auto,yes,no" default:"auto"`
 	MDNSAdvertise    bool          `name:"mdns-advertise" help:"advertise this daemon on the local network (multicast dns) so clients on the same network can upload to it directly" negatable:""`
+	VCSCache         bool          `name:"vcs-cache" help:"experimental: mirror cloned repositories in the workload cache so repeat clones are incremental" negatable:""`
 	LANPeerTTL       time.Duration `name:"lan-peer-ttl" type:"durationinf" help:"how long systems on the local network are remembered after they were last seen, the daemon's default applies when unset"`
 	Environment      []string      `name:"env" short:"e" help:"define environment variables and their values to be included"`
 	EnvironmentPaths []string      `name:"envpath" help:"environment files to include" default:""`
@@ -68,58 +67,22 @@ func (t BootstrapEnvDaemon) Run(kctx *kong.Context, gctx *cmdopts.Global, entrop
 		physdisk = du.Total
 	}
 
-	environ := envx.Build().Var(
-		eg.EnvAccount, t.AccountID,
-	).Var(
-		eg.EnvEGEntropySeed, seed,
-	).Var(
-		"EG_RESOURCES_CORES", strconv.FormatUint(numericx.Min(t.RuntimeResources.Cores, uint64(runtime.NumCPU())), 10),
-	).Var(
-		"EG_RESOURCES_MEMORY", strconv.FormatUint(numericx.Min(uint64(t.RuntimeResources.Memory), physmemory), 10),
-	).Var(
-		"EG_RESOURCES_DISK", fmt.Sprintf("\"%s\"", string(errorsx.Zero(bytesx.Unit(numericx.Min(uint64(t.RuntimeResources.Disk), physdisk)).MarshalText()))),
-	).Var(
-		"EG_RESOURCES_VRAM", strconv.FormatUint(numericx.Min(langx.FirstNonZero(uint64(t.RuntimeResources.Vram), gpuvram), gpuvram), 10),
-	)
-
+	environ := envx.Build()
+	environ.Var(eg.EnvAccount, t.AccountID)
+	environ.Var(eg.EnvEGEntropySeed, seed)
 	environ.Var(_eg.EnvRestartOnUpgrade, t.RestartOnUpgrade)
-
-	if t.Workers > 0 {
-		environ.Var(
-			_eg.EnvComputeWorkloadCapacity, strconv.FormatUint(t.Workers, 10),
-		)
-	}
-
-	if t.Compilers > 0 {
-		environ.Var(
-			_eg.EnvComputeCompileCapacity, strconv.FormatUint(t.Compilers, 10),
-		)
-	}
-
-	if t.TargetLoad > 0 {
-		environ.Var(
-			_eg.EnvComputeWorkloadTargetLoad, strconv.FormatFloat(t.TargetLoad, 'f', -1, 64),
-		)
-	}
-
-	// the daemon accepts pushed workloads by default, only emit when it is disabled.
-	if !t.API {
-		environ.Var(_eg.EnvComputeAPIEnabled, "false")
-	}
-
-	if len(labels) > 0 {
-		environ.Var(
-			"EG_LABELS", fmt.Sprintf("\"%s\"", strings.Join(labels, ",")),
-		)
-	}
-
-	if t.MDNSAdvertise {
-		environ.Var("EG_MDNS_ADVERTISE", "true")
-	}
-
-	if t.LANPeerTTL > 0 {
-		environ.Var("EG_LAN_PEER_TTL", fmt.Sprintf("\"%s\"", t.LANPeerTTL))
-	}
+	environ.Var(_eg.EnvComputeResourceCores, numericx.Min(t.RuntimeResources.Cores, uint64(runtime.NumCPU())))
+	environ.Var(_eg.EnvComputeResourceMemory, numericx.Min(t.RuntimeResources.Memory, bytesx.Unit(physmemory)), envx.FormatQuote)
+	environ.Var(_eg.EnvComputeResourceDisk, numericx.Min(t.RuntimeResources.Disk, bytesx.Unit(physdisk)), envx.FormatQuote)
+	environ.Var(_eg.EnvComputeResourceVram, numericx.Min(langx.FirstNonZero(t.RuntimeResources.Vram, gpuvram), gpuvram), envx.FormatQuote)
+	environ.Var(_eg.EnvComputeWorkloadCapacity, t.Workers, envx.FormatOmitZero)
+	environ.Var(_eg.EnvComputeCompileCapacity, t.Compilers, envx.FormatOmitZero)
+	environ.Var(_eg.EnvComputeWorkloadTargetLoad, t.TargetLoad, envx.FormatOmitZero)
+	environ.Var(_eg.EnvComputeAPIEnabled, t.API)
+	environ.Var(_eg.EnvComputeResourceLabels, envx.SliceFormat(",", labels...), envx.FormatQuote)
+	environ.Var(_eg.EnvComputeVCSCache, t.VCSCache)
+	environ.Var(_eg.EnvLANMDNSAdvertise, t.MDNSAdvertise)
+	environ.Var(_eg.EnvLANPeerTTL, t.LANPeerTTL, envx.FormatOmitZero)
 
 	environ.FromPath(t.EnvironmentPaths...).FromEnviron(envx.AutoEnviron(t.Environment...)...)
 

@@ -71,12 +71,12 @@ func TestCmdDaemon(t *testing.T) {
 
 	t.Run("gpu resources", func(t *testing.T) {
 		t.Run("detected vram larger than configured wins", func(t *testing.T) {
-			got := gpuresources(cmdopts.RuntimeResources{Vram: bytesx.GiB}, "amdgpu", 8*uint64(bytesx.GiB))
+			got := gpuresources(cmdopts.RuntimeResources{Vram: bytesx.GiB}, "amdgpu", 8*bytesx.GiB)
 			require.Equal(t, bytesx.Unit(8*bytesx.GiB), got.Vram)
 		})
 
 		t.Run("configured vram larger than detected wins", func(t *testing.T) {
-			got := gpuresources(cmdopts.RuntimeResources{Vram: 16 * bytesx.GiB}, "amdgpu", 8*uint64(bytesx.GiB))
+			got := gpuresources(cmdopts.RuntimeResources{Vram: 16 * bytesx.GiB}, "amdgpu", 8*bytesx.GiB)
 			require.Equal(t, bytesx.Unit(16*bytesx.GiB), got.Vram)
 		})
 

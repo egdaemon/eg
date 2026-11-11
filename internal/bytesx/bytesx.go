@@ -91,8 +91,27 @@ func (t FormatSI) Format(f fmt.State, verb rune) {
 
 type Unit uint64
 
+// MarshalText encodes the unit losslessly using the largest binary unit that divides it exactly,
+// i.e. 4 GiB, 1536 MiB or 1234567 B, and decodes with UnmarshalText.
 func (t Unit) MarshalText() (text []byte, err error) {
-	return []byte(humanize.IBytes(uint64(t))), nil
+	value, suffix := uint64(t), "B"
+	for _, u := range []struct {
+		size   uint64
+		suffix string
+	}{{EiB, "EiB"}, {PiB, "PiB"}, {TiB, "TiB"}, {GiB, "GiB"}, {MiB, "MiB"}, {KiB, "KiB"}} {
+		if value != 0 && value%u.size == 0 {
+			value, suffix = value/u.size, u.suffix
+			break
+		}
+	}
+
+	return fmt.Appendf(nil, "%d %s", value, suffix), nil
+}
+
+// String is the lossless text form of the unit, see MarshalText. fmt's verbs still use Format.
+func (t Unit) String() string {
+	text, _ := t.MarshalText()
+	return string(text)
 }
 
 func (t *Unit) UnmarshalText(text []byte) (err error) {

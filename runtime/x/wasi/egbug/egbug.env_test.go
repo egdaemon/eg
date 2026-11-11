@@ -47,7 +47,8 @@ func TestNormalizeEnvIgnoresLaunchVariance(t *testing.T) {
 	// values that differ per launch mode and replace the defaults.
 	variance := []string{
 		"EG_COMPUTE_GPU=true",
-		"EG_COMPUTE_PROFILE_MODE=cpu",
+		"EG_COMPUTE_CORES_LIMIT=24",
+		"EG_COMPUTE_MEMORY_LIMIT=59797337702",
 		"EG_GIT_BASE_VCS=git@github.com:egdaemon/eg.git",
 		"EG_COMPUTE_TTL=166666h40m0s",
 		"EG_COMPUTE_WORKLOAD=main.wasm",

@@ -153,10 +153,13 @@ func TestEnv(t *testing.T) {
 		require.True(t, ok)
 		require.Equal(t, "/home/egd/.gnupg", home, "should still redirect away from the overridden home")
 
-		// missing ambient identity vars come through empty rather than causing
+		// missing ambient identity vars are omitted rather than causing
 		// a panic or an error.
-		name, ok := value(got, eggpg.EnvName)
-		require.True(t, ok)
-		require.Empty(t, name)
+		_, ok = value(got, eggpg.EnvName)
+		require.False(t, ok)
+		_, ok = value(got, eggpg.EnvEmail)
+		require.False(t, ok)
+		_, ok = value(got, eggpg.EnvSeed)
+		require.False(t, ok)
 	})
 }

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/charmbracelet/x/ansi"
+	"github.com/egdaemon/eg/cmd/cmdopts"
 	"github.com/egdaemon/eg/compute"
 	"github.com/egdaemon/eg/computeapi"
 	"github.com/stretchr/testify/require"
@@ -21,6 +22,7 @@ func TestHistoryList(t *testing.T) {
 		srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			requests++
 			require.Equal(t, "build", r.URL.Query().Get("query"))
+			require.Equal(t, "https://example.com/r.git", r.URL.Query().Get("vcs_uri"))
 			require.Equal(t, "0", r.URL.Query().Get("offset"))
 			require.Equal(t, "20", r.URL.Query().Get("limit"))
 			_, _ = w.Write([]byte(`{"next":{"offset":1,"limit":20},"items":[{"id":"a","result":2}]}`))
@@ -33,7 +35,7 @@ func TestHistoryList(t *testing.T) {
 			return (&net.Dialer{}).DialContext(ctx, network, srv.Listener.Addr().String())
 		}
 
-		items, err := historyCmd{Query: "build", Limit: 20}.list(t.Context(), computeapi.NewWorkloadClient(srv.Client()))
+		items, err := historyCmd{VCS: cmdopts.VCS{VcsURI: "https://example.com/r.git"}, Query: "build", Limit: 20}.list(t.Context(), computeapi.NewWorkloadClient(srv.Client()))
 		require.NoError(t, err)
 		require.Equal(t, 1, requests)
 		require.Len(t, items, 1)

@@ -25,6 +25,11 @@ type historyCmd struct {
 }
 
 func (t historyCmd) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, ident *cmdidentity.T) (err error) {
+	// '-' is the escape hatch for removing the default detected repository from the filter.
+	if t.VcsURI == "-" {
+		t.VcsURI = ""
+	}
+
 	signer, err := sshx.AutoCached(sshx.NewKeyGen(), t.SSHKeyPath)
 	if err != nil {
 		return err
@@ -49,7 +54,7 @@ func (t historyCmd) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, ident *cm
 
 // list retrieves a single page of the most recently completed workloads of the account matching the filters.
 func (t historyCmd) list(ctx context.Context, c *computeapi.WorkloadClient) (items []*compute.History, err error) {
-	resp, err := c.HistorySearch(ctx, &compute.SearchHistoryRequest{Query: t.Query, Limit: t.Limit})
+	resp, err := c.HistorySearch(ctx, &compute.SearchHistoryRequest{Query: t.Query, VcsUri: t.VcsURI, Limit: t.Limit})
 	if err != nil {
 		return nil, errorsx.Wrap(err, "unable to retrieve history")
 	}

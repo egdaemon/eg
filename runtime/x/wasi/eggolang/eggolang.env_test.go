@@ -2,6 +2,7 @@ package eggolang
 
 import (
 	"fmt"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -29,6 +30,17 @@ func TestEnv(t *testing.T) {
 		environ, err := env()
 		require.NoError(t, err)
 		require.Contains(t, environ, "XDG_CACHE_HOME=/custom/xdg")
+	})
+
+	t.Run("sets_tmp_directories", func(t *testing.T) {
+		workload := t.TempDir()
+		t.Setenv("EG_COMPUTE_WORKSPACE_DIRECTORY", workload)
+
+		environ, err := env()
+		require.NoError(t, err)
+		require.Contains(t, environ, fmt.Sprintf("GOTMPDIR=%s", filepath.Join(workload, ".eg", "golang")))
+		require.Contains(t, environ, fmt.Sprintf("TMPDIR=%s", filepath.Join(workload, ".eg", "golang")))
+		require.DirExists(t, filepath.Join(workload, ".eg", "golang"))
 	})
 
 	t.Run("inherits_process_environment", func(t *testing.T) {

@@ -16,6 +16,7 @@ import (
 	"github.com/egdaemon/eg/internal/coverage/golangcov"
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
+	"github.com/egdaemon/eg/internal/fsx"
 	"github.com/egdaemon/eg/internal/langx"
 	"github.com/egdaemon/eg/internal/md5x"
 	"github.com/egdaemon/eg/internal/memlimitx"
@@ -349,7 +350,15 @@ func CacheModuleDirectory() string {
 // attempt to build the golang environment that sets up
 // the golang environment for caching.
 func env() ([]string, error) {
+	// builds (especially cgo links) can exhaust the default temp directory, so use the workload directory
+	// which is larger and not persisted. go requires GOTMPDIR to exist.
+	tmpdir := egenv.DirectoryWorkload(".eg", "golang")
+	// best effort, if it fails go reports the problem when it needs the directory.
+	errorsx.Log(errorsx.Wrap(fsx.MkDirs(0750, tmpdir), "unable to create golang tmp directory"))
+
 	return envx.Build().FromEnviron(os.Environ()...).
+		Var("GOTMPDIR", tmpdir). // used by the go tool for its work directory.
+		Var("TMPDIR", tmpdir).   // used by the cgo linker (go-link-*) and gcc.
 		Var("GOCACHE", CacheBuildDirectory()).
 		Var("GOMODCACHE", CacheModuleDirectory()).
 		Var("XDG_CACHE_HOME", envx.String(CacheDirectory(), "XDG_CACHE_HOME")). // used by go module code. only set it if its unset.

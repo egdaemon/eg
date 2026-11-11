@@ -71,6 +71,23 @@ func TestOwners(t *testing.T) {
 	})
 }
 
+func TestIdentity(t *testing.T) {
+	accounts := []egiso.Account{{ID: 0, Name: "root"}, {ID: 102, Name: "messagebus"}, {ID: 1000, Name: "egd"}}
+
+	t.Run("exposes every account as its own name", func(t *testing.T) {
+		o := egiso.Identity(accounts)
+		require.Equal(t, "root", o.Lookup(0, ""))
+		require.Equal(t, "messagebus", o.Lookup(102, "dbus"))
+		require.Equal(t, "egd", o.Lookup(1000, ""))
+	})
+
+	t.Run("exposes an id no account names as the defaults", func(t *testing.T) {
+		o := egiso.Identity(accounts[1:])
+		require.Equal(t, egiso.Privileged, o.Lookup(0, ""))
+		require.Equal(t, egiso.Default, o.Lookup(5001, ""))
+	})
+}
+
 // archive builds an egiso holding the entries, with the uids and gids they give. A file holds its
 // own name, except the account files, which name 0 and 1000.
 func archive(t *testing.T, entries ...*tar.Header) *egiso.Archive {

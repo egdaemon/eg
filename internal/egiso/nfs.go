@@ -7,6 +7,7 @@ import (
 	"net"
 	"os"
 	"path"
+	"syscall"
 	"time"
 
 	"github.com/egdaemon/eg/internal/errorsx"
@@ -16,17 +17,61 @@ import (
 	nfshelper "github.com/willscott/go-nfs/helpers"
 )
 
-// ServeNFS serves fsys over NFSv3 on l until l closes, so native processes on the host can use the
-// upper as a real filesystem by mounting it, without a kernel extension: macOS and Linux mount NFS
-// themselves. Every file belongs to the host user, which the mounting processes run as.
-func ServeNFS(l net.Listener, fsys *SysFS) error {
-	return nfs.Serve(l, nfshelper.NewCachingHandler(nfshelper.NewNullAuthHandler(nfsfs{sys: fsys}), 4096))
+// NFSOption configures ServeNFS.
+type NFSOption func(*nfsfs)
+
+// NFSOptionAccounts reports a file as owned by the ids that users and groups give the names of its
+// owners, for a client that is the machine the root belongs to, rather than by the host user. An
+// owner they do not name is reported as nobody. Changing a file's owner to an id they name changes
+// it in the upper.
+func NFSOptionAccounts(users []Account, groups []Account) NFSOption {
+	return func(t *nfsfs) {
+		t.users, t.groups = newids(users), newids(groups)
+	}
+}
+
+// ServeNFS serves fsys over NFSv3 on l until l closes, so native processes can use the upper as a
+// real filesystem by mounting it, without a kernel extension: macOS and Linux mount NFS themselves.
+// By default every file belongs to the host user, which the mounting processes run as.
+func ServeNFS(l net.Listener, fsys *SysFS, options ...NFSOption) error {
+	served := nfsfs{sys: fsys}
+	for _, opt := range options {
+		opt(&served)
+	}
+	return nfs.Serve(l, nfshelper.NewCachingHandler(nfshelper.NewNullAuthHandler(served), 4096))
 }
 
 // nfsfs is the billy filesystem go-nfs serves. NFS clients resolve symlinks themselves, so the
 // paths it receives are the upper's own; only Stat and Open follow a final symlink.
 type nfsfs struct {
-	sys *SysFS
+	sys    *SysFS
+	users  *ids
+	groups *ids
+}
+
+// nobody is the id of an owner the accounts do not name.
+const nobody = 65534
+
+// ids are the ids of the names of accounts, and the names of the ids.
+type ids struct {
+	byname map[string]uint32
+	byid   map[uint32]string
+}
+
+func newids(accounts []Account) *ids {
+	named := &ids{byname: make(map[string]uint32, len(accounts)), byid: make(map[uint32]string, len(accounts))}
+	for _, a := range accounts {
+		named.byname[a.Name] = uint32(a.ID)
+		named.byid[uint32(a.ID)] = a.Name
+	}
+	return named
+}
+
+func (t *ids) id(name string) uint32 {
+	if id, ok := t.byname[name]; ok {
+		return id
+	}
+	return nobody
 }
 
 func (t nfsfs) Create(name string) (billy.File, error) {
@@ -145,14 +190,34 @@ func (t nfsfs) Chmod(name string, mode fs.FileMode) error {
 	return t.sys.upper.Chmod(clean(name), mode)
 }
 
-// Lchown does nothing: every file belongs to the host user.
+// Lchown changes the owners of name to the accounts' uid and gid. It does nothing without accounts:
+// every file belongs to the host user.
 func (t nfsfs) Lchown(name string, uid int, gid int) error {
-	return nil
+	if t.users == nil {
+		return nil
+	}
+	return t.chown(clean(name), uid, gid)
 }
 
-// Chown does nothing: every file belongs to the host user.
+// Chown changes the owners of what name resolves to, as Lchown does.
 func (t nfsfs) Chown(name string, uid int, gid int) error {
-	return nil
+	if t.users == nil {
+		return nil
+	}
+	resolved, err := t.resolve(name, true)
+	if err != nil {
+		return err
+	}
+	return t.chown(resolved, uid, gid)
+}
+
+func (t nfsfs) chown(name string, uid int, gid int) error {
+	user, uok := t.users.byid[uint32(uid)]
+	group, gok := t.groups.byid[uint32(gid)]
+	if !uok || !gok {
+		return &fs.PathError{Op: "chown", Path: name, Err: syscall.EINVAL}
+	}
+	return t.sys.upper.Chown(name, user, group)
 }
 
 func (t nfsfs) Chtimes(name string, atime time.Time, mtime time.Time) error {
@@ -167,12 +232,26 @@ func (t nfsfs) resolve(name string, follow bool) (string, error) {
 	return resolved, nil
 }
 
-// lstat describes name as owned by the host user, with an id derived from its path, which NFS
-// clients use to tell files apart.
+// lstat describes name as owned by the host user, or its owners' ids among the accounts, with an
+// id derived from its path, which NFS clients use to tell files apart.
 func (t nfsfs) lstat(name string) (fs.FileInfo, error) {
+	var (
+		uid   = uint32(os.Getuid())
+		gid   = uint32(os.Getgid())
+		user  string
+		group string
+	)
+
 	st, err := t.sys.upper.Lstat(name)
 	if err != nil {
 		return nil, err
+	}
+
+	if t.users != nil {
+		if user, group, err = t.sys.upper.Owner(name); err != nil {
+			return nil, err
+		}
+		uid, gid = t.users.id(user), t.groups.id(group)
 	}
 
 	id := fnv.New64a()
@@ -181,7 +260,7 @@ func (t nfsfs) lstat(name string) (fs.FileInfo, error) {
 	if st.IsDir() {
 		links = 2
 	}
-	return nfsinfo{FileInfo: st, sys: &nfsfile.FileInfo{Nlink: links, UID: uint32(os.Getuid()), GID: uint32(os.Getgid()), Fileid: id.Sum64()}}, nil
+	return nfsinfo{FileInfo: st, sys: &nfsfile.FileInfo{Nlink: links, UID: uid, GID: gid, Fileid: id.Sum64()}}, nil
 }
 
 // clean turns a path go-nfs joined, "" for the root, into a name of the upper.

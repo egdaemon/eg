@@ -1,64 +1,191 @@
 package egvm
 
 import (
+	"bufio"
 	"context"
+	"crypto/rand"
+	"encoding/binary"
 	"io"
+	"net"
 	"os"
+	"path/filepath"
+	"sync"
 	"time"
 
 	"github.com/Code-Hex/vz/v3"
+	"github.com/egdaemon/eg/internal/egiso"
 	"github.com/egdaemon/eg/internal/errorsx"
+	"github.com/egdaemon/eg/interp/execproxy"
+	"google.golang.org/protobuf/encoding/protodelim"
 )
 
-// Run boots the machine with Virtualization.framework, copying its console to console, and waits
-// for it to stop. Cancelling ctx stops it. The process needs the com.apple.security.virtualization
-// entitlement.
-func Run(ctx context.Context, m Machine, console io.Writer) (err error) {
+// VM is a running machine.
+type VM struct {
+	vm      *vz.VirtualMachine
+	socket  *vz.VirtioSocketDevice
+	stopped chan struct{}
+	err     error
+	closers []io.Closer
+	copied  chan struct{}
+}
+
+// Boot starts the machine with Virtualization.framework, copying its console to console. The
+// process needs the com.apple.security.virtualization entitlement.
+func Boot(m Machine, console io.Writer) (_ *VM, err error) {
 	var (
 		config *vz.VirtualMachineConfiguration
 		vm     *vz.VirtualMachine
+		nfs    *vz.VirtioSocketListener
 	)
 
 	// the console's input is a pipe nothing writes to; its output is copied to console.
 	in, stdin, err := os.Pipe()
 	if err != nil {
-		return err
+		return nil, err
 	}
-	defer in.Close()
-	defer stdin.Close()
 	stdout, out, err := os.Pipe()
 	if err != nil {
-		return err
+		return nil, errorsx.Compact(err, in.Close(), stdin.Close())
 	}
-	defer stdout.Close()
-	defer out.Close()
+	t := &VM{stopped: make(chan struct{}), copied: make(chan struct{}), closers: []io.Closer{in, stdin, out, stdout}}
+	defer func() {
+		if err != nil {
+			t.close()
+		}
+	}()
 
 	if config, err = configure(m, in, out); err != nil {
-		return err
+		return nil, err
 	}
 	if vm, err = vz.NewVirtualMachine(config); err != nil {
-		return errorsx.Wrap(err, "unable to create the machine")
+		return nil, errorsx.Wrap(err, "unable to create the machine")
 	}
 
-	copied := make(chan struct{})
+	// the root is served before the machine starts, so vminit's first mount finds it.
+	if nfs, err = vm.SocketDevices()[0].Listen(NFSPort); err != nil {
+		return nil, errorsx.Wrap(err, "unable to listen for the machine's root")
+	}
+	t.closers = append(t.closers, nfs)
+	go egiso.ServeNFS(nfs, m.root, m.nfs...)
+
 	go func() {
-		defer close(copied)
+		defer close(t.copied)
 		_, cause := io.Copy(console, stdout)
 		errorsx.Log(errorsx.Ignore(cause, os.ErrClosed))
 	}()
 
 	if err = vm.Start(); err != nil {
-		return errorsx.Wrap(err, "unable to start the machine")
+		return nil, errorsx.Wrap(err, "unable to start the machine")
 	}
-	err = wait(ctx, vm)
 
+	t.vm, t.socket = vm, vm.SocketDevices()[0]
+	go func() {
+		defer close(t.stopped)
+		t.err = wait(vm)
+	}()
+
+	return t, nil
+}
+
+// Exec runs req in the machine and waits for it, with no input and its output discarded unless
+// options say otherwise. A command that exits with other than 0 returns an ExitError. It waits for
+// the machine to serve commands. Cancelling ctx kills the command.
+func (t *VM) Exec(ctx context.Context, req *execproxy.ExecRequest, options ...ExecOption) (err error) {
+	var (
+		stdio   = newstdio(options...)
+		id      uint64
+		control net.Conn
+		streams [3]net.Conn
+		resp    execproxy.ExecResponse
+		wg      sync.WaitGroup
+	)
+
+	if err = binary.Read(rand.Reader, binary.BigEndian, &id); err != nil {
+		return err
+	}
+
+	if control, err = t.connect(ctx, id, StreamControl); err != nil {
+		return err
+	}
+	defer control.Close()
+	stop := context.AfterFunc(ctx, func() { control.Close() })
+	defer stop()
+
+	if _, err = protodelim.MarshalTo(control, req); err != nil {
+		return errorsx.Wrap(err, "unable to send the command")
+	}
+
+	for i := range streams {
+		if streams[i], err = t.connect(ctx, id, uint8(i)); err != nil {
+			return err
+		}
+		defer streams[i].Close()
+	}
+
+	// the stdin stream is a connection of its own, so closing it is the command's end of input.
+	go func() {
+		if stdio.stdin != nil {
+			io.Copy(streams[StreamStdin], stdio.stdin)
+		}
+		streams[StreamStdin].Close()
+	}()
+	wg.Go(func() { io.Copy(stdio.stdout, streams[StreamStdout]) })
+	wg.Go(func() { io.Copy(stdio.stderr, streams[StreamStderr]) })
+
+	if err = protodelim.UnmarshalFrom(bufio.NewReader(control), &resp); err != nil {
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		return errorsx.Wrap(err, "unable to read the command's exit")
+	}
+	wg.Wait()
+
+	if resp.Exit != 0 {
+		return ExitError{Code: resp.Exit}
+	}
+	return nil
+}
+
+// connect opens the stream of command id, retrying until the machine serves commands.
+func (t *VM) connect(ctx context.Context, id uint64, stream uint8) (net.Conn, error) {
+	for {
+		conn, err := t.socket.Connect(Port)
+		if err == nil {
+			if err = WriteHeader(conn, id, stream); err != nil {
+				return nil, errorsx.Compact(err, conn.Close())
+			}
+			return conn, nil
+		}
+
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case <-t.stopped:
+			return nil, errorsx.Compact(errorsx.New("the machine stopped"), t.err)
+		case <-time.After(10 * time.Millisecond):
+		}
+	}
+}
+
+// Close stops the machine and waits for it.
+func (t *VM) Close() error {
+	if t.vm.CanStop() {
+		errorsx.Log(t.vm.Stop())
+	}
+	<-t.stopped
+	t.close()
+	return t.err
+}
+
+func (t *VM) close() {
+	for _, c := range t.closers {
+		c.Close()
+	}
 	// the framework holds its own handle on the console, so the copy may never see the end of it.
-	out.Close()
 	select {
-	case <-copied:
+	case <-t.copied:
 	case <-time.After(time.Second):
 	}
-	return err
 }
 
 func configure(m Machine, in *os.File, out *os.File) (_ *vz.VirtualMachineConfiguration, err error) {
@@ -69,13 +196,18 @@ func configure(m Machine, in *os.File, out *os.File) (_ *vz.VirtualMachineConfig
 		entropy  *vz.VirtioEntropyDeviceConfiguration
 		console  *vz.FileHandleSerialPortAttachment
 		serial   *vz.VirtioConsoleDeviceSerialPortConfiguration
-		shares   = make([]vz.DirectorySharingDeviceConfiguration, 0, len(m.Shares))
+		socket   *vz.VirtioSocketDeviceConfiguration
+		nat      *vz.NATNetworkDeviceAttachment
+		network  *vz.VirtioNetworkDeviceConfiguration
+		mac      *vz.MACAddress
+		device   *vz.VirtioFileSystemDeviceConfiguration
+		devices  = make([]vz.DirectorySharingDeviceConfiguration, 0, len(m.mounts))
 	)
 
-	if boot, err = vz.NewLinuxBootLoader(m.Kernel, vz.WithInitrd(m.Initrd), vz.WithCommandLine(m.Cmdline)); err != nil {
+	if boot, err = vz.NewLinuxBootLoader(filepath.Join(m.dir, "Image"), vz.WithInitrd(filepath.Join(m.dir, "initramfs")), vz.WithCommandLine(m.cmdline())); err != nil {
 		return nil, errorsx.Wrap(err, "unable to create the boot loader")
 	}
-	if config, err = vz.NewVirtualMachineConfiguration(boot, m.CPUs, m.Memory); err != nil {
+	if config, err = vz.NewVirtualMachineConfiguration(boot, m.cpus, m.memory); err != nil {
 		return nil, errorsx.Wrap(err, "unable to create the machine configuration")
 	}
 	if platform, err = vz.NewGenericPlatformConfiguration(); err != nil {
@@ -96,14 +228,30 @@ func configure(m Machine, in *os.File, out *os.File) (_ *vz.VirtualMachineConfig
 	}
 	config.SetSerialPortsVirtualMachineConfiguration([]*vz.VirtioConsoleDeviceSerialPortConfiguration{serial})
 
-	for _, s := range m.Shares {
-		device, err := share(s)
-		if err != nil {
+	if socket, err = vz.NewVirtioSocketDeviceConfiguration(); err != nil {
+		return nil, errorsx.Wrap(err, "unable to create the socket device")
+	}
+	config.SetSocketDevicesVirtualMachineConfiguration([]vz.SocketDeviceConfiguration{socket})
+
+	if nat, err = vz.NewNATNetworkDeviceAttachment(); err != nil {
+		return nil, errorsx.Wrap(err, "unable to create the network attachment")
+	}
+	if network, err = vz.NewVirtioNetworkDeviceConfiguration(nat); err != nil {
+		return nil, errorsx.Wrap(err, "unable to create the network device")
+	}
+	if mac, err = vz.NewRandomLocallyAdministeredMACAddress(); err != nil {
+		return nil, errorsx.Wrap(err, "unable to create the network device's address")
+	}
+	network.SetMACAddress(mac)
+	config.SetNetworkDevicesVirtualMachineConfiguration([]*vz.VirtioNetworkDeviceConfiguration{network})
+
+	for _, mnt := range m.mounts {
+		if device, err = share(mnt); err != nil {
 			return nil, err
 		}
-		shares = append(shares, device)
+		devices = append(devices, device)
 	}
-	config.SetDirectorySharingDevicesVirtualMachineConfiguration(shares)
+	config.SetDirectorySharingDevicesVirtualMachineConfiguration(devices)
 
 	if _, err = config.Validate(); err != nil {
 		return nil, errorsx.Wrap(err, "invalid machine configuration")
@@ -111,40 +259,35 @@ func configure(m Machine, in *os.File, out *os.File) (_ *vz.VirtualMachineConfig
 	return config, nil
 }
 
-func share(s Share) (_ *vz.VirtioFileSystemDeviceConfiguration, err error) {
+func share(mnt mount) (_ *vz.VirtioFileSystemDeviceConfiguration, err error) {
 	var (
 		dir    *vz.SharedDirectory
 		single *vz.SingleDirectoryShare
 		device *vz.VirtioFileSystemDeviceConfiguration
 	)
 
-	if dir, err = vz.NewSharedDirectory(s.Dir, false); err != nil {
-		return nil, errorsx.Wrapf(err, "unable to share %s", s.Dir)
+	if dir, err = vz.NewSharedDirectory(mnt.dir, mnt.readonly); err != nil {
+		return nil, errorsx.Wrapf(err, "unable to share %s", mnt.dir)
 	}
 	if single, err = vz.NewSingleDirectoryShare(dir); err != nil {
-		return nil, errorsx.Wrapf(err, "unable to share %s", s.Dir)
+		return nil, errorsx.Wrapf(err, "unable to share %s", mnt.dir)
 	}
-	if device, err = vz.NewVirtioFileSystemDeviceConfiguration(s.Tag); err != nil {
-		return nil, errorsx.Wrapf(err, "unable to create the virtio-fs device %s", s.Tag)
+	if device, err = vz.NewVirtioFileSystemDeviceConfiguration(mnt.tag); err != nil {
+		return nil, errorsx.Wrapf(err, "unable to create the virtio-fs device %s", mnt.tag)
 	}
 	device.SetDirectoryShare(single)
 	return device, nil
 }
 
-// wait returns once the machine stops, stopping it when ctx is done.
-func wait(ctx context.Context, vm *vz.VirtualMachine) error {
-	for {
-		select {
-		case <-ctx.Done():
-			errorsx.Log(vm.Stop())
-			return ctx.Err()
-		case state := <-vm.StateChangedNotify():
-			switch state {
-			case vz.VirtualMachineStateStopped:
-				return nil
-			case vz.VirtualMachineStateError:
-				return errorsx.New("the machine stopped with an error")
-			}
+// wait returns once the machine stops.
+func wait(vm *vz.VirtualMachine) error {
+	for state := range vm.StateChangedNotify() {
+		switch state {
+		case vz.VirtualMachineStateStopped:
+			return nil
+		case vz.VirtualMachineStateError:
+			return errorsx.New("the machine stopped with an error")
 		}
 	}
+	return nil
 }

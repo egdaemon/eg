@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"os"
+	"path/filepath"
 )
 
 // File is an entry of an initramfs: a directory when Mode is one, otherwise a regular file
@@ -27,6 +29,47 @@ func Initramfs(w io.Writer, files ...File) error {
 		}
 	}
 	return entry(w, 0, 0, "TRAILER!!!", nil)
+}
+
+// MachineInitramfs writes the initramfs machines boot to w: vminit as its init, and the modules the NFS root,
+// virtio-fs, vsock and the network need, loaded in this order, from kernel, the kernel's modules (lib/modules/<release>/kernel).
+func MachineInitramfs(w io.Writer, vminit []byte, kernel string) error {
+	var (
+		files = []File{
+			{Name: "proc", Mode: fs.ModeDir | 0755},
+			{Name: "sys", Mode: fs.ModeDir | 0755},
+			{Name: "dev", Mode: fs.ModeDir | 0755},
+			{Name: "root", Mode: fs.ModeDir | 0755},
+			{Name: "modules", Mode: fs.ModeDir | 0755},
+			{Name: "init", Mode: 0755, Data: vminit},
+		}
+	)
+
+	for i, m := range []string{
+		"net/sunrpc/sunrpc.ko",
+		"fs/nfs_common/grace.ko",
+		"fs/lockd/lockd.ko",
+		"fs/netfs/netfs.ko",
+		"fs/nfs/nfs.ko",
+		"fs/nfs/nfsv3.ko",
+		"fs/fuse/fuse.ko",
+		"fs/fuse/virtiofs.ko",
+		"net/vmw_vsock/vsock.ko",
+		"net/vmw_vsock/vmw_vsock_virtio_transport_common.ko",
+		"net/vmw_vsock/vmw_vsock_virtio_transport.ko",
+		"net/core/failover.ko",
+		"drivers/net/net_failover.ko",
+		"drivers/net/virtio_net.ko",
+		"net/packet/af_packet.ko",
+	} {
+		b, err := os.ReadFile(filepath.Join(kernel, m))
+		if err != nil {
+			return err
+		}
+		files = append(files, File{Name: fmt.Sprintf("modules/%02d.%s", i, filepath.Base(m)), Mode: 0644, Data: b})
+	}
+
+	return Initramfs(w, files...)
 }
 
 func entry(w io.Writer, ino uint32, mode uint32, name string, data []byte) error {

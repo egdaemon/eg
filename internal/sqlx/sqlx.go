@@ -7,8 +7,11 @@ package sqlx
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"log"
 	"strings"
+
+	"github.com/duckdb/duckdb-go/v2"
 )
 
 // database/sql returns this as an unexported sentinel (errDBClosed), so it
@@ -19,6 +22,18 @@ const errClosedMsg = "sql: database is closed"
 // error, and err otherwise. Useful for background workers racing DB shutdown.
 func IgnoreClosed(err error) error {
 	if err != nil && err.Error() == errClosedMsg {
+		return nil
+	}
+
+	return err
+}
+
+// IgnoreConstraint returns nil when err is a duckdb constraint violation (e.g. a duplicate primary key), and err
+// otherwise. duckdb's ON CONFLICT cannot see rows inserted by concurrent uncommitted transactions, so racing writers
+// of the same row fail with a constraint violation even though the row was stored.
+func IgnoreConstraint(err error) error {
+	var cause *duckdb.Error
+	if errors.As(err, &cause) && cause.Type == duckdb.ErrorTypeConstraint {
 		return nil
 	}
 

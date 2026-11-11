@@ -9,6 +9,8 @@ import (
 
 	"github.com/Masterminds/squirrel"
 	"github.com/egdaemon/eg/authn"
+	"github.com/egdaemon/eg/internal/md5x"
+	"github.com/egdaemon/eg/internal/sqlx"
 	"github.com/egdaemon/eg/internal/sshx"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/crypto/ssh"
@@ -207,5 +209,43 @@ func TestResolve(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, "a1", r.Current.Account.Id)
 		require.Equal(t, SourceFlag, r.Source)
+	})
+}
+
+func TestRemember(t *testing.T) {
+	t.Run("a concurrent insert of the same identity is expected", func(t *testing.T) {
+		ctx := context.Background()
+		signer := testsigner(t)
+		const uri = "git@github.com:u/r.git"
+		db, err := migrations.Open(ctx, filepath.Join(t.TempDir(), "identity.duckdb"))
+		require.NoError(t, err)
+		defer db.Close()
+
+		p := profile("a1")
+		ident := RepoIdentity{
+			UID:       ID(signer.PublicKey()),
+			ID:        "00000000-0000-0000-0000-000000000000",
+			VcsURIMd5: md5x.String(uri),
+			VcsURI:    uri,
+			AccountID: p.GetAccount().GetId(),
+			ProfileID: p.GetProfile().GetId(),
+		}
+
+		// a writer whose snapshot predates the concurrent insert, its upsert cannot see the row.
+		loser, err := db.BeginTx(ctx, nil)
+		require.NoError(t, err)
+		defer loser.Rollback()
+		_, err = loser.ExecContext(ctx, "SELECT count(*) FROM repo_identitys")
+		require.NoError(t, err)
+
+		require.NoError(t, RepoIdentityUpsert(ctx, db, ident).Scan(&RepoIdentity{}))
+
+		err = RepoIdentityUpsert(ctx, loser, ident).Scan(&RepoIdentity{})
+		require.Error(t, err)
+		require.NoError(t, sqlx.IgnoreConstraint(err))
+	})
+
+	t.Run("other errors are still reported", func(t *testing.T) {
+		require.Error(t, sqlx.IgnoreConstraint(sql.ErrNoRows))
 	})
 }

@@ -177,6 +177,12 @@ func Remember(ctx context.Context, db *sql.DB, signer ssh.Signer, vcsuri string,
 	}
 
 	if err = RepoIdentityUpsert(ctx, tx, h).Scan(&h); err != nil {
+		// duckdb's ON CONFLICT cannot see the uncommitted insert of a concurrent Remember of the same identity, which
+		// loses with a constraint violation. the winner stored the same identity so there is nothing left to do.
+		if sqlx.IgnoreConstraint(err) == nil {
+			return tx.Rollback()
+		}
+
 		return errorsx.Wrap(err, "unable to remember identity")
 	}
 

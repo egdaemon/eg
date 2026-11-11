@@ -47,12 +47,12 @@ func TestLsList(t *testing.T) {
 func TestRenderWorkloads(t *testing.T) {
 	t.Run("prints a row per workload with its state", func(t *testing.T) {
 		out := ansi.Strip(renderWorkloads(
-			&computeapi.Enqueued{Id: "a", Description: "queued one", Os: "linux", Arch: "amd64", CreatedAt: "garbage"},
+			&computeapi.Enqueued{Id: "a", Description: "queued one", Os: "linux", Arch: "amd64", VcsUri: "https://example.com/r.git", CreatedAt: "garbage"},
 			&computeapi.Enqueued{Id: "b", Os: "linux", Arch: "arm64", InitiatedAt: "2026-01-02T03:04:05Z"},
 		))
 
 		require.Contains(t, out, "workloads: 2")
-		require.Regexp(t, `│ ⏸\s+│ \s*│ \s*│ a - queued one\s+│ linux/amd64\s+│ garbage\s+│`, out)
+		require.Regexp(t, `│ ⏸\s+│ \s*│ \s*│ a - queued one\s+│ linux/amd64\s+│ https://example.com/r.git\s+│ garbage\s+│`, out)
 		require.Regexp(t, `│ ▶\s+│\s+│ \S+\s+│ b\s+│ linux/arm64\s+│`, out)
 	})
 

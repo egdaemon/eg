@@ -47,8 +47,7 @@ func TestRuntimeEnviron(t *testing.T) {
 		require.Equal(t, toc, environ.String("", eg.EnvComputeEgisoTOC))
 	})
 
-	t.Run("names the podman runtime", func(t *testing.T) {
-		environ := envx.NewEnvironFromStrings(cmdopts.Runtime{Runtime: eg.RuntimePodman}.Environ()...)
-		require.Equal(t, eg.RuntimePodman, environ.String("", eg.EnvComputeRuntime))
+	t.Run("names nothing for podman", func(t *testing.T) {
+		require.Empty(t, cmdopts.Runtime{Runtime: eg.RuntimePodman, Egiso: "https://example.com/root.egiso", TOC: toc}.Environ())
 	})
 }

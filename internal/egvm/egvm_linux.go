@@ -10,7 +10,6 @@ import (
 	"path/filepath"
 	"strconv"
 	"syscall"
-	"time"
 
 	"github.com/egdaemon/eg/internal/egiso"
 	"github.com/egdaemon/eg/internal/envx"
@@ -33,7 +32,6 @@ type VM struct {
 	init    *exec.Cmd
 	stopped chan struct{}
 	served  chan struct{}
-	err     error
 }
 
 // Boot starts the machine as an unprivileged user: its init runs as root of a user namespace mapping
@@ -124,7 +122,7 @@ func Boot(m Machine, console io.Writer) (_ *VM, err error) {
 	}
 	go func() {
 		defer close(t.stopped)
-		t.err = t.init.Wait()
+		errorsx.Log(t.init.Wait())
 	}()
 
 	if err = idmap(t.init.Process.Pid); err != nil {
@@ -213,29 +211,20 @@ func (t *VM) Exec(ctx context.Context, req *execproxy.ExecRequest, options ...Ex
 	return command(ctx, t.connect, req, options...)
 }
 
-// connect opens the stream of command id, retrying until the machine's agent listens.
-func (t *VM) connect(ctx context.Context, id uint64, stream uint8) (net.Conn, error) {
+// connect opens the stream of command id. The agent's socket listens from the start, so a
+// connection waits there until the agent serves it.
+func (t *VM) connect(ctx context.Context, id uint64, stream uint8) (conn net.Conn, err error) {
 	var (
 		dialer net.Dialer
 	)
 
-	for {
-		conn, err := dialer.DialContext(ctx, "unix", t.agent)
-		if err == nil {
-			if err = WriteHeader(conn, id, stream); err != nil {
-				return nil, errorsx.Compact(err, conn.Close())
-			}
-			return conn, nil
-		}
-
-		select {
-		case <-ctx.Done():
-			return nil, ctx.Err()
-		case <-t.stopped:
-			return nil, errorsx.Compact(errorsx.New("the machine stopped"), t.err)
-		case <-time.After(10 * time.Millisecond):
-		}
+	if conn, err = dialer.DialContext(ctx, "unix", t.agent); err != nil {
+		return nil, errorsx.Wrap(err, "unable to reach the machine's agent")
 	}
+	if err = WriteHeader(conn, id, stream); err != nil {
+		return nil, errorsx.Compact(err, conn.Close())
+	}
+	return conn, nil
 }
 
 // Close stops the machine, which ends every process of its namespaces and with them the mount of its
@@ -253,7 +242,7 @@ func (t *VM) Close() error {
 		<-t.served
 	}
 	if t.dev != nil {
-		errs = append(errs, errorsx.Ignore(t.dev.Close(), os.ErrClosed))
+		errs = append(errs, t.dev.Close())
 	}
 	if t.netns != "" {
 		errs = append(errs, errorsx.Ignore(os.Remove(t.netns), os.ErrNotExist))

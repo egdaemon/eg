@@ -70,8 +70,11 @@ func init() {
 		return
 	}
 
-	fmt.Fprintln(os.Stderr, "egvm:", os.Args[0], err)
-	os.Exit(1)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "egvm:", os.Args[0], err)
+		os.Exit(1)
+	}
+	os.Exit(0)
 }
 
 // waitmapped starts the program again as stageroot once Boot closes its end of fdmapped.
@@ -92,6 +95,7 @@ func boot(root string, rootinit string, netns string, shares []string) (err erro
 		networked [2]*os.File
 		dev       *os.File
 		stop      = make(chan os.Signal, 1)
+		stopping  = make(chan struct{})
 	)
 
 	// starting again as the namespace's root cleared the signal Boot asked for when it exits.
@@ -182,6 +186,7 @@ func boot(root string, rootinit string, netns string, shares []string) (err erro
 	}()
 	go func() {
 		<-stop
+		close(stopping)
 		machine.Process.Kill()
 	}()
 
@@ -195,7 +200,14 @@ func boot(root string, rootinit string, netns string, shares []string) (err erro
 	}
 	networked[1].Close()
 
-	return machine.Wait()
+	// the machine's init is killed when Boot's caller stops the machine, which is no failure.
+	err = machine.Wait()
+	select {
+	case <-stopping:
+		return nil
+	default:
+		return err
+	}
 }
 
 // start execs rootinit in root once pasta connects the machine's network, after mounting the
@@ -218,7 +230,6 @@ func start(root string, rootinit string) (err error) {
 	}{
 		{source: "proc", target: "proc", fstype: "proc", flags: unix.MS_NOSUID | unix.MS_NODEV | unix.MS_NOEXEC},
 		{source: "sysfs", target: "sys", fstype: "sysfs", flags: unix.MS_NOSUID | unix.MS_NODEV | unix.MS_NOEXEC | unix.MS_RDONLY},
-		{source: "mqueue", target: "dev/mqueue", fstype: "mqueue", flags: unix.MS_NOSUID | unix.MS_NODEV | unix.MS_NOEXEC},
 	} {
 		if err = mountat(m.source, filepath.Join(root, m.target), m.fstype, m.flags, ""); err != nil {
 			return err
@@ -278,35 +289,10 @@ func devices(root string) (err error) {
 			return fmt.Errorf("unable to mount /dev/%s: %w", name, err)
 		}
 	}
-	for _, m := range []struct {
-		source string
-		target string
-		fstype string
-		flags  uintptr
-		data   string
-	}{
-		{source: "devpts", target: "pts", fstype: "devpts", flags: unix.MS_NOSUID | unix.MS_NOEXEC, data: "newinstance,ptmxmode=0666,mode=0620"},
-		{source: "shm", target: "shm", fstype: "tmpfs", flags: unix.MS_NOSUID | unix.MS_NODEV, data: "mode=1777"},
-	} {
-		if err = mountat(m.source, filepath.Join(dev, m.target), m.fstype, m.flags, m.data); err != nil {
-			return err
-		}
+	if err = mountat("devpts", filepath.Join(dev, "pts"), "devpts", unix.MS_NOSUID|unix.MS_NOEXEC, "newinstance,ptmxmode=0666,mode=0620"); err != nil {
+		return err
 	}
-	for _, l := range []struct {
-		name   string
-		target string
-	}{
-		{name: "ptmx", target: "pts/ptmx"},
-		{name: "fd", target: "/proc/self/fd"},
-		{name: "stdin", target: "/proc/self/fd/0"},
-		{name: "stdout", target: "/proc/self/fd/1"},
-		{name: "stderr", target: "/proc/self/fd/2"},
-	} {
-		if err = os.Symlink(l.target, filepath.Join(dev, l.name)); err != nil {
-			return err
-		}
-	}
-	return nil
+	return os.Symlink("pts/ptmx", filepath.Join(dev, "ptmx"))
 }
 
 // share binds the host directory dir at target, read only if readonly says so.

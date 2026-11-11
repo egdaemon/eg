@@ -21,7 +21,7 @@ const Port = 1024
 // the same port on the guest's loopback.
 const NFSPort = 2049
 
-// The streams of a command, each its own connection to vminit. A connection starts with a header naming the command
+// The streams of a command, each its own connection to the agent. A connection starts with a header naming the command
 // and the stream it carries. The control stream carries the command's execproxy.ExecRequest from the host and its
 // execproxy.ExecResponse back, both length delimited; the host closing it before the response kills the command.
 const (
@@ -31,7 +31,7 @@ const (
 	StreamControl
 )
 
-// Header begins every connection to vminit.
+// Header begins every connection to the agent.
 type Header struct {
 	ID     uint64
 	Stream uint8

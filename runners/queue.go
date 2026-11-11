@@ -796,11 +796,11 @@ func (t staterunning) Update(ctx context.Context) state {
 	if logdst, err = os.OpenFile(logpath, os.O_WRONLY|os.O_APPEND, 0); err != nil {
 		return completed(t.workload, t.metadata, t.bucket, t.ws, 0, err)
 	}
+	defer logdst.Close()
 
 	if environ, err = envx.FromPath(filepath.Join(t.ws.RuntimeDir, eg.EnvironFile)); err != nil {
 		return completed(t.workload, t.metadata, t.bucket, t.ws, 0, errorsx.Wrap(err, "unable to read the workload's environment"))
 	}
-	defer logdst.Close()
 
 	options := append(
 		t.ragent.Options(),

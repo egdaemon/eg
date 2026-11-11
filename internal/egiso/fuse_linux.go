@@ -238,10 +238,7 @@ func (t *fusenode) Mkdir(ctx context.Context, name string, mode uint32, out *fus
 		created = t.child(name)
 	)
 
-	if _, err := t.fsys.Lstat(created); err == nil {
-		return nil, syscall.EEXIST
-	}
-	if err := t.fsys.MkdirAll(created, fs.FileMode(mode&07777)); err != nil {
+	if err := t.fsys.sys.upper.Mkdir(created, fs.FileMode(mode&07777), t.fsys.sys.user, t.fsys.sys.group); err != nil {
 		return nil, errnoofuse(err)
 	}
 	if errno := t.owned(ctx, created); errno != 0 {

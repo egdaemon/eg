@@ -30,8 +30,13 @@ func (t Runtime) Validate() error {
 	return err
 }
 
-// Environ is the runtime as the environment a runner reads it from.
+// Environ is the runtime as the environment a runner reads it from, which names no runtime for
+// podman: a runner runs podman when none is named.
 func (t Runtime) Environ() []string {
+	if t.Runtime != eg.RuntimeVM {
+		return nil
+	}
+
 	return []string{
 		envx.Format(eg.EnvComputeRuntime, t.Runtime),
 		envx.Format(eg.EnvComputeEgiso, t.Egiso),

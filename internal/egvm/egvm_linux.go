@@ -41,7 +41,7 @@ type VM struct {
 	dir     string
 	netns   string
 	socket  string
-	signer  ssh.Signer
+	client  *ssh.ClientConfig
 	dev     *os.File
 	init    *exec.Cmd
 	stopped chan struct{}
@@ -81,7 +81,7 @@ func Boot(m Machine, console io.Writer) (_ *VM, err error) {
 		return nil, errorsx.Wrap(err, "unable to create the machine's ssh directory")
 	}
 
-	if t.signer, authorized, err = key(); err != nil {
+	if t.client, authorized, err = client(m.root.Upper()); err != nil {
 		return nil, err
 	}
 
@@ -290,7 +290,7 @@ func (t *VM) Exec(ctx context.Context, req *execproxy.ExecRequest, options ...Ex
 	if conn, err = redial(ctx, func() (net.Conn, error) { return net.Dial("unix", t.socket) }, t.stopped, func() error { return nil }); err != nil {
 		return err
 	}
-	return command(ctx, conn, t.signer, req, options...)
+	return command(ctx, conn, t.client, req, options...)
 }
 
 // Close stops the machine, which ends every process of its namespaces and with them the mount of its

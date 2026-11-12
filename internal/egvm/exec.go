@@ -1,8 +1,10 @@
 package egvm
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"io/fs"
 	"net"
 	"slices"
 	"strings"
@@ -23,10 +25,11 @@ const NFSPort = 2049
 // defaultpath is the PATH of a command whose environment sets none.
 const defaultpath = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
-// key is the key a machine authorizes: the sshd@.service the generator's sockets start accepts the
-// keys of the ssh.ephemeral-authorized_keys-all credential, which it reads from its own credentials
-// rather than from a file in the root.
-func key() (_ ssh.Signer, authorized string, err error) {
+// client is how the host logs in to a machine rooted at root, as root with a key of its own, and the
+// key the machine authorizes for it: the sshd@.service the generator's sockets start accepts the keys
+// of the ssh.ephemeral-authorized_keys-all credential, which it reads from its own credentials rather
+// than from a file in the root.
+func client(root fs.FS) (_ *ssh.ClientConfig, authorized string, err error) {
 	var (
 		signer ssh.Signer
 	)
@@ -35,7 +38,38 @@ func key() (_ ssh.Signer, authorized string, err error) {
 		return nil, "", errorsx.Wrap(err, "unable to generate the machine's key")
 	}
 
-	return signer, string(ssh.MarshalAuthorizedKey(signer.PublicKey())), nil
+	return &ssh.ClientConfig{User: "root", Auth: []ssh.AuthMethod{ssh.PublicKeys(signer)}, HostKeyCallback: hostkeys(root)}, string(ssh.MarshalAuthorizedKey(signer.PublicKey())), nil
+}
+
+// hostkeys accepts the host keys the machine's root holds, which its image ships or its sshd-keygen
+// writes when it boots. The host serves the root, so it reads them there rather than trusting the
+// machine's sshd to present its own.
+func hostkeys(root fs.FS) ssh.HostKeyCallback {
+	return func(_ string, _ net.Addr, presented ssh.PublicKey) (err error) {
+		var (
+			paths []string
+			b     []byte
+			key   ssh.PublicKey
+		)
+
+		if paths, err = fs.Glob(root, "etc/ssh/ssh_host_*_key.pub"); err != nil {
+			return errorsx.Wrap(err, "unable to find the machine's host keys")
+		}
+
+		for _, path := range paths {
+			if b, err = fs.ReadFile(root, path); err != nil {
+				return errorsx.Wrapf(err, "unable to read the machine's host key %s", path)
+			}
+			if key, _, _, _, err = ssh.ParseAuthorizedKey(b); err != nil {
+				return errorsx.Wrapf(err, "unable to parse the machine's host key %s", path)
+			}
+			if bytes.Equal(key.Marshal(), presented.Marshal()) {
+				return nil
+			}
+		}
+
+		return errorsx.String("the machine's sshd presented a host key its root does not hold")
+	}
 }
 
 // dialer opens a connection to the machine's sshd, which systemd-ssh-generator binds once the root's
@@ -84,10 +118,11 @@ func commandline(req *execproxy.ExecRequest) (_ string, err error) {
 	return "cd " + words[0] + " && exec env -i " + strings.Join(words[1:], " "), nil
 }
 
-// command runs req over ssh as root on conn and waits for it, with no input and its output discarded
-// unless options say otherwise. A command that exits with other than 0 returns an ExitError, one
-// killed by a signal as 128 plus the signal, like a shell's. Cancelling ctx kills the command.
-func command(ctx context.Context, conn net.Conn, signer ssh.Signer, req *execproxy.ExecRequest, options ...ExecOption) (err error) {
+// command runs req over ssh on conn as config logs in, and waits for it, with no input and its output
+// discarded unless options say otherwise. A command that exits with other than 0 returns an
+// ExitError, one killed by a signal as 128 plus the signal, like a shell's. Cancelling ctx kills the
+// command.
+func command(ctx context.Context, conn net.Conn, config *ssh.ClientConfig, req *execproxy.ExecRequest, options ...ExecOption) (err error) {
 	var (
 		stdio   = newstdio(options...)
 		line    string
@@ -103,8 +138,7 @@ func command(ctx context.Context, conn net.Conn, signer ssh.Signer, req *execpro
 		return err
 	}
 
-	// machines generate their host keys when they boot, so there is nothing to verify them against.
-	if sconn, chans, reqs, err = ssh.NewClientConn(conn, "egvm", &ssh.ClientConfig{User: "root", Auth: []ssh.AuthMethod{ssh.PublicKeys(signer)}, HostKeyCallback: ssh.InsecureIgnoreHostKey()}); err != nil {
+	if sconn, chans, reqs, err = ssh.NewClientConn(conn, "egvm", config); err != nil {
 		return errorsx.Wrap(err, "unable to reach the machine's sshd")
 	}
 	client := ssh.NewClient(sconn, chans, reqs)

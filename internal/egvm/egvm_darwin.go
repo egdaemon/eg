@@ -20,7 +20,7 @@ import (
 type VM struct {
 	vm      *vz.VirtualMachine
 	socket  *vz.VirtioSocketDevice
-	signer  ssh.Signer
+	client  *ssh.ClientConfig
 	stopped chan struct{}
 	err     error
 	closers []io.Closer
@@ -34,11 +34,11 @@ func Boot(m Machine, console io.Writer) (_ *VM, err error) {
 		config     *vz.VirtualMachineConfiguration
 		vm         *vz.VirtualMachine
 		nfs        *vz.VirtioSocketListener
-		signer     ssh.Signer
+		login      *ssh.ClientConfig
 		authorized string
 	)
 
-	if signer, authorized, err = key(); err != nil {
+	if login, authorized, err = client(m.root.Upper()); err != nil {
 		return nil, err
 	}
 
@@ -51,7 +51,7 @@ func Boot(m Machine, console io.Writer) (_ *VM, err error) {
 	if err != nil {
 		return nil, errorsx.Compact(err, in.Close(), stdin.Close())
 	}
-	t := &VM{signer: signer, stopped: make(chan struct{}), copied: make(chan struct{}), closers: []io.Closer{in, stdin, out, stdout}}
+	t := &VM{client: login, stopped: make(chan struct{}), copied: make(chan struct{}), closers: []io.Closer{in, stdin, out, stdout}}
 	defer func() {
 		if err != nil {
 			t.close()
@@ -102,7 +102,7 @@ func (t *VM) Exec(ctx context.Context, req *execproxy.ExecRequest, options ...Ex
 	if conn, err = redial(ctx, func() (net.Conn, error) { return t.socket.Connect(22) }, t.stopped, func() error { return t.err }); err != nil {
 		return err
 	}
-	return command(ctx, conn, t.signer, req, options...)
+	return command(ctx, conn, t.client, req, options...)
 }
 
 // Close stops the machine and waits for it.

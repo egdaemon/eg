@@ -16,6 +16,7 @@ import (
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/execx"
+	"github.com/egdaemon/eg/internal/fsx"
 	"github.com/egdaemon/eg/internal/iox"
 	"github.com/egdaemon/eg/internal/slicesx"
 	"github.com/egdaemon/eg/internal/stringsx"
@@ -94,7 +95,8 @@ func NewMachine(ctx context.Context, c *http.Client, ws workspaces.Context, uri 
 }
 
 // BuildRootEgiso builds the root container as BuildRootContainerPath does and returns the uri of an
-// egiso of its filesystem, which it keeps in cache under the image's id so it builds one per image.
+// egiso of its filesystem. It keeps the egiso of the latest image in cache, in a directory named for
+// the image's id, so it builds one per image.
 func BuildRootEgiso(ctx context.Context, cache, dir, path string, options ...string) (_ string, err error) {
 	var (
 		id     string
@@ -113,18 +115,19 @@ func BuildRootEgiso(ctx context.Context, cache, dir, path string, options ...str
 	if id, err = execx.String(ctx, "podman", "image", "inspect", "--format", "{{.Id}}", "eg"); err != nil {
 		return "", errorsx.Wrap(err, "unable to identify the root container")
 	}
-	location := filepath.Join(cache, strings.TrimSpace(id)+".egiso")
+	imagedir := filepath.Join(cache, strings.TrimSpace(id))
+	location := filepath.Join(imagedir, "root.egiso")
 
 	// the table of contents is written once its egiso is complete.
-	if cached, err = os.ReadFile(location + ".toc"); err == nil {
+	if cached, err = os.ReadFile(filepath.Join(imagedir, "toc")); err == nil {
 		return location + "#" + string(cached), nil
 	}
 
-	if err = os.MkdirAll(cache, 0700); err != nil {
+	if err = os.MkdirAll(imagedir, 0700); err != nil {
 		return "", errorsx.Wrap(err, "unable to create the egiso cache")
 	}
 
-	if tar, err = os.CreateTemp(cache, "root.*.tar"); err != nil {
+	if tar, err = os.CreateTemp(imagedir, "root.*.tar"); err != nil {
 		return "", errorsx.Wrap(err, "unable to create the root container's archive")
 	}
 	defer func() { err = errorsx.Compact(err, tar.Close(), os.Remove(tar.Name())) }()
@@ -152,8 +155,12 @@ func BuildRootEgiso(ctx context.Context, cache, dir, path string, options ...str
 		return "", errorsx.Wrap(err, "unable to build the egiso")
 	}
 
-	if err = os.WriteFile(location+".toc", []byte(toc), 0600); err != nil {
+	if err = os.WriteFile(filepath.Join(imagedir, "toc"), []byte(toc), 0600); err != nil {
 		return "", errorsx.Wrap(err, "unable to record the egiso's table of contents")
+	}
+
+	for stale := range fsx.KeepNewestN(1, fsx.Find(cache, fsx.Levels(1))).Each(ctx) {
+		errorsx.Log(errorsx.Wrapf(fsx.RemoveAll(stale), "egiso cache cleanup: %s", stale))
 	}
 
 	return location + "#" + toc.String(), nil

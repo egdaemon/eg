@@ -343,7 +343,8 @@ func UploadDPut(gcfg Config, dput fs.FS, opts ...option) eg.OpFn {
 func Copy(gcfg Config, dst string, opts ...option) eg.OpFn {
 	return func(ctx context.Context, o eg.Op) error {
 		cfg := From(gcfg, opts...)
-		src := egenv.DirectoryTemp(fmt.Sprintf("deb.%s", cfg.Name))
+		root := fmt.Sprintf("deb.%s", gcfg.Name)
+		src := egenv.DirectoryTemp(root)
 		runtime := shell.Runtime()
 		return shell.Run(
 			ctx,

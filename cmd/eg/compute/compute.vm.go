@@ -11,11 +11,13 @@ import (
 	"github.com/egdaemon/eg/cmd/cmdopts"
 	"github.com/egdaemon/eg/internal/egvm"
 	"github.com/egdaemon/eg/internal/envx"
-	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/podmanx"
 	"github.com/egdaemon/eg/internal/stringsx"
 	"github.com/egdaemon/eg/internal/userx"
 	"github.com/egdaemon/eg/runners"
+	"github.com/egdaemon/eg/transpile"
+	"github.com/egdaemon/eg/workspaces"
+	"github.com/gofrs/uuid/v5"
 )
 
 // vm runs a workload as local does, in a machine booted from an egiso in place of podman's
@@ -29,37 +31,36 @@ func (t vm) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, hotswapbin *cmdop
 	return t.local.run(gctx, hotswapbin, t.machine(tlsc.DefaultClient()))
 }
 
-// machine runs the workload's modules in a machine booted from the egiso, fetched through c.
-func (t vm) machine(c *http.Client) runner {
-	return func(ctx context.Context, w workload) (err error) {
+// machine runs modules in a machine booted from an egiso.
+type machine struct {
+	*runners.Machine
+}
+
+func (t machine) Do(ctx context.Context, m transpile.Compiled) error {
+	return t.Module(ctx, m.Path, nil, egvm.ExecOptionStdin(os.Stdin), egvm.ExecOptionStdout(log.Writer()), egvm.ExecOptionStderr(log.Writer()))
+}
+
+// machine prepares a machine booted from the egiso, fetched through c, or from one of the default
+// root container when no egiso is given.
+func (t vm) machine(c *http.Client) newrunner {
+	return func(ctx context.Context, ws workspaces.Context, _ uuid.UUID, _ string, _ *envx.Builder) (_ runner, err error) {
 		var (
 			m   *runners.Machine
 			uri = t.Egiso
 		)
 
-		if err = w.environ(); err != nil {
-			return err
-		}
-
 		if stringsx.Blank(uri) {
-			if uri, err = runners.BuildRootEgiso(ctx, userx.DefaultCacheDirectory("egiso"), t.Dir, filepath.Join(w.ws.RuntimeDir, "Containerfile"), "--build-arg", envx.Format(eg.EnvBuildCommit, cmdopts.BuildCommit()), "--platform", podmanx.AutoPlatform(t.Arch)); err != nil {
-				return err
+			if uri, err = runners.BuildRootEgiso(ctx, userx.DefaultCacheDirectory("egiso"), t.Dir, filepath.Join(ws.RuntimeDir, "Containerfile"), "--build-arg", envx.Format(eg.EnvBuildCommit, cmdopts.BuildCommit()), "--platform", podmanx.AutoPlatform(t.Arch)); err != nil {
+				return nil, err
 			}
 		}
 
-		if m, err = runners.NewMachine(ctx, c, w.ws, uri, log.Writer(),
-			egvm.OptionMountReadOnly(filepath.Join(w.ws.Root, w.ws.BuildDir, w.ws.Module, eg.ModuleDir), eg.DefaultMountRoot(eg.RuntimeDirectory, w.ws.Module, eg.ModuleDir)),
+		if m, err = runners.NewMachine(ctx, c, ws, uri, log.Writer(),
+			egvm.OptionMountReadOnly(filepath.Join(ws.Root, ws.BuildDir, ws.Module, eg.ModuleDir), eg.DefaultMountRoot(eg.RuntimeDirectory, ws.Module, eg.ModuleDir)),
 		); err != nil {
-			return err
-		}
-		defer func() { err = errorsx.Compact(err, m.Close()) }()
-
-		for _, module := range w.modules {
-			if err = m.Module(ctx, module.Path, nil, egvm.ExecOptionStdin(os.Stdin), egvm.ExecOptionStdout(log.Writer()), egvm.ExecOptionStderr(log.Writer())); err != nil {
-				return errorsx.Wrap(err, "module execution failed")
-			}
+			return nil, err
 		}
 
-		return nil
+		return machine{Machine: m}, nil
 	}
 }

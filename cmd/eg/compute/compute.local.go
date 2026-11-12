@@ -67,43 +67,29 @@ func (t local) gpu() bool {
 	return t.GPU || t.RuntimeResources.Vram > 0
 }
 
-// workload is a workspace whose modules compiled, ready for a runtime to run them.
-type workload struct {
-	ws           workspaces.Context
-	uid          uuid.UUID
-	canonicaluri string
-	envb         *envx.Builder
-	modules      []transpile.Compiled
+// runner runs compiled modules, one at a time, in a runtime.
+type runner interface {
+	Do(ctx context.Context, m transpile.Compiled) error
+	Close() error
 }
 
-// environ writes the environment file the workload's modules read.
-func (t workload) environ() (err error) {
-	var (
-		f *os.File
-	)
-
-	if f, err = os.Create(filepath.Join(t.ws.RuntimeDir, eg.EnvironFile)); err != nil {
-		return errorsx.Wrap(err, "unable to open the environment variable file")
-	}
-	defer f.Close()
-
-	return errorsx.Wrap(t.envb.CopyTo(f), "unable to generate environment")
-}
-
-// runner runs a workload's modules in a runtime: it adds what the runtime needs to their
-// environment, writes the environment file, and runs each module.
-type runner func(ctx context.Context, w workload) error
+// newrunner prepares a runtime for the modules of the workspace, adding what the runtime needs to
+// their environment.
+type newrunner func(ctx context.Context, ws workspaces.Context, uid uuid.UUID, canonicaluri string, envb *envx.Builder) (runner, error)
 
 func (t local) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) error {
 	return t.run(gctx, hotswapbin, t.podman)
 }
 
-// run compiles the workload's modules, runs them with rt, and applies the changes they made.
-func (t local) run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath, rt runner) (err error) {
+// run compiles the workload's modules, runs them in the runtime newrt prepares, and applies the
+// changes they made.
+func (t local) run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath, newrt newrunner) (err error) {
 	var (
-		ws   workspaces.Context
-		repo *git.Repository
-		uid  = uuid.Must(uuid.NewV7())
+		ws      workspaces.Context
+		repo    *git.Repository
+		rt      runner
+		environ *os.File
+		uid     = uuid.Must(uuid.NewV7())
 	)
 
 	contextx.WaitGroupAdd(gctx.Context, 1)
@@ -185,18 +171,69 @@ func (t local) run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath, rt run
 	debugx.Println("modules", modules)
 	debugx.Println("runtime resources", spew.Sdump(t.RuntimeResources))
 
-	if err = rt(gctx.Context, workload{ws: ws, uid: uid, canonicaluri: canonicaluri, envb: envb, modules: modules}); err != nil {
+	if rt, err = newrt(gctx.Context, ws, uid, canonicaluri, envb); err != nil {
 		return err
+	}
+	defer func() { err = errorsx.Compact(err, rt.Close()) }()
+
+	if environ, err = os.Create(filepath.Join(ws.RuntimeDir, eg.EnvironFile)); err != nil {
+		return errorsx.Wrap(err, "unable to open the environment variable file")
+	}
+	defer environ.Close()
+
+	if err = envb.CopyTo(environ); err != nil {
+		return errorsx.Wrap(err, "unable to generate environment")
+	}
+
+	for _, m := range modules {
+		if err = rt.Do(gctx.Context, m); err != nil {
+			return errorsx.Wrap(err, "module execution failed")
+		}
 	}
 
 	return t.patch(gctx.Context, ws)
 }
 
-// podman runs the workload's modules in containers built from the repository's Containerfile.
-func (t local) podman(ctx context.Context, w workload) (err error) {
+// container runs modules in containers of the root container built from the repository's
+// Containerfile.
+type container struct {
+	ctx   context.Context // carries the podman client.
+	ws    workspaces.Context
+	uid   uuid.UUID
+	agent *runners.Agent
+}
+
+func (t container) Do(_ context.Context, m transpile.Compiled) error {
+	options := append(
+		t.agent.Options(),
+		runners.AgentOptionVolumeSpecs(
+			runners.AgentMountReadOnly(
+				filepath.Join(t.ws.Root, t.ws.BuildDir, t.ws.Module, eg.ModuleDir),
+				eg.DefaultMountRoot(eg.RuntimeDirectory, t.ws.Module, eg.ModuleDir),
+			),
+			runners.AgentMountReadOnly(m.Path, eg.ModuleMount()),
+		)...)
+
+	prepcmd := func(cmd *exec.Cmd) *exec.Cmd {
+		cmd.Dir = t.ws.Root
+		cmd.Stdout = log.Writer()
+		cmd.Stderr = log.Writer()
+		cmd.Stdin = os.Stdin
+		return cmd
+	}
+
+	// TODO REVISIT using t.ws.RuntimeDir as moduledir.
+	return c8sproxy.PodmanModule(t.ctx, prepcmd, eg.WorkingDirectory, fmt.Sprintf("eg-%s", t.uid.String()), t.ws.RuntimeDir, options...)
+}
+
+func (t container) Close() error {
+	return nil
+}
+
+// podman prepares containers of the root container built from the repository's Containerfile.
+func (t local) podman(ctx context.Context, ws workspaces.Context, uid uuid.UUID, canonicaluri string, envb *envx.Builder) (_ runner, err error) {
 	var (
 		homedir     = userx.HomeDirectoryOrDefault("/root")
-		ws          = w.ws
 		environpath = filepath.Join(ws.RuntimeDir, eg.EnvironFile)
 		pctx        context.Context
 		gnupghome   runners.AgentOption
@@ -220,31 +257,27 @@ func (t local) podman(ctx context.Context, w workload) (err error) {
 	}
 
 	if t.GCPAuto {
-		gcpcreds = runners.AgentOptionGcloudCredentials(ctx, w.envb, envx.String(userx.DefaultConfigDirectory("gcloud", "application_default_credentials.json"), eg.EnvGoogleApplicationCredentials))
+		gcpcreds = runners.AgentOptionGcloudCredentials(ctx, envb, envx.String(userx.DefaultConfigDirectory("gcloud", "application_default_credentials.json"), eg.EnvGoogleApplicationCredentials))
 	} else if stringsx.Present(t.GCP) {
-		gcpcreds = runners.AgentOptionGcloudCredentials(ctx, w.envb, t.GCP)
+		gcpcreds = runners.AgentOptionGcloudCredentials(ctx, envb, t.GCP)
 	}
 
 	if gpu, err = runners.AgentOptionGPU(t.gpu()); err != nil {
-		return err
+		return nil, err
 	}
 
-	gnupghome = runners.AgentOptionLocalGPGAgent(ctx, w.envb)
+	gnupghome = runners.AgentOptionLocalGPGAgent(ctx, envb)
 
 	if t.Wayland {
-		wayland = runners.AgentOptionWayland(ctx, w.envb)
-	}
-
-	if err = w.environ(); err != nil {
-		return err
+		wayland = runners.AgentOptionWayland(ctx, envb)
 	}
 
 	if pctx, err = podmanx.WithClient(ctx); err != nil {
-		return errorsx.Wrap(err, "unable to connect to podman")
+		return nil, errorsx.Wrap(err, "unable to connect to podman")
 	}
 
 	if err = runners.BuildRootContainerPath(ctx, t.Dir, filepath.Join(ws.RuntimeDir, "Containerfile"), "--build-arg", envx.Format(eg.EnvBuildCommit, cmdopts.BuildCommit()), "--platform", platform); err != nil {
-		return err
+		return nil, err
 	}
 
 	if err = wasix.WarmCacheDirectory(ctx, filepath.Join(ws.Root, ws.BuildDir), ws.CacheDirWazero); err != nil {
@@ -258,7 +291,7 @@ func (t local) podman(ctx context.Context, w workload) (err error) {
 	ragent := runners.NewRunner(
 		ctx,
 		ws,
-		w.uid.String(),
+		uid.String(),
 		privileged,
 		cgroups,
 		hostnet,
@@ -273,7 +306,7 @@ func (t local) podman(ctx context.Context, w workload) (err error) {
 			runners.AgentMountReadWrite(ws.WorkingDir, eg.DefaultMountRoot(eg.WorkingDirectory)),
 			runners.AgentMountReadWrite(ws.WorkspaceDir, eg.DefaultMountRoot(eg.WorkspaceDirectory)),
 		),
-		runners.AgentOptionLocalComputeCachingVolumes(w.canonicaluri),
+		runners.AgentOptionLocalComputeCachingVolumes(canonicaluri),
 		runners.AgentOptionEnvironFile(environpath), // ensure we pick up the environment file with the container.
 		runners.AgentOptionHostOS(t.ContainerArgs...),
 		runners.AgentOptionPublish(t.Ports...),
@@ -286,32 +319,7 @@ func (t local) podman(ctx context.Context, w workload) (err error) {
 		wayland,   // must come after the runtime directory mount to ensure correct mounting order.
 	)
 
-	for _, m := range w.modules {
-		options := append(
-			ragent.Options(),
-			runners.AgentOptionVolumeSpecs(
-				runners.AgentMountReadOnly(
-					filepath.Join(ws.Root, ws.BuildDir, ws.Module, eg.ModuleDir),
-					eg.DefaultMountRoot(eg.RuntimeDirectory, ws.Module, eg.ModuleDir),
-				),
-				runners.AgentMountReadOnly(m.Path, eg.ModuleMount()),
-			)...)
-
-		prepcmd := func(cmd *exec.Cmd) *exec.Cmd {
-			cmd.Dir = ws.Root
-			cmd.Stdout = log.Writer()
-			cmd.Stderr = log.Writer()
-			cmd.Stdin = os.Stdin
-			return cmd
-		}
-
-		// TODO REVISIT using t.ws.RuntimeDir as moduledir.
-		if err = c8sproxy.PodmanModule(pctx, prepcmd, eg.WorkingDirectory, fmt.Sprintf("eg-%s", w.uid.String()), ws.RuntimeDir, options...); err != nil {
-			return errorsx.Wrap(err, "module execution failed")
-		}
-	}
-
-	return nil
+	return container{ctx: pctx, ws: ws, uid: uid, agent: ragent}, nil
 }
 
 // patch applies the changes the workload made to its working directory to the worktree, or prints

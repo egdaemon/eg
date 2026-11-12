@@ -319,17 +319,28 @@ func (t local) podman(ctx context.Context, ws workspaces.Context, uid uuid.UUID,
 // machine prepares a machine booted from the egiso at uri, fetched through c, or from one of the
 // default root container when uri is empty.
 func (t local) machine(c *http.Client, uri string) runners.BFn {
-	return func(ctx context.Context, ws workspaces.Context, _ uuid.UUID, _ string, _ *envx.Builder) (_ runners.T, err error) {
+	return func(ctx context.Context, ws workspaces.Context, _ uuid.UUID, canonicaluri string, _ *envx.Builder) (_ runners.T, err error) {
+		var (
+			containers = userx.DefaultCacheDirectory("egvm", runners.ContainersVolume(canonicaluri))
+		)
+
 		if stringsx.Blank(uri) {
 			if uri, err = runners.BuildRootEgiso(ctx, userx.DefaultCacheDirectory("egiso"), t.Dir, filepath.Join(ws.RuntimeDir, "Containerfile"), "--build-arg", envx.Format(eg.EnvBuildCommit, cmdopts.BuildCommit()), "--platform", podmanx.AutoPlatform(t.Arch)); err != nil {
 				return nil, err
 			}
 		}
 
+		// as containers keep their container storage in a volume, a machine keeps it in the user's
+		// cache, where overlay can layer it, which the root's FUSE mount can not.
+		if err = os.MkdirAll(containers, 0700); err != nil {
+			return nil, errorsx.Wrap(err, "unable to create the machine's container storage")
+		}
+
 		return runners.NewMachine(ctx, c, ws, uri, log.Writer(),
 			egvm.OptionCPUs(uint(t.RuntimeResources.Cores)),
 			egvm.OptionMemory(uint64(t.RuntimeResources.Memory)),
 			egvm.OptionMountReadOnly(filepath.Join(ws.Root, ws.BuildDir, ws.Module, eg.ModuleDir), eg.DefaultMountRoot(eg.RuntimeDirectory, ws.Module, eg.ModuleDir)),
+			egvm.OptionMountReadWrite(containers, "/var/lib/containers"),
 		)
 	}
 }

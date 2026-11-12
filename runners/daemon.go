@@ -107,15 +107,20 @@ func AgentOptionContainerCache(dir string) string {
 // standard caching mounts across host environments for local compute, let podman deal with the issues.
 // since they cant seem to figure out how to make host directory mounts function identically.
 func AgentOptionLocalComputeCachingVolumes(canonicaluri string) AgentOption {
+	return AgentOptionCompose(
+		AgentOptionVolumes(
+			AgentMountReadWrite(ContainersVolume(canonicaluri), "/var/lib/containers"),
+		),
+	)
+}
+
+// ContainersVolume names where the workloads of the repository at canonicaluri keep their container
+// storage, /var/lib/containers, between runs.
+func ContainersVolume(canonicaluri string) string {
 	_, path, _ := strings.Cut(canonicaluri, ":")
 	path = strings.ReplaceAll(path, "/", ".")
 	path = strings.ReplaceAll(path, ".git", "")
-	path = podmanx.SanitizeVolumeName(path)
-	return AgentOptionCompose(
-		AgentOptionVolumes(
-			AgentMountReadWrite(fmt.Sprintf("%s.eg.containers", path), "/var/lib/containers"),
-		),
-	)
+	return fmt.Sprintf("%s.eg.containers", podmanx.SanitizeVolumeName(path))
 }
 
 func AgentOptionEnv(key, value string) AgentOption {

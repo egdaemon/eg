@@ -66,7 +66,23 @@ func OpenLocked(ctx context.Context, path string) (*sql.DB, error) {
 		return nil, errorsx.Wrap(err, "unable to create the database directory")
 	}
 
-	return migrated(ctx, sql.OpenDB(newsharedconnector(path)))
+	connector := newsharedconnector(path)
+	// only the cli's own database is served with the postgres wire protocol, it has a single well known socket.
+	if path == Path(CLI) {
+		connector.pgsocket = PostgresSocket()
+	}
+
+	return migrated(ctx, sql.OpenDB(connector))
+}
+
+// PostgresSocketName the unix socket, libpq style, the cli's database is served on with the postgres wire
+// protocol by the process that owns it, i.e. psql -h <directory of PostgresSocket> -d eg
+const PostgresSocketName = ".s.PGSQL.5432"
+
+// PostgresSocket is the unix socket the cli's database is served on, within the runtime directory.
+// it only exists while a command using the database is running, see OpenLocked.
+func PostgresSocket() string {
+	return userx.DefaultRuntimeDirectory("eg", PostgresSocketName)
 }
 
 func migrated(ctx context.Context, db *sql.DB) (*sql.DB, error) {

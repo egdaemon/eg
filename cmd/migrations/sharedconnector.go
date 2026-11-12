@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/duckdb/duckdb-go/v2"
+	"github.com/egdaemon/eg/duckpgwire"
 	"github.com/egdaemon/eg/duckproxy"
 	"github.com/egdaemon/eg/duckproxyserver"
 	"github.com/egdaemon/eg/internal/errorsx"
@@ -40,6 +41,9 @@ type sharedconnector struct {
 	dialwait time.Duration
 	// maxsessions is how many connections of the others the owner serves at once.
 	maxsessions int
+	// pgsocket when set the owner also serves the file with the postgres wire protocol on this unix socket,
+	// so clients that are not written in go, i.e. editor extensions, can use it.
+	pgsocket string
 
 	m     sync.Mutex
 	owned *ownedfile
@@ -54,6 +58,11 @@ type ownedfile struct {
 	stop      context.CancelFunc
 	done      chan struct{}
 	refs      int
+
+	// the postgres frontend, nil when not served.
+	pgdb     *sql.DB
+	pgsocket string
+	pgdone   chan struct{}
 }
 
 func newsharedconnector(path string) *sharedconnector {
@@ -156,6 +165,40 @@ func (t *sharedconnector) own(socket string) error {
 	}()
 
 	t.owned = &ownedfile{connector: connector, db: served, socket: socket, sessions: tracked, stop: stop, done: done}
+
+	if t.pgsocket != "" {
+		// failing to serve the postgres frontend must not take the database down with it.
+		if err = t.ownpg(ctx, socket); err != nil {
+			errorsx.Log(errorsx.Wrap(err, "unable to serve the postgres frontend"))
+		}
+	}
+
+	return nil
+}
+
+// ownpg serves the postgres wire protocol, it is a client of the native socket just like the others.
+func (t *sharedconnector) ownpg(ctx context.Context, socket string) (err error) {
+	if err = os.MkdirAll(filepath.Dir(t.pgsocket), 0700); err != nil {
+		return errorsx.Wrap(err, "unable to create the socket directory")
+	}
+
+	pgdb, err := sql.Open("duckproxy", socket)
+	if err != nil {
+		return errorsx.Wrap(err, "unable to open the database")
+	}
+
+	srv := duckpgwire.New(pgdb, duckpgwire.WithAcquireTimeout(t.lockwait))
+	pgdone := make(chan struct{})
+	go func() {
+		defer close(pgdone)
+		if err := duckpgwire.ListenUnix(ctx, t.pgsocket, srv); err != nil && ctx.Err() == nil {
+			errorsx.Log(errorsx.Wrap(err, "postgres frontend failed"))
+		}
+	}()
+
+	t.owned.pgdb = pgdb
+	t.owned.pgsocket = t.pgsocket
+	t.owned.pgdone = pgdone
 	return nil
 }
 
@@ -192,10 +235,17 @@ func (t *sharedconnector) Close() error {
 	o.sessions.hangup()
 	o.stop()
 	<-o.done
+
+	var pgerr error
+	if o.pgdone != nil {
+		<-o.pgdone
+		_ = os.Remove(o.pgsocket)
+		pgerr = o.pgdb.Close()
+	}
 	_ = os.Remove(o.socket)
 
 	// closing the served database also closes the connector.
-	return errors.Join(o.db.Close())
+	return errors.Join(pgerr, o.db.Close())
 }
 
 // duckdbconn the interfaces database/sql uses of duckdb's connections, which the proxy's connections implement as well.

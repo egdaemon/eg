@@ -1,6 +1,8 @@
 package compute
 
 import (
+	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"log"
@@ -14,6 +16,7 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/cmd/cmdopts"
+	"github.com/egdaemon/eg/cmd/migrations"
 	"github.com/egdaemon/eg/compile"
 	"github.com/egdaemon/eg/internal/debugx"
 	"github.com/egdaemon/eg/internal/envx"
@@ -21,6 +24,7 @@ import (
 	"github.com/egdaemon/eg/internal/gitx"
 	"github.com/egdaemon/eg/internal/md5x"
 	"github.com/egdaemon/eg/internal/podmanx"
+	"github.com/egdaemon/eg/internal/servesessions"
 	"github.com/egdaemon/eg/internal/stringsx"
 	"github.com/egdaemon/eg/internal/userx"
 	"github.com/egdaemon/eg/internal/wasix"
@@ -31,6 +35,7 @@ import (
 	"github.com/egdaemon/eg/workspaces"
 	"github.com/go-git/go-git/v6"
 	"github.com/gofrs/uuid/v5"
+	"go.podman.io/podman/v6/pkg/bindings/containers"
 )
 
 type serve struct {
@@ -50,8 +55,62 @@ type serve struct {
 	GitReference     string   `name:"git-ref" help:"name of the branch or commit to checkout" default:"${vars_git_head_reference}"`
 	Ports            []int    `name:"ports" help:"list of ports to publish to the host system"`
 	SSHKeyPath       string   `name:"sshkeypath" help:"path to ssh key to use" default:"${vars_ssh_key_path}"`
-	SSH              int      `name:"ssh" type:"sshport" help:"enable ssh access into the container as the egd user, using eg's own managed ssh identity; optionally set the published host port (default 2222)"`
+	SSH              int      `name:"ssh" type:"sshport" default:"-1" help:"enable ssh access into the container as the egd user, using eg's own managed ssh identity; bare --ssh publishes on a free host port, --ssh=<port> on a fixed one"`
+	Session          string   `name:"session" help:"uuid to use as the run's id, also names the container and identifies the session for lookups by tools, i.e. the editor extension. generated when blank" default:""`
 	Name             string   `arg:"" name:"module" help:"name of the module to run, i.e. the folder name within moduledir" default:"" predictor:"eg.workload"`
+}
+
+// containersshport the host port podman published for the container's sshd, 0 until the container exists.
+// containers are named by the run's id which clients can reuse, so a container left behind by an earlier run
+// with the same name still reports its ports until it is replaced. only a container that is running and
+// was created since this run started counts.
+func containersshport(ctx context.Context, cname string, since time.Time) int64 {
+	data, err := containers.Inspect(ctx, cname, nil)
+	if err != nil || data.NetworkSettings == nil || data.State == nil || !data.State.Running || data.Created.Before(since) {
+		return 0
+	}
+
+	for _, binding := range data.NetworkSettings.Ports["22/tcp"] {
+		if port, err := strconv.ParseInt(binding.HostPort, 10, 64); err == nil && port > 0 {
+			return port
+		}
+	}
+
+	return 0
+}
+
+// registerssh keeps the serve session registered with the port podman actually published, until ctx is cancelled.
+// the port is read from the container, which is what makes an automatic port possible: podman picks it.
+// every module is a new container, so the port is re-registered when it changes.
+func registerssh(ctx context.Context, db *sql.DB, s servesessions.Session, cname string) {
+	var (
+		registered int64
+		started    = time.Now()
+		tick       = time.NewTicker(250 * time.Millisecond)
+	)
+	defer tick.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-tick.C:
+		}
+
+		port := containersshport(ctx, cname, started)
+		if port == 0 || port == registered {
+			continue
+		}
+
+		s.SSHPort = port
+		if err := servesessions.Register(ctx, db, s); err != nil {
+			log.Println("unable to register serve session", err)
+			continue
+		}
+		registered = port
+
+		log.Printf("ssh access enabled: ssh -i %s -p %d -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o LogLevel=ERROR %s@localhost\n", s.SSHKeyPath, port, s.SSHUser)
+	}
 }
 
 func (t serve) datadir(rels ...string) string {
@@ -73,6 +132,13 @@ func (t serve) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err e
 		privileged runners.AgentOption = runners.AgentOptionNoop
 		mountegbin runners.AgentOption = runners.AgentOptionEGBin(errorsx.Must(exec.LookPath(os.Args[0])))
 	)
+
+	// clients that want to find the run again, i.e. the editor extension, pick the run's id.
+	if stringsx.Present(t.Session) {
+		if uid, err = uuid.FromString(t.Session); err != nil {
+			return errorsx.Wrapf(err, "invalid session id %q, expected a uuid", t.Session)
+		}
+	}
 
 	ctx, err := podmanx.WithClient(gctx.Context)
 	if err != nil {
@@ -139,8 +205,38 @@ func (t serve) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err e
 	}
 
 	sshserver := runners.AgentOptionSSHServer(gctx.Context, ws, t.SSHKeyPath, t.SSH)
-	if t.SSH != 0 {
-		log.Printf("ssh access enabled: ssh -i %s -p %d -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o LogLevel=ERROR %s@localhost\n", t.SSHKeyPath, t.SSH, eg.DefaultUsername)
+
+	// the cli's database is always opened, which applies its migrations. failure is not fatal, serve
+	// does not otherwise depend on it.
+	if db, derr := migrations.OpenLocked(gctx.Context, migrations.Path(migrations.CLI)); derr != nil {
+		log.Println("unable to open the cli database", derr)
+	} else {
+		defer func() { errorsx.Log(db.Close()) }()
+
+		// register the session so tools (i.e. the vscode extension) can discover how to connect.
+		if t.SSH != cmdopts.SSHPortDisabled {
+			wctx, stop := context.WithCancel(ctx)
+			done := make(chan struct{})
+			go func() {
+				defer close(done)
+				registerssh(wctx, db, servesessions.Session{
+					ID:         uid.String(),
+					Module:       t.Name,
+					Directory:    t.Dir,
+					SSHRequested: int64(t.SSH),
+					SSHUser:      eg.DefaultUsername,
+					SSHKeyPath:   t.SSHKeyPath,
+				}, fmt.Sprintf("eg-%s", uid.String()))
+			}()
+
+			defer func() {
+				// stop the watcher before marking the session stopped so it cannot register again, the session
+				// context may already be cancelled so stopping uses its own.
+				stop()
+				<-done
+				errorsx.Log(servesessions.Stop(context.Background(), db, uid.String()))
+			}()
+		}
 	}
 
 	if err = errorsx.Compact(envb.CopyTo(environio), environio.Close()); err != nil {

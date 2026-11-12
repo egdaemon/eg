@@ -21,12 +21,13 @@ import (
 // managed SSH identity (the same key backing `eg ssh key`, actl authorize,
 // compute upload, etc) for the egd workload user, and publishes port to the
 // host bound to the container's sshd. keypath is the private key of that
-// identity. port == 0 disables the feature.
+// identity. a negative port disables the feature, zero lets podman pick a free port
+// (bound to loopback only), read it back from the container, i.e. 'podman port'.
 //
 // the sshd configuration (sshd_config.d drop-in, profile.d) ships in the
 // egworkload package, only the authorized key is specific to the invocation.
 func AgentOptionSSHServer(ctx context.Context, ws workspaces.Context, keypath string, port int) AgentOption {
-	if port == 0 {
+	if port < 0 {
 		return AgentOptionNoop
 	}
 
@@ -36,11 +37,16 @@ func AgentOptionSSHServer(ctx context.Context, ws workspaces.Context, keypath st
 		return AgentOptionNoop
 	}
 
+	publish := fmt.Sprintf("%d:22", port)
+	if port == 0 {
+		publish = "127.0.0.1::22"
+	}
+
 	return AgentOptionCompose(
 		AgentOptionVolumes(
 			AgentMountReadOnly(authorizedkeys, filepath.Join("/etc/ssh/authorized_keys", eg.DefaultUsername)),
 		),
-		AgentOptionCommandLine("--publish", fmt.Sprintf("%d:22", port)),
+		AgentOptionCommandLine("--publish", publish),
 	)
 }
 

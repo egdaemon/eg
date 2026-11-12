@@ -8,19 +8,22 @@ import (
 	"github.com/alecthomas/kong"
 )
 
-// DefaultSSHPort is the port published for the SSH server when a bare --ssh
-// flag is provided without an explicit port override.
-const DefaultSSHPort = 2222
+const (
+	// SSHPortDisabled is the value of the flag when ssh is not requested, it is the flag's default.
+	SSHPortDisabled = -1
+	// SSHPortAuto is the value of a bare --ssh flag, callers pick a free host port.
+	SSHPortAuto = 0
+)
 
 // SSHPortMapper implements a bool-like Kong flag: bare --ssh enables the
-// feature with DefaultSSHPort, while --ssh=<port> enables it with a specific
-// port. Omitting the flag entirely leaves the target at its zero value,
-// which callers treat as "disabled".
+// feature with SSHPortAuto, while --ssh=<port> enables it with a specific
+// port. Omitting the flag entirely leaves the flag's default which must be
+// SSHPortDisabled.
 type SSHPortMapper struct{}
 
 func (SSHPortMapper) Decode(ctx *kong.DecodeContext, target reflect.Value) error {
 	if ctx.Scan.Peek().Type != kong.FlagValueToken {
-		target.SetInt(DefaultSSHPort)
+		target.SetInt(SSHPortAuto)
 		return nil
 	}
 

@@ -31,15 +31,26 @@ func TestAgentOptionSSHServer(t *testing.T) {
 		return false
 	}
 
-	t.Run("port zero disables the feature", func(t *testing.T) {
+	t.Run("negative port disables the feature", func(t *testing.T) {
+		keypath := filepath.Join(t.TempDir(), ".ssh", "eg")
+
+		ws := workspaces.Context{RuntimeDir: t.TempDir()}
+		opt := AgentOptionSSHServer(t.Context(), ws, keypath, -1)
+		a := langx.Clone(Agent{}, opt)
+
+		require.Empty(t, a.volumes)
+		require.Empty(t, a.literals)
+	})
+
+	t.Run("port zero lets podman choose a loopback port", func(t *testing.T) {
 		keypath := filepath.Join(t.TempDir(), ".ssh", "eg")
 
 		ws := workspaces.Context{RuntimeDir: t.TempDir()}
 		opt := AgentOptionSSHServer(t.Context(), ws, keypath, 0)
 		a := langx.Clone(Agent{}, opt)
 
-		require.Empty(t, a.volumes)
-		require.Empty(t, a.literals)
+		require.True(t, hasVolume(a, "/etc/ssh/authorized_keys/egd"), "expected authorized_keys mount")
+		require.True(t, hasLiteral(a, "127.0.0.1::22"), "expected an unspecified loopback host port")
 	})
 
 	t.Run("nonzero port mounts the key and publishes the port", func(t *testing.T) {

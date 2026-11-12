@@ -13,12 +13,14 @@ import (
 	"encoding/base64"
 	"fmt"
 	"io"
+	"net/netip"
 	"runtime"
 	"strings"
 
 	"github.com/egdaemon/eg/internal/egiso"
 	"github.com/egdaemon/eg/internal/langx"
 	"github.com/egdaemon/eg/internal/userx"
+	"github.com/egdaemon/wasinet/wasinet/wnetruntime"
 )
 
 // resolvlink is the tmpfiles.extra credential pointing resolv.conf at resolved, replacing the empty
@@ -33,16 +35,17 @@ type mount struct {
 	readonly bool
 }
 
-// Machine describes a virtual machine: the image it boots, its size, its root, and what it mounts.
-// A memory of 0 is the host's.
+// Machine describes a virtual machine: the image it boots, its size, its root, what it mounts, and
+// the addresses a Linux machine may reach. A memory of 0 is the host's.
 type Machine struct {
-	dir    string
-	init   string
-	cpus   uint
-	memory uint64
-	root   *egiso.SysFS
-	nfs    []egiso.NFSOption
-	mounts []mount
+	dir      string
+	init     string
+	cpus     uint
+	memory   uint64
+	root     *egiso.SysFS
+	nfs      []egiso.NFSOption
+	mounts   []mount
+	firewall wnetruntime.Firewall
 }
 
 // Option changes the machine New describes.
@@ -55,14 +58,22 @@ func Directory() string {
 }
 
 // New describes a machine rooted at root that boots the image in Directory, as large as the host,
-// with the root's systemd as its init.
+// with the root's systemd as its init, reaching its own loopback and public addresses only.
 func New(root *egiso.SysFS, options ...Option) Machine {
 	return langx.Clone(Machine{
-		dir:  Directory(),
-		init: "/usr/sbin/init",
-		cpus: uint(runtime.NumCPU()),
-		root: root,
+		dir:      Directory(),
+		init:     "/usr/sbin/init",
+		cpus:     uint(runtime.NumCPU()),
+		root:     root,
+		firewall: wnetruntime.PublicFirewall(wnetruntime.FirewallOptionAllow(netip.MustParsePrefix("127.0.0.0/8"), netip.MustParsePrefix("::1/128"))),
 	}, options...)
+}
+
+// OptionFirewall limits the addresses a Linux machine reaches to those fw permits.
+func OptionFirewall(fw wnetruntime.Firewall) Option {
+	return func(m *Machine) {
+		m.firewall = fw
+	}
 }
 
 // OptionCPUs gives the machine n cpus; 0 keeps the host's.

@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strconv"
+	"strings"
 	"syscall"
 
 	"github.com/egdaemon/eg/internal/errorsx"
@@ -43,6 +44,9 @@ const fdnetworked = 3
 // credentials is where the root's systemd reads the system credentials the machine passes it.
 const credentials = "/run/egvm/credentials"
 
+// nft is the root's nftables tool, which loads the machine's firewall.
+const nft = "/usr/sbin/nft"
+
 func init() {
 	var (
 		err error
@@ -52,9 +56,9 @@ func init() {
 	case stagemap:
 		err = waitmapped()
 	case stageroot:
-		err = boot(os.Args[1], os.Args[2], os.Args[3], os.Args[4], os.Args[5:])
+		err = boot(os.Args[1], os.Args[2], os.Args[3], os.Args[4], os.Args[5], os.Args[6:])
 	case stageinit:
-		err = start(os.Args[1], os.Args[2])
+		err = start(os.Args[1], os.Args[2], os.Args[3])
 	default:
 		return
 	}
@@ -76,10 +80,10 @@ func waitmapped() error {
 
 // boot mounts the root at root over FUSE and readies it as a container runtime readies an image,
 // then runs the machine's init until it exits. netns is the file the init's network namespace is
-// mounted on for pasta. authorized is the key root accepts over ssh. shares are the directories the
-// machine mounts, as triples of the host directory, the path within the root, and whether it is read
-// only.
-func boot(root string, rootinit string, netns string, authorized string, shares []string) (err error) {
+// mounted on for pasta. authorized is the key root accepts over ssh, and ruleset the machine's
+// firewall. shares are the directories the machine mounts, as triples of the host directory, the path
+// within the root, and whether it is read only.
+func boot(root string, rootinit string, netns string, authorized string, ruleset string, shares []string) (err error) {
 	var (
 		machine   *exec.Cmd
 		networked [2]*os.File
@@ -149,7 +153,7 @@ func boot(root string, rootinit string, netns string, authorized string, shares 
 	runtime.LockOSThread()
 	machine = &exec.Cmd{
 		Path:       "/proc/self/exe",
-		Args:       []string{stageinit, root, rootinit},
+		Args:       []string{stageinit, root, rootinit, ruleset},
 		Stdout:     os.Stdout,
 		Stderr:     os.Stderr,
 		ExtraFiles: []*os.File{networked[0]},
@@ -202,8 +206,9 @@ func boot(root string, rootinit string, netns string, authorized string, shares 
 }
 
 // start execs rootinit in root once pasta connects the machine's network, after mounting the
-// filesystems its own pid, network and ipc namespaces back.
-func start(root string, rootinit string) (err error) {
+// filesystems its own pid, network and ipc namespaces back and loading ruleset, the machine's
+// firewall, with the root's nft.
+func start(root string, rootinit string, ruleset string) (err error) {
 	if _, err = io.Copy(io.Discard, os.NewFile(fdnetworked, "networked")); err != nil {
 		return err
 	}
@@ -241,6 +246,17 @@ func start(root string, rootinit string) (err error) {
 	// unmounted, as it does in a rootless podman container.
 	if err = unix.Prctl(unix.PR_CAPBSET_DROP, unix.CAP_SYS_RAWIO, 0, 0, 0); err != nil {
 		return fmt.Errorf("unable to drop CAP_SYS_RAWIO: %w", err)
+	}
+
+	// pasta configures the machine's network from outside, so nothing in it needs to administer the
+	// network: once the firewall loads, not even root within it can change it.
+	firewall := exec.Command(nft, "-f", "-")
+	firewall.Stdin = strings.NewReader(ruleset)
+	if b, cause := firewall.CombinedOutput(); cause != nil {
+		return fmt.Errorf("unable to load the machine's firewall: %w: %s", cause, b)
+	}
+	if err = unix.Prctl(unix.PR_CAPBSET_DROP, unix.CAP_NET_ADMIN, 0, 0, 0); err != nil {
+		return fmt.Errorf("unable to drop CAP_NET_ADMIN: %w", err)
 	}
 
 	return fmt.Errorf("unable to exec %s: %w", rootinit, unix.Exec(rootinit, []string{rootinit}, []string{"container=egvm", "CREDENTIALS_DIRECTORY=" + credentials}))

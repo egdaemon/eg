@@ -115,6 +115,17 @@ func TestExec(t *testing.T) {
 		require.Equal(t, "200000 100000\n1073741824\n", stdout)
 	})
 
+	t.Run("drops what it sends to private addresses", func(t *testing.T) {
+		code, _, stderr := run(t, t.Context(), nil, "curl", "-sS", "--max-time", "2", "http://169.254.169.254/")
+		require.Equal(t, int32(28), code, stderr)
+	})
+
+	t.Run("keeps its firewall out of root's reach", func(t *testing.T) {
+		code, _, stderr := run(t, t.Context(), nil, "nft", "flush", "ruleset")
+		require.NotEqual(t, int32(0), code)
+		require.Contains(t, stderr, "Operation not permitted")
+	})
+
 	t.Run("quotes arguments the shell would expand", func(t *testing.T) {
 		code, stdout, _ := run(t, t.Context(), nil, "printf", "%s|", "a b", "$HOME", "'q'", "*")
 		require.Equal(t, int32(0), code)

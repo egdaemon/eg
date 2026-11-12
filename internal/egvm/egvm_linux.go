@@ -5,11 +5,13 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"net/netip"
 	"os"
 	"os/exec"
 	"os/user"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
@@ -17,7 +19,9 @@ import (
 	"github.com/egdaemon/eg/internal/egiso"
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
+	"github.com/egdaemon/eg/internal/slicesx"
 	"github.com/egdaemon/eg/interp/execproxy"
+	"github.com/egdaemon/wasinet/wasinet/wnetruntime"
 	"github.com/godbus/dbus/v5"
 	subids "github.com/moby/sys/user"
 	"go.podman.io/common/pkg/cgroups"
@@ -99,7 +103,7 @@ func Boot(m Machine, console io.Writer) (_ *VM, err error) {
 	}
 	defer unix.Close(mounted[0])
 
-	args = []string{stagemap, root, m.init, t.netns, authorized, shared, sshdir, strconv.FormatBool(false)}
+	args = []string{stagemap, root, m.init, t.netns, authorized, nftables(m.firewall), shared, sshdir, strconv.FormatBool(false)}
 	for _, mnt := range m.mounts {
 		args = append(args, mnt.dir, mnt.path, strconv.FormatBool(mnt.readonly))
 	}
@@ -179,6 +183,39 @@ func scope(pid int, m Machine) (err error) {
 		return errorsx.Errorf("unable to start the machine's scope: %s", result)
 	}
 	return nil
+}
+
+// nftables is the ruleset the machine loads to reach only what fw permits, besides its loopback and
+// DNS: fw's allowed prefixes, then nothing of its blocked ones. It filters what leaves the machine
+// and what the machine forwards for its own containers; nothing enters a machine it did not ask for.
+func nftables(fw wnetruntime.Firewall) string {
+	var (
+		b strings.Builder
+	)
+
+	b.WriteString("table inet eg {\n\tchain reach {\n\t\tmeta l4proto { tcp, udp } th dport 53 accept\n")
+	addresses(&b, fw.Allow, "accept")
+	addresses(&b, fw.Block, "drop")
+	b.WriteString("\t}\n\tchain output {\n\t\ttype filter hook output priority filter; policy accept;\n\t\toifname \"lo\" accept\n\t\tjump reach\n\t}\n")
+	b.WriteString("\tchain forward {\n\t\ttype filter hook forward priority filter; policy accept;\n\t\tjump reach\n\t}\n}\n")
+	return b.String()
+}
+
+// addresses writes the rules giving packets to prefixes verdict, one per address family.
+func addresses(b *strings.Builder, prefixes []netip.Prefix, verdict string) {
+	for _, family := range []struct {
+		match string
+		is    func(netip.Addr) bool
+	}{
+		{match: "ip", is: netip.Addr.Is4},
+		{match: "ip6", is: func(a netip.Addr) bool { return !a.Is4() }},
+	} {
+		set := slicesx.Filter(func(p netip.Prefix) bool { return family.is(p.Addr()) }, prefixes...)
+		if len(set) == 0 {
+			continue
+		}
+		fmt.Fprintf(b, "\t\t%s daddr { %s } %s\n", family.match, strings.Join(slicesx.MapTransform(netip.Prefix.String, set...), ", "), verdict)
+	}
 }
 
 // received is the descriptor the machine sends over the socket fd.

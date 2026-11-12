@@ -23,4 +23,3 @@ RUN arch="$(dpkg --print-architecture)"; \
 RUN systemd-tmpfiles --create
 RUN systemd-tmpfiles --clean
 RUN rm -rf /tmp/gomod /tmp/gocache /tmp/*.deb
-RUN du -xsh /tmp/*

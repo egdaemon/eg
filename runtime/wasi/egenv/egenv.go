@@ -9,6 +9,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"uuid"
 
 	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/internal/envx"
@@ -45,12 +46,16 @@ func Release() bool {
 
 // Read the run ID from the environment
 func RunID() string {
-	return env.String("00000000-0000-0000-0000-000000000000", eg.EnvComputeRunID)
+	return env.String(uuid.Nil().String(), eg.EnvComputeRunID)
 }
 
 // Read the account ID from the environment
 func AccountID() string {
-	return env.String("00000000-0000-0000-0000-000000000000", eg.EnvComputeAccountID)
+	return env.String(uuid.Nil().String(), eg.EnvComputeAccountID)
+}
+
+func HostOS() string {
+	return env.String("linux", eg.EnvComputeOS)
 }
 
 var initiated = sync.OnceValue(func() time.Time {

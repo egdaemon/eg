@@ -276,6 +276,37 @@ func TestOpen(t *testing.T) {
 	})
 }
 
+func TestOpenURI(t *testing.T) {
+	blob, toc, _ := image(t)
+	path := filepath.Join(t.TempDir(), "root.egiso")
+	require.NoError(t, os.WriteFile(path, blob, 0600))
+
+	t.Run("opens the archive the uri names, pinned to its fragment", func(t *testing.T) {
+		archive, err := egiso.OpenURI(t.Context(), http.DefaultClient, path+"#"+toc.String())
+		require.NoError(t, err)
+		defer archive.Close()
+
+		b, err := fs.ReadFile(archive, "etc/hostname")
+		require.NoError(t, err)
+		require.Equal(t, "egd\n", string(b))
+	})
+
+	t.Run("refuses a uri without a digest", func(t *testing.T) {
+		_, err := egiso.OpenURI(t.Context(), http.DefaultClient, path)
+		require.Error(t, err)
+	})
+
+	t.Run("refuses a fragment that is not a digest", func(t *testing.T) {
+		_, err := egiso.OpenURI(t.Context(), http.DefaultClient, path+"#e3b0c442")
+		require.Error(t, err)
+	})
+
+	t.Run("refuses a digest the archive's table of contents does not match", func(t *testing.T) {
+		_, err := egiso.OpenURI(t.Context(), http.DefaultClient, path+"#sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855")
+		require.Error(t, err)
+	})
+}
+
 func TestRemote(t *testing.T) {
 	blob, toc, large := image(t)
 

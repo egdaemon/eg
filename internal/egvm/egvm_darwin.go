@@ -1,22 +1,17 @@
 package egvm
 
 import (
-	"bufio"
 	"context"
-	"crypto/rand"
-	"encoding/binary"
 	"io"
 	"net"
 	"os"
 	"path/filepath"
-	"sync"
 	"time"
 
 	"github.com/Code-Hex/vz/v3"
 	"github.com/egdaemon/eg/internal/egiso"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/interp/execproxy"
-	"google.golang.org/protobuf/encoding/protodelim"
 )
 
 // VM is a running machine.
@@ -90,60 +85,8 @@ func Boot(m Machine, console io.Writer) (_ *VM, err error) {
 // Exec runs req in the machine and waits for it, with no input and its output discarded unless
 // options say otherwise. A command that exits with other than 0 returns an ExitError. It waits for
 // the machine to serve commands. Cancelling ctx kills the command.
-func (t *VM) Exec(ctx context.Context, req *execproxy.ExecRequest, options ...ExecOption) (err error) {
-	var (
-		stdio   = newstdio(options...)
-		id      uint64
-		control net.Conn
-		streams [3]net.Conn
-		resp    execproxy.ExecResponse
-		wg      sync.WaitGroup
-	)
-
-	if err = binary.Read(rand.Reader, binary.BigEndian, &id); err != nil {
-		return err
-	}
-
-	if control, err = t.connect(ctx, id, StreamControl); err != nil {
-		return err
-	}
-	defer control.Close()
-	stop := context.AfterFunc(ctx, func() { control.Close() })
-	defer stop()
-
-	if _, err = protodelim.MarshalTo(control, req); err != nil {
-		return errorsx.Wrap(err, "unable to send the command")
-	}
-
-	for i := range streams {
-		if streams[i], err = t.connect(ctx, id, uint8(i)); err != nil {
-			return err
-		}
-		defer streams[i].Close()
-	}
-
-	// the stdin stream is a connection of its own, so closing it is the command's end of input.
-	go func() {
-		if stdio.stdin != nil {
-			io.Copy(streams[StreamStdin], stdio.stdin)
-		}
-		streams[StreamStdin].Close()
-	}()
-	wg.Go(func() { io.Copy(stdio.stdout, streams[StreamStdout]) })
-	wg.Go(func() { io.Copy(stdio.stderr, streams[StreamStderr]) })
-
-	if err = protodelim.UnmarshalFrom(bufio.NewReader(control), &resp); err != nil {
-		if ctx.Err() != nil {
-			return ctx.Err()
-		}
-		return errorsx.Wrap(err, "unable to read the command's exit")
-	}
-	wg.Wait()
-
-	if resp.Exit != 0 {
-		return ExitError{Code: resp.Exit}
-	}
-	return nil
+func (t *VM) Exec(ctx context.Context, req *execproxy.ExecRequest, options ...ExecOption) error {
+	return command(ctx, t.connect, req, options...)
 }
 
 // connect opens the stream of command id, retrying until the machine serves commands.

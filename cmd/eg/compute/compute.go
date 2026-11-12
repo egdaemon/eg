@@ -9,7 +9,6 @@ type Cmd struct {
 	Download   download   `cmd:"" help:"download the logs or analytics of a workload by id"`
 	Cancel     cancel     `cmd:"" help:"cancel an enqueued or running workload by id"`
 	Local      local      `cmd:"" help:"execute the interpreter on the given directory"`
-	VM         vm         `cmd:"" name:"vm" hidden:"true" help:"EXPERIMENTAL: execute the interpreter on the given directory in a virtual machine booted from an egiso"`
 	Baremetal  baremetal  `cmd:"" help:"execute the interpreter on the given directory within the host itself, inherently unsafe"`
 	Serve      serve      `cmd:"" help:"run a service within eg, automiacally uses builds and loads the containerfile without the module directory and .eg.env if it exists"`
 	LAN        lanCmd     `cmd:"" name:"lan" help:"manage compute systems on your local network"`

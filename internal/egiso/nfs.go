@@ -42,7 +42,7 @@ func ServeNFS(l net.Listener, fsys *SysFS, options ...NFSOption) error {
 }
 
 // nfsfs is the billy filesystem go-nfs serves. NFS clients resolve symlinks themselves, so the
-// paths it receives are the upper's own; only Stat and Open follow a final symlink.
+// paths it receives are the upper's own; only Open follows a final symlink.
 type nfsfs struct {
 	sys    *SysFS
 	users  *ids
@@ -111,8 +111,11 @@ func (t nfsfs) OpenFile(name string, flag int, perm fs.FileMode) (billy.File, er
 	return nfshandle{name: name, f: f}, nil
 }
 
+// Stat describes name without following a final symlink. go-nfs asks it whether a name a client
+// creates already exists, and a symlink whose target is missing, as /etc/mtab's /proc/mounts is in
+// an image, still holds its name.
 func (t nfsfs) Stat(name string) (fs.FileInfo, error) {
-	resolved, err := t.resolve(name, true)
+	resolved, err := t.resolve(name, false)
 	if err != nil {
 		return nil, err
 	}

@@ -37,6 +37,20 @@ type Archive struct {
 	named  func() (names, error)
 }
 
+// OpenURI opens the egiso uri names, as Open does: a local path or an https URL whose fragment is
+// the digest of its table of contents.
+func OpenURI(ctx context.Context, c *http.Client, uri string) (_ *Archive, err error) {
+	var (
+		toc digest.Digest
+	)
+
+	location, fragment, _ := strings.Cut(uri, "#")
+	if toc, err = digest.Parse(fragment); err != nil {
+		return nil, errorsx.Wrapf(err, "%s needs the digest of its table of contents as its fragment", location)
+	}
+	return Open(ctx, c, location, toc)
+}
+
 // Open opens the egiso at location, a local path or an https URL read with range requests through
 // c, pinned to the digest of its table of contents.
 func Open(ctx context.Context, c *http.Client, location string, toc digest.Digest) (_ *Archive, err error) {

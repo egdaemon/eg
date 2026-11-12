@@ -27,6 +27,7 @@ func TestServeNFS(t *testing.T) {
 		&tar.Header{Typeflag: tar.TypeDir, Name: "usr/bin/", Mode: 0755},
 		&tar.Header{Typeflag: tar.TypeReg, Name: "usr/bin/tool", Mode: 0755},
 		&tar.Header{Typeflag: tar.TypeSymlink, Name: "usr/bin/abs", Linkname: "tool", Mode: 0777},
+		&tar.Header{Typeflag: tar.TypeSymlink, Name: "usr/bin/dangling", Linkname: "missing", Mode: 0777},
 		&tar.Header{Typeflag: tar.TypeReg, Name: "etc/passwd", Mode: 0644},
 		&tar.Header{Typeflag: tar.TypeReg, Name: "etc/group", Mode: 0644},
 		&tar.Header{Typeflag: tar.TypeDir, Name: "home/egd/", Mode: 0755, Uid: 1000, Gid: 1000},
@@ -101,6 +102,12 @@ func TestServeNFS(t *testing.T) {
 		b, err = fs.ReadFile(image, "etc/hostname")
 		require.NoError(t, err)
 		require.Equal(t, "etc/hostname", string(b))
+	})
+
+	t.Run("a symlink whose target is missing still holds its name", func(t *testing.T) {
+		mnt, _ := mounted(t, egiso.NewOwners(), egiso.NewOwners())
+		require.Contains(t, sh(t, mnt, "ln -s tool usr/bin/dangling 2>&1; true"), "File exists")
+		require.Equal(t, "missing", sh(t, mnt, "readlink usr/bin/dangling | tr -d '\\n'"))
 	})
 
 	// owners prints the uid and gid of each named file in the mount.

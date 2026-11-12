@@ -3,7 +3,9 @@
 // mounts it and hands the machine to the root's own init, as a container runtime starts an image
 // with /usr/sbin/init. The kernel's command line tells the root's systemd what the machine attaches:
 // the virtio-fs devices to mount and the network to configure. vminit keeps running beside the root's
-// init, forwarding NFS and running the commands the host sends it over vsock.
+// init, forwarding NFS and running the commands the host sends it over vsock. On Linux the machine
+// shares the host's kernel: the root's init runs in namespaces of its own, rooted at the egiso
+// served over FUSE, with an agent beside it serving the same commands over a unix socket.
 package egvm
 
 import (
@@ -17,6 +19,10 @@ import (
 	"github.com/egdaemon/eg/internal/langx"
 	"github.com/egdaemon/eg/internal/userx"
 )
+
+// resolvlink is the tmpfiles.extra credential pointing resolv.conf at resolved, replacing the empty
+// placeholder image builds leave behind.
+const resolvlink = "L+ /etc/resolv.conf - - - - ../run/systemd/resolve/stub-resolv.conf\n"
 
 // mount is a host directory the machine attaches as the virtio-fs device tag and mounts at path.
 type mount struct {
@@ -143,12 +149,10 @@ func newstdio(options ...ExecOption) stdio {
 // cmdline is the machine's kernel command line. Container images hold no udev to announce the
 // console, so systemd starts no getty on it: one would wait out its device's timeout before the
 // machine boots. systemd-fstab-generator mounts the virtio-fs devices from systemd.mount-extra, and
-// systemd-network-generator configures the machine's NAT device for networkd from ip=. The
-// tmpfiles.extra credential points resolv.conf at resolved, replacing the empty placeholder image
-// builds leave behind.
+// systemd-network-generator configures the machine's NAT device for networkd from ip=.
 func (t Machine) cmdline() string {
 	var (
-		resolv = base64.StdEncoding.EncodeToString([]byte("L+ /etc/resolv.conf - - - - ../run/systemd/resolve/stub-resolv.conf\n"))
+		resolv = base64.StdEncoding.EncodeToString([]byte(resolvlink))
 		params = []string{
 			"console=hvc0",
 			"quiet",

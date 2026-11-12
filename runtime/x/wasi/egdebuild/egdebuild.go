@@ -338,6 +338,20 @@ func UploadDPut(gcfg Config, dput fs.FS, opts ...option) eg.OpFn {
 	}
 }
 
+// Copy the binary packages (<name>_*.deb) produced by Build into the directory dst, creating it if necessary.
+// useful for handing the packages to later steps outside of the build container, e.g.) uploading to a github release.
+func Copy(gcfg Config, dst string, opts ...option) eg.OpFn {
+	return func(ctx context.Context, o eg.Op) error {
+		cfg := From(gcfg, opts...)
+		src := egenv.DirectoryTemp(fmt.Sprintf("deb.%s", cfg.Name))
+		runtime := shell.Runtime()
+		return shell.Run(
+			ctx,
+			runtime.Newf("rsync -av --include '%s_*.deb' --exclude '*' --mkpath %s/ %s/", cfg.Name, src, dst),
+		)
+	}
+}
+
 func applyversionsubstitutions(cfg Config) string {
 	return strings.ReplaceAll(cfg.Version, ":autopatch:", strconv.FormatInt(cfg.ChangeLog.When.Add(dynamicduration(10*time.Second, cfg.Distro)).UnixMilli(), 10))
 }

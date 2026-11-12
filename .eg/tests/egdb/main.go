@@ -7,7 +7,10 @@ import (
 
 	"github.com/egdaemon/eg/runtime/wasi/eg"
 	"github.com/egdaemon/eg/runtime/wasi/egenv"
+	"github.com/egdaemon/eg/runtime/wasi/egunsafe"
 	"github.com/egdaemon/eg/runtime/x/wasi/egdb"
+	"github.com/egdaemon/wasinet/wasinet"
+	"github.com/jackc/pgx/v5"
 )
 
 func ExecQuery(ctx context.Context, o eg.Op) error {
@@ -78,6 +81,53 @@ func Transaction(ctx context.Context, o eg.Op) error {
 	return nil
 }
 
+// PGX exercises the postgres wire frontend from inside the guest, connecting to the unix socket in the runtime
+// directory. pgconn derives the socket name (eg.SocketAnalyticsPG) from the directory it is given as the host.
+func PGX(ctx context.Context, o eg.Op) error {
+	cfg, err := pgx.ParseConfig(fmt.Sprintf("host=%s dbname=analytics sslmode=disable", egunsafe.RuntimeDirectory()))
+	if err != nil {
+		return fmt.Errorf("config: %w", err)
+	}
+	cfg.DialFunc = wasinet.DialContext
+
+	conn, err := pgx.ConnectConfig(ctx, cfg)
+	if err != nil {
+		return fmt.Errorf("connect: %w", err)
+	}
+	defer conn.Close(ctx)
+
+	var answer int
+	if err = conn.QueryRow(ctx, "SELECT 41 + 1").Scan(&answer); err != nil {
+		return fmt.Errorf("select: %w", err)
+	}
+
+	if answer != 42 {
+		return fmt.Errorf("unexpected answer: %d", answer)
+	}
+
+	if _, err = conn.Exec(ctx, "CREATE OR REPLACE TABLE duckproxy_integration_pgx (id INTEGER, name VARCHAR)"); err != nil {
+		return fmt.Errorf("create: %w", err)
+	}
+	defer conn.Exec(ctx, "DROP TABLE IF EXISTS duckproxy_integration_pgx")
+
+	if _, err = conn.Exec(ctx, "INSERT INTO duckproxy_integration_pgx VALUES (1, 'a'), (2, 'b')"); err != nil {
+		return fmt.Errorf("insert: %w", err)
+	}
+
+	var count int
+	var names string
+	if err = conn.QueryRow(ctx, "SELECT count(*), string_agg(name, ',' ORDER BY id) FROM duckproxy_integration_pgx").Scan(&count, &names); err != nil {
+		return fmt.Errorf("query: %w", err)
+	}
+
+	if count != 2 || names != "a,b" {
+		return fmt.Errorf("unexpected result: count=%d names=%q", count, names)
+	}
+
+	log.Println("pgx socket roundtrip succeeded")
+	return nil
+}
+
 func main() {
 	log.SetFlags(log.Lshortfile)
 	ctx, done := context.WithTimeout(context.Background(), egenv.TTL())
@@ -88,10 +138,9 @@ func main() {
 
 	err := eg.Perform(
 		ctx,
-		eg.Sequential(
-			ExecQuery,
-			Transaction,
-		),
+		ExecQuery,
+		Transaction,
+		PGX,
 	)
 	if err != nil {
 		log.Fatalln(err)

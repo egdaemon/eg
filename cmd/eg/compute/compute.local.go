@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -18,6 +19,7 @@ import (
 	"github.com/egdaemon/eg/compile"
 	"github.com/egdaemon/eg/internal/contextx"
 	"github.com/egdaemon/eg/internal/debugx"
+	"github.com/egdaemon/eg/internal/egvm"
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/gitx"
@@ -59,6 +61,7 @@ type local struct {
 	ContainerArgs    []string `name:"cargs" help:"list of command line arguments to pass to the root container" hidden:"true"`
 	Secrets          []string `name:"secret" help:"List of secret URIs to use. Examples: chachasm://passphrase@/path/to/file, gcpsm://project-id/secret-name/version, awssm://secret-name?region=us-east-1"`
 	Profile          string   `name:"profile" help:"enable profiling of module runs (cpu,heap,mem,allocs,block)" enum:"cpu,heap,mem,allocs,block," default:""`
+	Egiso            *string  `name:"egiso" help:"EXPERIMENTAL: run in a machine booted from the egiso at this path or https URL, with the digest of its table of contents as its fragment, built from the default root container when empty" hidden:"true"`
 	Name             string   `arg:"" name:"module" help:"name of the workload to run, i.e. the folder name within workload directory" default:"" predictor:"eg.workload"`
 }
 
@@ -67,30 +70,21 @@ func (t local) gpu() bool {
 	return t.GPU || t.RuntimeResources.Vram > 0
 }
 
-// runner runs compiled modules, one at a time, in a runtime.
-type runner interface {
-	Do(ctx context.Context, m transpile.Compiled) error
-	Close() error
-}
-
-// newrunner prepares a runtime for the modules of the workspace, adding what the runtime needs to
-// their environment.
-type newrunner func(ctx context.Context, ws workspaces.Context, uid uuid.UUID, canonicaluri string, envb *envx.Builder) (runner, error)
-
-func (t local) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) error {
-	return t.run(gctx, hotswapbin, t.podman)
-}
-
-// run compiles the workload's modules, runs them in the runtime newrt prepares, and applies the
-// changes they made.
-func (t local) run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath, newrt newrunner) (err error) {
+// Run compiles the workload's modules, runs them in containers or, given an egiso, a machine, and
+// applies the changes they made.
+func (t local) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, hotswapbin *cmdopts.HotswapPath) (err error) {
 	var (
 		ws      workspaces.Context
 		repo    *git.Repository
-		rt      runner
+		rt      runners.T
 		environ *os.File
-		uid     = uuid.Must(uuid.NewV7())
+		b       runners.B = runners.BFn(t.podman)
+		uid               = uuid.Must(uuid.NewV7())
 	)
+
+	if t.Egiso != nil {
+		b = t.machine(tlsc.DefaultClient(), *t.Egiso)
+	}
 
 	contextx.WaitGroupAdd(gctx.Context, 1)
 	go contextx.WaitGroupDone(gctx.Context)
@@ -171,7 +165,7 @@ func (t local) run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath, newrt 
 	debugx.Println("modules", modules)
 	debugx.Println("runtime resources", spew.Sdump(t.RuntimeResources))
 
-	if rt, err = newrt(gctx.Context, ws, uid, canonicaluri, envb); err != nil {
+	if rt, err = b.New(gctx.Context, ws, uid, canonicaluri, envb); err != nil {
 		return err
 	}
 	defer func() { err = errorsx.Compact(err, rt.Close()) }()
@@ -231,7 +225,7 @@ func (t container) Close() error {
 }
 
 // podman prepares containers of the root container built from the repository's Containerfile.
-func (t local) podman(ctx context.Context, ws workspaces.Context, uid uuid.UUID, canonicaluri string, envb *envx.Builder) (_ runner, err error) {
+func (t local) podman(ctx context.Context, ws workspaces.Context, uid uuid.UUID, canonicaluri string, envb *envx.Builder) (_ runners.T, err error) {
 	var (
 		homedir     = userx.HomeDirectoryOrDefault("/root")
 		environpath = filepath.Join(ws.RuntimeDir, eg.EnvironFile)
@@ -320,6 +314,22 @@ func (t local) podman(ctx context.Context, ws workspaces.Context, uid uuid.UUID,
 	)
 
 	return container{ctx: pctx, ws: ws, uid: uid, agent: ragent}, nil
+}
+
+// machine prepares a machine booted from the egiso at uri, fetched through c, or from one of the
+// default root container when uri is empty.
+func (t local) machine(c *http.Client, uri string) runners.BFn {
+	return func(ctx context.Context, ws workspaces.Context, _ uuid.UUID, _ string, _ *envx.Builder) (_ runners.T, err error) {
+		if stringsx.Blank(uri) {
+			if uri, err = runners.BuildRootEgiso(ctx, userx.DefaultCacheDirectory("egiso"), t.Dir, filepath.Join(ws.RuntimeDir, "Containerfile"), "--build-arg", envx.Format(eg.EnvBuildCommit, cmdopts.BuildCommit()), "--platform", podmanx.AutoPlatform(t.Arch)); err != nil {
+				return nil, err
+			}
+		}
+
+		return runners.NewMachine(ctx, c, ws, uri, log.Writer(),
+			egvm.OptionMountReadOnly(filepath.Join(ws.Root, ws.BuildDir, ws.Module, eg.ModuleDir), eg.DefaultMountRoot(eg.RuntimeDirectory, ws.Module, eg.ModuleDir)),
+		)
+	}
 }
 
 // patch applies the changes the workload made to its working directory to the worktree, or prints

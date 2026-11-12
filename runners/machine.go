@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"os/exec"
@@ -21,6 +22,7 @@ import (
 	"github.com/egdaemon/eg/internal/slicesx"
 	"github.com/egdaemon/eg/internal/stringsx"
 	"github.com/egdaemon/eg/interp/execproxy"
+	"github.com/egdaemon/eg/transpile"
 	"github.com/egdaemon/eg/workspaces"
 	"github.com/opencontainers/go-digest"
 )
@@ -166,9 +168,9 @@ func BuildRootEgiso(ctx context.Context, cache, dir, path string, options ...str
 	return location + "#" + toc.String(), nil
 }
 
-// Module runs the module at path in the machine, as c8sproxy.PodmanModule runs it in a container,
-// with the workspace's environment file and environ added to it.
-func (t *Machine) Module(ctx context.Context, path string, environ []string, options ...egvm.ExecOption) (err error) {
+// Do runs the module in the machine, as c8sproxy.PodmanModule runs it in a container, with the
+// workspace's environment file and the stdio of eg.
+func (t *Machine) Do(ctx context.Context, m transpile.Compiled) (err error) {
 	var (
 		env       []string
 		verbosity string
@@ -178,11 +180,11 @@ func (t *Machine) Module(ctx context.Context, path string, environ []string, opt
 		verbosity = fmt.Sprintf("-%s", strings.Repeat("v", x))
 	}
 
-	if err = iox.Copy(path, filepath.Join(t.ws.RuntimeDir, eg.ModuleBin)); err != nil {
+	if err = iox.Copy(m.Path, filepath.Join(t.ws.RuntimeDir, eg.ModuleBin)); err != nil {
 		return errorsx.Wrap(err, "unable to place the module")
 	}
 
-	if env, err = envx.Build().FromPath(filepath.Join(t.ws.RuntimeDir, eg.EnvironFile)).FromEnviron(environ...).Environ(); err != nil {
+	if env, err = envx.Build().FromPath(filepath.Join(t.ws.RuntimeDir, eg.EnvironFile)).Environ(); err != nil {
 		return errorsx.Wrap(err, "unable to generate environment")
 	}
 
@@ -192,7 +194,7 @@ func (t *Machine) Module(ctx context.Context, path string, environ []string, opt
 		Arguments:   slicesx.Filter(stringsx.Present, verbosity, "module", "--directory", eg.DefaultWorkingDirectory(), "--moduledir", t.ws.RuntimeDir, eg.ModuleMount()),
 		Dir:         "/",
 		Environment: env,
-	}, options...)
+	}, egvm.ExecOptionStdin(os.Stdin), egvm.ExecOptionStdout(log.Writer()), egvm.ExecOptionStderr(log.Writer()))
 }
 
 // Close shuts the machine down and releases its egiso.

@@ -17,17 +17,23 @@ import (
 	"github.com/egdaemon/eg/interp/execproxy"
 	subids "github.com/moby/sys/user"
 	"go.podman.io/common/pkg/cgroups"
+	"golang.org/x/crypto/ssh"
 	"golang.org/x/sys/unix"
 )
 
 // dnsforward is the address pasta answers DNS on inside the machine, as it does for rootless podman.
 const dnsforward = "169.254.1.1"
 
+// sshdir is where systemd-ssh-generator binds sshd's AF_UNIX socket, which the host shares into the
+// machine so the socket is the host's to dial.
+const sshdir = "/run/ssh-unix-local"
+
 // VM is a running machine: the root's init in namespaces of its own, rooted at the egiso.
 type VM struct {
 	dir     string
 	netns   string
-	agent   string
+	socket  string
+	signer  ssh.Signer
 	dev     *os.File
 	init    *exec.Cmd
 	stopped chan struct{}
@@ -40,14 +46,14 @@ type VM struct {
 // rootless podman. Its init's output is copied to console.
 func Boot(m Machine, console io.Writer) (_ *VM, err error) {
 	var (
-		t        = &VM{stopped: make(chan struct{})}
-		root     string
-		listener *net.UnixListener
-		agent    *os.File
-		mapped   [2]*os.File
-		mounted  [2]int
-		args     []string
-		owned    bool
+		t          = &VM{stopped: make(chan struct{})}
+		root       string
+		shared     string
+		authorized string
+		mapped     [2]*os.File
+		mounted    [2]int
+		args       []string
+		owned      bool
 	)
 	defer func() {
 		if err != nil {
@@ -66,9 +72,17 @@ func Boot(m Machine, console io.Writer) (_ *VM, err error) {
 	if t.dir, err = os.MkdirTemp("", "egvm.*"); err != nil {
 		return nil, errorsx.Wrap(err, "unable to create the machine's directory")
 	}
-	root, t.agent = filepath.Join(t.dir, "root"), filepath.Join(t.dir, "agent.sock")
+	root, shared = filepath.Join(t.dir, "root"), filepath.Join(t.dir, "ssh")
+	t.socket = filepath.Join(shared, "socket")
 	if err = os.Mkdir(root, 0755); err != nil {
 		return nil, errorsx.Wrap(err, "unable to create the machine's root")
+	}
+	if err = os.Mkdir(shared, 0700); err != nil {
+		return nil, errorsx.Wrap(err, "unable to create the machine's ssh directory")
+	}
+
+	if t.signer, authorized, err = key(); err != nil {
+		return nil, err
 	}
 
 	// the network namespace file goes where rootless podman keeps its own, which pasta may read.
@@ -80,17 +94,6 @@ func Boot(m Machine, console io.Writer) (_ *VM, err error) {
 		return nil, errorsx.Wrap(err, "unable to create the machine's network namespace file")
 	}
 
-	if listener, err = net.ListenUnix("unix", &net.UnixAddr{Name: t.agent, Net: "unix"}); err != nil {
-		return nil, errorsx.Wrap(err, "unable to listen for the machine's agent")
-	}
-	// the agent listens on the socket after Boot closes its own copy.
-	listener.SetUnlinkOnClose(false)
-	defer listener.Close()
-	if agent, err = listener.File(); err != nil {
-		return nil, err
-	}
-	defer agent.Close()
-
 	if mapped[0], mapped[1], err = os.Pipe(); err != nil {
 		return nil, err
 	}
@@ -100,7 +103,7 @@ func Boot(m Machine, console io.Writer) (_ *VM, err error) {
 	}
 	defer unix.Close(mounted[0])
 
-	args = []string{stagemap, root, m.init, t.netns}
+	args = []string{stagemap, root, m.init, t.netns, authorized, shared, sshdir, strconv.FormatBool(false)}
 	for _, mnt := range m.mounts {
 		args = append(args, mnt.dir, mnt.path, strconv.FormatBool(mnt.readonly))
 	}
@@ -110,7 +113,7 @@ func Boot(m Machine, console io.Writer) (_ *VM, err error) {
 		Args:        args,
 		Stdout:      console,
 		Stderr:      console,
-		ExtraFiles:  []*os.File{mapped[0], os.NewFile(uintptr(mounted[1]), "mounted"), agent},
+		ExtraFiles:  []*os.File{mapped[0], os.NewFile(uintptr(mounted[1]), "mounted")},
 		SysProcAttr: &syscall.SysProcAttr{Cloneflags: syscall.CLONE_NEWUSER | syscall.CLONE_NEWNS, Pdeathsig: syscall.SIGKILL},
 	}
 	err = t.init.Start()
@@ -206,24 +209,15 @@ func idmap(pid int) error {
 // Exec runs req in the machine and waits for it, with no input and its output discarded unless
 // options say otherwise. A command that exits with other than 0 returns an ExitError. It waits for
 // the machine to serve commands. Cancelling ctx kills the command.
-func (t *VM) Exec(ctx context.Context, req *execproxy.ExecRequest, options ...ExecOption) error {
-	return command(ctx, t.connect, req, options...)
-}
-
-// connect opens the stream of command id. The agent's socket listens from the start, so a
-// connection waits there until the agent serves it.
-func (t *VM) connect(ctx context.Context, id uint64, stream uint8) (conn net.Conn, err error) {
+func (t *VM) Exec(ctx context.Context, req *execproxy.ExecRequest, options ...ExecOption) (err error) {
 	var (
-		dialer net.Dialer
+		conn net.Conn
 	)
 
-	if conn, err = dialer.DialContext(ctx, "unix", t.agent); err != nil {
-		return nil, errorsx.Wrap(err, "unable to reach the machine's agent")
+	if conn, err = redial(ctx, func() (net.Conn, error) { return net.Dial("unix", t.socket) }, t.stopped, func() error { return nil }); err != nil {
+		return err
 	}
-	if err = WriteHeader(conn, id, stream); err != nil {
-		return nil, errorsx.Compact(err, conn.Close())
-	}
-	return conn, nil
+	return command(ctx, conn, t.signer, req, options...)
 }
 
 // Close stops the machine, which ends every process of its namespaces and with them the mount of its

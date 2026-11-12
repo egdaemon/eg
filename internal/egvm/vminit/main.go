@@ -2,9 +2,8 @@
 
 // Command vminit is the init of an egvm machine. It loads the kernel modules in /modules in name
 // order, mounts the root the host serves over NFS, and execs the root's init, the init= of the
-// kernel's command line, as the machine's pid 1. Before it does, it starts itself again twice; both
-// outlive the switch. One forwards the guest's NFS client to the host over vsock. The other, the
-// agent, serves commands on vsock port egvm.Port inside the root once the root's init answers them.
+// kernel's command line, as the machine's pid 1. Before it does, it starts itself again to forward
+// the guest's NFS client to the host over vsock; the forwarder outlives the switch.
 package main
 
 import (
@@ -27,9 +26,6 @@ func main() {
 	switch os.Args[0] {
 	case "nfs":
 		fmt.Println("egvm: nfs:", forward(os.NewFile(3, "nfs")))
-		os.Exit(1)
-	case "agent":
-		fmt.Println("egvm: agent:", agent(os.NewFile(3, "switch"), os.NewFile(4, "switched")))
 		os.Exit(1)
 	}
 
@@ -82,27 +78,13 @@ func boot() error {
 		return err
 	}
 
-	switching, switchw, err := os.Pipe()
-	if err != nil {
-		return err
-	}
-	switchedr, switched, err := os.Pipe()
-	if err != nil {
-		return err
-	}
-
-	// the forwarder never forks, so the commands the agent forks always have it to page themselves in over NFS.
-	for _, child := range []*exec.Cmd{
-		{Path: "/init", Args: []string{"nfs"}, Stdout: os.Stdout, Stderr: os.Stderr, ExtraFiles: []*os.File{listener}},
-		{Path: "/init", Args: []string{"agent"}, Stdout: os.Stdout, Stderr: os.Stderr, ExtraFiles: []*os.File{switching, switched}},
-	} {
-		if err = child.Start(); err != nil {
-			return fmt.Errorf("unable to start %s: %w", child.Args[0], err)
-		}
+	// the forwarder runs from the initramfs and never forks, so the root's processes always have it to
+	// page themselves in over NFS.
+	forwarder := &exec.Cmd{Path: "/init", Args: []string{"nfs"}, Stdout: os.Stdout, Stderr: os.Stderr, ExtraFiles: []*os.File{listener}}
+	if err = forwarder.Start(); err != nil {
+		return fmt.Errorf("unable to start the nfs forwarder: %w", err)
 	}
 	listener.Close()
-	switching.Close()
-	switched.Close()
 
 	options := fmt.Sprintf("vers=3,proto=tcp,port=%d,mountport=%d,mountproto=tcp,nolock,addr=127.0.0.1,mountaddr=127.0.0.1", egvm.NFSPort, egvm.NFSPort)
 	if err = mount("127.0.0.1:/", "/root", "nfs", options); err != nil {
@@ -120,12 +102,6 @@ func boot() error {
 		return fmt.Errorf("unable to make the root's /sys read only: %w", err)
 	}
 
-	// the agent enters the root before it moves over the initramfs, which hides the root's path.
-	switchw.Close()
-	if _, err = io.Copy(io.Discard, switchedr); err != nil {
-		return err
-	}
-
 	if err = unix.Chdir("/root"); err != nil {
 		return err
 	}
@@ -140,45 +116,6 @@ func boot() error {
 	}
 
 	return fmt.Errorf("unable to exec %s: %w", rootinit, unix.Exec(rootinit, []string{rootinit}, os.Environ()))
-}
-
-// agent enters the root once switching closes, closes switched, and serves commands once the
-// root's init answers them.
-func agent(switching *os.File, switched *os.File) (err error) {
-	var (
-		rootinit string
-		fd       int
-	)
-
-	if rootinit, err = initpath(); err != nil {
-		return err
-	}
-	if _, err = io.Copy(io.Discard, switching); err != nil {
-		return err
-	}
-	if err = unix.Chroot("/root"); err != nil {
-		return fmt.Errorf("unable to enter the root: %w", err)
-	}
-	if err = unix.Chdir("/"); err != nil {
-		return err
-	}
-	switched.Close()
-
-	if err = egvm.Answering(rootinit); err != nil {
-		return err
-	}
-
-	if fd, err = unix.Socket(unix.AF_VSOCK, unix.SOCK_STREAM|unix.SOCK_CLOEXEC, 0); err != nil {
-		return fmt.Errorf("unable to create the vsock listener: %w", err)
-	}
-	if err = unix.Bind(fd, &unix.SockaddrVM{CID: unix.VMADDR_CID_ANY, Port: egvm.Port}); err != nil {
-		return fmt.Errorf("unable to bind vsock port %d: %w", egvm.Port, err)
-	}
-	if err = unix.Listen(fd, unix.SOMAXCONN); err != nil {
-		return fmt.Errorf("unable to listen on vsock port %d: %w", egvm.Port, err)
-	}
-
-	return egvm.Serve(fd)
 }
 
 // initpath is the root's init: the init= of the kernel's command line, else /usr/sbin/init.
@@ -239,7 +176,7 @@ func forward(nfs *os.File) (err error) {
 	}
 }
 
-// loopback brings up lo, which the guest's NFS client reaches the agent on.
+// loopback brings up lo, which the guest's NFS client reaches the forwarder on.
 func loopback() error {
 	fd, err := unix.Socket(unix.AF_INET, unix.SOCK_DGRAM|unix.SOCK_CLOEXEC, 0)
 	if err != nil {

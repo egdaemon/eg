@@ -20,34 +20,25 @@ import (
 // namespace maps its ids holds no capabilities in it, and starting again as the namespace's root
 // restores them. stageroot mounts the root and starts stageinit in namespaces of its own, whose
 // network pasta connects to the host's, as rootless podman runs pasta beside a container.
-// stageinit execs the root's init; before it does it starts stageagent, which serves commands
-// inside the root.
+// stageinit execs the root's init.
 const (
-	stagemap   = "egvm-map"
-	stageroot  = "egvm-root"
-	stageinit  = "egvm-init"
-	stageagent = "egvm-agent"
+	stagemap  = "egvm-map"
+	stageroot = "egvm-root"
+	stageinit = "egvm-init"
 )
 
 // The descriptors Boot hands stagemap and stageroot: the pipe Boot closes once it maps the
-// machine's ids, the socket stageroot sends the /dev/fuse descriptor of the root's mount back over,
-// and the agent's listener. The kernel mounts a FUSE descriptor only in the user namespace that
-// opened it, so stageroot opens it, and Boot serves it.
+// machine's ids, and the socket stageroot sends the /dev/fuse descriptor of the root's mount back
+// over. The kernel mounts a FUSE descriptor only in the user namespace that opened it, so stageroot
+// opens it, and Boot serves it.
 const (
 	fdmapped  = 3
 	fdmounted = 4
-	fdagent   = 5
 )
 
-// The descriptors stageroot hands stageinit, and stageinit the agent: the agent's listener, then
-// for stageinit the pipe stageroot closes once pasta connects the machine's network, and for the
-// agent the pipe stageinit closes when it execs the root's init, by when the agent's root is the
-// machine's.
-const (
-	fdlistener  = 3
-	fdnetworked = 4
-	fdswitched  = 4
-)
+// fdnetworked is the pipe stageroot hands stageinit and closes once pasta connects the machine's
+// network.
+const fdnetworked = 3
 
 // credentials is where the root's systemd reads the system credentials the machine passes it.
 const credentials = "/run/egvm/credentials"
@@ -61,11 +52,9 @@ func init() {
 	case stagemap:
 		err = waitmapped()
 	case stageroot:
-		err = boot(os.Args[1], os.Args[2], os.Args[3], os.Args[4:])
+		err = boot(os.Args[1], os.Args[2], os.Args[3], os.Args[4], os.Args[5:])
 	case stageinit:
 		err = start(os.Args[1], os.Args[2])
-	case stageagent:
-		err = serveagent(os.Args[1])
 	default:
 		return
 	}
@@ -87,9 +76,10 @@ func waitmapped() error {
 
 // boot mounts the root at root over FUSE and readies it as a container runtime readies an image,
 // then runs the machine's init until it exits. netns is the file the init's network namespace is
-// mounted on for pasta. shares are the directories the machine mounts, as triples of the host
-// directory, the path within the root, and whether it is read only.
-func boot(root string, rootinit string, netns string, shares []string) (err error) {
+// mounted on for pasta. authorized is the key root accepts over ssh. shares are the directories the
+// machine mounts, as triples of the host directory, the path within the root, and whether it is read
+// only.
+func boot(root string, rootinit string, netns string, authorized string, shares []string) (err error) {
 	var (
 		machine   *exec.Cmd
 		networked [2]*os.File
@@ -104,7 +94,7 @@ func boot(root string, rootinit string, netns string, shares []string) (err erro
 		return err
 	}
 
-	for _, fd := range []int{fdmapped, fdmounted, fdagent} {
+	for _, fd := range []int{fdmapped, fdmounted} {
 		unix.CloseOnExec(fd)
 	}
 
@@ -139,6 +129,7 @@ func boot(root string, rootinit string, netns string, shares []string) (err erro
 	}{
 		{name: "tmpfiles.extra", value: resolvlink},
 		{name: "network.dns", value: dnsforward},
+		{name: "ssh.ephemeral-authorized_keys-all", value: authorized},
 	} {
 		if err = os.WriteFile(filepath.Join(root, credentials, c.name), []byte(c.value), 0400); err != nil {
 			return err
@@ -161,7 +152,7 @@ func boot(root string, rootinit string, netns string, shares []string) (err erro
 		Args:       []string{stageinit, root, rootinit},
 		Stdout:     os.Stdout,
 		Stderr:     os.Stderr,
-		ExtraFiles: []*os.File{os.NewFile(fdagent, "agent"), networked[0]},
+		ExtraFiles: []*os.File{networked[0]},
 		SysProcAttr: &syscall.SysProcAttr{
 			Cloneflags: syscall.CLONE_NEWNS | syscall.CLONE_NEWPID | syscall.CLONE_NEWNET | syscall.CLONE_NEWUTS | syscall.CLONE_NEWIPC | syscall.CLONE_NEWCGROUP,
 			Pdeathsig:  syscall.SIGKILL,
@@ -211,13 +202,8 @@ func boot(root string, rootinit string, netns string, shares []string) (err erro
 }
 
 // start execs rootinit in root once pasta connects the machine's network, after mounting the
-// filesystems its own pid, network and ipc namespaces back and starting the agent.
+// filesystems its own pid, network and ipc namespaces back.
 func start(root string, rootinit string) (err error) {
-	var (
-		agent    *exec.Cmd
-		switched [2]int
-	)
-
 	if _, err = io.Copy(io.Discard, os.NewFile(fdnetworked, "networked")); err != nil {
 		return err
 	}
@@ -236,17 +222,6 @@ func start(root string, rootinit string) (err error) {
 		}
 	}
 
-	// the write end is a bare descriptor, which only the exec of the root's init closes.
-	if err = unix.Pipe2(switched[:], unix.O_CLOEXEC); err != nil {
-		return err
-	}
-	agent = &exec.Cmd{Path: "/proc/self/exe", Args: []string{stageagent, rootinit}, Stdout: os.Stdout, Stderr: os.Stderr, ExtraFiles: []*os.File{os.NewFile(fdlistener, "agent"), os.NewFile(uintptr(switched[0]), "switched")}}
-	err = agent.Start()
-	agent.ExtraFiles[1].Close()
-	if err != nil {
-		return fmt.Errorf("unable to start the agent: %w", err)
-	}
-	unix.CloseOnExec(fdlistener)
 	unix.CloseOnExec(fdnetworked)
 
 	if err = unix.Chdir(root); err != nil {
@@ -320,21 +295,6 @@ func share(dir string, target string, readonly bool) (err error) {
 		return fmt.Errorf("unable to share %s read only: %w", dir, err)
 	}
 	return nil
-}
-
-// serveagent serves commands on the listener stageinit hands it, once stageinit switches the root and
-// rootinit answers them. Switching the root moves the agent's along with it.
-func serveagent(rootinit string) (err error) {
-	if _, err = io.Copy(io.Discard, os.NewFile(fdswitched, "switched")); err != nil {
-		return err
-	}
-	if err = unix.Chdir("/"); err != nil {
-		return err
-	}
-	if err = Answering(rootinit); err != nil {
-		return err
-	}
-	return Serve(fdlistener)
 }
 
 // mountat mounts source at target, creating target first.

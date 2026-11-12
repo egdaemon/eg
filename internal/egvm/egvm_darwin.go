@@ -12,12 +12,14 @@ import (
 	"github.com/egdaemon/eg/internal/egiso"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/interp/execproxy"
+	"golang.org/x/crypto/ssh"
 )
 
 // VM is a running machine.
 type VM struct {
 	vm      *vz.VirtualMachine
 	socket  *vz.VirtioSocketDevice
+	signer  ssh.Signer
 	stopped chan struct{}
 	err     error
 	closers []io.Closer
@@ -28,10 +30,16 @@ type VM struct {
 // process needs the com.apple.security.virtualization entitlement.
 func Boot(m Machine, console io.Writer) (_ *VM, err error) {
 	var (
-		config *vz.VirtualMachineConfiguration
-		vm     *vz.VirtualMachine
-		nfs    *vz.VirtioSocketListener
+		config     *vz.VirtualMachineConfiguration
+		vm         *vz.VirtualMachine
+		nfs        *vz.VirtioSocketListener
+		signer     ssh.Signer
+		authorized string
 	)
+
+	if signer, authorized, err = key(); err != nil {
+		return nil, err
+	}
 
 	// the console's input is a pipe nothing writes to; its output is copied to console.
 	in, stdin, err := os.Pipe()
@@ -42,14 +50,14 @@ func Boot(m Machine, console io.Writer) (_ *VM, err error) {
 	if err != nil {
 		return nil, errorsx.Compact(err, in.Close(), stdin.Close())
 	}
-	t := &VM{stopped: make(chan struct{}), copied: make(chan struct{}), closers: []io.Closer{in, stdin, out, stdout}}
+	t := &VM{signer: signer, stopped: make(chan struct{}), copied: make(chan struct{}), closers: []io.Closer{in, stdin, out, stdout}}
 	defer func() {
 		if err != nil {
 			t.close()
 		}
 	}()
 
-	if config, err = configure(m, in, out); err != nil {
+	if config, err = configure(m, authorized, in, out); err != nil {
 		return nil, err
 	}
 	if vm, err = vz.NewVirtualMachine(config); err != nil {
@@ -85,29 +93,15 @@ func Boot(m Machine, console io.Writer) (_ *VM, err error) {
 // Exec runs req in the machine and waits for it, with no input and its output discarded unless
 // options say otherwise. A command that exits with other than 0 returns an ExitError. It waits for
 // the machine to serve commands. Cancelling ctx kills the command.
-func (t *VM) Exec(ctx context.Context, req *execproxy.ExecRequest, options ...ExecOption) error {
-	return command(ctx, t.connect, req, options...)
-}
+func (t *VM) Exec(ctx context.Context, req *execproxy.ExecRequest, options ...ExecOption) (err error) {
+	var (
+		conn net.Conn
+	)
 
-// connect opens the stream of command id, retrying until the machine serves commands.
-func (t *VM) connect(ctx context.Context, id uint64, stream uint8) (net.Conn, error) {
-	for {
-		conn, err := t.socket.Connect(Port)
-		if err == nil {
-			if err = WriteHeader(conn, id, stream); err != nil {
-				return nil, errorsx.Compact(err, conn.Close())
-			}
-			return conn, nil
-		}
-
-		select {
-		case <-ctx.Done():
-			return nil, ctx.Err()
-		case <-t.stopped:
-			return nil, errorsx.Compact(errorsx.New("the machine stopped"), t.err)
-		case <-time.After(10 * time.Millisecond):
-		}
+	if conn, err = redial(ctx, func() (net.Conn, error) { return t.socket.Connect(22) }, t.stopped, func() error { return t.err }); err != nil {
+		return err
 	}
+	return command(ctx, conn, t.signer, req, options...)
 }
 
 // Close stops the machine and waits for it.
@@ -131,7 +125,7 @@ func (t *VM) close() {
 	}
 }
 
-func configure(m Machine, in *os.File, out *os.File) (_ *vz.VirtualMachineConfiguration, err error) {
+func configure(m Machine, authorized string, in *os.File, out *os.File) (_ *vz.VirtualMachineConfiguration, err error) {
 	var (
 		boot     *vz.LinuxBootLoader
 		config   *vz.VirtualMachineConfiguration
@@ -147,7 +141,7 @@ func configure(m Machine, in *os.File, out *os.File) (_ *vz.VirtualMachineConfig
 		devices  = make([]vz.DirectorySharingDeviceConfiguration, 0, len(m.mounts))
 	)
 
-	if boot, err = vz.NewLinuxBootLoader(filepath.Join(m.dir, "Image"), vz.WithInitrd(filepath.Join(m.dir, "initramfs")), vz.WithCommandLine(m.cmdline())); err != nil {
+	if boot, err = vz.NewLinuxBootLoader(filepath.Join(m.dir, "Image"), vz.WithInitrd(filepath.Join(m.dir, "initramfs")), vz.WithCommandLine(m.cmdline(authorized))); err != nil {
 		return nil, errorsx.Wrap(err, "unable to create the boot loader")
 	}
 	if config, err = vz.NewVirtualMachineConfiguration(boot, m.cpus, m.memory); err != nil {

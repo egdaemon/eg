@@ -1,7 +1,6 @@
 package egvm_test
 
 import (
-	"archive/tar"
 	"bytes"
 	"context"
 	"errors"
@@ -22,27 +21,30 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestExec runs commands in a Linux machine whose root is an egiso served over NFS. It needs
-// EG_TEST_ALPINE, a directory holding an uncompressed arm64 kernel (Image), Alpine's initramfs
-// unpacked (initrd) and the kernel's modules from its modloop (modules), and the test binary signed
-// with vz.entitlements:
+// TestExec runs commands over ssh in a Linux machine whose root is an egiso served over NFS, booted
+// by its systemd. It needs EG_TEST_ALPINE, a directory holding an uncompressed arm64 kernel (Image)
+// and the kernel's modules from Alpine's modloop (modules), EG_TEST_ROOTFS, a tar of the root
+// container's filesystem, whose sshd it reaches, and the test binary signed with vz.entitlements:
 //
-//	go test -c -o egvm.test ./internal/egvm && codesign -f -s - --entitlements internal/egvm/vz.entitlements egvm.test && ./egvm.test -test.v
+//	podman export $(podman create localhost/eg:latest) > eg.tar
+//	go test -c -o egvm.test ./internal/egvm && codesign -f -s - --entitlements internal/egvm/vz.entitlements egvm.test && EG_TEST_ROOTFS=eg.tar ./egvm.test -test.v
 func TestExec(t *testing.T) {
 	var (
 		alpine   = os.Getenv("EG_TEST_ALPINE")
-		initrd   = filepath.Join(alpine, "initrd")
+		rootfs   = os.Getenv("EG_TEST_ROOTFS")
 		console  bytes.Buffer
 		kernels  []string
 		archive  *egiso.Archive
 		root     *egiso.SysFS
 		upperdir string
+		users    []egiso.Account
+		groups   []egiso.Account
 		vm       *egvm.VM
 		err      error
 	)
 
-	if alpine == "" {
-		t.Skip("EG_TEST_ALPINE is not set")
+	if alpine == "" || rootfs == "" {
+		t.Skip("EG_TEST_ALPINE or EG_TEST_ROOTFS is not set")
 	}
 	kernels, err = filepath.Glob(filepath.Join(alpine, "modules", "*", "kernel"))
 	require.NoError(t, err)
@@ -69,59 +71,42 @@ func TestExec(t *testing.T) {
 		return dir
 	}
 
-	// image is an egiso of Alpine's busybox and musl.
+	// image is an egiso of the root filesystem.
 	image := func(t *testing.T) *egiso.Archive {
 		var (
-			buf bytes.Buffer
 			out bytes.Buffer
 		)
 
-		tw := tar.NewWriter(&buf)
-		write := func(h *tar.Header, data []byte) {
-			h.Size = int64(len(data))
-			h.ModTime = time.Unix(1700000000, 0)
-			require.NoError(t, tw.WriteHeader(h))
-			_, cause := tw.Write(data)
-			require.NoError(t, cause)
-		}
-		host := func(name string) []byte {
-			b, cause := os.ReadFile(filepath.Join(initrd, name))
-			require.NoError(t, cause)
-			return b
-		}
+		f, cause := os.Open(rootfs)
+		require.NoError(t, cause)
+		defer f.Close()
+		st, cause := f.Stat()
+		require.NoError(t, cause)
 
-		for _, dir := range []string{"bin/", "lib/", "etc/", "tmp/", "dev/", "proc/", "sys/"} {
-			write(&tar.Header{Typeflag: tar.TypeDir, Name: dir, Mode: 0755}, nil)
-		}
-		write(&tar.Header{Typeflag: tar.TypeReg, Name: "bin/busybox", Mode: 0755}, host("bin/busybox"))
-		for _, name := range []string{"sh", "cat", "uname", "mkdir", "sleep", "pwd"} {
-			write(&tar.Header{Typeflag: tar.TypeSymlink, Name: "bin/" + name, Linkname: "/bin/busybox", Mode: 0777}, nil)
-		}
-		write(&tar.Header{Typeflag: tar.TypeReg, Name: "lib/ld-musl-aarch64.so.1", Mode: 0755}, host("lib/ld-musl-aarch64.so.1"))
-		write(&tar.Header{Typeflag: tar.TypeReg, Name: "etc/hostname", Mode: 0644}, []byte("egvm\n"))
-		require.NoError(t, tw.Close())
-
-		toc, cause := egiso.Build(io.NewSectionReader(bytes.NewReader(buf.Bytes()), 0, int64(buf.Len())), &out)
+		toc, cause := egiso.Build(io.NewSectionReader(f, 0, st.Size()), &out)
 		require.NoError(t, cause)
 		a, cause := egiso.New(io.NewSectionReader(bytes.NewReader(out.Bytes()), 0, int64(out.Len())), toc)
 		require.NoError(t, cause)
 		return a
 	}
 
-	// upper is the image under a writable upper in a directory of its own.
+	// upper is the image under a writable upper in a directory of its own, keeping the image's own
+	// owners, as runners.Machine roots a machine, so sshd finds its files owned by root.
 	upper := func(t *testing.T, a *egiso.Archive) (*egiso.SysFS, string) {
 		dir := t.TempDir()
 		r, cause := os.OpenRoot(dir)
 		require.NoError(t, cause)
 		t.Cleanup(func() { r.Close() })
 
-		tree := egiso.Tree{}.Mount(".", a, egiso.NewOwners(), egiso.NewOwners())
+		tree := egiso.Tree{}.Mount(".", a, egiso.Identity(users), egiso.Identity(groups))
 		return egiso.NewSysFS(egiso.NewUpper(tree, r), egiso.Default, egiso.Default), dir
 	}
 
 	archive = image(t)
+	users, groups, err = archive.Accounts()
+	require.NoError(t, err)
 	root, upperdir = upper(t, archive)
-	vm, err = egvm.Boot(egvm.New(root, egvm.OptionDirectory(directory(t)), egvm.OptionInit("/bin/sh")), &console)
+	vm, err = egvm.Boot(egvm.New(root, egvm.OptionDirectory(directory(t)), egvm.OptionAccounts(users, groups)), &console)
 	if err != nil && strings.Contains(err.Error(), "entitlement") {
 		t.Skipf("the test binary is not signed with vz.entitlements: %v", err)
 	}
@@ -144,15 +129,21 @@ func TestExec(t *testing.T) {
 	}
 
 	t.Run("runs the image's linux binaries with the egiso as their root", func(t *testing.T) {
-		code, stdout, _ := run(t, t.Context(), nil, "sh", "-c", "cat /etc/hostname && uname -s")
+		code, stdout, _ := run(t, t.Context(), nil, "sh", "-c", "grep ^NAME= /etc/os-release && uname -s")
 		require.Equal(t, int32(0), code)
-		require.Equal(t, "egvm\nLinux\n", stdout)
+		require.Equal(t, "NAME=\"Ubuntu\"\nLinux\n", stdout)
 	})
 
-	t.Run("hands pid 1 to the init on the kernel's command line", func(t *testing.T) {
-		code, stdout, _ := run(t, t.Context(), nil, "cat", "/proc/1/cmdline")
+	t.Run("hands pid 1 to the root's systemd", func(t *testing.T) {
+		code, stdout, _ := run(t, t.Context(), nil, "cat", "/proc/1/comm")
 		require.Equal(t, int32(0), code)
-		require.Equal(t, "/bin/sh\x00", stdout)
+		require.Equal(t, "systemd\n", stdout)
+	})
+
+	t.Run("quotes arguments the shell would expand", func(t *testing.T) {
+		code, stdout, _ := run(t, t.Context(), nil, "printf", "%s|", "a b", "$HOME", "'q'", "*")
+		require.Equal(t, int32(0), code)
+		require.Equal(t, "a b|$HOME|'q'|*|", stdout)
 	})
 
 	t.Run("writes go to the upper and leave the image as it is", func(t *testing.T) {

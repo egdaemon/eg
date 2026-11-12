@@ -3,9 +3,10 @@
 // mounts it and hands the machine to the root's own init, as a container runtime starts an image
 // with /usr/sbin/init. The kernel's command line tells the root's systemd what the machine attaches:
 // the virtio-fs devices to mount and the network to configure. vminit keeps running beside the root's
-// init, forwarding NFS and running the commands the host sends it over vsock. On Linux the machine
-// shares the host's kernel: the root's init runs in namespaces of its own, rooted at the egiso
-// served over FUSE, with an agent beside it serving the same commands over a unix socket.
+// init, forwarding NFS. On Linux the machine shares the host's kernel: the root's init runs in
+// namespaces of its own, rooted at the egiso served over FUSE. Commands run over ssh into the root's
+// own sshd, which systemd-ssh-generator binds to vsock port 22 in a virtual machine and to
+// /run/ssh-unix-local/socket on Linux, as root with a key the machine authorizes when it boots.
 package egvm
 
 import (
@@ -149,8 +150,9 @@ func newstdio(options ...ExecOption) stdio {
 // cmdline is the machine's kernel command line. Container images hold no udev to announce the
 // console, so systemd starts no getty on it: one would wait out its device's timeout before the
 // machine boots. systemd-fstab-generator mounts the virtio-fs devices from systemd.mount-extra, and
-// systemd-network-generator configures the machine's NAT device for networkd from ip=.
-func (t Machine) cmdline() string {
+// systemd-network-generator configures the machine's NAT device for networkd from ip=. authorized is
+// the key root accepts over ssh.
+func (t Machine) cmdline(authorized string) string {
 	var (
 		resolv = base64.StdEncoding.EncodeToString([]byte(resolvlink))
 		params = []string{
@@ -162,6 +164,7 @@ func (t Machine) cmdline() string {
 			"systemd.wants=systemd-network-generator.service",
 			"systemd.wants=systemd-networkd.service",
 			"systemd.set_credential_binary=tmpfiles.extra:" + resolv,
+			"systemd.set_credential_binary=ssh.ephemeral-authorized_keys-all:" + base64.StdEncoding.EncodeToString([]byte(authorized)),
 		}
 	)
 

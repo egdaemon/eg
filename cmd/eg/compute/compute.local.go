@@ -327,6 +327,8 @@ func (t local) machine(c *http.Client, uri string) runners.BFn {
 		}
 
 		return runners.NewMachine(ctx, c, ws, uri, log.Writer(),
+			egvm.OptionCPUs(uint(t.RuntimeResources.Cores)),
+			egvm.OptionMemory(uint64(t.RuntimeResources.Memory)),
 			egvm.OptionMountReadOnly(filepath.Join(ws.Root, ws.BuildDir, ws.Module, eg.ModuleDir), eg.DefaultMountRoot(eg.RuntimeDirectory, ws.Module, eg.ModuleDir)),
 		)
 	}

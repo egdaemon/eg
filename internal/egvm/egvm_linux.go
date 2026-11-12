@@ -2,6 +2,7 @@ package egvm
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"net"
 	"os"
@@ -10,11 +11,14 @@ import (
 	"path/filepath"
 	"strconv"
 	"syscall"
+	"time"
 
+	systemd "github.com/coreos/go-systemd/v22/dbus"
 	"github.com/egdaemon/eg/internal/egiso"
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/interp/execproxy"
+	"github.com/godbus/dbus/v5"
 	subids "github.com/moby/sys/user"
 	"go.podman.io/common/pkg/cgroups"
 	"golang.org/x/crypto/ssh"
@@ -43,7 +47,8 @@ type VM struct {
 // Boot starts the machine as an unprivileged user: its init runs as root of a user namespace mapping
 // the user's subordinate ids, in mount, pid, uts, ipc, network and cgroup namespaces of its own,
 // rooted at the egiso served over FUSE. pasta connects its network to the host's, as it does for
-// rootless podman. Its init's output is copied to console.
+// rootless podman, in a scope of the user's systemd limited to the machine's cpus and memory. Its
+// init's output is copied to console.
 func Boot(m Machine, console io.Writer) (_ *VM, err error) {
 	var (
 		t          = &VM{stopped: make(chan struct{})}
@@ -53,21 +58,12 @@ func Boot(m Machine, console io.Writer) (_ *VM, err error) {
 		mapped     [2]*os.File
 		mounted    [2]int
 		args       []string
-		owned      bool
 	)
 	defer func() {
 		if err != nil {
 			errorsx.Log(t.Close())
 		}
 	}()
-
-	// the root's systemd manages the cgroup it starts in, which the user must own for it to boot.
-	if owned, err = cgroups.UserOwnsCurrentSystemdCgroup(); err != nil {
-		return nil, errorsx.Wrap(err, "unable to find the cgroup the machine starts in")
-	}
-	if !owned {
-		return nil, errorsx.New("machines need a cgroup the user owns: run in a systemd scope or service with Delegate=yes")
-	}
 
 	if t.dir, err = os.MkdirTemp("", "egvm.*"); err != nil {
 		return nil, errorsx.Wrap(err, "unable to create the machine's directory")
@@ -127,6 +123,11 @@ func Boot(m Machine, console io.Writer) (_ *VM, err error) {
 		errorsx.Log(t.init.Wait())
 	}()
 
+	// the machine starts nothing else until its ids are mapped, so all of it starts in the scope.
+	if err = scope(t.init.Process.Pid, m); err != nil {
+		return nil, err
+	}
+
 	if err = idmap(t.init.Process.Pid); err != nil {
 		return nil, err
 	}
@@ -143,6 +144,41 @@ func Boot(m Machine, console io.Writer) (_ *VM, err error) {
 	}()
 
 	return t, nil
+}
+
+// scope moves pid into a transient scope of the user's systemd, as systemd-run --user --scope -p
+// Delegate=yes runs a command, limited to the machine's cpus and, unless it is the host's, memory. The
+// root's systemd manages the scope's cgroup, which the scope delegates to it.
+func scope(pid int, m Machine) (err error) {
+	var (
+		conn       *systemd.Conn
+		done       = make(chan string, 1)
+		result     string
+		properties = []systemd.Property{
+			systemd.PropDescription("eg machine"),
+			systemd.PropPids(uint32(pid)),
+			{Name: "Delegate", Value: dbus.MakeVariant(true)},
+			{Name: "CollectMode", Value: dbus.MakeVariant("inactive-or-failed")},
+			{Name: "CPUQuotaPerSecUSec", Value: dbus.MakeVariant(uint64(m.cpus) * uint64(time.Second/time.Microsecond))},
+		}
+	)
+
+	if m.memory > 0 {
+		properties = append(properties, systemd.Property{Name: "MemoryMax", Value: dbus.MakeVariant(m.memory)})
+	}
+
+	if conn, err = cgroups.UserConnection(os.Getuid()); err != nil {
+		return errorsx.Wrap(err, "unable to reach the user's systemd, which machines run under")
+	}
+	defer conn.Close()
+
+	if _, err = conn.StartTransientUnitContext(context.Background(), fmt.Sprintf("egvm-%d.scope", pid), "fail", properties, done); err != nil {
+		return errorsx.Wrap(err, "unable to start the machine's scope")
+	}
+	if result = <-done; result != "done" {
+		return errorsx.Errorf("unable to start the machine's scope: %s", result)
+	}
+	return nil
 }
 
 // received is the descriptor the machine sends over the socket fd.

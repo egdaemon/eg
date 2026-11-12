@@ -21,11 +21,11 @@ import (
 )
 
 // TestExec runs commands over ssh in a machine whose root is an egiso served over FUSE, booted by
-// its systemd. It runs as an unprivileged user with subordinate ids in a cgroup it owns, and needs
-// pasta and EG_TEST_ROOTFS, a tar of the root container's filesystem, whose sshd it reaches:
+// its systemd. It runs as an unprivileged user with subordinate ids and a systemd of its own, and
+// needs pasta and EG_TEST_ROOTFS, a tar of the root container's filesystem, whose sshd it reaches:
 //
 //	podman export $(podman create localhost/eg:latest) > eg.tar
-//	go test -c -o egvm.test ./internal/egvm && EG_TEST_ROOTFS=eg.tar systemd-run --user --scope -p Delegate=yes ./egvm.test -test.v
+//	go test -c -o egvm.test ./internal/egvm && EG_TEST_ROOTFS=eg.tar ./egvm.test -test.v
 func TestExec(t *testing.T) {
 	var (
 		rootfs   = os.Getenv("EG_TEST_ROOTFS")
@@ -78,7 +78,7 @@ func TestExec(t *testing.T) {
 	users, groups, err = archive.Accounts()
 	require.NoError(t, err)
 	root, upperdir = upper(t, archive)
-	vm, err = egvm.Boot(egvm.New(root, egvm.OptionAccounts(users, groups), egvm.OptionMountReadOnly(t.TempDir(), "/srv/shared")), &console)
+	vm, err = egvm.Boot(egvm.New(root, egvm.OptionAccounts(users, groups), egvm.OptionCPUs(2), egvm.OptionMemory(1<<30), egvm.OptionMountReadOnly(t.TempDir(), "/srv/shared")), &console)
 	require.NoError(t, err, console.String())
 	t.Cleanup(func() { require.NoError(t, vm.Close()) })
 
@@ -107,6 +107,12 @@ func TestExec(t *testing.T) {
 		code, stdout, _ := run(t, t.Context(), nil, "cat", "/proc/1/comm")
 		require.Equal(t, int32(0), code)
 		require.Equal(t, "systemd\n", stdout)
+	})
+
+	t.Run("limits the machine to its cpus and memory", func(t *testing.T) {
+		code, stdout, stderr := run(t, t.Context(), nil, "cat", "/sys/fs/cgroup/cpu.max", "/sys/fs/cgroup/memory.max")
+		require.Equal(t, int32(0), code, stderr)
+		require.Equal(t, "200000 100000\n1073741824\n", stdout)
 	})
 
 	t.Run("quotes arguments the shell would expand", func(t *testing.T) {

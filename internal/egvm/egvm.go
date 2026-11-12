@@ -34,6 +34,7 @@ type mount struct {
 }
 
 // Machine describes a virtual machine: the image it boots, its size, its root, and what it mounts.
+// A memory of 0 is the host's.
 type Machine struct {
 	dir    string
 	init   string
@@ -57,12 +58,25 @@ func Directory() string {
 // with the root's systemd as its init.
 func New(root *egiso.SysFS, options ...Option) Machine {
 	return langx.Clone(Machine{
-		dir:    Directory(),
-		init:   "/usr/sbin/init",
-		cpus:   uint(runtime.NumCPU()),
-		memory: 4 << 30,
-		root:   root,
+		dir:  Directory(),
+		init: "/usr/sbin/init",
+		cpus: uint(runtime.NumCPU()),
+		root: root,
 	}, options...)
+}
+
+// OptionCPUs gives the machine n cpus; 0 keeps the host's.
+func OptionCPUs(n uint) Option {
+	return func(m *Machine) {
+		m.cpus = langx.FirstNonZero(n, m.cpus)
+	}
+}
+
+// OptionMemory gives the machine n bytes of memory; 0 keeps the host's.
+func OptionMemory(n uint64) Option {
+	return func(m *Machine) {
+		m.memory = n
+	}
 }
 
 // OptionDirectory boots the machine image in dir.

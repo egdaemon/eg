@@ -1,6 +1,7 @@
 package egiso
 
 import (
+	"encoding/binary"
 	"hash/fnv"
 	"io"
 	"io/fs"
@@ -128,6 +129,12 @@ func (t nfsfs) Lstat(name string) (fs.FileInfo, error) {
 
 func (t nfsfs) Rename(from string, to string) error {
 	return t.sys.upper.Rename(clean(from), clean(to))
+}
+
+// Link makes link another name of the file at path. Only FUSE calls it: go-nfs links only through a
+// filesystem that also makes devices, fifos and sockets.
+func (t nfsfs) Link(path string, link string) error {
+	return t.sys.upper.Link(clean(path), clean(link))
 }
 
 func (t nfsfs) Remove(name string) error {
@@ -258,11 +265,21 @@ func (t nfsfs) lstat(name string) (fs.FileInfo, error) {
 	}
 
 	id := fnv.New64a()
-	id.Write([]byte(name))
 	links := uint32(1)
 	if st.IsDir() {
 		links = 2
 	}
+
+	// a file the host holds with more than one name is named by its inode, so its names are one file,
+	// with its count of names. Everything else is named by its path, which a copy up keeps, so a
+	// directory stays the one the kernel mounted over.
+	if host, ok := st.Sys().(*syscall.Stat_t); ok && !st.IsDir() && host.Nlink > 1 {
+		binary.Write(id, binary.LittleEndian, [2]uint64{uint64(host.Dev), host.Ino})
+		links = uint32(host.Nlink)
+	} else {
+		id.Write([]byte(name))
+	}
+
 	return nfsinfo{FileInfo: st, sys: &nfsfile.FileInfo{Nlink: links, UID: uid, GID: gid, Fileid: id.Sum64()}}, nil
 }
 

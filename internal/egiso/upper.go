@@ -211,6 +211,48 @@ func (t *Upper) Symlink(target string, name string, user string, group string) e
 	})
 }
 
+// Link makes newname another name of the file oldname, copying oldname up first, with oldname's owner
+// and mode. The upper keeps owners and modes by name, so changing them through one name leaves the
+// file's other names as they were. Linking a directory fails with EPERM, and linking into or out of
+// a Bind mount with EXDEV.
+func (t *Upper) Link(oldname string, newname string) error {
+	mo, ro, bo := t.bound(oldname)
+	mn, rn, bn := t.bound(newname)
+	if bo && bn && mo.at == mn.at {
+		return mo.root.Link(ro, rn)
+	}
+	if bo || bn {
+		return &os.LinkError{Op: "link", Old: oldname, New: newname, Err: syscall.EXDEV}
+	}
+
+	t.m.Lock()
+	defer t.m.Unlock()
+
+	st, up, err := t.lstat("link", oldname)
+	if err != nil {
+		return err
+	}
+	if st.IsDir() {
+		return &os.LinkError{Op: "link", Old: oldname, New: newname, Err: syscall.EPERM}
+	}
+	if _, _, err = t.lstat("link", newname); err == nil {
+		return &os.LinkError{Op: "link", Old: oldname, New: newname, Err: fs.ErrExist}
+	} else if !errorsx.Is(err, fs.ErrNotExist) {
+		return err
+	}
+
+	if !up {
+		if err = t.copyup(oldname); err != nil {
+			return err
+		}
+	}
+
+	a := t.attrs[oldname]
+	return t.create(newname, a.mode, a.user, a.group, func() error {
+		return t.dir.Link(oldname, newname)
+	})
+}
+
 // Remove removes the named file or empty directory.
 func (t *Upper) Remove(name string) error {
 	if m, rel, ok := t.bound(name); ok {

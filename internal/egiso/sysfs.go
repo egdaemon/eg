@@ -131,6 +131,19 @@ func (t *SysFS) Rename(from string, to string) experimentalsys.Errno {
 	return errnoof(t.upper.Rename(src, dst))
 }
 
+// Link makes newName another name of the file oldName.
+func (t *SysFS) Link(oldName string, newName string) experimentalsys.Errno {
+	src, errno := t.resolve(oldName, false)
+	if errno != 0 {
+		return errno
+	}
+	dst, errno := t.resolve(newName, false)
+	if errno != 0 {
+		return errno
+	}
+	return errnoof(t.upper.Link(src, dst))
+}
+
 // Rmdir removes the named empty directory.
 func (t *SysFS) Rmdir(name string) experimentalsys.Errno {
 	return t.remove(name, true)

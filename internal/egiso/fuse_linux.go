@@ -277,6 +277,18 @@ func (t *fusenode) Symlink(ctx context.Context, target string, name string, out 
 	return t.entry(ctx, created, out)
 }
 
+// Link makes name another name of target, which keeps its owner.
+func (t *fusenode) Link(ctx context.Context, target gofs.InodeEmbedder, name string, out *fuse.EntryOut) (*gofs.Inode, syscall.Errno) {
+	var (
+		created = t.child(name)
+	)
+
+	if err := t.fsys.Link(target.(*fusenode).name(), created); err != nil {
+		return nil, errnoofuse(err)
+	}
+	return t.entry(ctx, created, out)
+}
+
 func (t *fusenode) Readlink(ctx context.Context) ([]byte, syscall.Errno) {
 	target, err := t.fsys.Readlink(t.name())
 	if err != nil {

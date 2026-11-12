@@ -115,6 +115,12 @@ func TestExec(t *testing.T) {
 		require.Equal(t, "200000 100000\n1073741824\n", stdout)
 	})
 
+	t.Run("links files, as dpkg backs up its status", func(t *testing.T) {
+		code, stdout, stderr := run(t, t.Context(), nil, "sh", "-c", "echo linked > /etc/status && ln /etc/status /etc/status-old && cat /etc/status-old && stat -c %h /etc/status-old")
+		require.Equal(t, int32(0), code, stderr)
+		require.Equal(t, "linked\n2\n", stdout)
+	})
+
 	t.Run("drops what it sends to private addresses", func(t *testing.T) {
 		code, _, stderr := run(t, t.Context(), nil, "curl", "-sS", "--max-time", "2", "http://169.254.169.254/")
 		require.Equal(t, int32(28), code, stderr)

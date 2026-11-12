@@ -90,6 +90,13 @@ func Boot(m Machine, console io.Writer) (_ *VM, err error) {
 	if err = os.MkdirAll(filepath.Dir(t.netns), 0700); err != nil {
 		return nil, errorsx.Wrap(err, "unable to create the network namespace directory")
 	}
+	// SELinux policy labels the directory as it does ip netns's, which pasta may read, but one Boot
+	// creates takes the runtime directory's label until restorecon applies the policy's.
+	if restorecon, cause := exec.LookPath("restorecon"); cause == nil {
+		if b, cause := exec.Command(restorecon, filepath.Dir(t.netns)).CombinedOutput(); cause != nil {
+			return nil, errorsx.Wrapf(cause, "unable to label the network namespace directory: %s", b)
+		}
+	}
 	if err = os.WriteFile(t.netns, nil, 0600); err != nil {
 		return nil, errorsx.Wrap(err, "unable to create the machine's network namespace file")
 	}

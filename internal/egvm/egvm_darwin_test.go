@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"net"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -32,6 +34,7 @@ func TestExec(t *testing.T) {
 	var (
 		alpine   = os.Getenv("EG_TEST_ALPINE")
 		rootfs   = os.Getenv("EG_TEST_ROOTFS")
+		sockets  = t.TempDir()
 		console  bytes.Buffer
 		kernels  []string
 		archive  *egiso.Archive
@@ -106,7 +109,7 @@ func TestExec(t *testing.T) {
 	users, groups, err = archive.Accounts()
 	require.NoError(t, err)
 	root, upperdir = upper(t, archive)
-	vm, err = egvm.Boot(egvm.New(root, egvm.OptionDirectory(directory(t)), egvm.OptionAccounts(users, groups)), &console)
+	vm, err = egvm.Boot(egvm.New(root, egvm.OptionDirectory(directory(t)), egvm.OptionAccounts(users, groups), egvm.OptionMountReadWrite(sockets, "/srv/sockets")), &console)
 	if err != nil && strings.Contains(err.Error(), "entitlement") {
 		t.Skipf("the test binary is not signed with vz.entitlements: %v", err)
 	}
@@ -138,6 +141,28 @@ func TestExec(t *testing.T) {
 		code, stdout, _ := run(t, t.Context(), nil, "cat", "/proc/1/comm")
 		require.Equal(t, int32(0), code)
 		require.Equal(t, "systemd\n", stdout)
+	})
+
+	t.Run("forwards a host socket into the machine", func(t *testing.T) {
+		// macOS limits a unix socket's path to 104 bytes, which a test's temporary directory exceeds.
+		dir, cause := os.MkdirTemp("/tmp", "egvm")
+		require.NoError(t, cause)
+		t.Cleanup(func() { os.RemoveAll(dir) })
+		host := filepath.Join(dir, "host.sock")
+		l, cause := net.Listen("unix", host)
+		require.NoError(t, cause)
+		srv := &http.Server{Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { io.WriteString(w, "forwarded") })}
+		go srv.Serve(l)
+		t.Cleanup(func() { srv.Close() })
+
+		require.NoError(t, vm.Forward(t.Context(), host, "/srv/sockets/forwarded.sock"))
+		code, stdout, stderr := run(t, t.Context(), nil, "curl", "-s", "--unix-socket", "/srv/sockets/forwarded.sock", "http://machine/")
+		require.Equal(t, int32(0), code, stderr)
+		require.Equal(t, "forwarded", stdout)
+	})
+
+	t.Run("refuses to forward to a path the machine can not listen on", func(t *testing.T) {
+		require.Error(t, vm.Forward(t.Context(), "/tmp/egvm.missing.sock", "/srv/missing/forwarded.sock"))
 	})
 
 	t.Run("quotes arguments the shell would expand", func(t *testing.T) {

@@ -37,7 +37,8 @@ type mount struct {
 }
 
 // Machine describes a virtual machine: the image it boots, its size, its root, what it mounts, and
-// the addresses a Linux machine may reach. A memory of 0 is the host's.
+// the addresses a Linux machine may reach. A memory of 0 is the host's: a Linux machine shares it,
+// a virtual machine, which reserves its memory, is given half of it.
 type Machine struct {
 	dir      string
 	init     string
@@ -85,7 +86,8 @@ func OptionCPUs(n uint) Option {
 	}
 }
 
-// OptionMemory gives the machine n bytes of memory; 0 keeps the host's.
+// OptionMemory gives the machine n bytes of memory; 0 keeps the host's, half of it for a virtual
+// machine.
 func OptionMemory(n uint64) Option {
 	return func(m *Machine) {
 		m.memory = n

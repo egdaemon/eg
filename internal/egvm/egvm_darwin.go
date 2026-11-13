@@ -14,6 +14,7 @@ import (
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/langx"
 	"github.com/egdaemon/eg/interp/execproxy"
+	"github.com/shirou/gopsutil/v4/mem"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -161,13 +162,17 @@ func configure(m Machine, authorized string, in *os.File, out *os.File) (_ *vz.V
 		devices  = make([]vz.DirectorySharingDeviceConfiguration, 0, len(m.mounts))
 		disk     *vz.VirtioBlockDeviceConfiguration
 		disks    = make([]vz.StorageDeviceConfiguration, 0, len(m.volumes))
+		host     *mem.VirtualMemoryStat
 	)
 
 	if boot, err = vz.NewLinuxBootLoader(filepath.Join(m.dir, "Image"), vz.WithInitrd(filepath.Join(m.dir, "initramfs")), vz.WithCommandLine(m.cmdline(authorized))); err != nil {
 		return nil, errorsx.Wrap(err, "unable to create the boot loader")
 	}
-	// a virtual machine reserves its memory up front, so one sized as the host is given 4GiB.
-	if config, err = vz.NewVirtualMachineConfiguration(boot, m.cpus, langx.FirstNonZero(m.memory, 4<<30)); err != nil {
+	// a virtual machine reserves its memory up front, so one sized as the host is given half of it.
+	if host, err = mem.VirtualMemory(); err != nil {
+		return nil, errorsx.Wrap(err, "unable to read the host's memory")
+	}
+	if config, err = vz.NewVirtualMachineConfiguration(boot, m.cpus, langx.FirstNonZero(m.memory, host.Total/2)); err != nil {
 		return nil, errorsx.Wrap(err, "unable to create the machine configuration")
 	}
 	if platform, err = vz.NewGenericPlatformConfiguration(); err != nil {

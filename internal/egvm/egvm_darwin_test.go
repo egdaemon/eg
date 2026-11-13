@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -20,6 +21,7 @@ import (
 	"github.com/egdaemon/eg/internal/egiso"
 	"github.com/egdaemon/eg/internal/egvm"
 	"github.com/egdaemon/eg/interp/execproxy"
+	"github.com/shirou/gopsutil/v4/mem"
 	"github.com/stretchr/testify/require"
 )
 
@@ -136,6 +138,18 @@ func TestExec(t *testing.T) {
 		code, stdout, _ := run(t, t.Context(), nil, "sh", "-c", "grep ^NAME= /etc/os-release && uname -s")
 		require.Equal(t, int32(0), code)
 		require.Equal(t, "NAME=\"Ubuntu\"\nLinux\n", stdout)
+	})
+
+	t.Run("is given half the host's memory", func(t *testing.T) {
+		host, cause := mem.VirtualMemory()
+		require.NoError(t, cause)
+		code, stdout, stderr := run(t, t.Context(), nil, "sh", "-c", "awk '/^MemTotal:/ { print $2 * 1024 }' /proc/meminfo")
+		require.Equal(t, int32(0), code, stderr)
+		total, cause := strconv.ParseUint(strings.TrimSpace(stdout), 10, 64)
+		require.NoError(t, cause)
+		// the kernel keeps some of the machine's memory for itself.
+		require.LessOrEqual(t, total, host.Total/2)
+		require.Greater(t, total, host.Total/2*9/10)
 	})
 
 	t.Run("hands pid 1 to the root's systemd", func(t *testing.T) {

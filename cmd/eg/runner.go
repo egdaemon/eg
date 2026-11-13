@@ -432,6 +432,8 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 			uid,
 			runners.AgentOptionCommandLine("--env-file", eg.DefaultRuntimeDirectory(eg.EnvironFile)), // required for tty to work correct in local mode.
 			runners.AgentOptionEnv(eg.EnvComputeTLSInsecure, strconv.FormatBool(tlsc.Insecure)),
+			// nested modules share the repository cache, it is under the mount root mounted below. blank disables it.
+			runners.AgentOptionEnv(eg.EnvComputeRepoCache, envx.String("", eg.EnvComputeRepoCache)),
 			runners.AgentOptionVolumes(
 				runners.AgentMountReadWrite("/root", "/root"),
 				runners.AgentMountReadWrite(eg.DefaultMountRoot(), eg.DefaultMountRoot()),

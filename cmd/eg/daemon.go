@@ -179,8 +179,7 @@ func (t daemon) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, keygen cmdopt
 
 	if t.VCSCache {
 		crepocacheopt = runners.CompileOptionRepoCache(userx.DefaultCacheDirectory("repos"))
-		// we'll do this later.
-		// repocacheopt = runners.AgentOptionEnv(eg.EnvComputeRepoCache, eg.DefaultMountRoot("repos"))
+		repocacheopt = runners.AgentOptionEnv(eg.EnvComputeRepoCache, eg.DefaultMountRoot("repos"))
 	}
 
 	go runners.AutoCompileReserved(gctx.Context, tlsc.DefaultClient(), authclient, compiledirs, rundirs, crepocacheopt)

@@ -2,6 +2,7 @@ package runners
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"testing"
 	"testing/fstest"
@@ -41,6 +42,28 @@ func TestEnviron(t *testing.T) {
 		environ, err := environ(fstest.MapFS{"etc/passwd": &fstest.MapFile{Data: []byte("egd:x:990:990::/home/egd:/bin/bash\n")}})
 		require.NoError(t, err)
 		require.Empty(t, environ)
+	})
+}
+
+func TestGPGConf(t *testing.T) {
+	if _, err := exec.LookPath("gpgconf"); err != nil {
+		t.Skip("gpgconf is not installed")
+	}
+
+	t.Run("finds gpg home and its agent beneath GNUPGHOME", func(t *testing.T) {
+		home := t.TempDir()
+		t.Setenv("GNUPGHOME", home)
+
+		agentsock, gnupghome, err := gpgconf(t.Context())
+		require.NoError(t, err)
+		require.Equal(t, home, gnupghome)
+		require.Equal(t, "S.gpg-agent", filepath.Base(agentsock))
+	})
+
+	t.Run("fails without gpgconf", func(t *testing.T) {
+		t.Setenv("PATH", t.TempDir())
+		_, _, err := gpgconf(t.Context())
+		require.Error(t, err)
 	})
 }
 

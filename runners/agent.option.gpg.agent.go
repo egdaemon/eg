@@ -5,9 +5,12 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/internal/envx"
+	"github.com/egdaemon/eg/internal/errorsx"
+	"github.com/egdaemon/eg/internal/execx"
 	"github.com/egdaemon/eg/internal/fsx"
 	"github.com/egdaemon/eg/internal/langx"
 	"github.com/egdaemon/eg/internal/userx"
@@ -53,15 +56,29 @@ func agentOptionLocalGPGAgent(ctx context.Context, envb *envx.Builder, agentsock
 }
 
 // MachineOptionLocalGPGAgent configures a local machine run to connect to the users gpg agent, as
-// AgentOptionLocalGPGAgent configures a container.
-func MachineOptionLocalGPGAgent(envb *envx.Builder) MachineOption {
-	agentsock, gnupghome, err := localgpg()
+// AgentOptionLocalGPGAgent configures a container. It asks gpgconf where the agent and gpg home are,
+// as gpg does: in the runtime directory on linux, in gpg home on macOS, beneath GNUPGHOME when set.
+func MachineOptionLocalGPGAgent(ctx context.Context, envb *envx.Builder) MachineOption {
+	agentsock, gnupghome, err := gpgconf(ctx)
 	if err != nil {
 		log.Println("unable to check if gpg config is available", err)
 		return MachineOptionNoop
 	}
 
 	return machineOptionLocalGPGAgent(envb, agentsock, gnupghome)
+}
+
+// gpgconf asks gpgconf where the user's gpg agent socket and gpg home are.
+func gpgconf(ctx context.Context) (agentsock string, gnupghome string, err error) {
+	if agentsock, err = execx.String(ctx, "gpgconf", "--list-dirs", "agent-socket"); err != nil {
+		return "", "", errorsx.Wrap(err, "unable to locate the gpg agent")
+	}
+
+	if gnupghome, err = execx.String(ctx, "gpgconf", "--list-dirs", "homedir"); err != nil {
+		return "", "", errorsx.Wrap(err, "unable to locate gpg home")
+	}
+
+	return strings.TrimSpace(agentsock), strings.TrimSpace(gnupghome), nil
 }
 
 func machineOptionLocalGPGAgent(envb *envx.Builder, agentsock string, gnupghome string) MachineOption {

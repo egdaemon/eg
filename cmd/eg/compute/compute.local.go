@@ -343,7 +343,7 @@ func (t local) machine(c *http.Client, uri string) runners.BFn {
 				egvm.OptionMountReadOnly(filepath.Join(ws.Root, ws.BuildDir, ws.Module, eg.ModuleDir), eg.DefaultMountRoot(eg.RuntimeDirectory, ws.Module, eg.ModuleDir)),
 				egvm.OptionMountReadWrite(containers, "/var/lib/containers"),
 			),
-			runners.MachineOptionLocalGPGAgent(envb),
+			runners.MachineOptionLocalGPGAgent(ctx, envb),
 		)
 	}
 }

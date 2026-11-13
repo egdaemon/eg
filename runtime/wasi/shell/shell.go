@@ -7,6 +7,7 @@ import (
 	"math"
 	"os"
 	"os/user"
+	"strings"
 	"time"
 
 	"github.com/logrusorgru/aurora"
@@ -166,7 +167,7 @@ func (t Command) UnsafeExec(e Execer) Command {
 func (t Command) Debug() Command {
 	original := t.entry
 	t.entry = func(ctx context.Context, user, group, cmd, directory string, environ []string, do Execer) (err error) {
-		log.Println("running command", directory, user, group, cmd, environ)
+		log.Printf("running command: '%s'\ndir(%s) u(%s):g(%s)\n%s", cmd, directory, user, group, strings.Join(environ, "\n"))
 		return original(ctx, user, group, cmd, directory, environ, do)
 	}
 	return t

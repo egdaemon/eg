@@ -13,9 +13,7 @@ import (
 	"os"
 	"os/user"
 	"path/filepath"
-	"strconv"
 	"strings"
-	"syscall"
 	"time"
 
 	"github.com/go-git/go-git/v6"
@@ -291,12 +289,12 @@ func RepositoryUsername(path string) string {
 		return fallback
 	}
 
-	st, ok := info.Sys().(*syscall.Stat_t)
+	uid, ok := fileOwnerID(info)
 	if !ok {
 		return fallback
 	}
 
-	u, err := user.LookupId(strconv.FormatUint(uint64(st.Uid), 10))
+	u, err := user.LookupId(uid)
 	if err != nil {
 		debugx.Println("unable to lookup repository owner, using current user", err)
 		return fallback

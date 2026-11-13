@@ -263,3 +263,32 @@ func (opts options) New(tw *tar.Writer) error {
 
 	return nil
 }
+
+// Size sums the sizes recorded in the archive's headers, i.e.) the uncompressed size of its contents.
+func Size(r io.Reader) (n int64, err error) {
+	var (
+		gzr *gzip.Reader
+		tr  *tar.Reader
+	)
+
+	if gzr, err = gzip.NewReader(r); err != nil {
+		return 0, errorsx.Wrap(err, "failed to create gzip reader")
+	}
+	defer gzr.Close()
+
+	tr = tar.NewReader(gzr)
+
+	for {
+		header, err := tr.Next()
+		switch {
+		case err == io.EOF:
+			return n, nil
+		case err != nil:
+			return n, errorsx.Wrap(err, "unable to read archive header")
+		case header == nil:
+			continue
+		}
+
+		n += header.Size
+	}
+}

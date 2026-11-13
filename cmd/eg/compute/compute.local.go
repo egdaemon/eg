@@ -319,7 +319,7 @@ func (t local) podman(ctx context.Context, ws workspaces.Context, uid uuid.UUID,
 // machine prepares a machine booted from the egiso at uri, fetched through c, or from one of the
 // default root container when uri is empty.
 func (t local) machine(c *http.Client, uri string) runners.BFn {
-	return func(ctx context.Context, ws workspaces.Context, _ uuid.UUID, canonicaluri string, _ *envx.Builder) (_ runners.T, err error) {
+	return func(ctx context.Context, ws workspaces.Context, _ uuid.UUID, canonicaluri string, envb *envx.Builder) (_ runners.T, err error) {
 		var (
 			containers = userx.DefaultCacheDirectory("egvm", runners.ContainersVolume(canonicaluri))
 		)
@@ -337,10 +337,13 @@ func (t local) machine(c *http.Client, uri string) runners.BFn {
 		}
 
 		return runners.NewMachine(ctx, c, ws, uri, log.Writer(),
-			egvm.OptionCPUs(uint(t.RuntimeResources.Cores)),
-			egvm.OptionMemory(uint64(t.RuntimeResources.Memory)),
-			egvm.OptionMountReadOnly(filepath.Join(ws.Root, ws.BuildDir, ws.Module, eg.ModuleDir), eg.DefaultMountRoot(eg.RuntimeDirectory, ws.Module, eg.ModuleDir)),
-			egvm.OptionMountReadWrite(containers, "/var/lib/containers"),
+			runners.MachineOptionVM(
+				egvm.OptionCPUs(uint(t.RuntimeResources.Cores)),
+				egvm.OptionMemory(uint64(t.RuntimeResources.Memory)),
+				egvm.OptionMountReadOnly(filepath.Join(ws.Root, ws.BuildDir, ws.Module, eg.ModuleDir), eg.DefaultMountRoot(eg.RuntimeDirectory, ws.Module, eg.ModuleDir)),
+				egvm.OptionMountReadWrite(containers, "/var/lib/containers"),
+			),
+			runners.MachineOptionLocalGPGAgent(envb),
 		)
 	}
 }

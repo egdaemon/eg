@@ -46,6 +46,7 @@ type VM struct {
 	init    *exec.Cmd
 	stopped chan struct{}
 	served  chan struct{}
+	closers []io.Closer
 }
 
 // Boot starts the machine as an unprivileged user: its init runs as root of a user namespace mapping
@@ -300,6 +301,24 @@ func (t *VM) Exec(ctx context.Context, req *execproxy.ExecRequest, options ...Ex
 	return command(ctx, conn, t.client, req, options...)
 }
 
+// Forward makes the host's unix socket host reachable in the machine at path, a socket the machine's
+// sshd listens on until the machine stops. It waits for the machine to serve commands.
+func (t *VM) Forward(ctx context.Context, host string, path string) (err error) {
+	var (
+		conn      net.Conn
+		forwarded io.Closer
+	)
+
+	if conn, err = redial(ctx, func() (net.Conn, error) { return net.Dial("unix", t.socket) }, t.stopped, func() error { return nil }); err != nil {
+		return err
+	}
+	if forwarded, err = forward(conn, t.client, host, path); err != nil {
+		return err
+	}
+	t.closers = append(t.closers, forwarded)
+	return nil
+}
+
 // Close stops the machine, which ends every process of its namespaces and with them the mount of its
 // root, and waits for its root to stop being served.
 func (t *VM) Close() error {
@@ -307,6 +326,9 @@ func (t *VM) Close() error {
 		errs []error
 	)
 
+	for _, c := range t.closers {
+		errorsx.Log(c.Close())
+	}
 	if t.init != nil && t.init.Process != nil {
 		errorsx.Log(errorsx.Ignore(t.init.Process.Signal(syscall.SIGTERM), os.ErrProcessDone))
 		<-t.stopped

@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"io"
 	"io/fs"
+	"log"
 	"net"
 	"slices"
 	"strings"
@@ -12,6 +14,7 @@ import (
 
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/langx"
+	"github.com/egdaemon/eg/internal/netx"
 	"github.com/egdaemon/eg/internal/sshx"
 	"github.com/egdaemon/eg/interp/execproxy"
 	"github.com/egdaemon/sh/v3/syntax"
@@ -116,6 +119,50 @@ func commandline(req *execproxy.ExecRequest) (_ string, err error) {
 	}
 
 	return "cd " + words[0] + " && exec env -i " + strings.Join(words[1:], " "), nil
+}
+
+// forward has the machine's sshd listen on path, as ssh -R path:host does, and connects every
+// connection it accepts there to the host's unix socket host, until the returned client closes.
+func forward(conn net.Conn, config *ssh.ClientConfig, host string, path string) (_ io.Closer, err error) {
+	var (
+		sconn    ssh.Conn
+		chans    <-chan ssh.NewChannel
+		reqs     <-chan *ssh.Request
+		client   *ssh.Client
+		listener net.Listener
+	)
+
+	if sconn, chans, reqs, err = ssh.NewClientConn(conn, "egvm", config); err != nil {
+		conn.Close()
+		return nil, errorsx.Wrap(err, "unable to reach the machine's sshd")
+	}
+	client = ssh.NewClient(sconn, chans, reqs)
+
+	if listener, err = client.ListenUnix(path); err != nil {
+		return nil, errorsx.Compact(errorsx.Wrapf(err, "unable to listen on %s in the machine", path), client.Close())
+	}
+
+	go func() {
+		for {
+			accepted, cause := listener.Accept()
+			if cause != nil {
+				return
+			}
+
+			go func() {
+				defer accepted.Close()
+				dst, cause := net.Dial("unix", host)
+				if cause != nil {
+					log.Println("unable to reach", host, "for", path, cause)
+					return
+				}
+				defer dst.Close()
+				errorsx.Log(errorsx.Wrapf(netx.Proxy(context.Background(), accepted, dst), "forwarding %s", path))
+			}()
+		}
+	}()
+
+	return client, nil
 }
 
 // command runs req over ssh on conn as config logs in, and waits for it, with no input and its output

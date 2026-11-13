@@ -21,6 +21,7 @@ import (
 	"github.com/egdaemon/eg/internal/execx"
 	"github.com/egdaemon/eg/internal/fsx"
 	"github.com/egdaemon/eg/internal/iox"
+	"github.com/egdaemon/eg/internal/langx"
 	"github.com/egdaemon/eg/internal/slicesx"
 	"github.com/egdaemon/eg/internal/stringsx"
 	"github.com/egdaemon/eg/interp/execproxy"
@@ -40,13 +41,56 @@ type Machine struct {
 	environ []string
 }
 
+// MachineOption changes the machine NewMachine boots, as an AgentOption changes a container.
+type MachineOption func(*machineconfig)
+
+type machineconfig struct {
+	vm       []egvm.Option
+	overlays []attachment
+	sockets  []attachment
+}
+
+// attachment is a host directory or socket, host, the machine sees at path.
+type attachment struct {
+	host string
+	path string
+}
+
+// MachineOptionVM boots the machine with the options.
+func MachineOptionVM(options ...egvm.Option) MachineOption {
+	return func(c *machineconfig) {
+		c.vm = append(c.vm, options...)
+	}
+}
+
+// MachineOptionOverlay mounts the host directory dir at path in the machine, with the changes the
+// machine makes within it discarded, as AgentMountOverlay does.
+func MachineOptionOverlay(dir string, path string) MachineOption {
+	return func(c *machineconfig) {
+		c.overlays = append(c.overlays, attachment{host: dir, path: path})
+	}
+}
+
+// MachineOptionSocket makes the host's unix socket host reachable in the machine at path, which must be
+// within an overlay: the root can not hold a socket.
+func MachineOptionSocket(host string, path string) MachineOption {
+	return func(c *machineconfig) {
+		c.sockets = append(c.sockets, attachment{host: host, path: path})
+	}
+}
+
+// MachineOptionNoop changes nothing.
+func MachineOptionNoop(*machineconfig) {}
+
 // NewMachine boots a machine from the egiso uri names, as egiso.OpenURI opens it, under a writable
 // upper kept in the workspace, and returns once its systemd finished booting.
-func NewMachine(ctx context.Context, c *http.Client, ws workspaces.Context, uri string, console io.Writer, options ...egvm.Option) (_ *Machine, err error) {
+func NewMachine(ctx context.Context, c *http.Client, ws workspaces.Context, uri string, console io.Writer, options ...MachineOption) (_ *Machine, err error) {
 	var (
 		t        = &Machine{ws: ws}
+		config   = langx.Clone(machineconfig{}, options...)
 		upperdir string
 		egbin    string
+		copied   string
 		users    []egiso.Account
 		groups   []egiso.Account
 	)
@@ -84,6 +128,18 @@ func NewMachine(ctx context.Context, c *http.Client, ws workspaces.Context, uri 
 		return nil, errorsx.Wrap(err, "unable to place egbin")
 	}
 
+	// the machine's tmpfiles empty /eg.mnt of all but its mounts, so an overlay is a copy in the
+	// workspace mounted in its place.
+	for _, o := range config.overlays {
+		if copied, err = os.MkdirTemp(ws.Root, "overlay.*"); err != nil {
+			return nil, errorsx.Wrapf(err, "unable to create the overlay of %s", o.host)
+		}
+		if err = fsx.CloneTree(ctx, copied, filepath.Base(o.host), os.DirFS(filepath.Dir(o.host))); err != nil {
+			return nil, errorsx.Wrapf(err, "unable to copy %s", o.host)
+		}
+		config.vm = append(config.vm, egvm.OptionMountReadWrite(copied, o.path))
+	}
+
 	// the machine has the image's own accounts, so the image's files keep their owners.
 	root := egiso.NewSysFS(egiso.NewUpper(egiso.Tree{}.Mount(".", t.archive, egiso.Identity(users), egiso.Identity(groups)), t.upper), egiso.Default, egiso.Default)
 
@@ -93,12 +149,18 @@ func NewMachine(ctx context.Context, c *http.Client, ws workspaces.Context, uri 
 		egvm.OptionMountReadWrite(ws.RuntimeDir, eg.DefaultMountRoot(eg.RuntimeDirectory)),
 		egvm.OptionMountReadWrite(ws.WorkingDir, eg.DefaultMountRoot(eg.WorkingDirectory)),
 		egvm.OptionMountReadWrite(ws.WorkspaceDir, eg.DefaultMountRoot(eg.WorkspaceDirectory)),
-	}, options...)...), console); err != nil {
+	}, config.vm...)...), console); err != nil {
 		return nil, err
 	}
 
 	if err = t.vm.Exec(ctx, &execproxy.ExecRequest{Cmd: "systemctl", Arguments: []string{"is-system-running", "--wait"}, Dir: "/"}); err != nil {
 		return nil, errorsx.Wrap(err, "the machine did not finish booting")
+	}
+
+	for _, s := range config.sockets {
+		if err = t.vm.Forward(ctx, s.host, s.path); err != nil {
+			return nil, errorsx.Wrapf(err, "unable to forward %s", s.host)
+		}
 	}
 
 	return t, nil

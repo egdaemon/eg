@@ -105,6 +105,24 @@ func (t *VM) Exec(ctx context.Context, req *execproxy.ExecRequest, options ...Ex
 	return command(ctx, conn, t.client, req, options...)
 }
 
+// Forward makes the host's unix socket host reachable in the machine at path, a socket the machine's
+// sshd listens on until the machine stops. It waits for the machine to serve commands.
+func (t *VM) Forward(ctx context.Context, host string, path string) (err error) {
+	var (
+		conn      net.Conn
+		forwarded io.Closer
+	)
+
+	if conn, err = redial(ctx, func() (net.Conn, error) { return t.socket.Connect(22) }, t.stopped, func() error { return t.err }); err != nil {
+		return err
+	}
+	if forwarded, err = forward(conn, t.client, host, path); err != nil {
+		return err
+	}
+	t.closers = append(t.closers, forwarded)
+	return nil
+}
+
 // Close stops the machine and waits for it.
 func (t *VM) Close() error {
 	if t.vm.CanStop() {

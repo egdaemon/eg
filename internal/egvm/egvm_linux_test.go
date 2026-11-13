@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"net"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -29,6 +31,7 @@ import (
 func TestExec(t *testing.T) {
 	var (
 		rootfs   = os.Getenv("EG_TEST_ROOTFS")
+		sockets  = t.TempDir()
 		console  bytes.Buffer
 		archive  *egiso.Archive
 		root     *egiso.SysFS
@@ -78,7 +81,7 @@ func TestExec(t *testing.T) {
 	users, groups, err = archive.Accounts()
 	require.NoError(t, err)
 	root, upperdir = upper(t, archive)
-	vm, err = egvm.Boot(egvm.New(root, egvm.OptionAccounts(users, groups), egvm.OptionCPUs(2), egvm.OptionMemory(1<<30), egvm.OptionMountReadOnly(t.TempDir(), "/srv/shared")), &console)
+	vm, err = egvm.Boot(egvm.New(root, egvm.OptionAccounts(users, groups), egvm.OptionCPUs(2), egvm.OptionMemory(1<<30), egvm.OptionMountReadOnly(t.TempDir(), "/srv/shared"), egvm.OptionMountReadWrite(sockets, "/srv/sockets")), &console)
 	require.NoError(t, err, console.String())
 	t.Cleanup(func() { require.NoError(t, vm.Close()) })
 
@@ -136,6 +139,24 @@ func TestExec(t *testing.T) {
 		code, stdout, _ := run(t, t.Context(), nil, "printf", "%s|", "a b", "$HOME", "'q'", "*")
 		require.Equal(t, int32(0), code)
 		require.Equal(t, "a b|$HOME|'q'|*|", stdout)
+	})
+
+	t.Run("forwards a host socket into the machine", func(t *testing.T) {
+		host := filepath.Join(t.TempDir(), "host.sock")
+		l, cause := net.Listen("unix", host)
+		require.NoError(t, cause)
+		srv := &http.Server{Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { io.WriteString(w, "forwarded") })}
+		go srv.Serve(l)
+		t.Cleanup(func() { srv.Close() })
+
+		require.NoError(t, vm.Forward(t.Context(), host, "/srv/sockets/forwarded.sock"))
+		code, stdout, stderr := run(t, t.Context(), nil, "curl", "-s", "--unix-socket", "/srv/sockets/forwarded.sock", "http://machine/")
+		require.Equal(t, int32(0), code, stderr)
+		require.Equal(t, "forwarded", stdout)
+	})
+
+	t.Run("refuses to forward to a path the machine can not listen on", func(t *testing.T) {
+		require.Error(t, vm.Forward(t.Context(), filepath.Join(t.TempDir(), "host.sock"), "/srv/missing/forwarded.sock"))
 	})
 
 	t.Run("mounts the machine's directories", func(t *testing.T) {

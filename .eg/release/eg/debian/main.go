@@ -20,9 +20,7 @@ func main() {
 	err := eg.Perform(
 		ctx,
 		eggit.AutoClone,
-		eg.Parallel(
-			debeg.Prepare,
-		),
+		debeg.Prepare,
 		eg.Parallel(
 			eg.Module(
 				ctx,

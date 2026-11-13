@@ -330,18 +330,14 @@ func (t local) machine(c *http.Client, uri string) runners.BFn {
 			}
 		}
 
-		// as containers keep their container storage in a volume, a machine keeps it in the user's
-		// cache, where overlay can layer it, which the root's FUSE mount can not.
-		if err = os.MkdirAll(containers, 0700); err != nil {
-			return nil, errorsx.Wrap(err, "unable to create the machine's container storage")
-		}
-
+		// as containers keep their container storage in a volume, a machine keeps it in a volume in the
+		// user's cache, where overlay can layer it, which the machine's root and shares can not.
 		return runners.NewMachine(ctx, c, ws, uri, log.Writer(),
 			runners.MachineOptionVM(
 				egvm.OptionCPUs(uint(t.RuntimeResources.Cores)),
 				egvm.OptionMemory(uint64(t.RuntimeResources.Memory)),
 				egvm.OptionMountReadOnly(filepath.Join(ws.Root, ws.BuildDir, ws.Module, eg.ModuleDir), eg.DefaultMountRoot(eg.RuntimeDirectory, ws.Module, eg.ModuleDir)),
-				egvm.OptionMountReadWrite(containers, "/var/lib/containers"),
+				egvm.OptionMountVolume(containers, "/var/lib/containers"),
 			),
 			runners.MachineOptionLocalGPGAgent(ctx, envb),
 		)

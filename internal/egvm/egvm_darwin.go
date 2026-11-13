@@ -3,6 +3,7 @@ package egvm
 import (
 	"context"
 	"io"
+	"io/fs"
 	"net"
 	"os"
 	"path/filepath"
@@ -158,6 +159,8 @@ func configure(m Machine, authorized string, in *os.File, out *os.File) (_ *vz.V
 		mac      *vz.MACAddress
 		device   *vz.VirtioFileSystemDeviceConfiguration
 		devices  = make([]vz.DirectorySharingDeviceConfiguration, 0, len(m.mounts))
+		disk     *vz.VirtioBlockDeviceConfiguration
+		disks    = make([]vz.StorageDeviceConfiguration, 0, len(m.volumes))
 	)
 
 	if boot, err = vz.NewLinuxBootLoader(filepath.Join(m.dir, "Image"), vz.WithInitrd(filepath.Join(m.dir, "initramfs")), vz.WithCommandLine(m.cmdline(authorized))); err != nil {
@@ -210,6 +213,14 @@ func configure(m Machine, authorized string, in *os.File, out *os.File) (_ *vz.V
 	}
 	config.SetDirectorySharingDevicesVirtualMachineConfiguration(devices)
 
+	for _, v := range m.volumes {
+		if disk, err = volume(v); err != nil {
+			return nil, err
+		}
+		disks = append(disks, disk)
+	}
+	config.SetStorageDevicesVirtualMachineConfiguration(disks)
+
 	if _, err = config.Validate(); err != nil {
 		return nil, errorsx.Wrap(err, "invalid machine configuration")
 	}
@@ -234,6 +245,34 @@ func share(mnt mount) (_ *vz.VirtioFileSystemDeviceConfiguration, err error) {
 	}
 	device.SetDirectoryShare(single)
 	return device, nil
+}
+
+// volumesize is the size of a volume's disk image, which takes the host only the space it holds.
+const volumesize = 128 << 30
+
+// volume attaches the disk image the volume keeps in its directory, creating it empty, and sparse, when
+// it has none.
+func volume(v mount) (_ *vz.VirtioBlockDeviceConfiguration, err error) {
+	var (
+		path       = filepath.Join(v.dir, "volume.img")
+		image      *os.File
+		attachment *vz.DiskImageStorageDeviceAttachment
+	)
+
+	if err = os.MkdirAll(v.dir, 0700); err != nil {
+		return nil, errorsx.Wrapf(err, "unable to create the volume %s", v.dir)
+	}
+	if image, err = os.OpenFile(path, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600); err == nil {
+		err = errorsx.Compact(image.Truncate(volumesize), image.Close())
+	}
+	if err = errorsx.Ignore(err, fs.ErrExist); err != nil {
+		return nil, errorsx.Wrapf(err, "unable to create the volume's disk image %s", path)
+	}
+
+	if attachment, err = vz.NewDiskImageStorageDeviceAttachment(path, false); err != nil {
+		return nil, errorsx.Wrapf(err, "unable to attach the volume's disk image %s", path)
+	}
+	return vz.NewVirtioBlockDeviceConfiguration(attachment)
 }
 
 // wait returns once the machine stops.

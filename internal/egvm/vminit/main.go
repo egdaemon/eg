@@ -53,7 +53,7 @@ func boot() error {
 		}
 	}
 
-	rootinit, err := initpath()
+	rootinit, volumes, err := params()
 	if err != nil {
 		return err
 	}
@@ -96,6 +96,12 @@ func boot() error {
 		}
 	}
 
+	for i, path := range volumes {
+		if err = volume(fmt.Sprintf("/dev/vd%c", 'a'+i), path); err != nil {
+			return err
+		}
+	}
+
 	// the root sees /sys read only, as a container does, so its systemd configures devices without
 	// the udev container images leave out.
 	if err = unix.Mount("", "/root/sys", "", unix.MS_REMOUNT|unix.MS_BIND|unix.MS_RDONLY, ""); err != nil {
@@ -118,22 +124,49 @@ func boot() error {
 	return fmt.Errorf("unable to exec %s: %w", rootinit, unix.Exec(rootinit, []string{rootinit}, os.Environ()))
 }
 
-// initpath is the root's init: the init= of the kernel's command line, else /usr/sbin/init.
-func initpath() (string, error) {
+// params reads the kernel's command line: the root's init, its init= else /usr/sbin/init, and the
+// paths of the volumes, its egvm.volume= in the order their disks attach.
+func params() (rootinit string, volumes []string, err error) {
 	var (
-		rootinit = "/usr/sbin/init"
+		cmdline []byte
 	)
 
-	cmdline, err := os.ReadFile("/proc/cmdline")
-	if err != nil {
-		return "", err
+	rootinit = "/usr/sbin/init"
+	if cmdline, err = os.ReadFile("/proc/cmdline"); err != nil {
+		return "", nil, err
 	}
 	for _, param := range strings.Fields(string(cmdline)) {
 		if v, ok := strings.CutPrefix(param, "init="); ok {
 			rootinit = v
 		}
+		if v, ok := strings.CutPrefix(param, egvm.VolumeParam+"="); ok {
+			volumes = append(volumes, v)
+		}
 	}
-	return rootinit, nil
+	return rootinit, volumes, nil
+}
+
+// volume mounts the disk dev at path in the root, formatting it ext4 with the root's mkfs when it holds
+// no filesystem, as systemd's makefs would were there udev to announce the disk.
+func volume(dev string, path string) (err error) {
+	var (
+		source = filepath.Join("/root", dev) // /dev has moved into the root.
+		target = filepath.Join("/root", path)
+		out    []byte
+	)
+
+	// a disk without a filesystem fails to mount as ext4 with EINVAL.
+	if err = mount(source, target, "ext4", ""); !errors.Is(err, unix.EINVAL) {
+		return err
+	}
+
+	mkfs := exec.Command("/usr/sbin/mkfs.ext4", "-q", dev)
+	mkfs.SysProcAttr = &unix.SysProcAttr{Chroot: "/root"}
+	mkfs.Stdin = strings.NewReader("") // exec would open /dev/null, which has moved into the root.
+	if out, err = mkfs.CombinedOutput(); err != nil {
+		return fmt.Errorf("unable to format the volume %s: %w: %s", dev, err, out)
+	}
+	return mount(source, target, "ext4", "")
 }
 
 // forward connects each connection the listener nfs accepts to the host's NFS server.

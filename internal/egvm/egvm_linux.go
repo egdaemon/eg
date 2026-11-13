@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"os/user"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"syscall"
@@ -112,7 +113,12 @@ func Boot(m Machine, console io.Writer) (_ *VM, err error) {
 	defer unix.Close(mounted[0])
 
 	args = []string{stagemap, root, m.init, t.netns, authorized, nftables(m.firewall), shared, sshdir, strconv.FormatBool(false)}
-	for _, mnt := range m.mounts {
+	for _, v := range m.volumes {
+		if err = os.MkdirAll(v.dir, 0700); err != nil {
+			return nil, errorsx.Wrapf(err, "unable to create the volume %s", v.dir)
+		}
+	}
+	for _, mnt := range slices.Concat(m.mounts, m.volumes) {
 		args = append(args, mnt.dir, mnt.path, strconv.FormatBool(mnt.readonly))
 	}
 

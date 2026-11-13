@@ -32,7 +32,8 @@ func Initramfs(w io.Writer, files ...File) error {
 }
 
 // MachineInitramfs writes the initramfs machines boot to w: vminit as its init, and the modules the NFS root,
-// virtio-fs, vsock and the network need, loaded in this order, from kernel, the kernel's modules (lib/modules/<release>/kernel).
+// virtio-fs, vsock, the network, volumes and the overlays of containers' storage need, loaded in this order, from
+// kernel, the kernel's modules (lib/modules/<release>/kernel).
 func MachineInitramfs(w io.Writer, vminit []byte, kernel string) error {
 	var (
 		files = []File{
@@ -61,6 +62,12 @@ func MachineInitramfs(w io.Writer, vminit []byte, kernel string) error {
 		"drivers/net/net_failover.ko",
 		"drivers/net/virtio_net.ko",
 		"net/packet/af_packet.ko",
+		"lib/crc/crc16.ko",
+		"fs/mbcache.ko",
+		"fs/jbd2/jbd2.ko",
+		"fs/ext4/ext4.ko",
+		"drivers/block/virtio_blk.ko",
+		"fs/overlayfs/overlay.ko",
 	} {
 		b, err := os.ReadFile(filepath.Join(kernel, m))
 		if err != nil {

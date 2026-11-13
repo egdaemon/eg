@@ -35,6 +35,7 @@ func TestExec(t *testing.T) {
 		alpine   = os.Getenv("EG_TEST_ALPINE")
 		rootfs   = os.Getenv("EG_TEST_ROOTFS")
 		sockets  = t.TempDir()
+		volumes  = t.TempDir()
 		console  bytes.Buffer
 		kernels  []string
 		archive  *egiso.Archive
@@ -109,7 +110,7 @@ func TestExec(t *testing.T) {
 	users, groups, err = archive.Accounts()
 	require.NoError(t, err)
 	root, upperdir = upper(t, archive)
-	vm, err = egvm.Boot(egvm.New(root, egvm.OptionDirectory(directory(t)), egvm.OptionAccounts(users, groups), egvm.OptionMountReadWrite(sockets, "/srv/sockets")), &console)
+	vm, err = egvm.Boot(egvm.New(root, egvm.OptionDirectory(directory(t)), egvm.OptionAccounts(users, groups), egvm.OptionMountReadWrite(sockets, "/srv/sockets"), egvm.OptionMountVolume(volumes, "/srv/volume")), &console)
 	if err != nil && strings.Contains(err.Error(), "entitlement") {
 		t.Skipf("the test binary is not signed with vz.entitlements: %v", err)
 	}
@@ -141,6 +142,30 @@ func TestExec(t *testing.T) {
 		code, stdout, _ := run(t, t.Context(), nil, "cat", "/proc/1/comm")
 		require.Equal(t, int32(0), code)
 		require.Equal(t, "systemd\n", stdout)
+	})
+
+	t.Run("mounts a volume of its own, formatted ext4", func(t *testing.T) {
+		code, stdout, stderr := run(t, t.Context(), nil, "findmnt", "-n", "-o", "FSTYPE", "/srv/volume")
+		require.Equal(t, int32(0), code, stderr)
+		require.Equal(t, "ext4\n", stdout)
+
+		st, cause := os.Stat(filepath.Join(volumes, "volume.img"))
+		require.NoError(t, cause)
+		require.Equal(t, int64(128<<30), st.Size())
+	})
+
+	t.Run("a volume holds what containers' storage writes", func(t *testing.T) {
+		code, stdout, stderr := run(t, t.Context(), nil, "sh", "-c", strings.Join([]string{
+			"cd /srv/volume",
+			"mkdir -p lower upper work merged",
+			"chown 100000:100000 lower",
+			"mknod null c 1 3",
+			"mount -t overlay overlay -o lowerdir=lower,upperdir=upper,workdir=work merged",
+			"stat -c %u lower",
+			"umount merged",
+		}, " && "))
+		require.Equal(t, int32(0), code, stderr)
+		require.Equal(t, "100000\n", stdout)
 	})
 
 	t.Run("forwards a host socket into the machine", func(t *testing.T) {

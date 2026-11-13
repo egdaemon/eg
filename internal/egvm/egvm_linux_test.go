@@ -32,6 +32,7 @@ func TestExec(t *testing.T) {
 	var (
 		rootfs   = os.Getenv("EG_TEST_ROOTFS")
 		sockets  = t.TempDir()
+		volume   = filepath.Join(t.TempDir(), "volume")
 		console  bytes.Buffer
 		archive  *egiso.Archive
 		root     *egiso.SysFS
@@ -81,7 +82,7 @@ func TestExec(t *testing.T) {
 	users, groups, err = archive.Accounts()
 	require.NoError(t, err)
 	root, upperdir = upper(t, archive)
-	vm, err = egvm.Boot(egvm.New(root, egvm.OptionAccounts(users, groups), egvm.OptionCPUs(2), egvm.OptionMemory(1<<30), egvm.OptionMountReadOnly(t.TempDir(), "/srv/shared"), egvm.OptionMountReadWrite(sockets, "/srv/sockets")), &console)
+	vm, err = egvm.Boot(egvm.New(root, egvm.OptionAccounts(users, groups), egvm.OptionCPUs(2), egvm.OptionMemory(1<<30), egvm.OptionMountReadOnly(t.TempDir(), "/srv/shared"), egvm.OptionMountReadWrite(sockets, "/srv/sockets"), egvm.OptionMountVolume(volume, "/srv/volume")), &console)
 	require.NoError(t, err, console.String())
 	t.Cleanup(func() { require.NoError(t, vm.Close()) })
 
@@ -139,6 +140,14 @@ func TestExec(t *testing.T) {
 		code, stdout, _ := run(t, t.Context(), nil, "printf", "%s|", "a b", "$HOME", "'q'", "*")
 		require.Equal(t, int32(0), code)
 		require.Equal(t, "a b|$HOME|'q'|*|", stdout)
+	})
+
+	t.Run("mounts a volume in the directory it creates for it", func(t *testing.T) {
+		code, _, stderr := run(t, t.Context(), nil, "sh", "-c", "echo kept > /srv/volume/kept && chown 1000:1000 /srv/volume/kept")
+		require.Equal(t, int32(0), code, stderr)
+		b, cause := os.ReadFile(filepath.Join(volume, "kept"))
+		require.NoError(t, cause)
+		require.Equal(t, "kept\n", string(b))
 	})
 
 	t.Run("forwards a host socket into the machine", func(t *testing.T) {

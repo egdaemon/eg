@@ -45,6 +45,7 @@ type Machine struct {
 	root     *egiso.SysFS
 	nfs      []egiso.NFSOption
 	mounts   []mount
+	volumes  []mount
 	firewall wnetruntime.Firewall
 }
 
@@ -121,6 +122,16 @@ func OptionMountReadOnly(dir string, path string) Option {
 	return optionMount(dir, path, true)
 }
 
+// OptionMountVolume mounts a filesystem of the machine's own at path, kept in the host directory dir
+// between boots, for what a share can not hold, as containers' storage: its owners, devices and
+// mounts. A Linux machine mounts dir; a virtual machine keeps an ext4 disk image in it, which vminit
+// formats when it is empty.
+func OptionMountVolume(dir string, path string) Option {
+	return func(m *Machine) {
+		m.volumes = append(m.volumes, mount{tag: fmt.Sprintf("egvmvolume%d", len(m.volumes)), dir: dir, path: path})
+	}
+}
+
 func optionMount(dir string, path string, readonly bool) Option {
 	return func(m *Machine) {
 		m.mounts = append(m.mounts, mount{tag: fmt.Sprintf("egvm%d", len(m.mounts)), dir: dir, path: path, readonly: readonly})
@@ -172,11 +183,16 @@ func newstdio(options ...ExecOption) stdio {
 	return langx.Clone(stdio{stdout: io.Discard, stderr: io.Discard}, options...)
 }
 
+// VolumeParam names, once per volume, in the order their disks attach, the path vminit mounts a
+// volume at.
+const VolumeParam = "egvm.volume"
+
 // cmdline is the machine's kernel command line. Container images hold no udev to announce the
 // console, so systemd starts no getty on it: one would wait out its device's timeout before the
 // machine boots. systemd-fstab-generator mounts the virtio-fs devices from systemd.mount-extra, and
-// systemd-network-generator configures the machine's NAT device for networkd from ip=. authorized is
-// the key root accepts over ssh.
+// systemd-network-generator configures the machine's NAT device for networkd from ip=. Without udev
+// systemd mounts no block device, so vminit mounts the volumes from egvm.volume=. authorized is the
+// key root accepts over ssh.
 func (t Machine) cmdline(authorized string) string {
 	var (
 		resolv = base64.StdEncoding.EncodeToString([]byte(resolvlink))
@@ -199,6 +215,10 @@ func (t Machine) cmdline(authorized string) string {
 			mode = "ro"
 		}
 		params = append(params, fmt.Sprintf("systemd.mount-extra=%s:%s:virtiofs:%s", m.tag, m.path, mode))
+	}
+
+	for _, v := range t.volumes {
+		params = append(params, VolumeParam+"="+v.path)
 	}
 
 	return strings.Join(params, " ")

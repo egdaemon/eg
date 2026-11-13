@@ -20,11 +20,12 @@ require (
 	github.com/coreos/go-systemd/v22 v22.7.0
 	github.com/dave/jennifer v1.7.1
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
+	github.com/docker/go-units v0.5.0
 	github.com/dominikbraun/graph v0.23.0
 	github.com/duckdb/duckdb-go/v2 v2.10503.1
 	github.com/dustin/go-humanize v1.1.0
-	github.com/egdaemon/gdx v0.0.0-20261031085230-c2c1dd829dc4
-	github.com/egdaemon/gdx/konggdx v0.0.0-20261031085230-c2c1dd829dc4
+	github.com/egdaemon/gdx v0.0.0-20261106002238-59fe7b8df603
+	github.com/egdaemon/gdx/konggdx v0.0.0-20261106002238-59fe7b8df603
 	github.com/egdaemon/sh/v3 v3.14.1-0.20261103040545-e33e887fd27a
 	github.com/egdaemon/sh/x v0.0.0-20261105220106-700f29e4a1a9
 	github.com/egdaemon/wasinet/wasinet v0.0.0-20261103201433-2f9a9bae892d
@@ -67,6 +68,7 @@ require (
 	github.com/tetratelabs/wazero v1.12.0
 	github.com/willabides/kongplete v0.4.0
 	github.com/willscott/go-nfs v0.0.4
+	go.podman.io/common v0.68.0
 	go.podman.io/podman/v6 v6.0.0-20260602192321-9e13b9ea52a4
 	go.uber.org/automaxprocs v1.6.0
 	golang.org/x/crypto v0.58.0
@@ -151,7 +153,6 @@ require (
 	github.com/docker/distribution v2.8.3+incompatible // indirect
 	github.com/docker/docker-credential-helpers v0.9.7 // indirect
 	github.com/docker/go-connections v0.8.2 // indirect
-	github.com/docker/go-units v0.5.0 // indirect
 	github.com/duckdb/duckdb-go-bindings v0.10505.0 // indirect
 	github.com/duckdb/duckdb-go-bindings/lib/darwin-amd64 v0.10505.0 // indirect
 	github.com/duckdb/duckdb-go-bindings/lib/darwin-arm64 v0.10505.0 // indirect
@@ -189,6 +190,7 @@ require (
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/hashicorp/go-multierror v1.1.1 // indirect
 	github.com/hashicorp/golang-lru v1.0.2 // indirect
+	github.com/hashicorp/golang-lru/v2 v2.0.7 // indirect
 	github.com/huin/goupnp v1.3.0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/ipfs/boxo v0.43.0 // indirect
@@ -304,7 +306,6 @@ require (
 	github.com/rasky/go-xdr v0.0.0-20170124162913-1a41d1a06c93 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/riywo/loginshell v0.0.0-20200815045211-7d26008be1ab // indirect
-	github.com/rogpeppe/go-internal v1.16.0 // indirect
 	github.com/secure-systems-lab/go-securesystemslib v0.11.0 // indirect
 	github.com/serenize/snaker v0.0.0-20201027110005-a7ad2135616e // indirect
 	github.com/sergi/go-diff v1.4.0 // indirect
@@ -342,7 +343,6 @@ require (
 	go.opentelemetry.io/otel/metric v1.47.0 // indirect
 	go.opentelemetry.io/otel/trace v1.47.0 // indirect
 	go.podman.io/buildah v1.44.0 // indirect
-	go.podman.io/common v0.68.0 // indirect
 	go.podman.io/image/v5 v5.40.0 // indirect
 	go.podman.io/storage v1.63.0 // indirect
 	go.uber.org/dig v1.19.0 // indirect
@@ -352,7 +352,7 @@ require (
 	go.uber.org/zap v1.28.0 // indirect
 	go.yaml.in/yaml/v2 v2.4.4 // indirect
 	go.yaml.in/yaml/v3 v3.0.6 // indirect
-	golang.org/x/sync v0.24.0 // indirect
+	golang.org/x/sync v0.25.0 // indirect
 	golang.org/x/telemetry v0.0.0-20261009151841-97e8ea77aa2a // indirect
 	golang.org/x/xerrors v0.0.0-20240903120638-7835f813f4da // indirect
 	gonum.org/v1/gonum v0.17.0 // indirect

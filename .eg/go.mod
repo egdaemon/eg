@@ -6,6 +6,7 @@ require (
 	cloud.google.com/go/secretmanager v1.22.0
 	github.com/egdaemon/eg v0.0.0-20261102224728-e980edb01f7f
 	github.com/egdaemon/wasinet/wasinet v0.0.0-20261103201433-2f9a9bae892d
+	github.com/jackc/pgx/v5 v5.12.0
 	google.golang.org/api v0.307.0
 	google.golang.org/grpc v1.84.0
 )
@@ -41,7 +42,6 @@ require (
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
 	github.com/jackc/pgtype v1.14.4 // indirect
-	github.com/jackc/pgx/v5 v5.12.0 // indirect
 	github.com/jackc/puddle/v2 v2.2.3 // indirect
 	github.com/james-lawrence/genieql v0.0.0-20260917171911-8038e3e1d315 // indirect
 	github.com/kevinburke/ssh_config v1.6.0 // indirect
@@ -74,7 +74,7 @@ require (
 	golang.org/x/mod v0.42.0 // indirect
 	golang.org/x/net v0.61.0 // indirect
 	golang.org/x/oauth2 v0.37.0 // indirect
-	golang.org/x/sync v0.24.0 // indirect
+	golang.org/x/sync v0.25.0 // indirect
 	golang.org/x/sys v0.49.0 // indirect
 	golang.org/x/text v0.43.0 // indirect
 	golang.org/x/time v0.16.0 // indirect

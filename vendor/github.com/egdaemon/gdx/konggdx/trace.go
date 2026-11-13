@@ -20,13 +20,19 @@ type Trace struct {
 }
 
 func (t Trace) Run(ctx context.Context) error {
+	return t.Do(ctx, gdxapi.NewUnixClient(t.Socket))
+}
+
+// Do fetches an execution trace through c, writing it to the configured output. Socket is ignored, allowing
+// callers to supply a client for another transport (see gdxapi.NewClient).
+func (t Trace) Do(ctx context.Context, c *http.Client) error {
 	out, err := t.Output.Open(os.Stdout)
 	if err != nil {
 		return fmt.Errorf("unable to open output: %w", err)
 	}
 	defer out.Close()
 
-	return t.run(ctx, gdxapi.NewUnixClient(t.Socket), out)
+	return t.run(ctx, c, out)
 }
 
 func (t Trace) run(ctx context.Context, c *http.Client, out io.Writer) error {

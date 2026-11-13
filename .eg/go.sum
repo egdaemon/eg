@@ -55,10 +55,6 @@ github.com/dustin/go-humanize v1.1.0 h1:dbKTrvD0klcbBV/h4AWJdMuZogJACoMlvWIWZ5b2
 github.com/dustin/go-humanize v1.1.0/go.mod h1:hc1CvRkJMsgxqjmjMQF3QNRAZBwY8AXBAzKYoSX9sFI=
 github.com/egdaemon/eg v0.0.0-20261102224728-e980edb01f7f h1:sdP/WXk3/O6tiUTTby8Fdu2f11j32c4KKy/xMNFv+HA=
 github.com/egdaemon/eg v0.0.0-20261102224728-e980edb01f7f/go.mod h1:Tgs28GKdBkEB20Sro4baMpc/YGnLw69AqiMuofjX9ds=
-github.com/egdaemon/wasinet/wasinet v0.0.0-20261027202319-9cfc20f44598 h1:VmTb24Bj8I8v0ce6a9P4elGL7Sxjp1O7DAXcNWx+ax4=
-github.com/egdaemon/wasinet/wasinet v0.0.0-20261027202319-9cfc20f44598/go.mod h1:2/G25/idU+fUZa8vElMrvgKi2RRkNM/0z0hHRsIfvkQ=
-github.com/egdaemon/wasinet/wasinet v0.0.0-20261103182433-1cd1b3637a0c h1:6lrQY6TEhL2NtluInINMVJ9+P1RLUx4K3XqPsAsegoE=
-github.com/egdaemon/wasinet/wasinet v0.0.0-20261103182433-1cd1b3637a0c/go.mod h1:2/G25/idU+fUZa8vElMrvgKi2RRkNM/0z0hHRsIfvkQ=
 github.com/egdaemon/wasinet/wasinet v0.0.0-20261103201433-2f9a9bae892d h1:vpuyri6vixAcYsEBsCI9wk32/fGI/ZpJp0z4zkZ3oS0=
 github.com/egdaemon/wasinet/wasinet v0.0.0-20261103201433-2f9a9bae892d/go.mod h1:2/G25/idU+fUZa8vElMrvgKi2RRkNM/0z0hHRsIfvkQ=
 github.com/egdaemon/wasinet/wazeronet v0.0.0-20260928194155-07f223337a8d h1:7Q86hXF6BAjqT28Xc9HTBi3Yyi6JzFTFP4QzfSuSnos=
@@ -345,8 +341,7 @@ golang.org/x/oauth2 v0.37.0/go.mod h1:IxwZNxUULJmpBFf9K/9NTMSIfZZuvuTy1gGxhigP/5
 golang.org/x/sync v0.0.0-20190423024810-112230192c58/go.mod h1:RxMgew5VJxzue5/jJTE5uejpjVlOe/izrB70Jof72aM=
 golang.org/x/sync v0.0.0-20220722155255-886fb9371eb4/go.mod h1:RxMgew5VJxzue5/jJTE5uejpjVlOe/izrB70Jof72aM=
 golang.org/x/sync v0.1.0/go.mod h1:RxMgew5VJxzue5/jJTE5uejpjVlOe/izrB70Jof72aM=
-golang.org/x/sync v0.24.0 h1:iqiDrGoDgyuvAKrhLQthUEzU/R378N78gXbBjxed7oA=
-golang.org/x/sync v0.24.0/go.mod h1:sUUOizhqBxiL6pEWpqNLUiaJn1ShEbZ6BBqskPbjZm0=
+golang.org/x/sync v0.25.0 h1:dJnifr0nMV8/SBnBvdo4eSGGnrc3O4FFx6IqvtLcmRs=
 golang.org/x/sys v0.0.0-20180905080454-ebe1bf3edb33/go.mod h1:STP8DvDyc/dI5b8T5hshtkjS+E42TnysNCUPdjciGhY=
 golang.org/x/sys v0.0.0-20190215142949-d0b11bdaac8a/go.mod h1:STP8DvDyc/dI5b8T5hshtkjS+E42TnysNCUPdjciGhY=
 golang.org/x/sys v0.0.0-20190222072716-a9d3bda3a223/go.mod h1:STP8DvDyc/dI5b8T5hshtkjS+E42TnysNCUPdjciGhY=

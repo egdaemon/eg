@@ -535,14 +535,14 @@ github.com/ebitengine/purego/internal/strings
 github.com/ebitengine/purego/internal/xreflect
 # github.com/egdaemon/eg v0.0.0-20261102224728-e980edb01f7f
 ## explicit; go 1.27.2
-# github.com/egdaemon/gdx v0.0.0-20261031085230-c2c1dd829dc4
+# github.com/egdaemon/gdx v0.0.0-20261106002238-59fe7b8df603
 ## explicit; go 1.25.8
 github.com/egdaemon/gdx
 github.com/egdaemon/gdx/gdxapi
 github.com/egdaemon/gdx/internal/envx
 github.com/egdaemon/gdx/internal/errorsx
 github.com/egdaemon/gdx/internal/langx
-# github.com/egdaemon/gdx/konggdx v0.0.0-20261031085230-c2c1dd829dc4
+# github.com/egdaemon/gdx/konggdx v0.0.0-20261106002238-59fe7b8df603
 ## explicit; go 1.25.8
 github.com/egdaemon/gdx/konggdx
 github.com/egdaemon/gdx/konggdx/cmdopts
@@ -821,7 +821,7 @@ github.com/hashicorp/go-multierror
 ## explicit; go 1.12
 github.com/hashicorp/golang-lru/simplelru
 # github.com/hashicorp/golang-lru/v2 v2.0.7
-## go 1.18
+## explicit; go 1.18
 github.com/hashicorp/golang-lru/v2
 github.com/hashicorp/golang-lru/v2/internal
 github.com/hashicorp/golang-lru/v2/simplelru
@@ -1596,8 +1596,6 @@ github.com/rivo/uniseg
 # github.com/riywo/loginshell v0.0.0-20200815045211-7d26008be1ab
 ## explicit
 github.com/riywo/loginshell
-# github.com/rogpeppe/go-internal v1.16.0
-## explicit; go 1.25
 # github.com/secure-systems-lab/go-securesystemslib v0.11.0
 ## explicit; go 1.25.0
 github.com/secure-systems-lab/go-securesystemslib/encrypted
@@ -2145,7 +2143,7 @@ golang.org/x/oauth2/google/internal/stsexchange
 golang.org/x/oauth2/internal
 golang.org/x/oauth2/jws
 golang.org/x/oauth2/jwt
-# golang.org/x/sync v0.24.0
+# golang.org/x/sync v0.25.0
 ## explicit; go 1.26.0
 golang.org/x/sync/errgroup
 golang.org/x/sync/semaphore

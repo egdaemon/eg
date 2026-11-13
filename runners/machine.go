@@ -1,9 +1,11 @@
 package runners
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
+	"io/fs"
 	"log"
 	"net/http"
 	"os"
@@ -24,6 +26,7 @@ import (
 	"github.com/egdaemon/eg/interp/execproxy"
 	"github.com/egdaemon/eg/transpile"
 	"github.com/egdaemon/eg/workspaces"
+	"github.com/moby/sys/user"
 	"github.com/opencontainers/go-digest"
 )
 
@@ -34,6 +37,7 @@ type Machine struct {
 	archive *egiso.Archive
 	upper   *os.Root
 	vm      *egvm.VM
+	environ []string
 }
 
 // NewMachine boots a machine from the egiso uri names, as egiso.OpenURI opens it, under a writable
@@ -68,6 +72,10 @@ func NewMachine(ctx context.Context, c *http.Client, ws workspaces.Context, uri 
 		return nil, err
 	}
 
+	if t.environ, err = environ(t.archive); err != nil {
+		return nil, err
+	}
+
 	// containers mount the eg running the command at egbin; machines share directories, not files.
 	if egbin, err = exec.LookPath(os.Args[0]); err != nil {
 		return nil, errorsx.Wrap(err, "unable to locate eg")
@@ -97,17 +105,18 @@ func NewMachine(ctx context.Context, c *http.Client, ws workspaces.Context, uri 
 }
 
 // BuildRootEgiso builds the root container as BuildRootContainerPath does and returns the uri of an
-// egiso of its filesystem. It keeps the egiso of the latest image in cache, in a directory named for
-// the image's id, so it builds one per image.
+// egiso of its filesystem, with the image's environment as its /etc/environment. It keeps the egiso
+// of the latest image in cache, in a directory named for the image's id, so it builds one per image.
 func BuildRootEgiso(ctx context.Context, cache, dir, path string, options ...string) (_ string, err error) {
 	var (
-		id     string
-		cid    string
-		tar    *os.File
-		st     os.FileInfo
-		out    *os.File
-		toc    digest.Digest
-		cached []byte
+		id      string
+		cid     string
+		environ string
+		tar     *os.File
+		st      os.FileInfo
+		out     *os.File
+		toc     digest.Digest
+		cached  []byte
 	)
 
 	if err = BuildRootContainerPath(ctx, dir, path, options...); err != nil {
@@ -140,6 +149,19 @@ func BuildRootEgiso(ctx context.Context, cache, dir, path string, options ...str
 	cid = strings.TrimSpace(cid)
 	defer func() { err = errorsx.Compact(err, exec.Command("podman", "rm", cid).Run()) }()
 
+	// an export holds only the filesystem, the environment a container starts its processes with is
+	// the image's configuration.
+	if environ, err = execx.String(ctx, "podman", "image", "inspect", "--format", "{{range .Config.Env}}{{println .}}{{end}}", "eg"); err != nil {
+		return "", errorsx.Wrap(err, "unable to read the root container's environment")
+	}
+	if err = os.WriteFile(filepath.Join(imagedir, "environment"), []byte(environ), 0644); err != nil {
+		return "", errorsx.Wrap(err, "unable to write the root container's environment")
+	}
+	defer os.Remove(filepath.Join(imagedir, "environment"))
+	if err = exec.CommandContext(ctx, "podman", "cp", "--archive=false", filepath.Join(imagedir, "environment"), cid+":/etc/environment").Run(); err != nil {
+		return "", errorsx.Wrap(err, "unable to place the root container's environment")
+	}
+
 	if err = exec.CommandContext(ctx, "podman", "export", "-o", tar.Name(), cid).Run(); err != nil {
 		return "", errorsx.Wrap(err, "unable to export the root container")
 	}
@@ -168,8 +190,38 @@ func BuildRootEgiso(ctx context.Context, cache, dir, path string, options ...str
 	return location + "#" + toc.String(), nil
 }
 
+// environ is the environment a container of root starts its processes with: the image's, which
+// root keeps as its /etc/environment, and root's home.
+func environ(root fs.FS) (_ []string, err error) {
+	var (
+		image  []byte
+		passwd []byte
+		users  []user.User
+		b      = envx.Build()
+	)
+
+	if image, err = fs.ReadFile(root, "etc/environment"); err != nil && fsx.ErrIsNotExist(err) == nil {
+		return nil, errorsx.Wrap(err, "unable to read the root's environment")
+	}
+
+	if passwd, err = fs.ReadFile(root, "etc/passwd"); err != nil {
+		return nil, errorsx.Wrap(err, "unable to read the root's accounts")
+	}
+
+	if users, err = user.ParsePasswdFilter(bytes.NewReader(passwd), func(u user.User) bool { return u.Uid == 0 }); err != nil {
+		return nil, errorsx.Wrap(err, "unable to parse the root's accounts")
+	}
+
+	b = b.FromReader(bytes.NewReader(image))
+	for _, u := range users {
+		b = b.Var("HOME", u.Home)
+	}
+
+	return b.Environ()
+}
+
 // Do runs the module in the machine, as c8sproxy.PodmanModule runs it in a container, with the
-// workspace's environment file and the stdio of eg.
+// environment of a container of the root, the workspace's environment file and the stdio of eg.
 func (t *Machine) Do(ctx context.Context, m transpile.Compiled) (err error) {
 	var (
 		env       []string
@@ -184,7 +236,7 @@ func (t *Machine) Do(ctx context.Context, m transpile.Compiled) (err error) {
 		return errorsx.Wrap(err, "unable to place the module")
 	}
 
-	if env, err = envx.Build().FromPath(filepath.Join(t.ws.RuntimeDir, eg.EnvironFile)).Environ(); err != nil {
+	if env, err = envx.Build().FromEnviron(t.environ...).FromPath(filepath.Join(t.ws.RuntimeDir, eg.EnvironFile)).Environ(); err != nil {
 		return errorsx.Wrap(err, "unable to generate environment")
 	}
 

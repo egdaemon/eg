@@ -26,6 +26,7 @@ import (
 	"github.com/egdaemon/eg/internal/wasix"
 	"github.com/egdaemon/eg/interp/c8s"
 	"github.com/egdaemon/eg/interp/runtime/wasi/ffiegcontainer"
+	"github.com/egdaemon/eg/interp/runtime/wasi/ffiegenv"
 	"github.com/egdaemon/eg/interp/runtime/wasi/ffiegvm"
 	"github.com/egdaemon/eg/interp/runtime/wasi/ffiexec"
 	"github.com/egdaemon/eg/interp/runtime/wasi/ffigit"
@@ -197,6 +198,9 @@ func Remote(ctx context.Context, wshost workspaces.Context, aid string, runid st
 			NewFunctionBuilder().WithFunc(
 			ffigit.Bearer(wshost.RuntimeDir),
 		).Export("github.com/egdaemon/eg/runtime/wasi/runtime/ffigit.Bearer").
+			NewFunctionBuilder().WithFunc(
+			ffiegenv.Environ(filepath.Join(wshost.RuntimeDir, eg.EnvironFile)),
+		).Export("github.com/egdaemon/eg/runtime/wasi/runtime/ffiegenv.Environ").
 			NewFunctionBuilder().WithFunc(
 			// ffimetric.Metric(evtclient),
 			ffigraph.NoopTrace,

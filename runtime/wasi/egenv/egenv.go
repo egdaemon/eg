@@ -1,6 +1,7 @@
 package egenv
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"os"
@@ -17,6 +18,7 @@ import (
 	"github.com/egdaemon/eg/internal/fsx"
 	"github.com/egdaemon/eg/internal/patternx"
 	"github.com/egdaemon/eg/internal/userx"
+	"github.com/egdaemon/eg/runtime/wasi/egunsafe/ffiegenv"
 	"github.com/egdaemon/eg/runtime/wasi/env"
 )
 
@@ -73,6 +75,12 @@ var initiated = sync.OnceValue(func() time.Time {
 // the environment is only parsed once.
 func Initiated() time.Time {
 	return initiated()
+}
+
+// Environ provides the environ the runner stored for the workload. the host reads it since commands run as an
+// unprivileged user that cannot.
+func Environ() ([]string, error) {
+	return ffiegenv.Environ(context.Background())
 }
 
 // Read the entry path of the workload from the environment, empty when the runtime did not provide it.

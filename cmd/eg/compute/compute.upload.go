@@ -31,7 +31,6 @@ import (
 	"github.com/egdaemon/eg/internal/stringsx"
 	"github.com/egdaemon/eg/internal/tarx"
 	"github.com/egdaemon/eg/internal/unsafepretty"
-	"github.com/egdaemon/eg/runners"
 	"github.com/egdaemon/eg/secrets"
 	"github.com/egdaemon/eg/transpile"
 	"github.com/egdaemon/eg/workspaces"
@@ -129,7 +128,7 @@ func (t upload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, ident *cmdide
 
 	t.GitClone = stringsx.First(t.GitClone, errorsx.Zero(gitx.QuirkCloneURI(repo, t.GitRemote)))
 
-	envb := nestedenviron(eg.DefaultRuntimeDirectory(eg.EnvironFile)).
+	envb := envx.Build().
 		Var(eg.EnvComputeArch, t.Arch).
 		Var(eg.EnvComputeOS, t.OS).
 		Var(eg.EnvWorkloadDraft, strconv.FormatBool(t.Draft)).
@@ -204,10 +203,4 @@ func (t upload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, ident *cmdide
 	chttp := authn.New(gctx.Context, tlsc.DefaultClient(), signer, aid, gctx.ProfileID, compute.NewAuthzTokenSource)
 
 	return t.submit(gctx.Context, chttp, t.Endpoint, lancache, enq, archiveio, environio)
-}
-
-// nestedenviron seeds the environment with the file at path when running inside a workload, so nested
-// runs inherit it. outside a workload the seed is empty. everything added afterwards overrides it.
-func nestedenviron(path string) *envx.Builder {
-	return envx.Build().FromPath(envx.Toggle("", path, runners.Nested())) // a blank path is a noop.
 }

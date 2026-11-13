@@ -152,7 +152,9 @@ func volume(dev string, path string) (err error) {
 	var (
 		source = filepath.Join("/root", dev) // /dev has moved into the root.
 		target = filepath.Join("/root", path)
-		out    []byte
+		// exec would open /dev/null for stdin, which has moved into the root.
+		mkfs = &exec.Cmd{Path: "/usr/sbin/mkfs.ext4", Args: []string{"mkfs.ext4", "-q", dev}, Stdin: strings.NewReader(""), SysProcAttr: &unix.SysProcAttr{Chroot: "/root"}}
+		out  []byte
 	)
 
 	// a disk without a filesystem fails to mount as ext4 with EINVAL.
@@ -160,9 +162,6 @@ func volume(dev string, path string) (err error) {
 		return err
 	}
 
-	mkfs := exec.Command("/usr/sbin/mkfs.ext4", "-q", dev)
-	mkfs.SysProcAttr = &unix.SysProcAttr{Chroot: "/root"}
-	mkfs.Stdin = strings.NewReader("") // exec would open /dev/null, which has moved into the root.
 	if out, err = mkfs.CombinedOutput(); err != nil {
 		return fmt.Errorf("unable to format the volume %s: %w: %s", dev, err, out)
 	}

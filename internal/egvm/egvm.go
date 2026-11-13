@@ -27,7 +27,8 @@ import (
 // placeholder image builds leave behind.
 const resolvlink = "L+ /etc/resolv.conf - - - - ../run/systemd/resolve/stub-resolv.conf\n"
 
-// mount is a host directory the machine attaches as the virtio-fs device tag and mounts at path.
+// mount is a host directory the machine attaches as the virtio-fs device tag and mounts at path, or a
+// volume, which a virtual machine attaches as a disk in the order of its volumes.
 type mount struct {
 	tag      string
 	dir      string
@@ -128,7 +129,7 @@ func OptionMountReadOnly(dir string, path string) Option {
 // formats when it is empty.
 func OptionMountVolume(dir string, path string) Option {
 	return func(m *Machine) {
-		m.volumes = append(m.volumes, mount{tag: fmt.Sprintf("egvmvolume%d", len(m.volumes)), dir: dir, path: path})
+		m.volumes = append(m.volumes, mount{dir: dir, path: path})
 	}
 }
 

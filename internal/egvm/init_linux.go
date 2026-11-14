@@ -8,7 +8,6 @@ import (
 	"os/signal"
 	"path/filepath"
 	"runtime"
-	"strconv"
 	"strings"
 	"syscall"
 
@@ -29,12 +28,19 @@ const (
 )
 
 // The descriptors Boot hands stagemap and stageroot: the pipe Boot closes once it maps the
-// machine's ids, and the socket stageroot sends the /dev/fuse descriptor of the root's mount back
-// over. The kernel mounts a FUSE descriptor only in the user namespace that opened it, so stageroot
-// opens it, and Boot serves it.
+// machine's ids, and the socket stageroot sends the /dev/fuse descriptors of the root's mount and
+// then of each share Boot serves back over. The kernel mounts a FUSE descriptor only in the user
+// namespace that opened it, so stageroot opens it, and Boot serves it.
 const (
 	fdmapped  = 3
 	fdmounted = 4
+)
+
+// How stageroot mounts a share: bound read write or read only, or over FUSE, which Boot serves.
+const (
+	sharerw   = "rw"
+	sharero   = "ro"
+	sharefuse = "fuse"
 )
 
 // fdnetworked is the pipe stageroot hands stageinit and closes once pasta connects the machine's
@@ -82,12 +88,11 @@ func waitmapped() error {
 // then runs the machine's init until it exits. netns is the file the init's network namespace is
 // mounted on for pasta. authorized is the key root accepts over ssh, and ruleset the machine's
 // firewall. shares are the directories the machine mounts, as triples of the host directory, the path
-// within the root, and whether it is read only.
+// within the root, and how it mounts them.
 func boot(root string, rootinit string, netns string, authorized string, ruleset string, shares []string) (err error) {
 	var (
 		machine   *exec.Cmd
 		networked [2]*os.File
-		dev       *os.File
 		stop      = make(chan os.Signal, 1)
 		stopping  = make(chan struct{})
 	)
@@ -105,17 +110,8 @@ func boot(root string, rootinit string, netns string, authorized string, ruleset
 	if err = unix.Mount("", "/", "", unix.MS_REC|unix.MS_PRIVATE, ""); err != nil {
 		return fmt.Errorf("unable to make the machine's mounts private: %w", err)
 	}
-	if dev, err = os.OpenFile("/dev/fuse", os.O_RDWR, 0); err != nil {
-		return fmt.Errorf("unable to open /dev/fuse: %w", err)
-	}
-	if err = unix.Mount("egiso", root, "fuse", 0, fmt.Sprintf("fd=%d,rootmode=40000,user_id=0,group_id=0,allow_other,default_permissions", dev.Fd())); err != nil {
+	if err = fusemount("egiso", root); err != nil {
 		return fmt.Errorf("unable to mount the root: %w", err)
-	}
-	if err = unix.Sendmsg(fdmounted, []byte{1}, unix.UnixRights(int(dev.Fd())), nil, 0); err != nil {
-		return fmt.Errorf("unable to hand over the root's mount: %w", err)
-	}
-	if err = dev.Close(); err != nil {
-		return err
 	}
 
 	if err = devices(root); err != nil {
@@ -140,7 +136,7 @@ func boot(root string, rootinit string, netns string, authorized string, ruleset
 		}
 	}
 	for i := 0; i+2 < len(shares); i += 3 {
-		if err = share(shares[i], filepath.Join(root, shares[i+1]), shares[i+2] == strconv.FormatBool(true)); err != nil {
+		if err = share(shares[i], filepath.Join(root, shares[i+1]), shares[i+2]); err != nil {
 			return err
 		}
 	}
@@ -286,8 +282,29 @@ func devices(root string) (err error) {
 	return os.Symlink("pts/ptmx", filepath.Join(dev, "ptmx"))
 }
 
-// share binds the host directory dir at target, read only if readonly says so.
-func share(dir string, target string, readonly bool) (err error) {
+// fusemount mounts a FUSE filesystem named source at target and hands its /dev/fuse descriptor to
+// Boot to serve.
+func fusemount(source string, target string) (err error) {
+	var (
+		dev *os.File
+	)
+
+	if dev, err = os.OpenFile("/dev/fuse", os.O_RDWR, 0); err != nil {
+		return fmt.Errorf("unable to open /dev/fuse: %w", err)
+	}
+
+	if err = unix.Mount(source, target, "fuse", 0, fmt.Sprintf("fd=%d,rootmode=40000,user_id=0,group_id=0,allow_other,default_permissions", dev.Fd())); err != nil {
+		return errorsx.Compact(err, dev.Close())
+	}
+	if err = unix.Sendmsg(fdmounted, []byte{1}, unix.UnixRights(int(dev.Fd())), nil, 0); err != nil {
+		return errorsx.Compact(fmt.Errorf("unable to hand over the mount: %w", err), dev.Close())
+	}
+	return dev.Close()
+}
+
+// share mounts the host directory dir at target as mode says: bound read write or read only, or over
+// FUSE, which Boot serves.
+func share(dir string, target string, mode string) (err error) {
 	var (
 		st unix.Statfs_t
 	)
@@ -295,10 +312,16 @@ func share(dir string, target string, readonly bool) (err error) {
 	if err = os.MkdirAll(target, 0755); err != nil {
 		return err
 	}
+	if mode == sharefuse {
+		if err = fusemount(dir, target); err != nil {
+			return fmt.Errorf("unable to share %s: %w", dir, err)
+		}
+		return nil
+	}
 	if err = unix.Mount(dir, target, "", unix.MS_BIND|unix.MS_REC, ""); err != nil {
 		return fmt.Errorf("unable to share %s: %w", dir, err)
 	}
-	if !readonly {
+	if mode != sharero {
 		return nil
 	}
 

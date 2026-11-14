@@ -28,12 +28,14 @@ import (
 const resolvlink = "L+ /etc/resolv.conf - - - - ../run/systemd/resolve/stub-resolv.conf\n"
 
 // mount is a host directory the machine attaches as the virtio-fs device tag and mounts at path, or a
-// volume, which a virtual machine attaches as a disk in the order of its volumes.
+// volume, which a virtual machine attaches as a disk in the order of its volumes. What the machine
+// writes in a host directory belongs to the machine's own ids, unless it is owned by the host user.
 type mount struct {
 	tag      string
 	dir      string
 	path     string
 	readonly bool
+	owned    bool
 }
 
 // Machine describes a virtual machine: the image it boots, its size, its root, what it mounts, and
@@ -115,14 +117,25 @@ func OptionAccounts(users []egiso.Account, groups []egiso.Account) Option {
 	}
 }
 
-// OptionMountReadWrite mounts the host directory dir in the machine at path.
+// OptionMountReadWrite mounts the host directory dir in the machine at path. On Linux what the
+// machine writes in it belongs to the machine's ids, as the host maps them, and a socket bound in it
+// is the host's to dial.
 func OptionMountReadWrite(dir string, path string) Option {
-	return optionMount(dir, path, false)
+	return optionMount(mount{dir: dir, path: path})
 }
 
 // OptionMountReadOnly mounts the host directory dir in the machine at path, read only.
 func OptionMountReadOnly(dir string, path string) Option {
-	return optionMount(dir, path, true)
+	return optionMount(mount{dir: dir, path: path, readonly: true})
+}
+
+// OptionMountOwned mounts the host directory dir in the machine at path, owned by the host user: what
+// the machine writes in it belongs to the host user, whichever of the machine's users writes it, so
+// the host user can change and delete it. The machine sees the host user's files as egiso.Default's
+// and root's as egiso.Privileged's, and can not change their owners. A Linux machine serves it over
+// FUSE, which holds no sockets; a virtual machine's virtio-fs already writes as the host user.
+func OptionMountOwned(dir string, path string) Option {
+	return optionMount(mount{dir: dir, path: path, owned: true})
 }
 
 // OptionMountVolume mounts a filesystem of the machine's own at path, kept in the host directory dir
@@ -135,9 +148,10 @@ func OptionMountVolume(dir string, path string) Option {
 	}
 }
 
-func optionMount(dir string, path string, readonly bool) Option {
+func optionMount(mnt mount) Option {
 	return func(m *Machine) {
-		m.mounts = append(m.mounts, mount{tag: fmt.Sprintf("egvm%d", len(m.mounts)), dir: dir, path: path, readonly: readonly})
+		mnt.tag = fmt.Sprintf("egvm%d", len(m.mounts))
+		m.mounts = append(m.mounts, mnt)
 	}
 }
 

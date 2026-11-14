@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"syscall"
 	"testing"
 	"time"
 
@@ -32,6 +33,7 @@ func TestExec(t *testing.T) {
 	var (
 		rootfs   = os.Getenv("EG_TEST_ROOTFS")
 		sockets  = t.TempDir()
+		owned    = t.TempDir()
 		volume   = filepath.Join(t.TempDir(), "volume")
 		console  bytes.Buffer
 		archive  *egiso.Archive
@@ -82,7 +84,7 @@ func TestExec(t *testing.T) {
 	users, groups, err = archive.Accounts()
 	require.NoError(t, err)
 	root, upperdir = upper(t, archive)
-	vm, err = egvm.Boot(egvm.New(root, egvm.OptionAccounts(users, groups), egvm.OptionCPUs(2), egvm.OptionMemory(1<<30), egvm.OptionMountReadOnly(t.TempDir(), "/srv/shared"), egvm.OptionMountReadWrite(sockets, "/srv/sockets"), egvm.OptionMountVolume(volume, "/srv/volume")), &console)
+	vm, err = egvm.Boot(egvm.New(root, egvm.OptionAccounts(users, groups), egvm.OptionCPUs(2), egvm.OptionMemory(1<<30), egvm.OptionMountReadOnly(t.TempDir(), "/srv/shared"), egvm.OptionMountReadWrite(sockets, "/srv/sockets"), egvm.OptionMountOwned(owned, "/srv/owned"), egvm.OptionMountVolume(volume, "/srv/volume")), &console)
 	require.NoError(t, err, console.String())
 	t.Cleanup(func() { require.NoError(t, vm.Close()) })
 
@@ -172,6 +174,47 @@ func TestExec(t *testing.T) {
 		code, _, stderr := run(t, t.Context(), nil, "sh", "-c", "touch /srv/shared/file")
 		require.NotEqual(t, int32(0), code)
 		require.Contains(t, stderr, "Read-only file system")
+	})
+
+	t.Run("gives the host user what any of the machine's users writes in an owned directory", func(t *testing.T) {
+		code, _, stderr := run(t, t.Context(), nil, "sh", "-c", "mkdir /srv/owned/root && echo root > /srv/owned/root/file && sudo -u egd sh -c 'mkdir /srv/owned/egd && echo egd > /srv/owned/egd/file'")
+		require.Equal(t, int32(0), code, stderr)
+
+		for _, name := range []string{"root", "root/file", "egd", "egd/file"} {
+			st, cause := os.Lstat(filepath.Join(owned, name))
+			require.NoError(t, cause)
+			require.Equal(t, uint32(os.Getuid()), st.Sys().(*syscall.Stat_t).Uid, name)
+		}
+		require.NoError(t, os.RemoveAll(filepath.Join(owned, "root")))
+		require.NoError(t, os.RemoveAll(filepath.Join(owned, "egd")))
+	})
+
+	t.Run("shows the host user's files in an owned directory as the default user's", func(t *testing.T) {
+		require.NoError(t, os.WriteFile(filepath.Join(owned, "host"), []byte("host\n"), 0644))
+		code, stdout, stderr := run(t, t.Context(), nil, "stat", "-c", "%U:%G", "/srv/owned/host")
+		require.Equal(t, int32(0), code, stderr)
+		require.Equal(t, egiso.Default+":"+egiso.Default+"\n", stdout)
+	})
+
+	t.Run("refuses to change the owner of a file in an owned directory", func(t *testing.T) {
+		require.NoError(t, os.WriteFile(filepath.Join(owned, "chowned"), nil, 0644))
+		code, _, stderr := run(t, t.Context(), nil, "chown", "root", "/srv/owned/chowned")
+		require.NotEqual(t, int32(0), code)
+		require.Contains(t, stderr, "Operation not permitted")
+	})
+
+	t.Run("reports the host filesystem holding an owned directory", func(t *testing.T) {
+		code, _, stderr := run(t, t.Context(), nil, "df", "/srv/owned")
+		require.Equal(t, int32(0), code, stderr)
+	})
+
+	t.Run("sees what the host writes in an owned directory after it looked", func(t *testing.T) {
+		code, _, _ := run(t, t.Context(), nil, "cat", "/srv/owned/later")
+		require.NotEqual(t, int32(0), code)
+		require.NoError(t, os.WriteFile(filepath.Join(owned, "later"), []byte("later\n"), 0644))
+		code, stdout, stderr := run(t, t.Context(), nil, "cat", "/srv/owned/later")
+		require.Equal(t, int32(0), code, stderr)
+		require.Equal(t, "later\n", stdout)
 	})
 
 	t.Run("writes go to the upper and leave the image as it is", func(t *testing.T) {

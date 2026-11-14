@@ -9,7 +9,7 @@ import (
 )
 
 func main() {
-	if err := ffiegvm.Run(context.Background(), "https://example.com/root.egiso", "sha256:abc", "module.wasm", "A=1", "B=2"); err != nil {
+	if err := ffiegvm.Run(context.Background(), "https://example.com/root.egiso#sha256:abc", "module.wasm", "A=1", "B=2"); err != nil {
 		log.Fatalln(err)
 	}
 }

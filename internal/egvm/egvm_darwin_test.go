@@ -15,6 +15,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"syscall"
 	"testing"
 	"time"
 
@@ -37,6 +38,7 @@ func TestExec(t *testing.T) {
 		alpine   = os.Getenv("EG_TEST_ALPINE")
 		rootfs   = os.Getenv("EG_TEST_ROOTFS")
 		sockets  = t.TempDir()
+		owned    = t.TempDir()
 		volumes  = t.TempDir()
 		console  bytes.Buffer
 		kernels  []string
@@ -112,7 +114,7 @@ func TestExec(t *testing.T) {
 	users, groups, err = archive.Accounts()
 	require.NoError(t, err)
 	root, upperdir = upper(t, archive)
-	vm, err = egvm.Boot(egvm.New(root, egvm.OptionDirectory(directory(t)), egvm.OptionAccounts(users, groups), egvm.OptionMountReadWrite(sockets, "/srv/sockets"), egvm.OptionMountVolume(volumes, "/srv/volume")), &console)
+	vm, err = egvm.Boot(egvm.New(root, egvm.OptionDirectory(directory(t)), egvm.OptionAccounts(users, groups), egvm.OptionMountReadWrite(sockets, "/srv/sockets"), egvm.OptionMountOwned(owned, "/srv/owned"), egvm.OptionMountVolume(volumes, "/srv/volume")), &console)
 	if err != nil && strings.Contains(err.Error(), "entitlement") {
 		t.Skipf("the test binary is not signed with vz.entitlements: %v", err)
 	}
@@ -166,6 +168,22 @@ func TestExec(t *testing.T) {
 		st, cause := os.Stat(filepath.Join(volumes, "volume.img"))
 		require.NoError(t, cause)
 		require.Equal(t, int64(128<<30), st.Size())
+	})
+
+	t.Run("refuses to attach a volume another machine holds", func(t *testing.T) {
+		_, cause := egvm.Boot(egvm.New(root, egvm.OptionDirectory(directory(t)), egvm.OptionMountVolume(volumes, "/srv/volume")), io.Discard)
+		require.ErrorContains(t, cause, "attached to another machine")
+	})
+
+	t.Run("gives the host user what any of the machine's users writes in an owned directory", func(t *testing.T) {
+		code, _, stderr := run(t, t.Context(), nil, "sh", "-c", "echo root > /srv/owned/root && sudo -u egd sh -c 'echo egd > /srv/owned/egd'")
+		require.Equal(t, int32(0), code, stderr)
+
+		for _, name := range []string{"root", "egd"} {
+			st, cause := os.Lstat(filepath.Join(owned, name))
+			require.NoError(t, cause)
+			require.Equal(t, uint32(os.Getuid()), st.Sys().(*syscall.Stat_t).Uid, name)
+		}
 	})
 
 	t.Run("a volume holds what containers' storage writes", func(t *testing.T) {

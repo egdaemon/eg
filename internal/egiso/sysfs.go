@@ -4,6 +4,7 @@ import (
 	"errors"
 	"io"
 	"io/fs"
+	"os"
 	"path"
 	"strings"
 	"syscall"
@@ -29,6 +30,14 @@ type SysFS struct {
 // NewSysFS serves upper to a guest whose writes are owned by user and group.
 func NewSysFS(upper *Upper, user string, group string) *SysFS {
 	return &SysFS{upper: upper, user: user, group: group}
+}
+
+// NewShare serves the host directory dir alone, Bind mounted at the root: what is written in it goes
+// to dir as the host user, and its files belong to the virtual users NewOwners exposes their owners
+// as.
+func NewShare(dir *os.Root) *SysFS {
+	// a Bind at the root holds every path, so the upper needs no directory to copy up into.
+	return NewSysFS(NewUpper(Tree{}.Bind(".", dir, NewOwners(), NewOwners()), nil), Default, Default)
 }
 
 // Upper is the upper the guest is served, for the host to read as it stands.

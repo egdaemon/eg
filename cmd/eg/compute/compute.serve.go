@@ -220,7 +220,7 @@ func (t serve) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err e
 			go func() {
 				defer close(done)
 				registerssh(wctx, db, servesessions.Session{
-					ID:         uid.String(),
+					ID:           uid.String(),
 					Module:       t.Name,
 					Directory:    t.Dir,
 					SSHRequested: int64(t.SSH),

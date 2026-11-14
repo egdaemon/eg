@@ -1,0 +1,22 @@
+syntax = "proto3";
+
+package eg.eg.compute;
+
+// ServeSession is a workload served by 'eg compute serve', as recorded in the
+// cli's database. it is the shape printed by 'eg compute sessions --json'.
+message ServeSession {
+  string id = 1 [ json_name = "id" ];
+  string module = 2 [ json_name = "module" ];
+  string directory = 3 [ json_name = "directory" ];
+  int64 pid = 4 [ json_name = "pid" ];
+  // the --ssh flag the session was started with: -1 disabled, 0 automatic
+  // port, otherwise the port.
+  int64 ssh_requested = 5 [ json_name = "ssh_requested" ];
+  // the published port while running, 0 otherwise.
+  int64 ssh_port = 6 [ json_name = "ssh_port" ];
+  string ssh_user = 7 [ json_name = "ssh_user" ];
+  string ssh_key_path = 8 [ json_name = "ssh_key_path" ];
+  string started_at = 9 [ json_name = "started_at" ]; // rfc3339.
+  string stopped_at = 10
+      [ json_name = "stopped_at" ]; // rfc3339, empty while running.
+}

@@ -89,7 +89,7 @@ func TestMachineOptionLocalGPGAgent(t *testing.T) {
 		require.Empty(t, config.sockets)
 		environ, err := envb.Environ()
 		require.NoError(t, err)
-		require.Equal(t, []string{"container=egiso"}, environ)
+		require.Empty(t, environ)
 	})
 
 	t.Run("missing gnupghome attaches nothing", func(t *testing.T) {

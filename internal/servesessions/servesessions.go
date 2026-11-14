@@ -16,41 +16,6 @@ import (
 // HistoryLimit is how many stopped sessions are kept.
 const HistoryLimit = 50
 
-type Session struct {
-	ID        string
-	Module    string
-	Directory string
-	PID       int64
-	// SSHRequested the --ssh flag the session was started with: -1 disabled, 0 automatic port, otherwise the port.
-	SSHRequested int64
-	// SSHPort is the published port while running, 0 otherwise.
-	SSHPort    int64
-	SSHUser    string
-	SSHKeyPath string
-	StartedAt  time.Time
-	// StoppedAt is nil while the session is running.
-	StoppedAt *time.Time
-}
-
-func (t Session) Running() bool {
-	return t.StoppedAt == nil
-}
-
-const columns = `id, module, directory, pid, ssh_requested, ssh_port, ssh_user, ssh_key_path, started_at, stopped_at`
-
-func scan(row interface{ Scan(...any) error }) (s Session, err error) {
-	var stopped sql.NullTime
-	if err = row.Scan(&s.ID, &s.Module, &s.Directory, &s.PID, &s.SSHRequested, &s.SSHPort, &s.SSHUser, &s.SSHKeyPath, &s.StartedAt, &stopped); err != nil {
-		return s, err
-	}
-
-	if stopped.Valid {
-		s.StoppedAt = &stopped.Time
-	}
-
-	return s, nil
-}
-
 // Register the session as running, first marking the sessions whose process is gone as stopped, i.e. killed before they could stop.
 // registering an id of a stopped session restarts it.
 func Register(ctx context.Context, db *sql.DB, s Session) (err error) {

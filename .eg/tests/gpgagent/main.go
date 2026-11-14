@@ -40,8 +40,9 @@ func Test(ctx context.Context, op eg.Op) error {
 			debug,
 		),
 		egbug.DebugFailure(
-			// ensure that gpg home is pointing to the correct directory.
-			shell.Op(runtime.New("test $(gpgconf --list-dirs agent-socket) = /eg.mnt/.gnupg/S.gpg-agent")),
+			// ensure that gpg home is pointing to the correct directory. gpg keeps root's sockets in /run/user/0
+			// once podman creates it, where the runner links them to gpg home.
+			shell.Op(runtime.New("test $(readlink -f $(gpgconf --list-dirs agent-socket)) = /eg.mnt/.gnupg/S.gpg-agent")),
 			debug,
 		),
 		egbug.DebugFailure(

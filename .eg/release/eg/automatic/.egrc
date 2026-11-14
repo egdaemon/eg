@@ -1,0 +1,3 @@
+# the arguments eg compute local uses for this workload, one per line.
+--gcp-auto
+--secret=gcpsm://egd-esuite/ssh

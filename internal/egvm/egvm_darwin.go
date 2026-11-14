@@ -16,6 +16,7 @@ import (
 	"github.com/egdaemon/eg/interp/execproxy"
 	"github.com/shirou/gopsutil/v4/mem"
 	"golang.org/x/crypto/ssh"
+	"golang.org/x/sys/unix"
 )
 
 // VM is a running machine.
@@ -38,6 +39,7 @@ func Boot(m Machine, console io.Writer) (_ *VM, err error) {
 		nfs        *vz.VirtioSocketListener
 		login      *ssh.ClientConfig
 		authorized string
+		lock       *os.File
 	)
 
 	if login, authorized, err = client(m.root.Upper()); err != nil {
@@ -62,6 +64,12 @@ func Boot(m Machine, console io.Writer) (_ *VM, err error) {
 
 	if config, err = configure(m, authorized, in, out); err != nil {
 		return nil, err
+	}
+	for _, v := range m.volumes {
+		if lock, err = attached(v); err != nil {
+			return nil, err
+		}
+		t.closers = append(t.closers, lock)
 	}
 	if vm, err = vz.NewVirtualMachine(config); err != nil {
 		return nil, errorsx.Wrap(err, "unable to create the machine")
@@ -278,6 +286,22 @@ func volume(v mount) (_ *vz.VirtioBlockDeviceConfiguration, err error) {
 		return nil, errorsx.Wrapf(err, "unable to attach the volume's disk image %s", path)
 	}
 	return vz.NewVirtioBlockDeviceConfiguration(attachment)
+}
+
+// attached holds the volume's directory locked until it is closed: a disk image is a filesystem only
+// one kernel at a time may mount, so one machine at a time may attach it.
+func attached(v mount) (_ *os.File, err error) {
+	var (
+		dir *os.File
+	)
+
+	if dir, err = os.Open(v.dir); err != nil {
+		return nil, errorsx.Wrapf(err, "unable to open the volume %s", v.dir)
+	}
+	if err = unix.Flock(int(dir.Fd()), unix.LOCK_EX|unix.LOCK_NB); err != nil {
+		return nil, errorsx.Compact(errorsx.Wrapf(err, "the volume %s is attached to another machine", v.dir), dir.Close())
+	}
+	return dir, nil
 }
 
 // wait returns once the machine stops.

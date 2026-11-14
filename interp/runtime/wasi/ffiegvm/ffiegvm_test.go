@@ -15,8 +15,7 @@ import (
 
 func TestRun(t *testing.T) {
 	type ran struct {
-		location   string
-		toc        string
+		uri        string
 		modulepath string
 		environ    []string
 	}
@@ -24,7 +23,7 @@ func TestRun(t *testing.T) {
 	wasm := interptest.Build(t, "./interp/runtime/wasi/ffiegvm/.xfixtures/guest")
 
 	// run runs the guest with runner behind the host function, returning its error.
-	run := func(t *testing.T, runner func(ctx context.Context, location string, toc string, modulepath string, environ ...string) error) error {
+	run := func(t *testing.T, runner func(ctx context.Context, uri string, modulepath string, environ ...string) error) error {
 		ctx := t.Context()
 		rt := wazero.NewRuntime(ctx)
 		defer rt.Close(context.Background())
@@ -43,15 +42,15 @@ func TestRun(t *testing.T) {
 
 	t.Run("passes the guest's arguments to the runner", func(t *testing.T) {
 		var got []ran
-		require.NoError(t, run(t, func(ctx context.Context, location string, toc string, modulepath string, environ ...string) error {
-			got = append(got, ran{location: location, toc: toc, modulepath: modulepath, environ: environ})
+		require.NoError(t, run(t, func(ctx context.Context, uri string, modulepath string, environ ...string) error {
+			got = append(got, ran{uri: uri, modulepath: modulepath, environ: environ})
 			return nil
 		}))
-		require.Equal(t, []ran{{location: "https://example.com/root.egiso", toc: "sha256:abc", modulepath: "module.wasm", environ: []string{"A=1", "B=2"}}}, got)
+		require.Equal(t, []ran{{uri: "https://example.com/root.egiso#sha256:abc", modulepath: "module.wasm", environ: []string{"A=1", "B=2"}}}, got)
 	})
 
 	t.Run("reports the runner's failure to the guest", func(t *testing.T) {
-		require.Error(t, run(t, func(ctx context.Context, location string, toc string, modulepath string, environ ...string) error {
+		require.Error(t, run(t, func(ctx context.Context, uri string, modulepath string, environ ...string) error {
 			return errorsx.New("boom")
 		}))
 	})

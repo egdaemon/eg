@@ -1,4 +1,4 @@
-// Package ffiegvm lets a guest run a module in a virtual machine whose root is an egiso.
+// Package ffiegvm lets a guest run a module in a machine whose root is an egiso.
 package ffiegvm
 
 import (
@@ -9,14 +9,13 @@ import (
 	"github.com/tetratelabs/wazero/api"
 )
 
-// Run runs the module at modulepath with runner, in a machine whose root is the egiso at location pinned to toc,
-// the digest of its table of contents, with environ added to its environment.
-func Run(runner func(ctx context.Context, location string, toc string, modulepath string, environ ...string) error) func(
+// Run runs the module at modulepath with runner, in a machine booted from the egiso uri names, the
+// running machine's own when blank, with environ added to its environment.
+func Run(runner func(ctx context.Context, uri string, modulepath string, environ ...string) error) func(
 	ctx context.Context,
 	m api.Module,
 	deadline int64,
-	locationoffset uint32, locationlen uint32,
-	tocoffset uint32, toclen uint32,
+	urioffset uint32, urilen uint32,
 	modulepathoffset uint32, modulepathlen uint32,
 	environoffset uint32, environlen uint32, environsize uint32,
 ) uint32 {
@@ -24,15 +23,13 @@ func Run(runner func(ctx context.Context, location string, toc string, modulepat
 		ctx context.Context,
 		m api.Module,
 		deadline int64,
-		locationoffset uint32, locationlen uint32,
-		tocoffset uint32, toclen uint32,
+		urioffset uint32, urilen uint32,
 		modulepathoffset uint32, modulepathlen uint32,
 		environoffset uint32, environlen uint32, environsize uint32,
 	) uint32 {
 		var (
 			err        error
-			location   string
-			toc        string
+			uri        string
 			modulepath string
 			environ    []string
 		)
@@ -40,13 +37,8 @@ func Run(runner func(ctx context.Context, location string, toc string, modulepat
 		cctx, done := ffi.ReadMicroDeadline(ctx, deadline)
 		defer done()
 
-		if location, err = ffi.ReadString(m.Memory(), locationoffset, locationlen); err != nil {
-			log.Println("unable to decode egiso location", err)
-			return 1
-		}
-
-		if toc, err = ffi.ReadString(m.Memory(), tocoffset, toclen); err != nil {
-			log.Println("unable to decode egiso table of contents digest", err)
+		if uri, err = ffi.ReadString(m.Memory(), urioffset, urilen); err != nil {
+			log.Println("unable to decode egiso uri", err)
 			return 1
 		}
 
@@ -60,8 +52,8 @@ func Run(runner func(ctx context.Context, location string, toc string, modulepat
 			return 1
 		}
 
-		if err = runner(cctx, location, toc, modulepath, environ...); err != nil {
-			log.Println("running the module in the vm failed", err)
+		if err = runner(cctx, uri, modulepath, environ...); err != nil {
+			log.Println("running the module in a machine failed", err)
 			return 2
 		}
 

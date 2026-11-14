@@ -23,36 +23,46 @@ import (
 // ServeFUSE serves fsys on dev, a /dev/fuse descriptor another process already mounted, until the
 // mount goes away. A process in a user namespace can mount FUSE, where it can not mount NFS. Files
 // belong to the ids ServeNFS reports for the same options, and a file a process creates belongs to
-// it, as the kernel reports the process's ids within the namespace that mounted dev. Only the mount
-// changes fsys while it is served, so the kernel keeps what it learns of it.
+// it, as the kernel reports the process's ids within the namespace that mounted dev. Unless fsys
+// holds a Bind mount, whose host directory others change too, only the mount changes fsys while it
+// is served, so the kernel keeps what it learns of it.
 func ServeFUSE(dev *os.File, fsys *SysFS, options ...NFSOption) error {
 	var (
 		served  = nfsfs{sys: fsys}
+		root    *fusenode
 		server  *fuse.Server
 		fd      int
 		err     error
-		forever = time.Hour
+		open    = uint32(fuse.FOPEN_KEEP_CACHE)
+		timeout = time.Hour
 	)
 
 	for _, opt := range options {
 		opt(&served)
 	}
 
+	if fsys.upper.tree.binds() {
+		open, timeout = 0, 0
+	}
+
 	// the server closes the descriptor it serves when the mount goes away, so it serves its own.
 	if fd, err = unix.FcntlInt(dev.Fd(), unix.F_DUPFD_CLOEXEC, 0); err != nil {
 		return errorsx.Wrap(err, "unable to duplicate the mount's descriptor")
 	}
-	if server, err = fuse.NewServer(gofs.NewNodeFS(&fusenode{fsys: served}, &gofs.Options{EntryTimeout: &forever, AttrTimeout: &forever, NegativeTimeout: &forever}), fmt.Sprintf("/dev/fd/%d", fd), &fuse.MountOptions{DisableXAttrs: true}); err != nil {
+	root = &fusenode{fsys: served, open: open}
+	if server, err = fuse.NewServer(gofs.NewNodeFS(root, &gofs.Options{EntryTimeout: &timeout, AttrTimeout: &timeout, NegativeTimeout: &timeout}), fmt.Sprintf("/dev/fd/%d", fd), &fuse.MountOptions{DisableXAttrs: true}); err != nil {
 		return errorsx.Compact(errorsx.Wrap(err, "unable to serve the mount"), unix.Close(fd))
 	}
 	server.Serve()
 	return nil
 }
 
-// fusenode is a file of the upper, named by its path from the root.
+// fusenode is a file of the upper, named by its path from the root. open is what the kernel may keep
+// of a file it opens.
 type fusenode struct {
 	gofs.Inode
 	fsys nfsfs
+	open uint32
 }
 
 var (
@@ -87,13 +97,14 @@ func (t *fusenode) entry(ctx context.Context, name string, out *fuse.EntryOut) (
 		return nil, errnoofuse(err)
 	}
 	attrof(info, &out.Attr)
-	return t.NewInode(ctx, &fusenode{fsys: t.fsys}, gofs.StableAttr{Mode: out.Attr.Mode & syscall.S_IFMT, Ino: out.Attr.Ino}), 0
+	return t.NewInode(ctx, &fusenode{fsys: t.fsys, open: t.open}, gofs.StableAttr{Mode: out.Attr.Mode & syscall.S_IFMT, Ino: out.Attr.Ino}), 0
 }
 
-// owned gives name to the process creating it, as an NFS client's create does.
+// owned gives name to the process creating it, as an NFS client's create does. What a process
+// creates in a Bind mount belongs to the host user.
 func (t *fusenode) owned(ctx context.Context, name string) syscall.Errno {
 	caller, ok := fuse.FromContext(ctx)
-	if !ok {
+	if _, _, bound := t.fsys.sys.upper.bound(name); !ok || bound {
 		return 0
 	}
 	return errnoofuse(t.fsys.Lchown(name, int(caller.Uid), int(caller.Gid)))
@@ -209,7 +220,7 @@ func (t *fusenode) Open(ctx context.Context, flags uint32) (gofs.FileHandle, uin
 	if err != nil {
 		return nil, 0, errnoofuse(err)
 	}
-	return &fusefile{f: f}, fuse.FOPEN_KEEP_CACHE, 0
+	return &fusefile{f: f}, t.open, 0
 }
 
 func (t *fusenode) Create(ctx context.Context, name string, flags uint32, mode uint32, out *fuse.EntryOut) (*gofs.Inode, gofs.FileHandle, uint32, syscall.Errno) {
@@ -302,13 +313,18 @@ func (t *fusenode) Fsync(ctx context.Context, f gofs.FileHandle, flags uint32) s
 	return 0
 }
 
-// Statfs reports the filesystem holding the upper, which the root's writes fill.
+// Statfs reports the filesystem the file's writes fill: its Bind mount's host directory, or the
+// upper's.
 func (t *fusenode) Statfs(ctx context.Context, out *fuse.StatfsOut) syscall.Errno {
 	var (
-		st syscall.Statfs_t
+		st  syscall.Statfs_t
+		dir = t.fsys.sys.upper.dir
 	)
 
-	if err := syscall.Statfs(t.fsys.sys.upper.dir.Name(), &st); err != nil {
+	if m, _, ok := t.fsys.sys.upper.bound(t.name()); ok {
+		dir = m.root
+	}
+	if err := syscall.Statfs(dir.Name(), &st); err != nil {
 		return errnoofuse(err)
 	}
 	out.FromStatfsT(&st)

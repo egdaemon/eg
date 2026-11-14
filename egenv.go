@@ -208,6 +208,10 @@ const (
 	SocketAnalyticsPG  = ".s.PGSQL.5432" // postgres wire frontend of the analytics database, the name libpq style clients derive from a directory.
 )
 
+// MachineSocket is where a machine's modules reach the eg that booted it, to run a module in a machine
+// beside it. Each machine has its own, in its own /run.
+const MachineSocket = "/run/eg.machine.socket"
+
 // generate unique daemon socket
 func SocketDaemon() string {
 	return fmt.Sprintf("main.%s.socket", errorsx.Must(uuid.NewV7()).String())

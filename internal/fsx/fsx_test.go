@@ -1,9 +1,12 @@
 package fsx_test
 
 import (
+	"context"
 	"io/fs"
+	"net"
 	"os"
 	"path/filepath"
+	"syscall"
 	"testing"
 
 	"github.com/egdaemon/eg/internal/fsx"
@@ -103,4 +106,74 @@ func TestRelative(t *testing.T) {
 		_, ok = fsx.Relative("/a/b", path)
 		require.False(t, ok, path)
 	}
+}
+
+func TestCloneTree(t *testing.T) {
+	type file struct {
+		name     string
+		contents string
+	}
+
+	// source is a directory, .gnupg, holding a file, a dotfile and a nested file, beside dir's other
+	// contents. Its path is short enough to bind a unix socket in, which macOS limits to 104 bytes.
+	source := func(t *testing.T) string {
+		dir, err := os.MkdirTemp("/tmp", "clonetree")
+		require.NoError(t, err)
+		t.Cleanup(func() { os.RemoveAll(dir) })
+		src := filepath.Join(dir, ".gnupg")
+		require.NoError(t, os.MkdirAll(filepath.Join(src, "private-keys-v1.d"), 0700))
+		require.NoError(t, os.WriteFile(filepath.Join(src, "pubring.kbx"), []byte("pubring"), 0600))
+		require.NoError(t, os.WriteFile(filepath.Join(src, ".#lk0x1"), []byte("lock"), 0600))
+		require.NoError(t, os.WriteFile(filepath.Join(src, "private-keys-v1.d", "key"), []byte("key"), 0600))
+		require.NoError(t, os.WriteFile(filepath.Join(dir, "outside"), []byte("outside"), 0600))
+		return src
+	}
+
+	t.Run("copies the directory's files", func(t *testing.T) {
+		src := source(t)
+		dst := filepath.Join(t.TempDir(), "copy")
+		require.NoError(t, fsx.CloneTree(t.Context(), dst, filepath.Base(src), os.DirFS(filepath.Dir(src))))
+
+		for _, f := range []file{{"pubring.kbx", "pubring"}, {".#lk0x1", "lock"}, {filepath.Join("private-keys-v1.d", "key"), "key"}} {
+			b, err := os.ReadFile(filepath.Join(dst, f.name))
+			require.NoError(t, err, f.name)
+			require.Equal(t, f.contents, string(b), f.name)
+		}
+
+		_, err := os.Stat(filepath.Join(dst, "outside"))
+		require.ErrorIs(t, err, fs.ErrNotExist)
+	})
+
+	t.Run("skips sockets", func(t *testing.T) {
+		src := source(t)
+		l, err := net.Listen("unix", filepath.Join(src, "S.gpg-agent"))
+		require.NoError(t, err)
+		defer l.Close()
+
+		dst := filepath.Join(t.TempDir(), "copy")
+		require.NoError(t, fsx.CloneTree(t.Context(), dst, filepath.Base(src), os.DirFS(filepath.Dir(src))))
+
+		_, err = os.Lstat(filepath.Join(dst, "S.gpg-agent"))
+		require.ErrorIs(t, err, fs.ErrNotExist)
+		_, err = os.Stat(filepath.Join(dst, "pubring.kbx"))
+		require.NoError(t, err)
+	})
+
+	t.Run("skips named pipes", func(t *testing.T) {
+		src := source(t)
+		require.NoError(t, syscall.Mkfifo(filepath.Join(src, "fifo"), 0600))
+
+		dst := filepath.Join(t.TempDir(), "copy")
+		require.NoError(t, fsx.CloneTree(t.Context(), dst, filepath.Base(src), os.DirFS(filepath.Dir(src))))
+
+		_, err := os.Lstat(filepath.Join(dst, "fifo"))
+		require.ErrorIs(t, err, fs.ErrNotExist)
+	})
+
+	t.Run("stops when the context is cancelled", func(t *testing.T) {
+		src := source(t)
+		ctx, cancel := context.WithCancel(t.Context())
+		cancel()
+		require.ErrorIs(t, fsx.CloneTree(ctx, filepath.Join(t.TempDir(), "copy"), filepath.Base(src), os.DirFS(filepath.Dir(src))), context.Canceled)
+	})
 }

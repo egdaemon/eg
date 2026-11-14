@@ -2,52 +2,68 @@ package egvm
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"net"
+	"net/netip"
 	"os"
 	"os/exec"
 	"os/user"
 	"path/filepath"
+	"slices"
 	"strconv"
+	"strings"
 	"syscall"
+	"time"
 
+	systemd "github.com/coreos/go-systemd/v22/dbus"
 	"github.com/egdaemon/eg/internal/egiso"
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
+	"github.com/egdaemon/eg/internal/slicesx"
 	"github.com/egdaemon/eg/interp/execproxy"
+	"github.com/egdaemon/wasinet/wasinet/wnetruntime"
+	"github.com/godbus/dbus/v5"
 	subids "github.com/moby/sys/user"
 	"go.podman.io/common/pkg/cgroups"
+	"golang.org/x/crypto/ssh"
 	"golang.org/x/sys/unix"
 )
 
 // dnsforward is the address pasta answers DNS on inside the machine, as it does for rootless podman.
 const dnsforward = "169.254.1.1"
 
+// sshdir is where systemd-ssh-generator binds sshd's AF_UNIX socket, which the host shares into the
+// machine so the socket is the host's to dial.
+const sshdir = "/run/ssh-unix-local"
+
 // VM is a running machine: the root's init in namespaces of its own, rooted at the egiso.
 type VM struct {
 	dir     string
 	netns   string
-	agent   string
+	socket  string
+	client  *ssh.ClientConfig
 	dev     *os.File
 	init    *exec.Cmd
 	stopped chan struct{}
 	served  chan struct{}
+	closers []io.Closer
 }
 
 // Boot starts the machine as an unprivileged user: its init runs as root of a user namespace mapping
 // the user's subordinate ids, in mount, pid, uts, ipc, network and cgroup namespaces of its own,
 // rooted at the egiso served over FUSE. pasta connects its network to the host's, as it does for
-// rootless podman. Its init's output is copied to console.
+// rootless podman, in a scope of the user's systemd limited to the machine's cpus and memory. Its
+// init's output is copied to console.
 func Boot(m Machine, console io.Writer) (_ *VM, err error) {
 	var (
-		t        = &VM{stopped: make(chan struct{})}
-		root     string
-		listener *net.UnixListener
-		agent    *os.File
-		mapped   [2]*os.File
-		mounted  [2]int
-		args     []string
-		owned    bool
+		t          = &VM{stopped: make(chan struct{})}
+		root       string
+		shared     string
+		authorized string
+		mapped     [2]*os.File
+		mounted    [2]int
+		args       []string
 	)
 	defer func() {
 		if err != nil {
@@ -55,20 +71,20 @@ func Boot(m Machine, console io.Writer) (_ *VM, err error) {
 		}
 	}()
 
-	// the root's systemd manages the cgroup it starts in, which the user must own for it to boot.
-	if owned, err = cgroups.UserOwnsCurrentSystemdCgroup(); err != nil {
-		return nil, errorsx.Wrap(err, "unable to find the cgroup the machine starts in")
-	}
-	if !owned {
-		return nil, errorsx.New("machines need a cgroup the user owns: run in a systemd scope or service with Delegate=yes")
-	}
-
 	if t.dir, err = os.MkdirTemp("", "egvm.*"); err != nil {
 		return nil, errorsx.Wrap(err, "unable to create the machine's directory")
 	}
-	root, t.agent = filepath.Join(t.dir, "root"), filepath.Join(t.dir, "agent.sock")
+	root, shared = filepath.Join(t.dir, "root"), filepath.Join(t.dir, "ssh")
+	t.socket = filepath.Join(shared, "socket")
 	if err = os.Mkdir(root, 0755); err != nil {
 		return nil, errorsx.Wrap(err, "unable to create the machine's root")
+	}
+	if err = os.Mkdir(shared, 0700); err != nil {
+		return nil, errorsx.Wrap(err, "unable to create the machine's ssh directory")
+	}
+
+	if t.client, authorized, err = client(m.root.Upper()); err != nil {
+		return nil, err
 	}
 
 	// the network namespace file goes where rootless podman keeps its own, which pasta may read.
@@ -76,20 +92,16 @@ func Boot(m Machine, console io.Writer) (_ *VM, err error) {
 	if err = os.MkdirAll(filepath.Dir(t.netns), 0700); err != nil {
 		return nil, errorsx.Wrap(err, "unable to create the network namespace directory")
 	}
+	// SELinux policy labels the directory as it does ip netns's, which pasta may read, but one Boot
+	// creates takes the runtime directory's label until restorecon applies the policy's.
+	if restorecon, cause := exec.LookPath("restorecon"); cause == nil {
+		if b, cause := exec.Command(restorecon, filepath.Dir(t.netns)).CombinedOutput(); cause != nil {
+			return nil, errorsx.Wrapf(cause, "unable to label the network namespace directory: %s", b)
+		}
+	}
 	if err = os.WriteFile(t.netns, nil, 0600); err != nil {
 		return nil, errorsx.Wrap(err, "unable to create the machine's network namespace file")
 	}
-
-	if listener, err = net.ListenUnix("unix", &net.UnixAddr{Name: t.agent, Net: "unix"}); err != nil {
-		return nil, errorsx.Wrap(err, "unable to listen for the machine's agent")
-	}
-	// the agent listens on the socket after Boot closes its own copy.
-	listener.SetUnlinkOnClose(false)
-	defer listener.Close()
-	if agent, err = listener.File(); err != nil {
-		return nil, err
-	}
-	defer agent.Close()
 
 	if mapped[0], mapped[1], err = os.Pipe(); err != nil {
 		return nil, err
@@ -100,8 +112,13 @@ func Boot(m Machine, console io.Writer) (_ *VM, err error) {
 	}
 	defer unix.Close(mounted[0])
 
-	args = []string{stagemap, root, m.init, t.netns}
-	for _, mnt := range m.mounts {
+	args = []string{stagemap, root, m.init, t.netns, authorized, nftables(m.firewall), shared, sshdir, strconv.FormatBool(false)}
+	for _, v := range m.volumes {
+		if err = os.MkdirAll(v.dir, 0700); err != nil {
+			return nil, errorsx.Wrapf(err, "unable to create the volume %s", v.dir)
+		}
+	}
+	for _, mnt := range slices.Concat(m.mounts, m.volumes) {
 		args = append(args, mnt.dir, mnt.path, strconv.FormatBool(mnt.readonly))
 	}
 
@@ -110,7 +127,7 @@ func Boot(m Machine, console io.Writer) (_ *VM, err error) {
 		Args:        args,
 		Stdout:      console,
 		Stderr:      console,
-		ExtraFiles:  []*os.File{mapped[0], os.NewFile(uintptr(mounted[1]), "mounted"), agent},
+		ExtraFiles:  []*os.File{mapped[0], os.NewFile(uintptr(mounted[1]), "mounted")},
 		SysProcAttr: &syscall.SysProcAttr{Cloneflags: syscall.CLONE_NEWUSER | syscall.CLONE_NEWNS, Pdeathsig: syscall.SIGKILL},
 	}
 	err = t.init.Start()
@@ -123,6 +140,11 @@ func Boot(m Machine, console io.Writer) (_ *VM, err error) {
 		defer close(t.stopped)
 		errorsx.Log(t.init.Wait())
 	}()
+
+	// the machine starts nothing else until its ids are mapped, so all of it starts in the scope.
+	if err = scope(t.init.Process.Pid, m); err != nil {
+		return nil, err
+	}
 
 	if err = idmap(t.init.Process.Pid); err != nil {
 		return nil, err
@@ -140,6 +162,74 @@ func Boot(m Machine, console io.Writer) (_ *VM, err error) {
 	}()
 
 	return t, nil
+}
+
+// scope moves pid into a transient scope of the user's systemd, as systemd-run --user --scope -p
+// Delegate=yes runs a command, limited to the machine's cpus and, unless it is the host's, memory. The
+// root's systemd manages the scope's cgroup, which the scope delegates to it.
+func scope(pid int, m Machine) (err error) {
+	var (
+		conn       *systemd.Conn
+		done       = make(chan string, 1)
+		result     string
+		properties = []systemd.Property{
+			systemd.PropDescription("eg machine"),
+			systemd.PropPids(uint32(pid)),
+			{Name: "Delegate", Value: dbus.MakeVariant(true)},
+			{Name: "CollectMode", Value: dbus.MakeVariant("inactive-or-failed")},
+			{Name: "CPUQuotaPerSecUSec", Value: dbus.MakeVariant(uint64(m.cpus) * uint64(time.Second/time.Microsecond))},
+		}
+	)
+
+	if m.memory > 0 {
+		properties = append(properties, systemd.Property{Name: "MemoryMax", Value: dbus.MakeVariant(m.memory)})
+	}
+
+	if conn, err = cgroups.UserConnection(os.Getuid()); err != nil {
+		return errorsx.Wrap(err, "unable to reach the user's systemd, which machines run under")
+	}
+	defer conn.Close()
+
+	if _, err = conn.StartTransientUnitContext(context.Background(), fmt.Sprintf("egvm-%d.scope", pid), "fail", properties, done); err != nil {
+		return errorsx.Wrap(err, "unable to start the machine's scope")
+	}
+	if result = <-done; result != "done" {
+		return errorsx.Errorf("unable to start the machine's scope: %s", result)
+	}
+	return nil
+}
+
+// nftables is the ruleset the machine loads to reach only what fw permits, besides its loopback and
+// DNS: fw's allowed prefixes, then nothing of its blocked ones. It filters what leaves the machine
+// and what the machine forwards for its own containers; nothing enters a machine it did not ask for.
+func nftables(fw wnetruntime.Firewall) string {
+	var (
+		b strings.Builder
+	)
+
+	b.WriteString("table inet eg {\n\tchain reach {\n\t\tmeta l4proto { tcp, udp } th dport 53 accept\n")
+	addresses(&b, fw.Allow, "accept")
+	addresses(&b, fw.Block, "drop")
+	b.WriteString("\t}\n\tchain output {\n\t\ttype filter hook output priority filter; policy accept;\n\t\toifname \"lo\" accept\n\t\tjump reach\n\t}\n")
+	b.WriteString("\tchain forward {\n\t\ttype filter hook forward priority filter; policy accept;\n\t\tjump reach\n\t}\n}\n")
+	return b.String()
+}
+
+// addresses writes the rules giving packets to prefixes verdict, one per address family.
+func addresses(b *strings.Builder, prefixes []netip.Prefix, verdict string) {
+	for _, family := range []struct {
+		match string
+		is    func(netip.Addr) bool
+	}{
+		{match: "ip", is: netip.Addr.Is4},
+		{match: "ip6", is: func(a netip.Addr) bool { return !a.Is4() }},
+	} {
+		set := slicesx.Filter(func(p netip.Prefix) bool { return family.is(p.Addr()) }, prefixes...)
+		if len(set) == 0 {
+			continue
+		}
+		fmt.Fprintf(b, "\t\t%s daddr { %s } %s\n", family.match, strings.Join(slicesx.MapTransform(netip.Prefix.String, set...), ", "), verdict)
+	}
 }
 
 // received is the descriptor the machine sends over the socket fd.
@@ -206,24 +296,33 @@ func idmap(pid int) error {
 // Exec runs req in the machine and waits for it, with no input and its output discarded unless
 // options say otherwise. A command that exits with other than 0 returns an ExitError. It waits for
 // the machine to serve commands. Cancelling ctx kills the command.
-func (t *VM) Exec(ctx context.Context, req *execproxy.ExecRequest, options ...ExecOption) error {
-	return command(ctx, t.connect, req, options...)
-}
-
-// connect opens the stream of command id. The agent's socket listens from the start, so a
-// connection waits there until the agent serves it.
-func (t *VM) connect(ctx context.Context, id uint64, stream uint8) (conn net.Conn, err error) {
+func (t *VM) Exec(ctx context.Context, req *execproxy.ExecRequest, options ...ExecOption) (err error) {
 	var (
-		dialer net.Dialer
+		conn net.Conn
 	)
 
-	if conn, err = dialer.DialContext(ctx, "unix", t.agent); err != nil {
-		return nil, errorsx.Wrap(err, "unable to reach the machine's agent")
+	if conn, err = redial(ctx, func() (net.Conn, error) { return net.Dial("unix", t.socket) }, t.stopped, func() error { return nil }); err != nil {
+		return err
 	}
-	if err = WriteHeader(conn, id, stream); err != nil {
-		return nil, errorsx.Compact(err, conn.Close())
+	return command(ctx, conn, t.client, req, options...)
+}
+
+// Forward makes the host's unix socket host reachable in the machine at path, a socket the machine's
+// sshd listens on until the machine stops. It waits for the machine to serve commands.
+func (t *VM) Forward(ctx context.Context, host string, path string) (err error) {
+	var (
+		conn      net.Conn
+		forwarded io.Closer
+	)
+
+	if conn, err = redial(ctx, func() (net.Conn, error) { return net.Dial("unix", t.socket) }, t.stopped, func() error { return nil }); err != nil {
+		return err
 	}
-	return conn, nil
+	if forwarded, err = forward(conn, t.client, host, path); err != nil {
+		return err
+	}
+	t.closers = append(t.closers, forwarded)
+	return nil
 }
 
 // Close stops the machine, which ends every process of its namespaces and with them the mount of its
@@ -233,6 +332,9 @@ func (t *VM) Close() error {
 		errs []error
 	)
 
+	for _, c := range t.closers {
+		errorsx.Log(c.Close())
+	}
 	if t.init != nil && t.init.Process != nil {
 		errorsx.Log(errorsx.Ignore(t.init.Process.Signal(syscall.SIGTERM), os.ErrProcessDone))
 		<-t.stopped

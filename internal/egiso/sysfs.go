@@ -31,6 +31,11 @@ func NewSysFS(upper *Upper, user string, group string) *SysFS {
 	return &SysFS{upper: upper, user: user, group: group}
 }
 
+// Upper is the upper the guest is served, for the host to read as it stands.
+func (t *SysFS) Upper() *Upper {
+	return t.upper
+}
+
 // OpenFile opens the named file. A file opened only for reading is read from wherever it lives; one
 // opened for writing is copied up or created first.
 func (t *SysFS) OpenFile(name string, flag experimentalsys.Oflag, perm fs.FileMode) (experimentalsys.File, experimentalsys.Errno) {
@@ -124,6 +129,19 @@ func (t *SysFS) Rename(from string, to string) experimentalsys.Errno {
 		return errno
 	}
 	return errnoof(t.upper.Rename(src, dst))
+}
+
+// Link makes newName another name of the file oldName.
+func (t *SysFS) Link(oldName string, newName string) experimentalsys.Errno {
+	src, errno := t.resolve(oldName, false)
+	if errno != 0 {
+		return errno
+	}
+	dst, errno := t.resolve(newName, false)
+	if errno != 0 {
+		return errno
+	}
+	return errnoof(t.upper.Link(src, dst))
 }
 
 // Rmdir removes the named empty directory.

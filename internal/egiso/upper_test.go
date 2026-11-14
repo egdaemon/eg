@@ -326,6 +326,54 @@ func TestUpper(t *testing.T) {
 		require.Equal(t, []string{".cache", "notes"}, names(t, u, "home/egd"))
 	})
 
+	t.Run("links a file of the tree, copying it up with its owner and mode", func(t *testing.T) {
+		u, _ := upper(t)
+		require.NoError(t, u.Link("home/egd/notes", "home/egd/notes-old"))
+		write(t, u, "home/egd/notes", os.O_WRONLY|os.O_TRUNC, "changed")
+		require.Equal(t, "changed", read(t, u, "home/egd/notes-old"))
+
+		st, err := u.Lstat("home/egd/notes-old")
+		require.NoError(t, err)
+		require.Equal(t, fs.FileMode(0600), st.Mode())
+
+		user, group, err := u.Owner("home/egd/notes-old")
+		require.NoError(t, err)
+		require.Equal(t, egiso.Default, user)
+		require.Equal(t, egiso.Default, group)
+	})
+
+	t.Run("keeps a link when its other name is removed", func(t *testing.T) {
+		u, _ := upper(t)
+		write(t, u, "etc/status", os.O_WRONLY|os.O_CREATE|os.O_EXCL, "installed")
+		require.NoError(t, u.Link("etc/status", "etc/status-old"))
+		require.NoError(t, u.Remove("etc/status"))
+		require.Equal(t, "installed", read(t, u, "etc/status-old"))
+	})
+
+	t.Run("shows a link made where a file of the tree was removed", func(t *testing.T) {
+		u, _ := upper(t)
+		require.NoError(t, u.Remove("etc/hostname"))
+		require.NoError(t, u.Link("etc/apt/sources", "etc/hostname"))
+		require.Equal(t, "etc/apt/sources", read(t, u, "etc/hostname"))
+	})
+
+	t.Run("refuses to link over an existing name, a directory, or across a bound host directory", func(t *testing.T) {
+		u, _ := upper(t)
+		require.ErrorIs(t, u.Link("etc/hostname", "etc/apt/sources"), fs.ErrExist)
+		require.ErrorIs(t, u.Link("etc", "etc-link"), syscall.EPERM)
+		require.ErrorIs(t, u.Link("etc/hostname", "home/egd/.cache/hostname"), syscall.EXDEV)
+	})
+
+	t.Run("links within a bound host directory in that directory", func(t *testing.T) {
+		u, host := upper(t)
+		write(t, u, "home/egd/.cache/entry", os.O_WRONLY|os.O_CREATE, "cached")
+		require.NoError(t, u.Link("home/egd/.cache/entry", "home/egd/.cache/linked"))
+
+		b, err := os.ReadFile(filepath.Join(host, "linked"))
+		require.NoError(t, err)
+		require.Equal(t, "cached", string(b))
+	})
+
 	t.Run("refuses whiteout names", func(t *testing.T) {
 		u, _ := upper(t)
 		_, err := u.OpenFile("etc/.wh.hostname", os.O_WRONLY|os.O_CREATE, 0644, egiso.Default, egiso.Default)

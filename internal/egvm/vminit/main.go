@@ -2,9 +2,8 @@
 
 // Command vminit is the init of an egvm machine. It loads the kernel modules in /modules in name
 // order, mounts the root the host serves over NFS, and execs the root's init, the init= of the
-// kernel's command line, as the machine's pid 1. Before it does, it starts itself again twice; both
-// outlive the switch. One forwards the guest's NFS client to the host over vsock. The other, the
-// agent, serves commands on vsock port egvm.Port inside the root once the root's init answers them.
+// kernel's command line, as the machine's pid 1. Before it does, it starts itself again to forward
+// the guest's NFS client to the host over vsock; the forwarder outlives the switch.
 package main
 
 import (
@@ -27,9 +26,6 @@ func main() {
 	switch os.Args[0] {
 	case "nfs":
 		fmt.Println("egvm: nfs:", forward(os.NewFile(3, "nfs")))
-		os.Exit(1)
-	case "agent":
-		fmt.Println("egvm: agent:", agent(os.NewFile(3, "switch"), os.NewFile(4, "switched")))
 		os.Exit(1)
 	}
 
@@ -57,7 +53,7 @@ func boot() error {
 		}
 	}
 
-	rootinit, err := initpath()
+	rootinit, volumes, err := params()
 	if err != nil {
 		return err
 	}
@@ -82,27 +78,13 @@ func boot() error {
 		return err
 	}
 
-	switching, switchw, err := os.Pipe()
-	if err != nil {
-		return err
-	}
-	switchedr, switched, err := os.Pipe()
-	if err != nil {
-		return err
-	}
-
-	// the forwarder never forks, so the commands the agent forks always have it to page themselves in over NFS.
-	for _, child := range []*exec.Cmd{
-		{Path: "/init", Args: []string{"nfs"}, Stdout: os.Stdout, Stderr: os.Stderr, ExtraFiles: []*os.File{listener}},
-		{Path: "/init", Args: []string{"agent"}, Stdout: os.Stdout, Stderr: os.Stderr, ExtraFiles: []*os.File{switching, switched}},
-	} {
-		if err = child.Start(); err != nil {
-			return fmt.Errorf("unable to start %s: %w", child.Args[0], err)
-		}
+	// the forwarder runs from the initramfs and never forks, so the root's processes always have it to
+	// page themselves in over NFS.
+	forwarder := &exec.Cmd{Path: "/init", Args: []string{"nfs"}, Stdout: os.Stdout, Stderr: os.Stderr, ExtraFiles: []*os.File{listener}}
+	if err = forwarder.Start(); err != nil {
+		return fmt.Errorf("unable to start the nfs forwarder: %w", err)
 	}
 	listener.Close()
-	switching.Close()
-	switched.Close()
 
 	options := fmt.Sprintf("vers=3,proto=tcp,port=%d,mountport=%d,mountproto=tcp,nolock,addr=127.0.0.1,mountaddr=127.0.0.1", egvm.NFSPort, egvm.NFSPort)
 	if err = mount("127.0.0.1:/", "/root", "nfs", options); err != nil {
@@ -114,16 +96,16 @@ func boot() error {
 		}
 	}
 
+	for i, path := range volumes {
+		if err = volume(fmt.Sprintf("/dev/vd%c", 'a'+i), path); err != nil {
+			return err
+		}
+	}
+
 	// the root sees /sys read only, as a container does, so its systemd configures devices without
 	// the udev container images leave out.
 	if err = unix.Mount("", "/root/sys", "", unix.MS_REMOUNT|unix.MS_BIND|unix.MS_RDONLY, ""); err != nil {
 		return fmt.Errorf("unable to make the root's /sys read only: %w", err)
-	}
-
-	// the agent enters the root before it moves over the initramfs, which hides the root's path.
-	switchw.Close()
-	if _, err = io.Copy(io.Discard, switchedr); err != nil {
-		return err
 	}
 
 	if err = unix.Chdir("/root"); err != nil {
@@ -142,61 +124,48 @@ func boot() error {
 	return fmt.Errorf("unable to exec %s: %w", rootinit, unix.Exec(rootinit, []string{rootinit}, os.Environ()))
 }
 
-// agent enters the root once switching closes, closes switched, and serves commands once the
-// root's init answers them.
-func agent(switching *os.File, switched *os.File) (err error) {
+// params reads the kernel's command line: the root's init, its init= else /usr/sbin/init, and the
+// paths of the volumes, its egvm.volume= in the order their disks attach.
+func params() (rootinit string, volumes []string, err error) {
 	var (
-		rootinit string
-		fd       int
+		cmdline []byte
 	)
 
-	if rootinit, err = initpath(); err != nil {
-		return err
-	}
-	if _, err = io.Copy(io.Discard, switching); err != nil {
-		return err
-	}
-	if err = unix.Chroot("/root"); err != nil {
-		return fmt.Errorf("unable to enter the root: %w", err)
-	}
-	if err = unix.Chdir("/"); err != nil {
-		return err
-	}
-	switched.Close()
-
-	if err = egvm.Answering(rootinit); err != nil {
-		return err
-	}
-
-	if fd, err = unix.Socket(unix.AF_VSOCK, unix.SOCK_STREAM|unix.SOCK_CLOEXEC, 0); err != nil {
-		return fmt.Errorf("unable to create the vsock listener: %w", err)
-	}
-	if err = unix.Bind(fd, &unix.SockaddrVM{CID: unix.VMADDR_CID_ANY, Port: egvm.Port}); err != nil {
-		return fmt.Errorf("unable to bind vsock port %d: %w", egvm.Port, err)
-	}
-	if err = unix.Listen(fd, unix.SOMAXCONN); err != nil {
-		return fmt.Errorf("unable to listen on vsock port %d: %w", egvm.Port, err)
-	}
-
-	return egvm.Serve(fd)
-}
-
-// initpath is the root's init: the init= of the kernel's command line, else /usr/sbin/init.
-func initpath() (string, error) {
-	var (
-		rootinit = "/usr/sbin/init"
-	)
-
-	cmdline, err := os.ReadFile("/proc/cmdline")
-	if err != nil {
-		return "", err
+	rootinit = "/usr/sbin/init"
+	if cmdline, err = os.ReadFile("/proc/cmdline"); err != nil {
+		return "", nil, err
 	}
 	for _, param := range strings.Fields(string(cmdline)) {
 		if v, ok := strings.CutPrefix(param, "init="); ok {
 			rootinit = v
 		}
+		if v, ok := strings.CutPrefix(param, egvm.VolumeParam+"="); ok {
+			volumes = append(volumes, v)
+		}
 	}
-	return rootinit, nil
+	return rootinit, volumes, nil
+}
+
+// volume mounts the disk dev at path in the root, formatting it ext4 with the root's mkfs when it holds
+// no filesystem, as systemd's makefs would were there udev to announce the disk.
+func volume(dev string, path string) (err error) {
+	var (
+		source = filepath.Join("/root", dev) // /dev has moved into the root.
+		target = filepath.Join("/root", path)
+		// exec would open /dev/null for stdin, which has moved into the root.
+		mkfs = &exec.Cmd{Path: "/usr/sbin/mkfs.ext4", Args: []string{"mkfs.ext4", "-q", dev}, Stdin: strings.NewReader(""), SysProcAttr: &unix.SysProcAttr{Chroot: "/root"}}
+		out  []byte
+	)
+
+	// a disk without a filesystem fails to mount as ext4 with EINVAL.
+	if err = mount(source, target, "ext4", ""); !errors.Is(err, unix.EINVAL) {
+		return err
+	}
+
+	if out, err = mkfs.CombinedOutput(); err != nil {
+		return fmt.Errorf("unable to format the volume %s: %w: %s", dev, err, out)
+	}
+	return mount(source, target, "ext4", "")
 }
 
 // forward connects each connection the listener nfs accepts to the host's NFS server.
@@ -239,7 +208,7 @@ func forward(nfs *os.File) (err error) {
 	}
 }
 
-// loopback brings up lo, which the guest's NFS client reaches the agent on.
+// loopback brings up lo, which the guest's NFS client reaches the forwarder on.
 func loopback() error {
 	fd, err := unix.Socket(unix.AF_INET, unix.SOCK_DGRAM|unix.SOCK_CLOEXEC, 0)
 	if err != nil {

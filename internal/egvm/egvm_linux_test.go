@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"net"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -20,19 +22,23 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestExec runs commands in a machine whose root is an egiso served over FUSE. It runs as an
-// unprivileged user with subordinate ids, and needs pasta and EG_TEST_ROOTFS, a tar of Alpine's
-// root filesystem:
+// TestExec runs commands over ssh in a machine whose root is an egiso served over FUSE, booted by
+// its systemd. It runs as an unprivileged user with subordinate ids and a systemd of its own, and
+// needs pasta and EG_TEST_ROOTFS, a tar of the root container's filesystem, whose sshd it reaches:
 //
-//	podman export $(podman create alpine:3.20) > alpine.tar
-//	go test -c -o egvm.test ./internal/egvm && EG_TEST_ROOTFS=alpine.tar ./egvm.test -test.v
+//	podman export $(podman create localhost/eg:latest) > eg.tar
+//	go test -c -o egvm.test ./internal/egvm && EG_TEST_ROOTFS=eg.tar ./egvm.test -test.v
 func TestExec(t *testing.T) {
 	var (
 		rootfs   = os.Getenv("EG_TEST_ROOTFS")
+		sockets  = t.TempDir()
+		volume   = filepath.Join(t.TempDir(), "volume")
 		console  bytes.Buffer
 		archive  *egiso.Archive
 		root     *egiso.SysFS
 		upperdir string
+		users    []egiso.Account
+		groups   []egiso.Account
 		vm       *egvm.VM
 		err      error
 	)
@@ -60,20 +66,23 @@ func TestExec(t *testing.T) {
 		return a
 	}
 
-	// upper is the image under a writable upper in a directory of its own.
+	// upper is the image under a writable upper in a directory of its own, keeping the image's own
+	// owners, as runners.Machine roots a machine, so sshd finds its files owned by root.
 	upper := func(t *testing.T, a *egiso.Archive) (*egiso.SysFS, string) {
 		dir := t.TempDir()
 		r, cause := os.OpenRoot(dir)
 		require.NoError(t, cause)
 		t.Cleanup(func() { r.Close() })
 
-		tree := egiso.Tree{}.Mount(".", a, egiso.NewOwners(), egiso.NewOwners())
+		tree := egiso.Tree{}.Mount(".", a, egiso.Identity(users), egiso.Identity(groups))
 		return egiso.NewSysFS(egiso.NewUpper(tree, r), egiso.Default, egiso.Default), dir
 	}
 
 	archive = image(t)
+	users, groups, err = archive.Accounts()
+	require.NoError(t, err)
 	root, upperdir = upper(t, archive)
-	vm, err = egvm.Boot(egvm.New(root, egvm.OptionInit("/sbin/init"), egvm.OptionMountReadOnly(t.TempDir(), "/srv/shared")), &console)
+	vm, err = egvm.Boot(egvm.New(root, egvm.OptionAccounts(users, groups), egvm.OptionCPUs(2), egvm.OptionMemory(1<<30), egvm.OptionMountReadOnly(t.TempDir(), "/srv/shared"), egvm.OptionMountReadWrite(sockets, "/srv/sockets"), egvm.OptionMountVolume(volume, "/srv/volume")), &console)
 	require.NoError(t, err, console.String())
 	t.Cleanup(func() { require.NoError(t, vm.Close()) })
 
@@ -93,15 +102,70 @@ func TestExec(t *testing.T) {
 	}
 
 	t.Run("runs the image's binaries with the egiso as their root", func(t *testing.T) {
-		code, stdout, _ := run(t, t.Context(), nil, "sh", "-c", "head -1 /etc/os-release && uname -s")
+		code, stdout, _ := run(t, t.Context(), nil, "sh", "-c", "grep ^NAME= /etc/os-release && uname -s")
 		require.Equal(t, int32(0), code)
-		require.Equal(t, "NAME=\"Alpine Linux\"\nLinux\n", stdout)
+		require.Equal(t, "NAME=\"Ubuntu\"\nLinux\n", stdout)
 	})
 
-	t.Run("runs the init as pid 1", func(t *testing.T) {
-		code, stdout, _ := run(t, t.Context(), nil, "cat", "/proc/1/cmdline")
+	t.Run("runs the root's systemd as pid 1", func(t *testing.T) {
+		code, stdout, _ := run(t, t.Context(), nil, "cat", "/proc/1/comm")
 		require.Equal(t, int32(0), code)
-		require.Equal(t, "/sbin/init\x00", stdout)
+		require.Equal(t, "systemd\n", stdout)
+	})
+
+	t.Run("limits the machine to its cpus and memory", func(t *testing.T) {
+		code, stdout, stderr := run(t, t.Context(), nil, "cat", "/sys/fs/cgroup/cpu.max", "/sys/fs/cgroup/memory.max")
+		require.Equal(t, int32(0), code, stderr)
+		require.Equal(t, "200000 100000\n1073741824\n", stdout)
+	})
+
+	t.Run("links files, as dpkg backs up its status", func(t *testing.T) {
+		code, stdout, stderr := run(t, t.Context(), nil, "sh", "-c", "echo linked > /etc/status && ln /etc/status /etc/status-old && cat /etc/status-old && stat -c %h /etc/status-old")
+		require.Equal(t, int32(0), code, stderr)
+		require.Equal(t, "linked\n2\n", stdout)
+	})
+
+	t.Run("drops what it sends to private addresses", func(t *testing.T) {
+		code, _, stderr := run(t, t.Context(), nil, "curl", "-sS", "--max-time", "2", "http://169.254.169.254/")
+		require.Equal(t, int32(28), code, stderr)
+	})
+
+	t.Run("keeps its firewall out of root's reach", func(t *testing.T) {
+		code, _, stderr := run(t, t.Context(), nil, "nft", "flush", "ruleset")
+		require.NotEqual(t, int32(0), code)
+		require.Contains(t, stderr, "Operation not permitted")
+	})
+
+	t.Run("quotes arguments the shell would expand", func(t *testing.T) {
+		code, stdout, _ := run(t, t.Context(), nil, "printf", "%s|", "a b", "$HOME", "'q'", "*")
+		require.Equal(t, int32(0), code)
+		require.Equal(t, "a b|$HOME|'q'|*|", stdout)
+	})
+
+	t.Run("mounts a volume in the directory it creates for it", func(t *testing.T) {
+		code, _, stderr := run(t, t.Context(), nil, "sh", "-c", "echo kept > /srv/volume/kept && chown 1000:1000 /srv/volume/kept")
+		require.Equal(t, int32(0), code, stderr)
+		b, cause := os.ReadFile(filepath.Join(volume, "kept"))
+		require.NoError(t, cause)
+		require.Equal(t, "kept\n", string(b))
+	})
+
+	t.Run("forwards a host socket into the machine", func(t *testing.T) {
+		host := filepath.Join(t.TempDir(), "host.sock")
+		l, cause := net.Listen("unix", host)
+		require.NoError(t, cause)
+		srv := &http.Server{Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { io.WriteString(w, "forwarded") })}
+		go srv.Serve(l)
+		t.Cleanup(func() { srv.Close() })
+
+		require.NoError(t, vm.Forward(t.Context(), host, "/srv/sockets/forwarded.sock"))
+		code, stdout, stderr := run(t, t.Context(), nil, "curl", "-s", "--unix-socket", "/srv/sockets/forwarded.sock", "http://machine/")
+		require.Equal(t, int32(0), code, stderr)
+		require.Equal(t, "forwarded", stdout)
+	})
+
+	t.Run("refuses to forward to a path the machine can not listen on", func(t *testing.T) {
+		require.Error(t, vm.Forward(t.Context(), filepath.Join(t.TempDir(), "host.sock"), "/srv/missing/forwarded.sock"))
 	})
 
 	t.Run("mounts the machine's directories", func(t *testing.T) {

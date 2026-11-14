@@ -230,6 +230,11 @@ func CloneTree(ctx context.Context, dstdir string, rootdir string, archive fs.FS
 			return nil
 		}
 
+		// sockets, pipes and devices have no contents to copy.
+		if d.Type()&(fs.ModeSocket|fs.ModeNamedPipe|fs.ModeDevice|fs.ModeCharDevice) != 0 {
+			return nil
+		}
+
 		dst := filepath.Join(dstdir, strings.TrimPrefix(path, rootdir))
 		if rootdir == path {
 			dst = path

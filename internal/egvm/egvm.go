@@ -3,28 +3,32 @@
 // mounts it and hands the machine to the root's own init, as a container runtime starts an image
 // with /usr/sbin/init. The kernel's command line tells the root's systemd what the machine attaches:
 // the virtio-fs devices to mount and the network to configure. vminit keeps running beside the root's
-// init, forwarding NFS and running the commands the host sends it over vsock. On Linux the machine
-// shares the host's kernel: the root's init runs in namespaces of its own, rooted at the egiso
-// served over FUSE, with an agent beside it serving the same commands over a unix socket.
+// init, forwarding NFS. On Linux the machine shares the host's kernel: the root's init runs in
+// namespaces of its own, rooted at the egiso served over FUSE. Commands run over ssh into the root's
+// own sshd, which systemd-ssh-generator binds to vsock port 22 in a virtual machine and to
+// /run/ssh-unix-local/socket on Linux, as root with a key the machine authorizes when it boots.
 package egvm
 
 import (
 	"encoding/base64"
 	"fmt"
 	"io"
+	"net/netip"
 	"runtime"
 	"strings"
 
 	"github.com/egdaemon/eg/internal/egiso"
 	"github.com/egdaemon/eg/internal/langx"
 	"github.com/egdaemon/eg/internal/userx"
+	"github.com/egdaemon/wasinet/wasinet/wnetruntime"
 )
 
 // resolvlink is the tmpfiles.extra credential pointing resolv.conf at resolved, replacing the empty
 // placeholder image builds leave behind.
 const resolvlink = "L+ /etc/resolv.conf - - - - ../run/systemd/resolve/stub-resolv.conf\n"
 
-// mount is a host directory the machine attaches as the virtio-fs device tag and mounts at path.
+// mount is a host directory the machine attaches as the virtio-fs device tag and mounts at path, or a
+// volume, which a virtual machine attaches as a disk in the order of its volumes.
 type mount struct {
 	tag      string
 	dir      string
@@ -32,15 +36,19 @@ type mount struct {
 	readonly bool
 }
 
-// Machine describes a virtual machine: the image it boots, its size, its root, and what it mounts.
+// Machine describes a virtual machine: the image it boots, its size, its root, what it mounts, and
+// the addresses a Linux machine may reach. A memory of 0 is the host's: a Linux machine shares it,
+// a virtual machine, which reserves its memory, is given half of it.
 type Machine struct {
-	dir    string
-	init   string
-	cpus   uint
-	memory uint64
-	root   *egiso.SysFS
-	nfs    []egiso.NFSOption
-	mounts []mount
+	dir      string
+	init     string
+	cpus     uint
+	memory   uint64
+	root     *egiso.SysFS
+	nfs      []egiso.NFSOption
+	mounts   []mount
+	volumes  []mount
+	firewall wnetruntime.Firewall
 }
 
 // Option changes the machine New describes.
@@ -53,15 +61,37 @@ func Directory() string {
 }
 
 // New describes a machine rooted at root that boots the image in Directory, as large as the host,
-// with the root's systemd as its init.
+// with the root's systemd as its init, reaching its own loopback and public addresses only.
 func New(root *egiso.SysFS, options ...Option) Machine {
 	return langx.Clone(Machine{
-		dir:    Directory(),
-		init:   "/usr/sbin/init",
-		cpus:   uint(runtime.NumCPU()),
-		memory: 4 << 30,
-		root:   root,
+		dir:      Directory(),
+		init:     "/usr/sbin/init",
+		cpus:     uint(runtime.NumCPU()),
+		root:     root,
+		firewall: wnetruntime.PublicFirewall(wnetruntime.FirewallOptionAllow(netip.MustParsePrefix("127.0.0.0/8"), netip.MustParsePrefix("::1/128"))),
 	}, options...)
+}
+
+// OptionFirewall limits the addresses a Linux machine reaches to those fw permits.
+func OptionFirewall(fw wnetruntime.Firewall) Option {
+	return func(m *Machine) {
+		m.firewall = fw
+	}
+}
+
+// OptionCPUs gives the machine n cpus; 0 keeps the host's.
+func OptionCPUs(n uint) Option {
+	return func(m *Machine) {
+		m.cpus = langx.FirstNonZero(n, m.cpus)
+	}
+}
+
+// OptionMemory gives the machine n bytes of memory; 0 keeps the host's, half of it for a virtual
+// machine.
+func OptionMemory(n uint64) Option {
+	return func(m *Machine) {
+		m.memory = n
+	}
 }
 
 // OptionDirectory boots the machine image in dir.
@@ -93,6 +123,16 @@ func OptionMountReadWrite(dir string, path string) Option {
 // OptionMountReadOnly mounts the host directory dir in the machine at path, read only.
 func OptionMountReadOnly(dir string, path string) Option {
 	return optionMount(dir, path, true)
+}
+
+// OptionMountVolume mounts a filesystem of the machine's own at path, kept in the host directory dir
+// between boots, for what a share can not hold, as containers' storage: its owners, devices and
+// mounts. A Linux machine mounts dir; a virtual machine keeps an ext4 disk image in it, which vminit
+// formats when it is empty.
+func OptionMountVolume(dir string, path string) Option {
+	return func(m *Machine) {
+		m.volumes = append(m.volumes, mount{dir: dir, path: path})
+	}
 }
 
 func optionMount(dir string, path string, readonly bool) Option {
@@ -146,11 +186,17 @@ func newstdio(options ...ExecOption) stdio {
 	return langx.Clone(stdio{stdout: io.Discard, stderr: io.Discard}, options...)
 }
 
+// VolumeParam names, once per volume, in the order their disks attach, the path vminit mounts a
+// volume at.
+const VolumeParam = "egvm.volume"
+
 // cmdline is the machine's kernel command line. Container images hold no udev to announce the
 // console, so systemd starts no getty on it: one would wait out its device's timeout before the
 // machine boots. systemd-fstab-generator mounts the virtio-fs devices from systemd.mount-extra, and
-// systemd-network-generator configures the machine's NAT device for networkd from ip=.
-func (t Machine) cmdline() string {
+// systemd-network-generator configures the machine's NAT device for networkd from ip=. Without udev
+// systemd mounts no block device, so vminit mounts the volumes from egvm.volume=. authorized is the
+// key root accepts over ssh.
+func (t Machine) cmdline(authorized string) string {
 	var (
 		resolv = base64.StdEncoding.EncodeToString([]byte(resolvlink))
 		params = []string{
@@ -162,6 +208,7 @@ func (t Machine) cmdline() string {
 			"systemd.wants=systemd-network-generator.service",
 			"systemd.wants=systemd-networkd.service",
 			"systemd.set_credential_binary=tmpfiles.extra:" + resolv,
+			"systemd.set_credential_binary=ssh.ephemeral-authorized_keys-all:" + base64.StdEncoding.EncodeToString([]byte(authorized)),
 		}
 	)
 
@@ -171,6 +218,10 @@ func (t Machine) cmdline() string {
 			mode = "ro"
 		}
 		params = append(params, fmt.Sprintf("systemd.mount-extra=%s:%s:virtiofs:%s", m.tag, m.path, mode))
+	}
+
+	for _, v := range t.volumes {
+		params = append(params, VolumeParam+"="+v.path)
 	}
 
 	return strings.Join(params, " ")

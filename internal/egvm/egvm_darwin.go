@@ -3,6 +3,7 @@ package egvm
 import (
 	"context"
 	"io"
+	"io/fs"
 	"net"
 	"os"
 	"path/filepath"
@@ -11,13 +12,17 @@ import (
 	"github.com/Code-Hex/vz/v3"
 	"github.com/egdaemon/eg/internal/egiso"
 	"github.com/egdaemon/eg/internal/errorsx"
+	"github.com/egdaemon/eg/internal/langx"
 	"github.com/egdaemon/eg/interp/execproxy"
+	"github.com/shirou/gopsutil/v4/mem"
+	"golang.org/x/crypto/ssh"
 )
 
 // VM is a running machine.
 type VM struct {
 	vm      *vz.VirtualMachine
 	socket  *vz.VirtioSocketDevice
+	client  *ssh.ClientConfig
 	stopped chan struct{}
 	err     error
 	closers []io.Closer
@@ -28,10 +33,16 @@ type VM struct {
 // process needs the com.apple.security.virtualization entitlement.
 func Boot(m Machine, console io.Writer) (_ *VM, err error) {
 	var (
-		config *vz.VirtualMachineConfiguration
-		vm     *vz.VirtualMachine
-		nfs    *vz.VirtioSocketListener
+		config     *vz.VirtualMachineConfiguration
+		vm         *vz.VirtualMachine
+		nfs        *vz.VirtioSocketListener
+		login      *ssh.ClientConfig
+		authorized string
 	)
+
+	if login, authorized, err = client(m.root.Upper()); err != nil {
+		return nil, err
+	}
 
 	// the console's input is a pipe nothing writes to; its output is copied to console.
 	in, stdin, err := os.Pipe()
@@ -42,14 +53,14 @@ func Boot(m Machine, console io.Writer) (_ *VM, err error) {
 	if err != nil {
 		return nil, errorsx.Compact(err, in.Close(), stdin.Close())
 	}
-	t := &VM{stopped: make(chan struct{}), copied: make(chan struct{}), closers: []io.Closer{in, stdin, out, stdout}}
+	t := &VM{client: login, stopped: make(chan struct{}), copied: make(chan struct{}), closers: []io.Closer{in, stdin, out, stdout}}
 	defer func() {
 		if err != nil {
 			t.close()
 		}
 	}()
 
-	if config, err = configure(m, in, out); err != nil {
+	if config, err = configure(m, authorized, in, out); err != nil {
 		return nil, err
 	}
 	if vm, err = vz.NewVirtualMachine(config); err != nil {
@@ -85,29 +96,33 @@ func Boot(m Machine, console io.Writer) (_ *VM, err error) {
 // Exec runs req in the machine and waits for it, with no input and its output discarded unless
 // options say otherwise. A command that exits with other than 0 returns an ExitError. It waits for
 // the machine to serve commands. Cancelling ctx kills the command.
-func (t *VM) Exec(ctx context.Context, req *execproxy.ExecRequest, options ...ExecOption) error {
-	return command(ctx, t.connect, req, options...)
+func (t *VM) Exec(ctx context.Context, req *execproxy.ExecRequest, options ...ExecOption) (err error) {
+	var (
+		conn net.Conn
+	)
+
+	if conn, err = redial(ctx, func() (net.Conn, error) { return t.socket.Connect(22) }, t.stopped, func() error { return t.err }); err != nil {
+		return err
+	}
+	return command(ctx, conn, t.client, req, options...)
 }
 
-// connect opens the stream of command id, retrying until the machine serves commands.
-func (t *VM) connect(ctx context.Context, id uint64, stream uint8) (net.Conn, error) {
-	for {
-		conn, err := t.socket.Connect(Port)
-		if err == nil {
-			if err = WriteHeader(conn, id, stream); err != nil {
-				return nil, errorsx.Compact(err, conn.Close())
-			}
-			return conn, nil
-		}
+// Forward makes the host's unix socket host reachable in the machine at path, a socket the machine's
+// sshd listens on until the machine stops. It waits for the machine to serve commands.
+func (t *VM) Forward(ctx context.Context, host string, path string) (err error) {
+	var (
+		conn      net.Conn
+		forwarded io.Closer
+	)
 
-		select {
-		case <-ctx.Done():
-			return nil, ctx.Err()
-		case <-t.stopped:
-			return nil, errorsx.Compact(errorsx.New("the machine stopped"), t.err)
-		case <-time.After(10 * time.Millisecond):
-		}
+	if conn, err = redial(ctx, func() (net.Conn, error) { return t.socket.Connect(22) }, t.stopped, func() error { return t.err }); err != nil {
+		return err
 	}
+	if forwarded, err = forward(conn, t.client, host, path); err != nil {
+		return err
+	}
+	t.closers = append(t.closers, forwarded)
+	return nil
 }
 
 // Close stops the machine and waits for it.
@@ -131,7 +146,7 @@ func (t *VM) close() {
 	}
 }
 
-func configure(m Machine, in *os.File, out *os.File) (_ *vz.VirtualMachineConfiguration, err error) {
+func configure(m Machine, authorized string, in *os.File, out *os.File) (_ *vz.VirtualMachineConfiguration, err error) {
 	var (
 		boot     *vz.LinuxBootLoader
 		config   *vz.VirtualMachineConfiguration
@@ -145,12 +160,19 @@ func configure(m Machine, in *os.File, out *os.File) (_ *vz.VirtualMachineConfig
 		mac      *vz.MACAddress
 		device   *vz.VirtioFileSystemDeviceConfiguration
 		devices  = make([]vz.DirectorySharingDeviceConfiguration, 0, len(m.mounts))
+		disk     *vz.VirtioBlockDeviceConfiguration
+		disks    = make([]vz.StorageDeviceConfiguration, 0, len(m.volumes))
+		host     *mem.VirtualMemoryStat
 	)
 
-	if boot, err = vz.NewLinuxBootLoader(filepath.Join(m.dir, "Image"), vz.WithInitrd(filepath.Join(m.dir, "initramfs")), vz.WithCommandLine(m.cmdline())); err != nil {
+	if boot, err = vz.NewLinuxBootLoader(filepath.Join(m.dir, "Image"), vz.WithInitrd(filepath.Join(m.dir, "initramfs")), vz.WithCommandLine(m.cmdline(authorized))); err != nil {
 		return nil, errorsx.Wrap(err, "unable to create the boot loader")
 	}
-	if config, err = vz.NewVirtualMachineConfiguration(boot, m.cpus, m.memory); err != nil {
+	// a virtual machine reserves its memory up front, so one sized as the host is given half of it.
+	if host, err = mem.VirtualMemory(); err != nil {
+		return nil, errorsx.Wrap(err, "unable to read the host's memory")
+	}
+	if config, err = vz.NewVirtualMachineConfiguration(boot, m.cpus, langx.FirstNonZero(m.memory, host.Total/2)); err != nil {
 		return nil, errorsx.Wrap(err, "unable to create the machine configuration")
 	}
 	if platform, err = vz.NewGenericPlatformConfiguration(); err != nil {
@@ -196,6 +218,14 @@ func configure(m Machine, in *os.File, out *os.File) (_ *vz.VirtualMachineConfig
 	}
 	config.SetDirectorySharingDevicesVirtualMachineConfiguration(devices)
 
+	for _, v := range m.volumes {
+		if disk, err = volume(v); err != nil {
+			return nil, err
+		}
+		disks = append(disks, disk)
+	}
+	config.SetStorageDevicesVirtualMachineConfiguration(disks)
+
 	if _, err = config.Validate(); err != nil {
 		return nil, errorsx.Wrap(err, "invalid machine configuration")
 	}
@@ -220,6 +250,34 @@ func share(mnt mount) (_ *vz.VirtioFileSystemDeviceConfiguration, err error) {
 	}
 	device.SetDirectoryShare(single)
 	return device, nil
+}
+
+// volumesize is the size of a volume's disk image, which takes the host only the space it holds.
+const volumesize = 128 << 30
+
+// volume attaches the disk image the volume keeps in its directory, creating it empty, and sparse, when
+// it has none.
+func volume(v mount) (_ *vz.VirtioBlockDeviceConfiguration, err error) {
+	var (
+		path       = filepath.Join(v.dir, "volume.img")
+		image      *os.File
+		attachment *vz.DiskImageStorageDeviceAttachment
+	)
+
+	if err = os.MkdirAll(v.dir, 0700); err != nil {
+		return nil, errorsx.Wrapf(err, "unable to create the volume %s", v.dir)
+	}
+	if image, err = os.OpenFile(path, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600); err == nil {
+		err = errorsx.Compact(image.Truncate(volumesize), image.Close())
+	}
+	if err = errorsx.Ignore(err, fs.ErrExist); err != nil {
+		return nil, errorsx.Wrapf(err, "unable to create the volume's disk image %s", path)
+	}
+
+	if attachment, err = vz.NewDiskImageStorageDeviceAttachment(path, false); err != nil {
+		return nil, errorsx.Wrapf(err, "unable to attach the volume's disk image %s", path)
+	}
+	return vz.NewVirtioBlockDeviceConfiguration(attachment)
 }
 
 // wait returns once the machine stops.

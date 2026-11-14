@@ -274,7 +274,7 @@ func environ(root fs.FS) (_ []string, err error) {
 		return nil, errorsx.Wrap(err, "unable to parse the root's accounts")
 	}
 
-	b = b.FromReader(bytes.NewReader(image))
+	b = b.FromReader(bytes.NewReader(image)).Var("container", "egiso") // podman's containers set it to podman, the egiso sets its own.
 	for _, u := range users {
 		b = b.Var("HOME", u.Home)
 	}

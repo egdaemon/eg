@@ -211,8 +211,7 @@ func normalizeEnv(environ *envx.Builder) *envx.Builder {
 	environ.Setenv(_eg.EnvComputeModuleSocket, _eg.DefaultRuntimeDirectory("module.socket"))
 	environ.Setenv(_eg.EnvComputeOS, "linux")
 	environ.Setenv(_eg.EnvComputeArch, "amd64")
-	environ.Unsetenv("container") // podman's containers set it, a machine does not.
-	environ.Var("container", "podman")
+	environ.Setenv("container", "podman") // podman's containers set it, a machine does not.
 	environ.Setenv(_eg.EnvComputeGPU, "false")
 	environ.Setenv(_eg.EnvComputeGuestMigrationsEnabled, "true")
 	environ.Setenv(_eg.EnvComputeTTL, "0s")

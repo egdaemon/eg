@@ -24,13 +24,13 @@ func TestEnviron(t *testing.T) {
 
 		environ, err := environ(root)
 		require.NoError(t, err)
-		require.Equal(t, []string{"PATH=/usr/sbin:/usr/bin", "DEBIAN_FRONTEND=noninteractive", "HOME=/root"}, environ)
+		require.Equal(t, []string{"PATH=/usr/sbin:/usr/bin", "DEBIAN_FRONTEND=noninteractive", "container=egiso", "HOME=/root"}, environ)
 	})
 
 	t.Run("missing environment is root's home alone", func(t *testing.T) {
 		environ, err := environ(fstest.MapFS{"etc/passwd": passwd})
 		require.NoError(t, err)
-		require.Equal(t, []string{"HOME=/root"}, environ)
+		require.Equal(t, []string{"container=egiso", "HOME=/root"}, environ)
 	})
 
 	t.Run("missing passwd fails", func(t *testing.T) {
@@ -38,10 +38,10 @@ func TestEnviron(t *testing.T) {
 		require.Error(t, err)
 	})
 
-	t.Run("no root account sets no home", func(t *testing.T) {
+	t.Run("no root account sets no home, only the container", func(t *testing.T) {
 		environ, err := environ(fstest.MapFS{"etc/passwd": &fstest.MapFile{Data: []byte("egd:x:990:990::/home/egd:/bin/bash\n")}})
 		require.NoError(t, err)
-		require.Empty(t, environ)
+		require.Equal(t, []string{"container=egiso"}, environ)
 	})
 }
 
@@ -89,7 +89,7 @@ func TestMachineOptionLocalGPGAgent(t *testing.T) {
 		require.Empty(t, config.sockets)
 		environ, err := envb.Environ()
 		require.NoError(t, err)
-		require.Empty(t, environ)
+		require.Equal(t, []string{"container=egiso"}, environ)
 	})
 
 	t.Run("missing gnupghome attaches nothing", func(t *testing.T) {

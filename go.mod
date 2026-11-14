@@ -24,6 +24,7 @@ require (
 	github.com/dominikbraun/graph v0.23.0
 	github.com/duckdb/duckdb-go/v2 v2.10503.1
 	github.com/dustin/go-humanize v1.1.0
+	github.com/egdaemon/duckproxy v0.0.0-20261114115105-8cd7c751218f
 	github.com/egdaemon/gdx v0.0.0-20261106002238-59fe7b8df603
 	github.com/egdaemon/gdx/konggdx v0.0.0-20261106002238-59fe7b8df603
 	github.com/egdaemon/sh/v3 v3.14.1-0.20261103040545-e33e887fd27a
@@ -33,6 +34,7 @@ require (
 	github.com/fsnotify/fsnotify v1.10.1
 	github.com/go-git/go-billy/v5 v5.6.0
 	github.com/go-git/go-git/v6 v6.0.0-beta.1
+	github.com/godbus/dbus/v5 v5.2.2
 	github.com/gofrs/flock v0.13.0
 	github.com/gofrs/uuid/v5 v5.5.1
 	github.com/golang-jwt/jwt/v4 v4.5.2
@@ -175,7 +177,6 @@ require (
 	github.com/go-ole/go-ole v1.3.0 // indirect
 	github.com/go-viper/mapstructure/v2 v2.5.0 // indirect
 	github.com/goccy/go-json v0.10.5 // indirect
-	github.com/godbus/dbus/v5 v5.2.2 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/google/flatbuffers v25.12.19+incompatible // indirect

@@ -5,8 +5,8 @@ import (
 	"context"
 	"database/sql"
 
+	"github.com/egdaemon/duckproxy/duckproxy"
 	"github.com/egdaemon/eg"
-	"github.com/egdaemon/eg/duckproxy"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/interp/events"
 	"github.com/egdaemon/eg/runtime/wasi/egunsafe"

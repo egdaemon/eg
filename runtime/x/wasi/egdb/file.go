@@ -5,7 +5,7 @@ import (
 	"database/sql"
 	"errors"
 
-	"github.com/egdaemon/eg/duckproxy"
+	"github.com/egdaemon/duckproxy/duckproxy"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/interp/dbproxy"
 	"github.com/egdaemon/eg/runtime/wasi/egunsafe"

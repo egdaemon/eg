@@ -10,8 +10,8 @@ import (
 	"path/filepath"
 	"strings"
 
+	_ "github.com/egdaemon/duckproxy/duckproxy"
 	"github.com/egdaemon/eg"
-	_ "github.com/egdaemon/eg/duckproxy"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/gofrs/uuid/v5"
 )

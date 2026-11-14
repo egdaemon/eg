@@ -11,7 +11,7 @@ import (
 	"path/filepath"
 	"sync"
 
-	"github.com/egdaemon/eg/duckproxyserver"
+	"github.com/egdaemon/duckproxy/duckserve"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/md5x"
 	"github.com/egdaemon/eg/interp/dbproxy"
@@ -112,7 +112,7 @@ func (t *Service) start(path string, socket string) (_ *served, err error) {
 		defer close(s.done)
 		defer db.Close()
 		defer os.Remove(socket)
-		_ = duckproxyserver.New(db).Serve(sctx, l)
+		_ = duckserve.New(db).Serve(sctx, l)
 	}()
 
 	return s, nil

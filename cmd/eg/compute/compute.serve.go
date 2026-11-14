@@ -18,13 +18,13 @@ import (
 	"github.com/egdaemon/eg/cmd/cmdopts"
 	"github.com/egdaemon/eg/cmd/migrations"
 	"github.com/egdaemon/eg/compile"
+	"github.com/egdaemon/eg/computesess"
 	"github.com/egdaemon/eg/internal/debugx"
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/gitx"
 	"github.com/egdaemon/eg/internal/md5x"
 	"github.com/egdaemon/eg/internal/podmanx"
-	"github.com/egdaemon/eg/internal/servesessions"
 	"github.com/egdaemon/eg/internal/stringsx"
 	"github.com/egdaemon/eg/internal/userx"
 	"github.com/egdaemon/eg/internal/wasix"
@@ -82,7 +82,7 @@ func containersshport(ctx context.Context, cname string, since time.Time) int64 
 // registerssh keeps the serve session registered with the port podman actually published, until ctx is cancelled.
 // the port is read from the container, which is what makes an automatic port possible: podman picks it.
 // every module is a new container, so the port is re-registered when it changes.
-func registerssh(ctx context.Context, db *sql.DB, s servesessions.Session, cname string) {
+func registerssh(ctx context.Context, db *sql.DB, s computesess.Session, cname string) {
 	var (
 		registered int64
 		started    = time.Now()
@@ -103,7 +103,7 @@ func registerssh(ctx context.Context, db *sql.DB, s servesessions.Session, cname
 		}
 
 		s.SSHPort = port
-		if err := servesessions.Register(ctx, db, s); err != nil {
+		if err := computesess.Register(ctx, db, s); err != nil {
 			log.Println("unable to register serve session", err)
 			continue
 		}
@@ -219,7 +219,7 @@ func (t serve) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err e
 			done := make(chan struct{})
 			go func() {
 				defer close(done)
-				registerssh(wctx, db, servesessions.Session{
+				registerssh(wctx, db, computesess.Session{
 					ID:           uid.String(),
 					Module:       t.Name,
 					Directory:    t.Dir,
@@ -234,7 +234,7 @@ func (t serve) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err e
 				// context may already be cancelled so stopping uses its own.
 				stop()
 				<-done
-				errorsx.Log(servesessions.Stop(context.Background(), db, uid.String()))
+				errorsx.Log(computesess.Stop(context.Background(), db, uid.String()))
 			}()
 		}
 	}

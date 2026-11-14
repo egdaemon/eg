@@ -14,9 +14,9 @@ import (
 	"time"
 
 	_ "github.com/duckdb/duckdb-go/v2"
+	"github.com/egdaemon/duckproxy/duckproxy"
+	"github.com/egdaemon/duckproxy/duckserve"
 	_eg "github.com/egdaemon/eg"
-	"github.com/egdaemon/eg/duckproxy"
-	"github.com/egdaemon/eg/duckproxyserver"
 	"github.com/egdaemon/eg/internal/coverage"
 	"github.com/egdaemon/eg/internal/sqlx"
 	"github.com/egdaemon/eg/interp/events"
@@ -43,7 +43,7 @@ func analyticsproxy(t *testing.T) (*sql.DB, func(context.Context, ...*coverage.R
 	sctx, stop := context.WithCancel(context.Background())
 	served := make(chan error, 1)
 	go func() {
-		served <- duckproxyserver.ListenUnix(sctx, socket, duckproxyserver.New(db))
+		served <- duckserve.ListenUnix(sctx, socket, duckserve.New(db))
 	}()
 	t.Cleanup(func() {
 		stop()

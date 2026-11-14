@@ -8,7 +8,7 @@ import (
 
 	"github.com/egdaemon/eg/cmd/migrations"
 	egcompute "github.com/egdaemon/eg/compute"
-	"github.com/egdaemon/eg/internal/servesessions"
+	"github.com/egdaemon/eg/computesess"
 	"github.com/egdaemon/eg/internal/sqltestx"
 	"github.com/egdaemon/eg/jsonx"
 	"github.com/stretchr/testify/require"
@@ -19,9 +19,9 @@ func TestWriteSessions(t *testing.T) {
 		db := sqltestx.DuckDB(t)
 		require.NoError(t, migrations.Migrate(t.Context(), db))
 
-		require.NoError(t, servesessions.Register(t.Context(), db, servesessions.Session{ID: "stopped", Module: "m", Directory: "/repo", SSHRequested: 2222, SSHPort: 2222, SSHUser: "egd", SSHKeyPath: "/k"}))
-		require.NoError(t, servesessions.Stop(t.Context(), db, "stopped"))
-		require.NoError(t, servesessions.Register(t.Context(), db, servesessions.Session{ID: "live", Module: "", Directory: "/repo", SSHRequested: 0, SSHPort: 44999, SSHUser: "egd", SSHKeyPath: "/k"}))
+		require.NoError(t, computesess.Register(t.Context(), db, computesess.Session{ID: "stopped", Module: "m", Directory: "/repo", SSHRequested: 2222, SSHPort: 2222, SSHUser: "egd", SSHKeyPath: "/k"}))
+		require.NoError(t, computesess.Stop(t.Context(), db, "stopped"))
+		require.NoError(t, computesess.Register(t.Context(), db, computesess.Session{ID: "live", Module: "", Directory: "/repo", SSHRequested: 0, SSHPort: 44999, SSHUser: "egd", SSHKeyPath: "/k"}))
 
 		var out bytes.Buffer
 		require.NoError(t, writeSessions(t.Context(), db, &out, true))
@@ -41,7 +41,7 @@ func TestWriteSessions(t *testing.T) {
 		require.Equal(t, "live", decoded[0].Id)
 		require.Equal(t, int64(44999), decoded[0].SshPort)
 		require.Equal(t, int64(0), decoded[0].SshRequested)
-		require.Empty(t, decoded[0].StoppedAt)
+		require.Empty(t, decoded[0].StoppedAt, "running sessions have not stopped")
 		require.NotEmpty(t, decoded[0].StartedAt)
 
 		require.Equal(t, "stopped", decoded[1].Id)
@@ -66,7 +66,7 @@ func TestWriteSessions(t *testing.T) {
 	t.Run("table", func(t *testing.T) {
 		db := sqltestx.DuckDB(t)
 		require.NoError(t, migrations.Migrate(t.Context(), db))
-		require.NoError(t, servesessions.Register(t.Context(), db, servesessions.Session{ID: "live", Module: "m", Directory: "/repo", SSHPort: 44999}))
+		require.NoError(t, computesess.Register(t.Context(), db, computesess.Session{ID: "live", Module: "m", Directory: "/repo", SSHPort: 44999}))
 
 		var out bytes.Buffer
 		require.NoError(t, writeSessions(t.Context(), db, &out, false))

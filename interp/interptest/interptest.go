@@ -15,8 +15,8 @@ import (
 	"time"
 
 	_ "github.com/duckdb/duckdb-go/v2"
+	"github.com/egdaemon/duckproxy/duckserve"
 	"github.com/egdaemon/eg"
-	"github.com/egdaemon/eg/duckproxyserver"
 	"github.com/egdaemon/eg/interp/events"
 	"github.com/egdaemon/eg/interp/runtime/wasi/ffiwasinet"
 	"github.com/egdaemon/wasinet/wasinet/wnetruntime"
@@ -55,7 +55,7 @@ type Analytics struct {
 
 // StartAnalytics starts an analytics server, backed by a prepared database, listening on the
 // analytics socket inside of a temporary runtime directory. it is stopped when the test ends.
-func StartAnalytics(t *testing.T, opts ...duckproxyserver.Option) Analytics {
+func StartAnalytics(t *testing.T, opts ...duckserve.Option) Analytics {
 	t.Helper()
 
 	rundir := t.TempDir()
@@ -71,7 +71,7 @@ func StartAnalytics(t *testing.T, opts ...duckproxyserver.Option) Analytics {
 	sctx, stop := context.WithCancel(context.Background())
 	served := make(chan error, 1)
 	go func() {
-		served <- duckproxyserver.ListenUnix(sctx, filepath.Join(rundir, eg.SocketAnalytics), duckproxyserver.New(db, opts...))
+		served <- duckserve.ListenUnix(sctx, filepath.Join(rundir, eg.SocketAnalytics), duckserve.New(db, opts...))
 	}()
 	t.Cleanup(func() {
 		stop()

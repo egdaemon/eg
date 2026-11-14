@@ -11,6 +11,7 @@ import (
 
 	"github.com/charmbracelet/x/ansi"
 	"github.com/egdaemon/eg/cmd/cmdopts"
+	"github.com/egdaemon/eg/cmd/cmdtypography"
 	"github.com/egdaemon/eg/computeapi"
 	"github.com/egdaemon/eg/internal/timex"
 	"github.com/stretchr/testify/require"
@@ -93,7 +94,7 @@ func TestWorkloadInfinityTimestamps(t *testing.T) {
 	require.Equal(t, "⏸", fmt.Sprintf("%v", TypographyWorkloadState(w)))
 	require.Equal(t, "1m0s", fmt.Sprintf("%v", TypographyWorkloadQueued(w)))
 	require.Equal(t, "", fmt.Sprintf("%v", TypographyWorkloadRunning(w)))
-	require.Equal(t, "", fmt.Sprintf("%v", TypographyTimestamp(inf)))
+	require.Equal(t, "", fmt.Sprintf("%v", cmdtypography.TimestampRFC3339(inf).Zero("").Infinity("", "")))
 
 	w = &computeapi.Enqueued{CreatedAt: now.Add(-time.Hour).Format(time.RFC3339Nano), InitiatedAt: now.Add(-30 * time.Second).Format(time.RFC3339Nano), CompletedAt: inf}
 	require.Equal(t, "▶", fmt.Sprintf("%v", TypographyWorkloadState(w)))

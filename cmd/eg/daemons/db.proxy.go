@@ -4,9 +4,9 @@ import (
 	"database/sql"
 	"log"
 
+	"github.com/egdaemon/duckproxy/duckserve"
 	"github.com/egdaemon/eg/cmd/cmdopts"
 	"github.com/egdaemon/eg/cmd/migrations"
-	"github.com/egdaemon/eg/duckproxyserver"
 	"github.com/egdaemon/eg/internal/userx"
 )
 
@@ -18,8 +18,8 @@ func DatabaseProxy(global *cmdopts.Global, db *sql.DB) {
 	go func() {
 		defer global.Cleanup.Done()
 
-		srv := duckproxyserver.New(db)
-		if err := duckproxyserver.ListenUnix(global.Context, userx.DefaultRuntimeDirectory(migrations.DatabaseSocketName), srv); err != nil && global.Context.Err() == nil {
+		srv := duckserve.New(db)
+		if err := duckserve.ListenUnix(global.Context, userx.DefaultRuntimeDirectory(migrations.DatabaseSocketName), srv); err != nil && global.Context.Err() == nil {
 			log.Println("database proxy failed", err)
 		}
 	}()

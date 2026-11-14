@@ -10,8 +10,8 @@ import (
 	"text/tabwriter"
 	"time"
 
+	_ "github.com/egdaemon/duckproxy/duckproxy" // registers the duckproxy driver.
 	"github.com/egdaemon/eg/cmd/migrations"
-	_ "github.com/egdaemon/eg/duckproxy" // registers the duckproxy driver.
 	"github.com/egdaemon/eg/internal/bytesx"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/fsx"

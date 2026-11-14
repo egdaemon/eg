@@ -10,10 +10,12 @@ import (
 
 	"github.com/alecthomas/kong"
 	"github.com/egdaemon/eg/cmd/cmdopts"
+	"github.com/egdaemon/eg/cmd/cmdtypography"
 	"github.com/egdaemon/eg/cmd/migrations"
 	egcompute "github.com/egdaemon/eg/compute"
+	"github.com/egdaemon/eg/computesess"
 	"github.com/egdaemon/eg/internal/errorsx"
-	"github.com/egdaemon/eg/internal/servesessions"
+	"github.com/egdaemon/eg/internal/langx"
 	"github.com/egdaemon/eg/jsonx"
 )
 
@@ -33,7 +35,7 @@ func (t sessionsCmd) Run(kctx *kong.Context, gctx *cmdopts.Global) (err error) {
 
 // writeSessions prints the sessions served by 'eg compute serve --ssh', the running ones first.
 func writeSessions(ctx context.Context, db *sql.DB, out io.Writer, asjsonl bool) (err error) {
-	sessions, err := servesessions.List(ctx, db)
+	sessions, err := computesess.List(ctx, db)
 	if err != nil {
 		return err
 	}
@@ -41,10 +43,10 @@ func writeSessions(ctx context.Context, db *sql.DB, out io.Writer, asjsonl bool)
 	if asjsonl {
 		for _, s := range sessions {
 			encoded := &egcompute.ServeSession{
-				Id: s.ID, Module: s.Module, Directory: s.Directory, Pid: s.PID, SshRequested: s.SSHRequested,
+				Id: s.ID, Module: s.Module, Directory: s.Directory, Pid: s.Pid, SshRequested: s.SSHRequested,
 				SshPort: s.SSHPort, SshUser: s.SSHUser, SshKeyPath: s.SSHKeyPath,
-				StartedAt: s.StartedAt.Format(time.RFC3339Nano),
-				StoppedAt: stoppedAt(s.StoppedAt),
+				StartedAt: fmt.Sprint(cmdtypography.Timestamp(s.StartedAt).Location(time.UTC)),
+				StoppedAt: fmt.Sprint(cmdtypography.Timestamp(langx.DerefOrZero(s.StoppedAt)).Location(time.UTC).Zero("")), // blank while running, which the console reads as never.
 			}
 
 			if err = jsonx.Encode(out, encoded); err != nil {
@@ -67,12 +69,4 @@ func writeSessions(ctx context.Context, db *sql.DB, out io.Writer, asjsonl bool)
 	}
 
 	return w.Flush()
-}
-
-func stoppedAt(t *time.Time) string {
-	if t == nil {
-		return ""
-	}
-
-	return t.Format(time.RFC3339Nano)
 }

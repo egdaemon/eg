@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/egdaemon/eg/duckproxyserver"
+	"github.com/egdaemon/duckproxy/duckserve"
 	"github.com/egdaemon/eg/interp/interptest"
 	"github.com/stretchr/testify/require"
 )
@@ -22,7 +22,7 @@ func TestWasiSequentialSessions(t *testing.T) {
 
 	for _, mode := range []string{"dial", "ping", "report"} {
 		t.Run(mode, func(t *testing.T) {
-			a := interptest.StartAnalytics(t, duckproxyserver.WithAcquireTimeout(5*time.Second))
+			a := interptest.StartAnalytics(t, duckserve.WithAcquireTimeout(5*time.Second))
 
 			require.NoError(t, interptest.Run(t, wasm, a.RuntimeDir, time.Minute, "SESSIONS_MODE="+mode, "SESSIONS_COUNT="+sessions))
 

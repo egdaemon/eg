@@ -10,6 +10,7 @@ import (
 	"github.com/egdaemon/eg/authn"
 	"github.com/egdaemon/eg/cmd/cmdidentity"
 	"github.com/egdaemon/eg/cmd/cmdopts"
+	"github.com/egdaemon/eg/cmd/cmdtypography"
 	"github.com/egdaemon/eg/compute"
 	"github.com/egdaemon/eg/computeapi"
 	"github.com/egdaemon/eg/identity"
@@ -76,8 +77,8 @@ func renderHistory(items ...*compute.History) string {
 			fmt.Sprintf("%.64v", TypographyHistoryCompact(h)),
 			h.GetVcsUri(),
 			fmt.Sprintf("%.8v", h.GetVcsCommit()),
-			fmt.Sprintf("%v", TypographyTimestamp(h.GetInitiatedAt())),
-			fmt.Sprintf("%v", TypographyTimestamp(h.GetCompletedAt())),
+			fmt.Sprintf("%v", cmdtypography.TimestampRFC3339(h.GetInitiatedAt()).Layout(time.DateTime).Zero("").Infinity("", "")),
+			fmt.Sprintf("%v", cmdtypography.TimestampRFC3339(h.GetCompletedAt()).Layout(time.DateTime).Zero("").Infinity("", "")),
 		})
 	}
 

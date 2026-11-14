@@ -9,9 +9,9 @@ import (
 	"testing"
 
 	_ "github.com/duckdb/duckdb-go/v2"
+	"github.com/egdaemon/duckproxy/duckproxy"
+	"github.com/egdaemon/duckproxy/duckserve"
 	"github.com/egdaemon/eg"
-	"github.com/egdaemon/eg/duckproxy"
-	"github.com/egdaemon/eg/duckproxyserver"
 	"github.com/stretchr/testify/require"
 )
 
@@ -26,7 +26,7 @@ func TestMigrate(t *testing.T) {
 
 		sctx, stop := context.WithCancel(context.Background())
 		served := make(chan error, 1)
-		go func() { served <- duckproxyserver.ListenUnix(sctx, socket, duckproxyserver.New(host)) }()
+		go func() { served <- duckserve.ListenUnix(sctx, socket, duckserve.New(host)) }()
 		t.Cleanup(func() {
 			stop()
 			<-served
@@ -59,7 +59,7 @@ func TestMigrate(t *testing.T) {
 
 		sctx, stop := context.WithCancel(context.Background())
 		served := make(chan error, 1)
-		go func() { served <- duckproxyserver.ListenUnix(sctx, socket, duckproxyserver.New(host)) }()
+		go func() { served <- duckserve.ListenUnix(sctx, socket, duckserve.New(host)) }()
 		t.Cleanup(func() {
 			stop()
 			<-served
@@ -92,7 +92,7 @@ func TestMigrate(t *testing.T) {
 
 		sctx, stop := context.WithCancel(context.Background())
 		served := make(chan error, 1)
-		go func() { served <- duckproxyserver.ListenUnix(sctx, socket, duckproxyserver.New(host)) }()
+		go func() { served <- duckserve.ListenUnix(sctx, socket, duckserve.New(host)) }()
 		t.Cleanup(func() {
 			stop()
 			<-served

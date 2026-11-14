@@ -26,6 +26,4 @@ package eg
 
 //go:generate protoc --proto_path=.proto --go_opt=Meg.compute.authz.proto=github.com/egciorg/eg/compute --go_opt=paths=source_relative --go_out=compute eg.compute.authz.proto
 
-//go:generate protoc --proto_path=.proto --go_opt=Meg.duckproxy.proto=github.com/egdaemon/eg/duckproxy --go_opt=paths=source_relative --go_out=duckproxy eg.duckproxy.proto
-
 //go:generate protoc --proto_path=.proto --go_opt=Meg.compute.sessions.proto=github.com/eg/compute --go_opt=paths=source_relative --go_out=compute eg.compute.sessions.proto

@@ -14,11 +14,11 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/egdaemon/duckproxy/duckgres"
+	"github.com/egdaemon/duckproxy/duckserve"
 	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/cmd/cmdopts"
 	"github.com/egdaemon/eg/compile"
-	"github.com/egdaemon/eg/duckpgwire"
-	"github.com/egdaemon/eg/duckproxyserver"
 	"github.com/egdaemon/eg/internal/bytesx"
 	"github.com/egdaemon/eg/internal/debugx"
 	"github.com/egdaemon/eg/internal/envx"
@@ -196,10 +196,10 @@ func (t baremetal) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, hotswapbin
 		return errorsx.Wrap(err, "unable to prepare analytics.db")
 	}
 
-	dpsrv := duckproxyserver.New(db, duckproxyserver.WithAcquireTimeout(time.Minute))
+	dpsrv := duckserve.New(db, duckserve.WithAcquireTimeout(time.Minute))
 	go func() {
 		dpspath := filepath.Join(ws.RuntimeDir, eg.SocketAnalytics)
-		if err := duckproxyserver.ListenUnix(ctx, dpspath, dpsrv); err != nil && ctx.Err() == nil {
+		if err := duckserve.ListenUnix(ctx, dpspath, dpsrv); err != nil && ctx.Err() == nil {
 			log.Println("duckproxy:", err)
 		}
 	}()
@@ -211,10 +211,10 @@ func (t baremetal) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, hotswapbin
 	}
 	defer pgdb.Close()
 
-	pgsrv := duckpgwire.New(pgdb, duckpgwire.WithAcquireTimeout(time.Minute))
+	pgsrv := duckgres.New(pgdb, duckgres.WithAcquireTimeout(time.Minute))
 	go func() {
 		pgpath := filepath.Join(ws.RuntimeDir, eg.SocketAnalyticsPG)
-		if err := duckpgwire.ListenUnix(ctx, pgpath, pgsrv); err != nil && ctx.Err() == nil {
+		if err := duckgres.ListenUnix(ctx, pgpath, pgsrv); err != nil && ctx.Err() == nil {
 			log.Println("duckpgwire:", err)
 		}
 	}()

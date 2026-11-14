@@ -12,10 +12,10 @@ import (
 	"time"
 
 	_ "github.com/duckdb/duckdb-go/v2"
+	"github.com/egdaemon/duckproxy/duckserve"
 	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/cmd/eg/daemons"
 	"github.com/egdaemon/eg/computeapi"
-	"github.com/egdaemon/eg/duckproxyserver"
 	"github.com/egdaemon/eg/runners"
 	"github.com/gofrs/uuid/v5"
 	"github.com/gorilla/mux"
@@ -115,7 +115,7 @@ func TestAnalyticsHandler(t *testing.T) {
 		sctx, cancel := context.WithCancel(t.Context())
 		errc := make(chan error, 1)
 		go func() {
-			errc <- duckproxyserver.ListenUnix(sctx, filepath.Join(runtimedir, eg.SocketAnalytics), duckproxyserver.New(live))
+			errc <- duckserve.ListenUnix(sctx, filepath.Join(runtimedir, eg.SocketAnalytics), duckserve.New(live))
 		}()
 		defer func() {
 			cancel()

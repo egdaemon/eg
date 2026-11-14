@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 
 	_ "github.com/duckdb/duckdb-go/v2" // registers the duckdb driver.
+	"github.com/egdaemon/duckproxy/duckshare"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/goosex"
 	"github.com/egdaemon/eg/internal/userx"
@@ -59,14 +60,33 @@ func Open(ctx context.Context, path string) (*sql.DB, error) {
 }
 
 // OpenLocked is Open for a database shared by concurrent commands: the command that connects first owns the file and
-// serves it to the others, see sharedconnector. the database recovers if the owner closes its database or exits,
+// serves it to the others, see duckshare. the database recovers if the owner closes its database or exits,
 // the next connection takes the file over.
 func OpenLocked(ctx context.Context, path string) (*sql.DB, error) {
 	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
 		return nil, errorsx.Wrap(err, "unable to create the database directory")
 	}
 
-	return migrated(ctx, sql.OpenDB(newsharedconnector(path)))
+	// the lock file keeps its historical location, see duckshare.WithLockPath.
+	opts := []duckshare.Option{duckshare.WithLockPath(path + ".lock")}
+	// only the cli's own database is served with the postgres wire protocol, it has a single well known socket.
+	if path == Path(CLI) {
+		opts = append(opts, duckshare.WithPostgresSocket(PostgresSocket()))
+	}
+
+	connector := duckshare.New(userx.DefaultRuntimeDirectory(), path, opts...)
+
+	return migrated(ctx, sql.OpenDB(connector))
+}
+
+// PostgresSocketName the unix socket, libpq style, the cli's database is served on with the postgres wire
+// protocol by the process that owns it, i.e. psql -h <directory of PostgresSocket> -d eg
+const PostgresSocketName = ".s.PGSQL.5432"
+
+// PostgresSocket is the unix socket the cli's database is served on, within the runtime directory.
+// it only exists while a command using the database is running, see OpenLocked.
+func PostgresSocket() string {
+	return userx.DefaultRuntimeDirectory("eg", PostgresSocketName)
 }
 
 func migrated(ctx context.Context, db *sql.DB) (*sql.DB, error) {

@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/egdaemon/duckproxy/duckserve"
 	"github.com/egdaemon/eg/cmd/migrations"
-	"github.com/egdaemon/eg/duckproxyserver"
 	"github.com/egdaemon/eg/internal/lan"
 	"github.com/egdaemon/eg/internal/langx"
 	"github.com/egdaemon/eg/internal/sqltestx"
@@ -32,7 +32,7 @@ func TestOpenLAN(t *testing.T) {
 		ctx, done := context.WithCancel(t.Context())
 		defer done()
 		go func() {
-			_ = duckproxyserver.ListenUnix(ctx, filepath.Join(runtime, migrations.DatabaseSocketName), duckproxyserver.New(daemon))
+			_ = duckserve.ListenUnix(ctx, filepath.Join(runtime, migrations.DatabaseSocketName), duckserve.New(daemon))
 		}()
 
 		require.Eventually(t, func() bool {

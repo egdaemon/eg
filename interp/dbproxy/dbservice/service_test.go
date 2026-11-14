@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/egdaemon/eg/duckproxy"
+	"github.com/egdaemon/duckproxy/duckproxy"
 	"github.com/egdaemon/eg/interp/dbproxy"
 	"github.com/egdaemon/eg/interp/dbproxy/dbservice"
 	"github.com/stretchr/testify/require"

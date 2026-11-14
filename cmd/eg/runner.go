@@ -18,11 +18,11 @@ import (
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
+	"github.com/egdaemon/duckproxy/duckgres"
+	"github.com/egdaemon/duckproxy/duckserve"
 	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/cmd/cmdopts"
 	"github.com/egdaemon/eg/cmd/eg/daemons"
-	"github.com/egdaemon/eg/duckpgwire"
-	"github.com/egdaemon/eg/duckproxyserver"
 	"github.com/egdaemon/eg/internal/bytesx"
 	"github.com/egdaemon/eg/internal/debugx"
 	"github.com/egdaemon/eg/internal/envx"
@@ -368,10 +368,10 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 		}
 
 		recordDiscoveredWorkloads(gctx.Context, db, eg.DefaultModuleDirectory(t.Dir), os.Environ()...)
-		dpsrv := duckproxyserver.New(db, duckproxyserver.WithAcquireTimeout(time.Minute))
+		dpsrv := duckserve.New(db, duckserve.WithAcquireTimeout(time.Minute))
 		go func() {
 			dpspath := filepath.Join(t.RuntimeDir, eg.SocketAnalytics)
-			if err := duckproxyserver.ListenUnix(gctx.Context, dpspath, dpsrv); err != nil && gctx.Context.Err() == nil {
+			if err := duckserve.ListenUnix(gctx.Context, dpspath, dpsrv); err != nil && gctx.Context.Err() == nil {
 				log.Println("duckproxy:", err)
 			}
 		}()
@@ -383,10 +383,10 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 		}
 		defer pgdb.Close()
 
-		pgsrv := duckpgwire.New(pgdb, duckpgwire.WithAcquireTimeout(time.Minute))
+		pgsrv := duckgres.New(pgdb, duckgres.WithAcquireTimeout(time.Minute))
 		go func() {
 			pgpath := filepath.Join(t.RuntimeDir, eg.SocketAnalyticsPG)
-			if err := duckpgwire.ListenUnix(gctx.Context, pgpath, pgsrv); err != nil && gctx.Context.Err() == nil {
+			if err := duckgres.ListenUnix(gctx.Context, pgpath, pgsrv); err != nil && gctx.Context.Err() == nil {
 				log.Println("duckpgwire:", err)
 			}
 		}()

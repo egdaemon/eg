@@ -9,6 +9,7 @@ import (
 	"github.com/egdaemon/eg/authn"
 	"github.com/egdaemon/eg/cmd/cmdidentity"
 	"github.com/egdaemon/eg/cmd/cmdopts"
+	"github.com/egdaemon/eg/cmd/cmdtypography"
 	"github.com/egdaemon/eg/compute"
 	"github.com/egdaemon/eg/computeapi"
 	"github.com/egdaemon/eg/identity"
@@ -89,8 +90,8 @@ func renderWorkloads(items ...*computeapi.Enqueued) string {
 			fmt.Sprintf("%v", TypographyWorkloadPlatform(w)),
 			w.GetVcsUri(),
 			fmt.Sprintf("%.8v", w.GetVcsCommit()),
-			fmt.Sprintf("%v", TypographyTimestamp(w.GetCreatedAt())),
-			fmt.Sprintf("%v", TypographyTimestamp(w.GetInitiatedAt())),
+			fmt.Sprintf("%v", cmdtypography.TimestampRFC3339(w.GetCreatedAt()).Layout(time.DateTime).Zero("").Infinity("", "")),
+			fmt.Sprintf("%v", cmdtypography.TimestampRFC3339(w.GetInitiatedAt()).Layout(time.DateTime).Zero("").Infinity("", "")),
 		})
 	}
 

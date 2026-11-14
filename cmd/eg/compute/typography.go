@@ -204,28 +204,6 @@ func TypographyWorkloadState(w *computeapi.Enqueued) fmt.Formatter {
 	return workloadState{w: w}
 }
 
-type timestamp struct {
-	v string
-}
-
-func (t timestamp) Format(f fmt.State, verb rune) {
-	v := t.v
-	if ts, ok := parsets(v); ok {
-		v = ts.Local().Format(time.DateTime)
-	} else if _, err := time.Parse(time.RFC3339Nano, v); err == nil {
-		// infinity, the timestamp isn't set.
-		v = ""
-	}
-
-	// width, precision and flags are applied to the whole value.
-	_, _ = fmt.Fprintf(f, fmt.FormatString(f, 's'), v)
-}
-
-// TypographyTimestamp formats an RFC3339 timestamp in local time, an empty or unparsable value is printed as is.
-func TypographyTimestamp(v string) fmt.Formatter {
-	return timestamp{v: v}
-}
-
 type historyCompact struct {
 	h *compute.History
 }

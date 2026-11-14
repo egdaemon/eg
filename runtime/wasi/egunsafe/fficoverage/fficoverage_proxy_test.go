@@ -10,8 +10,8 @@ import (
 	"time"
 
 	_ "github.com/duckdb/duckdb-go/v2"
-	"github.com/egdaemon/eg/duckproxy"
-	"github.com/egdaemon/eg/duckproxyserver"
+	"github.com/egdaemon/duckproxy/duckproxy"
+	"github.com/egdaemon/duckproxy/duckserve"
 	"github.com/egdaemon/eg/internal/coverage"
 	"github.com/egdaemon/eg/interp/events"
 	"github.com/stretchr/testify/require"
@@ -34,7 +34,7 @@ func TestReportThroughProxy(t *testing.T) {
 	sctx, stop := context.WithCancel(context.Background())
 	served := make(chan error, 1)
 	go func() {
-		served <- duckproxyserver.ListenUnix(sctx, socketPath, duckproxyserver.New(db))
+		served <- duckserve.ListenUnix(sctx, socketPath, duckserve.New(db))
 	}()
 	t.Cleanup(func() {
 		stop()

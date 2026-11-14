@@ -247,6 +247,8 @@ github.com/dustin/go-humanize v1.1.0 h1:dbKTrvD0klcbBV/h4AWJdMuZogJACoMlvWIWZ5b2
 github.com/dustin/go-humanize v1.1.0/go.mod h1:hc1CvRkJMsgxqjmjMQF3QNRAZBwY8AXBAzKYoSX9sFI=
 github.com/ebitengine/purego v0.10.0 h1:QIw4xfpWT6GWTzaW5XEKy3HXoqrJGx1ijYHzTF0/ISU=
 github.com/ebitengine/purego v0.10.0/go.mod h1:iIjxzd6CiRiOG0UyXP+V1+jWqUXVjPKLAI0mRfJZTmQ=
+github.com/egdaemon/duckproxy v0.0.0-20261114115105-8cd7c751218f h1:JKgH95MPa4Q1c/O6PMl0rgojVwBClYHOuPNyJAzAkJA=
+github.com/egdaemon/duckproxy v0.0.0-20261114115105-8cd7c751218f/go.mod h1:LvAlbnY/z3glFhk1nQM8YEw4E8xqSzHu3zARGfQQMHQ=
 github.com/egdaemon/gdx v0.0.0-20261106002238-59fe7b8df603 h1:PX/Ow5iCDRXk8Gp5xvCjPYBc0BomzJqvpOt9FQ1FslQ=
 github.com/egdaemon/gdx v0.0.0-20261106002238-59fe7b8df603/go.mod h1:zXd9WfJPRaoir/hXAwJcf6AhbNB0r3vqIFqhZdMswFg=
 github.com/egdaemon/gdx/konggdx v0.0.0-20261106002238-59fe7b8df603 h1:haFyPbgVBMhSiI55oeDqnZ0c6GZ4lrqqec4ZRXFMQEY=
@@ -378,6 +380,7 @@ github.com/hashicorp/go-multierror v1.1.1/go.mod h1:iw975J/qwKPdAO1clOe2L8331t/9
 github.com/hashicorp/golang-lru v1.0.2 h1:dV3g9Z/unq5DpblPpw+Oqcv4dU/1omnb4Ok8iPY6p1c=
 github.com/hashicorp/golang-lru v1.0.2/go.mod h1:iADmTwqILo4mZ8BN3D2Q6+9jd8WM5uGBxy+E8yxSoD4=
 github.com/hashicorp/golang-lru/v2 v2.0.7 h1:a+bsQ5rvGLjzHuww6tVxozPZFVghXaHOwFs4luLUK2k=
+github.com/hashicorp/golang-lru/v2 v2.0.7/go.mod h1:QeFd9opnmA6QUJc5vARoKUSoFhyfM2/ZepoAG6RGpeM=
 github.com/hexops/gotextdiff v1.0.3 h1:gitA9+qJrrTCsiCl7+kh75nPqQt1cx4ZkudSTLoUqJM=
 github.com/hexops/gotextdiff v1.0.3/go.mod h1:pSWU5MAI3yDq+fZBTazCSJysOMbxWL1BSow5/V2vxeg=
 github.com/huin/goupnp v1.3.0 h1:UvLUlWDNpoUdYzb2TCn+MuTWtcjXKSza2n6CBdQ0xXc=

@@ -43,7 +43,7 @@ type local struct {
 	Dir              string   `name:"directory" help:"root directory of the repository" default:"${vars_eg_root_directory}"`
 	ModuleDir        string   `name:"moduledir" help:"must be a subdirectory in the provided directory" default:"${vars_workload_directory}" hidden:"true"`
 	Debug            bool     `name:"debug" help:"keep workspace around to debug issues, requires manual cleanup"`
-	AutoPatch        bool     `name:"auto-patch" help:"apply the changes a workload made to its working directory to the current worktree once it completes, when disabled the changes are printed as a patch instead (dry run)" default:"true" negatable:""`
+	AutoPatch        bool     `name:"auto-patch" help:"commit the changes a workload made to its working directory to a new eg/ branch of the current repository once it completes, when disabled the changes are printed as a patch instead (dry run)" default:"true" negatable:""`
 	Privileged       bool     `name:"privileged" help:"run the initial container in privileged mode"`
 	Cgroups          bool     `name:"cgroups" help:"enable/disable cgroups for the module container" hidden:"true" negatable:"" default:"true"`
 	Dirty            bool     `name:"dirty" help:"include user directories and environment variables" hidden:"true"`
@@ -185,7 +185,7 @@ func (t local) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, hotswapbin *cm
 		}
 	}
 
-	return t.patch(gctx.Context, ws)
+	return gitx.AutoPatch(os.Stdout).DryRun(!t.AutoPatch).From(ws.WorkingDir).To(t.Dir).Branch(fmt.Sprintf("eg/%s-%s", t.Name, uid)).Apply(gctx.Context)
 }
 
 // container runs modules in containers of the root container built from the repository's
@@ -342,20 +342,4 @@ func (t local) machine(c *http.Client, uri string) runners.BFn {
 			runners.MachineOptionLocalGPGAgent(ctx, envb),
 		)
 	}
-}
-
-// patch applies the changes the workload made to its working directory to the worktree, or prints
-// them when auto patching is disabled.
-func (t local) patch(ctx context.Context, ws workspaces.Context) error {
-	patch, err := gitx.Changes(ctx, ws.WorkingDir, t.Dir)
-	if err != nil {
-		return err
-	}
-
-	if !t.AutoPatch {
-		_, err = os.Stdout.Write(patch)
-		return err
-	}
-
-	return gitx.ApplyPatch(ctx, t.Dir, patch)
 }

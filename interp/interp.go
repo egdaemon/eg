@@ -28,7 +28,6 @@ import (
 	"github.com/egdaemon/eg/interp/c8s"
 	"github.com/egdaemon/eg/interp/runtime/wasi/ffiegcontainer"
 	"github.com/egdaemon/eg/interp/runtime/wasi/ffiegenv"
-	"github.com/egdaemon/eg/interp/runtime/wasi/ffiegvm"
 	"github.com/egdaemon/eg/interp/runtime/wasi/ffiexec"
 	"github.com/egdaemon/eg/interp/runtime/wasi/ffigit"
 	"github.com/egdaemon/eg/interp/runtime/wasi/ffigraph"
@@ -44,7 +43,6 @@ import (
 	"github.com/tetratelabs/wazero/experimental/sysfs"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 )
 
 type Option func(*runner)
@@ -160,19 +158,6 @@ func Remote(ctx context.Context, wshost workspaces.Context, aid string, runid st
 			}
 			return nil
 		})).Export("github.com/egdaemon/eg/runtime/wasi/runtime/ffiegcontainer.Run").
-			NewFunctionBuilder().WithFunc(ffiegvm.Run(func(ctx context.Context, uri string, modulepath string, environ ...string) (err error) {
-			var (
-				cc *grpc.ClientConn
-			)
-
-			if cc, err = grpc.NewClient(fmt.Sprintf("unix://%s", eg.MachineSocket), grpc.WithTransportCredentials(insecure.NewCredentials())); err != nil {
-				return err
-			}
-			defer cc.Close()
-
-			_, err = c8s.NewProxyClient(cc).Module(ctx, &c8s.ModuleRequest{Image: uri, Module: modulepath, Options: environ})
-			return errorsx.Wrap(err, "unable to run the module in a machine, which only a module running in a machine can boot")
-		})).Export("github.com/egdaemon/eg/runtime/wasi/runtime/ffiegvm.Run").
 			NewFunctionBuilder().WithFunc(ffiexec.Exec(func(cmd *exec.Cmd) *exec.Cmd {
 			if !filepath.IsAbs(cmd.Dir) {
 				cmd.Dir = filepath.Join(wshost.WorkingDir, cmd.Dir)

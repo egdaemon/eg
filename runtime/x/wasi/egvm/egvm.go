@@ -13,8 +13,11 @@ import (
 
 	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/internal/envx"
+	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/langx"
-	"github.com/egdaemon/eg/runtime/wasi/egunsafe/ffiegvm"
+	"github.com/egdaemon/eg/interp/c8s"
+	"github.com/egdaemon/eg/runtime/wasi/egunsafe"
+	"google.golang.org/grpc"
 )
 
 // VM is the machine implementation of the virtualization layer (eg.C and eg.V).
@@ -46,9 +49,19 @@ func (t VM) CompileWith(ctx context.Context) error {
 }
 
 // RunWith runs the module at mpath in the machine.
-func (t VM) RunWith(ctx context.Context, mpath string) error {
-	level := fmt.Sprintf("%s=%d", eg.EnvComputeModuleNestedLevel, envx.Int(-1, eg.EnvComputeModuleNestedLevel)+1)
-	return ffiegvm.Run(ctx, t.uri, mpath, level)
+func (t VM) RunWith(ctx context.Context, mpath string) (err error) {
+	var (
+		cc    *grpc.ClientConn
+		level = fmt.Sprintf("%s=%d", eg.EnvComputeModuleNestedLevel, envx.Int(-1, eg.EnvComputeModuleNestedLevel)+1)
+	)
+
+	if cc, err = egunsafe.DialMachineSocket(ctx); err != nil {
+		return err
+	}
+	defer cc.Close()
+
+	_, err = c8s.NewProxyClient(cc).Module(ctx, &c8s.ModuleRequest{Image: t.uri, Module: mpath, Options: []string{level}})
+	return errorsx.Wrap(err, "unable to run the module in a machine, which only a module running in a machine can boot")
 }
 
 // internal use.

@@ -160,7 +160,7 @@ func initRepo(t *testing.T, dir string, committed map[string]string) {
 		require.NoErrorf(t, err, "git %v: %s", args, out)
 	}
 
-	run("init", "-q")
+	run("init", "-q", "-b", "main")
 	run("config", "user.email", "test@example.com")
 	run("config", "user.name", "test")
 	run("remote", "add", "origin", "https://example.com/dummy/repo.git")

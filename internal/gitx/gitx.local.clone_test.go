@@ -54,7 +54,7 @@ func TestLocalClone(t *testing.T) {
 			require.NoErrorf(t, err, "git %v: %s", args, out)
 		}
 
-		run("init", "-q")
+		run("init", "-q", "-b", "main")
 		run("config", "user.email", "test@example.com")
 		run("config", "user.name", "test")
 		require.NoError(t, os.WriteFile(filepath.Join(repo, "main.go"), []byte("package main"), 0644))

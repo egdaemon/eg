@@ -39,4 +39,32 @@ func TestShutdown(t *testing.T) {
 
 		require.ErrorIs(t, asynccompute.Shutdown(ctx, pool), context.DeadlineExceeded)
 	})
+
+	t.Run("shuts the pools down in the order given", func(t *testing.T) {
+		var printed []int
+		printing := asynccompute.New(func(ctx context.Context, n int) error {
+			printed = append(printed, n)
+			return nil
+		}, asynccompute.Workers[int](1))
+		detecting := asynccompute.New(func(ctx context.Context, root string) error {
+			return printing.Run(ctx, len(root))
+		}, asynccompute.Workers[string](2))
+
+		require.NoError(t, detecting.Run(t.Context(), "a"))
+		require.NoError(t, detecting.Run(t.Context(), "bb"))
+		require.NoError(t, asynccompute.Shutdown(t.Context(), detecting, printing))
+		require.ElementsMatch(t, []int{1, 2}, printed)
+	})
+
+	t.Run("a failing pool does not stop the others from being shut down", func(t *testing.T) {
+		cause := errors.New("boom")
+		failing := asynccompute.New(func(ctx context.Context, n int) error { return cause })
+		ran := make(chan int, 1)
+		other := asynccompute.New(func(ctx context.Context, n int) error { ran <- n; return nil })
+
+		require.NoError(t, failing.Run(t.Context(), 1))
+		require.NoError(t, other.Run(t.Context(), 2))
+		require.ErrorIs(t, asynccompute.Shutdown(t.Context(), failing, other), cause)
+		require.Len(t, ran, 1)
+	})
 }

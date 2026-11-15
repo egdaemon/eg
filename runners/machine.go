@@ -109,7 +109,7 @@ func MachineOptionNoop(*machineconfig) {}
 // upper kept in the workspace, and returns once its systemd finished booting.
 func NewMachine(ctx context.Context, c *http.Client, ws workspaces.Context, uri string, console io.Writer, options ...MachineOption) (_ *Machine, err error) {
 	var (
-		t        = &Machine{ws: ws}
+		t        = &Machine{ws: ws, siblings: grpc.NewServer(grpc.Creds(insecure.NewCredentials()))} // this is a local socket
 		config   = langx.Clone(machineconfig{}, options...)
 		upperdir string
 		copied   string
@@ -162,9 +162,6 @@ func NewMachine(ctx context.Context, c *http.Client, ws workspaces.Context, uri 
 	if siblings, err = net.Listen("unix", filepath.Join(t.dir, "machine.socket")); err != nil {
 		return nil, errorsx.Wrap(err, "unable to listen for the machine's modules")
 	}
-	t.siblings = grpc.NewServer(
-		grpc.Creds(insecure.NewCredentials()), // this is a local socket
-	)
 	machines{c: c, ws: ws, uri: uri, console: console, options: options}.Bind(t.siblings)
 	go func() {
 		errorsx.Log(errorsx.Wrap(t.siblings.Serve(siblings), "unable to serve the machine's modules"))
@@ -387,9 +384,7 @@ func (t machines) Module(ctx context.Context, req *c8s.ModuleRequest) (_ *c8s.Mo
 // Close shuts the machine down and releases its egiso.
 func (t *Machine) Close() error {
 	var errs []error
-	if t.siblings != nil {
-		t.siblings.GracefulStop()
-	}
+	t.siblings.GracefulStop()
 	if t.vm != nil {
 		errs = append(errs, t.vm.Close())
 	}

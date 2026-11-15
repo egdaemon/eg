@@ -2,6 +2,8 @@ package compile
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -272,6 +274,28 @@ func FromTranspiled(ctx context.Context, ws workspaces.Context, m ...transpile.C
 	}
 
 	return modules, errorsx.Wrap(err, "compilation failed")
+}
+
+// OneFromTranspiled is FromTranspiled for callers that run exactly one module, it is an error
+// for there to be none or more than one.
+func OneFromTranspiled(ctx context.Context, ws workspaces.Context, m ...transpile.Compiled) (zero transpile.Compiled, err error) {
+	modules, err := FromTranspiled(ctx, ws, m...)
+	if err != nil {
+		return zero, err
+	}
+
+	switch len(modules) {
+	case 0:
+		return zero, errors.New("no usable modules detected")
+	case 1:
+		return modules[0], nil
+	default:
+		paths := make([]string, 0, len(modules))
+		for _, m := range modules {
+			paths = append(paths, m.Path)
+		}
+		return zero, fmt.Errorf("expected exactly one module, found %d: %s", len(modules), strings.Join(paths, ", "))
+	}
 }
 
 func Run(ctx context.Context, dir, module string, output string) (err error) {

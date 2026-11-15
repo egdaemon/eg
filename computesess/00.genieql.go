@@ -22,7 +22,7 @@ func SessionUpsert(
 	pattern func(ctx context.Context, q sqlx.Queryer, s Session) NewSessionScannerStaticRow,
 ) {
 	gql.Into("serve_sessions").Default("started_at", "stopped_at").Conflict(
-		"ON CONFLICT (id) DO UPDATE SET module = EXCLUDED.module, directory = EXCLUDED.directory, pid = EXCLUDED.pid, ssh_requested = EXCLUDED.ssh_requested, ssh_port = EXCLUDED.ssh_port, ssh_user = EXCLUDED.ssh_user, ssh_key_path = EXCLUDED.ssh_key_path, started_at = CASE WHEN serve_sessions.stopped_at IS NULL THEN serve_sessions.started_at ELSE now() END, stopped_at = NULL",
+		"ON CONFLICT (id) DO UPDATE SET module = EXCLUDED.module, directory = EXCLUDED.directory, pid = EXCLUDED.pid, ssh_requested = EXCLUDED.ssh_requested, ssh_port = EXCLUDED.ssh_port, ssh_user = EXCLUDED.ssh_user, ssh_key_path = EXCLUDED.ssh_key_path, cap_ssh = EXCLUDED.cap_ssh, cap_agent = EXCLUDED.cap_agent, cap_patch = EXCLUDED.cap_patch, branch = COALESCE(NULLIF(EXCLUDED.branch, ''), serve_sessions.branch), started_at = CASE WHEN serve_sessions.stopped_at IS NULL THEN serve_sessions.started_at ELSE now() END, stopped_at = NULL",
 	)
 }
 

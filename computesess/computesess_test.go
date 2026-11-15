@@ -41,6 +41,26 @@ func TestServeSessions(t *testing.T) {
 		require.Equal(t, "m", sessions[0].Module)
 	})
 
+	t.Run("records the capabilities", func(t *testing.T) {
+		db := sqltestx.DuckDB(t)
+		require.NoError(t, migrations.Migrate(t.Context(), db))
+
+		require.NoError(t, computesess.Register(t.Context(), db, computesess.Session{ID: "served", CapSSH: true, CapAgent: true, CapPatch: true}))
+		require.NoError(t, computesess.Register(t.Context(), db, computesess.Session{ID: "local", SSHRequested: -1, CapPatch: true}))
+
+		served, err := computesess.Lookup(t.Context(), db, "served")
+		require.NoError(t, err)
+		require.True(t, served.CapSSH)
+		require.True(t, served.CapAgent)
+		require.True(t, served.CapPatch)
+
+		local, err := computesess.Lookup(t.Context(), db, "local")
+		require.NoError(t, err)
+		require.False(t, local.CapSSH)
+		require.False(t, local.CapAgent)
+		require.True(t, local.CapPatch)
+	})
+
 	t.Run("list orders running first", func(t *testing.T) {
 		db := sqltestx.DuckDB(t)
 		require.NoError(t, migrations.Migrate(t.Context(), db))
@@ -156,5 +176,38 @@ func TestServeSessions(t *testing.T) {
 
 		_, err = computesess.Lookup(t.Context(), db, "s000")
 		require.ErrorIs(t, err, sql.ErrNoRows, "the oldest stopped sessions are forgotten")
+	})
+}
+
+func TestServeSessionBranch(t *testing.T) {
+	t.Run("is recorded, kept when registered without one and replaced when registered with another", func(t *testing.T) {
+		db := sqltestx.DuckDB(t)
+		require.NoError(t, migrations.Migrate(t.Context(), db))
+
+		require.NoError(t, computesess.Register(t.Context(), db, computesess.Session{ID: "a", Branch: "eg/first"}))
+		found, err := computesess.Lookup(t.Context(), db, "a")
+		require.NoError(t, err)
+		require.Equal(t, "eg/first", found.Branch)
+
+		require.NoError(t, computesess.Stop(t.Context(), db, "a"))
+		require.NoError(t, computesess.Register(t.Context(), db, computesess.Session{ID: "a"}))
+		found, err = computesess.Lookup(t.Context(), db, "a")
+		require.NoError(t, err)
+		require.Equal(t, "eg/first", found.Branch, "resuming without a branch keeps the saved one")
+
+		require.NoError(t, computesess.Register(t.Context(), db, computesess.Session{ID: "a", Branch: "eg/second"}))
+		found, err = computesess.Lookup(t.Context(), db, "a")
+		require.NoError(t, err)
+		require.Equal(t, "eg/second", found.Branch)
+	})
+
+	t.Run("is blank when none was chosen", func(t *testing.T) {
+		db := sqltestx.DuckDB(t)
+		require.NoError(t, migrations.Migrate(t.Context(), db))
+
+		require.NoError(t, computesess.Register(t.Context(), db, computesess.Session{ID: "a"}))
+		found, err := computesess.Lookup(t.Context(), db, "a")
+		require.NoError(t, err)
+		require.Empty(t, found.Branch)
 	})
 }

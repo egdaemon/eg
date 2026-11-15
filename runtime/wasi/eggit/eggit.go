@@ -83,6 +83,8 @@ type commit struct {
 // {git.commit.day}         -> day of the commit, in UTC.
 // {git.commit.seconds}     -> seconds into the day of the commit, in UTC (0 to 86399). with the year, month and day
 // it orders commits and, unlike unix, never passes 2147483647.
+// {git.commit.seconds.short} -> seconds, zero padded to 5 digits (00000 to 86399). the fixed width allows following the
+// day with it, e.g.) {git.commit.day}{git.commit.seconds.short} is a number that sorts by commit time.
 // {git.commit.unix}        -> Unix of the commit.
 // {git.commit.unix.milli}  -> UnixMilli of the commit.
 // {git.commit.unix.micro}  -> UnixMicro of the commit.
@@ -102,7 +104,9 @@ func (c commit) StringReplace(pattern string) string {
 	s = strings.ReplaceAll(s, "{git.commit.month}", strconv.Itoa(int(cwhen.Month())))
 	s = strings.ReplaceAll(s, "%git.commit.day%", strconv.Itoa(cwhen.Day()))
 	s = strings.ReplaceAll(s, "{git.commit.day}", strconv.Itoa(cwhen.Day()))
-	s = strings.ReplaceAll(s, "{git.commit.seconds}", strconv.Itoa(cwhen.Hour()*3600+cwhen.Minute()*60+cwhen.Second()))
+	daysecs := cwhen.Hour()*3600 + cwhen.Minute()*60 + cwhen.Second()
+	s = strings.ReplaceAll(s, "{git.commit.seconds}", strconv.Itoa(daysecs))
+	s = strings.ReplaceAll(s, "{git.commit.seconds.short}", fmt.Sprintf("%05d", daysecs))
 	s = strings.ReplaceAll(s, "%git.commit.unix%", strconv.Itoa(int(cwhen.Unix())))
 	s = strings.ReplaceAll(s, "{git.commit.unix}", strconv.Itoa(int(cwhen.Unix())))
 	s = strings.ReplaceAll(s, "%git.commit.unix.milli%", strconv.Itoa(int(cwhen.UnixMilli())))
@@ -133,6 +137,7 @@ func PatternClean(pattern string) string {
 	s = strings.ReplaceAll(s, "%git.commit.day%", "")
 	s = strings.ReplaceAll(s, "{git.commit.day}", "")
 	s = strings.ReplaceAll(s, "{git.commit.seconds}", "")
+	s = strings.ReplaceAll(s, "{git.commit.seconds.short}", "")
 	s = strings.ReplaceAll(s, "%git.commit.unix%", "")
 	s = strings.ReplaceAll(s, "{git.commit.unix}", "")
 	s = strings.ReplaceAll(s, "%git.commit.unix.milli%", "")

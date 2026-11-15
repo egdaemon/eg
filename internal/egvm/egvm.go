@@ -15,12 +15,14 @@ import (
 	"io"
 	"net/netip"
 	"runtime"
+	"slices"
 	"strings"
 
 	"github.com/egdaemon/eg/internal/egiso"
 	"github.com/egdaemon/eg/internal/langx"
 	"github.com/egdaemon/eg/internal/userx"
 	"github.com/egdaemon/wasinet/wasinet/wnetruntime"
+	"github.com/moby/sys/mountinfo"
 )
 
 // resolvlink is the tmpfiles.extra credential pointing resolv.conf at resolved, replacing the empty
@@ -139,6 +141,16 @@ func OptionMountReadOnly(dir string, path string) Option {
 // machine's virtio-fs already writes as the host user.
 func OptionMountOwned(dir string, path string) Option {
 	return optionMount(mount{dir: dir, path: path, owned: true})
+}
+
+// Owned reports whether dir is a directory OptionMountOwned mounted in a Linux machine: a FUSE mount
+// without default_permissions, whose server checks writes as the host user, so the kernel checks none.
+func Owned(dir string) bool {
+	mounts, err := mountinfo.GetMounts(mountinfo.SingleEntryFilter(dir))
+	if err != nil || len(mounts) == 0 {
+		return false
+	}
+	return mounts[0].FSType == "fuse" && !slices.Contains(strings.Split(mounts[0].VFSOptions, ","), "default_permissions")
 }
 
 // OptionMountVolume mounts a filesystem of the machine's own at path, kept in the host directory dir

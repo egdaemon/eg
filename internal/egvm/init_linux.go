@@ -12,6 +12,7 @@ import (
 	"syscall"
 
 	"github.com/egdaemon/eg/internal/errorsx"
+	"go.podman.io/common/pkg/cgroups"
 	"golang.org/x/sys/unix"
 )
 
@@ -215,50 +216,41 @@ func boot(root string, rootinit string, netns string, authorized string, ruleset
 // hand its children controllers, so the machine's systemd could hand its own none.
 func delegate() (_ *os.File, err error) {
 	var (
-		self        []byte
-		controllers []byte
 		scope       string
+		payload     string
+		controllers string
+		limit       string
 	)
 
-	if self, err = os.ReadFile("/proc/self/cgroup"); err != nil {
+	if scope, err = cgroups.GetOwnCgroup(); err != nil {
 		return nil, err
 	}
-	scope = filepath.Join("/sys/fs/cgroup", strings.TrimPrefix(strings.TrimSpace(string(self)), "0::"))
-	for _, child := range []string{"supervisor", "payload"} {
-		if err = os.Mkdir(filepath.Join(scope, child), 0755); err != nil {
+	scope = filepath.Join("/sys/fs/cgroup", scope)
+	payload = filepath.Join(scope, "payload")
+	if err = cgroups.MoveUnderCgroupSubtree("supervisor"); err != nil {
+		return nil, err
+	}
+	if controllers, err = cgroups.ReadFile(scope, "cgroup.controllers"); err != nil {
+		return nil, err
+	}
+	for _, c := range strings.Fields(controllers) {
+		if err = cgroups.WriteFile(scope, "cgroup.subtree_control", "+"+c); err != nil {
 			return nil, err
 		}
 	}
-	if err = os.WriteFile(filepath.Join(scope, "supervisor", "cgroup.procs"), []byte("0"), 0); err != nil {
+	if err = os.Mkdir(payload, 0755); err != nil {
 		return nil, err
-	}
-	if controllers, err = os.ReadFile(filepath.Join(scope, "cgroup.controllers")); err != nil {
-		return nil, err
-	}
-	for _, c := range strings.Fields(string(controllers)) {
-		if err = os.WriteFile(filepath.Join(scope, "cgroup.subtree_control"), []byte("+"+c), 0); err != nil {
-			return nil, err
-		}
 	}
 	// the machine sees only its own cgroup, so the payload repeats the scope's limits for it to read.
-	for _, limit := range []string{"cpu.max", "memory.max"} {
-		if err = copylimit(filepath.Join(scope, limit), filepath.Join(scope, "payload", limit)); err != nil {
+	for _, file := range []string{"cpu.max", "memory.max"} {
+		if limit, err = cgroups.ReadFile(scope, file); err != nil {
+			return nil, err
+		}
+		if err = cgroups.WriteFile(payload, file, limit); err != nil {
 			return nil, err
 		}
 	}
-	return os.Open(filepath.Join(scope, "payload"))
-}
-
-// copylimit writes the cgroup limit file from holds to the limit file to.
-func copylimit(from string, to string) (err error) {
-	var (
-		limit []byte
-	)
-
-	if limit, err = os.ReadFile(from); err != nil {
-		return err
-	}
-	return os.WriteFile(to, limit, 0)
+	return os.Open(payload)
 }
 
 // start execs rootinit in root once pasta connects the machine's network, after mounting the

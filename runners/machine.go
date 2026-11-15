@@ -150,14 +150,17 @@ func NewMachine(ctx context.Context, c *http.Client, ws workspaces.Context, uri 
 		config.vm = append(config.vm, egvm.OptionMountReadWrite(copied, o.path))
 	}
 
+	// a socket's path must fit the kernel's 108 bytes, which one in the workspace may not.
 	if t.dir, err = os.MkdirTemp("", "egmachine.*"); err != nil {
 		return nil, errorsx.Wrap(err, "unable to create the machine's directory")
 	}
 	if siblings, err = net.Listen("unix", filepath.Join(t.dir, "machine.socket")); err != nil {
 		return nil, errorsx.Wrap(err, "unable to listen for the machine's modules")
 	}
-	t.siblings = grpc.NewServer(grpc.Creds(insecure.NewCredentials()))
-	c8s.RegisterProxyServer(t.siblings, machines{c: c, ws: ws, uri: uri, console: console, options: options})
+	t.siblings = grpc.NewServer(
+		grpc.Creds(insecure.NewCredentials()), // this is a local socket
+	)
+	machines{c: c, ws: ws, uri: uri, console: console, options: options}.Bind(t.siblings)
 	go func() {
 		errorsx.Log(errorsx.Wrap(t.siblings.Serve(siblings), "unable to serve the machine's modules"))
 	}()
@@ -355,6 +358,10 @@ type machines struct {
 	options []MachineOption
 }
 
+func (t machines) Bind(host grpc.ServiceRegistrar) {
+	c8s.RegisterProxyServer(host, t)
+}
+
 // Module implements c8s.ProxyServer.
 func (t machines) Module(ctx context.Context, req *c8s.ModuleRequest) (_ *c8s.ModuleResponse, err error) {
 	var (
@@ -376,7 +383,7 @@ func (t machines) Module(ctx context.Context, req *c8s.ModuleRequest) (_ *c8s.Mo
 func (t *Machine) Close() error {
 	var errs []error
 	if t.siblings != nil {
-		t.siblings.Stop()
+		t.siblings.GracefulStop()
 	}
 	if t.vm != nil {
 		errs = append(errs, t.vm.Close())

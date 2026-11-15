@@ -31,7 +31,6 @@ import (
 func ServeFUSE(dev *os.File, fsys *SysFS, options ...NFSOption) error {
 	var (
 		served   = nfsfs{sys: fsys}
-		root     *fusenode
 		server   *fuse.Server
 		fd       int
 		err      error
@@ -55,8 +54,7 @@ func ServeFUSE(dev *os.File, fsys *SysFS, options ...NFSOption) error {
 	if fd, err = unix.FcntlInt(dev.Fd(), unix.F_DUPFD_CLOEXEC, 0); err != nil {
 		return errorsx.Wrap(err, "unable to duplicate the mount's descriptor")
 	}
-	root = &fusenode{fsys: served}
-	if server, err = fuse.NewServer(gofs.NewNodeFS(root, &gofs.Options{EntryTimeout: &entry, AttrTimeout: &attr, NegativeTimeout: &negative}), fmt.Sprintf("/dev/fd/%d", fd), &fuse.MountOptions{DisableXAttrs: true}); err != nil {
+	if server, err = fuse.NewServer(gofs.NewNodeFS(&fusenode{fsys: served}, &gofs.Options{EntryTimeout: &entry, AttrTimeout: &attr, NegativeTimeout: &negative}), fmt.Sprintf("/dev/fd/%d", fd), &fuse.MountOptions{DisableXAttrs: true}); err != nil {
 		return errorsx.Compact(errorsx.Wrap(err, "unable to serve the mount"), unix.Close(fd))
 	}
 	server.Serve()
@@ -127,9 +125,13 @@ func (t *fusenode) attr(ctx context.Context, name string, info fs.FileInfo, out 
 }
 
 func (t *fusenode) Getattr(ctx context.Context, f gofs.FileHandle, out *fuse.AttrOut) syscall.Errno {
-	name := t.name()
-	info, err := t.fsys.Lstat(name)
-	if err != nil {
+	var (
+		name = t.name()
+		info fs.FileInfo
+		err  error
+	)
+
+	if info, err = t.fsys.Lstat(name); err != nil {
 		return errnoofuse(err)
 	}
 	t.attr(ctx, name, info, &out.Attr)
@@ -269,13 +271,13 @@ func (t *fusenode) Create(ctx context.Context, name string, flags uint32, mode u
 		created = t.child(name)
 		node    *gofs.Inode
 		f       billy.File
+		err     error
 	)
 
-	err := t.overriding(ctx, t.name(), func() (err error) {
+	if err = t.overriding(ctx, t.name(), func() (err error) {
 		f, err = t.fsys.OpenFile(created, int(flags)&(os.O_WRONLY|os.O_RDWR|os.O_APPEND|os.O_TRUNC|os.O_EXCL)|os.O_CREATE, fs.FileMode(mode&07777))
 		return err
-	})
-	if err != nil {
+	}); err != nil {
 		return nil, nil, 0, errnoofuse(err)
 	}
 	errno := t.owned(ctx, created)

@@ -121,6 +121,11 @@ func TestExec(t *testing.T) {
 		require.Equal(t, egvm.Container+"\n", stdout)
 	})
 
+	t.Run("lets its systemd hand its controllers down, as podman's containers need", func(t *testing.T) {
+		code, _, stderr := run(t, t.Context(), nil, "sh", "-c", "grep -qw pids /sys/fs/cgroup/cgroup.subtree_control || echo +pids > /sys/fs/cgroup/cgroup.subtree_control")
+		require.Equal(t, int32(0), code, stderr)
+	})
+
 	t.Run("limits the machine to its cpus and memory", func(t *testing.T) {
 		code, stdout, stderr := run(t, t.Context(), nil, "cat", "/sys/fs/cgroup/cpu.max", "/sys/fs/cgroup/memory.max")
 		require.Equal(t, int32(0), code, stderr)

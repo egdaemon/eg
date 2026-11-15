@@ -93,6 +93,7 @@ func boot(root string, rootinit string, netns string, authorized string, ruleset
 	var (
 		machine   *exec.Cmd
 		networked [2]*os.File
+		payload   *os.File
 		stop      = make(chan os.Signal, 1)
 		stopping  = make(chan struct{})
 	)
@@ -141,6 +142,11 @@ func boot(root string, rootinit string, netns string, authorized string, ruleset
 		}
 	}
 
+	if payload, err = delegate(); err != nil {
+		return fmt.Errorf("unable to hand the machine its cgroup: %w", err)
+	}
+	defer payload.Close()
+
 	if networked[0], networked[1], err = os.Pipe(); err != nil {
 		return err
 	}
@@ -154,8 +160,10 @@ func boot(root string, rootinit string, netns string, authorized string, ruleset
 		Stderr:     os.Stderr,
 		ExtraFiles: []*os.File{networked[0]},
 		SysProcAttr: &syscall.SysProcAttr{
-			Cloneflags: syscall.CLONE_NEWNS | syscall.CLONE_NEWPID | syscall.CLONE_NEWNET | syscall.CLONE_NEWUTS | syscall.CLONE_NEWIPC | syscall.CLONE_NEWCGROUP,
-			Pdeathsig:  syscall.SIGKILL,
+			Cloneflags:  syscall.CLONE_NEWNS | syscall.CLONE_NEWPID | syscall.CLONE_NEWNET | syscall.CLONE_NEWUTS | syscall.CLONE_NEWIPC | syscall.CLONE_NEWCGROUP,
+			Pdeathsig:   syscall.SIGKILL,
+			UseCgroupFD: true,
+			CgroupFD:    int(payload.Fd()),
 		},
 	}
 	err = machine.Start()
@@ -199,6 +207,58 @@ func boot(root string, rootinit string, netns string, authorized string, ruleset
 	default:
 		return err
 	}
+}
+
+// delegate moves this process from the machine's scope into the scope's supervisor cgroup, hands the
+// scope's controllers to its children, and opens the payload cgroup for the machine's init to start
+// in, as systemd-nspawn keeps itself apart from its container. A cgroup holding processes can not
+// hand its children controllers, so the machine's systemd could hand its own none.
+func delegate() (_ *os.File, err error) {
+	var (
+		self        []byte
+		controllers []byte
+		scope       string
+	)
+
+	if self, err = os.ReadFile("/proc/self/cgroup"); err != nil {
+		return nil, err
+	}
+	scope = filepath.Join("/sys/fs/cgroup", strings.TrimPrefix(strings.TrimSpace(string(self)), "0::"))
+	for _, child := range []string{"supervisor", "payload"} {
+		if err = os.Mkdir(filepath.Join(scope, child), 0755); err != nil {
+			return nil, err
+		}
+	}
+	if err = os.WriteFile(filepath.Join(scope, "supervisor", "cgroup.procs"), []byte("0"), 0); err != nil {
+		return nil, err
+	}
+	if controllers, err = os.ReadFile(filepath.Join(scope, "cgroup.controllers")); err != nil {
+		return nil, err
+	}
+	for _, c := range strings.Fields(string(controllers)) {
+		if err = os.WriteFile(filepath.Join(scope, "cgroup.subtree_control"), []byte("+"+c), 0); err != nil {
+			return nil, err
+		}
+	}
+	// the machine sees only its own cgroup, so the payload repeats the scope's limits for it to read.
+	for _, limit := range []string{"cpu.max", "memory.max"} {
+		if err = copylimit(filepath.Join(scope, limit), filepath.Join(scope, "payload", limit)); err != nil {
+			return nil, err
+		}
+	}
+	return os.Open(filepath.Join(scope, "payload"))
+}
+
+// copylimit writes the cgroup limit file from holds to the limit file to.
+func copylimit(from string, to string) (err error) {
+	var (
+		limit []byte
+	)
+
+	if limit, err = os.ReadFile(from); err != nil {
+		return err
+	}
+	return os.WriteFile(to, limit, 0)
 }
 
 // start execs rootinit in root once pasta connects the machine's network, after mounting the

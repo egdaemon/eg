@@ -23,7 +23,6 @@ import (
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/gitx"
-	"github.com/egdaemon/eg/internal/iox"
 	"github.com/egdaemon/eg/internal/md5x"
 	"github.com/egdaemon/eg/internal/podmanx"
 	"github.com/egdaemon/eg/internal/stringsx"
@@ -344,16 +343,10 @@ func (t local) machine(c *http.Client, uri string) runners.BFn {
 	return func(ctx context.Context, ws workspaces.Context, _ uuidx.UUID, canonicaluri string, envb *envx.Builder) (_ runners.T, err error) {
 		var (
 			containers = userx.DefaultCacheDirectory("egvm", runners.ContainersVolume(canonicaluri))
-			egbin      string
+			// a machine runs the eg running the command, as a container does, when it runs the host's
+			// OS; otherwise its image's own.
+			mountegbin = envx.Toggle(runners.MachineOptionNoop, runners.MachineOptionEGBin(errorsx.Must(exec.LookPath(os.Args[0]))), runtime.GOOS == "linux")
 		)
-
-		// containers mount the eg running the command at egbin; machines share directories, not files.
-		if egbin, err = exec.LookPath(os.Args[0]); err != nil {
-			return nil, errorsx.Wrap(err, "unable to locate eg")
-		}
-		if err = iox.Copy(egbin, filepath.Join(ws.RuntimeDir, eg.BinaryBin)); err != nil {
-			return nil, errorsx.Wrap(err, "unable to place egbin")
-		}
 
 		if stringsx.Blank(uri) {
 			if uri, err = runners.BuildRootEgiso(ctx, userx.DefaultCacheDirectory("egiso"), t.Dir, filepath.Join(ws.RuntimeDir, "Containerfile"), "--build-arg", envx.Format(eg.EnvBuildCommit, cmdopts.BuildCommit()), "--platform", podmanx.AutoPlatform(t.Arch)); err != nil {
@@ -371,6 +364,7 @@ func (t local) machine(c *http.Client, uri string) runners.BFn {
 				egvm.OptionMountVolume(containers, "/var/lib/containers"),
 			),
 			runners.MachineOptionLocalGPGAgent(ctx, envb),
+			mountegbin,
 		)
 	}
 }

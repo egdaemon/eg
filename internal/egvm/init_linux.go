@@ -354,14 +354,18 @@ func fusemount(source string, target string, options string) (err error) {
 	return dev.Close()
 }
 
-// share mounts the host directory dir at target as mode says: bound read write or read only, or over
-// FUSE, which Boot serves.
+// share mounts the host directory or file dir at target as mode says: bound read write or read only,
+// or over FUSE, which Boot serves.
 func share(dir string, target string, mode string) (err error) {
 	var (
-		st unix.Statfs_t
+		st  unix.Statfs_t
+		src os.FileInfo
 	)
 
-	if err = os.MkdirAll(target, 0755); err != nil {
+	if src, err = os.Stat(dir); err != nil {
+		return err
+	}
+	if err = mountpoint(target, src.IsDir()); err != nil {
 		return err
 	}
 	// the kernel checks no modes in a FUSE share: every user writes it as the host user, whose own
@@ -388,6 +392,25 @@ func share(dir string, target string, mode string) (err error) {
 		return fmt.Errorf("unable to share %s read only: %w", dir, err)
 	}
 	return nil
+}
+
+// mountpoint creates target to mount a directory on, or a file, as podman does for a file it mounts:
+// an empty file, in what may be the host's directory.
+func mountpoint(target string, dir bool) (err error) {
+	var (
+		f *os.File
+	)
+
+	if dir {
+		return os.MkdirAll(target, 0755)
+	}
+	if err = os.MkdirAll(filepath.Dir(target), 0755); err != nil {
+		return err
+	}
+	if f, err = os.OpenFile(target, os.O_CREATE|os.O_RDONLY, 0755); err != nil {
+		return err
+	}
+	return f.Close()
 }
 
 // mountat mounts source at target, creating target first.

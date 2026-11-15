@@ -468,7 +468,8 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, environsecret
 				runners.AgentMountReadWrite(eg.DefaultMountRoot(), eg.DefaultMountRoot()),
 				runners.AgentMountReadWrite("/var/lib/containers", "/var/lib/containers"),
 			),
-			runners.AgentOptionEGBin(errorsx.Must(exec.LookPath(eg.DefaultMountRoot(eg.RuntimeDirectory, eg.BinaryBin)))),
+			// a machine of another OS than its host's has no egbin, and its own eg runs its containers.
+			runners.AgentOptionEGBin(fsx.LocateFirst(eg.DefaultMountRoot(eg.RuntimeDirectory, eg.BinaryBin), errorsx.Must(exec.LookPath(os.Args[0])))),
 			runners.AgentOptionHostOS(),
 			runners.AgentOptionCommandLine("--cgroups", "disabled"),
 			hostnet,

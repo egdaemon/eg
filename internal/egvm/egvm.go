@@ -124,7 +124,8 @@ func OptionMountReadWrite(dir string, path string) Option {
 	return optionMount(mount{dir: dir, path: path})
 }
 
-// OptionMountReadOnly mounts the host directory dir in the machine at path, read only.
+// OptionMountReadOnly mounts the host directory dir in the machine at path, read only. A Linux machine
+// mounts a host file the same way, as podman mounts one.
 func OptionMountReadOnly(dir string, path string) Option {
 	return optionMount(mount{dir: dir, path: path, readonly: true})
 }

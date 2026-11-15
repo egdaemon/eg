@@ -33,6 +33,7 @@ func TestExec(t *testing.T) {
 	var (
 		rootfs   = os.Getenv("EG_TEST_ROOTFS")
 		sockets  = t.TempDir()
+		binary   = filepath.Join(t.TempDir(), "binary")
 		owned    = t.TempDir()
 		volume   = filepath.Join(t.TempDir(), "volume")
 		console  bytes.Buffer
@@ -84,7 +85,8 @@ func TestExec(t *testing.T) {
 	users, groups, err = archive.Accounts()
 	require.NoError(t, err)
 	root, upperdir = upper(t, archive)
-	vm, err = egvm.Boot(egvm.New(root, egvm.OptionAccounts(users, groups), egvm.OptionCPUs(2), egvm.OptionMemory(1<<30), egvm.OptionMountReadOnly(t.TempDir(), "/srv/shared"), egvm.OptionMountReadWrite(sockets, "/srv/sockets"), egvm.OptionMountOwned(owned, "/srv/owned"), egvm.OptionMountVolume(volume, "/srv/volume")), &console)
+	require.NoError(t, os.WriteFile(binary, []byte("#!/bin/sh\necho bound\n"), 0755))
+	vm, err = egvm.Boot(egvm.New(root, egvm.OptionAccounts(users, groups), egvm.OptionCPUs(2), egvm.OptionMemory(1<<30), egvm.OptionMountReadOnly(t.TempDir(), "/srv/shared"), egvm.OptionMountReadWrite(sockets, "/srv/sockets"), egvm.OptionMountReadOnly(binary, "/srv/sockets/bin/binary"), egvm.OptionMountOwned(owned, "/srv/owned"), egvm.OptionMountVolume(volume, "/srv/volume")), &console)
 	require.NoError(t, err, console.String())
 	t.Cleanup(func() { require.NoError(t, vm.Close()) })
 
@@ -161,6 +163,16 @@ func TestExec(t *testing.T) {
 		b, cause := os.ReadFile(filepath.Join(volume, "kept"))
 		require.NoError(t, cause)
 		require.Equal(t, "kept\n", string(b))
+	})
+
+	t.Run("mounts a host file read only within a directory it shares, as podman mounts egbin", func(t *testing.T) {
+		code, stdout, stderr := run(t, t.Context(), nil, "sh", "-c", "/srv/sockets/bin/binary && ! touch /srv/sockets/bin/binary 2>/dev/null")
+		require.Equal(t, int32(0), code, stderr)
+		require.Equal(t, "bound\n", stdout)
+
+		placeholder, cause := os.Stat(filepath.Join(sockets, "bin", "binary"))
+		require.NoError(t, cause)
+		require.Zero(t, placeholder.Size())
 	})
 
 	t.Run("forwards a host socket into the machine", func(t *testing.T) {

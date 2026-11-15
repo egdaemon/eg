@@ -96,12 +96,17 @@ func MachineOptionEnviron(environ ...string) MachineOption {
 	}
 }
 
+// MachineOptionEGBin mounts the host's eg at egbin in the machine, as AgentOptionEGBin mounts it in a
+// container. Only a machine of the host's own OS can run it.
+func MachineOptionEGBin(egbin string) MachineOption {
+	return MachineOptionVM(egvm.OptionMountReadOnly(egbin, eg.DefaultMountRoot(eg.RuntimeDirectory, eg.BinaryBin)))
+}
+
 // MachineOptionNoop changes nothing.
 func MachineOptionNoop(*machineconfig) {}
 
 // NewMachine boots a machine from the egiso uri names, as egiso.OpenURI opens it, under a writable
-// upper kept in the workspace, and returns once its systemd finished booting. The machine runs the
-// eg the workspace's runtime directory holds as egbin.
+// upper kept in the workspace, and returns once its systemd finished booting.
 func NewMachine(ctx context.Context, c *http.Client, ws workspaces.Context, uri string, console io.Writer, options ...MachineOption) (_ *Machine, err error) {
 	var (
 		t        = &Machine{ws: ws}

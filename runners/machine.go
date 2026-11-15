@@ -166,7 +166,7 @@ func NewMachine(ctx context.Context, c *http.Client, ws workspaces.Context, uri 
 
 	// the machine has the image's own accounts, so the image's files keep their owners. The host user
 	// owns what it writes in the workspace's directories, except the runtime directory, whose sockets
-	// the machine binds.
+	// the machine binds for the host to dial.
 	root := egiso.NewSysFS(egiso.NewUpper(egiso.Tree{}.Mount(".", t.archive, egiso.Identity(users), egiso.Identity(groups)), t.upper), egiso.Default, egiso.Default)
 
 	if t.vm, err = egvm.Boot(egvm.New(root, append([]egvm.Option{

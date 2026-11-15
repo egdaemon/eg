@@ -85,6 +85,7 @@ var (
 	_ gofs.NodeReadlinker = (*fusenode)(nil)
 	_ gofs.NodeStatfser   = (*fusenode)(nil)
 	_ gofs.NodeFsyncer    = (*fusenode)(nil)
+	_ gofs.NodeMknoder    = (*fusenode)(nil)
 )
 
 func (t *fusenode) name() string {
@@ -301,6 +302,19 @@ func (t *fusenode) Mkdir(ctx context.Context, name string, mode uint32, out *fus
 	}
 	if errno := t.owned(ctx, created); errno != 0 {
 		return nil, errno
+	}
+	return t.entry(ctx, created, out)
+}
+
+// Mknod makes a socket or fifo in a Bind mount, as a process binding a unix socket makes one: processes
+// of the machine connect to it by its inode, which the host can not.
+func (t *fusenode) Mknod(ctx context.Context, name string, mode uint32, dev uint32, out *fuse.EntryOut) (*gofs.Inode, syscall.Errno) {
+	var (
+		created = t.child(name)
+	)
+
+	if err := t.overriding(ctx, t.name(), func() error { return t.fsys.sys.upper.Mknod(created, mode) }); err != nil {
+		return nil, errnoofuse(err)
 	}
 	return t.entry(ctx, created, out)
 }

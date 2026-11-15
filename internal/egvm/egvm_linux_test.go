@@ -239,6 +239,23 @@ func TestExec(t *testing.T) {
 		require.NoError(t, os.RemoveAll(filepath.Join(owned, "readonly")))
 	})
 
+	t.Run("lets the machine's processes connect to a socket bound in an owned directory", func(t *testing.T) {
+		code, stdout, stderr := run(t, t.Context(), nil, "python3", "-c", strings.Join([]string{
+			"import socket",
+			"s = socket.socket(socket.AF_UNIX); s.bind('/srv/owned/bound.socket'); s.listen()",
+			"c = socket.socket(socket.AF_UNIX); c.connect('/srv/owned/bound.socket'); c.sendall(b'bound')",
+			"print(s.accept()[0].recv(5).decode())",
+		}, "; "))
+		require.Equal(t, int32(0), code, stderr)
+		require.Equal(t, "bound\n", stdout)
+
+		st, cause := os.Lstat(filepath.Join(owned, "bound.socket"))
+		require.NoError(t, cause)
+		require.Equal(t, fs.ModeSocket, st.Mode().Type())
+		require.Equal(t, uint32(os.Getuid()), st.Sys().(*syscall.Stat_t).Uid)
+		require.NoError(t, os.Remove(filepath.Join(owned, "bound.socket")))
+	})
+
 	t.Run("refuses to change the owner of a file in an owned directory", func(t *testing.T) {
 		require.NoError(t, os.WriteFile(filepath.Join(owned, "chowned"), nil, 0644))
 		code, _, stderr := run(t, t.Context(), nil, "chown", "root", "/srv/owned/chowned")

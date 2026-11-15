@@ -31,6 +31,7 @@ import (
 	"github.com/egdaemon/eg/cmd/cmdssh"
 	"github.com/egdaemon/eg/cmd/eg/compute"
 	"github.com/egdaemon/eg/cmd/eg/daemons"
+	"github.com/egdaemon/eg/cmd/eg/workloads"
 	"github.com/egdaemon/eg/internal/bytesx"
 	"github.com/egdaemon/eg/internal/contextx"
 	"github.com/egdaemon/eg/internal/envx"
@@ -42,11 +43,11 @@ import (
 	"github.com/egdaemon/eg/internal/stringsx"
 	"github.com/egdaemon/eg/internal/tracex"
 	"github.com/egdaemon/eg/internal/userx"
+	"github.com/egdaemon/eg/internal/uuidx"
 	"github.com/egdaemon/gdx"
 	"github.com/egdaemon/gdx/konggdx"
 	"github.com/go-git/go-git/v6"
 	"github.com/go-git/go-git/v6/plumbing"
-	"github.com/gofrs/uuid/v5"
 	"github.com/willabides/kongplete"
 
 	// ensure its a dependency.
@@ -70,7 +71,7 @@ func machineID() string {
 	}
 
 	// log.Println("failed to read a valid machine id, generating a random uuid", err)
-	uid := uuid.Must(uuid.NewV7()).String()
+	uid := uuidx.NewV7().String()
 	if err = os.WriteFile(midpath, []byte(uid), 0600); err == nil {
 		return strings.TrimSpace(uid)
 	}
@@ -85,6 +86,7 @@ func main() {
 		cmdopts.TLSConfig
 		Version            cmdopts.Version              `cmd:"" help:"display versioning information"`
 		Compute            compute.Cmd                  `cmd:"" help:"commands for running compute workloads"`
+		Workloads          workloads.Cmd                `cmd:"" help:"inspect the workloads of repositories"`
 		Module             module                       `cmd:"" help:"executes a compiled module directly" hidden:"true"`
 		Wasi               Wasi                         `cmd:"" help:"wasi related commmands"`
 		Egiso              Egiso                        `cmd:"" name:"egiso" help:"inspect egiso images" hidden:"true"`
@@ -121,7 +123,7 @@ func main() {
 	gitdir := envx.String(gitx.DetectRoot(), "EG_GIT_REPOSITORY")
 	gdxsocket := filepath.Join(userx.DefaultRuntimeDirectory(), gdx.DefaultSocket)
 	gitname, gitemail := gitx.User(gitdir)
-	autoentropy := errorsx.Must(uuid.NewV4()).String()
+	autoentropy := uuidx.NewV4().String()
 
 	go func() {
 		if err := (konggdx.Serve{Socket: gdxsocket}).Run(shellcli.Context); err != nil {
@@ -189,12 +191,18 @@ func main() {
 			&shellcli.TLSConfig,
 			cleanupsigs,
 			new(cmdopts.HotswapPath),
+			new(cmdopts.ComputeSession),
 			cmdopts.Entropy(cmdopts.GenerateEntropy),
 			cmdopts.KeyGenSeeded(cmdopts.DefaultKeyGenSeeded),
 			libp2px.MDNSLookup(libp2px.DefaultMDNSLookup),
+			cmdopts.Environ(cmdopts.DefaultEnviron),
 		),
 		kong.BindTo(shellcli.Context, (*context.Context)(nil)),
 		kong.BindTo(os.Stdin, (*cmdopts.Stdin)(nil)),
+		// only opened by the commands that ask for it.
+		kong.BindSingletonProvider(func(g *cmdopts.Global) *cmdopts.CLIDB {
+			return cmdopts.NewCLIDB(g.Context)
+		}),
 		kong.BindSingletonProvider(func(g *cmdopts.Global) *cmdidentity.T {
 			return cmdidentity.New(g.Context, g.AccountID, g.ProfileID, cmdidentity.Login)
 		}),

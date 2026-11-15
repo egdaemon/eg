@@ -9,8 +9,8 @@ import (
 	"testing"
 
 	"github.com/egdaemon/eg/computeapi"
+	"github.com/egdaemon/eg/internal/uuidx"
 
-	"github.com/gofrs/uuid/v5"
 	"github.com/stretchr/testify/require"
 )
 
@@ -20,7 +20,7 @@ func TestCacheResolutionClaim(t *testing.T) {
 		dirs := NewSpoolDir(sdir)
 		enq := &computeapi.Enqueued{AccountId: "acct-claims", VcsUri: "repo"}
 
-		uid := uuid.Must(uuid.NewV7())
+		uid := uuidx.NewV7()
 		require.NoError(t, dirs.Download(uid, "archive.tar.gz", bytes.NewBufferString("")))
 		require.NoError(t, dirs.Enqueue(uid))
 		rundir, err := dirs.Dequeue()
@@ -38,7 +38,7 @@ func TestCacheResolutionClaim(t *testing.T) {
 		dirs := NewSpoolDir(sdir)
 		enq := &computeapi.Enqueued{AccountId: "acct-park", VcsUri: "repo"}
 
-		uid1 := uuid.Must(uuid.NewV7())
+		uid1 := uuidx.NewV7()
 		require.NoError(t, dirs.Download(uid1, "archive.tar.gz", bytes.NewBufferString("")))
 		require.NoError(t, dirs.Enqueue(uid1))
 		rundir1, err := dirs.Dequeue()
@@ -46,7 +46,7 @@ func TestCacheResolutionClaim(t *testing.T) {
 		bucket1, err := NewCacheResolution(dirs, 1).Claim(t.Context(), cachebuckets(enq), rundir1)
 		require.NoError(t, err)
 
-		uid2 := uuid.Must(uuid.NewV7())
+		uid2 := uuidx.NewV7()
 		require.NoError(t, dirs.Download(uid2, "archive.tar.gz", bytes.NewBufferString("")))
 		require.NoError(t, dirs.Enqueue(uid2))
 		rundir2, err := dirs.Dequeue()
@@ -64,7 +64,7 @@ func TestCacheResolutionClaim(t *testing.T) {
 		dirs := NewSpoolDir(sdir)
 		enq := &computeapi.Enqueued{AccountId: "acct-next", VcsUri: "repo"}
 
-		uid1 := uuid.Must(uuid.NewV7())
+		uid1 := uuidx.NewV7()
 		require.NoError(t, dirs.Download(uid1, "archive.tar.gz", bytes.NewBufferString("")))
 		require.NoError(t, dirs.Enqueue(uid1))
 		rundir1, err := dirs.Dequeue()
@@ -72,7 +72,7 @@ func TestCacheResolutionClaim(t *testing.T) {
 		bucket1, err := NewCacheResolution(dirs, 1).Claim(t.Context(), cachebuckets(enq), rundir1)
 		require.NoError(t, err)
 
-		uid2 := uuid.Must(uuid.NewV7())
+		uid2 := uuidx.NewV7()
 		require.NoError(t, dirs.Download(uid2, "archive.tar.gz", bytes.NewBufferString("")))
 		require.NoError(t, dirs.Enqueue(uid2))
 		rundir2, err := dirs.Dequeue()
@@ -92,7 +92,7 @@ func TestCacheResolutionClaim(t *testing.T) {
 		const n = 3
 		var last string
 		for range n {
-			uid := uuid.Must(uuid.NewV7())
+			uid := uuidx.NewV7()
 			require.NoError(t, dirs.Download(uid, "archive.tar.gz", bytes.NewBufferString("")))
 			require.NoError(t, dirs.Enqueue(uid))
 			rundir, err := dirs.Dequeue()
@@ -103,7 +103,7 @@ func TestCacheResolutionClaim(t *testing.T) {
 			last = bucket
 		}
 
-		uidLast := uuid.Must(uuid.NewV7())
+		uidLast := uuidx.NewV7()
 		require.NoError(t, dirs.Download(uidLast, "archive.tar.gz", bytes.NewBufferString("")))
 		require.NoError(t, dirs.Enqueue(uidLast))
 		rundirLast, err := dirs.Dequeue()
@@ -121,7 +121,7 @@ func TestCacheResolutionClaim(t *testing.T) {
 		dirs := NewSpoolDir(sdir)
 		enq := &computeapi.Enqueued{AccountId: "acct-release", VcsUri: "repo"}
 
-		uid1 := uuid.Must(uuid.NewV7())
+		uid1 := uuidx.NewV7()
 		require.NoError(t, dirs.Download(uid1, "archive.tar.gz", bytes.NewBufferString("")))
 		require.NoError(t, dirs.Enqueue(uid1))
 		rundir1, err := dirs.Dequeue()
@@ -129,7 +129,7 @@ func TestCacheResolutionClaim(t *testing.T) {
 		bucket1, err := NewCacheResolution(dirs, 1).Claim(t.Context(), cachebuckets(enq), rundir1)
 		require.NoError(t, err)
 
-		uid2 := uuid.Must(uuid.NewV7())
+		uid2 := uuidx.NewV7()
 		require.NoError(t, dirs.Download(uid2, "archive.tar.gz", bytes.NewBufferString("")))
 		require.NoError(t, dirs.Enqueue(uid2))
 		rundir2, err := dirs.Dequeue()
@@ -156,7 +156,7 @@ func TestCacheResolutionClaim(t *testing.T) {
 		const n = 8
 		rundirs := make([]string, n)
 		for i := range rundirs {
-			uid := uuid.Must(uuid.NewV7())
+			uid := uuidx.NewV7()
 			require.NoError(t, dirs.Download(uid, "archive.tar.gz", bytes.NewBufferString("")))
 			require.NoError(t, dirs.Enqueue(uid))
 			rundir, err := dirs.Dequeue()
@@ -210,7 +210,7 @@ func TestCacheResolutionClaim(t *testing.T) {
 		const n = buckets * 2
 		rundirs := make([]string, n)
 		for i := range rundirs {
-			uid := uuid.Must(uuid.NewV7())
+			uid := uuidx.NewV7()
 			require.NoError(t, dirs.Download(uid, "archive.tar.gz", bytes.NewBufferString("")))
 			require.NoError(t, dirs.Enqueue(uid))
 			rundir, err := dirs.Dequeue()

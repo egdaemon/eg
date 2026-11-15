@@ -63,4 +63,12 @@ func TestPoolClose(t *testing.T) {
 
 		require.ErrorIs(t, pool.Close(), cause)
 	})
+
+	t.Run("close with error reports the error when no workload failed", func(t *testing.T) {
+		cause := errors.New("feeding failed")
+		pool := asynccompute.New(func(ctx context.Context, n int) error { return nil }, asynccompute.Workers[int](1))
+
+		require.NoError(t, pool.Run(t.Context(), 1))
+		require.ErrorIs(t, pool.CloseWithError(cause), cause)
+	})
 }

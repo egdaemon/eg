@@ -1,0 +1,22 @@
+syntax = "proto3";
+
+package eg.eg.compute;
+
+// Workload is one way a workload of a repository can be run, as detected by
+// 'eg workloads detect'. it is the shape printed by 'eg workloads detect --jsonl'.
+message Workload {
+  // the workload's name, blank for the default workload.
+  string workload = 1 [ json_name = "workload" ];
+  // the repository root the workload was detected in.
+  string directory = 2 [ json_name = "directory" ];
+  // the canonical vcs uri of the repository, i.e. git@github.com:egdaemon/eg.git.
+  // blank when the repository has no origin remote.
+  string vcsuri = 3 [ json_name = "vcsuri" ];
+  // the workload is ignored by an .egrcignore, only reported when asked for.
+  // clients should not display it.
+  bool ignored = 4 [ json_name = "ignored" ];
+  // the command line, the arguments after eg, that runs the workload. its
+  // second element is the way it runs: local or serve. clients append the
+  // flags they own, i.e. --session.
+  repeated string command = 1000 [ json_name = "command" ];
+}

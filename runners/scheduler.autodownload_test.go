@@ -14,10 +14,10 @@ import (
 	"time"
 
 	"github.com/egdaemon/eg/computeapi"
+	"github.com/egdaemon/eg/internal/uuidx"
 
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/httpx"
-	"github.com/gofrs/uuid/v5"
 	"github.com/stretchr/testify/require"
 )
 
@@ -36,7 +36,7 @@ func (t *recordingstrategy) Backoff(attempt int64) time.Duration {
 
 func dequeueresponse(t *testing.T) string {
 	t.Helper()
-	uid := errorsx.Must(uuid.NewV4())
+	uid := uuidx.NewV4()
 	return fmt.Sprintf(`{"enqueued":{"id":%q,"entry":"entry.wasm","cores":1,"memory":1048576}}`, uid.String())
 }
 

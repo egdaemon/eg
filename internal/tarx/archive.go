@@ -14,7 +14,7 @@ import (
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/iox"
 	"github.com/egdaemon/eg/internal/langx"
-	"github.com/gofrs/uuid/v5"
+	"github.com/egdaemon/eg/internal/uuidx"
 )
 
 // Pack the set of paths into the archive. caller is responsible for rewinding the writer.
@@ -251,7 +251,7 @@ func (opts options) New(tw *tar.Writer) error {
 		min:  bytesx.KiB,
 		max:  5 * bytesx.KiB,
 		n:    3,
-		seed: errorsx.Must(uuid.NewV4()).Bytes(),
+		seed: uuidx.NewV4().Bytes(),
 	}, opts...)
 
 	src := cryptox.NewChaCha8(r.seed)

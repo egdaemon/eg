@@ -131,3 +131,51 @@ func TestWasixWarmCache(t *testing.T) {
 		require.Len(t, entries, 3)
 	})
 }
+
+func TestOneFromTranspiled(t *testing.T) {
+	t.Run("returns the only module", func(t *testing.T) {
+		ctx := t.Context()
+		srcdir := t.TempDir()
+		tmpdir := t.TempDir()
+		ws, err := workspaces.New(ctx, md5.New(), tmpdir, tmpdir, "")
+		require.NoError(t, err)
+
+		require.NoError(t, fsx.CloneTree(ctx, srcdir, filepath.Join("example.1", eg.DefaultModuleDirectory()), os.DirFS(testx.Fixture())))
+
+		roots, err := transpile.Autodetect(transpile.New(srcdir, ws)).Run(ctx)
+		require.NoError(t, err)
+		require.NoError(t, compile.EnsureRequiredPackages(ctx, filepath.Join(ws.Root, ws.TransDir)))
+
+		module, err := compile.OneFromTranspiled(ctx, ws, roots...)
+		require.NoError(t, err)
+		require.False(t, module.Generated)
+		require.Equal(t, filepath.Join(tmpdir, ws.BuildDir, "main.wasm"), module.Path)
+	})
+
+	t.Run("errors when there are no modules", func(t *testing.T) {
+		ctx := t.Context()
+		tmpdir := t.TempDir()
+		ws, err := workspaces.New(ctx, md5.New(), tmpdir, tmpdir, "")
+		require.NoError(t, err)
+
+		_, err = compile.OneFromTranspiled(ctx, ws)
+		require.EqualError(t, err, "no usable modules detected")
+	})
+
+	t.Run("errors when there is more than one module", func(t *testing.T) {
+		ctx := t.Context()
+		srcdir := t.TempDir()
+		tmpdir := t.TempDir()
+		ws, err := workspaces.New(ctx, md5.New(), tmpdir, tmpdir, "")
+		require.NoError(t, err)
+
+		require.NoError(t, fsx.CloneTree(ctx, srcdir, filepath.Join("example.1", eg.DefaultModuleDirectory()), os.DirFS(testx.Fixture())))
+
+		roots, err := transpile.Autodetect(transpile.New(srcdir, ws)).Run(ctx)
+		require.NoError(t, err)
+		require.NoError(t, compile.EnsureRequiredPackages(ctx, filepath.Join(ws.Root, ws.TransDir)))
+
+		_, err = compile.OneFromTranspiled(ctx, ws, append(roots, roots...)...)
+		require.ErrorContains(t, err, "expected exactly one module, found 2")
+	})
+}

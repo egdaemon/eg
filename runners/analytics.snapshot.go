@@ -13,14 +13,14 @@ import (
 	_ "github.com/egdaemon/duckproxy/duckproxy"
 	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/internal/errorsx"
-	"github.com/gofrs/uuid/v5"
+	"github.com/egdaemon/eg/internal/uuidx"
 )
 
 // SnapshotAnalytics writes a consistent copy of the analytics database of the running workload uid into dst.
 // the database is held open by the workload's runner process, so the snapshot is taken by that process, through its
 // duckproxy socket, using duckdb's ATTACH and COPY FROM DATABASE. returns an error matching fs.ErrNotExist
 // when the workload isn't running.
-func (t SpoolDirs) SnapshotAnalytics(ctx context.Context, uid uuid.UUID, dst io.Writer) (err error) {
+func (t SpoolDirs) SnapshotAnalytics(ctx context.Context, uid uuidx.UUID, dst io.Writer) (err error) {
 	var (
 		runtimedir = t.Path(uid).Resolve(workdirname, eg.RuntimeDirectory)
 		socket     = filepath.Join(runtimedir, eg.SocketAnalytics)
@@ -44,7 +44,7 @@ func (t SpoolDirs) SnapshotAnalytics(ctx context.Context, uid uuid.UUID, dst io.
 		return errorsx.Wrap(err, "unable to locate analytics database")
 	}
 
-	snapname := "snapshot." + uuid.Must(uuid.NewV7()).String() + ".db"
+	snapname := "snapshot." + uuidx.NewV7().String() + ".db"
 	snappath := filepath.Join(filepath.Dir(dbpath), snapname)
 	local := filepath.Join(runtimedir, snapname)
 	defer func() { errorsx.Log(errorsx.Wrap(os.Remove(local), "unable to remove analytics snapshot")) }()

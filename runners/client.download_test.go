@@ -14,12 +14,12 @@ import (
 	"time"
 
 	"github.com/egdaemon/eg/computeapi"
+	"github.com/egdaemon/eg/internal/uuidx"
 
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/httpx"
 	"github.com/egdaemon/eg/internal/testx"
 	"github.com/egdaemon/eg/runners"
-	"github.com/gofrs/uuid/v5"
 	"github.com/stretchr/testify/require"
 )
 
@@ -45,7 +45,7 @@ func TestDownloadClient(t *testing.T) {
 		// body holds the only connection, so the next request blocks forever.
 		const conflictRetries = 3
 
-		uid := errorsx.Must(uuid.NewV4())
+		uid := uuidx.NewV4()
 		archive := buildArchive(t, "entry.wasm", testx.Read(testx.Fixture("example.1.wasm")))
 
 		attempts := 0
@@ -85,7 +85,7 @@ func TestDownloadClient(t *testing.T) {
 	})
 
 	t.Run("success_on_first_attempt_writes_spool_files", func(t *testing.T) {
-		uid := errorsx.Must(uuid.NewV4())
+		uid := uuidx.NewV4()
 		archive := buildArchive(t, "entry.wasm", testx.Read(testx.Fixture("example.1.wasm")))
 
 		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -113,7 +113,7 @@ func TestDownloadClient(t *testing.T) {
 	})
 
 	t.Run("context_cancelled_during_409_retry_loop", func(t *testing.T) {
-		uid := errorsx.Must(uuid.NewV4())
+		uid := uuidx.NewV4()
 
 		attempts := 0
 		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -140,7 +140,7 @@ func TestDownloadClient(t *testing.T) {
 	})
 
 	t.Run("non_retryable_http_error_propagates", func(t *testing.T) {
-		uid := errorsx.Must(uuid.NewV4())
+		uid := uuidx.NewV4()
 
 		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusInternalServerError)
@@ -157,7 +157,7 @@ func TestDownloadClient(t *testing.T) {
 	})
 
 	t.Run("gives_up_after_exhausting_conflict_retries", func(t *testing.T) {
-		uid := errorsx.Must(uuid.NewV4())
+		uid := uuidx.NewV4()
 
 		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			errorsx.Log(httpx.WriteEmptyJSON(w, http.StatusConflict))

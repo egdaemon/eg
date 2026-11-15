@@ -8,8 +8,8 @@ import (
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/httpx"
 	"github.com/egdaemon/eg/internal/jwtx"
+	"github.com/egdaemon/eg/internal/uuidx"
 	"github.com/egdaemon/eg/runners"
-	"github.com/gofrs/uuid/v5"
 	"github.com/gorilla/mux"
 )
 
@@ -35,11 +35,11 @@ type CancelHandler struct {
 func (t *CancelHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	var (
 		err    error
-		uid    uuid.UUID
+		uid    uuidx.UUID
 		claims computeapi.LogClaims
 	)
 
-	if uid, err = uuid.FromString(mux.Vars(r)["id"]); err != nil {
+	if uid, err = uuidx.FromString(mux.Vars(r)["id"]); err != nil {
 		log.Println(errorsx.Wrap(err, "invalid workload id"))
 		errorsx.Log(httpx.WriteEmptyJSON(w, http.StatusBadRequest))
 		return
@@ -51,7 +51,7 @@ func (t *CancelHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if uuid.FromStringOrNil(claims.Workload) != uid {
+	if uuidx.FromStringOrNil(claims.Workload) != uid {
 		log.Println("log token not valid for workload", uid, claims.Workload)
 		errorsx.Log(httpx.WriteEmptyJSON(w, http.StatusForbidden))
 		return

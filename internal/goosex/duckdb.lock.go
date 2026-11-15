@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/egdaemon/eg/internal/errorsx"
-	"github.com/gofrs/uuid/v5"
+	"github.com/egdaemon/eg/internal/uuidx"
 	"github.com/pressly/goose/v3/lock"
 )
 
@@ -45,7 +45,7 @@ type duckdbLocker struct {
 
 func newDuckdbLocker() *duckdbLocker {
 	return &duckdbLocker{
-		owner: uuid.Must(uuid.NewV7()).String(),
+		owner: uuidx.NewV7().String(),
 		lease: locklease,
 		wait:  lockwait,
 		poll:  lockpoll,

@@ -7,9 +7,8 @@ import (
 	"path/filepath"
 	"strconv"
 
-	"github.com/egdaemon/eg/identity"
-
 	"github.com/egdaemon/eg/computeapi"
+	"github.com/egdaemon/eg/identity"
 
 	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/authn"
@@ -31,11 +30,11 @@ import (
 	"github.com/egdaemon/eg/internal/stringsx"
 	"github.com/egdaemon/eg/internal/tarx"
 	"github.com/egdaemon/eg/internal/unsafepretty"
+	"github.com/egdaemon/eg/internal/uuidx"
 	"github.com/egdaemon/eg/secrets"
 	"github.com/egdaemon/eg/transpile"
 	"github.com/egdaemon/eg/workspaces"
 	"github.com/go-git/go-git/v6"
-	"github.com/gofrs/uuid/v5"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -75,7 +74,7 @@ func (t upload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, ident *cmdide
 
 	if ws, err = workspaces.NewLocal(
 		gctx.Context,
-		uuid.Must(uuid.NewV7()),
+		uuidx.NewV7(),
 		md5x.Digest(errorsx.Zero(cmdopts.BuildInfo())),
 		t.Dir,
 		t.Name,
@@ -183,7 +182,7 @@ func (t upload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, ident *cmdide
 	}
 
 	enq := &computeapi.Enqueued{
-		Id:          uuid.Must(uuid.NewV7()).String(),
+		Id:          uuidx.NewV7().String(),
 		AccountId:   aid,
 		Entry:       filepath.Join(ws.Module, filepath.Base(entry.Path)),
 		Workload:    t.Name,

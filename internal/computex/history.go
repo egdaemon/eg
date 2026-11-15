@@ -10,7 +10,7 @@ import (
 
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/sqlx"
-	"github.com/gofrs/uuid/v5"
+	"github.com/egdaemon/eg/internal/uuidx"
 )
 
 // DefaultTTL is how long a completed workload is remembered.
@@ -61,7 +61,7 @@ func Purge(ctx context.Context, q sqlx.Queryer) error {
 // intended for use with langx.Clone in tests.
 func EntryOptionTestDefaults(e *Entry) {
 	now := time.Now()
-	e.ID = uuid.Must(uuid.NewV7()).String()
+	e.ID = uuidx.NewV7().String()
 	e.Description = "workload - " + e.ID
 	e.Result = ResultCompleted
 	e.CreatedAt = now

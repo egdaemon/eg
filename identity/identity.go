@@ -23,7 +23,7 @@ import (
 	"github.com/egdaemon/eg/internal/squirrelx"
 	"github.com/egdaemon/eg/internal/stringsx"
 	"github.com/egdaemon/eg/internal/termx"
-	"github.com/gofrs/uuid/v5"
+	"github.com/egdaemon/eg/internal/uuidx"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/oauth2"
 )
@@ -151,7 +151,7 @@ func Remember(ctx context.Context, db *sql.DB, signer ssh.Signer, vcsuri string,
 	h := RepoIdentity{
 		UID:       ID(signer.PublicKey()),
 		UIDRaw:    identity.GetUidraw(),
-		ID:        stringsx.FirstNonBlank(identity.GetId(), uuid.Nil.String()),
+		ID:        stringsx.FirstNonBlank(identity.GetId(), uuidx.Nil().String()),
 		VcsURIMd5: md5x.String(vcsuri),
 		VcsURI:    vcsuri,
 		AccountID: stringsx.FirstNonBlank(current.GetProfile().GetAccountId(), current.GetAccount().GetId()),

@@ -27,6 +27,7 @@ import (
 	"github.com/egdaemon/eg/internal/podmanx"
 	"github.com/egdaemon/eg/internal/stringsx"
 	"github.com/egdaemon/eg/internal/userx"
+	"github.com/egdaemon/eg/internal/uuidx"
 	"github.com/egdaemon/eg/internal/wasix"
 	"github.com/egdaemon/eg/interp/c8sproxy"
 	"github.com/egdaemon/eg/runners"
@@ -34,7 +35,6 @@ import (
 	"github.com/egdaemon/eg/transpile"
 	"github.com/egdaemon/eg/workspaces"
 	"github.com/go-git/go-git/v6"
-	"github.com/gofrs/uuid/v5"
 )
 
 type local struct {
@@ -43,7 +43,7 @@ type local struct {
 	Dir              string   `name:"directory" help:"root directory of the repository" default:"${vars_eg_root_directory}"`
 	ModuleDir        string   `name:"moduledir" help:"must be a subdirectory in the provided directory" default:"${vars_workload_directory}" hidden:"true"`
 	Debug            bool     `name:"debug" help:"keep workspace around to debug issues, requires manual cleanup"`
-	AutoPatch        bool     `name:"auto-patch" help:"apply the changes a workload made to its working directory to the current worktree once it completes, when disabled the changes are printed as a patch instead (dry run)" default:"true" negatable:""`
+	AutoPatch        bool     `name:"auto-patch" help:"commit the changes a workload made to its working directory to a new eg/ branch of the current repository once it completes, when disabled the changes are printed as a patch instead (dry run)" default:"true" negatable:""`
 	Privileged       bool     `name:"privileged" help:"run the initial container in privileged mode"`
 	Cgroups          bool     `name:"cgroups" help:"enable/disable cgroups for the module container" hidden:"true" negatable:"" default:"true"`
 	Dirty            bool     `name:"dirty" help:"include user directories and environment variables" hidden:"true"`
@@ -72,26 +72,32 @@ func (t local) gpu() bool {
 
 // Run compiles the workload's modules, runs them in containers or, given an egiso, a machine, and
 // applies the changes they made.
-func (t local) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, hotswapbin *cmdopts.HotswapPath) (err error) {
+func (t local) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, hotswapbin *cmdopts.HotswapPath, session *cmdopts.ComputeSession, clidb *cmdopts.CLIDB) (err error) {
 	var (
 		ws      workspaces.Context
 		repo    *git.Repository
 		rt      runners.T
 		environ *os.File
 		b       runners.B = runners.BFn(t.podman)
-		uid               = uuid.Must(uuid.NewV7())
+		uid               = uuidx.FirstNonNil(session.Session, uuidx.NewV7())
 	)
 
 	if t.Egiso != nil {
 		b = t.machine(tlsc.DefaultClient(), *t.Egiso)
 	}
 
+	// register the run so tools (i.e. the vscode extension) can list it while it is running. local runs
+	// are not reachable over ssh and do not host an agent, they only patch their changes back when enabled.
+	defer func() { errorsx.Log(clidb.Close()) }()
+	registered, done := session.New(clidb).Branch(session.Branch, defaultbranch(t.Name, uid)).Patch(t.AutoPatch).Register(gctx.Context, uid, t.Name, t.Dir)
+	defer func() { done(err) }()
+
 	contextx.WaitGroupAdd(gctx.Context, 1)
 	go contextx.WaitGroupDone(gctx.Context)
 
 	if ws, err = workspaces.NewLocal(
 		gctx.Context,
-		uuid.Must(uuid.NewV7()),
+		uuidx.NewV7(),
 		md5x.Digest(cmdopts.BuildInfoSafe()),
 		t.Dir,
 		t.Name,
@@ -185,7 +191,7 @@ func (t local) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, hotswapbin *cm
 		}
 	}
 
-	return t.patch(gctx.Context, ws)
+	return gitx.AutoPatch(os.Stdout).DryRun(!t.AutoPatch).From(ws.WorkingDir).To(t.Dir).Branch(registered.Branch).Apply(gctx.Context)
 }
 
 // container runs modules in containers of the root container built from the repository's
@@ -193,8 +199,9 @@ func (t local) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, hotswapbin *cm
 type container struct {
 	ctx   context.Context // carries the podman client.
 	ws    workspaces.Context
-	uid   uuid.UUID
+	uid   uuidx.UUID
 	agent *runners.Agent
+	image string
 }
 
 func (t container) Do(_ context.Context, m transpile.Compiled) error {
@@ -217,7 +224,7 @@ func (t container) Do(_ context.Context, m transpile.Compiled) error {
 	}
 
 	// TODO REVISIT using t.ws.RuntimeDir as moduledir.
-	return c8sproxy.PodmanModule(t.ctx, prepcmd, eg.WorkingDirectory, fmt.Sprintf("eg-%s", t.uid.String()), t.ws.RuntimeDir, options...)
+	return c8sproxy.PodmanModule(t.ctx, prepcmd, t.image, fmt.Sprintf("eg-%s", t.uid.String()), t.ws.RuntimeDir, options...)
 }
 
 func (t container) Close() error {
@@ -225,7 +232,7 @@ func (t container) Close() error {
 }
 
 // podman prepares containers of the root container built from the repository's Containerfile.
-func (t local) podman(ctx context.Context, ws workspaces.Context, uid uuid.UUID, canonicaluri string, envb *envx.Builder) (_ runners.T, err error) {
+func (t local) podman(ctx context.Context, ws workspaces.Context, uid uuidx.UUID, canonicaluri string, envb *envx.Builder) (_ runners.T, err error) {
 	var (
 		homedir     = userx.HomeDirectoryOrDefault("/root")
 		environpath = filepath.Join(ws.RuntimeDir, eg.EnvironFile)
@@ -313,13 +320,13 @@ func (t local) podman(ctx context.Context, ws workspaces.Context, uid uuid.UUID,
 		wayland,   // must come after the runtime directory mount to ensure correct mounting order.
 	)
 
-	return container{ctx: pctx, ws: ws, uid: uid, agent: ragent}, nil
+	return container{ctx: pctx, ws: ws, uid: uid, agent: ragent, image: eg.WorkingDirectory}, nil
 }
 
 // machine prepares a machine booted from the egiso at uri, fetched through c, or from one of the
 // default root container when uri is empty.
 func (t local) machine(c *http.Client, uri string) runners.BFn {
-	return func(ctx context.Context, ws workspaces.Context, _ uuid.UUID, canonicaluri string, envb *envx.Builder) (_ runners.T, err error) {
+	return func(ctx context.Context, ws workspaces.Context, _ uuidx.UUID, canonicaluri string, envb *envx.Builder) (_ runners.T, err error) {
 		var (
 			containers = userx.DefaultCacheDirectory("egvm", runners.ContainersVolume(canonicaluri))
 		)
@@ -342,20 +349,4 @@ func (t local) machine(c *http.Client, uri string) runners.BFn {
 			runners.MachineOptionLocalGPGAgent(ctx, envb),
 		)
 	}
-}
-
-// patch applies the changes the workload made to its working directory to the worktree, or prints
-// them when auto patching is disabled.
-func (t local) patch(ctx context.Context, ws workspaces.Context) error {
-	patch, err := gitx.Changes(ctx, ws.WorkingDir, t.Dir)
-	if err != nil {
-		return err
-	}
-
-	if !t.AutoPatch {
-		_, err = os.Stdout.Write(patch)
-		return err
-	}
-
-	return gitx.ApplyPatch(ctx, t.Dir, patch)
 }

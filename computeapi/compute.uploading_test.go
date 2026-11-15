@@ -20,7 +20,7 @@ import (
 	"github.com/egdaemon/eg/internal/lan"
 	"github.com/egdaemon/eg/internal/langx"
 	"github.com/egdaemon/eg/internal/sqltestx"
-	"github.com/gofrs/uuid/v5"
+	"github.com/egdaemon/eg/internal/uuidx"
 	"github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p/core/network"
 	circuitv2 "github.com/libp2p/go-libp2p/p2p/protocol/circuitv2/client"
@@ -41,7 +41,7 @@ func (t *recordingbackoff) Backoff(attempt int64) time.Duration {
 }
 
 func TestUpload(t *testing.T) {
-	enq := &Enqueued{Id: uuid.Must(uuid.NewV7()).String(), AccountId: "acct", Entry: "main.wasm"}
+	enq := &Enqueued{Id: uuidx.NewV7().String(), AccountId: "acct", Entry: "main.wasm"}
 
 	t.Run("retries when the runner declines and succeeds once it accepts", func(t *testing.T) {
 		var (

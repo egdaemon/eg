@@ -9,12 +9,11 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/md5x"
 	"github.com/egdaemon/eg/internal/slicesx"
 	"github.com/egdaemon/eg/internal/stringsx"
 	"github.com/egdaemon/eg/internal/tracex"
-	"github.com/gofrs/uuid/v5"
+	"github.com/egdaemon/eg/internal/uuidx"
 )
 
 var (
@@ -210,12 +209,12 @@ const (
 
 // generate unique daemon socket
 func SocketDaemon() string {
-	return fmt.Sprintf("main.%s.socket", errorsx.Must(uuid.NewV7()).String())
+	return fmt.Sprintf("main.%s.socket", uuidx.NewV7().String())
 }
 
 // generate unique module socket
 func SocketModule() string {
-	return fmt.Sprintf("module.%s.socket", errorsx.Must(uuid.NewV7()).String())
+	return fmt.Sprintf("module.%s.socket", uuidx.NewV7().String())
 }
 
 func DefaultModuleDirectory(rel ...string) string {

@@ -23,11 +23,11 @@ import (
 	"github.com/egdaemon/eg/internal/gitx"
 	iterx "github.com/egdaemon/eg/internal/iterx"
 	"github.com/egdaemon/eg/internal/langx"
+	"github.com/egdaemon/eg/internal/uuidx"
 	"github.com/egdaemon/eg/internal/wasix"
 	"github.com/egdaemon/eg/runtime/wasi/egunsafe"
 	"github.com/go-git/go-git/v6"
 	"github.com/go-git/go-git/v6/plumbing"
-	"github.com/gofrs/uuid/v5"
 	"golang.org/x/tools/go/packages"
 )
 
@@ -75,6 +75,8 @@ func (t Context) FS() fs.FS {
 // added without breaking callers.
 type Desc struct {
 	Path string // relative to dir
+	Dir  string // absolute path of the package's directory
+	Name string // the package's name, workloads are package main
 }
 
 // Workloads scans dir for eg workloads: main-module go packages, the same
@@ -104,7 +106,7 @@ func Workloads(ctx context.Context, dir string) iterx.Seq[Desc] {
 				continue
 			}
 
-			if !yield(Desc{Path: m}) {
+			if !yield(Desc{Path: m, Dir: pkg.Dir, Name: pkg.Name}) {
 				return nil
 			}
 		}
@@ -219,7 +221,7 @@ func OptionCompose(opts ...Option) Option {
 // the roots of all runs live together in a .eg.workload directory. a run launched by another, which provides that
 // run's root in the environment, places its root beside it instead of within its clone, so the path does not grow
 // for each nesting.
-func NewLocal(ctx context.Context, uid uuid.UUID, cid hash.Hash, cwd string, name string, options ...Option) (zero Context, err error) {
+func NewLocal(ctx context.Context, uid uuidx.UUID, cid hash.Hash, cwd string, name string, options ...Option) (zero Context, err error) {
 	root := envx.String(cwd, eg.EnvComputeWorkloadDirectory)
 	workloadroot := egunsafe.ModuleRuntimeDirectory(uid)
 	// detect nested environments and root the workload appropriately.
@@ -242,7 +244,7 @@ func NewLocal(ctx context.Context, uid uuid.UUID, cid hash.Hash, cwd string, nam
 	)
 }
 
-func NewBuiltin(ctx context.Context, uid uuid.UUID, cid hash.Hash, cwd string, name string, options ...Option) (zero Context, err error) {
+func NewBuiltin(ctx context.Context, uid uuidx.UUID, cid hash.Hash, cwd string, name string, options ...Option) (zero Context, err error) {
 	root := filepath.Join(cwd, eg.WorkloadDirectory, egunsafe.ModuleRuntimeDirectory(uid))
 	return New(
 		ctx,
@@ -268,7 +270,7 @@ func New(ctx context.Context, cid hash.Hash, cwd string, root string, name strin
 		return zero, errorsx.Wrap(err, "unable to create cache id")
 	}
 
-	_cid := uuid.FromBytesOrNil(cid.Sum(nil)).String()
+	_cid := uuidx.FromBytesOrNil(cid.Sum(nil)).String()
 
 	return ensuredirs(langx.Clone(Context{
 		Module:         name,

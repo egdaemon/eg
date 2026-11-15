@@ -12,7 +12,7 @@ import (
 	"github.com/egdaemon/eg/internal/execx"
 	"github.com/egdaemon/eg/internal/gpgx"
 	"github.com/egdaemon/eg/internal/stringsx"
-	"github.com/gofrs/uuid/v5"
+	"github.com/egdaemon/eg/internal/uuidx"
 	"github.com/stretchr/testify/require"
 )
 
@@ -121,7 +121,7 @@ func TestKeyring(t *testing.T) {
 		}
 
 		for range envx.Int(512, "GPGX_FUZZ_N") {
-			runOnce(uuid.Must(uuid.NewV7()).String())
+			runOnce(uuidx.NewV7().String())
 		}
 
 		if seed := envx.String("", "GPGX_FUZZ_SEED"); stringsx.Present(seed) {

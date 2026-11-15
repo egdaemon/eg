@@ -10,7 +10,7 @@ import (
 	"github.com/egdaemon/eg/internal/sqlx"
 	"github.com/egdaemon/eg/internal/timex"
 	"github.com/egdaemon/eg/internal/tracex"
-	"github.com/gofrs/uuid/v5"
+	"github.com/egdaemon/eg/internal/uuidx"
 	"github.com/shirou/gopsutil/v4/cpu"
 	"github.com/shirou/gopsutil/v4/disk"
 	"github.com/shirou/gopsutil/v4/mem"
@@ -59,7 +59,7 @@ func sampledisk(ctx context.Context, analytics *sql.DB) error {
 		return errorsx.Wrap(err, "unable to retrieve disk")
 	}
 
-	if err := analytics.QueryRowContext(ctx, "INSERT INTO 'eg.metrics.disk' (id, name, ts, path, percent) VALUES (?, 'disk', ?, ?, ?) RETURNING percent", uuid.Must(uuid.NewV7()).String(), time.Now().UTC(), usage.Path, usage.UsedPercent).Scan(&usage.UsedPercent); err != nil {
+	if err := analytics.QueryRowContext(ctx, "INSERT INTO 'eg.metrics.disk' (id, name, ts, path, percent) VALUES (?, 'disk', ?, ?, ?) RETURNING percent", uuidx.NewV7().String(), time.Now().UTC(), usage.Path, usage.UsedPercent).Scan(&usage.UsedPercent); err != nil {
 		return err
 	}
 
@@ -80,7 +80,7 @@ func samplecompute(ctx context.Context, analytics *sql.DB) error {
 
 	load := slicesx.FirstOrZero(loads...)
 
-	if err := analytics.QueryRowContext(ctx, "INSERT INTO 'eg.metrics.cpu' (id, name, ts, load) VALUES (?, 'compute', ?, ?) RETURNING load", uuid.Must(uuid.NewV7()).String(), time.Now().UTC(), load).Scan(&load); err != nil {
+	if err := analytics.QueryRowContext(ctx, "INSERT INTO 'eg.metrics.cpu' (id, name, ts, load) VALUES (?, 'compute', ?, ?) RETURNING load", uuidx.NewV7().String(), time.Now().UTC(), load).Scan(&load); err != nil {
 		return err
 	}
 
@@ -110,7 +110,7 @@ func samplememory(ctx context.Context, analytics *sql.DB) error {
 		return errorsx.Wrap(err, "unable to retrieve memory usage")
 	}
 
-	if err := analytics.QueryRowContext(ctx, query, uuid.Must(uuid.NewV7()).String(), time.Now().UTC(), usage.UsedPercent, usage.Free, usage.Used, usage.Cached, usage.Total).Scan(&percent); err != nil {
+	if err := analytics.QueryRowContext(ctx, query, uuidx.NewV7().String(), time.Now().UTC(), usage.UsedPercent, usage.Free, usage.Used, usage.Cached, usage.Total).Scan(&percent); err != nil {
 		return err
 	}
 
@@ -150,7 +150,7 @@ func samplenet(ctx context.Context, analytics *sql.DB) error {
 	}
 
 	for _, v := range usage {
-		if err := analytics.QueryRowContext(ctx, query, uuid.Must(uuid.NewV7()).String(), v.Name, time.Now().UTC(), v.BytesSent, v.BytesRecv, v.PacketsSent, v.PacketsRecv, v.Dropout, v.Dropin, v.Errout, v.Errin, v.Fifoout, v.Fifoin).Scan(&v.BytesSent, &v.BytesRecv, &v.PacketsSent, &v.PacketsRecv, &v.Dropout, &v.Dropin, &v.Errout, &v.Errin, &v.Fifoout, &v.Fifoin); err != nil {
+		if err := analytics.QueryRowContext(ctx, query, uuidx.NewV7().String(), v.Name, time.Now().UTC(), v.BytesSent, v.BytesRecv, v.PacketsSent, v.PacketsRecv, v.Dropout, v.Dropin, v.Errout, v.Errin, v.Fifoout, v.Fifoin).Scan(&v.BytesSent, &v.BytesRecv, &v.PacketsSent, &v.PacketsRecv, &v.Dropout, &v.Dropin, &v.Errout, &v.Errin, &v.Fifoout, &v.Fifoin); err != nil {
 			return err
 		}
 		tracex.Printf("eg.metrics.network %s v(sent,recv) bytes(%d, %d) packets(%d,%d) packets_dropped(%d,%d) total_errors(%d,%d) fifo_buff_errors(%d,%d)\n", v.Name, v.BytesSent, v.BytesRecv, v.PacketsSent, v.PacketsRecv, v.Dropout, v.Dropin, v.Errout, v.Errin, v.Fifoout, v.Fifoin)

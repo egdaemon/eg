@@ -7,8 +7,8 @@ import (
 	"testing"
 
 	"github.com/egdaemon/eg"
+	"github.com/egdaemon/eg/internal/uuidx"
 	"github.com/egdaemon/eg/workspaces"
-	"github.com/gofrs/uuid/v5"
 	"github.com/stretchr/testify/require"
 )
 
@@ -17,7 +17,7 @@ func TestNewBuiltinRoot(t *testing.T) {
 		cwd := t.TempDir()
 		t.Setenv(eg.EnvComputeWorkloadDirectory, "")
 
-		ws, err := workspaces.NewBuiltin(t.Context(), uuid.Max, sha256.New(), cwd, "")
+		ws, err := workspaces.NewBuiltin(t.Context(), uuidx.Max(), sha256.New(), cwd, "")
 		require.NoError(t, err)
 
 		root := filepath.Join(cwd, eg.WorkloadDirectory, "m.ffffffff.d")
@@ -34,7 +34,7 @@ func TestNewBuiltinRoot(t *testing.T) {
 		require.NoError(t, os.MkdirAll(cwd, 0755))
 		t.Setenv(eg.EnvComputeWorkloadDirectory, filepath.Join(shared, "m.aaaaaaaa.d"))
 
-		ws, err := workspaces.NewBuiltin(t.Context(), uuid.Max, sha256.New(), cwd, "")
+		ws, err := workspaces.NewBuiltin(t.Context(), uuidx.Max(), sha256.New(), cwd, "")
 		require.NoError(t, err)
 		require.Equal(t, filepath.Join(cwd, eg.WorkloadDirectory, "m.ffffffff.d"), ws.Root)
 	})

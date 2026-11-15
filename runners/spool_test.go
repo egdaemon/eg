@@ -6,8 +6,9 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/gofrs/uuid/v5"
 	"github.com/stretchr/testify/require"
+
+	"github.com/egdaemon/eg/internal/uuidx"
 )
 
 func TestSpoolDequeue(t *testing.T) {
@@ -15,7 +16,7 @@ func TestSpoolDequeue(t *testing.T) {
 		sdir := t.TempDir()
 		dirs := NewSpoolDir(sdir)
 
-		uid := uuid.Must(uuid.NewV7())
+		uid := uuidx.NewV7()
 		require.NoError(t, dirs.Download(uid, "archive.tar.gz", bytes.NewBufferString("")))
 		require.NoError(t, dirs.Enqueue(uid))
 

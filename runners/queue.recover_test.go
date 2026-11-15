@@ -6,8 +6,8 @@ import (
 	"testing"
 
 	"github.com/egdaemon/eg/computeapi"
+	"github.com/egdaemon/eg/internal/uuidx"
 
-	"github.com/gofrs/uuid/v5"
 	"github.com/stretchr/testify/require"
 )
 
@@ -19,7 +19,7 @@ func TestRecover(t *testing.T) {
 
 		// item that had claimed the key (still sitting in Running, as if the
 		// process crashed mid-run).
-		uid1 := uuid.Must(uuid.NewV7())
+		uid1 := uuidx.NewV7()
 		require.NoError(t, dirs.Download(uid1, "archive.tar.gz", bytes.NewBufferString("")))
 		require.NoError(t, dirs.Enqueue(uid1))
 		rundir1, err := dirs.Dequeue()
@@ -28,7 +28,7 @@ func TestRecover(t *testing.T) {
 		require.NoError(t, err)
 
 		// a second item for the same repo that got parked behind it.
-		uid2 := uuid.Must(uuid.NewV7())
+		uid2 := uuidx.NewV7()
 		require.NoError(t, dirs.Download(uid2, "archive.tar.gz", bytes.NewBufferString("")))
 		require.NoError(t, dirs.Enqueue(uid2))
 		rundir2, err := dirs.Dequeue()

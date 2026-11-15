@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/egdaemon/eg/computeapi"
+	"github.com/egdaemon/eg/internal/uuidx"
 
 	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/compute"
@@ -22,7 +23,6 @@ import (
 	"github.com/egdaemon/eg/internal/tarx"
 	"github.com/go-git/go-git/v6"
 	"github.com/go-git/go-git/v6/plumbing/object"
-	"github.com/gofrs/uuid/v5"
 	"github.com/stretchr/testify/require"
 )
 
@@ -80,7 +80,7 @@ func TestCompileWorkload(t *testing.T) {
 			return w.Result(), nil
 		})}
 
-		uid := uuid.Must(uuid.NewV7())
+		uid := uuidx.NewV7()
 		req := computeapi.EnqueuedDequeueResponse{
 			Enqueued: &computeapi.Enqueued{
 				VcsUri:    uri,
@@ -154,7 +154,7 @@ func TestCompileWorkload(t *testing.T) {
 		})}
 
 		missing := filepath.Join(t.TempDir(), "does-not-exist")
-		uid := uuid.Must(uuid.NewV7())
+		uid := uuidx.NewV7()
 		req := computeapi.EnqueuedDequeueResponse{Enqueued: &computeapi.Enqueued{VcsUri: missing}, AccessToken: "token"}
 		encoded, err := json.Marshal(&req)
 		require.NoError(t, err)
@@ -192,7 +192,7 @@ func TestCompileWorkload(t *testing.T) {
 			return w.Result(), nil
 		})}
 
-		uid := uuid.Must(uuid.NewV7())
+		uid := uuidx.NewV7()
 		req := computeapi.EnqueuedDequeueResponse{
 			Enqueued:    &computeapi.Enqueued{VcsUri: uri, VcsCommit: ref, Cores: 1},
 			AccessToken: "token",
@@ -230,7 +230,7 @@ func TestCompileWorkload(t *testing.T) {
 
 		// the clone fails, leaving the job directory in place to inspect.
 		missing := filepath.Join(t.TempDir(), "does-not-exist")
-		uid := uuid.Must(uuid.NewV7())
+		uid := uuidx.NewV7()
 		req := computeapi.EnqueuedDequeueResponse{
 			Enqueued:    &computeapi.Enqueued{VcsUri: missing},
 			AccessToken: "token",
@@ -269,7 +269,7 @@ func TestCompileWorkload(t *testing.T) {
 
 		// mirrors what egmeta pushes: the canonical vcs uri and commit, which
 		// are not directly cloneable, alongside the clone uri and ref.
-		uid := uuid.Must(uuid.NewV7())
+		uid := uuidx.NewV7()
 		req := computeapi.EnqueuedDequeueResponse{
 			Enqueued:    &computeapi.Enqueued{VcsUri: "git@github.com:example/nope.git", VcsCommit: head.Hash().String(), Cores: 1},
 			AccessToken: "token",
@@ -312,7 +312,7 @@ func TestCompileWorkload(t *testing.T) {
 			return w.Result(), nil
 		})}
 
-		uid := uuid.Must(uuid.NewV7())
+		uid := uuidx.NewV7()
 		req := computeapi.EnqueuedDequeueResponse{Enqueued: &computeapi.Enqueued{VcsUri: uri, VcsCommit: ref, Cores: 1}, AccessToken: "token"}
 		encoded, err := json.Marshal(&req)
 		require.NoError(t, err)
@@ -333,7 +333,7 @@ func TestCompileWorkload(t *testing.T) {
 		compiledirs := NewSpoolDir(t.TempDir())
 		rundirs := NewSpoolDir(t.TempDir())
 
-		uid := uuid.Must(uuid.NewV7())
+		uid := uuidx.NewV7()
 		req := computeapi.EnqueuedDequeueResponse{Enqueued: &computeapi.Enqueued{VcsUri: uri, VcsCommit: ref, Cores: 1}}
 		encoded, err := json.Marshal(&req)
 		require.NoError(t, err)
@@ -362,7 +362,7 @@ func TestCompileWorkload(t *testing.T) {
 			return httptest.NewRecorder().Result(), nil
 		})}
 
-		uid := uuid.Must(uuid.NewV7())
+		uid := uuidx.NewV7()
 		req := computeapi.EnqueuedDequeueResponse{Enqueued: &computeapi.Enqueued{VcsUri: uri, VcsCommit: ref, Cores: 1}}
 		encoded, err := json.Marshal(&req)
 		require.NoError(t, err)
@@ -436,7 +436,7 @@ func (t roundtripper) RoundTrip(r *http.Request) (*http.Response, error) {
 }
 
 func TestCompileWorkloadReserved(t *testing.T) {
-	spool := func(t *testing.T, compiledirs SpoolDirs, uid uuid.UUID, req *computeapi.EnqueuedDequeueResponse, environ string) string {
+	spool := func(t *testing.T, compiledirs SpoolDirs, uid uuidx.UUID, req *computeapi.EnqueuedDequeueResponse, environ string) string {
 		encoded, err := json.Marshal(req)
 		require.NoError(t, err)
 		require.NoError(t, compiledirs.Download(uid, "metadata.json", bytes.NewReader(encoded)))
@@ -455,7 +455,7 @@ func TestCompileWorkloadReserved(t *testing.T) {
 		compiledirs := NewSpoolDir(t.TempDir())
 		rundirs := NewSpoolDir(t.TempDir())
 
-		uid := uuid.Must(uuid.NewV7())
+		uid := uuidx.NewV7()
 		cp := &controlplane{
 			reserved: computeapi.EnqueuedDequeueResponse{
 				Enqueued:    &computeapi.Enqueued{Id: uid.String(), VcsUri: uri, VcsCommit: ref, Entry: "reserved.wasm"},
@@ -507,7 +507,7 @@ func TestCompileWorkloadReserved(t *testing.T) {
 		compiledirs := NewSpoolDir(t.TempDir())
 		rundirs := NewSpoolDir(t.TempDir())
 
-		uid := uuid.Must(uuid.NewV7())
+		uid := uuidx.NewV7()
 		cp := &controlplane{}
 
 		dir := spool(t, compiledirs, uid, &computeapi.EnqueuedDequeueResponse{
@@ -526,7 +526,7 @@ func TestCompileWorkloadReserved(t *testing.T) {
 		compiledirs := NewSpoolDir(t.TempDir())
 		rundirs := NewSpoolDir(t.TempDir())
 
-		uid := uuid.Must(uuid.NewV7())
+		uid := uuidx.NewV7()
 		cp := &controlplane{}
 
 		vcsaccess := &http.Client{Transport: roundtripper(func(r *http.Request) (*http.Response, error) {
@@ -561,7 +561,7 @@ func TestCompileWorkloadReserved(t *testing.T) {
 			return w.Result(), nil
 		})}
 
-		uid := uuid.Must(uuid.NewV7())
+		uid := uuidx.NewV7()
 		dir := spool(t, compiledirs, uid, &computeapi.EnqueuedDequeueResponse{
 			Enqueued:    &computeapi.Enqueued{VcsUri: uri, VcsCommit: ref, Cores: 1},
 			AccessToken: "token",
@@ -580,7 +580,7 @@ func TestCompileWorkloadReserved(t *testing.T) {
 		compiledirs := NewSpoolDir(t.TempDir())
 		rundirs := NewSpoolDir(t.TempDir())
 
-		uid := uuid.Must(uuid.NewV7())
+		uid := uuidx.NewV7()
 		cp := &controlplane{}
 
 		vcsaccess := &http.Client{Transport: roundtripper(func(r *http.Request) (*http.Response, error) {
@@ -615,7 +615,7 @@ func TestCompileN(t *testing.T) {
 		})}
 
 		// compiles and is handed off.
-		succeeds := uuid.Must(uuid.NewV7())
+		succeeds := uuidx.NewV7()
 		encoded, err := json.Marshal(&computeapi.EnqueuedDequeueResponse{
 			Enqueued:    &computeapi.Enqueued{VcsUri: uri, VcsCommit: ref, Cores: 1},
 			AccessToken: "token",
@@ -626,7 +626,7 @@ func TestCompileN(t *testing.T) {
 		require.NoError(t, compiledirs.Enqueue(succeeds))
 
 		// fails, missing the head uri/ref.
-		fails := uuid.Must(uuid.NewV7())
+		fails := uuidx.NewV7()
 		encoded, err = json.Marshal(&computeapi.EnqueuedDequeueResponse{
 			Enqueued:    &computeapi.Enqueued{VcsUri: uri, VcsCommit: ref, Cores: 1},
 			AccessToken: "token",
@@ -671,7 +671,7 @@ func TestCompileN(t *testing.T) {
 			return w.Result(), nil
 		})}
 
-		uid := uuid.Must(uuid.NewV7())
+		uid := uuidx.NewV7()
 		encoded, err := json.Marshal(&computeapi.EnqueuedDequeueResponse{
 			Enqueued:    &computeapi.Enqueued{VcsUri: uri, VcsCommit: ref, Cores: 1},
 			AccessToken: "token",

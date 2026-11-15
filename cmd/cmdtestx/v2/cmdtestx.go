@@ -44,7 +44,7 @@ func New(t *testing.T, cmd any) *Harness {
 }
 
 // Env provides environment variables, in the form KEY=value, to the command without touching
-// the process environment. flags declaring `env:"NAME"` are populated from them when NAME is
+// the process environment. commands that accept a cmdopts.Environ look them up through it. flags declaring `env:"NAME"` are populated from them when NAME is
 // present. a value given on the command line wins, otherwise these win over the flag's default
 // and the process environment. when a key is repeated, the last value wins. positional
 // arguments don't support env tags and aren't affected.
@@ -88,6 +88,8 @@ func (t *Harness) Parse(args ...string) (*kong.Context, error) {
 	opts := []kong.Option{
 		kong.Vars{"env_eg_account": eg.EnvAccount, "env_eg_profile": eg.EnvProfile},
 		kong.Bind(&t.global),
+		// the variables given to Env, not the process environment, so tests do not depend on where they run.
+		kong.Bind(cmdopts.Environ(func(name string) string { return lookup[name] })),
 	}
 	opts = append(opts, t.opts...)
 	parser, err := kong.New(t.cmd, append(opts, kong.Resolvers(resolver))...)

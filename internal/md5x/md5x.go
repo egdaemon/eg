@@ -6,7 +6,7 @@ import (
 	"encoding/hex"
 	"hash"
 
-	"github.com/gofrs/uuid/v5"
+	"github.com/egdaemon/eg/internal/uuidx"
 )
 
 // digest the provided contents and return the resulting hash.
@@ -31,7 +31,7 @@ func String(s string) string {
 
 // format md5 hash to a uuid encoded string
 func FormatString(m hash.Hash) string {
-	return uuid.FromBytesOrNil(m.Sum(nil)).String()
+	return uuidx.FromBytesOrNil(m.Sum(nil)).String()
 }
 
 // format md5 hash to a hex encoded string

@@ -13,11 +13,11 @@ import (
 
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/langx"
+	"github.com/egdaemon/eg/internal/uuidx"
 	"github.com/egdaemon/eg/interp/runtime/wasi/ffierrors"
 	"github.com/egdaemon/eg/interp/runtime/wasi/ffiguest"
 	"github.com/egdaemon/eg/runtime/wasi/egunsafe"
 	"github.com/egdaemon/wasinet/wasinet"
-	"github.com/gofrs/uuid/v5"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -43,7 +43,7 @@ func Command(ctx context.Context, name string, args ...string) *Cmd {
 // Run executes the command and waits for it, a non zero exit is returned as an error.
 func (t *Cmd) Run() (err error) {
 	var (
-		uid   = errorsx.Must(uuid.NewV7())
+		uid   = uuidx.NewV7()
 		id    = binary.BigEndian.Uint64(uid[8:])
 		name  = egunsafe.PatternIsolateFrom(uid, 8, "%s")
 		env   = t.Env

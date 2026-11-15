@@ -21,11 +21,11 @@ import (
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/gitx"
+	"github.com/egdaemon/eg/internal/uuidx"
 	"github.com/egdaemon/eg/runtime/wasi/eg"
 	"github.com/egdaemon/eg/runtime/wasi/egenv"
 	"github.com/egdaemon/eg/runtime/wasi/env"
 	"github.com/egdaemon/eg/runtime/wasi/shell"
-	"github.com/gofrs/uuid/v5"
 )
 
 const nilUUID = "00000000-0000-0000-0000-000000000000"
@@ -198,15 +198,15 @@ func normalizeEnv(environ *envx.Builder) *envx.Builder {
 	}
 
 	// zero out some dynamic environment variables for consistent results
-	environ.Setenv(_eg.EnvComputeAccountID, uuid.Nil.String())
-	environ.Setenv(_eg.EnvComputeRunID, uuid.Nil.String())
+	environ.Setenv(_eg.EnvComputeAccountID, uuidx.Nil().String())
+	environ.Setenv(_eg.EnvComputeRunID, uuidx.Nil().String())
 	environ.Setenv(_eg.EnvGitHeadCommitTimestamp, "0000-00-00T00:00:00-00:00")
 	environ.Setenv(_eg.EnvGitHeadCommit, "0000000000000000000000000000000000000000")
 	environ.Setenv(_eg.EnvGitBaseCommit, "0000000000000000000000000000000000000000")
 	environ.Setenv(_eg.EnvGitHeadCommitAuthor, "Egdaemon")
 	environ.Setenv(_eg.EnvGitHeadCommitEmail, "noreply@egdaemon.com")
 	environ.Setenv(_eg.EnvComputeInitiatedTimestamp, "0000-00-00T00:00:00-00:00")
-	environ.Setenv(_eg.EnvUnsafeCacheID, uuid.Nil.String())
+	environ.Setenv(_eg.EnvUnsafeCacheID, uuidx.Nil().String())
 	environ.Setenv(_eg.EnvComputeLoggingVerbosity, "0")
 	environ.Setenv(_eg.EnvComputeModuleSocket, _eg.DefaultRuntimeDirectory("module.socket"))
 	environ.Setenv(_eg.EnvComputeOS, "linux")

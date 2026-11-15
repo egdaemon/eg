@@ -21,10 +21,10 @@ import (
 	"github.com/egdaemon/eg/internal/stringsx"
 	"github.com/egdaemon/eg/internal/tarx"
 	"github.com/egdaemon/eg/internal/unsafepretty"
+	"github.com/egdaemon/eg/internal/uuidx"
 	"github.com/egdaemon/eg/transpile"
 	"github.com/egdaemon/eg/workspaces"
 	"github.com/go-git/go-git/v6"
-	"github.com/gofrs/uuid/v5"
 )
 
 type archive struct {
@@ -49,7 +49,7 @@ func (t archive) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) 
 
 	if ws, err = workspaces.NewLocal(
 		gctx.Context,
-		uuid.Must(uuid.NewV7()),
+		uuidx.NewV7(),
 		md5x.Digest(errorsx.Zero(cmdopts.BuildInfo())),
 		t.Dir,
 		t.Name,

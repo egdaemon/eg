@@ -1,6 +1,9 @@
 package compute
 
+import "github.com/egdaemon/eg/cmd/cmdopts"
+
 type Cmd struct {
+	cmdopts.ComputeSession
 	Builtin    cmdbuiltin  `cmd:"" help:"EXPERIMENTAL: run builtin workloads like cache clearing and standalone containers/wasi workloads"`
 	Cache      cmdCache    `cmd:"" help:"manage the runner workload cache"`
 	Archive    archive     `cmd:"" help:"compiles and creates a workload tar archive from manual inspection/storage"`
@@ -11,8 +14,8 @@ type Cmd struct {
 	Cancel     cancel      `cmd:"" help:"cancel an enqueued or running workload by id"`
 	Local      local       `cmd:"" help:"execute the interpreter on the given directory"`
 	Baremetal  baremetal   `cmd:"" help:"execute the interpreter on the given directory within the host itself, inherently unsafe"`
-	Serve      serve       `cmd:"" help:"run a service within eg, automiacally uses builds and loads the containerfile without the module directory and .eg.env if it exists"`
-	Sessions   sessionsCmd `cmd:"" name:"sessions" help:"list the workloads served with 'eg compute serve --ssh', running and previous"`
+	Serve      serve       `cmd:"" help:"run a service within eg, automiacally uses builds and loads the nearest containerfile, from the workload up to the module directory, and .eg.env if it exists"`
+	Sessions   sessionsCmd `cmd:"" name:"sessions" help:"the workloads run with 'eg compute serve' and 'eg compute local', running and previous"`
 	LAN        lanCmd      `cmd:"" name:"lan" help:"manage compute systems on your local network"`
 	Pub        pubCmd      `cmd:"" name:"pub" help:"manage compute systems on your account"`
 	History    historyCmd  `cmd:"" name:"history" help:"list the completed workloads of the account, result is ✔ completed, ✖ failed or ⏹ cancelled"`

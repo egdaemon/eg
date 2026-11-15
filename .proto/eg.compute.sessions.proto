@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package eg.eg.compute;
 
-// ServeSession is a workload served by 'eg compute serve', as recorded in the
+// ServeSession is a workload run by 'eg compute serve' or 'eg compute local', as recorded in the
 // cli's database. it is the shape printed by 'eg compute sessions --json'.
 message ServeSession {
   string id = 1 [ json_name = "id" ];
@@ -19,4 +19,13 @@ message ServeSession {
   string started_at = 9 [ json_name = "started_at" ]; // rfc3339.
   string stopped_at = 10
       [ json_name = "stopped_at" ]; // rfc3339, empty while running.
+  // the branch the session's changes are committed to, restored when the
+  // session is resumed. empty until one is chosen.
+  string branch = 11 [ json_name = "branch" ];
+  // what the session supports, tools use these to decide which actions to
+  // offer instead of inferring them from how it was started.
+  bool cap_ssh = 1000 [ json_name = "cap_ssh" ];     // reachable over ssh.
+  bool cap_agent = 1001 [ json_name = "cap_agent" ]; // an agent can run inside it.
+  bool cap_patch = 1002
+      [ json_name = "cap_patch" ]; // its changes are patched back to the worktree.
 }

@@ -10,7 +10,6 @@ import (
 	"strings"
 	"sync"
 	"time"
-	"uuid"
 
 	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/internal/envx"
@@ -18,6 +17,7 @@ import (
 	"github.com/egdaemon/eg/internal/fsx"
 	"github.com/egdaemon/eg/internal/patternx"
 	"github.com/egdaemon/eg/internal/userx"
+	"github.com/egdaemon/eg/internal/uuidx"
 	"github.com/egdaemon/eg/runtime/wasi/egunsafe/ffiegenv"
 	"github.com/egdaemon/eg/runtime/wasi/env"
 )
@@ -48,12 +48,12 @@ func Release() bool {
 
 // Read the run ID from the environment
 func RunID() string {
-	return env.String(uuid.Nil().String(), eg.EnvComputeRunID)
+	return env.String(uuidx.Nil().String(), eg.EnvComputeRunID)
 }
 
 // Read the account ID from the environment
 func AccountID() string {
-	return env.String(uuid.Nil().String(), eg.EnvComputeAccountID)
+	return env.String(uuidx.Nil().String(), eg.EnvComputeAccountID)
 }
 
 func HostOS() string {

@@ -36,6 +36,7 @@ import (
 	"github.com/egdaemon/eg/internal/runtimex"
 	"github.com/egdaemon/eg/internal/stringsx"
 	"github.com/egdaemon/eg/internal/userx"
+	"github.com/egdaemon/eg/internal/uuidx"
 	"github.com/egdaemon/eg/interp"
 	"github.com/egdaemon/eg/interp/c8sproxy"
 	"github.com/egdaemon/eg/interp/dbproxy/dbservice"
@@ -44,7 +45,6 @@ import (
 	"github.com/egdaemon/eg/runners"
 	"github.com/egdaemon/eg/runtime/wasi/egunsafe/egworkloads"
 	"github.com/egdaemon/eg/workspaces"
-	"github.com/gofrs/uuid/v5"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
@@ -274,8 +274,8 @@ func recordDiscoveredWorkloads(ctx context.Context, db *sql.DB, dir string, envi
 func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 	var (
 		ws      workspaces.Context
-		aid     = envx.String(uuid.Nil.String(), eg.EnvComputeAccountID)
-		uid     = envx.String(uuid.Nil.String(), eg.EnvComputeRunID)
+		aid     = envx.String(uuidx.Nil().String(), eg.EnvComputeAccountID)
+		uid     = envx.String(uuidx.Nil().String(), eg.EnvComputeRunID)
 		descr   = envx.String("", eg.EnvComputeVCS)
 		hostnet = envx.Toggle(runners.AgentOptionCommandLine("--network", "host"), runners.AgentOptionNoop, envx.Boolean(false, eg.EnvExperimentalDisableHostNetwork)) // ipv4 group bullshit. pretty sure its a podman 4 issue that was resolved in podman 5. this is 'safe' to do because we are already in a container.
 		cc      grpc.ClientConnInterface

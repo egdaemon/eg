@@ -75,6 +75,8 @@ func (t Context) FS() fs.FS {
 // added without breaking callers.
 type Desc struct {
 	Path string // relative to dir
+	Dir  string // absolute path of the package's directory
+	Name string // the package's name, workloads are package main
 }
 
 // Workloads scans dir for eg workloads: main-module go packages, the same
@@ -104,7 +106,7 @@ func Workloads(ctx context.Context, dir string) iterx.Seq[Desc] {
 				continue
 			}
 
-			if !yield(Desc{Path: m}) {
+			if !yield(Desc{Path: m, Dir: pkg.Dir, Name: pkg.Name}) {
 				return nil
 			}
 		}

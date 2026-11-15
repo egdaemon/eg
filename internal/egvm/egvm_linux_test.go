@@ -256,11 +256,15 @@ func TestExec(t *testing.T) {
 		require.NoError(t, os.Remove(filepath.Join(owned, "bound.socket")))
 	})
 
-	t.Run("refuses to change the owner of a file in an owned directory", func(t *testing.T) {
+	t.Run("lets a user change the owner of a file in an owned directory, which stays the host user's", func(t *testing.T) {
 		require.NoError(t, os.WriteFile(filepath.Join(owned, "chowned"), nil, 0644))
-		code, _, stderr := run(t, t.Context(), nil, "chown", "root", "/srv/owned/chowned")
-		require.NotEqual(t, int32(0), code)
-		require.Contains(t, stderr, "Operation not permitted")
+		code, stdout, stderr := run(t, t.Context(), nil, "sh", "-c", "chown egd:egd /srv/owned/chowned && stat -c %u:%g /srv/owned/chowned")
+		require.Equal(t, int32(0), code, stderr)
+		require.Equal(t, "0:0\n", stdout)
+
+		st, cause := os.Lstat(filepath.Join(owned, "chowned"))
+		require.NoError(t, cause)
+		require.Equal(t, uint32(os.Getuid()), st.Sys().(*syscall.Stat_t).Uid)
 	})
 
 	t.Run("reports the host filesystem holding an owned directory", func(t *testing.T) {

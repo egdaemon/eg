@@ -13,6 +13,7 @@ import (
 	"os/user"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -46,6 +47,7 @@ import (
 	"github.com/egdaemon/eg/runners"
 	"github.com/egdaemon/eg/runtime/wasi/egunsafe/egworkloads"
 	"github.com/egdaemon/eg/workspaces"
+	"github.com/moby/sys/mountinfo"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
@@ -64,8 +66,16 @@ type module struct {
 }
 
 // remapdir returns a function that remaps a directory, giving the unprivileged user access to the contents.
+// A directory whose files the kernel checks no permissions on, as a machine's owned directories, is
+// bound as it is: every user already has access, and bindfs would only add a mount to go through.
 func remapdir(ctx context.Context, bindfs string) func(from, to string) error {
 	return func(from, to string) (err error) {
+		if unchecked(from) {
+			mcmd := exec.CommandContext(ctx, "mount", "--bind", from, to)
+			mcmd.Stdout, mcmd.Stderr = log.Writer(), log.Writer()
+			return errorsx.Wrapf(execx.MaybeRun(mcmd), "unable to bind: %s", from)
+		}
+
 		if envx.Boolean(false, eg.EnvExperimentalBindMount) {
 			egdu, err := user.Lookup(eg.DefaultUsername)
 			if err != nil {
@@ -105,6 +115,16 @@ func remapdir(ctx context.Context, bindfs string) func(from, to string) error {
 
 		return nil
 	}
+}
+
+// unchecked reports whether dir is a FUSE mount the kernel checks no permissions on: one mounted
+// without default_permissions leaves them to its server.
+func unchecked(dir string) bool {
+	mounts, err := mountinfo.GetMounts(mountinfo.SingleEntryFilter(dir))
+	if err != nil || len(mounts) == 0 {
+		return false
+	}
+	return mounts[0].FSType == "fuse" && !slices.Contains(strings.Split(mounts[0].VFSOptions, ","), "default_permissions")
 }
 
 // defaultgcloudcredentials points gcloud at the credentials installed for the workload, gcloud commands only use them when told to.

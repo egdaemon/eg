@@ -26,7 +26,8 @@ import (
 // it, as the kernel reports the process's ids within the namespace that mounted dev. A Bind mount's
 // files belong to the host user, so each process sees them as its own. Unless fsys holds a Bind
 // mount, whose host directory others change too, only the mount changes fsys while it is served, so
-// the kernel keeps what it learns of it.
+// the kernel keeps what it learns of it. The kernel keeps what it reads of a file, and drops it when
+// the file's attributes show it changed.
 func ServeFUSE(dev *os.File, fsys *SysFS, options ...NFSOption) error {
 	var (
 		served   = nfsfs{sys: fsys}
@@ -34,7 +35,6 @@ func ServeFUSE(dev *os.File, fsys *SysFS, options ...NFSOption) error {
 		server   *fuse.Server
 		fd       int
 		err      error
-		open     = uint32(fuse.FOPEN_KEEP_CACHE)
 		entry    = time.Hour
 		attr     = time.Hour
 		negative = time.Hour
@@ -45,16 +45,17 @@ func ServeFUSE(dev *os.File, fsys *SysFS, options ...NFSOption) error {
 	}
 
 	// the kernel keeps a Bind mount's names for a second, as an NFS client keeps attributes, and asks
-	// for their attributes each time, since their owner is whoever asks.
+	// for their attributes each time, since their owner is whoever asks: each open so learns whether
+	// what it kept of the file is still the file.
 	if fsys.upper.tree.binds() {
-		open, entry, attr, negative = 0, time.Second, 0, 0
+		entry, attr, negative = time.Second, 0, 0
 	}
 
 	// the server closes the descriptor it serves when the mount goes away, so it serves its own.
 	if fd, err = unix.FcntlInt(dev.Fd(), unix.F_DUPFD_CLOEXEC, 0); err != nil {
 		return errorsx.Wrap(err, "unable to duplicate the mount's descriptor")
 	}
-	root = &fusenode{fsys: served, open: open}
+	root = &fusenode{fsys: served}
 	if server, err = fuse.NewServer(gofs.NewNodeFS(root, &gofs.Options{EntryTimeout: &entry, AttrTimeout: &attr, NegativeTimeout: &negative}), fmt.Sprintf("/dev/fd/%d", fd), &fuse.MountOptions{DisableXAttrs: true}); err != nil {
 		return errorsx.Compact(errorsx.Wrap(err, "unable to serve the mount"), unix.Close(fd))
 	}
@@ -62,12 +63,10 @@ func ServeFUSE(dev *os.File, fsys *SysFS, options ...NFSOption) error {
 	return nil
 }
 
-// fusenode is a file of the upper, named by its path from the root. open is what the kernel may keep
-// of a file it opens.
+// fusenode is a file of the upper, named by its path from the root.
 type fusenode struct {
 	gofs.Inode
 	fsys nfsfs
-	open uint32
 }
 
 var (
@@ -103,7 +102,7 @@ func (t *fusenode) entry(ctx context.Context, name string, out *fuse.EntryOut) (
 		return nil, errnoofuse(err)
 	}
 	t.attr(ctx, name, info, &out.Attr)
-	return t.NewInode(ctx, &fusenode{fsys: t.fsys, open: t.open}, gofs.StableAttr{Mode: out.Attr.Mode & syscall.S_IFMT, Ino: out.Attr.Ino}), 0
+	return t.NewInode(ctx, &fusenode{fsys: t.fsys}, gofs.StableAttr{Mode: out.Attr.Mode & syscall.S_IFMT, Ino: out.Attr.Ino}), 0
 }
 
 // owned gives name to the process creating it, as an NFS client's create does. What a process
@@ -238,7 +237,7 @@ func (t *fusenode) Open(ctx context.Context, flags uint32) (gofs.FileHandle, uin
 	if err != nil {
 		return nil, 0, errnoofuse(err)
 	}
-	return &fusefile{f: f}, t.open, 0
+	return &fusefile{f: f}, fuse.FOPEN_KEEP_CACHE, 0
 }
 
 // overriding runs op, which changes the entries of the directory dir. Root may change any directory,

@@ -158,7 +158,8 @@ func Boot(m Machine, console io.Writer) (_ *VM, err error) {
 		return nil, errorsx.Wrap(err, "the machine did not mount its root")
 	}
 
-	// the machine mounts what the host user owns after its root, in order.
+	// the machine mounts what the host user owns after its root, in order. Its files belong to whoever
+	// asks, so the root's accounts would name no owner.
 	for _, mnt := range m.mounts {
 		if !mnt.owned {
 			continue
@@ -167,7 +168,7 @@ func Boot(m Machine, console io.Writer) (_ *VM, err error) {
 			return nil, errorsx.Wrapf(err, "unable to open %s", mnt.dir)
 		}
 		t.owned = append(t.owned, owned)
-		if err = t.serve(mounted[0], egiso.NewShare(owned), m.nfs...); err != nil {
+		if err = t.serve(mounted[0], egiso.NewShare(owned)); err != nil {
 			return nil, errorsx.Wrapf(err, "the machine did not mount %s", mnt.dir)
 		}
 	}

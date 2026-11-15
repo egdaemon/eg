@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/alecthomas/kong"
 	"github.com/egdaemon/eg/cmd/migrations"
 	egcompute "github.com/egdaemon/eg/compute"
 	"github.com/egdaemon/eg/computesess"
@@ -75,5 +76,46 @@ func TestWriteSessions(t *testing.T) {
 		require.Contains(t, out.String(), "live")
 		require.Contains(t, out.String(), "running")
 		require.Contains(t, out.String(), "44999")
+	})
+
+	t.Run("listing stays the default of sessions, rm is its own command", func(t *testing.T) {
+		var cli struct {
+			Sessions sessionsCmd `cmd:"" name:"sessions"`
+		}
+
+		parser, err := kong.New(&cli)
+		require.NoError(t, err)
+
+		for args, expected := range map[string]string{
+			"sessions":         "sessions list",
+			"sessions --jsonl": "sessions list",
+			"sessions rm a b":  "sessions rm <id>",
+		} {
+			kctx, err := parser.Parse(strings.Fields(args))
+			require.NoError(t, err, args)
+			require.Equal(t, expected, kctx.Command(), args)
+		}
+
+	})
+
+	t.Run("rm forgets stopped sessions and says which", func(t *testing.T) {
+		db := sqltestx.DuckDB(t)
+		require.NoError(t, migrations.Migrate(t.Context(), db))
+		require.NoError(t, computesess.Register(t.Context(), db, computesess.Session{ID: "old", Module: "m", Directory: "/repo"}))
+		require.NoError(t, computesess.Stop(t.Context(), db, "old"))
+		require.NoError(t, computesess.Register(t.Context(), db, computesess.Session{ID: "live", Module: "m", Directory: "/repo"}))
+
+		var out bytes.Buffer
+		err := removeSessions(t.Context(), db, &out, []string{"old", "live", "missing"})
+
+		// the stopped one is gone and reported, the running and the missing ones are errors and untouched.
+		require.Equal(t, "old\n", out.String())
+		require.ErrorContains(t, err, "session live is running")
+		require.ErrorContains(t, err, "no session missing")
+
+		var listed bytes.Buffer
+		require.NoError(t, writeSessions(t.Context(), db, &listed, true))
+		require.Contains(t, listed.String(), `"id":"live"`)
+		require.NotContains(t, listed.String(), `"id":"old"`)
 	})
 }

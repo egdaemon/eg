@@ -54,6 +54,37 @@ func Stop(ctx context.Context, db *sql.DB, id string) error {
 	return nil
 }
 
+// Remove forgets the stopped sessions with the given ids, they are no longer in the history. a session that is running
+// is not removed, it has to be stopped first, and neither is one that does not exist. every id is tried, the failures
+// are joined.
+func Remove(ctx context.Context, db *sql.DB, ids ...string) (removed []string, err error) {
+	for _, id := range ids {
+		s, lerr := Lookup(ctx, db, id)
+		if errors.Is(lerr, sql.ErrNoRows) {
+			err = errors.Join(err, errorsx.Errorf("no session %s", id))
+			continue
+		}
+		if lerr != nil {
+			err = errors.Join(err, lerr)
+			continue
+		}
+
+		if s.Running() {
+			err = errors.Join(err, errorsx.Errorf("session %s is running as process %d, stop it first", id, s.Pid))
+			continue
+		}
+
+		if _, derr := db.ExecContext(ctx, "DELETE FROM serve_sessions WHERE id = $1 AND stopped_at IS NOT NULL", id); derr != nil {
+			err = errors.Join(err, errorsx.Wrapf(derr, "unable to remove session %s", id))
+			continue
+		}
+
+		removed = append(removed, id)
+	}
+
+	return removed, err
+}
+
 // Lookup a session by id, running or stopped. returns sql.ErrNoRows when there is none.
 func Lookup(ctx context.Context, db *sql.DB, id string) (s Session, err error) {
 	if err = reap(ctx, db); err != nil {

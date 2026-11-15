@@ -1,6 +1,9 @@
 package compute
 
+import "github.com/egdaemon/eg/cmd/cmdopts"
+
 type Cmd struct {
+	cmdopts.ComputeSession
 	Builtin    cmdbuiltin  `cmd:"" help:"EXPERIMENTAL: run builtin workloads like cache clearing and standalone containers/wasi workloads"`
 	Cache      cmdCache    `cmd:"" help:"manage the runner workload cache"`
 	Archive    archive     `cmd:"" help:"compiles and creates a workload tar archive from manual inspection/storage"`

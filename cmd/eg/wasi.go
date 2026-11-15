@@ -16,13 +16,13 @@ import (
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/md5x"
+	"github.com/egdaemon/eg/internal/uuidx"
 	"github.com/egdaemon/eg/internal/wasix"
 	"github.com/egdaemon/eg/interp/runtime/wasi/ffiwasinet"
 	"github.com/egdaemon/eg/interp/runtime/wasi/wasimod"
 	"github.com/egdaemon/eg/interp/wasidebug"
 	"github.com/egdaemon/eg/workspaces"
 	"github.com/egdaemon/wasinet/wasinet/wnetruntime"
-	"github.com/gofrs/uuid/v5"
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
 )
@@ -45,7 +45,7 @@ func (t wasiCmdRun) Run(gctx *cmdopts.Global) (err error) {
 	ctx, done := context.WithCancel(gctx.Context)
 	defer done()
 
-	if ws, err = workspaces.NewLocal(gctx.Context, uuid.Must(uuid.NewV7()), md5x.Digest(cmdopts.BuildInfoSafe()), t.Dir, t.Module); err != nil {
+	if ws, err = workspaces.NewLocal(gctx.Context, uuidx.NewV7(), md5x.Digest(cmdopts.BuildInfoSafe()), t.Dir, t.Module); err != nil {
 		return errorsx.Wrap(err, "unable to setup workspace")
 	}
 

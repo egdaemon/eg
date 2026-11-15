@@ -3,13 +3,14 @@ package egunsafe_test
 import (
 	"testing"
 
+	"github.com/egdaemon/eg/internal/errorsx"
+	"github.com/egdaemon/eg/internal/uuidx"
 	"github.com/egdaemon/eg/runtime/wasi/egunsafe"
-	"github.com/gofrs/uuid/v5"
 	"github.com/stretchr/testify/require"
 )
 
 func TestPatternIsolateFrom(t *testing.T) {
-	id := uuid.Must(uuid.FromString("01890a5d-ac96-774b-bcce-b302099a8057"))
+	id := errorsx.Must(uuidx.FromString("01890a5d-ac96-774b-bcce-b302099a8057"))
 
 	t.Run("substitutes the last n bytes as hex", func(t *testing.T) {
 		require.Equal(t, "m.099a8057.d", egunsafe.PatternIsolateFrom(id, 4, "m.%x.d"))
@@ -20,7 +21,7 @@ func TestPatternIsolateFrom(t *testing.T) {
 	})
 
 	t.Run("base64 uses the url safe alphabet without padding", func(t *testing.T) {
-		require.Equal(t, "AYkKXayWd0u8zrMCCZqAVw", egunsafe.PatternIsolateFrom(id, uuid.Size, "%s"))
+		require.Equal(t, "AYkKXayWd0u8zrMCCZqAVw", egunsafe.PatternIsolateFrom(id, uuidx.Size, "%s"))
 	})
 
 	t.Run("precision 16 encodes as hex", func(t *testing.T) {
@@ -68,7 +69,7 @@ func TestPatternIsolateFrom(t *testing.T) {
 	})
 
 	t.Run("full length substitutes the entire id", func(t *testing.T) {
-		require.Equal(t, "01890a5dac96774bbcceb302099a8057", egunsafe.PatternIsolateFrom(id, uuid.Size, "%x"))
+		require.Equal(t, "01890a5dac96774bbcceb302099a8057", egunsafe.PatternIsolateFrom(id, uuidx.Size, "%x"))
 	})
 }
 

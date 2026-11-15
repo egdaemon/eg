@@ -4,9 +4,8 @@ import (
 	"context"
 	"sync"
 
-	"github.com/egdaemon/eg/internal/errorsx"
+	"github.com/egdaemon/eg/internal/uuidx"
 	"github.com/egdaemon/eg/runtime/wasi/eg"
-	"github.com/gofrs/uuid/v5"
 )
 
 type op string
@@ -16,7 +15,7 @@ func (t op) ID() string {
 }
 
 func Op() eg.Op {
-	return op(errorsx.Zero(uuid.NewV4()).String())
+	return op(uuidx.NewV4().String())
 }
 
 func NewBuffer() *buffer {

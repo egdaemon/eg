@@ -42,11 +42,11 @@ import (
 	"github.com/egdaemon/eg/internal/stringsx"
 	"github.com/egdaemon/eg/internal/tracex"
 	"github.com/egdaemon/eg/internal/userx"
+	"github.com/egdaemon/eg/internal/uuidx"
 	"github.com/egdaemon/gdx"
 	"github.com/egdaemon/gdx/konggdx"
 	"github.com/go-git/go-git/v6"
 	"github.com/go-git/go-git/v6/plumbing"
-	"github.com/gofrs/uuid/v5"
 	"github.com/willabides/kongplete"
 
 	// ensure its a dependency.
@@ -70,7 +70,7 @@ func machineID() string {
 	}
 
 	// log.Println("failed to read a valid machine id, generating a random uuid", err)
-	uid := uuid.Must(uuid.NewV7()).String()
+	uid := uuidx.NewV7().String()
 	if err = os.WriteFile(midpath, []byte(uid), 0600); err == nil {
 		return strings.TrimSpace(uid)
 	}
@@ -121,7 +121,7 @@ func main() {
 	gitdir := envx.String(gitx.DetectRoot(), "EG_GIT_REPOSITORY")
 	gdxsocket := filepath.Join(userx.DefaultRuntimeDirectory(), gdx.DefaultSocket)
 	gitname, gitemail := gitx.User(gitdir)
-	autoentropy := errorsx.Must(uuid.NewV4()).String()
+	autoentropy := uuidx.NewV4().String()
 
 	go func() {
 		if err := (konggdx.Serve{Socket: gdxsocket}).Run(shellcli.Context); err != nil {

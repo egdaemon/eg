@@ -10,7 +10,7 @@ import (
 	"github.com/egdaemon/eg/internal/bytesx"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/sqlx"
-	"github.com/gofrs/uuid/v5"
+	"github.com/egdaemon/eg/internal/uuidx"
 )
 
 // DefaultTTL is how long a peer is remembered after it was last seen.
@@ -24,7 +24,7 @@ func Purge(ctx context.Context, db sqlx.Queryer, ttl time.Duration) error {
 // PeerOptionTestDefaults populates a peer with representative values and a unique id,
 // intended for use with langx.Clone in tests.
 func PeerOptionTestDefaults(p *Peer) {
-	p.PeerID = uuid.Must(uuid.NewV7()).String()
+	p.PeerID = uuidx.NewV7().String()
 	p.PublicKey = []byte{1, 2, 3}
 	p.Addrs = EncodeList([]string{"/ip4/192.168.1.2/tcp/4001"})
 	p.Description = "host - " + p.PeerID

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/egdaemon/eg/identity"
+	"github.com/egdaemon/eg/internal/uuidx"
 	"log"
 	"os"
 	"path/filepath"
@@ -34,7 +35,6 @@ import (
 	"github.com/egdaemon/eg/transpile"
 	"github.com/egdaemon/eg/workspaces"
 	"github.com/go-git/go-git/v6"
-	"github.com/gofrs/uuid/v5"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -77,7 +77,7 @@ func (t builtinUpload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, ident 
 
 	if ws, err = workspaces.NewBuiltin(
 		gctx.Context,
-		uuid.Must(uuid.NewV7()),
+		uuidx.NewV7(),
 		md5x.Digest(errorsx.Zero(cmdopts.BuildInfo())),
 		tmpdir,
 		t.Name,
@@ -182,7 +182,7 @@ func (t builtinUpload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, ident 
 	}
 
 	enq := &computeapi.Enqueued{
-		Id:          uuid.Must(uuid.NewV7()).String(),
+		Id:          uuidx.NewV7().String(),
 		AccountId:   aid,
 		Description: fmt.Sprintf("builtin workload - %s", t.Name),
 		Entry:       filepath.Join(ws.Module, filepath.Base(entry.Path)),

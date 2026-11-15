@@ -30,6 +30,7 @@ import (
 	"github.com/egdaemon/eg/internal/podmanx"
 	"github.com/egdaemon/eg/internal/runtimex"
 	"github.com/egdaemon/eg/internal/stringsx"
+	"github.com/egdaemon/eg/internal/uuidx"
 	"github.com/egdaemon/eg/internal/wasix"
 	"github.com/egdaemon/eg/interp"
 	"github.com/egdaemon/eg/interp/c8sproxy"
@@ -41,7 +42,6 @@ import (
 	"github.com/egdaemon/eg/transpile"
 	"github.com/egdaemon/eg/workspaces"
 	"github.com/go-git/go-git/v6"
-	"github.com/gofrs/uuid/v5"
 
 	"github.com/KimMachineGun/automemlimit/memlimit"
 	"google.golang.org/grpc"
@@ -69,8 +69,8 @@ func (t baremetal) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, hotswapbin
 		ws        workspaces.Context
 		repo      *git.Repository
 		environio *os.File
-		aid       = envx.String(uuid.Nil.String(), eg.EnvComputeAccountID)
-		uid       = uuid.Must(uuid.NewV7())
+		aid       = envx.String(uuidx.Nil().String(), eg.EnvComputeAccountID)
+		uid       = uuidx.NewV7()
 		descr     = envx.String("", eg.EnvComputeVCS)
 		cc        grpc.ClientConnInterface
 		cgroups   = envx.Toggle(runners.AgentOptionNoop, runners.AgentOptionCommandLine("--cgroups", "disabled"), !t.Cgroups)                                            // disable cgroups
@@ -118,7 +118,7 @@ func (t baremetal) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, hotswapbin
 
 	if ws, err = workspaces.NewLocal(
 		ctx,
-		uuid.Must(uuid.NewV7()),
+		uuidx.NewV7(),
 		md5x.Digest(errorsx.Zero(cmdopts.BuildInfo())),
 		t.Dir,
 		t.Workload,

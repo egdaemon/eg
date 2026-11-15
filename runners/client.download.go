@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/egdaemon/eg/internal/uuidx"
 	"github.com/egdaemon/eg/jsonx"
 	"net/http"
 	"runtime"
@@ -14,7 +15,6 @@ import (
 	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/httpx"
-	"github.com/gofrs/uuid/v5"
 )
 
 func DownloadClientOptionHost(host string) func(*DownloadClient) {
@@ -71,7 +71,7 @@ func (t DownloadClient) Download(ctx context.Context, workload *computeapi.Enque
 			return err
 		}
 
-		uid, err := uuid.FromString(workload.Enqueued.Id)
+		uid, err := uuidx.FromString(workload.Enqueued.Id)
 		if err != nil {
 			return errorsx.Wrap(err, "invalid enqueued downloaded, malformed uid")
 		}

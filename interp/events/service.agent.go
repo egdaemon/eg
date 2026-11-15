@@ -11,7 +11,7 @@ import (
 
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/md5x"
-	"github.com/gofrs/uuid/v5"
+	"github.com/egdaemon/eg/internal/uuidx"
 	"google.golang.org/grpc"
 )
 
@@ -33,7 +33,7 @@ func (t *AgentService) Bind(host grpc.ServiceRegistrar) {
 // Upload implements RunServer.
 func (t *AgentService) Upload(s Agent_UploadServer) (err error) {
 	var (
-		uid   uuid.UUID
+		uid   uuidx.UUID
 		chunk *RunUploadChunk
 	)
 
@@ -41,9 +41,7 @@ func (t *AgentService) Upload(s Agent_UploadServer) (err error) {
 		return errorsx.WithStack(err)
 	}
 
-	if uid, err = uuid.NewV7(); err != nil {
-		return errorsx.WithStack(err)
-	}
+	uid = uuidx.NewV7()
 
 	metadata := chunk.GetMetadata()
 	dst, err := os.Create(filepath.Join(t.dir, md5x.FormatHex(md5x.Digest(metadata.Checksum))))

@@ -2,6 +2,7 @@ package daemons
 
 import (
 	"bytes"
+	"github.com/egdaemon/eg/internal/uuidx"
 	"github.com/egdaemon/eg/jsonx"
 	"log"
 	"mime/multipart"
@@ -18,7 +19,6 @@ import (
 	"github.com/egdaemon/eg/internal/stringsx"
 	"github.com/egdaemon/eg/runners"
 	"github.com/gofrs/flock"
-	"github.com/gofrs/uuid/v5"
 )
 
 // NewEnqueueHandler constructs the POST /c/enqueue handler. dirs is the
@@ -55,7 +55,7 @@ type EnqueueHandler struct {
 func (t *EnqueueHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	var (
 		err  error
-		uid  uuid.UUID
+		uid  uuidx.UUID
 		req  computeapi.EnqueuedDequeueResponse
 		envc multipart.File
 	)
@@ -78,7 +78,7 @@ func (t *EnqueueHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// which likewise parses workload.Enqueued.Id rather than minting one),
 	// so reuse it as the spool directory name instead of generating a new
 	// one.
-	if uid, err = uuid.FromString(req.Enqueued.Id); err != nil {
+	if uid, err = uuidx.FromString(req.Enqueued.Id); err != nil {
 		log.Println(errorsx.Wrap(err, "invalid enqueue request, malformed id"))
 		errorsx.Log(httpx.WriteEmptyJSON(w, http.StatusBadRequest))
 		return

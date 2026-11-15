@@ -25,9 +25,9 @@ import (
 	"github.com/egdaemon/eg/internal/langx"
 	"github.com/egdaemon/eg/internal/podmanx"
 	"github.com/egdaemon/eg/internal/stringsx"
+	"github.com/egdaemon/eg/internal/uuidx"
 	"github.com/egdaemon/eg/jsonx"
 	"github.com/egdaemon/eg/runners"
-	"github.com/gofrs/uuid/v5"
 )
 
 // spooled runs a workload archive, as produced by `eg compute archive`, through the same
@@ -64,7 +64,7 @@ func (t *spooledcompletion) Upload(ctx context.Context, id string, duration time
 
 func (t spooled) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath, stdin cmdopts.Stdin) (err error) {
 	var (
-		uid      = uuid.Must(uuid.NewV7())
+		uid      = uuidx.NewV7()
 		archived *os.File
 		agentopt = runners.AgentOptionNoop
 	)

@@ -10,9 +10,9 @@ import (
 	"testing"
 
 	"github.com/egdaemon/eg/internal/egiso"
+	"github.com/egdaemon/eg/internal/uuidx"
 	"github.com/egdaemon/eg/interp/interptest"
 	"github.com/egdaemon/eg/workspaces"
-	"github.com/gofrs/uuid/v5"
 	"github.com/opencontainers/go-digest"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
@@ -55,7 +55,7 @@ func TestCell(t *testing.T) {
 	}
 
 	cell := func(t *testing.T, ws workspaces.Context, toc digest.Digest) error {
-		return Cell(t.Context(), ws, uuid.Nil.String(), uuid.Nil.String(), svc, http.DefaultClient, wasm, image, toc)
+		return Cell(t.Context(), ws, uuidx.Nil().String(), uuidx.Nil().String(), svc, http.DefaultClient, wasm, image, toc)
 	}
 
 	t.Run("runs the module with the egiso as its root", func(t *testing.T) {

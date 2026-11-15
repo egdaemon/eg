@@ -18,13 +18,13 @@ import (
 	"github.com/egdaemon/eg/internal/gitx"
 	"github.com/egdaemon/eg/internal/md5x"
 	"github.com/egdaemon/eg/internal/podmanx"
+	"github.com/egdaemon/eg/internal/uuidx"
 	"github.com/egdaemon/eg/internal/wasix"
 	"github.com/egdaemon/eg/interp/c8sproxy"
 	"github.com/egdaemon/eg/runners"
 	"github.com/egdaemon/eg/transpile"
 	"github.com/egdaemon/eg/workspaces"
 	"github.com/go-git/go-git/v6"
-	"github.com/gofrs/uuid/v5"
 )
 
 type builtinLocal struct {
@@ -46,7 +46,7 @@ func (t builtinLocal) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath)
 		ws         workspaces.Context
 		repo       *git.Repository
 		environio  *os.File
-		uid                            = uuid.Must(uuid.NewV7())
+		uid                            = uuidx.NewV7()
 		sshmount   runners.AgentOption = runners.AgentOptionNoop
 		sshenvvar  runners.AgentOption = runners.AgentOptionNoop
 		envvar     runners.AgentOption = runners.AgentOptionNoop
@@ -68,7 +68,7 @@ func (t builtinLocal) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath)
 
 	if ws, err = workspaces.NewBuiltin(
 		gctx.Context,
-		uuid.Must(uuid.NewV7()),
+		uuidx.NewV7(),
 		md5x.Digest(errorsx.Zero(cmdopts.BuildInfo())),
 		tmpdir,
 		t.Name,

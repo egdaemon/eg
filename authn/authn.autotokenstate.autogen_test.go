@@ -7,7 +7,7 @@ import (
 
 	"github.com/egdaemon/eg/authn"
 	"github.com/egdaemon/eg/internal/jwtx"
-	"github.com/gofrs/uuid/v5"
+	"github.com/egdaemon/eg/internal/uuidx"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/crypto/ssh"
 )
@@ -31,7 +31,7 @@ func TestAutoTokenState(t *testing.T) {
 		}
 		require.NoError(t, jwtx.DecodeJSON(encoded, &decoded))
 
-		u, err := uuid.FromString(decoded.ID)
+		u, err := uuidx.FromString(decoded.ID)
 		require.NoError(t, err)
 		require.Equal(t, uint8(4), u.Version())
 

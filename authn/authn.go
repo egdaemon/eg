@@ -20,7 +20,7 @@ import (
 	"github.com/egdaemon/eg/internal/langx"
 	"github.com/egdaemon/eg/internal/stringsx"
 	"github.com/egdaemon/eg/internal/userx"
-	"github.com/gofrs/uuid/v5"
+	"github.com/egdaemon/eg/internal/uuidx"
 	"github.com/golang-jwt/jwt/v4"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/oauth2"
@@ -64,7 +64,7 @@ func OAuth2SSHToken(ctx context.Context, signer ssh.Signer, endpoint oauth2.Endp
 		sig *ssh.Signature
 	)
 
-	password := uuid.Must(uuid.NewV4())
+	password := uuidx.NewV4()
 
 	cfg = OAuth2SSHConfig(signer, password.String(), endpoint)
 	if sig, err = signer.Sign(rand.Reader, password.Bytes()); err != nil {
@@ -136,9 +136,9 @@ func LoginOptionsFrom(account string, defaults ...LoginOption) ([]LoginOption, e
 		return defaults, nil
 	}
 
-	id, err := uuid.FromString(account)
+	id, err := uuidx.FromString(account)
 	switch {
-	case err == nil && id.IsNil():
+	case err == nil && id.IsZero():
 		return nil, errorsx.Notification(errorsx.String("account must be the account id or a eg login domain"))
 	case err == nil:
 		return slices.Concat(defaults, []LoginOption{LoginOptionAccountID(id.String())}), nil
@@ -228,10 +228,7 @@ func AutoTokenStateIdentity(signer ssh.Signer, display, email string) (encoded s
 		Display   string `json:"display,omitempty"`
 	}
 
-	id, err := uuid.NewV4()
-	if err != nil {
-		return "", err
-	}
+	id := uuidx.NewV4()
 	rawstate := reqstate{
 		ID:        id.String(),
 		PublicKey: signer.PublicKey().Marshal(),

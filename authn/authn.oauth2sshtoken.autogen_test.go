@@ -12,7 +12,7 @@ import (
 	"testing"
 
 	"github.com/egdaemon/eg/authn"
-	"github.com/gofrs/uuid/v5"
+	"github.com/egdaemon/eg/internal/uuidx"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/oauth2"
@@ -60,7 +60,7 @@ func TestOAuth2SSHToken(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, expectedFingerprint, cfg.ClientID)
 		require.Equal(t, endpoint, cfg.Endpoint)
-		_, perr := uuid.FromString(cfg.ClientSecret)
+		_, perr := uuidx.FromString(cfg.ClientSecret)
 		require.NoError(t, perr)
 		require.NotNil(t, tok)
 		require.Equal(t, "at-123", tok.AccessToken)
@@ -184,7 +184,7 @@ func TestOAuth2SSHToken(t *testing.T) {
 		_, _, err = authn.OAuth2SSHToken(t.Context(), signer, endpoint)
 		require.NoError(t, err)
 
-		passwordUUID, err := uuid.FromString(receivedClientSecret)
+		passwordUUID, err := uuidx.FromString(receivedClientSecret)
 		require.NoError(t, err)
 
 		raw, err := base64.RawURLEncoding.DecodeString(receivedPassword)

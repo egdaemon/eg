@@ -10,15 +10,15 @@ import (
 
 	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/internal/errorsx"
+	"github.com/egdaemon/eg/internal/uuidx"
 	"github.com/fsnotify/fsnotify"
-	"github.com/gofrs/uuid/v5"
 )
 
 // Follow streams the log of the workload uid, starting at offset, into dst as it is
 // written (tail -f), calling flush after each write. if the workload hasn't started
 // running yet it waits for its log to be created. returns nil once the workload
 // completes (its running directory is removed) and all of its log has been written.
-func (t SpoolDirs) Follow(ctx context.Context, uid uuid.UUID, offset int64, dst io.Writer, flush func()) (err error) {
+func (t SpoolDirs) Follow(ctx context.Context, uid uuidx.UUID, offset int64, dst io.Writer, flush func()) (err error) {
 	var (
 		watcher    *fsnotify.Watcher
 		logs       *os.File

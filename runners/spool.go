@@ -16,7 +16,7 @@ import (
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/fsx"
 	"github.com/egdaemon/eg/internal/userx"
-	"github.com/gofrs/uuid/v5"
+	"github.com/egdaemon/eg/internal/uuidx"
 	"github.com/pkg/errors"
 )
 
@@ -79,12 +79,12 @@ func DefaultSpoolDirs() SpoolDirs {
 }
 
 // Path to the running directory of the workload uid.
-func (t SpoolDirs) Path(uid uuid.UUID) SpoolPath {
+func (t SpoolDirs) Path(uid uuidx.UUID) SpoolPath {
 	return SpoolPath{dir: filepath.Join(t.Running, Queued().Dirname(uid))}
 }
 
 // Locate the spool directory currently holding the workload uid.
-func (t SpoolDirs) Locate(uid uuid.UUID) (dir string, ok bool) {
+func (t SpoolDirs) Locate(uid uuidx.UUID) (dir string, ok bool) {
 	for _, root := range []string{t.Downloading, t.Queued, t.Running} {
 		dir = filepath.Join(root, Queued().Dirname(uid))
 		if _, err := os.Stat(dir); err == nil {
@@ -98,7 +98,7 @@ func (t SpoolDirs) Locate(uid uuid.UUID) (dir string, ok bool) {
 // Cancel requests cancellation of the workload uid by touching a marker file within its spool directory.
 // the queue reacts to the marker: running workloads are stopped, queued workloads are never started
 // and recovery discards them. Cancelling an already cancelled workload is a no-op.
-func (t SpoolDirs) Cancel(uid uuid.UUID) error {
+func (t SpoolDirs) Cancel(uid uuidx.UUID) error {
 	dir, ok := t.Locate(uid)
 	if !ok {
 		return ErrWorkloadNotFound
@@ -138,15 +138,15 @@ func Queued() queued {
 
 type queued struct{}
 
-func (t queued) Dirname(uid uuid.UUID) string {
+func (t queued) Dirname(uid uuidx.UUID) string {
 	return base64.URLEncoding.WithPadding(base64.NoPadding).EncodeToString(uid.Bytes())
 }
 
-func (t queued) Id(dir string) uuid.UUID {
-	return uuid.FromBytesOrNil(errorsx.Zero(base64.URLEncoding.WithPadding(base64.NoPadding).DecodeString(filepath.Base(dir))))
+func (t queued) Id(dir string) uuidx.UUID {
+	return uuidx.FromBytesOrNil(errorsx.Zero(base64.URLEncoding.WithPadding(base64.NoPadding).DecodeString(filepath.Base(dir))))
 }
 
-func (t SpoolDirs) Download(uid uuid.UUID, name string, content io.Reader) (err error) {
+func (t SpoolDirs) Download(uid uuidx.UUID, name string, content io.Reader) (err error) {
 	var (
 		dst *os.File
 	)
@@ -167,7 +167,7 @@ func (t SpoolDirs) Download(uid uuid.UUID, name string, content io.Reader) (err 
 	return nil
 }
 
-func (t SpoolDirs) Enqueue(uid uuid.UUID) (err error) {
+func (t SpoolDirs) Enqueue(uid uuidx.UUID) (err error) {
 	return os.Rename(filepath.Join(t.Downloading, Queued().Dirname(uid)), filepath.Join(t.Queued, Queued().Dirname(uid)))
 }
 
@@ -210,7 +210,7 @@ func (t SpoolDirs) dequeueRename(dir fs.DirEntry) error {
 	return os.Rename(filepath.Join(t.Queued, dir.Name()), filepath.Join(t.Running, dir.Name()))
 }
 
-func (t SpoolDirs) Completed(uid uuid.UUID) (err error) {
+func (t SpoolDirs) Completed(uid uuidx.UUID) (err error) {
 	// we tombstone before removing. we do this because if there are permission issues within
 	// the directory structure deleting as this user running the command will not work and we need to let the OS handle it.
 	// We can fail to remove a folder due to a permission issue in files and subfolders. optimistically attempt to remove the
@@ -226,7 +226,7 @@ func (t SpoolDirs) Completed(uid uuid.UUID) (err error) {
 	return errorsx.Wrapf(
 		os.Rename(
 			filepath.Join(t.Running, Queued().Dirname(uid)),
-			filepath.Join(t.Tombstoned, fmt.Sprintf("%s-%s", uuid.Must(uuid.NewV7()).String(), Queued().Dirname(uid))),
+			filepath.Join(t.Tombstoned, fmt.Sprintf("%s-%s", uuidx.NewV7().String(), Queued().Dirname(uid))),
 		),
 		"unable to tombstone work directory: %s",
 		Queued().Dirname(uid),
@@ -249,7 +249,7 @@ func (t SpoolDirs) Discard(dir string) (err error) {
 	return errorsx.Wrapf(
 		os.Rename(
 			dir,
-			filepath.Join(t.Tombstoned, fmt.Sprintf("%s-%s", uuid.Must(uuid.NewV7()).String(), filepath.Base(dir))),
+			filepath.Join(t.Tombstoned, fmt.Sprintf("%s-%s", uuidx.NewV7().String(), filepath.Base(dir))),
 		),
 		"unable to tombstone work directory: %s",
 		Queued().Id(dir),

@@ -18,9 +18,8 @@ import (
 
 	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/internal/envx"
-	"github.com/egdaemon/eg/internal/errorsx"
+	"github.com/egdaemon/eg/internal/uuidx"
 	"github.com/egdaemon/wasinet/wasinet"
-	"github.com/gofrs/uuid/v5"
 	"google.golang.org/grpc"
 )
 
@@ -71,7 +70,7 @@ func RuntimeDirectory(paths ...string) string {
 // ModuleRuntimeDirectory is the name of the directory of a workload run, named after the last 4 bytes of the run id,
 // the random part of a v7 uuid. the name is kept short as the sockets within the run's directory are close to the
 // length limit of a unix socket path.
-func ModuleRuntimeDirectory(id uuid.UUID) string {
+func ModuleRuntimeDirectory(id uuidx.UUID) string {
 	return PatternIsolateFrom(id, 4, "m.%x.d")
 }
 
@@ -79,14 +78,14 @@ func ModuleRuntimeDirectory(id uuid.UUID) string {
 // short (n) length random sequence from a uuidv7.
 // used to create isolated directories like proc/module runtime.
 func PatternIsolate(n int, pattern string) string {
-	return PatternIsolateFrom(errorsx.Must(uuid.NewV7()), n, pattern)
+	return PatternIsolateFrom(uuidx.NewV7(), n, pattern)
 }
 
 // create an string from the given pattern that contains the
 // last n bytes of the provided id. %x encodes as hex, %s as unpadded url safe base64,
 // a precision of 16, 32, 64 selects hex, lowercase base32, base64 respectively for either verb.
-func PatternIsolateFrom(id uuid.UUID, n int, pattern string) string {
-	return fmt.Sprintf(pattern, fmtisolate(id[uuid.Size-n:]))
+func PatternIsolateFrom(id uuidx.UUID, n int, pattern string) string {
+	return fmt.Sprintf(pattern, fmtisolate(id[uuidx.Size-n:]))
 }
 
 // lowercase so its safe on case insensitive filesystems.

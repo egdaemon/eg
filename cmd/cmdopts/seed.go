@@ -8,7 +8,7 @@ import (
 	"github.com/egdaemon/eg/internal/cryptox"
 	"github.com/egdaemon/eg/internal/langx"
 	"github.com/egdaemon/eg/internal/sshx"
-	"github.com/gofrs/uuid/v5"
+	"github.com/egdaemon/eg/internal/uuidx"
 )
 
 // Entropy derives a long, high-entropy, base64-encoded value from a raw seed
@@ -23,7 +23,7 @@ type Entropy func(seed string) (string, error)
 
 // GenerateEntropy is the production implementation bound to Entropy in main.go.
 func GenerateEntropy(seed string) (string, error) {
-	prng := cryptox.NewChaCha8(langx.FirstNonZero(seed, uuid.Must(uuid.NewV4()).String()))
+	prng := cryptox.NewChaCha8(langx.FirstNonZero(seed, uuidx.NewV4().String()))
 	b, err := io.ReadAll(io.LimitReader(prng, rand.New(prng).Int64N(128)))
 	if err != nil {
 		return "", err

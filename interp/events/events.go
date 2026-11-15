@@ -13,7 +13,7 @@ import (
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/iox"
 	"github.com/egdaemon/eg/internal/protobuflog"
-	"github.com/gofrs/uuid/v5"
+	"github.com/egdaemon/eg/internal/uuidx"
 )
 
 const (
@@ -22,7 +22,7 @@ const (
 
 func NewMessage(evt isMessage_Event) *Message {
 	return &Message{
-		Id:    uuid.Must(uuid.NewV7()).String(),
+		Id:    uuidx.NewV7().String(),
 		Ts:    time.Now().UnixMicro(),
 		Event: evt,
 	}
@@ -96,7 +96,7 @@ func NewLogEnsureDir(dir string) (_ *Log, err error) {
 }
 
 func NewLogDirFromRun(root string, md *RunMetadata) string {
-	return NewLogDirFromRunID(root, uuid.FromBytesOrNil(md.Id).String())
+	return NewLogDirFromRunID(root, uuidx.FromBytesOrNil(md.Id).String())
 }
 
 func NewLogDirFromRunID(root string, id string) string {

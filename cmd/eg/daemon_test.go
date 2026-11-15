@@ -9,7 +9,7 @@ import (
 	"github.com/egdaemon/eg/identity"
 	"github.com/egdaemon/eg/internal/bytesx"
 	"github.com/egdaemon/eg/internal/sshx"
-	"github.com/gofrs/uuid/v5"
+	"github.com/egdaemon/eg/internal/uuidx"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/crypto/ssh"
 )
@@ -34,7 +34,7 @@ func TestCmdDaemon(t *testing.T) {
 		// either command's seed handling drifts from this shape, this test
 		// catches it without needing any network mocking, since both halves are
 		// now pure functions of injected dependencies.
-		rawSeed := uuid.Must(uuid.NewV7()).String()
+		rawSeed := uuidx.NewV7().String()
 
 		asigner, err := actl.AuthorizeSecret{Seed: rawSeed}.Signer(cmdopts.GenerateEntropy, sshx.NewKeyGenSeeded)
 		require.NoError(t, err)

@@ -11,10 +11,11 @@ import (
 	"testing"
 
 	"github.com/egdaemon/eg/computeapi"
+	"github.com/egdaemon/eg/internal/errorsx"
+	"github.com/egdaemon/eg/internal/uuidx"
 
 	"github.com/egdaemon/eg/cmd/eg/daemons"
 	"github.com/egdaemon/eg/runners"
-	"github.com/gofrs/uuid/v5"
 	"github.com/stretchr/testify/require"
 )
 
@@ -26,7 +27,7 @@ func TestEnqueueHandler(t *testing.T) {
 		}
 
 		enqresp := computeapi.EnqueuedDequeueResponse{
-			Enqueued:    &computeapi.Enqueued{Id: uuid.Must(uuid.NewV7()).String(), VcsUri: "https://example.com/repo.git", VcsCommit: "deadbeef", Cores: 1},
+			Enqueued:    &computeapi.Enqueued{Id: uuidx.NewV7().String(), VcsUri: "https://example.com/repo.git", VcsCommit: "deadbeef", Cores: 1},
 			AccessToken: "tok",
 		}
 		mimetype, body, err := computeapi.NewWorkloadRequestToken(&enqresp, "candidate", strings.NewReader(""))
@@ -56,7 +57,7 @@ func TestEnqueueHandler(t *testing.T) {
 		}
 
 		enqresp := computeapi.EnqueuedDequeueResponse{
-			Enqueued: &computeapi.Enqueued{Id: uuid.Must(uuid.NewV7()).String(), VcsUri: "https://example.com/repo.git", VcsCommit: "deadbeef", Cores: 1},
+			Enqueued: &computeapi.Enqueued{Id: uuidx.NewV7().String(), VcsUri: "https://example.com/repo.git", VcsCommit: "deadbeef", Cores: 1},
 		}
 		mimetype, body, err := computeapi.NewWorkloadRequest(&enqresp, strings.NewReader(""))
 		require.NoError(t, err)
@@ -80,7 +81,7 @@ func TestEnqueueHandler(t *testing.T) {
 		}
 
 		enqresp := computeapi.EnqueuedDequeueResponse{
-			Enqueued: &computeapi.Enqueued{Id: uuid.Must(uuid.NewV7()).String(), VcsUri: "https://example.com/repo.git", VcsCommit: "deadbeef", Cores: 9},
+			Enqueued: &computeapi.Enqueued{Id: uuidx.NewV7().String(), VcsUri: "https://example.com/repo.git", VcsCommit: "deadbeef", Cores: 9},
 		}
 		mimetype, body, err := computeapi.NewWorkloadRequest(&enqresp, strings.NewReader(""))
 		require.NoError(t, err)
@@ -121,7 +122,7 @@ func TestEnqueueHandler(t *testing.T) {
 		}
 
 		enqresp := computeapi.EnqueuedDequeueResponse{
-			Enqueued:    &computeapi.Enqueued{Id: uuid.Must(uuid.NewV7()).String(), VcsUri: "https://example.com/repo.git", VcsCommit: "deadbeef", Cores: 1},
+			Enqueued:    &computeapi.Enqueued{Id: uuidx.NewV7().String(), VcsUri: "https://example.com/repo.git", VcsCommit: "deadbeef", Cores: 1},
 			AccessToken: "tok",
 		}
 
@@ -168,7 +169,7 @@ func TestEnqueueHandler(t *testing.T) {
 		}
 
 		enqresp := computeapi.EnqueuedDequeueResponse{
-			Enqueued:    &computeapi.Enqueued{Id: uuid.Must(uuid.NewV7()).String(), VcsUri: "https://example.com/repo.git", VcsCommit: "deadbeef", Cores: 1},
+			Enqueued:    &computeapi.Enqueued{Id: uuidx.NewV7().String(), VcsUri: "https://example.com/repo.git", VcsCommit: "deadbeef", Cores: 1},
 			AccessToken: "tok",
 		}
 
@@ -210,11 +211,11 @@ func TestEnqueueHandler(t *testing.T) {
 		}
 
 		enqresp := computeapi.EnqueuedDequeueResponse{
-			Enqueued:    &computeapi.Enqueued{Id: uuid.Must(uuid.NewV7()).String(), VcsUri: "https://example.com/repo.git", VcsCommit: "deadbeef", Cores: 1},
+			Enqueued:    &computeapi.Enqueued{Id: uuidx.NewV7().String(), VcsUri: "https://example.com/repo.git", VcsCommit: "deadbeef", Cores: 1},
 			AccessToken: "tok",
 		}
 
-		stale := filepath.Join(h.Dirs.Downloading, runners.Queued().Dirname(uuid.Must(uuid.FromString(enqresp.Enqueued.Id))))
+		stale := filepath.Join(h.Dirs.Downloading, runners.Queued().Dirname(errorsx.Must(uuidx.FromString(enqresp.Enqueued.Id))))
 		require.NoError(t, os.MkdirAll(stale, 0700))
 		require.NoError(t, os.WriteFile(filepath.Join(stale, "partial"), []byte("x"), 0600))
 

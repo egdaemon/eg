@@ -21,14 +21,13 @@ import (
 	"github.com/egdaemon/eg/cmd/migrations"
 	"github.com/egdaemon/eg/internal/computex"
 	"github.com/egdaemon/eg/internal/debugx"
-	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/fsx"
 	"github.com/egdaemon/eg/internal/httpx"
 	"github.com/egdaemon/eg/internal/md5x"
 	"github.com/egdaemon/eg/internal/sqltestx"
 	"github.com/egdaemon/eg/internal/testx"
+	"github.com/egdaemon/eg/internal/uuidx"
 	"github.com/egdaemon/eg/runners"
-	"github.com/gofrs/uuid/v5"
 	"github.com/stretchr/testify/require"
 )
 
@@ -61,7 +60,7 @@ func (t *completion) Upload(ctx context.Context, id string, duration time.Durati
 func TestQueue(t *testing.T) {
 	t.Run("records_the_completed_workload", func(t *testing.T) {
 		dirs := runners.NewSpoolDir(t.TempDir())
-		uid := errorsx.Must(uuid.NewV4())
+		uid := uuidx.NewV4()
 		createTestWorkload(t, dirs.Queued, uid, "entry.wasm", testx.Read(testx.Fixture("example.1.wasm")))
 		rm := runners.NewResourceManager(runners.NewRuntimeResources())
 		reload := make(chan error, 1)
@@ -81,7 +80,7 @@ func TestQueue(t *testing.T) {
 
 	t.Run("mounts_an_entry_nested_in_the_archive", func(t *testing.T) {
 		dirs := runners.NewSpoolDir(t.TempDir())
-		uid := errorsx.Must(uuid.NewV4())
+		uid := uuidx.NewV4()
 		createTestWorkload(t, dirs.Queued, uid, "containers/clear/main.wasm", testx.Read(testx.Fixture("example.1.wasm")))
 		rm := runners.NewResourceManager(runners.NewRuntimeResources())
 		reload := make(chan error, 1)
@@ -102,7 +101,7 @@ func TestQueue(t *testing.T) {
 
 	t.Run("runs_a_single_workload_and_completes", func(t *testing.T) {
 		dirs := runners.NewSpoolDir(t.TempDir())
-		createTestWorkload(t, dirs.Queued, errorsx.Must(uuid.NewV4()), "entry.wasm", testx.Read(testx.Fixture("example.1.wasm")))
+		createTestWorkload(t, dirs.Queued, uuidx.NewV4(), "entry.wasm", testx.Read(testx.Fixture("example.1.wasm")))
 		rm := runners.NewResourceManager(runners.NewRuntimeResources())
 		debugx.SetOutput(os.Stderr)
 		reload := make(chan error, 1)
@@ -125,7 +124,7 @@ func TestQueue(t *testing.T) {
 		// --replace is present, so this guards against that flag being
 		// dropped from the podman invocation queue.go builds.
 		dirs := runners.NewSpoolDir(t.TempDir())
-		uid := errorsx.Must(uuid.NewV4())
+		uid := uuidx.NewV4()
 		createTestWorkload(t, dirs.Queued, uid, "entry.wasm", testx.Read(testx.Fixture("example.1.wasm")))
 
 		cname := fmt.Sprintf("eg-%s", uid.String())
@@ -143,7 +142,7 @@ func TestQueue(t *testing.T) {
 
 	t.Run("workload_timeout", func(t *testing.T) {
 		dirs := runners.NewSpoolDir(t.TempDir())
-		createTestWorkload(t, dirs.Queued, errorsx.Must(uuid.NewV4()), "entry.wasm", testx.Read(testx.Fixture("example.1.wasm")))
+		createTestWorkload(t, dirs.Queued, uuidx.NewV4(), "entry.wasm", testx.Read(testx.Fixture("example.1.wasm")))
 		rm := runners.NewResourceManager(runners.NewRuntimeResources())
 
 		reload := make(chan error, 1)
@@ -161,8 +160,8 @@ func TestQueue(t *testing.T) {
 
 	t.Run("workload for the same repo runs concurrently instead of blocking", func(t *testing.T) {
 		dirs := runners.NewSpoolDir(t.TempDir())
-		createTestWorkload(t, dirs.Queued, errorsx.Must(uuid.NewV4()), "entry.wasm", testx.Read(testx.Fixture("example.1.wasm")))
-		createTestWorkload(t, dirs.Queued, errorsx.Must(uuid.NewV4()), "entry.wasm", testx.Read(testx.Fixture("example.1.wasm")))
+		createTestWorkload(t, dirs.Queued, uuidx.NewV4(), "entry.wasm", testx.Read(testx.Fixture("example.1.wasm")))
+		createTestWorkload(t, dirs.Queued, uuidx.NewV4(), "entry.wasm", testx.Read(testx.Fixture("example.1.wasm")))
 
 		rm := runners.NewResourceManager(runners.NewRuntimeResources())
 		reload := make(chan error, 1)
@@ -197,13 +196,13 @@ func TestQueue(t *testing.T) {
 
 	t.Run("workload is deferred once every repo bucket is claimed, and resumes once one is released", func(t *testing.T) {
 		dirs := runners.NewSpoolDir(t.TempDir())
-		uid := errorsx.Must(uuid.NewV4())
+		uid := uuidx.NewV4()
 		createTestWorkload(t, dirs.Queued, uid, "entry.wasm", testx.Read(testx.Fixture("example.1.wasm")))
 
 		// simulate 8 other workers already active for this repo by
 		// claiming every candidate bucket beginwork would try (account_id
 		// "" / vcs_uri "uri" match what createTestWorkload writes).
-		buckets := repoBuckets(uuid.Nil.String(), "uri", 8)
+		buckets := repoBuckets(uuidx.Nil().String(), "uri", 8)
 		res := runners.NewCacheResolution(dirs, 1)
 		for _, bucket := range buckets {
 			_, err := res.Claim(t.Context(), slices.Values([]string{bucket}), "")
@@ -239,8 +238,8 @@ func TestQueue(t *testing.T) {
 
 	t.Run("workloads for different repos run without blocking each other", func(t *testing.T) {
 		dirs := runners.NewSpoolDir(t.TempDir())
-		createTestWorkloadFor(t, dirs.Queued, errorsx.Must(uuid.NewV4()), uuid.Nil.String(), "repo-a", "entry.wasm", testx.Read(testx.Fixture("example.1.wasm")))
-		createTestWorkloadFor(t, dirs.Queued, errorsx.Must(uuid.NewV4()), uuid.Nil.String(), "repo-b", "entry.wasm", testx.Read(testx.Fixture("example.1.wasm")))
+		createTestWorkloadFor(t, dirs.Queued, uuidx.NewV4(), uuidx.Nil().String(), "repo-a", "entry.wasm", testx.Read(testx.Fixture("example.1.wasm")))
+		createTestWorkloadFor(t, dirs.Queued, uuidx.NewV4(), uuidx.Nil().String(), "repo-b", "entry.wasm", testx.Read(testx.Fixture("example.1.wasm")))
 
 		rm := runners.NewResourceManager(runners.NewRuntimeResources())
 		reload := make(chan error, 1)
@@ -277,7 +276,7 @@ func TestQueue(t *testing.T) {
 		testx.SkipInCICD(t, "workload missing metadata test disabled in CI/CD - requires podman access")
 
 		dirs := runners.NewSpoolDir(t.TempDir())
-		uid := errorsx.Must(uuid.NewV4())
+		uid := uuidx.NewV4()
 		createTestWorkload(t, dirs.Queued, uid, "entry.wasm", testx.Read(testx.Fixture("example.1.wasm")))
 		fsx.PrintFS(os.DirFS(dirs.Queued))
 		require.NoError(t, os.RemoveAll(filepath.Join(dirs.Queued, runners.Queued().Dirname(uid), "metadata.json")))
@@ -302,14 +301,14 @@ func TestQueue(t *testing.T) {
 
 // createTestWorkload is a helper function to set up a dummy workload directory
 // for testing purposes.
-func createTestWorkload(t *testing.T, baseDir string, uid uuid.UUID, entrypoint string, src io.Reader) string {
-	return createTestWorkloadFor(t, baseDir, uid, uuid.Nil.String(), "uri", entrypoint, src)
+func createTestWorkload(t *testing.T, baseDir string, uid uuidx.UUID, entrypoint string, src io.Reader) string {
+	return createTestWorkloadFor(t, baseDir, uid, uuidx.Nil().String(), "uri", entrypoint, src)
 }
 
 // createTestWorkloadFor is like createTestWorkload but allows the account_id
 // and vcs_uri to be set explicitly, so tests can construct workloads that
 // belong to distinct (or identical) repos.
-func createTestWorkloadFor(t *testing.T, baseDir string, uid uuid.UUID, accountID, vcsURI, entrypoint string, src io.Reader) string {
+func createTestWorkloadFor(t *testing.T, baseDir string, uid uuidx.UUID, accountID, vcsURI, entrypoint string, src io.Reader) string {
 	workloadDir := filepath.Join(baseDir, runners.Queued().Dirname(uid))
 	require.NoError(t, os.MkdirAll(workloadDir, 0755))
 	dst, err := os.Create(filepath.Join(workloadDir, "archive.tar.gz"))

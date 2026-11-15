@@ -12,8 +12,8 @@ import (
 
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/goosex"
+	"github.com/egdaemon/eg/internal/uuidx"
 	"github.com/egdaemon/eg/workspaces"
-	"github.com/gofrs/uuid/v5"
 )
 
 //go:embed migrations
@@ -31,7 +31,7 @@ func Detect(ctx context.Context, db *sql.DB, dir string) error {
 
 	ts := time.Now()
 	for d := range workspaces.Workloads(ctx, dir).Each(ctx) {
-		w := Discovered{ID: uuid.Must(uuid.NewV7()).String(), Path: d.Path, Ts: ts}
+		w := Discovered{ID: uuidx.NewV7().String(), Path: d.Path, Ts: ts}
 		if err := DiscoveredInsert(ctx, db, w).Scan(&w); err != nil {
 			return err
 		}

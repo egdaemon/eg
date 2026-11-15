@@ -10,8 +10,9 @@ import (
 	"time"
 
 	"github.com/egdaemon/eg"
-	"github.com/gofrs/uuid/v5"
 	"github.com/stretchr/testify/require"
+
+	"github.com/egdaemon/eg/internal/uuidx"
 )
 
 // syncbuffer is a bytes.Buffer safe for concurrent writes/reads.
@@ -32,7 +33,7 @@ func (t *syncbuffer) String() string {
 	return t.buf.String()
 }
 
-func createlog(t *testing.T, dirs SpoolDirs, uid uuid.UUID) *os.File {
+func createlog(t *testing.T, dirs SpoolDirs, uid uuidx.UUID) *os.File {
 	t.Helper()
 	runtimedir := dirs.Path(uid).Resolve(workdirname, eg.RuntimeDirectory)
 	require.NoError(t, os.MkdirAll(runtimedir, 0700))
@@ -42,7 +43,7 @@ func createlog(t *testing.T, dirs SpoolDirs, uid uuid.UUID) *os.File {
 	return logs
 }
 
-func follow(ctx context.Context, dirs SpoolDirs, uid uuid.UUID, offset int64, dst *syncbuffer) chan error {
+func follow(ctx context.Context, dirs SpoolDirs, uid uuidx.UUID, offset int64, dst *syncbuffer) chan error {
 	done := make(chan error, 1)
 	go func() {
 		done <- dirs.Follow(ctx, uid, offset, dst, func() {})
@@ -65,13 +66,13 @@ func TestSpoolFollow(t *testing.T) {
 	t.Run("unknown workload", func(t *testing.T) {
 		dirs := NewSpoolDir(t.TempDir())
 		var out syncbuffer
-		require.NoError(t, awaitFollow(t, follow(t.Context(), dirs, uuid.Must(uuid.NewV7()), 0, &out)))
+		require.NoError(t, awaitFollow(t, follow(t.Context(), dirs, uuidx.NewV7(), 0, &out)))
 		require.Empty(t, out.String())
 	})
 
 	t.Run("existing log from offset", func(t *testing.T) {
 		dirs := NewSpoolDir(t.TempDir())
-		uid := uuid.Must(uuid.NewV7())
+		uid := uuidx.NewV7()
 		logs := createlog(t, dirs, uid)
 		_, err := logs.WriteString("hello world\n")
 		require.NoError(t, err)
@@ -87,7 +88,7 @@ func TestSpoolFollow(t *testing.T) {
 
 	t.Run("appended writes arrive in order", func(t *testing.T) {
 		dirs := NewSpoolDir(t.TempDir())
-		uid := uuid.Must(uuid.NewV7())
+		uid := uuidx.NewV7()
 		logs := createlog(t, dirs, uid)
 
 		var out syncbuffer
@@ -111,7 +112,7 @@ func TestSpoolFollow(t *testing.T) {
 
 	t.Run("waits for a queued workload to start", func(t *testing.T) {
 		dirs := NewSpoolDir(t.TempDir())
-		uid := uuid.Must(uuid.NewV7())
+		uid := uuidx.NewV7()
 		require.NoError(t, dirs.Download(uid, "archive.tar.gz", bytes.NewBufferString("")))
 		require.NoError(t, dirs.Enqueue(uid))
 
@@ -133,7 +134,7 @@ func TestSpoolFollow(t *testing.T) {
 
 	t.Run("context cancellation", func(t *testing.T) {
 		dirs := NewSpoolDir(t.TempDir())
-		uid := uuid.Must(uuid.NewV7())
+		uid := uuidx.NewV7()
 		createlog(t, dirs, uid)
 
 		ctx, cancel := context.WithCancel(t.Context())

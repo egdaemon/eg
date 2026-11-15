@@ -12,9 +12,9 @@ import (
 	"time"
 
 	"github.com/egdaemon/eg/computeapi"
+	"github.com/egdaemon/eg/internal/uuidx"
 
 	"github.com/egdaemon/eg/compute"
-	"github.com/gofrs/uuid/v5"
 	"github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"
@@ -105,7 +105,7 @@ func TestTryUpload(t *testing.T) {
 		}
 
 		req := &computeapi.EnqueuedDequeueResponse{
-			Enqueued: &computeapi.Enqueued{Id: uuid.Must(uuid.NewV7()).String(), AccountId: "acct", Entry: "main.wasm"},
+			Enqueued: &computeapi.Enqueued{Id: uuidx.NewV7().String(), AccountId: "acct", Entry: "main.wasm"},
 		}
 
 		accepted, recorded := computeapi.TryUpload(t.Context(), client, candidates, req, strings.NewReader("kernel contents"), strings.NewReader("environ contents"))
@@ -141,7 +141,7 @@ func TestTryUpload(t *testing.T) {
 		}
 
 		req := &computeapi.EnqueuedDequeueResponse{
-			Enqueued: &computeapi.Enqueued{Id: uuid.Must(uuid.NewV7()).String()},
+			Enqueued: &computeapi.Enqueued{Id: uuidx.NewV7().String()},
 		}
 
 		accepted, recorded := computeapi.TryUpload(t.Context(), client, candidates, req, strings.NewReader("kernel contents"), strings.NewReader(""))

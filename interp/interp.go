@@ -23,6 +23,7 @@ import (
 	"github.com/egdaemon/eg/internal/fsx"
 	"github.com/egdaemon/eg/internal/langx"
 	"github.com/egdaemon/eg/internal/md5x"
+	"github.com/egdaemon/eg/internal/uuidx"
 	"github.com/egdaemon/eg/internal/wasix"
 	"github.com/egdaemon/eg/interp/c8s"
 	"github.com/egdaemon/eg/interp/runtime/wasi/ffiegcontainer"
@@ -36,7 +37,6 @@ import (
 	"github.com/egdaemon/eg/interp/wasidebug"
 	"github.com/egdaemon/eg/workspaces"
 	"github.com/egdaemon/wasinet/wasinet/wnetruntime"
-	"github.com/gofrs/uuid/v5"
 	"github.com/opencontainers/go-digest"
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/experimental"
@@ -337,7 +337,7 @@ func (t runner) perform(ctx context.Context, wshost workspaces.Context, runid, p
 	).WithEnv(
 		eg.EnvComputeRunID, runid,
 	).WithEnv(
-		eg.EnvComputeAccountID, envx.String(uuid.Nil.String(), eg.EnvComputeAccountID),
+		eg.EnvComputeAccountID, envx.String(uuidx.Nil().String(), eg.EnvComputeAccountID),
 	).WithEnv(
 		eg.EnvComputeModuleNestedLevel, strconv.Itoa(envx.Int(0, eg.EnvComputeModuleNestedLevel)),
 	).WithEnv(

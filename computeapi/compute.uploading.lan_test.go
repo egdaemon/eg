@@ -11,12 +11,12 @@ import (
 	"time"
 
 	"github.com/egdaemon/eg/cmd/migrations"
+	"github.com/egdaemon/eg/internal/uuidx"
 
 	"github.com/egdaemon/eg/compute"
 	"github.com/egdaemon/eg/internal/lan"
 	"github.com/egdaemon/eg/internal/langx"
 	"github.com/egdaemon/eg/internal/sqltestx"
-	"github.com/gofrs/uuid/v5"
 	"github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/stretchr/testify/require"
@@ -25,7 +25,7 @@ import (
 
 func TestUploadLAN(t *testing.T) {
 	req := &EnqueuedDequeueResponse{
-		Enqueued: &Enqueued{Id: uuid.Must(uuid.NewV7()).String(), AccountId: "acct", Entry: "main.wasm"},
+		Enqueued: &Enqueued{Id: uuidx.NewV7().String(), AccountId: "acct", Entry: "main.wasm"},
 	}
 
 	t.Run("uploads to a remembered runner without the control plane's network", func(t *testing.T) {

@@ -29,10 +29,10 @@ import (
 	"github.com/egdaemon/eg/internal/stringsx"
 	"github.com/egdaemon/eg/internal/tarx"
 	"github.com/egdaemon/eg/internal/unsafepretty"
+	"github.com/egdaemon/eg/internal/uuidx"
 	"github.com/egdaemon/eg/transpile"
 	"github.com/egdaemon/eg/workspaces"
 	"github.com/go-git/go-git/v6"
-	"github.com/gofrs/uuid/v5"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -89,7 +89,7 @@ func (t cacheoptions) run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, ident *
 
 	if ws, err = workspaces.NewBuiltin(
 		gctx.Context,
-		uuid.Must(uuid.NewV7()),
+		uuidx.NewV7(),
 		md5x.Digest(errorsx.Zero(cmdopts.BuildInfo())),
 		tmpdir,
 		module,
@@ -189,7 +189,7 @@ func (t cacheoptions) run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, ident *
 	}
 
 	enq := &computeapi.Enqueued{
-		Id:          uuid.Must(uuid.NewV7()).String(),
+		Id:          uuidx.NewV7().String(),
 		AccountId:   aid,
 		Description: description,
 		Entry:       filepath.Join(ws.Module, filepath.Base(entry.Path)),

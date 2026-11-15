@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"path/filepath"
 
+	"github.com/egdaemon/eg/internal/uuidx"
 	"github.com/egdaemon/eg/jsonx"
 
 	"github.com/egdaemon/eg/computeapi"
@@ -19,7 +20,6 @@ import (
 	"github.com/egdaemon/eg/internal/httpx"
 	"github.com/egdaemon/eg/internal/stringsx"
 	"github.com/egdaemon/eg/runners"
-	"github.com/gofrs/uuid/v5"
 )
 
 // Reserver records a workload uploaded directly to this runner with the
@@ -57,7 +57,7 @@ type UploadHandler struct {
 func (t *UploadHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	var (
 		err           error
-		uid           uuid.UUID
+		uid           uuidx.UUID
 		req           computeapi.EnqueuedDequeueResponse
 		recorded      *computeapi.EnqueuedDequeueResponse
 		encoded       []byte
@@ -116,7 +116,7 @@ func (t *UploadHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// from here on the workload is claimed by this runner within the control
 	// plane; if we fail to spool it the record is abandoned and expires via its ttl
 	// while the client falls back to the cluster.
-	if uid, err = uuid.FromString(recorded.Enqueued.Id); err != nil {
+	if uid, err = uuidx.FromString(recorded.Enqueued.Id); err != nil {
 		log.Println(errorsx.Wrap(err, "invalid recorded workload, malformed id"))
 		errorsx.Log(httpx.WriteEmptyJSON(w, http.StatusInternalServerError))
 		return

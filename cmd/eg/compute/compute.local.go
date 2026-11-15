@@ -27,6 +27,7 @@ import (
 	"github.com/egdaemon/eg/internal/podmanx"
 	"github.com/egdaemon/eg/internal/stringsx"
 	"github.com/egdaemon/eg/internal/userx"
+	"github.com/egdaemon/eg/internal/uuidx"
 	"github.com/egdaemon/eg/internal/wasix"
 	"github.com/egdaemon/eg/interp/c8sproxy"
 	"github.com/egdaemon/eg/runners"
@@ -34,7 +35,6 @@ import (
 	"github.com/egdaemon/eg/transpile"
 	"github.com/egdaemon/eg/workspaces"
 	"github.com/go-git/go-git/v6"
-	"github.com/gofrs/uuid/v5"
 )
 
 type local struct {
@@ -79,7 +79,7 @@ func (t local) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, hotswapbin *cm
 		rt      runners.T
 		environ *os.File
 		b       runners.B = runners.BFn(t.podman)
-		uid               = uuid.Must(uuid.NewV7())
+		uid               = uuidx.NewV7()
 	)
 
 	if t.Egiso != nil {
@@ -91,7 +91,7 @@ func (t local) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, hotswapbin *cm
 
 	if ws, err = workspaces.NewLocal(
 		gctx.Context,
-		uuid.Must(uuid.NewV7()),
+		uuidx.NewV7(),
 		md5x.Digest(cmdopts.BuildInfoSafe()),
 		t.Dir,
 		t.Name,
@@ -193,7 +193,7 @@ func (t local) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, hotswapbin *cm
 type container struct {
 	ctx   context.Context // carries the podman client.
 	ws    workspaces.Context
-	uid   uuid.UUID
+	uid   uuidx.UUID
 	agent *runners.Agent
 }
 
@@ -225,7 +225,7 @@ func (t container) Close() error {
 }
 
 // podman prepares containers of the root container built from the repository's Containerfile.
-func (t local) podman(ctx context.Context, ws workspaces.Context, uid uuid.UUID, canonicaluri string, envb *envx.Builder) (_ runners.T, err error) {
+func (t local) podman(ctx context.Context, ws workspaces.Context, uid uuidx.UUID, canonicaluri string, envb *envx.Builder) (_ runners.T, err error) {
 	var (
 		homedir     = userx.HomeDirectoryOrDefault("/root")
 		environpath = filepath.Join(ws.RuntimeDir, eg.EnvironFile)
@@ -319,7 +319,7 @@ func (t local) podman(ctx context.Context, ws workspaces.Context, uid uuid.UUID,
 // machine prepares a machine booted from the egiso at uri, fetched through c, or from one of the
 // default root container when uri is empty.
 func (t local) machine(c *http.Client, uri string) runners.BFn {
-	return func(ctx context.Context, ws workspaces.Context, _ uuid.UUID, canonicaluri string, envb *envx.Builder) (_ runners.T, err error) {
+	return func(ctx context.Context, ws workspaces.Context, _ uuidx.UUID, canonicaluri string, envb *envx.Builder) (_ runners.T, err error) {
 		var (
 			containers = userx.DefaultCacheDirectory("egvm", runners.ContainersVolume(canonicaluri))
 		)

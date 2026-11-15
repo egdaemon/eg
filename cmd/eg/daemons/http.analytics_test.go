@@ -16,8 +16,8 @@ import (
 	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/cmd/eg/daemons"
 	"github.com/egdaemon/eg/computeapi"
+	"github.com/egdaemon/eg/internal/uuidx"
 	"github.com/egdaemon/eg/runners"
-	"github.com/gofrs/uuid/v5"
 	"github.com/gorilla/mux"
 	"github.com/stretchr/testify/require"
 )
@@ -31,7 +31,7 @@ func TestAnalyticsHandler(t *testing.T) {
 		srv := httptest.NewServer(r)
 		defer srv.Close()
 
-		resp, err := srv.Client().Get(srv.URL + "/c/analytics/" + uuid.Must(uuid.NewV7()).String())
+		resp, err := srv.Client().Get(srv.URL + "/c/analytics/" + uuidx.NewV7().String())
 		require.NoError(t, err)
 		defer resp.Body.Close()
 		require.Equal(t, http.StatusUnauthorized, resp.StatusCode)
@@ -43,9 +43,9 @@ func TestAnalyticsHandler(t *testing.T) {
 		srv := httptest.NewServer(r)
 		defer srv.Close()
 
-		token, err := computeapi.SignLogToken(secret, uuid.Must(uuid.NewV7()).String(), time.Minute)
+		token, err := computeapi.SignLogToken(secret, uuidx.NewV7().String(), time.Minute)
 		require.NoError(t, err)
-		req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, srv.URL+"/c/analytics/"+uuid.Must(uuid.NewV7()).String(), nil)
+		req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, srv.URL+"/c/analytics/"+uuidx.NewV7().String(), nil)
 		require.NoError(t, err)
 		req.Header.Set("Authorization", token)
 		resp, err := srv.Client().Do(req)
@@ -60,7 +60,7 @@ func TestAnalyticsHandler(t *testing.T) {
 		srv := httptest.NewServer(r)
 		defer srv.Close()
 
-		uid := uuid.Must(uuid.NewV7())
+		uid := uuidx.NewV7()
 		token, err := computeapi.SignLogToken(secret, uid.String(), time.Minute)
 		require.NoError(t, err)
 		req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, srv.URL+"/c/analytics/"+uid.String(), nil)
@@ -74,7 +74,7 @@ func TestAnalyticsHandler(t *testing.T) {
 
 	t.Run("running workload without an analytics socket", func(t *testing.T) {
 		dirs := runners.NewSpoolDir(t.TempDir())
-		uid := uuid.Must(uuid.NewV7())
+		uid := uuidx.NewV7()
 		require.NoError(t, os.MkdirAll(dirs.Path(uid).Resolve("work", eg.RuntimeDirectory), 0700))
 
 		r := mux.NewRouter()
@@ -99,7 +99,7 @@ func TestAnalyticsHandler(t *testing.T) {
 		require.NoError(t, err)
 		defer os.RemoveAll(root)
 		dirs := runners.NewSpoolDir(root)
-		uid := uuid.Must(uuid.NewV7())
+		uid := uuidx.NewV7()
 		runtimedir := dirs.Path(uid).Resolve("work", eg.RuntimeDirectory)
 		require.NoError(t, os.MkdirAll(runtimedir, 0700))
 

@@ -11,9 +11,9 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/internal/gitx"
+	"github.com/egdaemon/eg/internal/uuidx"
 	"github.com/egdaemon/eg/workspaces"
 	git "github.com/go-git/go-git/v6"
-	"github.com/gofrs/uuid/v5"
 	"github.com/stretchr/testify/require"
 )
 
@@ -56,9 +56,9 @@ func TestNewLocal(t *testing.T) {
 		require.NoError(t, err)
 		_, err = hasher.Write(fileBytes)
 		require.NoError(t, err)
-		expectedCID := uuid.FromBytesOrNil(hasher.Sum(nil)).String()
+		expectedCID := uuidx.FromBytesOrNil(hasher.Sum(nil)).String()
 
-		ws, err := workspaces.NewLocal(t.Context(), uuid.Max, sha256.New(), root, moduleName)
+		ws, err := workspaces.NewLocal(t.Context(), uuidx.Max(), sha256.New(), root, moduleName)
 		require.NoError(t, err)
 		require.NotNil(t, ws)
 
@@ -95,9 +95,9 @@ func TestNewLocal(t *testing.T) {
 		require.NoError(t, err)
 		_, err = hasher.Write(fileBytes)
 		require.NoError(t, err)
-		expectedCID := uuid.FromBytesOrNil(hasher.Sum(nil)).String()
+		expectedCID := uuidx.FromBytesOrNil(hasher.Sum(nil)).String()
 
-		ws, err := workspaces.NewLocal(t.Context(), uuid.Max, sha256.New(), root, moduleName)
+		ws, err := workspaces.NewLocal(t.Context(), uuidx.Max(), sha256.New(), root, moduleName)
 		require.NoError(t, err)
 		require.NotNil(t, ws)
 
@@ -127,7 +127,7 @@ func TestNewLocal(t *testing.T) {
 		moduleDir := ".eg"
 		initRepo(t, root, moduleDir)
 
-		ws, err := workspaces.NewLocal(t.Context(), uuid.Max, sha256.New(), root, "")
+		ws, err := workspaces.NewLocal(t.Context(), uuidx.Max(), sha256.New(), root, "")
 		require.NoError(t, err)
 
 		fi, err := os.Lstat(ws.WorkingDir)
@@ -166,7 +166,7 @@ func TestNewLocal(t *testing.T) {
 			require.NoErrorf(t, err, "git %v: %s", args, out)
 		}
 
-		ws, err := workspaces.NewLocal(t.Context(), uuid.Max, sha256.New(), root, "")
+		ws, err := workspaces.NewLocal(t.Context(), uuidx.Max(), sha256.New(), root, "")
 		require.NoError(t, err)
 
 		repo, err := git.PlainOpen(ws.WorkingDir)
@@ -188,7 +188,7 @@ func TestNewLocal(t *testing.T) {
 		require.NoError(t, os.Mkdir(filepath.Join(root, moduleDir), 0755))
 		require.NoError(t, os.WriteFile(filepath.Join(root, moduleDir, "main.go"), []byte("package main"), 0644))
 
-		ws, err := workspaces.NewLocal(t.Context(), uuid.Max, sha256.New(), root, "")
+		ws, err := workspaces.NewLocal(t.Context(), uuidx.Max(), sha256.New(), root, "")
 		require.NoError(t, err)
 
 		fi, err := os.Lstat(ws.WorkingDir)
@@ -210,9 +210,9 @@ func TestNewQueued(t *testing.T) {
 		require.NoError(t, err)
 		_, err = hasher.Write(fileBytes)
 		require.NoError(t, err)
-		expectedCID := uuid.FromBytesOrNil(hasher.Sum(nil)).String()
+		expectedCID := uuidx.FromBytesOrNil(hasher.Sum(nil)).String()
 
-		ws, err := workspaces.NewLocal(t.Context(), uuid.Max, sha256.New(), root, moduleName)
+		ws, err := workspaces.NewLocal(t.Context(), uuidx.Max(), sha256.New(), root, moduleName)
 		require.NoError(t, err)
 		require.NotNil(t, ws)
 
@@ -249,9 +249,9 @@ func TestNewQueued(t *testing.T) {
 		require.NoError(t, err)
 		_, err = hasher.Write(fileBytes)
 		require.NoError(t, err)
-		expectedCID := uuid.FromBytesOrNil(hasher.Sum(nil)).String()
+		expectedCID := uuidx.FromBytesOrNil(hasher.Sum(nil)).String()
 
-		ws, err := workspaces.NewLocal(t.Context(), uuid.Max, sha256.New(), root, moduleName)
+		ws, err := workspaces.NewLocal(t.Context(), uuidx.Max(), sha256.New(), root, moduleName)
 		require.NoError(t, err)
 		require.NotNil(t, ws)
 
@@ -290,9 +290,9 @@ func TestNewBuiltin(t *testing.T) {
 		require.NoError(t, err)
 		_, err = hasher.Write(fileBytes)
 		require.NoError(t, err)
-		expectedCID := uuid.FromBytesOrNil(hasher.Sum(nil)).String()
+		expectedCID := uuidx.FromBytesOrNil(hasher.Sum(nil)).String()
 
-		ws, err := workspaces.NewLocal(t.Context(), uuid.Max, sha256.New(), root, moduleName)
+		ws, err := workspaces.NewLocal(t.Context(), uuidx.Max(), sha256.New(), root, moduleName)
 		require.NoError(t, err)
 		require.NotNil(t, ws)
 
@@ -329,9 +329,9 @@ func TestNewBuiltin(t *testing.T) {
 		require.NoError(t, err)
 		_, err = hasher.Write(fileBytes)
 		require.NoError(t, err)
-		expectedCID := uuid.FromBytesOrNil(hasher.Sum(nil)).String()
+		expectedCID := uuidx.FromBytesOrNil(hasher.Sum(nil)).String()
 
-		ws, err := workspaces.NewLocal(t.Context(), uuid.Max, sha256.New(), root, moduleName)
+		ws, err := workspaces.NewLocal(t.Context(), uuidx.Max(), sha256.New(), root, moduleName)
 		require.NoError(t, err)
 		require.NotNil(t, ws)
 
@@ -370,7 +370,7 @@ func TestNew(t *testing.T) {
 		require.NoError(t, err)
 		_, err = hasher.Write(fileBytes)
 		require.NoError(t, err)
-		expectedCID := uuid.FromBytesOrNil(hasher.Sum(nil)).String()
+		expectedCID := uuidx.FromBytesOrNil(hasher.Sum(nil)).String()
 
 		ws, err := workspaces.New(t.Context(), sha256.New(), root, root, moduleName)
 		require.NoError(t, err)
@@ -408,7 +408,7 @@ func TestNew(t *testing.T) {
 		require.NoError(t, err)
 		_, err = hasher.Write(fileBytes)
 		require.NoError(t, err)
-		expectedCID := uuid.FromBytesOrNil(hasher.Sum(nil)).String()
+		expectedCID := uuidx.FromBytesOrNil(hasher.Sum(nil)).String()
 
 		oldBuildDir := filepath.Join(root, eg.CacheDirectory, eg.DefaultModuleDirectory(), ".gen", expectedCID, "build")
 		oldTransDir := filepath.Join(root, eg.CacheDirectory, eg.DefaultModuleDirectory(), ".gen", expectedCID, "trans")
@@ -446,7 +446,7 @@ func TestNew(t *testing.T) {
 		require.NoError(t, err)
 		_, err = hasher.Write(fileBytes)
 		require.NoError(t, err)
-		expectedCID := uuid.FromBytesOrNil(hasher.Sum(nil)).String()
+		expectedCID := uuidx.FromBytesOrNil(hasher.Sum(nil)).String()
 
 		oldBuildDir := filepath.Join(root, eg.CacheDirectory, eg.DefaultModuleDirectory(), ".gen", expectedCID, "build")
 		dummyBuildFile := filepath.Join(oldBuildDir, "dummy.txt")
@@ -495,7 +495,7 @@ func TestNew(t *testing.T) {
 		require.NoError(t, err)
 		_, err = hasher.Write(content2) // then main.go
 		require.NoError(t, err)
-		expectedCID := uuid.FromBytesOrNil(hasher.Sum(nil)).String()
+		expectedCID := uuidx.FromBytesOrNil(hasher.Sum(nil)).String()
 
 		ws, err := workspaces.New(t.Context(), sha256.New(), root, root, moduleName)
 		require.NoError(t, err)
@@ -511,7 +511,7 @@ func TestNew(t *testing.T) {
 		require.NoError(t, os.Mkdir(filepath.Join(root, moduleDir), 0755))
 
 		hasher := sha256.New()
-		expectedCID := uuid.FromBytesOrNil(hasher.Sum(nil)).String()
+		expectedCID := uuidx.FromBytesOrNil(hasher.Sum(nil)).String()
 
 		ws, err := workspaces.New(t.Context(), sha256.New(), root, root, moduleName)
 		require.NoError(t, err)

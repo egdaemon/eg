@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/egdaemon/eg/computeapi"
+	"github.com/egdaemon/eg/internal/uuidx"
 
 	"github.com/egdaemon/eg/cmd/migrations"
 	"github.com/egdaemon/eg/compute"
@@ -19,7 +20,6 @@ import (
 	"github.com/egdaemon/eg/internal/langx"
 	"github.com/egdaemon/eg/internal/sqltestx"
 	"github.com/egdaemon/eg/internal/testx"
-	"github.com/gofrs/uuid/v5"
 	"github.com/gorilla/mux"
 	"github.com/stretchr/testify/require"
 )
@@ -51,26 +51,26 @@ func historyRequest(t *testing.T, srv *httptest.Server, path string, token strin
 func TestHistoryHandler(t *testing.T) {
 	t.Run("missing token", func(t *testing.T) {
 		srv, _ := newHistoryServer(t)
-		resp := historyRequest(t, srv, "/c/history/"+uuid.Must(uuid.NewV7()).String(), "")
+		resp := historyRequest(t, srv, "/c/history/"+uuidx.NewV7().String(), "")
 		require.Equal(t, http.StatusUnauthorized, resp.StatusCode)
 	})
 
 	t.Run("token for another workload", func(t *testing.T) {
 		srv, _ := newHistoryServer(t)
-		resp := historyRequest(t, srv, "/c/history/"+uuid.Must(uuid.NewV7()).String(), logsToken(t, uuid.Must(uuid.NewV7()).String()))
+		resp := historyRequest(t, srv, "/c/history/"+uuidx.NewV7().String(), logsToken(t, uuidx.NewV7().String()))
 		require.Equal(t, http.StatusForbidden, resp.StatusCode)
 	})
 
 	t.Run("not recorded", func(t *testing.T) {
 		srv, _ := newHistoryServer(t)
-		id := uuid.Must(uuid.NewV7()).String()
+		id := uuidx.NewV7().String()
 		require.Equal(t, http.StatusNotFound, historyRequest(t, srv, "/c/history/"+id, logsToken(t, id)).StatusCode)
 		require.Equal(t, http.StatusNotFound, historyRequest(t, srv, "/c/history/"+id+"/logs", logsToken(t, id)).StatusCode)
 	})
 
 	t.Run("serves the record and logs", func(t *testing.T) {
 		srv, db := newHistoryServer(t)
-		id := uuid.Must(uuid.NewV7()).String()
+		id := uuidx.NewV7().String()
 		logs := filepath.Join(t.TempDir(), "w.log")
 		require.NoError(t, os.WriteFile(logs, []byte("output"), 0600))
 		require.NoError(t, computex.EntryUpsert(t.Context(), db, langx.Clone(computex.Entry{}, computex.EntryOptionTestDefaults, computex.EntryOptionID(id), func(e *computex.Entry) {
@@ -94,7 +94,7 @@ func TestHistoryHandler(t *testing.T) {
 
 	t.Run("serves the recorded analytics", func(t *testing.T) {
 		srv, db := newHistoryServer(t)
-		id := uuid.Must(uuid.NewV7()).String()
+		id := uuidx.NewV7().String()
 		analytics := filepath.Join(t.TempDir(), "w.analytics.db")
 		require.NoError(t, os.WriteFile(analytics, []byte("analytics"), 0600))
 		require.NoError(t, computex.EntryUpsert(t.Context(), db, langx.Clone(computex.Entry{}, computex.EntryOptionTestDefaults, computex.EntryOptionID(id), func(e *computex.Entry) {
@@ -110,7 +110,7 @@ func TestHistoryHandler(t *testing.T) {
 
 	t.Run("no analytics recorded", func(t *testing.T) {
 		srv, db := newHistoryServer(t)
-		id := uuid.Must(uuid.NewV7()).String()
+		id := uuidx.NewV7().String()
 		require.NoError(t, computex.EntryUpsert(t.Context(), db, langx.Clone(computex.Entry{}, computex.EntryOptionTestDefaults, computex.EntryOptionID(id))).Scan(&computex.Entry{}))
 
 		require.Equal(t, http.StatusNotFound, historyRequest(t, srv, "/c/history/"+id+"/analytics", logsToken(t, id)).StatusCode)

@@ -20,6 +20,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/egdaemon/eg/internal/uuidx"
 	"github.com/egdaemon/eg/jsonx"
 
 	"github.com/egdaemon/eg/computeapi"
@@ -47,7 +48,6 @@ import (
 	"github.com/egdaemon/eg/secrets"
 	"github.com/egdaemon/eg/workspaces"
 	"github.com/fsnotify/fsnotify"
-	"github.com/gofrs/uuid/v5"
 
 	"github.com/alitto/pond/v2"
 )
@@ -941,7 +941,7 @@ func (t statediscard) Update(ctx context.Context) state {
 		}
 	}()
 
-	if err := t.metadata.dirs.Completed(uuid.FromStringOrNil(t.workload.Id)); err != nil {
+	if err := t.metadata.dirs.Completed(uuidx.FromStringOrNil(t.workload.Id)); err != nil {
 		return failure(t.metadata, errorsx.Wrap(err, "completion failed"), t.n)
 	}
 

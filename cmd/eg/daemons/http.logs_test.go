@@ -10,11 +10,11 @@ import (
 	"time"
 
 	"github.com/egdaemon/eg/computeapi"
+	"github.com/egdaemon/eg/internal/uuidx"
 
 	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/cmd/eg/daemons"
 	"github.com/egdaemon/eg/runners"
-	"github.com/gofrs/uuid/v5"
 	"github.com/gorilla/mux"
 	"github.com/stretchr/testify/require"
 )
@@ -52,7 +52,7 @@ func logsToken(t *testing.T, wid string) string {
 	return token
 }
 
-func runningLog(t *testing.T, dirs runners.SpoolDirs, uid uuid.UUID) *os.File {
+func runningLog(t *testing.T, dirs runners.SpoolDirs, uid uuidx.UUID) *os.File {
 	t.Helper()
 	runtimedir := dirs.Path(uid).Resolve("work", eg.RuntimeDirectory)
 	require.NoError(t, os.MkdirAll(runtimedir, 0700))
@@ -65,13 +65,13 @@ func runningLog(t *testing.T, dirs runners.SpoolDirs, uid uuid.UUID) *os.File {
 func TestLogsHandler(t *testing.T) {
 	t.Run("missing token", func(t *testing.T) {
 		srv := newLogsServer(t, runners.NewSpoolDir(t.TempDir()))
-		resp := logsRequest(t, srv, uuid.Must(uuid.NewV7()).String(), "", "")
+		resp := logsRequest(t, srv, uuidx.NewV7().String(), "", "")
 		require.Equal(t, http.StatusUnauthorized, resp.StatusCode)
 	})
 
 	t.Run("token signed with another secret", func(t *testing.T) {
 		srv := newLogsServer(t, runners.NewSpoolDir(t.TempDir()))
-		uid := uuid.Must(uuid.NewV7())
+		uid := uuidx.NewV7()
 		token, err := computeapi.SignLogToken(func() []byte { return []byte("derp") }, uid.String(), time.Minute)
 		require.NoError(t, err)
 		resp := logsRequest(t, srv, uid.String(), token, "")
@@ -80,14 +80,14 @@ func TestLogsHandler(t *testing.T) {
 
 	t.Run("expired token", func(t *testing.T) {
 		srv := newLogsServer(t, runners.NewSpoolDir(t.TempDir()))
-		uid := uuid.Must(uuid.NewV7())
+		uid := uuidx.NewV7()
 		resp := logsRequest(t, srv, uid.String(), mustExpired(t, uid.String()), "")
 		require.Equal(t, http.StatusUnauthorized, resp.StatusCode)
 	})
 
 	t.Run("token for another workload", func(t *testing.T) {
 		srv := newLogsServer(t, runners.NewSpoolDir(t.TempDir()))
-		resp := logsRequest(t, srv, uuid.Must(uuid.NewV7()).String(), logsToken(t, uuid.Must(uuid.NewV7()).String()), "")
+		resp := logsRequest(t, srv, uuidx.NewV7().String(), logsToken(t, uuidx.NewV7().String()), "")
 		require.Equal(t, http.StatusForbidden, resp.StatusCode)
 	})
 
@@ -100,7 +100,7 @@ func TestLogsHandler(t *testing.T) {
 	t.Run("invalid offset", func(t *testing.T) {
 		dirs := runners.NewSpoolDir(t.TempDir())
 		srv := newLogsServer(t, dirs)
-		uid := uuid.Must(uuid.NewV7())
+		uid := uuidx.NewV7()
 		runningLog(t, dirs, uid)
 		resp := logsRequest(t, srv, uid.String(), logsToken(t, uid.String()), "?offset=-1")
 		require.Equal(t, http.StatusBadRequest, resp.StatusCode)
@@ -108,7 +108,7 @@ func TestLogsHandler(t *testing.T) {
 
 	t.Run("unknown workload", func(t *testing.T) {
 		srv := newLogsServer(t, runners.NewSpoolDir(t.TempDir()))
-		uid := uuid.Must(uuid.NewV7())
+		uid := uuidx.NewV7()
 		resp := logsRequest(t, srv, uid.String(), logsToken(t, uid.String()), "")
 		require.Equal(t, http.StatusNotFound, resp.StatusCode)
 	})
@@ -116,7 +116,7 @@ func TestLogsHandler(t *testing.T) {
 	t.Run("streams until the workload completes", func(t *testing.T) {
 		dirs := runners.NewSpoolDir(t.TempDir())
 		srv := newLogsServer(t, dirs)
-		uid := uuid.Must(uuid.NewV7())
+		uid := uuidx.NewV7()
 		logs := runningLog(t, dirs, uid)
 		_, err := logs.WriteString("skipped hello\n")
 		require.NoError(t, err)

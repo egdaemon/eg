@@ -13,12 +13,12 @@ import (
 	"testing"
 
 	"github.com/egdaemon/eg/computeapi"
+	"github.com/egdaemon/eg/internal/uuidx"
 	"github.com/egdaemon/eg/jsonx"
 
 	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/cmd/eg/daemons"
 	"github.com/egdaemon/eg/runners"
-	"github.com/gofrs/uuid/v5"
 	"github.com/stretchr/testify/require"
 )
 
@@ -47,7 +47,7 @@ func (t *fakereserver) Reserve(ctx context.Context, enq *computeapi.Enqueued, ar
 
 func newRecorded() *computeapi.EnqueuedDequeueResponse {
 	return &computeapi.EnqueuedDequeueResponse{
-		Enqueued:    &computeapi.Enqueued{Id: uuid.Must(uuid.NewV7()).String(), Entry: "containers/clear/main.wasm"},
+		Enqueued:    &computeapi.Enqueued{Id: uuidx.NewV7().String(), Entry: "containers/clear/main.wasm"},
 		AccessToken: "access-token",
 	}
 }
@@ -78,7 +78,7 @@ func TestUploadHandler(t *testing.T) {
 		h.RM = runners.NewResourceManager(runners.RuntimeResources{Cores: 10, Memory: 10, Vram: 10})
 
 		enqresp := computeapi.EnqueuedDequeueResponse{
-			Enqueued: &computeapi.Enqueued{Id: uuid.Must(uuid.NewV7()).String(), Entry: "containers/clear/main.wasm", Cores: 1, Description: "my workload"},
+			Enqueued: &computeapi.Enqueued{Id: uuidx.NewV7().String(), Entry: "containers/clear/main.wasm", Cores: 1, Description: "my workload"},
 		}
 
 		w := httptest.NewRecorder()
@@ -132,7 +132,7 @@ func TestUploadHandler(t *testing.T) {
 		h := &daemons.UploadHandler{Dirs: runners.NewSpoolDir(t.TempDir()), Reserver: reserver}
 
 		enqresp := computeapi.EnqueuedDequeueResponse{
-			Enqueued: &computeapi.Enqueued{Id: uuid.Must(uuid.NewV7()).String()},
+			Enqueued: &computeapi.Enqueued{Id: uuidx.NewV7().String()},
 		}
 
 		w := httptest.NewRecorder()
@@ -153,7 +153,7 @@ func TestUploadHandler(t *testing.T) {
 		require.NoError(t, os.WriteFile(h.Dirs.Downloading, nil, 0600))
 
 		enqresp := computeapi.EnqueuedDequeueResponse{
-			Enqueued: &computeapi.Enqueued{Id: uuid.Must(uuid.NewV7()).String()},
+			Enqueued: &computeapi.Enqueued{Id: uuidx.NewV7().String()},
 		}
 
 		w := httptest.NewRecorder()
@@ -173,7 +173,7 @@ func TestUploadHandler(t *testing.T) {
 		h.RM = runners.NewResourceManager(runners.RuntimeResources{Cores: 10, Memory: 10, Vram: 10})
 
 		enqresp := computeapi.EnqueuedDequeueResponse{
-			Enqueued: &computeapi.Enqueued{Id: uuid.Must(uuid.NewV7()).String(), Cores: 9},
+			Enqueued: &computeapi.Enqueued{Id: uuidx.NewV7().String(), Cores: 9},
 		}
 
 		w := httptest.NewRecorder()
@@ -191,7 +191,7 @@ func TestUploadHandler(t *testing.T) {
 		h := &daemons.UploadHandler{Dirs: runners.NewSpoolDir(t.TempDir()), Reserver: reserver}
 
 		enqresp := computeapi.EnqueuedDequeueResponse{
-			Enqueued: &computeapi.Enqueued{Id: uuid.Must(uuid.NewV7()).String()},
+			Enqueued: &computeapi.Enqueued{Id: uuidx.NewV7().String()},
 		}
 		mimetype, body, err := computeapi.NewWorkloadRequest(&enqresp, strings.NewReader(""))
 		require.NoError(t, err)
@@ -212,7 +212,7 @@ func TestUploadHandler(t *testing.T) {
 		h := &daemons.UploadHandler{Dirs: runners.NewSpoolDir(t.TempDir()), Reserver: reserver}
 
 		enqresp := computeapi.EnqueuedDequeueResponse{
-			Enqueued: &computeapi.Enqueued{Id: uuid.Must(uuid.NewV7()).String()},
+			Enqueued: &computeapi.Enqueued{Id: uuidx.NewV7().String()},
 		}
 
 		w := httptest.NewRecorder()

@@ -14,7 +14,7 @@ import (
 	"time"
 
 	"github.com/egdaemon/eg/internal/httpx"
-	"github.com/gofrs/uuid/v5"
+	"github.com/egdaemon/eg/internal/uuidx"
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p/core/network"
@@ -22,7 +22,7 @@ import (
 )
 
 func TestUploadWatch(t *testing.T) {
-	enq := &Enqueued{Id: uuid.Must(uuid.NewV7()).String(), AccountId: "acct", Entry: "main.wasm"}
+	enq := &Enqueued{Id: uuidx.NewV7().String(), AccountId: "acct", Entry: "main.wasm"}
 
 	for _, c := range []struct {
 		name     string

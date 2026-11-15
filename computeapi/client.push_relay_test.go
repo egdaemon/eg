@@ -14,10 +14,10 @@ import (
 	"time"
 
 	"github.com/egdaemon/eg/computeapi"
+	"github.com/egdaemon/eg/internal/uuidx"
 
 	"github.com/egdaemon/eg/compute"
 	"github.com/egdaemon/eg/internal/libp2px"
-	"github.com/gofrs/uuid/v5"
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p/core/host"
@@ -169,7 +169,7 @@ func TestUploadViaCandidateTokenRelay(t *testing.T) {
 	kernel := bytes.Repeat([]byte("k"), 1<<10)
 
 	req := &computeapi.EnqueuedDequeueResponse{
-		Enqueued: &computeapi.Enqueued{Id: uuid.Must(uuid.NewV7()).String()},
+		Enqueued: &computeapi.Enqueued{Id: uuidx.NewV7().String()},
 	}
 
 	accepted, err := computeapi.UploadOne(ctx, client, &compute.Compute{Id: "relayed", P2Pid: runner.ID().String(), Token: token}, req, bytes.NewReader(kernel), strings.NewReader(""))

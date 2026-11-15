@@ -27,6 +27,7 @@ import (
 	"github.com/egdaemon/eg/internal/podmanx"
 	"github.com/egdaemon/eg/internal/stringsx"
 	"github.com/egdaemon/eg/internal/userx"
+	"github.com/egdaemon/eg/internal/uuidx"
 	"github.com/egdaemon/eg/internal/wasix"
 	"github.com/egdaemon/eg/interp/c8sproxy"
 	"github.com/egdaemon/eg/runners"
@@ -34,7 +35,6 @@ import (
 	"github.com/egdaemon/eg/transpile"
 	"github.com/egdaemon/eg/workspaces"
 	"github.com/go-git/go-git/v6"
-	"github.com/gofrs/uuid/v5"
 	"go.podman.io/podman/v6/pkg/bindings/containers"
 )
 
@@ -120,7 +120,7 @@ func (t serve) datadir(rels ...string) string {
 func (t serve) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err error) {
 	var (
 		homedir    = userx.HomeDirectoryOrDefault("/root")
-		uid        = uuid.Must(uuid.NewV7())
+		uid        = uuidx.NewV7()
 		ws         workspaces.Context
 		repo       *git.Repository
 		environio  *os.File
@@ -135,7 +135,7 @@ func (t serve) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err e
 
 	// clients that want to find the run again, i.e. the editor extension, pick the run's id.
 	if stringsx.Present(t.Session) {
-		if uid, err = uuid.FromString(t.Session); err != nil {
+		if uid, err = uuidx.FromString(t.Session); err != nil {
 			return errorsx.Wrapf(err, "invalid session id %q, expected a uuid", t.Session)
 		}
 	}
@@ -147,7 +147,7 @@ func (t serve) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath) (err e
 
 	if ws, err = workspaces.NewLocal(
 		gctx.Context,
-		uuid.Must(uuid.NewV7()),
+		uuidx.NewV7(),
 		md5x.Digest(errorsx.Zero(cmdopts.BuildInfo())),
 		t.Dir,
 		t.Name,

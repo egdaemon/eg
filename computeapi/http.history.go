@@ -15,7 +15,7 @@ import (
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/httpx"
 	"github.com/egdaemon/eg/internal/jwtx"
-	"github.com/gofrs/uuid/v5"
+	"github.com/egdaemon/eg/internal/uuidx"
 	"github.com/gorilla/mux"
 )
 
@@ -167,13 +167,13 @@ func (t *HistoryService) analytics(w http.ResponseWriter, r *http.Request) {
 }
 
 // authorize validates the log token against the workload in the path, writing the failure response when it isn't valid.
-func (t *HistoryService) authorize(w http.ResponseWriter, r *http.Request) (uid uuid.UUID, ok bool) {
+func (t *HistoryService) authorize(w http.ResponseWriter, r *http.Request) (uid uuidx.UUID, ok bool) {
 	var (
 		err    error
 		claims LogClaims
 	)
 
-	if uid, err = uuid.FromString(mux.Vars(r)["id"]); err != nil {
+	if uid, err = uuidx.FromString(mux.Vars(r)["id"]); err != nil {
 		log.Println(errorsx.Wrap(err, "invalid workload id"))
 		errorsx.Log(httpx.WriteEmptyJSON(w, http.StatusBadRequest))
 		return uid, false
@@ -185,7 +185,7 @@ func (t *HistoryService) authorize(w http.ResponseWriter, r *http.Request) (uid 
 		return uid, false
 	}
 
-	if uuid.FromStringOrNil(claims.Workload) != uid {
+	if uuidx.FromStringOrNil(claims.Workload) != uid {
 		log.Println("log token not valid for workload", uid, claims.Workload)
 		errorsx.Log(httpx.WriteEmptyJSON(w, http.StatusForbidden))
 		return uid, false

@@ -7,19 +7,20 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gofrs/uuid/v5"
 	"github.com/stretchr/testify/require"
+
+	"github.com/egdaemon/eg/internal/uuidx"
 )
 
 func TestSpoolCancel(t *testing.T) {
 	t.Run("unknown workload", func(t *testing.T) {
 		dirs := NewSpoolDir(t.TempDir())
-		require.ErrorIs(t, dirs.Cancel(uuid.Must(uuid.NewV7())), ErrWorkloadNotFound)
+		require.ErrorIs(t, dirs.Cancel(uuidx.NewV7()), ErrWorkloadNotFound)
 	})
 
 	t.Run("marks queued and running workloads and is idempotent", func(t *testing.T) {
 		dirs := NewSpoolDir(t.TempDir())
-		uid := uuid.Must(uuid.NewV7())
+		uid := uuidx.NewV7()
 		require.NoError(t, dirs.Download(uid, "archive.tar.gz", bytes.NewBufferString("")))
 		require.NoError(t, dirs.Enqueue(uid))
 
@@ -36,7 +37,7 @@ func TestSpoolCancel(t *testing.T) {
 func TestWatchCancel(t *testing.T) {
 	t.Run("cancels the context when the marker is created", func(t *testing.T) {
 		dirs := NewSpoolDir(t.TempDir())
-		uid := uuid.Must(uuid.NewV7())
+		uid := uuidx.NewV7()
 		require.NoError(t, dirs.Download(uid, "archive.tar.gz", bytes.NewBufferString("")))
 		require.NoError(t, dirs.Enqueue(uid))
 		rundir, err := dirs.Dequeue()
@@ -78,7 +79,7 @@ func TestWatchCancel(t *testing.T) {
 
 func TestRecoverDiscardsCancelled(t *testing.T) {
 	dirs := NewSpoolDir(t.TempDir())
-	uid := uuid.Must(uuid.NewV7())
+	uid := uuidx.NewV7()
 	require.NoError(t, dirs.Download(uid, "archive.tar.gz", bytes.NewBufferString("")))
 	require.NoError(t, dirs.Enqueue(uid))
 	rundir, err := dirs.Dequeue()

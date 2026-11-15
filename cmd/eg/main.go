@@ -31,6 +31,7 @@ import (
 	"github.com/egdaemon/eg/cmd/cmdssh"
 	"github.com/egdaemon/eg/cmd/eg/compute"
 	"github.com/egdaemon/eg/cmd/eg/daemons"
+	"github.com/egdaemon/eg/cmd/eg/workloads"
 	"github.com/egdaemon/eg/internal/bytesx"
 	"github.com/egdaemon/eg/internal/contextx"
 	"github.com/egdaemon/eg/internal/envx"
@@ -85,6 +86,7 @@ func main() {
 		cmdopts.TLSConfig
 		Version            cmdopts.Version              `cmd:"" help:"display versioning information"`
 		Compute            compute.Cmd                  `cmd:"" help:"commands for running compute workloads"`
+		Workloads          workloads.Cmd                `cmd:"" help:"inspect the workloads of repositories"`
 		Module             module                       `cmd:"" help:"executes a compiled module directly" hidden:"true"`
 		Wasi               Wasi                         `cmd:"" help:"wasi related commmands"`
 		Egiso              Egiso                        `cmd:"" name:"egiso" help:"inspect egiso images" hidden:"true"`
@@ -192,6 +194,7 @@ func main() {
 			cmdopts.Entropy(cmdopts.GenerateEntropy),
 			cmdopts.KeyGenSeeded(cmdopts.DefaultKeyGenSeeded),
 			libp2px.MDNSLookup(libp2px.DefaultMDNSLookup),
+			cmdopts.Environ(cmdopts.DefaultEnviron),
 		),
 		kong.BindTo(shellcli.Context, (*context.Context)(nil)),
 		kong.BindTo(os.Stdin, (*cmdopts.Stdin)(nil)),

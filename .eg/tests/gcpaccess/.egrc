@@ -1,0 +1,6 @@
+# the arguments of this workload, one per line. a [mode] header declares a mode it supports: local, upload or serve.
+# lines before the first header are common to every mode.
+--gcp-auto
+
+[local]
+[upload]

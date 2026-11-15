@@ -12,6 +12,7 @@ func TestPatternClean(t *testing.T) {
 	require.Equal(t, "", PatternClean("%git.commit.year%"))
 	require.Equal(t, "", PatternClean("%git.commit.month%"))
 	require.Equal(t, "", PatternClean("%git.commit.day%"))
+	require.Equal(t, "", PatternClean("{git.commit.seconds}"))
 	require.Equal(t, "", PatternClean("%git.commit.unix%"))
 	require.Equal(t, "", PatternClean("%git.commit.unix.milli%"))
 	require.Equal(t, "", PatternClean("%git.commit.unix.micro%"))

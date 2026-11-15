@@ -78,16 +78,19 @@ type commit struct {
 // the %token% style of tokens is deprecated, use {token}.
 // {git.hash}               -> the full hex encoded commit id.
 // {git.hash.short}         -> the first 7 characters of the hex encoded commit id.
-// {git.commit.year}        -> year of the commit.
-// {git.commit.month}       -> month of the commit.
-// {git.commit.day}         -> day of the commit.
+// {git.commit.year}        -> year of the commit, in UTC.
+// {git.commit.month}       -> month of the commit, in UTC.
+// {git.commit.day}         -> day of the commit, in UTC.
+// {git.commit.seconds}     -> seconds into the day of the commit, in UTC (0 to 86399). with the year, month and day
+// it orders commits and, unlike unix, never passes 2147483647.
 // {git.commit.unix}        -> Unix of the commit.
 // {git.commit.unix.milli}  -> UnixMilli of the commit.
 // {git.commit.unix.micro}  -> UnixMicro of the commit.
 // {eg.git.canonical.uri}   -> the uri of the repository that eg considers to be the canonical uri.
 func (c commit) StringReplace(pattern string) string {
 	patternx.Warn(pattern)
-	cwhen := c.Committer.When
+	// the date is taken in UTC so it does not depend on the committer's timezone and stays consistent with unix.
+	cwhen := c.Committer.When.UTC()
 
 	s := strings.ReplaceAll(pattern, "%git.hash%", c.Hash.String())
 	s = strings.ReplaceAll(s, "{git.hash}", c.Hash.String())
@@ -99,6 +102,7 @@ func (c commit) StringReplace(pattern string) string {
 	s = strings.ReplaceAll(s, "{git.commit.month}", strconv.Itoa(int(cwhen.Month())))
 	s = strings.ReplaceAll(s, "%git.commit.day%", strconv.Itoa(cwhen.Day()))
 	s = strings.ReplaceAll(s, "{git.commit.day}", strconv.Itoa(cwhen.Day()))
+	s = strings.ReplaceAll(s, "{git.commit.seconds}", strconv.Itoa(cwhen.Hour()*3600+cwhen.Minute()*60+cwhen.Second()))
 	s = strings.ReplaceAll(s, "%git.commit.unix%", strconv.Itoa(int(cwhen.Unix())))
 	s = strings.ReplaceAll(s, "{git.commit.unix}", strconv.Itoa(int(cwhen.Unix())))
 	s = strings.ReplaceAll(s, "%git.commit.unix.milli%", strconv.Itoa(int(cwhen.UnixMilli())))
@@ -128,6 +132,7 @@ func PatternClean(pattern string) string {
 	s = strings.ReplaceAll(s, "{git.commit.month}", "")
 	s = strings.ReplaceAll(s, "%git.commit.day%", "")
 	s = strings.ReplaceAll(s, "{git.commit.day}", "")
+	s = strings.ReplaceAll(s, "{git.commit.seconds}", "")
 	s = strings.ReplaceAll(s, "%git.commit.unix%", "")
 	s = strings.ReplaceAll(s, "{git.commit.unix}", "")
 	s = strings.ReplaceAll(s, "%git.commit.unix.milli%", "")

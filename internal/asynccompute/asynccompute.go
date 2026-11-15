@@ -3,6 +3,8 @@ package asynccompute
 
 import (
 	"context"
+	"errors"
+	"io"
 	"runtime"
 	"sync"
 	"sync/atomic"
@@ -33,6 +35,16 @@ func (t *Pool[T]) Run(ctx context.Context, w T) error {
 
 // Close stops accepting workloads and waits for the queued ones to complete, returning the first failure.
 func (t *Pool[T]) Close() error {
+	return t.CloseWithError(nil)
+}
+
+// CloseWithError is Close for a pool that is closed because of err, i.e. the producer feeding it failed. a non-nil err
+// counts as a failure of the pool like one of the workloads, the first failure is the one returned.
+func (t *Pool[T]) CloseWithError(err error) error {
+	if err != nil {
+		t.failed.CompareAndSwap(nil, &err)
+	}
+
 	close(t.queued)
 	t.shutdown.Wait()
 	return langx.Autoderef(t.failed.Load())
@@ -92,14 +104,26 @@ func New[T any](async func(ctx context.Context, w T) error, options ...Option[T]
 		init()
 }
 
-// gracefully shutdown by invoking close and waiting until all workers
-// complete or the context times out.
-func Shutdown[T any](ctx context.Context, p *Pool[T]) error {
-	dctx, cancelled := context.WithCancelCause(ctx)
-	go func() {
-		cancelled(p.Close())
-	}()
+// gracefully shutdown by invoking close on each pool, in the order given, and waiting until its workers complete or
+// the context times out. the order is the dependency order: a pool whose workloads feed another is shut down before it.
+// a pool that fails does not stop the others from being shut down, the failures are joined. when the context ends the
+// pools that are not closed yet are left alone, closing one while the one feeding it still runs would break it.
+func Shutdown(ctx context.Context, pools ...io.Closer) error {
+	var failed error
 
-	<-dctx.Done()
-	return errorsx.Ignore(context.Cause(dctx), context.Canceled)
+	for _, p := range pools {
+		dctx, cancelled := context.WithCancelCause(ctx)
+		go func() {
+			cancelled(p.Close())
+		}()
+
+		<-dctx.Done()
+		failed = errors.Join(failed, errorsx.Ignore(context.Cause(dctx), context.Canceled))
+
+		if ctx.Err() != nil {
+			break
+		}
+	}
+
+	return failed
 }

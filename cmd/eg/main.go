@@ -191,6 +191,7 @@ func main() {
 			&shellcli.TLSConfig,
 			cleanupsigs,
 			new(cmdopts.HotswapPath),
+			new(cmdopts.ComputeSession),
 			cmdopts.Entropy(cmdopts.GenerateEntropy),
 			cmdopts.KeyGenSeeded(cmdopts.DefaultKeyGenSeeded),
 			libp2px.MDNSLookup(libp2px.DefaultMDNSLookup),
@@ -198,6 +199,10 @@ func main() {
 		),
 		kong.BindTo(shellcli.Context, (*context.Context)(nil)),
 		kong.BindTo(os.Stdin, (*cmdopts.Stdin)(nil)),
+		// only opened by the commands that ask for it.
+		kong.BindSingletonProvider(func(g *cmdopts.Global) *cmdopts.CLIDB {
+			return cmdopts.NewCLIDB(g.Context)
+		}),
 		kong.BindSingletonProvider(func(g *cmdopts.Global) *cmdidentity.T {
 			return cmdidentity.New(g.Context, g.AccountID, g.ProfileID, cmdidentity.Login)
 		}),

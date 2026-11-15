@@ -72,19 +72,25 @@ func (t local) gpu() bool {
 
 // Run compiles the workload's modules, runs them in containers or, given an egiso, a machine, and
 // applies the changes they made.
-func (t local) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, hotswapbin *cmdopts.HotswapPath) (err error) {
+func (t local) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, hotswapbin *cmdopts.HotswapPath, session *cmdopts.ComputeSession, clidb *cmdopts.CLIDB) (err error) {
 	var (
 		ws      workspaces.Context
 		repo    *git.Repository
 		rt      runners.T
 		environ *os.File
 		b       runners.B = runners.BFn(t.podman)
-		uid               = uuidx.NewV7()
+		uid               = uuidx.FirstNonNil(session.Session, uuidx.NewV7())
 	)
 
 	if t.Egiso != nil {
 		b = t.machine(tlsc.DefaultClient(), *t.Egiso)
 	}
+
+	// register the run so tools (i.e. the vscode extension) can list it while it is running. local runs
+	// are not reachable over ssh and do not host an agent, they only patch their changes back when enabled.
+	defer func() { errorsx.Log(clidb.Close()) }()
+	registered, done := session.New(clidb).Branch(session.Branch, defaultbranch(t.Name, uid)).Patch(t.AutoPatch).Register(gctx.Context, uid, t.Name, t.Dir)
+	defer func() { done(err) }()
 
 	contextx.WaitGroupAdd(gctx.Context, 1)
 	go contextx.WaitGroupDone(gctx.Context)
@@ -185,7 +191,7 @@ func (t local) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, hotswapbin *cm
 		}
 	}
 
-	return gitx.AutoPatch(os.Stdout).DryRun(!t.AutoPatch).From(ws.WorkingDir).To(t.Dir).Branch(fmt.Sprintf("eg/%s-%s", t.Name, uid)).Apply(gctx.Context)
+	return gitx.AutoPatch(os.Stdout).DryRun(!t.AutoPatch).From(ws.WorkingDir).To(t.Dir).Branch(registered.Branch).Apply(gctx.Context)
 }
 
 // container runs modules in containers of the root container built from the repository's
@@ -195,6 +201,7 @@ type container struct {
 	ws    workspaces.Context
 	uid   uuidx.UUID
 	agent *runners.Agent
+	image string
 }
 
 func (t container) Do(_ context.Context, m transpile.Compiled) error {
@@ -217,7 +224,7 @@ func (t container) Do(_ context.Context, m transpile.Compiled) error {
 	}
 
 	// TODO REVISIT using t.ws.RuntimeDir as moduledir.
-	return c8sproxy.PodmanModule(t.ctx, prepcmd, eg.WorkingDirectory, fmt.Sprintf("eg-%s", t.uid.String()), t.ws.RuntimeDir, options...)
+	return c8sproxy.PodmanModule(t.ctx, prepcmd, t.image, fmt.Sprintf("eg-%s", t.uid.String()), t.ws.RuntimeDir, options...)
 }
 
 func (t container) Close() error {
@@ -313,7 +320,7 @@ func (t local) podman(ctx context.Context, ws workspaces.Context, uid uuidx.UUID
 		wayland,   // must come after the runtime directory mount to ensure correct mounting order.
 	)
 
-	return container{ctx: pctx, ws: ws, uid: uid, agent: ragent}, nil
+	return container{ctx: pctx, ws: ws, uid: uid, agent: ragent, image: eg.WorkingDirectory}, nil
 }
 
 // machine prepares a machine booted from the egiso at uri, fetched through c, or from one of the

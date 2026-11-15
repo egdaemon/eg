@@ -110,7 +110,7 @@ func boot(root string, rootinit string, netns string, authorized string, ruleset
 	if err = unix.Mount("", "/", "", unix.MS_REC|unix.MS_PRIVATE, ""); err != nil {
 		return fmt.Errorf("unable to make the machine's mounts private: %w", err)
 	}
-	if err = fusemount("egiso", root); err != nil {
+	if err = fusemount("egiso", root, "allow_other,default_permissions"); err != nil {
 		return fmt.Errorf("unable to mount the root: %w", err)
 	}
 
@@ -282,9 +282,9 @@ func devices(root string) (err error) {
 	return os.Symlink("pts/ptmx", filepath.Join(dev, "ptmx"))
 }
 
-// fusemount mounts a FUSE filesystem named source at target and hands its /dev/fuse descriptor to
-// Boot to serve.
-func fusemount(source string, target string) (err error) {
+// fusemount mounts a FUSE filesystem named source at target with the mount options options, and
+// hands its /dev/fuse descriptor to Boot to serve.
+func fusemount(source string, target string, options string) (err error) {
 	var (
 		dev *os.File
 	)
@@ -293,7 +293,7 @@ func fusemount(source string, target string) (err error) {
 		return fmt.Errorf("unable to open /dev/fuse: %w", err)
 	}
 
-	if err = unix.Mount(source, target, "fuse", 0, fmt.Sprintf("fd=%d,rootmode=40000,user_id=0,group_id=0,allow_other,default_permissions", dev.Fd())); err != nil {
+	if err = unix.Mount(source, target, "fuse", 0, fmt.Sprintf("fd=%d,rootmode=40000,user_id=0,group_id=0,%s", dev.Fd(), options)); err != nil {
 		return errorsx.Compact(err, dev.Close())
 	}
 	if err = unix.Sendmsg(fdmounted, []byte{1}, unix.UnixRights(int(dev.Fd())), nil, 0); err != nil {
@@ -312,8 +312,10 @@ func share(dir string, target string, mode string) (err error) {
 	if err = os.MkdirAll(target, 0755); err != nil {
 		return err
 	}
+	// the kernel checks no modes in a FUSE share: every user writes it as the host user, whose own
+	// permissions the host applies.
 	if mode == sharefuse {
-		if err = fusemount(dir, target); err != nil {
+		if err = fusemount(dir, target, "allow_other"); err != nil {
 			return fmt.Errorf("unable to share %s: %w", dir, err)
 		}
 		return nil

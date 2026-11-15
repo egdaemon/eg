@@ -131,9 +131,10 @@ func OptionMountReadOnly(dir string, path string) Option {
 
 // OptionMountOwned mounts the host directory dir in the machine at path, owned by the host user: what
 // the machine writes in it belongs to the host user, whichever of the machine's users writes it, so
-// the host user can change and delete it. The machine sees the host user's files as egiso.Default's
-// and root's as egiso.Privileged's, and can not change their owners. A Linux machine serves it over
-// FUSE, which holds no sockets; a virtual machine's virtio-fs already writes as the host user.
+// the host user can change and delete it. Every user of the machine, its containers' too, sees each
+// file in it as its own and may do with it what the host user may, except change its owner. A Linux
+// machine serves it over FUSE, which holds no sockets; a virtual machine's virtio-fs already writes
+// as the host user.
 func OptionMountOwned(dir string, path string) Option {
 	return optionMount(mount{dir: dir, path: path, owned: true})
 }

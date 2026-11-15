@@ -189,11 +189,43 @@ func TestExec(t *testing.T) {
 		require.NoError(t, os.RemoveAll(filepath.Join(owned, "egd")))
 	})
 
-	t.Run("shows the host user's files in an owned directory as the default user's", func(t *testing.T) {
+	t.Run("shows each user an owned directory's files as its own", func(t *testing.T) {
 		require.NoError(t, os.WriteFile(filepath.Join(owned, "host"), []byte("host\n"), 0644))
-		code, stdout, stderr := run(t, t.Context(), nil, "stat", "-c", "%U:%G", "/srv/owned/host")
+		code, stdout, stderr := run(t, t.Context(), nil, "sh", "-c", "stat -c %u:%g /srv/owned/host && sudo -u egd stat -c %U:%G /srv/owned/host && setpriv --reuid 4242 --regid 4242 --clear-groups stat -c %u:%g /srv/owned/host")
 		require.Equal(t, int32(0), code, stderr)
-		require.Equal(t, egiso.Default+":"+egiso.Default+"\n", stdout)
+		require.Equal(t, "0:0\n"+egiso.Default+":"+egiso.Default+"\n4242:4242\n", stdout)
+	})
+
+	t.Run("lets a user the image does not name use what other users made private in an owned directory", func(t *testing.T) {
+		code, stdout, stderr := run(t, t.Context(), nil, "sh", "-c", "mkdir -m 0700 /srv/owned/private && setpriv --reuid 4242 --regid 4242 --clear-groups sh -c 'echo written > /srv/owned/private/file && cat /srv/owned/private/file'")
+		require.Equal(t, int32(0), code, stderr)
+		require.Equal(t, "written\n", stdout)
+
+		st, cause := os.Lstat(filepath.Join(owned, "private", "file"))
+		require.NoError(t, cause)
+		require.Equal(t, uint32(os.Getuid()), st.Sys().(*syscall.Stat_t).Uid)
+		require.NoError(t, os.RemoveAll(filepath.Join(owned, "private")))
+	})
+
+	t.Run("lets root change what the host user made read only in an owned directory, as root may", func(t *testing.T) {
+		require.NoError(t, os.MkdirAll(filepath.Join(owned, "readonly", "module"), 0755))
+		require.NoError(t, os.WriteFile(filepath.Join(owned, "readonly", "module", "go.mod"), nil, 0444))
+		require.NoError(t, os.Chmod(filepath.Join(owned, "readonly", "module"), 0555))
+		require.NoError(t, os.Chmod(filepath.Join(owned, "readonly"), 0555))
+
+		code, _, _ := run(t, t.Context(), nil, "sudo", "-u", "egd", "rm", "-rf", "/srv/owned/readonly/module")
+		require.NotEqual(t, int32(0), code)
+
+		code, _, stderr := run(t, t.Context(), nil, "sh", "-c", "rm -rf /srv/owned/readonly/module && touch /srv/owned/readonly/added")
+		require.Equal(t, int32(0), code, stderr)
+		require.NoFileExists(t, filepath.Join(owned, "readonly", "module", "go.mod"))
+		require.FileExists(t, filepath.Join(owned, "readonly", "added"))
+		st, cause := os.Stat(filepath.Join(owned, "readonly"))
+		require.NoError(t, cause)
+		require.Equal(t, fs.FileMode(0555), st.Mode().Perm())
+
+		require.NoError(t, os.Chmod(filepath.Join(owned, "readonly"), 0755))
+		require.NoError(t, os.RemoveAll(filepath.Join(owned, "readonly")))
 	})
 
 	t.Run("refuses to change the owner of a file in an owned directory", func(t *testing.T) {

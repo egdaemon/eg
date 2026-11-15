@@ -205,6 +205,10 @@ func newstdio(options ...ExecOption) stdio {
 // volume at.
 const VolumeParam = "egvm.volume"
 
+// Container is the container manager a Linux machine names to its systemd, which records it in
+// /run/systemd/container.
+const Container = "egvm"
+
 // cmdline is the machine's kernel command line. Container images hold no udev to announce the
 // console, so systemd starts no getty on it: one would wait out its device's timeout before the
 // machine boots. systemd-fstab-generator mounts the virtio-fs devices from systemd.mount-extra, and

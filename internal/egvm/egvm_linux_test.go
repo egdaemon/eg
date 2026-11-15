@@ -115,6 +115,12 @@ func TestExec(t *testing.T) {
 		require.Equal(t, "systemd\n", stdout)
 	})
 
+	t.Run("names the machine as its systemd's container manager", func(t *testing.T) {
+		code, stdout, stderr := run(t, t.Context(), nil, "cat", "/run/systemd/container")
+		require.Equal(t, int32(0), code, stderr)
+		require.Equal(t, egvm.Container+"\n", stdout)
+	})
+
 	t.Run("limits the machine to its cpus and memory", func(t *testing.T) {
 		code, stdout, stderr := run(t, t.Context(), nil, "cat", "/sys/fs/cgroup/cpu.max", "/sys/fs/cgroup/memory.max")
 		require.Equal(t, int32(0), code, stderr)

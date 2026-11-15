@@ -255,7 +255,7 @@ func start(root string, rootinit string, ruleset string) (err error) {
 		return fmt.Errorf("unable to drop CAP_NET_ADMIN: %w", err)
 	}
 
-	return fmt.Errorf("unable to exec %s: %w", rootinit, unix.Exec(rootinit, []string{rootinit}, []string{"container=egvm", "CREDENTIALS_DIRECTORY=" + credentials}))
+	return fmt.Errorf("unable to exec %s: %w", rootinit, unix.Exec(rootinit, []string{rootinit}, []string{"container=" + Container, "CREDENTIALS_DIRECTORY=" + credentials}))
 }
 
 // devices mounts the root's /dev: the host's character devices containers are given, with fuse, as

@@ -268,6 +268,7 @@ func normalizeEnv(environ *envx.Builder) *envx.Builder {
 	environ.Unsetenv(_eg.EnvComputeDefaultGroup)
 	environ.Unsetenv(_eg.EnvComputeTLSInsecure)
 	environ.Unsetenv(_eg.EnvExperimentalBaremetal)
+	environ.Unsetenv(_eg.EnvComputeEgiso) // a machine sets it, a container does not.
 
 	// always ignore compute bin. its development tooling.
 	environ.Unsetenv(_eg.EnvComputeBin)

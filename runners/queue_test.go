@@ -128,7 +128,7 @@ func TestQueue(t *testing.T) {
 		createTestWorkload(t, dirs.Queued, uid, "entry.wasm", testx.Read(testx.Fixture("example.1.wasm")))
 
 		cname := fmt.Sprintf("eg-%s", uid.String())
-		out, err := exec.Command("podman", "run", "--detach", "--name", cname, "eg", "sleep", "infinity").CombinedOutput()
+		out, err := exec.Command("podman", "run", "--detach", "--name", cname, "docker.io/library/ubuntu:resolute", "sleep", "infinity").CombinedOutput()
 		require.NoError(t, err, "podman run output: %s", out)
 		t.Cleanup(func() { _ = exec.Command("podman", "rm", "-f", cname).Run() })
 

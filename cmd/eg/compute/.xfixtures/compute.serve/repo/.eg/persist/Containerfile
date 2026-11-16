@@ -1,0 +1,33 @@
+FROM ubuntu:resolute
+
+ARG GOBIN="/usr/bin"
+ARG GOMODCACHE="/tmp/gomod"
+ARG GOCACHE="/tmp/gocache"
+
+RUN echo "cache buster a8e05cc5-6705-43d5-850d-d142566037e2"
+# put apt in non-interactive mode
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update
+
+# general utilities
+RUN apt-get install -y software-properties-common build-essential ca-certificates curl sudo gnupg2 lsb-release iproute2 git apt-file uidmap dbus-user-session fuse-overlayfs rsync vim nftables iptables nmap socat tree ssh podman
+RUN add-apt-repository -n ppa:longsleep/golang-backports
+RUN add-apt-repository -n ppa:egdaemon/eg
+
+RUN echo "cache buster 1efbab17-116b-4a38-91dd-ca396a82e796"
+RUN apt-get update
+RUN apt-get install -y --no-install-recommends netavark golang-1.27 egworkload
+
+# properly link golang into the path.
+RUN ln -s /usr/lib/go-1.27/bin/go /usr/local/bin/go
+
+RUN sh /usr/share/eg/install/github.sh
+RUN apt-get update
+RUN apt-get install -y gh
+
+# preload some well known hosts
+RUN ssh-keyscan -H github.com >> /etc/ssh/ssh_known_hosts
+RUN ssh-keyscan -H gitlab.com >> /etc/ssh/ssh_known_hosts
+
+RUN systemd-tmpfiles --create

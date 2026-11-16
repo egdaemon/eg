@@ -11,6 +11,6 @@ import (
 func Agent(ctx context.Context, _ eg.Op) error {
 	return shell.Run(
 		ctx,
-		console.New("tail -f /dev/null").Timeout(egenv.TTL()),
+		shell.Env().New("tail -f /dev/null").Timeout(egenv.TTL()),
 	)
 }

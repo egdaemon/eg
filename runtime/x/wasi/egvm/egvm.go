@@ -10,15 +10,9 @@ package egvm
 
 import (
 	"context"
-	"fmt"
 
-	"github.com/egdaemon/eg"
-	"github.com/egdaemon/eg/internal/envx"
-	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/langx"
-	"github.com/egdaemon/eg/interp/machines"
-	"github.com/egdaemon/eg/runtime/wasi/egunsafe"
-	"google.golang.org/grpc"
+	"github.com/egdaemon/eg/runtime/wasi/egunsafe/ffiegmachine"
 )
 
 // VM is the machine implementation of the virtualization layer (eg.C and eg.V).
@@ -51,18 +45,7 @@ func (t VM) CompileWith(ctx context.Context) error {
 
 // RunWith runs the module at mpath in the machine.
 func (t VM) RunWith(ctx context.Context, mpath string) (err error) {
-	var (
-		cc    *grpc.ClientConn
-		level = fmt.Sprintf("%s=%d", eg.EnvComputeModuleNestedLevel, envx.Int(-1, eg.EnvComputeModuleNestedLevel)+1)
-	)
-
-	if cc, err = egunsafe.DialControlSocket(ctx); err != nil {
-		return err
-	}
-	defer cc.Close()
-
-	_, err = machines.NewMachinesClient(cc).Module(ctx, &machines.ModuleRequest{Egiso: t.uri, Module: mpath, Options: []string{level}})
-	return errorsx.Wrap(err, "unable to run the module in a machine")
+	return ffiegmachine.Module(ctx, t.uri, mpath)
 }
 
 // internal use.

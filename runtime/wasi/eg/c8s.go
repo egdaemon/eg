@@ -10,6 +10,7 @@ import (
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/runtime/wasi/egunsafe/ffiegcontainer"
+	"github.com/egdaemon/eg/runtime/wasi/egunsafe/ffiegmachine"
 )
 
 // Run the tasks with the specified container.
@@ -49,6 +50,7 @@ type C8S struct {
 	cmd        []string
 	options    []coption
 	built      *sync.Once
+	machine    bool
 }
 
 func (t C8S) Clone() C8S {
@@ -91,6 +93,9 @@ func (t C8S) CompileWith(ctx context.Context) (err error) {
 	}
 
 	t.built.Do(func() {
+		if t.machine {
+			return
+		}
 		if t.pull != "" {
 			if err = errorsx.Wrapf(ffiegcontainer.Pull(ctx, t.pull, opts), "unable to pull the container: %s", t.name); err != nil {
 				return
@@ -142,6 +147,10 @@ type ContainerModuleRunner struct {
 
 func (t ContainerModuleRunner) RunWith(ctx context.Context, mpath string) (err error) {
 	var opts []string
+
+	if t.machine {
+		return ffiegmachine.Module(ctx, "", mpath)
+	}
 	for _, o := range t.options {
 		opts = append(opts, o...)
 	}

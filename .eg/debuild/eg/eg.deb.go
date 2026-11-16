@@ -33,7 +33,7 @@ func init() {
 	gcfg = egdebuild.New(
 		"eg",
 		"",
-		egenv.DirectoryCache(".dist", "eg"),
+		egenv.DirectoryWorking(),
 		egdebuild.Option.Maintainer(maintainer.Name, maintainer.Email),
 		egdebuild.Option.SigningKeyID(maintainer.GPGFingerprint),
 		egdebuild.Option.ChangeLogDate(c.Committer.When),
@@ -60,14 +60,7 @@ func init() {
 }
 
 func Prepare(ctx context.Context, o eg.Op) error {
-	debdir := egenv.DirectoryCache(".dist", "eg")
-	sruntime := shell.Runtime()
-	return eg.Sequential(
-		shell.Op(
-			sruntime.Newf("git -C \"%s\" pull --rebase -X theirs file://${PWD}/ || (rm -rf %s && git clone --depth 1 file://${PWD}/ %s)", debdir, debdir, debdir),
-		),
-		egdebuild.Prepare(Runner(), errorsx.Must(fs.Sub(debskel, ".debskel"))),
-	)(ctx, o)
+	return egdebuild.Prepare(Runner(), errorsx.Must(fs.Sub(debskel, ".debskel")))(ctx, o)
 }
 
 // container for this package.
@@ -86,6 +79,11 @@ func Build(ctx context.Context, o eg.Op) error {
 			egdebuild.Option.NoLint(),
 		),
 	)(ctx, o)
+}
+
+// Copy the built deb packages into the workload's .dist directory.
+func Copy(ctx context.Context, o eg.Op) error {
+	return egdebuild.Copy(gcfg, egenv.DirectoryWorkload(".dist"))(ctx, o)
 }
 
 func Upload(ctx context.Context, o eg.Op) error {

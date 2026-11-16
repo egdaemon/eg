@@ -14,4 +14,5 @@ RUN ln -s /usr/lib/go-1.27/bin/go /usr/local/bin/go
 
 RUN echo "cache buster 61571c95-0539-4f6e-bad4-f913db80e227"
 RUN apt-get -o Acquire::Retries=8 -o Acquire::http::Timeout=8 -o Acquire::https::Timeout=8 update && apt-get -o Acquire::Retries=8 -o Acquire::http::Timeout=8 -o Acquire::https::Timeout=8 -y install egworkload gh
-RUN systemctl mask tmp.mount dev-mqueue.mount systemd-ask-password-console.path systemd-ask-password-wall.path systemd-resolved.service systemd-resolved-monitor.socket systemd-resolved-varlink.socket 
+# temporary hack until new release is out
+RUN systemctl mask tmp.mount dev-mqueue.mount systemd-ask-password-console.path systemd-ask-password-wall.path systemd-resolved.service systemd-resolved-monitor.socket systemd-resolved-varlink.socket

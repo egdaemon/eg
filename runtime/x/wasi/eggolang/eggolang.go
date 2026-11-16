@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"go/build"
-	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -347,9 +346,10 @@ func CacheModuleDirectory() string {
 }
 
 // attempt to build the golang environment that sets up
-// the golang environment for caching.
+// the golang environment for caching. only the variables it sets are returned, the process environment is
+// deliberately not copied: it would override what the caller configured.
 func env() ([]string, error) {
-	return envx.Build().FromEnviron(os.Environ()...).
+	return envx.Build().
 		Var("GOCACHE", CacheBuildDirectory()).
 		Var("GOMODCACHE", CacheModuleDirectory()).
 		Var("XDG_CACHE_HOME", envx.String(CacheDirectory(), "XDG_CACHE_HOME")). // used by go module code. only set it if its unset.
@@ -358,6 +358,11 @@ func env() ([]string, error) {
 
 // attempt to build the golang environment that sets up
 // the golang environment for caching.
+//
+// only the variables it sets are returned, the process environment is not copied. to inherit it, start from shell.Env()
+// and add these after it, later entries win:
+//
+//	shell.Env().EnvironFrom(eggolang.Env()...)
 func Env() []string {
 	return errorsx.Must(env())
 }

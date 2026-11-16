@@ -11,7 +11,6 @@ import (
 	"io/fs"
 	"log"
 	"net/netip"
-	"os"
 	"strings"
 	"time"
 
@@ -120,10 +119,15 @@ func InsertSuperuser(name string) eg.OpFn {
 }
 
 // build a environment that sets up postgresql the standard postgresql variables.
+//
+// only the variables it sets are returned, the process environment is not copied. to inherit it, start from shell.Env()
+// and add these after it, later entries win:
+//
+//	shell.Env().EnvironFrom(egpostgresql.Environ()...)
 func Environ() []string {
 	ctx, done := context.WithTimeout(context.Background(), 3*time.Second)
 	defer done()
-	return langx.Must(envx.Build().FromEnv(os.Environ()...).
+	return langx.Must(envx.Build().
 		Var("PGPORT", fmt.Sprintf("%d", AutoLocatePort(ctx))).
 		Var("PGHOST", "localhost").
 		Environ())

@@ -241,6 +241,12 @@ func Runtime() Command {
 }
 
 // Env creates a runtime command pre-populated with the current process environment.
+//
+// the Env functions of the runtime/x/wasi packages (eggolang, egyarn, egpostgresql, ...) only return the variables
+// they set and do not copy the process environment. use Env to inherit it and add theirs afterwards, later entries
+// win so the package's variables override inherited ones:
+//
+//	shell.Env().EnvironFrom(eggolang.Env()...).New("go build ./...")
 func Env() Command {
 	return Runtime().EnvironFrom(os.Environ()...)
 }

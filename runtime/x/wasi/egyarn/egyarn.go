@@ -3,7 +3,6 @@
 package egyarn
 
 import (
-	"os"
 	"path/filepath"
 
 	_eg "github.com/egdaemon/eg"
@@ -19,7 +18,7 @@ func CacheDirectory(dirs ...string) string {
 
 // attempt to build the yarn environment that properly
 func env() ([]string, error) {
-	return envx.Build().FromEnv(os.Environ()...).
+	return envx.Build().
 		Var("COREPACK_ENABLE_DOWNLOAD_PROMPT", "0").
 		Var("COREPACK_HOME", egenv.DirectoryCache(_eg.DefaultModuleDirectory(), "corepack")).
 		Var("YARN_CACHE_FOLDER", CacheDirectory()).
@@ -27,7 +26,12 @@ func env() ([]string, error) {
 		Environ()
 }
 
-// attempt to build the yarn environment that properly
+// attempt to build the yarn environment that properly sets up caching.
+//
+// only the variables it sets are returned, the process environment is not copied. to inherit it, start from shell.Env()
+// and add these after it, later entries win:
+//
+//	shell.Env().EnvironFrom(egyarn.Env()...)
 func Env() []string {
 	return errorsx.Must(env())
 }

@@ -88,6 +88,7 @@ func Build(ctx context.Context, o eg.Op) error {
 			egdebuild.Option.Distro(egdebuild.UbuntuLatestCodename),
 			egdebuild.Option.BuildBinary(20*time.Minute),
 			egdebuild.Option.Environ(eggolang.Env()...),
+			egdebuild.Option.Environ(eggpg.Env(gpgoptions()...)...),
 			egdebuild.Option.NoLint(),
 		),
 	)(ctx, o)

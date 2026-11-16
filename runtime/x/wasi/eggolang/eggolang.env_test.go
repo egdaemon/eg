@@ -31,12 +31,15 @@ func TestEnv(t *testing.T) {
 		require.Contains(t, environ, "XDG_CACHE_HOME=/custom/xdg")
 	})
 
-	t.Run("inherits_process_environment", func(t *testing.T) {
+	t.Run("does_not_copy_the_process_environment", func(t *testing.T) {
 		t.Setenv("EGGOLANG_TEST_INHERIT", "value")
+		t.Setenv("GNUPGHOME", "/eg.mnt/.gnupg")
 
 		environ, err := env()
 		require.NoError(t, err)
-		require.Contains(t, environ, "EGGOLANG_TEST_INHERIT=value")
+		require.NotContains(t, environ, "EGGOLANG_TEST_INHERIT=value")
+		require.NotContains(t, environ, "GNUPGHOME=/eg.mnt/.gnupg")
+		require.Len(t, environ, 3)
 	})
 
 	t.Run("Env_matches_env", func(t *testing.T) {

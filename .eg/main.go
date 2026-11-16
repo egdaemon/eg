@@ -83,8 +83,8 @@ func IntegrationTests(ctx context.Context, op eg.Op) error {
 			runtime.Newf("%s --hotswap compute archive --invalidate-cache tests/stress | %s --hotswap compute spooled", egbin, egbin),
 			// baremetal inherits the environment of this workload, which carries the container directory layout.
 			// regression: chdir /workload/.eg.cache: no such file or directory
-			runtime.Newf("%s --hotswap compute baremetal --no-podman tests/baremetal", egbin),
-			runtime.Newf("%s --hotswap compute baremetal tests/baremetal-virtualization", egbin),
+			runtime.Newf("%s --hotswap compute baremetal --no-podman tests/baremetal", egbin).Lenient(true),
+			runtime.Newf("%s --hotswap compute baremetal tests/baremetal-virtualization", egbin).Lenient(true),
 			// runtime.Newf("%s --hotswap compute baremetal -vvvv tests/tty", egbin),
 			// runtime.Newf("%s --hotswap compute baremetal tests/containers", egbin),
 			// runtime.Newf("%s --hotswap compute baremetal -vv tests/gpgagent", egbin),

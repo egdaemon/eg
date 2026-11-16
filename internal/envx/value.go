@@ -3,11 +3,14 @@ package envx
 import (
 	"encoding/base64"
 	"encoding/hex"
+	"log"
 	"net/url"
 	"os"
 	"reflect"
 	"strconv"
+	"strings"
 	"time"
+	"unicode"
 
 	"github.com/dustin/go-humanize"
 	"github.com/egdaemon/eg/internal/errorsx"
@@ -32,6 +35,35 @@ type Reader[T any] struct {
 // if none do the default is returned.
 func (t Reader[T]) From(keys ...string) T {
 	return envval(t.def, t.m, t.parse, keys...)
+}
+
+// List reads a list from the environment, checks each key in order and the first with a value is used.
+// the value is split on commas and whitespace and each element is parsed by the reader, an element that
+// is invalid is logged and skipped. the reader's default is not used, nil is returned when no key has a value.
+//
+//	var units []string = envx.List(envx.New(""), "UNITS")
+func List[T any](r Reader[T], keys ...string) []T {
+	for _, k := range keys {
+		elements := strings.FieldsFunc(r.m(k), func(c rune) bool { return c == ',' || unicode.IsSpace(c) })
+		if len(elements) == 0 {
+			continue
+		}
+
+		out := make([]T, 0, len(elements))
+		for _, element := range elements {
+			decoded, err := r.parse(element)
+			if err != nil {
+				log.Printf("%s stored an invalid value %v\n", k, err)
+				continue
+			}
+
+			out = append(out, decoded)
+		}
+
+		return out
+	}
+
+	return nil
 }
 
 // New reads a primitive from the environment. T is inferred from def, note untyped

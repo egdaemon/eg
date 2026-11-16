@@ -115,6 +115,7 @@ const (
 	EnvScheduleSystemLoadFreq        = "EG_COMPUTE_SCHEDULER_SYSTEM_LOAD_FREQUENCY" // how frequently we measure system load, small enough we can saturate, high enough its not a burden.
 	EnvPingMinimumDelay              = "EG_COMPUTE_PING_MINIMUM_DELAY"              // minimum delay for pings
 	EnvComputeBin                    = "EG_COMPUTE_BIN"                             // hotswap the binary, used for development testing
+	EnvComputeSystemdFailedReset     = "EG_COMPUTE_SYSTEMD_FAILED_RESET"            // units, separated by commas or whitespace, whose failed state is reset before the system health check, in addition to the built-in set.
 	EnvComputeBinAlt                 = "EG_COMPUTE_BIN_ALTERNATE"                   // absolute path to an alternate binary to inject into the host environment when hotswapping.
 	EnvComputeContainerImpure        = "EG_COMPUTE_C8S_IMPURE"                      // informs the container runner that the container depends on the repository being present.
 	EnvComputeGPU                    = "EG_COMPUTE_GPU"                             // enable gpu support for the compute workload, propagated to nested module containers.

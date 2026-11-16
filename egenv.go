@@ -58,6 +58,14 @@ const (
 	EnvEGSSHHostDefault   = "api.egdaemon.com:8090"
 )
 
+// GPG keyring settings, shared by eggpg (seeds the keyring in a workload) and eg gpg keyring (generates it).
+const (
+	EnvGPGKeyringHome  = "EG_GPG_KEYRING_HOME"  // directory holding the generated private.asc and public.asc.
+	EnvGPGKeyringName  = "EG_GPG_KEYRING_NAME"  // identity name embedded in the key.
+	EnvGPGKeyringEmail = "EG_GPG_KEYRING_EMAIL" // identity email embedded in the key.
+	EnvGPGKeyringSeed  = "EG_GPG_KEYRING_SEED"  // seed the key is deterministically generated from, this is a sensitive value.
+)
+
 const (
 	EnvP2PProxyDisabled = "EG_P2P_PROXY_DISABLED"
 )

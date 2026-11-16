@@ -132,7 +132,7 @@ func TestServeContainerfile(t *testing.T) {
 		)
 		require.NoError(t, err)
 
-		kctx, err := parser.Parse([]string{"serve", "--directory", repo, "--session-branch", "eg/e2e", "persist"})
+		kctx, err := parser.Parse([]string{"-vv", "serve", "--directory", repo, "--session-branch", "eg/e2e", "persist"})
 		require.NoError(t, err)
 		require.NoError(t, kctx.Run())
 

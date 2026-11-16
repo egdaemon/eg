@@ -19,7 +19,23 @@ func systemReady(_ctx context.Context) error {
 	)
 
 	_, err := errorsx.IgnoreN[string](_ctx, 8, e0)(func(ctx context.Context) (string, error) {
-		errorsx.ZeroDebug[string](debugx.Fn)(execx.String(ctx, "systemctl", "reset-failed", "--wait", "sys-kernel-config.mount", "sys-kernel-debug.mount", "sys-kernel-tracing.mount", "systemd-journald-dev-log.socket", "systemd-journald.socket", "proc-sys-fs-binfmt_misc.automount", "ssh.socket"))
+		errorsx.ZeroDebug[string](debugx.Fn)(execx.String(
+			ctx, "systemctl", "reset-failed", "--wait",
+			"sys-kernel-config.mount",
+			"sys-kernel-debug.mount",
+			"sys-kernel-tracing.mount",
+			"systemd-journald-dev-log.socket",
+			"systemd-journald.socket",
+			"proc-sys-fs-binfmt_misc.automount",
+			"ssh.socket",
+			"tmp.mount",                         // mounting a tmpfs needs CAP_SYS_ADMIN, the container manager provides /tmp already.
+			"dev-mqueue.mount",                  // same as tmp.mount, the container manager mounts /dev/mqueue itself.
+			"systemd-ask-password-console.path", // nothing prompts for passwords in a headless container.
+			"systemd-ask-password-wall.path",    // same as the console path.
+			"systemd-resolved.service",          // sandboxing needs mount namespaces, fails with 226/NAMESPACE when unprivileged. the container manager owns /etc/resolv.conf.
+			"systemd-resolved-monitor.socket",   // belongs to systemd-resolved.service, fails with it.
+			"systemd-resolved-varlink.socket",   // belongs to systemd-resolved.service, fails with it.
+		))
 		o, err := execx.String(ctx, "systemctl", "is-system-running", "--wait")
 		debugx.Fn(func() {
 			log.Println("systemctl is-system-running --wait")

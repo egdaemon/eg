@@ -326,7 +326,7 @@ func retry(ctx context.Context, c Command, do func() error) (err error) {
 }
 
 func run(ctx context.Context, user string, group string, cmd string, directory string, environ []string, exec Execer) (err error) {
-	scmd := []string{"-E", "-H", "-u", user, "-g", group, "bash", "-o", "pipefail", "-c", cmd}
+	scmd := []string{"-E", "-H", "-u", user, "-g", group, "bash", "-c", cmd}
 	return exec(ctx, directory, environ, "sudo", scmd)
 }
 

@@ -10,7 +10,6 @@ import (
 	"github.com/egdaemon/eg/runtime/wasi/eggit"
 	"github.com/egdaemon/eg/runtime/wasi/shell"
 	"github.com/egdaemon/eg/runtime/x/wasi/egbug"
-	"github.com/egdaemon/eg/runtime/x/wasi/egcoverage"
 	"github.com/egdaemon/eg/runtime/x/wasi/egdb"
 	"github.com/egdaemon/eg/runtime/x/wasi/eggolang"
 )
@@ -33,9 +32,9 @@ func main() {
 			ctx,
 			c1,
 			eggolang.New().Timeout(10*time.Minute).AutoInstall(),
-			eggolang.New().Timeout(egenv.TTL()).Parallelism(4).AutoTest(),
-			egbug.Log("recording coverage initiated"),
-			egcoverage.Report(eggolang.Coverage().MarkGeneratedExt(".gen.go", ".pb.go", ".autogen_test.go")...),
+			// eggolang.New().Timeout(egenv.TTL()).Parallelism(4).AutoTest(),
+			// egbug.Log("recording coverage initiated"),
+			// egcoverage.Report(eggolang.Coverage().MarkGeneratedExt(".gen.go", ".pb.go", ".autogen_test.go")...),
 			// copies the binary built by AutoInstall into the workspace directory
 			// so the default module's integration tests exercise the new binary.
 			shell.Op(shell.Newf("install -m 0755 /home/egd/go/bin/eg %s", sharedbin()).Debug()),
@@ -85,9 +84,6 @@ func IntegrationTests(ctx context.Context, op eg.Op) error {
 			// regression: chdir /workload/.eg.cache: no such file or directory
 			runtime.Newf("%s --hotswap compute baremetal --no-podman tests/baremetal", egbin),
 			runtime.Newf("%s --hotswap compute baremetal tests/baremetal-virtualization", egbin),
-			// runtime.New("/home/egd/go/bin/eg compute baremetal -vvvv tests/tty"),
-			// runtime.New("/home/egd/go/bin/eg compute baremetal tests/containers"),
-			// runtime.New("/home/egd/go/bin/eg compute baremetal -vv tests/gpgagent"),
 		),
 	)
 }

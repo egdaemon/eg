@@ -17,7 +17,7 @@ import (
 // ensures the system is actual able to execute modules.
 func systemReady(_ctx context.Context) error {
 	var (
-		e0 = errorsx.String("container systemd status is degraded or failed - this implies there will be issues with the runtime")
+		e0 = errorsx.String("container systemd status is degraded or failed - this implies there will be issues with the runtime. enable debugging (-vv) for details.")
 	)
 
 	_, err := errorsx.IgnoreN[string](_ctx, 8, e0)(func(ctx context.Context) (string, error) {

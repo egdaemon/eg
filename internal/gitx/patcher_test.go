@@ -260,4 +260,56 @@ func TestAutoPatch(t *testing.T) {
 		require.True(t, errors.As(err, &perr))
 		require.Contains(t, out.String(), "+two")
 	})
+
+	t.Run("carries commits made within the clone, then the uncommitted changes", func(t *testing.T) {
+		repo := t.TempDir()
+		initRepo(t, repo, map[string]string{"a.txt": "one\n", "b.txt": "one\n"})
+		clone := filepath.Join(t.TempDir(), "clone")
+		require.NoError(t, LocalClone(t.Context(), repo, clone, "main", "HEAD"))
+
+		base, err := exec.Command("git", "-C", repo, "rev-parse", "HEAD").CombinedOutput()
+		require.NoError(t, err, string(base))
+		require.Equal(t, strings.TrimSpace(string(base)), CloneBase(t.Context(), clone))
+
+		require.NoError(t, os.WriteFile(filepath.Join(clone, "a.txt"), []byte("two\n"), 0644))
+		for _, args := range [][]string{{"add", "."}, {"-c", "user.name=Ada", "-c", "user.email=ada@example.com", "commit", "-qm", "ada's change"}} {
+			raw, err := exec.Command("git", append([]string{"-C", clone}, args...)...).CombinedOutput()
+			require.NoError(t, err, string(raw))
+		}
+		require.NoError(t, os.WriteFile(filepath.Join(clone, "b.txt"), []byte("two\n"), 0644))
+
+		require.NoError(t, AutoPatch(io.Discard).From(clone).To(repo).Branch("eg/commits").Apply(t.Context()))
+
+		show := func(args ...string) string {
+			raw, err := exec.Command("git", append([]string{"-C", repo}, args...)...).CombinedOutput()
+			require.NoError(t, err, string(raw))
+			return strings.TrimSpace(string(raw))
+		}
+
+		require.Equal(t, "two", show("show", "eg/commits:a.txt"))
+		require.Equal(t, "two", show("show", "eg/commits:b.txt"))
+		require.Equal(t, "eg: apply workload changes\nada's change", show("log", "--format=%s", "main..eg/commits"))
+		require.Equal(t, "Ada", show("log", "--format=%an", "-n1", "eg/commits~1"))
+		require.Equal(t, "one", show("show", "main:a.txt"))
+	})
+
+	t.Run("carries commits when the working tree is clean", func(t *testing.T) {
+		repo := t.TempDir()
+		initRepo(t, repo, map[string]string{"a.txt": "one\n"})
+		clone := filepath.Join(t.TempDir(), "clone")
+		require.NoError(t, LocalClone(t.Context(), repo, clone, "main", "HEAD"))
+
+		require.NoError(t, os.WriteFile(filepath.Join(clone, "a.txt"), []byte("two\n"), 0644))
+		for _, args := range [][]string{{"add", "."}, {"-c", "user.name=Ada", "-c", "user.email=ada@example.com", "commit", "-qm", "ada's change"}} {
+			raw, err := exec.Command("git", append([]string{"-C", clone}, args...)...).CombinedOutput()
+			require.NoError(t, err, string(raw))
+		}
+
+		require.NoError(t, AutoPatch(io.Discard).From(clone).To(repo).Branch("eg/clean").Apply(t.Context()))
+
+		raw, err := exec.Command("git", "-C", repo, "log", "--format=%s", "main..eg/clean").CombinedOutput()
+		require.NoError(t, err, string(raw))
+		require.Equal(t, "ada's change", strings.TrimSpace(string(raw)))
+	})
+
 }

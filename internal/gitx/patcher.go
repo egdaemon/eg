@@ -201,29 +201,73 @@ func (t autopatcher) branchname() string {
 
 // Apply collects the changes from the clone and commits them to the branch. the repository's worktree,
 // index and head are left untouched. if the changes cannot be committed the patch is written so they are not lost.
+//
+// both the commits made within the clone, since the commit it started at (see CloneBase), and the uncommitted
+// changes are collected. the commits are carried over as they are, keeping their authors and messages, and the
+// uncommitted changes are committed on top of them.
 func (t autopatcher) Apply(ctx context.Context) error {
 	patch, err := Changes(ctx, t.clone, t.repo)
 	if err != nil {
 		return err
 	}
 
-	if len(patch) == 0 {
+	head := t.carried(ctx)
+	if len(patch) == 0 && head == "" {
 		return nil
 	}
 
 	if t.dry {
+		if head != "" {
+			if out, err := execx.RunAs(ctx, RepositoryUsername(t.clone), "git", "-C", t.clone, "format-patch", "--stdout", "--binary", CloneBase(ctx, t.clone)+".."+head).Output(); err != nil {
+				return errorsx.Wrapf(err, "unable to format the commits: %s", t.clone)
+			} else if _, err = t.w.Write(out); err != nil {
+				return err
+			}
+		}
+
 		_, err = t.w.Write(patch)
 		return err
 	}
 
-	if err = t.commit(ctx, patch); err != nil {
+	if err = t.commit(ctx, head, patch); err != nil {
 		return PatchWrite(&PatchError{Patch: patch, Err: err}, t.w)
 	}
 
 	return nil
 }
 
-func (t autopatcher) commit(ctx context.Context, patch []byte) error {
+// carried returns the commit the clone is at when commits were made within it since it started, blank otherwise.
+func (t autopatcher) carried(ctx context.Context) string {
+	if !isSeparateClone(t.clone, t.repo) {
+		return ""
+	}
+
+	base := CloneBase(ctx, t.clone)
+	if base == "" {
+		return ""
+	}
+
+	username := RepositoryUsername(t.clone)
+	out, err := execx.RunAs(ctx, username, "git", "-C", t.clone, "rev-parse", "--verify", "--quiet", "HEAD^{commit}").Output()
+	if err != nil {
+		return ""
+	}
+
+	head := strings.TrimSpace(string(out))
+	if head == base {
+		return ""
+	}
+
+	// a clone that was reset or rebased away from its base has no commits to carry.
+	if err := execx.RunAs(ctx, username, "git", "-C", t.clone, "merge-base", "--is-ancestor", base, head).Run(); err != nil {
+		return ""
+	}
+
+	return head
+}
+
+// commit commits the patch to the branch on top of head, the commits made within the clone, when there are any.
+func (t autopatcher) commit(ctx context.Context, head string, patch []byte) error {
 	var (
 		branch   = t.branchname()
 		ref      = "refs/heads/" + branch
@@ -263,6 +307,31 @@ func (t autopatcher) commit(ctx context.Context, patch []byte) error {
 		}
 	}
 
+	if head != "" {
+		// bring the commits, and their history, into the repository.
+		abs, err := filepath.Abs(t.clone)
+		if err != nil {
+			return err
+		}
+
+		if _, err = git(nil, nil, "fetch", "-q", "--no-tags", "file://"+abs, "HEAD"); err != nil {
+			return err
+		}
+
+		// an existing branch is only extended, anything else would rewrite what it already has.
+		if oldtip != "" {
+			if _, err = git(nil, nil, "merge-base", "--is-ancestor", oldtip, head); err != nil {
+				return errorsx.Wrapf(err, "the commits do not extend %s", branch)
+			}
+		}
+
+		parent = head
+	}
+
+	if len(patch) == 0 {
+		return t.updateref(git, ref, parent, oldtip)
+	}
+
 	// the temporary index lives in the repository so it is accessible to the repository's user.
 	gitdir, err := git(nil, nil, "rev-parse", "--absolute-git-dir")
 	if err != nil {
@@ -290,14 +359,18 @@ func (t autopatcher) commit(ctx context.Context, patch []byte) error {
 		return err
 	}
 
-	updateref := []string{"update-ref", ref, commit}
+	return t.updateref(git, ref, commit, oldtip)
+}
+
+// updateref points ref at commit, ref must be at oldtip, or must not exist when oldtip is blank.
+func (t autopatcher) updateref(git func([]string, []byte, ...string) (string, error), ref, commit, oldtip string) error {
+	args := []string{"update-ref", ref, commit}
 	if oldtip != "" {
-		updateref = append(updateref, oldtip)
+		args = append(args, oldtip)
 	} else {
-		// must not exist yet.
-		updateref = append(updateref, strings.Repeat("0", len(commit)))
+		args = append(args, strings.Repeat("0", len(commit)))
 	}
 
-	_, err = git(nil, nil, updateref...)
+	_, err := git(nil, nil, args...)
 	return err
 }

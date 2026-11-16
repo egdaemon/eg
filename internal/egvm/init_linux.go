@@ -285,6 +285,21 @@ func network(root string, rootinit string, ruleset string) (err error) {
 		return fmt.Errorf("unable to load the machine's firewall: %w: %s", cause, b)
 	}
 
+	// binding a privileged port or pinging needs a capability in this user namespace, which the machine
+	// does not hold, so the network namespace lets any user bind one and root ping, as podman sets
+	// its containers' namespaces.
+	for _, s := range []struct {
+		name  string
+		value string
+	}{
+		{name: "net/ipv4/ip_unprivileged_port_start", value: "0"},
+		{name: "net/ipv4/ping_group_range", value: "0 0"},
+	} {
+		if err = os.WriteFile(filepath.Join("/proc/sys", s.name), []byte(s.value), 0); err != nil {
+			return fmt.Errorf("unable to set %s: %w", s.name, err)
+		}
+	}
+
 	if err = mountat("sysfs", filepath.Join(root, "sys"), "sysfs", unix.MS_NOSUID|unix.MS_NODEV|unix.MS_NOEXEC|unix.MS_RDONLY, ""); err != nil {
 		return err
 	}

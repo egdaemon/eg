@@ -117,6 +117,12 @@ func TestExec(t *testing.T) {
 		require.Equal(t, "systemd\n", stdout)
 	})
 
+	t.Run("finishes booting with no unit failed", func(t *testing.T) {
+		code, stdout, _ := run(t, t.Context(), nil, "systemctl", "is-system-running", "--wait")
+		_, failed, _ := run(t, t.Context(), nil, "systemctl", "--failed", "--no-legend")
+		require.Equal(t, int32(0), code, stdout+failed)
+	})
+
 	t.Run("names the machine as its systemd's container manager", func(t *testing.T) {
 		code, stdout, stderr := run(t, t.Context(), nil, "cat", "/run/systemd/container")
 		require.Equal(t, int32(0), code, stderr)

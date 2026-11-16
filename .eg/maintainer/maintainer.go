@@ -3,5 +3,5 @@ package maintainer
 const (
 	Name           = "engineering"
 	Email          = "engineering@egdaemon.com"
-	GPGFingerprint = "394332CE06C035E40237A6743A33D4F9C8E3829F"
+	GPGFingerprint = "135BB0E4117959AE5FE8F902BB89E0FDAA837248"
 )

@@ -1,0 +1,5 @@
+#!/bin/sh
+# stands in for /usr/sbin/init, which PodmanModuleRunCmd runs. ignores SIGTERM so podman stop has to wait
+# out its grace period and then SIGKILL, a workload that does not shut down gracefully.
+trap '' TERM
+while :; do sleep 1; done

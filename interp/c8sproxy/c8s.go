@@ -39,21 +39,25 @@ func silence(c *exec.Cmd) *exec.Cmd {
 }
 
 func cleanup(ctx context.Context, cmdctx func(*exec.Cmd) *exec.Cmd, cname string) {
-	cctx, done := context.WithTimeout(ctx, 10*time.Second)
-	defer done()
+	// graceful stop first. podman stop waits 10s for SIGTERM before it sends SIGKILL,
+	// so give it its own budget with headroom, otherwise the kill races the context.
+	sctx, sdone := context.WithTimeout(ctx, 15*time.Second)
+	defer sdone()
 
-	// don't care about this error; if the container doesn't exist its fine; if something
-	// actually prevented it from being stopped then our startup command will fail.
-	if err := execx.MaybeRun(silence(cmdctx(exec.CommandContext(cctx, "podman", "stop", cname)))); err != nil {
+	// don't care about this error; if the container doesn't exist its fine. a failed
+	// stop must not skip the removal below, that is what leaks the published ports.
+	if err := execx.MaybeRun(silence(cmdctx(exec.CommandContext(sctx, "podman", "stop", cname)))); err != nil {
 		debugx.Println(errorsx.Wrap(err, "container stop failed"))
-		return
 	}
 
-	// don't care about this error; if the container doesn't exist its fine; if something
-	// actually prevented it from being removed then our startup command will fail.
-	if err := execx.MaybeRun(silence(cmdctx(exec.CommandContext(cctx, "podman", "rm", cname)))); err != nil {
+	// always remove, with a fresh budget. --force covers a container stop could not
+	// stop, --ignore tolerates it already being gone. removal tears down the container's
+	// pasta process and releases its published ports.
+	rctx, rdone := context.WithTimeout(ctx, 10*time.Second)
+	defer rdone()
+
+	if err := execx.MaybeRun(silence(cmdctx(exec.CommandContext(rctx, "podman", "rm", "--force", "--ignore", cname)))); err != nil {
 		debugx.Println(errorsx.Wrap(err, "container rm failed"))
-		return
 	}
 }
 

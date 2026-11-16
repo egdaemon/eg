@@ -1,0 +1,4 @@
+FROM ubuntu:resolute
+
+# PodmanModuleRunCmd starts the container with /usr/sbin/init; this one ignores SIGTERM.
+COPY --chmod=0755 init /usr/sbin/init

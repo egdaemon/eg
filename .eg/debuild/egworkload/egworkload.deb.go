@@ -13,8 +13,9 @@ import (
 	"github.com/egdaemon/eg/runtime/wasi/eg"
 	"github.com/egdaemon/eg/runtime/wasi/egenv"
 	"github.com/egdaemon/eg/runtime/wasi/eggit"
-	"github.com/egdaemon/eg/runtime/wasi/shell"
+	"github.com/egdaemon/eg/runtime/x/wasi/egbug"
 	"github.com/egdaemon/eg/runtime/x/wasi/egdebuild"
+	"github.com/egdaemon/eg/runtime/x/wasi/eggpg"
 )
 
 //go:embed .debskel
@@ -23,6 +24,13 @@ var debskel embed.FS
 var (
 	gcfg egdebuild.Config
 )
+
+func gpgoptions() []eggpg.Option {
+	// eggpg.Options() takes GNUPGHOME from the environment, which inside the container is the
+	// host-provided /eg.mnt/.gnupg (not writable by us: "unsafe ownership", "Permission denied").
+	// pin the isolated per-container home instead.
+	return eggpg.Options().IgnoreLocalGNU().Home("/home/egd/.gnupg")
+}
 
 func init() {
 	c := eggit.EnvCommit()
@@ -49,10 +57,7 @@ func init() {
 		egdebuild.Option.Suggests(
 			"openssh-server", // allows ssh access into workload containers, i.e. eg compute serve --ssh.
 		),
-		egdebuild.Option.Runtime(func(c shell.Command) shell.Command {
-			return c.MaybePrivileged(true) // temporary until we register the gpg key.
-			// this allows the runner to access the .gnupg directory we mount via compute local
-		}),
+		egdebuild.Option.Environ(eggpg.Env(gpgoptions()...)...),
 		egdebuild.Option.Description(
 			"configures a container for running eg workloads",
 			"installs and configures all components required to run eg workloads in a container",
@@ -71,7 +76,14 @@ func Runner() eg.ContainerRunner {
 }
 
 func Build(ctx context.Context, o eg.Op) error {
-	return eg.Parallel(
+	return eg.Sequential(
+		// override eg compute local's setting of the home directory.
+		// ideally we should default to this except when performing local
+		// compute workloads.
+		egbug.DebugFailure(
+			eggpg.Seed(gpgoptions()...),
+			eggpg.Debug(gpgoptions()...),
+		),
 		egdebuild.Build(gcfg, egdebuild.Option.Distro(egdebuild.UbuntuLatestCodename)),
 		egdebuild.Build(
 			gcfg,

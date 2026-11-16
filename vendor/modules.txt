@@ -540,7 +540,7 @@ github.com/egdaemon/duckproxy/duckproxy
 github.com/egdaemon/duckproxy/duckserve
 github.com/egdaemon/duckproxy/duckshare
 github.com/egdaemon/duckproxy/internal/errorsx
-# github.com/egdaemon/eg v0.0.0-20261102224728-e980edb01f7f
+# github.com/egdaemon/eg v0.0.0-20261116151058-f53594029bd0
 ## explicit; go 1.27.2
 # github.com/egdaemon/gdx v0.0.0-20261106002238-59fe7b8df603
 ## explicit; go 1.25.8
@@ -753,7 +753,7 @@ github.com/google/go-intervals/intervalset
 # github.com/google/gopacket v1.1.19
 ## explicit; go 1.12
 github.com/google/gopacket/routing
-# github.com/google/pprof v0.0.0-20261102214848-0031fcd306b0
+# github.com/google/pprof v0.0.0-20261111200114-fac431ef4d26
 ## explicit; go 1.26.0
 github.com/google/pprof/profile
 # github.com/google/s2a-go v0.1.11
@@ -891,7 +891,7 @@ github.com/jackc/pgservicefile
 # github.com/jackc/pgtype v1.14.4
 ## explicit; go 1.13
 github.com/jackc/pgtype
-# github.com/jackc/pgx/v5 v5.12.0
+# github.com/jackc/pgx/v5 v5.13.0
 ## explicit; go 1.25.0
 github.com/jackc/pgx/v5
 github.com/jackc/pgx/v5/internal/iobufpool
@@ -906,7 +906,7 @@ github.com/jackc/pgx/v5/pgproto3
 github.com/jackc/pgx/v5/pgtype
 github.com/jackc/pgx/v5/pgxpool
 github.com/jackc/pgx/v5/stdlib
-# github.com/jackc/puddle/v2 v2.2.3
+# github.com/jackc/puddle/v2 v2.2.4
 ## explicit; go 1.19
 github.com/jackc/puddle/v2
 github.com/jackc/puddle/v2/internal/genstack
@@ -2113,7 +2113,7 @@ golang.org/x/crypto/ssh/knownhosts
 golang.org/x/exp/constraints
 golang.org/x/exp/maps
 golang.org/x/exp/slices
-# golang.org/x/mod v0.42.0
+# golang.org/x/mod v0.43.0
 ## explicit; go 1.26.0
 golang.org/x/mod/internal/lazyregexp
 golang.org/x/mod/modfile
@@ -2171,7 +2171,7 @@ golang.org/x/telemetry/internal/telemetry
 # golang.org/x/term v0.47.0
 ## explicit; go 1.26.0
 golang.org/x/term
-# golang.org/x/text v0.43.0
+# golang.org/x/text v0.44.0
 ## explicit; go 1.26.0
 golang.org/x/text/cases
 golang.org/x/text/internal

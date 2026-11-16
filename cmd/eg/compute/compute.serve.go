@@ -36,6 +36,7 @@ type serve struct {
 	cmdopts.RuntimeResources
 	Dir              string   `name:"directory" help:"root directory of the repository" default:"${vars_eg_root_directory}"`
 	ModuleDir        string   `name:"moduledir" help:"must be a subdirectory in the provided directory" default:"${vars_workload_directory}"`
+	Debug            bool     `name:"debug" help:"keep workspace around to debug issues, requires manual cleanup"`
 	InvalidateCache  bool     `name:"invalidate-cache" help:"removes workload build cache"`
 	AutoPatch        bool     `name:"auto-patch" help:"commit the changes made inside the served workload to a new eg/ branch of the current repository once it stops, when disabled the changes are printed as a patch instead (dry run)" default:"true" negatable:""`
 	Privileged       bool     `name:"privileged" help:"run the initial container in privileged mode"`
@@ -120,7 +121,11 @@ func (t serve) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath, sessio
 	); err != nil {
 		return errorsx.Wrap(err, "unable to setup workspace")
 	}
-	defer os.RemoveAll(ws.Root)
+	if !t.Debug {
+		defer os.RemoveAll(ws.Root)
+	} else {
+		defer log.Println("debug enabled, the workspace was kept and requires manual cleanup:", ws.Root)
+	}
 
 	if repo, err = git.PlainOpen(ws.WorkingDir); err != nil {
 		return errorsx.Wrapf(err, "unable to open git repository: %s", ws.WorkingDir)
@@ -161,6 +166,11 @@ func (t serve) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath, sessio
 	module, err := compile.OneFromTranspiled(gctx.Context, ws, roots...)
 	if err != nil {
 		return err
+	}
+
+	// podman reports a missing bind mount source as an opaque exit 125, fail with the actual cause instead.
+	if _, err = os.Stat(module.Path); err != nil {
+		return errorsx.Wrapf(err, "compiled module is missing: %s", module.Path)
 	}
 
 	debugx.Println("module", module)

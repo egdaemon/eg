@@ -21,6 +21,3 @@ RUN arch="$(dpkg --print-architecture)"; \
     curl -fsSL -o /tmp/libgcrypt20.deb "${mirror}/pool/main/libg/libgcrypt20/libgcrypt20_1.12.2-1ubuntu2_${arch}.deb"; \
     dpkg -i /tmp/libgcrypt20.deb; \
     rm -f /tmp/libgcrypt20.deb
-
-# temporary hack until new release is out
-RUN systemctl mask tmp.mount dev-mqueue.mount systemd-ask-password-console.path systemd-ask-password-wall.path systemd-resolved.service systemd-resolved-monitor.socket systemd-resolved-varlink.socket

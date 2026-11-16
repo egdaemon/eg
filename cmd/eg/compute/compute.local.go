@@ -89,7 +89,7 @@ func (t local) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, hotswapbin *cm
 	// register the run so tools (i.e. the vscode extension) can list it while it is running. local runs
 	// are not reachable over ssh and do not host an agent, they only patch their changes back when enabled.
 	defer func() { errorsx.Log(clidb.Close()) }()
-	registered, done := session.New(clidb).Branch(session.Branch, defaultbranch(t.Name, uid)).Patch(t.AutoPatch).Register(gctx.Context, uid, t.Name, t.Dir)
+	registered, done := session.New(clidb).Branch(session.Branch, headbranch(t.Dir, t.Name, uid)).Patch(t.AutoPatch).Register(gctx.Context, uid, t.Name, t.Dir)
 	defer func() { done(err) }()
 
 	contextx.WaitGroupAdd(gctx.Context, 1)

@@ -190,6 +190,44 @@ func TestAutoPatch(t *testing.T) {
 		require.Equal(t, "one\n", string(a))
 	})
 
+	t.Run("checked out branch updates the worktree and keeps local modifications", func(t *testing.T) {
+		repo := t.TempDir()
+		initRepo(t, repo, map[string]string{"a.txt": "one\n", "b.txt": "one\n"})
+		clone := filepath.Join(t.TempDir(), "clone")
+		require.NoError(t, LocalClone(t.Context(), repo, clone, "main", "HEAD"))
+		require.NoError(t, os.WriteFile(filepath.Join(clone, "a.txt"), []byte("two\n"), 0644))
+		require.NoError(t, os.WriteFile(filepath.Join(clone, "new.txt"), []byte("new\n"), 0644))
+		require.NoError(t, os.WriteFile(filepath.Join(repo, "b.txt"), []byte("mine\n"), 0644))
+
+		require.NoError(t, AutoPatch(io.Discard).From(clone).To(repo).Branch("main").Apply(t.Context()))
+
+		for name, expected := range map[string]string{"a.txt": "two\n", "new.txt": "new\n", "b.txt": "mine\n"} {
+			actual, err := os.ReadFile(filepath.Join(repo, name))
+			require.NoError(t, err)
+			require.Equal(t, expected, string(actual), name)
+		}
+
+		raw, err := exec.Command("git", "-C", repo, "status", "--porcelain", "--untracked-files=no").CombinedOutput()
+		require.NoError(t, err, string(raw))
+		require.Equal(t, "M b.txt", strings.TrimSpace(string(raw)))
+	})
+
+	t.Run("checked out branch with overlapping local modifications writes the patch", func(t *testing.T) {
+		repo := t.TempDir()
+		initRepo(t, repo, map[string]string{"a.txt": "one\n"})
+		clone := filepath.Join(t.TempDir(), "clone")
+		require.NoError(t, LocalClone(t.Context(), repo, clone, "main", "HEAD"))
+		require.NoError(t, os.WriteFile(filepath.Join(clone, "a.txt"), []byte("two\n"), 0644))
+		require.NoError(t, os.WriteFile(filepath.Join(repo, "a.txt"), []byte("mine\n"), 0644))
+
+		var out strings.Builder
+		require.Error(t, AutoPatch(&out).From(clone).To(repo).Branch("main").Apply(t.Context()))
+		require.Contains(t, out.String(), "+two")
+		actual, err := os.ReadFile(filepath.Join(repo, "a.txt"))
+		require.NoError(t, err)
+		require.Equal(t, "mine\n", string(actual))
+	})
+
 	t.Run("explicit branch is extended", func(t *testing.T) {
 		repo := t.TempDir()
 		initRepo(t, repo, map[string]string{"a.txt": "one\n", "b.txt": "one\n"})

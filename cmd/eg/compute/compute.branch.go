@@ -9,6 +9,7 @@ import (
 	"github.com/egdaemon/eg/internal/stringsx"
 	"github.com/egdaemon/eg/internal/userx"
 	"github.com/egdaemon/eg/internal/uuidx"
+	"github.com/go-git/go-git/v6"
 )
 
 var invalidbranchchars = regexp.MustCompile(`[^A-Za-z0-9._-]+`)
@@ -27,4 +28,16 @@ func defaultbranch(workload string, id uuidx.UUID) string {
 	}
 
 	return fmt.Sprintf("%s/eg-%s-%x", user, clean(workload), id[uuidx.Size-4:])
+}
+
+// headbranch is the branch checked out in the repository at dir, the changes of a local run are committed to it
+// by default. falls back to defaultbranch when HEAD is detached or the repository cannot be read.
+func headbranch(dir string, workload string, id uuidx.UUID) string {
+	if repo, err := git.PlainOpen(dir); err == nil {
+		if head, err := repo.Head(); err == nil && head.Name().IsBranch() {
+			return head.Name().Short()
+		}
+	}
+
+	return defaultbranch(workload, id)
 }

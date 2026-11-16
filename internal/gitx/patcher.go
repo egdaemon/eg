@@ -6,11 +6,13 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 
+	"github.com/egdaemon/eg/internal/debugx"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/execx"
 	"github.com/egdaemon/eg/internal/langx"
@@ -212,11 +214,17 @@ func (t autopatcher) Apply(ctx context.Context) error {
 	}
 
 	head := t.carried(ctx)
+	debugx.Fn(func() {
+		log.Printf("autopatch: clone=%q repo=%q branch=%q dry=%t patch=%d bytes carried=%q\n", t.clone, t.repo, t.branch, t.dry, len(patch), head)
+	})
+
 	if len(patch) == 0 && head == "" {
+		debugx.Fn(func() { log.Println("autopatch: path=noop, no changes and no carried commits") })
 		return nil
 	}
 
 	if t.dry {
+		debugx.Fn(func() { log.Println("autopatch: path=dry-run, writing patch instead of committing") })
 		if head != "" {
 			if out, err := execx.RunAs(ctx, RepositoryUsername(t.clone), "git", "-C", t.clone, "format-patch", "--stdout", "--binary", CloneBase(ctx, t.clone)+".."+head).Output(); err != nil {
 				return errorsx.Wrapf(err, "unable to format the commits: %s", t.clone)
@@ -229,7 +237,9 @@ func (t autopatcher) Apply(ctx context.Context) error {
 		return err
 	}
 
+	debugx.Fn(func() { log.Println("autopatch: path=commit, committing to branch") })
 	if err = t.commit(ctx, head, patch); err != nil {
+		debugx.Fn(func() { log.Println("autopatch: commit failed, writing patch to fallback writer", err) })
 		return PatchWrite(&PatchError{Patch: patch, Err: err}, t.w)
 	}
 
@@ -239,30 +249,36 @@ func (t autopatcher) Apply(ctx context.Context) error {
 // carried returns the commit the clone is at when commits were made within it since it started, blank otherwise.
 func (t autopatcher) carried(ctx context.Context) string {
 	if !isSeparateClone(t.clone, t.repo) {
+		debugx.Fn(func() { log.Println("autopatch: carried=none, clone is not separate from the repository") })
 		return ""
 	}
 
 	base := CloneBase(ctx, t.clone)
 	if base == "" {
+		debugx.Fn(func() { log.Println("autopatch: carried=none, clone has no recorded base commit") })
 		return ""
 	}
 
 	username := RepositoryUsername(t.clone)
 	out, err := execx.RunAs(ctx, username, "git", "-C", t.clone, "rev-parse", "--verify", "--quiet", "HEAD^{commit}").Output()
 	if err != nil {
+		debugx.Fn(func() { log.Println("autopatch: carried=none, unable to resolve clone HEAD", err) })
 		return ""
 	}
 
 	head := strings.TrimSpace(string(out))
 	if head == base {
+		debugx.Fn(func() { log.Println("autopatch: carried=none, clone HEAD is at its base", base) })
 		return ""
 	}
 
 	// a clone that was reset or rebased away from its base has no commits to carry.
 	if err := execx.RunAs(ctx, username, "git", "-C", t.clone, "merge-base", "--is-ancestor", base, head).Run(); err != nil {
+		debugx.Fn(func() { log.Println("autopatch: carried=none, base is not an ancestor of HEAD", base, head) })
 		return ""
 	}
 
+	debugx.Fn(func() { log.Println("autopatch: carried=commits", base, "..", head) })
 	return head
 }
 
@@ -305,6 +321,9 @@ func (t autopatcher) commit(ctx context.Context, head string, patch []byte) erro
 		if parent, err = git(nil, nil, "rev-parse", "--verify", "HEAD"); err != nil {
 			return err
 		}
+		debugx.Fn(func() { log.Println("autopatch: branch does not exist, creating from HEAD", branch, parent) })
+	} else {
+		debugx.Fn(func() { log.Println("autopatch: branch exists, extending", branch, oldtip) })
 	}
 
 	if head != "" {
@@ -326,9 +345,11 @@ func (t autopatcher) commit(ctx context.Context, head string, patch []byte) erro
 		}
 
 		parent = head
+		debugx.Fn(func() { log.Println("autopatch: fetched clone commits, parent is now", parent) })
 	}
 
 	if len(patch) == 0 {
+		debugx.Fn(func() { log.Println("autopatch: no uncommitted changes, only updating ref", ref, parent) })
 		return t.updateref(git, ref, parent, oldtip)
 	}
 
@@ -359,11 +380,20 @@ func (t autopatcher) commit(ctx context.Context, head string, patch []byte) erro
 		return err
 	}
 
+	debugx.Fn(func() { log.Println("autopatch: committed uncommitted changes on top of parent", commit, parent) })
 	return t.updateref(git, ref, commit, oldtip)
 }
 
-// updateref points ref at commit, ref must be at oldtip, or must not exist when oldtip is blank.
+// updateref points ref at commit, when ref is checked out the worktree is updated as well, ref must be at oldtip, or must not exist when oldtip is blank.
 func (t autopatcher) updateref(git func([]string, []byte, ...string) (string, error), ref, commit, oldtip string) error {
+	// the branch is checked out, fast forward it so the index and worktree receive the changes, local
+	// modifications are kept and the merge refuses, leaving the ref untouched, if they overlap with the changes.
+	if current, err := git(nil, nil, "symbolic-ref", "-q", "HEAD"); err == nil && current == ref {
+		debugx.Fn(func() { log.Println("autopatch: branch is checked out, fast forwarding the worktree", ref, commit) })
+		_, err = git(nil, nil, "merge", "--ff-only", "-q", commit)
+		return err
+	}
+
 	args := []string{"update-ref", ref, commit}
 	if oldtip != "" {
 		args = append(args, oldtip)
@@ -371,6 +401,12 @@ func (t autopatcher) updateref(git func([]string, []byte, ...string) (string, er
 		args = append(args, strings.Repeat("0", len(commit)))
 	}
 
-	_, err := git(nil, nil, args...)
-	return err
+	if _, err := git(nil, nil, args...); err != nil {
+		return err
+	}
+
+	// the worktree was not updated, make sure the user knows where their changes went.
+	branch := strings.TrimPrefix(ref, "refs/heads/")
+	log.Printf("autopatch: the changes were committed to branch %q, your worktree was not modified. use `git checkout %s` or `git merge %s` to get them\n", branch, branch, branch)
+	return nil
 }

@@ -39,12 +39,12 @@ import (
 	"github.com/egdaemon/eg/internal/userx"
 	"github.com/egdaemon/eg/internal/uuidx"
 	"github.com/egdaemon/eg/interp"
-	"github.com/egdaemon/eg/interp/c8s"
 	"github.com/egdaemon/eg/interp/c8sproxy"
 	"github.com/egdaemon/eg/interp/dbproxy/dbservice"
 	"github.com/egdaemon/eg/interp/environ"
 	"github.com/egdaemon/eg/interp/events"
 	"github.com/egdaemon/eg/interp/execproxy/v2"
+	"github.com/egdaemon/eg/interp/machines"
 	"github.com/egdaemon/eg/runners"
 	"github.com/egdaemon/eg/runtime/wasi/egunsafe/egworkloads"
 	"github.com/egdaemon/eg/workspaces"
@@ -466,22 +466,17 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, environsecret
 			gpu,
 		)
 
-		c8s.RegisterProxyServer(srv, runners.NewMachines(
-			c8sproxy.NewServiceProxy(
-				log.Default(),
-				ws,
-				c8sproxy.ServiceProxyOptionCommandEnviron(cmdenv...),
-				c8sproxy.ServiceProxyOptionContainerOptions(
-					ragent.Options()...,
-				),
-				// builds create their own network namespace as well, they take the options of hostnet.
-				c8sproxy.ServiceProxyOptionBuildOptions(runners.ZeroAgent(hostnet).Options()...),
-			),
-			tlsc.DefaultClient(),
+		c8sproxy.NewServiceProxy(
+			log.Default(),
 			ws,
-			log.Writer(),
-			runners.MachineOptionEGBin(errorsx.Must(exec.LookPath(os.Args[0]))),
-		))
+			c8sproxy.ServiceProxyOptionCommandEnviron(cmdenv...),
+			c8sproxy.ServiceProxyOptionContainerOptions(
+				ragent.Options()...,
+			),
+			// builds create their own network namespace as well, they take the options of hostnet.
+			c8sproxy.ServiceProxyOptionBuildOptions(runners.ZeroAgent(hostnet).Options()...),
+		).Bind(srv)
+		machines.RegisterMachinesServer(srv, runners.NewMachines(tlsc.DefaultClient(), ws, log.Writer(), runners.MachineOptionEGBin(errorsx.Must(exec.LookPath(os.Args[0])))))
 
 		go func() {
 			errorsx.Log(errorsx.Wrap(srv.Serve(control), "unable to serve control socket"))

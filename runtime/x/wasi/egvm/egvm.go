@@ -16,7 +16,7 @@ import (
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/langx"
-	"github.com/egdaemon/eg/interp/c8s"
+	"github.com/egdaemon/eg/interp/machines"
 	"github.com/egdaemon/eg/runtime/wasi/egunsafe"
 	"google.golang.org/grpc"
 )
@@ -61,7 +61,7 @@ func (t VM) RunWith(ctx context.Context, mpath string) (err error) {
 	}
 	defer cc.Close()
 
-	_, err = c8s.NewProxyClient(cc).Module(ctx, &c8s.ModuleRequest{Image: t.uri, Module: mpath, Options: []string{level}})
+	_, err = machines.NewMachinesClient(cc).Module(ctx, &machines.ModuleRequest{Egiso: t.uri, Module: mpath, Options: []string{level}})
 	return errorsx.Wrap(err, "unable to run the module in a machine")
 }
 

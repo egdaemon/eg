@@ -21,6 +21,9 @@ package eg
 //go:generate protoc --proto_path=.proto --go_opt=Meg.interp.containers.proto=github.com/eg/interp/c8s --go_opt=paths=source_relative --go_out=interp/c8s eg.interp.containers.proto
 //go:generate protoc --proto_path=.proto --go-grpc_opt=Meg.interp.containers.proto=github.com/eg/interp/c8s --go-grpc_opt=paths=source_relative --go-grpc_out=interp/c8s eg.interp.containers.proto
 
+//go:generate protoc --proto_path=.proto --go_opt=Meg.interp.machines.proto=github.com/egdaemon/eg/interp/machines --go_opt=paths=source_relative --go_out=interp/machines eg.interp.machines.proto
+//go:generate protoc --proto_path=.proto --go-grpc_opt=Meg.interp.machines.proto=github.com/egdaemon/eg/interp/machines --go-grpc_opt=paths=source_relative --go-grpc_out=interp/machines eg.interp.machines.proto
+
 //go:generate protoc --proto_path=.proto --go_opt=Meg.interp.exec.proto=github.com/eg/interp/execproxy --go_opt=paths=source_relative --go_out=interp/execproxy eg.interp.exec.proto
 //go:generate protoc --proto_path=.proto --go-grpc_opt=Meg.interp.exec.proto=github.com/eg/interp/execproxy --go-grpc_opt=paths=source_relative --go-grpc_out=interp/execproxy eg.interp.exec.proto
 

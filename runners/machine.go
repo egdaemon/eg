@@ -26,8 +26,8 @@ import (
 	"github.com/egdaemon/eg/internal/slicesx"
 	"github.com/egdaemon/eg/internal/stringsx"
 	"github.com/egdaemon/eg/internal/userx"
-	"github.com/egdaemon/eg/interp/c8s"
 	"github.com/egdaemon/eg/interp/execproxy"
+	"github.com/egdaemon/eg/interp/machines"
 	"github.com/egdaemon/eg/transpile"
 	"github.com/egdaemon/eg/workspaces"
 	"github.com/moby/sys/user"
@@ -344,33 +344,29 @@ func (t *Machine) module(ctx context.Context, path string) (err error) {
 	}, egvm.ExecOptionStdin(os.Stdin), egvm.ExecOptionStdout(log.Writer()), egvm.ExecOptionStderr(log.Writer()))
 }
 
-// NewMachines serves proxy's rpcs, and boots a machine for each module asked to run in one, as
-// egvm.New asks: a request whose image is the uri of an egiso, which carries its pin as its fragment,
-// or blank, for the egiso of the machine running the module, eg.EnvComputeEgiso. Its module is the
-// module's path in the runtime directory, and its options the environment the module runs with. Each
-// machine shares the workspace's directories.
-func NewMachines(proxy c8s.ProxyServer, c *http.Client, ws workspaces.Context, console io.Writer, options ...MachineOption) c8s.ProxyServer {
-	return machines{ProxyServer: proxy, c: c, ws: ws, console: console, options: options}
+// NewMachines boots a machine for each module asked to run in one, as egvm.New asks: from the egiso
+// the request names, a uri carrying its pin as its fragment, else the egiso of the machine running the
+// module, eg.EnvComputeEgiso. Its module is the module's path in the runtime directory, and its
+// options the environment the module runs with. Each machine shares the workspace's directories.
+func NewMachines(c *http.Client, ws workspaces.Context, console io.Writer, options ...MachineOption) machines.MachinesServer {
+	return machineserver{c: c, ws: ws, console: console, options: options}
 }
 
-type machines struct {
-	c8s.ProxyServer
+type machineserver struct {
+	machines.UnimplementedMachinesServer
 	c       *http.Client
 	ws      workspaces.Context
 	console io.Writer
 	options []MachineOption
 }
 
-// Module implements c8s.ProxyServer.
-func (t machines) Module(ctx context.Context, req *c8s.ModuleRequest) (_ *c8s.ModuleResponse, err error) {
+// Module implements machines.MachinesServer.
+func (t machineserver) Module(ctx context.Context, req *machines.ModuleRequest) (_ *machines.ModuleResponse, err error) {
 	var (
 		m   *Machine
-		uri = stringsx.First(req.Image, envx.String("", eg.EnvComputeEgiso))
+		uri = stringsx.First(req.Egiso, envx.String("", eg.EnvComputeEgiso))
 	)
 
-	if !stringsx.Blank(req.Image) && !strings.Contains(req.Image, "#") {
-		return t.ProxyServer.Module(ctx, req)
-	}
 	if stringsx.Blank(uri) {
 		return nil, errorsx.String("only a module running in a machine can boot one from its egiso")
 	}
@@ -383,7 +379,7 @@ func (t machines) Module(ctx context.Context, req *c8s.ModuleRequest) (_ *c8s.Mo
 	if err = m.module(ctx, eg.DefaultMountRoot(eg.RuntimeDirectory, req.Module)); err != nil {
 		return nil, err
 	}
-	return &c8s.ModuleResponse{}, nil
+	return &machines.ModuleResponse{}, nil
 }
 
 // Close shuts the machine down, removes its upper and releases its egiso.

@@ -1,6 +1,7 @@
 package gitx
 
 import (
+	"os"
 	"testing"
 
 	"github.com/go-git/go-git/v6"
@@ -11,6 +12,8 @@ func TestUserEnv(t *testing.T) {
 	t.Run("configured identity is passed as git config environment", func(t *testing.T) {
 		t.Setenv("HOME", t.TempDir())
 		t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+		t.Setenv("GIT_CONFIG_COUNT", "")
+		require.NoError(t, os.Unsetenv("GIT_CONFIG_COUNT"))
 		repo, err := git.PlainInit(t.TempDir(), false)
 		require.NoError(t, err)
 		cfg, err := repo.Config()
@@ -29,6 +32,8 @@ func TestUserEnv(t *testing.T) {
 	t.Run("no identity yields nothing", func(t *testing.T) {
 		t.Setenv("HOME", t.TempDir())
 		t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+		t.Setenv("GIT_CONFIG_COUNT", "")
+		require.NoError(t, os.Unsetenv("GIT_CONFIG_COUNT"))
 		repo, err := git.PlainInit(t.TempDir(), false)
 		require.NoError(t, err)
 

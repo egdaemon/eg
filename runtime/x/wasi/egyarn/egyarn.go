@@ -32,6 +32,8 @@ func env() ([]string, error) {
 // and add these after it, later entries win:
 //
 //	shell.Env().EnvironFrom(egyarn.Env()...)
+//
+// when a []string is needed instead of a command, use egenv.InheritEnv().
 func Env() []string {
 	return errorsx.Must(env())
 }

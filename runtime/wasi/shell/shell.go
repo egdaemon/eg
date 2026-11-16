@@ -247,6 +247,8 @@ func Runtime() Command {
 // win so the package's variables override inherited ones:
 //
 //	shell.Env().EnvironFrom(eggolang.Env()...).New("go build ./...")
+//
+// when a []string is needed instead of a command, use egenv.InheritEnv().
 func Env() Command {
 	return Runtime().EnvironFrom(os.Environ()...)
 }

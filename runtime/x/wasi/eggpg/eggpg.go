@@ -198,6 +198,9 @@ func Debug(options ...Option) eg.OpFn {
 			runtime.New("ls -lha ${GNUPGHOME}"),
 			runtime.New("gpg --version"),
 			runtime.New("gpg-agent --version"),
+			runtime.New("id"),
+			runtime.New("gpgconf --list-dirs"),
+			runtime.New("gpg-connect-agent --verbose /bye"),
 			runtime.New("gpg --list-keys"),
 			runtime.New("sha256sum ${EG_GPG_KEYRING_HOME}/private.asc ${EG_GPG_KEYRING_HOME}/public.asc"),
 		)
@@ -227,6 +230,9 @@ func Seed(options ...Option) eg.OpFn {
 		runtime := opts.runtime()
 		return shell.Run(
 			ctx,
+			// the agent is launched against GNUPGHOME and it does not create the directory, it must exist with the
+			// permissions gpg requires.
+			runtime.New("mkdir -p -m 700 ${GNUPGHOME}"),
 			// launch the gpg agent for this environment ensuring its available prior to importing.
 			runtime.New("gpgconf --launch gpg-agent"),
 			runtime.New("gpg-connect-agent /bye").Attempts(32),

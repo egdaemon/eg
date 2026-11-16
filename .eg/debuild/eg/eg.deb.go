@@ -60,6 +60,9 @@ func init() {
 		),
 		egdebuild.Option.Envvar("VCS_REVISION", c.Hash.String()),
 		egdebuild.Option.Envvar("VCS_TIMESTAMP", c.Committer.When.UTC().Format(time.RFC3339)),
+		// the host environment first, later entries win so the isolated gpg home must come last.
+		egdebuild.Option.Environ(egenv.InheritEnv()...),
+		egdebuild.Option.Environ(eggolang.Env()...),
 		egdebuild.Option.Environ(eggpg.Env(gpgoptions()...)...),
 	)
 }
@@ -87,8 +90,6 @@ func Build(ctx context.Context, o eg.Op) error {
 			gcfg,
 			egdebuild.Option.Distro(egdebuild.UbuntuLatestCodename),
 			egdebuild.Option.BuildBinary(20*time.Minute),
-			egdebuild.Option.Environ(eggolang.Env()...),
-			egdebuild.Option.Environ(eggpg.Env(gpgoptions()...)...),
 			egdebuild.Option.NoLint(),
 		),
 	)(ctx, o)

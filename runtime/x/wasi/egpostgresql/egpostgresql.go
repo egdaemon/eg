@@ -124,6 +124,8 @@ func InsertSuperuser(name string) eg.OpFn {
 // and add these after it, later entries win:
 //
 //	shell.Env().EnvironFrom(egpostgresql.Environ()...)
+//
+// when a []string is needed instead of a command, use egenv.InheritEnv().
 func Environ() []string {
 	ctx, done := context.WithTimeout(context.Background(), 3*time.Second)
 	defer done()

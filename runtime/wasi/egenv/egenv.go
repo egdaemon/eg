@@ -319,6 +319,20 @@ func Build() *envx.Builder {
 	return envx.Build()
 }
 
+// Inherit a builder pre-populated with a copy of the process environment. the runtime/x/wasi packages' Env()
+// functions deliberately don't copy it, start from here when the host environment is wanted. later entries win,
+// so add the packages' variables afterwards:
+//
+//	egenv.MustEnviron(egenv.Inherit().FromEnviron(eggolang.Env()...))
+func Inherit() *envx.Builder {
+	return envx.Build().FromEnviron(os.Environ()...)
+}
+
+// InheritEnv a copy of the process environment as a []string, shorthand for MustEnviron(Inherit()).
+func InheritEnv() []string {
+	return MustEnviron(Inherit())
+}
+
 func MustEnviron(env *envx.Builder) []string {
 	return errorsx.Must(env.Environ())
 }

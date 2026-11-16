@@ -151,6 +151,16 @@ func TestExec(t *testing.T) {
 		require.Contains(t, stderr, "Operation not permitted")
 	})
 
+	t.Run("administers the network namespaces root makes", func(t *testing.T) {
+		code, _, stderr := run(t, t.Context(), nil, "unshare", "--net", "nft", "add", "table", "inet", "nested")
+		require.Equal(t, int32(0), code, stderr)
+	})
+
+	t.Run("has a tun device for pasta", func(t *testing.T) {
+		code, _, stderr := run(t, t.Context(), nil, "test", "-c", "/dev/net/tun")
+		require.Equal(t, int32(0), code, stderr)
+	})
+
 	t.Run("quotes arguments the shell would expand", func(t *testing.T) {
 		code, stdout, _ := run(t, t.Context(), nil, "printf", "%s|", "a b", "$HOME", "'q'", "*")
 		require.Equal(t, int32(0), code)

@@ -19,12 +19,15 @@ import (
 // The names Boot starts this program under, in the machine's user and mount namespaces. stagemap
 // waits for the machine's ids, then starts again as stageroot: a program started before its user
 // namespace maps its ids holds no capabilities in it, and starting again as the namespace's root
-// restores them. stageroot mounts the root and starts stageinit in namespaces of its own, whose
-// network pasta connects to the host's, as rootless podman runs pasta beside a container.
+// restores them. stageroot mounts the root and starts stagenet in a network namespace of its own,
+// which pasta connects to the host's, as rootless podman runs pasta beside a container. stagenet
+// loads the machine's firewall and starts stageinit in a user namespace of its own and the machine's
+// other namespaces, so the machine has no say over its network namespace, but owns any it makes.
 // stageinit execs the root's init.
 const (
 	stagemap  = "egvm-map"
 	stageroot = "egvm-root"
+	stagenet  = "egvm-net"
 	stageinit = "egvm-init"
 )
 
@@ -44,9 +47,12 @@ const (
 	sharefuse = "fuse"
 )
 
-// fdnetworked is the pipe stageroot hands stageinit and closes once pasta connects the machine's
-// network.
-const fdnetworked = 3
+// The descriptors stageroot hands stagenet: the pipe it closes once pasta connects the machine's
+// network, and the payload cgroup the machine's init starts in.
+const (
+	fdnetworked = 3
+	fdpayload   = 4
+)
 
 // credentials is where the root's systemd reads the system credentials the machine passes it.
 const credentials = "/run/egvm/credentials"
@@ -64,8 +70,10 @@ func init() {
 		err = waitmapped()
 	case stageroot:
 		err = boot(os.Args[1], os.Args[2], os.Args[3], os.Args[4], os.Args[5], os.Args[6:])
+	case stagenet:
+		err = network(os.Args[1], os.Args[2], os.Args[3])
 	case stageinit:
-		err = start(os.Args[1], os.Args[2], os.Args[3])
+		err = start(os.Args[1], os.Args[2])
 	default:
 		return
 	}
@@ -156,15 +164,13 @@ func boot(root string, rootinit string, netns string, authorized string, ruleset
 	runtime.LockOSThread()
 	machine = &exec.Cmd{
 		Path:       "/proc/self/exe",
-		Args:       []string{stageinit, root, rootinit, ruleset},
+		Args:       []string{stagenet, root, rootinit, ruleset},
 		Stdout:     os.Stdout,
 		Stderr:     os.Stderr,
-		ExtraFiles: []*os.File{networked[0]},
+		ExtraFiles: []*os.File{networked[0], payload},
 		SysProcAttr: &syscall.SysProcAttr{
-			Cloneflags:  syscall.CLONE_NEWNS | syscall.CLONE_NEWPID | syscall.CLONE_NEWNET | syscall.CLONE_NEWUTS | syscall.CLONE_NEWIPC | syscall.CLONE_NEWCGROUP,
-			Pdeathsig:   syscall.SIGKILL,
-			UseCgroupFD: true,
-			CgroupFD:    int(payload.Fd()),
+			Cloneflags: syscall.CLONE_NEWNET,
+			Pdeathsig:  syscall.SIGKILL,
 		},
 	}
 	err = machine.Start()
@@ -253,29 +259,100 @@ func delegate() (_ *os.File, err error) {
 	return os.Open(payload)
 }
 
-// start execs rootinit in root once pasta connects the machine's network, after mounting the
-// filesystems its own pid, network and ipc namespaces back and loading ruleset, the machine's
-// firewall, with the root's nft.
-func start(root string, rootinit string, ruleset string) (err error) {
+// network loads ruleset, the machine's firewall, with the root's nft once pasta connects the
+// machine's network, and mounts the root's /sys, which only the network namespace's user namespace
+// may. It then runs stageinit in the payload cgroup until it exits, as root of a user namespace mapping
+// each id to its own: root in the machine changes no firewall, as the namespace that owns its
+// network is this one, and administers the networks it makes for its own machines and containers.
+func network(root string, rootinit string, ruleset string) (err error) {
+	var (
+		machine  *exec.Cmd
+		uids     []syscall.SysProcIDMap
+		gids     []syscall.SysProcIDMap
+		firewall = exec.Command(nft, "-f", "-")
+	)
+
 	if _, err = io.Copy(io.Discard, os.NewFile(fdnetworked, "networked")); err != nil {
 		return err
 	}
-
-	for _, m := range []struct {
-		source string
-		target string
-		fstype string
-		flags  uintptr
-	}{
-		{source: "proc", target: "proc", fstype: "proc", flags: unix.MS_NOSUID | unix.MS_NODEV | unix.MS_NOEXEC},
-		{source: "sysfs", target: "sys", fstype: "sysfs", flags: unix.MS_NOSUID | unix.MS_NODEV | unix.MS_NOEXEC | unix.MS_RDONLY},
-	} {
-		if err = mountat(m.source, filepath.Join(root, m.target), m.fstype, m.flags, ""); err != nil {
-			return err
-		}
+	for _, fd := range []int{fdnetworked, fdpayload} {
+		unix.CloseOnExec(fd)
 	}
 
-	unix.CloseOnExec(fdnetworked)
+	firewall.Stdin = strings.NewReader(ruleset)
+	firewall.SysProcAttr = &syscall.SysProcAttr{Chroot: root}
+	if b, cause := firewall.CombinedOutput(); cause != nil {
+		return fmt.Errorf("unable to load the machine's firewall: %w: %s", cause, b)
+	}
+
+	if err = mountat("sysfs", filepath.Join(root, "sys"), "sysfs", unix.MS_NOSUID|unix.MS_NODEV|unix.MS_NOEXEC|unix.MS_RDONLY, ""); err != nil {
+		return err
+	}
+
+	if uids, err = identity("/proc/self/uid_map"); err != nil {
+		return err
+	}
+	if gids, err = identity("/proc/self/gid_map"); err != nil {
+		return err
+	}
+
+	// the machine dies with the thread that starts it, so that thread never exits.
+	runtime.LockOSThread()
+	machine = &exec.Cmd{
+		Path:   "/proc/self/exe",
+		Args:   []string{stageinit, root, rootinit},
+		Stdout: os.Stdout,
+		Stderr: os.Stderr,
+		SysProcAttr: &syscall.SysProcAttr{
+			Cloneflags:                 syscall.CLONE_NEWUSER | syscall.CLONE_NEWNS | syscall.CLONE_NEWPID | syscall.CLONE_NEWUTS | syscall.CLONE_NEWIPC | syscall.CLONE_NEWCGROUP,
+			UidMappings:                uids,
+			GidMappings:                gids,
+			GidMappingsEnableSetgroups: true,
+			Pdeathsig:                  syscall.SIGKILL,
+			UseCgroupFD:                true,
+			CgroupFD:                   fdpayload,
+		},
+	}
+	return machine.Run()
+}
+
+// identity maps each id of this process's user namespace to itself, as podman nested with --userns
+// host maps a container's, from file, its uid_map or gid_map.
+func identity(file string) (ids []syscall.SysProcIDMap, err error) {
+	var (
+		b      []byte
+		id     int
+		parent int
+		size   int
+	)
+
+	if b, err = os.ReadFile(file); err != nil {
+		return nil, err
+	}
+	for _, line := range strings.Split(strings.TrimSpace(string(b)), "\n") {
+		if _, err = fmt.Sscan(line, &id, &parent, &size); err != nil {
+			return nil, fmt.Errorf("unable to read %s: %w", file, err)
+		}
+		ids = append(ids, syscall.SysProcIDMap{ContainerID: id, HostID: id, Size: size})
+	}
+	return ids, nil
+}
+
+// start execs rootinit in root, after mounting the proc filesystem of its own pid namespace.
+func start(root string, rootinit string) (err error) {
+	// a user namespace of its own cleared the signal stagenet asked for when it exits.
+	if err = unix.Prctl(unix.PR_SET_PDEATHSIG, uintptr(unix.SIGKILL), 0, 0, 0); err != nil {
+		return err
+	}
+
+	// the root's mount came from the user namespace above, which locks it, and pivot_root moves no
+	// locked mount, so the root moves bound onto itself, as crun binds a container's.
+	if err = unix.Mount(root, root, "", unix.MS_BIND|unix.MS_REC, ""); err != nil {
+		return fmt.Errorf("unable to bind the root: %w", err)
+	}
+	if err = mountat("proc", filepath.Join(root, "proc"), "proc", unix.MS_NOSUID|unix.MS_NODEV|unix.MS_NOEXEC, ""); err != nil {
+		return err
+	}
 
 	if err = unix.Chdir(root); err != nil {
 		return err
@@ -296,22 +373,12 @@ func start(root string, rootinit string, ruleset string) (err error) {
 		return fmt.Errorf("unable to drop CAP_SYS_RAWIO: %w", err)
 	}
 
-	// pasta configures the machine's network from outside, so nothing in it needs to administer the
-	// network: once the firewall loads, not even root within it can change it.
-	firewall := exec.Command(nft, "-f", "-")
-	firewall.Stdin = strings.NewReader(ruleset)
-	if b, cause := firewall.CombinedOutput(); cause != nil {
-		return fmt.Errorf("unable to load the machine's firewall: %w: %s", cause, b)
-	}
-	if err = unix.Prctl(unix.PR_CAPBSET_DROP, unix.CAP_NET_ADMIN, 0, 0, 0); err != nil {
-		return fmt.Errorf("unable to drop CAP_NET_ADMIN: %w", err)
-	}
-
 	return fmt.Errorf("unable to exec %s: %w", rootinit, unix.Exec(rootinit, []string{rootinit}, []string{"container=" + Container, "CREDENTIALS_DIRECTORY=" + credentials}))
 }
 
 // devices mounts the root's /dev: the host's character devices containers are given, with fuse, as
-// the runner gives its containers for eg module's bindfs, and its own pseudo terminals.
+// the runner gives its containers for eg module's bindfs, tun, for pasta to connect the machines the
+// machine boots, and its own pseudo terminals.
 func devices(root string) (err error) {
 	var (
 		dev = filepath.Join(root, "dev")
@@ -320,8 +387,8 @@ func devices(root string) (err error) {
 	if err = mountat("tmpfs", dev, "tmpfs", unix.MS_NOSUID|unix.MS_NOEXEC, "mode=755"); err != nil {
 		return err
 	}
-	for _, name := range []string{"null", "zero", "full", "random", "urandom", "tty", "fuse"} {
-		if err = os.WriteFile(filepath.Join(dev, name), nil, 0666); err != nil {
+	for _, name := range []string{"null", "zero", "full", "random", "urandom", "tty", "fuse", "net/tun"} {
+		if err = mountpoint(filepath.Join(dev, name), false); err != nil {
 			return err
 		}
 		if err = unix.Mount(filepath.Join("/dev", name), filepath.Join(dev, name), "", unix.MS_BIND, ""); err != nil {

@@ -1,10 +1,11 @@
-// Package egvm runs modules in a machine booted from an egiso, beside the machine running them, in
+// Package egvm runs modules in a machine booted from an egiso, within the machine running them, in
 // place of a container:
 //
 //	eg.Module(ctx, egvm.New(), ops...)
 //	eg.Module(ctx, egvm.New(egvm.OptionEgiso("https://example.com/root.egiso#sha256:…")), ops...)
 //
-// Only a module running in a machine, as eg compute local --egiso runs one, can boot another.
+// The root module boots it, as it runs containers. Only a module running in a machine, as eg compute
+// local --egiso runs one, has an egiso to boot one from by default.
 package egvm
 
 import (
@@ -55,13 +56,13 @@ func (t VM) RunWith(ctx context.Context, mpath string) (err error) {
 		level = fmt.Sprintf("%s=%d", eg.EnvComputeModuleNestedLevel, envx.Int(-1, eg.EnvComputeModuleNestedLevel)+1)
 	)
 
-	if cc, err = egunsafe.DialMachineSocket(ctx); err != nil {
+	if cc, err = egunsafe.DialControlSocket(ctx); err != nil {
 		return err
 	}
 	defer cc.Close()
 
 	_, err = c8s.NewProxyClient(cc).Module(ctx, &c8s.ModuleRequest{Image: t.uri, Module: mpath, Options: []string{level}})
-	return errorsx.Wrap(err, "unable to run the module in a machine, which only a module running in a machine can boot")
+	return errorsx.Wrap(err, "unable to run the module in a machine")
 }
 
 // internal use.

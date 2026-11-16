@@ -52,11 +52,12 @@ type VM struct {
 	closers []io.Closer
 }
 
-// Boot starts the machine as an unprivileged user: its init runs as root of a user namespace mapping
-// the user's subordinate ids, in mount, pid, uts, ipc, network and cgroup namespaces of its own,
-// rooted at the egiso served over FUSE, as is each directory the host user owns. pasta connects its
-// network to the host's, as it does for rootless podman, in a scope of the user's systemd limited to
-// the machine's cpus and memory. Its init's output is copied to console.
+// Boot starts the machine as an unprivileged user, or as root of a machine, which boots one within
+// it: its init runs as root of a user namespace mapping the user's subordinate ids, or root's own, in
+// mount, pid, uts, ipc and cgroup namespaces of its own, rooted at the egiso served over FUSE, as is
+// each directory the host user owns. Its network namespace belongs to the user namespace above its
+// own, and pasta connects it to the host's, as it does for rootless podman, in a scope of the user's
+// systemd limited to the machine's cpus and memory. Its init's output is copied to console.
 func Boot(m Machine, console io.Writer) (_ *VM, err error) {
 	var (
 		t          = &VM{stopped: make(chan struct{})}
@@ -161,7 +162,7 @@ func Boot(m Machine, console io.Writer) (_ *VM, err error) {
 	// the machine mounts what the host user owns after its root, in order. Its files belong to whoever
 	// asks, so the root's accounts would name no owner.
 	for _, mnt := range m.mounts {
-		if !mnt.owned {
+		if mnt.mode() != sharefuse {
 			continue
 		}
 		if owned, err = os.OpenRoot(mnt.dir); err != nil {
@@ -197,10 +198,11 @@ func (t *VM) serve(fd int, fsys *egiso.SysFS, options ...egiso.NFSOption) (err e
 }
 
 // mode is how stageroot mounts mnt: bound, read write or read only, or over FUSE when the host user
-// owns it.
+// owns it. A directory a machine already serves as the host user's is bound as it is, as eg module
+// binds it.
 func (t mount) mode() string {
 	switch {
-	case t.owned:
+	case t.owned && !Owned(t.dir):
 		return sharefuse
 	case t.readonly:
 		return sharero
@@ -230,7 +232,13 @@ func scope(pid int, m Machine) (err error) {
 		properties = append(properties, systemd.Property{Name: "MemoryMax", Value: dbus.MakeVariant(m.memory)})
 	}
 
-	if conn, err = cgroups.UserConnection(os.Getuid()); err != nil {
+	// root, as a machine's is, has the system's systemd, as podman connects to it as root.
+	if os.Getuid() == 0 {
+		conn, err = systemd.NewWithContext(context.Background())
+	} else {
+		conn, err = cgroups.UserConnection(os.Getuid())
+	}
+	if err != nil {
 		return errorsx.Wrap(err, "unable to reach the user's systemd, which machines run under")
 	}
 	defer conn.Close()
@@ -303,12 +311,28 @@ func received(fd int) (_ *os.File, err error) {
 }
 
 // idmap maps root of the machine's user namespace to the user, and the ids after it to the user's
-// subordinate ids, as rootless podman maps a container's.
+// subordinate ids, as rootless podman maps a container's. Root, as a machine's is, maps each of its
+// ids to itself, as podman nested with --userns host does.
 func idmap(pid int) error {
 	var (
 		current *user.User
+		ids     []syscall.SysProcIDMap
 		err     error
 	)
+
+	if os.Getuid() == 0 {
+		for _, file := range []string{"uid_map", "gid_map"} {
+			if ids, err = identity(filepath.Join("/proc/self", file)); err != nil {
+				return err
+			}
+			if err = os.WriteFile(filepath.Join("/proc", strconv.Itoa(pid), file), []byte(strings.Join(slicesx.MapTransform(func(m syscall.SysProcIDMap) string {
+				return fmt.Sprintf("%d %d %d", m.ContainerID, m.HostID, m.Size)
+			}, ids...), "\n")), 0); err != nil {
+				return errorsx.Wrap(err, "unable to map the machine's ids")
+			}
+		}
+		return nil
+	}
 
 	if current, err = user.Current(); err != nil {
 		return err

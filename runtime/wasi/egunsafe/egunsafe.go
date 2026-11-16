@@ -58,17 +58,6 @@ func DialControlSocket(ctx context.Context) (conn *grpc.ClientConn, err error) {
 	return NewControlSocket(&wasinet.Dialer{}).DialContext(ctx)
 }
 
-// DialMachineSocket dials the eg that booted the machine the module runs in, which runs modules in
-// machines beside it.
-func DialMachineSocket(ctx context.Context) (conn *grpc.ClientConn, err error) {
-	return grpc.DialContext(ctx, fmt.Sprintf("unix://%s", eg.MachineSocket), grpc.WithInsecure(), grpc.WithDialer(func(s string, d time.Duration) (net.Conn, error) {
-		dctx, done := context.WithTimeout(ctx, d)
-		defer done()
-		proto, address, _ := strings.Cut(s, "://")
-		return wasinet.DialContext(dctx, proto, address)
-	}))
-}
-
 // DialAnalyticsSocket dials the analytics (duckproxy) socket, for issuing
 // SQL against the host's analytics.db. Signature matches duckproxy.DialFunc.
 func DialAnalyticsSocket(ctx context.Context, network, addr string) (net.Conn, error) {

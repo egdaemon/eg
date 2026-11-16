@@ -39,6 +39,7 @@ import (
 	"github.com/egdaemon/eg/internal/userx"
 	"github.com/egdaemon/eg/internal/uuidx"
 	"github.com/egdaemon/eg/interp"
+	"github.com/egdaemon/eg/interp/c8s"
 	"github.com/egdaemon/eg/interp/c8sproxy"
 	"github.com/egdaemon/eg/interp/dbproxy/dbservice"
 	"github.com/egdaemon/eg/interp/environ"
@@ -283,13 +284,14 @@ func recordDiscoveredWorkloads(ctx context.Context, db *sql.DB, dir string, envi
 
 func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, environsecret *cmdopts.EnvironSecret) (err error) {
 	var (
-		ws      workspaces.Context
-		aid     = envx.String(uuidx.Nil().String(), eg.EnvComputeAccountID)
-		uid     = envx.String(uuidx.Nil().String(), eg.EnvComputeRunID)
-		descr   = envx.String("", eg.EnvComputeVCS)
-		hostnet = envx.Toggle(runners.AgentOptionCommandLine("--network", "host"), runners.AgentOptionNoop, envx.Boolean(false, eg.EnvExperimentalDisableHostNetwork)) // ipv4 group bullshit. pretty sure its a podman 4 issue that was resolved in podman 5. this is 'safe' to do because we are already in a container.
-		cc      grpc.ClientConnInterface
-		cmdenv  []string
+		ws        workspaces.Context
+		machinews workspaces.Context
+		aid       = envx.String(uuidx.Nil().String(), eg.EnvComputeAccountID)
+		uid       = envx.String(uuidx.Nil().String(), eg.EnvComputeRunID)
+		descr     = envx.String("", eg.EnvComputeVCS)
+		hostnet   = envx.Toggle(runners.AgentOptionCommandLine("--network", "host"), runners.AgentOptionNoop, envx.Boolean(false, eg.EnvExperimentalDisableHostNetwork)) // ipv4 group bullshit. pretty sure its a podman 4 issue that was resolved in podman 5. this is 'safe' to do because we are already in a container.
+		cc        grpc.ClientConnInterface
+		cmdenv    []string
 	)
 
 	// ensure when we run modules our umask is set to allow git clones to work properly
@@ -465,16 +467,27 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, environsecret
 			gpu,
 		)
 
-		c8sproxy.NewServiceProxy(
-			log.Default(),
-			ws,
-			c8sproxy.ServiceProxyOptionCommandEnviron(cmdenv...),
-			c8sproxy.ServiceProxyOptionContainerOptions(
-				ragent.Options()...,
+		// a machine keeps its upper in the workspace's root, here the repository's working directory, so
+		// the machines modules boot keep theirs on the disk of the machine or container running them.
+		machinews = ws
+		machinews.Root = "/var/tmp"
+
+		c8s.RegisterProxyServer(srv, runners.NewMachines(
+			c8sproxy.NewServiceProxy(
+				log.Default(),
+				ws,
+				c8sproxy.ServiceProxyOptionCommandEnviron(cmdenv...),
+				c8sproxy.ServiceProxyOptionContainerOptions(
+					ragent.Options()...,
+				),
+				// builds create their own network namespace as well, they take the options of hostnet.
+				c8sproxy.ServiceProxyOptionBuildOptions(runners.ZeroAgent(hostnet).Options()...),
 			),
-			// builds create their own network namespace as well, they take the options of hostnet.
-			c8sproxy.ServiceProxyOptionBuildOptions(runners.ZeroAgent(hostnet).Options()...),
-		).Bind(srv)
+			tlsc.DefaultClient(),
+			machinews,
+			log.Writer(),
+			runners.MachineOptionEGBin(errorsx.Must(exec.LookPath(os.Args[0]))),
+		))
 
 		go func() {
 			errorsx.Log(errorsx.Wrap(srv.Serve(control), "unable to serve control socket"))

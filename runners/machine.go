@@ -7,7 +7,6 @@ import (
 	"io"
 	"io/fs"
 	"log"
-	"net"
 	"net/http"
 	"os"
 	"os/exec"
@@ -32,13 +31,11 @@ import (
 	"github.com/egdaemon/eg/workspaces"
 	"github.com/moby/sys/user"
 	"github.com/opencontainers/go-digest"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 )
 
 // Machine runs a workload's modules in a machine booted from an egiso, with the workspace's
 // directories mounted where a container mounts them as volumes. Its modules run modules of their own
-// in machines it boots beside it, through eg.MachineSocket.
+// in machines it boots within it, as NewMachines boots them.
 type Machine struct {
 	ws        workspaces.Context
 	archive   *egiso.Archive
@@ -46,8 +43,6 @@ type Machine struct {
 	vm        *egvm.VM
 	environ   []string
 	moduleenv []string
-	siblings  *grpc.Server
-	dir       string
 }
 
 // MachineOption changes the machine NewMachine boots, as an AgentOption changes a container.
@@ -109,13 +104,12 @@ func MachineOptionNoop(*machineconfig) {}
 // upper kept in the workspace, and returns once its systemd finished booting.
 func NewMachine(ctx context.Context, c *http.Client, ws workspaces.Context, uri string, console io.Writer, options ...MachineOption) (_ *Machine, err error) {
 	var (
-		t        = &Machine{ws: ws, siblings: grpc.NewServer(grpc.Creds(insecure.NewCredentials()))} // this is a local socket
+		t        = &Machine{ws: ws}
 		config   = langx.Clone(machineconfig{}, options...)
 		upperdir string
 		copied   string
 		users    []egiso.Account
 		groups   []egiso.Account
-		siblings net.Listener
 	)
 	defer func() {
 		if err != nil {
@@ -155,19 +149,11 @@ func NewMachine(ctx context.Context, c *http.Client, ws workspaces.Context, uri 
 		config.vm = append(config.vm, egvm.OptionMountReadWrite(copied, o.path))
 	}
 
-	// a socket's path must fit the kernel's 108 bytes, which one in the workspace may not.
-	if t.dir, err = os.MkdirTemp("", "egmachine.*"); err != nil {
-		return nil, errorsx.Wrap(err, "unable to create the machine's directory")
+	// the machine boots machines of its own from its egiso, a path it finds where the host does.
+	if location, _, _ := strings.Cut(uri, "#"); !strings.HasPrefix(location, "https://") {
+		config.vm = append(config.vm, egvm.OptionMountReadOnly(filepath.Dir(location), filepath.Dir(location)))
 	}
-	if siblings, err = net.Listen("unix", filepath.Join(t.dir, "machine.socket")); err != nil {
-		return nil, errorsx.Wrap(err, "unable to listen for the machine's modules")
-	}
-	machines{c: c, ws: ws, uri: uri, console: console, options: options}.Bind(t.siblings)
-	go func() {
-		errorsx.Log(errorsx.Wrap(t.siblings.Serve(siblings), "unable to serve the machine's modules"))
-	}()
-	config.sockets = append(config.sockets, attachment{host: siblings.Addr().String(), path: eg.MachineSocket})
-	t.moduleenv = config.environ
+	t.moduleenv = append(config.environ, envx.Format(eg.EnvComputeEgiso, uri))
 
 	// the machine has the image's own accounts, so the image's files keep their owners. The host user
 	// owns what it writes in the workspace's directories, except the runtime directory, whose sockets
@@ -346,36 +332,43 @@ func (t *Machine) module(ctx context.Context, path string) (err error) {
 	}, egvm.ExecOptionStdin(os.Stdin), egvm.ExecOptionStdout(log.Writer()), egvm.ExecOptionStderr(log.Writer()))
 }
 
-// machines boots the machines a machine's modules ask for beside it, implementing c8s.Proxy's Module
-// as a machine runs it: a request's image is the uri of the egiso it boots, the machine's own when
-// blank, its module the path of the module in the workspace's build directory, and its options the
-// environment the module runs with. A machine beside it boots as it did, sharing its workspace and
-// container storage.
-type machines struct {
-	c8s.UnimplementedProxyServer
-	c       *http.Client
-	ws      workspaces.Context
-	uri     string
-	console io.Writer
-	options []MachineOption
+// NewMachines serves proxy's rpcs, and boots a machine for each module asked to run in one, as
+// egvm.New asks: a request whose image is the uri of an egiso, which carries its pin as its fragment,
+// or blank, for the egiso of the machine running the module, eg.EnvComputeEgiso. Its module is the
+// module's path in the runtime directory, and its options the environment the module runs with. Each
+// machine shares the workspace's directories, its upper kept in ws's root.
+func NewMachines(proxy c8s.ProxyServer, c *http.Client, ws workspaces.Context, console io.Writer, options ...MachineOption) c8s.ProxyServer {
+	return machines{ProxyServer: proxy, c: c, ws: ws, console: console, options: options}
 }
 
-func (t machines) Bind(host grpc.ServiceRegistrar) {
-	c8s.RegisterProxyServer(host, t)
+type machines struct {
+	c8s.ProxyServer
+	c       *http.Client
+	ws      workspaces.Context
+	console io.Writer
+	options []MachineOption
 }
 
 // Module implements c8s.ProxyServer.
 func (t machines) Module(ctx context.Context, req *c8s.ModuleRequest) (_ *c8s.ModuleResponse, err error) {
 	var (
-		sibling *Machine
+		m   *Machine
+		uri = stringsx.First(req.Image, envx.String("", eg.EnvComputeEgiso))
 	)
 
-	if sibling, err = NewMachine(ctx, t.c, t.ws, stringsx.First(req.Image, t.uri), t.console, append(slices.Clone(t.options), MachineOptionEnviron(req.Options...))...); err != nil {
+	if !stringsx.Blank(req.Image) && !strings.Contains(req.Image, "#") {
+		return t.ProxyServer.Module(ctx, req)
+	}
+	if stringsx.Blank(uri) {
+		return nil, errorsx.String("only a module running in a machine can boot one from its egiso")
+	}
+
+	if m, err = NewMachine(ctx, t.c, t.ws, uri, t.console, append(slices.Clone(t.options), MachineOptionEnviron(req.Options...))...); err != nil {
 		return nil, err
 	}
-	defer func() { err = errorsx.Compact(err, sibling.Close()) }()
+	defer func() { err = errorsx.Compact(err, m.Close()) }()
 
-	if err = sibling.module(ctx, eg.DefaultMountRoot(eg.RuntimeDirectory, req.Module)); err != nil {
+	if err = m.module(ctx, eg.DefaultMountRoot(eg.RuntimeDirectory, req.Module)); err != nil {
 		return nil, err
 	}
 	return &c8s.ModuleResponse{}, nil
@@ -384,12 +377,8 @@ func (t machines) Module(ctx context.Context, req *c8s.ModuleRequest) (_ *c8s.Mo
 // Close shuts the machine down and releases its egiso.
 func (t *Machine) Close() error {
 	var errs []error
-	t.siblings.GracefulStop()
 	if t.vm != nil {
 		errs = append(errs, t.vm.Close())
-	}
-	if t.dir != "" {
-		errs = append(errs, os.RemoveAll(t.dir))
 	}
 	if t.upper != nil {
 		errs = append(errs, t.upper.Close())

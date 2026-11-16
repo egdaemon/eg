@@ -130,20 +130,19 @@ func boot(root string, rootinit string, netns string, authorized string, ruleset
 	if err = mountat("tmpfs", filepath.Join(root, "run"), "tmpfs", unix.MS_NOSUID|unix.MS_NODEV, "mode=755"); err != nil {
 		return err
 	}
+	// the image's own tmpfiles claim /etc/resolv.conf for resolved, so the machine binds pasta's
+	// forwarder over it, as podman binds a container's.
+	if err = os.WriteFile(filepath.Join(root, "run", "resolv.conf"), []byte("nameserver "+dnsforward+"\n"), 0644); err != nil {
+		return err
+	}
+	if err = share(filepath.Join(root, "run", "resolv.conf"), filepath.Join(root, "etc", "resolv.conf"), sharerw); err != nil {
+		return err
+	}
 	if err = os.MkdirAll(filepath.Join(root, credentials), 0700); err != nil {
 		return err
 	}
-	for _, c := range []struct {
-		name  string
-		value string
-	}{
-		{name: "tmpfiles.extra", value: resolvlink},
-		{name: "network.dns", value: dnsforward},
-		{name: "ssh.ephemeral-authorized_keys-all", value: authorized},
-	} {
-		if err = os.WriteFile(filepath.Join(root, credentials, c.name), []byte(c.value), 0400); err != nil {
-			return err
-		}
+	if err = os.WriteFile(filepath.Join(root, credentials, "ssh.ephemeral-authorized_keys-all"), []byte(authorized), 0400); err != nil {
+		return err
 	}
 	for i := 0; i+2 < len(shares); i += 3 {
 		if err = share(shares[i], filepath.Join(root, shares[i+1]), shares[i+2]); err != nil {

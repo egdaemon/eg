@@ -151,6 +151,11 @@ func TestExec(t *testing.T) {
 		require.Equal(t, int32(28), code, stderr)
 	})
 
+	t.Run("resolves names without resolved, which the default image masks", func(t *testing.T) {
+		code, _, stderr := run(t, t.Context(), nil, "sh", "-c", "systemctl stop systemd-resolved; getent hosts github.com")
+		require.Equal(t, int32(0), code, stderr)
+	})
+
 	t.Run("keeps its firewall out of root's reach", func(t *testing.T) {
 		code, _, stderr := run(t, t.Context(), nil, "nft", "flush", "ruleset")
 		require.NotEqual(t, int32(0), code)

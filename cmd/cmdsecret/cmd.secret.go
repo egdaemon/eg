@@ -17,6 +17,7 @@ type SecretCmd struct {
 	Read   CmdRead   `cmd:"" help:"Read secrets from various schemes."`
 	Create CmdCreate `cmd:"" help:"Create or replace secrets for various schemes."`
 	Edit   CmdEdit   `cmd:"" help:"Interactively edit a secret using $EDITOR."`
+	Cp     CmdCp     `cmd:"" help:"Copy a secret from one URI to another, across schemes if needed."`
 	B64    CmdB64    `cmd:"" name:"b64" help:"Base64 URL encode stdin and write the result to stdout or a file."`
 	Env    CmdEnv    `cmd:"" name:"env" help:"Run a command with environment variables loaded from secret URIs."`
 }

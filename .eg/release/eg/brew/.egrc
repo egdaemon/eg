@@ -1,0 +1,3 @@
+# macosx has no cloud vms, so this workload runs on the host.
+[baremetal]
+--no-podman

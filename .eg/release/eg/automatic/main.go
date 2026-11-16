@@ -25,7 +25,7 @@ func main() {
 	defer done()
 
 	uploads := egpool.New(4, func(cmd string) eg.OpFn {
-		return shell.Op(shell.Env().New(cmd).Attempts(3))
+		return shell.Op(shell.Env().New(cmd).Attempts(3).Debug())
 	})
 
 	err := eg.Perform(

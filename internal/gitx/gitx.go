@@ -45,6 +45,9 @@ import (
 	"github.com/egdaemon/eg/internal/userx"
 )
 
+// CloneBaseRef is the ref within a clone made by LocalClone naming the commit it started at.
+const CloneBaseRef = "refs/eg/base"
+
 func DetectRoot() string {
 	return filepath.Dir(fsx.Locate(".git"))
 }
@@ -223,7 +226,24 @@ func LocalClone(ctx context.Context, repo, dir, basetreeish, headtreeish string)
 		}
 	}
 
+	// record the commit the clone started at, commits made within the clone move HEAD so it is the only way
+	// to tell them apart from the history that was cloned, see CloneBase.
+	if _, err = run("-C", dir, "update-ref", CloneBaseRef, head); err != nil {
+		return errorsx.Wrapf(err, "unable to record the clone base: %s", dir)
+	}
+
 	return nil
+}
+
+// CloneBase returns the commit the clone at dir started at, blank when it isn't known,
+// e.g.) the clone wasn't made by LocalClone.
+func CloneBase(ctx context.Context, dir string) string {
+	out, err := execx.RunAs(ctx, RepositoryUsername(dir), "git", "-C", dir, "rev-parse", "--verify", "--quiet", CloneBaseRef+"^{commit}").Output()
+	if err != nil {
+		return ""
+	}
+
+	return strings.TrimSpace(string(out))
 }
 
 // DefaultBase finds the base branch of repo, the one workloads are compared against, and the commit it is at.
@@ -1106,16 +1126,11 @@ func Bearer(dir string) string {
 // e.g.) the changes a workload made, which would otherwise be lost with the clone. new files
 // are included. the patch is empty if there are no changes, or if clonedir is not a separate clone,
 // the clone is not usable afterwards.
+//
+// commits made within the clone are not part of the patch, it is relative to the clone's HEAD, see AutoPatch.
 func Changes(ctx context.Context, clonedir string, repodir string) ([]byte, error) {
-	if !IsRepository(clonedir) {
+	if !isSeparateClone(clonedir, repodir) {
 		return nil, nil
-	}
-
-	// directories that aren't repositories are symlinked instead of cloned.
-	if resolved, err := filepath.EvalSymlinks(clonedir); err == nil {
-		if original, err := filepath.EvalSymlinks(repodir); err == nil && resolved == original {
-			return nil, nil
-		}
 	}
 
 	username := RepositoryUsername(clonedir)
@@ -1131,4 +1146,20 @@ func Changes(ctx context.Context, clonedir string, repodir string) ([]byte, erro
 	}
 
 	return patch, nil
+}
+
+// isSeparateClone reports whether clonedir is a repository that is not repodir itself.
+// directories that aren't repositories are symlinked instead of cloned.
+func isSeparateClone(clonedir string, repodir string) bool {
+	if !IsRepository(clonedir) {
+		return false
+	}
+
+	if resolved, err := filepath.EvalSymlinks(clonedir); err == nil {
+		if original, err := filepath.EvalSymlinks(repodir); err == nil && resolved == original {
+			return false
+		}
+	}
+
+	return true
 }

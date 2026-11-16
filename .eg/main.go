@@ -85,9 +85,9 @@ func IntegrationTests(ctx context.Context, op eg.Op) error {
 			// regression: chdir /workload/.eg.cache: no such file or directory
 			runtime.Newf("%s --hotswap compute baremetal --no-podman tests/baremetal", egbin),
 			runtime.Newf("%s --hotswap compute baremetal tests/baremetal-virtualization", egbin),
-			// runtime.New("/home/egd/go/bin/eg compute baremetal -vvvv tests/tty"),
-			// runtime.New("/home/egd/go/bin/eg compute baremetal tests/containers"),
-			// runtime.New("/home/egd/go/bin/eg compute baremetal -vv tests/gpgagent"),
+			// runtime.Newf("%s --hotswap compute baremetal -vvvv tests/tty", egbin),
+			// runtime.Newf("%s --hotswap compute baremetal tests/containers", egbin),
+			// runtime.Newf("%s --hotswap compute baremetal -vv tests/gpgagent", egbin),
 		),
 	)
 }

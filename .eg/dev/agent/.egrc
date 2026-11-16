@@ -1,0 +1,3 @@
+# the arguments of this workload, one per line. a [mode] header declares a mode it supports: local, upload, serve or baremetal.
+[serve]
+--ttl=8h

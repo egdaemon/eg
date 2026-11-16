@@ -106,6 +106,38 @@ func TestDuration(t *testing.T) {
 	require.Equal(t, time.Second, envx.Duration(time.Second, "missing-key-duration"))
 }
 
+func TestList(t *testing.T) {
+	t.Run("splits on commas and whitespace and drops blanks", func(t *testing.T) {
+		const key = "c9d0e1f2-a3b4-4567-cdef-789012345678"
+		t.Setenv(key, " a.service,b.mount ,, c.socket\td.path\n")
+		require.Equal(t, []string{"a.service", "b.mount", "c.socket", "d.path"}, envx.List(envx.New(""), key))
+	})
+
+	t.Run("the first key with a value wins", func(t *testing.T) {
+		const blank, set, other = "d0e1f2a3-b4c5-4678-def0-890123456789", "e1f2a3b4-c5d6-4789-ef01-901234567890", "f2a3b4c5-d6e7-4890-f012-012345678901"
+		t.Setenv(blank, " , ")
+		t.Setenv(set, "a,b")
+		t.Setenv(other, "c")
+		require.Equal(t, []string{"a", "b"}, envx.List(envx.New(""), "missing-key-list", blank, set, other))
+	})
+
+	t.Run("is nil when no key has a value", func(t *testing.T) {
+		require.Nil(t, envx.List(envx.New("default"), "missing-key-list"))
+	})
+
+	t.Run("parses each element with the reader", func(t *testing.T) {
+		const key = "a3b4c5d6-e7f8-4901-a123-123456789012"
+		t.Setenv(key, "1s, 2m")
+		require.Equal(t, []time.Duration{time.Second, 2 * time.Minute}, envx.List(envx.NewDuration(0), key))
+	})
+
+	t.Run("skips invalid elements", func(t *testing.T) {
+		const key = "b4c5d6e7-f8a9-4012-b234-234567890123"
+		t.Setenv(key, "1s,nope,3s")
+		require.Equal(t, []time.Duration{time.Second, 3 * time.Second}, envx.List(envx.NewDuration(0), key))
+	})
+}
+
 func TestHex(t *testing.T) {
 	const key = "a7b8c9d0-e1f2-3456-abcd-567890123456"
 	raw := []byte{0xde, 0xad, 0xbe, 0xef}

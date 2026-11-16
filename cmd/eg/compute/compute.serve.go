@@ -15,7 +15,6 @@ import (
 	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/cmd/cmdopts"
 	"github.com/egdaemon/eg/compile"
-	"github.com/egdaemon/eg/internal/asynccompute"
 	"github.com/egdaemon/eg/internal/debugx"
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
@@ -190,26 +189,22 @@ func (t serve) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath, sessio
 	registered, done := session.New(clidb).Branch(session.Branch, defaultbranch(t.Name, uid)).SSH(t.SSH, t.SSHKeyPath).Agent(true).Patch(t.AutoPatch).Register(ctx, uid, t.Name, t.Dir)
 	defer func() { done(err) }()
 
+	err = errorsx.Wrap(rt.Do(gctx.Context, module), "module execution failed")
+
+	log.Println("--------------------------------------------------------------------------")
+	log.Println("autopatch", t.AutoPatch)
+	log.Println("branch", registered.Branch)
+	log.Println("from", ws.WorkingDir)
+	log.Println("to", t.Dir)
 	// a served workload ends when its container is stopped, which is not a failure of the work done inside it,
 	// so the changes are collected however the modules ended. the run's context is likely cancelled by then.
-	defer func() {
-		perr := gitx.AutoPatch(os.Stdout).From(ws.WorkingDir).To(t.Dir).Branch(registered.Branch).DryRun(!t.AutoPatch).Apply(context.WithoutCancel(gctx.Context))
-
-		if perr != nil {
-			log.Println("unable to apply the workload's changes to the worktree", perr)
-			err = errorsx.Compact(err, perr)
-		}
-	}()
-
-	pool := asynccompute.New(func(_ context.Context, m transpile.Compiled) error {
-		return errorsx.Wrap(rt.Do(gctx.Context, m), "module execution failed")
-	}, asynccompute.Compose(asynccompute.Workers[transpile.Compiled](1), asynccompute.Backlog[transpile.Compiled](1)))
-
-	if err = pool.Run(gctx.Context, module); err != nil {
-		return err
+	if perr := gitx.AutoPatch(os.Stdout).From(ws.WorkingDir).To(t.Dir).Branch(registered.Branch).DryRun(!t.AutoPatch).Apply(context.WithoutCancel(gctx.Context)); perr != nil {
+		log.Println("unable to apply the workload's changes to the worktree", perr)
+		err = errorsx.Compact(err, perr)
 	}
+	log.Println("--------------------------------------------------------------------------")
 
-	return pool.Close()
+	return err
 }
 
 // podman prepares the container the served module runs in, built from the workload's Containerfile.

@@ -25,6 +25,7 @@ import (
 	"github.com/egdaemon/eg/internal/langx"
 	"github.com/egdaemon/eg/internal/slicesx"
 	"github.com/egdaemon/eg/internal/stringsx"
+	"github.com/egdaemon/eg/internal/userx"
 	"github.com/egdaemon/eg/interp/c8s"
 	"github.com/egdaemon/eg/interp/execproxy"
 	"github.com/egdaemon/eg/transpile"
@@ -43,6 +44,7 @@ type Machine struct {
 	vm        *egvm.VM
 	environ   []string
 	moduleenv []string
+	dir       string
 }
 
 // MachineOption changes the machine NewMachine boots, as an AgentOption changes a container.
@@ -101,11 +103,12 @@ func MachineOptionEGBin(egbin string) MachineOption {
 func MachineOptionNoop(*machineconfig) {}
 
 // NewMachine boots a machine from the egiso uri names, as egiso.OpenURI opens it, under a writable
-// upper kept in the workspace, and returns once its systemd finished booting.
+// upper kept in the user's cache until it closes, and returns once its systemd finished booting.
 func NewMachine(ctx context.Context, c *http.Client, ws workspaces.Context, uri string, console io.Writer, options ...MachineOption) (_ *Machine, err error) {
 	var (
 		t        = &Machine{ws: ws}
 		config   = langx.Clone(machineconfig{}, options...)
+		cache    = userx.DefaultCacheDirectory("egvm")
 		upperdir string
 		copied   string
 		users    []egiso.Account
@@ -121,7 +124,16 @@ func NewMachine(ctx context.Context, c *http.Client, ws workspaces.Context, uri 
 		return nil, err
 	}
 
-	if upperdir, err = os.MkdirTemp(ws.Root, "vm.*"); err != nil {
+	// the workspace's root in a machine is the repository, so the machine's files go in the cache of
+	// whoever boots it, as compute local keeps a machine's container storage.
+	if err = os.MkdirAll(cache, 0700); err != nil {
+		return nil, errorsx.Wrap(err, "unable to create the machines' cache")
+	}
+	if t.dir, err = os.MkdirTemp(cache, "machine.*"); err != nil {
+		return nil, errorsx.Wrap(err, "unable to create the machine's directory")
+	}
+	upperdir = filepath.Join(t.dir, "upper")
+	if err = os.Mkdir(upperdir, 0700); err != nil {
 		return nil, errorsx.Wrap(err, "unable to create the machine's upper")
 	}
 
@@ -137,10 +149,10 @@ func NewMachine(ctx context.Context, c *http.Client, ws workspaces.Context, uri 
 		return nil, err
 	}
 
-	// the machine's tmpfiles empty /eg.mnt of all but its mounts, so an overlay is a copy in the
-	// workspace mounted in its place.
+	// the machine's tmpfiles empty /eg.mnt of all but its mounts, so an overlay is a copy mounted in
+	// its place.
 	for _, o := range config.overlays {
-		if copied, err = os.MkdirTemp(ws.Root, "overlay.*"); err != nil {
+		if copied, err = os.MkdirTemp(t.dir, "overlay.*"); err != nil {
 			return nil, errorsx.Wrapf(err, "unable to create the overlay of %s", o.host)
 		}
 		if err = fsx.CloneTree(ctx, copied, filepath.Base(o.host), os.DirFS(filepath.Dir(o.host))); err != nil {
@@ -336,7 +348,7 @@ func (t *Machine) module(ctx context.Context, path string) (err error) {
 // egvm.New asks: a request whose image is the uri of an egiso, which carries its pin as its fragment,
 // or blank, for the egiso of the machine running the module, eg.EnvComputeEgiso. Its module is the
 // module's path in the runtime directory, and its options the environment the module runs with. Each
-// machine shares the workspace's directories, its upper kept in ws's root.
+// machine shares the workspace's directories.
 func NewMachines(proxy c8s.ProxyServer, c *http.Client, ws workspaces.Context, console io.Writer, options ...MachineOption) c8s.ProxyServer {
 	return machines{ProxyServer: proxy, c: c, ws: ws, console: console, options: options}
 }
@@ -374,7 +386,7 @@ func (t machines) Module(ctx context.Context, req *c8s.ModuleRequest) (_ *c8s.Mo
 	return &c8s.ModuleResponse{}, nil
 }
 
-// Close shuts the machine down and releases its egiso.
+// Close shuts the machine down, removes its upper and releases its egiso.
 func (t *Machine) Close() error {
 	var errs []error
 	if t.vm != nil {
@@ -382,6 +394,9 @@ func (t *Machine) Close() error {
 	}
 	if t.upper != nil {
 		errs = append(errs, t.upper.Close())
+	}
+	if t.dir != "" {
+		errs = append(errs, fsx.RemoveAll(t.dir))
 	}
 	if t.archive != nil {
 		errs = append(errs, t.archive.Close())

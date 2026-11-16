@@ -298,6 +298,50 @@ func User(dir string) (name, email string) {
 		envx.String(email, "GIT_AUTHOR_EMAIL", "GIT_COMMITTER_EMAIL")
 }
 
+// UserEnv the environment that makes git commit as the configured user for the repository, workloads run
+// without a git config of their own. it uses GIT_CONFIG_* instead of GIT_AUTHOR_* so a workload can still
+// override the identity with `git -c`. empty when no identity is configured or the environment already
+// defines GIT_CONFIG_COUNT.
+func UserEnv(repo *git.Repository) (env []string) {
+	if _, set := os.LookupEnv("GIT_CONFIG_COUNT"); set {
+		return nil
+	}
+
+	var name, email string
+
+	if cfg, err := config.LoadConfig(config.GlobalScope); err == nil {
+		name, email = cfg.User.Name, cfg.User.Email
+	}
+
+	if cfg, err := repo.Config(); err == nil {
+		name = stringsx.FirstNonBlank(cfg.User.Name, name)
+		email = stringsx.FirstNonBlank(cfg.User.Email, email)
+	}
+
+	name = envx.String(name, "GIT_AUTHOR_NAME", "GIT_COMMITTER_NAME")
+	email = envx.String(email, "GIT_AUTHOR_EMAIL", "GIT_COMMITTER_EMAIL")
+
+	var kv []string
+	if stringsx.Present(name) {
+		kv = append(kv, "user.name", name)
+	}
+
+	if stringsx.Present(email) {
+		kv = append(kv, "user.email", email)
+	}
+
+	if len(kv) == 0 {
+		return nil
+	}
+
+	env = append(env, fmt.Sprintf("GIT_CONFIG_COUNT=%d", len(kv)/2))
+	for i := 0; i < len(kv); i += 2 {
+		env = append(env, fmt.Sprintf("GIT_CONFIG_KEY_%d=%s", i/2, kv[i]), fmt.Sprintf("GIT_CONFIG_VALUE_%d=%s", i/2, kv[i+1]))
+	}
+
+	return env
+}
+
 // RepositoryUsername returns the username owning the repository at path,
 // falling back to the current user when it can't be determined.
 func RepositoryUsername(path string) string {
@@ -696,7 +740,7 @@ func Env(repo *git.Repository, remote string, branch string, vcsclone string) (e
 		return nil, errorsx.Wrapf(err, "base env: %s", uri)
 	}
 
-	return append(env, benv...), nil
+	return append(append(env, benv...), UserEnv(repo)...), nil
 }
 
 // ideally we shouldn't need this but unfortunately go-git doesn't apply 'instead of' rules properly.
@@ -720,6 +764,7 @@ func LocalEnv(repo *git.Repository, remote string, branch string) (env []string,
 	}
 
 	env = append(env, benv...)
+	env = append(env, UserEnv(repo)...)
 	if encoded := envx.Format(eg.EnvComputeVCS, uri); encoded != "" {
 		env = append(env, encoded)
 	}

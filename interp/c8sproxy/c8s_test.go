@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"os"
 	"os/exec"
 	"testing"
 	"time"
@@ -92,6 +93,11 @@ func TestCleanup(t *testing.T) {
 
 		if _, err := exec.LookPath("podman"); err != nil {
 			t.Skip("podman is not available")
+		}
+
+		// publishing a port makes rootless podman start pasta, which needs a tap device.
+		if _, err := os.Stat("/dev/net/tun"); err != nil {
+			t.Skip("/dev/net/tun is not available, required by pasta to publish ports")
 		}
 
 		// an unused port, so a leaked container from another run or a real workload doesn't interfere.

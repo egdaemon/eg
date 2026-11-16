@@ -286,8 +286,8 @@ func network(root string, rootinit string, ruleset string) (err error) {
 	}
 
 	// binding a privileged port or pinging needs a capability in this user namespace, which the machine
-	// does not hold, so the network namespace lets any user bind one and root ping, as podman sets
-	// its containers' namespaces.
+	// does not hold, so the network namespace lets any user bind one, as docker sets its containers',
+	// and root ping, as podman's containers.conf sets them.
 	for _, s := range []struct {
 		name  string
 		value string

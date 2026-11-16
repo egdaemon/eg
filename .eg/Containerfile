@@ -35,4 +35,7 @@ RUN which protoc-gen-go
 RUN systemd-tmpfiles --create
 RUN systemd-tmpfiles --clean
 
+RUN apt-get -y install openssh-server npm
+RUN npm install -g @anthropic-ai/claude-code
+
 CMD /usr/sbin/init

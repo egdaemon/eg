@@ -262,7 +262,7 @@ func NewQueued(ctx context.Context, cid hash.Hash, cwd string, name string, opti
 
 func New(ctx context.Context, cid hash.Hash, cwd string, root string, name string, options ...Option) (zero Context, err error) {
 	ignore := ignoredir{path: eg.CacheDirectory, reason: "cache directory"}
-	if err := os.MkdirAll(root, 0700); err != nil {
+	if err := os.MkdirAll(root, 0710); err != nil {
 		return zero, errorsx.Wrapf(err, "unable to ensure root directory: %s", root)
 	}
 

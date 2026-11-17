@@ -23,7 +23,7 @@ func Inherited(ctx context.Context) ([]string, error) {
 		return nil, nil
 	}
 
-	conn, err := egunsafe.NewControlSocket(&net.Dialer{}).DialContext(ctx)
+	conn, err := egunsafe.NewModuleSocket(&net.Dialer{}).DialContext(ctx)
 	if err != nil {
 		return nil, errorsx.Wrap(err, "unable to dial the control socket")
 	}

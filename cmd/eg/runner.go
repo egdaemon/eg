@@ -327,6 +327,12 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, environsecret
 		"PAGER", "cat", // no paging in this environmenet.
 	)
 
+	// authenticates the module's commands to the environ service of this module's socket, see interp/environ.
+	environtoken, err := environ.NewToken(environsecret.Source(), uid, envx.Duration(time.Hour, eg.EnvComputeTTL))
+	if err != nil {
+		return errorsx.Wrap(err, "unable to generate environ token")
+	}
+
 	if mlevel := envx.Int(0, eg.EnvComputeModuleNestedLevel); mlevel == 0 {
 		var (
 			control   net.Listener
@@ -401,11 +407,6 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, environsecret
 				log.Println("duckpgwire:", err)
 			}
 		}()
-
-		environtoken, err := environ.NewToken(environsecret.Source(), uid, envx.Duration(time.Hour, eg.EnvComputeTTL))
-		if err != nil {
-			return errorsx.Wrap(err, "unable to generate environ token")
-		}
 
 		cmdenvb = cmdenvb.Var(
 			eg.EnvComputeModuleSocket, eg.DefaultMountRoot(eg.RuntimeDirectory, filepath.Base(cspath)),
@@ -516,6 +517,8 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, environsecret
 
 		cmdenvb = cmdenvb.Var(
 			eg.EnvComputeModuleSocket, eg.DefaultMountRoot(eg.RuntimeDirectory, filepath.Base(mspath)),
+		).Var(
+			eg.EnvComputeEnvironToken, environtoken,
 		).FromEnviron(
 			os.Environ()...,
 		)
@@ -525,6 +528,7 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, environsecret
 		}
 
 		execproxy.Auto(gctx.Context, t.Dir, t.RuntimeDir, cmdenv).Bind(srv)
+		environ.NewService(filepath.Join(t.RuntimeDir, eg.EnvironFile), environsecret.Source()).Bind(srv)
 		go func() {
 			errorsx.Log(errorsx.Wrap(srv.Serve(control), "unable to serve control socket"))
 		}()

@@ -121,10 +121,8 @@ func (t local) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, hotswapbin *cm
 	canonicaluri := errorsx.Zero(gitx.CanonicalURI(repo, t.GitRemote))
 
 	// the environment the enclosing workload was provided, everything below overrides it.
-	inherited, err := environ.Inherited(gctx.Context)
-	if err != nil {
-		return err
-	}
+	inherited, ierr := environ.Inherited(gctx.Context)
+	errorsx.Log(errorsx.Wrap(ierr, "warning: unable to inherit the workload environment, continuing without it"))
 
 	envb := envx.Build().
 		FromEnviron(inherited...).

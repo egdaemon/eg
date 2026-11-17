@@ -31,18 +31,26 @@ type dialer interface {
 
 // NewControlSocket the control socket, in the runtime directory, dialed with the given dialer.
 func NewControlSocket(d dialer) ControlSocket {
-	return ControlSocket{d: d}
+	return ControlSocket{d: d, path: func() string { return RuntimeDirectory(eg.SocketControl) }}
+}
+
+// NewModuleSocket the socket of the module, the one advertised to its commands by EG_COMPUTE_MODULE_SOCKET,
+// dialed with the given dialer. it is the control socket for the root module.
+func NewModuleSocket(d dialer) ControlSocket {
+	return ControlSocket{d: d, path: func() string {
+		return envx.String(RuntimeDirectory(eg.SocketControl), eg.EnvComputeModuleSocket)
+	}}
 }
 
 type ControlSocket struct {
-	d dialer
+	d    dialer
+	path func() string
 }
 
-// DialContext dials the control socket for executing various functionality that is too slow or impedes concurrency.
+// DialContext dials the socket for executing various functionality that is too slow or impedes concurrency.
 // the options are applied after the defaults (insecure, the socket's dialer) and so can override them.
 func (t ControlSocket) DialContext(ctx context.Context, options ...grpc.DialOption) (conn *grpc.ClientConn, err error) {
-	cspath := RuntimeDirectory(eg.SocketControl)
-	return grpc.DialContext(ctx, fmt.Sprintf("unix://%s", cspath), append([]grpc.DialOption{
+	return grpc.DialContext(ctx, fmt.Sprintf("unix://%s", t.path()), append([]grpc.DialOption{
 		grpc.WithInsecure(),
 		grpc.WithDialer(func(s string, d time.Duration) (net.Conn, error) {
 			dctx, done := context.WithTimeout(ctx, d)

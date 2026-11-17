@@ -10,15 +10,25 @@ import (
 	"time"
 )
 
-// NewUnixClient returns an http.Client that dials the gdx debug socket at path.
-func NewUnixClient(path string) *http.Client {
+// DialFunc establishes the connection to a gdx debug surface. the network and address are those of
+// the request url, which for gdx carries no meaning of its own, implementations choose the destination.
+type DialFunc func(ctx context.Context, network, addr string) (net.Conn, error)
+
+// NewClient returns an http.Client that reaches the gdx debug surface through dial, allowing the surface
+// to be served over any transport (e.g. a multiplexed or authenticated connection) not just a unix socket.
+func NewClient(dial DialFunc) *http.Client {
 	return &http.Client{
 		Transport: &http.Transport{
-			DialContext: func(ctx context.Context, _, _ string) (net.Conn, error) {
-				return (&net.Dialer{}).DialContext(ctx, "unix", path)
-			},
+			DialContext: dial,
 		},
 	}
+}
+
+// NewUnixClient returns an http.Client that dials the gdx debug socket at path.
+func NewUnixClient(path string) *http.Client {
+	return NewClient(func(ctx context.Context, _, _ string) (net.Conn, error) {
+		return (&net.Dialer{}).DialContext(ctx, "unix", path)
+	})
 }
 
 // Fetch issues a GET against urlPath?duration=<seconds> (converting duration
@@ -37,13 +47,13 @@ func Fetch(ctx context.Context, c *http.Client, urlPath string, duration time.Du
 
 	resp, err := c.Do(req)
 	if err != nil {
-		return fmt.Errorf("unable to reach gdx debug socket: %w", err)
+		return fmt.Errorf("unable to reach gdx debug endpoint: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		body, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("gdx debug socket returned %d: %s", resp.StatusCode, string(body))
+		return fmt.Errorf("gdx debug endpoint returned %d: %s", resp.StatusCode, string(body))
 	}
 
 	if _, err := io.Copy(out, resp.Body); err != nil {

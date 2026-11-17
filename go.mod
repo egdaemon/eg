@@ -25,8 +25,8 @@ require (
 	github.com/duckdb/duckdb-go/v2 v2.10503.1
 	github.com/dustin/go-humanize v1.1.0
 	github.com/egdaemon/duckproxy v0.0.0-20261114115105-8cd7c751218f
-	github.com/egdaemon/gdx v0.0.0-20261106002238-59fe7b8df603
-	github.com/egdaemon/gdx/konggdx v0.0.0-20261106002238-59fe7b8df603
+	github.com/egdaemon/gdx v0.0.0-20261115232526-a70109276a78
+	github.com/egdaemon/gdx/konggdx v0.0.0-20261115232526-a70109276a78
 	github.com/egdaemon/sh/v3 v3.14.1-0.20261103040545-e33e887fd27a
 	github.com/egdaemon/sh/x v0.0.0-20261105220106-700f29e4a1a9
 	github.com/egdaemon/wasinet/wasinet v0.0.0-20261103201433-2f9a9bae892d

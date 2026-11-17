@@ -40,6 +40,9 @@ func TestInheritedEnviron(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Setenv(eg.EnvComputeRuntimeDirectory, dir)
+	// inside a workload this is set and takes precedence over the runtime directory,
+	// which would dial the real daemon rather than the test server.
+	t.Setenv(eg.EnvComputeModuleSocket, filepath.Join(dir, eg.SocketControl))
 	t.Setenv(eg.EnvComputeEnvironToken, token)
 
 	got, err := environ.Inherited(t.Context())

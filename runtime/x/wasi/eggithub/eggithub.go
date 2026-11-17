@@ -105,17 +105,18 @@ func (t options) Attempts(n int16) options {
 
 // create returns the base command with the environment the gh commands require, including the
 // title and notes so gh never prompts when a tty is available.
-func (t options) create(v string) (shell.Command, int16) {
+func (t options) create(v string) shell.Command {
 	c := langx.Clone(release{
 		title:    v,
 		attempts: 3,
 	}, t...)
 
 	return shell.Runtime().
+		Attempts(c.attempts).
 		Environ(_eg.EnvGithubToken, ffigit.Bearer()).
 		Environ("EGGITHUB_RELEASE_NOTES", c.notes).
 		Environ("EGGITHUB_RELEASE_TITLE", c.title).
-		Timeout(egenv.TTL()), c.attempts
+		Timeout(egenv.TTL())
 }
 
 // Draft creates (or reuses) the draft release and uploads the patterns to it.
@@ -123,12 +124,12 @@ func (t options) create(v string) (shell.Command, int16) {
 func (t options) Draft(patterns ...string) eg.OpFn {
 	return func(ctx context.Context, o eg.Op) error {
 		version := PatternVersion()
-		runtime, attempts := t.create(version)
+		runtime := t.create(version)
 
 		if shell.Run(ctx, runtime.Newf("gh release view %s", version)) != nil {
 			return shell.Run(
 				ctx,
-				runtime.Attempts(attempts).Newf(
+				runtime.Newf(
 					`gh release create --draft --target %s --title "$EGGITHUB_RELEASE_TITLE" ${EGGITHUB_RELEASE_NOTES:+--notes "$EGGITHUB_RELEASE_NOTES"} $([ -z "$EGGITHUB_RELEASE_NOTES" ] && echo --generate-notes) %s %s`,
 					eggit.EnvCommit().Hash.String(), version, strings.Join(patterns, " "),
 				),
@@ -139,7 +140,7 @@ func (t options) Draft(patterns ...string) eg.OpFn {
 			return nil
 		}
 
-		return UploadRuntime(runtime.Attempts(attempts), version, patterns...)(ctx, o)
+		return UploadRuntime(runtime, version, patterns...)(ctx, o)
 	}
 }
 

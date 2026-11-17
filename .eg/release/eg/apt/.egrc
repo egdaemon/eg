@@ -1,0 +1,4 @@
+# the arguments eg compute local uses for this workload, one per line.
+[local]
+--gcp-auto
+--secret=gcpsm://egd-esuite/release-env

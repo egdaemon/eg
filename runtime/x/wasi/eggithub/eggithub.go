@@ -70,8 +70,9 @@ func Draft(patterns ...string) eg.OpFn {
 }
 
 type release struct {
-	title string
-	notes string
+	title    string
+	notes    string
+	attempts int16
 }
 
 type option = func(*release)
@@ -95,18 +96,26 @@ func (t options) Notes(s string) options {
 	})
 }
 
+// override the number of attempts for creating the release and uploading assets, defaults to 3.
+func (t options) Attempts(n int16) options {
+	return append(t, func(o *release) {
+		o.attempts = n
+	})
+}
+
 // create returns the base command with the environment the gh commands require, including the
 // title and notes so gh never prompts when a tty is available.
-func (t options) create(v string) shell.Command {
+func (t options) create(v string) (shell.Command, int16) {
 	c := langx.Clone(release{
-		title: v,
+		title:    v,
+		attempts: 3,
 	}, t...)
 
 	return shell.Runtime().
 		Environ(_eg.EnvGithubToken, ffigit.Bearer()).
 		Environ("EGGITHUB_RELEASE_NOTES", c.notes).
 		Environ("EGGITHUB_RELEASE_TITLE", c.title).
-		Timeout(egenv.TTL())
+		Timeout(egenv.TTL()), c.attempts
 }
 
 // Draft creates (or reuses) the draft release and uploads the patterns to it.
@@ -114,12 +123,12 @@ func (t options) create(v string) shell.Command {
 func (t options) Draft(patterns ...string) eg.OpFn {
 	return func(ctx context.Context, o eg.Op) error {
 		version := PatternVersion()
-		runtime := t.create(version)
+		runtime, attempts := t.create(version)
 
 		if shell.Run(ctx, runtime.Newf("gh release view %s", version)) != nil {
 			return shell.Run(
 				ctx,
-				runtime.Newf(
+				runtime.Attempts(attempts).Newf(
 					`gh release create --draft --target %s --title "$EGGITHUB_RELEASE_TITLE" ${EGGITHUB_RELEASE_NOTES:+--notes "$EGGITHUB_RELEASE_NOTES"} $([ -z "$EGGITHUB_RELEASE_NOTES" ] && echo --generate-notes) %s %s`,
 					eggit.EnvCommit().Hash.String(), version, strings.Join(patterns, " "),
 				),
@@ -130,7 +139,7 @@ func (t options) Draft(patterns ...string) eg.OpFn {
 			return nil
 		}
 
-		return UploadRuntime(runtime, version, patterns...)(ctx, o)
+		return UploadRuntime(runtime.Attempts(attempts), version, patterns...)(ctx, o)
 	}
 }
 

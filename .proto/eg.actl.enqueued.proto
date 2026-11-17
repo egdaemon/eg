@@ -77,7 +77,14 @@ message EnqueuedDequeueResponse {
 
 message EnqueuedDownloadRequest {}
 
-message EnqueuedCompletedRequest {}
+message EnqueuedCompletedRequest {
+  // runtime of the workload in milliseconds.
+  uint64 duration = 1 [ json_name = "duration" ];
+  bool successful = 2 [ json_name = "successful" ];
+  // the access token issued with the workload, attests the workload and its
+  // account so the control plane can validate the completion without loading it.
+  string access_token = 3 [ json_name = "access_token" ];
+}
 message EnqueuedCompletedResponse {
   Enqueued enqueued = 1 [ json_name = "enqueue" ];
 }

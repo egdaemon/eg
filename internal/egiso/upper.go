@@ -139,7 +139,7 @@ func (t *Upper) OpenFile(name string, flag int, perm fs.FileMode, user string, g
 	if err != nil {
 		return nil, err
 	}
-	return dir.OpenFile(rel, flag, perm)
+	return dir.OpenFile(rel, flag, perm.Perm())
 }
 
 // Chtimes sets the named file's access and modification times, copying it up first.
@@ -189,7 +189,7 @@ func (t *Upper) prepare(name string, flag int, perm fs.FileMode, user string, gr
 // Mkdir creates the named directory with mode perm, owned by user and group.
 func (t *Upper) Mkdir(name string, perm fs.FileMode, user string, group string) error {
 	if m, rel, ok := t.bound(name); ok {
-		return m.root.Mkdir(rel, perm)
+		return m.root.Mkdir(rel, perm.Perm())
 	}
 
 	t.m.Lock()

@@ -13,6 +13,7 @@ import (
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/fsx"
+	"github.com/egdaemon/eg/internal/langx"
 	"github.com/egdaemon/eg/runtime/wasi/eg"
 	"github.com/egdaemon/eg/runtime/wasi/egenv"
 	"github.com/egdaemon/eg/runtime/wasi/eggit"
@@ -65,23 +66,80 @@ func Env() []string {
 // repository's remote is github.com and the gh cli is installed. override it explicitly with
 // e.g.) eg compute local -e GH_TOKEN=<token>, needed for environments without gh.
 func Draft(patterns ...string) eg.OpFn {
-	return func(ctx context.Context, o eg.Op) error {
-		c := eggit.EnvCommit()
-		version := PatternVersion()
+	return New().Draft(patterns...)
+}
 
-		runtime := shell.Runtime().Environ(
-			_eg.EnvGithubToken, ffigit.Bearer(),
-		).Timeout(egenv.TTL())
+type release struct {
+	title string
+	notes string
+}
+
+type option = func(*release)
+type options []option
+
+func New() options {
+	return options(nil)
+}
+
+// override the release title, defaults to PatternVersion().
+func (t options) Title(s string) options {
+	return append(t, func(o *release) {
+		o.title = s
+	})
+}
+
+// override the release notes, defaults to github's generated notes.
+func (t options) Notes(s string) options {
+	return append(t, func(o *release) {
+		o.notes = s
+	})
+}
+
+// create returns the base command with the environment the gh commands require, including the
+// title and notes so gh never prompts when a tty is available.
+func (t options) create(v string) shell.Command {
+	c := langx.Clone(release{
+		title: v,
+	}, t...)
+
+	return shell.Runtime().
+		Environ(_eg.EnvGithubToken, ffigit.Bearer()).
+		Environ("EGGITHUB_RELEASE_NOTES", c.notes).
+		Environ("EGGITHUB_RELEASE_TITLE", c.title).
+		Timeout(egenv.TTL())
+}
+
+// Draft creates (or reuses) the draft release and uploads the patterns to it.
+// without patterns it only ensures the draft release exists.
+func (t options) Draft(patterns ...string) eg.OpFn {
+	return func(ctx context.Context, o eg.Op) error {
+		version := PatternVersion()
+		runtime := t.create(version)
 
 		if shell.Run(ctx, runtime.Newf("gh release view %s", version)) != nil {
 			return shell.Run(
 				ctx,
-				runtime.Newf("gh release create --draft --target %s %s %s", c.Hash.String(), version, strings.Join(patterns, " ")),
+				runtime.Newf(
+					`gh release create --draft --target %s --title "$EGGITHUB_RELEASE_TITLE" ${EGGITHUB_RELEASE_NOTES:+--notes "$EGGITHUB_RELEASE_NOTES"} $([ -z "$EGGITHUB_RELEASE_NOTES" ] && echo --generate-notes) %s %s`,
+					eggit.EnvCommit().Hash.String(), version, strings.Join(patterns, " "),
+				),
 			)
+		}
+
+		if len(patterns) == 0 {
+			return nil
 		}
 
 		return UploadRuntime(runtime, version, patterns...)(ctx, o)
 	}
+}
+
+// Commit drafts the release with the configured title and notes, then promotes it.
+func (t options) Commit(patterns ...string) eg.OpFn {
+	return eg.Sequential(
+		t.Draft(patterns...),
+		Promote(),
+	)
 }
 
 // assetMatch reports whether pattern (a glob against an asset's basename, e.g.
@@ -185,15 +243,12 @@ func Promote(patterns ...string) eg.OpFn {
 	}
 }
 
-// Release to github, this is very experimental.
+// Commit a release to github (draft then promote), this is very experimental.
 // for local environments `eg compute local` auto-detects a GitHub token via `gh auth token` when the
 // repository's remote is github.com and the gh cli is installed. override it explicitly with
 // e.g.) eg compute local -e GH_TOKEN=<token>, needed for environments without gh.
-func Release(patterns ...string) eg.OpFn {
-	return eg.Sequential(
-		Draft(patterns...),
-		Promote(),
-	)
+func Commit(patterns ...string) eg.OpFn {
+	return New().Commit(patterns...)
 }
 
 // Upload an asset to a github release, this is very experimental. uploads into

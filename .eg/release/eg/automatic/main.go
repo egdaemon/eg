@@ -7,11 +7,9 @@ import (
 
 	egrel "eg/compute/release/eg"
 
-	_eg "github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/runtime/wasi/eg"
 	"github.com/egdaemon/eg/runtime/wasi/egenv"
 	"github.com/egdaemon/eg/runtime/wasi/eggit"
-	"github.com/egdaemon/eg/runtime/wasi/egunsafe/ffigit"
 	"github.com/egdaemon/eg/runtime/wasi/shell"
 	"github.com/egdaemon/eg/runtime/x/wasi/eggithub"
 	"github.com/egdaemon/eg/runtime/x/wasi/egpool"
@@ -34,14 +32,7 @@ func main() {
 		shell.Op(shell.Env().New("eg login")),
 		eggithub.DraftClean(0),
 		// every workload drafts into the same release, create it once up front so they don't race to create it.
-		shell.Op(
-			shell.Runtime().
-				Environ(_eg.EnvGithubToken, ffigit.Bearer()).
-				Newf(
-					"gh release view %s || gh release create --draft --target %s %s",
-					eggithub.PatternVersion(), eggit.EnvCommit().Hash.String(), eggithub.PatternVersion(),
-				),
-		),
+		eggithub.Draft(),
 		// TODO:
 		// egbug.Env,
 		// eggpg.Seed(eggpg.Options()...),

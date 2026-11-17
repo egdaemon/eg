@@ -1,0 +1,14 @@
+syntax = "proto3";
+
+package eg.interp.machines;
+
+message ModuleRequest {
+  string egiso = 1;
+  string module = 2;
+  repeated string options = 3;
+}
+message ModuleResponse {}
+
+service Machines {
+  rpc Module(ModuleRequest) returns (ModuleResponse) {}
+}

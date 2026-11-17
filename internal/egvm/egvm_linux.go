@@ -13,6 +13,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -43,18 +44,20 @@ type VM struct {
 	netns   string
 	socket  string
 	client  *ssh.ClientConfig
-	dev     *os.File
+	devs    []*os.File
+	owned   []*os.Root
 	init    *exec.Cmd
 	stopped chan struct{}
-	served  chan struct{}
+	served  sync.WaitGroup
 	closers []io.Closer
 }
 
-// Boot starts the machine as an unprivileged user: its init runs as root of a user namespace mapping
-// the user's subordinate ids, in mount, pid, uts, ipc, network and cgroup namespaces of its own,
-// rooted at the egiso served over FUSE. pasta connects its network to the host's, as it does for
-// rootless podman, in a scope of the user's systemd limited to the machine's cpus and memory. Its
-// init's output is copied to console.
+// Boot starts the machine as an unprivileged user, or as root of a machine, which boots one within
+// it: its init runs as root of a user namespace mapping the user's subordinate ids, or root's own, in
+// mount, pid, uts, ipc and cgroup namespaces of its own, rooted at the egiso served over FUSE, as is
+// each directory the host user owns. Its network namespace belongs to the user namespace above its
+// own, and pasta connects it to the host's, as it does for rootless podman, in a scope of the user's
+// systemd limited to the machine's cpus and memory. Its init's output is copied to console.
 func Boot(m Machine, console io.Writer) (_ *VM, err error) {
 	var (
 		t          = &VM{stopped: make(chan struct{})}
@@ -63,6 +66,7 @@ func Boot(m Machine, console io.Writer) (_ *VM, err error) {
 		authorized string
 		mapped     [2]*os.File
 		mounted    [2]int
+		owned      *os.Root
 		args       []string
 	)
 	defer func() {
@@ -112,14 +116,14 @@ func Boot(m Machine, console io.Writer) (_ *VM, err error) {
 	}
 	defer unix.Close(mounted[0])
 
-	args = []string{stagemap, root, m.init, t.netns, authorized, nftables(m.firewall), shared, sshdir, strconv.FormatBool(false)}
+	args = []string{stagemap, root, m.init, t.netns, authorized, nftables(m.firewall), shared, sshdir, sharerw}
 	for _, v := range m.volumes {
 		if err = os.MkdirAll(v.dir, 0700); err != nil {
 			return nil, errorsx.Wrapf(err, "unable to create the volume %s", v.dir)
 		}
 	}
 	for _, mnt := range slices.Concat(m.mounts, m.volumes) {
-		args = append(args, mnt.dir, mnt.path, strconv.FormatBool(mnt.readonly))
+		args = append(args, mnt.dir, mnt.path, mnt.mode())
 	}
 
 	t.init = &exec.Cmd{
@@ -151,17 +155,60 @@ func Boot(m Machine, console io.Writer) (_ *VM, err error) {
 	}
 
 	mapped[1].Close()
-	if t.dev, err = received(mounted[0]); err != nil {
+	if err = t.serve(mounted[0], m.root, m.nfs...); err != nil {
 		return nil, errorsx.Wrap(err, "the machine did not mount its root")
 	}
 
-	t.served = make(chan struct{})
-	go func() {
-		defer close(t.served)
-		errorsx.Log(egiso.ServeFUSE(t.dev, m.root, m.nfs...))
-	}()
+	// the machine mounts what the host user owns after its root, in order. Its files belong to whoever
+	// asks, so the root's accounts would name no owner.
+	for _, mnt := range m.mounts {
+		if mnt.mode() != sharefuse {
+			continue
+		}
+		if owned, err = os.OpenRoot(mnt.dir); err != nil {
+			return nil, errorsx.Wrapf(err, "unable to open %s", mnt.dir)
+		}
+		t.owned = append(t.owned, owned)
+		if err = t.serve(mounted[0], egiso.NewShare(owned)); err != nil {
+			return nil, errorsx.Wrapf(err, "the machine did not mount %s", mnt.dir)
+		}
+	}
 
 	return t, nil
+}
+
+// serve serves fsys on the /dev/fuse descriptor the machine sends over the socket fd, once it mounts
+// it.
+func (t *VM) serve(fd int, fsys *egiso.SysFS, options ...egiso.NFSOption) (err error) {
+	var (
+		dev *os.File
+	)
+
+	if dev, err = received(fd); err != nil {
+		return err
+	}
+	t.devs = append(t.devs, dev)
+
+	t.served.Add(1)
+	go func() {
+		defer t.served.Done()
+		errorsx.Log(egiso.ServeFUSE(dev, fsys, options...))
+	}()
+	return nil
+}
+
+// mode is how stageroot mounts mnt: bound, read write or read only, or over FUSE when the host user
+// owns it. A directory a machine already serves as the host user's is bound as it is, as eg module
+// binds it.
+func (t mount) mode() string {
+	switch {
+	case t.owned && !Owned(t.dir):
+		return sharefuse
+	case t.readonly:
+		return sharero
+	default:
+		return sharerw
+	}
 }
 
 // scope moves pid into a transient scope of the user's systemd, as systemd-run --user --scope -p
@@ -185,7 +232,13 @@ func scope(pid int, m Machine) (err error) {
 		properties = append(properties, systemd.Property{Name: "MemoryMax", Value: dbus.MakeVariant(m.memory)})
 	}
 
-	if conn, err = cgroups.UserConnection(os.Getuid()); err != nil {
+	// root, as a machine's is, has the system's systemd, as podman connects to it as root.
+	if os.Getuid() == 0 {
+		conn, err = systemd.NewWithContext(context.Background())
+	} else {
+		conn, err = cgroups.UserConnection(os.Getuid())
+	}
+	if err != nil {
 		return errorsx.Wrap(err, "unable to reach the user's systemd, which machines run under")
 	}
 	defer conn.Close()
@@ -258,12 +311,28 @@ func received(fd int) (_ *os.File, err error) {
 }
 
 // idmap maps root of the machine's user namespace to the user, and the ids after it to the user's
-// subordinate ids, as rootless podman maps a container's.
+// subordinate ids, as rootless podman maps a container's. Root, as a machine's is, maps each of its
+// ids to itself, as podman nested with --userns host does.
 func idmap(pid int) error {
 	var (
 		current *user.User
+		ids     []syscall.SysProcIDMap
 		err     error
 	)
+
+	if os.Getuid() == 0 {
+		for _, file := range []string{"uid_map", "gid_map"} {
+			if ids, err = identity(filepath.Join("/proc/self", file)); err != nil {
+				return err
+			}
+			if err = os.WriteFile(filepath.Join("/proc", strconv.Itoa(pid), file), []byte(strings.Join(slicesx.MapTransform(func(m syscall.SysProcIDMap) string {
+				return fmt.Sprintf("%d %d %d", m.ContainerID, m.HostID, m.Size)
+			}, ids...), "\n")), 0); err != nil {
+				return errorsx.Wrap(err, "unable to map the machine's ids")
+			}
+		}
+		return nil
+	}
 
 	if current, err = user.Current(); err != nil {
 		return err
@@ -339,11 +408,12 @@ func (t *VM) Close() error {
 		errorsx.Log(errorsx.Ignore(t.init.Process.Signal(syscall.SIGTERM), os.ErrProcessDone))
 		<-t.stopped
 	}
-	if t.served != nil {
-		<-t.served
+	t.served.Wait()
+	for _, dev := range t.devs {
+		errs = append(errs, dev.Close())
 	}
-	if t.dev != nil {
-		errs = append(errs, t.dev.Close())
+	for _, owned := range t.owned {
+		errs = append(errs, owned.Close())
 	}
 	if t.netns != "" {
 		errs = append(errs, errorsx.Ignore(os.Remove(t.netns), os.ErrNotExist))

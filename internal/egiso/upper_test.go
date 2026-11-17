@@ -321,6 +321,15 @@ func TestUpper(t *testing.T) {
 		require.NoError(t, u.Remove("home/egd/.cache/moved"))
 	})
 
+	t.Run("creates within a bound host directory with a mode beyond its permissions, as crun makes a mountpoint", func(t *testing.T) {
+		u, host := upper(t)
+		require.NoError(t, u.Mkdir("home/egd/.cache/mnt", 02755, egiso.Privileged, egiso.Privileged))
+		f, err := u.OpenFile("home/egd/.cache/mnt/file", os.O_WRONLY|os.O_CREATE, 04755, egiso.Default, egiso.Default)
+		require.NoError(t, err)
+		require.NoError(t, f.Close())
+		require.FileExists(t, filepath.Join(host, "mnt", "file"))
+	})
+
 	t.Run("lists a bound host directory in the directory that holds it", func(t *testing.T) {
 		u, _ := upper(t)
 		require.Equal(t, []string{".cache", "notes"}, names(t, u, "home/egd"))

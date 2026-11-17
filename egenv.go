@@ -85,6 +85,7 @@ const (
 	EnvComputeTLSInsecure            = "EG_COMPUTE_TLS_INSECURE"                    // used to pass TLS insecure flag to container.
 	EnvComputeLoggingVerbosity       = "EG_COMPUTE_LOG_VERBOSITY"                   // logging verbosity.
 	EnvComputeModuleNestedLevel      = "EG_COMPUTE_MODULE_LEVEL"                    // number of nested levels the current module is running in.
+	EnvComputeEgiso                  = "EG_COMPUTE_EGISO"                           // uri of the egiso the machine running the module booted from. unset outside a machine.
 	EnvComputeMemoryLimit            = "EG_COMPUTE_MEMORY_LIMIT"                    // memory available to the workload in bytes, detected from the cgroup by the root module. unset when unknown.
 	EnvComputeCoresLimit             = "EG_COMPUTE_CORES_LIMIT"                     // number of cpu cores available to the workload, detected by the root module. unset when unknown.
 	EnvComputeRootModule             = "EG_COMPUTE_ROOT_MODULE"                     // default is always false, but is set to true for the root module to bootstrap services

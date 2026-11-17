@@ -25,6 +25,7 @@ import (
 	"github.com/egdaemon/eg/cmd/eg/daemons"
 	"github.com/egdaemon/eg/internal/bytesx"
 	"github.com/egdaemon/eg/internal/debugx"
+	"github.com/egdaemon/eg/internal/egvm"
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/execx"
@@ -43,6 +44,7 @@ import (
 	"github.com/egdaemon/eg/interp/environ"
 	"github.com/egdaemon/eg/interp/events"
 	"github.com/egdaemon/eg/interp/execproxy/v2"
+	"github.com/egdaemon/eg/interp/machines"
 	"github.com/egdaemon/eg/runners"
 	"github.com/egdaemon/eg/runtime/wasi/egunsafe/egworkloads"
 	"github.com/egdaemon/eg/workspaces"
@@ -64,8 +66,16 @@ type module struct {
 }
 
 // remapdir returns a function that remaps a directory, giving the unprivileged user access to the contents.
+// A machine's owned directory is bound as it is: every user already has access, and bindfs would only
+// add a mount to go through.
 func remapdir(ctx context.Context, bindfs string) func(from, to string) error {
 	return func(from, to string) (err error) {
+		if egvm.Owned(from) {
+			mcmd := exec.CommandContext(ctx, "mount", "--bind", from, to)
+			mcmd.Stdout, mcmd.Stderr = log.Writer(), log.Writer()
+			return errorsx.Wrapf(execx.MaybeRun(mcmd), "unable to bind: %s", from)
+		}
+
 		if envx.Boolean(false, eg.EnvExperimentalBindMount) {
 			egdu, err := user.Lookup(eg.DefaultUsername)
 			if err != nil {
@@ -448,7 +458,8 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, environsecret
 				runners.AgentMountReadWrite(eg.DefaultMountRoot(), eg.DefaultMountRoot()),
 				runners.AgentMountReadWrite("/var/lib/containers", "/var/lib/containers"),
 			),
-			runners.AgentOptionEGBin(errorsx.Must(exec.LookPath(eg.DefaultMountRoot(eg.RuntimeDirectory, eg.BinaryBin)))),
+			// a machine of another OS than its host's has no egbin, and its own eg runs its containers.
+			runners.AgentOptionEGBin(fsx.LocateFirst(eg.DefaultMountRoot(eg.RuntimeDirectory, eg.BinaryBin), errorsx.Must(exec.LookPath(os.Args[0])))),
 			runners.AgentOptionHostOS(),
 			runners.AgentOptionCommandLine("--cgroups", "disabled"),
 			hostnet,
@@ -465,6 +476,7 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, environsecret
 			// builds create their own network namespace as well, they take the options of hostnet.
 			c8sproxy.ServiceProxyOptionBuildOptions(runners.ZeroAgent(hostnet).Options()...),
 		).Bind(srv)
+		machines.RegisterMachinesServer(srv, runners.NewMachines(tlsc.DefaultClient(), ws, log.Writer(), runners.MachineOptionEGBin(errorsx.Must(exec.LookPath(os.Args[0])))))
 
 		go func() {
 			errorsx.Log(errorsx.Wrap(srv.Serve(control), "unable to serve control socket"))

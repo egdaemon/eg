@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"syscall"
 	"testing"
 	"time"
 
@@ -32,6 +33,8 @@ func TestExec(t *testing.T) {
 	var (
 		rootfs   = os.Getenv("EG_TEST_ROOTFS")
 		sockets  = t.TempDir()
+		binary   = filepath.Join(t.TempDir(), "binary")
+		owned    = t.TempDir()
 		volume   = filepath.Join(t.TempDir(), "volume")
 		console  bytes.Buffer
 		archive  *egiso.Archive
@@ -82,7 +85,8 @@ func TestExec(t *testing.T) {
 	users, groups, err = archive.Accounts()
 	require.NoError(t, err)
 	root, upperdir = upper(t, archive)
-	vm, err = egvm.Boot(egvm.New(root, egvm.OptionAccounts(users, groups), egvm.OptionCPUs(2), egvm.OptionMemory(1<<30), egvm.OptionMountReadOnly(t.TempDir(), "/srv/shared"), egvm.OptionMountReadWrite(sockets, "/srv/sockets"), egvm.OptionMountVolume(volume, "/srv/volume")), &console)
+	require.NoError(t, os.WriteFile(binary, []byte("#!/bin/sh\necho bound\n"), 0755))
+	vm, err = egvm.Boot(egvm.New(root, egvm.OptionAccounts(users, groups), egvm.OptionCPUs(2), egvm.OptionMemory(1<<30), egvm.OptionMountReadOnly(t.TempDir(), "/srv/shared"), egvm.OptionMountReadWrite(sockets, "/srv/sockets"), egvm.OptionMountReadOnly(binary, "/srv/sockets/bin/binary"), egvm.OptionMountOwned(owned, "/srv/owned"), egvm.OptionMountVolume(volume, "/srv/volume")), &console)
 	require.NoError(t, err, console.String())
 	t.Cleanup(func() { require.NoError(t, vm.Close()) })
 
@@ -113,6 +117,23 @@ func TestExec(t *testing.T) {
 		require.Equal(t, "systemd\n", stdout)
 	})
 
+	t.Run("finishes booting with no unit failed", func(t *testing.T) {
+		code, stdout, _ := run(t, t.Context(), nil, "systemctl", "is-system-running", "--wait")
+		_, failed, _ := run(t, t.Context(), nil, "systemctl", "--failed", "--no-legend")
+		require.Equal(t, int32(0), code, stdout+failed)
+	})
+
+	t.Run("names the machine as its systemd's container manager", func(t *testing.T) {
+		code, stdout, stderr := run(t, t.Context(), nil, "cat", "/run/systemd/container")
+		require.Equal(t, int32(0), code, stderr)
+		require.Equal(t, egvm.Container+"\n", stdout)
+	})
+
+	t.Run("lets its systemd hand its controllers down, as podman's containers need", func(t *testing.T) {
+		code, _, stderr := run(t, t.Context(), nil, "sh", "-c", "grep -qw pids /sys/fs/cgroup/cgroup.subtree_control || echo +pids > /sys/fs/cgroup/cgroup.subtree_control")
+		require.Equal(t, int32(0), code, stderr)
+	})
+
 	t.Run("limits the machine to its cpus and memory", func(t *testing.T) {
 		code, stdout, stderr := run(t, t.Context(), nil, "cat", "/sys/fs/cgroup/cpu.max", "/sys/fs/cgroup/memory.max")
 		require.Equal(t, int32(0), code, stderr)
@@ -130,10 +151,25 @@ func TestExec(t *testing.T) {
 		require.Equal(t, int32(28), code, stderr)
 	})
 
+	t.Run("resolves names without resolved, which the default image masks", func(t *testing.T) {
+		code, _, stderr := run(t, t.Context(), nil, "sh", "-c", "systemctl stop systemd-resolved; getent hosts github.com")
+		require.Equal(t, int32(0), code, stderr)
+	})
+
 	t.Run("keeps its firewall out of root's reach", func(t *testing.T) {
 		code, _, stderr := run(t, t.Context(), nil, "nft", "flush", "ruleset")
 		require.NotEqual(t, int32(0), code)
 		require.Contains(t, stderr, "Operation not permitted")
+	})
+
+	t.Run("administers the network namespaces root makes", func(t *testing.T) {
+		code, _, stderr := run(t, t.Context(), nil, "unshare", "--net", "nft", "add", "table", "inet", "nested")
+		require.Equal(t, int32(0), code, stderr)
+	})
+
+	t.Run("has a tun device for pasta", func(t *testing.T) {
+		code, _, stderr := run(t, t.Context(), nil, "test", "-c", "/dev/net/tun")
+		require.Equal(t, int32(0), code, stderr)
 	})
 
 	t.Run("quotes arguments the shell would expand", func(t *testing.T) {
@@ -148,6 +184,16 @@ func TestExec(t *testing.T) {
 		b, cause := os.ReadFile(filepath.Join(volume, "kept"))
 		require.NoError(t, cause)
 		require.Equal(t, "kept\n", string(b))
+	})
+
+	t.Run("mounts a host file read only within a directory it shares, as podman mounts egbin", func(t *testing.T) {
+		code, stdout, stderr := run(t, t.Context(), nil, "sh", "-c", "/srv/sockets/bin/binary && ! touch /srv/sockets/bin/binary 2>/dev/null")
+		require.Equal(t, int32(0), code, stderr)
+		require.Equal(t, "bound\n", stdout)
+
+		placeholder, cause := os.Stat(filepath.Join(sockets, "bin", "binary"))
+		require.NoError(t, cause)
+		require.Zero(t, placeholder.Size())
 	})
 
 	t.Run("forwards a host socket into the machine", func(t *testing.T) {
@@ -172,6 +218,100 @@ func TestExec(t *testing.T) {
 		code, _, stderr := run(t, t.Context(), nil, "sh", "-c", "touch /srv/shared/file")
 		require.NotEqual(t, int32(0), code)
 		require.Contains(t, stderr, "Read-only file system")
+	})
+
+	t.Run("gives the host user what any of the machine's users writes in an owned directory", func(t *testing.T) {
+		code, _, stderr := run(t, t.Context(), nil, "sh", "-c", "mkdir /srv/owned/root && echo root > /srv/owned/root/file && sudo -u egd sh -c 'mkdir /srv/owned/egd && echo egd > /srv/owned/egd/file'")
+		require.Equal(t, int32(0), code, stderr)
+
+		for _, name := range []string{"root", "root/file", "egd", "egd/file"} {
+			st, cause := os.Lstat(filepath.Join(owned, name))
+			require.NoError(t, cause)
+			require.Equal(t, uint32(os.Getuid()), st.Sys().(*syscall.Stat_t).Uid, name)
+		}
+		require.NoError(t, os.RemoveAll(filepath.Join(owned, "root")))
+		require.NoError(t, os.RemoveAll(filepath.Join(owned, "egd")))
+	})
+
+	t.Run("shows each user an owned directory's files as its own", func(t *testing.T) {
+		require.NoError(t, os.WriteFile(filepath.Join(owned, "host"), []byte("host\n"), 0644))
+		code, stdout, stderr := run(t, t.Context(), nil, "sh", "-c", "stat -c %u:%g /srv/owned/host && sudo -u egd stat -c %U:%G /srv/owned/host && setpriv --reuid 4242 --regid 4242 --clear-groups stat -c %u:%g /srv/owned/host")
+		require.Equal(t, int32(0), code, stderr)
+		require.Equal(t, "0:0\n"+egiso.Default+":"+egiso.Default+"\n4242:4242\n", stdout)
+	})
+
+	t.Run("lets a user the image does not name use what other users made private in an owned directory", func(t *testing.T) {
+		code, stdout, stderr := run(t, t.Context(), nil, "sh", "-c", "mkdir -m 0700 /srv/owned/private && setpriv --reuid 4242 --regid 4242 --clear-groups sh -c 'echo written > /srv/owned/private/file && cat /srv/owned/private/file'")
+		require.Equal(t, int32(0), code, stderr)
+		require.Equal(t, "written\n", stdout)
+
+		st, cause := os.Lstat(filepath.Join(owned, "private", "file"))
+		require.NoError(t, cause)
+		require.Equal(t, uint32(os.Getuid()), st.Sys().(*syscall.Stat_t).Uid)
+		require.NoError(t, os.RemoveAll(filepath.Join(owned, "private")))
+	})
+
+	t.Run("lets root change what the host user made read only in an owned directory, as root may", func(t *testing.T) {
+		require.NoError(t, os.MkdirAll(filepath.Join(owned, "readonly", "module"), 0755))
+		require.NoError(t, os.WriteFile(filepath.Join(owned, "readonly", "module", "go.mod"), nil, 0444))
+		require.NoError(t, os.Chmod(filepath.Join(owned, "readonly", "module"), 0555))
+		require.NoError(t, os.Chmod(filepath.Join(owned, "readonly"), 0555))
+
+		code, _, _ := run(t, t.Context(), nil, "sudo", "-u", "egd", "rm", "-rf", "/srv/owned/readonly/module")
+		require.NotEqual(t, int32(0), code)
+
+		code, _, stderr := run(t, t.Context(), nil, "sh", "-c", "rm -rf /srv/owned/readonly/module && touch /srv/owned/readonly/added")
+		require.Equal(t, int32(0), code, stderr)
+		require.NoFileExists(t, filepath.Join(owned, "readonly", "module", "go.mod"))
+		require.FileExists(t, filepath.Join(owned, "readonly", "added"))
+		st, cause := os.Stat(filepath.Join(owned, "readonly"))
+		require.NoError(t, cause)
+		require.Equal(t, fs.FileMode(0555), st.Mode().Perm())
+
+		require.NoError(t, os.Chmod(filepath.Join(owned, "readonly"), 0755))
+		require.NoError(t, os.RemoveAll(filepath.Join(owned, "readonly")))
+	})
+
+	t.Run("lets the machine's processes connect to a socket bound in an owned directory", func(t *testing.T) {
+		code, stdout, stderr := run(t, t.Context(), nil, "python3", "-c", strings.Join([]string{
+			"import socket",
+			"s = socket.socket(socket.AF_UNIX); s.bind('/srv/owned/bound.socket'); s.listen()",
+			"c = socket.socket(socket.AF_UNIX); c.connect('/srv/owned/bound.socket'); c.sendall(b'bound')",
+			"print(s.accept()[0].recv(5).decode())",
+		}, "; "))
+		require.Equal(t, int32(0), code, stderr)
+		require.Equal(t, "bound\n", stdout)
+
+		st, cause := os.Lstat(filepath.Join(owned, "bound.socket"))
+		require.NoError(t, cause)
+		require.Equal(t, fs.ModeSocket, st.Mode().Type())
+		require.Equal(t, uint32(os.Getuid()), st.Sys().(*syscall.Stat_t).Uid)
+		require.NoError(t, os.Remove(filepath.Join(owned, "bound.socket")))
+	})
+
+	t.Run("lets a user change the owner of a file in an owned directory, which stays the host user's", func(t *testing.T) {
+		require.NoError(t, os.WriteFile(filepath.Join(owned, "chowned"), nil, 0644))
+		code, stdout, stderr := run(t, t.Context(), nil, "sh", "-c", "chown egd:egd /srv/owned/chowned && stat -c %u:%g /srv/owned/chowned")
+		require.Equal(t, int32(0), code, stderr)
+		require.Equal(t, "0:0\n", stdout)
+
+		st, cause := os.Lstat(filepath.Join(owned, "chowned"))
+		require.NoError(t, cause)
+		require.Equal(t, uint32(os.Getuid()), st.Sys().(*syscall.Stat_t).Uid)
+	})
+
+	t.Run("reports the host filesystem holding an owned directory", func(t *testing.T) {
+		code, _, stderr := run(t, t.Context(), nil, "df", "/srv/owned")
+		require.Equal(t, int32(0), code, stderr)
+	})
+
+	t.Run("sees what the host writes in an owned directory after it looked", func(t *testing.T) {
+		code, _, _ := run(t, t.Context(), nil, "cat", "/srv/owned/later")
+		require.NotEqual(t, int32(0), code)
+		require.NoError(t, os.WriteFile(filepath.Join(owned, "later"), []byte("later\n"), 0644))
+		code, stdout, stderr := run(t, t.Context(), nil, "cat", "/srv/owned/later")
+		require.Equal(t, int32(0), code, stderr)
+		require.Equal(t, "later\n", stdout)
 	})
 
 	t.Run("writes go to the upper and leave the image as it is", func(t *testing.T) {

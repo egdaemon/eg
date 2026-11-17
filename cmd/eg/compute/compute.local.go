@@ -343,6 +343,9 @@ func (t local) machine(c *http.Client, uri string) runners.BFn {
 	return func(ctx context.Context, ws workspaces.Context, _ uuidx.UUID, canonicaluri string, envb *envx.Builder) (_ runners.T, err error) {
 		var (
 			containers = userx.DefaultCacheDirectory("egvm", runners.ContainersVolume(canonicaluri))
+			// a machine runs the eg running the command, as a container does, when it runs the host's
+			// OS; otherwise its image's own.
+			mountegbin = envx.Toggle(runners.MachineOptionNoop, runners.MachineOptionEGBin(errorsx.Must(exec.LookPath(os.Args[0]))), runtime.GOOS == "linux")
 		)
 
 		if stringsx.Blank(uri) {
@@ -361,6 +364,7 @@ func (t local) machine(c *http.Client, uri string) runners.BFn {
 				egvm.OptionMountVolume(containers, "/var/lib/containers"),
 			),
 			runners.MachineOptionLocalGPGAgent(ctx, envb),
+			mountegbin,
 		)
 	}
 }

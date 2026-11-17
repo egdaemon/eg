@@ -189,6 +189,11 @@ func (t Tree) mount(name string) (found mount, rel string, ok bool) {
 	return found, rel, ok
 }
 
+// binds reports whether the tree holds a Bind mount.
+func (t Tree) binds() bool {
+	return slices.ContainsFunc(t.mounts, func(m mount) bool { return m.root != nil })
+}
+
 // leads reports whether name is a directory on the way to a mount point.
 func (t Tree) leads(name string) bool {
 	return slices.ContainsFunc(t.mounts, func(m mount) bool {

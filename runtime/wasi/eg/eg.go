@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/egdaemon/eg"
+	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/interp/events"
 	"github.com/egdaemon/eg/runtime/wasi/egunsafe"
@@ -17,11 +18,14 @@ import (
 
 // Generally unsafe predefined runner for modules. useful
 // for providing a base line environment but has no long term
-// stability promises.
+// stability promises. A module running in a machine runs its
+// modules in machines booted from the same egiso.
 func DefaultModule() C8S {
 	path := egunsafe.RuntimeDirectory("eg.default.module")
 	errorsx.Never(eg.PrepareRootContainer(path))
-	return Container("eg").BuildFromFile(path)
+	c := Container("eg").BuildFromFile(path)
+	c.machine = envx.String("", eg.EnvComputeEgiso) != ""
+	return c
 }
 
 // A reference to an operation. used during instrumentation.

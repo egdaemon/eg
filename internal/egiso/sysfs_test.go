@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"syscall"
 	"testing"
 
 	"github.com/egdaemon/eg/internal/egiso"
@@ -222,5 +223,87 @@ func TestSysFS(t *testing.T) {
 		_, err = os.Stat(filepath.Join(upperdir, "home", "egd", ".cache"))
 		require.ErrorIs(t, err, fs.ErrNotExist)
 		require.NoError(t, os.RemoveAll(filepath.Join(host, "go-build")))
+	})
+}
+
+func TestNewShare(t *testing.T) {
+	// shared serves a fresh host directory alone.
+	shared := func(t *testing.T) (*egiso.SysFS, string) {
+		host := t.TempDir()
+		dir, err := os.OpenRoot(host)
+		require.NoError(t, err)
+		t.Cleanup(func() { dir.Close() })
+		return egiso.NewShare(dir), host
+	}
+
+	t.Run("writes to the host directory as the host user", func(t *testing.T) {
+		fsys, host := shared(t)
+		require.Zero(t, fsys.Mkdir("go-build", 0755))
+		f, errno := fsys.OpenFile("go-build/entry", experimentalsys.O_CREAT|experimentalsys.O_WRONLY, 0644)
+		require.Zero(t, errno)
+		_, errno = f.Write([]byte("cached"))
+		require.Zero(t, errno)
+		require.Zero(t, f.Close())
+
+		b, err := os.ReadFile(filepath.Join(host, "go-build", "entry"))
+		require.NoError(t, err)
+		require.Equal(t, "cached", string(b))
+	})
+
+	t.Run("exposes the host user's files as the default user's", func(t *testing.T) {
+		fsys, host := shared(t)
+		require.NoError(t, os.WriteFile(filepath.Join(host, "file"), nil, 0644))
+
+		user, group, err := fsys.Upper().Owner("file")
+		require.NoError(t, err)
+		require.Equal(t, egiso.Default, user)
+		require.Equal(t, egiso.Default, group)
+	})
+
+	t.Run("refuses to change an owner", func(t *testing.T) {
+		fsys, host := shared(t)
+		require.NoError(t, os.WriteFile(filepath.Join(host, "file"), nil, 0644))
+		require.ErrorIs(t, fsys.Upper().Chown("file", egiso.Privileged, ""), syscall.EPERM)
+	})
+
+	t.Run("renames, links, lists and removes within the host directory", func(t *testing.T) {
+		fsys, host := shared(t)
+		require.NoError(t, os.WriteFile(filepath.Join(host, "file"), []byte("data"), 0644))
+		require.Zero(t, fsys.Rename("file", "moved"))
+		require.Zero(t, fsys.Link("moved", "linked"))
+		require.Zero(t, fsys.Symlink("moved", "alias"))
+		require.Zero(t, fsys.Chmod("moved", 0600))
+		require.Zero(t, fsys.Utimens("moved", 0, 0))
+
+		dir, errno := fsys.OpenFile(".", experimentalsys.O_RDONLY, 0)
+		require.Zero(t, errno)
+		entries, errno := dir.Readdir(-1)
+		require.Zero(t, errno)
+		require.Zero(t, dir.Close())
+		names := make([]string, 0, len(entries))
+		for _, e := range entries {
+			names = append(names, e.Name)
+		}
+		require.ElementsMatch(t, []string{"alias", "linked", "moved"}, names)
+
+		require.Zero(t, fsys.Unlink("alias"))
+		require.Zero(t, fsys.Unlink("linked"))
+		require.Zero(t, fsys.Unlink("moved"))
+		require.Zero(t, fsys.Mkdir("empty", 0755))
+		require.Zero(t, fsys.Rmdir("empty"))
+
+		remaining, err := os.ReadDir(host)
+		require.NoError(t, err)
+		require.Empty(t, remaining)
+	})
+
+	t.Run("sees what the host changes", func(t *testing.T) {
+		fsys, host := shared(t)
+		_, errno := fsys.Stat("later")
+		require.Equal(t, experimentalsys.ENOENT, errno)
+		require.NoError(t, os.WriteFile(filepath.Join(host, "later"), []byte("later"), 0644))
+		st, errno := fsys.Stat("later")
+		require.Zero(t, errno)
+		require.Equal(t, int64(5), st.Size)
 	})
 }

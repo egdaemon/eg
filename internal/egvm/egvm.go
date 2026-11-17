@@ -15,12 +15,14 @@ import (
 	"io"
 	"net/netip"
 	"runtime"
+	"slices"
 	"strings"
 
 	"github.com/egdaemon/eg/internal/egiso"
 	"github.com/egdaemon/eg/internal/langx"
 	"github.com/egdaemon/eg/internal/userx"
 	"github.com/egdaemon/wasinet/wasinet/wnetruntime"
+	"github.com/moby/sys/mountinfo"
 )
 
 // resolvlink is the tmpfiles.extra credential pointing resolv.conf at resolved, replacing the empty
@@ -28,12 +30,14 @@ import (
 const resolvlink = "L+ /etc/resolv.conf - - - - ../run/systemd/resolve/stub-resolv.conf\n"
 
 // mount is a host directory the machine attaches as the virtio-fs device tag and mounts at path, or a
-// volume, which a virtual machine attaches as a disk in the order of its volumes.
+// volume, which a virtual machine attaches as a disk in the order of its volumes. What the machine
+// writes in a host directory belongs to the machine's own ids, unless it is owned by the host user.
 type mount struct {
 	tag      string
 	dir      string
 	path     string
 	readonly bool
+	owned    bool
 }
 
 // Machine describes a virtual machine: the image it boots, its size, its root, what it mounts, and
@@ -115,14 +119,38 @@ func OptionAccounts(users []egiso.Account, groups []egiso.Account) Option {
 	}
 }
 
-// OptionMountReadWrite mounts the host directory dir in the machine at path.
+// OptionMountReadWrite mounts the host directory dir in the machine at path. On Linux what the
+// machine writes in it belongs to the machine's ids, as the host maps them, and a socket bound in it
+// is the host's to dial.
 func OptionMountReadWrite(dir string, path string) Option {
-	return optionMount(dir, path, false)
+	return optionMount(mount{dir: dir, path: path})
 }
 
-// OptionMountReadOnly mounts the host directory dir in the machine at path, read only.
+// OptionMountReadOnly mounts the host directory dir in the machine at path, read only. A Linux machine
+// mounts a host file the same way, as podman mounts one.
 func OptionMountReadOnly(dir string, path string) Option {
-	return optionMount(dir, path, true)
+	return optionMount(mount{dir: dir, path: path, readonly: true})
+}
+
+// OptionMountOwned mounts the host directory dir in the machine at path, owned by the host user: what
+// the machine writes in it belongs to the host user, whichever of the machine's users writes it, so
+// the host user can change and delete it. Every user of the machine, its containers' too, sees each
+// file in it as its own and may do with it what the host user may; changing a file's owner changes
+// nothing, as it can not give the file to anyone but the host user. A Linux machine serves it over
+// FUSE, where a socket the machine binds is the machine's to dial and not the host's; a virtual
+// machine's virtio-fs already writes as the host user.
+func OptionMountOwned(dir string, path string) Option {
+	return optionMount(mount{dir: dir, path: path, owned: true})
+}
+
+// Owned reports whether dir is a directory OptionMountOwned mounted in a Linux machine: a FUSE mount
+// without default_permissions, whose server checks writes as the host user, so the kernel checks none.
+func Owned(dir string) bool {
+	mounts, err := mountinfo.GetMounts(mountinfo.SingleEntryFilter(dir))
+	if err != nil || len(mounts) == 0 {
+		return false
+	}
+	return mounts[0].FSType == "fuse" && !slices.Contains(strings.Split(mounts[0].VFSOptions, ","), "default_permissions")
 }
 
 // OptionMountVolume mounts a filesystem of the machine's own at path, kept in the host directory dir
@@ -135,9 +163,10 @@ func OptionMountVolume(dir string, path string) Option {
 	}
 }
 
-func optionMount(dir string, path string, readonly bool) Option {
+func optionMount(mnt mount) Option {
 	return func(m *Machine) {
-		m.mounts = append(m.mounts, mount{tag: fmt.Sprintf("egvm%d", len(m.mounts)), dir: dir, path: path, readonly: readonly})
+		mnt.tag = fmt.Sprintf("egvm%d", len(m.mounts))
+		m.mounts = append(m.mounts, mnt)
 	}
 }
 
@@ -189,6 +218,10 @@ func newstdio(options ...ExecOption) stdio {
 // VolumeParam names, once per volume, in the order their disks attach, the path vminit mounts a
 // volume at.
 const VolumeParam = "egvm.volume"
+
+// Container is the container manager a Linux machine names to its systemd, which records it in
+// /run/systemd/container.
+const Container = "egvm"
 
 // cmdline is the machine's kernel command line. Container images hold no udev to announce the
 // console, so systemd starts no getty on it: one would wait out its device's timeout before the

@@ -23,26 +23,38 @@ import (
 // ServeFUSE serves fsys on dev, a /dev/fuse descriptor another process already mounted, until the
 // mount goes away. A process in a user namespace can mount FUSE, where it can not mount NFS. Files
 // belong to the ids ServeNFS reports for the same options, and a file a process creates belongs to
-// it, as the kernel reports the process's ids within the namespace that mounted dev. Only the mount
-// changes fsys while it is served, so the kernel keeps what it learns of it.
+// it, as the kernel reports the process's ids within the namespace that mounted dev. A Bind mount's
+// files belong to the host user, so each process sees them as its own. Unless fsys holds a Bind
+// mount, whose host directory others change too, only the mount changes fsys while it is served, so
+// the kernel keeps what it learns of it. The kernel keeps what it reads of a file, and drops it when
+// the file's attributes show it changed.
 func ServeFUSE(dev *os.File, fsys *SysFS, options ...NFSOption) error {
 	var (
-		served  = nfsfs{sys: fsys}
-		server  *fuse.Server
-		fd      int
-		err     error
-		forever = time.Hour
+		served   = nfsfs{sys: fsys}
+		server   *fuse.Server
+		fd       int
+		err      error
+		entry    = time.Hour
+		attr     = time.Hour
+		negative = time.Hour
 	)
 
 	for _, opt := range options {
 		opt(&served)
 	}
 
+	// the kernel keeps a Bind mount's names for a second, as an NFS client keeps attributes, and asks
+	// for their attributes each time, since their owner is whoever asks: each open so learns whether
+	// what it kept of the file is still the file.
+	if fsys.upper.tree.binds() {
+		entry, attr, negative = time.Second, 0, 0
+	}
+
 	// the server closes the descriptor it serves when the mount goes away, so it serves its own.
 	if fd, err = unix.FcntlInt(dev.Fd(), unix.F_DUPFD_CLOEXEC, 0); err != nil {
 		return errorsx.Wrap(err, "unable to duplicate the mount's descriptor")
 	}
-	if server, err = fuse.NewServer(gofs.NewNodeFS(&fusenode{fsys: served}, &gofs.Options{EntryTimeout: &forever, AttrTimeout: &forever, NegativeTimeout: &forever}), fmt.Sprintf("/dev/fd/%d", fd), &fuse.MountOptions{DisableXAttrs: true}); err != nil {
+	if server, err = fuse.NewServer(gofs.NewNodeFS(&fusenode{fsys: served}, &gofs.Options{EntryTimeout: &entry, AttrTimeout: &attr, NegativeTimeout: &negative}), fmt.Sprintf("/dev/fd/%d", fd), &fuse.MountOptions{DisableXAttrs: true}); err != nil {
 		return errorsx.Compact(errorsx.Wrap(err, "unable to serve the mount"), unix.Close(fd))
 	}
 	server.Serve()
@@ -70,6 +82,7 @@ var (
 	_ gofs.NodeReadlinker = (*fusenode)(nil)
 	_ gofs.NodeStatfser   = (*fusenode)(nil)
 	_ gofs.NodeFsyncer    = (*fusenode)(nil)
+	_ gofs.NodeMknoder    = (*fusenode)(nil)
 )
 
 func (t *fusenode) name() string {
@@ -86,25 +99,42 @@ func (t *fusenode) entry(ctx context.Context, name string, out *fuse.EntryOut) (
 	if err != nil {
 		return nil, errnoofuse(err)
 	}
-	attrof(info, &out.Attr)
+	t.attr(ctx, name, info, &out.Attr)
 	return t.NewInode(ctx, &fusenode{fsys: t.fsys}, gofs.StableAttr{Mode: out.Attr.Mode & syscall.S_IFMT, Ino: out.Attr.Ino}), 0
 }
 
-// owned gives name to the process creating it, as an NFS client's create does.
+// owned gives name to the process creating it, as an NFS client's create does. What a process
+// creates in a Bind mount belongs to the host user.
 func (t *fusenode) owned(ctx context.Context, name string) syscall.Errno {
 	caller, ok := fuse.FromContext(ctx)
-	if !ok {
+	if _, _, bound := t.fsys.sys.upper.bound(name); !ok || bound {
 		return 0
 	}
 	return errnoofuse(t.fsys.Lchown(name, int(caller.Uid), int(caller.Gid)))
 }
 
+// attr describes the file at name, as info does, in out. A Bind mount's files belong to whichever
+// process asks.
+func (t *fusenode) attr(ctx context.Context, name string, info fs.FileInfo, out *fuse.Attr) {
+	attrof(info, out)
+	if caller, ok := fuse.FromContext(ctx); ok {
+		if _, _, bound := t.fsys.sys.upper.bound(name); bound {
+			out.Uid, out.Gid = caller.Uid, caller.Gid
+		}
+	}
+}
+
 func (t *fusenode) Getattr(ctx context.Context, f gofs.FileHandle, out *fuse.AttrOut) syscall.Errno {
-	info, err := t.fsys.Lstat(t.name())
-	if err != nil {
+	var (
+		name = t.name()
+		info fs.FileInfo
+		err  error
+	)
+
+	if info, err = t.fsys.Lstat(name); err != nil {
 		return errnoofuse(err)
 	}
-	attrof(info, &out.Attr)
+	t.attr(ctx, name, info, &out.Attr)
 	return 0
 }
 
@@ -212,14 +242,42 @@ func (t *fusenode) Open(ctx context.Context, flags uint32) (gofs.FileHandle, uin
 	return &fusefile{f: f}, fuse.FOPEN_KEEP_CACHE, 0
 }
 
+// overriding runs op, which changes the entries of the directory dir. Root may change any directory,
+// so when a Bind mount's host directory refuses root, op runs again once the host user, who owns
+// dir, may write it, and dir then gets its mode back.
+func (t *fusenode) overriding(ctx context.Context, dir string, op func() error) (err error) {
+	var (
+		info fs.FileInfo
+	)
+
+	if err = op(); !errors.Is(err, fs.ErrPermission) {
+		return err
+	}
+	m, rel, bound := t.fsys.sys.upper.bound(dir)
+	if caller, ok := fuse.FromContext(ctx); !ok || caller.Uid != 0 || !bound {
+		return err
+	}
+	if info, err = m.root.Lstat(rel); err != nil {
+		return err
+	}
+	if err = m.root.Chmod(rel, info.Mode().Perm()|0700); err != nil {
+		return err
+	}
+	return errorsx.Compact(op(), m.root.Chmod(rel, info.Mode().Perm()))
+}
+
 func (t *fusenode) Create(ctx context.Context, name string, flags uint32, mode uint32, out *fuse.EntryOut) (*gofs.Inode, gofs.FileHandle, uint32, syscall.Errno) {
 	var (
 		created = t.child(name)
 		node    *gofs.Inode
+		f       billy.File
+		err     error
 	)
 
-	f, err := t.fsys.OpenFile(created, int(flags)&(os.O_WRONLY|os.O_RDWR|os.O_APPEND|os.O_TRUNC|os.O_EXCL)|os.O_CREATE, fs.FileMode(mode&07777))
-	if err != nil {
+	if err = t.overriding(ctx, t.name(), func() (err error) {
+		f, err = t.fsys.OpenFile(created, int(flags)&(os.O_WRONLY|os.O_RDWR|os.O_APPEND|os.O_TRUNC|os.O_EXCL)|os.O_CREATE, fs.FileMode(mode&07777))
+		return err
+	}); err != nil {
 		return nil, nil, 0, errnoofuse(err)
 	}
 	errno := t.owned(ctx, created)
@@ -238,7 +296,9 @@ func (t *fusenode) Mkdir(ctx context.Context, name string, mode uint32, out *fus
 		created = t.child(name)
 	)
 
-	if err := t.fsys.sys.upper.Mkdir(created, fs.FileMode(mode&07777), t.fsys.sys.user, t.fsys.sys.group); err != nil {
+	if err := t.overriding(ctx, t.name(), func() error {
+		return t.fsys.sys.upper.Mkdir(created, fs.FileMode(mode&07777), t.fsys.sys.user, t.fsys.sys.group)
+	}); err != nil {
 		return nil, errnoofuse(err)
 	}
 	if errno := t.owned(ctx, created); errno != 0 {
@@ -247,20 +307,39 @@ func (t *fusenode) Mkdir(ctx context.Context, name string, mode uint32, out *fus
 	return t.entry(ctx, created, out)
 }
 
+// Mknod makes a socket or fifo in a Bind mount, as a process binding a unix socket makes one: processes
+// of the machine connect to it by its inode, which the host can not.
+func (t *fusenode) Mknod(ctx context.Context, name string, mode uint32, dev uint32, out *fuse.EntryOut) (*gofs.Inode, syscall.Errno) {
+	var (
+		created = t.child(name)
+	)
+
+	if err := t.overriding(ctx, t.name(), func() error { return t.fsys.sys.upper.Mknod(created, mode) }); err != nil {
+		return nil, errnoofuse(err)
+	}
+	return t.entry(ctx, created, out)
+}
+
 func (t *fusenode) Unlink(ctx context.Context, name string) syscall.Errno {
-	return errnoofuse(t.fsys.Remove(t.child(name)))
+	return errnoofuse(t.overriding(ctx, t.name(), func() error { return t.fsys.Remove(t.child(name)) }))
 }
 
 func (t *fusenode) Rmdir(ctx context.Context, name string) syscall.Errno {
-	return errnoofuse(t.fsys.Remove(t.child(name)))
+	return errnoofuse(t.overriding(ctx, t.name(), func() error { return t.fsys.Remove(t.child(name)) }))
 }
 
 // Rename refuses renameat2's flags, which callers fall back from to a plain rename.
 func (t *fusenode) Rename(ctx context.Context, name string, parent gofs.InodeEmbedder, newname string, flags uint32) syscall.Errno {
+	var (
+		to = parent.(*fusenode)
+	)
+
 	if flags != 0 {
 		return syscall.EINVAL
 	}
-	return errnoofuse(t.fsys.Rename(t.child(name), parent.(*fusenode).child(newname)))
+	return errnoofuse(t.overriding(ctx, t.name(), func() error {
+		return to.overriding(ctx, to.name(), func() error { return t.fsys.Rename(t.child(name), to.child(newname)) })
+	}))
 }
 
 func (t *fusenode) Symlink(ctx context.Context, target string, name string, out *fuse.EntryOut) (*gofs.Inode, syscall.Errno) {
@@ -268,7 +347,7 @@ func (t *fusenode) Symlink(ctx context.Context, target string, name string, out 
 		created = t.child(name)
 	)
 
-	if err := t.fsys.Symlink(target, created); err != nil {
+	if err := t.overriding(ctx, t.name(), func() error { return t.fsys.Symlink(target, created) }); err != nil {
 		return nil, errnoofuse(err)
 	}
 	if errno := t.owned(ctx, created); errno != 0 {
@@ -283,7 +362,7 @@ func (t *fusenode) Link(ctx context.Context, target gofs.InodeEmbedder, name str
 		created = t.child(name)
 	)
 
-	if err := t.fsys.Link(target.(*fusenode).name(), created); err != nil {
+	if err := t.overriding(ctx, t.name(), func() error { return t.fsys.Link(target.(*fusenode).name(), created) }); err != nil {
 		return nil, errnoofuse(err)
 	}
 	return t.entry(ctx, created, out)
@@ -302,13 +381,18 @@ func (t *fusenode) Fsync(ctx context.Context, f gofs.FileHandle, flags uint32) s
 	return 0
 }
 
-// Statfs reports the filesystem holding the upper, which the root's writes fill.
+// Statfs reports the filesystem the file's writes fill: its Bind mount's host directory, or the
+// upper's.
 func (t *fusenode) Statfs(ctx context.Context, out *fuse.StatfsOut) syscall.Errno {
 	var (
-		st syscall.Statfs_t
+		st  syscall.Statfs_t
+		dir = t.fsys.sys.upper.dir
 	)
 
-	if err := syscall.Statfs(t.fsys.sys.upper.dir.Name(), &st); err != nil {
+	if m, _, ok := t.fsys.sys.upper.bound(t.name()); ok {
+		dir = m.root
+	}
+	if err := syscall.Statfs(dir.Name(), &st); err != nil {
 		return errnoofuse(err)
 	}
 	out.FromStatfsT(&st)

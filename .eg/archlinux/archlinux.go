@@ -47,12 +47,15 @@ func Prepare(ctx context.Context, o eg.Op) error {
 
 func Build(ctx context.Context, o eg.Op) error {
 	cdir := egenv.DirectoryCache(".dist", "pacman")
-	templatedir := egenv.DirectoryWorking(".dist", "archlinux")
+	templatedir := egenv.DirectoryWorking(".eg", "archlinux")
+	builddir := egenv.DirectoryWorkload("archlinux")
 
 	runtime := shell.Runtime().
 		EnvironFrom(eggolang.Env()...).
 		EnvironFrom(egccache.Env()...).
 		Environ("PKGDEST", cdir).
+		// the release assets are named egd-v<version>, see .dist/archlinux/Containerfile.
+		Environ("PKGVER", "v"+pkgver()).
 		// build the checked out commit instead of the upstream default branch.
 		Environ("EG_SOURCE_URL", "git+file://"+egenv.DirectoryWorking()).
 		Environ("BUILDDIR", filepath.Join("/", "tmp", "build")).
@@ -62,9 +65,9 @@ func Build(ctx context.Context, o eg.Op) error {
 	return eg.Sequential(
 		egccache.PrintStatistics(runtime),
 		shell.Op(
-			runtime.Newf("mkdir -p %s", cdir),
-			runtime.New("pwd; ls -lha .; makepkg -f").Directory(templatedir),
-			runtime.New("git checkout -- .").Directory(templatedir), // reset PKGBUILD modifications caused by pkgver()
+			runtime.Newf("mkdir -p %s %s", cdir, builddir),
+			runtime.Newf("cp %s/PKGBUILD %s/PKGBUILD", templatedir, builddir),
+			runtime.New("pwd; ls -lha .; makepkg -f").Directory(builddir),
 			runtime.Newf("paccache -c %s -rk2", cdir),
 		),
 		egccache.PrintStatistics(runtime),

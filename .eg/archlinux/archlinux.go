@@ -68,7 +68,7 @@ func Build(ctx context.Context, o eg.Op) error {
 			runtime.Newf("mkdir -p %s %s", cdir, builddir),
 			runtime.Newf("cp %s/PKGBUILD %s/PKGBUILD", templatedir, builddir),
 			runtime.New("pwd; ls -lha .; makepkg -f").Directory(builddir),
-			runtime.Newf("paccache -c %s -rk2", cdir),
+			runtime.Newf("paccache -c %s -rk1", cdir),
 		),
 		egccache.PrintStatistics(runtime),
 	)(ctx, o)

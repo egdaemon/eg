@@ -126,7 +126,8 @@ func (t options) Draft(patterns ...string) eg.OpFn {
 		version := PatternVersion()
 		runtime := t.create(version)
 
-		if shell.Run(ctx, runtime.Newf("gh release view %s", version)) != nil {
+		// a missing release (404) is the expected case here, so don't retry the lookup.
+		if shell.Run(ctx, runtime.Attempts(1).Newf("gh release view %s", version)) != nil {
 			return shell.Run(
 				ctx,
 				runtime.Newf(

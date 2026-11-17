@@ -48,7 +48,6 @@ func main() {
 				egtarball.Name(egrel.TarLinux("amd64")),
 				egtarball.Name(egrel.TarLinux("arm64")),
 				"egd-*.pkg.tar.*",
-				"egworkload-*.pkg.tar.*",
 				"eg_*_amd64.deb",
 			),
 		),

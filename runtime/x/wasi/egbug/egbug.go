@@ -231,6 +231,7 @@ func normalizeEnv(environ *envx.Builder) *envx.Builder {
 	environ.Setenv(_eg.EnvGitHeadURI, _eg.DefaultWorkingDirectory())
 	environ.Setenv(_eg.EnvGitHeadRef, "HEAD")
 	environ.Setenv(_eg.EnvGitBaseVCS, "git@github.com:egdaemon/eg.git")
+	environ.Setenv(_eg.EnvComputeEnvironToken, "0000000000000000000000000000000000000000")
 
 	// normalize standard directories.
 	normalizedirprefix(_eg.EnvComputeWorkloadDirectory)

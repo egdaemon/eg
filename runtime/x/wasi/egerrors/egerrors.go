@@ -18,6 +18,11 @@ func Zero[T any](v T, err error) T {
 	return errorsx.Zero(v, err)
 }
 
+// Never returns v, panics if err is not nil.
+func Never[T any](v T, err error) T {
+	return errorsx.Must(v, err)
+}
+
 func matches(err error, errs []error) bool {
 	if len(errs) == 0 {
 		return true

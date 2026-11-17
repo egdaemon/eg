@@ -202,6 +202,7 @@ type container struct {
 	uid   uuidx.UUID
 	agent *runners.Agent
 	image string
+	tty   bool // hands the module the host's stdin and stdout themselves, so a terminal is attached as one.
 }
 
 func (t container) Do(_ context.Context, m transpile.Compiled) error {
@@ -220,6 +221,11 @@ func (t container) Do(_ context.Context, m transpile.Compiled) error {
 		cmd.Stdout = log.Writer()
 		cmd.Stderr = log.Writer()
 		cmd.Stdin = os.Stdin
+		if t.tty {
+			// the terminal attach needs the files themselves, a writer in between is not a terminal.
+			cmd.Stdout = os.Stdout
+			cmd.Stderr = os.Stderr
+		}
 		return cmd
 	}
 

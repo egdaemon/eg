@@ -18,6 +18,7 @@ import (
 	"github.com/egdaemon/eg/internal/podmanx"
 	"github.com/egdaemon/eg/internal/slicesx"
 	"github.com/egdaemon/eg/internal/stringsx"
+	"github.com/egdaemon/eg/internal/termx"
 	"github.com/egdaemon/eg/interp/c8s"
 	"github.com/egdaemon/eg/workspaces"
 	"golang.org/x/exp/slices"
@@ -79,6 +80,17 @@ func (t *ProxyService) prepcmd(cmd *exec.Cmd) *exec.Cmd {
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = t.log.Writer()
 	cmd.Stderr = t.log.Writer()
+	return cmd
+}
+
+// prepmodule is prepcmd for a module's container. when this process has a terminal, the module's own is the one it is attached to,
+// the module's container needs the files themselves to be given one too (see moduleExec), not the log's writer.
+func (t *ProxyService) prepmodule(cmd *exec.Cmd) *exec.Cmd {
+	cmd = t.prepcmd(cmd)
+	if termx.IsTTY(os.Stdin, os.Stdout) {
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+	}
 	return cmd
 }
 
@@ -201,7 +213,7 @@ func (t *ProxyService) Module(ctx context.Context, req *c8s.ModuleRequest) (_ *c
 	// log.Println("module options", options)
 	// envx.Debug(options...)
 
-	if err = PodmanModule(ctx, t.prepcmd, req.Image, req.Name, req.Mdir, options...); err != nil {
+	if err = PodmanModule(ctx, t.prepmodule, req.Image, req.Name, req.Mdir, options...); err != nil {
 		return nil, err
 	}
 

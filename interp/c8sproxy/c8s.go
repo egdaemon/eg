@@ -24,6 +24,7 @@ import (
 	"github.com/egdaemon/eg/internal/execx"
 	"github.com/egdaemon/eg/internal/slicesx"
 	"github.com/egdaemon/eg/internal/stringsx"
+	"github.com/egdaemon/eg/internal/termx"
 	"github.com/moby/moby/api/types/container"
 	"go.podman.io/podman/v6/pkg/api/handlers"
 	"go.podman.io/podman/v6/pkg/bindings"
@@ -99,11 +100,17 @@ func PodmanModule(ctx context.Context, cmdctx func(*exec.Cmd) *exec.Cmd, image, 
 		PodmanModuleRunCmd(image, cname, options...)...,
 	))
 
+	stdin, stdout, stderr := cmd.Stdin, cmd.Stdout, cmd.Stderr
+	if termx.IsTTY(stdin, stdout) {
+		// the detached run prints the id of the container, the terminal is the module's.
+		cmd.Stdout = io.Discard
+	}
+
 	if err = execx.MaybeRun(cmd); err != nil {
 		return errorsx.Wrap(err, "unable to run container")
 	}
 
-	if err = moduleExec(ctx, cname, moduledir, cmd.Stdin, cmd.Stdout, cmd.Stderr); err != nil {
+	if err = moduleExec(ctx, cname, moduledir, stdin, stdout, stderr); err != nil {
 		return errorsx.Wrap(err, "unable to exec module")
 	}
 
@@ -132,6 +139,10 @@ func moduleExec(ctx context.Context, cname, moduledir string, stdin io.Reader, s
 		wtty *io.PipeWriter
 	)
 
+	// a terminal on both ends is given to the module as one, the files are attached as they are so the terminal is put in raw mode
+	// and resized with the window, see execAttach.
+	tty := termx.IsTTY(stdin, stdout)
+
 	verbosity := ""
 	switch x := envx.Int(0, eg.EnvComputeLoggingVerbosity); x {
 	case 0:
@@ -141,7 +152,7 @@ func moduleExec(ctx context.Context, cname, moduledir string, stdin io.Reader, s
 
 	id, err := containers.ExecCreate(ctx, cname, &handlers.ExecCreateConfig{
 		ExecCreateRequest: container.ExecCreateRequest{
-			Tty:          false,
+			Tty:          tty,
 			AttachStdin:  stdin != nil,
 			AttachStderr: true,
 			AttachStdout: true,
@@ -168,7 +179,7 @@ func moduleExec(ctx context.Context, cname, moduledir string, stdin io.Reader, s
 		errorsx.Log(errorsx.Wrap(containers.ExecRemove(ctx, id, &containers.ExecRemoveOptions{Force: new(true)}), "failed to remove exec session"))
 	}()
 
-	if stdin != nil {
+	if stdin != nil && !tty {
 		rtty, wtty = io.Pipe()
 		defer rtty.Close()
 		defer wtty.Close()
@@ -180,7 +191,12 @@ func moduleExec(ctx context.Context, cname, moduledir string, stdin io.Reader, s
 		}()
 	}
 
-	if err = execAttach(ctx, id, rtty, stdout, stderr); err != nil {
+	attached := io.Reader(rtty)
+	if rtty == nil {
+		attached = stdin
+	}
+
+	if err = execAttach(ctx, id, attached, stdout, stderr); err != nil {
 		return errorsx.Wrap(err, "podman exec attach failed")
 	}
 

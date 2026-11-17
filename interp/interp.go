@@ -23,6 +23,7 @@ import (
 	"github.com/egdaemon/eg/internal/fsx"
 	"github.com/egdaemon/eg/internal/langx"
 	"github.com/egdaemon/eg/internal/md5x"
+	"github.com/egdaemon/eg/internal/termx"
 	"github.com/egdaemon/eg/internal/uuidx"
 	"github.com/egdaemon/eg/internal/wasix"
 	"github.com/egdaemon/eg/interp/c8s"
@@ -290,12 +291,16 @@ func (t runner) perform(ctx context.Context, wshost workspaces.Context, runid, p
 	inpr, inpw := io.Pipe()
 	defer inpr.Close()
 	defer inpw.CloseWithError(io.EOF)
-	go func() {
-		_, _err := io.Copy(inpw, os.Stdin)
-		_err = errorsx.Ignore(_err, io.ErrClosedPipe)
-		errorsx.Log(errorsx.Wrap(_err, "failed copying stdin"))
-		inpw.CloseWithError(_err)
-	}()
+	// a terminal is the workload's own: the commands it runs are given os.Stdin directly (see ffiexec.Command), copying it
+	// here as well would take key presses from them.
+	if !termx.IsTTY(os.Stdin) {
+		go func() {
+			_, _err := io.Copy(inpw, os.Stdin)
+			_err = errorsx.Ignore(_err, io.ErrClosedPipe)
+			errorsx.Log(errorsx.Wrap(_err, "failed copying stdin"))
+			inpw.CloseWithError(_err)
+		}()
+	}
 
 	outpr, outpw := io.Pipe()
 	defer outpr.Close()

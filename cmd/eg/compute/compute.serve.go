@@ -22,6 +22,7 @@ import (
 	"github.com/egdaemon/eg/internal/md5x"
 	"github.com/egdaemon/eg/internal/podmanx"
 	"github.com/egdaemon/eg/internal/stringsx"
+	"github.com/egdaemon/eg/internal/termx"
 	"github.com/egdaemon/eg/internal/userx"
 	"github.com/egdaemon/eg/internal/uuidx"
 	"github.com/egdaemon/eg/internal/wasix"
@@ -41,6 +42,7 @@ type serve struct {
 	AutoPatch        bool     `name:"auto-patch" help:"commit the changes made inside the served workload to a new eg/ branch of the current repository once it stops, when disabled the changes are printed as a patch instead (dry run)" default:"true" negatable:""`
 	Privileged       bool     `name:"privileged" help:"run the initial container in privileged mode"`
 	Dirty            bool     `name:"dirty" help:"include user directories and environment variables" hidden:"true"`
+	TTY              bool     `name:"tty" help:"give the workload a terminal so interactive tools, e.g.) flutter's r and R keys, receive key presses. eg must be run from a terminal"`
 	Wayland          bool     `name:"wayland" help:"bind-mount the host wayland display socket into the container"`
 	GCPAuto          bool     `name:"gcp-auto" help:"use the default well known path for gcp's application default credentials"`
 	GCP              string   `name:"gcp" help:"path to gcp's application default credentials"`
@@ -105,6 +107,10 @@ func (t serve) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath, sessio
 		environio *os.File
 		rt        runners.T
 	)
+
+	if t.TTY && !termx.IsTTY(os.Stdin, os.Stdout) {
+		return errorsx.New("--tty requires stdin and stdout to be a terminal")
+	}
 
 	ctx, err := podmanx.WithClient(gctx.Context)
 	if err != nil {
@@ -293,5 +299,5 @@ func (t serve) podman(ctx context.Context, ws workspaces.Context, uid uuidx.UUID
 		runners.AgentOptionMemory(uint64(t.RuntimeResources.Memory)),
 	)
 
-	return container{ctx: ctx, ws: ws, uid: uid, agent: ragent, image: imagename}, nil
+	return container{ctx: ctx, ws: ws, uid: uid, agent: ragent, image: imagename, tty: t.TTY}, nil
 }

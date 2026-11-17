@@ -81,7 +81,7 @@ func Build(ctx context.Context, o eg.Op) error {
 		// override eg compute local's setting of the home directory.
 		// ideally we should default to this except when performing local
 		// compute workloads.
-		egbug.DebugFailure(
+		egbug.Debug(
 			eggpg.Seed(gpgoptions()...),
 			eggpg.Debug(gpgoptions()...),
 		),

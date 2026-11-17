@@ -98,15 +98,21 @@ func Fail(ctx context.Context, op eg.Op) error {
 	return fmt.Errorf("explicitly failing due to egbug.Fail being invoked")
 }
 
-// Utility operation for debugging failures
-func DebugFailure(op, debug eg.OpFn) eg.OpFn {
+// runs the debug operations, in order, when the provided op fails.
+// failures of a debug operation are logged and do not prevent the remaining
+// debug operations from running. the original error is always returned.
+func Debug(op eg.OpFn, debug ...eg.OpFn) eg.OpFn {
 	return func(ctx context.Context, o eg.Op) error {
-		if err := op(ctx, o); err != nil {
-			errorsx.Log(errorsx.Wrap(debug(ctx, o), "debug operation failed"))
-			return err
+		err := op(ctx, o)
+		if err == nil {
+			return nil
 		}
 
-		return nil
+		for _, d := range debug {
+			errorsx.Log(errorsx.Wrap(d(ctx, o), "debug operation failed"))
+		}
+
+		return err
 	}
 }
 

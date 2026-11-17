@@ -40,6 +40,7 @@ import (
 	"github.com/egdaemon/eg/interp"
 	"github.com/egdaemon/eg/interp/c8sproxy"
 	"github.com/egdaemon/eg/interp/dbproxy/dbservice"
+	"github.com/egdaemon/eg/interp/environ"
 	"github.com/egdaemon/eg/interp/events"
 	"github.com/egdaemon/eg/interp/execproxy/v2"
 	"github.com/egdaemon/eg/runners"
@@ -271,7 +272,7 @@ func recordDiscoveredWorkloads(ctx context.Context, db *sql.DB, dir string, envi
 	}
 }
 
-func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
+func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, environsecret *cmdopts.EnvironSecret) (err error) {
 	var (
 		ws      workspaces.Context
 		aid     = envx.String(uuidx.Nil().String(), eg.EnvComputeAccountID)
@@ -391,8 +392,15 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 			}
 		}()
 
+		environtoken, err := environ.NewToken(environsecret.Source(), uid, envx.Duration(time.Hour, eg.EnvComputeTTL))
+		if err != nil {
+			return errorsx.Wrap(err, "unable to generate environ token")
+		}
+
 		cmdenvb = cmdenvb.Var(
 			eg.EnvComputeModuleSocket, eg.DefaultMountRoot(eg.RuntimeDirectory, filepath.Base(cspath)),
+		).Var(
+			eg.EnvComputeEnvironToken, environtoken,
 		).FromEnviron(
 			os.Environ()...,
 		)
@@ -420,6 +428,7 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) {
 		events.NewServiceDispatch(db).Bind(srv)
 		dbservice.NewService(gctx.Context, t.RuntimeDir).Bind(srv)
 		execproxy.Auto(gctx.Context, t.Dir, t.RuntimeDir, cmdenv).Bind(srv)
+		environ.NewService(filepath.Join(t.RuntimeDir, eg.EnvironFile), environsecret.Source()).Bind(srv)
 
 		gpu, err := runners.AgentOptionGPU(envx.Boolean(false, eg.EnvComputeGPU))
 		if err != nil {

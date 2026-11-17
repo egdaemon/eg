@@ -1,0 +1,16 @@
+syntax = "proto3";
+
+package eg.interp.environ;
+
+message GetRequest {}
+
+message GetResponse {
+  // environ is the raw bytes of the environment file the workload was provided.
+  bytes environ = 1;
+}
+
+service Environ {
+  // Get returns the environment file the workload was provided.
+  // authenticated with a token from the EG_COMPUTE_ENVIRON_TOKEN environment variable.
+  rpc Get(GetRequest) returns (GetResponse) {}
+}

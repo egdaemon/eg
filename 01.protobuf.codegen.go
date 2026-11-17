@@ -15,6 +15,9 @@ package eg
 //go:generate protoc --proto_path=.proto --go_opt=Meg.interp.events.proto=github.com/eg/interp/events --go_opt=paths=source_relative --go_out=interp/events eg.interp.events.proto
 //go:generate protoc --proto_path=.proto --go-grpc_opt=Meg.interp.events.proto=github.com/eg/interp/events --go-grpc_opt=paths=source_relative --go-grpc_out=interp/events eg.interp.events.proto
 
+//go:generate protoc --proto_path=.proto --go_opt=Meg.interp.environ.proto=github.com/eg/interp/environ --go_opt=paths=source_relative --go_out=interp/environ eg.interp.environ.proto
+//go:generate protoc --proto_path=.proto --go-grpc_opt=Meg.interp.environ.proto=github.com/eg/interp/environ --go-grpc_opt=paths=source_relative --go-grpc_out=interp/environ eg.interp.environ.proto
+
 //go:generate protoc --proto_path=.proto --go_opt=Meg.interp.containers.proto=github.com/eg/interp/c8s --go_opt=paths=source_relative --go_out=interp/c8s eg.interp.containers.proto
 //go:generate protoc --proto_path=.proto --go-grpc_opt=Meg.interp.containers.proto=github.com/eg/interp/c8s --go-grpc_opt=paths=source_relative --go-grpc_out=interp/c8s eg.interp.containers.proto
 

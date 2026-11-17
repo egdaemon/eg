@@ -23,18 +23,39 @@ import (
 	"google.golang.org/grpc"
 )
 
-// dial the control socket for executing various functionality that is too slow or impedes concurrency.
-func DialControlSocket(ctx context.Context) (conn *grpc.ClientConn, err error) {
-	// log.Println("DIALING CONTROL SOCKET INITIATED")
-	// defer log.Println("DIALING CONTROL SOCKET COMPLETED")
+// dialer establishes the connections to the control socket. *net.Dialer for native processes,
+// *wasinet.Dialer for wasm guests.
+type dialer interface {
+	DialContext(ctx context.Context, network, address string) (net.Conn, error)
+}
 
+// NewControlSocket the control socket, in the runtime directory, dialed with the given dialer.
+func NewControlSocket(d dialer) ControlSocket {
+	return ControlSocket{d: d}
+}
+
+type ControlSocket struct {
+	d dialer
+}
+
+// DialContext dials the control socket for executing various functionality that is too slow or impedes concurrency.
+// the options are applied after the defaults (insecure, the socket's dialer) and so can override them.
+func (t ControlSocket) DialContext(ctx context.Context, options ...grpc.DialOption) (conn *grpc.ClientConn, err error) {
 	cspath := RuntimeDirectory(eg.SocketControl)
-	return grpc.DialContext(ctx, fmt.Sprintf("unix://%s", cspath), grpc.WithInsecure(), grpc.WithDialer(func(s string, d time.Duration) (net.Conn, error) {
-		dctx, done := context.WithTimeout(ctx, d)
-		defer done()
-		proto, address, _ := strings.Cut(s, "://")
-		return wasinet.DialContext(dctx, proto, address)
-	}))
+	return grpc.DialContext(ctx, fmt.Sprintf("unix://%s", cspath), append([]grpc.DialOption{
+		grpc.WithInsecure(),
+		grpc.WithDialer(func(s string, d time.Duration) (net.Conn, error) {
+			dctx, done := context.WithTimeout(ctx, d)
+			defer done()
+			proto, address, _ := strings.Cut(s, "://")
+			return t.d.DialContext(dctx, proto, address)
+		}),
+	}, options...)...)
+}
+
+// dial the control socket from within a wasm guest.
+func DialControlSocket(ctx context.Context) (conn *grpc.ClientConn, err error) {
+	return NewControlSocket(&wasinet.Dialer{}).DialContext(ctx)
 }
 
 // DialAnalyticsSocket dials the analytics (duckproxy) socket, for issuing

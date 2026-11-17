@@ -31,6 +31,7 @@ import (
 	"github.com/egdaemon/eg/internal/tarx"
 	"github.com/egdaemon/eg/internal/unsafepretty"
 	"github.com/egdaemon/eg/internal/uuidx"
+	"github.com/egdaemon/eg/interp/environ"
 	"github.com/egdaemon/eg/secrets"
 	"github.com/egdaemon/eg/transpile"
 	"github.com/egdaemon/eg/workspaces"
@@ -127,7 +128,14 @@ func (t upload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, ident *cmdide
 
 	t.GitClone = stringsx.First(t.GitClone, errorsx.Zero(gitx.QuirkCloneURI(repo, t.GitRemote)))
 
+	// the environment the enclosing workload was provided, everything below overrides it.
+	inherited, err := environ.Inherited(gctx.Context)
+	if err != nil {
+		return err
+	}
+
 	envb := envx.Build().
+		FromEnviron(inherited...).
 		Var(eg.EnvComputeArch, t.Arch).
 		Var(eg.EnvComputeOS, t.OS).
 		Var(eg.EnvWorkloadDraft, strconv.FormatBool(t.Draft)).

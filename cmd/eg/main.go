@@ -204,6 +204,7 @@ func main() {
 		kong.BindTo(shellcli.Context, (*context.Context)(nil)),
 		kong.BindTo(os.Stdin, (*cmdopts.Stdin)(nil)),
 		// only opened by the commands that ask for it.
+		kong.BindSingletonProvider(cmdopts.NewEnvironSecret),
 		kong.BindSingletonProvider(func(g *cmdopts.Global) *cmdopts.CLIDB {
 			return cmdopts.NewCLIDB(g.Context)
 		}),

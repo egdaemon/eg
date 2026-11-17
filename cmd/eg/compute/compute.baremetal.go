@@ -35,6 +35,7 @@ import (
 	"github.com/egdaemon/eg/interp"
 	"github.com/egdaemon/eg/interp/c8sproxy"
 	"github.com/egdaemon/eg/interp/dbproxy/dbservice"
+	"github.com/egdaemon/eg/interp/environ"
 	"github.com/egdaemon/eg/interp/events"
 	"github.com/egdaemon/eg/interp/execproxy/v2"
 	"github.com/egdaemon/eg/runners"
@@ -64,7 +65,7 @@ type baremetal struct {
 	Workload        string   `arg:"" help:"name of the workload to run" default:"" predictor:"eg.workload"`
 }
 
-func (t baremetal) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, hotswapbin *cmdopts.HotswapPath) (err error) {
+func (t baremetal) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, hotswapbin *cmdopts.HotswapPath, environsecret *cmdopts.EnvironSecret) (err error) {
 	var (
 		ws        workspaces.Context
 		repo      *git.Repository
@@ -294,6 +295,11 @@ func (t baremetal) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, hotswapbin
 		errorsx.Log(runners.SampleSystemLoad(fctx, db))
 	}()
 
+	environtoken, err := environ.NewToken(environsecret.Source(), uid.String(), t.RuntimeResources.TTL)
+	if err != nil {
+		return errorsx.Wrap(err, "unable to generate environ token")
+	}
+
 	srv := grpc.NewServer(
 		grpc.Creds(insecure.NewCredentials()), // this is a local socket
 		grpc.ChainUnaryInterceptor(
@@ -311,9 +317,12 @@ func (t baremetal) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, hotswapbin
 		errorsx.Must(
 			envx.Build().
 				FromEnviron(gitenv...).
-				FromEnviron(os.Environ()...).Environ(),
+				FromEnviron(os.Environ()...).
+				Var(eg.EnvComputeEnvironToken, environtoken).Environ(),
 		),
 	).Bind(srv)
+
+	environ.NewService(environpath, environsecret.Source()).Bind(srv)
 
 	canonicaluri := errorsx.Zero(gitx.CanonicalURI(repo, t.GitRemote))
 	ragent := runners.NewRunner(

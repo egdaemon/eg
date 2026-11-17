@@ -128,6 +128,7 @@ const (
 	EnvComputeContainerImpure        = "EG_COMPUTE_C8S_IMPURE"                      // informs the container runner that the container depends on the repository being present.
 	EnvComputeGPU                    = "EG_COMPUTE_GPU"                             // enable gpu support for the compute workload, propagated to nested module containers.
 	EnvComputeModuleSocket           = "EG_COMPUTE_MODULE_SOCKET"                   // socket providing functionality that is scoped to an individual module. primarily command execution.
+	EnvComputeEnvironToken           = "EG_COMPUTE_ENVIRON_TOKEN"                   // token authenticating requests to the control socket for the environment file the workload was provided. never written to the environment file.
 	EnvComputeDefaultGroup           = "EG_COMPUTE_DEFAULT_GROUP"                   // override the group assigned to the user. mainly used by baremetal.
 	EnvComputeAPIEnabled             = "EG_COMPUTE_API_ENABLED"                     // gates the runner's push HTTP surface (POST /c/upload, POST /c/enqueue) and whether the runner advertises itself as uploadable; enabled by default, see the daemon's --uploadable flag.
 	EnvComputeGuestMigrationsEnabled = "EG_COMPUTE_GUEST_MIGRATIONS_ENABLED"        // gates whether guests migrate the analytics database over its socket before writing to it (egdb.OpenMigrate); enabled by default.

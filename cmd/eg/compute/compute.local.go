@@ -30,6 +30,7 @@ import (
 	"github.com/egdaemon/eg/internal/uuidx"
 	"github.com/egdaemon/eg/internal/wasix"
 	"github.com/egdaemon/eg/interp/c8sproxy"
+	"github.com/egdaemon/eg/interp/environ"
 	"github.com/egdaemon/eg/runners"
 	"github.com/egdaemon/eg/secrets"
 	"github.com/egdaemon/eg/transpile"
@@ -74,12 +75,12 @@ func (t local) gpu() bool {
 // applies the changes they made.
 func (t local) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, hotswapbin *cmdopts.HotswapPath, session *cmdopts.ComputeSession, clidb *cmdopts.CLIDB) (err error) {
 	var (
-		ws      workspaces.Context
-		repo    *git.Repository
-		rt      runners.T
-		environ *os.File
-		b       runners.B = runners.BFn(t.podman)
-		uid               = uuidx.FirstNonNil(session.Session, uuidx.NewV7())
+		ws        workspaces.Context
+		repo      *git.Repository
+		rt        runners.T
+		environio *os.File
+		b         runners.B = runners.BFn(t.podman)
+		uid                 = uuidx.FirstNonNil(session.Session, uuidx.NewV7())
 	)
 
 	if t.Egiso != nil {
@@ -119,7 +120,14 @@ func (t local) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, hotswapbin *cm
 
 	canonicaluri := errorsx.Zero(gitx.CanonicalURI(repo, t.GitRemote))
 
+	// the environment the enclosing workload was provided, everything below overrides it.
+	inherited, err := environ.Inherited(gctx.Context)
+	if err != nil {
+		return err
+	}
+
 	envb := envx.Build().
+		FromEnviron(inherited...).
 		Var(eg.EnvGithubToken, githubToken(gctx.Context, t.GithubAuto, canonicaluri)).
 		FromReader(secrets.NewReader(gctx.Context, t.Secrets...)).
 		FromPath(t.EnvironmentPaths...).
@@ -176,12 +184,12 @@ func (t local) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, hotswapbin *cm
 	}
 	defer func() { err = errorsx.Compact(err, rt.Close()) }()
 
-	if environ, err = os.Create(filepath.Join(ws.RuntimeDir, eg.EnvironFile)); err != nil {
+	if environio, err = os.Create(filepath.Join(ws.RuntimeDir, eg.EnvironFile)); err != nil {
 		return errorsx.Wrap(err, "unable to open the environment variable file")
 	}
-	defer environ.Close()
+	defer environio.Close()
 
-	if err = envb.CopyTo(environ); err != nil {
+	if err = envb.CopyTo(environio); err != nil {
 		return errorsx.Wrap(err, "unable to generate environment")
 	}
 

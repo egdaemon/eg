@@ -1,0 +1,17 @@
+post_install() {
+	systemd-sysusers
+	systemd-tmpfiles --create
+
+	usermod --add-subuids 100000-165535 --add-subgids 100000-165535 egd
+
+	# see: usr/lib/systemd/system-preset/51.eg.workload.preset
+	systemctl preset podman.socket
+	# see: usr/lib/systemd/user-preset/51.eg.workload.preset
+	systemctl --global enable podman.socket
+
+	rm -rf /run/containers/storage /run/libpod
+}
+
+post_upgrade() {
+	post_install
+}

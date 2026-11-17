@@ -74,6 +74,30 @@ func Build(ctx context.Context, o eg.Op) error {
 	)(ctx, o)
 }
 
+// BuildWorkload builds the egworkload package, which ships the same payload as the debian
+// egworkload package from .dist/egworkload.
+func BuildWorkload(ctx context.Context, o eg.Op) error {
+	cdir := egenv.DirectoryCache(".dist", "pacman")
+	templatedir := egenv.DirectoryWorking(".eg", "archlinux", "egworkload")
+	builddir := egenv.DirectoryWorkload("archlinux", "egworkload")
+
+	runtime := shell.Runtime().
+		Environ("PKGDEST", cdir).
+		Environ("PKGVER", "v"+pkgver()).
+		// build the checked out commit instead of the upstream default branch.
+		Environ("EG_SOURCE_URL", "git+file://"+egenv.DirectoryWorking()).
+		Environ("BUILDDIR", filepath.Join("/", "tmp", "build-egworkload")).
+		Environ("SRCDEST", filepath.Join("/", "tmp", "src-egworkload")).
+		Environ("PACKAGER", fmt.Sprintf("%s <%s>", maintainer.Name, maintainer.Email))
+
+	return shell.Run(
+		ctx,
+		runtime.Newf("mkdir -p %s %s", cdir, builddir),
+		runtime.Newf("cp %s/PKGBUILD %s/egworkload.install %s/", templatedir, templatedir, builddir),
+		runtime.New("makepkg -f").Directory(builddir),
+	)
+}
+
 // Publish generates the AUR .SRCINFO from the PKGBUILD via makepkg, derives a
 // deterministic SSH keypair from the EG_SSH_KEY_SEED environment variable
 // (via `eg ssh key`), and pushes PKGBUILD/.SRCINFO to the AUR git repository

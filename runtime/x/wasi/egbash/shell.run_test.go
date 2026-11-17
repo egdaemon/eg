@@ -33,7 +33,7 @@ func serve(t *testing.T) (runtimedir string) {
 	l, err = net.Listen("unix", filepath.Join(runtimedir, eg.SocketControl))
 	require.NoError(t, err)
 	srv := grpc.NewServer()
-	execproxy.NewProxy(filepath.Join(runtimedir, "work"), runtimedir, os.Environ()).Bind(srv)
+	execproxy.NewProxy(t.Context(), filepath.Join(runtimedir, "work"), runtimedir, os.Environ()).Bind(srv)
 	go srv.Serve(l)
 	t.Cleanup(srv.Stop)
 	return runtimedir

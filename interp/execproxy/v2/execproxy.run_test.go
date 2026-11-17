@@ -30,7 +30,7 @@ func serve(t *testing.T, root string, environ ...string) string {
 	l, err := net.Listen("unix", filepath.Join(runtimedir, eg.SocketControl))
 	require.NoError(t, err)
 	srv := grpc.NewServer()
-	NewProxy(root, runtimedir, environ).Bind(srv)
+	NewProxy(t.Context(), root, runtimedir, environ).Bind(srv)
 	go srv.Serve(l)
 	t.Cleanup(srv.Stop)
 	return runtimedir
@@ -180,11 +180,11 @@ func TestExec(t *testing.T) {
 func TestAuto(t *testing.T) {
 	t.Run("defaults to v1", func(t *testing.T) {
 		t.Setenv(eg.EnvExperimentalProcSockets, "")
-		require.IsType(t, &v1.ExecProxy{}, Auto(t.TempDir(), t.TempDir(), nil))
+		require.IsType(t, &v1.ExecProxy{}, Auto(t.Context(), t.TempDir(), t.TempDir(), nil))
 	})
 
 	t.Run("experiment selects v2", func(t *testing.T) {
 		t.Setenv(eg.EnvExperimentalProcSockets, "true")
-		require.IsType(t, &Proxy{}, Auto(t.TempDir(), t.TempDir(), nil))
+		require.IsType(t, &Proxy{}, Auto(t.Context(), t.TempDir(), t.TempDir(), nil))
 	})
 }

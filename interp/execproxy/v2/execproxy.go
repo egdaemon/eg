@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"syscall"
+	"time"
 
 	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/internal/envx"
@@ -19,16 +20,28 @@ import (
 )
 
 // Auto returns v2 when EG_EXPERIMENTAL_PROC_SOCKETS is set and v1 otherwise.
-func Auto(root string, runtimedir string, environ []string) interface{ Bind(grpc.ServiceRegistrar) } {
+func Auto(ctx context.Context, root string, runtimedir string, environ []string) interface{ Bind(grpc.ServiceRegistrar) } {
 	if envx.Boolean(false, eg.EnvExperimentalProcSockets) {
-		return NewProxy(root, runtimedir, environ)
+		return NewProxy(ctx, root, runtimedir, environ)
 	}
 
-	return v1.NewExecProxy(root, environ)
+	return v1.NewExecProxy(ctx, root, environ)
 }
 
-func NewProxy(root string, runtimedir string, environ []string) *Proxy {
+// gracedelay is how long a cancelled command has to end before it is killed.
+var gracedelay = 10 * time.Second
+
+// ends makes the cancel of the command's context ask it to end, SIGTERM, instead of killing it, and kills it once it has had gracedelay.
+// the command is told by SIGTERM because sudo, which the commands run under, does not relay a SIGINT sent from its own process group.
+func ends(cmd *exec.Cmd) {
+	cmd.Cancel = func() error { return cmd.Process.Signal(syscall.SIGTERM) }
+	cmd.WaitDelay = gracedelay
+}
+
+// NewProxy the commands it runs are ended, as ends describes, when ctx is done, however long their requests are.
+func NewProxy(ctx context.Context, root string, runtimedir string, environ []string) *Proxy {
 	return &Proxy{
+		ctx:        ctx,
 		dir:        root,
 		runtimedir: runtimedir,
 		environ:    environ,
@@ -37,6 +50,7 @@ func NewProxy(root string, runtimedir string, environ []string) *Proxy {
 
 type Proxy struct {
 	v1.UnimplementedProxyServer
+	ctx        context.Context
 	dir        string
 	runtimedir string
 	environ    []string
@@ -51,10 +65,17 @@ func (t *Proxy) Bind(host grpc.ServiceRegistrar) {
 // request without an id comes from a guest that predates v2: the command inherits the module's stdio and a
 // failed exit is an error, which is how those guests detect failure.
 func (t *Proxy) Exec(ctx context.Context, req *v1.ExecRequest) (resp *v1.ExecResponse, err error) {
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	defer context.AfterFunc(t.ctx, cancel)()
+
 	var (
 		cmd   *exec.Cmd = confined(ctx, req.Cmd, req.Arguments...)
 		stdio []*os.File
 	)
+
+	// cancelled, the command is asked to end and is killed when it has not within the delay, see ends.
+	ends(cmd)
 
 	cmd.Dir = req.Dir
 	if !filepath.IsAbs(cmd.Dir) {

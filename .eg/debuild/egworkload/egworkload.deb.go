@@ -47,6 +47,7 @@ func init() {
 		egdebuild.Option.Depends(
 			"egbootstrap",
 			"eg",
+			"egcoreutils",
 			"sudo",
 			"git",
 			"golang",

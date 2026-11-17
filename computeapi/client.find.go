@@ -127,6 +127,18 @@ func (t PushClient) HistoryAnalytics(ctx context.Context, id string, dst io.Writ
 // HistoryFind retrieves the record of a completed workload, including its result.
 // a status error of http.StatusNotFound means the record isn't written (yet).
 func (t PushClient) HistoryFind(ctx context.Context, id string) (_ *compute.History, err error) {
+	resp, err := t.HistoryFindResponse(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	return resp.History, nil
+}
+
+// HistoryFindResponse retrieves the record of a completed workload along with the token for reading its
+// logs and analytics from the runner that executed it, blank when the runner can't be reached.
+// a status error of http.StatusNotFound means the record isn't written (yet).
+func (t PushClient) HistoryFindResponse(ctx context.Context, id string) (_ *compute.HistoryFindResponse, err error) {
 	var (
 		resp compute.HistoryFindResponse
 	)
@@ -150,5 +162,5 @@ func (t PushClient) HistoryFind(ctx context.Context, id string) (_ *compute.Hist
 		return nil, errorsx.String("history response missing record")
 	}
 
-	return resp.History, nil
+	return &resp, nil
 }

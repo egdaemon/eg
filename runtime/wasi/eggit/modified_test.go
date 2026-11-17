@@ -2,12 +2,14 @@ package eggit
 
 import (
 	"fmt"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"testing"
 
 	_eg "github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/internal/envx"
+	"github.com/egdaemon/eg/internal/md5x"
 	"github.com/egdaemon/eg/runtime/wasi/shell"
 	"github.com/stretchr/testify/require"
 )
@@ -156,6 +158,55 @@ func TestModified(t *testing.T) {
 			require.Empty(t, m.changed)
 		})
 
+		t.Run("changeset named by hash of range", func(t *testing.T) {
+			dir := t.TempDir()
+			rundir := t.TempDir()
+			gitInit(t, dir)
+			c0 := gitRevParse(t, dir, "HEAD")
+			gitCommitFiles(t, dir, []string{"a.txt"}, "add a")
+			c1 := gitRevParse(t, dir, "HEAD")
+			gitCommitFiles(t, dir, []string{"b.txt"}, "add b")
+			c2 := gitRevParse(t, dir, "HEAD")
+
+			first := NewModified(
+				ModifiedOptionRuntime(shell.NewLocal()),
+				ModifiedOptionGetenv(envx.NewEnvironFromStrings(
+					fmt.Sprintf("%s=%s", _eg.EnvGitHeadCommit, c1),
+					fmt.Sprintf("%s=%s", _eg.EnvGitBaseCommit, c0),
+				).Map),
+				ModifiedOptionWorkingDirectory(dir),
+				ModifiedOptionRuntimeDirectory(rundir),
+			)
+			second := NewModified(
+				ModifiedOptionRuntime(shell.NewLocal()),
+				ModifiedOptionGetenv(envx.NewEnvironFromStrings(
+					fmt.Sprintf("%s=%s", _eg.EnvGitHeadCommit, c2),
+					fmt.Sprintf("%s=%s", _eg.EnvGitBaseCommit, c0),
+				).Map),
+				ModifiedOptionWorkingDirectory(dir),
+				ModifiedOptionRuntimeDirectory(rundir),
+			)
+			require.NoError(t, first.detect(t.Context()))
+			require.NoError(t, second.detect(t.Context()))
+
+			p1 := filepath.Join(rundir, fmt.Sprintf("eg.git.%s.mod", md5x.FormatHex(md5x.Digest(c0, c1))))
+			p2 := filepath.Join(rundir, fmt.Sprintf("eg.git.%s.mod", md5x.FormatHex(md5x.Digest(c0, c2))))
+			require.NotEqual(t, p1, p2)
+
+			b1, err := os.ReadFile(p1)
+			require.NoError(t, err)
+			b2, err := os.ReadFile(p2)
+			require.NoError(t, err)
+			require.Equal(t, "a.txt\n", string(b1))
+			require.Equal(t, "a.txt\nb.txt\n", string(b2))
+			require.Equal(t, []string{"a.txt"}, first.changed[:1])
+			require.Contains(t, second.changed, "b.txt")
+
+			entries, err := os.ReadDir(rundir)
+			require.NoError(t, err)
+			require.Len(t, entries, 2)
+		})
+
 		t.Run("unwritable runtime directory", func(t *testing.T) {
 			dir := t.TempDir()
 			gitInit(t, dir)
@@ -246,6 +297,59 @@ func TestModified(t *testing.T) {
 			)
 
 			require.True(t, m.Changed()(t.Context()))
+		})
+
+		t.Run("empty changeset returns true", func(t *testing.T) {
+			dir := t.TempDir()
+			gitInit(t, dir)
+			baseCommit := gitRevParse(t, dir, "HEAD")
+
+			cmd := exec.Command("git", "commit", "--allow-empty", "-m", "empty")
+			cmd.Dir = dir
+			require.NoError(t, cmd.Run())
+			headCommit := gitRevParse(t, dir, "HEAD")
+
+			getenv := envx.NewEnvironFromStrings(
+				fmt.Sprintf("%s=%s", _eg.EnvGitHeadCommit, headCommit),
+				fmt.Sprintf("%s=%s", _eg.EnvGitBaseCommit, baseCommit),
+			)
+
+			m := NewModified(
+				ModifiedOptionRuntime(shell.NewLocal()),
+				ModifiedOptionGetenv(getenv.Map),
+				ModifiedOptionWorkingDirectory(dir),
+				ModifiedOptionRuntimeDirectory(dir),
+			)
+
+			require.True(t, m.Changed("src/")(t.Context()))
+			require.Empty(t, m.changed)
+		})
+
+		t.Run("nothing matched returns false", func(t *testing.T) {
+			dir := t.TempDir()
+			gitInit(t, dir)
+			baseCommit := gitRevParse(t, dir, "HEAD")
+
+			cmd := exec.Command("mkdir", "-p", "src")
+			cmd.Dir = dir
+			require.NoError(t, cmd.Run())
+			gitCommitFiles(t, dir, []string{"src/main.go"}, "add main.go")
+			headCommit := gitRevParse(t, dir, "HEAD")
+
+			getenv := envx.NewEnvironFromStrings(
+				fmt.Sprintf("%s=%s", _eg.EnvGitHeadCommit, headCommit),
+				fmt.Sprintf("%s=%s", _eg.EnvGitBaseCommit, baseCommit),
+			)
+
+			m := NewModified(
+				ModifiedOptionRuntime(shell.NewLocal()),
+				ModifiedOptionGetenv(getenv.Map),
+				ModifiedOptionWorkingDirectory(dir),
+				ModifiedOptionRuntimeDirectory(dir),
+			)
+
+			require.False(t, m.Changed("docs/", "pkg/")(t.Context()))
+			require.Contains(t, m.changed, "src/main.go")
 		})
 	})
 }

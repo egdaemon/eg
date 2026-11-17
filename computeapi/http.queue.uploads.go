@@ -191,12 +191,27 @@ func NewDirectUpload(resp *EnqueuedDequeueResponse, token string, archive io.Rea
 }
 
 func NewEnqueueCompletion(cause error, duration time.Duration, logs io.Reader, analytics io.Reader) (mimetype string, body io.ReadCloser, err error) {
+	return NewEnqueueCompletionRequest(&EnqueuedCompletedRequest{
+		Duration:   uint64(duration.Milliseconds()),
+		Successful: cause == nil,
+	}, logs, analytics)
+}
+
+// NewEnqueueCompletionRequest encodes the completion of a workload. the fields are written ahead of the logs
+// and analytics so the receiver knows the workload before it handles the uploads.
+func NewEnqueueCompletionRequest(req *EnqueuedCompletedRequest, logs io.Reader, analytics io.Reader) (mimetype string, body io.ReadCloser, err error) {
 	return httpx.Multipart(func(w *multipart.Writer) error {
-		if err = w.WriteField("duration", strconv.FormatUint(uint64(duration.Milliseconds()), 10)); err != nil {
-			return errorsx.Wrap(err, "unable to write duration")
+		if req.AccessToken != "" {
+			if err = w.WriteField("access_token", req.AccessToken); err != nil {
+				return errorsx.Wrap(err, "unable to write access token")
+			}
 		}
 
-		if err = w.WriteField("successful", strconv.FormatBool(cause == nil)); err != nil {
+		if err = w.WriteField("duration", strconv.FormatUint(req.Duration, 10)); err != nil {
+			return errorsx.Wrap(err, "unable to write completion state")
+		}
+
+		if err = w.WriteField("successful", strconv.FormatBool(req.Successful)); err != nil {
 			return errorsx.Wrap(err, "unable to write completion state")
 		}
 

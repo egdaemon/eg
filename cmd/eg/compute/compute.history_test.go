@@ -54,7 +54,7 @@ func TestRenderHistory(t *testing.T) {
 		require.Contains(t, out, "workloads: 3")
 		require.Regexp(t, `│ ✔\s+│ 1m30s\s+│ a - built\s+│ https://example.com/r.git\s+│ 01234567\s+│ garbage\s+│ garbage\s+│`, out)
 		require.Regexp(t, `│ ✖\s+│ 0s\s+│ b\s+│`, out)
-		require.Regexp(t, `│ ⏹\s+│ 0s\s+│ c\s+│`, out)
+		require.Regexp(t, `│ ⊘\s+│ 0s\s+│ c\s+│`, out)
 	})
 }
 
@@ -62,7 +62,7 @@ func TestTypographyHistoryResult(t *testing.T) {
 	require.Equal(t, "?", fmt.Sprintf("%v", TypographyHistoryResult(&compute.History{})))
 	require.Equal(t, "✖", fmt.Sprintf("%v", TypographyHistoryResult(&compute.History{Result: 1})))
 	require.Equal(t, "✔", fmt.Sprintf("%v", TypographyHistoryResult(&compute.History{Result: 2})))
-	require.Equal(t, "⏹", fmt.Sprintf("%v", TypographyHistoryResult(&compute.History{Result: 3})))
+	require.Equal(t, "⊘", fmt.Sprintf("%v", TypographyHistoryResult(&compute.History{Result: 3})))
 }
 
 func TestTypographyDuration(t *testing.T) {

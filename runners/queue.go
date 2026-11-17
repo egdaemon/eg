@@ -836,6 +836,17 @@ func (t staterunning) Update(ctx context.Context) state {
 	return completed(t.workload, t.metadata, t.bucket, t.ws, time.Since(ts), err)
 }
 
+// completiontoken returns the access token the control plane issued when the workload was handed to this runner,
+// blank when there is none; the control plane then loads the record itself.
+func (t statecompleted) completiontoken() string {
+	// the workspace is the work directory of the run directory, see beginwork.
+	if t.ws.Root == "" {
+		return ""
+	}
+
+	return ReadAccessToken(filepath.Dir(t.ws.Root))
+}
+
 func completed(workload *computeapi.Enqueued, md metadata, bucket string, ws workspaces.Context, duration time.Duration, cause error) statecompleted {
 	return statecompleted{
 		workload: workload,
@@ -889,7 +900,7 @@ func (t statecompleted) Update(ctx context.Context) state {
 		return discard(t.workload, t.metadata, t.bucket, idle(t.metadata))
 	}
 
-	if err = t.metadata.completion.Upload(ctx, t.workload.Id, t.duration, t.cause, logs, analytics); httpx.IsStatusError(err, http.StatusNotFound) != nil {
+	if err = t.metadata.completion.Upload(computeapi.ContextWithCompletionToken(ctx, t.completiontoken()), t.workload.Id, t.duration, t.cause, logs, analytics); httpx.IsStatusError(err, http.StatusNotFound) != nil {
 		// means we already uploaded the results.
 		return discard(t.workload, t.metadata, t.bucket, idle(t.metadata))
 	} else if err != nil {

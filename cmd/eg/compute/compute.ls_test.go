@@ -55,8 +55,8 @@ func TestRenderWorkloads(t *testing.T) {
 		))
 
 		require.Contains(t, out, "workloads: 2")
-		require.Regexp(t, `│ ⏸\s+│ \s*│ \s*│ a - queued one\s+│ linux/amd64\s+│ https://example.com/r.git\s+│ 01234567\s+│ garbage\s+│`, out)
-		require.Regexp(t, `│ ▶\s+│\s+│ \S+\s+│ b\s+│ linux/arm64\s+│`, out)
+		require.Regexp(t, `│ ⏱\s+│ \s*│ \s*│ \s*│ a\s+│ queued one\s+│ linux/amd64\s+│ 01234567\s+│ garbage\s+│`, out)
+		require.Regexp(t, `│ ⚙\s+│\s+│ \S+\s+│ \S*\s+│ b\s+│\s+│ linux/arm64\s+│`, out)
 	})
 
 	t.Run("no workloads still prints the header", func(t *testing.T) {
@@ -67,10 +67,10 @@ func TestRenderWorkloads(t *testing.T) {
 }
 
 func TestTypographyWorkloadState(t *testing.T) {
-	require.Equal(t, "⏸", fmt.Sprintf("%v", TypographyWorkloadState(&computeapi.Enqueued{})))
-	require.Equal(t, "▶", fmt.Sprintf("%v", TypographyWorkloadState(&computeapi.Enqueued{InitiatedAt: "2026-01-02T03:04:05Z"})))
+	require.Equal(t, "⏱", fmt.Sprintf("%v", TypographyWorkloadState(&computeapi.Enqueued{})))
+	require.Equal(t, "⚙", fmt.Sprintf("%v", TypographyWorkloadState(&computeapi.Enqueued{InitiatedAt: "2026-01-02T03:04:05Z"})))
 	require.Equal(t, "✔", fmt.Sprintf("%v", TypographyWorkloadState(&computeapi.Enqueued{InitiatedAt: "2026-01-02T03:04:05Z", CompletedAt: "2026-01-02T03:04:06Z"})))
-	require.Equal(t, "▶ |", fmt.Sprintf("%-2v|", TypographyWorkloadState(&computeapi.Enqueued{InitiatedAt: "2026-01-02T03:04:05Z"})))
+	require.Equal(t, "⚙ |", fmt.Sprintf("%-2v|", TypographyWorkloadState(&computeapi.Enqueued{InitiatedAt: "2026-01-02T03:04:05Z"})))
 }
 
 func TestTypographyWorkloadQueued(t *testing.T) {
@@ -87,16 +87,25 @@ func TestTypographyWorkloadRunning(t *testing.T) {
 	require.Equal(t, "10s", fmt.Sprintf("%v", TypographyWorkloadRunning(&computeapi.Enqueued{InitiatedAt: now.Add(-time.Hour).Format(time.RFC3339Nano), CompletedAt: now.Add(-time.Hour + 10*time.Second).Format(time.RFC3339Nano)})))
 }
 
+func TestTypographyWorkloadDeadline(t *testing.T) {
+	now := time.Now()
+	ttl := uint64(time.Hour)
+	require.Equal(t, "", fmt.Sprintf("%v", TypographyWorkloadDeadline(&computeapi.Enqueued{Ttl: ttl})))
+	require.Equal(t, "59m30s", fmt.Sprintf("%v", TypographyWorkloadDeadline(&computeapi.Enqueued{Ttl: ttl, InitiatedAt: now.Add(-30 * time.Second).Format(time.RFC3339Nano)})))
+	require.Equal(t, "0s", fmt.Sprintf("%v", TypographyWorkloadDeadline(&computeapi.Enqueued{Ttl: ttl, InitiatedAt: now.Add(-2 * time.Hour).Format(time.RFC3339Nano)})))
+	require.Equal(t, "", fmt.Sprintf("%v", TypographyWorkloadDeadline(&computeapi.Enqueued{Ttl: ttl, InitiatedAt: now.Add(-time.Minute).Format(time.RFC3339Nano), CompletedAt: now.Format(time.RFC3339Nano)})))
+}
+
 func TestWorkloadInfinityTimestamps(t *testing.T) {
 	now := time.Now()
 	inf := timex.RFC3339Inf().Format(time.RFC3339Nano)
 	w := &computeapi.Enqueued{CreatedAt: now.Add(-time.Minute).Format(time.RFC3339Nano), InitiatedAt: inf, CompletedAt: inf}
-	require.Equal(t, "⏸", fmt.Sprintf("%v", TypographyWorkloadState(w)))
+	require.Equal(t, "⏱", fmt.Sprintf("%v", TypographyWorkloadState(w)))
 	require.Equal(t, "1m0s", fmt.Sprintf("%v", TypographyWorkloadQueued(w)))
 	require.Equal(t, "", fmt.Sprintf("%v", TypographyWorkloadRunning(w)))
 	require.Equal(t, "", fmt.Sprintf("%v", cmdtypography.TimestampRFC3339(inf).Zero("").Infinity("", "")))
 
 	w = &computeapi.Enqueued{CreatedAt: now.Add(-time.Hour).Format(time.RFC3339Nano), InitiatedAt: now.Add(-30 * time.Second).Format(time.RFC3339Nano), CompletedAt: inf}
-	require.Equal(t, "▶", fmt.Sprintf("%v", TypographyWorkloadState(w)))
+	require.Equal(t, "⚙", fmt.Sprintf("%v", TypographyWorkloadState(w)))
 	require.Equal(t, "30s", fmt.Sprintf("%v", TypographyWorkloadRunning(w)))
 }

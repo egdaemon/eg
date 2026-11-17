@@ -112,7 +112,33 @@ func TestDownloadAnalytics(t *testing.T) {
 		require.Equal(t, "recorded analytics", dst.String())
 	})
 
-	t.Run("a workload that completed earlier is downloaded from the cluster's history", func(t *testing.T) {
+	t.Run("a workload that completed earlier is downloaded from its runner before the cluster's history", func(t *testing.T) {
+		runner := newlogrunner(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			switch r.URL.Path {
+			case "/c/history/w1/analytics":
+				_, _ = w.Write([]byte("runner analytics"))
+			default:
+				w.WriteHeader(http.StatusBadRequest)
+			}
+		}))
+
+		token, err := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{"p2p": runner.ID().String()}).SignedString([]byte("secret"))
+		require.NoError(t, err)
+
+		chttp, seen := fakeapi(t, map[string]string{
+			"/c/runners/meta":         fmt.Sprintf(`{"bootstrap":[%q]}`, fmt.Sprintf("%s/p2p/%s", runner.Addrs()[0], runner.ID())),
+			"/c/q/w1":                 `{"enqueue":{"id":"w1","completed_at":"2020-01-01T00:00:00Z"}}`,
+			"/c/history/w1":           fmt.Sprintf(`{"history":{"id":"w1","p2p_id":%q},"logs_token":%q}`, runner.ID().String(), token),
+			"/c/history/w1/analytics": "stored analytics",
+		})
+
+		var dst bytes.Buffer
+		require.NoError(t, computeapi.DownloadAnalytics(t.Context(), chttp, "w1", &dst))
+		require.Equal(t, "runner analytics", dst.String())
+		require.NotContains(t, seen(), "/c/history/w1/analytics")
+	})
+
+	t.Run("a workload that completed earlier falls back to the cluster's history when the runner has nothing", func(t *testing.T) {
 		chttp, seen := fakeapi(t, map[string]string{
 			"/c/q/w1":                 `{"enqueue":{"id":"w1","completed_at":"2020-01-01T00:00:00Z"}}`,
 			"/c/history/w1/analytics": "stored analytics",
@@ -121,7 +147,7 @@ func TestDownloadAnalytics(t *testing.T) {
 		var dst bytes.Buffer
 		require.NoError(t, computeapi.DownloadAnalytics(t.Context(), chttp, "w1", &dst))
 		require.Equal(t, "stored analytics", dst.String())
-		require.Equal(t, []string{"/c/q/w1", "/c/history/w1/analytics"}, seen())
+		require.Equal(t, []string{"/c/q/w1", "/c/history/w1", "/c/history/w1/analytics"}, seen())
 	})
 
 	t.Run("unknown id", func(t *testing.T) {
@@ -132,7 +158,33 @@ func TestDownloadAnalytics(t *testing.T) {
 }
 
 func TestDownloadLogs(t *testing.T) {
-	t.Run("a workload that completed earlier is downloaded from the cluster's history", func(t *testing.T) {
+	t.Run("a workload that completed earlier is downloaded from its runner before the cluster's history", func(t *testing.T) {
+		runner := newlogrunner(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			switch r.URL.Path {
+			case "/c/history/w1/logs":
+				_, _ = w.Write([]byte("runner logs\n"))
+			default:
+				w.WriteHeader(http.StatusBadRequest)
+			}
+		}))
+
+		token, err := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{"p2p": runner.ID().String()}).SignedString([]byte("secret"))
+		require.NoError(t, err)
+
+		chttp, seen := fakeapi(t, map[string]string{
+			"/c/runners/meta":    fmt.Sprintf(`{"bootstrap":[%q]}`, fmt.Sprintf("%s/p2p/%s", runner.Addrs()[0], runner.ID())),
+			"/c/q/w1":            `{"enqueue":{"id":"w1","completed_at":"2020-01-01T00:00:00Z"}}`,
+			"/c/history/w1":      fmt.Sprintf(`{"history":{"id":"w1","p2p_id":%q},"logs_token":%q}`, runner.ID().String(), token),
+			"/c/history/w1/logs": "stored logs\n",
+		})
+
+		var dst bytes.Buffer
+		require.NoError(t, computeapi.DownloadLogs(t.Context(), chttp, "w1", &dst))
+		require.Equal(t, "runner logs\n", dst.String())
+		require.NotContains(t, seen(), "/c/history/w1/logs")
+	})
+
+	t.Run("a workload that completed earlier falls back to the cluster's history when the runner has nothing", func(t *testing.T) {
 		chttp, _ := fakeapi(t, map[string]string{
 			"/c/q/w1":            `{"enqueue":{"id":"w1","completed_at":"2020-01-01T00:00:00Z"}}`,
 			"/c/history/w1/logs": "stored logs\n",

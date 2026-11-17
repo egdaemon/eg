@@ -156,7 +156,7 @@ func APTPackage(packages ...string) eg.OpFn {
 
 const (
 	EnvUnsafeDigest = "EG_UNSAFE_ENVVARS_DIGEST"
-	defaultDigest   = "6b4c189e90a5594dfc7a39ce45ce4959"
+	defaultDigest   = "0830f1791e9db7ac50d133cbbf826f10"
 )
 
 //go:embed default.env
@@ -221,6 +221,7 @@ func normalizeEnv(environ *envx.Builder) *envx.Builder {
 	environ.Setenv(_eg.EnvComputeGPU, "false")
 	environ.Setenv(_eg.EnvComputeGuestMigrationsEnabled, "true")
 	environ.Setenv(_eg.EnvComputeTTL, "0s")
+	environ.Setenv(_eg.EnvComputeEnvironToken, "")
 	environ.Setenv(_eg.EnvComputeWorkload, "")
 	environ.Unsetenv(_eg.EnvComputeWorkloadName) // not part of default.env, removed so the digest is unchanged.
 	environ.Setenv(_eg.EnvComputeProfileMode, "")

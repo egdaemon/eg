@@ -9,6 +9,7 @@ import (
 	"github.com/egdaemon/eg/compute"
 	"github.com/egdaemon/eg/computeapi"
 	"github.com/egdaemon/eg/internal/bytesx"
+	"github.com/egdaemon/eg/internal/computex"
 	"github.com/egdaemon/eg/internal/stringsx"
 	"github.com/egdaemon/eg/internal/timex"
 )
@@ -180,26 +181,52 @@ func TypographyWorkloadPlatform(w *computeapi.Enqueued) fmt.Formatter {
 	return workloadPlatform{w: w}
 }
 
-type workloadState struct {
-	w *computeapi.Enqueued
+type resultTypography struct {
+	r int32
 }
 
-func (t workloadState) Format(f fmt.State, verb rune) {
-	v := "⏸"
-	_, completed := parsets(t.w.GetCompletedAt())
-	_, initiated := parsets(t.w.GetInitiatedAt())
-	switch {
-	case completed:
+func (t resultTypography) Format(f fmt.State, verb rune) {
+	v := "?"
+	switch t.r {
+	case computex.ResultCompleted:
 		v = "✔"
-	case initiated:
-		v = "▶"
+	case computex.ResultFailure:
+		v = "✖"
+	case computex.ResultCancelled:
+		v = "⊘"
 	}
 
 	// width, precision and flags are applied to the whole value.
 	_, _ = fmt.Fprintf(f, fmt.FormatString(f, 's'), v)
 }
 
-// TypographyWorkloadState formats the workload as an icon: ⏸ queued until it is initiated, ▶ running until it is completed, ✔ completed.
+// TypographyResult formats a computex result as an icon: ✔ completed, ✖ failure, ⊘ cancelled, ? unknown.
+func TypographyResult(r int32) fmt.Formatter {
+	return resultTypography{r: r}
+}
+
+type workloadState struct {
+	w *computeapi.Enqueued
+}
+
+func (t workloadState) Format(f fmt.State, verb rune) {
+	// a completed workload is a result, until then it is either running or queued.
+	if _, completed := parsets(t.w.GetCompletedAt()); completed {
+		TypographyResult(computex.ResultCompleted).Format(f, verb)
+		return
+	}
+
+	v := "⏱"
+	if _, initiated := parsets(t.w.GetInitiatedAt()); initiated {
+		v = "⚙"
+	}
+
+	// width, precision and flags are applied to the whole value.
+	_, _ = fmt.Fprintf(f, fmt.FormatString(f, 's'), v)
+}
+
+// TypographyWorkloadState formats the workload as an icon: ⏱ queued until it is initiated, ⚙ running until it is
+// completed, then the completed result, see TypographyResult.
 func TypographyWorkloadState(w *computeapi.Enqueued) fmt.Formatter {
 	return workloadState{w: w}
 }
@@ -224,29 +251,9 @@ func TypographyHistoryCompact(h *compute.History) fmt.Formatter {
 	return historyCompact{h: h}
 }
 
-type historyResult struct {
-	h *compute.History
-}
-
-func (t historyResult) Format(f fmt.State, verb rune) {
-	// 0 unknown, 1 failure, 2 completed, 3 cancelled.
-	v := "?"
-	switch t.h.GetResult() {
-	case 1:
-		v = "✖"
-	case 2:
-		v = "✔"
-	case 3:
-		v = "⏹"
-	}
-
-	// width, precision and flags are applied to the whole value.
-	_, _ = fmt.Fprintf(f, fmt.FormatString(f, 's'), v)
-}
-
-// TypographyHistoryResult formats the outcome of the workload as an icon: ✔ completed, ✖ failure, ⏹ cancelled, ? unknown.
+// TypographyHistoryResult formats the outcome of the workload as an icon, see TypographyResult.
 func TypographyHistoryResult(h *compute.History) fmt.Formatter {
-	return historyResult{h: h}
+	return TypographyResult(h.GetResult())
 }
 
 type duration struct {
@@ -309,4 +316,27 @@ func (t workloadRunning) Format(f fmt.State, verb rune) {
 // while it is running. blank when the workload hasn't started.
 func TypographyWorkloadRunning(w *computeapi.Enqueued) fmt.Formatter {
 	return workloadRunning{w: w}
+}
+
+type workloadDeadline struct {
+	w *computeapi.Enqueued
+}
+
+func (t workloadDeadline) Format(f fmt.State, verb rune) {
+	v := ""
+	started, ok := parsets(t.w.GetInitiatedAt())
+	_, completed := parsets(t.w.GetCompletedAt())
+	if ok && !completed {
+		remaining := started.Add(time.Duration(t.w.GetTtl())).Sub(time.Now())
+		v = max(remaining, 0).Round(time.Second).String()
+	}
+
+	// width, precision and flags are applied to the whole value.
+	_, _ = fmt.Fprintf(f, fmt.FormatString(f, 's'), v)
+}
+
+// TypographyWorkloadDeadline formats the time remaining before the workload exceeds its ttl, counting down to zero from
+// initiation. blank when the workload hasn't started or has completed.
+func TypographyWorkloadDeadline(w *computeapi.Enqueued) fmt.Formatter {
+	return workloadDeadline{w: w}
 }

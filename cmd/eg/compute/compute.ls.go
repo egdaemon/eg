@@ -87,9 +87,10 @@ func renderWorkloads(items ...*computeapi.Enqueued) string {
 			fmt.Sprintf("%v", TypographyWorkloadState(w)),
 			fmt.Sprintf("%v", TypographyWorkloadQueued(w)),
 			fmt.Sprintf("%v", TypographyWorkloadRunning(w)),
-			fmt.Sprintf("%.64v", TypographyWorkloadCompact(w)),
+			fmt.Sprintf("%v", TypographyWorkloadDeadline(w)),
+			w.GetId(),
+			fmt.Sprintf("%.64v", w.GetDescription()),
 			fmt.Sprintf("%v", TypographyWorkloadPlatform(w)),
-			w.GetVcsUri(),
 			fmt.Sprintf("%.8v", w.GetVcsCommit()),
 			fmt.Sprintf("%v", cmdtypography.TimestampRFC3339(w.GetCreatedAt()).Layout(time.DateTime).Zero("").Infinity("", "")),
 			fmt.Sprintf("%v", cmdtypography.TimestampRFC3339(w.GetInitiatedAt()).Layout(time.DateTime).Zero("").Infinity("", "")),
@@ -98,7 +99,7 @@ func renderWorkloads(items ...*computeapi.Enqueued) string {
 
 	tbl := table.New().
 		Border(lipgloss.NormalBorder()).
-		Headers("STATE", "QUEUED", "RUNNING", "WORKLOAD", "OS/ARCH", "VCS", "COMMIT", "CREATED", "STARTED").
+		Headers("STATE", "QUEUED", "RUNNING", "TTL", "WORKLOAD", "DESCRIPTION", "OS/ARCH", "COMMIT", "CREATED", "STARTED").
 		Rows(rows...).
 		StyleFunc(func(row, col int) lipgloss.Style {
 			if row == table.HeaderRow {

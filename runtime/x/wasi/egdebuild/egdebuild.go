@@ -9,7 +9,6 @@ import (
 	"embed"
 	"fmt"
 	"io/fs"
-	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -21,6 +20,7 @@ import (
 	"github.com/egdaemon/eg/internal/langx"
 	"github.com/egdaemon/eg/runtime/wasi/eg"
 	"github.com/egdaemon/eg/runtime/wasi/egenv"
+	"github.com/egdaemon/eg/runtime/wasi/egunsafe"
 	"github.com/egdaemon/eg/runtime/wasi/shell"
 	"github.com/egdaemon/eg/runtime/x/wasi/egfs"
 )
@@ -270,31 +270,35 @@ func Runtime(cfg Config, opts ...option) shell.Command {
 	)
 }
 
+// builddir is the directory build artifacts are written to. it lives in the workload directory instead of the
+// temporary directory because the source tree is copied for every build and the temporary directory is too small for large projects.
+func builddir(name string) string {
+	return egenv.DirectoryWorkload(fmt.Sprintf("deb.%s", name))
+}
+
 // Build creates a debian package from debian skeleton folder containing.
 // requires a working
 func Build(cfg Config, opts ...option) eg.OpFn {
 	cfg = From(cfg, opts...)
 	return func(ctx context.Context, _ eg.Op) error {
-		root := egenv.DirectoryTemp(fmt.Sprintf("deb.%s", cfg.Name))
+		root := builddir(cfg.Name)
 		if err := fsx.MkDirs(0755, root); err != nil {
 			return err
 		}
 
-		bdir, err := os.MkdirTemp(root, "deb.*")
-		if err != nil {
-			return err
-		}
+		// isolate each build, they run in parallel and share the root.
+		bdir := egenv.DirectoryWorkload(fmt.Sprintf("deb.%s", cfg.Name), egunsafe.PatternIsolate(4, "%x"))
 
 		if err := fsx.MkDirs(0755, filepath.Join(bdir, "bin"), filepath.Join(bdir, "src"), filepath.Join(bdir, "debian"), filepath.Join(bdir, "linux")); err != nil {
 			return err
 		}
 
-		if err = egfs.CloneFS(ctx, filepath.Join(bdir, "debian"), filepath.Join(".debian", "debian"), debskel); err != nil {
+		if err := egfs.CloneFS(ctx, filepath.Join(bdir, "debian"), filepath.Join(".debian", "debian"), debskel); err != nil {
 			return errorsx.Wrap(err, "unable to read default debian templates from package, this is an upstream bug. file an issue")
 		}
 
 		if cfg.Debian != nil {
-			if err = egfs.CloneFS(ctx, filepath.Join(bdir, "debian"), "debian", cfg.Debian); err != nil {
+			if err := egfs.CloneFS(ctx, filepath.Join(bdir, "debian"), "debian", cfg.Debian); err != nil {
 				return err
 			}
 		}
@@ -320,8 +324,7 @@ func UploadDPut(gcfg Config, dput fs.FS, opts ...option) eg.OpFn {
 		if err := egfs.CloneFS(ctx, egenv.DirectoryTemp(), "dput.config", dput); err != nil {
 			return err
 		}
-		root := fmt.Sprintf("deb.%s", gcfg.Name)
-		bdir := egenv.DirectoryTemp(root)
+		bdir := builddir(gcfg.Name)
 		cfg := From(gcfg, opts...)
 		runtime := Runtime(cfg)
 		return shell.Run(
@@ -343,8 +346,7 @@ func UploadDPut(gcfg Config, dput fs.FS, opts ...option) eg.OpFn {
 func Copy(gcfg Config, dst string, opts ...option) eg.OpFn {
 	return func(ctx context.Context, o eg.Op) error {
 		cfg := From(gcfg, opts...)
-		root := fmt.Sprintf("deb.%s", gcfg.Name)
-		src := egenv.DirectoryTemp(root)
+		src := builddir(gcfg.Name)
 		runtime := shell.Runtime()
 		return shell.Run(
 			ctx,

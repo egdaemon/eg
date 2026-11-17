@@ -1,0 +1,2 @@
+// retry transient acquire failures (network, mirror hiccups)
+Acquire::Retries "5";

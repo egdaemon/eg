@@ -5,3 +5,6 @@ APT::Periodic::AutocleanInterval "1";
 APT::Periodic::CleanInterval "1";
 APT::Periodic::MinAge "2";
 APT::Periodic::MaxAge "30";
+
+Binary::apt::APT::Keep-Downloaded-Packages "true";
+APT::Keep-Downloaded-Packages "true";

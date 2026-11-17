@@ -21,12 +21,14 @@ const downloadpollinterval = 2 * time.Second
 
 // DownloadLogs writes the logs of a workload enqueued with the cluster into dst. it waits for the cluster to
 // schedule the workload on a runner, then streams the logs from that runner until the workload completes.
-// workloads that already completed are served from the stored logs.
+// workloads that already completed are read from the runner that executed them, falling back to the stored logs.
 func DownloadLogs(ctx context.Context, chttp *http.Client, id string, dst io.Writer) (err error) {
 	log.Println("waiting for the workload to start", id)
 	found, err := NewPushClient(chttp).AwaitLogsToken(ctx, id, downloadpollinterval)
 	if errors.Is(err, ErrWorkloadCompleted) {
-		return computex.Logs(ctx, id, dst, NewPushClient(chttp).HistoryLogs)
+		return downloadCompleted(ctx, chttp, id, dst, RunnerHistoryLogs, func(ctx context.Context, id string, dst io.Writer) error {
+			return computex.Logs(ctx, id, dst, NewPushClient(chttp).HistoryLogs)
+		})
 	} else if err != nil {
 		return errorsx.Wrap(err, "unable to download workload logs")
 	}
@@ -43,12 +45,12 @@ func DownloadLogs(ctx context.Context, chttp *http.Client, id string, dst io.Wri
 // DownloadAnalytics writes the analytics database of a workload enqueued with the cluster into dst, downloaded
 // directly from the runner. it waits for the cluster to schedule the workload on a runner. a running workload
 // is snapshotted, one that completed in the meantime is served from the runner's history, and one that completed
-// earlier is served from the stored analytics of the cluster.
+// earlier is read from its runner first, falling back to the stored analytics of the cluster.
 func DownloadAnalytics(ctx context.Context, chttp *http.Client, id string, dst io.Writer) (err error) {
 	log.Println("waiting for the workload to start", id)
 	found, err := NewPushClient(chttp).AwaitLogsToken(ctx, id, downloadpollinterval)
 	if errors.Is(err, ErrWorkloadCompleted) {
-		return errorsx.Wrap(NewPushClient(chttp).HistoryAnalytics(ctx, id, dst), "stored workload analytics unavailable")
+		return downloadCompleted(ctx, chttp, id, dst, RunnerHistoryAnalytics, NewPushClient(chttp).HistoryAnalytics)
 	} else if err != nil {
 		return errorsx.Wrap(err, "unable to locate workload on the cluster")
 	}
@@ -81,4 +83,60 @@ func dialp2p(ctx context.Context, chttp *http.Client) (_ host.Host, err error) {
 	}
 
 	return p2p, nil
+}
+
+// downloadCompleted retrieves the data of a workload that already completed. the runner that executed it
+// is always attempted first, located through the p2p id and log token of the history record. when the runner
+// can't be located or no longer has the data, the copy stored by the cluster (stored) is used instead.
+func downloadCompleted(
+	ctx context.Context,
+	chttp *http.Client,
+	id string,
+	dst io.Writer,
+	fetch func(ctx context.Context, p2p host.Host, token string, id string, dst io.Writer) error,
+	stored func(ctx context.Context, id string, dst io.Writer) error,
+) (err error) {
+	rerr := downloadFromRunner(ctx, chttp, id, dst, fetch)
+	if rerr == nil {
+		return nil
+	}
+
+	if ctx.Err() != nil {
+		return ctx.Err()
+	}
+
+	log.Println("unable to retrieve from the runner, using the stored copy:", rerr)
+
+	if err = stored(ctx, id, dst); err != nil {
+		return errorsx.Wrapf(err, "stored workload data unavailable and the runner failed: %v", rerr)
+	}
+
+	return nil
+}
+
+// downloadFromRunner resolves the runner of a completed workload from its history record (p2p id
+// and log token) and reads the recorded data directly from it.
+func downloadFromRunner(
+	ctx context.Context,
+	chttp *http.Client,
+	id string,
+	dst io.Writer,
+	fetch func(ctx context.Context, p2p host.Host, token string, id string, dst io.Writer) error,
+) (err error) {
+	found, err := NewPushClient(chttp).HistoryFindResponse(ctx, id)
+	if err != nil {
+		return errorsx.Wrap(err, "unable to load the history record")
+	}
+
+	if found.History.P2PId == "" || found.LogsToken == "" {
+		return errorsx.String("the history has no runner to retrieve from")
+	}
+
+	p2p, err := dialp2p(ctx, chttp)
+	if err != nil {
+		return err
+	}
+	defer p2p.Close()
+
+	return errorsx.Wrapf(fetch(ctx, p2p, found.LogsToken, id, dst), "runner %s has no recorded data for workload", found.History.P2PId)
 }

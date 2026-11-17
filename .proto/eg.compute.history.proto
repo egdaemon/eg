@@ -15,9 +15,16 @@ message History {
   string uploaded_by = 8 [ json_name = "uploaded_by" ];
   string vcs_uri = 9 [ json_name = "vcs_uri" ];
   string vcs_commit = 10 [ json_name = "vcs_commit" ];
+  // p2p id of the runner that executed the workload.
+  string p2p_id = 11 [ json_name = "p2p_id" ];
 }
 
-message HistoryFindResponse { History history = 1 [ json_name = "history" ]; }
+message HistoryFindResponse {
+  History history = 1 [ json_name = "history" ];
+  // short lived token for reading logs/analytics from the runner, only set
+  // while the runner may still hold the data.
+  string logs_token = 2 [ json_name = "logs_token" ];
+}
 
 message SearchHistoryRequest {
   string query = 1 [ json_name = "query" ];

@@ -35,13 +35,19 @@ d=$(mktemp -d) && curl -fsSL https://api.github.com/repos/egdaemon/eg/releases/l
 
 #### archlinux
 
-with [gh](https://cli.github.com):
+from [aur](https://cli.github.com):
+
+```bash
+yay -S egd
+```
+
+from [gh](https://cli.github.com):
 
 ```bash
 d=$(mktemp -d) && gh release download --repo egdaemon/eg --pattern "egd-v*-$(uname -m).pkg.tar.zst" --dir "$d" && sudo pacman -U "$d"/*.pkg.tar.zst
 ```
 
-with curl:
+from curl:
 
 ```bash
 d=$(mktemp -d) && curl -fsSL https://api.github.com/repos/egdaemon/eg/releases/latest | jq -r --arg a "$(uname -m)" '.assets[] | select((.name | startswith("egd-v")) and (.name | endswith("-" + $a + ".pkg.tar.zst"))) | .browser_download_url' | xargs curl -fsSL --output-dir "$d" -O && sudo pacman -U "$d"/*.pkg.tar.zst

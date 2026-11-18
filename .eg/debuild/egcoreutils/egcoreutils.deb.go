@@ -52,7 +52,6 @@ func init() {
 		egdebuild.Option.Version(fmt.Sprintf("%s.:autopatch:", version)),
 		egdebuild.Option.Description("egcoreutils", "uutils coreutils compiled to WebAssembly (wasm32-wasip1) for eg's guest shell"),
 		egdebuild.Option.Debian(errorsx.Must(fs.Sub(debskel, ".debskel"))),
-		egdebuild.Option.Architecture("all"),
 		egdebuild.Option.Environ(eggpg.Env(gpgoptions()...)...),
 	)
 }

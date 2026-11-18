@@ -14,8 +14,10 @@ import (
 	"github.com/egdaemon/eg/runtime/wasi/egenv"
 	"github.com/egdaemon/eg/runtime/wasi/eggit"
 	"github.com/egdaemon/eg/runtime/wasi/shell"
+	"github.com/egdaemon/eg/runtime/x/wasi/egbug"
 	"github.com/egdaemon/eg/runtime/x/wasi/egcargo"
 	"github.com/egdaemon/eg/runtime/x/wasi/egdebuild"
+	"github.com/egdaemon/eg/runtime/x/wasi/eggpg"
 )
 
 //go:embed .debskel
@@ -31,6 +33,13 @@ const (
 
 var gcfg egdebuild.Config
 
+func gpgoptions() []eggpg.Option {
+	// eggpg.Options() takes GNUPGHOME from the environment, which inside the container is the
+	// host-provided /eg.mnt/.gnupg (not writable by us: "unsafe ownership", "Permission denied").
+	// pin the isolated per-container home instead.
+	return eggpg.Options().IgnoreLocalGNU().Home("/home/egd/.gnupg")
+}
+
 func init() {
 	c := eggit.EnvCommit()
 	gcfg = egdebuild.New(
@@ -44,10 +53,7 @@ func init() {
 		egdebuild.Option.Description("egcoreutils", "uutils coreutils compiled to WebAssembly (wasm32-wasip1) for eg's guest shell"),
 		egdebuild.Option.Debian(errorsx.Must(fs.Sub(debskel, ".debskel"))),
 		egdebuild.Option.Architecture("all"),
-		egdebuild.Option.Runtime(func(c shell.Command) shell.Command {
-			return c.MaybePrivileged(true) // temporary until we register the gpg key.
-			// this allows the runner to access the .gnupg directory we mount via compute local
-		}),
+		egdebuild.Option.Environ(eggpg.Env(gpgoptions()...)...),
 	)
 }
 
@@ -86,6 +92,11 @@ func Compile(ctx context.Context, o eg.Op) error {
 func Build(ctx context.Context, o eg.Op) error {
 	return eg.Sequential(
 		Compile,
+		// seed the isolated gpg home with the signing key so debuild can sign the source package.
+		egbug.Debug(
+			eggpg.Seed(gpgoptions()...),
+			eggpg.Debug(gpgoptions()...),
+		),
 		egdebuild.Build(gcfg, egdebuild.Option.Distro(egdebuild.UbuntuLatestCodename), egdebuild.Option.NoLint()),
 	)(ctx, o)
 }

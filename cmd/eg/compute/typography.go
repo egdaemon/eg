@@ -256,6 +256,42 @@ func TypographyHistoryResult(h *compute.History) fmt.Formatter {
 	return TypographyResult(h.GetResult())
 }
 
+type historyPlatform struct {
+	h *compute.History
+}
+
+func (t historyPlatform) Format(f fmt.State, verb rune) {
+	v := fmt.Sprintf("%s/%s", t.h.GetOs(), t.h.GetArch())
+
+	// width, precision and flags are applied to the whole value.
+	_, _ = fmt.Fprintf(f, fmt.FormatString(f, 's'), v)
+}
+
+// TypographyHistoryPlatform formats the record as the operating system followed by the architecture of the runner.
+func TypographyHistoryPlatform(h *compute.History) fmt.Formatter {
+	return historyPlatform{h: h}
+}
+
+type historyQueued struct {
+	h *compute.History
+}
+
+func (t historyQueued) Format(f fmt.State, verb rune) {
+	v := ""
+	// a completed workload that never started has no queue time, rather than one that keeps counting.
+	if _, ok := parsets(t.h.GetInitiatedAt()); ok {
+		v = elapsed(t.h.GetCreatedAt(), t.h.GetInitiatedAt())
+	}
+
+	// width, precision and flags are applied to the whole value.
+	_, _ = fmt.Fprintf(f, fmt.FormatString(f, 's'), v)
+}
+
+// TypographyHistoryQueued formats the time the workload waited in the queue, from creation until it was initiated.
+func TypographyHistoryQueued(h *compute.History) fmt.Formatter {
+	return historyQueued{h: h}
+}
+
 type duration struct {
 	d time.Duration
 }

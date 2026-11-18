@@ -17,6 +17,9 @@ message History {
   string vcs_commit = 10 [ json_name = "vcs_commit" ];
   // p2p id of the runner that executed the workload.
   string p2p_id = 11 [ json_name = "p2p_id" ];
+  // operating system and architecture of the runner that executed the workload.
+  string os = 12 [ json_name = "os" ];
+  string arch = 13 [ json_name = "arch" ];
 }
 
 message HistoryFindResponse {

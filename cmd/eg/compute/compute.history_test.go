@@ -46,15 +46,17 @@ func TestHistoryList(t *testing.T) {
 func TestRenderHistory(t *testing.T) {
 	t.Run("prints a row per record with its result", func(t *testing.T) {
 		out := ansi.Strip(renderHistory(
-			&compute.History{Id: "a", Description: "built", VcsUri: "https://example.com/r.git", VcsCommit: "0123456789abcdef", Result: 2, Duration: int64(90 * time.Second), InitiatedAt: "garbage", CompletedAt: "garbage"},
+			&compute.History{Id: "a", Description: "built", Os: "linux", Arch: "amd64", VcsUri: "https://example.com/r.git", VcsCommit: "0123456789abcdef", Result: 2, Duration: int64(90 * time.Second), InitiatedAt: "garbage", CompletedAt: "garbage"},
 			&compute.History{Id: "b", Result: 1},
 			&compute.History{Id: "c", Result: 3},
 		))
 
 		require.Contains(t, out, "workloads: 3")
-		require.Regexp(t, `│ ✔\s+│ 1m30s\s+│ a - built\s+│ https://example.com/r.git\s+│ 01234567\s+│ garbage\s+│ garbage\s+│`, out)
-		require.Regexp(t, `│ ✖\s+│ 0s\s+│ b\s+│`, out)
-		require.Regexp(t, `│ ⊘\s+│ 0s\s+│ c\s+│`, out)
+		require.Contains(t, out, "QUEUED")
+		require.Contains(t, out, "ELAPSED")
+		require.Regexp(t, `│ ✔\s+│\s+│ 1m30s\s+│ a\s+│ built\s+│ linux/amd64\s+│ 01234567\s+│\s+│ garbage\s+│ garbage\s+│`, out)
+		require.Regexp(t, `│ ✖\s+│\s+│ 0s\s+│ b\s+│`, out)
+		require.Regexp(t, `│ ⊘\s+│\s+│ 0s\s+│ c\s+│`, out)
 	})
 }
 
@@ -63,6 +65,11 @@ func TestTypographyHistoryResult(t *testing.T) {
 	require.Equal(t, "✖", fmt.Sprintf("%v", TypographyHistoryResult(&compute.History{Result: 1})))
 	require.Equal(t, "✔", fmt.Sprintf("%v", TypographyHistoryResult(&compute.History{Result: 2})))
 	require.Equal(t, "⊘", fmt.Sprintf("%v", TypographyHistoryResult(&compute.History{Result: 3})))
+}
+
+func TestTypographyHistoryQueued(t *testing.T) {
+	require.Equal(t, "", fmt.Sprintf("%v", TypographyHistoryQueued(&compute.History{CreatedAt: "2026-01-02T03:04:05Z"})))
+	require.Equal(t, "5s", fmt.Sprintf("%v", TypographyHistoryQueued(&compute.History{CreatedAt: "2026-01-02T03:04:05Z", InitiatedAt: "2026-01-02T03:04:10Z"})))
 }
 
 func TestTypographyDuration(t *testing.T) {

@@ -36,7 +36,10 @@ type History struct {
 	VcsUri     string `protobuf:"bytes,9,opt,name=vcs_uri,proto3" json:"vcs_uri,omitempty"`
 	VcsCommit  string `protobuf:"bytes,10,opt,name=vcs_commit,proto3" json:"vcs_commit,omitempty"`
 	// p2p id of the runner that executed the workload.
-	P2PId         string `protobuf:"bytes,11,opt,name=p2p_id,proto3" json:"p2p_id,omitempty"`
+	P2PId string `protobuf:"bytes,11,opt,name=p2p_id,proto3" json:"p2p_id,omitempty"`
+	// operating system and architecture of the runner that executed the workload.
+	Os            string `protobuf:"bytes,12,opt,name=os,proto3" json:"os,omitempty"`
+	Arch          string `protobuf:"bytes,13,opt,name=arch,proto3" json:"arch,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -144,6 +147,20 @@ func (x *History) GetVcsCommit() string {
 func (x *History) GetP2PId() string {
 	if x != nil {
 		return x.P2PId
+	}
+	return ""
+}
+
+func (x *History) GetOs() string {
+	if x != nil {
+		return x.Os
+	}
+	return ""
+}
+
+func (x *History) GetArch() string {
+	if x != nil {
+		return x.Arch
 	}
 	return ""
 }
@@ -327,7 +344,7 @@ var File_eg_compute_history_proto protoreflect.FileDescriptor
 const file_eg_compute_history_proto_rawDesc = "" +
 	"\n" +
 	"\x18eg.compute.history.proto\x12\n" +
-	"eg.compute\"\xcb\x02\n" +
+	"eg.compute\"\xef\x02\n" +
 	"\aHistory\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12 \n" +
 	"\vdescription\x18\x02 \x01(\tR\vdescription\x12\x1e\n" +
@@ -344,7 +361,9 @@ const file_eg_compute_history_proto_rawDesc = "" +
 	"vcs_commit\x18\n" +
 	" \x01(\tR\n" +
 	"vcs_commit\x12\x16\n" +
-	"\x06p2p_id\x18\v \x01(\tR\x06p2p_id\"d\n" +
+	"\x06p2p_id\x18\v \x01(\tR\x06p2p_id\x12\x0e\n" +
+	"\x02os\x18\f \x01(\tR\x02os\x12\x12\n" +
+	"\x04arch\x18\r \x01(\tR\x04arch\"d\n" +
 	"\x13HistoryFindResponse\x12-\n" +
 	"\ahistory\x18\x01 \x01(\v2\x13.eg.compute.HistoryR\ahistory\x12\x1e\n" +
 	"\n" +

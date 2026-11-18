@@ -42,7 +42,11 @@ func main() {
 		),
 		egbug.Log("test suite completed"),
 		egbug.Log("integration tests initiated"),
-		IntegrationTests,
+		egbug.Debug(
+			IntegrationTests,
+			egbug.Cgroups,
+			egbug.SystemdServices,
+		),
 		egbug.Log("integration tests completed"),
 		// keep the analytics database of a successful run in the cache for the next run, see egdb.Latest.
 		egdb.Cache,

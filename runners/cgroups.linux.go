@@ -3,6 +3,7 @@
 package runners
 
 import (
+	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -33,11 +34,21 @@ func IsolateCgroups(runid string) (err error) {
 	}
 
 	if current != "/" || os.Getpid() == 1 {
+		log.Printf("cgroup isolation skipped: cgroup(%s) pid(%d)\n", current, os.Getpid())
 		return nil
 	}
 
 	if err = cgroups.MoveUnderCgroupSubtree(CgroupWorkload(runid)); err != nil {
 		return errorsx.Wrap(err, "unable to move the workload out of the root cgroup")
+	}
+
+	// moving processes failures are only logged at debug level by the cgroups package, verify it worked.
+	if current, err = cgroups.GetOwnCgroup(); err != nil {
+		return errorsx.Wrap(err, "unable to determine the workload's cgroup after moving")
+	}
+
+	if expected := "/" + CgroupWorkload(runid); current != expected {
+		return errorsx.Errorf("workload remains in cgroup %s, expected %s", current, expected)
 	}
 
 	if controllers, err = cgroups.ReadFile(root, "cgroup.controllers"); err != nil {

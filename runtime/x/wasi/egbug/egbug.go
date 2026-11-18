@@ -126,7 +126,7 @@ func Env(ctx context.Context, op eg.Op) error {
 }
 
 // debugging information for system initialization
-func SystemInit(ctx context.Context, op eg.Op) error {
+func SystemdServices(ctx context.Context, op eg.Op) error {
 	return shell.Run(
 		ctx,
 		shell.New("systemctl list-units --failed").Privileged().Timeout(time.Second),
@@ -338,6 +338,33 @@ func EnsureEnv(expected string, keys ...string) eg.OpFn {
 	}
 }
 
+// prints debugging information about the cgroups of the workload, see EnsureCgroups.
+// commands are lenient, a missing file is reported and does not prevent the remaining output.
+func Cgroups(ctx context.Context, op eg.Op) error {
+	const root = "/sys/fs/cgroup"
+	workload := fmt.Sprintf("%s/eg.workload.%s", root, egenv.RunID())
+	lenient := shell.Runtime().Lenient(true)
+	return shell.Run(
+		ctx,
+		lenient.New("echo 'pid:' $$ && echo 'self cgroup:' && cat /proc/self/cgroup"),
+		lenient.New("echo 'pid 1 cgroup:' && cat /proc/1/cgroup"),
+		lenient.New("echo 'cgroup namespace:' && readlink /proc/self/ns/cgroup"),
+		lenient.New("echo 'cgroup mounts:' && grep cgroup /proc/self/mountinfo"),
+		lenient.Newf("echo 'root controllers:' && cat %s/cgroup.controllers", root),
+		lenient.Newf("echo 'root subtree_control:' && cat %s/cgroup.subtree_control", root),
+		lenient.Newf("echo 'root procs:' && cat %s/cgroup.procs", root),
+		lenient.Newf("echo 'root cpu.max:' && cat %s/cpu.max", root),
+		lenient.Newf("echo 'root memory.max:' && cat %s/memory.max", root),
+		lenient.Newf("echo 'root children:' && ls -lhan %s | grep '^d'", root),
+		lenient.Newf("echo 'workload cgroup: %s' && ls -lhan %s", workload, workload),
+		lenient.Newf("echo 'workload controllers:' && cat %s/cgroup.controllers", workload),
+		lenient.Newf("echo 'workload subtree_control:' && cat %s/cgroup.subtree_control", workload),
+		lenient.Newf("echo 'workload procs:' && cat %s/cgroup.procs", workload),
+		lenient.Newf("echo 'workload cpu.max:' && cat %s/cpu.max", workload),
+		lenient.Newf("echo 'workload memory.max:' && cat %s/memory.max", workload),
+	)
+}
+
 // EnsureCgroups asserts the workload is isolated from the container's root cgroup, see runners.IsolateCgroups,
 // so containers run by the workload get the cgroup controllers they would on the host.
 func EnsureCgroups(ctx context.Context, op eg.Op) error {
@@ -346,7 +373,7 @@ func EnsureCgroups(ctx context.Context, op eg.Op) error {
 	return shell.Run(
 		ctx,
 		// the workload's commands run in the workload's cgroup.
-		shell.Newf("test \"$(cat /proc/self/cgroup)\" = \"0::/eg.workload.%s\"", egenv.RunID()),
+		shell.Newf("c=\"$(cat /proc/self/cgroup)\"; test \"$c\" = \"0::/eg.workload.%s\" || { echo \"unexpected cgroup: $c\" >&2; exit 1; }", egenv.RunID()),
 		// nothing remains in the root cgroup, a cgroup holding processes can not hand its children controllers.
 		shell.Newf("test -z \"$(cat %s/cgroup.procs)\"", root),
 		// every controller of the container is handed to its children.

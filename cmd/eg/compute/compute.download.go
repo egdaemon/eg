@@ -26,7 +26,7 @@ type download struct {
 type downloadopts struct {
 	cmdopts.VCS `embed:""`
 	SSHKeyPath  string `name:"sshkeypath" help:"path to ssh key to use" default:"${vars_ssh_key_path}"`
-	Output      string `name:"output" short:"o" help:"file to store the download to, '-' writes to stdout. defaults to ./{id}.{logs|analytics.db}"`
+	Output      string `name:"output" short:"o" help:"file to store the download to, '-' writes to stdout. defaults to ./{id}.{log|db}"`
 	ID          string `arg:"" name:"id" help:"id of the enqueued workload, printed when it was uploaded"`
 }
 
@@ -46,6 +46,7 @@ func (t downloadopts) client(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, iden
 
 type downloadlogs struct {
 	downloadopts `embed:""`
+	Tee          bool `name:"tee" help:"also stream the logs to stderr while writing them to the output"`
 }
 
 func (t downloadlogs) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, ident *cmdidentity.T) (err error) {
@@ -55,6 +56,10 @@ func (t downloadlogs) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, ident *
 	}
 
 	return downloadto(t.Output, t.ID+".log", func(dst io.Writer) error {
+		if t.Tee {
+			dst = io.MultiWriter(dst, os.Stderr)
+		}
+
 		return computeapi.DownloadLogs(gctx.Context, chttp, t.ID, dst)
 	})
 }
@@ -69,7 +74,7 @@ func (t downloadanalytics) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, id
 		return err
 	}
 
-	return downloadto(t.Output, t.ID+".analytics.db", func(dst io.Writer) error {
+	return downloadto(t.Output, t.ID+".db", func(dst io.Writer) error {
 		return computeapi.DownloadAnalytics(gctx.Context, chttp, t.ID, dst)
 	})
 }

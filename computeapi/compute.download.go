@@ -25,7 +25,8 @@ const downloadpollinterval = 2 * time.Second
 func DownloadLogs(ctx context.Context, chttp *http.Client, id string, dst io.Writer) (err error) {
 	log.Println("waiting for the workload to start", id)
 	found, err := NewPushClient(chttp).AwaitLogsToken(ctx, id, downloadpollinterval)
-	if errors.Is(err, ErrWorkloadCompleted) {
+	if errors.Is(err, ErrWorkloadCompleted) || httpx.IsStatusError(err, http.StatusNotFound) != nil {
+		// a workload no longer in the queue (404) has completed and only exists in the history.
 		return downloadCompleted(ctx, chttp, id, dst, RunnerHistoryLogs, func(ctx context.Context, id string, dst io.Writer) error {
 			return computex.Logs(ctx, id, dst, NewPushClient(chttp).HistoryLogs)
 		})
@@ -49,7 +50,8 @@ func DownloadLogs(ctx context.Context, chttp *http.Client, id string, dst io.Wri
 func DownloadAnalytics(ctx context.Context, chttp *http.Client, id string, dst io.Writer) (err error) {
 	log.Println("waiting for the workload to start", id)
 	found, err := NewPushClient(chttp).AwaitLogsToken(ctx, id, downloadpollinterval)
-	if errors.Is(err, ErrWorkloadCompleted) {
+	if errors.Is(err, ErrWorkloadCompleted) || httpx.IsStatusError(err, http.StatusNotFound) != nil {
+		// a workload no longer in the queue (404) has completed and only exists in the history.
 		return downloadCompleted(ctx, chttp, id, dst, RunnerHistoryAnalytics, NewPushClient(chttp).HistoryAnalytics)
 	} else if err != nil {
 		return errorsx.Wrap(err, "unable to locate workload on the cluster")

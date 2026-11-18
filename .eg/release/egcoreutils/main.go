@@ -8,6 +8,8 @@ import (
 
 	"github.com/egdaemon/eg/runtime/wasi/eg"
 	"github.com/egdaemon/eg/runtime/wasi/egenv"
+	"github.com/egdaemon/eg/runtime/wasi/eggit"
+	"github.com/egdaemon/eg/runtime/x/wasi/eggithub"
 )
 
 func main() {
@@ -16,12 +18,17 @@ func main() {
 
 	err := eg.Perform(
 		ctx,
+		eggit.AutoClone,
 		egcoreutils.Prepare,
 		eg.Module(
 			ctx,
 			egcoreutils.Runner(),
 			egcoreutils.Build,
 			egcoreutils.Upload,
+			egcoreutils.Copy,
+		),
+		eggithub.Draft(
+			egenv.DirectoryWorkload(".dist", "*.deb"),
 		),
 	)
 

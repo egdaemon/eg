@@ -97,7 +97,18 @@ func Build(ctx context.Context, o eg.Op) error {
 			eggpg.Debug(gpgoptions()...),
 		),
 		egdebuild.Build(gcfg, egdebuild.Option.Distro(egdebuild.UbuntuLatestCodename), egdebuild.Option.NoLint()),
+		egdebuild.Build(
+			gcfg,
+			egdebuild.Option.Distro(egdebuild.UbuntuLatestCodename),
+			egdebuild.Option.BuildBinary(20*time.Minute),
+			egdebuild.Option.NoLint(),
+		),
 	)(ctx, o)
+}
+
+// Copy the built deb packages into the workload's .dist directory.
+func Copy(ctx context.Context, o eg.Op) error {
+	return egdebuild.Copy(gcfg, egenv.DirectoryWorkload(".dist"))(ctx, o)
 }
 
 func Upload(ctx context.Context, o eg.Op) error {

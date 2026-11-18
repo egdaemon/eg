@@ -38,6 +38,7 @@ func main() {
 			"eg compute upload --no-follow --arch=amd64 --cores=8 --memory=18g release/eg/targz",
 			"eg compute upload --no-follow --arch=amd64 --cores=8 --memory=18g release/eg/archlinux",
 			"eg compute upload --no-follow --arch=amd64 --cores=8 --memory=18g release/eg/debian",
+			"eg compute upload --no-follow --arch=amd64 --cores=8 --memory=18g release/egcoreutils",
 		)),
 		egx.Retry(0).Delay(30*time.Second).Run(
 			eggithub.Promote(
@@ -45,6 +46,7 @@ func main() {
 				egtarball.Name(egrel.TarLinux("arm64")),
 				"egd-*.pkg.tar.*",
 				"eg_*_amd64.deb",
+				"egcoreutils_*_amd64.deb",
 			),
 		),
 	)

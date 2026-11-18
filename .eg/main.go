@@ -38,7 +38,7 @@ func main() {
 			egcoverage.Report(eggolang.Coverage().MarkGeneratedExt(".gen.go", ".pb.go", ".autogen_test.go")...),
 			// copies the binary built by AutoInstall into the workspace directory
 			// so the default module's integration tests exercise the new binary.
-			shell.Op(shell.Newf("install -m 0755 /home/egd/go/bin/eg %s", sharedbin()).Debug()),
+			shell.Op(shell.Newf("install -m 0755 /home/egd/go/bin/eg %s", sharedbin())),
 		),
 		egbug.Log("test suite completed"),
 		egbug.Log("integration tests initiated"),

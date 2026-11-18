@@ -8,7 +8,7 @@ RUN mkdir -p /etc/sudoers.d/
 RUN echo "%wheel ALL=(ALL:ALL) NOPASSWD: ALL" | tee /etc/sudoers.d/egd
 RUN systemd-sysusers
 RUN systemd-tmpfiles --create
-RUN pacman --noconfirm -Syu podman netavark pacman-contrib pkgfile foot sudo bash-completion tree ccache base base-devel git go openssh rsync github-cli btrfs-progs fuse3
+RUN pacman --noconfirm -Syu podman netavark pacman-contrib pkgfile foot sudo bash-completion tree ccache base base-devel git go openssh rsync github-cli btrfs-progs fuse3 hub
 # egd runtime dependencies, makepkg refuses to build when they are missing. keep in sync with .eg/archlinux/PKGBUILD.
 RUN pacman --noconfirm -Syu waypipe acl pciutils
 # duckdb build dependencies.
@@ -20,23 +20,18 @@ RUN pacman --noconfirm -Syu gcc-libs openssl
 RUN pacman --noconfirm -Syu gettext
 RUN ssh-keyscan -H aur.archlinux.org >> /etc/ssh/ssh_known_hosts
 
-RUN chown -R egd:egd /tmp/pacman/
-
 # these commands are run manually with -C /tmp/pacman replaced with the rootfs pah.
 RUN sudo -H -S -u egd -g egd git -C /tmp/pacman clone --depth 1 https://aur.archlinux.org/yay.git
 RUN sudo -H -S -u egd -g egd git -C /tmp/pacman clone --depth 1 https://aur.archlinux.org/bindfs.git
-# RUN sudo -H -S -u egd git -C .dist/archlinux/rootfs/tmp/pacman clone --depth 1 https://aur.archlinux.org/duckdb.git # upstream is broken.
 
 RUN ls -d /tmp/pacman/*/ | xargs -I {} sudo -H -P -E -S -u egd -g egd makepkg -D {} -Cs
-RUN pacman --noconfirm -U /tmp/*.pkg.tar.zst
 
 # install the latest published egd release. asset names embed the version (egd-<ver>-<pkgrel>-<arch>.pkg.tar.zst)
-RUN url="$(curl -fsSL https://api.github.com/repos/egdaemon/eg/releases/latest | grep -o "https://[^\"]*/egd-v[^\"/]*-$(uname -m)\.pkg\.tar\.zst" | head -n1)" \
-    && test -n "${url}" \
-    && curl -fsSL -o /tmp/egd.pkg.tar.zst "${url}" \
-    && pacman --noconfirm -U /tmp/egd.pkg.tar.zst \
-    && rm /tmp/egd.pkg.tar.zst
+RUN gh release download --repo egdaemon/eg --pattern "egd-v*-$(uname -m).pkg.tar.zst" --dir /tmp
 
+RUN pacman --noconfirm -U /tmp/*.pkg.tar.zst
+
+RUN systemd-tmpfiles --remove
 RUN systemctl enable podman.socket
 
 CMD /usr/sbin/init

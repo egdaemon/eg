@@ -44,5 +44,10 @@ func Inherited(ctx context.Context) ([]string, error) {
 			eg.EnvWorkloadDraft,
 			eg.EnvWorkloadRelease,
 			eg.EnvGCPWorkloadIdentityEnabled,
+			// launcher scoped, the enclosing workload's values are wrong for the new run.
+			// i.e. `eg compute local` disables the clone which the new workload requires.
+			eg.EnvUnsafeGitCloneEnabled,
+			eg.EnvUnsafeCacheID,
+			eg.EnvComputeInitiatedTimestamp,
 		).Environ()
 }

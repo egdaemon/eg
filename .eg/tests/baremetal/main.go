@@ -20,7 +20,7 @@ func main() {
 
 	err := eg.Perform(
 		ctx,
-		egbug.DebugFailure(
+		egbug.Debug(
 			eg.Sequential(
 				egbug.EnsureEnv("2ff85b3300938e3efdb0567eb216de33", egbug.EgEnviron()...),
 				shell.Op(

@@ -40,7 +40,7 @@ func Test(ctx context.Context, op eg.Op) error {
 				egtarball.SHA256Op("example"),
 			),
 		),
-		egbug.DebugFailure(
+		egbug.Debug(
 			// ensure the tar archive has the expected files.
 			shell.Op(
 				shell.Newf("tar tf %s | md5sum", egtarball.Archive("example")),
@@ -74,7 +74,7 @@ func main() {
 		egbug.Log("baremetal basic sanity checks"),
 		// test for cache directory and runtime.
 		// test for git commit details.
-		egbug.DebugFailure(
+		egbug.Debug(
 			eg.Sequential(
 				egbug.EnsureEnv("2ff85b3300938e3efdb0567eb216de33", egbug.EgEnviron()...),
 				shell.Op(
@@ -101,7 +101,7 @@ func main() {
 			ctx,
 			eg.DefaultModule(),
 			eg.Sequential(
-				egbug.DebugFailure(
+				egbug.Debug(
 					// ensure that the user isnt egd
 					shell.Op(
 						shell.New("test $(id -nu) = egd"),
@@ -109,7 +109,7 @@ func main() {
 					),
 					Debug(shell.Runtime()),
 				),
-				egbug.DebugFailure(
+				egbug.Debug(
 					eg.Sequential(
 						egbug.EnsureEnv("92570199637f3732b241968f689f74d2", egbug.EgEnviron()...),
 						shell.Op(

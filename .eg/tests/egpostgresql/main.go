@@ -56,7 +56,7 @@ func Postgres(ctx context.Context, op eg.Op) (err error) {
 		egpostgresql.InsertSuperuser("migrations"),
 		egpostgresql.Trust(egunsafe.HostPrefixes()...),
 		egpostgresql.Trust(netip.PrefixFrom(netip.IPv4Unspecified(), 0), netip.PrefixFrom(netip.IPv6Unspecified(), 0)),
-		egbug.DebugFailure(
+		egbug.Debug(
 			egpostgresql.Restart("systemctl restart postgresql.service"),
 			shell.Op(
 				shell.New("journalctl --since -1m -u postgresql.service"),

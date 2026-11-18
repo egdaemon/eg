@@ -8,6 +8,8 @@ import (
 	"github.com/egdaemon/eg/runtime/wasi/eg"
 	"github.com/egdaemon/eg/runtime/wasi/egenv"
 	"github.com/egdaemon/eg/runtime/wasi/eggit"
+	"github.com/egdaemon/eg/runtime/x/wasi/egbug"
+	"github.com/egdaemon/eg/runtime/x/wasi/egerrors"
 	"github.com/egdaemon/eg/runtime/x/wasi/eggithub"
 )
 
@@ -20,16 +22,19 @@ func main() {
 	err := eg.Perform(
 		ctx,
 		eggit.AutoClone,
-		eg.Parallel(
-			eg.Build(eg.Container(archlinux.ContainerName).BuildFromFile(".dist/archlinux/Containerfile")),
-		),
-		eg.Parallel(
-			eg.Module(
-				ctx,
-				archlinux.Builder(archlinux.ContainerName),
-				eg.Sequential(
-					archlinux.Build,
-					eggithub.Draft(egenv.DirectoryCache(".dist", "pacman", "*.pkg.tar.*")),
+		eg.Build(eg.Container(archlinux.ContainerName).BuildFromFile(".dist/archlinux/Containerfile")),
+		eg.Module(
+			ctx,
+			archlinux.Builder(archlinux.ContainerName),
+			eg.Sequential(
+				archlinux.Build,
+				eggithub.Draft(
+					egenv.DirectoryCache(".dist", "pacman", "*.pkg.tar.*"),
+					archlinux.PKGBUILD(),
+				),
+				egerrors.Chain(
+					eg.Fn(archlinux.Publish),
+					egbug.Log("our archlinux ssh keys are currently rejected, need to talk to upstream"),
 				),
 			),
 		),

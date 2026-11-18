@@ -1,0 +1,2 @@
+# placeholder so the rootfs directory exists in the package. the runner Containerfile copies this directory into the
+# runner image (see EG_RUNNER_OVERRIDE_DIR), put files here to override the image's contents. the build fails if it is missing.

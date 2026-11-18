@@ -16,6 +16,10 @@ RUN pacman --noconfirm -Syu git cmake python-setuptools pybind11 python-numpy py
 # duckdb runtime time dependencies.
 RUN pacman --noconfirm -Syu gcc-libs openssl
 
+# AUR publishing: gettext provides envsubst for the PKGBUILD, preload the AUR host key so git+ssh pushes don't prompt.
+RUN pacman --noconfirm -Syu gettext
+RUN ssh-keyscan -H aur.archlinux.org >> /etc/ssh/ssh_known_hosts
+
 RUN chown -R egd:egd /tmp/pacman/
 
 # these commands are run manually with -C /tmp/pacman replaced with the rootfs pah.

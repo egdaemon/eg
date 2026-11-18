@@ -86,7 +86,8 @@ func PodmanRun(ctx context.Context, cmdctx func(*exec.Cmd) *exec.Cmd, image, cna
 	return nil
 }
 
-func PodmanModule(ctx context.Context, cmdctx func(*exec.Cmd) *exec.Cmd, image, cname, moduledir string, options ...string) (err error) {
+// PodmanModule runs the module within a new container of image, args are the module's os.Args[1:].
+func PodmanModule(ctx context.Context, cmdctx func(*exec.Cmd) *exec.Cmd, image, cname, moduledir string, args []string, options ...string) (err error) {
 	var (
 		cmd *exec.Cmd
 	)
@@ -111,7 +112,7 @@ func PodmanModule(ctx context.Context, cmdctx func(*exec.Cmd) *exec.Cmd, image, 
 		return errorsx.Wrap(err, "unable to run container")
 	}
 
-	if err = moduleExec(ctx, cname, moduledir, stdin, stdout, stderr); err != nil {
+	if err = moduleExec(ctx, cname, moduledir, args, stdin, stdout, stderr); err != nil {
 		return errorsx.Wrap(err, "unable to exec module")
 	}
 
@@ -134,7 +135,26 @@ func PodmanModuleRunCmd(image, cname string, options ...string) []string {
 	return args
 }
 
-func moduleExec(ctx context.Context, cname, moduledir string, stdin io.Reader, stdout io.Writer, stderr io.Writer) (err error) {
+// modulecmd is the command that runs the module within the container. the arguments of the module follow a --, which
+// ends the flags of the command, so the module's flags are not taken for its own, e.g.) -v.
+func modulecmd(egbin, verbosity, moduledir string, args []string) []string {
+	cmd := slicesx.Filter(stringsx.Present, []string{
+		egbin,
+		verbosity,
+		"module",
+		"--directory", eg.DefaultWorkingDirectory(),
+		"--moduledir", moduledir,
+		eg.ModuleMount(),
+	}...)
+
+	if len(args) == 0 {
+		return cmd
+	}
+
+	return append(append(cmd, "--"), args...)
+}
+
+func moduleExec(ctx context.Context, cname, moduledir string, args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer) (err error) {
 	var (
 		rtty *io.PipeReader
 		wtty *io.PipeWriter
@@ -157,14 +177,7 @@ func moduleExec(ctx context.Context, cname, moduledir string, stdin io.Reader, s
 			AttachStdin:  stdin != nil,
 			AttachStderr: true,
 			AttachStdout: true,
-			Cmd: slicesx.Filter(stringsx.Present, []string{
-				envx.String("eg", eg.EnvComputeBin),
-				verbosity,
-				"module",
-				"--directory", eg.DefaultWorkingDirectory(),
-				"--moduledir", moduledir,
-				eg.ModuleMount(),
-			}...),
+			Cmd:          modulecmd(envx.String("eg", eg.EnvComputeBin), verbosity, moduledir, args),
 		},
 	})
 	if err != nil {

@@ -229,7 +229,7 @@ func (t *ProxyService) Module(ctx context.Context, req *c8s.ModuleRequest) (_ *c
 	session := t.mux.Session()
 	defer func() { errorsx.Log(errorsx.Wrap(session.Close(), "unable to close the module's terminal")) }()
 
-	if err = PodmanModule(ctx, t.prepmodule(session), req.Image, req.Name, req.Mdir, options...); err != nil {
+	if err = PodmanModule(ctx, t.prepmodule(session), req.Image, req.Name, req.Mdir, nil, options...); err != nil {
 		return nil, err
 	}
 

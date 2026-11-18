@@ -828,7 +828,7 @@ func (t staterunning) Update(ctx context.Context) state {
 	}
 	defer stopwatch()
 
-	err = c8sproxy.PodmanModule(wctx, prepcmd, "eg", fmt.Sprintf("eg-%s", t.ragent.id), t.ws.RuntimeDir, options...)
+	err = c8sproxy.PodmanModule(wctx, prepcmd, "eg", fmt.Sprintf("eg-%s", t.ragent.id), t.ws.RuntimeDir, nil, options...)
 	if errors.Is(context.Cause(wctx), ErrCancelled) {
 		err = ErrCancelled
 	}

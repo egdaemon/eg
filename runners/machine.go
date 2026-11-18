@@ -44,6 +44,7 @@ type Machine struct {
 	vm        *egvm.VM
 	environ   []string
 	moduleenv []string
+	args      []string
 	dir       string
 }
 
@@ -55,6 +56,7 @@ type machineconfig struct {
 	overlays []attachment
 	sockets  []attachment
 	environ  []string
+	args     []string
 }
 
 // attachment is a host directory or socket, host, the machine sees at path.
@@ -90,6 +92,13 @@ func MachineOptionSocket(host string, path string) MachineOption {
 func MachineOptionEnviron(environ ...string) MachineOption {
 	return func(c *machineconfig) {
 		c.environ = append(c.environ, environ...)
+	}
+}
+
+// MachineOptionArgs gives the machine's module args, its os.Args[1:].
+func MachineOptionArgs(args ...string) MachineOption {
+	return func(c *machineconfig) {
+		c.args = append(c.args, args...)
 	}
 }
 
@@ -166,6 +175,7 @@ func NewMachine(ctx context.Context, c *http.Client, ws workspaces.Context, uri 
 		config.vm = append(config.vm, egvm.OptionMountReadOnly(filepath.Dir(location), filepath.Dir(location)))
 	}
 	t.moduleenv = append(config.environ, envx.Format(eg.EnvComputeEgiso, uri))
+	t.args = config.args
 
 	// the machine has the image's own accounts, so the image's files keep their owners. The host user
 	// owns what it writes in the workspace's directories, except the runtime directory, whose sockets
@@ -311,6 +321,16 @@ func environ(root fs.FS) (_ []string, err error) {
 	return b.Environ()
 }
 
+// modulearguments are the arguments of the eg that runs the module, the arguments of the module follow a --, which ends the flags of the command.
+func modulearguments(verbosity, moduledir, path string, args []string) []string {
+	cmd := slicesx.Filter(stringsx.Present, verbosity, "module", "--directory", eg.DefaultWorkingDirectory(), "--moduledir", moduledir, path)
+	if len(args) == 0 {
+		return cmd
+	}
+
+	return append(append(cmd, "--"), args...)
+}
+
 // Do runs the module in the machine, as c8sproxy.PodmanModule runs it in a container.
 func (t *Machine) Do(ctx context.Context, m transpile.Compiled) (err error) {
 	if err = iox.Copy(m.Path, filepath.Join(t.ws.RuntimeDir, eg.ModuleBin)); err != nil {
@@ -338,7 +358,7 @@ func (t *Machine) module(ctx context.Context, path string) (err error) {
 	// TODO REVISIT using t.ws.RuntimeDir as moduledir, as containers do.
 	return t.vm.Exec(ctx, &execproxy.ExecRequest{
 		Cmd:         envx.String("eg", eg.EnvComputeBin),
-		Arguments:   slicesx.Filter(stringsx.Present, verbosity, "module", "--directory", eg.DefaultWorkingDirectory(), "--moduledir", t.ws.RuntimeDir, path),
+		Arguments:   modulearguments(verbosity, t.ws.RuntimeDir, path, t.args),
 		Dir:         "/",
 		Environment: env,
 	}, egvm.ExecOptionStdin(os.Stdin), egvm.ExecOptionStdout(log.Writer()), egvm.ExecOptionStderr(log.Writer()))

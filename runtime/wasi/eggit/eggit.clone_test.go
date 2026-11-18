@@ -34,6 +34,14 @@ func TestClone(t *testing.T) {
 		require.Error(t, err)
 	})
 
+	t.Run("clone ignores the disabled flag", func(t *testing.T) {
+		// the flag would skip the clone, so reaching the host call, which is unavailable outside of wasi, proves it was attempted.
+		t.Setenv(_eg.EnvUnsafeGitCloneEnabled, "false")
+		err := Clone(t.Context(), "/wd", "https://example.com/repo.git", "origin", "main")
+		require.Error(t, err)
+		require.NotContains(t, err.Error(), "not specified")
+	})
+
 	t.Run("auto clone without uri", func(t *testing.T) {
 		testx.Tempenvvar(_eg.EnvGitHeadURI, "", func() {
 			err := AutoClone(t.Context(), nil)

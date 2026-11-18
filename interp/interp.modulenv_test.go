@@ -109,7 +109,7 @@ func TestRunnerModuleEnv(t *testing.T) {
 			require.NoError(t, err)
 
 			var stdout bytes.Buffer
-			_, err = rt.InstantiateWithConfig(ctx, bin, r.modulenv(wazero.NewModuleConfig().WithStdout(&stdout).WithStderr(os.Stderr), ws))
+			_, err = rt.InstantiateWithConfig(ctx, bin, r.modulenv(wazero.NewModuleConfig().WithStdout(&stdout).WithStderr(os.Stderr), ws, "/m.wasm"))
 			require.NoError(t, err)
 
 			// the guest prints its environment one entry per line, in the order it was given.

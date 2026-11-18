@@ -208,7 +208,8 @@ type container struct {
 	uid   uuidx.UUID
 	agent *runners.Agent
 	image string
-	tty   bool // hands the module the host's stdin and stdout themselves, so a terminal is attached as one.
+	tty   bool     // hands the module the host's stdin and stdout themselves, so a terminal is attached as one.
+	args  []string // the module's os.Args[1:].
 }
 
 func (t container) Do(_ context.Context, m transpile.Compiled) error {
@@ -236,7 +237,7 @@ func (t container) Do(_ context.Context, m transpile.Compiled) error {
 	}
 
 	// TODO REVISIT using t.ws.RuntimeDir as moduledir.
-	return c8sproxy.PodmanModule(t.ctx, prepcmd, t.image, fmt.Sprintf("eg-%s", t.uid.String()), t.ws.RuntimeDir, options...)
+	return c8sproxy.PodmanModule(t.ctx, prepcmd, t.image, fmt.Sprintf("eg-%s", t.uid.String()), t.ws.RuntimeDir, t.args, options...)
 }
 
 func (t container) Close() error {

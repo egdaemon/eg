@@ -409,8 +409,9 @@ func Clone(ctx context.Context, cachedir, dir, uri, remote, treeish string, opts
 		return clone(ctx, dir, uri, remote, treeish, opts...)
 	}
 
+	log.Printf("cloning from the repository cache: %s -> %s\n", uri, mirror)
 	if err = clone(ctx, dir, "file://"+mirror, remote, treeish); err != nil {
-		return err
+		return errorsx.Wrapf(err, "unable to clone from the repository cache: %s (%s)", uri, mirror)
 	}
 
 	r, err := git.PlainOpen(dir)

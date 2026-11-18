@@ -17,8 +17,9 @@ import (
 )
 
 type cmdbuiltin struct {
-	Upload builtinUpload `cmd:"" help:"upload and run a builtin workload"`
-	Local  builtinLocal  `cmd:"" help:"upload and run a builtin workload"`
+	Upload    builtinUpload    `cmd:"" help:"upload and run a builtin workload"`
+	Local     builtinLocal     `cmd:"" help:"upload and run a builtin workload"`
+	Bootstrap builtinBootstrap `cmd:"" help:"build eg from the repository then run a workload with it, equivalent to: eg --hotswap compute local {workload}, but hermetic"`
 }
 
 //go:embed .builtin

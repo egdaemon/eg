@@ -19,6 +19,7 @@ import (
 	"github.com/egdaemon/eg/internal/debugx"
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
+	"github.com/egdaemon/eg/internal/execx"
 	"github.com/egdaemon/eg/internal/fsx"
 	"github.com/egdaemon/eg/internal/langx"
 	"github.com/egdaemon/eg/internal/md5x"
@@ -82,6 +83,23 @@ func OptionRepoCache(root string) Option {
 	}
 }
 
+// OptionArgs sets the arguments of the module, its os.Args[1:], given to it as they are, nothing interprets them.
+// os.Args[0] is always the module itself.
+func OptionArgs(args ...string) Option {
+	return func(r *runner) {
+		r.args = args
+	}
+}
+
+// OptionRemap sets the function that maps the paths the module sends to the host, e.g.) a clone destination.
+// the default is workspaces.RemapPassthrough, correct when the paths of the module are valid where the interpreter
+// runs, as in a container. baremetal modules need workspaces.Remap.
+func OptionRemap(fn func(string) string) Option {
+	return func(r *runner) {
+		r.remap = fn
+	}
+}
+
 type runtimefn func(r runner, host wazero.HostModuleBuilder) wazero.HostModuleBuilder
 
 // moduleenviron is the environment the runner provides to the module, read from its runtime directory.
@@ -91,16 +109,20 @@ func moduleenviron(wshost workspaces.Context) []string {
 	return errorsx.Zero(envx.FromPath(filepath.Join(wshost.RuntimeDir, eg.EnvironFile)))
 }
 
+// newrunner is the runner with its defaults, modified by options.
+func newrunner(options ...Option) runner {
+	return langx.Clone(runner{
+		initonce: &sync.Once{},
+		root:     &sysfs.AdaptFS{FS: embed.FS{}},
+		client:   http.DefaultClient,
+		remap:    workspaces.RemapPassthrough,
+	}, options...)
+}
+
 // Remote uses the api to implement particular actions like building and running containers.
 // may not be necessary.
 func Remote(ctx context.Context, wshost workspaces.Context, aid string, runid string, svc grpc.ClientConnInterface, module string, options ...Option) error {
-	var (
-		r = langx.Clone(runner{
-			initonce: &sync.Once{},
-			root:     &sysfs.AdaptFS{FS: embed.FS{}},
-			client:   http.DefaultClient,
-		}, options...)
-	)
+	r := newrunner(options...)
 
 	debugx.Println("interp workspace context", spew.Sdump(wshost))
 
@@ -188,7 +210,7 @@ func Remote(ctx context.Context, wshost workspaces.Context, aid string, runid st
 			ffigit.CloneV2(fsx.JoinIfPresent(r.repocache, aid), wshost.WorkingDir, wshost.RuntimeDir),
 		).Export("github.com/egdaemon/eg/runtime/wasi/runtime/ffigit.CloneV2").
 			NewFunctionBuilder().WithFunc(
-			ffigit.CloneV3(fsx.JoinIfPresent(r.repocache, aid), wshost.RuntimeDir, workspaces.Remap(wshost)),
+			ffigit.CloneV3(fsx.JoinIfPresent(r.repocache, aid), wshost.RuntimeDir, r.remap),
 		).Export("github.com/egdaemon/eg/runtime/wasi/runtime/ffigit.CloneV3").
 			NewFunctionBuilder().WithFunc(
 			ffigit.Bearer(wshost.RuntimeDir),
@@ -240,15 +262,20 @@ type runner struct {
 	repocache string
 	// mux shares the terminal between the commands of the module, nil when there is none.
 	mux *ttyx.Mux
+	// remap maps the paths of the module to the host, see OptionRemap.
+	remap func(string) string
+	// args are the arguments of the module, see OptionArgs.
+	args []string
 }
 
-func (t runner) modulenv(mcfg wazero.ModuleConfig, wshost workspaces.Context) wazero.ModuleConfig {
+func (t runner) modulenv(mcfg wazero.ModuleConfig, wshost workspaces.Context, path string) wazero.ModuleConfig {
 	hostenviron := moduleenviron(wshost)
 	// envx.Debug(t.environ...)
 	// envx.Debug(hostenviron...)
 	mcfg = wasix.Environ(mcfg, hostenviron...)
 	mcfg = wasix.Environ(mcfg, t.environ...)
-	return mcfg
+	// the module itself is the first argument, as it is for any program.
+	return mcfg.WithArgs(execx.Args(path).Append(t.args...)...)
 }
 
 func (t runner) perform(ctx context.Context, wshost workspaces.Context, runid, path string, rtb runtimefn) (err error) {
@@ -364,7 +391,7 @@ func (t runner) perform(ctx context.Context, wshost workspaces.Context, runid, p
 	).WithFSConfig(
 		wazerofs,
 	).WithSysNanotime().WithSysWalltime().WithRandSource(rand.Reader)
-	mcfg = t.modulenv(mcfg, wshost)
+	mcfg = t.modulenv(mcfg, wshost, path)
 
 	wasienv, err := wasi_snapshot_preview1.NewBuilder(runtime).Instantiate(ctx)
 	if err != nil {

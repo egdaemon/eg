@@ -49,12 +49,36 @@ func Commitish(ctx context.Context, treeish string) string {
 	return string(ffiguest.BytesRead(revisionptr, revisionlen))
 }
 
-func Clone(ctx context.Context, dir, uri, remote, branch string) error {
+type cloneopts struct {
+	environ []string
+}
+
+// Option modifies how Clone calls the host.
+type Option func(*cloneopts)
+
+// Environ replaces the environment sent to the host with env. the host reads its clone behavior from it,
+// e.g.) EG_UNSAFE_GIT_CLONE_ENABLED, as well as any credentials. the default is os.Environ().
+func Environ(env ...string) Option {
+	return func(o *cloneopts) {
+		o.environ = env
+	}
+}
+
+func newcloneopts(opts ...Option) (o cloneopts) {
+	o.environ = os.Environ()
+	for _, opt := range opts {
+		opt(&o)
+	}
+	return o
+}
+
+func Clone(ctx context.Context, dir, uri, remote, branch string, opts ...Option) error {
+	o := newcloneopts(opts...)
 	dirptr, dirlen := ffiguest.String(dir)
 	uriptr, urilen := ffiguest.String(uri)
 	remoteptr, remotelen := ffiguest.String(remote)
 	treeishptr, treeishlen := ffiguest.String(branch)
-	envptr, envsize, envlen := ffiguest.StringArray(os.Environ()...)
+	envptr, envsize, envlen := ffiguest.StringArray(o.environ...)
 
 	errcode := clone3(
 		ffiguest.ContextDeadline(ctx),

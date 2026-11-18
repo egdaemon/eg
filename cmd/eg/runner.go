@@ -60,10 +60,11 @@ import (
 )
 
 type module struct {
-	Dir        string `name:"directory" help:"root directory of the repository" default:"${vars_eg_root_directory}"`
-	ModuleDir  string `name:"moduledir" help:"deprecated removed once infrastructure is updated" hidden:"true" default:"${vars_workload_directory}"`
-	RuntimeDir string `name:"runtimedir" help:"runtime directory" hidden:"true" default:"${vars_eg_runtime_directory}"`
-	Module     string `arg:"" help:"name of the module to run"`
+	Dir        string   `name:"directory" help:"root directory of the repository" default:"${vars_eg_root_directory}"`
+	ModuleDir  string   `name:"moduledir" help:"deprecated removed once infrastructure is updated" hidden:"true" default:"${vars_workload_directory}"`
+	RuntimeDir string   `name:"runtimedir" help:"runtime directory" hidden:"true" default:"${vars_eg_runtime_directory}"`
+	Module     string   `arg:"" help:"name of the module to run"`
+	Args       []string `arg:"" optional:"" help:"arguments for the module, its os.Args[1:]"`
 }
 
 // remapdir returns a function that remaps a directory, giving the unprivileged user access to the contents.
@@ -583,5 +584,6 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, environsecret
 		interp.OptionHTTPClient(tlsc.DefaultClient()),
 		interp.OptionRepoCache(envx.String("", eg.EnvComputeRepoCache)),
 		interp.OptionMux(mux),
+		interp.OptionArgs(t.Args...),
 	)
 }

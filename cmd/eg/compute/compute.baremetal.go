@@ -374,6 +374,7 @@ func (t baremetal) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, hotswapbin
 			m.Path,
 			interp.OptionEnviron(cmdenv...),
 			interp.OptionHTTPClient(tlsc.DefaultClient()),
+			interp.OptionRemap(workspaces.Remap(ws)),
 		)
 
 		if err != nil {

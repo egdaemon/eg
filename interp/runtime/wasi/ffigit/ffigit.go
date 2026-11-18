@@ -195,6 +195,7 @@ func CloneV3(cachedir string, runtimedir string, remap func(string) string) func
 			return 1
 		}
 
+		log.Println("remapping", dst, "->", remap(dst))
 		return clone(ctx, cachedir, remap(dst), runtimedir, uri, remote, treeish, env)
 	}
 }

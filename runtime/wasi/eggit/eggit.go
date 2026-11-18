@@ -13,6 +13,7 @@ import (
 
 	_eg "github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/internal/errorsx"
+	"github.com/egdaemon/eg/internal/md5x"
 	"github.com/egdaemon/eg/internal/patternx"
 	"github.com/egdaemon/eg/runtime/wasi/eg"
 	"github.com/egdaemon/eg/runtime/wasi/egenv"
@@ -185,7 +186,19 @@ func Commitish(ctx context.Context, treeish string) string {
 
 // clone a git repository from the given uri, remote and treeish into dir, the commit is preferred.
 // dir is required, a relative dir is relative to the working directory.
+//
+// the clone always happens, EG_UNSAFE_GIT_CLONE_ENABLED=false, which local runs set to avoid cloning the
+// workload's own repository, is ignored. see AutoClone for the clone that honors it.
 func Clone(ctx context.Context, dir, uri, remote, commit string) error {
+	environ, err := egenv.Build().FromEnviron(os.Environ()...).Var(_eg.EnvUnsafeGitCloneEnabled, true).Environ()
+	if err != nil {
+		return err
+	}
+
+	return clone(ctx, []ffigit.Option{ffigit.Environ(environ...)}, dir, uri, remote, commit)
+}
+
+func clone(ctx context.Context, opts []ffigit.Option, dir, uri, remote, commit string) error {
 	if strings.TrimSpace(dir) == "" {
 		return fmt.Errorf("unable to clone destination not specified: %s", dir)
 	}
@@ -198,7 +211,7 @@ func Clone(ctx context.Context, dir, uri, remote, commit string) error {
 		return fmt.Errorf("unable to clone remote not specified: %s", remote)
 	}
 
-	return ffigit.Clone(ctx, dir, uri, remote, commit)
+	return ffigit.Clone(ctx, dir, uri, remote, commit, opts...)
 }
 
 // CloneOp returns an operation that clones a git repository, see Clone.
@@ -208,9 +221,35 @@ func CloneOp(dir, uri, remote, commit string) eg.OpFn {
 	}
 }
 
+// AutoCached returns the directory within the repository cache that holds the clone of uri,
+// {cache}/git/{md5(uri)}.git. the name is derived from the uri alone, so every call for the
+// same uri, from any module or workload sharing the cache, resolves to the same directory and
+// different uris never collide. the name is the one the host uses for its own mirrors of uri.
+//
+// the directory is only computed, it is not created. see egenv.DirectoryCache for the lifecycle
+// of the cache: it survives across workloads on a best effort basis, so never rely on its contents.
+func AutoCached(uri string) string {
+	return egenv.DirectoryCache("git", fmt.Sprintf("%s.git", md5x.String(uri)))
+}
+
+// CachedClone returns an operation that clones a git repository into the repository cache,
+// see AutoCached for the location. it is CloneOp without the dir argument: uri, remote and commit
+// behave as they do for Clone, and the same validation applies, a blank uri or remote is an error.
+//
+// because the location is stable for a uri, a later CachedClone, or any other consumer of
+// AutoCached(uri), finds the repository where it was left and the clone only has to bring
+// it up to date. use CloneOp when the repository needs to live at a specific path, e.g.) the
+// working directory.
+func CachedClone(uri, remote, commit string) eg.OpFn {
+	return CloneOp(AutoCached(uri), uri, remote, commit)
+}
+
 // clone the repository specified by the eg environment variables into the working directory.
+//
+// unlike Clone it honors EG_UNSAFE_GIT_CLONE_ENABLED=false, which local runs set because the
+// workload's repository is already present, and skips the clone.
 func AutoClone(ctx context.Context, _ eg.Op) error {
-	if err := Clone(ctx, egenv.DirectoryWorking(), env.String("", _eg.EnvGitHeadURI), env.String("origin", "EG_GIT_HEAD_REMOTE"), env.String("main", _eg.EnvGitHeadCommit, _eg.EnvGitHeadRef)); err != nil {
+	if err := clone(ctx, nil,egenv.DirectoryWorking(), env.String("", _eg.EnvGitHeadURI), env.String("origin", "EG_GIT_HEAD_REMOTE"), env.String("main", _eg.EnvGitHeadCommit, _eg.EnvGitHeadRef)); err != nil {
 		return err
 	}
 

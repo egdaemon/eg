@@ -11,7 +11,6 @@ import (
 	"eg/compute/maintainer"
 
 	"github.com/egdaemon/eg/runtime/wasi/eg"
-	"github.com/egdaemon/eg/runtime/wasi/egenv"
 	"github.com/egdaemon/eg/runtime/wasi/eggit"
 	"github.com/egdaemon/eg/runtime/wasi/shell"
 	"github.com/egdaemon/eg/runtime/x/wasi/egccache"
@@ -22,6 +21,7 @@ import (
 var debskel embed.FS
 
 const (
+	uri       = "https://github.com/duckdb/duckdb.git"
 	container = "eg.deb.duckdb"
 	version   = "1.5.2"
 	// commit of the v1.5.2 tag. eggit.Clone only understands branches and commits, so the tag is pinned by its commit.
@@ -38,7 +38,7 @@ func init() {
 	gcfg = egdebuild.New(
 		"duckdb",
 		"",
-		egenv.DirectoryCache("duckdb"),
+		eggit.AutoCached(uri),
 		egdebuild.Option.Maintainer(maintainer.Name, maintainer.Email),
 		egdebuild.Option.SigningKeyID(maintainer.GPGFingerprint),
 		egdebuild.Option.ChangeLogDate(c.Committer.When),
@@ -55,10 +55,10 @@ func init() {
 }
 
 func Prepare(ctx context.Context, o eg.Op) error {
-	sruntime := shell.Runtime().Directory(egenv.DirectoryCache())
+	sruntime := shell.Runtime().Directory(eggit.AutoCached(uri))
 	return eg.Parallel(
 		eg.Sequential(
-			eggit.CloneOp(egenv.DirectoryCache("duckdb"), "https://github.com/duckdb/duckdb.git", "origin", commit),
+			eggit.CachedClone(uri, "origin", commit),
 			shell.Op(
 				sruntime.New("md5sum duckdb/src/include/duckdb.h"),
 				sruntime.New("echo \"fcdba922a5ef1ac7373134cb915d204b  duckdb/src/include/duckdb.h\" > duckdb.md5"),

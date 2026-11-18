@@ -24,6 +24,7 @@ import (
 var debskel embed.FS
 
 const (
+	uri       = "https://github.com/egdaemon/coreutils.git"
 	container = "eg.deb.egcoreutils"
 	version   = "0.13.0"                                   // uutils release the fork is based on.
 	commit    = "a07ea094007bdc0bc1ab71cf8488421b52c771d4" // egdaemon/coreutils commit with every utility in the execveat reactor.
@@ -45,7 +46,7 @@ func init() {
 	gcfg = egdebuild.New(
 		"egcoreutils",
 		"",
-		egenv.DirectoryCache("egcoreutils", "dist"),
+		egenv.DirectoryCache(".dist", "egcoreutils"),
 		egdebuild.Option.Maintainer(maintainer.Name, maintainer.Email),
 		egdebuild.Option.SigningKeyID(maintainer.GPGFingerprint),
 		egdebuild.Option.ChangeLogDate(c.Committer.When),
@@ -58,7 +59,7 @@ func init() {
 
 func Prepare(ctx context.Context, o eg.Op) error {
 	return eg.Parallel(
-		eggit.CloneOp(egenv.DirectoryCache("egcoreutils", "coreutils"), "https://github.com/egdaemon/coreutils.git", "origin", commit),
+		eggit.CachedClone(uri, "origin", commit),
 		egdebuild.Prepare(Runner(), errorsx.Must(fs.Sub(debskel, ".debskel"))),
 	)(ctx, o)
 }
@@ -73,8 +74,8 @@ func Runner() eg.ContainerRunner {
 func Compile(ctx context.Context, o eg.Op) error {
 	runtime := egcargo.Runtime().
 		Environ("RUSTUP_HOME", egcargo.CacheDirectory("rustup")).
-		Directory(egenv.DirectoryCache("egcoreutils", "coreutils"))
-	dist := egenv.DirectoryCache("egcoreutils", "dist")
+		Directory(eggit.AutoCached(uri))
+	dist := egenv.DirectoryCache(".dist", "egcoreutils")
 	return shell.Run(
 		ctx,
 		runtime.Newf("rustup toolchain install %s --profile minimal --target %s", toolchain, target),

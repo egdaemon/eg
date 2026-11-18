@@ -356,7 +356,9 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, environsecret
 		// must happen before the module starts anything, i.e.) bindfs, so the root cgroup is left empty and
 		// the workload's containers get the cgroup controllers they would on the host.
 		// not fatal: without it only containers within the workload lose cgroup support.
+		log.Println("isolating cgroups initiated")
 		errorsx.Log(errorsx.Wrap(runners.IsolateCgroups(uid), "unable to isolate cgroups"))
+		log.Println("isolating cgroups completed")
 
 		// ensure the environment is up and running.
 		if err = systemReady(gctx.Context); err != nil {

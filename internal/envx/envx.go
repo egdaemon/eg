@@ -440,7 +440,7 @@ func (t *Builder) Drop(keys ...string) *Builder {
 		}
 
 		if _, ok := uniq[k]; ok {
-			log.Println("dropping", k)
+			debugx.Println("dropping", k)
 			continue
 		}
 		vars = append(vars, s)

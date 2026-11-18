@@ -55,7 +55,7 @@ func TestRenderWorkloads(t *testing.T) {
 		))
 
 		require.Contains(t, out, "workloads: 2")
-		require.Regexp(t, `│ ⏱\s+│ \s*│ \s*│ \s*│ a\s+│ queued one\s+│ linux/amd64\s+│ 01234567\s+│ garbage\s+│`, out)
+		require.Regexp(t, `│ ⏱\s+│ \s*│ \s*│ \s*│ a\s+│ queued one\s+│ linux/amd64\s+│ r.git@01234567\s+│ garbage\s+│`, out)
 		require.Regexp(t, `│ ⚙\s+│\s+│ \S+\s+│ \S*\s+│ b\s+│\s+│ linux/arm64\s+│`, out)
 	})
 

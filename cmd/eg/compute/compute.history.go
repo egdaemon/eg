@@ -78,7 +78,7 @@ func renderHistory(items ...*compute.History) string {
 			h.GetId(),
 			fmt.Sprintf("%.64v", h.GetDescription()),
 			fmt.Sprintf("%v", TypographyHistoryPlatform(h)),
-			fmt.Sprintf("%.8v", h.GetVcsCommit()),
+			fmt.Sprintf("%v", TypographyVCSCommit(h.GetVcsUri(), h.GetVcsCommit())),
 			fmt.Sprintf("%v", cmdtypography.TimestampRFC3339(h.GetCreatedAt()).Layout(time.DateTime).Zero("").Infinity("", "")),
 			fmt.Sprintf("%v", cmdtypography.TimestampRFC3339(h.GetInitiatedAt()).Layout(time.DateTime).Zero("").Infinity("", "")),
 			fmt.Sprintf("%v", cmdtypography.TimestampRFC3339(h.GetCompletedAt()).Layout(time.DateTime).Zero("").Infinity("", "")),
@@ -87,7 +87,7 @@ func renderHistory(items ...*compute.History) string {
 
 	tbl := table.New().
 		Border(lipgloss.NormalBorder()).
-		Headers("RESULT", "QUEUED", "ELAPSED", "WORKLOAD", "DESCRIPTION", "OS/ARCH", "COMMIT", "CREATED", "STARTED", "COMPLETED").
+		Headers("RESULT", "QUEUED", "ELAPSED", "ID", "WORKLOAD", "OS/ARCH", "COMMIT", "CREATED", "STARTED", "COMPLETED").
 		Rows(rows...).
 		StyleFunc(func(row, col int) lipgloss.Style {
 			if row == table.HeaderRow {

@@ -54,7 +54,7 @@ func TestRenderHistory(t *testing.T) {
 		require.Contains(t, out, "workloads: 3")
 		require.Contains(t, out, "QUEUED")
 		require.Contains(t, out, "ELAPSED")
-		require.Regexp(t, `│ ✔\s+│\s+│ 1m30s\s+│ a\s+│ built\s+│ linux/amd64\s+│ 01234567\s+│\s+│ garbage\s+│ garbage\s+│`, out)
+		require.Regexp(t, `│ ✔\s+│\s+│ 1m30s\s+│ a\s+│ built\s+│ linux/amd64\s+│ r.git@01234567\s+│\s+│ garbage\s+│ garbage\s+│`, out)
 		require.Regexp(t, `│ ✖\s+│\s+│ 0s\s+│ b\s+│`, out)
 		require.Regexp(t, `│ ⊘\s+│\s+│ 0s\s+│ c\s+│`, out)
 	})
@@ -70,6 +70,14 @@ func TestTypographyHistoryResult(t *testing.T) {
 func TestTypographyHistoryQueued(t *testing.T) {
 	require.Equal(t, "", fmt.Sprintf("%v", TypographyHistoryQueued(&compute.History{CreatedAt: "2026-01-02T03:04:05Z"})))
 	require.Equal(t, "5s", fmt.Sprintf("%v", TypographyHistoryQueued(&compute.History{CreatedAt: "2026-01-02T03:04:05Z", InitiatedAt: "2026-01-02T03:04:10Z"})))
+}
+
+func TestTypographyVCSCommit(t *testing.T) {
+	require.Equal(t, "retrovibed/retrovibed.git@59d8af54", fmt.Sprintf("%v", TypographyVCSCommit("git@github.com:retrovibed/retrovibed.git", "59d8af54ffffffff")))
+	require.Equal(t, "retrovibed/retrovibed.git@59d8af54", fmt.Sprintf("%v", TypographyVCSCommit("https://github.com/retrovibed/retrovibed.git", "59d8af54")))
+	require.Equal(t, "retrovibed/retrovibed.git@59d8af54", fmt.Sprintf("%v", TypographyVCSCommit("ssh://git@github.com/retrovibed/retrovibed.git", "59d8af54")))
+	require.Equal(t, "59d8af54", fmt.Sprintf("%v", TypographyVCSCommit("", "59d8af54")))
+	require.Equal(t, "a/b.git", fmt.Sprintf("%v", TypographyVCSCommit("git@h:a/b.git", "")))
 }
 
 func TestTypographyDuration(t *testing.T) {

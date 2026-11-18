@@ -2,6 +2,7 @@ package compute
 
 import (
 	"fmt"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -290,6 +291,48 @@ func (t historyQueued) Format(f fmt.State, verb rune) {
 // TypographyHistoryQueued formats the time the workload waited in the queue, from creation until it was initiated.
 func TypographyHistoryQueued(h *compute.History) fmt.Formatter {
 	return historyQueued{h: h}
+}
+
+// vcspath extracts the repository path from a vcs uri, handling both url (https://host/owner/repo.git) and
+// scp-like (git@host:owner/repo.git) forms. returns the uri unchanged when it matches neither.
+func vcspath(uri string) string {
+	if u, err := url.Parse(uri); err == nil && u.Host != "" {
+		return strings.TrimPrefix(u.Path, "/")
+	}
+
+	if _, p, ok := strings.Cut(uri, ":"); ok && !strings.Contains(uri, "://") {
+		return strings.TrimPrefix(p, "/")
+	}
+
+	return uri
+}
+
+type vcsCommit struct {
+	uri    string
+	commit string
+}
+
+func (t vcsCommit) Format(f fmt.State, verb rune) {
+	commit := t.commit
+	if len(commit) > 8 {
+		commit = commit[:8]
+	}
+
+	v := commit
+	if p := vcspath(t.uri); stringsx.Present(p) && stringsx.Present(commit) {
+		v = fmt.Sprintf("%s@%s", p, commit)
+	} else if stringsx.Present(p) {
+		v = p
+	}
+
+	// width, precision and flags are applied to the whole value.
+	_, _ = fmt.Fprintf(f, fmt.FormatString(f, 's'), v)
+}
+
+// TypographyVCSCommit formats the repository path followed by the abbreviated commit, i.e.
+// git@github.com:retrovibed/retrovibed.git and 59d8af54... becomes retrovibed/retrovibed.git@59d8af54.
+func TypographyVCSCommit(uri, commit string) fmt.Formatter {
+	return vcsCommit{uri: uri, commit: commit}
 }
 
 type duration struct {

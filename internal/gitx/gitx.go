@@ -530,7 +530,7 @@ func cloneFetched(ctx context.Context, dir, uri, remote, treeish string, spec co
 	)
 
 	if r, err = git.PlainOpen(dir); errors.Is(err, git.ErrRepositoryNotExists) {
-		log.Println(errorsx.Wrapf(err, "repository is missing attempting clone: %s", uri))
+		log.Println(errorsx.Wrapf(err, "repository is missing attempting clone: %s - %s", uri, treeish))
 
 		if r, err = git.PlainInit(dir, false); err != nil {
 			return errorsx.Wrapf(err, "unable to initialize: %s", dir)
@@ -619,7 +619,7 @@ func cloneBranch(ctx context.Context, dir, uri, remote, treeish string, opts ...
 
 		return errorsx.Wrapf(w.Checkout(&branchCoOpts), "unable to checkout '%s'", treeish)
 	} else {
-		log.Println(errorsx.Wrapf(err, "repository is missing attempting clone: %s", uri))
+		log.Println(errorsx.Wrapf(err, "repository is missing attempting clone: %s - %s", uri, treeish))
 	}
 
 	cloneOpts := &git.CloneOptions{

@@ -11,9 +11,41 @@ This document assumes you understand your local package manager/host environment
 
 ### ubuntu
 
+Install the latest [release](https://github.com/egdaemon/eg/releases/latest) package.
+
+with [gh](https://cli.github.com):
+
+```bash
+d=$(mktemp -d) && gh release download --repo egdaemon/eg --pattern "*_$(dpkg --print-architecture).deb" --dir "$d" && sudo apt-get install "$d"/*.deb
+```
+
+with curl:
+
+```bash
+d=$(mktemp -d) && curl -fsSL https://api.github.com/repos/egdaemon/eg/releases/latest | jq -r --arg a "$(dpkg --print-architecture)" '.assets[] | select(.name | endswith("_" + $a + ".deb")) | .browser_download_url' | xargs curl -fsSL --output-dir "$d" -O && sudo apt-get install "$d"/*.deb
+```
+
+Ubuntu users can alternatively use the PPA:
+
 ```bash
 add-apt-repository ppa:egdaemon/eg
 apt-get install eg
+```
+
+### archlinux
+
+Install the latest [release](https://github.com/egdaemon/eg/releases/latest) package.
+
+with [gh](https://cli.github.com):
+
+```bash
+d=$(mktemp -d) && gh release download --repo egdaemon/eg --pattern "egd-v*-$(uname -m).pkg.tar.zst" --dir "$d" && sudo pacman -U "$d"/*.pkg.tar.zst
+```
+
+with curl:
+
+```bash
+d=$(mktemp -d) && curl -fsSL https://api.github.com/repos/egdaemon/eg/releases/latest | jq -r --arg a "$(uname -m)" '.assets[] | select((.name | startswith("egd-v")) and (.name | endswith("-" + $a + ".pkg.tar.zst"))) | .browser_download_url' | xargs curl -fsSL --output-dir "$d" -O && sudo pacman -U "$d"/*.pkg.tar.zst
 ```
 
 ### macosx (beta)

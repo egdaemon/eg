@@ -3,20 +3,18 @@
 package ttyx
 
 import (
-	"fmt"
 	"os"
 	"strings"
 	"testing"
 
 	"github.com/egdaemon/eg"
 	"github.com/stretchr/testify/require"
-	"golang.org/x/sys/unix"
 )
 
 func TestAvailable(t *testing.T) {
 	tests := []struct {
 		name     string
-		terminal bool   // stdin is the pty slave, otherwise a pipe.
+		terminal bool   // stdin is the pty child, otherwise a pipe.
 		def      string // ttypath, {pty} is the pty.
 		env      string // EG_TTY
 		flag     string // SetPath
@@ -36,19 +34,8 @@ func TestAvailable(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			master, err := os.OpenFile("/dev/ptmx", os.O_RDWR|unix.O_NOCTTY, 0)
-			if err != nil {
-				t.Skip("no pseudo terminal available", err)
-			}
-			defer master.Close()
-
-			require.NoError(t, unix.IoctlSetPointerInt(int(master.Fd()), unix.TIOCSPTLCK, 0))
-			n, err := unix.IoctlGetInt(int(master.Fd()), unix.TIOCGPTN)
-			require.NoError(t, err)
-			ptypath := fmt.Sprintf("/dev/pts/%d", n)
-			slave, err := os.OpenFile(ptypath, os.O_RDWR|unix.O_NOCTTY, 0)
-			require.NoError(t, err)
-			defer slave.Close()
+			_, child := testpty(t)
+			ptypath := child.Name()
 
 			r, w, err := os.Pipe()
 			require.NoError(t, err)
@@ -57,7 +44,7 @@ func TestAvailable(t *testing.T) {
 
 			in := r
 			if tc.terminal {
-				in = slave
+				in = child
 			}
 			defer Override(func() *os.File { return in }, strings.ReplaceAll(tc.def, "{pty}", ptypath))()
 			defer SetPath("")

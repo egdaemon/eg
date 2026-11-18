@@ -11,7 +11,8 @@ import (
 	"github.com/tetratelabs/wazero/api"
 )
 
-func Exec(op func(*exec.Cmd) *exec.Cmd) func(
+// Exec runs the command once op has prepared it, the function op returns is called after the command finishes.
+func Exec(op func(*exec.Cmd) (*exec.Cmd, func())) func(
 	ctx context.Context,
 	m api.Module,
 	deadline int64,
@@ -38,7 +39,8 @@ func Exec(op func(*exec.Cmd) *exec.Cmd) func(
 			return 127
 		}
 
-		cmd = op(cmd)
+		cmd, finished := op(cmd)
+		defer finished()
 
 		if err = execx.MaybeRun(cmd); err != nil {
 			log.Println("failed to execute shell command", cmd.Dir, cmd.String(), err)

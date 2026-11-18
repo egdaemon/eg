@@ -36,6 +36,7 @@ import (
 	"github.com/egdaemon/eg/internal/podmanx"
 	"github.com/egdaemon/eg/internal/runtimex"
 	"github.com/egdaemon/eg/internal/stringsx"
+	"github.com/egdaemon/eg/internal/ttyx"
 	"github.com/egdaemon/eg/internal/userx"
 	"github.com/egdaemon/eg/internal/uuidx"
 	"github.com/egdaemon/eg/interp"
@@ -333,6 +334,10 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, environsecret
 		return errorsx.Wrap(err, "unable to generate environ token")
 	}
 
+	// the commands and modules of this module share its terminal, each is given one of its own. see ttyx.Mux.
+	mux := ttyx.NewMux(gctx.Context)
+	defer func() { errorsx.Log(errorsx.Wrap(mux.Close(), "unable to restore the terminal")) }()
+
 	if mlevel := envx.Int(0, eg.EnvComputeModuleNestedLevel); mlevel == 0 {
 		var (
 			control   net.Listener
@@ -483,6 +488,7 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, environsecret
 			),
 			// builds create their own network namespace as well, they take the options of hostnet.
 			c8sproxy.ServiceProxyOptionBuildOptions(runners.ZeroAgent(hostnet).Options()...),
+			c8sproxy.ServiceProxyOptionMux(mux),
 		).Bind(srv)
 		machines.RegisterMachinesServer(srv, runners.NewMachines(tlsc.DefaultClient(), ws, log.Writer(), runners.MachineOptionEGBin(errorsx.Must(exec.LookPath(os.Args[0])))))
 
@@ -576,5 +582,6 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, environsecret
 		interp.OptionEnviron(cmdenv...),
 		interp.OptionHTTPClient(tlsc.DefaultClient()),
 		interp.OptionRepoCache(envx.String("", eg.EnvComputeRepoCache)),
+		interp.OptionMux(mux),
 	)
 }

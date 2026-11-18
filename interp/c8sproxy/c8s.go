@@ -25,6 +25,7 @@ import (
 	"github.com/egdaemon/eg/internal/slicesx"
 	"github.com/egdaemon/eg/internal/stringsx"
 	"github.com/egdaemon/eg/internal/termx"
+	"github.com/egdaemon/eg/internal/ttyx"
 	"github.com/moby/moby/api/types/container"
 	"go.podman.io/podman/v6/pkg/api/handlers"
 	"go.podman.io/podman/v6/pkg/bindings"
@@ -255,15 +256,13 @@ func execAttach(ctx context.Context, sessionID string, stdin io.Reader, stdout i
 	_, outOk := stdout.(*os.File)
 	needTTY := ok && outOk && xterm.IsTerminal(int(file.Fd()))
 	if needTTY {
-		state, err := xterm.MakeRaw(int(file.Fd()))
+		// output processing stays on: anything else writing to the terminal while the module is attached, e.g.) another
+		// command or the log, still returns to the first column. see ttyx.Raw.
+		restore, err := ttyx.Raw(file)
 		if err != nil {
 			return err
 		}
-		defer func() {
-			if err := xterm.Restore(int(file.Fd()), state); err != nil {
-				log.Println("unable to restore terminal state", err)
-			}
-		}()
+		defer restore()
 	}
 
 	body := struct {

@@ -23,6 +23,7 @@ import (
 	"github.com/egdaemon/eg/internal/langx"
 	"github.com/egdaemon/eg/internal/md5x"
 	"github.com/egdaemon/eg/internal/termx"
+	"github.com/egdaemon/eg/internal/ttyx"
 	"github.com/egdaemon/eg/internal/uuidx"
 	"github.com/egdaemon/eg/internal/wasix"
 	"github.com/egdaemon/eg/interp/c8s"
@@ -64,6 +65,13 @@ func OptionHTTPClient(c *http.Client) Option {
 func OptionRoot(root experimentalsys.FS) Option {
 	return func(r *runner) {
 		r.root = root
+	}
+}
+
+// OptionMux shares the terminal between the commands the module runs, see ttyx.Mux.
+func OptionMux(m *ttyx.Mux) Option {
+	return func(r *runner) {
+		r.mux = m
 	}
 }
 
@@ -158,16 +166,20 @@ func Remote(ctx context.Context, wshost workspaces.Context, aid string, runid st
 			}
 			return nil
 		})).Export("github.com/egdaemon/eg/runtime/wasi/runtime/ffiegcontainer.Run").
-			NewFunctionBuilder().WithFunc(ffiexec.Exec(func(cmd *exec.Cmd) *exec.Cmd {
+			NewFunctionBuilder().WithFunc(ffiexec.Exec(func(cmd *exec.Cmd) (*exec.Cmd, func()) {
 			if !filepath.IsAbs(cmd.Dir) {
 				cmd.Dir = filepath.Join(wshost.WorkingDir, cmd.Dir)
 			}
 			cmd.Env = append(r.environ, cmd.Env...)
-			cmd.Stdin = os.Stdin
-			cmd.Stdout = os.Stdout
-			cmd.Stderr = os.Stderr
 
-			return cmd
+			// every command gets a terminal of its own when there is one, so commands running at the same time
+			// neither change the mode of each other's terminal nor interleave their output within a line.
+			session := r.mux.Session()
+			cmd.Stdin = session.Stdin()
+			cmd.Stdout = session.Stdout()
+			cmd.Stderr = session.Stderr()
+
+			return cmd, func() { errorsx.Log(errorsx.Wrap(session.Close(), "unable to close the command's terminal")) }
 		})).Export("github.com/egdaemon/eg/runtime/wasi/runtime/ffiexec.Command").
 			NewFunctionBuilder().WithFunc(
 			ffigit.Commitish(wshost.WorkingDir),
@@ -226,6 +238,8 @@ type runner struct {
 	client   *http.Client
 	// repocache is the root directory repositories are mirrored in, blank disables caching.
 	repocache string
+	// mux shares the terminal between the commands of the module, nil when there is none.
+	mux *ttyx.Mux
 }
 
 func (t runner) modulenv(mcfg wazero.ModuleConfig, wshost workspaces.Context) wazero.ModuleConfig {
@@ -288,7 +302,7 @@ func (t runner) perform(ctx context.Context, wshost workspaces.Context, runid, p
 	defer outpr.Close()
 	defer outpw.CloseWithError(io.EOF)
 	go func() {
-		_, _err := io.Copy(os.Stdout, outpr)
+		_, _err := io.Copy(t.mux.Stdout(), outpr)
 		_err = errorsx.Ignore(_err, io.ErrClosedPipe)
 		errorsx.Log(errorsx.Wrapf(_err, "failed copying to stdout: %T", _err))
 		outpw.CloseWithError(_err)
@@ -298,7 +312,7 @@ func (t runner) perform(ctx context.Context, wshost workspaces.Context, runid, p
 	defer errpr.Close()
 	defer errpw.CloseWithError(io.EOF)
 	go func() {
-		_, _err := io.Copy(os.Stderr, errpr)
+		_, _err := io.Copy(t.mux.Stderr(), errpr)
 		_err = errorsx.Ignore(_err, io.ErrClosedPipe)
 		errorsx.Log(errorsx.Wrap(_err, "failed copying to stderr"))
 		errpw.CloseWithError(_err)

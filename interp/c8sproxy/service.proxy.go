@@ -19,6 +19,7 @@ import (
 	"github.com/egdaemon/eg/internal/slicesx"
 	"github.com/egdaemon/eg/internal/stringsx"
 	"github.com/egdaemon/eg/internal/termx"
+	"github.com/egdaemon/eg/internal/ttyx"
 	"github.com/egdaemon/eg/interp/c8s"
 	"github.com/egdaemon/eg/workspaces"
 	"golang.org/x/exp/slices"
@@ -46,6 +47,13 @@ func ServiceProxyOptionBuildOptions(v ...string) ServiceProxyOption {
 	}
 }
 
+// ServiceProxyOptionMux shares the terminal between the modules run by the service, see ttyx.Mux.
+func ServiceProxyOptionMux(m *ttyx.Mux) ServiceProxyOption {
+	return func(ps *ProxyService) {
+		ps.mux = m
+	}
+}
+
 func ServiceProxyOptionBaremetal(ps *ProxyService) {
 	ps.remap = workspaces.RemapBaremetal(ps.ws)
 }
@@ -68,6 +76,7 @@ type ProxyService struct {
 	cmdenv        []string
 	containeropts []string
 	buildopts     []string
+	mux           *ttyx.Mux
 }
 
 func (t *ProxyService) Bind(host grpc.ServiceRegistrar) {
@@ -83,15 +92,18 @@ func (t *ProxyService) prepcmd(cmd *exec.Cmd) *exec.Cmd {
 	return cmd
 }
 
-// prepmodule is prepcmd for a module's container. when this process has a terminal, the module's own is the one it is attached to,
-// the module's container needs the files themselves to be given one too (see moduleExec), not the log's writer.
-func (t *ProxyService) prepmodule(cmd *exec.Cmd) *exec.Cmd {
-	cmd = t.prepcmd(cmd)
-	if termx.IsTTY(os.Stdin, os.Stdout) {
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
+// prepmodule is prepcmd for a module's container given the terminal of session. when there is a terminal the module is attached
+// to it, the module's container needs the files themselves to be given one too (see moduleExec), not the log's writer.
+func (t *ProxyService) prepmodule(session *ttyx.Session) func(cmd *exec.Cmd) *exec.Cmd {
+	return func(cmd *exec.Cmd) *exec.Cmd {
+		cmd = t.prepcmd(cmd)
+		cmd.Stdin = session.Stdin()
+		if termx.IsTTY(session.Stdin(), session.Stdout()) {
+			cmd.Stdout = session.Stdout()
+			cmd.Stderr = session.Stderr()
+		}
+		return cmd
 	}
-	return cmd
 }
 
 // buildoptions are the options of the container build.
@@ -213,7 +225,11 @@ func (t *ProxyService) Module(ctx context.Context, req *c8s.ModuleRequest) (_ *c
 	// log.Println("module options", options)
 	// envx.Debug(options...)
 
-	if err = PodmanModule(ctx, t.prepmodule, req.Image, req.Name, req.Mdir, options...); err != nil {
+	// the module gets a terminal of its own, when it puts that terminal in raw mode the other commands are unaffected.
+	session := t.mux.Session()
+	defer func() { errorsx.Log(errorsx.Wrap(session.Close(), "unable to close the module's terminal")) }()
+
+	if err = PodmanModule(ctx, t.prepmodule(session), req.Image, req.Name, req.Mdir, options...); err != nil {
 		return nil, err
 	}
 

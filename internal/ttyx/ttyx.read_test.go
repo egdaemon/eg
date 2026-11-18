@@ -4,14 +4,12 @@ package ttyx
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"os"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
-	"golang.org/x/sys/unix"
 )
 
 func TestRead(t *testing.T) {
@@ -33,22 +31,11 @@ func TestRead(t *testing.T) {
 	})
 
 	t.Run("a terminal is not read", func(t *testing.T) {
-		master, err := os.OpenFile("/dev/ptmx", os.O_RDWR|unix.O_NOCTTY, 0)
-		if err != nil {
-			t.Skip("no pseudo terminal available", err)
-		}
-		defer master.Close()
-
-		require.NoError(t, unix.IoctlSetPointerInt(int(master.Fd()), unix.TIOCSPTLCK, 0))
-		n, err := unix.IoctlGetInt(int(master.Fd()), unix.TIOCGPTN)
-		require.NoError(t, err)
-		slave, err := os.OpenFile(fmt.Sprintf("/dev/pts/%d", n), os.O_RDWR|unix.O_NOCTTY, 0)
-		require.NoError(t, err)
-		defer slave.Close()
-		stdin = func() *os.File { return slave }
+		parent, child := testpty(t)
+		stdin = func() *os.File { return child }
 
 		// the user has typed something, draining stdin would consume it or block.
-		_, err = master.Write([]byte("typed\n"))
+		_, err := parent.Write([]byte("typed\n"))
 		require.NoError(t, err)
 
 		in := Read(t.Context())

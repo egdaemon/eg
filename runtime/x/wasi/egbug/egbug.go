@@ -365,24 +365,26 @@ func Cgroups(ctx context.Context, op eg.Op) error {
 	)
 }
 
-// EnsureCgroups asserts the workload is isolated from the container's root cgroup, see runners.IsolateCgroups,
-// so containers run by the workload get the cgroup controllers they would on the host.
+// EnsureCgroups asserts the container's cgroup controllers are available to the workload's containers, see
+// runners.IsolateCgroups. the workload is either moved into its own cgroup, or, when the container's systemd
+// manages the cgroup tree (the workload runs in /init.scope), systemd already delegates the controllers and
+// isolation is not needed.
 func EnsureCgroups(ctx context.Context, op eg.Op) error {
 	const root = "/sys/fs/cgroup"
 	workload := fmt.Sprintf("%s/eg.workload.%s", root, egenv.RunID())
 	return shell.Run(
 		ctx,
-		// the workload's commands run in the workload's cgroup.
-		shell.Newf("c=\"$(cat /proc/self/cgroup)\"; test \"$c\" = \"0::/eg.workload.%s\" || { echo \"unexpected cgroup: $c\" >&2; exit 1; }", egenv.RunID()),
+		// the workload's commands run in the workload's cgroup, or systemd's.
+		shell.Newf("c=\"$(cat /proc/self/cgroup)\"; case \"$c\" in \"0::/eg.workload.%s\"|\"0::/init.scope\") ;; *) echo \"unexpected cgroup: $c\" >&2; exit 1;; esac", egenv.RunID()),
 		// nothing remains in the root cgroup, a cgroup holding processes can not hand its children controllers.
 		shell.Newf("test -z \"$(cat %s/cgroup.procs)\"", root),
 		// every controller of the container is handed to its children.
 		shell.Newf("test -n \"$(cat %s/cgroup.controllers)\"", root),
 		shell.Newf("test \"$(cat %s/cgroup.subtree_control)\" = \"$(cat %s/cgroup.controllers)\"", root, root),
 		shell.Newf("grep -qw pids %s/cgroup.subtree_control", root),
-		// the workload's cgroup repeats the container's limits.
-		shell.Newf("test \"$(cat %s/cpu.max)\" = \"$(cat %s/cpu.max)\"", workload, root),
-		shell.Newf("test \"$(cat %s/memory.max)\" = \"$(cat %s/memory.max)\"", workload, root),
+		// when the workload has its own cgroup it repeats the container's limits.
+		shell.Newf("! test -d %s || test \"$(cat %s/cpu.max)\" = \"$(cat %s/cpu.max)\"", workload, workload, root),
+		shell.Newf("! test -d %s || test \"$(cat %s/memory.max)\" = \"$(cat %s/memory.max)\"", workload, workload, root),
 	)
 }
 

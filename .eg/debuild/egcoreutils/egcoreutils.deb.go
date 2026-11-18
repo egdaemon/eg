@@ -57,12 +57,8 @@ func init() {
 }
 
 func Prepare(ctx context.Context, o eg.Op) error {
-	sruntime := shell.Runtime().Directory(egenv.DirectoryCache())
 	return eg.Parallel(
-		shell.Op(
-			sruntime.Newf("test -d coreutils || (git init -q coreutils && git -C coreutils fetch -q --depth 1 https://github.com/egdaemon/coreutils.git %s && git -C coreutils checkout -q FETCH_HEAD)", commit),
-			sruntime.Newf("test \"$(git -C coreutils rev-parse HEAD)\" = %s", commit),
-		),
+		eggit.CloneOp(egenv.DirectoryCache("egcoreutils", "coreutils"), "https://github.com/egdaemon/coreutils.git", "origin", commit),
 		egdebuild.Prepare(Runner(), errorsx.Must(fs.Sub(debskel, ".debskel"))),
 	)(ctx, o)
 }
@@ -77,7 +73,7 @@ func Runner() eg.ContainerRunner {
 func Compile(ctx context.Context, o eg.Op) error {
 	runtime := egcargo.Runtime().
 		Environ("RUSTUP_HOME", egcargo.CacheDirectory("rustup")).
-		Directory(egenv.DirectoryCache("coreutils"))
+		Directory(egenv.DirectoryCache("egcoreutils", "coreutils"))
 	dist := egenv.DirectoryCache("egcoreutils", "dist")
 	return shell.Run(
 		ctx,

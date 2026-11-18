@@ -353,6 +353,11 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, environsecret
 		cmdenvb = cmdenvb.Var(eg.EnvComputeMemoryLimit, strconv.FormatInt(vmemlimit, 10))
 		cmdenvb = cmdenvb.Var(eg.EnvComputeCoresLimit, strconv.Itoa(runtime.GOMAXPROCS(-1)))
 
+		// must happen before the module starts anything, i.e.) bindfs, so the root cgroup is left empty and
+		// the workload's containers get the cgroup controllers they would on the host.
+		// not fatal: without it only containers within the workload lose cgroup support.
+		errorsx.Log(errorsx.Wrap(runners.IsolateCgroups(uid), "unable to isolate cgroups"))
+
 		// ensure the environment is up and running.
 		if err = systemReady(gctx.Context); err != nil {
 			return errorsx.Wrap(err, "failed system ready check")

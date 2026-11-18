@@ -21,6 +21,7 @@ func main() {
 	if err := eg.Perform(
 		ctx,
 		egbug.EnsureEnvAuto,
+		egbug.EnsureCgroups,
 	); err != nil {
 		log.Fatalln(err)
 	}

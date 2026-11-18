@@ -233,6 +233,7 @@ func normalizeEnv(environ *envx.Builder) *envx.Builder {
 	environ.Setenv(_eg.EnvGitHeadRef, "HEAD")
 	environ.Setenv(_eg.EnvGitBaseVCS, "git@github.com:egdaemon/eg.git")
 	environ.Setenv(_eg.EnvComputeEnvironToken, "0000000000000000000000000000000000000000")
+	environ.Setenv("TERM", "") // depends on the launching terminal.
 
 	// normalize standard directories.
 	normalizedirprefix(_eg.EnvComputeWorkloadDirectory)
@@ -262,6 +263,14 @@ func normalizeEnv(environ *envx.Builder) *envx.Builder {
 	environ.Unsetenv("SSH_AUTH_SOCK")
 	environ.Unsetenv("GNUPGHOME")
 	environ.Unsetenv("_")
+
+	// git identity is injected from the launching user's config, see gitx.UserEnv.
+	for _, v := range os.Environ() {
+		if k, _, _ := strings.Cut(v, "="); strings.HasPrefix(k, "GIT_CONFIG_") {
+			environ.Unsetenv(k)
+		}
+	}
+
 	environ.Unsetenv("SUDO_COMMAND")
 	environ.Unsetenv("SUDO_GID")
 	environ.Unsetenv("SUDO_HOME")

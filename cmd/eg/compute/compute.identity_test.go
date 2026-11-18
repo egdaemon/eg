@@ -38,7 +38,7 @@ func TestWorkloadCommandsResolveTheAccountThroughIdentity(t *testing.T) {
 		_, sshkey := uploadrepo(t)
 		output := filepath.Join(t.TempDir(), "w1.log")
 
-		cmd := downloadlogs{downloadopts{SSHKeyPath: sshkey, ID: "w1", Output: output}}
+		cmd := downloadlogs{downloadopts: downloadopts{SSHKeyPath: sshkey, ID: "w1", Output: output}}
 
 		require.NoError(t, cmd.Run(&cmdopts.Global{Context: t.Context(), AccountID: "account"}, tlsc, cmdidentity.New(t.Context(), "account", "", nil)))
 

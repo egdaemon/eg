@@ -3,6 +3,7 @@ package termx
 import (
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"os"
 	"syscall"
@@ -40,4 +41,27 @@ func Run(r interface{ Run() error }) error {
 	}
 
 	return err
+}
+
+type hangupEOF struct {
+	io.Reader
+}
+
+func (t hangupEOF) Read(p []byte) (int, error) {
+	n, err := t.Reader.Read(p)
+	if errors.Is(err, syscall.EIO) {
+		return n, io.EOF
+	}
+
+	return n, err
+}
+
+// HangupEOF wraps r such that, when r is a terminal, the EIO a pty returns once its controlling terminal hangs up, e.g.)
+// the window was closed, is reported as io.EOF; a normal end of input. anything that is not a terminal is returned untouched.
+func HangupEOF(r io.Reader) io.Reader {
+	if !IsTTY(r) {
+		return r
+	}
+
+	return hangupEOF{Reader: r}
 }

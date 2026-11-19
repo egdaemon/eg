@@ -336,7 +336,7 @@ func execAttach(ctx context.Context, sessionID string, stdin io.Reader, stdout i
 
 	if isSet.stdin {
 		go func() {
-			_, err := io.Copy(socket, stdin)
+			_, err := io.Copy(socket, termx.HangupEOF(stdin))
 			if errorsx.Ignore(err, io.ErrClosedPipe) != nil {
 				log.Printf("failed to write input to service: %T - %v\n", err, err)
 			}

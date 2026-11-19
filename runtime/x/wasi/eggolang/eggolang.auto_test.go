@@ -58,6 +58,34 @@ func TestAuto(t *testing.T) {
 		require.Empty(t, rec.Results())
 	})
 
+	t.Run("AutoInstall environ passes KEY=VALUE entries as is", func(t *testing.T) {
+		root := testmodule(t, "a")
+		base, rec := recorder()
+
+		require.NoError(t, New().WorkingDirectory(root).Environ("FOO=bar").autoinstall(base)(t.Context(), nil))
+		require.Len(t, rec.Results(), 1)
+		require.Contains(t, rec.Results()[0], "FOO=bar")
+	})
+
+	t.Run("AutoInstall environ copies bare keys from the process environment", func(t *testing.T) {
+		t.Setenv("EGGOLANG_TEST_COPY", "copied")
+		root := testmodule(t, "a")
+		base, rec := recorder()
+
+		require.NoError(t, New().WorkingDirectory(root).Environ("EGGOLANG_TEST_COPY").autoinstall(base)(t.Context(), nil))
+		require.Len(t, rec.Results(), 1)
+		require.Contains(t, rec.Results()[0], "EGGOLANG_TEST_COPY=copied")
+	})
+
+	t.Run("AutoInstall environ ignores bare keys missing from the process environment", func(t *testing.T) {
+		root := testmodule(t, "a")
+		base, rec := recorder()
+
+		require.NoError(t, New().WorkingDirectory(root).Environ("EGGOLANG_TEST_MISSING").autoinstall(base)(t.Context(), nil))
+		require.Len(t, rec.Results(), 1)
+		require.NotContains(t, rec.Results()[0], "EGGOLANG_TEST_MISSING")
+	})
+
 	t.Run("AutoCompile runs go build per module", func(t *testing.T) {
 		root := testmodule(t, "a")
 		base, rec := recorder()

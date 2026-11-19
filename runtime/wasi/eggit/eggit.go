@@ -249,7 +249,7 @@ func CachedClone(uri, remote, commit string) eg.OpFn {
 // unlike Clone it honors EG_UNSAFE_GIT_CLONE_ENABLED=false, which local runs set because the
 // workload's repository is already present, and skips the clone.
 func AutoClone(ctx context.Context, _ eg.Op) error {
-	if err := clone(ctx, nil,egenv.DirectoryWorking(), env.String("", _eg.EnvGitHeadURI), env.String("origin", "EG_GIT_HEAD_REMOTE"), env.String("main", _eg.EnvGitHeadCommit, _eg.EnvGitHeadRef)); err != nil {
+	if err := clone(ctx, nil, egenv.DirectoryWorking(), env.String("", _eg.EnvGitHeadURI), env.String("origin", "EG_GIT_HEAD_REMOTE"), env.String("main", _eg.EnvGitHeadCommit, _eg.EnvGitHeadRef)); err != nil {
 		return err
 	}
 

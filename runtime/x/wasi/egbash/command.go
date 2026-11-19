@@ -4,25 +4,65 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"math"
 	"os"
+	"strings"
 	"time"
 
+	"github.com/logrusorgru/aurora"
+	"golang.org/x/time/rate"
+
+	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
+	"github.com/egdaemon/eg/internal/stringsx"
+	"github.com/egdaemon/eg/runtime/wasi/eg"
 )
 
 const (
 	DefaultTimeout = 5 * time.Minute
 )
 
+// defaultRetryLimiter retries once every 200ms.
+func defaultRetryLimiter() *rate.Limiter {
+	return rate.NewLimiter(rate.Every(200*time.Millisecond), 1)
+}
+
+// Execer runs an external command the interpreter hands off, in dir with environ added to the guest's environment.
+// ctx is the interpreter's handler context, interp.HandlerCtx gives the command's stdio.
+type Execer func(ctx context.Context, dir string, environ []string, cmd string, args []string) error
+
 // Command is a shell command to interpret, configured like eg/shell's Command.
 type Command struct {
-	user      string
-	group     string
-	cmd       string
-	directory string
-	environ   []string
-	timeout   time.Duration
-	lenient   bool
+	user       string
+	group      string
+	cmd        string
+	directory  string
+	environ    []string
+	timeout    time.Duration
+	attempts   int16
+	retrylimit *rate.Limiter
+	lenient    bool
+	silent     bool
+	exec       Execer
+	color      aurora.Aurora
+}
+
+// enable or disable colorized log output (warnings on retries, errors on failure). default is enabled.
+func (t Command) Colors(enabled bool) Command {
+	t.color = aurora.NewAurora(enabled)
+	return t
+}
+
+// number of attempts to make before giving up.
+func (t Command) Attempts(a int16) Command {
+	t.attempts = a
+	return t
+}
+
+// limits how quickly attempts are retried, see Attempts. the limiter must not be nil.
+func (t Command) Retry(l *rate.Limiter) Command {
+	t.retrylimit = l
+	return t
 }
 
 // directory to run the command in, relative to the working directory.
@@ -37,15 +77,22 @@ func (t Command) Lenient(d bool) Command {
 	return t
 }
 
+// silence the warnings logged when a failure is ignored by Lenient or before a retry, see Attempts.
+// the output of the command itself is not affected, and a failure that is returned is still reported.
+func (t Command) Silent(d bool) Command {
+	t.silent = d
+	return t
+}
+
 // maximum duration for a command to run. default is 5 minutes.
 func (t Command) Timeout(d time.Duration) Command {
 	t.timeout = d
 	return t
 }
 
-// append a set of environment variables in the form KEY=VALUE to the environment.
-func (t Command) EnvironFrom(environ ...string) Command {
-	t.environ = append(t.environ, environ...)
+// append a set of environment variables, given as KEY=VALUE or as keys copied from the current environment.
+func (t Command) EnvironFrom(keysOrEnviron ...string) Command {
+	t.environ = append(t.environ, envx.AutoEnviron(keysOrEnviron...)...)
 	return t
 }
 
@@ -96,41 +143,59 @@ func (t Command) MaybePrivileged(b bool) Command {
 	return t
 }
 
-// New clone the current command configuration and replace the command
-// that will be executed.
-func (t Command) New(cmd string) Command {
+// Internal use only not under compatability promises.
+func (t Command) UnsafeExec(e Execer) Command {
+	t.exec = e
+	return t
+}
+
+// debug a command, logging each external command the interpreter hands off.
+func (t Command) Debug() Command {
+	original := t.exec
+	t.exec = func(ctx context.Context, dir string, environ []string, cmd string, args []string) error {
+		log.Printf("running command: '%s %s'\ndir(%s)\n%s", cmd, strings.Join(args, " "), dir, strings.Join(environ, "\n"))
+		return original(ctx, dir, environ, cmd, args)
+	}
+	return t
+}
+
+func (t Command) MaybeDebug(b bool) Command {
+	if b {
+		return t.Debug()
+	}
+
+	return t
+}
+
+// New clone the current command configuration and replace the command that will be executed, formatted with
+// options as fmt.Sprintf does.
+func (t Command) New(cmd string, options ...any) Command {
 	var (
 		environ = make([]string, len(t.environ))
 	)
 
 	copy(environ, t.environ)
 	d := t
-	d.cmd = cmd
+	d.cmd = fmt.Sprintf(cmd, options...)
 	d.environ = environ
 
 	return d
 }
 
-// Newf provides a simple printf form of creating commands.
-func (t Command) Newf(cmd string, options ...any) Command {
-	return t.New(fmt.Sprintf(cmd, options...))
-}
-
-// New create a new command with reasonable defaults. unlike eg/shell, external commands run as the module's own
-// user until User, Group or As say otherwise.
+// New create a new command, formatted with options as fmt.Sprintf does, with reasonable defaults. unlike
+// eg/shell, external commands run as the module's own user until User, Group or As say otherwise.
 // defaults:
 //
 //	timeout: 5 minutes.
-func New(cmd string) Command {
+func New(cmd string, options ...any) Command {
 	return Command{
-		cmd:     cmd,
-		timeout: DefaultTimeout,
+		cmd:        fmt.Sprintf(cmd, options...),
+		timeout:    DefaultTimeout,
+		exec:       reactor,
+		attempts:   1,
+		retrylimit: defaultRetryLimiter(),
+		color:      aurora.NewAurora(true),
 	}
-}
-
-// Newf provides a simple printf form of creating commands.
-func Newf(cmd string, options ...any) Command {
-	return New(fmt.Sprintf(cmd, options...))
 }
 
 // Runtime creates a Command with no specified command to run, for use as a template.
@@ -143,26 +208,108 @@ func Env() Command {
 	return Runtime().EnvironFrom(os.Environ()...)
 }
 
+// Convience function for running a set of commands as an operation.
+func Op(cmds ...Command) eg.OpFn {
+	return func(ctx context.Context, o eg.Op) error {
+		return Run(ctx, cmds...)
+	}
+}
+
+// Convience function for running a set of commands in parallel as an operation.
+func Parallel(cmds ...Command) eg.OpFn {
+	ops := make([]eg.OpFn, 0, len(cmds))
+	for _, cmd := range cmds {
+		ops = append(ops, func(ctx context.Context, o eg.Op) error {
+			return Run(ctx, cmd)
+		})
+	}
+	return eg.Parallel(ops...)
+}
+
 // Run interprets the commands in order, stopping at the first that fails.
 func Run(ctx context.Context, cmds ...Command) error {
 	for _, cmd := range cmds {
-		if err := cmd.run(ctx); err != nil {
-			return err
+		if ts, err := time.Now(), retry(ctx, cmd, func() error {
+			cctx, done := context.WithTimeout(ctx, cmd.timeout)
+			defer done()
+			if cause := interpret(cctx, cmd.cmd, cmd.directory, cmd.environ, cmd.exec); cmd.lenient && cause != nil {
+				if !cmd.silent {
+					log.Println(cmd.color.Yellow("WARN"), "command failed, but lenient mode enable, ignoring", cause)
+				}
+				return nil
+			} else if cause != nil {
+				return cause
+			}
+
+			return nil
+		}); err != nil {
+			return errorsx.Wrapf(err, "%s duration(%v) shell command failed: %s", cmd.color.Red("ERROR"), time.Since(ts), cmd.cmd)
 		}
 	}
 
 	return nil
 }
 
-func (t Command) run(ctx context.Context) error {
-	cctx, done := context.WithTimeout(ctx, t.timeout)
-	defer done()
-
-	cause := interpret(cctx, t.user, t.group, t.cmd, t.directory, t.environ)
-	if t.lenient && cause != nil {
-		log.Println("WARN", "command failed, but lenient mode enable, ignoring", cause)
-		return nil
+func retry(ctx context.Context, c Command, do func() error) (err error) {
+	attempts := c.attempts
+	switch attempts {
+	case 0, 1: // handle zero and single attempt case. 0 attempts makes no sense, so assume 1.
+		return do()
+	case -1: // unlimited attempts.
+		attempts = math.MaxInt16
+	default:
 	}
 
-	return errorsx.Wrapf(cause, "shell command failed: %s", t.cmd)
+	for i := int16(0); i < attempts; i++ {
+		if cause := do(); cause == nil {
+			return nil
+		} else {
+			err = errorsx.Compact(err, cause)
+			if i+1 < attempts && ctx.Err() == nil && !c.silent {
+				log.Println(c.color.Yellow("WARN"), fmt.Sprintf("attempt %d failed, retrying: %s", i+1, c.cmd), cause)
+			}
+		}
+
+		if i+1 < attempts {
+			if werr := c.retrylimit.Wait(ctx); werr != nil {
+				return errorsx.Compact(err, werr)
+			}
+		}
+	}
+
+	return err
+}
+
+// creates a recorder that allows for generating string representations of commands for tests.
+func NewRecorder(cmd *Command) *Recorder {
+	rec := Recorder{}
+	rec.Hijack(cmd)
+	return &rec
+}
+
+// Recorder records the external commands the interpreter hands off, in place of running them.
+type Recorder struct {
+	commands []string
+}
+
+func (t *Recorder) Hijack(cmd *Command) error {
+	cmd.exec = t.Record
+	return nil
+}
+
+func (t *Recorder) Record(ctx context.Context, dir string, environ []string, cmd string, args []string) error {
+	t.commands = append(t.commands, stringsx.Join(":", dir, stringsx.Join(":", environ...), cmd, stringsx.Join(" ", args...)))
+	return nil
+}
+
+func (t *Recorder) Result() string {
+	if len(t.commands) == 0 {
+		return ""
+	}
+
+	return t.commands[0]
+}
+
+func (t *Recorder) Results() []string {
+	return t.commands
 }

@@ -121,6 +121,62 @@ func TestAuto(t *testing.T) {
 		require.Contains(t, rec.Results()[0], "FOO=bar")
 	})
 
+	t.Run("AutoCompile environ copies bare keys from the process environment", func(t *testing.T) {
+		t.Setenv("EGGOLANG_TEST_COPY", "copied")
+		root := testmodule(t, "a")
+		base, rec := recorder()
+
+		require.NoError(t, New().WorkingDirectory(root).Environ("EGGOLANG_TEST_COPY").autocompile(base)(t.Context(), nil))
+		require.Len(t, rec.Results(), 1)
+		require.Contains(t, rec.Results()[0], "EGGOLANG_TEST_COPY=copied")
+	})
+
+	t.Run("AutoCompile environ ignores bare keys missing from the process environment", func(t *testing.T) {
+		root := testmodule(t, "a")
+		base, rec := recorder()
+
+		require.NoError(t, New().WorkingDirectory(root).Environ("EGGOLANG_TEST_MISSING").autocompile(base)(t.Context(), nil))
+		require.Len(t, rec.Results(), 1)
+		require.NotContains(t, rec.Results()[0], "EGGOLANG_TEST_MISSING")
+	})
+
+	t.Run("AutoTest environ passes KEY=VALUE entries as is", func(t *testing.T) {
+		root := testmodule(t, "a")
+		base, rec := recorder()
+
+		testx.Tempenvvar(_eg.EnvComputeWorkingDirectory, root, func() {
+			require.NoError(t, New().Environ("FOO=bar").autotest(base)(t.Context(), nil))
+		})
+
+		require.Len(t, rec.Results(), 2)
+		require.Contains(t, rec.Results()[1], "FOO=bar")
+	})
+
+	t.Run("AutoTest environ copies bare keys from the process environment", func(t *testing.T) {
+		t.Setenv("EGGOLANG_TEST_COPY", "copied")
+		root := testmodule(t, "a")
+		base, rec := recorder()
+
+		testx.Tempenvvar(_eg.EnvComputeWorkingDirectory, root, func() {
+			require.NoError(t, New().Environ("EGGOLANG_TEST_COPY").autotest(base)(t.Context(), nil))
+		})
+
+		require.Len(t, rec.Results(), 2)
+		require.Contains(t, rec.Results()[1], "EGGOLANG_TEST_COPY=copied")
+	})
+
+	t.Run("AutoTest environ ignores bare keys missing from the process environment", func(t *testing.T) {
+		root := testmodule(t, "a")
+		base, rec := recorder()
+
+		testx.Tempenvvar(_eg.EnvComputeWorkingDirectory, root, func() {
+			require.NoError(t, New().Environ("EGGOLANG_TEST_MISSING").autotest(base)(t.Context(), nil))
+		})
+
+		require.Len(t, rec.Results(), 2)
+		require.NotContains(t, rec.Results()[1], "EGGOLANG_TEST_MISSING")
+	})
+
 	t.Run("AutoTest creates the coverage directory and runs go test per module", func(t *testing.T) {
 		root := testmodule(t, "a")
 		base, rec := recorder()

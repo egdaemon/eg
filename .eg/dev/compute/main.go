@@ -27,6 +27,10 @@ func daemon(ctx context.Context, op eg.Op) error {
 		log.Println("unable to keep the workload alive:", cause)
 	}
 
+	select {
+	case <-ctx.Done():
+	}
+
 	return err
 }
 
@@ -53,26 +57,22 @@ func run(ctx context.Context, _ eg.Op) error {
 		runtime.New(`go install -ldflags="-X github.com/egdaemon/eg.apiHostDefault=${EG_DEV_API_HOST} -X github.com/egdaemon/eg.consoleHostDefault=${EG_DEV_CONSOLE_HOST} -X github.com/egdaemon/eg.containerAPIHostDefault=${EG_DEV_API_HOST} -X github.com/egdaemon/eg.tlsinsecure=true" ./cmd/eg`),
 		// the daemon is preauthorized by egmeta's dev/daemon (egci-meta accounts create), no authorize step is needed.
 		// bootstrap env derives the daemon's seed the same way authorize would, and the daemon consumes the derived value.
-		runtime.Newf("~/go/bin/eg actl bootstrap env daemon --account=${EG_ACCOUNT} --seed=${EG_DEV_SEED} -e EG_COMPUTE_TLS_INSECURE=true | tee %s", envfile),
+		runtime.Newf("~/go/bin/eg actl bootstrap env daemon --account=${EG_ACCOUNT} --seed=${EG_DEV_SEED} -e EG_COMPUTE_TLS_INSECURE=true | tee %s | ~/go/bin/eg secrets redact", envfile),
 	)
 	if err != nil {
 		return err
 	}
 
 	// the daemon builds containers, nested inside this one that needs the user's systemd session to create scopes.
-	// so it runs there like egmeta's dev/daemon does, the session loads the daemon's environment from the file.
-	// the session's own environment is used, so an EG_SSH_KEY_SEED exported by the launching shell can't take
-	// precedence over the derived EG_ENTROPY_SEED the daemon must use.
+	// so it runs as a unit of the user's systemd manager, which loads the daemon's environment from the file. the unit
+	// has its own environment, so an EG_SSH_KEY_SEED exported by the launching shell can't take precedence over the
+	// derived EG_ENTROPY_SEED the daemon must use. no machinectl and no privileges are needed: systemd-run only needs to
+	// be told where the user's bus is, a plain workload process doesn't have XDG_RUNTIME_DIR.
 	return shell.Run(
 		ctx,
-		// diagnostics, exec status 203 is also what systemd reports when it can't load an EnvironmentFile. each probe adds
-		// one piece of the real command: a plain binary, then the env file, then the eg binary itself.
-		shell.New("machinectl shell egd@.host /usr/bin/systemd-run --user --pty --wait /usr/bin/id").Privileged().Lenient(true),
-		shell.Newf("machinectl shell egd@.host /usr/bin/systemd-run --user --pty --wait --property=EnvironmentFile=%s /usr/bin/id", envfile).Privileged().Lenient(true),
-		shell.New("machinectl shell egd@.host /usr/bin/systemd-run --user --pty --wait /home/egd/go/bin/eg version").Privileged().Lenient(true),
 		shell.New(
-			"machinectl shell egd@.host /usr/bin/systemd-run --user --pty --wait --property=EnvironmentFile=${COMPUTE_ENV} ~/go/bin/eg daemon",
-		).Environ("COMPUTE_ENV", envfile).Privileged().Timeout(egenv.TTL()),
+			"XDG_RUNTIME_DIR=/run/user/$(id -u) systemd-run --user --wait --pipe --property=EnvironmentFile=${COMPUTE_ENV} ~/go/bin/eg daemon",
+		).Environ("COMPUTE_ENV", envfile).Timeout(egenv.TTL()),
 	)
 }
 

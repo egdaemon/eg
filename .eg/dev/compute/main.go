@@ -51,12 +51,13 @@ func run(ctx context.Context, _ eg.Op) error {
 		// the workload environment sets this from the launching eg, which overrides the compiled default.
 		Environ("EG_COMPUTE_TLS_INSECURE", "true").
 		Environ("EG_DEV_API_HOST", egenv.String("https://host.containers.internal:8081", "EG_DEV_API_HOST")).
-		Environ("EG_DEV_CONSOLE_HOST", egenv.String("https://host.containers.internal:8080", "EG_DEV_CONSOLE_HOST"))
+		Environ("EG_DEV_CONSOLE_HOST", egenv.String("https://host.containers.internal:8080", "EG_DEV_CONSOLE_HOST")).
+		Environ("EG_DEV_APT_HOST", egenv.String("apt.eg.lawrencia.network", "EG_DEV_APT_HOST"))
 
 	// the eg on the PATH points at the production hosts, so the freshly built binary is always invoked by path.
 	err := shell.Run(
 		ctx,
-		runtime.New(`go install -ldflags="-X github.com/egdaemon/eg.apiHostDefault=${EG_DEV_API_HOST} -X github.com/egdaemon/eg.consoleHostDefault=${EG_DEV_CONSOLE_HOST} -X github.com/egdaemon/eg.containerAPIHostDefault=${EG_DEV_API_HOST} -X github.com/egdaemon/eg.tlsinsecure=true" ./cmd/eg`),
+		runtime.New(`go install -ldflags="-X github.com/egdaemon/eg.apiHostDefault=${EG_DEV_API_HOST} -X github.com/egdaemon/eg.consoleHostDefault=${EG_DEV_CONSOLE_HOST} -X github.com/egdaemon/eg.containerAPIHostDefault=${EG_DEV_API_HOST} -X github.com/egdaemon/eg.aptHostDefault=${EG_DEV_APT_HOST} -X github.com/egdaemon/eg.tlsinsecure=true" ./cmd/eg`),
 		runtime.Newf("install -D -m 0755 ~/go/bin/eg %s", egbin),
 		// the daemon is preauthorized by egmeta's dev/daemon (egci-meta accounts create), no authorize step is needed.
 		// bootstrap env derives the daemon's seed the same way authorize would, and the daemon consumes the derived value.

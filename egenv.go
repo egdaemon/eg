@@ -20,6 +20,7 @@ var (
 	apiHostDefault          = "https://api.egdaemon.com"
 	consoleHostDefault      = "https://console.egdaemon.com"
 	ssoHostDefault          = "https://sso.egdaemon.com"
+	aptHostDefault          = "apt.egdaemon.com"
 	tlsinsecure             = "false"
 	containerAPIHostDefault = ""
 )
@@ -38,6 +39,12 @@ func EnvConsoleHostDefault() string {
 
 func EnvSSOHostDefault() string {
 	return ssoHostDefault
+}
+
+// EnvAptHostDefault the domain of the apt repository service, repositories are served from
+// https://<account id>.<domain>/<repository>.
+func EnvAptHostDefault() string {
+	return aptHostDefault
 }
 
 func EnvContainerAPIHostDefault() string {

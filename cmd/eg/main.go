@@ -20,6 +20,8 @@ import (
 	"github.com/egdaemon/duckproxy/duckkong"
 	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/cmd/cmdaccounts"
+	"github.com/egdaemon/eg/cmd/cmdapt"
+	"github.com/egdaemon/eg/cmd/cmdauthz"
 	"github.com/egdaemon/eg/cmd/cmderrors"
 	"github.com/egdaemon/eg/cmd/cmdgcp"
 	"github.com/egdaemon/eg/cmd/cmdgpg"
@@ -106,6 +108,8 @@ func main() {
 		DB                 duckkong.Cmd                 `cmd:"" name:"db" help:"sql shell for the cli's local database, -c runs the statements and exits"`
 		Me                 cmdme.Cmd                    `cmd:"" name:"me" help:"manage your own profile"`
 		GCP                cmdgcp.Cmd                   `cmd:"" name:"gcp" help:"gcp integration management"`
+		Authz              cmdauthz.Cmd                 `cmd:"" name:"authz" help:"print authorization tokens for the eg api"`
+		Apt                cmdapt.Cmd                   `cmd:"" name:"apt" help:"manage private apt repositories"`
 		GDX                konggdx.Commands             `cmd:"" name:"gdx" help:"pull profiles/traces from a running eg debug socket"`
 		InstallCompletions kongplete.InstallCompletions `cmd:"" help:"install shell completions"`
 	}
@@ -146,6 +150,7 @@ func main() {
 			"vars_timestamp_started":       time.Now().UTC().Format(time.RFC3339),
 			"vars_endpoint":                eg.EnvAPIHostDefault(),
 			"vars_console_endpoint":        eg.EnvConsoleHostDefault(),
+			"vars_apt_domain":              eg.EnvAptHostDefault(),
 			"vars_tls_insecure_default":    eg.EnvTLSInsecure(),
 			"vars_cwd":                     osx.Getwd("."),
 			"vars_git_directory":           gitdir,

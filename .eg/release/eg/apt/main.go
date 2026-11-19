@@ -74,15 +74,38 @@ func main() {
 		repo = rt.Directory(egenv.DirectoryWorking())
 	)
 
+	// mirror every amd64 deb attached to a published release under dl/github.com/<owner>/<repo>/releases/download/<tag>/<deb>,
+	// fails when there are none.
+	mirror := shell.Op(
+		repo.New("mkdir -p ${APT_BINARY} ${APT_SITE}"),
+		repo.New(`gh api repos/{owner}/{repo}/releases --paginate --jq '.[] | select(.draft | not) | .assets[] | select(.name | endswith("_" + env.APT_ARCH + ".deb")) | .browser_download_url' | wget -q -x -i - -P ${APT_POOL}`),
+	)
+
+	// private repository mode: the debs are uploaded to the eg hosted apt repository named by EG_APT_REPOSITORY,
+	// which builds, signs and serves the index itself, instead of publishing the gh-pages repository below.
+	// the eg in the workload must be authorized for the account (repository_modify), see eg authz ci token.
+	if private := egenv.String("", "EG_APT_REPOSITORY"); private != "" {
+		prt := rt.Environ("EG_APT_REPOSITORY", private).Directory(pool)
+		if err := eg.Perform(
+			ctx,
+			eggit.AutoClone,
+			mirror,
+			shell.Op(
+				prt.New("find . -name '*.deb' -print0 | xargs -0 --no-run-if-empty eg apt upload ${EG_APT_REPOSITORY}"),
+				prt.New("eg apt publish ${EG_APT_REPOSITORY}"),
+			),
+		); err != nil {
+			log.Fatalln(err)
+		}
+		return
+	}
+
 	err := eg.Perform(
 		ctx,
 		eggit.AutoClone,
 		eggpg.Seed(gpgoptions...),
+		mirror,
 		shell.Op(
-			repo.New("mkdir -p ${APT_BINARY} ${APT_SITE}"),
-			// mirror every amd64 deb attached to a published release under dl/github.com/<owner>/<repo>/releases/download/<tag>/<deb>,
-			// fails when there are none.
-			repo.New(`gh api repos/{owner}/{repo}/releases --paginate --jq '.[] | select(.draft | not) | .assets[] | select(.name | endswith("_" + env.APT_ARCH + ".deb")) | .browser_download_url' | wget -q -x -i - -P ${APT_POOL}`),
 			// the path prefix makes every Filename the release download url apt fetches the package from.
 			rt.New("dpkg-scanpackages --multiversion github.com /dev/null https:// > ${APT_BINARY}/Packages").Directory(pool),
 			rt.New("gzip -9 -k -f ${APT_BINARY}/Packages"),

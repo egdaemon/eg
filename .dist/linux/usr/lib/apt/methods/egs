@@ -1,0 +1,3 @@
+#!/bin/sh
+# apt acquire method for egs:// repositories, see eg apt repo sources.
+exec /usr/bin/eg apt transport "$@"

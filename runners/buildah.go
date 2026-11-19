@@ -20,22 +20,24 @@ import (
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
-// BuildEgiso builds the Containerfile at path, in the context dir, with buildah squashed to a single
-// layer, and returns the uri of an egiso of that layer, with the image's environment as its
+// BuildEgiso builds the Containerfile at path, in the context dir, with buildah, and returns the uri of
+// an egiso of the image squashed to a single layer, with the image's environment as its
 // /etc/environment. It keeps the egiso of the latest image in cache, in a directory named for the
-// image's id, so it converts one per image.
+// image's id, so it squashes and converts one per image.
 func BuildEgiso(ctx context.Context, cache, dir, path string, options ...string) (_ string, err error) {
 	var (
-		iid     *os.File
-		id      []byte
-		layout  string
-		layer   string
-		environ []string
-		root    *os.File
-		st      os.FileInfo
-		out     *os.File
-		toc     digest.Digest
-		cached  []byte
+		iid       *os.File
+		id        []byte
+		container string
+		squash    string
+		layout    string
+		layer     string
+		environ   []string
+		root      *os.File
+		st        os.FileInfo
+		out       *os.File
+		toc       digest.Digest
+		cached    []byte
 	)
 
 	if iid, err = os.CreateTemp("", "eg.buildah.iid.*"); err != nil {
@@ -46,8 +48,8 @@ func BuildEgiso(ctx context.Context, cache, dir, path string, options ...string)
 		return "", err
 	}
 
-	// squashing includes the layers of the base image, so the image is one layer with no whiteouts.
-	cmd := exec.CommandContext(ctx, "buildah", append(append([]string{"build", "--squash", "--iidfile", iid.Name(), "-f", path}, options...), dir)...)
+	// --layers caches each step, and a fixed timestamp keeps an unchanged image's id, which keys the cache.
+	cmd := exec.CommandContext(ctx, "buildah", append(append([]string{"build", "--layers", "--timestamp", "0", "--iidfile", iid.Name(), "-f", path}, options...), dir)...)
 	cmd.Stdout, cmd.Stderr = os.Stdout, os.Stderr
 	if err = execx.MaybeRun(cmd); err != nil {
 		return "", errorsx.Wrap(err, "unable to build the image")
@@ -56,11 +58,8 @@ func BuildEgiso(ctx context.Context, cache, dir, path string, options ...string)
 	if id, err = os.ReadFile(iid.Name()); err != nil {
 		return "", errorsx.Wrap(err, "unable to identify the image")
 	}
-	// the egiso replaces the image, so it leaves nothing behind in buildah's storage.
-	defer func() {
-		errorsx.Log(errorsx.Wrap(exec.Command("buildah", "rmi", strings.TrimSpace(string(id))).Run(), "unable to remove the image"))
-	}()
-	imagedir := filepath.Join(cache, digest.Digest(strings.TrimSpace(string(id))).Encoded())
+	image := strings.TrimSpace(string(id))
+	imagedir := filepath.Join(cache, digest.Digest(image).Encoded())
 	location := filepath.Join(imagedir, "root.egiso")
 
 	// the table of contents is written once its egiso is complete.
@@ -77,7 +76,25 @@ func BuildEgiso(ctx context.Context, cache, dir, path string, options ...string)
 	}
 	defer func() { err = errorsx.Compact(err, os.RemoveAll(layout)) }()
 
-	if err = exec.CommandContext(ctx, "buildah", "push", "--compression-format", "gzip", "--force-compression", strings.TrimSpace(string(id)), "oci:"+layout).Run(); err != nil {
+	// squashing includes the layers of the base image, so the egiso is one layer with no whiteouts. a
+	// squash of an unchanged image differs from build to build, so only an image the cache misses is squashed.
+	if container, err = execx.String(ctx, "buildah", "from", "--pull=never", image); err != nil {
+		return "", errorsx.Wrap(err, "unable to create the image's container")
+	}
+	container = strings.TrimSpace(container)
+	defer func() {
+		errorsx.Log(errorsx.Wrapf(exec.Command("buildah", "rm", container).Run(), "unable to remove the container: %s", container))
+	}()
+
+	if squash, err = execx.String(ctx, "buildah", "commit", "-q", "--squash", "--timestamp", "0", container); err != nil {
+		return "", errorsx.Wrap(err, "unable to squash the image")
+	}
+	squash = strings.TrimSpace(squash)
+	defer func() {
+		errorsx.Log(errorsx.Wrapf(exec.Command("buildah", "rmi", squash).Run(), "unable to remove the squashed image: %s", squash))
+	}()
+
+	if err = exec.CommandContext(ctx, "buildah", "push", "--compression-format", "gzip", "--force-compression", squash, "oci:"+layout).Run(); err != nil {
 		return "", errorsx.Wrap(err, "unable to write the image's layout")
 	}
 
@@ -111,8 +128,10 @@ func BuildEgiso(ctx context.Context, cache, dir, path string, options ...string)
 		return "", errorsx.Wrap(err, "unable to record the egiso's table of contents")
 	}
 
+	// the latest image stays in buildah's storage, so an unchanged rebuild reuses it and keeps its id.
 	for stale := range fsx.KeepNewestN(1, fsx.Find(cache, fsx.Levels(1))).Each(ctx) {
 		errorsx.Log(errorsx.Wrapf(fsx.RemoveAll(stale), "egiso cache cleanup: %s", stale))
+		errorsx.Log(errorsx.Wrapf(exec.Command("buildah", "rmi", filepath.Base(stale)).Run(), "unable to remove the image: %s", filepath.Base(stale)))
 	}
 
 	return location + "#" + toc.String(), nil

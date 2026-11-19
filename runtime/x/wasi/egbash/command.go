@@ -30,7 +30,6 @@ func defaultRetryLimiter() *rate.Limiter {
 // Execer runs an external command the interpreter hands off, in dir with environ added to the guest's environment.
 // ctx is the interpreter's handler context, interp.HandlerCtx gives the command's stdio.
 type Execer func(ctx context.Context, dir string, environ []string, cmd string, args []string) error
-type entrypoint func(ctx context.Context, user string, group string, cmd string, directory string, environ []string, do Execer) (err error)
 
 // Command is a shell command to interpret, configured like eg/shell's Command.
 type Command struct {
@@ -44,7 +43,6 @@ type Command struct {
 	retrylimit *rate.Limiter
 	lenient    bool
 	silent     bool
-	entry      entrypoint
 	exec       Execer
 	color      aurora.Aurora
 }
@@ -92,14 +90,8 @@ func (t Command) Timeout(d time.Duration) Command {
 	return t
 }
 
-// append a set of environment variables in the form KEY=VALUE to the environment.
-func (t Command) EnvironFrom(environ ...string) Command {
-	t.environ = append(t.environ, environ...)
-	return t
-}
-
 // append a set of environment variables, given as KEY=VALUE or as keys copied from the current environment.
-func (t Command) EnvironCopy(keysOrEnviron ...string) Command {
+func (t Command) EnvironFrom(keysOrEnviron ...string) Command {
 	t.environ = append(t.environ, envx.AutoEnviron(keysOrEnviron...)...)
 	return t
 }
@@ -152,22 +144,17 @@ func (t Command) MaybePrivileged(b bool) Command {
 }
 
 // Internal use only not under compatability promises.
-func (t Command) UnsafeEntrypoint(e entrypoint) Command {
-	t.entry = e
-	return t
-}
-
 func (t Command) UnsafeExec(e Execer) Command {
 	t.exec = e
 	return t
 }
 
-// debug a command
+// debug a command, logging each external command the interpreter hands off.
 func (t Command) Debug() Command {
-	original := t.entry
-	t.entry = func(ctx context.Context, user, group, cmd, directory string, environ []string, do Execer) (err error) {
-		log.Printf("running command: '%s'\ndir(%s) u(%s):g(%s)\n%s", cmd, directory, user, group, strings.Join(environ, "\n"))
-		return original(ctx, user, group, cmd, directory, environ, do)
+	original := t.exec
+	t.exec = func(ctx context.Context, dir string, environ []string, cmd string, args []string) error {
+		log.Printf("running command: '%s %s'\ndir(%s)\n%s", cmd, strings.Join(args, " "), dir, strings.Join(environ, "\n"))
+		return original(ctx, dir, environ, cmd, args)
 	}
 	return t
 }
@@ -180,46 +167,35 @@ func (t Command) MaybeDebug(b bool) Command {
 	return t
 }
 
-// New clone the current command configuration and replace the command
-// that will be executed.
-func (t Command) New(cmd string) Command {
+// New clone the current command configuration and replace the command that will be executed, formatted with
+// options as fmt.Sprintf does.
+func (t Command) New(cmd string, options ...any) Command {
 	var (
 		environ = make([]string, len(t.environ))
 	)
 
 	copy(environ, t.environ)
 	d := t
-	d.cmd = cmd
+	d.cmd = fmt.Sprintf(cmd, options...)
 	d.environ = environ
 
 	return d
 }
 
-// Newf provides a simple printf form of creating commands.
-func (t Command) Newf(cmd string, options ...any) Command {
-	return t.New(fmt.Sprintf(cmd, options...))
-}
-
-// New create a new command with reasonable defaults. unlike eg/shell, external commands run as the module's own
-// user until User, Group or As say otherwise.
+// New create a new command, formatted with options as fmt.Sprintf does, with reasonable defaults. unlike
+// eg/shell, external commands run as the module's own user until User, Group or As say otherwise.
 // defaults:
 //
 //	timeout: 5 minutes.
-func New(cmd string) Command {
+func New(cmd string, options ...any) Command {
 	return Command{
-		cmd:        cmd,
+		cmd:        fmt.Sprintf(cmd, options...),
 		timeout:    DefaultTimeout,
-		entry:      interpret,
 		exec:       reactor,
 		attempts:   1,
 		retrylimit: defaultRetryLimiter(),
 		color:      aurora.NewAurora(true),
 	}
-}
-
-// Newf provides a simple printf form of creating commands.
-func Newf(cmd string, options ...any) Command {
-	return New(fmt.Sprintf(cmd, options...))
 }
 
 // Runtime creates a Command with no specified command to run, for use as a template.
@@ -256,7 +232,7 @@ func Run(ctx context.Context, cmds ...Command) error {
 		if ts, err := time.Now(), retry(ctx, cmd, func() error {
 			cctx, done := context.WithTimeout(ctx, cmd.timeout)
 			defer done()
-			if cause := cmd.entry(cctx, cmd.user, cmd.group, cmd.cmd, cmd.directory, cmd.environ, cmd.exec); cmd.lenient && cause != nil {
+			if cause := interpret(cctx, cmd.cmd, cmd.directory, cmd.environ, cmd.exec); cmd.lenient && cause != nil {
 				if !cmd.silent {
 					log.Println(cmd.color.Yellow("WARN"), "command failed, but lenient mode enable, ignoring", cause)
 				}

@@ -25,7 +25,7 @@ import (
 // interpret interprets cmd in directory, relative to the working directory, with environ added to the guest's
 // environment. external commands other than the coreutils go to do, with the exported variables that differ
 // from the guest's environment.
-func interpret(ctx context.Context, user string, group string, cmd string, directory string, environ []string, do Execer) (err error) {
+func interpret(ctx context.Context, cmd string, directory string, environ []string, do Execer) (err error) {
 	var (
 		file *syntax.File
 		r    *interp.Runner

@@ -28,6 +28,27 @@ func TestNewRecorder(t *testing.T) {
 			},
 		},
 		{
+			name: "formats the command with its options",
+			cmd:  func(dir string) egbash.Command { return egbash.New("deploy --to %s", "prod").Directory(dir) },
+			expected: func(dir string) []string {
+				return []string{dir + "::deploy:--to prod"}
+			},
+		},
+		{
+			name: "a literal percent is escaped as in fmt.Sprintf",
+			cmd:  func(dir string) egbash.Command { return egbash.New("deploy +%%s").Directory(dir) },
+			expected: func(dir string) []string {
+				return []string{dir + "::deploy:+%s"}
+			},
+		},
+		{
+			name: "formats a command cloned from a runtime",
+			cmd:  func(dir string) egbash.Command { return egbash.Runtime().Directory(dir).New("deploy %d", 3) },
+			expected: func(dir string) []string {
+				return []string{dir + "::deploy:3"}
+			},
+		},
+		{
 			name: "records only the variables added to the environment",
 			cmd: func(dir string) egbash.Command {
 				return egbash.Env().Environ("EGBASH_TEST", "derp").New("deploy").Directory(dir)

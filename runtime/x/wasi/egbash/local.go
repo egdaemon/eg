@@ -15,7 +15,6 @@ import (
 func NewLocal() Command {
 	return Command{
 		timeout:    DefaultTimeout,
-		entry:      interpret,
 		exec:       execlocal,
 		attempts:   1,
 		retrylimit: defaultRetryLimiter(),

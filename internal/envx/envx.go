@@ -4,8 +4,11 @@ package envx
 import (
 	"bufio"
 	"bytes"
+	"crypto/hmac"
+	"crypto/sha256"
 	"encoding"
 	"encoding/base64"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -448,6 +451,33 @@ func (t *Builder) Drop(keys ...string) *Builder {
 
 	t.environ = vars
 	return t
+}
+
+// Redact replaces the values of the keys with redacted:{digest}, the digest is a hex encoded HMAC-SHA256 of the
+// value keyed by the seed. the same value and seed always produce the same digest so redacted values can be
+// compared without being revealed.
+func Redact(b *Builder, seed string, keys ...string) *Builder {
+	uniq := slicesx.Reduce(func(m map[string]struct{}, v string) map[string]struct{} {
+		m[v] = struct{}{}
+		return m
+	}, make(map[string]struct{}, len(keys)), keys...)
+
+	b.environ = slicesx.Map(func(s string) string {
+		k, v, ok := strings.Cut(s, "=")
+		if _, found := uniq[k]; !ok || !found {
+			return s
+		}
+
+		return fmt.Sprintf("%s=%s", k, redacted(seed, v))
+	}, b.environ...)
+
+	return b
+}
+
+func redacted(seed, v string) string {
+	mac := hmac.New(sha256.New, []byte(seed))
+	mac.Write([]byte(v))
+	return "redacted:" + hex.EncodeToString(mac.Sum(nil))
 }
 
 func (t *Builder) Setenv(k, v string) error {

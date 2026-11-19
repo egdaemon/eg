@@ -63,7 +63,7 @@ type local struct {
 	ContainerArgs    []string `name:"cargs" help:"list of command line arguments to pass to the root container" hidden:"true"`
 	Secrets          []string `name:"secret" help:"List of secret URIs to use. Examples: chachasm://passphrase@/path/to/file, gcpsm://project-id/secret-name/version, awssm://secret-name?region=us-east-1"`
 	Profile          string   `name:"profile" help:"enable profiling of module runs (cpu,heap,mem,allocs,block)" enum:"cpu,heap,mem,allocs,block," default:""`
-	Egiso            *string  `name:"egiso" help:"EXPERIMENTAL: run in a machine booted from the egiso at this path or https URL, with the digest of its table of contents as its fragment, built from the default root container when empty" hidden:"true"`
+	Egiso            *string  `name:"egiso" help:"EXPERIMENTAL: run in a machine booted from the egiso at this path or https URL, with the digest of its table of contents as its fragment, built from the default root container with buildah when empty, on linux" hidden:"true"`
 	Name             string   `arg:"" name:"module" help:"name of the workload to run, i.e. the folder name within workload directory" default:"" predictor:"eg.workload"`
 }
 
@@ -343,6 +343,20 @@ func (t local) podman(ctx context.Context, ws workspaces.Context, uid uuidx.UUID
 	return container{ctx: pctx, ws: ws, uid: uid, agent: ragent, image: eg.WorkingDirectory}, nil
 }
 
+// rootegiso builds an egiso of the default root container, written to path, with buildah. buildah
+// runs only on linux, so elsewhere a machine needs the egiso it boots from.
+func rootegiso(ctx context.Context, dir, path, arch string) (_ string, err error) {
+	if runtime.GOOS != "linux" {
+		return "", errorsx.Errorf("building the root egiso needs buildah, which runs on linux; pass the egiso to boot with --egiso")
+	}
+
+	if err = eg.PrepareRootContainer(path); err != nil {
+		return "", errorsx.Wrapf(err, "preparing root container failed: %s", path)
+	}
+
+	return runners.BuildEgiso(ctx, userx.DefaultCacheDirectory("egiso"), dir, path, "--build-arg", envx.Format(eg.EnvBuildCommit, cmdopts.BuildCommit()), "--platform", podmanx.AutoPlatform(arch))
+}
+
 // machine prepares a machine booted from the egiso at uri, fetched through c, or from one of the
 // default root container when uri is empty.
 func (t local) machine(c *http.Client, uri string) runners.BFn {
@@ -355,7 +369,7 @@ func (t local) machine(c *http.Client, uri string) runners.BFn {
 		)
 
 		if stringsx.Blank(uri) {
-			if uri, err = runners.BuildRootEgiso(ctx, userx.DefaultCacheDirectory("egiso"), t.Dir, filepath.Join(ws.RuntimeDir, "Containerfile"), "--build-arg", envx.Format(eg.EnvBuildCommit, cmdopts.BuildCommit()), "--platform", podmanx.AutoPlatform(t.Arch)); err != nil {
+			if uri, err = rootegiso(ctx, t.Dir, filepath.Join(ws.RuntimeDir, "Containerfile"), t.Arch); err != nil {
 				return nil, err
 			}
 		}

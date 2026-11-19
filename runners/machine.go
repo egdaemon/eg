@@ -9,7 +9,6 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -19,7 +18,6 @@ import (
 	"github.com/egdaemon/eg/internal/egvm"
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
-	"github.com/egdaemon/eg/internal/execx"
 	"github.com/egdaemon/eg/internal/fsx"
 	"github.com/egdaemon/eg/internal/iox"
 	"github.com/egdaemon/eg/internal/langx"
@@ -31,7 +29,6 @@ import (
 	"github.com/egdaemon/eg/transpile"
 	"github.com/egdaemon/eg/workspaces"
 	"github.com/moby/sys/user"
-	"github.com/opencontainers/go-digest"
 )
 
 // Machine runs a workload's modules in a machine booted from an egiso, with the workspace's
@@ -203,92 +200,6 @@ func NewMachine(ctx context.Context, c *http.Client, ws workspaces.Context, uri 
 	}
 
 	return t, nil
-}
-
-// BuildRootEgiso builds the root container as BuildRootContainerPath does and returns the uri of an
-// egiso of its filesystem, with the image's environment as its /etc/environment. It keeps the egiso
-// of the latest image in cache, in a directory named for the image's id, so it builds one per image.
-func BuildRootEgiso(ctx context.Context, cache, dir, path string, options ...string) (_ string, err error) {
-	var (
-		id      string
-		cid     string
-		environ string
-		tar     *os.File
-		st      os.FileInfo
-		out     *os.File
-		toc     digest.Digest
-		cached  []byte
-	)
-
-	if err = BuildRootContainerPath(ctx, dir, path, options...); err != nil {
-		return "", err
-	}
-
-	if id, err = execx.String(ctx, "podman", "image", "inspect", "--format", "{{.Id}}", "eg"); err != nil {
-		return "", errorsx.Wrap(err, "unable to identify the root container")
-	}
-	imagedir := filepath.Join(cache, strings.TrimSpace(id))
-	location := filepath.Join(imagedir, "root.egiso")
-
-	// the table of contents is written once its egiso is complete.
-	if cached, err = os.ReadFile(filepath.Join(imagedir, "toc")); err == nil {
-		return location + "#" + string(cached), nil
-	}
-
-	if err = os.MkdirAll(imagedir, 0700); err != nil {
-		return "", errorsx.Wrap(err, "unable to create the egiso cache")
-	}
-
-	if tar, err = os.CreateTemp(imagedir, "root.*.tar"); err != nil {
-		return "", errorsx.Wrap(err, "unable to create the root container's archive")
-	}
-	defer func() { err = errorsx.Compact(err, tar.Close(), os.Remove(tar.Name())) }()
-
-	if cid, err = execx.String(ctx, "podman", "create", "eg"); err != nil {
-		return "", errorsx.Wrap(err, "unable to create the root container")
-	}
-	cid = strings.TrimSpace(cid)
-	defer func() { err = errorsx.Compact(err, exec.Command("podman", "rm", cid).Run()) }()
-
-	// an export holds only the filesystem, the environment a container starts its processes with is
-	// the image's configuration.
-	if environ, err = execx.String(ctx, "podman", "image", "inspect", "--format", "{{range .Config.Env}}{{println .}}{{end}}", "eg"); err != nil {
-		return "", errorsx.Wrap(err, "unable to read the root container's environment")
-	}
-	if err = os.WriteFile(filepath.Join(imagedir, "environment"), []byte(environ), 0644); err != nil {
-		return "", errorsx.Wrap(err, "unable to write the root container's environment")
-	}
-	defer os.Remove(filepath.Join(imagedir, "environment"))
-	if err = exec.CommandContext(ctx, "podman", "cp", "--archive=false", filepath.Join(imagedir, "environment"), cid+":/etc/environment").Run(); err != nil {
-		return "", errorsx.Wrap(err, "unable to place the root container's environment")
-	}
-
-	if err = exec.CommandContext(ctx, "podman", "export", "-o", tar.Name(), cid).Run(); err != nil {
-		return "", errorsx.Wrap(err, "unable to export the root container")
-	}
-
-	if st, err = tar.Stat(); err != nil {
-		return "", err
-	}
-
-	if out, err = os.Create(location); err != nil {
-		return "", errorsx.Wrap(err, "unable to create the egiso")
-	}
-	defer out.Close()
-
-	if toc, err = egiso.Build(io.NewSectionReader(tar, 0, st.Size()), out); err != nil {
-		return "", errorsx.Wrap(err, "unable to build the egiso")
-	}
-
-	if err = os.WriteFile(filepath.Join(imagedir, "toc"), []byte(toc), 0600); err != nil {
-		return "", errorsx.Wrap(err, "unable to record the egiso's table of contents")
-	}
-
-	for stale := range fsx.KeepNewestN(1, fsx.Find(cache, fsx.Levels(1))).Each(ctx) {
-		errorsx.Log(errorsx.Wrapf(fsx.RemoveAll(stale), "egiso cache cleanup: %s", stale))
-	}
-
-	return location + "#" + toc.String(), nil
 }
 
 // environ is the environment a container of root starts its processes with: the image's, which

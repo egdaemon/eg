@@ -33,7 +33,8 @@ func main() {
 			ctx,
 			c1,
 			eggolang.New().Timeout(10*time.Minute).AutoInstall(),
-			eggolang.New().Timeout(egenv.TTL()).Parallelism(4).AutoTest(),
+			// EG_TEST_WASIP1 runs the tests that build and run wasip1 guests, egworkload installs the reactor they load.
+			eggolang.New().Timeout(egenv.TTL()).Parallelism(4).Environ("EG_TEST_WASIP1=1").AutoTest(),
 			egbug.Log("recording coverage initiated"),
 			egcoverage.Report(eggolang.Coverage().MarkGeneratedExt(".gen.go", ".pb.go", ".autogen_test.go")...),
 			// copies the binary built by AutoInstall into the workspace directory

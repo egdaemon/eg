@@ -1,7 +1,6 @@
 // Package egbash interprets shell commands inside the guest with egdaemon/sh, so expansion, redirects, pipes,
-// builtins, the bash and sh scripts a command starts and the coreutils egdaemon/sh/x provides stay in the
-// sandbox, and only the other external commands reach the module, through execproxy/v2. eg/shell runs through it
-// with EG_EXPERIMENTAL_GUEST_SHELL, which requires EG_EXPERIMENTAL_PROC_SOCKETS for the module.
+// builtins and the coreutils egdaemon/sh/x provides stay in the sandbox, and the other external commands run in
+// the egcoreutils reactor. a workload opts in by importing egbash in place of eg/shell, whose API it implements.
 package egbash
 
 import (
@@ -16,22 +15,19 @@ import (
 	"github.com/egdaemon/eg/internal/iox"
 	"github.com/egdaemon/eg/interp/runtime/wasi/ffierrors"
 	"github.com/egdaemon/eg/runtime/wasi/egenv"
-	"github.com/egdaemon/eg/runtime/wasi/egunsafe"
 	"github.com/egdaemon/eg/runtime/wasi/egunsafe/fficoreutils"
 	"github.com/egdaemon/sh/v3/expand"
 	"github.com/egdaemon/sh/v3/interp"
 	"github.com/egdaemon/sh/v3/syntax"
 	"github.com/egdaemon/sh/x/coreutils"
-	"google.golang.org/grpc"
 )
 
 // interpret interprets cmd in directory, relative to the working directory, with environ added to the guest's
-// environment. external commands other than the coreutils run in the module as user and group; when both are
-// empty they run as the module's own user.
-func interpret(ctx context.Context, user string, group string, cmd string, directory string, environ []string) (err error) {
+// environment. external commands other than the coreutils go to do, with the exported variables that differ
+// from the guest's environment.
+func interpret(ctx context.Context, user string, group string, cmd string, directory string, environ []string, do Execer) (err error) {
 	var (
 		file *syntax.File
-		cc   *grpc.ClientConn
 		r    *interp.Runner
 	)
 
@@ -43,11 +39,6 @@ func interpret(ctx context.Context, user string, group string, cmd string, direc
 		directory = egenv.WorkingDirectory(directory)
 	}
 
-	if cc, err = egunsafe.DialModuleControlSocket(ctx); err != nil {
-		return err
-	}
-	defer cc.Close()
-
 	if r, err = interp.New(
 		interp.Env(expand.ListEnviron(append(os.Environ(), environ...)...)),
 		interp.Dir(directory),
@@ -56,11 +47,7 @@ func interpret(ctx context.Context, user string, group string, cmd string, direc
 		interp.ExecHandlers(coreutils.ExecHandler, func(interp.ExecHandlerFunc) interp.ExecHandlerFunc {
 			return func(ctx context.Context, args []string) error {
 				hc := interp.HandlerCtx(ctx)
-				cmd := fficoreutils.Command(ctx, args[0], args[1:]...)
-				cmd.Dir = hc.Dir
-				cmd.Env = exported(hc.Env)
-				cmd.Stdin, cmd.Stdout, cmd.Stderr = hc.Stdin, hc.Stdout, hc.Stderr
-				return exitstatus(cmd.Run())
+				return do(ctx, hc.Dir, changed(hc.Env), args[0], args[1:])
 			}
 		}),
 	); err != nil {
@@ -68,6 +55,16 @@ func interpret(ctx context.Context, user string, group string, cmd string, direc
 	}
 
 	return r.Run(ctx, file)
+}
+
+// reactor runs cmd in the egcoreutils reactor with the interpreter's stdio.
+func reactor(ctx context.Context, dir string, environ []string, cmd string, args []string) error {
+	hc := interp.HandlerCtx(ctx)
+	c := fficoreutils.Command(ctx, cmd, args...)
+	c.Dir = dir
+	c.Env = append(os.Environ(), environ...)
+	c.Stdin, c.Stdout, c.Stderr = hc.Stdin, hc.Stdout, hc.Stderr
+	return exitstatus(c.Run())
 }
 
 // exitstatus reports a utility's non-zero exit as the interpreter's exit status, so || and $? see it. codes from
@@ -80,21 +77,9 @@ func exitstatus(err error) error {
 	return err
 }
 
-// exported is the environment a command started by the interpreter sees: its exported string variables.
-func exported(env expand.Environ) (environ []string) {
-	env.Each(func(name string, vr expand.Variable) bool {
-		if vr.Exported && vr.Kind == expand.String {
-			environ = append(environ, name+"="+vr.Str)
-		}
-		return true
-	})
-
-	return environ
-}
-
-// changed reports the exported variables whose value differs from the guest's own environment. the module
-// supplies the rest, so a variable the command never touched keeps the module's value. PWD and OLDPWD are guest
-// paths, and the module derives them from the command's directory.
+// changed reports the exported variables whose value differs from the guest's own environment, the rest of an
+// external command's environment is the guest's own. PWD and OLDPWD are left out, the command's directory
+// sets them.
 func changed(env expand.Environ) (environ []string) {
 	env.Each(func(name string, vr expand.Variable) bool {
 		switch name {

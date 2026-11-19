@@ -22,7 +22,9 @@ import (
 func InitGolang(ctx context.Context, dir string, packages ...string) error {
 	cmd := exec.CommandContext(ctx, "go", "mod", "init", "eg/compute")
 	cmd.Dir = dir
-	cmd.Stderr = os.Stderr
+	debugx.Fn(func() {
+		cmd.Stderr = os.Stderr
+	})
 	if err := cmd.Run(); err != nil {
 		return errorsx.Wrapf(err, "unable to initialize go.mod: %s", cmd.Dir)
 	}
@@ -38,7 +40,9 @@ func InitGolang(ctx context.Context, dir string, packages ...string) error {
 func InitGolangModule(ctx context.Context, dir string, packages ...string) error {
 	cmd := exec.CommandContext(ctx, "go", "mod", "init", "eg/compute")
 	cmd.Dir = dir
-	cmd.Stderr = os.Stderr
+	debugx.Fn(func() {
+		cmd.Stderr = os.Stderr
+	})
 	if err := execx.MaybeRun(cmd); err != nil {
 		return errorsx.Wrapf(err, "unable to initialize go.mod: %s", cmd.Dir)
 	}

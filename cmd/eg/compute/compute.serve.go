@@ -35,6 +35,7 @@ import (
 
 type serve struct {
 	cmdopts.RuntimeResources
+	cmdopts.Mounts
 	Dir              string   `name:"directory" help:"root directory of the repository" default:"${vars_eg_root_directory}"`
 	ModuleDir        string   `name:"moduledir" help:"must be a subdirectory in the provided directory" default:"${vars_workload_directory}"`
 	Debug            bool     `name:"debug" help:"keep workspace around to debug issues, requires manual cleanup"`
@@ -274,6 +275,11 @@ func (t serve) podman(ctx context.Context, ws workspaces.Context, uid uuidx.UUID
 		privileged = runners.AgentOptionCommandLine("--privileged")
 	}
 
+	usermounts, err := t.Mounts.Volumes()
+	if err != nil {
+		return nil, err
+	}
+
 	ragent := runners.NewRunner(
 		ctx,
 		ws,
@@ -289,6 +295,7 @@ func (t serve) podman(ctx context.Context, ws workspaces.Context, uid uuidx.UUID
 			runners.AgentMountReadWrite(ws.WorkingDir, eg.DefaultMountRoot(eg.WorkingDirectory)),
 			runners.AgentMountReadWrite(ws.WorkspaceDir, eg.DefaultMountRoot(eg.WorkspaceDirectory)),
 		),
+		runners.AgentOptionVolumes(usermounts...), // mode, user, and group of the mount are not honored by podman.
 		runners.AgentOptionLocalComputeCachingVolumes(canonicaluri),
 		gnupghome, // must come after the runtime directory mount to ensure correct mounting order.
 		gcpcreds,  // must come after the mount directory to ensure correct mounting order.

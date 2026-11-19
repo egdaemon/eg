@@ -41,7 +41,8 @@ import (
 type local struct {
 	cmdopts.RuntimeResources
 	cmdopts.Publishing
-	Dir              string   `name:"directory" help:"root directory of the repository" default:"${vars_eg_root_directory}"`
+	cmdopts.Mounts
+	Dir             string   `name:"directory" help:"root directory of the repository" default:"${vars_eg_root_directory}"`
 	ModuleDir        string   `name:"moduledir" help:"must be a subdirectory in the provided directory" default:"${vars_workload_directory}" hidden:"true"`
 	Debug            bool     `name:"debug" help:"keep workspace around to debug issues, requires manual cleanup"`
 	AutoPatch        bool     `name:"auto-patch" help:"commit the changes a workload made to its working directory to a new eg/ branch of the current repository once it completes, when disabled the changes are printed as a patch instead (dry run)" default:"true" negatable:""`
@@ -302,6 +303,11 @@ func (t local) podman(ctx context.Context, ws workspaces.Context, uid uuidx.UUID
 		privileged = runners.AgentOptionCommandLine("--privileged")
 	}
 
+	usermounts, err := t.Mounts.Volumes()
+	if err != nil {
+		return nil, err
+	}
+
 	ragent := runners.NewRunner(
 		ctx,
 		ws,
@@ -320,6 +326,7 @@ func (t local) podman(ctx context.Context, ws workspaces.Context, uid uuidx.UUID
 			runners.AgentMountReadWrite(ws.WorkingDir, eg.DefaultMountRoot(eg.WorkingDirectory)),
 			runners.AgentMountReadWrite(ws.WorkspaceDir, eg.DefaultMountRoot(eg.WorkspaceDirectory)),
 		),
+		runners.AgentOptionVolumes(usermounts...), // mode, user, and group of the mount are not honored by podman.
 		runners.AgentOptionLocalComputeCachingVolumes(canonicaluri),
 		runners.AgentOptionEnvironFile(environpath), // ensure we pick up the environment file with the container.
 		runners.AgentOptionHostOS(t.ContainerArgs...),
@@ -353,15 +360,36 @@ func (t local) machine(c *http.Client, uri string) runners.BFn {
 			}
 		}
 
+		// Volumes ensures every source exists, the specs are what the machine mounts.
+		if _, err = t.Mounts.Volumes(); err != nil {
+			return nil, err
+		}
+
+		usermounts, err := t.Mounts.Specs()
+		if err != nil {
+			return nil, err
+		}
+
+		vmopts := []egvm.Option{
+			egvm.OptionCPUs(uint(t.RuntimeResources.Cores)),
+			egvm.OptionMemory(uint64(t.RuntimeResources.Memory)),
+			egvm.OptionMountReadOnly(filepath.Join(ws.Root, ws.BuildDir, ws.Module, eg.ModuleDir), eg.DefaultMountRoot(eg.RuntimeDirectory, ws.Module, eg.ModuleDir)),
+			egvm.OptionMountVolume(containers, "/var/lib/containers"),
+		}
+
+		// mode, user, and group of the mount are not honored yet.
+		for _, m := range usermounts {
+			if m.Access == cmdopts.AccessRead {
+				vmopts = append(vmopts, egvm.OptionMountReadOnly(m.Source, m.Destination))
+			} else {
+				vmopts = append(vmopts, egvm.OptionMountReadWrite(m.Source, m.Destination))
+			}
+		}
+
 		// as containers keep their container storage in a volume, a machine keeps it in a volume in the
 		// user's cache, where overlay can layer it, which the machine's root and shares can not.
 		return runners.NewMachine(ctx, c, ws, uri, log.Writer(),
-			runners.MachineOptionVM(
-				egvm.OptionCPUs(uint(t.RuntimeResources.Cores)),
-				egvm.OptionMemory(uint64(t.RuntimeResources.Memory)),
-				egvm.OptionMountReadOnly(filepath.Join(ws.Root, ws.BuildDir, ws.Module, eg.ModuleDir), eg.DefaultMountRoot(eg.RuntimeDirectory, ws.Module, eg.ModuleDir)),
-				egvm.OptionMountVolume(containers, "/var/lib/containers"),
-			),
+			runners.MachineOptionVM(vmopts...),
 			runners.MachineOptionLocalGPGAgent(ctx, envb),
 			mountegbin,
 		)

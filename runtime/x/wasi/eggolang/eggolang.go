@@ -244,7 +244,7 @@ func (t options) autoinstall(base shell.Command) eg.OpFn {
 			return err
 		}
 
-		runtime := base.EnvironFrom(goenv...).EnvironFrom(opts.environ...)
+		runtime := base.EnvironFrom(goenv...).EnvironCopy(opts.environ...)
 		timeout := timex.DurationMin(contextx.Until(ctx), timex.DurationFirstNonZero(opts.timeout, shell.DefaultTimeout))
 
 		for gomod := range modfilex.FindModules(stringsx.DefaultIfBlank(opts.bctx.Dir, egenv.DirectoryWorking())) {

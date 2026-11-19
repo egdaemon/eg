@@ -155,6 +155,20 @@ const (
 	EnvGitAuthHTTPUsername    = "EG_GIT_AUTH_HTTP_USERNAME"
 )
 
+// SensitiveEnvironment lists the environment variables whose values are secrets, i.e. what eg secrets redact
+// hashes in its input. keep it in sync when adding sensitive variables.
+func SensitiveEnvironment() []string {
+	return []string{
+		EnvEGEntropySeed,
+		EnvEGSSHSeed,
+		EnvGPGKeyringSeed,
+		EnvGithubToken,
+		EnvComputeEnvironToken,
+		EnvGitAuthHTTPPassword,
+		EnvUnsafeGcloudADCB64,
+	}
+}
+
 // IsDefaultBranchBuild reports whether the head and base commits recorded in
 // environ are identical, which only happens for default-branch builds (see
 // vcsevents push-event handling, where Head and Base are built from the same

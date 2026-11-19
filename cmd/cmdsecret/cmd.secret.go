@@ -21,6 +21,7 @@ type SecretCmd struct {
 	Rm     CmdRm     `cmd:"" help:"Remove secrets."`
 	B64    CmdB64    `cmd:"" name:"b64" help:"Base64 URL encode stdin and write the result to stdout or a file."`
 	Env    CmdEnv    `cmd:"" name:"env" help:"Run a command with environment variables loaded from secret URIs."`
+	Redact CmdRedact `cmd:"" name:"redact" help:"Read KEY=VALUE environment variables from stdin and write them to stdout with the values of eg's sensitive variables and any additional ones replaced by redacted:{digest}."`
 }
 
 type CmdRead struct {

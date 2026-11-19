@@ -2,6 +2,9 @@ package envx_test
 
 import (
 	"bytes"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
 	"os"
 	"path/filepath"
 	"sort"
@@ -160,6 +163,38 @@ func TestBuilder(t *testing.T) {
 			require.NoError(t, err)
 			expected := []string{"B=2"}
 			require.Equal(t, expected, actual)
+		})
+	})
+
+	t.Run("Redact", func(t *testing.T) {
+		digest := func(seed, v string) string {
+			mac := hmac.New(sha256.New, []byte(seed))
+			mac.Write([]byte(v))
+			return "redacted:" + hex.EncodeToString(mac.Sum(nil))
+		}
+
+		t.Run("redacts_matching_keys", func(t *testing.T) {
+			actual, err := envx.Redact(envx.Build().FromEnviron("A=1", "B=2", "C=3", "A=4"), "seed", "A", "C").Environ()
+			require.NoError(t, err)
+			expected := []string{"A=" + digest("seed", "1"), "B=2", "C=" + digest("seed", "3"), "A=" + digest("seed", "4")}
+			require.Equal(t, expected, actual)
+		})
+
+		t.Run("digest_depends_on_seed_and_value", func(t *testing.T) {
+			actual, err := envx.Redact(envx.Build().FromEnviron("A=1", "B=1", "C=2"), "seed", "A", "B", "C").Environ()
+			require.NoError(t, err)
+			other, err := envx.Redact(envx.Build().FromEnviron("A=1"), "other", "A").Environ()
+			require.NoError(t, err)
+			require.Regexp(t, "^A=redacted:[0-9a-f]{64}$", actual[0])
+			require.Equal(t, actual[0][2:], actual[1][2:])
+			require.NotEqual(t, actual[0][2:], actual[2][2:])
+			require.NotEqual(t, actual[0], other[0])
+		})
+
+		t.Run("redact_non_existent_key", func(t *testing.T) {
+			actual, err := envx.Redact(envx.Build().FromEnviron("A=1"), "seed", "B").Environ()
+			require.NoError(t, err)
+			require.Equal(t, []string{"A=1"}, actual)
 		})
 	})
 

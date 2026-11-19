@@ -259,7 +259,7 @@ func (t local) podman(ctx context.Context, ws workspaces.Context, uid uuidx.UUID
 		mounthome   runners.AgentOption = runners.AgentOptionNoop
 		wayland     runners.AgentOption = runners.AgentOptionNoop
 		privileged  runners.AgentOption = runners.AgentOptionNoop
-		cgroups                         = envx.Toggle(runners.AgentOptionNoop, runners.AgentOptionCommandLine("--cgroups", "disabled"), runners.Nested() && !t.Cgroups) // disable cgroups
+		cgroups                         = envx.Toggle(runners.AgentOptionNoop, runners.AgentOptionCommandLine("--cgroups", envx.String("disabled", eg.EnvComputeRunnerCgroups)), runners.Nested() && !t.Cgroups) // disable cgroups
 		// nested containers cannot write the sysctls netavark needs for a bridge network (read-only /proc/sys), share the outer network instead.
 		hostnet                        = envx.Toggle(runners.AgentOptionNoop, runners.AgentOptionCommandLine("--network", "host"), runners.Nested() && !envx.Boolean(false, eg.EnvExperimentalDisableHostNetwork))
 		mountegbin runners.AgentOption = runners.AgentOptionEGBin(errorsx.Must(exec.LookPath(os.Args[0])))

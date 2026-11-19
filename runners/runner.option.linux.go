@@ -9,7 +9,9 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/internal/bytesx"
+	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/jaypipes/ghw"
 	"github.com/logrusorgru/aurora"
@@ -17,14 +19,15 @@ import (
 
 func AgentOptionHostOS(cli ...string) AgentOption {
 	return AgentOptionCompose(
-		AgentOptionCommandLine("--userns", "host"),                // properly map host user into containers.
-		AgentOptionCommandLine("--cap-add", "NET_ADMIN"),          // required for loopback device creation inside the container
-		AgentOptionCommandLine("--cap-add", "SYS_ADMIN"),          // required for rootless container building https://github.com/containers/podman/issues/4056#issuecomment-612893749
-		AgentOptionCommandLine("--device", "/dev/fuse"),           // required for rootless container building https://github.com/containers/podman/issues/4056#issuecomment-612893749
-		AgentOptionCommandLine("--device", "/dev/net/tun"),        // required for pasta (rootless container networking) to create a tap device when containers run inside the workload.
-		AgentOptionCommandLine("--security-opt", "label=disable"), // as eg-runner.service, container_init_t refuses the mounts systemd's units sandbox themselves with.
-		AgentOptionCommandLine("--pids-limit", "-1"),              // ensure we dont run into pid limits.
-		AgentOptionCommandLine(cli...),                            // escape hatch to allow customizing the container cli
+		AgentOptionCommandLine("--userns", envx.String("host", eg.EnvComputePodmanUsernamespace)),                                                // properly map host user into containers.
+		envx.Toggle(AgentOptionNoop, AgentOptionCommandLine("--cap-add", "NET_ADMIN"), envx.Boolean(true, eg.EnvComputePodmanCapNetwork)),        // required for loopback device creation inside the container
+		envx.Toggle(AgentOptionNoop, AgentOptionCommandLine("--cap-add", "SYS_ADMIN"), envx.Boolean(true, eg.EnvComputePodmanCapAdmin)),          // required for rootless container building https://github.com/containers/podman/issues/4056#issuecomment-612893749
+		envx.Toggle(AgentOptionNoop, AgentOptionCommandLine("--device", "/dev/fuse"), envx.Boolean(true, eg.EnvComputePodmanDeviceFuse)),         // required for rootless container building https://github.com/containers/podman/issues/4056#issuecomment-612893749
+		envx.Toggle(AgentOptionNoop, AgentOptionCommandLine("--device", "/dev/net/tun"), envx.Boolean(true, eg.EnvComputePodmanDeviceTun)),       // required for pasta (rootless container networking) to create a tap device when containers run inside the workload.
+		AgentOptionCommandLine("--security-opt", envx.String("label=disable", eg.EnvComputePodmanSecurityLabel)),                                 // as eg-runner.service, container_init_t refuses the mounts systemd's units sandbox themselves with.
+		AgentOptionCommandLine("--pids-limit", envx.String("-1", eg.EnvComputePodmanPidsLimit)),                                                  // ensure we dont run into pid limits.
+		envx.Toggle(AgentOptionNoop, AgentOptionCommandLine("--security-opt", "unmask=/proc/*"), envx.Boolean(false, eg.EnvComputeRunnerUnmask)), // opt in: nested containers can't mount a fresh /proc over podman's masked one.
+		AgentOptionCommandLine(cli...), // escape hatch to allow customizing the container cli
 	)
 }
 

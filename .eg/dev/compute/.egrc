@@ -1,3 +1,12 @@
 # the arguments of this workload, one per line. a [mode] header declares a mode it supports: local, upload, serve or baremetal.
+# nested containers need an unmasked /proc, the daemon builds and runs containers inside the workload container.
+# cargs are passed to the root container.
 [serve]
 --ttl=infinity
+--cargs=--security-opt
+--cargs=unmask=/proc/*
+
+[local]
+--ttl=infinity
+--cargs=--security-opt
+--cargs=unmask=/proc/*

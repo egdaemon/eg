@@ -74,7 +74,7 @@ func (t baremetal) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, hotswapbin
 		uid       = uuidx.NewV7()
 		descr     = envx.String("", eg.EnvComputeVCS)
 		cc        grpc.ClientConnInterface
-		cgroups   = envx.Toggle(runners.AgentOptionNoop, runners.AgentOptionCommandLine("--cgroups", "disabled"), !t.Cgroups)                                            // disable cgroups
+		cgroups   = envx.Toggle(runners.AgentOptionNoop, runners.AgentOptionCommandLine("--cgroups", envx.String("disabled", eg.EnvComputeRunnerCgroups)), !t.Cgroups)   // disable cgroups
 		hostnet   = envx.Toggle(runners.AgentOptionCommandLine("--network", "host"), runners.AgentOptionNoop, envx.Boolean(false, eg.EnvExperimentalDisableHostNetwork)) // ipv4 group bullshit. pretty sure its a podman 4 issue that was resolved in podman 5. this is 'safe' to do because we are already in a container.
 		// unset means the host, 0 is the first container which is already nested. defaulting to 0 cannot tell them apart.
 		// a nested workload builds within a container, which does not allow the container runtime to create the containers of the build, e.g.) mount proc.

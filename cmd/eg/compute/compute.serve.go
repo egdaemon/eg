@@ -52,6 +52,7 @@ type serve struct {
 	GitRemote        string   `name:"git-remote" help:"name of the git remote to use" default:"${vars_git_default_remote_name}"`
 	GitReference     string   `name:"git-ref" help:"name of the branch or commit to checkout" default:"${vars_git_head_reference}"`
 	Ports            []int    `name:"ports" help:"list of ports to publish to the host system"`
+	ContainerArgs    []string `name:"cargs" help:"list of command line arguments to pass to the root container" hidden:"true"`
 	SSHKeyPath       string   `name:"sshkeypath" help:"path to ssh key to use" default:"${vars_ssh_key_path}"`
 	SSH              int      `name:"ssh" type:"sshport" default:"-1" help:"enable ssh access into the container as the egd user, using eg's own managed ssh identity; bare --ssh publishes on a free host port, --ssh=<port> on a fixed one"`
 	Containerfile    string   `name:"containerfile" help:"containerfile to build the workload's container from, relative to the repository directory. by default the nearest Containerfile, from the workload's directory up to the module directory"`
@@ -293,7 +294,7 @@ func (t serve) podman(ctx context.Context, ws workspaces.Context, uid uuidx.UUID
 		gcpcreds,  // must come after the mount directory to ensure correct mounting order.
 		wayland,   // must come after the runtime directory mount to ensure correct mounting order.
 		runners.AgentOptionEnvironFile(environpath), // ensure we pick up the environment file with the container.
-		runners.AgentOptionHostOS(),
+		runners.AgentOptionHostOS(t.ContainerArgs...),
 		runners.AgentOptionPublish(t.Ports...),
 		runners.AgentOptionCores(t.RuntimeResources.Cores),
 		runners.AgentOptionMemory(uint64(t.RuntimeResources.Memory)),

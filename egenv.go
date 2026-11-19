@@ -83,6 +83,15 @@ const (
 	EnvGithubToken                   = "GH_TOKEN"                                   // standard environment variable for github token
 	EnvCI                            = "CI"                                         // standard ci/cd environment variable flag
 	EnvComputeTLSInsecure            = "EG_COMPUTE_TLS_INSECURE"                    // used to pass TLS insecure flag to container.
+	EnvComputeRunnerCgroups          = "EG_COMPUTE_RUNNER_CGROUPS"                  // podman --cgroups mode of the containers a module creates, defaults to disabled.
+	EnvComputeRunnerUnmask           = "EG_COMPUTE_RUNNER_UNMASK"                   // unmask /proc in the containers a runner creates so containers can nest. defaults to false.
+	EnvComputePodmanUsernamespace    = "EG_COMPUTE_PODMAN_USERNS"                   // podman --userns of the containers a runner creates, defaults to host.
+	EnvComputePodmanCapNetwork       = "EG_COMPUTE_PODMAN_CAP_NETWORK"              // add the NET_ADMIN capability, required for loopback device creation. defaults to true.
+	EnvComputePodmanCapAdmin         = "EG_COMPUTE_PODMAN_CAP_ADMIN"                // add the SYS_ADMIN capability, required for rootless container building. defaults to true.
+	EnvComputePodmanDeviceFuse       = "EG_COMPUTE_PODMAN_DEVICE_FUSE"              // pass /dev/fuse through, required for rootless container building. defaults to true.
+	EnvComputePodmanDeviceTun        = "EG_COMPUTE_PODMAN_DEVICE_TUN"               // pass /dev/net/tun through, required by pasta's tap device. defaults to true.
+	EnvComputePodmanSecurityLabel    = "EG_COMPUTE_PODMAN_SECURITY_LABEL"           // podman --security-opt label setting, defaults to label=disable.
+	EnvComputePodmanPidsLimit        = "EG_COMPUTE_PODMAN_PIDS_LIMIT"               // podman --pids-limit, defaults to -1 (unlimited).
 	EnvComputeLoggingVerbosity       = "EG_COMPUTE_LOG_VERBOSITY"                   // logging verbosity.
 	EnvComputeModuleNestedLevel      = "EG_COMPUTE_MODULE_LEVEL"                    // number of nested levels the current module is running in.
 	EnvComputeEgiso                  = "EG_COMPUTE_EGISO"                           // uri of the egiso the machine running the module booted from. unset outside a machine.

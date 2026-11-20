@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"log"
 	"net"
@@ -16,6 +17,7 @@ import (
 	"time"
 
 	"github.com/alecthomas/kong"
+	"github.com/egdaemon/duckproxy/duckkong"
 	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/cmd/cmdaccounts"
 	"github.com/egdaemon/eg/cmd/cmderrors"
@@ -32,6 +34,7 @@ import (
 	"github.com/egdaemon/eg/cmd/eg/compute"
 	"github.com/egdaemon/eg/cmd/eg/daemons"
 	"github.com/egdaemon/eg/cmd/eg/workloads"
+	"github.com/egdaemon/eg/cmd/migrations"
 	"github.com/egdaemon/eg/internal/bytesx"
 	"github.com/egdaemon/eg/internal/contextx"
 	"github.com/egdaemon/eg/internal/envx"
@@ -101,6 +104,7 @@ func main() {
 		GPG                cmdgpg.Cmd                   `cmd:"" name:"gpg" help:"gpg keyring management"`
 		SSH                cmdssh.Cmd                   `cmd:"" name:"ssh" help:"ssh key management"`
 		Machine            cmdmachine.Cmd               `cmd:"" name:"machine" help:"interact with machines"`
+		DB                 duckkong.Cmd                 `cmd:"" name:"db" help:"sql shell for the cli's local database, -c runs the statements and exits"`
 		Me                 cmdme.Cmd                    `cmd:"" name:"me" help:"manage your own profile"`
 		GCP                cmdgcp.Cmd                   `cmd:"" name:"gcp" help:"gcp integration management"`
 		GDX                konggdx.Commands             `cmd:"" name:"gdx" help:"pull profiles/traces from a running eg debug socket"`
@@ -147,6 +151,7 @@ func main() {
 			"vars_cwd":                     osx.Getwd("."),
 			"vars_git_directory":           gitdir,
 			"vars_cache_directory":         userx.DefaultCacheDirectory(),
+			"vars_cli_database":            migrations.CLI,
 			"vars_runtime_directory":       userx.DefaultRuntimeDirectory(),
 			"vars_gdx_socket":              gdxsocket,
 			"vars_gdx_default_output":      "-",
@@ -200,6 +205,14 @@ func main() {
 			cmdopts.KeyGenSeeded(cmdopts.DefaultKeyGenSeeded),
 			libp2px.MDNSLookup(libp2px.DefaultMDNSLookup),
 			cmdopts.Environ(cmdopts.DefaultEnviron),
+			// the shell opens the database the way the other commands do, so it works while they have it open.
+			duckkong.Opener(func(ctx context.Context, path string) (*sql.DB, error) {
+				if path == "" {
+					path = migrations.Path(migrations.CLI)
+				}
+
+				return migrations.OpenLocked(ctx, path)
+			}),
 		),
 		kong.BindTo(shellcli.Context, (*context.Context)(nil)),
 		kong.BindTo(os.Stdin, (*cmdopts.Stdin)(nil)),

@@ -109,6 +109,10 @@ func schemaIsReleased(s *CArrowSchema) bool {
 	return C.ArrowSchemaIsReleased(s) == 1
 }
 
+func setCSchemaChildCount(s *CArrowSchema, n int64) {
+	s.n_children = C.int64_t(n)
+}
+
 func getMetadataKeys() ([]string, []string) {
 	return []string{"key1", "key2"}, []string{"key"}
 }
@@ -125,6 +129,24 @@ func exportInt32Array() *CArrowArray {
 
 func freeCArray(arr *CArrowArray) {
 	C.free(unsafe.Pointer(arr))
+}
+
+func setCArrayLength(arr *CArrowArray, length int64) {
+	arr.length = C.int64_t(length)
+}
+
+func setCArrayCounts(arr *CArrowArray, nBuffers, nChildren int64) {
+	arr.n_buffers = C.int64_t(nBuffers)
+	arr.n_children = C.int64_t(nChildren)
+}
+
+func setCArrayBuffers(arr *CArrowArray, n int) {
+	arr.buffers = (*unsafe.Pointer)(C.calloc(C.size_t(n), C.size_t(unsafe.Sizeof(uintptr(0)))))
+}
+
+func freeCArrayBuffers(arr *CArrowArray) {
+	C.free(unsafe.Pointer(arr.buffers))
+	arr.buffers = nil
 }
 
 func isReleased(arr *CArrowArray) bool {

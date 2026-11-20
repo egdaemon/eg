@@ -47,14 +47,15 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"syscall"
 	"unsafe"
 
 	"github.com/apache/arrow-go/v18/arrow"
 	"github.com/apache/arrow-go/v18/arrow/array"
 	"github.com/apache/arrow-go/v18/arrow/bitutil"
+	"github.com/apache/arrow-go/v18/arrow/internal/debug"
 	"github.com/apache/arrow-go/v18/arrow/memory"
-	"golang.org/x/xerrors"
 )
 
 type (
@@ -156,8 +157,26 @@ func decodeCMetadata(md *C.char) arrow.Metadata {
 
 // convert a C.ArrowSchema to an arrow.Field to maintain metadata with the schema
 func importSchema(schema *CArrowSchema) (ret arrow.Field, err error) {
+	if schema == nil {
+		return ret, fmt.Errorf("%w: nil ArrowSchema", arrow.ErrInvalid)
+	}
 	// always release, even on error
 	defer C.ArrowSchemaRelease(schema)
+	if schema.format == nil {
+		return ret, fmt.Errorf("%w: ArrowSchema format is nil", arrow.ErrInvalid)
+	}
+	if schema.n_children < 0 {
+		return ret, fmt.Errorf("%w: ArrowSchema n_children cannot be negative: %d", arrow.ErrInvalid, schema.n_children)
+	}
+	if int64(schema.n_children) > maxIntValue() {
+		return ret, fmt.Errorf("%w: ArrowSchema n_children is too large: %d", arrow.ErrInvalid, schema.n_children)
+	}
+	if _, err := checkedMul(int64(schema.n_children), int64(unsafe.Sizeof(uintptr(0)))); err != nil {
+		return ret, fmt.Errorf("%w: ArrowSchema children pointer array is too large", arrow.ErrInvalid)
+	}
+	if schema.n_children > 0 && schema.children == nil {
+		return ret, fmt.Errorf("%w: ArrowSchema children is nil with n_children %d", arrow.ErrInvalid, schema.n_children)
+	}
 
 	var childFields []arrow.Field
 	if schema.n_children > 0 {
@@ -180,12 +199,18 @@ func importSchema(schema *CArrowSchema) (ret arrow.Field, err error) {
 
 	// copies the c-string here, but it's very small
 	f := C.GoString(schema.format)
+	if f == "" {
+		return ret, fmt.Errorf("%w: ArrowSchema format is empty", arrow.ErrInvalid)
+	}
 	// handle our non-parameterized simple types.
 	dt, ok := formatToSimpleType[f]
 	if ok {
 		ret.Type = dt
 
 		if schema.dictionary != nil {
+			if !arrow.IsInteger(ret.Type.ID()) {
+				return ret, fmt.Errorf("%w: dictionary index type must be an integer", arrow.ErrInvalid)
+			}
 			valueField, err := importSchema(schema.dictionary)
 			if err != nil {
 				return ret, err
@@ -202,62 +227,47 @@ func importSchema(schema *CArrowSchema) (ret arrow.Field, err error) {
 	}
 
 	// handle types with params via colon
-	typs := strings.Split(f, ":")
-	defaulttz := ""
-	switch typs[0] {
+	switch key, val, _ := strings.Cut(f, ":"); key {
 	case "tss":
-		tz := typs[1]
-		if len(typs[1]) == 0 {
-			tz = defaulttz
-		}
-		dt = &arrow.TimestampType{Unit: arrow.Second, TimeZone: tz}
+		dt = &arrow.TimestampType{Unit: arrow.Second, TimeZone: val}
 	case "tsm":
-		tz := typs[1]
-		if len(typs[1]) == 0 {
-			tz = defaulttz
-		}
-		dt = &arrow.TimestampType{Unit: arrow.Millisecond, TimeZone: tz}
+		dt = &arrow.TimestampType{Unit: arrow.Millisecond, TimeZone: val}
 	case "tsu":
-		tz := typs[1]
-		if len(typs[1]) == 0 {
-			tz = defaulttz
-		}
-		dt = &arrow.TimestampType{Unit: arrow.Microsecond, TimeZone: tz}
+		dt = &arrow.TimestampType{Unit: arrow.Microsecond, TimeZone: val}
 	case "tsn":
-		tz := typs[1]
-		if len(typs[1]) == 0 {
-			tz = defaulttz
-		}
-		dt = &arrow.TimestampType{Unit: arrow.Nanosecond, TimeZone: tz}
+		dt = &arrow.TimestampType{Unit: arrow.Nanosecond, TimeZone: val}
 	case "w": // fixed size binary is "w:##" where ## is the byteWidth
-		byteWidth, err := strconv.Atoi(typs[1])
+		byteWidth, err := strconv.Atoi(val)
 		if err != nil {
-			return ret, err
+			return ret, fmt.Errorf("%w: invalid fixed-size binary format %q: %v", arrow.ErrInvalid, f, err)
+		}
+		if byteWidth <= 0 {
+			return ret, fmt.Errorf("%w: fixed-size binary byte width must be positive: %d", arrow.ErrInvalid, byteWidth)
 		}
 		dt = &arrow.FixedSizeBinaryType{ByteWidth: byteWidth}
 	case "d": // decimal types are d:<precision>,<scale>[,<bitsize>] size is assumed 128 if left out
-		props := typs[1]
+		props := val
 		propList := strings.Split(props, ",")
 		bitwidth := 128
 		var precision, scale int
 
 		if len(propList) < 2 || len(propList) > 3 {
-			return ret, xerrors.Errorf("invalid decimal spec '%s': wrong number of properties", f)
+			return ret, fmt.Errorf("invalid decimal spec '%s': wrong number of properties", f)
 		} else if len(propList) == 3 {
 			bitwidth, err = strconv.Atoi(propList[2])
 			if err != nil {
-				return ret, xerrors.Errorf("could not parse decimal bitwidth in '%s': %s", f, err.Error())
+				return ret, fmt.Errorf("could not parse decimal bitwidth in '%s': %w", f, err)
 			}
 		}
 
 		precision, err = strconv.Atoi(propList[0])
 		if err != nil {
-			return ret, xerrors.Errorf("could not parse decimal precision in '%s': %s", f, err.Error())
+			return ret, fmt.Errorf("could not parse decimal precision in '%s': %w", f, err)
 		}
 
 		scale, err = strconv.Atoi(propList[1])
 		if err != nil {
-			return ret, xerrors.Errorf("could not parse decimal scale in '%s': %s", f, err.Error())
+			return ret, fmt.Errorf("could not parse decimal scale in '%s': %w", f, err)
 		}
 
 		switch bitwidth {
@@ -270,42 +280,91 @@ func importSchema(schema *CArrowSchema) (ret arrow.Field, err error) {
 		case 256:
 			dt = &arrow.Decimal256Type{Precision: int32(precision), Scale: int32(scale)}
 		default:
-			return ret, xerrors.Errorf("unsupported decimal bitwidth, got '%s'", f)
+			return ret, fmt.Errorf("unsupported decimal bitwidth, got '%s'", f)
 		}
 	}
 
 	if f[0] == '+' { // types with children
+		if len(f) < 2 {
+			return ret, fmt.Errorf("%w: invalid nested type format %q", arrow.ErrInvalid, f)
+		}
 		switch f[1] {
 		case 'l': // list
+			if f != "+l" {
+				return ret, fmt.Errorf("%w: invalid list type format %q", arrow.ErrInvalid, f)
+			}
+			if len(childFields) != 1 {
+				return ret, fmt.Errorf("%w: list type must have exactly 1 child", arrow.ErrInvalid)
+			}
 			dt = arrow.ListOfField(childFields[0])
 		case 'L': // large list
+			if f != "+L" {
+				return ret, fmt.Errorf("%w: invalid large list type format %q", arrow.ErrInvalid, f)
+			}
+			if len(childFields) != 1 {
+				return ret, fmt.Errorf("%w: large list type must have exactly 1 child", arrow.ErrInvalid)
+			}
 			dt = arrow.LargeListOfField(childFields[0])
 		case 'v': // list view/large list view
+			if (f != "+vl" && f != "+vL") || len(childFields) != 1 {
+				return ret, fmt.Errorf("%w: invalid list view type format %q or child count %d", arrow.ErrInvalid, f, len(childFields))
+			}
 			switch f[2] {
 			case 'l':
 				dt = arrow.ListViewOfField(childFields[0])
 			case 'L':
 				dt = arrow.LargeListViewOfField(childFields[0])
+			default:
+				return ret, fmt.Errorf("%w: invalid list view type format %q", arrow.ErrInvalid, f)
 			}
 		case 'w': // fixed size list is w:# where # is the list size.
-			listSize, err := strconv.Atoi(strings.Split(f, ":")[1])
+			if len(childFields) != 1 {
+				return ret, fmt.Errorf("%w: fixed-size list type must have exactly 1 child", arrow.ErrInvalid)
+			}
+			_, size, ok := strings.Cut(f, ":")
+			if !ok {
+				return ret, fmt.Errorf("%w: invalid fixed-size list format %q", arrow.ErrInvalid, f)
+			}
+			listSize, err := strconv.Atoi(size)
 			if err != nil {
-				return ret, err
+				return ret, fmt.Errorf("%w: invalid fixed-size list format %q: %v", arrow.ErrInvalid, f, err)
+			}
+			if listSize <= 0 || int64(listSize) > 1<<31-1 {
+				return ret, fmt.Errorf("%w: fixed-size list size must be in the range [1, %d]: %d", arrow.ErrInvalid, 1<<31-1, listSize)
 			}
 
 			dt = arrow.FixedSizeListOfField(int32(listSize), childFields[0])
 		case 's': // struct
+			if f != "+s" {
+				return ret, fmt.Errorf("%w: invalid struct type format %q", arrow.ErrInvalid, f)
+			}
 			dt = arrow.StructOf(childFields...)
 		case 'r': // run-end encoded
+			if f != "+r" {
+				return ret, fmt.Errorf("%w: invalid run-end encoded type format %q", arrow.ErrInvalid, f)
+			}
 			if len(childFields) != 2 {
 				return ret, fmt.Errorf("%w: run-end encoded arrays must have 2 children", arrow.ErrInvalid)
 			}
 			dt = arrow.RunEndEncodedOf(childFields[0].Type, childFields[1].Type)
+			dt.(*arrow.RunEndEncodedType).ValueNullable = childFields[1].Nullable
 		case 'm': // map type is basically a list of structs.
-			st := childFields[0].Type.(*arrow.StructType)
+			if f != "+m" {
+				return ret, fmt.Errorf("%w: invalid map type format %q", arrow.ErrInvalid, f)
+			}
+			if len(childFields) != 1 {
+				return ret, fmt.Errorf("%w: map type must have exactly 1 child", arrow.ErrInvalid)
+			}
+			st, ok := childFields[0].Type.(*arrow.StructType)
+			if !ok || st.NumFields() != 2 {
+				return ret, fmt.Errorf("%w: map child must be a struct with exactly 2 fields", arrow.ErrInvalid)
+			}
 			dt = arrow.MapOf(st.Field(0).Type, st.Field(1).Type)
 			dt.(*arrow.MapType).KeysSorted = (schema.flags & C.ARROW_FLAG_MAP_KEYS_SORTED) != 0
 		case 'u': // union
+			if len(f) < 3 {
+				return ret, fmt.Errorf("%w: invalid union type format %q", arrow.ErrInvalid, f)
+			}
 			var mode arrow.UnionMode
 			switch f[2] {
 			case 'd':
@@ -317,9 +376,12 @@ func importSchema(schema *CArrowSchema) (ret arrow.Field, err error) {
 				return
 			}
 
-			codes := strings.Split(strings.Split(f, ":")[1], ",")
-			typeCodes := make([]arrow.UnionTypeCode, 0, len(codes))
-			for _, i := range codes {
+			_, val, ok := strings.Cut(f, ":")
+			if !ok {
+				return ret, fmt.Errorf("invalid union type code spec %q", f)
+			}
+			var typeCodes []arrow.UnionTypeCode
+			for i := range strings.SplitSeq(val, ",") {
 				v, e := strconv.ParseInt(i, 10, 8)
 				if e != nil {
 					err = fmt.Errorf("%w: invalid type code: %s", arrow.ErrInvalid, e)
@@ -343,7 +405,7 @@ func importSchema(schema *CArrowSchema) (ret arrow.Field, err error) {
 
 	if dt == nil {
 		// if we didn't find a type, then it's something we haven't implemented.
-		err = xerrors.New("unimplemented type")
+		err = errors.New("unimplemented type")
 	} else {
 		ret.Type = dt
 	}
@@ -363,13 +425,147 @@ type cimporter struct {
 	alloc *importAllocator
 }
 
+const maxInt64Value = int64(1<<63 - 1)
+
 func (imp *cimporter) importChild(parent *cimporter, src *CArrowArray) error {
 	imp.parent, imp.arr, imp.alloc = parent, src, parent.alloc
 	return imp.doImport()
 }
 
+func validateCArrayHeader(arr *CArrowArray) error {
+	if arr == nil {
+		return fmt.Errorf("%w: nil ArrowArray", arrow.ErrInvalid)
+	}
+	length := int64(arr.length)
+	offset := int64(arr.offset)
+	nullCount := int64(arr.null_count)
+	nBuffers := int64(arr.n_buffers)
+	nChildren := int64(arr.n_children)
+
+	if length < 0 {
+		return fmt.Errorf("%w: ArrowArray length cannot be negative: %d", arrow.ErrInvalid, length)
+	}
+	if offset < 0 {
+		return fmt.Errorf("%w: ArrowArray offset cannot be negative: %d", arrow.ErrInvalid, offset)
+	}
+	if nullCount < -1 || nullCount > length {
+		return fmt.Errorf("%w: ArrowArray null_count %d is outside [-1, %d]", arrow.ErrInvalid, nullCount, length)
+	}
+	if nBuffers < 0 {
+		return fmt.Errorf("%w: ArrowArray n_buffers cannot be negative: %d", arrow.ErrInvalid, nBuffers)
+	}
+	if nChildren < 0 {
+		return fmt.Errorf("%w: ArrowArray n_children cannot be negative: %d", arrow.ErrInvalid, nChildren)
+	}
+	if nBuffers > maxIntValue() {
+		return fmt.Errorf("%w: ArrowArray n_buffers is too large: %d", arrow.ErrInvalid, nBuffers)
+	}
+	if nChildren > maxIntValue() {
+		return fmt.Errorf("%w: ArrowArray n_children is too large: %d", arrow.ErrInvalid, nChildren)
+	}
+	if _, err := checkedMul(nBuffers, int64(unsafe.Sizeof(uintptr(0)))); err != nil {
+		return fmt.Errorf("%w: ArrowArray buffers pointer array is too large", arrow.ErrInvalid)
+	}
+	if _, err := checkedMul(nChildren, int64(unsafe.Sizeof(uintptr(0)))); err != nil {
+		return fmt.Errorf("%w: ArrowArray children pointer array is too large", arrow.ErrInvalid)
+	}
+	if nBuffers > 0 && arr.buffers == nil {
+		return fmt.Errorf("%w: ArrowArray buffers is nil with n_buffers %d", arrow.ErrInvalid, nBuffers)
+	}
+	if nChildren > 0 && arr.children == nil {
+		return fmt.Errorf("%w: ArrowArray children is nil with n_children %d", arrow.ErrInvalid, nChildren)
+	}
+	if offset > maxInt64Value-length {
+		return fmt.Errorf("%w: ArrowArray length and offset overflow: length %d, offset %d", arrow.ErrInvalid, length, offset)
+	}
+	if length+offset > maxIntValue() {
+		return fmt.Errorf("%w: ArrowArray length and offset exceed native int: length %d, offset %d", arrow.ErrInvalid, length, offset)
+	}
+
+	return nil
+}
+
+func maxIntValue() int64 {
+	return int64(^uint(0) >> 1)
+}
+
+func checkedAdd(a, b int64) (int64, error) {
+	if a < 0 || b < 0 || a > maxInt64Value-b {
+		return 0, fmt.Errorf("%w: integer addition overflow: %d + %d", arrow.ErrInvalid, a, b)
+	}
+	return a + b, nil
+}
+
+func checkedMul(a, b int64) (int64, error) {
+	if a < 0 || b < 0 || (a != 0 && b > maxInt64Value/a) {
+		return 0, fmt.Errorf("%w: integer multiplication overflow: %d * %d", arrow.ErrInvalid, a, b)
+	}
+	return a * b, nil
+}
+
+func checkedBytesForBits(bits int64) (int64, error) {
+	bits, err := checkedAdd(bits, 7)
+	if err != nil {
+		return 0, err
+	}
+	return bits >> 3, nil
+}
+
+func (imp *cimporter) checkExpectedChildren() error {
+	var expected int64
+	switch imp.dt.ID() {
+	case arrow.LIST, arrow.LARGE_LIST, arrow.LIST_VIEW, arrow.LARGE_LIST_VIEW, arrow.FIXED_SIZE_LIST, arrow.MAP:
+		expected = 1
+	case arrow.STRUCT:
+		expected = int64(len(imp.dt.(*arrow.StructType).Fields()))
+	case arrow.RUN_END_ENCODED:
+		expected = 2
+	case arrow.DENSE_UNION:
+		expected = int64(len(imp.dt.(*arrow.DenseUnionType).Fields()))
+	case arrow.SPARSE_UNION:
+		expected = int64(len(imp.dt.(*arrow.SparseUnionType).Fields()))
+	}
+	return imp.checkNumChildren(expected)
+}
+
+func (imp *cimporter) checkExpectedBuffers() error {
+	switch imp.dt.(type) {
+	case *arrow.NullType, *arrow.RunEndEncodedType:
+		return imp.checkNumBuffers(0)
+	case arrow.FixedWidthDataType:
+		return imp.checkNumBuffers(2)
+	case *arrow.StringType, *arrow.BinaryType, *arrow.LargeStringType, *arrow.LargeBinaryType:
+		return imp.checkNumBuffers(3)
+	case *arrow.StringViewType, *arrow.BinaryViewType:
+		if imp.arr.n_buffers < 3 {
+			return fmt.Errorf("%w: expected at least 3 buffers for imported type %s, ArrowArray has %d", arrow.ErrInvalid, imp.dt, imp.arr.n_buffers)
+		}
+	case *arrow.ListType, *arrow.LargeListType, *arrow.MapType:
+		return imp.checkNumBuffers(2)
+	case *arrow.ListViewType, *arrow.LargeListViewType:
+		return imp.checkNumBuffers(3)
+	case *arrow.FixedSizeListType, *arrow.StructType:
+		return imp.checkNumBuffers(1)
+	case *arrow.DenseUnionType:
+		if imp.arr.n_buffers != 2 && imp.arr.n_buffers != 3 {
+			return fmt.Errorf("%w: expected 2 or 3 buffers for imported type %s, ArrowArray has %d", arrow.ErrInvalid, imp.dt, imp.arr.n_buffers)
+		}
+	case *arrow.SparseUnionType:
+		if imp.arr.n_buffers != 1 && imp.arr.n_buffers != 2 {
+			return fmt.Errorf("%w: expected 1 or 2 buffers for imported type %s, ArrowArray has %d", arrow.ErrInvalid, imp.dt, imp.arr.n_buffers)
+		}
+	default:
+		return fmt.Errorf("unimplemented type %s", imp.dt)
+	}
+	return nil
+}
+
 // import any child arrays for lists, structs, and so on.
 func (imp *cimporter) doImportChildren() error {
+	if err := imp.checkExpectedChildren(); err != nil {
+		return err
+	}
+
 	var children []*CArrowArray
 	if imp.arr.n_children > 0 {
 		children = unsafe.Slice(imp.arr.children, imp.arr.n_children)
@@ -455,6 +651,9 @@ func (imp *cimporter) initarr() {
 }
 
 func (imp *cimporter) doImportArr(src *CArrowArray) error {
+	if err := validateCArrayHeader(src); err != nil {
+		return err
+	}
 	imp.arr = C.get_arr()
 	C.ArrowArrayMove(src, imp.arr)
 	if imp.alloc == nil {
@@ -482,6 +681,16 @@ func (imp *cimporter) doImportArr(src *CArrowArray) error {
 // import is called recursively as needed for importing an array and its children
 // in order to generate array.Data objects
 func (imp *cimporter) doImport() error {
+	if err := validateCArrayHeader(imp.arr); err != nil {
+		return err
+	}
+	if _, ok := imp.dt.(*arrow.DictionaryType); ok && imp.arr.dictionary == nil {
+		return fmt.Errorf("%w: dictionary ArrowArray has no dictionary", arrow.ErrInvalid)
+	}
+	if err := imp.checkExpectedBuffers(); err != nil {
+		return err
+	}
+
 	// import any children
 	if err := imp.doImportChildren(); err != nil {
 		for _, c := range imp.children {
@@ -700,6 +909,9 @@ func (imp *cimporter) importBinaryViewLike() (err error) {
 	if err = imp.checkNoChildren(); err != nil {
 		return
 	}
+	if _, err = checkedMul(int64(imp.arr.n_buffers)-3, int64(arrow.Int64SizeBytes)); err != nil {
+		return err
+	}
 
 	buffers := make([]*memory.Buffer, len(imp.cbuffers)-1)
 	defer memory.ReleaseBuffers(buffers)
@@ -713,6 +925,12 @@ func (imp *cimporter) importBinaryViewLike() (err error) {
 	}
 
 	if len(buffers) > 2 {
+		if imp.cbuffers[len(buffers)] == nil {
+			return fmt.Errorf("%w: invalid data buffer sizes", arrow.ErrInvalid)
+		}
+		if _, err = checkedMul(int64(len(buffers)-2), int64(arrow.Int64SizeBytes)); err != nil {
+			return err
+		}
 		dataBufferSizes := unsafe.Slice((*int64)(unsafe.Pointer(imp.cbuffers[len(buffers)])), len(buffers)-2)
 		for i, size := range dataBufferSizes {
 			if buffers[i+2], err = imp.importVariableValuesBuffer(i+2, 1, size); err != nil {
@@ -809,10 +1027,15 @@ func (imp *cimporter) importFixedSizePrimitive() error {
 
 	fw := imp.dt.(arrow.FixedWidthDataType)
 	if bitutil.IsMultipleOf8(int64(fw.BitWidth())) {
-		values, err = imp.importFixedSizeBuffer(1, bitutil.BytesForBits(int64(fw.BitWidth())))
+		var byteWidth int64
+		byteWidth, err = checkedBytesForBits(int64(fw.BitWidth()))
+		if err != nil {
+			return err
+		}
+		values, err = imp.importFixedSizeBuffer(1, byteWidth)
 	} else {
 		if fw.BitWidth() != 1 {
-			return xerrors.New("invalid bitwidth")
+			return errors.New("invalid bitwidth")
 		}
 		values, err = imp.importBitsBuffer(1)
 	}
@@ -867,11 +1090,19 @@ func (imp *cimporter) checkNumBuffers(n int64) error {
 }
 
 func (imp *cimporter) importBuffer(bufferID int, sz int64) (*memory.Buffer, error) {
+	// Buffer sizes come from foreign memory and cannot be independently verified;
+	// these checks only prevent invalid metadata from creating unsafe Go slices.
 	// this is not a copy, we're just having a slice which points at the data
 	// it's still owned by the C.ArrowArray object and its backing C++ object.
+	if bufferID < 0 || bufferID >= len(imp.cbuffers) {
+		return nil, fmt.Errorf("%w: invalid buffer index %d", arrow.ErrInvalid, bufferID)
+	}
+	if sz < 0 || sz > maxIntValue() {
+		return nil, fmt.Errorf("%w: invalid buffer size %d", arrow.ErrInvalid, sz)
+	}
 	if imp.cbuffers[bufferID] == nil || sz == 0 {
 		if sz != 0 {
-			return nil, errors.New("invalid buffer")
+			return nil, fmt.Errorf("%w: invalid buffer", arrow.ErrInvalid)
 		}
 		return memory.NewBufferBytes([]byte{}), nil
 	}
@@ -881,7 +1112,14 @@ func (imp *cimporter) importBuffer(bufferID int, sz int64) (*memory.Buffer, erro
 }
 
 func (imp *cimporter) importBitsBuffer(bufferID int) (*memory.Buffer, error) {
-	bufsize := bitutil.BytesForBits(int64(imp.arr.length) + int64(imp.arr.offset))
+	total, err := checkedAdd(int64(imp.arr.length), int64(imp.arr.offset))
+	if err != nil {
+		return nil, err
+	}
+	bufsize, err := checkedBytesForBits(total)
+	if err != nil {
+		return nil, err
+	}
 	return imp.importBuffer(bufferID, bufsize)
 }
 
@@ -898,18 +1136,39 @@ func (imp *cimporter) importNullBitmap(bufferID int) (*memory.Buffer, error) {
 }
 
 func (imp *cimporter) importFixedSizeBuffer(bufferID int, byteWidth int64) (*memory.Buffer, error) {
-	bufsize := byteWidth * int64(imp.arr.length+imp.arr.offset)
+	total, err := checkedAdd(int64(imp.arr.length), int64(imp.arr.offset))
+	if err != nil {
+		return nil, err
+	}
+	bufsize, err := checkedMul(byteWidth, total)
+	if err != nil {
+		return nil, err
+	}
 	return imp.importBuffer(bufferID, bufsize)
 }
 
 func (imp *cimporter) importOffsetsBuffer(bufferID int, offsetsize int64) (*memory.Buffer, error) {
-	bufsize := offsetsize * int64((imp.arr.length + imp.arr.offset + 1))
+	total, err := checkedAdd(int64(imp.arr.length), int64(imp.arr.offset))
+	if err != nil {
+		return nil, err
+	}
+	total, err = checkedAdd(total, 1)
+	if err != nil {
+		return nil, err
+	}
+	bufsize, err := checkedMul(offsetsize, total)
+	if err != nil {
+		return nil, err
+	}
 	return imp.importBuffer(bufferID, bufsize)
 }
 
 func (imp *cimporter) importVariableValuesBuffer(bufferID int, byteWidth, nvals int64) (*memory.Buffer, error) {
-	bufsize := byteWidth * nvals
-	return imp.importBuffer(bufferID, int64(bufsize))
+	bufsize, err := checkedMul(byteWidth, nvals)
+	if err != nil {
+		return nil, err
+	}
+	return imp.importBuffer(bufferID, bufsize)
 }
 
 func importCArrayAsType(arr *CArrowArray, dt arrow.DataType) (imp *cimporter, err error) {
@@ -919,18 +1178,19 @@ func importCArrayAsType(arr *CArrowArray, dt arrow.DataType) (imp *cimporter, er
 }
 
 func initReader(rdr *nativeCRecordBatchReader, stream *CArrowArrayStream) error {
+	rdr.refCount.Store(1)
 	rdr.stream = C.get_stream()
 	C.ArrowArrayStreamMove(stream, rdr.stream)
 	rdr.arr = C.get_arr()
-	runtime.SetFinalizer(rdr, func(r *nativeCRecordBatchReader) {
-		if r.cur != nil {
-			r.cur.Release()
-		}
-		C.ArrowArrayStreamRelease(r.stream)
-		C.ArrowArrayRelease(r.arr)
-		C.free(unsafe.Pointer(r.stream))
-		C.free(unsafe.Pointer(r.arr))
-	})
+
+	rdr.cleanUps[0] = runtime.AddCleanup(rdr, func(s *CArrowArrayStream) {
+		C.ArrowArrayStreamRelease(s)
+		C.free(unsafe.Pointer(s))
+	}, rdr.stream)
+	rdr.cleanUps[1] = runtime.AddCleanup(rdr, func(a *CArrowArray) {
+		C.ArrowArrayRelease(a)
+		C.free(unsafe.Pointer(a))
+	}, rdr.arr)
 
 	var sc CArrowSchema
 	errno := C.stream_get_schema(rdr.stream, &sc)
@@ -956,12 +1216,32 @@ type nativeCRecordBatchReader struct {
 
 	cur arrow.RecordBatch
 	err error
+
+	refCount atomic.Int64
+	cleanUps [2]runtime.Cleanup
 }
 
-// No need to implement retain and release here as we used runtime.SetFinalizer when constructing
-// the reader to free up the ArrowArrayStream memory when the garbage collector cleans it up.
-func (n *nativeCRecordBatchReader) Retain()  {}
-func (n *nativeCRecordBatchReader) Release() {}
+func (n *nativeCRecordBatchReader) Retain() {
+	n.refCount.Add(1)
+}
+
+func (n *nativeCRecordBatchReader) Release() {
+	rc := n.refCount.Add(-1)
+	debug.Assert(rc >= 0, "too many releases")
+
+	if rc == 0 {
+		n.cleanUps[0].Stop()
+		n.cleanUps[1].Stop()
+		if n.cur != nil {
+			n.cur.Release()
+		}
+
+		C.ArrowArrayStreamRelease(n.stream)
+		C.ArrowArrayRelease(n.arr)
+		C.free(unsafe.Pointer(n.stream))
+		C.free(unsafe.Pointer(n.arr))
+	}
+}
 
 func (n *nativeCRecordBatchReader) Err() error                     { return n.err }
 func (n *nativeCRecordBatchReader) RecordBatch() arrow.RecordBatch { return n.cur }

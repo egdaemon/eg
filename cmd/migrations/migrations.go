@@ -67,8 +67,7 @@ func OpenLocked(ctx context.Context, path string) (*sql.DB, error) {
 		return nil, errorsx.Wrap(err, "unable to create the database directory")
 	}
 
-	// the lock file keeps its historical location, see duckshare.WithLockPath.
-	opts := []duckshare.Option{duckshare.WithLockPath(path + ".lock")}
+	opts := []duckshare.Option{}
 	// only the cli's own database is served with the postgres wire protocol, it has a single well known socket.
 	if path == Path(CLI) {
 		opts = append(opts, duckshare.WithPostgresSocket(PostgresSocket()))

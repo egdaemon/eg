@@ -21,13 +21,14 @@ package cdata
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"unsafe"
 
 	"github.com/apache/arrow-go/v18/arrow"
 	"github.com/apache/arrow-go/v18/arrow/array"
 	"github.com/apache/arrow-go/v18/arrow/arrio"
 	"github.com/apache/arrow-go/v18/arrow/memory"
-	"golang.org/x/xerrors"
 )
 
 // SchemaFromPtr is a simple helper function to cast a uintptr to a *CArrowSchema
@@ -58,7 +59,12 @@ func ImportCArrowSchema(out *CArrowSchema) (*arrow.Schema, error) {
 		return nil, err
 	}
 
-	return arrow.NewSchema(ret.Type.(*arrow.StructType).Fields(), &ret.Metadata), nil
+	structType, ok := ret.Type.(*arrow.StructType)
+	if !ok {
+		return nil, fmt.Errorf("%w: record batch schema must have a top-level struct type", arrow.ErrInvalid)
+	}
+
+	return arrow.NewSchema(structType.Fields(), &ret.Metadata), nil
 }
 
 // ImportCArrayWithType takes a pointer to a C Data ArrowArray and interprets the values
@@ -151,7 +157,7 @@ func ImportCRecordBatch(arr *CArrowArray, sc *CArrowSchema) (arrow.RecordBatch, 
 	}
 
 	if field.Type.ID() != arrow.STRUCT {
-		return nil, xerrors.New("recordbatch array import must be of struct type")
+		return nil, errors.New("recordbatch array import must be of struct type")
 	}
 
 	return ImportCRecordBatchWithSchema(arr, arrow.NewSchema(field.Type.(*arrow.StructType).Fields(), &field.Metadata))
@@ -189,8 +195,10 @@ func ImportCArrayStream(stream *CArrowArrayStream, schema *arrow.Schema) arrio.R
 func ImportCRecordReader(stream *CArrowArrayStream, schema *arrow.Schema) (arrio.Reader, error) {
 	out := &nativeCRecordBatchReader{schema: schema}
 	if err := initReader(out, stream); err != nil {
+		out.Release()
 		return nil, err
 	}
+
 	return out, nil
 }
 

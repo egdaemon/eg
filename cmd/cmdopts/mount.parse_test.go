@@ -35,7 +35,7 @@ func TestParseMount(t *testing.T) {
 	})
 
 	t.Run("invalid", func(t *testing.T) {
-		for _, spec := range []string{"", "/a", ":/b", "/a:", "/a:/b:rw", "/a:/b:0700:u:g:extra"} {
+		for _, spec := range []string{"", "/a", ":/b", "/a:", "/a:/b:rw", "/a:/b:0700:u:g:extra", "/a:b", "/a:./b"} {
 			_, err := cmdopts.ParseMount(spec, cmdopts.AccessDefault)
 			require.Error(t, err, spec)
 		}

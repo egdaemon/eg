@@ -3,6 +3,9 @@ package cmdopts
 import (
 	"fmt"
 	"os"
+
+	"github.com/egdaemon/eg"
+	"github.com/egdaemon/eg/internal/envx"
 )
 
 // Mounts are the flags for making host directories available to a workload.
@@ -60,4 +63,38 @@ func (t Mounts) Volumes() (volumes []string, err error) {
 	}
 
 	return volumes, nil
+}
+
+// Remap the destinations of the remapped mounts, which the runner remaps from where they were mounted, see
+// Mount.Remapped and eg.EnvUnsafeRemapDirectory.
+func (t Mounts) Remap() (dirs []string, err error) {
+	mounts, err := t.Specs()
+	if err != nil {
+		return nil, err
+	}
+
+	for _, m := range mounts {
+		if _, ok := m.Remapped(); ok {
+			dirs = append(dirs, m.Destination)
+		}
+	}
+
+	return dirs, nil
+}
+
+// RemapEnviron appends the destinations of the mounts to the directories the runner remaps, keeping those already
+// in the environment.
+func (t Mounts) RemapEnviron(envb *envx.Builder) error {
+	dirs, err := t.Remap()
+	if err != nil {
+		return err
+	}
+
+	for _, d := range dirs {
+		if err = envb.Append(eg.EnvUnsafeRemapDirectory, d, ":"); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }

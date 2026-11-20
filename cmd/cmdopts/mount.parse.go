@@ -3,6 +3,7 @@ package cmdopts
 import (
 	"fmt"
 	"io/fs"
+	"path/filepath"
 	"strconv"
 	"strings"
 )
@@ -24,6 +25,10 @@ func ParseMount(spec string, access Access) (m Mount, err error) {
 
 	if strings.TrimSpace(m.Destination) == "" {
 		return m, fmt.Errorf("invalid mount %q, the destination is required", spec)
+	}
+
+	if !filepath.IsAbs(m.Destination) {
+		return m, fmt.Errorf("invalid mount %q, the destination must be an absolute path", spec)
 	}
 
 	if len(parts) > 2 && parts[2] != "" {

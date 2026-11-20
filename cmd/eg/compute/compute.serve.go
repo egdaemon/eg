@@ -294,6 +294,10 @@ func (t serve) podman(ctx context.Context, ws workspaces.Context, uid uuidx.UUID
 		return nil, err
 	}
 
+	if err = t.Mounts.RemapEnviron(envb); err != nil {
+		return nil, err
+	}
+
 	ragent := runners.NewRunner(
 		ctx,
 		ws,

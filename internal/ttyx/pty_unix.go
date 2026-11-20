@@ -41,3 +41,10 @@ func control(f *os.File, fn func(fd int) error) error {
 
 	return ferr
 }
+
+// setsize gives the pseudo terminal of parent a window size.
+func setsize(parent *os.File, rows, cols uint16) error {
+	return control(parent, func(fd int) error {
+		return unix.IoctlSetWinsize(fd, unix.TIOCSWINSZ, &unix.Winsize{Row: rows, Col: cols})
+	})
+}

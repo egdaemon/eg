@@ -55,7 +55,7 @@ github.com/duckdb/duckdb-go-bindings/lib/windows-amd64 v0.10505.0 h1:DjqZl9rYreH
 github.com/duckdb/duckdb-go/v2 v2.10503.1 h1:mExuoVmoLQYVdTiGvsKTAlRPtGBVRutx12B8lctU+NI=
 github.com/dustin/go-humanize v1.1.0 h1:dbKTrvD0klcbBV/h4AWJdMuZogJACoMlvWIWZ5b2xWg=
 github.com/dustin/go-humanize v1.1.0/go.mod h1:hc1CvRkJMsgxqjmjMQF3QNRAZBwY8AXBAzKYoSX9sFI=
-github.com/egdaemon/duckproxy v0.0.0-20261114115105-8cd7c751218f h1:JKgH95MPa4Q1c/O6PMl0rgojVwBClYHOuPNyJAzAkJA=
+github.com/egdaemon/duckproxy v0.0.0-20261120182532-964887dc2a88 h1:ijs8FSe6KXNJPTyXs45TPXQV1Tx2amWVI4cGl7Eq4to=
 github.com/egdaemon/eg v0.0.0-20261116151058-f53594029bd0 h1:scSaY5MQ79blse9U7OI7+c7r/gs/IUMdOBSttRUqrQU=
 github.com/egdaemon/eg v0.0.0-20261116151058-f53594029bd0/go.mod h1:5vEByo6QVitChwdRII/IA4I2WD4doxQikmY00p9etek=
 github.com/egdaemon/sh/v3 v3.14.1-0.20261103040545-e33e887fd27a h1:iGlPjuwVYuTIFqTFNbHIeRDArtr1Ji/Y4r5Upebpo14=

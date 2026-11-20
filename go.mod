@@ -24,7 +24,7 @@ require (
 	github.com/dominikbraun/graph v0.23.0
 	github.com/duckdb/duckdb-go/v2 v2.10503.1
 	github.com/dustin/go-humanize v1.1.0
-	github.com/egdaemon/duckproxy v0.0.0-20261114115105-8cd7c751218f
+	github.com/egdaemon/duckproxy v0.0.0-20261120182532-964887dc2a88
 	github.com/egdaemon/gdx v0.0.0-20261115232526-a70109276a78
 	github.com/egdaemon/gdx/konggdx v0.0.0-20261115232526-a70109276a78
 	github.com/egdaemon/sh/v3 v3.14.1-0.20261103040545-e33e887fd27a
@@ -58,6 +58,7 @@ require (
 	github.com/moby/sys/user v0.4.0
 	github.com/multiformats/go-multiaddr v0.16.1
 	github.com/opencontainers/go-digest v1.0.0
+	github.com/opencontainers/image-spec v1.1.1
 	github.com/pbnjay/memory v0.0.0-20210728143218-7b4eea64cf58
 	github.com/pkg/errors v0.9.1
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2
@@ -267,7 +268,6 @@ require (
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/nxadm/tail v1.4.11 // indirect
 	github.com/opencontainers/cgroups v0.0.6 // indirect
-	github.com/opencontainers/image-spec v1.1.1 // indirect
 	github.com/opencontainers/runtime-spec v1.3.0 // indirect
 	github.com/opencontainers/runtime-tools v0.9.1-0.20260316125833-8a4db579f5c8 // indirect
 	github.com/opencontainers/selinux v1.14.1 // indirect

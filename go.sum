@@ -247,8 +247,8 @@ github.com/dustin/go-humanize v1.1.0 h1:dbKTrvD0klcbBV/h4AWJdMuZogJACoMlvWIWZ5b2
 github.com/dustin/go-humanize v1.1.0/go.mod h1:hc1CvRkJMsgxqjmjMQF3QNRAZBwY8AXBAzKYoSX9sFI=
 github.com/ebitengine/purego v0.10.0 h1:QIw4xfpWT6GWTzaW5XEKy3HXoqrJGx1ijYHzTF0/ISU=
 github.com/ebitengine/purego v0.10.0/go.mod h1:iIjxzd6CiRiOG0UyXP+V1+jWqUXVjPKLAI0mRfJZTmQ=
-github.com/egdaemon/duckproxy v0.0.0-20261114115105-8cd7c751218f h1:JKgH95MPa4Q1c/O6PMl0rgojVwBClYHOuPNyJAzAkJA=
-github.com/egdaemon/duckproxy v0.0.0-20261114115105-8cd7c751218f/go.mod h1:LvAlbnY/z3glFhk1nQM8YEw4E8xqSzHu3zARGfQQMHQ=
+github.com/egdaemon/duckproxy v0.0.0-20261120182532-964887dc2a88 h1:ijs8FSe6KXNJPTyXs45TPXQV1Tx2amWVI4cGl7Eq4to=
+github.com/egdaemon/duckproxy v0.0.0-20261120182532-964887dc2a88/go.mod h1:HmUy4eFjC13nVTjcaPdVqAsevqazg43QN/UP07CWqRM=
 github.com/egdaemon/gdx v0.0.0-20261115232526-a70109276a78 h1:oDEdKaNmWJlQR65agX6cF2ndV2yR1r7uxJq7ubhcdtE=
 github.com/egdaemon/gdx v0.0.0-20261115232526-a70109276a78/go.mod h1:zXd9WfJPRaoir/hXAwJcf6AhbNB0r3vqIFqhZdMswFg=
 github.com/egdaemon/gdx/konggdx v0.0.0-20261115232526-a70109276a78 h1:KRMR8rOtkB2zGP9niOyfCEnoVyoEzn3/e5LJMFoZSvA=

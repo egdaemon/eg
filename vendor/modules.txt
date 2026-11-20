@@ -533,7 +533,7 @@ github.com/ebitengine/purego/internal/cgo
 github.com/ebitengine/purego/internal/fakecgo
 github.com/ebitengine/purego/internal/strings
 github.com/ebitengine/purego/internal/xreflect
-# github.com/egdaemon/duckproxy v0.0.0-20261114115105-8cd7c751218f
+# github.com/egdaemon/duckproxy v0.0.0-20261120182532-964887dc2a88
 ## explicit; go 1.27.2
 github.com/egdaemon/duckproxy/duckgres
 github.com/egdaemon/duckproxy/duckproxy

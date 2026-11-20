@@ -24,7 +24,7 @@ require (
 	github.com/cloudflare/circl v1.6.4 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/dustin/go-humanize v1.1.0 // indirect
-	github.com/egdaemon/duckproxy v0.0.0-20261114115105-8cd7c751218f // indirect
+	github.com/egdaemon/duckproxy v0.0.0-20261120182532-964887dc2a88 // indirect
 	github.com/egdaemon/sh/v3 v3.14.1-0.20261103040545-e33e887fd27a // indirect
 	github.com/egdaemon/sh/x v0.0.0-20261105220106-700f29e4a1a9 // indirect
 	github.com/emirpasic/gods v1.18.1 // indirect

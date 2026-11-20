@@ -8,6 +8,7 @@ import (
 	"database/sql/driver"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"io"
 	"maps"
 	"net"
@@ -49,6 +50,8 @@ type Connector struct {
 	// pgsocket when set the owner also serves the file with the postgres wire protocol on this unix socket,
 	// so clients that are not written in go, i.e. editor extensions, can use it.
 	pgsocket string
+	// init statements run on every connection the owner opens to the file.
+	init []string
 
 	m     sync.Mutex
 	owned *ownedfile
@@ -79,6 +82,13 @@ func WithPostgresSocket(socket string) Option {
 	return func(t *Connector) { t.pgsocket = socket }
 }
 
+// WithInit runs statements on every connection the owner opens to the file, i.e. an ATTACH. state held by the
+// duckdb instance is lost when the owner goes away and another process takes the file over, this is what
+// restores it, so the statements must be safe to repeat.
+func WithInit(statements ...string) Option {
+	return func(t *Connector) { t.init = append(t.init, statements...) }
+}
+
 // WithLockWait sets the longest a connection waits for another process to finish connecting, defaults to 10s.
 func WithLockWait(d time.Duration) Option {
 	return func(t *Connector) { t.lockwait = d }
@@ -87,10 +97,13 @@ func WithLockWait(d time.Duration) Option {
 // WithLockPath sets the file used to serialize connecting.
 //
 // Deprecated: exists so existing deployments keep the lock file they already use, new callers should use the
-// default, the database path with the suffix ".duckproxy.lock".
+// default, the database path with the suffix ".lock".
 func WithLockPath(path string) Option {
 	return func(t *Connector) { t.lockpath = path }
 }
+
+// lock the path of the file lock serializing connecting to the database at path.
+func lock(path string) string { return fmt.Sprintf("%s.lock", path) }
 
 // New shares the duckdb file at db between processes. sockdir is the directory, common to all the processes
 // sharing the file, holding the socket the owner serves it on.
@@ -98,7 +111,7 @@ func New(sockdir, db string, opts ...Option) *Connector {
 	t := &Connector{
 		path:        db,
 		sockdir:     sockdir,
-		lockpath:    db + ".duckproxy.lock",
+		lockpath:    lock(db),
 		lockwait:    10 * time.Second,
 		lockpoll:    25 * time.Millisecond,
 		dialwait:    time.Second,
@@ -167,7 +180,15 @@ func (t *Connector) Connect(ctx context.Context) (driver.Conn, error) {
 // own opens the file and serves it. the socket is listening before returning, so by the time the lock is
 // released others find it.
 func (t *Connector) own(socket string) error {
-	connector, err := duckdb.NewConnector(t.path, nil)
+	connector, err := duckdb.NewConnector(t.path, func(execer driver.ExecerContext) error {
+		for _, stmt := range t.init {
+			if _, err := execer.ExecContext(context.Background(), stmt, nil); err != nil {
+				return errorsx.Wrap(err, "unable to initialize the connection")
+			}
+		}
+
+		return nil
+	})
 	if err != nil {
 		return errorsx.Wrap(err, "unable to open the database")
 	}
@@ -263,6 +284,18 @@ func (t *Connector) Close() error {
 
 	if t.owned == nil {
 		return nil
+	}
+
+	// hold the connect lock until the file is released. otherwise a process taking over finds the socket gone
+	// while this one still holds the file and fails to open it.
+	lctx, done := context.WithTimeout(context.Background(), t.lockwait)
+	defer done()
+
+	lock := flock.New(t.lockpath)
+	if locked, err := lock.TryLockContext(lctx, t.lockpoll); err != nil || !locked {
+		errorsx.Log(errorsx.Wrap(errors.Join(err, lctx.Err()), "unable to lock the database to close it"))
+	} else {
+		defer func() { errorsx.Log(lock.Unlock()) }()
 	}
 
 	o := t.owned

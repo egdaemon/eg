@@ -153,11 +153,13 @@ func (t patcher) Apply(ctx context.Context, patch []byte) error {
 }
 
 type autopatcher struct {
-	w      io.Writer
-	clone  string
-	repo   string
-	branch string
-	dry    bool
+	w        io.Writer
+	clone    string
+	repo     string
+	branch   string
+	session  string
+	nobranch bool
+	dry      bool
 }
 
 // AutoPatch creates a patcher which collects the changes made within a clone and commits them to a
@@ -184,6 +186,23 @@ func (t autopatcher) To(repodir string) autopatcher {
 // otherwise it is created from the current head.
 func (t autopatcher) Branch(names ...string) autopatcher {
 	t.branch = stringsx.FirstNonBlank(names...)
+	return t
+}
+
+// Session commits the changes to the ref of the session, see SessionRef, instead of to the branch: the work
+// does not depend on what the branch is called, which can change while the run is going. the commits are
+// only extended. when Branch is also given, and AutoBranch is not disabled, the branch is then created or fast
+// forwarded to the ref, the same as a commit straight to the branch would have left it.
+func (t autopatcher) Session(id string) autopatcher {
+	t.session = id
+	return t
+}
+
+// AutoBranch whether the branch is created from the session ref once the changes are committed, it defaults to
+// enabled. it only applies with Session, a commit straight to a branch always creates it. disabled, the ref is
+// all that is written and whatever manages the branch takes it from there.
+func (t autopatcher) AutoBranch(b bool) autopatcher {
+	t.nobranch = !b
 	return t
 }
 
@@ -226,7 +245,7 @@ func (t autopatcher) Apply(ctx context.Context) error {
 	if t.dry {
 		debugx.Fn(func() { log.Println("autopatch: path=dry-run, writing patch instead of committing") })
 		if head != "" {
-			if out, err := execx.RunAs(ctx, RepositoryUsername(t.clone), "git", "-C", t.clone, "format-patch", "--stdout", "--binary", CloneBase(ctx, t.clone)+".."+head).Output(); err != nil {
+			if out, err := execx.RunAs(ctx, RepositoryUsername(t.clone), "git", "-C", t.clone, "format-patch", "--stdout", "--binary", t.base(ctx, head)+".."+head).Output(); err != nil {
 				return errorsx.Wrapf(err, "unable to format the commits: %s", t.clone)
 			} else if _, err = t.w.Write(out); err != nil {
 				return err
@@ -253,12 +272,6 @@ func (t autopatcher) carried(ctx context.Context) string {
 		return ""
 	}
 
-	base := CloneBase(ctx, t.clone)
-	if base == "" {
-		debugx.Fn(func() { log.Println("autopatch: carried=none, clone has no recorded base commit") })
-		return ""
-	}
-
 	username := RepositoryUsername(t.clone)
 	out, err := execx.RunAs(ctx, username, "git", "-C", t.clone, "rev-parse", "--verify", "--quiet", "HEAD^{commit}").Output()
 	if err != nil {
@@ -267,6 +280,12 @@ func (t autopatcher) carried(ctx context.Context) string {
 	}
 
 	head := strings.TrimSpace(string(out))
+	base := t.base(ctx, head)
+	if base == "" {
+		debugx.Fn(func() { log.Println("autopatch: carried=none, clone has no recorded base commit") })
+		return ""
+	}
+
 	if head == base {
 		debugx.Fn(func() { log.Println("autopatch: carried=none, clone HEAD is at its base", base) })
 		return ""
@@ -282,13 +301,54 @@ func (t autopatcher) carried(ctx context.Context) string {
 	return head
 }
 
-// commit commits the patch to the branch on top of head, the commits made within the clone, when there are any.
+// base is the commit the commits of the clone are counted from: the latest commit of the user's workspace the clone
+// knows of when head is built on it, i.e. after the clone was rebased onto it, otherwise the commit the clone started at.
+func (t autopatcher) base(ctx context.Context, head string) string {
+	base := CloneBase(ctx, t.clone)
+	username := RepositoryUsername(t.clone)
+
+	out, err := execx.RunAs(ctx, username, "git", "-C", t.clone, "rev-parse", "--verify", "--quiet", RefLatest+"^{commit}").Output()
+	if err != nil {
+		return base
+	}
+
+	latest := strings.TrimSpace(string(out))
+	if latest == "" || latest == base {
+		return base
+	}
+
+	if err := execx.RunAs(ctx, username, "git", "-C", t.clone, "merge-base", "--is-ancestor", latest, head).Run(); err != nil {
+		return base
+	}
+
+	return latest
+}
+
+// target is the ref the changes are committed to.
+func (t autopatcher) target() string {
+	if t.session != "" {
+		return SessionRef(t.session)
+	}
+
+	return "refs/heads/" + t.branchname()
+}
+
+// commit commits the patch to the target on top of head, the commits made within the clone, when there are any.
 func (t autopatcher) commit(ctx context.Context, head string, patch []byte) error {
-	var (
-		branch   = t.branchname()
-		ref      = "refs/heads/" + branch
-		username = RepositoryUsername(t.repo)
-	)
+	if err := t.commitref(ctx, head, patch); err != nil {
+		return err
+	}
+
+	if t.session == "" {
+		return nil
+	}
+
+	return t.materialize(ctx)
+}
+
+// repogit runs git in the repository the changes are committed to, as its user.
+func (t autopatcher) repogit(ctx context.Context) func(env []string, stdin []byte, args ...string) (string, error) {
+	username := RepositoryUsername(t.repo)
 
 	git := func(env []string, stdin []byte, args ...string) (string, error) {
 		args = append([]string{"-C", t.repo}, args...)
@@ -313,6 +373,16 @@ func (t autopatcher) commit(ctx context.Context, head string, patch []byte) erro
 		}
 		return strings.TrimSpace(string(out)), nil
 	}
+	return git
+}
+
+// commitref commits to the target, see commit.
+func (t autopatcher) commitref(ctx context.Context, head string, patch []byte) error {
+	var (
+		ref    = t.target()
+		branch = strings.TrimPrefix(ref, "refs/heads/")
+		git    = t.repogit(ctx)
+	)
 
 	parent, err := git(nil, nil, "rev-parse", "--verify", "--quiet", ref)
 	oldtip := parent
@@ -388,7 +458,7 @@ func (t autopatcher) commit(ctx context.Context, head string, patch []byte) erro
 func (t autopatcher) updateref(git func([]string, []byte, ...string) (string, error), ref, commit, oldtip string) error {
 	// the branch is checked out, fast forward it so the index and worktree receive the changes, local
 	// modifications are kept and the merge refuses, leaving the ref untouched, if they overlap with the changes.
-	if current, err := git(nil, nil, "symbolic-ref", "-q", "HEAD"); err == nil && current == ref {
+	if current, err := git(nil, nil, "symbolic-ref", "-q", "HEAD"); strings.HasPrefix(ref, "refs/heads/") && err == nil && current == ref {
 		debugx.Fn(func() { log.Println("autopatch: branch is checked out, fast forwarding the worktree", ref, commit) })
 		_, err = git(nil, nil, "merge", "--ff-only", "-q", commit)
 		return err
@@ -405,8 +475,51 @@ func (t autopatcher) updateref(git func([]string, []byte, ...string) (string, er
 		return err
 	}
 
+	if !strings.HasPrefix(ref, "refs/heads/") {
+		return nil
+	}
+
 	// the worktree was not updated, make sure the user knows where their changes went.
 	branch := strings.TrimPrefix(ref, "refs/heads/")
 	log.Printf("autopatch: the changes were committed to branch %q, your worktree was not modified. use `git checkout %s` or `git merge %s` to get them\n", branch, branch, branch)
 	return nil
+}
+
+// materialize points the branch at the session ref, creating it or fast forwarding it, once the changes are committed to
+// the ref. nothing is done when the branch is not wanted, or has no name, and the ref is where to find the changes. a
+// branch that is not an ancestor of the ref is left alone: it was changed by something else.
+func (t autopatcher) materialize(ctx context.Context) error {
+	ref := SessionRef(t.session)
+
+	if t.nobranch || t.branch == "" {
+		log.Printf("autopatch: the changes were committed to %s, use `git branch <name> %s` to get a branch for them\n", ref, ref)
+		return nil
+	}
+
+	var (
+		git       = t.repogit(ctx)
+		branchref = "refs/heads/" + t.branch
+	)
+
+	tip, err := git(nil, nil, "rev-parse", "--verify", ref)
+	if err != nil {
+		return err
+	}
+
+	oldtip, err := git(nil, nil, "rev-parse", "--verify", "--quiet", branchref)
+	if err != nil {
+		oldtip = ""
+	}
+
+	if oldtip == tip {
+		return nil
+	}
+
+	if oldtip != "" {
+		if _, err = git(nil, nil, "merge-base", "--is-ancestor", oldtip, tip); err != nil {
+			return errorsx.Wrapf(err, "%s is not behind %s, the changes are in %s", t.branch, ref, ref)
+		}
+	}
+
+	return t.updateref(git, branchref, tip, oldtip)
 }

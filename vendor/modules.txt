@@ -69,8 +69,6 @@ cloud.google.com/go/auth/oauth2adapt
 # cloud.google.com/go/compute/metadata v0.10.0
 ## explicit; go 1.26.0
 cloud.google.com/go/compute/metadata
-# cloud.google.com/go/iam v1.12.0
-## explicit; go 1.25.0
 # cloud.google.com/go/iam v1.13.0
 ## explicit; go 1.25.0
 cloud.google.com/go/iam
@@ -554,16 +552,14 @@ github.com/ebitengine/purego/internal/cgo
 github.com/ebitengine/purego/internal/fakecgo
 github.com/ebitengine/purego/internal/strings
 github.com/ebitengine/purego/internal/xreflect
-# github.com/egdaemon/duckproxy v0.0.0-20261120182532-964887dc2a88
-## explicit; go 1.27.2
-# github.com/egdaemon/duckproxy v0.0.0-20261120183610-afbab7aa8c71
+# github.com/egdaemon/duckproxy v0.0.0-20261120193429-c2b61b872b69
 ## explicit; go 1.27.2
 github.com/egdaemon/duckproxy/duckgres
 github.com/egdaemon/duckproxy/duckproxy
 github.com/egdaemon/duckproxy/duckserve
 github.com/egdaemon/duckproxy/duckshare
 github.com/egdaemon/duckproxy/internal/errorsx
-# github.com/egdaemon/duckproxy/duckkong v0.0.0-20261120183610-afbab7aa8c71
+# github.com/egdaemon/duckproxy/duckkong v0.0.0-20261120193429-c2b61b872b69
 ## explicit; go 1.27.2
 github.com/egdaemon/duckproxy/duckkong
 # github.com/egdaemon/duckproxy/usqlx v0.0.0-20261120183610-afbab7aa8c71
@@ -631,6 +627,8 @@ github.com/emirpasic/gods/lists/arraylist
 github.com/emirpasic/gods/trees
 github.com/emirpasic/gods/trees/binaryheap
 github.com/emirpasic/gods/utils
+# github.com/envoyproxy/go-control-plane/envoy v1.39.0
+## explicit; go 1.25.0
 # github.com/felixge/fgprof v0.9.5
 ## explicit; go 1.14
 github.com/felixge/fgprof
@@ -1072,6 +1070,8 @@ github.com/lann/builder
 # github.com/lann/ps v0.0.0-20150810152359-62de8c46ede0
 ## explicit
 github.com/lann/ps
+# github.com/lib/pq v1.12.3
+## explicit; go 1.21
 # github.com/libp2p/go-buffer-pool v0.1.0
 ## explicit; go 1.17
 github.com/libp2p/go-buffer-pool
@@ -1870,8 +1870,6 @@ github.com/zieckey/goini
 ## explicit; go 1.24.0
 go.opentelemetry.io/auto/sdk
 go.opentelemetry.io/auto/sdk/internal/telemetry
-# go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.70.0
-## explicit; go 1.25.0
 # go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.71.0
 ## explicit; go 1.25.0
 go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc
@@ -2318,8 +2316,6 @@ google.golang.org/api/option
 google.golang.org/api/option/internaloption
 google.golang.org/api/transport/grpc
 google.golang.org/api/transport/http
-# google.golang.org/genproto v0.0.0-20260715232425-e75dac1f907d
-## explicit; go 1.25.0
 # google.golang.org/genproto v0.0.0-20260911204522-f61a6ca850bd
 ## explicit; go 1.25.0
 google.golang.org/genproto/googleapis/cloud/location

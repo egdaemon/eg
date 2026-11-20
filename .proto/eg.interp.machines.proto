@@ -6,6 +6,7 @@ message ModuleRequest {
   string egiso = 1;
   string module = 2;
   repeated string options = 3;
+  string containerfile = 4;
 }
 message ModuleResponse {}
 

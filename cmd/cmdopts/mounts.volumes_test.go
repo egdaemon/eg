@@ -78,3 +78,17 @@ func TestMountsRemap(t *testing.T) {
 		}
 	})
 }
+
+func TestMountMountpoint(t *testing.T) {
+	t.Run("outside the root directory is its destination", func(t *testing.T) {
+		require.Equal(t, "/x", cmdopts.Mount{Destination: "/x"}.Mountpoint())
+	})
+
+	t.Run("within the root directory is within the mount root", func(t *testing.T) {
+		require.Equal(t, eg.DefaultMountRoot(".agent.d", "claude"), cmdopts.Mount{Destination: eg.DefaultRootDirectory(".agent.d", "claude")}.Mountpoint())
+	})
+
+	t.Run("the root directory itself is its destination", func(t *testing.T) {
+		require.Equal(t, eg.DefaultRootDirectory(), cmdopts.Mount{Destination: eg.DefaultRootDirectory()}.Mountpoint())
+	})
+}

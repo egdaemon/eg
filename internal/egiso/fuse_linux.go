@@ -85,8 +85,10 @@ var (
 	_ gofs.NodeMknoder    = (*fusenode)(nil)
 )
 
+// name is the node's path in the upper. A node whose last name is unlinked has none: walked from the
+// root its path is a placeholder that names nothing, where walked from nil it would be the root's.
 func (t *fusenode) name() string {
-	return clean(t.Path(nil))
+	return clean(t.Path(t.Root()))
 }
 
 func (t *fusenode) child(name string) string {
@@ -131,11 +133,14 @@ func (t *fusenode) Getattr(ctx context.Context, f gofs.FileHandle, out *fuse.Att
 		err  error
 	)
 
-	if info, err = t.fsys.Lstat(name); err != nil {
-		return errnoofuse(err)
+	if info, err = t.fsys.Lstat(name); err == nil {
+		t.attr(ctx, name, info, &out.Attr)
+		return 0
 	}
-	t.attr(ctx, name, info, &out.Attr)
-	return 0
+	if h, ok := f.(*fusefile); ok && errors.Is(err, fs.ErrNotExist) {
+		return h.Getattr(ctx, out)
+	}
+	return errnoofuse(err)
 }
 
 func (t *fusenode) Setattr(ctx context.Context, f gofs.FileHandle, in *fuse.SetAttrIn, out *fuse.AttrOut) syscall.Errno {
@@ -235,11 +240,21 @@ func (t *fusenode) Readdir(ctx context.Context) (gofs.DirStream, syscall.Errno) 
 }
 
 func (t *fusenode) Open(ctx context.Context, flags uint32) (gofs.FileHandle, uint32, syscall.Errno) {
-	f, err := t.fsys.OpenFile(t.name(), int(flags)&(os.O_RDONLY|os.O_WRONLY|os.O_RDWR|os.O_APPEND|os.O_TRUNC), 0)
-	if err != nil {
+	var (
+		name = t.name()
+		h    = &fusefile{}
+		info fs.FileInfo
+		err  error
+	)
+
+	if info, err = t.fsys.Lstat(name); err != nil {
 		return nil, 0, errnoofuse(err)
 	}
-	return &fusefile{f: f}, fuse.FOPEN_KEEP_CACHE, 0
+	if h.f, err = t.fsys.OpenFile(name, int(flags)&(os.O_RDONLY|os.O_WRONLY|os.O_RDWR|os.O_APPEND|os.O_TRUNC), 0); err != nil {
+		return nil, 0, errnoofuse(err)
+	}
+	t.attr(ctx, name, info, &h.attr)
+	return h, fuse.FOPEN_KEEP_CACHE, 0
 }
 
 // overriding runs op, which changes the entries of the directory dir. Root may change any directory,
@@ -288,7 +303,7 @@ func (t *fusenode) Create(ctx context.Context, name string, flags uint32, mode u
 		errorsx.Log(f.Close())
 		return nil, nil, 0, errno
 	}
-	return node, &fusefile{f: f}, 0, 0
+	return node, &fusefile{f: f, attr: out.Attr}, 0, 0
 }
 
 func (t *fusenode) Mkdir(ctx context.Context, name string, mode uint32, out *fuse.EntryOut) (*gofs.Inode, syscall.Errno) {
@@ -400,18 +415,45 @@ func (t *fusenode) Statfs(ctx context.Context, out *fuse.StatfsOut) syscall.Errn
 }
 
 // fusefile is an open file. Reads and writes arrive concurrently with their offsets, and a file of
-// an archive reads, as every handle writes, where it seeks.
+// an archive reads, as every handle writes, where it seeks. It keeps the attributes its file had when
+// opened, which describe the file once its name is unlinked.
 type fusefile struct {
-	m sync.Mutex
-	f billy.File
+	m    sync.Mutex
+	f    billy.File
+	attr fuse.Attr
 }
 
 var (
-	_ gofs.FileReader   = (*fusefile)(nil)
-	_ gofs.FileWriter   = (*fusefile)(nil)
-	_ gofs.FileFsyncer  = (*fusefile)(nil)
-	_ gofs.FileReleaser = (*fusefile)(nil)
+	_ gofs.FileGetattrer = (*fusefile)(nil)
+	_ gofs.FileReader    = (*fusefile)(nil)
+	_ gofs.FileWriter    = (*fusefile)(nil)
+	_ gofs.FileFsyncer   = (*fusefile)(nil)
+	_ gofs.FileReleaser  = (*fusefile)(nil)
 )
+
+// Getattr describes a file whose name is unlinked: as it was when opened, with the size and times
+// it has now, so the kernel reads what its handles wrote.
+func (t *fusefile) Getattr(ctx context.Context, out *fuse.AttrOut) syscall.Errno {
+	var (
+		info  fs.FileInfo
+		mtime time.Time
+		err   error
+	)
+
+	t.m.Lock()
+	defer t.m.Unlock()
+
+	if info, err = t.f.(nfshandle).f.Stat(); err != nil {
+		return errnoofuse(err)
+	}
+	mtime = info.ModTime()
+	out.Attr = t.attr
+	out.Size = uint64(info.Size())
+	out.Blocks = (out.Size + 511) / 512
+	out.Nlink = 0
+	out.SetTimes(&mtime, &mtime, &mtime)
+	return 0
+}
 
 func (t *fusefile) Read(ctx context.Context, dest []byte, off int64) (fuse.ReadResult, syscall.Errno) {
 	t.m.Lock()

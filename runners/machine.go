@@ -21,6 +21,7 @@ import (
 	"github.com/egdaemon/eg/internal/fsx"
 	"github.com/egdaemon/eg/internal/iox"
 	"github.com/egdaemon/eg/internal/langx"
+	"github.com/egdaemon/eg/internal/md5x"
 	"github.com/egdaemon/eg/internal/slicesx"
 	"github.com/egdaemon/eg/internal/stringsx"
 	"github.com/egdaemon/eg/internal/userx"
@@ -275,10 +276,11 @@ func (t *Machine) module(ctx context.Context, path string) (err error) {
 	}, egvm.ExecOptionStdin(os.Stdin), egvm.ExecOptionStdout(log.Writer()), egvm.ExecOptionStderr(log.Writer()))
 }
 
-// NewMachines boots a machine for each module asked to run in one, as egvm.New asks: from the egiso
-// the request names, a uri carrying its pin as its fragment, else the egiso of the machine running the
-// module, eg.EnvComputeEgiso. Its module is the module's path in the runtime directory, and its
-// options the environment the module runs with. Each machine shares the workspace's directories.
+// NewMachines boots a machine for each module asked to run in one, as egvm.New asks: from an egiso of
+// the Containerfile the request names, built with BuildEgiso, else the egiso the request names, a uri
+// carrying its pin as its fragment, else the egiso of the machine running the module,
+// eg.EnvComputeEgiso. Its module is the module's path in the runtime directory, and its options the
+// environment the module runs with. Each machine shares the workspace's directories.
 func NewMachines(c *http.Client, ws workspaces.Context, console io.Writer, options ...MachineOption) machines.MachinesServer {
 	return machineserver{c: c, ws: ws, console: console, options: options}
 }
@@ -294,9 +296,21 @@ type machineserver struct {
 // Module implements machines.MachinesServer.
 func (t machineserver) Module(ctx context.Context, req *machines.ModuleRequest) (_ *machines.ModuleResponse, err error) {
 	var (
-		m   *Machine
-		uri = stringsx.First(req.Egiso, envx.String("", eg.EnvComputeEgiso))
+		m          *Machine
+		uri        = stringsx.First(req.Egiso, envx.String("", eg.EnvComputeEgiso))
+		definition = req.Containerfile
 	)
+
+	if !stringsx.Blank(definition) {
+		if !filepath.IsAbs(definition) {
+			definition = filepath.Join(t.ws.WorkingDir, definition)
+		}
+
+		// BuildEgiso keeps only the latest egiso in its cache, so each Containerfile has its own.
+		if uri, err = BuildEgiso(ctx, filepath.Join(t.ws.CacheDir, ".eg", "egiso", md5x.String(definition)), filepath.Dir(definition), definition); err != nil {
+			return nil, err
+		}
+	}
 
 	if stringsx.Blank(uri) {
 		return nil, errorsx.String("only a module running in a machine can boot one from its egiso")

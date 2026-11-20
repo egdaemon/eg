@@ -12,9 +12,10 @@ import (
 	"github.com/egdaemon/eg/runtime/wasi/egunsafe"
 )
 
-// Module runs the module at modulepath in a machine booted from the egiso uri names, or, blank, from
-// the egiso of the machine running the caller.
-func Module(ctx context.Context, uri string, modulepath string) error {
+// Module runs the module at modulepath in a machine booted from an egiso of the Containerfile at
+// containerfile, else from the egiso uri names, else, both blank, from the egiso of the machine
+// running the caller.
+func Module(ctx context.Context, uri string, containerfile string, modulepath string) error {
 	cc, err := egunsafe.DialControlSocket(ctx)
 	if err != nil {
 		return err
@@ -22,9 +23,10 @@ func Module(ctx context.Context, uri string, modulepath string) error {
 	defer cc.Close()
 
 	_, err = machines.NewMachinesClient(cc).Module(ctx, &machines.ModuleRequest{
-		Egiso:   uri,
-		Module:  modulepath,
-		Options: []string{fmt.Sprintf("%s=%d", eg.EnvComputeModuleNestedLevel, envx.Int(-1, eg.EnvComputeModuleNestedLevel)+1)},
+		Egiso:         uri,
+		Containerfile: containerfile,
+		Module:        modulepath,
+		Options:       []string{fmt.Sprintf("%s=%d", eg.EnvComputeModuleNestedLevel, envx.Int(-1, eg.EnvComputeModuleNestedLevel)+1)},
 	})
 	return errorsx.Wrap(err, "unable to run the module in a machine")
 }

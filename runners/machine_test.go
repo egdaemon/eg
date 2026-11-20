@@ -1,6 +1,8 @@
 package runners
 
 import (
+	"io"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -10,6 +12,8 @@ import (
 	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/langx"
+	"github.com/egdaemon/eg/interp/machines"
+	"github.com/egdaemon/eg/workspaces"
 	"github.com/stretchr/testify/require"
 )
 
@@ -114,5 +118,27 @@ func TestMachineOptionLocalGPGAgent(t *testing.T) {
 		environ, err := envb.Environ()
 		require.NoError(t, err)
 		require.Equal(t, []string{"GNUPGHOME=" + eg.DefaultMountRoot(".gnupg")}, environ)
+	})
+}
+
+func TestMachineserverModule(t *testing.T) {
+	server := func(t *testing.T) machines.MachinesServer {
+		return NewMachines(http.DefaultClient, workspaces.Context{WorkingDir: t.TempDir(), CacheDir: t.TempDir()}, io.Discard)
+	}
+
+	t.Run("without an egiso or a Containerfile outside a machine fails", func(t *testing.T) {
+		t.Setenv(eg.EnvComputeEgiso, "")
+
+		_, err := server(t).Module(t.Context(), &machines.ModuleRequest{Module: "module.wasm"})
+		require.ErrorContains(t, err, "only a module running in a machine can boot one from its egiso")
+	})
+
+	t.Run("a Containerfile is built before the machine boots", func(t *testing.T) {
+		t.Setenv(eg.EnvComputeEgiso, "")
+		dir := t.TempDir()
+		require.NoError(t, os.WriteFile(filepath.Join(dir, "Containerfile"), []byte("FROM scratch\nCOPY missing.txt /missing.txt\n"), 0644))
+
+		_, err := server(t).Module(t.Context(), &machines.ModuleRequest{Containerfile: filepath.Join(dir, "Containerfile"), Module: "module.wasm"})
+		require.ErrorContains(t, err, "unable to build the image")
 	})
 }

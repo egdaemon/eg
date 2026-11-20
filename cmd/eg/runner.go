@@ -293,6 +293,7 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, environsecret
 		hostnet = envx.Toggle(runners.AgentOptionCommandLine("--network", "host"), runners.AgentOptionNoop, envx.Boolean(false, eg.EnvExperimentalDisableHostNetwork)) // ipv4 group bullshit. pretty sure its a podman 4 issue that was resolved in podman 5. this is 'safe' to do because we are already in a container.
 		cc      grpc.ClientConnInterface
 		cmdenv  []string
+		vms     machines.MachinesServer
 	)
 
 	// ensure when we run modules our umask is set to allow git clones to work properly
@@ -480,6 +481,7 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, environsecret
 			gpu,
 		)
 
+		vms = runners.NewMachines(tlsc.DefaultClient(), ws, log.Writer(), runners.MachineOptionEGBin(errorsx.Must(exec.LookPath(os.Args[0]))))
 		c8sproxy.NewServiceProxy(
 			log.Default(),
 			ws,
@@ -490,8 +492,10 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, environsecret
 			// builds create their own network namespace as well, they take the options of hostnet.
 			c8sproxy.ServiceProxyOptionBuildOptions(runners.ZeroAgent(hostnet).Options()...),
 			c8sproxy.ServiceProxyOptionMux(mux),
+			// a module running in a machine runs the root container's modules in machines booted from the same egiso.
+			c8sproxy.ServiceProxyOptionMachines(envx.Toggle(nil, vms, stringsx.Present(envx.String("", eg.EnvComputeEgiso)))),
 		).Bind(srv)
-		machines.RegisterMachinesServer(srv, runners.NewMachines(tlsc.DefaultClient(), ws, log.Writer(), runners.MachineOptionEGBin(errorsx.Must(exec.LookPath(os.Args[0])))))
+		machines.RegisterMachinesServer(srv, vms)
 
 		go func() {
 			errorsx.Log(errorsx.Wrap(srv.Serve(control), "unable to serve control socket"))

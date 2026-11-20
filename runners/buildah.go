@@ -40,6 +40,7 @@ func BuildEgiso(ctx context.Context, cache, dir, path string, options ...string)
 		out       *os.File
 		toc       digest.Digest
 		cached    []byte
+		cmd       *exec.Cmd
 	)
 
 	if iid, err = os.CreateTemp("", "eg.buildah.iid.*"); err != nil {
@@ -51,7 +52,7 @@ func BuildEgiso(ctx context.Context, cache, dir, path string, options ...string)
 	}
 
 	// --layers caches each step, and a fixed timestamp keeps an unchanged image's id, which keys the cache.
-	cmd := exec.CommandContext(ctx, "buildah", append(append([]string{"build", "--layers", "--timestamp", "0", "--iidfile", iid.Name(), "-f", path}, options...), dir)...)
+	cmd = exec.CommandContext(ctx, "buildah", append(append([]string{"build", "--layers", "--timestamp", "0", "--iidfile", iid.Name(), "-f", path}, options...), dir)...)
 	cmd.Stdout, cmd.Stderr = os.Stdout, os.Stderr
 	if err = execx.MaybeRun(cmd); err != nil {
 		return "", errorsx.Wrap(err, "unable to build the image")
@@ -96,7 +97,9 @@ func BuildEgiso(ctx context.Context, cache, dir, path string, options ...string)
 		errorsx.Log(errorsx.Wrapf(exec.Command("buildah", "rmi", squash).Run(), "unable to remove the squashed image: %s", squash))
 	}()
 
-	if err = exec.CommandContext(ctx, "buildah", "push", "--compression-format", "gzip", "--force-compression", squash, "oci:"+layout).Run(); err != nil {
+	cmd = exec.CommandContext(ctx, "buildah", "push", "--compression-format", "gzip", "--force-compression", squash, "oci:"+layout)
+	cmd.Stdout, cmd.Stderr = os.Stdout, os.Stderr
+	if err = execx.MaybeRun(cmd); err != nil {
 		return "", errorsx.Wrap(err, "unable to write the image's layout")
 	}
 

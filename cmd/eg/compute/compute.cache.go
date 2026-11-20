@@ -41,11 +41,14 @@ const (
 	cachePayloadArchive = "cache.payload.tar.gz"
 	// environment variable listing the paths to remove, must match .builtin/cache/delete.
 	cacheEnvDeletePaths = "EG_CACHE_DELETE_PATHS"
+	// environment variable holding the json encoded command to execute, must match .builtin/cache/exec.
+	cacheEnvExecArgs = "EG_CACHE_EXEC_ARGS"
 )
 
 type cmdCache struct {
 	Insert cacheInsert `cmd:"" help:"upload files and directories into the runner's workload cache, directories are inserted by their contents"`
 	Delete cacheDelete `cmd:"" help:"remove paths, relative to the cache root, from the runner's workload cache"`
+	Exec   cacheExec   `cmd:"" help:"execute a command, i.e.) tree -L 3, within the root of the runner's workload cache"`
 }
 
 // cacheoptions are the flags shared by the cache commands, the same as builtin upload minus the module.

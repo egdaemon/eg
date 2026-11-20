@@ -183,7 +183,7 @@ func TestCacheDeletePaths(t *testing.T) {
 }
 
 func TestCacheBuiltinsEmbedded(t *testing.T) {
-	for _, module := range []string{"cache/insert", "cache/delete"} {
+	for _, module := range []string{"cache/insert", "cache/delete", "cache/exec"} {
 		t.Run(module, func(t *testing.T) {
 			_, err := fs.Stat(embeddedbuiltin, filepath.Join(".builtin", module, "main.go"))
 			require.NoError(t, err)

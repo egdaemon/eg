@@ -21,6 +21,7 @@ package array
 import (
 	"bytes"
 	"fmt"
+	"math"
 	"reflect"
 	"strconv"
 	"strings"
@@ -77,9 +78,15 @@ func (b *Int64Builder) AppendNull() {
 }
 
 func (b *Int64Builder) AppendNulls(n int) {
-	for i := 0; i < n; i++ {
-		b.AppendNull()
+	if n <= 0 {
+		return
 	}
+	if n == 1 {
+		b.AppendNull()
+		return
+	}
+	b.Reserve(n)
+	b.unsafeAppendNulls(n)
 }
 
 func (b *Int64Builder) AppendEmptyValue() {
@@ -87,9 +94,15 @@ func (b *Int64Builder) AppendEmptyValue() {
 }
 
 func (b *Int64Builder) AppendEmptyValues(n int) {
-	for i := 0; i < n; i++ {
-		b.AppendEmptyValue()
+	if n <= 0 {
+		return
 	}
+	if n == 1 {
+		b.AppendEmptyValue()
+		return
+	}
+	b.Reserve(n)
+	b.unsafeAppendEmptyValues(b.data.Bytes(), arrow.Int64Traits.BytesRequired(1), n)
 }
 
 func (b *Int64Builder) UnsafeAppend(v int64) {
@@ -218,7 +231,47 @@ func (b *Int64Builder) UnmarshalOne(dec *json.Decoder) error {
 		b.AppendNull()
 
 	case string:
+		// Try ParseInt first for direct integer strings, fall back to ParseFloat for
+		// exponential notation. Reject NaN/Inf, then range-check before any int
+		// conversion to avoid undefined behavior on overflow or non-finite values.
 		f, err := strconv.ParseInt(v, 10, 8*8)
+		if err != nil {
+			fval, ferr := strconv.ParseFloat(v, 64)
+			if ferr != nil {
+				return &json.UnmarshalTypeError{
+					Value:  v,
+					Type:   reflect.TypeOf(int64(0)),
+					Offset: dec.InputOffset(),
+				}
+			}
+			if math.IsNaN(fval) || math.IsInf(fval, 0) || fval < -9223372036854775808.0 || fval >= 9223372036854775808.0 {
+				return &json.UnmarshalTypeError{
+					Value:  v,
+					Type:   reflect.TypeOf(int64(0)),
+					Offset: dec.InputOffset(),
+				}
+			}
+			// Beyond 2^53, float64 cannot represent every integer exactly, so
+			// exponent-form input like "9.007199254740993e15" may have been
+			// silently rounded by ParseFloat. Reject conservatively.
+			if math.Abs(fval) >= 9007199254740992 {
+				return &json.UnmarshalTypeError{
+					Value:  v,
+					Type:   reflect.TypeOf(int64(0)),
+					Offset: dec.InputOffset(),
+				}
+			}
+			truncated := int64(fval)
+			if fval != float64(truncated) {
+				return &json.UnmarshalTypeError{
+					Value:  v,
+					Type:   reflect.TypeOf(int64(0)),
+					Offset: dec.InputOffset(),
+				}
+			}
+			f = truncated
+			err = nil
+		}
 		if err != nil {
 			return &json.UnmarshalTypeError{
 				Value:  v,
@@ -230,7 +283,49 @@ func (b *Int64Builder) UnmarshalOne(dec *json.Decoder) error {
 	case float64:
 		b.Append(int64(v))
 	case json.Number:
+		// Try ParseInt first to preserve precision for integer values too large
+		// for float64. Fall back to ParseFloat to support exponential notation
+		// (e.g. "1e3"), but reject NaN/Inf, fractional, or out-of-range values
+		// so invalid JSON like 1.5 or 128 (for int8) is surfaced as
+		// UnmarshalTypeError rather than silently truncated or wrapped.
 		f, err := strconv.ParseInt(v.String(), 10, 8*8)
+		if err != nil {
+			fval, ferr := strconv.ParseFloat(v.String(), 64)
+			if ferr != nil {
+				return &json.UnmarshalTypeError{
+					Value:  v.String(),
+					Type:   reflect.TypeOf(int64(0)),
+					Offset: dec.InputOffset(),
+				}
+			}
+			if math.IsNaN(fval) || math.IsInf(fval, 0) || fval < -9223372036854775808.0 || fval >= 9223372036854775808.0 {
+				return &json.UnmarshalTypeError{
+					Value:  v.String(),
+					Type:   reflect.TypeOf(int64(0)),
+					Offset: dec.InputOffset(),
+				}
+			}
+			// Beyond 2^53, float64 cannot represent every integer exactly, so
+			// exponent-form input like "9.007199254740993e15" may have been
+			// silently rounded by ParseFloat. Reject conservatively.
+			if math.Abs(fval) >= 9007199254740992 {
+				return &json.UnmarshalTypeError{
+					Value:  v.String(),
+					Type:   reflect.TypeOf(int64(0)),
+					Offset: dec.InputOffset(),
+				}
+			}
+			truncated := int64(fval)
+			if fval != float64(truncated) {
+				return &json.UnmarshalTypeError{
+					Value:  v.String(),
+					Type:   reflect.TypeOf(int64(0)),
+					Offset: dec.InputOffset(),
+				}
+			}
+			f = truncated
+			err = nil
+		}
 		if err != nil {
 			return &json.UnmarshalTypeError{
 				Value:  v.String(),
@@ -262,6 +357,7 @@ func (b *Int64Builder) Unmarshal(dec *json.Decoder) error {
 
 func (b *Int64Builder) UnmarshalJSON(data []byte) error {
 	dec := json.NewDecoder(bytes.NewReader(data))
+	dec.UseNumber()
 	t, err := dec.Token()
 	if err != nil {
 		return err
@@ -318,9 +414,15 @@ func (b *Uint64Builder) AppendNull() {
 }
 
 func (b *Uint64Builder) AppendNulls(n int) {
-	for i := 0; i < n; i++ {
-		b.AppendNull()
+	if n <= 0 {
+		return
 	}
+	if n == 1 {
+		b.AppendNull()
+		return
+	}
+	b.Reserve(n)
+	b.unsafeAppendNulls(n)
 }
 
 func (b *Uint64Builder) AppendEmptyValue() {
@@ -328,9 +430,15 @@ func (b *Uint64Builder) AppendEmptyValue() {
 }
 
 func (b *Uint64Builder) AppendEmptyValues(n int) {
-	for i := 0; i < n; i++ {
-		b.AppendEmptyValue()
+	if n <= 0 {
+		return
 	}
+	if n == 1 {
+		b.AppendEmptyValue()
+		return
+	}
+	b.Reserve(n)
+	b.unsafeAppendEmptyValues(b.data.Bytes(), arrow.Uint64Traits.BytesRequired(1), n)
 }
 
 func (b *Uint64Builder) UnsafeAppend(v uint64) {
@@ -459,7 +567,47 @@ func (b *Uint64Builder) UnmarshalOne(dec *json.Decoder) error {
 		b.AppendNull()
 
 	case string:
+		// Try ParseUint first for direct integer strings, fall back to ParseFloat for
+		// exponential notation. Reject NaN/Inf, then range-check before any uint
+		// conversion to avoid undefined behavior on overflow or non-finite values.
 		f, err := strconv.ParseUint(v, 10, 8*8)
+		if err != nil {
+			fval, ferr := strconv.ParseFloat(v, 64)
+			if ferr != nil {
+				return &json.UnmarshalTypeError{
+					Value:  v,
+					Type:   reflect.TypeOf(uint64(0)),
+					Offset: dec.InputOffset(),
+				}
+			}
+			if math.IsNaN(fval) || math.IsInf(fval, 0) || fval < 0 || fval >= float64(^uint64(0))+1 {
+				return &json.UnmarshalTypeError{
+					Value:  v,
+					Type:   reflect.TypeOf(uint64(0)),
+					Offset: dec.InputOffset(),
+				}
+			}
+			// Beyond 2^53, float64 cannot represent every integer exactly, so
+			// exponent-form input like "9.007199254740993e15" may have been
+			// silently rounded by ParseFloat. Reject conservatively.
+			if math.Abs(fval) >= 9007199254740992 {
+				return &json.UnmarshalTypeError{
+					Value:  v,
+					Type:   reflect.TypeOf(uint64(0)),
+					Offset: dec.InputOffset(),
+				}
+			}
+			truncated := uint64(fval)
+			if fval != float64(truncated) {
+				return &json.UnmarshalTypeError{
+					Value:  v,
+					Type:   reflect.TypeOf(uint64(0)),
+					Offset: dec.InputOffset(),
+				}
+			}
+			f = truncated
+			err = nil
+		}
 		if err != nil {
 			return &json.UnmarshalTypeError{
 				Value:  v,
@@ -471,7 +619,53 @@ func (b *Uint64Builder) UnmarshalOne(dec *json.Decoder) error {
 	case float64:
 		b.Append(uint64(v))
 	case json.Number:
+		// Try ParseUint first to preserve precision for integer values too large
+		// for float64. Fall back to ParseFloat to support exponential notation
+		// (e.g. "1e3"), but reject NaN/Inf, fractional, or out-of-range values
+		// so invalid JSON is surfaced as UnmarshalTypeError rather than silently
+		// coerced. Range-check before any uint conversion to avoid undefined
+		// behavior on overflow or non-finite values.
 		f, err := strconv.ParseUint(v.String(), 10, 8*8)
+		if err != nil {
+			fval, ferr := strconv.ParseFloat(v.String(), 64)
+			if ferr != nil {
+				return &json.UnmarshalTypeError{
+					Value:  v.String(),
+					Type:   reflect.TypeOf(uint64(0)),
+					Offset: dec.InputOffset(),
+				}
+			}
+			// Boundary is max+1: for uint64, valid range is [0, max]; reject anything >= max+1.
+			// For uint64, float64(^uint64(0)) already rounds up to 2^64, so this naturally
+			// rejects the exact 2^64 boundary that the looser `>` check missed.
+			if math.IsNaN(fval) || math.IsInf(fval, 0) || fval < 0 || fval >= float64(^uint64(0))+1 {
+				return &json.UnmarshalTypeError{
+					Value:  v.String(),
+					Type:   reflect.TypeOf(uint64(0)),
+					Offset: dec.InputOffset(),
+				}
+			}
+			// Beyond 2^53, float64 cannot represent every integer exactly, so
+			// exponent-form input like "9.007199254740993e15" may have been
+			// silently rounded by ParseFloat. Reject conservatively.
+			if math.Abs(fval) >= 9007199254740992 {
+				return &json.UnmarshalTypeError{
+					Value:  v.String(),
+					Type:   reflect.TypeOf(uint64(0)),
+					Offset: dec.InputOffset(),
+				}
+			}
+			truncated := uint64(fval)
+			if fval != float64(truncated) {
+				return &json.UnmarshalTypeError{
+					Value:  v.String(),
+					Type:   reflect.TypeOf(uint64(0)),
+					Offset: dec.InputOffset(),
+				}
+			}
+			f = truncated
+			err = nil
+		}
 		if err != nil {
 			return &json.UnmarshalTypeError{
 				Value:  v.String(),
@@ -503,6 +697,7 @@ func (b *Uint64Builder) Unmarshal(dec *json.Decoder) error {
 
 func (b *Uint64Builder) UnmarshalJSON(data []byte) error {
 	dec := json.NewDecoder(bytes.NewReader(data))
+	dec.UseNumber()
 	t, err := dec.Token()
 	if err != nil {
 		return err
@@ -559,9 +754,15 @@ func (b *Float64Builder) AppendNull() {
 }
 
 func (b *Float64Builder) AppendNulls(n int) {
-	for i := 0; i < n; i++ {
-		b.AppendNull()
+	if n <= 0 {
+		return
 	}
+	if n == 1 {
+		b.AppendNull()
+		return
+	}
+	b.Reserve(n)
+	b.unsafeAppendNulls(n)
 }
 
 func (b *Float64Builder) AppendEmptyValue() {
@@ -569,9 +770,15 @@ func (b *Float64Builder) AppendEmptyValue() {
 }
 
 func (b *Float64Builder) AppendEmptyValues(n int) {
-	for i := 0; i < n; i++ {
-		b.AppendEmptyValue()
+	if n <= 0 {
+		return
 	}
+	if n == 1 {
+		b.AppendEmptyValue()
+		return
+	}
+	b.Reserve(n)
+	b.unsafeAppendEmptyValues(b.data.Bytes(), arrow.Float64Traits.BytesRequired(1), n)
 }
 
 func (b *Float64Builder) UnsafeAppend(v float64) {
@@ -744,6 +951,7 @@ func (b *Float64Builder) Unmarshal(dec *json.Decoder) error {
 
 func (b *Float64Builder) UnmarshalJSON(data []byte) error {
 	dec := json.NewDecoder(bytes.NewReader(data))
+	dec.UseNumber()
 	t, err := dec.Token()
 	if err != nil {
 		return err
@@ -800,9 +1008,15 @@ func (b *Int32Builder) AppendNull() {
 }
 
 func (b *Int32Builder) AppendNulls(n int) {
-	for i := 0; i < n; i++ {
-		b.AppendNull()
+	if n <= 0 {
+		return
 	}
+	if n == 1 {
+		b.AppendNull()
+		return
+	}
+	b.Reserve(n)
+	b.unsafeAppendNulls(n)
 }
 
 func (b *Int32Builder) AppendEmptyValue() {
@@ -810,9 +1024,15 @@ func (b *Int32Builder) AppendEmptyValue() {
 }
 
 func (b *Int32Builder) AppendEmptyValues(n int) {
-	for i := 0; i < n; i++ {
-		b.AppendEmptyValue()
+	if n <= 0 {
+		return
 	}
+	if n == 1 {
+		b.AppendEmptyValue()
+		return
+	}
+	b.Reserve(n)
+	b.unsafeAppendEmptyValues(b.data.Bytes(), arrow.Int32Traits.BytesRequired(1), n)
 }
 
 func (b *Int32Builder) UnsafeAppend(v int32) {
@@ -941,7 +1161,39 @@ func (b *Int32Builder) UnmarshalOne(dec *json.Decoder) error {
 		b.AppendNull()
 
 	case string:
+		// Try ParseInt first for direct integer strings, fall back to ParseFloat for
+		// exponential notation. Reject NaN/Inf, then range-check before any int
+		// conversion to avoid undefined behavior on overflow or non-finite values.
 		f, err := strconv.ParseInt(v, 10, 4*8)
+		if err != nil {
+			fval, ferr := strconv.ParseFloat(v, 64)
+			if ferr != nil {
+				return &json.UnmarshalTypeError{
+					Value:  v,
+					Type:   reflect.TypeOf(int32(0)),
+					Offset: dec.InputOffset(),
+				}
+			}
+			minVal := float64(int64(-1) << (4*8 - 1))
+			maxVal := float64(int64(1) << (4*8 - 1))
+			if math.IsNaN(fval) || math.IsInf(fval, 0) || fval < minVal || fval >= maxVal {
+				return &json.UnmarshalTypeError{
+					Value:  v,
+					Type:   reflect.TypeOf(int32(0)),
+					Offset: dec.InputOffset(),
+				}
+			}
+			truncated := int64(fval)
+			if fval != float64(truncated) {
+				return &json.UnmarshalTypeError{
+					Value:  v,
+					Type:   reflect.TypeOf(int32(0)),
+					Offset: dec.InputOffset(),
+				}
+			}
+			f = truncated
+			err = nil
+		}
 		if err != nil {
 			return &json.UnmarshalTypeError{
 				Value:  v,
@@ -953,7 +1205,41 @@ func (b *Int32Builder) UnmarshalOne(dec *json.Decoder) error {
 	case float64:
 		b.Append(int32(v))
 	case json.Number:
+		// Try ParseInt first to preserve precision for integer values too large
+		// for float64. Fall back to ParseFloat to support exponential notation
+		// (e.g. "1e3"), but reject NaN/Inf, fractional, or out-of-range values
+		// so invalid JSON like 1.5 or 128 (for int8) is surfaced as
+		// UnmarshalTypeError rather than silently truncated or wrapped.
 		f, err := strconv.ParseInt(v.String(), 10, 4*8)
+		if err != nil {
+			fval, ferr := strconv.ParseFloat(v.String(), 64)
+			if ferr != nil {
+				return &json.UnmarshalTypeError{
+					Value:  v.String(),
+					Type:   reflect.TypeOf(int32(0)),
+					Offset: dec.InputOffset(),
+				}
+			}
+			minVal := float64(int64(-1) << (4*8 - 1))
+			maxVal := float64(int64(1) << (4*8 - 1))
+			if math.IsNaN(fval) || math.IsInf(fval, 0) || fval < minVal || fval >= maxVal {
+				return &json.UnmarshalTypeError{
+					Value:  v.String(),
+					Type:   reflect.TypeOf(int32(0)),
+					Offset: dec.InputOffset(),
+				}
+			}
+			truncated := int64(fval)
+			if fval != float64(truncated) {
+				return &json.UnmarshalTypeError{
+					Value:  v.String(),
+					Type:   reflect.TypeOf(int32(0)),
+					Offset: dec.InputOffset(),
+				}
+			}
+			f = truncated
+			err = nil
+		}
 		if err != nil {
 			return &json.UnmarshalTypeError{
 				Value:  v.String(),
@@ -985,6 +1271,7 @@ func (b *Int32Builder) Unmarshal(dec *json.Decoder) error {
 
 func (b *Int32Builder) UnmarshalJSON(data []byte) error {
 	dec := json.NewDecoder(bytes.NewReader(data))
+	dec.UseNumber()
 	t, err := dec.Token()
 	if err != nil {
 		return err
@@ -1041,9 +1328,15 @@ func (b *Uint32Builder) AppendNull() {
 }
 
 func (b *Uint32Builder) AppendNulls(n int) {
-	for i := 0; i < n; i++ {
-		b.AppendNull()
+	if n <= 0 {
+		return
 	}
+	if n == 1 {
+		b.AppendNull()
+		return
+	}
+	b.Reserve(n)
+	b.unsafeAppendNulls(n)
 }
 
 func (b *Uint32Builder) AppendEmptyValue() {
@@ -1051,9 +1344,15 @@ func (b *Uint32Builder) AppendEmptyValue() {
 }
 
 func (b *Uint32Builder) AppendEmptyValues(n int) {
-	for i := 0; i < n; i++ {
-		b.AppendEmptyValue()
+	if n <= 0 {
+		return
 	}
+	if n == 1 {
+		b.AppendEmptyValue()
+		return
+	}
+	b.Reserve(n)
+	b.unsafeAppendEmptyValues(b.data.Bytes(), arrow.Uint32Traits.BytesRequired(1), n)
 }
 
 func (b *Uint32Builder) UnsafeAppend(v uint32) {
@@ -1182,7 +1481,37 @@ func (b *Uint32Builder) UnmarshalOne(dec *json.Decoder) error {
 		b.AppendNull()
 
 	case string:
+		// Try ParseUint first for direct integer strings, fall back to ParseFloat for
+		// exponential notation. Reject NaN/Inf, then range-check before any uint
+		// conversion to avoid undefined behavior on overflow or non-finite values.
 		f, err := strconv.ParseUint(v, 10, 4*8)
+		if err != nil {
+			fval, ferr := strconv.ParseFloat(v, 64)
+			if ferr != nil {
+				return &json.UnmarshalTypeError{
+					Value:  v,
+					Type:   reflect.TypeOf(uint32(0)),
+					Offset: dec.InputOffset(),
+				}
+			}
+			if math.IsNaN(fval) || math.IsInf(fval, 0) || fval < 0 || fval >= float64(^uint32(0))+1 {
+				return &json.UnmarshalTypeError{
+					Value:  v,
+					Type:   reflect.TypeOf(uint32(0)),
+					Offset: dec.InputOffset(),
+				}
+			}
+			truncated := uint64(fval)
+			if fval != float64(truncated) {
+				return &json.UnmarshalTypeError{
+					Value:  v,
+					Type:   reflect.TypeOf(uint32(0)),
+					Offset: dec.InputOffset(),
+				}
+			}
+			f = truncated
+			err = nil
+		}
 		if err != nil {
 			return &json.UnmarshalTypeError{
 				Value:  v,
@@ -1194,7 +1523,43 @@ func (b *Uint32Builder) UnmarshalOne(dec *json.Decoder) error {
 	case float64:
 		b.Append(uint32(v))
 	case json.Number:
+		// Try ParseUint first to preserve precision for integer values too large
+		// for float64. Fall back to ParseFloat to support exponential notation
+		// (e.g. "1e3"), but reject NaN/Inf, fractional, or out-of-range values
+		// so invalid JSON is surfaced as UnmarshalTypeError rather than silently
+		// coerced. Range-check before any uint conversion to avoid undefined
+		// behavior on overflow or non-finite values.
 		f, err := strconv.ParseUint(v.String(), 10, 4*8)
+		if err != nil {
+			fval, ferr := strconv.ParseFloat(v.String(), 64)
+			if ferr != nil {
+				return &json.UnmarshalTypeError{
+					Value:  v.String(),
+					Type:   reflect.TypeOf(uint32(0)),
+					Offset: dec.InputOffset(),
+				}
+			}
+			// Boundary is max+1: for uint32, valid range is [0, max]; reject anything >= max+1.
+			// For uint64, float64(^uint64(0)) already rounds up to 2^64, so this naturally
+			// rejects the exact 2^64 boundary that the looser `>` check missed.
+			if math.IsNaN(fval) || math.IsInf(fval, 0) || fval < 0 || fval >= float64(^uint32(0))+1 {
+				return &json.UnmarshalTypeError{
+					Value:  v.String(),
+					Type:   reflect.TypeOf(uint32(0)),
+					Offset: dec.InputOffset(),
+				}
+			}
+			truncated := uint64(fval)
+			if fval != float64(truncated) {
+				return &json.UnmarshalTypeError{
+					Value:  v.String(),
+					Type:   reflect.TypeOf(uint32(0)),
+					Offset: dec.InputOffset(),
+				}
+			}
+			f = truncated
+			err = nil
+		}
 		if err != nil {
 			return &json.UnmarshalTypeError{
 				Value:  v.String(),
@@ -1226,6 +1591,7 @@ func (b *Uint32Builder) Unmarshal(dec *json.Decoder) error {
 
 func (b *Uint32Builder) UnmarshalJSON(data []byte) error {
 	dec := json.NewDecoder(bytes.NewReader(data))
+	dec.UseNumber()
 	t, err := dec.Token()
 	if err != nil {
 		return err
@@ -1282,9 +1648,15 @@ func (b *Float32Builder) AppendNull() {
 }
 
 func (b *Float32Builder) AppendNulls(n int) {
-	for i := 0; i < n; i++ {
-		b.AppendNull()
+	if n <= 0 {
+		return
 	}
+	if n == 1 {
+		b.AppendNull()
+		return
+	}
+	b.Reserve(n)
+	b.unsafeAppendNulls(n)
 }
 
 func (b *Float32Builder) AppendEmptyValue() {
@@ -1292,9 +1664,15 @@ func (b *Float32Builder) AppendEmptyValue() {
 }
 
 func (b *Float32Builder) AppendEmptyValues(n int) {
-	for i := 0; i < n; i++ {
-		b.AppendEmptyValue()
+	if n <= 0 {
+		return
 	}
+	if n == 1 {
+		b.AppendEmptyValue()
+		return
+	}
+	b.Reserve(n)
+	b.unsafeAppendEmptyValues(b.data.Bytes(), arrow.Float32Traits.BytesRequired(1), n)
 }
 
 func (b *Float32Builder) UnsafeAppend(v float32) {
@@ -1467,6 +1845,7 @@ func (b *Float32Builder) Unmarshal(dec *json.Decoder) error {
 
 func (b *Float32Builder) UnmarshalJSON(data []byte) error {
 	dec := json.NewDecoder(bytes.NewReader(data))
+	dec.UseNumber()
 	t, err := dec.Token()
 	if err != nil {
 		return err
@@ -1523,9 +1902,15 @@ func (b *Int16Builder) AppendNull() {
 }
 
 func (b *Int16Builder) AppendNulls(n int) {
-	for i := 0; i < n; i++ {
-		b.AppendNull()
+	if n <= 0 {
+		return
 	}
+	if n == 1 {
+		b.AppendNull()
+		return
+	}
+	b.Reserve(n)
+	b.unsafeAppendNulls(n)
 }
 
 func (b *Int16Builder) AppendEmptyValue() {
@@ -1533,9 +1918,15 @@ func (b *Int16Builder) AppendEmptyValue() {
 }
 
 func (b *Int16Builder) AppendEmptyValues(n int) {
-	for i := 0; i < n; i++ {
-		b.AppendEmptyValue()
+	if n <= 0 {
+		return
 	}
+	if n == 1 {
+		b.AppendEmptyValue()
+		return
+	}
+	b.Reserve(n)
+	b.unsafeAppendEmptyValues(b.data.Bytes(), arrow.Int16Traits.BytesRequired(1), n)
 }
 
 func (b *Int16Builder) UnsafeAppend(v int16) {
@@ -1664,7 +2055,39 @@ func (b *Int16Builder) UnmarshalOne(dec *json.Decoder) error {
 		b.AppendNull()
 
 	case string:
+		// Try ParseInt first for direct integer strings, fall back to ParseFloat for
+		// exponential notation. Reject NaN/Inf, then range-check before any int
+		// conversion to avoid undefined behavior on overflow or non-finite values.
 		f, err := strconv.ParseInt(v, 10, 2*8)
+		if err != nil {
+			fval, ferr := strconv.ParseFloat(v, 64)
+			if ferr != nil {
+				return &json.UnmarshalTypeError{
+					Value:  v,
+					Type:   reflect.TypeOf(int16(0)),
+					Offset: dec.InputOffset(),
+				}
+			}
+			minVal := float64(int64(-1) << (2*8 - 1))
+			maxVal := float64(int64(1) << (2*8 - 1))
+			if math.IsNaN(fval) || math.IsInf(fval, 0) || fval < minVal || fval >= maxVal {
+				return &json.UnmarshalTypeError{
+					Value:  v,
+					Type:   reflect.TypeOf(int16(0)),
+					Offset: dec.InputOffset(),
+				}
+			}
+			truncated := int64(fval)
+			if fval != float64(truncated) {
+				return &json.UnmarshalTypeError{
+					Value:  v,
+					Type:   reflect.TypeOf(int16(0)),
+					Offset: dec.InputOffset(),
+				}
+			}
+			f = truncated
+			err = nil
+		}
 		if err != nil {
 			return &json.UnmarshalTypeError{
 				Value:  v,
@@ -1676,7 +2099,41 @@ func (b *Int16Builder) UnmarshalOne(dec *json.Decoder) error {
 	case float64:
 		b.Append(int16(v))
 	case json.Number:
+		// Try ParseInt first to preserve precision for integer values too large
+		// for float64. Fall back to ParseFloat to support exponential notation
+		// (e.g. "1e3"), but reject NaN/Inf, fractional, or out-of-range values
+		// so invalid JSON like 1.5 or 128 (for int8) is surfaced as
+		// UnmarshalTypeError rather than silently truncated or wrapped.
 		f, err := strconv.ParseInt(v.String(), 10, 2*8)
+		if err != nil {
+			fval, ferr := strconv.ParseFloat(v.String(), 64)
+			if ferr != nil {
+				return &json.UnmarshalTypeError{
+					Value:  v.String(),
+					Type:   reflect.TypeOf(int16(0)),
+					Offset: dec.InputOffset(),
+				}
+			}
+			minVal := float64(int64(-1) << (2*8 - 1))
+			maxVal := float64(int64(1) << (2*8 - 1))
+			if math.IsNaN(fval) || math.IsInf(fval, 0) || fval < minVal || fval >= maxVal {
+				return &json.UnmarshalTypeError{
+					Value:  v.String(),
+					Type:   reflect.TypeOf(int16(0)),
+					Offset: dec.InputOffset(),
+				}
+			}
+			truncated := int64(fval)
+			if fval != float64(truncated) {
+				return &json.UnmarshalTypeError{
+					Value:  v.String(),
+					Type:   reflect.TypeOf(int16(0)),
+					Offset: dec.InputOffset(),
+				}
+			}
+			f = truncated
+			err = nil
+		}
 		if err != nil {
 			return &json.UnmarshalTypeError{
 				Value:  v.String(),
@@ -1708,6 +2165,7 @@ func (b *Int16Builder) Unmarshal(dec *json.Decoder) error {
 
 func (b *Int16Builder) UnmarshalJSON(data []byte) error {
 	dec := json.NewDecoder(bytes.NewReader(data))
+	dec.UseNumber()
 	t, err := dec.Token()
 	if err != nil {
 		return err
@@ -1764,9 +2222,15 @@ func (b *Uint16Builder) AppendNull() {
 }
 
 func (b *Uint16Builder) AppendNulls(n int) {
-	for i := 0; i < n; i++ {
-		b.AppendNull()
+	if n <= 0 {
+		return
 	}
+	if n == 1 {
+		b.AppendNull()
+		return
+	}
+	b.Reserve(n)
+	b.unsafeAppendNulls(n)
 }
 
 func (b *Uint16Builder) AppendEmptyValue() {
@@ -1774,9 +2238,15 @@ func (b *Uint16Builder) AppendEmptyValue() {
 }
 
 func (b *Uint16Builder) AppendEmptyValues(n int) {
-	for i := 0; i < n; i++ {
-		b.AppendEmptyValue()
+	if n <= 0 {
+		return
 	}
+	if n == 1 {
+		b.AppendEmptyValue()
+		return
+	}
+	b.Reserve(n)
+	b.unsafeAppendEmptyValues(b.data.Bytes(), arrow.Uint16Traits.BytesRequired(1), n)
 }
 
 func (b *Uint16Builder) UnsafeAppend(v uint16) {
@@ -1905,7 +2375,37 @@ func (b *Uint16Builder) UnmarshalOne(dec *json.Decoder) error {
 		b.AppendNull()
 
 	case string:
+		// Try ParseUint first for direct integer strings, fall back to ParseFloat for
+		// exponential notation. Reject NaN/Inf, then range-check before any uint
+		// conversion to avoid undefined behavior on overflow or non-finite values.
 		f, err := strconv.ParseUint(v, 10, 2*8)
+		if err != nil {
+			fval, ferr := strconv.ParseFloat(v, 64)
+			if ferr != nil {
+				return &json.UnmarshalTypeError{
+					Value:  v,
+					Type:   reflect.TypeOf(uint16(0)),
+					Offset: dec.InputOffset(),
+				}
+			}
+			if math.IsNaN(fval) || math.IsInf(fval, 0) || fval < 0 || fval >= float64(^uint16(0))+1 {
+				return &json.UnmarshalTypeError{
+					Value:  v,
+					Type:   reflect.TypeOf(uint16(0)),
+					Offset: dec.InputOffset(),
+				}
+			}
+			truncated := uint64(fval)
+			if fval != float64(truncated) {
+				return &json.UnmarshalTypeError{
+					Value:  v,
+					Type:   reflect.TypeOf(uint16(0)),
+					Offset: dec.InputOffset(),
+				}
+			}
+			f = truncated
+			err = nil
+		}
 		if err != nil {
 			return &json.UnmarshalTypeError{
 				Value:  v,
@@ -1917,7 +2417,43 @@ func (b *Uint16Builder) UnmarshalOne(dec *json.Decoder) error {
 	case float64:
 		b.Append(uint16(v))
 	case json.Number:
+		// Try ParseUint first to preserve precision for integer values too large
+		// for float64. Fall back to ParseFloat to support exponential notation
+		// (e.g. "1e3"), but reject NaN/Inf, fractional, or out-of-range values
+		// so invalid JSON is surfaced as UnmarshalTypeError rather than silently
+		// coerced. Range-check before any uint conversion to avoid undefined
+		// behavior on overflow or non-finite values.
 		f, err := strconv.ParseUint(v.String(), 10, 2*8)
+		if err != nil {
+			fval, ferr := strconv.ParseFloat(v.String(), 64)
+			if ferr != nil {
+				return &json.UnmarshalTypeError{
+					Value:  v.String(),
+					Type:   reflect.TypeOf(uint16(0)),
+					Offset: dec.InputOffset(),
+				}
+			}
+			// Boundary is max+1: for uint16, valid range is [0, max]; reject anything >= max+1.
+			// For uint64, float64(^uint64(0)) already rounds up to 2^64, so this naturally
+			// rejects the exact 2^64 boundary that the looser `>` check missed.
+			if math.IsNaN(fval) || math.IsInf(fval, 0) || fval < 0 || fval >= float64(^uint16(0))+1 {
+				return &json.UnmarshalTypeError{
+					Value:  v.String(),
+					Type:   reflect.TypeOf(uint16(0)),
+					Offset: dec.InputOffset(),
+				}
+			}
+			truncated := uint64(fval)
+			if fval != float64(truncated) {
+				return &json.UnmarshalTypeError{
+					Value:  v.String(),
+					Type:   reflect.TypeOf(uint16(0)),
+					Offset: dec.InputOffset(),
+				}
+			}
+			f = truncated
+			err = nil
+		}
 		if err != nil {
 			return &json.UnmarshalTypeError{
 				Value:  v.String(),
@@ -1949,6 +2485,7 @@ func (b *Uint16Builder) Unmarshal(dec *json.Decoder) error {
 
 func (b *Uint16Builder) UnmarshalJSON(data []byte) error {
 	dec := json.NewDecoder(bytes.NewReader(data))
+	dec.UseNumber()
 	t, err := dec.Token()
 	if err != nil {
 		return err
@@ -2005,9 +2542,15 @@ func (b *Int8Builder) AppendNull() {
 }
 
 func (b *Int8Builder) AppendNulls(n int) {
-	for i := 0; i < n; i++ {
-		b.AppendNull()
+	if n <= 0 {
+		return
 	}
+	if n == 1 {
+		b.AppendNull()
+		return
+	}
+	b.Reserve(n)
+	b.unsafeAppendNulls(n)
 }
 
 func (b *Int8Builder) AppendEmptyValue() {
@@ -2015,9 +2558,15 @@ func (b *Int8Builder) AppendEmptyValue() {
 }
 
 func (b *Int8Builder) AppendEmptyValues(n int) {
-	for i := 0; i < n; i++ {
-		b.AppendEmptyValue()
+	if n <= 0 {
+		return
 	}
+	if n == 1 {
+		b.AppendEmptyValue()
+		return
+	}
+	b.Reserve(n)
+	b.unsafeAppendEmptyValues(b.data.Bytes(), arrow.Int8Traits.BytesRequired(1), n)
 }
 
 func (b *Int8Builder) UnsafeAppend(v int8) {
@@ -2146,7 +2695,39 @@ func (b *Int8Builder) UnmarshalOne(dec *json.Decoder) error {
 		b.AppendNull()
 
 	case string:
+		// Try ParseInt first for direct integer strings, fall back to ParseFloat for
+		// exponential notation. Reject NaN/Inf, then range-check before any int
+		// conversion to avoid undefined behavior on overflow or non-finite values.
 		f, err := strconv.ParseInt(v, 10, 1*8)
+		if err != nil {
+			fval, ferr := strconv.ParseFloat(v, 64)
+			if ferr != nil {
+				return &json.UnmarshalTypeError{
+					Value:  v,
+					Type:   reflect.TypeOf(int8(0)),
+					Offset: dec.InputOffset(),
+				}
+			}
+			minVal := float64(int64(-1) << (1*8 - 1))
+			maxVal := float64(int64(1) << (1*8 - 1))
+			if math.IsNaN(fval) || math.IsInf(fval, 0) || fval < minVal || fval >= maxVal {
+				return &json.UnmarshalTypeError{
+					Value:  v,
+					Type:   reflect.TypeOf(int8(0)),
+					Offset: dec.InputOffset(),
+				}
+			}
+			truncated := int64(fval)
+			if fval != float64(truncated) {
+				return &json.UnmarshalTypeError{
+					Value:  v,
+					Type:   reflect.TypeOf(int8(0)),
+					Offset: dec.InputOffset(),
+				}
+			}
+			f = truncated
+			err = nil
+		}
 		if err != nil {
 			return &json.UnmarshalTypeError{
 				Value:  v,
@@ -2158,7 +2739,41 @@ func (b *Int8Builder) UnmarshalOne(dec *json.Decoder) error {
 	case float64:
 		b.Append(int8(v))
 	case json.Number:
+		// Try ParseInt first to preserve precision for integer values too large
+		// for float64. Fall back to ParseFloat to support exponential notation
+		// (e.g. "1e3"), but reject NaN/Inf, fractional, or out-of-range values
+		// so invalid JSON like 1.5 or 128 (for int8) is surfaced as
+		// UnmarshalTypeError rather than silently truncated or wrapped.
 		f, err := strconv.ParseInt(v.String(), 10, 1*8)
+		if err != nil {
+			fval, ferr := strconv.ParseFloat(v.String(), 64)
+			if ferr != nil {
+				return &json.UnmarshalTypeError{
+					Value:  v.String(),
+					Type:   reflect.TypeOf(int8(0)),
+					Offset: dec.InputOffset(),
+				}
+			}
+			minVal := float64(int64(-1) << (1*8 - 1))
+			maxVal := float64(int64(1) << (1*8 - 1))
+			if math.IsNaN(fval) || math.IsInf(fval, 0) || fval < minVal || fval >= maxVal {
+				return &json.UnmarshalTypeError{
+					Value:  v.String(),
+					Type:   reflect.TypeOf(int8(0)),
+					Offset: dec.InputOffset(),
+				}
+			}
+			truncated := int64(fval)
+			if fval != float64(truncated) {
+				return &json.UnmarshalTypeError{
+					Value:  v.String(),
+					Type:   reflect.TypeOf(int8(0)),
+					Offset: dec.InputOffset(),
+				}
+			}
+			f = truncated
+			err = nil
+		}
 		if err != nil {
 			return &json.UnmarshalTypeError{
 				Value:  v.String(),
@@ -2190,6 +2805,7 @@ func (b *Int8Builder) Unmarshal(dec *json.Decoder) error {
 
 func (b *Int8Builder) UnmarshalJSON(data []byte) error {
 	dec := json.NewDecoder(bytes.NewReader(data))
+	dec.UseNumber()
 	t, err := dec.Token()
 	if err != nil {
 		return err
@@ -2246,9 +2862,15 @@ func (b *Uint8Builder) AppendNull() {
 }
 
 func (b *Uint8Builder) AppendNulls(n int) {
-	for i := 0; i < n; i++ {
-		b.AppendNull()
+	if n <= 0 {
+		return
 	}
+	if n == 1 {
+		b.AppendNull()
+		return
+	}
+	b.Reserve(n)
+	b.unsafeAppendNulls(n)
 }
 
 func (b *Uint8Builder) AppendEmptyValue() {
@@ -2256,9 +2878,15 @@ func (b *Uint8Builder) AppendEmptyValue() {
 }
 
 func (b *Uint8Builder) AppendEmptyValues(n int) {
-	for i := 0; i < n; i++ {
-		b.AppendEmptyValue()
+	if n <= 0 {
+		return
 	}
+	if n == 1 {
+		b.AppendEmptyValue()
+		return
+	}
+	b.Reserve(n)
+	b.unsafeAppendEmptyValues(b.data.Bytes(), arrow.Uint8Traits.BytesRequired(1), n)
 }
 
 func (b *Uint8Builder) UnsafeAppend(v uint8) {
@@ -2387,7 +3015,37 @@ func (b *Uint8Builder) UnmarshalOne(dec *json.Decoder) error {
 		b.AppendNull()
 
 	case string:
+		// Try ParseUint first for direct integer strings, fall back to ParseFloat for
+		// exponential notation. Reject NaN/Inf, then range-check before any uint
+		// conversion to avoid undefined behavior on overflow or non-finite values.
 		f, err := strconv.ParseUint(v, 10, 1*8)
+		if err != nil {
+			fval, ferr := strconv.ParseFloat(v, 64)
+			if ferr != nil {
+				return &json.UnmarshalTypeError{
+					Value:  v,
+					Type:   reflect.TypeOf(uint8(0)),
+					Offset: dec.InputOffset(),
+				}
+			}
+			if math.IsNaN(fval) || math.IsInf(fval, 0) || fval < 0 || fval >= float64(^uint8(0))+1 {
+				return &json.UnmarshalTypeError{
+					Value:  v,
+					Type:   reflect.TypeOf(uint8(0)),
+					Offset: dec.InputOffset(),
+				}
+			}
+			truncated := uint64(fval)
+			if fval != float64(truncated) {
+				return &json.UnmarshalTypeError{
+					Value:  v,
+					Type:   reflect.TypeOf(uint8(0)),
+					Offset: dec.InputOffset(),
+				}
+			}
+			f = truncated
+			err = nil
+		}
 		if err != nil {
 			return &json.UnmarshalTypeError{
 				Value:  v,
@@ -2399,7 +3057,43 @@ func (b *Uint8Builder) UnmarshalOne(dec *json.Decoder) error {
 	case float64:
 		b.Append(uint8(v))
 	case json.Number:
+		// Try ParseUint first to preserve precision for integer values too large
+		// for float64. Fall back to ParseFloat to support exponential notation
+		// (e.g. "1e3"), but reject NaN/Inf, fractional, or out-of-range values
+		// so invalid JSON is surfaced as UnmarshalTypeError rather than silently
+		// coerced. Range-check before any uint conversion to avoid undefined
+		// behavior on overflow or non-finite values.
 		f, err := strconv.ParseUint(v.String(), 10, 1*8)
+		if err != nil {
+			fval, ferr := strconv.ParseFloat(v.String(), 64)
+			if ferr != nil {
+				return &json.UnmarshalTypeError{
+					Value:  v.String(),
+					Type:   reflect.TypeOf(uint8(0)),
+					Offset: dec.InputOffset(),
+				}
+			}
+			// Boundary is max+1: for uint8, valid range is [0, max]; reject anything >= max+1.
+			// For uint64, float64(^uint64(0)) already rounds up to 2^64, so this naturally
+			// rejects the exact 2^64 boundary that the looser `>` check missed.
+			if math.IsNaN(fval) || math.IsInf(fval, 0) || fval < 0 || fval >= float64(^uint8(0))+1 {
+				return &json.UnmarshalTypeError{
+					Value:  v.String(),
+					Type:   reflect.TypeOf(uint8(0)),
+					Offset: dec.InputOffset(),
+				}
+			}
+			truncated := uint64(fval)
+			if fval != float64(truncated) {
+				return &json.UnmarshalTypeError{
+					Value:  v.String(),
+					Type:   reflect.TypeOf(uint8(0)),
+					Offset: dec.InputOffset(),
+				}
+			}
+			f = truncated
+			err = nil
+		}
 		if err != nil {
 			return &json.UnmarshalTypeError{
 				Value:  v.String(),
@@ -2431,6 +3125,7 @@ func (b *Uint8Builder) Unmarshal(dec *json.Decoder) error {
 
 func (b *Uint8Builder) UnmarshalJSON(data []byte) error {
 	dec := json.NewDecoder(bytes.NewReader(data))
+	dec.UseNumber()
 	t, err := dec.Token()
 	if err != nil {
 		return err
@@ -2488,9 +3183,15 @@ func (b *Time32Builder) AppendNull() {
 }
 
 func (b *Time32Builder) AppendNulls(n int) {
-	for i := 0; i < n; i++ {
-		b.AppendNull()
+	if n <= 0 {
+		return
 	}
+	if n == 1 {
+		b.AppendNull()
+		return
+	}
+	b.Reserve(n)
+	b.unsafeAppendNulls(n)
 }
 
 func (b *Time32Builder) AppendEmptyValue() {
@@ -2498,9 +3199,15 @@ func (b *Time32Builder) AppendEmptyValue() {
 }
 
 func (b *Time32Builder) AppendEmptyValues(n int) {
-	for i := 0; i < n; i++ {
-		b.AppendEmptyValue()
+	if n <= 0 {
+		return
 	}
+	if n == 1 {
+		b.AppendEmptyValue()
+		return
+	}
+	b.Reserve(n)
+	b.unsafeAppendEmptyValues(b.data.Bytes(), arrow.Time32Traits.BytesRequired(1), n)
 }
 
 func (b *Time32Builder) UnsafeAppend(v arrow.Time32) {
@@ -2609,6 +3316,10 @@ func (b *Time32Builder) AppendValueFromString(s string) error {
 		b.AppendNull()
 		return nil
 	}
+	if v, parseErr := strconv.ParseInt(s, 10, 32); parseErr == nil {
+		b.Append(arrow.Time32(v))
+		return nil
+	}
 	val, err := arrow.Time32FromString(s, b.dtype.Unit)
 	if err != nil {
 		b.AppendNull()
@@ -2628,6 +3339,10 @@ func (b *Time32Builder) UnmarshalOne(dec *json.Decoder) error {
 	case nil:
 		b.AppendNull()
 	case string:
+		if i, parseErr := strconv.ParseInt(v, 10, 4*8); parseErr == nil {
+			b.Append(arrow.Time32(i))
+			break
+		}
 		tm, err := arrow.Time32FromString(v, b.dtype.Unit)
 		if err != nil {
 			return &json.UnmarshalTypeError{
@@ -2641,6 +3356,15 @@ func (b *Time32Builder) UnmarshalOne(dec *json.Decoder) error {
 	case json.Number:
 		n, err := v.Int64()
 		if err != nil {
+			return &json.UnmarshalTypeError{
+				Value:  v.String(),
+				Type:   reflect.TypeOf(arrow.Time32(0)),
+				Offset: dec.InputOffset(),
+			}
+		}
+		// arrow.Time32 is int32-backed; reject values outside int32 range
+		// to avoid silent wrap-around.
+		if n < -2147483648 || n > 2147483647 {
 			return &json.UnmarshalTypeError{
 				Value:  v.String(),
 				Type:   reflect.TypeOf(arrow.Time32(0)),
@@ -2673,6 +3397,7 @@ func (b *Time32Builder) Unmarshal(dec *json.Decoder) error {
 
 func (b *Time32Builder) UnmarshalJSON(data []byte) error {
 	dec := json.NewDecoder(bytes.NewReader(data))
+	dec.UseNumber()
 	t, err := dec.Token()
 	if err != nil {
 		return err
@@ -2730,9 +3455,15 @@ func (b *Time64Builder) AppendNull() {
 }
 
 func (b *Time64Builder) AppendNulls(n int) {
-	for i := 0; i < n; i++ {
-		b.AppendNull()
+	if n <= 0 {
+		return
 	}
+	if n == 1 {
+		b.AppendNull()
+		return
+	}
+	b.Reserve(n)
+	b.unsafeAppendNulls(n)
 }
 
 func (b *Time64Builder) AppendEmptyValue() {
@@ -2740,9 +3471,15 @@ func (b *Time64Builder) AppendEmptyValue() {
 }
 
 func (b *Time64Builder) AppendEmptyValues(n int) {
-	for i := 0; i < n; i++ {
-		b.AppendEmptyValue()
+	if n <= 0 {
+		return
 	}
+	if n == 1 {
+		b.AppendEmptyValue()
+		return
+	}
+	b.Reserve(n)
+	b.unsafeAppendEmptyValues(b.data.Bytes(), arrow.Time64Traits.BytesRequired(1), n)
 }
 
 func (b *Time64Builder) UnsafeAppend(v arrow.Time64) {
@@ -2851,6 +3588,10 @@ func (b *Time64Builder) AppendValueFromString(s string) error {
 		b.AppendNull()
 		return nil
 	}
+	if v, parseErr := strconv.ParseInt(s, 10, 64); parseErr == nil {
+		b.Append(arrow.Time64(v))
+		return nil
+	}
 	val, err := arrow.Time64FromString(s, b.dtype.Unit)
 	if err != nil {
 		b.AppendNull()
@@ -2870,6 +3611,10 @@ func (b *Time64Builder) UnmarshalOne(dec *json.Decoder) error {
 	case nil:
 		b.AppendNull()
 	case string:
+		if i, parseErr := strconv.ParseInt(v, 10, 8*8); parseErr == nil {
+			b.Append(arrow.Time64(i))
+			break
+		}
 		tm, err := arrow.Time64FromString(v, b.dtype.Unit)
 		if err != nil {
 			return &json.UnmarshalTypeError{
@@ -2915,6 +3660,7 @@ func (b *Time64Builder) Unmarshal(dec *json.Decoder) error {
 
 func (b *Time64Builder) UnmarshalJSON(data []byte) error {
 	dec := json.NewDecoder(bytes.NewReader(data))
+	dec.UseNumber()
 	t, err := dec.Token()
 	if err != nil {
 		return err
@@ -2971,9 +3717,15 @@ func (b *Date32Builder) AppendNull() {
 }
 
 func (b *Date32Builder) AppendNulls(n int) {
-	for i := 0; i < n; i++ {
-		b.AppendNull()
+	if n <= 0 {
+		return
 	}
+	if n == 1 {
+		b.AppendNull()
+		return
+	}
+	b.Reserve(n)
+	b.unsafeAppendNulls(n)
 }
 
 func (b *Date32Builder) AppendEmptyValue() {
@@ -2981,9 +3733,15 @@ func (b *Date32Builder) AppendEmptyValue() {
 }
 
 func (b *Date32Builder) AppendEmptyValues(n int) {
-	for i := 0; i < n; i++ {
-		b.AppendEmptyValue()
+	if n <= 0 {
+		return
 	}
+	if n == 1 {
+		b.AppendEmptyValue()
+		return
+	}
+	b.Reserve(n)
+	b.unsafeAppendEmptyValues(b.data.Bytes(), arrow.Date32Traits.BytesRequired(1), n)
 }
 
 func (b *Date32Builder) UnsafeAppend(v arrow.Date32) {
@@ -3092,6 +3850,10 @@ func (b *Date32Builder) AppendValueFromString(s string) error {
 		b.AppendNull()
 		return nil
 	}
+	if v, parseErr := strconv.ParseInt(s, 10, 32); parseErr == nil {
+		b.Append(arrow.Date32(v))
+		return nil
+	}
 	tm, err := time.Parse("2006-01-02", s)
 	if err != nil {
 		b.AppendNull()
@@ -3111,6 +3873,10 @@ func (b *Date32Builder) UnmarshalOne(dec *json.Decoder) error {
 	case nil:
 		b.AppendNull()
 	case string:
+		if i, parseErr := strconv.ParseInt(v, 10, 4*8); parseErr == nil {
+			b.Append(arrow.Date32(i))
+			break
+		}
 		tm, err := time.Parse("2006-01-02", v)
 		if err != nil {
 			return &json.UnmarshalTypeError{
@@ -3124,6 +3890,15 @@ func (b *Date32Builder) UnmarshalOne(dec *json.Decoder) error {
 	case json.Number:
 		n, err := v.Int64()
 		if err != nil {
+			return &json.UnmarshalTypeError{
+				Value:  v.String(),
+				Type:   reflect.TypeOf(arrow.Date32(0)),
+				Offset: dec.InputOffset(),
+			}
+		}
+		// arrow.Date32 is int32-backed; reject values outside int32 range
+		// to avoid silent wrap-around.
+		if n < -2147483648 || n > 2147483647 {
 			return &json.UnmarshalTypeError{
 				Value:  v.String(),
 				Type:   reflect.TypeOf(arrow.Date32(0)),
@@ -3156,6 +3931,7 @@ func (b *Date32Builder) Unmarshal(dec *json.Decoder) error {
 
 func (b *Date32Builder) UnmarshalJSON(data []byte) error {
 	dec := json.NewDecoder(bytes.NewReader(data))
+	dec.UseNumber()
 	t, err := dec.Token()
 	if err != nil {
 		return err
@@ -3212,9 +3988,15 @@ func (b *Date64Builder) AppendNull() {
 }
 
 func (b *Date64Builder) AppendNulls(n int) {
-	for i := 0; i < n; i++ {
-		b.AppendNull()
+	if n <= 0 {
+		return
 	}
+	if n == 1 {
+		b.AppendNull()
+		return
+	}
+	b.Reserve(n)
+	b.unsafeAppendNulls(n)
 }
 
 func (b *Date64Builder) AppendEmptyValue() {
@@ -3222,9 +4004,15 @@ func (b *Date64Builder) AppendEmptyValue() {
 }
 
 func (b *Date64Builder) AppendEmptyValues(n int) {
-	for i := 0; i < n; i++ {
-		b.AppendEmptyValue()
+	if n <= 0 {
+		return
 	}
+	if n == 1 {
+		b.AppendEmptyValue()
+		return
+	}
+	b.Reserve(n)
+	b.unsafeAppendEmptyValues(b.data.Bytes(), arrow.Date64Traits.BytesRequired(1), n)
 }
 
 func (b *Date64Builder) UnsafeAppend(v arrow.Date64) {
@@ -3333,6 +4121,10 @@ func (b *Date64Builder) AppendValueFromString(s string) error {
 		b.AppendNull()
 		return nil
 	}
+	if v, parseErr := strconv.ParseInt(s, 10, 64); parseErr == nil {
+		b.Append(arrow.Date64(v))
+		return nil
+	}
 	tm, err := time.Parse("2006-01-02", s)
 	if err != nil {
 		b.AppendNull()
@@ -3352,6 +4144,10 @@ func (b *Date64Builder) UnmarshalOne(dec *json.Decoder) error {
 	case nil:
 		b.AppendNull()
 	case string:
+		if i, parseErr := strconv.ParseInt(v, 10, 8*8); parseErr == nil {
+			b.Append(arrow.Date64(i))
+			break
+		}
 		tm, err := time.Parse("2006-01-02", v)
 		if err != nil {
 			return &json.UnmarshalTypeError{
@@ -3397,6 +4193,7 @@ func (b *Date64Builder) Unmarshal(dec *json.Decoder) error {
 
 func (b *Date64Builder) UnmarshalJSON(data []byte) error {
 	dec := json.NewDecoder(bytes.NewReader(data))
+	dec.UseNumber()
 	t, err := dec.Token()
 	if err != nil {
 		return err
@@ -3454,9 +4251,15 @@ func (b *DurationBuilder) AppendNull() {
 }
 
 func (b *DurationBuilder) AppendNulls(n int) {
-	for i := 0; i < n; i++ {
-		b.AppendNull()
+	if n <= 0 {
+		return
 	}
+	if n == 1 {
+		b.AppendNull()
+		return
+	}
+	b.Reserve(n)
+	b.unsafeAppendNulls(n)
 }
 
 func (b *DurationBuilder) AppendEmptyValue() {
@@ -3464,9 +4267,15 @@ func (b *DurationBuilder) AppendEmptyValue() {
 }
 
 func (b *DurationBuilder) AppendEmptyValues(n int) {
-	for i := 0; i < n; i++ {
-		b.AppendEmptyValue()
+	if n <= 0 {
+		return
 	}
+	if n == 1 {
+		b.AppendEmptyValue()
+		return
+	}
+	b.Reserve(n)
+	b.unsafeAppendEmptyValues(b.data.Bytes(), arrow.DurationTraits.BytesRequired(1), n)
 }
 
 func (b *DurationBuilder) UnsafeAppend(v arrow.Duration) {
@@ -3575,6 +4384,10 @@ func (b *DurationBuilder) AppendValueFromString(s string) error {
 		b.AppendNull()
 		return nil
 	}
+	if v, parseErr := strconv.ParseInt(s, 10, 64); parseErr == nil {
+		b.Append(arrow.Duration(v))
+		return nil
+	}
 	dur, err := time.ParseDuration(s)
 	if err != nil {
 		return err
@@ -3606,6 +4419,13 @@ func (b *DurationBuilder) UnmarshalOne(dec *json.Decoder) error {
 	case float64:
 		b.Append(arrow.Duration(v))
 	case string:
+		// raw integer strings (e.g. "9223372036854775807") - useful when the
+		// caller serializes large integers as strings to bypass JSON number
+		// precision limits
+		if i, parseErr := strconv.ParseInt(v, 10, 64); parseErr == nil {
+			b.Append(arrow.Duration(i))
+			break
+		}
 		// be flexible for specifying durations by accepting forms like
 		// 3h2m0.5s regardless of the unit and converting it to the proper
 		// precision.
@@ -3662,6 +4482,7 @@ func (b *DurationBuilder) Unmarshal(dec *json.Decoder) error {
 
 func (b *DurationBuilder) UnmarshalJSON(data []byte) error {
 	dec := json.NewDecoder(bytes.NewReader(data))
+	dec.UseNumber()
 	t, err := dec.Token()
 	if err != nil {
 		return err

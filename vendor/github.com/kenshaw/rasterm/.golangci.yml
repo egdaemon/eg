@@ -1,0 +1,27 @@
+linters:
+  enable-all: true
+  disable:
+    - depguard
+    - execinquery
+    - exhaustive
+    - exhaustruct
+    - exportloopref
+    - gci
+    - gochecknoglobals
+    - gochecknoinits
+    - gomnd
+    - inamedparam
+    - ireturn
+    - lll
+    - mnd
+    - nakedret
+    - nlreturn
+    - nonamedreturns
+    - paralleltest
+    - prealloc
+    - testableexamples
+    - testpackage
+    - varnamelen
+    - wastedassign
+    - wrapcheck
+    - wsl

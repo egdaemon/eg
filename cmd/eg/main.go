@@ -18,6 +18,7 @@ import (
 	"github.com/alecthomas/kong"
 	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/cmd/cmdaccounts"
+	"github.com/egdaemon/eg/cmd/cmddb"
 	"github.com/egdaemon/eg/cmd/cmderrors"
 	"github.com/egdaemon/eg/cmd/cmdgcp"
 	"github.com/egdaemon/eg/cmd/cmdgpg"
@@ -32,6 +33,7 @@ import (
 	"github.com/egdaemon/eg/cmd/eg/compute"
 	"github.com/egdaemon/eg/cmd/eg/daemons"
 	"github.com/egdaemon/eg/cmd/eg/workloads"
+	"github.com/egdaemon/eg/cmd/migrations"
 	"github.com/egdaemon/eg/internal/bytesx"
 	"github.com/egdaemon/eg/internal/contextx"
 	"github.com/egdaemon/eg/internal/envx"
@@ -101,6 +103,7 @@ func main() {
 		GPG                cmdgpg.Cmd                   `cmd:"" name:"gpg" help:"gpg keyring management"`
 		SSH                cmdssh.Cmd                   `cmd:"" name:"ssh" help:"ssh key management"`
 		Machine            cmdmachine.Cmd               `cmd:"" name:"machine" help:"interact with machines"`
+		DB                 cmddb.Cmd                    `cmd:"" name:"db" help:"sql shell for the cli's local database, -c runs the statements and exits"`
 		Me                 cmdme.Cmd                    `cmd:"" name:"me" help:"manage your own profile"`
 		GCP                cmdgcp.Cmd                   `cmd:"" name:"gcp" help:"gcp integration management"`
 		GDX                konggdx.Commands             `cmd:"" name:"gdx" help:"pull profiles/traces from a running eg debug socket"`
@@ -147,6 +150,7 @@ func main() {
 			"vars_cwd":                     osx.Getwd("."),
 			"vars_git_directory":           gitdir,
 			"vars_cache_directory":         userx.DefaultCacheDirectory(),
+			"vars_cli_database":            migrations.CLI,
 			"vars_runtime_directory":       userx.DefaultRuntimeDirectory(),
 			"vars_gdx_socket":              gdxsocket,
 			"vars_gdx_default_output":      "-",

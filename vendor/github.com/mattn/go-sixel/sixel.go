@@ -1,0 +1,870 @@
+package sixel
+
+import (
+	"bufio"
+	"errors"
+	"fmt"
+	"image"
+	"image/color"
+	"image/draw"
+	"io"
+	"strconv"
+
+	"github.com/soniakeys/quant/median"
+)
+
+// Encoder encode image to sixel format
+type Encoder struct {
+	w io.Writer
+
+	// Dither, if true, will dither the image when generating a paletted version
+	// using the Floyd–Steinberg dithering algorithm.
+	Dither bool
+
+	// Width is the maximum width to draw to.
+	Width int
+	// Height is the maximum height to draw to.
+	Height int
+
+	// Colors sets the number of colors for the encoder to quantize if needed.
+	// If the value is below 2 (e.g. the zero value), then 256 is used.
+	// A color is always reserved for alpha, so 2 colors give you 1 color.
+	Colors int
+
+	// Transparent, if true, leaves the existing screen content visible
+	// behind pixels with zero alpha (DECSIXEL P2=1). By default they are
+	// painted in the terminal's background color (P2=0).
+	Transparent bool
+
+	// Palette, if non-nil, is used for quantization instead of computing an
+	// adaptive palette for every image. The nearest-color lookup table is
+	// built once and cached across Encode calls, which makes encoding many
+	// similar images (e.g. video frames) much faster. It may hold at most
+	// 255 colors (one register is reserved for transparency) and takes
+	// precedence over Colors.
+	Palette color.Palette
+
+	outScratch    []byte
+	bitsetScratch []byte
+	seenScratch   []uint16
+	opaqueScratch []byte
+	seenGen       uint16
+	fixedPalette  color.Palette
+	fixedLUT      []uint8
+}
+
+// NewEncoder return new instance of Encoder
+func NewEncoder(w io.Writer) *Encoder {
+	return &Encoder{w: w}
+}
+
+const (
+	specialChNr = byte(0x6d)
+	specialChCr = byte(0x64)
+)
+
+// Encode do encoding
+func (e *Encoder) Encode(img image.Image) error {
+	nc := e.Colors // (>= 2, one slot is reserved for the transparent key color)
+	if nc < 2 {
+		nc = 256
+	} else if nc > 256 {
+		nc = 256
+	}
+
+	width, height := img.Bounds().Dx(), img.Bounds().Dy()
+	if width == 0 || height == 0 {
+		return nil
+	}
+	if e.Width > 0 {
+		width = e.Width
+	}
+	if e.Height > 0 {
+		height = e.Height
+	}
+	srcBounds := img.Bounds()
+	srcWidth := srcBounds.Dx()
+	srcHeight := srcBounds.Dy()
+	if srcWidth > width {
+		srcWidth = width
+	}
+	if srcHeight > height {
+		srcHeight = height
+	}
+
+	var paletted *image.Paletted
+
+	// fast path for paletted images
+	if p, ok := img.(*image.Paletted); ok && len(p.Palette) <= int(nc) {
+		paletted = p
+	} else if p, ok := img.(*image.NRGBA); ok && !e.Dither && e.Palette == nil {
+		paletted = palettedFromNRGBA(p, nc-1)
+	} else if p, ok := img.(*image.RGBA); ok && !e.Dither && e.Palette == nil {
+		paletted = palettedFromRGBA(p, nc-1)
+	} else {
+		paletted = nil
+	}
+	if paletted == nil {
+		rgba := toRGBA(img)
+		var palette color.Palette
+		var lut []uint8
+		if e.Palette != nil {
+			if len(e.Palette) > 255 {
+				return errors.New("sixel: fixed palette may hold at most 255 colors")
+			}
+			if !palettesEqual(e.fixedPalette, e.Palette) {
+				// Copy with no spare capacity so the transparent entry
+				// appended below never lands in the cached slice.
+				e.fixedPalette = make(color.Palette, len(e.Palette))
+				copy(e.fixedPalette, e.Palette)
+				e.fixedLUT = newPaletteLUT(e.fixedPalette)
+			}
+			palette, lut = e.fixedPalette, e.fixedLUT
+		} else {
+			// make adaptive palette using median cut alogrithm
+			palette = samplePalette(rgba, nc-1)
+			lut = newPaletteLUT(palette)
+		}
+		paletted = image.NewPaletted(rgba.Bounds(), palette)
+		if e.Dither {
+			// apply floyd-steinberg dithering
+			ditherPaletted(paletted, rgba, lut)
+		} else {
+			mapPaletted(paletted, rgba, lut)
+		}
+
+		// The quantizer ignores alpha, so remap fully transparent source
+		// pixels to a dedicated transparent palette entry.
+		transparentIndex := -1
+		b := rgba.Bounds()
+		for y := b.Min.Y; y < b.Max.Y; y++ {
+			so := rgba.PixOffset(b.Min.X, y) + 3
+			do := paletted.PixOffset(b.Min.X, y)
+			for x := 0; x < b.Dx(); x++ {
+				if rgba.Pix[so] == 0 {
+					if transparentIndex < 0 {
+						transparentIndex = len(paletted.Palette)
+						paletted.Palette = append(paletted.Palette, color.NRGBA{})
+					}
+					paletted.Pix[do] = uint8(transparentIndex)
+				}
+				so += 4
+				do++
+			}
+		}
+	}
+
+	// Color registers are not shifted: slot 0 is an ordinary register per
+	// DEC STD 070; transparency comes from leaving pixels unencoded.
+	paletteSize := len(paletted.Palette)
+
+	out := e.outScratch[:0]
+	outCap := width*height/2 + len(paletted.Palette)*16 + 64
+	if cap(out) < outCap {
+		out = make([]byte, 0, outCap)
+	}
+
+	// DECSIXEL Introducer(\033P0;P2;8q) + DECGRA ("1;1;W;H): Set Raster Attributes
+	// P2=1 keeps the existing screen content behind transparent pixels,
+	// P2=0 paints them in the background color.
+	if e.Transparent {
+		out = append(out, "\033P0;1;8q\"1;1;"...)
+	} else {
+		out = append(out, "\033P0;0;8q\"1;1;"...)
+	}
+	out = strconv.AppendInt(out, int64(width), 10)
+	out = append(out, ';')
+	out = strconv.AppendInt(out, int64(height), 10)
+
+	for n, v := range paletted.Palette {
+		r, g, b, _ := v.RGBA()
+		r = r * 100 / 0xFFFF
+		g = g * 100 / 0xFFFF
+		b = b * 100 / 0xFFFF
+		out = appendColorRegister(out, n, r, g, b)
+	}
+
+	bufSize := width * paletteSize
+	buf := e.bitsetScratch
+	if cap(buf) < bufSize {
+		buf = make([]byte, bufSize)
+	} else {
+		buf = buf[:bufSize]
+		clear(buf)
+	}
+	seen := e.seenScratch
+	if cap(seen) < paletteSize {
+		seen = make([]uint16, paletteSize)
+	} else {
+		seen = seen[:paletteSize]
+	}
+	var opaque []byte
+	if cap(e.opaqueScratch) < len(paletted.Palette) {
+		opaque = make([]byte, len(paletted.Palette))
+	} else {
+		opaque = e.opaqueScratch[:len(paletted.Palette)]
+	}
+	for i, c := range paletted.Palette {
+		_, _, _, alpha := c.RGBA()
+		if alpha != 0 {
+			opaque[i] = 1
+		} else {
+			opaque[i] = 0
+		}
+	}
+	ch0 := specialChNr
+	for z := 0; z < (height+5)/6; z++ {
+		e.seenGen++
+		if e.seenGen == 0 {
+			for i := range seen {
+				seen[i] = 0
+			}
+			e.seenGen = 1
+		}
+		gen := e.seenGen
+		// DECGNL (-): Graphics Next Line
+		if z > 0 {
+			out = append(out, '-')
+		}
+		for p := 0; p < 6; p++ {
+			y := z*6 + p
+			if y >= srcHeight {
+				continue
+			}
+			rowMask := byte(1 << uint(p))
+			offset := paletted.PixOffset(srcBounds.Min.X, srcBounds.Min.Y+y)
+			row := paletted.Pix[offset : offset+srcWidth]
+			for x, pix := range row {
+				if opaque[pix] == 0 {
+					continue
+				}
+				idx := int(pix)
+				seen[idx] = gen
+				buf[width*idx+x] |= rowMask
+			}
+		}
+		for n := 0; n < paletteSize; n++ {
+			if seen[n] != gen {
+				continue
+			}
+			// DECGCR ($): Graphics Carriage Return
+			if ch0 == specialChCr {
+				out = append(out, '$')
+			}
+			out = appendColorSelect(out, n)
+			cnt := 0
+			base := width * n
+			for x := 0; x < width; x++ {
+				// make sixel character from 6 pixels
+				ch := buf[base+x]
+				buf[base+x] = 0
+				if ch0 < 0x40 && ch != ch0 {
+					out = appendRun(out, ch0, cnt)
+					cnt = 0
+				}
+				ch0 = ch
+				cnt++
+			}
+			if ch0 != 0 {
+				out = appendRun(out, ch0, cnt)
+			}
+			ch0 = specialChCr
+		}
+	}
+	// string terminator(ST)
+	out = append(out, 0x1b, 0x5c)
+	e.outScratch = out[:0]
+	e.bitsetScratch = buf
+	e.seenScratch = seen
+	e.opaqueScratch = opaque
+	if _, err := e.w.Write(out); err != nil {
+		return err
+	}
+	return nil
+}
+
+// Decoder decode sixel format into image
+type Decoder struct {
+	r io.Reader
+}
+
+// NewDecoder return new instance of Decoder
+func NewDecoder(r io.Reader) *Decoder {
+	return &Decoder{r}
+}
+
+// Decode do decoding from image
+func (e *Decoder) Decode(img *image.Image) error {
+	buf := bufio.NewReader(e.r)
+	_, err := buf.ReadBytes('\x1B')
+	if err != nil {
+		if err == io.EOF {
+			err = nil
+		}
+		return err
+	}
+	c, err := buf.ReadByte()
+	if err != nil {
+		return err
+	}
+	switch c {
+	case 'P':
+		_, err := buf.ReadString('q')
+		if err != nil {
+			return err
+		}
+	default:
+		return errors.New("Invalid format: illegal header")
+	}
+	colors := map[uint]color.Color{
+		// 16 predefined color registers of VT340
+		0:  sixelRGB(0, 0, 0),
+		1:  sixelRGB(20, 20, 80),
+		2:  sixelRGB(80, 13, 13),
+		3:  sixelRGB(20, 80, 20),
+		4:  sixelRGB(80, 20, 80),
+		5:  sixelRGB(20, 80, 80),
+		6:  sixelRGB(80, 80, 20),
+		7:  sixelRGB(53, 53, 53),
+		8:  sixelRGB(26, 26, 26),
+		9:  sixelRGB(33, 33, 60),
+		10: sixelRGB(60, 26, 26),
+		11: sixelRGB(33, 60, 33),
+		12: sixelRGB(60, 33, 60),
+		13: sixelRGB(33, 60, 60),
+		14: sixelRGB(60, 60, 33),
+		15: sixelRGB(80, 80, 80),
+	}
+	dx, dy := 0, 0
+	dw, dh, w, h := 0, 0, 200, 200
+	pimg := image.NewNRGBA(image.Rect(0, 0, w, h))
+	var cn uint
+data:
+	for {
+		c, err = buf.ReadByte()
+		if err != nil {
+			if err == io.EOF {
+				err = nil
+			}
+			return err
+		}
+		if c == '\r' || c == '\n' || c == '\b' {
+			continue
+		}
+		switch c {
+		case '\x1b':
+			c, err = buf.ReadByte()
+			if err != nil {
+				return err
+			}
+			if c == '\\' {
+				break data
+			}
+		case '"':
+			params := []int{}
+			for {
+				var i int
+				n, err := fmt.Fscanf(buf, "%d", &i)
+				if err == io.EOF {
+					return err
+				}
+				if n == 0 {
+					i = 0
+				}
+				params = append(params, i)
+				c, err = buf.ReadByte()
+				if err != nil {
+					return err
+				}
+				if c != ';' {
+					break
+				}
+			}
+			if len(params) >= 4 {
+				if w < params[2] {
+					w = params[2]
+				}
+				if h < params[3]+6 {
+					h = params[3] + 6
+				}
+				pimg = expandImage(pimg, w, h)
+			}
+			err = buf.UnreadByte()
+			if err != nil {
+				return err
+			}
+		case '$':
+			dx = 0
+		case '!':
+			err = buf.UnreadByte()
+			if err != nil {
+				return err
+			}
+			var nc uint
+			var c byte
+			n, err := fmt.Fscanf(buf, "!%d%c", &nc, &c)
+			if err != nil {
+				return err
+			}
+			if n != 2 || c < '?' || c > '~' {
+				return fmt.Errorf("invalid format: illegal repeating data tokens '!%d%c'", nc, c)
+			}
+			pimg, w, h = ensureImageSize(pimg, dx+int(nc), dy+6)
+			m := byte(1)
+			c -= '?'
+			for p := 0; p < 6; p++ {
+				if c&m != 0 {
+					for q := 0; q < int(nc); q++ {
+						pimg.Set(dx+q, dy+p, colors[cn])
+					}
+					if dh < dy+p+1 {
+						dh = dy + p + 1
+					}
+				}
+				m <<= 1
+			}
+			dx += int(nc)
+			if dw < dx {
+				dw = dx
+			}
+		case '-':
+			dx = 0
+			dy += 6
+			pimg, w, h = ensureImageSize(pimg, w, dy+7)
+		case '#':
+			err = buf.UnreadByte()
+			if err != nil {
+				return err
+			}
+			var nc, csys uint
+			var r, g, b uint
+			var c byte
+			n, err := fmt.Fscanf(buf, "#%d%c", &nc, &c)
+			if err != nil {
+				return err
+			}
+			if n != 2 {
+				return fmt.Errorf("invalid format: illegal color specifier '#%d%c'", nc, c)
+			}
+			if c == ';' {
+				n, err := fmt.Fscanf(buf, "%d;%d;%d;%d", &csys, &r, &g, &b)
+				if err != nil {
+					return err
+				}
+				if n != 4 {
+					return fmt.Errorf("invalid format: illegal color specifier '#%d;%d;%d;%d;%d'", nc, csys, r, g, b)
+				}
+				if csys == 1 {
+					colors[nc] = sixelHLS(r, g, b)
+				} else {
+					colors[nc] = sixelRGB(r, g, b)
+				}
+			} else {
+				err = buf.UnreadByte()
+				if err != nil {
+					return err
+				}
+			}
+			cn = nc
+			if _, ok := colors[cn]; !ok {
+				return fmt.Errorf("invalid format: undefined color number %d", cn)
+			}
+		default:
+			if c >= '?' && c <= '~' {
+				pimg, w, h = ensureImageSize(pimg, dx+1, dy+6)
+				m := byte(1)
+				c -= '?'
+				for p := 0; p < 6; p++ {
+					if c&m != 0 {
+						pimg.Set(dx, dy+p, colors[cn])
+						if dh < dy+p+1 {
+							dh = dy + p + 1
+						}
+					}
+					m <<= 1
+				}
+				dx++
+				if dw < dx {
+					dw = dx
+				}
+				break
+			}
+			return errors.New("invalid format: illegal data tokens")
+		}
+	}
+	rect := image.Rect(0, 0, dw, dh)
+	tmp := image.NewNRGBA(rect)
+	draw.Draw(tmp, rect, pimg, image.Point{0, 0}, draw.Src)
+	*img = tmp
+	return nil
+}
+
+func sixelRGB(r, g, b uint) color.Color {
+	return color.NRGBA{uint8(r * 0xFF / 100), uint8(g * 0xFF / 100), uint8(b * 0xFF / 100), 0xFF}
+}
+
+func sixelHLS(h, l, s uint) color.Color {
+	var r, g, b, max, min float64
+
+	/* https://wikimedia.org/api/rest_v1/media/math/render/svg/17e876f7e3260ea7fed73f69e19c71eb715dd09d */
+	/* https://wikimedia.org/api/rest_v1/media/math/render/svg/f6721b57985ad83db3d5b800dc38c9980eedde1d */
+	if l > 50 {
+		max = float64(l) + float64(s)*(1.0-float64(l)/100.0)
+		min = float64(l) - float64(s)*(1.0-float64(l)/100.0)
+	} else {
+		max = float64(l) + float64(s*l)/100.0
+		min = float64(l) - float64(s*l)/100.0
+	}
+
+	/* sixel hue color ring is roteted -120 degree from nowdays general one. */
+	h = (h + 240) % 360
+
+	/* https://wikimedia.org/api/rest_v1/media/math/render/svg/937e8abdab308a22ff99de24d645ec9e70f1e384 */
+	switch h / 60 {
+	case 0: /* 0 <= hue < 60 */
+		r = max
+		g = min + (max-min)*(float64(h)/60.0)
+		b = min
+	case 1: /* 60 <= hue < 120 */
+		r = min + (max-min)*(float64(120-h)/60.0)
+		g = max
+		b = min
+	case 2: /* 120 <= hue < 180 */
+		r = min
+		g = max
+		b = min + (max-min)*(float64(h-120)/60.0)
+	case 3: /* 180 <= hue < 240 */
+		r = min
+		g = min + (max-min)*(float64(240-h)/60.0)
+		b = max
+	case 4: /* 240 <= hue < 300 */
+		r = min + (max-min)*(float64(h-240)/60.0)
+		g = min
+		b = max
+	case 5: /* 300 <= hue < 360 */
+		r = max
+		g = min
+		b = min + (max-min)*(float64(360-h)/60.0)
+	default:
+	}
+	return sixelRGB(uint(r), uint(g), uint(b))
+}
+
+func expandImage(pimg *image.NRGBA, w, h int) *image.NRGBA {
+	b := pimg.Bounds()
+	if w < b.Max.X {
+		w = b.Max.X
+	}
+	if h < b.Max.Y {
+		h = b.Max.Y
+	}
+	tmp := image.NewNRGBA(image.Rect(0, 0, w, h))
+	draw.Draw(tmp, b, pimg, image.Point{0, 0}, draw.Src)
+	return tmp
+}
+
+func ensureImageSize(pimg *image.NRGBA, w, h int) (*image.NRGBA, int, int) {
+	for {
+		b := pimg.Bounds()
+		if b.Max.X >= w && b.Max.Y >= h {
+			return pimg, b.Max.X, b.Max.Y
+		}
+		nw, nh := b.Max.X, b.Max.Y
+		for nw < w {
+			nw *= 2
+		}
+		for nh < h {
+			nh *= 2
+		}
+		pimg = expandImage(pimg, nw, nh)
+	}
+}
+
+func appendColorRegister(dst []byte, n int, r, g, b uint32) []byte {
+	dst = append(dst, '#')
+	dst = strconv.AppendInt(dst, int64(n), 10)
+	dst = append(dst, ';', '2', ';')
+	dst = strconv.AppendInt(dst, int64(r), 10)
+	dst = append(dst, ';')
+	dst = strconv.AppendInt(dst, int64(g), 10)
+	dst = append(dst, ';')
+	dst = strconv.AppendInt(dst, int64(b), 10)
+	return dst
+}
+
+func appendColorSelect(dst []byte, n int) []byte {
+	dst = append(dst, '#')
+	return strconv.AppendInt(dst, int64(n), 10)
+}
+
+func appendRun(dst []byte, ch byte, cnt int) []byte {
+	if cnt == 0 {
+		return dst
+	}
+	s := 63 + ch
+	for ; cnt > 255; cnt -= 255 {
+		dst = append(dst, '!', '2', '5', '5', s)
+	}
+	switch cnt {
+	case 1:
+		return append(dst, s)
+	case 2:
+		return append(dst, s, s)
+	case 3:
+		return append(dst, s, s, s)
+	default:
+		dst = append(dst, '!')
+		dst = strconv.AppendInt(dst, int64(cnt), 10)
+		return append(dst, s)
+	}
+}
+
+// toRGBA returns img as *image.RGBA, converting if necessary.
+func toRGBA(img image.Image) *image.RGBA {
+	if p, ok := img.(*image.RGBA); ok {
+		return p
+	}
+	b := img.Bounds()
+	tmp := image.NewRGBA(b)
+	draw.Draw(tmp, b, img, b.Min, draw.Src)
+	return tmp
+}
+
+// samplePalette builds an adaptive palette of at most maxColors colors using
+// the median cut algorithm. Large images are subsampled first: palette
+// quality barely depends on pixel count, while median cut cost does.
+func samplePalette(rgba *image.RGBA, maxColors int) color.Palette {
+	const budget = 1 << 18
+	b := rgba.Bounds()
+	src := image.Image(rgba)
+	if b.Dx()*b.Dy() > budget {
+		step := 2
+		for (b.Dx()/step)*(b.Dy()/step) > budget {
+			step++
+		}
+		sw, sh := b.Dx()/step, b.Dy()/step
+		sample := image.NewRGBA(image.Rect(0, 0, sw, sh))
+		for y := 0; y < sh; y++ {
+			do := sample.PixOffset(0, y)
+			for x := 0; x < sw; x++ {
+				so := rgba.PixOffset(b.Min.X+x*step, b.Min.Y+y*step)
+				copy(sample.Pix[do:do+4], rgba.Pix[so:so+4])
+				do += 4
+			}
+		}
+		src = sample
+	}
+	return median.Quantizer(0).Quantize(make(color.Palette, 0, maxColors), src)
+}
+
+// palettesEqual reports whether two palettes hold the same colors in the
+// same order.
+func palettesEqual(a, b color.Palette) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		ar, ag, ab, aa := a[i].RGBA()
+		br, bg, bb, ba := b[i].RGBA()
+		if ar != br || ag != bg || ab != bb || aa != ba {
+			return false
+		}
+	}
+	return true
+}
+
+// newPaletteLUT returns a lookup table from 15-bit RGB (5 bits per channel)
+// to the nearest palette index, replacing per-pixel linear palette searches.
+func newPaletteLUT(p color.Palette) []uint8 {
+	var pr, pg, pb [256]int32
+	for i, c := range p {
+		r, g, b, _ := c.RGBA()
+		pr[i], pg[i], pb[i] = int32(r>>8), int32(g>>8), int32(b>>8)
+	}
+	lut := make([]uint8, 1<<15)
+	for i := range lut {
+		r := int32(i>>10&31<<3 | 4)
+		g := int32(i>>5&31<<3 | 4)
+		b := int32(i&31<<3 | 4)
+		best, bestd := 0, int32(1<<31-1)
+		for j := 0; j < len(p); j++ {
+			dr, dg, db := r-pr[j], g-pg[j], b-pb[j]
+			if d := dr*dr + dg*dg + db*db; d < bestd {
+				best, bestd = j, d
+			}
+		}
+		lut[i] = uint8(best)
+	}
+	return lut
+}
+
+func lutIndex(r, g, b uint8) int {
+	return int(r>>3)<<10 | int(g>>3)<<5 | int(b>>3)
+}
+
+// mapPaletted assigns each source pixel the nearest palette index via lut.
+func mapPaletted(dst *image.Paletted, src *image.RGBA, lut []uint8) {
+	b := src.Bounds()
+	for y := b.Min.Y; y < b.Max.Y; y++ {
+		so := src.PixOffset(b.Min.X, y)
+		do := dst.PixOffset(b.Min.X, y)
+		for x := 0; x < b.Dx(); x++ {
+			dst.Pix[do] = lut[lutIndex(src.Pix[so], src.Pix[so+1], src.Pix[so+2])]
+			so += 4
+			do++
+		}
+	}
+}
+
+// ditherPaletted is Floyd-Steinberg dithering with nearest-color lookups
+// going through lut. Fully transparent pixels neither receive nor diffuse
+// error; they are remapped to the transparent palette entry afterwards.
+func ditherPaletted(dst *image.Paletted, src *image.RGBA, lut []uint8) {
+	var pr, pg, pb [256]int32
+	for i, c := range dst.Palette {
+		r, g, b, _ := c.RGBA()
+		pr[i], pg[i], pb[i] = int32(r>>8), int32(g>>8), int32(b>>8)
+	}
+	clamp := func(v int32) uint8 {
+		if v < 0 {
+			return 0
+		}
+		if v > 255 {
+			return 255
+		}
+		return uint8(v)
+	}
+	bd := src.Bounds()
+	w := bd.Dx()
+	// accumulated quantization error, scaled by 16
+	cur := make([][3]int32, w+2)
+	next := make([][3]int32, w+2)
+	for y := bd.Min.Y; y < bd.Max.Y; y++ {
+		so := src.PixOffset(bd.Min.X, y)
+		do := dst.PixOffset(bd.Min.X, y)
+		for x := 0; x < w; x++ {
+			if src.Pix[so+3] == 0 {
+				so += 4
+				do++
+				continue
+			}
+			r := clamp(int32(src.Pix[so]) + cur[x+1][0]/16)
+			g := clamp(int32(src.Pix[so+1]) + cur[x+1][1]/16)
+			b := clamp(int32(src.Pix[so+2]) + cur[x+1][2]/16)
+			idx := lut[lutIndex(r, g, b)]
+			dst.Pix[do] = idx
+			er, eg, eb := int32(r)-pr[idx], int32(g)-pg[idx], int32(b)-pb[idx]
+			cur[x+2][0] += er * 7
+			cur[x+2][1] += eg * 7
+			cur[x+2][2] += eb * 7
+			next[x][0] += er * 3
+			next[x][1] += eg * 3
+			next[x][2] += eb * 3
+			next[x+1][0] += er * 5
+			next[x+1][1] += eg * 5
+			next[x+1][2] += eb * 5
+			next[x+2][0] += er
+			next[x+2][1] += eg
+			next[x+2][2] += eb
+			so += 4
+			do++
+		}
+		cur, next = next, cur
+		for i := range next {
+			next[i] = [3]int32{}
+		}
+	}
+}
+
+func palettedFromNRGBA(img *image.NRGBA, maxColors int) *image.Paletted {
+	if maxColors < 1 {
+		return nil
+	}
+	bounds := img.Bounds()
+	palette := make(color.Palette, 1, maxColors+1)
+	palette[0] = color.NRGBA{}
+	indexes := make(map[uint32]uint8, maxColors)
+	dst := image.NewPaletted(bounds, palette)
+
+	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
+		srcOffset := img.PixOffset(bounds.Min.X, y)
+		dstOffset := dst.PixOffset(bounds.Min.X, y)
+		srcRow := img.Pix[srcOffset : srcOffset+bounds.Dx()*4]
+		dstRow := dst.Pix[dstOffset : dstOffset+bounds.Dx()]
+		for x := 0; x < bounds.Dx(); x++ {
+			base := x * 4
+			a := srcRow[base+3]
+			if a == 0 {
+				dstRow[x] = 0
+				continue
+			}
+			key := uint32(srcRow[base])<<24 | uint32(srcRow[base+1])<<16 | uint32(srcRow[base+2])<<8 | uint32(a)
+			if idx, ok := indexes[key]; ok {
+				dstRow[x] = idx
+				continue
+			}
+			if len(palette) > maxColors {
+				return nil
+			}
+			idx := uint8(len(palette))
+			indexes[key] = idx
+			palette = append(palette, color.NRGBA{
+				R: srcRow[base],
+				G: srcRow[base+1],
+				B: srcRow[base+2],
+				A: a,
+			})
+			dstRow[x] = idx
+		}
+	}
+	dst.Palette = palette
+	return dst
+}
+
+func palettedFromRGBA(img *image.RGBA, maxColors int) *image.Paletted {
+	if maxColors < 1 {
+		return nil
+	}
+	bounds := img.Bounds()
+	palette := make(color.Palette, 1, maxColors+1)
+	palette[0] = color.NRGBA{}
+	indexes := make(map[uint32]uint8, maxColors)
+	dst := image.NewPaletted(bounds, palette)
+
+	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
+		srcOffset := img.PixOffset(bounds.Min.X, y)
+		dstOffset := dst.PixOffset(bounds.Min.X, y)
+		srcRow := img.Pix[srcOffset : srcOffset+bounds.Dx()*4]
+		dstRow := dst.Pix[dstOffset : dstOffset+bounds.Dx()]
+		for x := 0; x < bounds.Dx(); x++ {
+			base := x * 4
+			a := srcRow[base+3]
+			if a == 0 {
+				dstRow[x] = 0
+				continue
+			}
+			r := srcRow[base]
+			g := srcRow[base+1]
+			b := srcRow[base+2]
+			if a != 0xFF {
+				r = uint8(uint16(r) * 0xFF / uint16(a))
+				g = uint8(uint16(g) * 0xFF / uint16(a))
+				b = uint8(uint16(b) * 0xFF / uint16(a))
+			}
+			key := uint32(r)<<24 | uint32(g)<<16 | uint32(b)<<8 | uint32(a)
+			if idx, ok := indexes[key]; ok {
+				dstRow[x] = idx
+				continue
+			}
+			if len(palette) > maxColors {
+				return nil
+			}
+			idx := uint8(len(palette))
+			indexes[key] = idx
+			palette = append(palette, color.NRGBA{R: r, G: g, B: b, A: a})
+			dstRow[x] = idx
+		}
+	}
+	dst.Palette = palette
+	return dst
+}

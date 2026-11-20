@@ -15,6 +15,7 @@ CacheDirectory=%p
 ConfigurationDirectory=%p
 RuntimeDirectory=%p
 RuntimeDirectoryMode=0700
+LimitMEMLOCK=infinity                           # gpu's are memory hungry
 Environment=EG_RUNNER_CPU=2
 Environment=EG_RUNNER_MEMORY=2g
 Environment=EG_RUNNER_OVERRIDE_DIR=rootfs

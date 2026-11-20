@@ -85,6 +85,25 @@ func Remove(ctx context.Context, db *sql.DB, ids ...string) (removed []string, e
 	return removed, err
 }
 
+// Rename changes the branch of the session, running or stopped. a running run does not use the name, it
+// commits to its own ref, so tools that manage the branch can rename it at any time. a blank name is refused.
+func Rename(ctx context.Context, db *sql.DB, id string, branch string) error {
+	if branch == "" {
+		return errorsx.Errorf("the branch of session %s cannot be blank", id)
+	}
+
+	res, err := db.ExecContext(ctx, "UPDATE serve_sessions SET branch = $2 WHERE id = $1", id, branch)
+	if err != nil {
+		return errorsx.Wrapf(err, "unable to rename the branch of session %s", id)
+	}
+
+	if n, err := res.RowsAffected(); err == nil && n == 0 {
+		return errorsx.Errorf("no session %s", id)
+	}
+
+	return nil
+}
+
 // Lookup a session by id, running or stopped. returns sql.ErrNoRows when there is none.
 func Lookup(ctx context.Context, db *sql.DB, id string) (s Session, err error) {
 	if err = reap(ctx, db); err != nil {

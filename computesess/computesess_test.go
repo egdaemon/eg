@@ -41,6 +41,27 @@ func TestServeSessions(t *testing.T) {
 		require.Equal(t, "m", sessions[0].Module)
 	})
 
+	t.Run("renames the branch of a running or stopped session", func(t *testing.T) {
+		db := sqltestx.DuckDB(t)
+		require.NoError(t, migrations.Migrate(t.Context(), db))
+
+		require.NoError(t, computesess.Register(t.Context(), db, computesess.Session{ID: "a", Branch: "before"}))
+		require.NoError(t, computesess.Rename(t.Context(), db, "a", "during"))
+		found, err := computesess.Lookup(t.Context(), db, "a")
+		require.NoError(t, err)
+		require.Equal(t, "during", found.Branch)
+		require.True(t, found.Running())
+
+		require.NoError(t, computesess.Stop(t.Context(), db, "a"))
+		require.NoError(t, computesess.Rename(t.Context(), db, "a", "after"))
+		found, err = computesess.Lookup(t.Context(), db, "a")
+		require.NoError(t, err)
+		require.Equal(t, "after", found.Branch)
+
+		require.Error(t, computesess.Rename(t.Context(), db, "a", ""))
+		require.Error(t, computesess.Rename(t.Context(), db, "missing", "x"))
+	})
+
 	t.Run("records the capabilities", func(t *testing.T) {
 		db := sqltestx.DuckDB(t)
 		require.NoError(t, migrations.Migrate(t.Context(), db))

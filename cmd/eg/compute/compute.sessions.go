@@ -21,8 +21,9 @@ import (
 
 // sessionsCmd the sessions of 'eg compute serve' and 'eg compute local', listing them is the default.
 type sessionsCmd struct {
-	List sessionsListCmd `cmd:"" default:"withargs" help:"list the workloads served with 'eg compute serve --ssh', running and previous"`
-	Rm   sessionsRmCmd   `cmd:"" help:"remove stopped sessions from the history"`
+	List   sessionsListCmd   `cmd:"" default:"withargs" help:"list the workloads served with 'eg compute serve --ssh', running and previous"`
+	Rm     sessionsRmCmd     `cmd:"" help:"remove stopped sessions from the history"`
+	Branch sessionsBranchCmd `cmd:"" help:"rename the branch of a session, running or stopped, for tools that manage the branch"`
 }
 
 type sessionsListCmd struct {
@@ -51,6 +52,21 @@ func (t sessionsRmCmd) Run(kctx *kong.Context, gctx *cmdopts.Global) (err error)
 	defer db.Close()
 
 	return removeSessions(gctx.Context, db, kctx.Stdout, t.IDs)
+}
+
+type sessionsBranchCmd struct {
+	ID     string `arg:"" name:"id" help:"id of the session"`
+	Branch string `arg:"" name:"branch" help:"the new name of the branch"`
+}
+
+func (t sessionsBranchCmd) Run(gctx *cmdopts.Global) (err error) {
+	db, err := migrations.OpenLocked(gctx.Context, migrations.Path(migrations.CLI))
+	if err != nil {
+		return errorsx.Wrap(err, "unable to open the cli database")
+	}
+	defer db.Close()
+
+	return computesess.Rename(gctx.Context, db, t.ID, t.Branch)
 }
 
 // removeSessions forgets the stopped sessions with the given ids, printing the ones that were removed.

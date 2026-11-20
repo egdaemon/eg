@@ -90,7 +90,7 @@ func TestSpooledEntry(t *testing.T) {
 			require.NoError(t, tw.Close())
 			require.NoError(t, gw.Close())
 
-			entry, err := spooledentry(&buf, tc.prefix)
+			entry, err := spooledentry(t.Context(), &buf, tc.prefix)
 			if tc.failed {
 				require.Error(t, err)
 				require.Contains(t, err.Error(), "--entry")
@@ -103,7 +103,7 @@ func TestSpooledEntry(t *testing.T) {
 	}
 
 	t.Run("rejects a non archive", func(t *testing.T) {
-		_, err := spooledentry(bytes.NewReader([]byte("not an archive")), "")
+		_, err := spooledentry(t.Context(), bytes.NewReader([]byte("not an archive")), "")
 		require.Error(t, err)
 	})
 }

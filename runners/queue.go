@@ -636,7 +636,7 @@ func (t stateprepare) Update(ctx context.Context) state {
 
 	// debugx.Println("workspace", spew.Sdump(ws))
 
-	if err = tarx.Unpack(ws.RuntimeDir, archive); err != nil {
+	if err = tarx.Unpack(ctx, ws.RuntimeDir, archive); err != nil {
 		return t.failed(errorsx.Wrap(err, "unable to unpack archive"))
 	}
 

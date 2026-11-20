@@ -1,6 +1,7 @@
 package compute
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log"
@@ -38,7 +39,7 @@ func (t cacheInsert) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, ident *c
 		errorsx.Log(errorsx.Wrap(os.RemoveAll(tmpdir), "unable to remove temp directory"))
 	}()
 
-	if payload, size, err = cachePayload(tmpdir, t.Paths...); err != nil {
+	if payload, size, err = cachePayload(gctx.Context, tmpdir, t.Paths...); err != nil {
 		return err
 	}
 
@@ -56,7 +57,7 @@ func (t cacheInsert) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, ident *c
 }
 
 // cachePayload packs paths into the payload archive within dir, returning its path and the uncompressed size of its contents.
-func cachePayload(dir string, paths ...string) (path string, size bytesx.Unit, err error) {
+func cachePayload(ctx context.Context, dir string, paths ...string) (path string, size bytesx.Unit, err error) {
 	var (
 		payload *os.File
 		n       int64
@@ -76,7 +77,7 @@ func cachePayload(dir string, paths ...string) (path string, size bytesx.Unit, e
 		return "", 0, errorsx.Wrap(err, "unable to rewind the payload archive")
 	}
 
-	if n, err = tarx.Size(payload); err != nil {
+	if n, err = tarx.Size(ctx, payload); err != nil {
 		return "", 0, errorsx.Wrap(err, "unable to compute the payload size")
 	}
 

@@ -16,6 +16,8 @@ import (
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/execx"
 	"github.com/egdaemon/eg/internal/fsx"
+	"github.com/egdaemon/eg/internal/iterx"
+	"github.com/egdaemon/eg/internal/tarx"
 	"github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
@@ -107,7 +109,7 @@ func BuildEgiso(ctx context.Context, cache, dir, path string, options ...string)
 	}
 	defer func() { err = errorsx.Compact(err, root.Close(), os.Remove(root.Name())) }()
 
-	if err = withenviron(layer, environ, root); err != nil {
+	if err = withenviron(ctx, layer, environ, root); err != nil {
 		return "", err
 	}
 
@@ -188,11 +190,11 @@ func decode(p string, v any) (err error) {
 
 // withenviron writes the gzipped layer to dst as a tar archive whose etc/environment holds environ,
 // since an archive holds only the filesystem and the environment is the image's configuration.
-func withenviron(layer string, environ []string, dst io.Writer) (err error) {
+func withenviron(ctx context.Context, layer string, environ []string, dst io.Writer) (err error) {
 	var (
-		src *os.File
-		gz  *gzip.Reader
-		hdr *tar.Header
+		src     *os.File
+		gz      *gzip.Reader
+		entries iterx.Seq[*tar.Header]
 	)
 
 	if src, err = os.Open(layer); err != nil {
@@ -208,30 +210,23 @@ func withenviron(layer string, environ []string, dst io.Writer) (err error) {
 	r := tar.NewReader(gz)
 	w := tar.NewWriter(dst)
 
-	for hdr, err = r.Next(); err == nil; hdr, err = r.Next() {
+	entries = tarx.Entries(r)
+	for hdr := range entries.Each(ctx) {
 		if path.Clean(strings.TrimPrefix(hdr.Name, "./")) == "etc/environment" {
 			continue
 		}
 
-		if err = w.WriteHeader(hdr); err != nil {
-			return errorsx.Wrap(err, "unable to copy the image's layer")
-		}
-
-		if _, err = io.Copy(w, r); err != nil {
+		if err = tarx.WriteFileToArchive(w, hdr, r); err != nil {
 			return errorsx.Wrap(err, "unable to copy the image's layer")
 		}
 	}
 
-	if err != io.EOF {
+	if err = entries.Err(); err != nil {
 		return errorsx.Wrap(err, "unable to read the image's layer")
 	}
 
-	environment := []byte(strings.Join(append(environ, ""), "\n"))
-	if err = w.WriteHeader(&tar.Header{Typeflag: tar.TypeReg, Name: "etc/environment", Mode: 0644, Size: int64(len(environment))}); err != nil {
-		return errorsx.Wrap(err, "unable to write the image's environment")
-	}
-
-	if _, err = w.Write(environment); err != nil {
+	environment := strings.Join(append(environ, ""), "\n")
+	if err = tarx.WriteFileToArchive(w, &tar.Header{Typeflag: tar.TypeReg, Name: "etc/environment", Mode: 0644, Size: int64(len(environment))}, strings.NewReader(environment)); err != nil {
 		return errorsx.Wrap(err, "unable to write the image's environment")
 	}
 

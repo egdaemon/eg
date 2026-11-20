@@ -22,9 +22,11 @@ import (
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/httpx"
 	"github.com/egdaemon/eg/internal/iox"
+	"github.com/egdaemon/eg/internal/iterx"
 	"github.com/egdaemon/eg/internal/langx"
 	"github.com/egdaemon/eg/internal/podmanx"
 	"github.com/egdaemon/eg/internal/stringsx"
+	"github.com/egdaemon/eg/internal/tarx"
 	"github.com/egdaemon/eg/internal/uuidx"
 	"github.com/egdaemon/eg/jsonx"
 	"github.com/egdaemon/eg/runners"
@@ -97,7 +99,7 @@ func (t spooled) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath, stdi
 		return errorsx.Wrap(err, "unable to rewind archive")
 	}
 
-	entry, err := spooledentry(archived, t.Entry)
+	entry, err := spooledentry(gctx.Context, archived, t.Entry)
 	if err != nil {
 		return err
 	}
@@ -192,10 +194,11 @@ func (t spooled) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath, stdi
 // along with the archive, there is nothing in the archive to say which it is, so prefix selects: a path prefix of whole
 // path segments, tests/stress matches tests/stress/main.wasm but not tests/stress2/main.wasm. the modules generated
 // for a module, within its .wasm.d directory, are never the entry. without a prefix the archive must hold one module.
-func spooledentry(r io.Reader, prefix string) (_ string, err error) {
+func spooledentry(ctx context.Context, r io.Reader, prefix string) (_ string, err error) {
 	var (
-		found []string
-		gzr   *gzip.Reader
+		found   []string
+		gzr     *gzip.Reader
+		entries iterx.Seq[*tar.Header]
 	)
 
 	prefix = strings.TrimSuffix(filepath.Clean(prefix), "/")
@@ -208,15 +211,8 @@ func spooledentry(r io.Reader, prefix string) (_ string, err error) {
 	}
 	defer gzr.Close()
 
-	tr := tar.NewReader(gzr)
-	for {
-		header, err := tr.Next()
-		if err == io.EOF {
-			break
-		} else if err != nil {
-			return "", errorsx.Wrap(err, "unable to read archive")
-		}
-
+	entries = tarx.Entries(tar.NewReader(gzr))
+	for header := range entries.Each(ctx) {
 		name := filepath.Clean(header.Name)
 		if header.Typeflag != tar.TypeReg || !strings.HasSuffix(name, ".wasm") || strings.Contains(name, ".wasm.d/") {
 			continue
@@ -227,6 +223,10 @@ func spooledentry(r io.Reader, prefix string) (_ string, err error) {
 		}
 
 		found = append(found, name)
+	}
+
+	if err = entries.Err(); err != nil {
+		return "", errorsx.Wrap(err, "unable to read archive")
 	}
 
 	if len(found) != 1 {

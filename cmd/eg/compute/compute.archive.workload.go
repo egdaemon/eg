@@ -132,7 +132,7 @@ func (t archive) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig) (err error) 
 	}
 
 	log.Println("archive", archiveio.Name())
-	if err = tarx.Inspect(archiveio); err != nil {
+	if err = tarx.Inspect(gctx.Context, archiveio); err != nil {
 		log.Println(errorsx.Wrap(err, "unable to inspect archive"))
 	}
 

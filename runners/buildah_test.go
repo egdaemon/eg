@@ -148,7 +148,7 @@ func TestWithenviron(t *testing.T) {
 
 		layer := filepath.Join(t.TempDir(), "layer")
 		require.NoError(t, os.WriteFile(layer, gzlayer(t, entries...), 0600))
-		require.NoError(t, withenviron(layer, environ, &buf))
+		require.NoError(t, withenviron(t.Context(), layer, environ, &buf))
 		return buf.Bytes()
 	}
 
@@ -184,7 +184,7 @@ func TestWithenviron(t *testing.T) {
 
 		layer := filepath.Join(t.TempDir(), "layer")
 		require.NoError(t, os.WriteFile(layer, []byte("not a layer"), 0600))
-		require.ErrorContains(t, withenviron(layer, nil, &buf), "unable to decompress the image's layer")
+		require.ErrorContains(t, withenviron(t.Context(), layer, nil, &buf), "unable to decompress the image's layer")
 	})
 
 	t.Run("a missing layer fails", func(t *testing.T) {
@@ -192,7 +192,7 @@ func TestWithenviron(t *testing.T) {
 			buf bytes.Buffer
 		)
 
-		require.ErrorContains(t, withenviron(filepath.Join(t.TempDir(), "missing"), nil, &buf), "unable to open the image's layer")
+		require.ErrorContains(t, withenviron(t.Context(), filepath.Join(t.TempDir(), "missing"), nil, &buf), "unable to open the image's layer")
 	})
 }
 
@@ -201,7 +201,7 @@ func TestBuildEgiso(t *testing.T) {
 		t.Skip("buildah is not installed")
 	}
 
-	// context writes a Containerfile that needs no network into a build context.
+	// buildcontext writes a Containerfile that needs no network into a build context.
 	buildcontext := func(t *testing.T) (dir string) {
 		dir = t.TempDir()
 		require.NoError(t, os.WriteFile(filepath.Join(dir, "hello.txt"), []byte("hello world\n"), 0644))

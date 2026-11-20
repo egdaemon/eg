@@ -126,19 +126,45 @@ func TestMachineserverModule(t *testing.T) {
 		return NewMachines(http.DefaultClient, workspaces.Context{WorkingDir: t.TempDir(), CacheDir: t.TempDir()}, io.Discard)
 	}
 
-	t.Run("without an egiso or a Containerfile outside a machine fails", func(t *testing.T) {
+	t.Run("without an egiso or an image outside a machine fails", func(t *testing.T) {
 		t.Setenv(eg.EnvComputeEgiso, "")
 
 		_, err := server(t).Module(t.Context(), &machines.ModuleRequest{Module: "module.wasm"})
 		require.ErrorContains(t, err, "only a module running in a machine can boot one from its egiso")
 	})
 
-	t.Run("a Containerfile is built before the machine boots", func(t *testing.T) {
+	t.Run("an image is converted to an egiso before the machine boots", func(t *testing.T) {
 		t.Setenv(eg.EnvComputeEgiso, "")
+
+		_, err := server(t).Module(t.Context(), &machines.ModuleRequest{Image: "egvm.missing", Module: "module.wasm"})
+		require.ErrorContains(t, err, "unable to identify the image: egvm.missing")
+	})
+}
+
+func TestMachineserverBuild(t *testing.T) {
+	server := func(t *testing.T, working string) machines.MachinesServer {
+		return NewMachines(http.DefaultClient, workspaces.Context{WorkingDir: working, CacheDir: t.TempDir()}, io.Discard)
+	}
+
+	t.Run("a Containerfile that fails to build fails", func(t *testing.T) {
 		dir := t.TempDir()
 		require.NoError(t, os.WriteFile(filepath.Join(dir, "Containerfile"), []byte("FROM scratch\nCOPY missing.txt /missing.txt\n"), 0644))
 
-		_, err := server(t).Module(t.Context(), &machines.ModuleRequest{Containerfile: filepath.Join(dir, "Containerfile"), Module: "module.wasm"})
+		_, err := server(t, dir).Build(t.Context(), &machines.BuildRequest{Name: "egvm.fails", Definition: "Containerfile"})
 		require.ErrorContains(t, err, "unable to build the image")
+	})
+
+	t.Run("builds the image name from a definition relative to the working directory", func(t *testing.T) {
+		if _, err := exec.LookPath("buildah"); err != nil {
+			t.Skip("buildah is not installed")
+		}
+		dir := t.TempDir()
+		require.NoError(t, os.WriteFile(filepath.Join(dir, "hello.txt"), []byte("hello world\n"), 0644))
+		require.NoError(t, os.WriteFile(filepath.Join(dir, "Containerfile"), []byte("FROM scratch\nCOPY hello.txt /hello.txt\n"), 0644))
+
+		_, err := server(t, dir).Build(t.Context(), &machines.BuildRequest{Name: "egvm.machineserver.build", Definition: "Containerfile"})
+		require.NoError(t, err)
+		t.Cleanup(func() { exec.Command("buildah", "rmi", "egvm.machineserver.build").Run() })
+		require.NoError(t, exec.Command("buildah", "inspect", "--type", "image", "egvm.machineserver.build").Run())
 	})
 }

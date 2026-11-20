@@ -2,14 +2,24 @@ syntax = "proto3";
 
 package eg.interp.machines;
 
+message BuildRequest {
+  string name = 1;
+  string directory = 2;
+  string definition = 3;
+  repeated string options = 4;
+}
+message BuildResponse {}
+
 message ModuleRequest {
   string egiso = 1;
   string module = 2;
   repeated string options = 3;
-  string containerfile = 4;
+  reserved 4;
+  string image = 5;
 }
 message ModuleResponse {}
 
 service Machines {
+  rpc Build(BuildRequest) returns (BuildResponse) {}
   rpc Module(ModuleRequest) returns (ModuleResponse) {}
 }

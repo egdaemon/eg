@@ -23,24 +23,24 @@ import (
 )
 
 // BuildEgiso builds the Containerfile at path, in the context dir, with buildah, and returns the uri of
-// an egiso of the image squashed to a single layer, with the image's environment as its
-// /etc/environment. It keeps the egiso of the latest image in cache, in a directory named for the
-// image's id, so it squashes and converts one per image.
+// an egiso of the image, as ImageEgiso does.
 func BuildEgiso(ctx context.Context, cache, dir, path string, options ...string) (_ string, err error) {
 	var (
-		iid       *os.File
-		id        []byte
-		container string
-		squash    string
-		layout    string
-		layer     string
-		environ   []string
-		root      *os.File
-		st        os.FileInfo
-		out       *os.File
-		toc       digest.Digest
-		cached    []byte
-		cmd       *exec.Cmd
+		image string
+	)
+
+	if image, err = BuildImage(ctx, dir, path, options...); err != nil {
+		return "", err
+	}
+	return ImageEgiso(ctx, cache, image)
+}
+
+// BuildImage builds the Containerfile at path, in the context dir, with buildah, and returns the image's id.
+func BuildImage(ctx context.Context, dir, path string, options ...string) (_ string, err error) {
+	var (
+		iid *os.File
+		id  []byte
+		cmd *exec.Cmd
 	)
 
 	if iid, err = os.CreateTemp("", "eg.buildah.iid.*"); err != nil {
@@ -61,8 +61,33 @@ func BuildEgiso(ctx context.Context, cache, dir, path string, options ...string)
 	if id, err = os.ReadFile(iid.Name()); err != nil {
 		return "", errorsx.Wrap(err, "unable to identify the image")
 	}
-	image := strings.TrimSpace(string(id))
-	imagedir := filepath.Join(cache, digest.Digest(image).Encoded())
+	return digest.Digest(strings.TrimSpace(string(id))).Encoded(), nil
+}
+
+// ImageEgiso returns the uri of an egiso of image, the name or id of an image in buildah's storage, squashed to
+// a single layer, with the image's environment as its /etc/environment. It keeps the egiso of the latest image in
+// cache, in a directory named for the image's id, so it squashes and converts one per image.
+func ImageEgiso(ctx context.Context, cache, image string) (_ string, err error) {
+	var (
+		id        string
+		container string
+		squash    string
+		layout    string
+		layer     string
+		environ   []string
+		root      *os.File
+		st        os.FileInfo
+		out       *os.File
+		toc       digest.Digest
+		cached    []byte
+		cmd       *exec.Cmd
+	)
+
+	if id, err = execx.String(ctx, "buildah", "inspect", "--type", "image", "--format", "{{.FromImageID}}", image); err != nil {
+		return "", errorsx.Wrapf(err, "unable to identify the image: %s", image)
+	}
+	id = strings.TrimSpace(id)
+	imagedir := filepath.Join(cache, id)
 	location := filepath.Join(imagedir, "root.egiso")
 
 	// the table of contents is written once its egiso is complete.
@@ -81,7 +106,7 @@ func BuildEgiso(ctx context.Context, cache, dir, path string, options ...string)
 
 	// squashing includes the layers of the base image, so the egiso is one layer with no whiteouts. a
 	// squash of an unchanged image differs from build to build, so only an image the cache misses is squashed.
-	if container, err = execx.String(ctx, "buildah", "from", "--pull=never", image); err != nil {
+	if container, err = execx.String(ctx, "buildah", "from", "--pull=never", id); err != nil {
 		return "", errorsx.Wrap(err, "unable to create the image's container")
 	}
 	container = strings.TrimSpace(container)

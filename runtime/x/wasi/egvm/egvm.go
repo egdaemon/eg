@@ -3,7 +3,11 @@
 //
 //	eg.Module(ctx, egvm.New(), ops...)
 //	eg.Module(ctx, egvm.New(egvm.OptionEgiso("https://example.com/root.egiso#sha256:…")), ops...)
-//	eg.Module(ctx, egvm.New(egvm.OptionContainerfile(".eg/Containerfile")), ops...)
+//
+// A machine of a Containerfile is built first, as a container is:
+//
+//	vm := egvm.New(egvm.OptionContainerfile(".eg/Containerfile"))
+//	eg.Perform(ctx, eg.Build(vm), eg.Module(ctx, vm, ops...))
 //
 // The root module boots it, as it runs containers. Only a module running in a machine, as eg compute
 // local --egiso runs one, has an egiso to boot one from by default.
@@ -11,8 +15,11 @@ package egvm
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/egdaemon/eg/internal/langx"
+	"github.com/egdaemon/eg/internal/md5x"
+	"github.com/egdaemon/eg/internal/stringsx"
 	"github.com/egdaemon/eg/runtime/wasi/egunsafe/ffiegmachine"
 )
 
@@ -40,24 +47,35 @@ func OptionEgiso(uri string) Option {
 	}
 }
 
-// OptionContainerfile boots the machine from an egiso of the Containerfile at path, relative to the
-// working directory as eg.C8S.BuildFromFile's is, built in its directory with buildah by the machine
-// running the module. That machine keeps the egiso of each Containerfile's latest image, so only a
-// changed image is converted again.
+// OptionContainerfile boots the machine from an egiso of the image of the Containerfile at path, relative to
+// the working directory as eg.C8S.BuildFromFile's is, which CompileWith builds in its directory with buildah.
+// The machine running the module keeps the egiso of the image's latest build, so only a changed image is
+// converted again.
 func OptionContainerfile(path string) Option {
 	return func(t *VM) {
 		t.containerfile = path
 	}
 }
 
-// CompileWith prepares nothing: the host builds, opens and verifies the egiso when a module runs in it.
+// image is the name of the image of the machine's Containerfile, none without one.
+func (t VM) image() string {
+	if stringsx.Blank(t.containerfile) {
+		return ""
+	}
+	return fmt.Sprintf("egvm.%s", md5x.String(t.containerfile))
+}
+
+// CompileWith builds the image of the machine's Containerfile; an egiso needs nothing built.
 func (t VM) CompileWith(ctx context.Context) error {
-	return nil
+	if stringsx.Blank(t.containerfile) {
+		return nil
+	}
+	return ffiegmachine.Build(ctx, t.image(), t.containerfile, nil)
 }
 
 // RunWith runs the module at mpath in the machine.
 func (t VM) RunWith(ctx context.Context, mpath string) (err error) {
-	return ffiegmachine.Module(ctx, t.uri, t.containerfile, mpath)
+	return ffiegmachine.Module(ctx, t.uri, t.image(), mpath)
 }
 
 // internal use.

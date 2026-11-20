@@ -12,9 +12,9 @@ import (
 // each is of the form source:destination[:mode[:user[:group]]], where mode, user, and group describe the mount
 // point and not its contents.
 type Mounts struct {
-	Mount          []string `name:"mount" help:"mount a host directory into the workload, source:destination[:mode[:user[:group]]]" hidden:"true"`
-	MountReadOnly  []string `name:"mount-read-only" help:"mount a host directory into the workload read only, source:destination[:mode[:user[:group]]]" hidden:"true"`
-	MountReadWrite []string `name:"mount-read-write" help:"mount a host directory into the workload read write, source:destination[:mode[:user[:group]]]" hidden:"true"`
+	Mount          []string `name:"mount" help:"mount a host directory into the workload, source:destination[:mode[:user[:group]]]"`
+	MountReadOnly  []string `name:"mount-read-only" help:"mount a host directory into the workload read only, source:destination[:mode[:user[:group]]]"`
+	MountReadWrite []string `name:"mount-read-write" help:"mount a host directory into the workload read write, source:destination[:mode[:user[:group]]]"`
 }
 
 // Validate ensures every mount specification parses.

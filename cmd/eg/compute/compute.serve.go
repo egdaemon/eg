@@ -23,6 +23,7 @@ import (
 	"github.com/egdaemon/eg/internal/podmanx"
 	"github.com/egdaemon/eg/internal/stringsx"
 	"github.com/egdaemon/eg/internal/termx"
+	"github.com/egdaemon/eg/internal/ttyx"
 	"github.com/egdaemon/eg/internal/userx"
 	"github.com/egdaemon/eg/internal/uuidx"
 	"github.com/egdaemon/eg/internal/wasix"
@@ -45,7 +46,7 @@ type serve struct {
 	CheckpointInterval time.Duration `name:"checkpoint-interval" help:"how often the changes made inside the served workload are saved to refs/eg/checkpoint of its clone, 0 disables checkpoints" default:"5m"`
 	Privileged         bool          `name:"privileged" help:"run the initial container in privileged mode"`
 	Dirty              bool          `name:"dirty" help:"include user directories and environment variables" hidden:"true"`
-	TTY                bool          `name:"tty" help:"give the workload a terminal so interactive tools, e.g.) flutter's r and R keys, receive key presses. eg must be run from a terminal"`
+	TTY                bool          `name:"tty" help:"give the workload a terminal so interactive tools, e.g.) flutter's r and R keys, receive key presses. from a terminal that terminal is used, otherwise eg hosts one that can be attached to with 'eg compute sessions pty'"`
 	Wayland            bool          `name:"wayland" help:"bind-mount the host wayland display socket into the container"`
 	GCPAuto            bool          `name:"gcp-auto" help:"use the default well known path for gcp's application default credentials"`
 	GCP                string        `name:"gcp" help:"path to gcp's application default credentials"`
@@ -112,8 +113,14 @@ func (t serve) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath, sessio
 		rt        runners.T
 	)
 
+	// run from a terminal the workload is given that terminal. otherwise, i.e. run headless by an editor, eg owns a pseudo terminal
+	// that outlives whoever is looking at it: clients attach to it with `eg compute sessions pty`, see ttyx.Host.
+	var pty *ttyx.Host
 	if t.TTY && !termx.IsTTY(os.Stdin, os.Stdout) {
-		return errorsx.New("--tty requires stdin and stdout to be a terminal")
+		if pty, err = ttyx.NewHost(gctx.Context, ttyx.SocketPath(uid.String()), os.Stdout); err != nil {
+			return errorsx.Wrap(err, "--tty requires stdin and stdout to be a terminal, or a pseudo terminal eg can host")
+		}
+		defer pty.Close()
 	}
 
 	ctx, err := podmanx.WithClient(gctx.Context)
@@ -124,9 +131,9 @@ func (t serve) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath, sessio
 	// the cli's database is optional, serve does not otherwise depend on it. registering does nothing without it.
 	defer func() { errorsx.Log(clidb.Close()) }()
 
-	// registered before anything is built or started, the container's name exists already, which the ssh port is waited for under.
-	// a run that fails before its module starts is stopped again, and is in the history.
-	registered, done := session.New(clidb).Branch(session.Branch, defaultbranch(t.Name, uid)).SSH(t.SSH, t.SSHKeyPath).Agent(true).Patch(t.AutoPatch).Register(ctx, uid, t.Name, t.Dir)
+	// registered before anything is built or started, the terminal of the run exists already and so does the container's name, which the
+	// ssh port is waited for under. a run that fails before its module starts is stopped again, and is in the history.
+	registered, done := session.New(clidb).Branch(session.Branch, defaultbranch(t.Name, uid)).SSH(t.SSH, t.SSHKeyPath).Agent(true).Patch(t.AutoPatch).PTY(pty.Path()).Register(ctx, uid, t.Name, t.Dir)
 	defer func() { done(err) }()
 
 	if ws, err = workspaces.NewLocal(
@@ -196,7 +203,7 @@ func (t serve) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath, sessio
 	debugx.Println("runtime resources", spew.Sdump(t.RuntimeResources))
 
 	canonicaluri := errorsx.Zero(gitx.CanonicalURI(repo, t.GitRemote))
-	if rt, err = t.podman(ctx, ws, uid, canonicaluri, envb); err != nil {
+	if rt, err = t.podman(ctx, ws, uid, canonicaluri, envb, pty); err != nil {
 		return err
 	}
 	defer func() { err = errorsx.Compact(err, rt.Close()) }()
@@ -231,8 +238,9 @@ func (t serve) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath, sessio
 	return err
 }
 
-// podman prepares the container the served module runs in, built from the workload's Containerfile.
-func (t serve) podman(ctx context.Context, ws workspaces.Context, uid uuidx.UUID, canonicaluri string, envb *envx.Builder) (_ runners.T, err error) {
+// podman prepares the container the served module runs in, built from the workload's Containerfile. pty is the terminal eg hosts for
+// the module, nil when it is given the terminal eg was run from, or none.
+func (t serve) podman(ctx context.Context, ws workspaces.Context, uid uuidx.UUID, canonicaluri string, envb *envx.Builder, pty *ttyx.Host) (_ runners.T, err error) {
 	var (
 		homedir     = userx.HomeDirectoryOrDefault("/root")
 		environpath = filepath.Join(ws.RuntimeDir, eg.EnvironFile)
@@ -313,5 +321,5 @@ func (t serve) podman(ctx context.Context, ws workspaces.Context, uid uuidx.UUID
 		runners.AgentOptionMemory(uint64(t.RuntimeResources.Memory)),
 	)
 
-	return container{ctx: ctx, ws: ws, uid: uid, agent: ragent, image: imagename, tty: t.TTY}, nil
+	return container{ctx: ctx, ws: ws, uid: uid, agent: ragent, image: imagename, tty: t.TTY, child: pty.Child()}, nil
 }

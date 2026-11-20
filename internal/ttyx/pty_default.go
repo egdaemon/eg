@@ -1,4 +1,4 @@
-//go:build !linux
+//go:build !linux && !darwin
 
 package ttyx
 
@@ -12,5 +12,9 @@ func openpty() (parent, child *os.File, err error) {
 }
 
 func resize(ctl, parent *os.File) error {
+	return errors.ErrUnsupported
+}
+
+func setsize(parent *os.File, rows, cols uint16) error {
 	return errors.ErrUnsupported
 }

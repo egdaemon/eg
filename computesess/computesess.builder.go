@@ -19,6 +19,7 @@ type Builder struct {
 	sshkey    string
 	capagent  bool
 	cappatch  bool
+	ptysocket string
 	branches  []string
 	container func(uuidx.UUID) string
 }
@@ -52,6 +53,13 @@ func (t Builder) Branch(names ...string) Builder {
 	return t
 }
 
+// PTY records the unix socket the run's terminal can be attached to, see ttyx.Host. blank, the default, means the run has
+// no terminal to attach to.
+func (t Builder) PTY(socket string) Builder {
+	t.ptysocket = socket
+	return t
+}
+
 // Patch marks the run's changes as being patched back to the repository.
 func (t Builder) Patch(b bool) Builder {
 	t.cappatch = b
@@ -60,8 +68,8 @@ func (t Builder) Patch(b bool) Builder {
 
 // Register the run as running so tools, i.e. the editor extension, can discover it. the session returned is
 // the one registered, its branch is the one requested or else the one the run saved when it last ran, blank when
-// there is none. when ssh is enabled the registration waits, in the background, for the container (named
-// eg-<id>) to publish its port, so this should be called before the container is started. the returned function
+// there is none. when ssh is enabled the port is filled in, in the background, once the container (named
+// eg-<id>) publishes it: until then the session is running with port 0, so this should be called before the container is started. the returned function
 // ends the registration: it stops waiting, marks the run as stopped and waits for that to complete, cause is
 // the reason the run ended and may be nil. it must be called exactly once.
 func (t Builder) Register(ctx context.Context, id uuidx.UUID, module string, dir string) (_ Session, done context.CancelCauseFunc) {
@@ -76,6 +84,7 @@ func (t Builder) Register(ctx context.Context, id uuidx.UUID, module string, dir
 		CapSSH:       sshon,
 		CapAgent:     t.capagent,
 		CapPatch:     t.cappatch,
+		PtySocket:    t.ptysocket,
 	}
 
 	if t.db == nil {
@@ -100,8 +109,11 @@ func (t Builder) Register(ctx context.Context, id uuidx.UUID, module string, dir
 		return true
 	}
 
+	// the run is visible at once, with the port unknown (0), so what does not depend on it, i.e. the terminal, can be found while the image
+	// is built. the port is filled in when podman publishes it.
+	register()
+
 	if !sshon {
-		register()
 		close(finished)
 	} else {
 		go func() {

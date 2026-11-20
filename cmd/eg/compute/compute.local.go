@@ -210,6 +210,7 @@ type container struct {
 	agent *runners.Agent
 	image string
 	tty   bool     // hands the module the host's stdin and stdout themselves, so a terminal is attached as one.
+	child *os.File // a terminal hosted by eg, see ttyx.Host, handed to the module in place of the host's stdin and stdout.
 	args  []string // the module's os.Args[1:].
 }
 
@@ -233,6 +234,9 @@ func (t container) Do(_ context.Context, m transpile.Compiled) error {
 			// the terminal attach needs the files themselves, a writer in between is not a terminal.
 			cmd.Stdout = os.Stdout
 			cmd.Stderr = os.Stderr
+		}
+		if t.child != nil {
+			cmd.Stdin, cmd.Stdout, cmd.Stderr = t.child, t.child, t.child
 		}
 		return cmd
 	}

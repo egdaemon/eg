@@ -23,6 +23,7 @@ import (
 	"github.com/egdaemon/eg/internal/podmanx"
 	"github.com/egdaemon/eg/internal/stringsx"
 	"github.com/egdaemon/eg/internal/termx"
+	"github.com/egdaemon/eg/internal/ttyx"
 	"github.com/egdaemon/eg/internal/userx"
 	"github.com/egdaemon/eg/internal/uuidx"
 	"github.com/egdaemon/eg/internal/wasix"
@@ -36,28 +37,30 @@ import (
 type serve struct {
 	cmdopts.RuntimeResources
 	cmdopts.Mounts
-	Dir              string   `name:"directory" help:"root directory of the repository" default:"${vars_eg_root_directory}"`
-	ModuleDir        string   `name:"moduledir" help:"must be a subdirectory in the provided directory" default:"${vars_workload_directory}"`
-	Debug            bool     `name:"debug" help:"keep workspace around to debug issues, requires manual cleanup"`
-	InvalidateCache  bool     `name:"invalidate-cache" help:"removes workload build cache"`
-	AutoPatch        bool     `name:"auto-patch" help:"commit the changes made inside the served workload to a new eg/ branch of the current repository once it stops, when disabled the changes are printed as a patch instead (dry run)" default:"true" negatable:""`
-	Privileged       bool     `name:"privileged" help:"run the initial container in privileged mode"`
-	Dirty            bool     `name:"dirty" help:"include user directories and environment variables" hidden:"true"`
-	TTY              bool     `name:"tty" help:"give the workload a terminal so interactive tools, e.g.) flutter's r and R keys, receive key presses. eg must be run from a terminal"`
-	Wayland          bool     `name:"wayland" help:"bind-mount the host wayland display socket into the container"`
-	GCPAuto          bool     `name:"gcp-auto" help:"use the default well known path for gcp's application default credentials"`
-	GCP              string   `name:"gcp" help:"path to gcp's application default credentials"`
-	EnvironmentPaths []string `name:"envpath" help:"environment files to pass to the module" default:""`
-	Environment      []string `name:"env" short:"e" help:"define environment variables and their values to be included"`
-	Secrets          []string `name:"secret" help:"List of secret URIs to use. Examples: chachasm://passphrase@/path/to/file, gcpsm://project-id/secret-name/version, awssm://secret-name?region=us-east-1"`
-	GitRemote        string   `name:"git-remote" help:"name of the git remote to use" default:"${vars_git_default_remote_name}"`
-	GitReference     string   `name:"git-ref" help:"name of the branch or commit to checkout" default:"${vars_git_head_reference}"`
-	Ports            []int    `name:"ports" help:"list of ports to publish to the host system"`
-	ContainerArgs    []string `name:"cargs" help:"list of command line arguments to pass to the root container" hidden:"true"`
-	SSHKeyPath       string   `name:"sshkeypath" help:"path to ssh key to use" default:"${vars_ssh_key_path}"`
-	SSH              int      `name:"ssh" type:"sshport" default:"-1" help:"enable ssh access into the container as the egd user, using eg's own managed ssh identity; bare --ssh publishes on a free host port, --ssh=<port> on a fixed one"`
-	Containerfile    string   `name:"containerfile" help:"containerfile to build the workload's container from, relative to the repository directory. by default the nearest Containerfile, from the workload's directory up to the module directory"`
-	Name             string   `arg:"" name:"module" help:"name of the module to run, i.e. the folder name within moduledir" default:"" predictor:"eg.workload"`
+	Dir                string        `name:"directory" help:"root directory of the repository" default:"${vars_eg_root_directory}"`
+	ModuleDir          string        `name:"moduledir" help:"must be a subdirectory in the provided directory" default:"${vars_workload_directory}"`
+	Debug              bool          `name:"debug" help:"keep workspace around to debug issues, requires manual cleanup"`
+	InvalidateCache    bool          `name:"invalidate-cache" help:"removes workload build cache"`
+	AutoPatch          bool          `name:"auto-patch" help:"commit the changes made inside the served workload to a new eg/ branch of the current repository once it stops, when disabled the changes are printed as a patch instead (dry run)" default:"true" negatable:""`
+	AutoBranch         bool          `name:"auto-branch" help:"create the session's branch from the ref its changes were committed to (refs/eg/s.<session>) once it stops, when disabled only the ref is written and whatever manages the branch takes it from there" default:"true" negatable:""`
+	CheckpointInterval time.Duration `name:"checkpoint-interval" help:"how often the changes made inside the served workload are saved to refs/eg/checkpoint of its clone, 0 disables checkpoints" default:"5m"`
+	Privileged         bool          `name:"privileged" help:"run the initial container in privileged mode"`
+	Dirty              bool          `name:"dirty" help:"include user directories and environment variables" hidden:"true"`
+	TTY                bool          `name:"tty" help:"give the workload a terminal so interactive tools, e.g.) flutter's r and R keys, receive key presses. from a terminal that terminal is used, otherwise eg hosts one that can be attached to with 'eg compute sessions pty'"`
+	Wayland            bool          `name:"wayland" help:"bind-mount the host wayland display socket into the container"`
+	GCPAuto            bool          `name:"gcp-auto" help:"use the default well known path for gcp's application default credentials"`
+	GCP                string        `name:"gcp" help:"path to gcp's application default credentials"`
+	EnvironmentPaths   []string      `name:"envpath" help:"environment files to pass to the module" default:""`
+	Environment        []string      `name:"env" short:"e" help:"define environment variables and their values to be included"`
+	Secrets            []string      `name:"secret" help:"List of secret URIs to use. Examples: chachasm://passphrase@/path/to/file, gcpsm://project-id/secret-name/version, awssm://secret-name?region=us-east-1"`
+	GitRemote          string        `name:"git-remote" help:"name of the git remote to use" default:"${vars_git_default_remote_name}"`
+	GitReference       string        `name:"git-ref" help:"name of the branch or commit to checkout" default:"${vars_git_head_reference}"`
+	Ports              []int         `name:"ports" help:"list of ports to publish to the host system"`
+	ContainerArgs      []string      `name:"cargs" help:"list of command line arguments to pass to the root container" hidden:"true"`
+	SSHKeyPath         string        `name:"sshkeypath" help:"path to ssh key to use" default:"${vars_ssh_key_path}"`
+	SSH                int           `name:"ssh" type:"sshport" default:"-1" help:"enable ssh access into the container as the egd user, using eg's own managed ssh identity; bare --ssh publishes on a free host port, --ssh=<port> on a fixed one"`
+	Containerfile      string        `name:"containerfile" help:"containerfile to build the workload's container from, relative to the repository directory. by default the nearest Containerfile, from the workload's directory up to the module directory"`
+	Name               string        `arg:"" name:"module" help:"name of the module to run, i.e. the folder name within moduledir" default:"" predictor:"eg.workload"`
 }
 
 func (t serve) datadir(rels ...string) string {
@@ -110,14 +113,28 @@ func (t serve) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath, sessio
 		rt        runners.T
 	)
 
+	// run from a terminal the workload is given that terminal. otherwise, i.e. run headless by an editor, eg owns a pseudo terminal
+	// that outlives whoever is looking at it: clients attach to it with `eg compute sessions pty`, see ttyx.Host.
+	var pty *ttyx.Host
 	if t.TTY && !termx.IsTTY(os.Stdin, os.Stdout) {
-		return errorsx.New("--tty requires stdin and stdout to be a terminal")
+		if pty, err = ttyx.NewHost(gctx.Context, ttyx.SocketPath(uid.String()), os.Stdout); err != nil {
+			return errorsx.Wrap(err, "--tty requires stdin and stdout to be a terminal, or a pseudo terminal eg can host")
+		}
+		defer pty.Close()
 	}
 
 	ctx, err := podmanx.WithClient(gctx.Context)
 	if err != nil {
 		return errorsx.Wrap(err, "unable to connect to podman")
 	}
+
+	// the cli's database is optional, serve does not otherwise depend on it. registering does nothing without it.
+	defer func() { errorsx.Log(clidb.Close()) }()
+
+	// registered before anything is built or started, the terminal of the run exists already and so does the container's name, which the
+	// ssh port is waited for under. a run that fails before its module starts is stopped again, and is in the history.
+	registered, done := session.New(clidb).Branch(session.Branch, defaultbranch(t.Name, uid)).SSH(t.SSH, t.SSHKeyPath).Agent(true).Patch(t.AutoPatch).PTY(pty.Path()).Register(ctx, uid, t.Name, t.Dir)
+	defer func() { done(err) }()
 
 	if ws, err = workspaces.NewLocal(
 		gctx.Context,
@@ -186,7 +203,7 @@ func (t serve) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath, sessio
 	debugx.Println("runtime resources", spew.Sdump(t.RuntimeResources))
 
 	canonicaluri := errorsx.Zero(gitx.CanonicalURI(repo, t.GitRemote))
-	if rt, err = t.podman(ctx, ws, uid, canonicaluri, envb); err != nil {
+	if rt, err = t.podman(ctx, ws, uid, canonicaluri, envb, pty); err != nil {
 		return err
 	}
 	defer func() { err = errorsx.Compact(err, rt.Close()) }()
@@ -200,14 +217,10 @@ func (t serve) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath, sessio
 		return errorsx.Wrap(err, "unable to generate environment")
 	}
 
-	// the cli's database is optional, serve does not otherwise depend on it. registering does nothing without it.
-	defer func() { errorsx.Log(clidb.Close()) }()
-
-	// registered before the module starts so the container's ssh port is waited for as soon as it exists.
-	registered, done := session.New(clidb).Branch(session.Branch, defaultbranch(t.Name, uid)).SSH(t.SSH, t.SSHKeyPath).Agent(true).Patch(t.AutoPatch).Register(ctx, uid, t.Name, t.Dir)
-	defer func() { done(err) }()
-
+	// progress is saved while the module runs, the loop is ended before the changes are collected so nothing else is using the clone.
+	stopcheckpoints := gitx.CheckpointLoop(gctx.Context, ws.WorkingDir, t.CheckpointInterval)
 	err = errorsx.Wrap(rt.Do(gctx.Context, module), "module execution failed")
+	stopcheckpoints()
 
 	log.Println("--------------------------------------------------------------------------")
 	log.Println("autopatch", t.AutoPatch)
@@ -216,7 +229,7 @@ func (t serve) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath, sessio
 	log.Println("to", t.Dir)
 	// a served workload ends when its container is stopped, which is not a failure of the work done inside it,
 	// so the changes are collected however the modules ended. the run's context is likely cancelled by then.
-	if perr := gitx.AutoPatch(os.Stdout).From(ws.WorkingDir).To(t.Dir).Branch(registered.Branch).DryRun(!t.AutoPatch).Apply(context.WithoutCancel(gctx.Context)); perr != nil {
+	if perr := gitx.AutoPatch(os.Stdout).From(ws.WorkingDir).To(t.Dir).Session(uid.String()).Branch(registered.Branch).AutoBranch(t.AutoBranch).DryRun(!t.AutoPatch).Apply(context.WithoutCancel(gctx.Context)); perr != nil {
 		log.Println("unable to apply the workload's changes to the worktree", perr)
 		err = errorsx.Compact(err, perr)
 	}
@@ -225,8 +238,9 @@ func (t serve) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath, sessio
 	return err
 }
 
-// podman prepares the container the served module runs in, built from the workload's Containerfile.
-func (t serve) podman(ctx context.Context, ws workspaces.Context, uid uuidx.UUID, canonicaluri string, envb *envx.Builder) (_ runners.T, err error) {
+// podman prepares the container the served module runs in, built from the workload's Containerfile. pty is the terminal eg hosts for
+// the module, nil when it is given the terminal eg was run from, or none.
+func (t serve) podman(ctx context.Context, ws workspaces.Context, uid uuidx.UUID, canonicaluri string, envb *envx.Builder, pty *ttyx.Host) (_ runners.T, err error) {
 	var (
 		homedir     = userx.HomeDirectoryOrDefault("/root")
 		environpath = filepath.Join(ws.RuntimeDir, eg.EnvironFile)
@@ -307,5 +321,5 @@ func (t serve) podman(ctx context.Context, ws workspaces.Context, uid uuidx.UUID
 		runners.AgentOptionMemory(uint64(t.RuntimeResources.Memory)),
 	)
 
-	return container{ctx: ctx, ws: ws, uid: uid, agent: ragent, image: imagename, tty: t.TTY}, nil
+	return container{ctx: ctx, ws: ws, uid: uid, agent: ragent, image: imagename, tty: t.TTY, child: pty.Child()}, nil
 }

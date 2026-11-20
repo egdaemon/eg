@@ -48,6 +48,24 @@ import (
 // CloneBaseRef is the ref within a clone made by LocalClone naming the commit it started at.
 const CloneBaseRef = "refs/eg/base"
 
+// the refs within a clone made by LocalClone, they are what eg works from instead of branch names.
+const (
+	// RefBase is the commit the clone branched from, see CloneBaseRef.
+	RefBase = CloneBaseRef
+	// RefLatest is the latest commit of the user's workspace the clone knows of, a rebase of the clone moves onto it.
+	// it starts as the base.
+	RefLatest = "refs/eg/latest"
+	// RefCurrent is the latest commit of the running workspace, the clone's HEAD as of the last checkpoint.
+	RefCurrent = "refs/eg/current"
+	// RefCheckpoint is an automatic commit of the working tree, made every few minutes to save progress.
+	RefCheckpoint = "refs/eg/checkpoint"
+)
+
+// SessionRef is the ref of the repository holding the work of a session, whatever its branch is called.
+func SessionRef(id string) string {
+	return "refs/eg/s." + id
+}
+
 func DetectRoot() string {
 	return filepath.Dir(fsx.Locate(".git"))
 }
@@ -230,6 +248,11 @@ func LocalClone(ctx context.Context, repo, dir, basetreeish, headtreeish string)
 	// to tell them apart from the history that was cloned, see CloneBase.
 	if _, err = run("-C", dir, "update-ref", CloneBaseRef, head); err != nil {
 		return errorsx.Wrapf(err, "unable to record the clone base: %s", dir)
+	}
+
+	// the user's workspace is at the base until the clone is told otherwise.
+	if _, err = run("-C", dir, "update-ref", RefLatest, head); err != nil {
+		return errorsx.Wrapf(err, "unable to record the latest commit: %s", dir)
 	}
 
 	return nil

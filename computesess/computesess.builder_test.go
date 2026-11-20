@@ -105,15 +105,24 @@ func TestBuilder(t *testing.T) {
 		done(nil)
 	})
 
-	t.Run("ending a run before its ssh port is published registers nothing", func(t *testing.T) {
+	t.Run("a run is visible before its ssh port is published, without one, and stops without ever having one", func(t *testing.T) {
 		db := sqltestx.DuckDB(t)
 		require.NoError(t, migrations.Migrate(t.Context(), db))
 		id := uuidx.NewV7()
 
-		_, done := computesess.New(db).SSH(0, "key").Register(t.Context(), id, "m", "/repo")
+		_, done := computesess.New(db).SSH(0, "key").PTY("/run/user/1000/eg/pty.d/x.sock").Register(t.Context(), id, "m", "/repo")
+
+		found, err := computesess.Lookup(t.Context(), db, id.String())
+		require.NoError(t, err)
+		require.True(t, found.Running())
+		require.Equal(t, int64(0), found.SSHPort)
+		require.Equal(t, "/run/user/1000/eg/pty.d/x.sock", found.PtySocket)
+
 		done(nil)
 
-		_, err := computesess.Lookup(t.Context(), db, id.String())
-		require.Error(t, err)
+		found, err = computesess.Lookup(t.Context(), db, id.String())
+		require.NoError(t, err)
+		require.False(t, found.Running())
+		require.Equal(t, int64(0), found.SSHPort)
 	})
 }

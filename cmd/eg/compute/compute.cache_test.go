@@ -93,7 +93,7 @@ func TestCachePayload(t *testing.T) {
 		require.NoError(t, os.MkdirAll(filepath.Join(dir, "nested"), 0700))
 		require.NoError(t, os.WriteFile(filepath.Join(dir, "nested", "b.txt"), []byte("01234"), 0600))
 
-		path, size, err := cachePayload(t.TempDir(), file, dir)
+		path, size, err := cachePayload(t.Context(), t.TempDir(), file, dir)
 		require.NoError(t, err)
 		require.Equal(t, cachePayloadArchive, filepath.Base(path))
 		require.Equal(t, bytesx.Unit(15), size)
@@ -103,7 +103,7 @@ func TestCachePayload(t *testing.T) {
 		defer archive.Close()
 
 		dst := t.TempDir()
-		require.NoError(t, tarx.Unpack(dst, archive))
+		require.NoError(t, tarx.Unpack(t.Context(), dst, archive))
 
 		a, err := os.ReadFile(filepath.Join(dst, "a.txt"))
 		require.NoError(t, err)
@@ -115,13 +115,13 @@ func TestCachePayload(t *testing.T) {
 	})
 
 	t.Run("empty directory has zero size", func(t *testing.T) {
-		_, size, err := cachePayload(t.TempDir(), t.TempDir())
+		_, size, err := cachePayload(t.Context(), t.TempDir(), t.TempDir())
 		require.NoError(t, err)
 		require.Zero(t, size)
 	})
 
 	t.Run("missing path fails", func(t *testing.T) {
-		_, _, err := cachePayload(t.TempDir(), filepath.Join(t.TempDir(), "missing"))
+		_, _, err := cachePayload(t.Context(), t.TempDir(), filepath.Join(t.TempDir(), "missing"))
 		require.ErrorIs(t, err, fs.ErrNotExist)
 	})
 }

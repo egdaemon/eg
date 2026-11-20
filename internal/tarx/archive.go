@@ -3,6 +3,7 @@ package tarx
 import (
 	"archive/tar"
 	"compress/gzip"
+	"context"
 	"io"
 	"log"
 	"math/rand/v2"
@@ -13,9 +14,41 @@ import (
 	"github.com/egdaemon/eg/internal/cryptox"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/iox"
+	"github.com/egdaemon/eg/internal/iterx"
 	"github.com/egdaemon/eg/internal/langx"
 	"github.com/egdaemon/eg/internal/uuidx"
 )
+
+// Entries yields the headers of the archive tr reads, with tr positioned at the contents of each
+// entry while it is yielded.
+func Entries(tr *tar.Reader) iterx.Seq[*tar.Header] {
+	return iterx.New(func(ctx context.Context, yield func(*tar.Header) bool) (err error) {
+		var (
+			header *tar.Header
+		)
+
+		for header, err = tr.Next(); err == nil; header, err = tr.Next() {
+			if !yield(header) {
+				return nil
+			}
+		}
+
+		return iox.IgnoreEOF(err)
+	})
+}
+
+// WriteFileToArchive write a file to a tar given the contents and a header.
+func WriteFileToArchive(tw *tar.Writer, hdr *tar.Header, reader io.Reader) (err error) {
+	if err = tw.WriteHeader(hdr); err != nil {
+		return errorsx.Wrap(err, "failed to write header for tar archive")
+	}
+
+	if _, err = io.Copy(tw, reader); err != nil {
+		return errorsx.Wrap(err, "failed to copy content")
+	}
+
+	return nil
+}
 
 // Pack the set of paths into the archive. caller is responsible for rewinding the writer.
 func Pack(dst io.Writer, paths ...string) (err error) {
@@ -56,11 +89,12 @@ func Pack(dst io.Writer, paths ...string) (err error) {
 }
 
 // Unpack the archive from the reader into the root directory.
-func Unpack(root string, r io.Reader) (err error) {
+func Unpack(ctx context.Context, root string, r io.Reader) (err error) {
 	var (
-		dst *os.File
-		gzr *gzip.Reader
-		tr  *tar.Reader
+		dst     *os.File
+		gzr     *gzip.Reader
+		tr      *tar.Reader
+		entries iterx.Seq[*tar.Header]
 	)
 
 	if err = os.MkdirAll(root, 0700); err != nil {
@@ -72,21 +106,9 @@ func Unpack(root string, r io.Reader) (err error) {
 	defer gzr.Close()
 
 	tr = tar.NewReader(gzr)
+	entries = Entries(tr)
 
-	for {
-		header, err := tr.Next()
-		switch {
-		// if no more files are found return
-		case err == io.EOF:
-			return nil
-		// return any other error
-		case err != nil:
-			return err
-		// if the header is nil, just skip it (not sure how this happens)
-		case header == nil:
-			continue
-		}
-
+	for header := range entries.Each(ctx) {
 		// the target location where the dir/file should be created
 		target := filepath.Join(root, filepath.Clean(header.Name))
 
@@ -118,18 +140,20 @@ func Unpack(root string, r io.Reader) (err error) {
 				return nil
 			}
 
-			if err := writefile(); err != nil {
+			if err = writefile(); err != nil {
 				return err
 			}
 		}
 	}
+
+	return entries.Err()
 }
 
 // prints to stderr information about the archive
-func Inspect(r io.Reader) (err error) {
+func Inspect(ctx context.Context, r io.Reader) (err error) {
 	var (
-		gzr *gzip.Reader
-		tr  *tar.Reader
+		gzr     *gzip.Reader
+		entries iterx.Seq[*tar.Header]
 	)
 
 	if s, ok := r.(io.Seeker); ok {
@@ -145,30 +169,15 @@ func Inspect(r io.Reader) (err error) {
 	}
 	defer gzr.Close()
 
-	tr = tar.NewReader(gzr)
+	entries = Entries(tar.NewReader(gzr))
 
-	for {
-		header, err := tr.Next()
-		switch {
-		// if no more files are found return
-		case err == io.EOF:
-			return nil
-		// return any other error
-		case err != nil:
-			return err
-		// if the header is nil, just skip it (not sure how this happens)
-		case header == nil:
-			continue
-		}
-
-		switch header.Typeflag {
-		// if its a dir ignore
-		case tar.TypeDir:
-		// if it's a file create it
-		case tar.TypeReg:
+	for header := range entries.Each(ctx) {
+		if header.Typeflag == tar.TypeReg {
 			log.Println(header.Name, header.Size, header.FileInfo().Size())
 		}
 	}
+
+	return entries.Err()
 }
 
 func write(basepath, path string, tw *tar.Writer, info os.FileInfo) (err error) {
@@ -265,10 +274,10 @@ func (opts options) New(tw *tar.Writer) error {
 }
 
 // Size sums the sizes recorded in the archive's headers, i.e.) the uncompressed size of its contents.
-func Size(r io.Reader) (n int64, err error) {
+func Size(ctx context.Context, r io.Reader) (n int64, err error) {
 	var (
-		gzr *gzip.Reader
-		tr  *tar.Reader
+		gzr     *gzip.Reader
+		entries iterx.Seq[*tar.Header]
 	)
 
 	if gzr, err = gzip.NewReader(r); err != nil {
@@ -276,19 +285,11 @@ func Size(r io.Reader) (n int64, err error) {
 	}
 	defer gzr.Close()
 
-	tr = tar.NewReader(gzr)
+	entries = Entries(tar.NewReader(gzr))
 
-	for {
-		header, err := tr.Next()
-		switch {
-		case err == io.EOF:
-			return n, nil
-		case err != nil:
-			return n, errorsx.Wrap(err, "unable to read archive header")
-		case header == nil:
-			continue
-		}
-
+	for header := range entries.Each(ctx) {
 		n += header.Size
 	}
+
+	return n, errorsx.Wrap(entries.Err(), "unable to read archive header")
 }

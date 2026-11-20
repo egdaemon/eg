@@ -177,7 +177,7 @@ func (t c8sUpload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, ident *cmd
 	}
 
 	log.Println("archive", archiveio.Name())
-	if err = tarx.Inspect(archiveio); err != nil {
+	if err = tarx.Inspect(gctx.Context, archiveio); err != nil {
 		log.Println(errorsx.Wrap(err, "unable to inspect archive"))
 	}
 

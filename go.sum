@@ -252,10 +252,10 @@ github.com/dustin/go-humanize v1.1.0 h1:dbKTrvD0klcbBV/h4AWJdMuZogJACoMlvWIWZ5b2
 github.com/dustin/go-humanize v1.1.0/go.mod h1:hc1CvRkJMsgxqjmjMQF3QNRAZBwY8AXBAzKYoSX9sFI=
 github.com/ebitengine/purego v0.10.1 h1:dewVBCBT2GaMu1SrNTYxQhgQBethzfhiwvZiLGP/qyY=
 github.com/ebitengine/purego v0.10.1/go.mod h1:iIjxzd6CiRiOG0UyXP+V1+jWqUXVjPKLAI0mRfJZTmQ=
-github.com/egdaemon/duckproxy v0.0.0-20261120183610-afbab7aa8c71 h1:NFZgEUvefmlXQM0YCTyRtFyTdMYk27HsURCsmQsqh0c=
-github.com/egdaemon/duckproxy v0.0.0-20261120183610-afbab7aa8c71/go.mod h1:HmUy4eFjC13nVTjcaPdVqAsevqazg43QN/UP07CWqRM=
-github.com/egdaemon/duckproxy/duckkong v0.0.0-20261120183610-afbab7aa8c71 h1:r8zhrC4n0/FzACwgtUiOeqf8Svxd2HbLqQ6C0RC4s4Y=
-github.com/egdaemon/duckproxy/duckkong v0.0.0-20261120183610-afbab7aa8c71/go.mod h1:mgDQABCNMo3rOVlfkijwqa0mQCUSmJZX5bl6AtQ63RI=
+github.com/egdaemon/duckproxy v0.0.0-20261120193429-c2b61b872b69 h1:nHvwQFPOEMMXgwa4UcAkToVs3hQyh5Q/gh9wZdBrY6Y=
+github.com/egdaemon/duckproxy v0.0.0-20261120193429-c2b61b872b69/go.mod h1:HmUy4eFjC13nVTjcaPdVqAsevqazg43QN/UP07CWqRM=
+github.com/egdaemon/duckproxy/duckkong v0.0.0-20261120193429-c2b61b872b69 h1:OPA7GFpAA1DABsG9RW+Rbq6WYXcelQoYzeZCi9kS5iQ=
+github.com/egdaemon/duckproxy/duckkong v0.0.0-20261120193429-c2b61b872b69/go.mod h1:WCh0q9NaJolMbU7kdi1odM9LVBkPHHHWmpXKhZWPuYw=
 github.com/egdaemon/duckproxy/usqlx v0.0.0-20261120183610-afbab7aa8c71 h1:blb65Jyg6Bje/ahpEoV2KQowXZRG+c6lH1KWdWiA8cs=
 github.com/egdaemon/duckproxy/usqlx v0.0.0-20261120183610-afbab7aa8c71/go.mod h1:XD7RN4lR8X8eBnqJnKq5XEEMCsSR3Yxle1+NL/j4KOY=
 github.com/egdaemon/gdx v0.0.0-20261115232526-a70109276a78 h1:oDEdKaNmWJlQR65agX6cF2ndV2yR1r7uxJq7ubhcdtE=

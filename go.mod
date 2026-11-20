@@ -24,8 +24,8 @@ require (
 	github.com/dominikbraun/graph v0.23.0
 	github.com/duckdb/duckdb-go/v2 v2.10505.0
 	github.com/dustin/go-humanize v1.1.0
-	github.com/egdaemon/duckproxy v0.0.0-20261120183610-afbab7aa8c71
-	github.com/egdaemon/duckproxy/duckkong v0.0.0-20261120183610-afbab7aa8c71
+	github.com/egdaemon/duckproxy v0.0.0-20261120193429-c2b61b872b69
+	github.com/egdaemon/duckproxy/duckkong v0.0.0-20261120193429-c2b61b872b69
 	github.com/egdaemon/gdx v0.0.0-20261115232526-a70109276a78
 	github.com/egdaemon/gdx/konggdx v0.0.0-20261115232526-a70109276a78
 	github.com/egdaemon/sh/v3 v3.14.1-0.20261103040545-e33e887fd27a

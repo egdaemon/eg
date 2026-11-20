@@ -47,11 +47,15 @@ func main() {
 		log.Fatalln(err)
 	}
 
+	c := eg.Container("egvm.containerfile").BuildFromFile(path)
+
 	if err = eg.Perform(
 		ctx,
 		Containerfile(path),
 		eg.Module(ctx, egvm.New(egvm.OptionContainerfile(path)), Marker),
 		eg.Module(ctx, egvm.New(egvm.OptionContainerfile(relative)), Marker),
+		eg.Build(c),
+		eg.Module(ctx, c, Marker),
 	); err != nil {
 		log.Fatalln(err)
 	}

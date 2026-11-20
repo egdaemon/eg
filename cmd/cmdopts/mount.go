@@ -40,15 +40,19 @@ func (t Mount) Remapped() (rel string, ok bool) {
 	return rel, ok && rel != "."
 }
 
-// Volume renders the mount as a podman volume specification: source:mountpoint[:ro|rw]. the mount point is the
-// destination, or its location within the mount root when it is remapped.
-func (t Mount) Volume() string {
-	mountpoint := t.Destination
+// Mountpoint the location the mount is mounted at: the destination, or its location within the mount root when it
+// is remapped.
+func (t Mount) Mountpoint() string {
 	if rel, ok := t.Remapped(); ok {
-		mountpoint = eg.DefaultMountRoot(rel)
+		return eg.DefaultMountRoot(rel)
 	}
 
-	parts := []string{t.Source, mountpoint}
+	return t.Destination
+}
+
+// Volume renders the mount as a podman volume specification: source:mountpoint[:ro|rw].
+func (t Mount) Volume() string {
+	parts := []string{t.Source, t.Mountpoint()}
 	if t.Access != AccessDefault {
 		parts = append(parts, string(t.Access))
 	}

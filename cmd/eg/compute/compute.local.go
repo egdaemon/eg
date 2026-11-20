@@ -392,6 +392,10 @@ func (t local) machine(c *http.Client, uri string) runners.BFn {
 			return nil, err
 		}
 
+		if err = t.Mounts.RemapEnviron(envb); err != nil {
+			return nil, err
+		}
+
 		vmopts := []egvm.Option{
 			egvm.OptionCPUs(uint(t.RuntimeResources.Cores)),
 			egvm.OptionMemory(uint64(t.RuntimeResources.Memory)),
@@ -402,9 +406,9 @@ func (t local) machine(c *http.Client, uri string) runners.BFn {
 		// mode, user, and group of the mount are not honored yet.
 		for _, m := range usermounts {
 			if m.Access == cmdopts.AccessRead {
-				vmopts = append(vmopts, egvm.OptionMountReadOnly(m.Source, m.Destination))
+				vmopts = append(vmopts, egvm.OptionMountReadOnly(m.Source, m.Mountpoint()))
 			} else {
-				vmopts = append(vmopts, egvm.OptionMountReadWrite(m.Source, m.Destination))
+				vmopts = append(vmopts, egvm.OptionMountReadWrite(m.Source, m.Mountpoint()))
 			}
 		}
 

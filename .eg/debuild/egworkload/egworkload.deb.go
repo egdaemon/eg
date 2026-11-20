@@ -56,6 +56,7 @@ func init() {
 			"waypipe",           // required to support --wayland passthrough.
 			"openssh-server",    // allows ssh access into workload containers, i.e. eg compute serve --ssh.
 			"passt",             // required for pasta to connect the machines egvm.New boots within a machine.
+			"buildah",           // required to build the egiso of egvm.OptionContainerfile's Containerfile within a machine.
 		),
 		egdebuild.Option.Environ(eggpg.Env(gpgoptions()...)...),
 		egdebuild.Option.Description(

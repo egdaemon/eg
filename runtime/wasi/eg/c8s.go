@@ -149,7 +149,7 @@ func (t ContainerModuleRunner) RunWith(ctx context.Context, mpath string) (err e
 	var opts []string
 
 	if t.machine {
-		return ffiegmachine.Module(ctx, "", mpath)
+		return ffiegmachine.Module(ctx, "", "", mpath)
 	}
 	for _, o := range t.options {
 		opts = append(opts, o...)

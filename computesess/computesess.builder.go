@@ -19,6 +19,7 @@ type Builder struct {
 	sshkey    string
 	capagent  bool
 	cappatch  bool
+	ptysocket string
 	branches  []string
 	container func(uuidx.UUID) string
 }
@@ -52,6 +53,13 @@ func (t Builder) Branch(names ...string) Builder {
 	return t
 }
 
+// PTY records the unix socket the run's terminal can be attached to, see ttyx.Host. blank, the default, means the run has
+// no terminal to attach to.
+func (t Builder) PTY(socket string) Builder {
+	t.ptysocket = socket
+	return t
+}
+
 // Patch marks the run's changes as being patched back to the repository.
 func (t Builder) Patch(b bool) Builder {
 	t.cappatch = b
@@ -76,6 +84,7 @@ func (t Builder) Register(ctx context.Context, id uuidx.UUID, module string, dir
 		CapSSH:       sshon,
 		CapAgent:     t.capagent,
 		CapPatch:     t.cappatch,
+		PtySocket:    t.ptysocket,
 	}
 
 	if t.db == nil {

@@ -35,10 +35,37 @@ func TestServeSessions(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, sessions, 1)
 		require.False(t, sessions[0].Running())
-		require.NotNil(t, sessions[0].StoppedAt)
+		require.False(t, sessions[0].Running())
 		require.Equal(t, int64(0), sessions[0].SSHPort)
 		require.Equal(t, "/repo", sessions[0].Directory)
 		require.Equal(t, "m", sessions[0].Module)
+	})
+
+	t.Run("records the terminal socket while running and clears it when stopped", func(t *testing.T) {
+		db := sqltestx.DuckDB(t)
+		require.NoError(t, migrations.Migrate(t.Context(), db))
+
+		require.NoError(t, computesess.Register(t.Context(), db, computesess.Session{ID: "tty", PtySocket: "/run/user/1000/eg/pty.d/tty.sock"}))
+		require.NoError(t, computesess.Register(t.Context(), db, computesess.Session{ID: "plain"}))
+
+		tty, err := computesess.Lookup(t.Context(), db, "tty")
+		require.NoError(t, err)
+		require.Equal(t, "/run/user/1000/eg/pty.d/tty.sock", tty.PtySocket)
+
+		plain, err := computesess.Lookup(t.Context(), db, "plain")
+		require.NoError(t, err)
+		require.Equal(t, "", plain.PtySocket)
+
+		// a session that stopped has nothing to attach to, and one that restarts brings its socket back.
+		require.NoError(t, computesess.Stop(t.Context(), db, "tty"))
+		tty, err = computesess.Lookup(t.Context(), db, "tty")
+		require.NoError(t, err)
+		require.Equal(t, "", tty.PtySocket)
+
+		require.NoError(t, computesess.Register(t.Context(), db, computesess.Session{ID: "tty", PtySocket: "/run/user/1000/eg/pty.d/tty.sock"}))
+		tty, err = computesess.Lookup(t.Context(), db, "tty")
+		require.NoError(t, err)
+		require.Equal(t, "/run/user/1000/eg/pty.d/tty.sock", tty.PtySocket)
 	})
 
 	t.Run("renames the branch of a running or stopped session", func(t *testing.T) {

@@ -1,7 +1,8 @@
 package computesess
 
-// Running reports whether the session has not been stopped. a session that is running has no time it stopped,
-// which the generated scanner reads as the zero time.
+import "github.com/egdaemon/eg/internal/timex"
+
+// Running reports whether the session has not been stopped: it stops at infinity.
 func (t Session) Running() bool {
-	return t.StoppedAt == nil || t.StoppedAt.IsZero()
+	return !t.StoppedAt.Before(timex.RFC3339Inf())
 }

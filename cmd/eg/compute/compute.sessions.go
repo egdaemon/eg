@@ -15,7 +15,6 @@ import (
 	egcompute "github.com/egdaemon/eg/compute"
 	"github.com/egdaemon/eg/computesess"
 	"github.com/egdaemon/eg/internal/errorsx"
-	"github.com/egdaemon/eg/internal/langx"
 	"github.com/egdaemon/eg/jsonx"
 )
 
@@ -93,7 +92,7 @@ func writeSessions(ctx context.Context, db *sql.DB, out io.Writer, asjsonl bool)
 				SshPort: s.SSHPort, SshUser: s.SSHUser, SshKeyPath: s.SSHKeyPath,
 				CapSsh: s.CapSSH, CapAgent: s.CapAgent, CapPatch: s.CapPatch,
 				StartedAt: fmt.Sprint(cmdtypography.Timestamp(s.StartedAt).Location(time.UTC)),
-				StoppedAt: fmt.Sprint(cmdtypography.Timestamp(langx.DerefOrZero(s.StoppedAt)).Location(time.UTC).Zero("")), // blank while running, which the console reads as never.
+				StoppedAt: fmt.Sprint(cmdtypography.Timestamp(s.StoppedAt).Location(time.UTC).Infinity("", "")), // a running session stops at infinity: blank, which the console reads as never.
 			}
 
 			if err = jsonx.Encode(out, encoded); err != nil {

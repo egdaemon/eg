@@ -74,7 +74,7 @@ func Remove(ctx context.Context, db *sql.DB, ids ...string) (removed []string, e
 			continue
 		}
 
-		if _, derr := db.ExecContext(ctx, "DELETE FROM serve_sessions WHERE id = $1 AND stopped_at IS NOT NULL", id); derr != nil {
+		if _, derr := db.ExecContext(ctx, "DELETE FROM serve_sessions WHERE id = $1 AND stopped_at <> 'infinity'", id); derr != nil {
 			err = errors.Join(err, errorsx.Wrapf(derr, "unable to remove session %s", id))
 			continue
 		}

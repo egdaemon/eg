@@ -121,6 +121,14 @@ func (t serve) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath, sessio
 		return errorsx.Wrap(err, "unable to connect to podman")
 	}
 
+	// the cli's database is optional, serve does not otherwise depend on it. registering does nothing without it.
+	defer func() { errorsx.Log(clidb.Close()) }()
+
+	// registered before anything is built or started, the container's name exists already, which the ssh port is waited for under.
+	// a run that fails before its module starts is stopped again, and is in the history.
+	registered, done := session.New(clidb).Branch(session.Branch, defaultbranch(t.Name, uid)).SSH(t.SSH, t.SSHKeyPath).Agent(true).Patch(t.AutoPatch).Register(ctx, uid, t.Name, t.Dir)
+	defer func() { done(err) }()
+
 	if ws, err = workspaces.NewLocal(
 		gctx.Context,
 		uuidx.NewV7(),
@@ -201,13 +209,6 @@ func (t serve) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath, sessio
 	if err = envb.CopyTo(environio); err != nil {
 		return errorsx.Wrap(err, "unable to generate environment")
 	}
-
-	// the cli's database is optional, serve does not otherwise depend on it. registering does nothing without it.
-	defer func() { errorsx.Log(clidb.Close()) }()
-
-	// registered before the module starts so the container's ssh port is waited for as soon as it exists.
-	registered, done := session.New(clidb).Branch(session.Branch, defaultbranch(t.Name, uid)).SSH(t.SSH, t.SSHKeyPath).Agent(true).Patch(t.AutoPatch).Register(ctx, uid, t.Name, t.Dir)
-	defer func() { done(err) }()
 
 	// progress is saved while the module runs, the loop is ended before the changes are collected so nothing else is using the clone.
 	stopcheckpoints := gitx.CheckpointLoop(gctx.Context, ws.WorkingDir, t.CheckpointInterval)

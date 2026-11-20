@@ -36,28 +36,30 @@ import (
 type serve struct {
 	cmdopts.RuntimeResources
 	cmdopts.Mounts
-	Dir              string   `name:"directory" help:"root directory of the repository" default:"${vars_eg_root_directory}"`
-	ModuleDir        string   `name:"moduledir" help:"must be a subdirectory in the provided directory" default:"${vars_workload_directory}"`
-	Debug            bool     `name:"debug" help:"keep workspace around to debug issues, requires manual cleanup"`
-	InvalidateCache  bool     `name:"invalidate-cache" help:"removes workload build cache"`
-	AutoPatch        bool     `name:"auto-patch" help:"commit the changes made inside the served workload to a new eg/ branch of the current repository once it stops, when disabled the changes are printed as a patch instead (dry run)" default:"true" negatable:""`
-	Privileged       bool     `name:"privileged" help:"run the initial container in privileged mode"`
-	Dirty            bool     `name:"dirty" help:"include user directories and environment variables" hidden:"true"`
-	TTY              bool     `name:"tty" help:"give the workload a terminal so interactive tools, e.g.) flutter's r and R keys, receive key presses. eg must be run from a terminal"`
-	Wayland          bool     `name:"wayland" help:"bind-mount the host wayland display socket into the container"`
-	GCPAuto          bool     `name:"gcp-auto" help:"use the default well known path for gcp's application default credentials"`
-	GCP              string   `name:"gcp" help:"path to gcp's application default credentials"`
-	EnvironmentPaths []string `name:"envpath" help:"environment files to pass to the module" default:""`
-	Environment      []string `name:"env" short:"e" help:"define environment variables and their values to be included"`
-	Secrets          []string `name:"secret" help:"List of secret URIs to use. Examples: chachasm://passphrase@/path/to/file, gcpsm://project-id/secret-name/version, awssm://secret-name?region=us-east-1"`
-	GitRemote        string   `name:"git-remote" help:"name of the git remote to use" default:"${vars_git_default_remote_name}"`
-	GitReference     string   `name:"git-ref" help:"name of the branch or commit to checkout" default:"${vars_git_head_reference}"`
-	Ports            []int    `name:"ports" help:"list of ports to publish to the host system"`
-	ContainerArgs    []string `name:"cargs" help:"list of command line arguments to pass to the root container" hidden:"true"`
-	SSHKeyPath       string   `name:"sshkeypath" help:"path to ssh key to use" default:"${vars_ssh_key_path}"`
-	SSH              int      `name:"ssh" type:"sshport" default:"-1" help:"enable ssh access into the container as the egd user, using eg's own managed ssh identity; bare --ssh publishes on a free host port, --ssh=<port> on a fixed one"`
-	Containerfile    string   `name:"containerfile" help:"containerfile to build the workload's container from, relative to the repository directory. by default the nearest Containerfile, from the workload's directory up to the module directory"`
-	Name             string   `arg:"" name:"module" help:"name of the module to run, i.e. the folder name within moduledir" default:"" predictor:"eg.workload"`
+	Dir                string        `name:"directory" help:"root directory of the repository" default:"${vars_eg_root_directory}"`
+	ModuleDir          string        `name:"moduledir" help:"must be a subdirectory in the provided directory" default:"${vars_workload_directory}"`
+	Debug              bool          `name:"debug" help:"keep workspace around to debug issues, requires manual cleanup"`
+	InvalidateCache    bool          `name:"invalidate-cache" help:"removes workload build cache"`
+	AutoPatch          bool          `name:"auto-patch" help:"commit the changes made inside the served workload to a new eg/ branch of the current repository once it stops, when disabled the changes are printed as a patch instead (dry run)" default:"true" negatable:""`
+	AutoBranch         bool          `name:"auto-branch" help:"create the session's branch from the ref its changes were committed to (refs/eg/s.<session>) once it stops, when disabled only the ref is written and whatever manages the branch takes it from there" default:"true" negatable:""`
+	CheckpointInterval time.Duration `name:"checkpoint-interval" help:"how often the changes made inside the served workload are saved to refs/eg/checkpoint of its clone, 0 disables checkpoints" default:"5m"`
+	Privileged         bool          `name:"privileged" help:"run the initial container in privileged mode"`
+	Dirty              bool          `name:"dirty" help:"include user directories and environment variables" hidden:"true"`
+	TTY                bool          `name:"tty" help:"give the workload a terminal so interactive tools, e.g.) flutter's r and R keys, receive key presses. eg must be run from a terminal"`
+	Wayland            bool          `name:"wayland" help:"bind-mount the host wayland display socket into the container"`
+	GCPAuto            bool          `name:"gcp-auto" help:"use the default well known path for gcp's application default credentials"`
+	GCP                string        `name:"gcp" help:"path to gcp's application default credentials"`
+	EnvironmentPaths   []string      `name:"envpath" help:"environment files to pass to the module" default:""`
+	Environment        []string      `name:"env" short:"e" help:"define environment variables and their values to be included"`
+	Secrets            []string      `name:"secret" help:"List of secret URIs to use. Examples: chachasm://passphrase@/path/to/file, gcpsm://project-id/secret-name/version, awssm://secret-name?region=us-east-1"`
+	GitRemote          string        `name:"git-remote" help:"name of the git remote to use" default:"${vars_git_default_remote_name}"`
+	GitReference       string        `name:"git-ref" help:"name of the branch or commit to checkout" default:"${vars_git_head_reference}"`
+	Ports              []int         `name:"ports" help:"list of ports to publish to the host system"`
+	ContainerArgs      []string      `name:"cargs" help:"list of command line arguments to pass to the root container" hidden:"true"`
+	SSHKeyPath         string        `name:"sshkeypath" help:"path to ssh key to use" default:"${vars_ssh_key_path}"`
+	SSH                int           `name:"ssh" type:"sshport" default:"-1" help:"enable ssh access into the container as the egd user, using eg's own managed ssh identity; bare --ssh publishes on a free host port, --ssh=<port> on a fixed one"`
+	Containerfile      string        `name:"containerfile" help:"containerfile to build the workload's container from, relative to the repository directory. by default the nearest Containerfile, from the workload's directory up to the module directory"`
+	Name               string        `arg:"" name:"module" help:"name of the module to run, i.e. the folder name within moduledir" default:"" predictor:"eg.workload"`
 }
 
 func (t serve) datadir(rels ...string) string {
@@ -207,7 +209,10 @@ func (t serve) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath, sessio
 	registered, done := session.New(clidb).Branch(session.Branch, defaultbranch(t.Name, uid)).SSH(t.SSH, t.SSHKeyPath).Agent(true).Patch(t.AutoPatch).Register(ctx, uid, t.Name, t.Dir)
 	defer func() { done(err) }()
 
+	// progress is saved while the module runs, the loop is ended before the changes are collected so nothing else is using the clone.
+	stopcheckpoints := gitx.CheckpointLoop(gctx.Context, ws.WorkingDir, t.CheckpointInterval)
 	err = errorsx.Wrap(rt.Do(gctx.Context, module), "module execution failed")
+	stopcheckpoints()
 
 	log.Println("--------------------------------------------------------------------------")
 	log.Println("autopatch", t.AutoPatch)
@@ -216,7 +221,7 @@ func (t serve) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath, sessio
 	log.Println("to", t.Dir)
 	// a served workload ends when its container is stopped, which is not a failure of the work done inside it,
 	// so the changes are collected however the modules ended. the run's context is likely cancelled by then.
-	if perr := gitx.AutoPatch(os.Stdout).From(ws.WorkingDir).To(t.Dir).Branch(registered.Branch).DryRun(!t.AutoPatch).Apply(context.WithoutCancel(gctx.Context)); perr != nil {
+	if perr := gitx.AutoPatch(os.Stdout).From(ws.WorkingDir).To(t.Dir).Session(uid.String()).Branch(registered.Branch).AutoBranch(t.AutoBranch).DryRun(!t.AutoPatch).Apply(context.WithoutCancel(gctx.Context)); perr != nil {
 		log.Println("unable to apply the workload's changes to the worktree", perr)
 		err = errorsx.Compact(err, perr)
 	}

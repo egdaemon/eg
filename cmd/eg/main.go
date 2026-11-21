@@ -97,7 +97,6 @@ func main() {
 		AgentManagement    actlcmd                      `cmd:"" name:"actl" help:"agent management commands"`
 		Register           cmdaccounts.Signup           `cmd:"" name:"register" help:"register with an account with eg"`
 		Login              cmdaccounts.Login            `cmd:"" name:"login" help:"login to a profile"`
-		Browser            cmdaccounts.OTP              `cmd:"" name:"browser" help:"login to the browser console"`
 		Repo               cmdrepo.Cmd                  `cmd:"" name:"repo" help:"repository identity and defaults"`
 		DiskUsage          daemons.DiskUsage            `cmd:"" name:"disk-usage" help:"monitors disk usage and executes services when above threshold"`
 		Secrets            cmdsecret.SecretCmd          `cmd:"" name:"secrets" help:"ALPHA: builtin simple secret manager"`

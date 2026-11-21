@@ -72,8 +72,3 @@ func session(ctx context.Context, chttp *http.Client, authed *authn.Authn) (err 
 	log.Println("logged in as", cmdidentity.TypographySession(session))
 	return nil
 }
-
-func otp(ctx context.Context, chttp *http.Client, authed *authn.Authn) (err error) {
-	fmt.Printf("%s?lt=%s\n", eg.EnvConsoleHostDefault(), authed.Token)
-	return nil
-}

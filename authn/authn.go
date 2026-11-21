@@ -323,6 +323,23 @@ func AutoRefreshToken(ctx context.Context, signer ssh.Signer) (_ *oauth2.Token, 
 	return AutoRefreshTokenState(ctx, signer, state)
 }
 
+// AutoRefreshTokenMemory is AutoRefreshToken that never writes the token to disk or the environment.
+func AutoRefreshTokenMemory(ctx context.Context, signer ssh.Signer) (_ *oauth2.Token, err error) {
+	var (
+		state string
+	)
+
+	if t, err := ReadRefreshToken(); err == nil {
+		return t, nil
+	}
+
+	if state, err = AutoTokenState(signer); err != nil {
+		return nil, err
+	}
+
+	return RetrieveToken(ctx, signer, state)
+}
+
 func WriteRefreshToken(token string) (err error) {
 	basedir := userx.DefaultCacheDirectory()
 	path := filepath.Join(basedir, "session.token")

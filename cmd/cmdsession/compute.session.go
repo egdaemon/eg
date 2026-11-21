@@ -1,6 +1,7 @@
-package cmdopts
+package cmdsession
 
 import (
+	"github.com/egdaemon/eg/cmd/cmddb"
 	"github.com/egdaemon/eg/computesess"
 	"github.com/egdaemon/eg/internal/uuidx"
 )
@@ -21,7 +22,7 @@ func (t ComputeSession) AfterApply(dst *ComputeSession) error {
 
 // New starts describing the run to register. the builder registers nothing, unless a session was requested
 // and the cli's database is available.
-func (t ComputeSession) New(db *CLIDB) computesess.Builder {
+func (t ComputeSession) New(db *cmddb.CLIDB) computesess.Builder {
 	if t.Session.IsZero() {
 		return computesess.New(nil)
 	}

@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"github.com/egdaemon/eg/cmd/cmddb"
+	"github.com/egdaemon/eg/cmd/cmdsession"
 	"log"
 	"net"
 	"os"
@@ -199,7 +201,7 @@ func main() {
 			&shellcli.TLSConfig,
 			cleanupsigs,
 			new(cmdopts.HotswapPath),
-			new(cmdopts.ComputeSession),
+			new(cmdsession.ComputeSession),
 			cmdopts.Entropy(cmdopts.GenerateEntropy),
 			cmdopts.KeyGenSeeded(cmdopts.DefaultKeyGenSeeded),
 			libp2px.MDNSLookup(libp2px.DefaultMDNSLookup),
@@ -217,8 +219,8 @@ func main() {
 		kong.BindTo(os.Stdin, (*cmdopts.Stdin)(nil)),
 		// only opened by the commands that ask for it.
 		kong.BindSingletonProvider(cmdopts.NewEnvironSecret),
-		kong.BindSingletonProvider(func(g *cmdopts.Global) *cmdopts.CLIDB {
-			return cmdopts.NewCLIDB(g.Context)
+		kong.BindSingletonProvider(func(g *cmdopts.Global) *cmddb.CLIDB {
+			return cmddb.NewCLIDB(g.Context)
 		}),
 		kong.BindSingletonProvider(func(g *cmdopts.Global) *cmdidentity.T {
 			return cmdidentity.New(g.Context, g.AccountID, g.ProfileID, cmdidentity.Login)

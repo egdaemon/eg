@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/egdaemon/eg/cmd/cmddb"
+	"github.com/egdaemon/eg/cmd/cmdsession"
 	"log"
 	"net/http"
 	"os"
@@ -74,7 +76,7 @@ func (t local) gpu() bool {
 
 // Run compiles the workload's modules, runs them in containers or, given an egiso, a machine, and
 // applies the changes they made.
-func (t local) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, hotswapbin *cmdopts.HotswapPath, session *cmdopts.ComputeSession, clidb *cmdopts.CLIDB) (err error) {
+func (t local) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, hotswapbin *cmdopts.HotswapPath, session *cmdsession.ComputeSession, clidb *cmddb.CLIDB) (err error) {
 	var (
 		ws        workspaces.Context
 		repo      *git.Repository

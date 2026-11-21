@@ -1,9 +1,10 @@
-package cmdopts_test
+package cmdsession_test
 
 import (
 	"testing"
 
-	"github.com/egdaemon/eg/cmd/cmdopts"
+	"github.com/egdaemon/eg/cmd/cmddb"
+	"github.com/egdaemon/eg/cmd/cmdsession"
 	"github.com/egdaemon/eg/cmd/migrations"
 	"github.com/egdaemon/eg/computesess"
 	"github.com/egdaemon/eg/internal/sqltestx"
@@ -17,7 +18,7 @@ func TestComputeSessionNew(t *testing.T) {
 		require.NoError(t, migrations.Migrate(t.Context(), db))
 		id := uuidx.NewV7()
 
-		_, done := cmdopts.ComputeSession{Session: id}.New(&cmdopts.CLIDB{DB: db}).Register(t.Context(), id, "m", "/repo")
+		_, done := cmdsession.ComputeSession{Session: id}.New(&cmddb.CLIDB{DB: db}).Register(t.Context(), id, "m", "/repo")
 		defer done(nil)
 
 		found, err := computesess.Lookup(t.Context(), db, id.String())
@@ -29,7 +30,7 @@ func TestComputeSessionNew(t *testing.T) {
 		db := sqltestx.DuckDB(t)
 		require.NoError(t, migrations.Migrate(t.Context(), db))
 
-		_, done := cmdopts.ComputeSession{}.New(&cmdopts.CLIDB{DB: db}).Register(t.Context(), uuidx.NewV7(), "m", "/repo")
+		_, done := cmdsession.ComputeSession{}.New(&cmddb.CLIDB{DB: db}).Register(t.Context(), uuidx.NewV7(), "m", "/repo")
 		defer done(nil)
 
 		sessions, err := computesess.List(t.Context(), db)
@@ -38,7 +39,7 @@ func TestComputeSessionNew(t *testing.T) {
 	})
 
 	t.Run("registers nothing when the database is unavailable", func(t *testing.T) {
-		_, done := cmdopts.ComputeSession{Session: uuidx.NewV7()}.New(&cmdopts.CLIDB{}).Register(t.Context(), uuidx.NewV7(), "m", "/repo")
+		_, done := cmdsession.ComputeSession{Session: uuidx.NewV7()}.New(&cmddb.CLIDB{}).Register(t.Context(), uuidx.NewV7(), "m", "/repo")
 		done(nil)
 	})
 }

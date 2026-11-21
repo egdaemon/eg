@@ -3,6 +3,8 @@ package compute
 import (
 	"context"
 	"fmt"
+	"github.com/egdaemon/eg/cmd/cmddb"
+	"github.com/egdaemon/eg/cmd/cmdsession"
 	"log"
 	"os"
 	"os/exec"
@@ -104,7 +106,7 @@ func (t serve) containerfile() (string, error) {
 	}
 }
 
-func (t serve) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath, session *cmdopts.ComputeSession, clidb *cmdopts.CLIDB) (err error) {
+func (t serve) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath, session *cmdsession.ComputeSession, clidb *cmddb.CLIDB) (err error) {
 	var (
 		uid       = uuidx.FirstNonNil(session.Session, uuidx.NewV7())
 		ws        workspaces.Context

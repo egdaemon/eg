@@ -2,6 +2,8 @@ package compute
 
 import (
 	"context"
+	"github.com/egdaemon/eg/cmd/cmddb"
+	"github.com/egdaemon/eg/cmd/cmdsession"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -109,7 +111,7 @@ func TestServeContainerfile(t *testing.T) {
 
 		var cli struct {
 			cmdopts.Global
-			cmdopts.ComputeSession
+			cmdsession.ComputeSession
 			Serve serve `cmd:""`
 		}
 		cli.Context = ctx
@@ -128,7 +130,7 @@ func TestServeContainerfile(t *testing.T) {
 				"vars_ssh_key_path":            filepath.Join(t.TempDir(), "id"),
 			},
 			kong.NamedMapper("durationinf", kong.MapperFunc(cmdopts.ParseDurationInf)),
-			kong.Bind(&cli.Global, new(cmdopts.HotswapPath), new(cmdopts.ComputeSession), &cmdopts.CLIDB{}),
+			kong.Bind(&cli.Global, new(cmdopts.HotswapPath), new(cmdsession.ComputeSession), &cmddb.CLIDB{}),
 		)
 		require.NoError(t, err)
 

@@ -1,4 +1,4 @@
-package cmdopts
+package cmddb
 
 import (
 	"context"

@@ -99,10 +99,12 @@ func (t Login) run(ctx context.Context, account string, oauthc *http.Client, cht
 	switch len(authed.Profiles) {
 	case 0:
 		return errorsx.Notification(fmt.Errorf(
-			"the ssh key (%s - %s) is not associated with any profiles, unable to login. associate the key with a profile or use the `%s register --help` command to setup a new account",
+			"the ssh key (%s - %s) is not associated with any profiles, unable to login. associate the key with a profile or use the `%s register --help` command to setup a new account. attempted login against %s (sso: %s)",
 			t.SSHKeyPath,
 			ssh.FingerprintSHA256(signer.PublicKey()),
 			stringsx.First(os.Args...),
+			fmt.Sprintf("%s/authn/ssh", eg.EnvAPIHostDefault()),
+			eg.EnvSSOHostDefault(),
 		))
 	case 1:
 		profile = authed.Profiles[0]

@@ -59,8 +59,10 @@ func run(ctx context.Context, _ eg.Op) error {
 		ctx,
 		runtime.New(`go install -ldflags="-X github.com/egdaemon/eg.apiHostDefault=${EG_DEV_API_HOST} -X github.com/egdaemon/eg.consoleHostDefault=${EG_DEV_CONSOLE_HOST} -X github.com/egdaemon/eg.containerAPIHostDefault=${EG_DEV_API_HOST} -X github.com/egdaemon/eg.aptHostDefault=${EG_DEV_APT_HOST} -X github.com/egdaemon/eg.tlsinsecure=true" ./cmd/eg`),
 		runtime.Newf("install -D -m 0755 ~/go/bin/eg %s", egbin),
-		// the daemon is preauthorized by egmeta's dev/daemon (egci-meta accounts create), no authorize step is needed.
-		// bootstrap env derives the daemon's seed the same way authorize would, and the daemon consumes the derived value.
+		// egmeta's dev/daemon (egci-meta accounts create) only creates the account and the login key derived from the seed.
+		// the daemon registers with a different key, derived from the seed by bootstrap env, so it is granted here using the login key.
+		runtime.Newf("%s actl authorize seed --account-id=${EG_ACCOUNT} --sshkeyseed=${EG_DEV_SEED} ${EG_DEV_SEED}", egbin),
+		// bootstrap env derives the daemon's seed the same way authorize seed does, and the daemon consumes the derived value.
 		runtime.Newf("%s actl bootstrap env daemon --account=${EG_ACCOUNT} --seed=${EG_DEV_SEED} -e EG_COMPUTE_TLS_INSECURE=true | tee %s | %s secrets redact", egbin, envfile, egbin),
 	)
 	if err != nil {

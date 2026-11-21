@@ -97,7 +97,8 @@ func TestAutoPatchSession(t *testing.T) {
 		require.NoError(t, LocalClone(t.Context(), repo, clone, "main", "HEAD"))
 
 		run := func(dir string, args ...string) string {
-			raw, err := exec.Command("git", append([]string{"-C", dir}, args...)...).CombinedOutput()
+			// the clone has no identity of its own, and the environment may not have a global one.
+			raw, err := exec.Command("git", append([]string{"-C", dir, "-c", "user.name=eg", "-c", "user.email=eg@example.com"}, args...)...).CombinedOutput()
 			require.NoError(t, err, string(raw))
 			return strings.TrimSpace(string(raw))
 		}

@@ -177,3 +177,37 @@ func TestCloneTree(t *testing.T) {
 		require.ErrorIs(t, fsx.CloneTree(ctx, filepath.Join(t.TempDir(), "copy"), filepath.Base(src), os.DirFS(filepath.Dir(src))), context.Canceled)
 	})
 }
+
+func TestLocateWithinUntil(t *testing.T) {
+	root := t.TempDir()
+	for _, rel := range []string{
+		"Containerfile", // above stop, never found.
+		"mod/Containerfile",
+		"mod/own/Containerfile",
+		"mod/own/deep/main.go",
+		"mod/shared/main.go",
+		"mod/none/main.go",
+	} {
+		require.NoError(t, os.MkdirAll(filepath.Dir(filepath.Join(root, rel)), 0700))
+		require.NoError(t, os.WriteFile(filepath.Join(root, rel), []byte("x"), 0600))
+	}
+
+	stop := filepath.Join(root, "mod")
+
+	t.Run("nearest wins", func(t *testing.T) {
+		require.Equal(t, filepath.Join(root, "mod/own/Containerfile"), fsx.LocateWithinUntil(filepath.Join(root, "mod/own/deep"), stop, "Containerfile"))
+		require.Equal(t, filepath.Join(root, "mod/Containerfile"), fsx.LocateWithinUntil(filepath.Join(root, "mod/shared"), stop, "Containerfile"))
+	})
+
+	t.Run("stop is inclusive", func(t *testing.T) {
+		require.Equal(t, filepath.Join(root, "mod/Containerfile"), fsx.LocateWithinUntil(stop, stop, "Containerfile"))
+	})
+
+	t.Run("nothing is found above stop", func(t *testing.T) {
+		require.Empty(t, fsx.LocateWithinUntil(filepath.Join(root, "mod/shared/sub"), filepath.Join(root, "mod/shared"), "Containerfile"))
+	})
+
+	t.Run("dir outside of stop only checks dir", func(t *testing.T) {
+		require.Empty(t, fsx.LocateWithinUntil(filepath.Join(root, "mod/none"), filepath.Join(root, "elsewhere"), "Containerfile"))
+	})
+}

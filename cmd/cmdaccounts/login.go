@@ -25,26 +25,37 @@ type Login struct {
 	SSHKeyPath string `name:"sshkeypath" help:"path to ssh key to use" default:"${vars_ssh_key_path}"`
 	Seed       string `name:"seed" help:"seed for generating determistic credentials, useful for ci/cd platforms" default:"${vars_ssh_key_seed}"`
 	Account    string `name:"account" help:"optional account id or login domain to login with, disambiguates when the ssh key is associated with multiple profiles" env:"${env_eg_account}"`
-	Browser    bool   `name:"browser" help:"open the console in the default browser once logged in"`
+	Browser    bool   `name:"browser" help:"print the console login url and open it in the default browser once logged in"`
+	Memory     bool   `name:"memory" help:"keep the credentials in memory only, nothing is read from or written to disk"`
 }
 
 func (t Login) Run(gctx *cmdopts.Global, tlscfg *cmdopts.TLSConfig, ident *cmdidentity.T) (err error) {
 	var (
-		signer ssh.Signer
+		signer       ssh.Signer
+		refreshtoken *oauth2.Token
 	)
-
-	if signer, err = sshx.AutoCached(sshx.NewKeyGenSeeded(t.Seed), t.SSHKeyPath); err != nil {
-		return err
-	}
 
 	chttp := tlscfg.DefaultClient()
 	ctx := context.WithValue(gctx.Context, oauth2.HTTPClient, chttp)
-	cfg := authn.OAuth2SSHConfig(signer, "", authn.EndpointSSHAuth())
 
-	refreshtoken, err := authn.AutoRefreshToken(ctx, signer)
+	if t.Memory {
+		if signer, err = sshx.SignerFromGenerator(sshx.NewKeyGenSeeded(t.Seed)); err != nil {
+			return err
+		}
+
+		refreshtoken, err = authn.AutoRefreshTokenMemory(ctx, signer)
+	} else {
+		if signer, err = sshx.AutoCached(sshx.NewKeyGenSeeded(t.Seed), t.SSHKeyPath); err != nil {
+			return err
+		}
+
+		refreshtoken, err = authn.AutoRefreshToken(ctx, signer)
+	}
 	if err != nil {
 		return errorsx.WithStack(err)
 	}
+
+	cfg := authn.OAuth2SSHConfig(signer, "", authn.EndpointSSHAuth())
 
 	return t.run(ctx, gctx.AccountID, cfg.Client(ctx, refreshtoken), chttp, signer, ident.Choose)
 }
@@ -88,10 +99,12 @@ func (t Login) run(ctx context.Context, account string, oauthc *http.Client, cht
 	switch len(authed.Profiles) {
 	case 0:
 		return errorsx.Notification(fmt.Errorf(
-			"the ssh key (%s - %s) is not associated with any profiles, unable to login. associate the key with a profile or use the `%s register --help` command to setup a new account",
+			"the ssh key (%s - %s) is not associated with any profiles, unable to login. associate the key with a profile or use the `%s register --help` command to setup a new account. attempted login against %s (sso: %s)",
 			t.SSHKeyPath,
 			ssh.FingerprintSHA256(signer.PublicKey()),
 			stringsx.First(os.Args...),
+			fmt.Sprintf("%s/authn/ssh", eg.EnvAPIHostDefault()),
+			eg.EnvSSOHostDefault(),
 		))
 	case 1:
 		profile = authed.Profiles[0]
@@ -102,7 +115,12 @@ func (t Login) run(ctx context.Context, account string, oauthc *http.Client, cht
 	}
 
 	if t.Browser {
-		return browserx.Open(ctx, fmt.Sprintf("%s?lt=%s", eg.EnvConsoleHostDefault(), profile.Token))
+		console := fmt.Sprintf("%s?lt=%s", eg.EnvConsoleHostDefault(), profile.Token)
+
+		// printed before opening so the url is available when the browser can't be opened, e.g. over ssh.
+		fmt.Println(console)
+
+		return browserx.Open(ctx, console)
 	}
 
 	if err = session(ctx, chttp, profile); err != nil {

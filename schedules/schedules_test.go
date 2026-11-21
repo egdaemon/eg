@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"strconv"
 	"testing"
+	"time"
 
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/httpx"
@@ -212,5 +213,20 @@ func TestRemove(t *testing.T) {
 
 		err := schedules.Remove(t.Context(), c, "s1")
 		require.NotNil(t, httpx.IsStatusError(err, http.StatusInternalServerError))
+	})
+}
+
+func TestPaused(t *testing.T) {
+	t.Run("should be paused when paused_at has passed", func(t *testing.T) {
+		require.True(t, schedules.Paused(&schedules.Schedule{PausedAt: time.Now().Add(-time.Hour).UTC().Format(time.RFC3339Nano)}))
+	})
+
+	t.Run("should not be paused at infinity", func(t *testing.T) {
+		require.False(t, schedules.Paused(&schedules.Schedule{PausedAt: "9999-12-31T23:59:59.999Z"}))
+	})
+
+	t.Run("should not be paused when unset or unparsable", func(t *testing.T) {
+		require.False(t, schedules.Paused(&schedules.Schedule{}))
+		require.False(t, schedules.Paused(&schedules.Schedule{PausedAt: "garbage"}))
 	})
 }

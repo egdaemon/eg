@@ -12,6 +12,7 @@ type Cmd struct {
 	Watch      watch       `cmd:"" help:"follow the logs and result of an enqueued workload by id"`
 	Download   download    `cmd:"" help:"download the logs or analytics of a workload by id"`
 	Cancel     cancel      `cmd:"" help:"cancel an enqueued or running workload by id"`
+	Run        run         `cmd:"" name:"run" help:"enqueue one of the repository's scheduled workloads now" hidden:"true"`
 	Local      local       `cmd:"" help:"execute the interpreter on the given directory"`
 	Baremetal  baremetal   `cmd:"" help:"execute the interpreter on the given directory within the host itself, inherently unsafe"`
 	Serve      serve       `cmd:"" help:"run a service within eg, automiacally uses builds and loads the nearest containerfile, from the workload up to the module directory, and .eg.env if it exists"`

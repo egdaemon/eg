@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"time"
 
 	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/internal/errorsx"
@@ -98,6 +99,13 @@ func Update(ctx context.Context, c *http.Client, id string, s *Schedule) (_ *Sch
 // Remove the schedule with the id.
 func Remove(ctx context.Context, c *http.Client, id string) error {
 	return errorsx.Wrap(do(ctx, c, http.MethodDelete, endpoint()+"/"+url.PathEscape(id), nil, nil), "unable to remove schedule")
+}
+
+// Paused reports whether the schedule is paused, its paused_at has passed. the control plane reports a schedule that
+// is not paused as paused at infinity, unset and unparsable timestamps are not paused either.
+func Paused(s *Schedule) bool {
+	at, err := time.Parse(time.RFC3339Nano, s.GetPausedAt())
+	return err == nil && !at.After(time.Now())
 }
 
 func do(ctx context.Context, c *http.Client, method string, target string, in any, out any) (err error) {

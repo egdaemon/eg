@@ -8,9 +8,11 @@ import (
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/md5x"
+	"github.com/egdaemon/eg/internal/stringsx"
 	"github.com/egdaemon/eg/interp/c8s"
 	"github.com/egdaemon/eg/interp/runtime/wasi/ffiguest"
 	"github.com/egdaemon/eg/runtime/wasi/egunsafe"
+	"github.com/egdaemon/eg/runtime/wasi/egunsafe/ffiegmachine"
 )
 
 func Pull(ctx context.Context, name string, args []string) error {
@@ -26,7 +28,18 @@ func Pull(ctx context.Context, name string, args []string) error {
 	)
 }
 
+// machine reports whether the module runs in a machine, where its containers are images it runs modules in
+// machines booted from, see ffiegmachine.
+func machine() bool {
+	return stringsx.Present(envx.String("", eg.EnvComputeEgiso))
+}
+
+// Build builds the container name from definition, in a machine the image, see machine.
 func Build(ctx context.Context, name, definition string, args []string) error {
+	if machine() {
+		return ffiegmachine.Build(ctx, name, definition, args)
+	}
+
 	cc, err := egunsafe.DialControlSocket(ctx)
 	if err != nil {
 		return err
@@ -56,7 +69,12 @@ func Run(ctx context.Context, name, modulepath string, cmd []string, args []stri
 	return errorsx.Wrap(err, "fun failed")
 }
 
+// Module runs the module at modulepath in the container name, in a machine booted from the image, see machine.
 func Module(ctx context.Context, name, modulepath string, options []string) error {
+	if machine() {
+		return ffiegmachine.Module(ctx, "", name, modulepath)
+	}
+
 	cc, err := egunsafe.DialControlSocket(ctx)
 	if err != nil {
 		return err

@@ -11,7 +11,6 @@ import (
 
 	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/internal/debugx"
-	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/execx"
 	"github.com/egdaemon/eg/internal/fsx"
@@ -22,7 +21,6 @@ import (
 	"github.com/egdaemon/eg/internal/termx"
 	"github.com/egdaemon/eg/internal/ttyx"
 	"github.com/egdaemon/eg/interp/c8s"
-	"github.com/egdaemon/eg/interp/machines"
 	"github.com/egdaemon/eg/workspaces"
 	"golang.org/x/exp/slices"
 	"google.golang.org/grpc"
@@ -60,15 +58,6 @@ func ServiceProxyOptionBaremetal(ps *ProxyService) {
 	ps.remap = workspaces.RemapBaremetal(ps.ws)
 }
 
-// ServiceProxyOptionMachines runs the modules of the root container, the image eg, in machines m boots
-// from the egiso of the machine running the service, which is the root container, so it is never built.
-// nil runs them in containers.
-func ServiceProxyOptionMachines(m machines.MachinesServer) ServiceProxyOption {
-	return func(ps *ProxyService) {
-		ps.machines = m
-	}
-}
-
 func NewServiceProxy(l *log.Logger, ws workspaces.Context, options ...ServiceProxyOption) *ProxyService {
 	svc := langx.Clone(ProxyService{
 		log:   l,
@@ -88,7 +77,6 @@ type ProxyService struct {
 	containeropts []string
 	buildopts     []string
 	mux           *ttyx.Mux
-	machines      machines.MachinesServer
 }
 
 func (t *ProxyService) Bind(host grpc.ServiceRegistrar) {
@@ -127,17 +115,13 @@ func (t *ProxyService) buildoptions(req *c8s.BuildRequest) []string {
 
 // Build implements ProxyServer.
 func (t *ProxyService) Build(ctx context.Context, req *c8s.BuildRequest) (_ *c8s.BuildResponse, err error) {
-	var (
-		cmd     *exec.Cmd
-		abspath = t.remap(req.Definition)
-	)
 	debugx.Println("PROXY CONTAINER BUILD INITIATED", errorsx.Zero(os.Getwd()), t.ws.Root)
 	defer debugx.Println("PROXY CONTAINER BUILD COMPLETED", errorsx.Zero(os.Getwd()), t.ws.Root)
+	var (
+		cmd *exec.Cmd
+	)
 
-	if t.machines != nil && req.Name == "eg" {
-		return &c8s.BuildResponse{}, nil
-	}
-
+	abspath := t.remap(req.Definition)
 	if !filepath.IsAbs(abspath) {
 		abspath = filepath.Join(t.ws.WorkingDir, req.Definition)
 	}
@@ -204,34 +188,10 @@ func (t *ProxyService) Run(ctx context.Context, req *c8s.RunRequest) (_ *c8s.Run
 	return &c8s.RunResponse{}, nil
 }
 
-// environ is the environment podman's -e and --env options give a container: KEY=VALUE as it is, and
-// KEY with the value it has here, when it has one.
-func environ(options []string) (env []string) {
-	for i := 0; i+1 < len(options); i++ {
-		if options[i] != "-e" && options[i] != "--env" {
-			continue
-		}
-		i++
-		if strings.Contains(options[i], "=") {
-			env = append(env, options[i])
-		} else if v, ok := os.LookupEnv(options[i]); ok {
-			env = append(env, envx.Format(options[i], v))
-		}
-	}
-	return env
-}
-
 // Module implements ProxyServer.
 func (t *ProxyService) Module(ctx context.Context, req *c8s.ModuleRequest) (_ *c8s.ModuleResponse, err error) {
 	debugx.Println("PROXY CONTAINER MODULE INITIATED", errorsx.Zero(os.Getwd()))
 	defer debugx.Println("PROXY CONTAINER MODULE COMPLETED", errorsx.Zero(os.Getwd()))
-
-	if t.machines != nil && req.Image == "eg" {
-		if _, err = t.machines.Module(ctx, &machines.ModuleRequest{Module: req.Module, Options: environ(req.Options)}); err != nil {
-			return nil, err
-		}
-		return &c8s.ModuleResponse{}, nil
-	}
 
 	// log.Println("reqopts", req.Options)
 	// log.Println("image", req.Image)

@@ -166,18 +166,16 @@ func (t upload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, ident *cmdide
 		return errorsx.Wrap(err, "unable to pack the kernel archive")
 	}
 
+	debugx.Fn(func() {
+		errorsx.Log(errorsx.Wrap(iox.Rewind(archiveio), "unable to rewind kernel archive"))
+		errorsx.Log(errorsx.Wrap(tarx.Inspect(gctx.Context, archiveio), "unable to inspect archive"))
+	})
+
 	if err = iox.Rewind(archiveio); err != nil {
 		return errorsx.Wrap(err, "unable to rewind kernel archive")
 	}
 
 	log.Println("archive", archiveio.Name())
-	// if err = tarx.Inspect(archiveio); err != nil {
-	// 	log.Println(errorsx.Wrap(err, "unable to inspect archive"))
-	// }
-
-	// if err = iox.Rewind(archiveio); err != nil {
-	// 	return errorsx.Wrap(err, "unable to rewind kernel archive")
-	// }
 
 	ainfo := errorsx.Zero(os.Stat(archiveio.Name()))
 	log.Println("archive metadata", ainfo.Name(), bytesx.Unit(ainfo.Size()))

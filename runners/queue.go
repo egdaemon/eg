@@ -188,14 +188,16 @@ func BuildRootContainer(ctx context.Context, options ...string) error {
 	defer os.RemoveAll(tmpdir)
 	rootc := filepath.Join(tmpdir, "Containerfile")
 
-	return BuildRootContainerPath(ctx, tmpdir, rootc, options...)
+	return BuildRootContainerPath(ctx, tmpdir, rootc, "", options...)
 }
 
-func BuildRootContainerPath(ctx context.Context, dir, path string, options ...string) (err error) {
+// BuildRootContainerPath builds the root container from the Containerfile at path, which is written from the
+// embedded default or, when src is not blank, from the Containerfile at src.
+func BuildRootContainerPath(ctx context.Context, dir, path, src string, options ...string) (err error) {
 	debugx.Println("building root container initiated")
 	defer debugx.Println("building root container completed")
 
-	if err = eg.PrepareRootContainer(path); err != nil {
+	if err = eg.PrepareRootContainer(path, src); err != nil {
 		return errorsx.Wrapf(err, "preparing root container failed: %s", path)
 	}
 

@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/egdaemon/eg/internal/fsx"
 	"github.com/egdaemon/eg/internal/md5x"
 	"github.com/egdaemon/eg/internal/slicesx"
 	"github.com/egdaemon/eg/internal/stringsx"
@@ -298,7 +299,9 @@ func ModuleMount() string {
 //go:embed DefaultContainerfile
 var Embedded embed.FS
 
-func PrepareRootContainer(cpath string) (err error) {
+// PrepareRootContainer writes the root container's Containerfile to cpath. by default it is the embedded
+// one, a non blank source replaces it with the Containerfile at that path.
+func PrepareRootContainer(cpath string, source ...string) (err error) {
 	var (
 		c   fs.File
 		dst *os.File
@@ -307,7 +310,12 @@ func PrepareRootContainer(cpath string) (err error) {
 	tracex.Println("---------------------- Prepare Root Container Initiated ----------------------")
 	tracex.Println("default container path", cpath)
 	defer tracex.Println("---------------------- Prepare Root Container Completed ----------------------")
-	if c, err = Embedded.Open("DefaultContainerfile"); err != nil {
+
+	if custom := fsx.LocateFirst(source...); custom != "" {
+		if c, err = os.Open(custom); err != nil {
+			return err
+		}
+	} else if c, err = Embedded.Open("DefaultContainerfile"); err != nil {
 		return err
 	}
 	defer c.Close()

@@ -30,7 +30,7 @@ type run struct {
 	SSHKeyPath  string `name:"sshkeypath" help:"path to ssh key to use" default:"${vars_ssh_key_path}"`
 	ID          string `name:"id" help:"id of the schedule, selects one explicitly when the workload matches several schedules"`
 	Follow      bool   `name:"follow" help:"stream the workload's logs once it is running, requires a runner supporting log streaming" negatable:"" default:"true"`
-	Name        string `arg:"" name:"workload" help:"name of the scheduled workload to run, i.e. the workload of the schedule" default:""`
+	Name        string `arg:"" name:"workload" help:"name of the scheduled workload to run, i.e. the workload of the schedule" default:"" predictor:"eg.workload"`
 }
 
 func (t run) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, ident *cmdidentity.T) (err error) {

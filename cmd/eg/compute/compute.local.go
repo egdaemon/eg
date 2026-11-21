@@ -58,6 +58,7 @@ type local struct {
 	GCPAuto          bool     `name:"gcp-auto" help:"use the default well known path for gcp's application default credentials"`
 	GCP              string   `name:"gcp" help:"path to gcp's application default credentials"`
 	InvalidateCache  bool     `name:"invalidate-cache" help:"removes workload build cache"`
+	Containerfile    string   `name:"containerfile" help:"containerfile to build the workload's container from, relative to the repository directory. by default the nearest Containerfile, from the workload's directory up to the module directory, falling back to the builtin container. it must provide the same runtime the builtin container does"`
 	EnvironmentPaths []string `name:"envpath" help:"environment files to pass to the module" default:""`
 	Environment      []string `name:"env" short:"e" help:"define environment variables and their values to be included"`
 	GitRemote        string   `name:"git-remote" help:"name of the git remote to use" default:"${vars_git_default_remote_name}"`
@@ -298,7 +299,12 @@ func (t local) podman(ctx context.Context, ws workspaces.Context, uid uuidx.UUID
 		return nil, errorsx.Wrap(err, "unable to connect to podman")
 	}
 
-	if err = runners.BuildRootContainerPath(ctx, t.Dir, filepath.Join(ws.RuntimeDir, "Containerfile"), "", "--build-arg", envx.Format(eg.EnvBuildCommit, cmdopts.BuildCommit()), "--platform", platform); err != nil {
+	containerfile, err := runners.LocateContainerfile(t.Dir, filepath.Join(t.Dir, t.ModuleDir), filepath.Join(t.Dir, t.ModuleDir, t.Name), t.Containerfile)
+	if err != nil {
+		return nil, err
+	}
+
+	if err = runners.BuildRootContainerPath(ctx, t.Dir, filepath.Join(ws.RuntimeDir, "Containerfile"), containerfile, "--build-arg", envx.Format(eg.EnvBuildCommit, cmdopts.BuildCommit()), "--platform", platform); err != nil {
 		return nil, err
 	}
 
@@ -381,7 +387,12 @@ func (t local) machine(c *http.Client, uri string) runners.BFn {
 		)
 
 		if stringsx.Blank(uri) {
-			if uri, err = rootegiso(ctx, t.Dir, filepath.Join(ws.RuntimeDir, "Containerfile"), "", t.Arch); err != nil {
+			containerfile, err := runners.LocateContainerfile(t.Dir, filepath.Join(t.Dir, t.ModuleDir), filepath.Join(t.Dir, t.ModuleDir, t.Name), t.Containerfile)
+			if err != nil {
+				return nil, err
+			}
+
+			if uri, err = rootegiso(ctx, t.Dir, filepath.Join(ws.RuntimeDir, "Containerfile"), containerfile, t.Arch); err != nil {
 				return nil, err
 			}
 		}

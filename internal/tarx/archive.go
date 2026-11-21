@@ -4,7 +4,9 @@ import (
 	"archive/tar"
 	"compress/gzip"
 	"context"
+	"errors"
 	"io"
+	"io/fs"
 	"log"
 	"math/rand/v2"
 	"os"
@@ -50,8 +52,88 @@ func WriteFileToArchive(tw *tar.Writer, hdr *tar.Header, reader io.Reader) (err 
 	return nil
 }
 
-// Pack the set of paths into the archive. caller is responsible for rewinding the writer.
-func Pack(dst io.Writer, paths ...string) (err error) {
+// Packer writes a prepared entry to the archive.
+type Packer func(tw *tar.Writer) error
+
+// Paths yields a Packer for every file and directory beneath each of the paths, named relative to the path
+// it was found in. the path itself is not an entry when it is a directory.
+func Paths(paths ...string) iterx.Seq[Packer] {
+	return iterx.New(func(ctx context.Context, yield func(Packer) bool) error {
+		for _, basepath := range paths {
+			walker := func(path string, info os.FileInfo, err error) error {
+				if err != nil {
+					return err
+				}
+
+				// skip the root directory itself.
+				if basepath == path && info.IsDir() {
+					return nil
+				}
+
+				if !yield(func(tw *tar.Writer) error { return write(basepath, path, tw, info) }) {
+					return iterx.ErrIterationComplete
+				}
+
+				return nil
+			}
+
+			if err := filepath.Walk(basepath, walker); errors.Is(err, iterx.ErrIterationComplete) {
+				return nil
+			} else if err != nil {
+				return err
+			}
+		}
+
+		return nil
+	})
+}
+
+// File yields a Packer for the file at src, which is named dst within the archive.
+func File(src, dst string) iterx.Seq[Packer] {
+	return file(src, dst, false)
+}
+
+// MaybeFile is File that yields nothing when src does not exist, including when src is blank.
+func MaybeFile(src, dst string) iterx.Seq[Packer] {
+	return file(src, dst, true)
+}
+
+func file(src, dst string, optional bool) iterx.Seq[Packer] {
+	return iterx.New(func(ctx context.Context, yield func(Packer) bool) error {
+		info, err := os.Stat(src)
+		if optional && errors.Is(err, fs.ErrNotExist) {
+			return nil
+		}
+
+		if err != nil {
+			return errorsx.Wrapf(err, "failed to stat path: %s", src)
+		}
+
+		yield(func(tw *tar.Writer) (err error) {
+			var (
+				f      *os.File
+				header *tar.Header
+			)
+
+			if f, err = os.Open(src); err != nil {
+				return errorsx.Wrap(err, "failed to open path")
+			}
+			defer f.Close()
+
+			if header, err = tar.FileInfoHeader(info, ""); err != nil {
+				return errorsx.Wrap(err, "failed to created header")
+			}
+			header.Name = dst
+
+			return WriteFileToArchive(tw, header, f)
+		})
+
+		return nil
+	})
+}
+
+// Pack the contents into the archive. caller is responsible for rewinding the writer.
+func Pack(ctx context.Context, dst io.Writer, contents ...iterx.Seq[Packer]) (err error) {
 	var (
 		gw *gzip.Writer
 		tw *tar.Writer
@@ -66,21 +148,14 @@ func Pack(dst io.Writer, paths ...string) (err error) {
 	tw = tar.NewWriter(gw)
 	defer tw.Close()
 
-	for _, basepath := range paths {
-		walker := func(path string, info os.FileInfo, err error) error {
-			if err != nil {
+	for _, c := range contents {
+		for packer := range c.Each(ctx) {
+			if err = packer(tw); err != nil {
 				return err
 			}
-
-			// skip the root directory itself.
-			if basepath == path && info.IsDir() {
-				return nil
-			}
-
-			return write(basepath, path, tw, info)
 		}
 
-		if err = filepath.Walk(basepath, walker); err != nil {
+		if err = c.Err(); err != nil {
 			return err
 		}
 	}

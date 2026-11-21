@@ -175,7 +175,7 @@ func (t cacheoptions) run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, ident *
 	}
 	defer archiveio.Close()
 
-	if err = tarx.Pack(archiveio, append([]string{filepath.Join(ws.Root, ws.BuildDir), environio.Name()}, extra...)...); err != nil {
+	if err = tarx.Pack(gctx.Context, archiveio, tarx.Paths(append([]string{filepath.Join(ws.Root, ws.BuildDir), environio.Name()}, extra...)...)); err != nil {
 		return errorsx.Wrap(err, "unable to pack the kernel archive")
 	}
 

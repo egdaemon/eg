@@ -162,7 +162,7 @@ func (t upload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, ident *cmdide
 	}
 	defer archiveio.Close()
 
-	if err = tarx.Pack(archiveio, filepath.Join(ws.Root, ws.BuildDir), environio.Name()); err != nil {
+	if err = tarx.Pack(gctx.Context, archiveio, tarx.Paths(filepath.Join(ws.Root, ws.BuildDir), environio.Name())); err != nil {
 		return errorsx.Wrap(err, "unable to pack the kernel archive")
 	}
 

@@ -69,43 +69,6 @@ func (t serve) datadir(rels ...string) string {
 	return filepath.Join(t.Dir, t.ModuleDir, t.Name, filepath.Join(rels...))
 }
 
-// containerfile the Containerfile the workload's container is built from: the one asked for, otherwise the nearest
-// one from the workload's directory up to the module directory, so a Containerfile in a directory serves the
-// workloads below it and a workload's own takes precedence.
-func (t serve) containerfile() (string, error) {
-	if t.Containerfile != "" {
-		path := t.Containerfile
-		if !filepath.IsAbs(path) {
-			path = filepath.Join(t.Dir, path)
-		}
-
-		if _, err := os.Stat(path); err != nil {
-			return "", errorsx.Wrapf(err, "unable to use the containerfile %s", path)
-		}
-
-		return path, nil
-	}
-
-	var (
-		root = filepath.Join(t.Dir, t.ModuleDir)
-		dir  = t.datadir()
-	)
-
-	for {
-		candidate := filepath.Join(dir, "Containerfile")
-		if _, err := os.Stat(candidate); err == nil {
-			return candidate, nil
-		}
-
-		if parent := filepath.Dir(dir); dir != root && parent != dir {
-			dir = parent
-			continue
-		}
-
-		return "", errorsx.Errorf("no Containerfile in %s or the directories above it up to %s", t.datadir(), root)
-	}
-}
-
 func (t serve) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath, session *cmdsession.ComputeSession, clidb *cmddb.CLIDB) (err error) {
 	var (
 		uid       = uuidx.FirstNonNil(session.Session, uuidx.NewV7())
@@ -274,9 +237,14 @@ func (t serve) podman(ctx context.Context, ws workspaces.Context, uid uuidx.UUID
 	sshserver := runners.AgentOptionSSHServer(ctx, ws, t.SSHKeyPath, t.SSH)
 
 	imagename := stringsx.Join(".", "eg.serve", strings.ReplaceAll(t.Name, string(filepath.Separator), "."))
-	containerfile, err := t.containerfile()
+	// the one asked for, otherwise the nearest from the workload's directory up to the module directory.
+	containerfile, err := runners.LocateContainerfile(t.Dir, filepath.Join(t.Dir, t.ModuleDir), t.datadir(), t.Containerfile)
 	if err != nil {
 		return nil, errorsx.Wrap(err, "serve requires a containerfile to run")
+	}
+
+	if containerfile == "" {
+		return nil, errorsx.Errorf("serve requires a containerfile to run: no Containerfile in %s or the directories above it up to %s", t.datadir(), filepath.Join(t.Dir, t.ModuleDir))
 	}
 
 	if err = runners.BuildContainer(ctx, imagename, t.Dir, containerfile); err != nil {

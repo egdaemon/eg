@@ -201,7 +201,11 @@ func Unpack(ctx context.Context, root string, r io.Reader) (err error) {
 		// if it's a file create it
 		case tar.TypeReg:
 			writefile := func() error {
-				// log.Println("writing", header.Name, "->", target)
+				// archives are not guaranteed to contain entries for the parent directories (e.g. File).
+				if err = os.MkdirAll(filepath.Dir(target), 0755); err != nil {
+					return errorsx.Wrapf(err, "failed to create directory: %s", filepath.Dir(target))
+				}
+
 				if dst, err = os.OpenFile(target, os.O_CREATE|os.O_RDWR, os.FileMode(header.Mode)); err != nil {
 					return errorsx.Wrapf(err, "failed to open file: %s", target)
 				}

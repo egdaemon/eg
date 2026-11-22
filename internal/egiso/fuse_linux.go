@@ -53,7 +53,7 @@ func ServeFUSE(dev *os.File, fsys *SysFS, options ...NFSOption) error {
 	if fd, err = unix.FcntlInt(dev.Fd(), unix.F_DUPFD_CLOEXEC, 0); err != nil {
 		return errorsx.Wrap(err, "unable to duplicate the mount's descriptor")
 	}
-	if server, err = fuse.NewServer(gofs.NewNodeFS(&fusenode{fsys: served}, &gofs.Options{EntryTimeout: &entry, AttrTimeout: &attr, NegativeTimeout: &negative, Logger: log.New(io.Discard, "", log.Flags())}), fmt.Sprintf("/dev/fd/%d", fd), &fuse.MountOptions{DisableXAttrs: true}); err != nil {
+	if server, err = fuse.NewServer(gofs.NewNodeFS(&fusenode{fsys: served}, &gofs.Options{EntryTimeout: &entry, AttrTimeout: &attr, NegativeTimeout: &negative, Logger: log.New(io.Discard, "", log.Flags())}), fmt.Sprintf("/dev/fd/%d", fd), &fuse.MountOptions{DisableXAttrs: true, Logger: log.New(io.Discard, "", log.Flags())}); err != nil {
 		return errorsx.Compact(errorsx.Wrap(err, "unable to serve the mount"), unix.Close(fd))
 	}
 	server.Serve()

@@ -4,8 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/egdaemon/eg/cmd/cmddb"
-	"github.com/egdaemon/eg/cmd/cmdsession"
 	"log"
 	"net/http"
 	"os"
@@ -14,6 +12,9 @@ import (
 	"runtime"
 	"strconv"
 	"time"
+
+	"github.com/egdaemon/eg/cmd/cmddb"
+	"github.com/egdaemon/eg/cmd/cmdsession"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/egdaemon/eg"
@@ -297,7 +298,7 @@ func (t local) podman(ctx context.Context, ws workspaces.Context, uid uuidx.UUID
 		return nil, errorsx.Wrap(err, "unable to connect to podman")
 	}
 
-	if err = runners.BuildRootContainerPath(ctx, t.Dir, filepath.Join(ws.RuntimeDir, "Containerfile"), "--build-arg", envx.Format(eg.EnvBuildCommit, cmdopts.BuildCommit()), "--platform", platform); err != nil {
+	if err = runners.BuildRootContainerPath(ctx, t.Dir, filepath.Join(ws.RuntimeDir, "Containerfile"), "", "--build-arg", envx.Format(eg.EnvBuildCommit, cmdopts.BuildCommit()), "--platform", platform); err != nil {
 		return nil, err
 	}
 
@@ -353,14 +354,15 @@ func (t local) podman(ctx context.Context, ws workspaces.Context, uid uuidx.UUID
 	return container{ctx: pctx, ws: ws, uid: uid, agent: ragent, image: eg.WorkingDirectory}, nil
 }
 
-// rootegiso builds an egiso of the default root container, written to path, with buildah. buildah
-// runs only on linux, so elsewhere a machine needs the egiso it boots from.
-func rootegiso(ctx context.Context, dir, path, arch string) (_ string, err error) {
+// rootegiso builds an egiso of the root container, written to path, with buildah. the root container is
+// the default unless src is not blank, then it is the containerfile at src. buildah runs only on linux, so
+// elsewhere a machine needs the egiso it boots from.
+func rootegiso(ctx context.Context, dir, path, src, arch string) (_ string, err error) {
 	if runtime.GOOS != "linux" {
 		return "", errorsx.Errorf("building the root egiso needs buildah, which runs on linux; pass the egiso to boot with --egiso")
 	}
 
-	if err = eg.PrepareRootContainer(path); err != nil {
+	if err = eg.PrepareRootContainer(path, src); err != nil {
 		return "", errorsx.Wrapf(err, "preparing root container failed: %s", path)
 	}
 
@@ -379,7 +381,7 @@ func (t local) machine(c *http.Client, uri string) runners.BFn {
 		)
 
 		if stringsx.Blank(uri) {
-			if uri, err = rootegiso(ctx, t.Dir, filepath.Join(ws.RuntimeDir, "Containerfile"), t.Arch); err != nil {
+			if uri, err = rootegiso(ctx, t.Dir, filepath.Join(ws.RuntimeDir, "Containerfile"), "", t.Arch); err != nil {
 				return nil, err
 			}
 		}

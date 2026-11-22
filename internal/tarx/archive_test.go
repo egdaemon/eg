@@ -3,6 +3,7 @@ package tarx_test
 import (
 	"archive/tar"
 	"bytes"
+	"compress/gzip"
 	"io"
 	"os"
 	"path/filepath"
@@ -24,7 +25,7 @@ func TestSize(t *testing.T) {
 		require.NoError(t, os.WriteFile(single, bytes.Repeat([]byte("c"), 7), 0600))
 
 		buf := bytes.NewBuffer(nil)
-		require.NoError(t, tarx.Pack(buf, dir, single))
+		require.NoError(t, tarx.Pack(t.Context(), buf, tarx.Paths(dir, single)))
 
 		n, err := tarx.Size(t.Context(), buf)
 		require.NoError(t, err)
@@ -33,7 +34,7 @@ func TestSize(t *testing.T) {
 
 	t.Run("an empty archive is zero", func(t *testing.T) {
 		buf := bytes.NewBuffer(nil)
-		require.NoError(t, tarx.Pack(buf))
+		require.NoError(t, tarx.Pack(t.Context(), buf))
 
 		n, err := tarx.Size(t.Context(), buf)
 		require.NoError(t, err)
@@ -142,5 +143,83 @@ func TestWriteFileToArchive(t *testing.T) {
 		w := tar.NewWriter(io.Discard)
 		require.NoError(t, w.Close())
 		require.ErrorIs(t, tarx.WriteFileToArchive(w, &tar.Header{Typeflag: tar.TypeReg, Name: "a.txt"}, strings.NewReader("")), tar.ErrWriteAfterClose)
+	})
+}
+
+func TestPack(t *testing.T) {
+	read := func(t *testing.T, buf *bytes.Buffer) map[string]string {
+		gz, err := gzip.NewReader(buf)
+		require.NoError(t, err)
+		r := tar.NewReader(gz)
+
+		found := map[string]string{}
+		for header := range tarx.Entries(r).Each(t.Context()) {
+			data, err := io.ReadAll(r)
+			require.NoError(t, err)
+			found[header.Name] = string(data)
+		}
+
+		return found
+	}
+
+	t.Run("paths are named relative to the path they are found in", func(t *testing.T) {
+		dir := t.TempDir()
+		require.NoError(t, os.MkdirAll(filepath.Join(dir, "nested"), 0700))
+		require.NoError(t, os.WriteFile(filepath.Join(dir, "nested", "a.txt"), []byte("a"), 0600))
+
+		single := filepath.Join(t.TempDir(), "b.txt")
+		require.NoError(t, os.WriteFile(single, []byte("b"), 0600))
+
+		buf := bytes.NewBuffer(nil)
+		require.NoError(t, tarx.Pack(t.Context(), buf, tarx.Paths(dir, single)))
+		require.Equal(t, map[string]string{"nested": "", "nested/a.txt": "a", "b.txt": "b"}, read(t, buf))
+	})
+
+	t.Run("a file is named dst and combines with paths", func(t *testing.T) {
+		dir := t.TempDir()
+		require.NoError(t, os.WriteFile(filepath.Join(dir, "a.txt"), []byte("a"), 0600))
+
+		src := filepath.Join(t.TempDir(), "Containerfile.custom")
+		require.NoError(t, os.WriteFile(src, []byte("FROM scratch"), 0600))
+
+		buf := bytes.NewBuffer(nil)
+		require.NoError(t, tarx.Pack(t.Context(), buf, tarx.Paths(dir), tarx.File(src, ".eg/Containerfile")))
+		require.Equal(t, map[string]string{"a.txt": "a", ".eg/Containerfile": "FROM scratch"}, read(t, buf))
+	})
+
+	t.Run("a file that does not exist fails", func(t *testing.T) {
+		require.Error(t, tarx.Pack(t.Context(), bytes.NewBuffer(nil), tarx.File(filepath.Join(t.TempDir(), "missing"), "a")))
+	})
+
+	t.Run("a path that does not exist fails", func(t *testing.T) {
+		require.Error(t, tarx.Pack(t.Context(), bytes.NewBuffer(nil), tarx.Paths(filepath.Join(t.TempDir(), "missing"))))
+	})
+}
+
+func TestMaybeFile(t *testing.T) {
+	t.Run("a file that exists is named dst", func(t *testing.T) {
+		src := filepath.Join(t.TempDir(), "Containerfile")
+		require.NoError(t, os.WriteFile(src, []byte("FROM scratch"), 0600))
+
+		buf := bytes.NewBuffer(nil)
+		require.NoError(t, tarx.Pack(t.Context(), buf, tarx.MaybeFile(src, ".eg/Containerfile")))
+
+		gz, err := gzip.NewReader(buf)
+		require.NoError(t, err)
+		r := tar.NewReader(gz)
+
+		header, err := r.Next()
+		require.NoError(t, err)
+		require.Equal(t, ".eg/Containerfile", header.Name)
+	})
+
+	t.Run("a file that does not exist or is blank is skipped", func(t *testing.T) {
+		for _, src := range []string{"", filepath.Join(t.TempDir(), "missing")} {
+			buf := bytes.NewBuffer(nil)
+			require.NoError(t, tarx.Pack(t.Context(), buf, tarx.MaybeFile(src, "a")))
+			n, err := tarx.Size(t.Context(), buf)
+			require.NoError(t, err)
+			require.Zero(t, n)
+		}
 	})
 }

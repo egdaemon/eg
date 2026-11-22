@@ -249,7 +249,7 @@ func (t statecompiling) Update(ctx context.Context) state {
 	}
 	defer archiveio.Close()
 
-	if err = tarx.Pack(archiveio, filepath.Join(ws.Root, ws.BuildDir), environpath); err != nil {
+	if err = tarx.Pack(ctx, archiveio, tarx.Paths(filepath.Join(ws.Root, ws.BuildDir), environpath)); err != nil {
 		return compilefailed(t.compilejob, errorsx.Wrap(err, "unable to pack archive"))
 	}
 

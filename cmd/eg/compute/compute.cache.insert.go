@@ -69,7 +69,7 @@ func cachePayload(ctx context.Context, dir string, paths ...string) (path string
 	}
 	defer payload.Close()
 
-	if err = tarx.Pack(payload, paths...); err != nil {
+	if err = tarx.Pack(ctx, payload, tarx.Paths(paths...)); err != nil {
 		return "", 0, errorsx.Wrap(err, "unable to pack the payload archive")
 	}
 

@@ -63,6 +63,32 @@ func LocateWithin(dir, name string) string {
 	return name
 }
 
+// LocateWithinUntil looks for the provided filename in dir and then each of its parents, up to and including
+// stop. unlike LocateWithin it never looks above stop and returns an empty string when nothing is found.
+// when dir is not within stop only dir itself is checked.
+func LocateWithinUntil(dir, stop, name string) string {
+	dir, stop = filepath.Clean(dir), filepath.Clean(stop)
+
+	// never walk above a stop that dir is not beneath.
+	if rel, err := filepath.Rel(stop, dir); err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		stop = dir
+	}
+
+	for {
+		path := filepath.Join(dir, name)
+		if _, err := os.Stat(path); err == nil {
+			return path
+		}
+
+		parent := filepath.Dir(dir)
+		if dir == stop || parent == dir {
+			return ""
+		}
+
+		dir = parent
+	}
+}
+
 // LocateFirstInDir locates the first file in the given directory by name.
 func LocateFirstInDir(dir string, names ...string) (result string) {
 	for _, name := range names {

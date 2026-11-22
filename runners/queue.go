@@ -188,14 +188,16 @@ func BuildRootContainer(ctx context.Context, options ...string) error {
 	defer os.RemoveAll(tmpdir)
 	rootc := filepath.Join(tmpdir, "Containerfile")
 
-	return BuildRootContainerPath(ctx, tmpdir, rootc, options...)
+	return BuildRootContainerPath(ctx, tmpdir, rootc, "", options...)
 }
 
-func BuildRootContainerPath(ctx context.Context, dir, path string, options ...string) (err error) {
+// BuildRootContainerPath builds the root container from the Containerfile at path, which is written from the
+// embedded default or, when src is not blank, from the Containerfile at src.
+func BuildRootContainerPath(ctx context.Context, dir, path, src string, options ...string) (err error) {
 	debugx.Println("building root container initiated")
 	defer debugx.Println("building root container completed")
 
-	if err = eg.PrepareRootContainer(path); err != nil {
+	if err = eg.PrepareRootContainer(path, src); err != nil {
 		return errorsx.Wrapf(err, "preparing root container failed: %s", path)
 	}
 
@@ -828,7 +830,22 @@ func (t staterunning) Update(ctx context.Context) state {
 	}
 	defer stopwatch()
 
-	err = c8sproxy.PodmanModule(wctx, prepcmd, "eg", fmt.Sprintf("eg-%s", t.ragent.id), t.ws.RuntimeDir, nil, options...)
+	// a workload uploaded with its own containerfile runs in a container built from it, otherwise in the runner's root container.
+	image := "eg"
+	if contextdir := filepath.Join(t.ws.RuntimeDir, filepath.Dir(ArchiveContainerfile)); fsx.FileExists(filepath.Join(t.ws.RuntimeDir, ArchiveContainerfile)) {
+		image = fmt.Sprintf("eg.%s", t.ragent.id)
+
+		// the build context is only the directory holding the containerfile, the archive carries no repository.
+		if err = BuildContainer(wctx, image, contextdir, filepath.Join(t.ws.RuntimeDir, ArchiveContainerfile)); err != nil {
+			return completed(t.workload, t.metadata, t.bucket, t.ws, time.Since(ts), errorsx.Wrap(err, "unable to build the workload's container"))
+		}
+
+		defer func() {
+			errorsx.Log(errorsx.Wrap(exec.Command("podman", "rmi", "--force", image).Run(), "unable to remove the workload's container image"))
+		}()
+	}
+
+	err = c8sproxy.PodmanModule(wctx, prepcmd, image, fmt.Sprintf("eg-%s", t.ragent.id), t.ws.RuntimeDir, nil, options...)
 	if errors.Is(context.Cause(wctx), ErrCancelled) {
 		err = ErrCancelled
 	}

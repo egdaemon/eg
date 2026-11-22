@@ -39,14 +39,17 @@ func TestServeContainerfile(t *testing.T) {
 			"dev/own/deep": ".eg/dev/own/Containerfile",
 			"dev":          ".eg/dev/Containerfile",
 		} {
-			found, err := serve{Dir: root, ModuleDir: ".eg", Name: name}.containerfile()
+			s := serve{Dir: root, ModuleDir: ".eg", Name: name}
+			found, err := runners.LocateContainerfile(s.Dir, filepath.Join(s.Dir, s.ModuleDir), s.datadir(), s.Containerfile)
 			require.NoError(t, err, name)
 			require.Equal(t, filepath.Join(root, expected), found, name)
 		}
 
 		// nothing between the workload and the module directory.
-		_, err := serve{Dir: root, ModuleDir: ".eg", Name: "other"}.containerfile()
-		require.ErrorContains(t, err, "no Containerfile")
+		s := serve{Dir: root, ModuleDir: ".eg", Name: "other"}
+		found, err := runners.LocateContainerfile(s.Dir, filepath.Join(s.Dir, s.ModuleDir), s.datadir(), s.Containerfile)
+		require.NoError(t, err)
+		require.Empty(t, found)
 	})
 
 	t.Run("the containerfile flag is relative to the repository directory", func(t *testing.T) {
@@ -54,11 +57,13 @@ func TestServeContainerfile(t *testing.T) {
 		require.NoError(t, os.MkdirAll(filepath.Join(root, ".eg", "dev"), 0700))
 		require.NoError(t, os.WriteFile(filepath.Join(root, ".eg", "dev", "Containerfile"), []byte("FROM scratch\n"), 0600))
 
-		found, err := serve{Dir: root, ModuleDir: ".eg", Name: "elsewhere", Containerfile: ".eg/dev/Containerfile"}.containerfile()
+		s := serve{Dir: root, ModuleDir: ".eg", Name: "elsewhere", Containerfile: ".eg/dev/Containerfile"}
+		found, err := runners.LocateContainerfile(s.Dir, filepath.Join(s.Dir, s.ModuleDir), s.datadir(), s.Containerfile)
 		require.NoError(t, err)
 		require.Equal(t, filepath.Join(root, ".eg", "dev", "Containerfile"), found)
 
-		_, err = serve{Dir: root, ModuleDir: ".eg", Name: "x", Containerfile: ".eg/missing"}.containerfile()
+		s = serve{Dir: root, ModuleDir: ".eg", Name: "x", Containerfile: ".eg/missing"}
+		_, err = runners.LocateContainerfile(s.Dir, filepath.Join(s.Dir, s.ModuleDir), s.datadir(), s.Containerfile)
 		require.Error(t, err)
 	})
 

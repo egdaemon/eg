@@ -118,10 +118,14 @@ func Debug(op eg.OpFn, debug ...eg.OpFn) eg.OpFn {
 
 // prints current environment variables.
 func Env(ctx context.Context, op eg.Op) error {
+	// redact sensitive values.
+	environ := errorsx.Zero(envx.Redact(envx.Build().FromEnv(os.Environ()...), egenv.RunID(), _eg.SensitiveEnvironment()...).Environ())
+	runtime := shell.Runtime().
+		EnvironFrom(environ...)
 	return shell.Run(
 		ctx,
-		shell.New("env | sort"),
-		shell.New("env | sort | md5sum"),
+		runtime.New("env | sort"),
+		runtime.New("env | sort | md5sum"),
 	)
 }
 

@@ -175,12 +175,12 @@ func ModifiedOptionRuntimeDirectory(dir string) modifiedoption {
 	}
 }
 
-func NewModified(options ...modifiedoption) modified {
+func NewModified(options ...modifiedoption) *modified {
 	cfg := langx.Clone(modified{
 		runtime: shell.Runtime(),
 		getenv:  os.Getenv,
 		workdir: egenv.DirectoryWorking,
 		rundir:  egenv.DirectoryTemp,
 	}, options...)
-	return modified{o: sync.Once{}, runtime: cfg.runtime, getenv: cfg.getenv, workdir: cfg.workdir, rundir: cfg.rundir}
+	return &modified{o: sync.Once{}, runtime: cfg.runtime, getenv: cfg.getenv, workdir: cfg.workdir, rundir: cfg.rundir}
 }

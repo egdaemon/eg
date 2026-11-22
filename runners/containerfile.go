@@ -2,9 +2,12 @@ package runners
 
 import (
 	"path/filepath"
+	"strings"
 
+	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/fsx"
+	"github.com/egdaemon/eg/internal/stringsx"
 )
 
 // ContainerfileName the name of the file nearest-lookups search for.
@@ -17,19 +20,25 @@ const ArchiveContainerfile = ".eg/" + ContainerfileName
 // LocateContainerfile the Containerfile a workload's container is built from: the explicit one when provided,
 // otherwise the nearest one from workloaddir up to and including root. an explicit path is relative to repo
 // unless it is absolute and must exist. an empty path with no error means no Containerfile was found.
-func LocateContainerfile(repo, root, workloaddir, explicit string) (string, error) {
+// the image is the name to build the Containerfile as: the default container's, eg.WorkingDirectory, when none
+// was found, otherwise one unique to the workload, derived from name.
+func LocateContainerfile(repo, root, workloaddir, explicit, name string) (path string, image string, err error) {
 	if explicit != "" {
-		path := explicit
+		path = explicit
 		if !filepath.IsAbs(path) {
 			path = filepath.Join(repo, path)
 		}
 
 		if !fsx.FileExists(path) {
-			return "", errorsx.Errorf("unable to use the containerfile %s", path)
+			return "", "", errorsx.Errorf("unable to use the containerfile %s", path)
 		}
-
-		return path, nil
+	} else {
+		path = fsx.LocateWithinUntil(workloaddir, root, ContainerfileName)
 	}
 
-	return fsx.LocateWithinUntil(workloaddir, root, ContainerfileName), nil
+	if path == "" {
+		return "", eg.WorkingDirectory, nil
+	}
+
+	return path, stringsx.Join(".", eg.WorkingDirectory, strings.ReplaceAll(stringsx.First(name, "workload"), string(filepath.Separator), ".")), nil
 }

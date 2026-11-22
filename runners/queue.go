@@ -188,12 +188,13 @@ func BuildRootContainer(ctx context.Context, options ...string) error {
 	defer os.RemoveAll(tmpdir)
 	rootc := filepath.Join(tmpdir, "Containerfile")
 
-	return BuildRootContainerPath(ctx, tmpdir, rootc, "", options...)
+	return BuildRootContainerPath(ctx, eg.WorkingDirectory, tmpdir, rootc, "", options...)
 }
 
 // BuildRootContainerPath builds the root container from the Containerfile at path, which is written from the
-// embedded default or, when src is not blank, from the Containerfile at src.
-func BuildRootContainerPath(ctx context.Context, dir, path, src string, options ...string) (err error) {
+// embedded default or, when src is not blank, from the Containerfile at src. the image is tagged name, the
+// default container is expected to use eg.WorkingDirectory.
+func BuildRootContainerPath(ctx context.Context, name, dir, path, src string, options ...string) (err error) {
 	debugx.Println("building root container initiated")
 	defer debugx.Println("building root container completed")
 
@@ -201,7 +202,7 @@ func BuildRootContainerPath(ctx context.Context, dir, path, src string, options 
 		return errorsx.Wrapf(err, "preparing root container failed: %s", path)
 	}
 
-	return BuildContainer(ctx, "eg", dir, path, options...)
+	return BuildContainer(ctx, name, dir, path, options...)
 }
 
 func BuildContainer(ctx context.Context, name, dir, path string, options ...string) (err error) {
@@ -830,22 +831,10 @@ func (t staterunning) Update(ctx context.Context) state {
 	}
 	defer stopwatch()
 
-	// a workload uploaded with its own containerfile runs in a container built from it, otherwise in the runner's root container.
-	image := "eg"
-	if contextdir := filepath.Join(t.ws.RuntimeDir, filepath.Dir(ArchiveContainerfile)); fsx.FileExists(filepath.Join(t.ws.RuntimeDir, ArchiveContainerfile)) {
-		image = fmt.Sprintf("eg.%s", t.ragent.id)
-
-		// the build context is only the directory holding the containerfile, the archive carries no repository.
-		if err = BuildContainer(wctx, image, contextdir, filepath.Join(t.ws.RuntimeDir, ArchiveContainerfile)); err != nil {
-			return completed(t.workload, t.metadata, t.bucket, t.ws, time.Since(ts), errorsx.Wrap(err, "unable to build the workload's container"))
-		}
-
-		defer func() {
-			errorsx.Log(errorsx.Wrap(exec.Command("podman", "rmi", "--force", image).Run(), "unable to remove the workload's container image"))
-		}()
-	}
-
-	err = c8sproxy.PodmanModule(wctx, prepcmd, image, fmt.Sprintf("eg-%s", t.ragent.id), t.ws.RuntimeDir, nil, options...)
+	// TODO a workload uploaded with its own containerfile (ArchiveContainerfile) is ignored for now, every workload
+	// runs in the runner's root container until building them per run is sorted out.
+	// NOTE the custom image's name will be the md5 of the account.id, the vcs uri, and the workload name.
+	err = c8sproxy.PodmanModule(wctx, prepcmd, eg.WorkingDirectory, fmt.Sprintf("eg-%s", t.ragent.id), t.ws.RuntimeDir, nil, options...)
 	if errors.Is(context.Cause(wctx), ErrCancelled) {
 		err = ErrCancelled
 	}

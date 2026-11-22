@@ -299,12 +299,12 @@ func (t local) podman(ctx context.Context, ws workspaces.Context, uid uuidx.UUID
 		return nil, errorsx.Wrap(err, "unable to connect to podman")
 	}
 
-	containerfile, err := runners.LocateContainerfile(t.Dir, filepath.Join(t.Dir, t.ModuleDir), filepath.Join(t.Dir, t.ModuleDir, t.Name), t.Containerfile)
+	containerfile, imagename, err := runners.LocateContainerfile(t.Dir, filepath.Join(t.Dir, t.ModuleDir), filepath.Join(t.Dir, t.ModuleDir, t.Name), t.Containerfile, t.Name)
 	if err != nil {
 		return nil, err
 	}
 
-	if err = runners.BuildRootContainerPath(ctx, t.Dir, filepath.Join(ws.RuntimeDir, "Containerfile"), containerfile, "--build-arg", envx.Format(eg.EnvBuildCommit, cmdopts.BuildCommit()), "--platform", platform); err != nil {
+	if err = runners.BuildRootContainerPath(ctx, imagename, t.Dir, filepath.Join(ws.RuntimeDir, "Containerfile"), containerfile, "--build-arg", envx.Format(eg.EnvBuildCommit, cmdopts.BuildCommit()), "--platform", platform); err != nil {
 		return nil, err
 	}
 
@@ -357,7 +357,7 @@ func (t local) podman(ctx context.Context, ws workspaces.Context, uid uuidx.UUID
 		wayland,   // must come after the runtime directory mount to ensure correct mounting order.
 	)
 
-	return container{ctx: pctx, ws: ws, uid: uid, agent: ragent, image: eg.WorkingDirectory}, nil
+	return container{ctx: pctx, ws: ws, uid: uid, agent: ragent, image: imagename}, nil
 }
 
 // rootegiso builds an egiso of the root container, written to path, with buildah. the root container is
@@ -387,7 +387,7 @@ func (t local) machine(c *http.Client, uri string) runners.BFn {
 		)
 
 		if stringsx.Blank(uri) {
-			containerfile, err := runners.LocateContainerfile(t.Dir, filepath.Join(t.Dir, t.ModuleDir), filepath.Join(t.Dir, t.ModuleDir, t.Name), t.Containerfile)
+			containerfile, _, err := runners.LocateContainerfile(t.Dir, filepath.Join(t.Dir, t.ModuleDir), filepath.Join(t.Dir, t.ModuleDir, t.Name), t.Containerfile, t.Name)
 			if err != nil {
 				return nil, err
 			}

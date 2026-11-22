@@ -166,7 +166,7 @@ func (t upload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, ident *cmdide
 
 	// the runner builds the workload's container from the containerfile in the archive when there is one.
 	moduledir := eg.DefaultModuleDirectory(t.Dir)
-	containerfile, err := runners.LocateContainerfile(t.Dir, moduledir, filepath.Join(moduledir, t.Name), t.Containerfile)
+	containerfile, _, err := runners.LocateContainerfile(t.Dir, moduledir, filepath.Join(moduledir, t.Name), t.Containerfile, t.Name)
 	if err != nil {
 		return err
 	}

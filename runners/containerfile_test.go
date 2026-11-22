@@ -32,33 +32,33 @@ func TestLocateContainerfile(t *testing.T) {
 			"dev/own/deep": ".eg/dev/own/Containerfile",
 			"dev":          ".eg/dev/Containerfile",
 		} {
-			found, err := runners.LocateContainerfile(repo, root, filepath.Join(root, name), "")
+			found, _, err := runners.LocateContainerfile(repo, root, filepath.Join(root, name), "", "")
 			require.NoError(t, err, name)
 			require.Equal(t, filepath.Join(repo, expected), found, name)
 		}
 	})
 
 	t.Run("none found is an empty path without an error", func(t *testing.T) {
-		found, err := runners.LocateContainerfile(repo, root, filepath.Join(root, "other"), "")
+		found, _, err := runners.LocateContainerfile(repo, root, filepath.Join(root, "other"), "", "")
 		require.NoError(t, err)
 		require.Empty(t, found)
 	})
 
 	t.Run("explicit is relative to the repository", func(t *testing.T) {
-		found, err := runners.LocateContainerfile(repo, root, filepath.Join(root, "other"), ".eg/dev/Containerfile")
+		found, _, err := runners.LocateContainerfile(repo, root, filepath.Join(root, "other"), ".eg/dev/Containerfile", "")
 		require.NoError(t, err)
 		require.Equal(t, filepath.Join(repo, ".eg", "dev", "Containerfile"), found)
 	})
 
 	t.Run("explicit absolute is used as is", func(t *testing.T) {
 		abs := filepath.Join(repo, "Containerfile")
-		found, err := runners.LocateContainerfile(repo, root, filepath.Join(root, "other"), abs)
+		found, _, err := runners.LocateContainerfile(repo, root, filepath.Join(root, "other"), abs, "")
 		require.NoError(t, err)
 		require.Equal(t, abs, found)
 	})
 
 	t.Run("explicit missing is an error", func(t *testing.T) {
-		_, err := runners.LocateContainerfile(repo, root, filepath.Join(root, "other"), ".eg/missing")
+		_, _, err := runners.LocateContainerfile(repo, root, filepath.Join(root, "other"), ".eg/missing", "")
 		require.ErrorContains(t, err, "unable to use the containerfile")
 	})
 }

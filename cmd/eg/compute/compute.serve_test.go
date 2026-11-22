@@ -40,14 +40,14 @@ func TestServeContainerfile(t *testing.T) {
 			"dev":          ".eg/dev/Containerfile",
 		} {
 			s := serve{Dir: root, ModuleDir: ".eg", Name: name}
-			found, err := runners.LocateContainerfile(s.Dir, filepath.Join(s.Dir, s.ModuleDir), s.datadir(), s.Containerfile)
+			found, _, err := runners.LocateContainerfile(s.Dir, filepath.Join(s.Dir, s.ModuleDir), s.datadir(), s.Containerfile, "")
 			require.NoError(t, err, name)
 			require.Equal(t, filepath.Join(root, expected), found, name)
 		}
 
 		// nothing between the workload and the module directory.
 		s := serve{Dir: root, ModuleDir: ".eg", Name: "other"}
-		found, err := runners.LocateContainerfile(s.Dir, filepath.Join(s.Dir, s.ModuleDir), s.datadir(), s.Containerfile)
+		found, _, err := runners.LocateContainerfile(s.Dir, filepath.Join(s.Dir, s.ModuleDir), s.datadir(), s.Containerfile, "")
 		require.NoError(t, err)
 		require.Empty(t, found)
 	})
@@ -58,12 +58,12 @@ func TestServeContainerfile(t *testing.T) {
 		require.NoError(t, os.WriteFile(filepath.Join(root, ".eg", "dev", "Containerfile"), []byte("FROM scratch\n"), 0600))
 
 		s := serve{Dir: root, ModuleDir: ".eg", Name: "elsewhere", Containerfile: ".eg/dev/Containerfile"}
-		found, err := runners.LocateContainerfile(s.Dir, filepath.Join(s.Dir, s.ModuleDir), s.datadir(), s.Containerfile)
+		found, _, err := runners.LocateContainerfile(s.Dir, filepath.Join(s.Dir, s.ModuleDir), s.datadir(), s.Containerfile, "")
 		require.NoError(t, err)
 		require.Equal(t, filepath.Join(root, ".eg", "dev", "Containerfile"), found)
 
 		s = serve{Dir: root, ModuleDir: ".eg", Name: "x", Containerfile: ".eg/missing"}
-		_, err = runners.LocateContainerfile(s.Dir, filepath.Join(s.Dir, s.ModuleDir), s.datadir(), s.Containerfile)
+		_, _, err = runners.LocateContainerfile(s.Dir, filepath.Join(s.Dir, s.ModuleDir), s.datadir(), s.Containerfile, "")
 		require.Error(t, err)
 	})
 

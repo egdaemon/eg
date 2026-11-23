@@ -7,11 +7,11 @@ ARG GOCACHE=/tmp/gocache
 
 RUN echo "cache buster 8e9b3211-6e69-40de-94c4-5f76249baaba"
 
-RUN apt-get update && apt-get -y install software-properties-common build-essential apt-file ca-certificates curl apt-transport-https sudo netavark python3 python3-venv cmake ninja-build libssl-dev
+RUN apt-get -o Acquire::Retries=8 -o Acquire::http::Timeout=8 -o Acquire::https::Timeout=8 update && apt-get -o Acquire::Retries=8 -o Acquire::http::Timeout=8 -o Acquire::https::Timeout=8 -y install software-properties-common build-essential apt-file ca-certificates curl apt-transport-https sudo netavark python3 python3-venv cmake ninja-build libssl-dev
 RUN add-apt-repository -n ppa:longsleep/golang-backports
 RUN add-apt-repository -n ppa:egdaemon/eg
-RUN apt-get update && apt-get -y install dput devscripts dh-make dput git uidmap dbus-user-session fuse-overlayfs tree iproute2 gh apt-utils gnupg wget
-RUN apt-get update && apt-get -y install golang-1.27 podman rsync vim egworkload dpkg tree pinentry-tty protobuf-compiler libprotobuf-dev libbtrfs-dev libassuan-dev libc6-dev libdevmapper-dev libglib2.0-dev libgpgme-dev libgpg-error-dev libprotobuf-c-dev libseccomp-dev libselinux1-dev libsystemd-dev pciutils llama.cpp
+RUN apt-get -o Acquire::Retries=8 -o Acquire::http::Timeout=8 -o Acquire::https::Timeout=8 update && apt-get -o Acquire::Retries=8 -o Acquire::http::Timeout=8 -o Acquire::https::Timeout=8 -y install dput devscripts dh-make dput git uidmap dbus-user-session fuse-overlayfs tree iproute2 gh apt-utils gnupg wget
+RUN apt-get -o Acquire::Retries=8 -o Acquire::http::Timeout=8 -o Acquire::https::Timeout=8 update && apt-get -o Acquire::Retries=8 -o Acquire::http::Timeout=8 -o Acquire::https::Timeout=8 -y install golang-1.27 podman rsync vim egworkload dpkg tree pinentry-tty protobuf-compiler libprotobuf-dev libbtrfs-dev libassuan-dev libc6-dev libdevmapper-dev libglib2.0-dev libgpgme-dev libgpg-error-dev libprotobuf-c-dev libseccomp-dev libselinux1-dev libsystemd-dev pciutils llama.cpp
 
 RUN ln -s /usr/lib/go-1.27/bin/go /usr/local/bin/go
 
@@ -35,12 +35,12 @@ RUN which protoc-gen-go
 RUN systemd-tmpfiles --create
 RUN systemd-tmpfiles --clean
 
-RUN apt-get -y install openssh-server npm
+RUN apt-get -o Acquire::Retries=8 -o Acquire::http::Timeout=8 -o Acquire::https::Timeout=8 -y install openssh-server npm
 RUN npm install -g @anthropic-ai/claude-code
 
 # the packaged eg (egworkload) must be current: the dev workloads run the container's eg and rely on its newest options.
 # change the buster to pull the latest, the layer is otherwise cached.
 RUN echo "cache buster 2d0a6c1e-6b0f-4f4e-9d27-0f5c8d1b7a43"
-RUN apt-get update && apt-get -y upgrade
+RUN apt-get -o Acquire::Retries=8 -o Acquire::http::Timeout=8 -o Acquire::https::Timeout=8 update && apt-get -o Acquire::Retries=8 -o Acquire::http::Timeout=8 -o Acquire::https::Timeout=8 -y upgrade
 
 CMD /usr/sbin/init

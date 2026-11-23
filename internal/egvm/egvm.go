@@ -64,13 +64,15 @@ func Directory() string {
 	return userx.DefaultConfigLocation("egvm.d")
 }
 
-// New describes a machine rooted at root that boots the image in Directory, as large as the host,
-// with the root's systemd as its init, reaching its own loopback and public addresses only.
+// New describes a machine rooted at root that boots the image in Directory, with the cpus this
+// process may use, the root's systemd as its init, reaching its own loopback and public addresses
+// only. GOMAXPROCS respects the cgroup's cpu limit where NumCPU does not, so a machine booted within
+// a machine is never given more cpus than its parent's quota allows.
 func New(root *egiso.SysFS, options ...Option) Machine {
 	return langx.Clone(Machine{
 		dir:      Directory(),
 		init:     "/usr/sbin/init",
-		cpus:     uint(runtime.NumCPU()),
+		cpus:     uint(runtime.GOMAXPROCS(0)),
 		root:     root,
 		firewall: wnetruntime.PublicFirewall(wnetruntime.FirewallOptionAllow(netip.MustParsePrefix("127.0.0.0/8"), netip.MustParsePrefix("::1/128"))),
 	}, options...)

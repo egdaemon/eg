@@ -12,10 +12,3 @@ package computeapi
 //go:generate gomodifytags -file eg.actl.enqueued.pb.go -struct EnqueuedSearchRequest -field Memory -add-tags json:memory -add-options json=omitempty,json=string -override -w -quiet
 //go:generate gomodifytags -file eg.actl.enqueued.pb.go -struct EnqueuedSearchRequest -field Vram -add-tags json:vram -add-options json=omitempty,json=string -override -w -quiet
 //go:generate gomodifytags -file eg.actl.enqueued.pb.go -struct EnqueuedSearchRequest -field ClusterId -add-tags json:cid -add-options json=omitempty -override -w -quiet
-//go:generate gomodifytags -file eg.actl.enqueued.pb.go -struct EnqueuedCreateRequest -field Enqueued -add-tags json:enqueue -add-options json=omitempty -override -w -quiet
-//go:generate gomodifytags -file eg.actl.enqueued.pb.go -struct EnqueuedCreateResponse -field Enqueued -add-tags json:enqueue -add-options json=omitempty -override -w -quiet
-//go:generate gomodifytags -file eg.actl.enqueued.pb.go -struct EnqueuedUpdateRequest -field Enqueued -add-tags json:enqueue -add-options json=omitempty -override -w -quiet
-//go:generate gomodifytags -file eg.actl.enqueued.pb.go -struct EnqueuedUpdateResponse -field Enqueued -add-tags json:enqueue -add-options json=omitempty -override -w -quiet
-//go:generate gomodifytags -file eg.actl.enqueued.pb.go -struct EnqueuedCompletedResponse -field Enqueued -add-tags json:enqueue -add-options json=omitempty -override -w -quiet
-//go:generate gomodifytags -file eg.actl.enqueued.pb.go -struct EnqueuedFindRequest -field Enqueued -add-tags json:enqueue -add-options json=omitempty -override -w -quiet
-//go:generate gomodifytags -file eg.actl.enqueued.pb.go -struct EnqueuedFindResponse -field Enqueued -add-tags json:enqueue -add-options json=omitempty -override -w -quiet

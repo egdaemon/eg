@@ -57,17 +57,17 @@ message EnqueuedSearchResponse {
 }
 
 message EnqueuedCreateRequest {
-  Enqueued enqueued = 1 [ json_name = "enqueue" ];
+  Enqueued enqueued = 1 [ json_name = "enqueued" ];
 }
 message EnqueuedCreateResponse {
-  Enqueued enqueued = 1 [ json_name = "enqueue" ];
+  Enqueued enqueued = 1 [ json_name = "enqueued" ];
 }
 
 message EnqueuedUpdateRequest {
-  Enqueued enqueued = 1 [ json_name = "enqueue" ];
+  Enqueued enqueued = 1 [ json_name = "enqueued" ];
 }
 message EnqueuedUpdateResponse {
-  Enqueued enqueued = 1 [ json_name = "enqueue" ];
+  Enqueued enqueued = 1 [ json_name = "enqueued" ];
 }
 
 message EnqueuedDequeueResponse {
@@ -86,10 +86,10 @@ message EnqueuedCompletedRequest {
   string access_token = 3 [ json_name = "access_token" ];
 }
 message EnqueuedCompletedResponse {
-  Enqueued enqueued = 1 [ json_name = "enqueue" ];
+  Enqueued enqueued = 1 [ json_name = "enqueued" ];
 }
 
-message EnqueuedFindRequest { Enqueued enqueued = 1 [ json_name = "enqueue" ]; }
+message EnqueuedFindRequest { Enqueued enqueued = 1 [ json_name = "enqueued" ]; }
 message EnqueuedFindResponse {
-  Enqueued enqueued = 1 [ json_name = "enqueue" ];
+  Enqueued enqueued = 1 [ json_name = "enqueued" ];
 }

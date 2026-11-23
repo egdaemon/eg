@@ -32,6 +32,7 @@ import (
 	"github.com/egdaemon/eg/internal/unsafepretty"
 	"github.com/egdaemon/eg/internal/uuidx"
 	"github.com/egdaemon/eg/interp/environ"
+	"github.com/egdaemon/eg/runners"
 	"github.com/egdaemon/eg/secrets"
 	"github.com/egdaemon/eg/transpile"
 	"github.com/egdaemon/eg/workspaces"
@@ -55,6 +56,24 @@ type upload struct {
 	GitClone         string   `name:"git-clone-uri" help:"clone uri"`
 	GCPAuto          bool     `name:"gcp-auto" help:"have the runner issue the account's gcp credentials (workload identity) to the workload"`
 	Secrets          []string `name:"secret" help:"List of secret URIs to use. Examples: chachasm://passphrase@/path/to/file, gcpsm://project-id/secret-name/version, awssm://secret-name?region=us-east-1"`
+
+	// the Containerfile the runner builds the workload's container from, shipped in the archive. there are three modes:
+	// by default none is shipped and the runner uses its builtin container, --upload-containerfile ships the nearest one
+	// from the workload's directory up to the module directory, --containerfile ships the one it names.
+	UploadContainerfile bool   `name:"upload-containerfile" help:"ship the nearest Containerfile, from the workload's directory up to the module directory, for the runner to build the workload's container from. by default none is shipped and the runner uses its builtin container" default:"false" hidden:"true"`
+	Containerfile       string `name:"containerfile" help:"ship this Containerfile, relative to the repository directory, for the runner to build the workload's container from" hidden:"true"`
+}
+
+// containerfile the path of the Containerfile to ship in the archive, empty when none is: the one named by --containerfile,
+// the nearest one with --upload-containerfile, and otherwise none so the runner uses its builtin container.
+func (t upload) containerfile() (path string, err error) {
+	if !t.UploadContainerfile && stringsx.Blank(t.Containerfile) {
+		return "", nil
+	}
+
+	moduledir := eg.DefaultModuleDirectory(t.Dir)
+	path, _, err = runners.LocateContainerfile(t.Dir, moduledir, filepath.Join(moduledir, t.Name), t.Containerfile, t.Name)
+	return path, err
 }
 
 func (t upload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, ident *cmdidentity.T, find libp2px.MDNSLookup) (err error) {
@@ -162,10 +181,16 @@ func (t upload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, ident *cmdide
 	}
 	defer archiveio.Close()
 
+	containerfile, err := t.containerfile()
+	if err != nil {
+		return err
+	}
+
 	if err = tarx.Pack(
 		gctx.Context,
 		archiveio,
 		tarx.Paths(filepath.Join(ws.Root, ws.BuildDir), environio.Name()),
+		tarx.MaybeFile(containerfile, runners.ArchiveContainerfile),
 	); err != nil {
 		return errorsx.Wrap(err, "unable to pack the kernel archive")
 	}

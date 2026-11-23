@@ -54,6 +54,7 @@ func (t BootstrapEnvDaemon) Run(kctx *kong.Context, gctx *cmdopts.Global, entrop
 	}
 
 	// requested resources are capped at what the machine physically has.
+	// we default to 80% to leave the host room for itself.
 	physmemory, physdisk := uint64(math.MaxUint64), uint64(math.MaxUint64)
 	if vm, err := mem.VirtualMemory(); err != nil {
 		log.Println("unable to detect memory:", err)
@@ -72,7 +73,7 @@ func (t BootstrapEnvDaemon) Run(kctx *kong.Context, gctx *cmdopts.Global, entrop
 	environ.Var(eg.EnvEGEntropySeed, seed)
 	environ.Var(_eg.EnvRestartOnUpgrade, t.RestartOnUpgrade)
 	environ.Var(_eg.EnvComputeResourceCores, numericx.Min(t.RuntimeResources.Cores, uint64(runtime.NumCPU())))
-	environ.Var(_eg.EnvComputeResourceMemory, numericx.Min(t.RuntimeResources.Memory, bytesx.Unit(physmemory)), envx.FormatQuote)
+	environ.Var(_eg.EnvComputeResourceMemory, numericx.Min(langx.FirstNonZero(t.RuntimeResources.Memory, bytesx.Unit(float64(physmemory)*0.8)), bytesx.Unit(physmemory)), envx.FormatQuote)
 	environ.Var(_eg.EnvComputeResourceDisk, numericx.Min(t.RuntimeResources.Disk, bytesx.Unit(physdisk)), envx.FormatQuote)
 	environ.Var(_eg.EnvComputeResourceVram, numericx.Min(langx.FirstNonZero(t.RuntimeResources.Vram, gpuvram), gpuvram), envx.FormatQuote)
 	environ.Var(_eg.EnvComputeWorkloadCapacity, t.Workers, envx.FormatOmitZero)

@@ -32,7 +32,6 @@ import (
 	"github.com/egdaemon/eg/internal/unsafepretty"
 	"github.com/egdaemon/eg/internal/uuidx"
 	"github.com/egdaemon/eg/interp/environ"
-	"github.com/egdaemon/eg/runners"
 	"github.com/egdaemon/eg/secrets"
 	"github.com/egdaemon/eg/transpile"
 	"github.com/egdaemon/eg/workspaces"
@@ -47,7 +46,6 @@ type upload struct {
 	uploadoptions    `embed:""`
 	SSHKeyPath       string   `name:"sshkeypath" help:"path to ssh key to use" default:"${vars_ssh_key_path}"`
 	Dir              string   `name:"directory" help:"root directory of the repository" default:"${vars_eg_root_directory}"`
-	Containerfile    string   `name:"containerfile" help:"containerfile to build the workload's container from on the runner, relative to the repository directory. by default the nearest Containerfile, from the workload's directory up to the module directory, falling back to the runner's builtin container. the build has no access to the repository"`
 	Name             string   `arg:"" name:"module" help:"name of the module to run, i.e. the folder name within moduledir" default:"" predictor:"eg.workload"`
 	EnvironmentPaths []string `name:"envpath" help:"environment files to pass to the module" default:""`
 	Environment      []string `name:"env" short:"e" help:"define environment variables and their values to be included"`
@@ -164,18 +162,10 @@ func (t upload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, ident *cmdide
 	}
 	defer archiveio.Close()
 
-	// the runner builds the workload's container from the containerfile in the archive when there is one.
-	moduledir := eg.DefaultModuleDirectory(t.Dir)
-	containerfile, _, err := runners.LocateContainerfile(t.Dir, moduledir, filepath.Join(moduledir, t.Name), t.Containerfile, t.Name)
-	if err != nil {
-		return err
-	}
-
 	if err = tarx.Pack(
 		gctx.Context,
 		archiveio,
 		tarx.Paths(filepath.Join(ws.Root, ws.BuildDir), environio.Name()),
-		tarx.MaybeFile(containerfile, runners.ArchiveContainerfile),
 	); err != nil {
 		return errorsx.Wrap(err, "unable to pack the kernel archive")
 	}

@@ -110,20 +110,53 @@ func loadcached(path string) (s ssh.Signer, err error) {
 	return ssh.ParsePrivateKey(privencoded)
 }
 
-func SignerFromGenerator(kg keygen) (s ssh.Signer, err error) {
+// reads a key from disk to 'generate'
+type diskgen string
+
+func (t diskgen) Generate() (epriv, epub []byte, err error) {
 	var (
 		privencoded []byte
+		s           ssh.Signer
 	)
 
-	if privencoded, _, err = kg.Generate(); err != nil {
-		return nil, err
+	if privencoded, err = os.ReadFile(string(t)); err != nil {
+		return nil, nil, err
 	}
 
 	if s, err = ssh.ParsePrivateKey(privencoded); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	return s, nil
+	return privencoded, s.PublicKey().Marshal(), nil
+}
+
+// reads from disk if present
+func NewKeyGenPath(path string) diskgen {
+	return diskgen(path)
+}
+
+func SignerFromGenerator(kg ...keygen) (s ssh.Signer, err error) {
+	errs := make([]error, 0, len(kg))
+	for _, g := range kg {
+		var (
+			_err        error
+			privencoded []byte
+		)
+
+		if privencoded, _, _err = g.Generate(); _err != nil {
+			errs = append(errs, _err)
+			continue
+		}
+
+		if s, _err = ssh.ParsePrivateKey(privencoded); _err != nil {
+			errs = append(errs, _err)
+			continue
+		}
+
+		return s, nil
+	}
+
+	return nil, errors.Join(errs...)
 }
 
 func AutoCached(kg keygen, path string) (s ssh.Signer, err error) {

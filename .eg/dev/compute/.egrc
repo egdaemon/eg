@@ -1,12 +1,18 @@
 # the arguments of this workload, one per line. a [mode] header declares a mode it supports: local, upload, serve or baremetal.
 # nested containers need an unmasked /proc, the daemon builds and runs containers inside the workload container.
-# cargs are passed to the root container.
+# cargs are passed to the root container. the workload itself runs in a container the root container creates, which
+# only unmasks /proc when EG_COMPUTE_RUNNER_UNMASK is set in the root container's environment, see runners.AgentOptionHostOS.
 [serve]
 --ttl=infinity
+--mount-read-only=${HOME}/.ssh:/workload/ssh
 --cargs=--security-opt
 --cargs=unmask=/proc/*
+--cargs=--env
+--cargs=EG_COMPUTE_RUNNER_UNMASK=true
 
 [local]
 --ttl=infinity
 --cargs=--security-opt
 --cargs=unmask=/proc/*
+--cargs=--env
+--cargs=EG_COMPUTE_RUNNER_UNMASK=true

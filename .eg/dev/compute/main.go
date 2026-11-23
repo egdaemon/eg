@@ -1,6 +1,8 @@
 // Package main runs an eg daemon from the checked out source, registered using an identity seed and talking to the egmeta
 // development services on the container host.
-// usage: eg compute serve --ttl infinity dev/compute
+// usage: eg --hotswap compute serve --ttl infinity dev/compute
+// --hotswap is required: without it the containers run the eg packaged in their image, which doesn't know the
+// development options (e.g. EG_COMPUTE_RUNNER_UNMASK in the .egrc) and masks /proc for the workload container.
 package main
 
 import (
@@ -11,13 +13,14 @@ import (
 	"github.com/egdaemon/eg/runtime/wasi/egenv"
 	"github.com/egdaemon/eg/runtime/wasi/eggit"
 	"github.com/egdaemon/eg/runtime/wasi/shell"
+	"github.com/egdaemon/eg/runtime/x/wasi/egbug"
 	"github.com/egdaemon/eg/runtime/x/wasi/eggolang"
 )
 
 // daemon runs the daemon and, when anything fails, keeps the workload alive until the ttl instead of closing it
 // so the environment can be inspected and the steps reproduced by hand. the failure is logged and returned afterwards.
 func daemon(ctx context.Context, op eg.Op) error {
-	err := run(ctx, op)
+	err := egbug.Debug(run, egbug.Env, daemonenv)(ctx, op)
 	if err == nil {
 		return nil
 	}
@@ -34,6 +37,27 @@ func daemon(ctx context.Context, op eg.Op) error {
 	return err
 }
 
+// daemonenv prints what the daemon's unit sees, which is not the workload's environment: the unit inherits the user
+// manager's environment plus the environment file, so this runs a probe through the same systemd-run the daemon uses.
+// it answers which podman the daemon talks to: the socket eg picks (the user's when it exists, otherwise the root one),
+// the one podman reports, and the user manager's environment. secrets are filtered out.
+func daemonenv(ctx context.Context, op eg.Op) error {
+	probe := `echo "== identity"; id
+echo "== unit environment"; env | sort | grep -vE "SEED|TOKEN|SECRET|PASSWORD|KEY"
+echo "== user manager environment"; systemctl --user show-environment | grep -vE "SEED|TOKEN|SECRET|PASSWORD|KEY"
+echo "== sockets eg chooses between"; ls -ld /var/run/user/$(id -u)/podman/podman.sock /run/podman/podman.sock 2>&1
+echo "== podman"; podman info --format 'remote socket: {{.Host.RemoteSocket.Path}} exists={{.Host.RemoteSocket.Exists}} rootless={{.Host.Security.Rootless}} graphroot={{.Store.GraphRoot}}' 2>&1
+echo "== mounts"; grep -E ' /proc(/[a-z_]+)* ' /proc/self/mountinfo
+echo "== pause processes"; ps -eo pid,user,args | grep '[c]atatonit'`
+
+	return shell.Run(
+		ctx,
+		shell.New(
+			"XDG_RUNTIME_DIR=/run/user/$(id -u) systemd-run --user --wait --pipe --property=EnvironmentFile=${COMPUTE_ENV} sh -c \"$PROBE\"",
+		).Environ("COMPUTE_ENV", egenv.DirectoryWorkload("compute.env")).Environ("PROBE", probe).Lenient(true),
+	)
+}
+
 func run(ctx context.Context, _ eg.Op) error {
 	// the default hosts are compile time variables, the shell expands them from the environment.
 	// the defaults point at the egmeta development services on the container host, see egmeta/.eg/dev/daemon.
@@ -45,22 +69,24 @@ func run(ctx context.Context, _ eg.Op) error {
 		EnvironFrom(eggolang.Env()...).
 		Environ("CACHE_DIRECTORY", egenv.DirectoryCache()).
 		Environ("EG_ACCOUNT", egenv.String("00000000-0000-0000-0000-000000000001", "EG_ACCOUNT")).
+		Environ("EG_SSH_KEY_PATH", "/workload/ssh/eg").
 		// the seed of the daemon identity, egmeta's dev/daemon preauthorizes the identity derived from it. it must not
 		// be exported as EG_SSH_KEY_SEED: that takes precedence over the derived EG_ENTROPY_SEED the daemon is meant to use.
 		Environ("EG_DEV_SEED", egenv.String("00000000-0000-0000-0000-000000000002", "EG_DEV_SEED", "EG_SSH_KEY_SEED")).
 		// the workload environment sets this from the launching eg, which overrides the compiled default.
-		Environ("EG_COMPUTE_TLS_INSECURE", "true").
+		Environ("EG_COMPUTE_TLS_INSECURE", true).
+		// Environ("EG_LOGS_NETWORK", true).
 		Environ("EG_DEV_API_HOST", egenv.String("https://host.containers.internal:8081", "EG_DEV_API_HOST")).
 		Environ("EG_DEV_CONSOLE_HOST", egenv.String("https://host.containers.internal:8080", "EG_DEV_CONSOLE_HOST"))
 
 	// the eg on the PATH points at the production hosts, so the freshly built binary is always invoked by path.
 	err := shell.Run(
 		ctx,
-		runtime.New(`go install -ldflags="-X github.com/egdaemon/eg.apiHostDefault=${EG_DEV_API_HOST} -X github.com/egdaemon/eg.consoleHostDefault=${EG_DEV_CONSOLE_HOST} -X github.com/egdaemon/eg.containerAPIHostDefault=${EG_DEV_API_HOST} -X github.com/egdaemon/eg.tlsinsecure=true" ./cmd/eg`),
+		runtime.New(`go install -ldflags="-X github.com/egdaemon/eg.apiHostDefault=${EG_DEV_API_HOST} -X github.com/egdaemon/eg.consoleHostDefault=${EG_DEV_CONSOLE_HOST} -X github.com/egdaemon/eg.ssoHostDefault=${EG_DEV_API_HOST} -X github.com/egdaemon/eg.containerAPIHostDefault=${EG_DEV_API_HOST} -X github.com/egdaemon/eg.tlsinsecure=true" ./cmd/eg`),
 		runtime.Newf("install -D -m 0755 ~/go/bin/eg %s", egbin),
 		// egmeta's dev/daemon (egci-meta accounts create) only creates the account and the login key derived from the seed.
 		// the daemon registers with a different key, derived from the seed by bootstrap env, so it is granted here using the login key.
-		runtime.Newf("%s actl authorize seed --account-id=${EG_ACCOUNT} --sshkeyseed=${EG_DEV_SEED} ${EG_DEV_SEED}", egbin),
+		runtime.Newf("%s actl authorize seed --account-id=${EG_ACCOUNT} ${EG_DEV_SEED}", egbin).Attempts(8),
 		// bootstrap env derives the daemon's seed the same way authorize seed does, and the daemon consumes the derived value.
 		runtime.Newf("%s actl bootstrap env daemon --account=${EG_ACCOUNT} --seed=${EG_DEV_SEED} -e EG_COMPUTE_TLS_INSECURE=true | tee %s | %s secrets redact", egbin, envfile, egbin),
 	)

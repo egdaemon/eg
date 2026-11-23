@@ -38,4 +38,9 @@ RUN systemd-tmpfiles --clean
 RUN apt-get -y install openssh-server npm
 RUN npm install -g @anthropic-ai/claude-code
 
+# the packaged eg (egworkload) must be current: the dev workloads run the container's eg and rely on its newest options.
+# change the buster to pull the latest, the layer is otherwise cached.
+RUN echo "cache buster 2d0a6c1e-6b0f-4f4e-9d27-0f5c8d1b7a43"
+RUN apt-get update && apt-get -y upgrade
+
 CMD /usr/sbin/init

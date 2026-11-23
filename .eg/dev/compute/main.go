@@ -1,8 +1,10 @@
 // Package main runs an eg daemon from the checked out source, registered using an identity seed and talking to the egmeta
 // development services on the container host.
-// usage: eg --hotswap compute serve --ttl infinity dev/compute
-// --hotswap is required: without it the containers run the eg packaged in their image, which doesn't know the
-// development options (e.g. EG_COMPUTE_RUNNER_UNMASK in the .egrc) and masks /proc for the workload container.
+// usage: eg compute serve --ttl infinity dev/compute
+// the containers run the eg packaged in their image (egworkload), which must be current: it has to know the development
+// options of the .egrc (e.g. EG_COMPUTE_RUNNER_UNMASK, without it /proc is masked for the workload container and
+// nested builds fail). rebuild the image to update it, see the cache buster at the end of .eg/Containerfile. or run
+// with `eg --hotswap compute serve` to use the eg that runs the command instead.
 package main
 
 import (

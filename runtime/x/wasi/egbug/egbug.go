@@ -242,7 +242,8 @@ func normalizeEnv(environ *envx.Builder) *envx.Builder {
 	environ.Setenv(_eg.EnvComputeTTL, "0s")
 	environ.Setenv(_eg.EnvComputeEnvironToken, "")
 	environ.Setenv(_eg.EnvComputeWorkload, "")
-	environ.Unsetenv(_eg.EnvComputeWorkloadName) // not part of default.env, removed so the digest is unchanged.
+	environ.Unsetenv(_eg.EnvComputeWorkloadName)  // not part of default.env, removed so the digest is unchanged.
+	environ.Unsetenv(_eg.EnvComputeModuleIsolate) // the runner sets it, blank unless the workload was uploaded with a containerfile, removed so the digest is unchanged.
 	environ.Setenv(_eg.EnvComputeProfileMode, "")
 	environ.Setenv(_eg.EnvComputeCoresLimit, "42")
 	environ.Setenv(_eg.EnvComputeMemoryLimit, "42")

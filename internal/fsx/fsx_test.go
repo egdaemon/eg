@@ -108,6 +108,15 @@ func TestRelative(t *testing.T) {
 	}
 }
 
+func TestRebase(t *testing.T) {
+	from := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(from, ".eg"), 0700))
+	require.NoError(t, os.WriteFile(filepath.Join(from, ".eg", "Containerfile"), nil, 0600))
+
+	require.Equal(t, "/m/.eg/Containerfile", fsx.Rebase(from, "/m", ".eg/Containerfile"))
+	require.Equal(t, "", fsx.Rebase(from, "/m", ".eg/missing"))
+}
+
 func TestCloneTree(t *testing.T) {
 	type file struct {
 		name     string

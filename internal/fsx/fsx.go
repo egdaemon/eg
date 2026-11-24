@@ -313,6 +313,16 @@ func Relative(dir, path string) (rel string, ok bool) {
 	return rel, true
 }
 
+// Rebase locates name beneath from and returns where it is beneath to, blank when name does not exist beneath from.
+// blank means nothing was found, it must stay blank, joining would turn it into to.
+func Rebase(from, to, name string) string {
+	if LocateFirst(filepath.Join(from, name)) == "" {
+		return ""
+	}
+
+	return filepath.Join(to, name)
+}
+
 func MkDirs(perm fs.FileMode, paths ...string) (err error) {
 	for _, p := range paths {
 		if err = os.MkdirAll(p, perm); err != nil {

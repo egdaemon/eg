@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/alecthomas/kong"
+	"github.com/egdaemon/eg"
 	"github.com/stretchr/testify/require"
 )
 
@@ -17,9 +18,10 @@ func TestModuleArgs(t *testing.T) {
 	parse := func(t *testing.T, args ...string) module {
 		var c cli
 		parser, err := kong.New(&c, kong.Vars{
-			"vars_eg_root_directory":    "/w",
-			"vars_workload_directory":   ".eg",
-			"vars_eg_runtime_directory": "/r",
+			"vars_eg_root_directory":        "/w",
+			"vars_workload_directory":       ".eg",
+			"vars_eg_runtime_directory":     "/r",
+			"env_eg_compute_module_isolate": eg.EnvComputeModuleIsolate,
 		})
 		require.NoError(t, err)
 		_, err = parser.Parse(append([]string{"module"}, args...))

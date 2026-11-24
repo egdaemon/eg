@@ -40,6 +40,7 @@ import (
 	"github.com/egdaemon/eg/internal/userx"
 	"github.com/egdaemon/eg/internal/uuidx"
 	"github.com/egdaemon/eg/interp"
+	"github.com/egdaemon/eg/interp/c8s"
 	"github.com/egdaemon/eg/interp/c8sproxy"
 	"github.com/egdaemon/eg/interp/dbproxy/dbservice"
 	"github.com/egdaemon/eg/interp/environ"
@@ -63,6 +64,7 @@ type module struct {
 	Dir        string   `name:"directory" help:"root directory of the repository" default:"${vars_eg_root_directory}"`
 	ModuleDir  string   `name:"moduledir" help:"deprecated removed once infrastructure is updated" hidden:"true" default:"${vars_workload_directory}"`
 	RuntimeDir string   `name:"runtimedir" help:"runtime directory" hidden:"true" default:"${vars_eg_runtime_directory}"`
+	Isolate    string   `name:"isolate" help:"path of the Containerfile to build and run the module within, instead of within this container" hidden:"true" env:"${env_eg_compute_module_isolate}"`
 	Module     string   `arg:"" help:"name of the module to run"`
 	Args       []string `arg:"" optional:"" help:"arguments for the module, its os.Args[1:]"`
 }
@@ -282,6 +284,32 @@ func recordDiscoveredWorkloads(ctx context.Context, db *sql.DB, dir string, envi
 	if err := egworkloads.Detect(ctx, db, dir); err != nil {
 		log.Println("unable to record discovered workloads", err)
 	}
+}
+
+// isolated builds the workload's Containerfile and runs the module within the resulting container, instead of within
+// this one. both go through the container proxy of the root module, the same as a module that builds and runs a container.
+func (t module) isolated(ctx context.Context, cc grpc.ClientConnInterface, uid, containerfile string) (err error) {
+	var (
+		containers = c8s.NewProxyClient(cc)
+		image      = stringsx.Join(".", eg.WorkingDirectory, strings.ReplaceAll(envx.String("workload", eg.EnvComputeWorkloadName), string(filepath.Separator), "."))
+	)
+
+	log.Println("building the workload's container", image, containerfile)
+	if _, err = containers.Build(ctx, &c8s.BuildRequest{Name: image, Directory: t.Dir, Definition: containerfile}); err != nil {
+		return errorsx.Wrap(err, "unable to build the workload's containerfile")
+	}
+
+	_, err = containers.Module(ctx, &c8s.ModuleRequest{
+		Image:  image,
+		Name:   fmt.Sprintf("eg-workload-%s", uid),
+		Module: filepath.Base(t.Module),
+		Mdir:   t.RuntimeDir,
+		Options: []string{
+			"--env", fmt.Sprintf("%s=%d", eg.EnvComputeModuleNestedLevel, envx.Int(0, eg.EnvComputeModuleNestedLevel)+1),
+		},
+	})
+
+	return errorsx.Wrap(err, "unable to run the workload's container")
 }
 
 func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, environsecret *cmdopts.EnvironSecret) (err error) {
@@ -573,6 +601,12 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, environsecret
 			errorsx.Log(gdx.RecordFile(gctx.Context, pfile, gdx.Profile(gctx.Context, gdx.ProfileModeFromString(pmode))))
 			log.Println("profile written to", pfile)
 		}()
+	}
+
+	// a workload uploaded with its own Containerfile, the runner sets isolate to it, runs isolated within this container,
+	// the root container of the runner, so what it builds and stores is accounted for with the rest of the workload's storage.
+	if t.Isolate != "" {
+		return t.isolated(gctx.Context, cc, uid, t.Isolate)
 	}
 
 	return interp.Remote(

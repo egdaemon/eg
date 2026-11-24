@@ -112,14 +112,20 @@ func (t *HistoryService) logs(w http.ResponseWriter, r *http.Request) {
 	}
 	defer f.Close()
 
+	stat, err := f.Stat()
+	if err != nil {
+		log.Println(errorsx.Wrap(err, "unable to stat history logs"))
+		errorsx.Log(httpx.WriteEmptyJSON(w, http.StatusInternalServerError))
+		return
+	}
+
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.Header().Set("Cache-Control", "no-store")
-	w.WriteHeader(http.StatusOK)
 
-	// headers are sent; on failure the stream just ends.
-	_, err = io.Copy(w, f)
-	errorsx.Log(errorsx.Wrap(err, "unable to stream history logs"))
+	// honors Range so a reader that already has the start of the logs, e.g. from tailing the workload,
+	// only transfers the rest.
+	http.ServeContent(w, r, "", stat.ModTime(), f)
 }
 
 // analytics serves the recorded analytics database of the workload.

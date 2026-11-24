@@ -92,6 +92,50 @@ func TestHistoryHandler(t *testing.T) {
 		require.Equal(t, "output", string(b))
 	})
 
+	t.Run("serves the logs after the requested range", func(t *testing.T) {
+		srv, db := newHistoryServer(t)
+		id := uuidx.NewV7().String()
+		logs := filepath.Join(t.TempDir(), "w.log")
+		require.NoError(t, os.WriteFile(logs, []byte("0123456789"), 0600))
+		require.NoError(t, computex.EntryUpsert(t.Context(), db, langx.Clone(computex.Entry{}, computex.EntryOptionTestDefaults, computex.EntryOptionID(id), func(e *computex.Entry) {
+			e.LogsPath = logs
+		})).Scan(&computex.Entry{}))
+
+		req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, srv.URL+"/c/history/"+id+"/logs", nil)
+		require.NoError(t, err)
+		req.Header.Set("Authorization", logsToken(t, id))
+		req.Header.Set("Range", "bytes=4-")
+		resp, err := srv.Client().Do(req)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+
+		require.Equal(t, http.StatusPartialContent, resp.StatusCode)
+		require.Equal(t, "bytes 4-9/10", resp.Header.Get("Content-Range"))
+		b, err := io.ReadAll(resp.Body)
+		require.NoError(t, err)
+		require.Equal(t, "456789", string(b))
+	})
+
+	t.Run("rejects a range beyond the logs", func(t *testing.T) {
+		srv, db := newHistoryServer(t)
+		id := uuidx.NewV7().String()
+		logs := filepath.Join(t.TempDir(), "w.log")
+		require.NoError(t, os.WriteFile(logs, []byte("0123456789"), 0600))
+		require.NoError(t, computex.EntryUpsert(t.Context(), db, langx.Clone(computex.Entry{}, computex.EntryOptionTestDefaults, computex.EntryOptionID(id), func(e *computex.Entry) {
+			e.LogsPath = logs
+		})).Scan(&computex.Entry{}))
+
+		req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, srv.URL+"/c/history/"+id+"/logs", nil)
+		require.NoError(t, err)
+		req.Header.Set("Authorization", logsToken(t, id))
+		req.Header.Set("Range", "bytes=10-")
+		resp, err := srv.Client().Do(req)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+
+		require.Equal(t, http.StatusRequestedRangeNotSatisfiable, resp.StatusCode)
+	})
+
 	t.Run("serves the recorded analytics", func(t *testing.T) {
 		srv, db := newHistoryServer(t)
 		id := uuidx.NewV7().String()

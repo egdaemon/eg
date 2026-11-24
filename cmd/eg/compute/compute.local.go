@@ -58,7 +58,8 @@ type local struct {
 	GCPAuto          bool     `name:"gcp-auto" help:"use the default well known path for gcp's application default credentials"`
 	GCP              string   `name:"gcp" help:"path to gcp's application default credentials"`
 	InvalidateCache  bool     `name:"invalidate-cache" help:"removes workload build cache"`
-	Containerfile    string   `name:"containerfile" help:"containerfile to build the workload's container from, relative to the repository directory. by default the nearest Containerfile, from the workload's directory up to the module directory, falling back to the builtin container. it must provide the same runtime the builtin container does"`
+	DefaultModule    bool     `name:"default-module" aliases:"builtin-container" help:"always use the builtin container, ignoring any Containerfile between the workload's directory and the module directory" xor:"container"`
+	Containerfile    string   `name:"containerfile" xor:"container" help:"containerfile to build the workload's container from, relative to the repository directory. by default the nearest Containerfile, from the workload's directory up to the module directory, falling back to the builtin container. it must provide the same runtime the builtin container does"`
 	EnvironmentPaths []string `name:"envpath" help:"environment files to pass to the module" default:""`
 	Environment      []string `name:"env" short:"e" help:"define environment variables and their values to be included"`
 	GitRemote        string   `name:"git-remote" help:"name of the git remote to use" default:"${vars_git_default_remote_name}"`
@@ -299,7 +300,7 @@ func (t local) podman(ctx context.Context, ws workspaces.Context, uid uuidx.UUID
 		return nil, errorsx.Wrap(err, "unable to connect to podman")
 	}
 
-	containerfile, imagename, err := runners.LocateContainerfile(t.Dir, filepath.Join(t.Dir, t.ModuleDir), filepath.Join(t.Dir, t.ModuleDir, t.Name), t.Containerfile, t.Name)
+	containerfile, imagename, err := runners.LocateContainerfile(t.Dir, filepath.Join(t.Dir, t.ModuleDir), filepath.Join(t.Dir, t.ModuleDir, t.Name), t.Containerfile, t.Name, t.DefaultModule)
 	if err != nil {
 		return nil, err
 	}
@@ -387,7 +388,7 @@ func (t local) machine(c *http.Client, uri string) runners.BFn {
 		)
 
 		if stringsx.Blank(uri) {
-			containerfile, _, err := runners.LocateContainerfile(t.Dir, filepath.Join(t.Dir, t.ModuleDir), filepath.Join(t.Dir, t.ModuleDir, t.Name), t.Containerfile, t.Name)
+			containerfile, _, err := runners.LocateContainerfile(t.Dir, filepath.Join(t.Dir, t.ModuleDir), filepath.Join(t.Dir, t.ModuleDir, t.Name), t.Containerfile, t.Name, t.DefaultModule)
 			if err != nil {
 				return nil, err
 			}

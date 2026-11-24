@@ -22,7 +22,11 @@ const ArchiveContainerfile = ".eg/" + ContainerfileName
 // unless it is absolute and must exist. an empty path with no error means no Containerfile was found.
 // the image is the name to build the Containerfile as: the default container's, eg.WorkingDirectory, when none
 // was found, otherwise one unique to the workload, derived from name.
-func LocateContainerfile(repo, root, workloaddir, explicit, name string) (path string, image string, err error) {
+func LocateContainerfile(repo, root, workloaddir, explicit, name string, builtin bool) (path string, image string, err error) {
+	if builtin {
+		return "", eg.WorkingDirectory, nil
+	}
+
 	if explicit != "" {
 		path = explicit
 		if !filepath.IsAbs(path) {

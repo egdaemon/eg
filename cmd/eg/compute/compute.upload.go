@@ -72,7 +72,7 @@ func (t upload) containerfile() (path string, err error) {
 	}
 
 	moduledir := eg.DefaultModuleDirectory(t.Dir)
-	path, _, err = runners.LocateContainerfile(t.Dir, moduledir, filepath.Join(moduledir, t.Name), t.Containerfile, t.Name)
+	path, _, err = runners.LocateContainerfile(t.Dir, moduledir, filepath.Join(moduledir, t.Name), t.Containerfile, t.Name, false)
 	return path, err
 }
 

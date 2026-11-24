@@ -20,34 +20,32 @@ func main() {
 	ctx, done := context.WithTimeout(context.Background(), egenv.TTL())
 	defer done()
 
-	c1 := eg.Container("eg.ubuntu")
 	err := eg.Perform(
 		ctx,
 		eggit.AutoClone,
 		eg.Parallel(
 			eg.Build(eg.DefaultModule()),
-			eg.Build(c1.BuildFromFile(".eg/Containerfile")),
 		),
 		egbug.Log("test suite initiated"),
+		eggolang.New().Timeout(10*time.Minute).AutoInstall(),
+		eggolang.New().Timeout(egenv.TTL()).Parallelism(4).Environ("EG_TEST_WASIP1").AutoTest(),
+		egbug.Log("recording coverage initiated"),
+		egcoverage.Report(eggolang.Coverage().MarkGeneratedExt(".gen.go", ".pb.go", ".autogen_test.go")...),
+		// copies the binary built by AutoInstall into the workspace directory
+		// so the default module's integration tests exercise the new binary.
+		shell.Op(shell.Newf("install -m 0755 /home/egd/go/bin/eg %s", sharedbin())),
+		egbug.Log("test suite completed"),
 		eg.Module(
 			ctx,
-			c1,
-			eggolang.New().Timeout(10*time.Minute).AutoInstall(),
-			eggolang.New().Timeout(egenv.TTL()).Parallelism(4).Environ("EG_TEST_WASIP1").AutoTest(),
-			egbug.Log("recording coverage initiated"),
-			egcoverage.Report(eggolang.Coverage().MarkGeneratedExt(".gen.go", ".pb.go", ".autogen_test.go")...),
-			// copies the binary built by AutoInstall into the workspace directory
-			// so the default module's integration tests exercise the new binary.
-			shell.Op(shell.Newf("install -m 0755 /home/egd/go/bin/eg %s", sharedbin())),
+			eg.DefaultModule(),
+			egbug.Log("integration tests initiated"),
+			egbug.Debug(
+				IntegrationTests,
+				egbug.Cgroups,
+				egbug.SystemdServices,
+			),
+			egbug.Log("integration tests completed"),
 		),
-		egbug.Log("test suite completed"),
-		egbug.Log("integration tests initiated"),
-		egbug.Debug(
-			IntegrationTests,
-			egbug.Cgroups,
-			egbug.SystemdServices,
-		),
-		egbug.Log("integration tests completed"),
 		// keep the analytics database of a successful run in the cache for the next run, see egdb.Latest.
 		egdb.Cache,
 	)
@@ -77,12 +75,12 @@ func IntegrationTests(ctx context.Context, op eg.Op) error {
 		ctx,
 		shell.Op(
 			// envvars is the most likely to break.
-			runtime.Newf("%s --hotswap compute local tests/envvars", egbin),
-			runtime.Newf("%s --hotswap compute local tests/concurrent", egbin),
-			runtime.Newf("%s --hotswap compute local tests/metrics", egbin),
-			runtime.Newf("%s --hotswap compute local tests/stress", egbin),
-			runtime.Newf("%s --hotswap compute local tests/localref", egbin),
-			runtime.Newf("%s --hotswap compute local tests/egdb", egbin),
+			runtime.Newf("%s --hotswap compute local --default-module tests/envvars", egbin),
+			runtime.Newf("%s --hotswap compute local --default-module tests/concurrent", egbin),
+			runtime.Newf("%s --hotswap compute local --default-module tests/metrics", egbin),
+			runtime.Newf("%s --hotswap compute local --default-module tests/stress", egbin),
+			runtime.Newf("%s --hotswap compute local --default-module tests/localref", egbin),
+			runtime.Newf("%s --hotswap compute local --default-module tests/egdb", egbin),
 			// exercises the runner path (spool, queue, archive unpack) which compute local bypasses.
 			runtime.Newf("%s --hotswap compute archive --invalidate-cache tests/stress | %s --hotswap compute spooled", egbin, egbin),
 			// baremetal inherits the environment of this workload, which carries the container directory layout.

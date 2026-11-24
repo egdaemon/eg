@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/runners"
 	"github.com/stretchr/testify/require"
 )
@@ -32,33 +33,49 @@ func TestLocateContainerfile(t *testing.T) {
 			"dev/own/deep": ".eg/dev/own/Containerfile",
 			"dev":          ".eg/dev/Containerfile",
 		} {
-			found, _, err := runners.LocateContainerfile(repo, root, filepath.Join(root, name), "", "")
+			found, _, err := runners.LocateContainerfile(repo, root, filepath.Join(root, name), "", "", false)
 			require.NoError(t, err, name)
 			require.Equal(t, filepath.Join(repo, expected), found, name)
 		}
 	})
 
 	t.Run("none found is an empty path without an error", func(t *testing.T) {
-		found, _, err := runners.LocateContainerfile(repo, root, filepath.Join(root, "other"), "", "")
+		found, _, err := runners.LocateContainerfile(repo, root, filepath.Join(root, "other"), "", "", false)
 		require.NoError(t, err)
 		require.Empty(t, found)
 	})
 
 	t.Run("explicit is relative to the repository", func(t *testing.T) {
-		found, _, err := runners.LocateContainerfile(repo, root, filepath.Join(root, "other"), ".eg/dev/Containerfile", "")
+		found, _, err := runners.LocateContainerfile(repo, root, filepath.Join(root, "other"), ".eg/dev/Containerfile", "", false)
 		require.NoError(t, err)
 		require.Equal(t, filepath.Join(repo, ".eg", "dev", "Containerfile"), found)
 	})
 
 	t.Run("explicit absolute is used as is", func(t *testing.T) {
 		abs := filepath.Join(repo, "Containerfile")
-		found, _, err := runners.LocateContainerfile(repo, root, filepath.Join(root, "other"), abs, "")
+		found, _, err := runners.LocateContainerfile(repo, root, filepath.Join(root, "other"), abs, "", false)
 		require.NoError(t, err)
 		require.Equal(t, abs, found)
 	})
 
 	t.Run("explicit missing is an error", func(t *testing.T) {
-		_, _, err := runners.LocateContainerfile(repo, root, filepath.Join(root, "other"), ".eg/missing", "")
+		_, _, err := runners.LocateContainerfile(repo, root, filepath.Join(root, "other"), ".eg/missing", "", false)
 		require.ErrorContains(t, err, "unable to use the containerfile")
+	})
+
+	t.Run("builtin ignores the containerfiles that exist", func(t *testing.T) {
+		for _, name := range []string{"dev/own", "dev", "other"} {
+			found, image, err := runners.LocateContainerfile(repo, root, filepath.Join(root, name), "", "workload", true)
+			require.NoError(t, err, name)
+			require.Empty(t, found, name)
+			require.Equal(t, eg.WorkingDirectory, image, name)
+		}
+	})
+
+	t.Run("builtin ignores an explicit containerfile, even a missing one", func(t *testing.T) {
+		found, image, err := runners.LocateContainerfile(repo, root, filepath.Join(root, "dev"), ".eg/missing", "workload", true)
+		require.NoError(t, err)
+		require.Empty(t, found)
+		require.Equal(t, eg.WorkingDirectory, image)
 	})
 }

@@ -238,7 +238,7 @@ func (t serve) podman(ctx context.Context, ws workspaces.Context, uid uuidx.UUID
 
 	imagename := stringsx.Join(".", "eg.serve", strings.ReplaceAll(t.Name, string(filepath.Separator), "."))
 	// the one asked for, otherwise the nearest from the workload's directory up to the module directory.
-	containerfile, _, err := runners.LocateContainerfile(t.Dir, filepath.Join(t.Dir, t.ModuleDir), t.datadir(), t.Containerfile, t.Name)
+	containerfile, _, err := runners.LocateContainerfile(t.Dir, filepath.Join(t.Dir, t.ModuleDir), t.datadir(), t.Containerfile, t.Name, false)
 	if err != nil {
 		return nil, errorsx.Wrap(err, "serve requires a containerfile to run")
 	}

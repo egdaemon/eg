@@ -18,7 +18,11 @@ func TestBuildContainer(t *testing.T) {
 	ctx, done := testx.Context(t)
 	defer done()
 
-	require.Error(t, egdebuild.Prepare(egdebuild.Runner(), nil)(ctx, egtest.Op()), ffierrors.ErrNotImplemented)
+	// the build outcome depends on the environment: on a host it is not implemented,
+	// within a workload the control socket performs the build and succeeds.
+	if err := egdebuild.Prepare(egdebuild.Runner(), nil)(ctx, egtest.Op()); err != nil {
+		require.Error(t, err, ffierrors.ErrNotImplemented)
+	}
 	s := testx.ReadMD5(os.TempDir(), "Containerfile")
 	require.Equal(t, testx.ReadMD5(filepath.Join(".debian", "Containerfile")), s)
 }

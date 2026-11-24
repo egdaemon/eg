@@ -61,7 +61,6 @@ type baremetal struct {
 	InvalidateCache bool     `name:"invalidate-cache" help:"removes workload build cache"`
 	Clean           bool     `name:"clean" help:"start with a clean environment" negatable:"" default:"false"`
 	Podman          bool     `name:"podman" help:"enable/disable podman" hidden:"true" negatable:"" default:"true"`
-	Cgroups         bool     `name:"cgroups" help:"enable/disable cgroups for the module container" hidden:"true" negatable:"" default:"true"`
 	Workload        string   `arg:"" help:"name of the workload to run" default:"" predictor:"eg.workload"`
 }
 
@@ -74,8 +73,8 @@ func (t baremetal) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, hotswapbin
 		uid       = uuidx.NewV7()
 		descr     = envx.String("", eg.EnvComputeVCS)
 		cc        grpc.ClientConnInterface
-		cgroups   = envx.Toggle(runners.AgentOptionNoop, runners.AgentOptionCommandLine("--cgroups", envx.String("disabled", eg.EnvComputeRunnerCgroups)), !t.Cgroups)   // disable cgroups
-		hostnet   = envx.Toggle(runners.AgentOptionCommandLine("--network", "host"), runners.AgentOptionNoop, envx.Boolean(false, eg.EnvExperimentalDisableHostNetwork)) // ipv4 group bullshit. pretty sure its a podman 4 issue that was resolved in podman 5. this is 'safe' to do because we are already in a container.
+		cgroups   = envx.Toggle(runners.AgentOptionNoop, runners.AgentOptionCommandLine("--cgroups", envx.String("", eg.EnvComputeRunnerCgroups)), envx.String("", eg.EnvComputeRunnerCgroups) != "") // explicit podman --cgroups mode, otherwise podman's default.
+		hostnet   = envx.Toggle(runners.AgentOptionCommandLine("--network", "host"), runners.AgentOptionNoop, envx.Boolean(false, eg.EnvExperimentalDisableHostNetwork))                              // ipv4 group bullshit. pretty sure its a podman 4 issue that was resolved in podman 5. this is 'safe' to do because we are already in a container.
 		// unset means the host, 0 is the first container which is already nested. defaulting to 0 cannot tell them apart.
 		// a nested workload builds within a container, which does not allow the container runtime to create the containers of the build, e.g.) mount proc.
 		isolation = envx.Toggle(runners.AgentOptionNoop, runners.AgentOptionCommandLine("--isolation", "chroot"), runners.Nested())

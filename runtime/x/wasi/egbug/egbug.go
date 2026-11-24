@@ -137,6 +137,21 @@ func SystemdServices(ctx context.Context, op eg.Op) error {
 	)
 }
 
+// debugging information for failed transient units (e.g. crun/buildah scopes), includes the
+// status and journal of each failed unit and the cgroup/systemd versions. commands are lenient.
+func SystemdFailures(ctx context.Context, op eg.Op) error {
+	privileged := shell.Runtime().Privileged().Lenient(true).Timeout(5 * time.Second)
+	return shell.Run(
+		ctx,
+		privileged.New("systemctl --version | head -n 1"),
+		privileged.New("echo 'cgroup manager config:' && podman info --format '{{.Host.CgroupManager}} {{.Host.CgroupVersion}} {{.Host.OCIRuntime.Name}}'"),
+		privileged.New("echo 'failed unit status:' && systemctl list-units --failed --plain --no-legend | awk '{print $1}' | xargs -r systemctl status --no-pager -l"),
+		privileged.New("echo 'failed unit journal:' && systemctl list-units --failed --plain --no-legend | awk '{print $1}' | xargs -r -I{} journalctl -b --no-pager -n 30 -u {}"),
+		privileged.New("echo 'recent journal:' && journalctl -b --no-pager -n 100 -p warning"),
+		privileged.New("echo 'systemd dbus:' && ls -l /run/dbus/system_bus_socket /run/systemd/private"),
+	)
+}
+
 func Images(ctx context.Context, op eg.Op) error {
 	return shell.Run(
 		ctx,
@@ -160,7 +175,7 @@ func APTPackage(packages ...string) eg.OpFn {
 
 const (
 	EnvUnsafeDigest = "EG_UNSAFE_ENVVARS_DIGEST"
-	defaultDigest   = "eb18ef2ce42cb3f0ee3d2635cafcd5a7"
+	defaultDigest   = "1c0572a0a768cca00cc01b895db0c09f"
 )
 
 //go:embed default.env
@@ -237,6 +252,7 @@ func normalizeEnv(environ *envx.Builder) *envx.Builder {
 	environ.Setenv(_eg.EnvGitHeadRef, "HEAD")
 	environ.Setenv(_eg.EnvGitBaseVCS, "git@github.com:egdaemon/eg.git")
 	environ.Setenv(_eg.EnvComputeEnvironToken, "0000000000000000000000000000000000000000")
+	environ.Setenv(_eg.EnvComputeBootstrapArgs, "")
 	environ.Setenv("TERM", "") // depends on the launching terminal.
 
 	// normalize standard directories.
@@ -360,6 +376,8 @@ func Cgroups(ctx context.Context, op eg.Op) error {
 		lenient.Newf("echo 'root cpu.max:' && cat %s/cpu.max", root),
 		lenient.Newf("echo 'root memory.max:' && cat %s/memory.max", root),
 		lenient.Newf("echo 'root children:' && ls -lhan %s | grep '^d'", root),
+		lenient.Newf("echo 'system.slice children:' && ls -lhan %s/system.slice | grep '^d'", root),
+		lenient.New("echo 'process tree with cgroups:' && ps -eo pid,ppid,cgroup:60,args --forest | head -n 60"),
 		lenient.Newf("echo 'workload cgroup: %s' && ls -lhan %s", workload, workload),
 		lenient.Newf("echo 'workload controllers:' && cat %s/cgroup.controllers", workload),
 		lenient.Newf("echo 'workload subtree_control:' && cat %s/cgroup.subtree_control", workload),

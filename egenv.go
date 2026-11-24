@@ -84,7 +84,7 @@ const (
 	EnvGithubToken                   = "GH_TOKEN"                                   // standard environment variable for github token
 	EnvCI                            = "CI"                                         // standard ci/cd environment variable flag
 	EnvComputeTLSInsecure            = "EG_COMPUTE_TLS_INSECURE"                    // used to pass TLS insecure flag to container.
-	EnvComputeRunnerCgroups          = "EG_COMPUTE_RUNNER_CGROUPS"                  // podman --cgroups mode of the containers a module creates, defaults to disabled.
+	EnvComputeRunnerCgroups          = "EG_COMPUTE_RUNNER_CGROUPS"                  // podman --cgroups mode of the containers a module creates, defaults to enabled.
 	EnvComputeRunnerUnmask           = "EG_COMPUTE_RUNNER_UNMASK"                   // unmask /proc in the containers a runner creates so containers can nest. defaults to false.
 	EnvComputePodmanUsernamespace    = "EG_COMPUTE_PODMAN_USERNS"                   // podman --userns of the containers a runner creates, defaults to host.
 	EnvComputePodmanCapNetwork       = "EG_COMPUTE_PODMAN_CAP_NETWORK"              // add the NET_ADMIN capability, required for loopback device creation. defaults to true.
@@ -147,6 +147,7 @@ const (
 	EnvComputeLLMEndpoint            = "EG_COMPUTE_LLM_ENDPOINT"                    // override the base url (http(s):// or unix:///path/to.sock) of the llm server used by egllm, the server must provide llama.cpp's OpenAI-compatible api. defaults to llama.cpp's, which is managed for the duration of the workload.
 	EnvBuildCommit                   = "EG_COMMIT"                                  // build arg for the root container carrying the commit of the eg build, busts the container cache each release.
 	EnvRestartOnUpgrade              = "EG_RESTART_ON_UPGRADE"                      // restart the daemon when the eg package is upgraded: auto (default), yes or no. read from daemon.env by the package's postinst.
+	EnvComputeBootstrapArgs          = "EG_UNSAFE_BOOTSTRAP_ARGS"                   // internal holds the arguments of the module, see encodeargs. the workload reads it, it must match the one in .builtin/bootstrapped.
 )
 
 const (

@@ -53,7 +53,6 @@ type builtinBootstrap struct {
 	Debug            bool     `name:"debug" help:"keep workspace around to debug issues, requires manual cleanup"`
 	AutoPatch        bool     `name:"auto-patch" help:"commit the changes a workload made to its working directory to a new eg/ branch of the current repository once it completes, when disabled the changes are printed as a patch instead (dry run)" default:"true" negatable:""`
 	Privileged       bool     `name:"privileged" help:"run the initial container in privileged mode"`
-	Cgroups          bool     `name:"cgroups" help:"enable/disable cgroups for the module container" hidden:"true" negatable:"" default:"true"`
 	Dirty            bool     `name:"dirty" help:"include user directories and environment variables" hidden:"true"`
 	Wayland          bool     `name:"wayland" help:"bind-mount the host wayland display socket into the container"`
 	GPU              bool     `name:"gpu" help:"enable gpu support, implied by a non zero --vram" hidden:"true"`
@@ -86,9 +85,6 @@ var hostflags = map[string]bool{
 	"--cores":      true,
 	"--memory":     true,
 }
-
-// bootstrapArgsEnv holds the arguments of the module, see encodeargs. the workload reads it, it must match the one in .builtin/bootstrapped.
-const bootstrapArgsEnv = "EG_BOOTSTRAP_ARGS"
 
 // encodeargs encodes args as a base64 json array.
 func encodeargs(args []string) string {
@@ -209,8 +205,8 @@ func (t builtinBootstrap) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapP
 		Var(eg.EnvComputeWorkloadName, bootstrapWorkload).
 		Var(eg.EnvComputeLoggingVerbosity, strconv.Itoa(gctx.Verbosity)).
 		Var(eg.EnvComputeBin, hotswapbin.String()).
-		Var(bootstrapArgsEnv, encodeargs(moduleargs(os.Args))).
 		Var(eg.EnvUnsafeCacheID, ws.CachedID).
+		Var(eg.EnvComputeBootstrapArgs, encodeargs(moduleargs(os.Args))).
 		Var(eg.EnvComputeTTL, t.RuntimeResources.TTL.String()).
 		Var(eg.EnvUnsafeGitCloneEnabled, strconv.FormatBool(false)) // hack to disable cloning
 

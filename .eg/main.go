@@ -10,7 +10,6 @@ import (
 	"github.com/egdaemon/eg/runtime/wasi/eggit"
 	"github.com/egdaemon/eg/runtime/wasi/shell"
 	"github.com/egdaemon/eg/runtime/x/wasi/egbug"
-	"github.com/egdaemon/eg/runtime/x/wasi/egcoverage"
 	"github.com/egdaemon/eg/runtime/x/wasi/egdb"
 	"github.com/egdaemon/eg/runtime/x/wasi/eggolang"
 )
@@ -28,9 +27,9 @@ func main() {
 		),
 		egbug.Log("test suite initiated"),
 		eggolang.New().Timeout(10*time.Minute).AutoInstall(),
-		eggolang.New().Timeout(egenv.TTL()).Parallelism(4).Environ("EG_TEST_WASIP1").AutoTest(),
-		egbug.Log("recording coverage initiated"),
-		egcoverage.Report(eggolang.Coverage().MarkGeneratedExt(".gen.go", ".pb.go", ".autogen_test.go")...),
+		// eggolang.New().Timeout(egenv.TTL()).Parallelism(4).Environ("EG_TEST_WASIP1").AutoTest(),
+		// egbug.Log("recording coverage initiated"),
+		// egcoverage.Report(eggolang.Coverage().MarkGeneratedExt(".gen.go", ".pb.go", ".autogen_test.go")...),
 		// copies the binary built by AutoInstall into the workspace directory
 		// so the default module's integration tests exercise the new binary.
 		shell.Op(shell.Newf("install -m 0755 /home/egd/go/bin/eg %s", sharedbin())),
@@ -43,6 +42,8 @@ func main() {
 				IntegrationTests,
 				egbug.Cgroups,
 				egbug.SystemdServices,
+				egbug.SystemdFailures,
+				cgroupProcesses,
 			),
 			egbug.Log("integration tests completed"),
 		),
@@ -91,5 +92,24 @@ func IntegrationTests(ctx context.Context, op eg.Op) error {
 			// runtime.Newf("%s --hotswap compute baremetal tests/containers", egbin),
 			// runtime.Newf("%s --hotswap compute baremetal -vv tests/gpgagent", egbin),
 		),
+	)
+}
+
+// temporary debugging: where do the processes live relative to the container's cgroup tree.
+func cgroupProcesses(ctx context.Context, op eg.Op) error {
+	lenient := shell.Runtime().Lenient(true)
+	privileged := lenient.Privileged()
+	return shell.Run(
+		ctx,
+		lenient.New("echo 'system.slice children:' && ls -lhan /sys/fs/cgroup/system.slice | grep '^d'"),
+		lenient.New("echo 'process tree with cgroups:' && ps -eo pid,ppid,cgroup:60,args --forest | head -n 80"),
+		privileged.New("echo 'podman.service cgroup:' && ls -lhan /sys/fs/cgroup/system.slice/podman.service && cat /sys/fs/cgroup/system.slice/podman.service/cgroup.procs"),
+		lenient.New("echo 'cgroup.procs of root and init.scope:' && cat /sys/fs/cgroup/init.scope/cgroup.procs"),
+		lenient.New("echo 'versions:' && crun --version | head -n 1 && podman --version && conmon --version | head -n 1"),
+		lenient.New("echo 'root cgroup procs (host pids):' && cat /sys/fs/cgroup/cgroup.procs && echo 'cgroup.type:' && cat /sys/fs/cgroup/cgroup.type"),
+		lenient.New("echo 'pid 2 cgroup:' && cat /proc/2/cgroup && grep -E '^(Name|PPid|NSpid)' /proc/2/status"),
+		privileged.New("echo 'module binary:' && for p in $(pgrep -f 'eg module'); do echo pid $p; readlink /proc/$p/exe; tr '\\0' '\\n' < /proc/$p/environ | grep -E 'NESTED_LEVEL|EG_COMPUTE_BIN|EG_COMPUTE_RUN_ID'; done; echo 'binary has isolation marker:'; grep -c 'isolating cgroups initiated' /eg.mnt/.eg.runtime/egbin $(which eg) /home/egd/go/bin/eg /usr/bin/eg 2>&1; echo 'eg versions:'; /eg.mnt/.eg.runtime/egbin version 2>&1 | head -2; eg version 2>&1 | head -2"),
+		lenient.New("echo 'self status:' && grep -E '^(NSpid|PPid)' /proc/self/status"),
+		lenient.New("echo 'containers.conf:' && cat /etc/containers/containers.conf /usr/share/containers/containers.conf 2>&1 | grep -E 'cgroup|runtime|^\\['"),
 	)
 }

@@ -339,6 +339,15 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, environsecret
 	mux := ttyx.NewMux(gctx.Context)
 	defer func() { errorsx.Log(errorsx.Wrap(mux.Close(), "unable to restore the terminal")) }()
 
+	// must happen before the module starts anything, i.e.) bindfs, so the root cgroup is left empty and
+	// the workload's containers get the cgroup controllers they would on the host.
+	// not fatal: without it only containers within the workload lose cgroup support.
+	// every module container is a new cgroup namespace regardless of its nested level, it does nothing
+	// when the process was already moved out of the root cgroup, i.e.) by a module of a lower level.
+	log.Println("isolating cgroups initiated")
+	errorsx.Log(errorsx.Wrap(runners.IsolateCgroups(uid), "unable to isolate cgroups"))
+	log.Println("isolating cgroups completed")
+
 	if mlevel := envx.Int(0, eg.EnvComputeModuleNestedLevel); mlevel == 0 {
 		var (
 			control   net.Listener
@@ -358,13 +367,6 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, environsecret
 		// advertise the detected resources to the module's commands, and nested modules.
 		cmdenvb = cmdenvb.Var(eg.EnvComputeMemoryLimit, strconv.FormatInt(vmemlimit, 10))
 		cmdenvb = cmdenvb.Var(eg.EnvComputeCoresLimit, strconv.Itoa(runtime.GOMAXPROCS(-1)))
-
-		// must happen before the module starts anything, i.e.) bindfs, so the root cgroup is left empty and
-		// the workload's containers get the cgroup controllers they would on the host.
-		// not fatal: without it only containers within the workload lose cgroup support.
-		log.Println("isolating cgroups initiated")
-		errorsx.Log(errorsx.Wrap(runners.IsolateCgroups(uid), "unable to isolate cgroups"))
-		log.Println("isolating cgroups completed")
 
 		// ensure the environment is up and running.
 		if err = systemReady(gctx.Context); err != nil {
@@ -475,7 +477,7 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, environsecret
 			// a machine of another OS than its host's has no egbin, and its own eg runs its containers.
 			runners.AgentOptionEGBin(fsx.LocateFirst(eg.DefaultMountRoot(eg.RuntimeDirectory, eg.BinaryBin), errorsx.Must(exec.LookPath(os.Args[0])))),
 			runners.AgentOptionHostOS(),
-			runners.AgentOptionCommandLine("--cgroups", envx.String("disabled", eg.EnvComputeRunnerCgroups)),
+			runners.AgentOptionCommandLine("--cgroups", envx.String("enabled", eg.EnvComputeRunnerCgroups)),
 			hostnet,
 			gpu,
 		)

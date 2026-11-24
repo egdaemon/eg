@@ -1,5 +1,5 @@
 // bootstrapped builds eg from the repository in the working directory, then runs `eg --hotswap` with the freshly
-// built binary and `compute local` with the arguments of the module, EG_BOOTSTRAP_ARGS. it is what the repository's own
+// built binary and `compute local` with the arguments of the module, eg.EnvComputeBootstrapArgs. it is what the repository's own
 // workload does for its integration tests. use it to try a change to eg itself, the eg installed by the container's
 // package doesn't have it. it runs in the container of the repository, see cmd/eg/compute/compute.builtin.bootstrap.go.
 //
@@ -11,6 +11,7 @@ import (
 	"encoding/json"
 	"log"
 
+	_eg "github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/runtime/wasi/eg"
 	"github.com/egdaemon/eg/runtime/wasi/egenv"
 	"github.com/egdaemon/eg/runtime/wasi/shell"
@@ -29,7 +30,7 @@ func main() {
 	defer done()
 
 	var args []string
-	if raw := egenv.Base64(nil, "EG_BOOTSTRAP_ARGS"); len(raw) > 0 {
+	if raw := egenv.Base64(nil, _eg.EnvComputeBootstrapArgs); len(raw) > 0 {
 		if err := json.Unmarshal(raw, &args); err != nil {
 			log.Fatalln("unable to parse bootstrap arguments", err)
 		}

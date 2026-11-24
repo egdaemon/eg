@@ -50,7 +50,6 @@ type local struct {
 	Debug            bool     `name:"debug" help:"keep workspace around to debug issues, requires manual cleanup"`
 	AutoPatch        bool     `name:"auto-patch" help:"commit the changes a workload made to its working directory to a new eg/ branch of the current repository once it completes, when disabled the changes are printed as a patch instead (dry run)" default:"true" negatable:""`
 	Privileged       bool     `name:"privileged" help:"run the initial container in privileged mode"`
-	Cgroups          bool     `name:"cgroups" help:"enable/disable cgroups for the module container" hidden:"true" negatable:"" default:"true"`
 	Dirty            bool     `name:"dirty" help:"include user directories and environment variables" hidden:"true"`
 	Wayland          bool     `name:"wayland" help:"bind-mount the host wayland display socket into the container"`
 	GPU              bool     `name:"gpu" help:"enable gpu support, implied by a non zero --vram" hidden:"true"`
@@ -269,7 +268,7 @@ func (t local) podman(ctx context.Context, ws workspaces.Context, uid uuidx.UUID
 		mounthome   runners.AgentOption = runners.AgentOptionNoop
 		wayland     runners.AgentOption = runners.AgentOptionNoop
 		privileged  runners.AgentOption = runners.AgentOptionNoop
-		cgroups                         = envx.Toggle(runners.AgentOptionNoop, runners.AgentOptionCommandLine("--cgroups", envx.String("disabled", eg.EnvComputeRunnerCgroups)), runners.Nested() && !t.Cgroups) // disable cgroups
+		cgroups                         = envx.Toggle(runners.AgentOptionNoop, runners.AgentOptionCommandLine("--cgroups", envx.String("", eg.EnvComputeRunnerCgroups)), envx.String("", eg.EnvComputeRunnerCgroups) != "") // explicit podman --cgroups mode, otherwise podman's default.
 		// nested containers cannot write the sysctls netavark needs for a bridge network (read-only /proc/sys), share the outer network instead.
 		hostnet                        = envx.Toggle(runners.AgentOptionNoop, runners.AgentOptionCommandLine("--network", "host"), runners.Nested() && !envx.Boolean(false, eg.EnvExperimentalDisableHostNetwork))
 		mountegbin runners.AgentOption = runners.AgentOptionEGBin(errorsx.Must(exec.LookPath(os.Args[0])))

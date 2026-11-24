@@ -72,6 +72,15 @@ func New[T Primitive](def T) Reader[T] {
 	return NewEnviron(os.Getenv).New(def)
 }
 
+// From is shorthand for New(zero).From(keys...), the default is the zero value of T.
+// T cannot be inferred and must be provided.
+//
+//	var repo string = envx.From[string]("EG_REPO")
+func From[T Primitive](keys ...string) T {
+	var zero T
+	return New(zero).From(keys...)
+}
+
 // NewBytes reads a byte size, accepts human readable sizes such as '6g', '6GB', or '6GiB'
 // in addition to plain integers.
 func NewBytes(def uint64) Reader[uint64] {

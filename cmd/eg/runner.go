@@ -584,7 +584,7 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, environsecret
 		t.Module,
 		interp.OptionEnviron(cmdenv...),
 		interp.OptionHTTPClient(tlsc.DefaultClient()),
-		interp.OptionRepoCache(envx.String("", eg.EnvComputeRepoCache)),
+		interp.OptionRepoCache(envx.From[string](eg.EnvComputeRepoCache)),
 		interp.OptionMux(mux),
 		interp.OptionArgs(t.Args...),
 	)

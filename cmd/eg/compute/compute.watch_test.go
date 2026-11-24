@@ -113,7 +113,7 @@ func TestStoredLogs(t *testing.T) {
 func TestFollowEnqueued(t *testing.T) {
 	t.Run("completed workload prints stored logs and reports its result", func(t *testing.T) {
 		chttp, seen := fakeapi(t, map[string]string{
-			"/c/q/w1":            `{"enqueue":{"id":"w1","completed_at":"2020-01-01T00:00:00Z"}}`,
+			"/c/q/w1":            `{"enqueued":{"id":"w1","completed_at":"2020-01-01T00:00:00Z"}}`,
 			"/c/history/w1/logs": "done\n",
 			"/c/history/w1":      `{"history":{"result":2}}`,
 		})
@@ -124,7 +124,7 @@ func TestFollowEnqueued(t *testing.T) {
 
 	t.Run("completed failed workload returns an error", func(t *testing.T) {
 		chttp, _ := fakeapi(t, map[string]string{
-			"/c/q/w1":            `{"enqueue":{"id":"w1","completed_at":"2020-01-01T00:00:00Z"}}`,
+			"/c/q/w1":            `{"enqueued":{"id":"w1","completed_at":"2020-01-01T00:00:00Z"}}`,
 			"/c/history/w1/logs": "boom\n",
 			"/c/history/w1":      `{"history":{"result":1}}`,
 		})
@@ -192,7 +192,7 @@ func TestFollowEnqueuedLive(t *testing.T) {
 
 			chttp, seen := fakeapi(t, map[string]string{
 				"/c/runners/meta": fmt.Sprintf(`{"bootstrap":[%q]}`, bootstrap),
-				"/c/q/w1":         fmt.Sprintf(`{"enqueue":{"id":"w1","logs_token":%q,"completed_at":"9999-12-31T23:59:59Z"}}`, token),
+				"/c/q/w1":         fmt.Sprintf(`{"enqueued":{"id":"w1","logs_token":%q,"completed_at":"9999-12-31T23:59:59Z"}}`, token),
 				"/c/history/w1":   c.result,
 			})
 
@@ -259,11 +259,11 @@ func enqueueapi(t *testing.T) (*cmdopts.TLSConfig, func() []url.Values) {
 		accepted = append(accepted, r.Form)
 		m.Unlock()
 
-		json(w, `{"enqueue":{"id":"w1"}}`)
+		json(w, `{"enqueued":{"id":"w1"}}`)
 	})
 	// the enqueued workload has already completed, following it prints its stored log and reports its result.
 	mux.HandleFunc("/c/q/w1", func(w http.ResponseWriter, r *http.Request) {
-		json(w, `{"enqueue":{"id":"w1","completed_at":"2020-01-01T00:00:00Z"}}`)
+		json(w, `{"enqueued":{"id":"w1","completed_at":"2020-01-01T00:00:00Z"}}`)
 	})
 	mux.HandleFunc("/c/history/w1/logs", func(w http.ResponseWriter, r *http.Request) { _, _ = w.Write([]byte("done\n")) })
 	mux.HandleFunc("/c/history/w1", func(w http.ResponseWriter, r *http.Request) { json(w, `{"history":{"result":2}}`) })

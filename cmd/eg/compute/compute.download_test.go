@@ -77,7 +77,7 @@ func TestDownloadAnalytics(t *testing.T) {
 
 		chttp, seen := fakeapi(t, map[string]string{
 			"/c/runners/meta": fmt.Sprintf(`{"bootstrap":[%q]}`, fmt.Sprintf("%s/p2p/%s", runner.Addrs()[0], runner.ID())),
-			"/c/q/w1":         fmt.Sprintf(`{"enqueue":{"id":"w1","logs_token":%q,"completed_at":"9999-12-31T23:59:59Z"}}`, token),
+			"/c/q/w1":         fmt.Sprintf(`{"enqueued":{"id":"w1","logs_token":%q,"completed_at":"9999-12-31T23:59:59Z"}}`, token),
 		})
 
 		var dst bytes.Buffer
@@ -104,7 +104,7 @@ func TestDownloadAnalytics(t *testing.T) {
 
 		chttp, _ := fakeapi(t, map[string]string{
 			"/c/runners/meta": fmt.Sprintf(`{"bootstrap":[%q]}`, fmt.Sprintf("%s/p2p/%s", runner.Addrs()[0], runner.ID())),
-			"/c/q/w1":         fmt.Sprintf(`{"enqueue":{"id":"w1","logs_token":%q,"completed_at":"9999-12-31T23:59:59Z"}}`, token),
+			"/c/q/w1":         fmt.Sprintf(`{"enqueued":{"id":"w1","logs_token":%q,"completed_at":"9999-12-31T23:59:59Z"}}`, token),
 		})
 
 		var dst bytes.Buffer
@@ -127,7 +127,7 @@ func TestDownloadAnalytics(t *testing.T) {
 
 		chttp, seen := fakeapi(t, map[string]string{
 			"/c/runners/meta":         fmt.Sprintf(`{"bootstrap":[%q]}`, fmt.Sprintf("%s/p2p/%s", runner.Addrs()[0], runner.ID())),
-			"/c/q/w1":                 `{"enqueue":{"id":"w1","completed_at":"2020-01-01T00:00:00Z"}}`,
+			"/c/q/w1":                 `{"enqueued":{"id":"w1","completed_at":"2020-01-01T00:00:00Z"}}`,
 			"/c/history/w1":           fmt.Sprintf(`{"history":{"id":"w1","p2p_id":%q},"logs_token":%q}`, runner.ID().String(), token),
 			"/c/history/w1/analytics": "stored analytics",
 		})
@@ -140,7 +140,7 @@ func TestDownloadAnalytics(t *testing.T) {
 
 	t.Run("a workload that completed earlier falls back to the cluster's history when the runner has nothing", func(t *testing.T) {
 		chttp, seen := fakeapi(t, map[string]string{
-			"/c/q/w1":                 `{"enqueue":{"id":"w1","completed_at":"2020-01-01T00:00:00Z"}}`,
+			"/c/q/w1":                 `{"enqueued":{"id":"w1","completed_at":"2020-01-01T00:00:00Z"}}`,
 			"/c/history/w1/analytics": "stored analytics",
 		})
 
@@ -173,7 +173,7 @@ func TestDownloadLogs(t *testing.T) {
 
 		chttp, seen := fakeapi(t, map[string]string{
 			"/c/runners/meta":    fmt.Sprintf(`{"bootstrap":[%q]}`, fmt.Sprintf("%s/p2p/%s", runner.Addrs()[0], runner.ID())),
-			"/c/q/w1":            `{"enqueue":{"id":"w1","completed_at":"2020-01-01T00:00:00Z"}}`,
+			"/c/q/w1":            `{"enqueued":{"id":"w1","completed_at":"2020-01-01T00:00:00Z"}}`,
 			"/c/history/w1":      fmt.Sprintf(`{"history":{"id":"w1","p2p_id":%q},"logs_token":%q}`, runner.ID().String(), token),
 			"/c/history/w1/logs": "stored logs\n",
 		})
@@ -186,7 +186,7 @@ func TestDownloadLogs(t *testing.T) {
 
 	t.Run("a workload that completed earlier falls back to the cluster's history when the runner has nothing", func(t *testing.T) {
 		chttp, _ := fakeapi(t, map[string]string{
-			"/c/q/w1":            `{"enqueue":{"id":"w1","completed_at":"2020-01-01T00:00:00Z"}}`,
+			"/c/q/w1":            `{"enqueued":{"id":"w1","completed_at":"2020-01-01T00:00:00Z"}}`,
 			"/c/history/w1/logs": "stored logs\n",
 		})
 

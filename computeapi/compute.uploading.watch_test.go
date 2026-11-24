@@ -79,9 +79,9 @@ func TestUploadWatch(t *testing.T) {
 				switch r.URL.Path {
 				case "/c/q/upload":
 					uploads.Add(1)
-					_, _ = w.Write([]byte(`{"enqueue":{"id":"w1"}}`))
+					_, _ = w.Write([]byte(`{"enqueued":{"id":"w1"}}`))
 				case "/c/q/w1":
-					_, _ = fmt.Fprintf(w, `{"enqueue":{"id":"w1","logs_token":%q,"completed_at":"9999-12-31T23:59:59Z"}}`, token)
+					_, _ = fmt.Fprintf(w, `{"enqueued":{"id":"w1","logs_token":%q,"completed_at":"9999-12-31T23:59:59Z"}}`, token)
 				case "/c/runners/meta":
 					_, _ = fmt.Fprintf(w, `{"bootstrap":[%q]}`, bootstrap)
 				case "/c/history/w1/logs":

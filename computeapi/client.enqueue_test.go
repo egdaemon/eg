@@ -20,7 +20,7 @@ func TestPushClientEnqueue(t *testing.T) {
 					Entry       string   `json:"entrypoint"`
 					TTL         string   `json:"ttl"`
 					SecretURIs  []string `json:"secret_uris"`
-				} `json:"enqueue"`
+				} `json:"enqueued"`
 			}
 
 			require.Equal(t, http.MethodPost, r.Method)
@@ -32,7 +32,7 @@ func TestPushClientEnqueue(t *testing.T) {
 			require.Equal(t, "release/eg/debian", body.Enqueue.Entry)
 			require.Equal(t, "3600000", body.Enqueue.TTL)
 			require.Equal(t, []string{"gcpsm://p/s"}, body.Enqueue.SecretURIs)
-			_, _ = w.Write([]byte(`{"enqueue":{"id":"w1","entrypoint":"release/eg/debian"}}`))
+			_, _ = w.Write([]byte(`{"enqueued":{"id":"w1","entrypoint":"release/eg/debian"}}`))
 		}))
 		defer srv.Close()
 

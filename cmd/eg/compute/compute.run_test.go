@@ -30,7 +30,7 @@ func TestRunEnqueue(t *testing.T) {
 			body, err := io.ReadAll(r.Body)
 			require.NoError(t, err)
 			enqueued = string(body)
-			_, _ = w.Write([]byte(`{"enqueue":{"id":"w1"}}`))
+			_, _ = w.Write([]byte(`{"enqueued":{"id":"w1"}}`))
 		}))
 		defer srv.Close()
 
@@ -78,7 +78,7 @@ func TestRunEnqueue(t *testing.T) {
 			body, err := io.ReadAll(r.Body)
 			require.NoError(t, err)
 			enqueued = string(body)
-			_, _ = w.Write([]byte(`{"enqueue":{"id":"w1"}}`))
+			_, _ = w.Write([]byte(`{"enqueued":{"id":"w1"}}`))
 		}))
 		defer srv.Close()
 
@@ -168,7 +168,7 @@ func TestAwaitWorkload(t *testing.T) {
 				w.WriteHeader(http.StatusNotFound)
 				return
 			}
-			_, _ = w.Write([]byte(`{"enqueue":{"id":"w1"}}`))
+			_, _ = w.Write([]byte(`{"enqueued":{"id":"w1"}}`))
 		}))
 		defer srv.Close()
 

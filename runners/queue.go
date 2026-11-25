@@ -822,6 +822,9 @@ func (t staterunning) Update(ctx context.Context) state {
 		"--env", fmt.Sprintf("%s=%s", eg.EnvComputeInitiatedTimestamp, ts.UTC().Format(time.RFC3339Nano)),
 		"--env", fmt.Sprintf("%s=%s", eg.EnvComputeWorkload, t.workload.Entry),
 		"--env", fmt.Sprintf("%s=%s", eg.EnvComputeWorkloadName, t.workload.Workload),
+		// a workload uploaded with its own containerfile (ArchiveContainerfile) is isolated: the module in the runner's
+		// root container builds and runs it, so its storage is accounted for by containerdir. blank when it shipped none, a noop.
+		"--env", fmt.Sprintf("%s=%s", eg.EnvComputeModuleIsolate, fsx.Rebase(t.ws.RuntimeDir, eg.DefaultMountRoot(eg.RuntimeDirectory), ArchiveContainerfile)),
 	)
 	// TODO REVISIT using t.ws.RuntimeDir as moduledir.
 	// a failure to watch means the workload cannot be cancelled, it should still run.
@@ -831,9 +834,7 @@ func (t staterunning) Update(ctx context.Context) state {
 	}
 	defer stopwatch()
 
-	// TODO a workload uploaded with its own containerfile (ArchiveContainerfile) is ignored for now, every workload
-	// runs in the runner's root container until building them per run is sorted out.
-	// NOTE the custom image's name will be the md5 of the account.id, the vcs uri, and the workload name.
+	// the module in the runner's root container (cmd/eg/runner.go) isolates the workload when EnvComputeModuleIsolate is set.
 	err = c8sproxy.PodmanModule(wctx, prepcmd, eg.WorkingDirectory, fmt.Sprintf("eg-%s", t.ragent.id), t.ws.RuntimeDir, nil, options...)
 	if errors.Is(context.Cause(wctx), ErrCancelled) {
 		err = ErrCancelled

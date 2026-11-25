@@ -95,6 +95,7 @@ const (
 	EnvComputePodmanPidsLimit        = "EG_COMPUTE_PODMAN_PIDS_LIMIT"               // podman --pids-limit, defaults to -1 (unlimited).
 	EnvComputeLoggingVerbosity       = "EG_COMPUTE_LOG_VERBOSITY"                   // logging verbosity.
 	EnvComputeModuleNestedLevel      = "EG_COMPUTE_MODULE_LEVEL"                    // number of nested levels the current module is running in.
+	EnvComputeModuleIsolate          = "EG_COMPUTE_MODULE_ISOLATE"                  // path of the Containerfile the module is built and run within, set by the runner for uploaded workloads. blank or unset runs the module directly.
 	EnvComputeEgiso                  = "EG_COMPUTE_EGISO"                           // uri of the egiso the machine running the module booted from. unset outside a machine.
 	EnvComputeMemoryLimit            = "EG_COMPUTE_MEMORY_LIMIT"                    // memory available to the workload in bytes, detected from the cgroup by the root module. unset when unknown.
 	EnvComputeCoresLimit             = "EG_COMPUTE_CORES_LIMIT"                     // number of cpu cores available to the workload, detected by the root module. unset when unknown.

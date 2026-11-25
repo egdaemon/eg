@@ -175,7 +175,7 @@ func APTPackage(packages ...string) eg.OpFn {
 
 const (
 	EnvUnsafeDigest = "EG_UNSAFE_ENVVARS_DIGEST"
-	defaultDigest   = "1c0572a0a768cca00cc01b895db0c09f"
+	defaultDigest   = "eb18ef2ce42cb3f0ee3d2635cafcd5a7"
 )
 
 //go:embed default.env
@@ -242,7 +242,8 @@ func normalizeEnv(environ *envx.Builder) *envx.Builder {
 	environ.Setenv(_eg.EnvComputeTTL, "0s")
 	environ.Setenv(_eg.EnvComputeEnvironToken, "")
 	environ.Setenv(_eg.EnvComputeWorkload, "")
-	environ.Unsetenv(_eg.EnvComputeWorkloadName) // not part of default.env, removed so the digest is unchanged.
+	environ.Unsetenv(_eg.EnvComputeWorkloadName)  // not part of default.env, removed so the digest is unchanged.
+	environ.Unsetenv(_eg.EnvComputeModuleIsolate) // the runner sets it, blank unless the workload was uploaded with a containerfile, removed so the digest is unchanged.
 	environ.Setenv(_eg.EnvComputeProfileMode, "")
 	environ.Setenv(_eg.EnvComputeCoresLimit, "42")
 	environ.Setenv(_eg.EnvComputeMemoryLimit, "42")
@@ -252,7 +253,6 @@ func normalizeEnv(environ *envx.Builder) *envx.Builder {
 	environ.Setenv(_eg.EnvGitHeadRef, "HEAD")
 	environ.Setenv(_eg.EnvGitBaseVCS, "git@github.com:egdaemon/eg.git")
 	environ.Setenv(_eg.EnvComputeEnvironToken, "0000000000000000000000000000000000000000")
-	environ.Setenv(_eg.EnvComputeBootstrapArgs, "")
 	environ.Setenv("TERM", "") // depends on the launching terminal.
 
 	// normalize standard directories.
@@ -260,6 +260,9 @@ func normalizeEnv(environ *envx.Builder) *envx.Builder {
 	normalizedirprefix(_eg.EnvComputeWorkingDirectory)
 	normalizedirprefix(_eg.EnvComputeCacheDirectory)
 	normalizedirprefix(_eg.EnvComputeRuntimeDirectory)
+
+	// ignore bootstrap args they are a specific usecase for zero state bootstrapping.
+	environ.Unsetenv(_eg.EnvComputeBootstrapArgs)
 
 	// always ignore logging levels.
 	environ.Unsetenv(_eg.EnvLogsInfo)

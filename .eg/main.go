@@ -75,15 +75,15 @@ func IntegrationTests(ctx context.Context, op eg.Op) error {
 	return eg.Perform(
 		ctx,
 		shell.Op(
-			// envvars is the most likely to break.
+			// important: envvars is the most likely to break, and ensures stability for runtimes.
 			runtime.Newf("%s --hotswap compute local --default-module tests/envvars", egbin),
+			// important: exercises the runner path (spool, queue, archive unpack) which compute local bypasses. limiting the scope for upload path failures.
+			runtime.Newf("%s --hotswap compute archive --invalidate-cache tests/stress | %s --hotswap compute spooled", egbin, egbin),
 			runtime.Newf("%s --hotswap compute local --default-module tests/concurrent", egbin),
 			runtime.Newf("%s --hotswap compute local --default-module tests/metrics", egbin),
 			runtime.Newf("%s --hotswap compute local --default-module tests/stress", egbin),
 			runtime.Newf("%s --hotswap compute local --default-module tests/localref", egbin),
 			runtime.Newf("%s --hotswap compute local --default-module tests/egdb", egbin),
-			// exercises the runner path (spool, queue, archive unpack) which compute local bypasses.
-			runtime.Newf("%s --hotswap compute archive --invalidate-cache tests/stress | %s --hotswap compute spooled", egbin, egbin),
 			// baremetal inherits the environment of this workload, which carries the container directory layout.
 			// regression: chdir /workload/.eg.cache: no such file or directory
 			runtime.Newf("%s --hotswap compute baremetal --no-podman tests/baremetal", egbin).Lenient(true),

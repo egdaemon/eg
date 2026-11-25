@@ -90,7 +90,7 @@ func run(ctx context.Context, _ eg.Op) error {
 		// the daemon registers with a different key, derived from the seed by bootstrap env, so it is granted here using the login key.
 		runtime.Newf("%s actl authorize seed --account-id=${EG_ACCOUNT} ${EG_DEV_SEED}", egbin).Attempts(8),
 		// bootstrap env derives the daemon's seed the same way authorize seed does, and the daemon consumes the derived value.
-		runtime.Newf("%s actl bootstrap env daemon --account=${EG_ACCOUNT} --seed=${EG_DEV_SEED} --api -e EG_COMPUTE_TLS_INSECURE=true | tee %s | %s secrets redact", egbin, envfile, egbin),
+		runtime.Newf("%s actl bootstrap env daemon --account=${EG_ACCOUNT} --seed=${EG_DEV_SEED} --api --vram=0B -e EG_COMPUTE_TLS_INSECURE=true | tee %s | %s secrets redact", egbin, envfile, egbin),
 	)
 	if err != nil {
 		return err

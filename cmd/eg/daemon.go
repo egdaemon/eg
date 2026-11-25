@@ -6,6 +6,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strconv"
 	"time"
@@ -75,7 +76,7 @@ func (t daemon) signer(keygen cmdopts.KeyGenSeeded) (ssh.Signer, error) {
 
 // essentially we use ssh forwarding from the control plane to the local http server
 // allowing the control plane to interogate
-func (t daemon) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, keygen cmdopts.KeyGenSeeded) (err error) {
+func (t daemon) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, keygen cmdopts.KeyGenSeeded, hotswapbin *cmdopts.HotswapPath) (err error) {
 	var (
 		signer        ssh.Signer
 		httpl         net.Listener
@@ -219,6 +220,15 @@ func (t daemon) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, keygen cmdopt
 			runners.AgentOptionEnvKeys(t.EnvVars...),
 			runners.AgentOptionEnv(eg.EnvComputeTLSInsecure, strconv.FormatBool(tlsc.Insecure)),
 			repocacheopt,
+			// --hotswap replaces the eg binary in workload containers with the one running this daemon.
+			envx.Toggle(
+				runners.AgentOptionNoop,
+				runners.AgentOptionCompose(
+					runners.AgentOptionEGBin(errorsx.Must(exec.LookPath(os.Args[0]))),
+					runners.AgentOptionEnv(eg.EnvComputeBin, hotswapbin.String()),
+				),
+				hotswapbin.String() != "",
+			),
 			// workload containers create their own network namespace too, which a container the daemon is nested in may not be able to configure.
 			envx.Toggle(runners.AgentOptionNoop, runners.AgentOptionCommandLine("--network", "host"), t.NetworkHost),
 			// a private pid namespace needs a fresh /proc, which a container that masks its own /proc cannot mount.

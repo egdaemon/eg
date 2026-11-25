@@ -104,7 +104,7 @@ func run(ctx context.Context, _ eg.Op) error {
 	return shell.Run(
 		ctx,
 		shell.New(
-			"XDG_RUNTIME_DIR=/run/user/$(id -u) systemd-run --user --wait --pipe --property=EnvironmentFile=${COMPUTE_ENV} ~/go/bin/eg daemon --network-host --pid-host",
+			"XDG_RUNTIME_DIR=/run/user/$(id -u) systemd-run --user --wait --pipe --property=EnvironmentFile=${COMPUTE_ENV} ~/go/bin/eg --hotswap daemon --network-host --pid-host",
 		).Environ("COMPUTE_ENV", envfile).Timeout(egenv.TTL()),
 	)
 }

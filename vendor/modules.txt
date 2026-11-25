@@ -603,7 +603,7 @@ github.com/egdaemon/sh/v3/syntax
 # github.com/egdaemon/sh/x v0.0.0-20261105220106-700f29e4a1a9
 ## explicit; go 1.26.0
 github.com/egdaemon/sh/x/coreutils
-# github.com/egdaemon/wasinet/wasinet v0.0.0-20261103201433-2f9a9bae892d
+# github.com/egdaemon/wasinet/wasinet v0.0.0-20261125165302-a2ab2283c016
 ## explicit; go 1.26.0
 github.com/egdaemon/wasinet/wasinet
 github.com/egdaemon/wasinet/wasinet/autohijack
@@ -616,7 +616,7 @@ github.com/egdaemon/wasinet/wasinet/internal/langx
 github.com/egdaemon/wasinet/wasinet/stdlib/wasip1net
 github.com/egdaemon/wasinet/wasinet/stdlib/wasip1syscall
 github.com/egdaemon/wasinet/wasinet/wnetruntime
-# github.com/egdaemon/wasinet/wazeronet v0.0.0-20260928194155-07f223337a8d
+# github.com/egdaemon/wasinet/wazeronet v0.0.0-20261125165302-a2ab2283c016
 ## explicit; go 1.25.0
 github.com/egdaemon/wasinet/wazeronet
 # github.com/emirpasic/gods v1.18.1
@@ -2228,7 +2228,7 @@ golang.org/x/oauth2/jwt
 golang.org/x/sync/errgroup
 golang.org/x/sync/semaphore
 golang.org/x/sync/singleflight
-# golang.org/x/sys v0.49.0
+# golang.org/x/sys v0.50.0
 ## explicit; go 1.26.0
 golang.org/x/sys/cpu
 golang.org/x/sys/plan9

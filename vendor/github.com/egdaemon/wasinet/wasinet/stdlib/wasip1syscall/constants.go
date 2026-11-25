@@ -26,7 +26,8 @@ const (
 )
 
 const (
-	SOL_SOCKET = iota
+	// SOL_SOCKET is the wasi value; the host translates it, and the names above, to its system values (SockoptTranslate).
+	SOL_SOCKET = 0x1
 )
 
 const (

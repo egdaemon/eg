@@ -51,6 +51,8 @@ func sock_connect(fd int32, addr unsafe.Pointer, addrlen uint32) syscall.Errno {
 }
 
 func sock_getsockopt(fd int32, level uint32, name uint32, dst unsafe.Pointer, _ uint32) syscall.Errno {
+	nlevel, nname := SockoptTranslate(int(level), int(name))
+	level, name = uint32(nlevel), uint32(nname)
 	switch name {
 	default:
 		v, err := unix.GetsockoptInt(int(fd), int(level), int(name))
@@ -60,8 +62,10 @@ func sock_getsockopt(fd int32, level uint32, name uint32, dst unsafe.Pointer, _ 
 }
 
 func sock_setsockopt(fd int32, level uint32, name uint32, valueptr unsafe.Pointer, valuelen uint32) syscall.Errno {
+	nlevel, nname := SockoptTranslate(int(level), int(name))
+	level, name = uint32(nlevel), uint32(nname)
 	switch name {
-	case syscall.SO_LINGER: // this is untested.
+	case syscall.SO_LINGER, syscall.SO_RCVTIMEO, syscall.SO_SNDTIMEO: // linger is untested.
 		value := ffi.UnsafeClone[unix.Timeval](valueptr)
 		return ffierrors.Errno(unix.SetsockoptTimeval(int(fd), int(level), int(name), &value))
 	default:

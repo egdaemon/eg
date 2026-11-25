@@ -270,7 +270,8 @@ func SocketSetOpt(fn SetOptFn) SetOptHostFn {
 			return TranslateErrno(err)
 		}
 
-		return TranslateErrno(fn(ctx, int(fd), int(level), int(name), value))
+		nlevel, nname := wasip1syscall.SockoptTranslate(int(level), int(name))
+		return TranslateErrno(fn(ctx, int(fd), nlevel, nname, value))
 	}
 }
 
@@ -291,7 +292,8 @@ func SocketGetOpt(fn GetOptFn) GetOptHostFn {
 		if err != nil {
 			return TranslateErrno(err)
 		}
-		rv, err := fn(ctx, int(fd), int(level), int(name), value)
+		nlevel, nname := wasip1syscall.SockoptTranslate(int(level), int(name))
+		rv, err := fn(ctx, int(fd), nlevel, nname, value)
 		if err != nil {
 			return TranslateErrno(err)
 		}

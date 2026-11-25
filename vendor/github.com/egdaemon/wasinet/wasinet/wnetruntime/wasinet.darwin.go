@@ -34,7 +34,11 @@ func (t network) Open(ctx context.Context, af, socktype, protocol int) (fd int, 
 
 func (t network) Accept(ctx context.Context, fd int) (nfd int, sa unix.Sockaddr, err error) {
 	// slog.Log(ctx, slog.LevelDebug, "sock_accept", slog.Int("fd", fd))
-	if nfd, sa, err = unix.Accept(fd); err != nil {
+	err = ready(fd, unix.POLLIN, func() error {
+		nfd, sa, err = unix.Accept(fd)
+		return err
+	})
+	if err != nil {
 		return nfd, sa, err
 	}
 

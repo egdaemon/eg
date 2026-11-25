@@ -107,11 +107,13 @@ func SetsockoptTimeval(fd int, level uint32, opt uint32, d time.Duration) error 
 		Usec int64
 	}
 
-	secs := d.Truncate(time.Second)
-	milli := d - secs
-	tval := &Timeval{Sec: int64(secs / time.Second), Usec: milli.Milliseconds()}
-	// chatgpt'd the range for these....
-	tval.Usec = max(0, min(tval.Usec, 999999))
+	// zero disables the timeout. anything else (including negative, i.e. deadline already
+	// passed) is clamped to the smallest timeout, since {0,0} would mean no timeout.
+	if d != 0 {
+		d = max(d, time.Microsecond)
+	}
+
+	tval := &Timeval{Sec: int64(d / time.Second), Usec: int64((d % time.Second) / time.Microsecond)}
 	tvalptr, tvallen := ffi.Pointer(tval)
 	err := ffierrors.Error(sock_setsockopt(int32(fd), level, opt, tvalptr, tvallen))
 	return os.NewSyscallError("setsockopt_timeval", err)

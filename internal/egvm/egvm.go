@@ -13,6 +13,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"io"
+	"net/http"
 	"net/netip"
 	"runtime"
 	"slices"
@@ -49,6 +50,8 @@ type Machine struct {
 	cpus     uint
 	memory   uint64
 	root     *egiso.SysFS
+	egiso    string
+	client   *http.Client
 	nfs      []egiso.NFSOption
 	mounts   []mount
 	volumes  []mount
@@ -72,8 +75,26 @@ func New(root *egiso.SysFS, options ...Option) Machine {
 		init:     "/usr/sbin/init",
 		cpus:     uint(runtime.NumCPU()),
 		root:     root,
+		client:   http.DefaultClient,
 		firewall: wnetruntime.PublicFirewall(wnetruntime.FirewallOptionAllow(netip.MustParsePrefix("127.0.0.0/8"), netip.MustParsePrefix("::1/128"))),
 	}, options...)
+}
+
+// OptionEgiso names the egiso root serves, as egiso.OpenURI opens it. A Linux machine booted within
+// one the host serves has the host serve its root from it, which is not then served over the root
+// machine's own FUSE mount.
+func OptionEgiso(uri string) Option {
+	return func(m *Machine) {
+		m.egiso = uri
+	}
+}
+
+// OptionClient fetches the egisos of machines booted within a Linux machine through c, when they are
+// https URLs.
+func OptionClient(c *http.Client) Option {
+	return func(m *Machine) {
+		m.client = c
+	}
 }
 
 // OptionFirewall limits the addresses a Linux machine reaches to those fw permits.

@@ -2,13 +2,11 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"net"
 	"net/http"
 	"os"
 	"path/filepath"
-	"slices"
 	"strconv"
 	"time"
 
@@ -20,12 +18,10 @@ import (
 	"github.com/egdaemon/eg/cmd/cmdopts"
 	"github.com/egdaemon/eg/cmd/eg/daemons"
 	"github.com/egdaemon/eg/compute"
-	"github.com/egdaemon/eg/internal/bytesx"
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/httpx"
 	"github.com/egdaemon/eg/internal/libp2px"
-	"github.com/egdaemon/eg/internal/numericx"
 	"github.com/egdaemon/eg/internal/podmanx"
 	"github.com/egdaemon/eg/internal/runtimex"
 	"github.com/egdaemon/eg/internal/sshx"
@@ -58,19 +54,6 @@ func (t daemon) signer(keygen cmdopts.KeyGenSeeded) (ssh.Signer, error) {
 	return sshx.AutoCached(keygen(t.Seed), t.SSHKeyPath)
 }
 
-// gpuresources merges the detected gpu into the configured runtime resources so the
-// control plane sees the gpu even when the daemon wasn't configured via bootstrap.
-// mirrors actl bootstrap env daemon.
-func gpuresources(rr cmdopts.RuntimeResources, driver string, vram bytesx.Unit) cmdopts.RuntimeResources {
-	rr.Vram = numericx.Max(rr.Vram, vram)
-
-	if label := fmt.Sprintf("eg:gpu:%s", driver); driver != "" && !slices.Contains(rr.Labels, label) {
-		rr.Labels = append(slices.Clone(rr.Labels), label)
-	}
-
-	return rr
-}
-
 // essentially we use ssh forwarding from the control plane to the local http server
 // allowing the control plane to interogate
 func (t daemon) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, keygen cmdopts.KeyGenSeeded) (err error) {
@@ -87,18 +70,12 @@ func (t daemon) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, keygen cmdopt
 	log.Println("running daemon initiated")
 	defer log.Println("running daemon completed")
 
-	rm := runners.NewResourceManager(runners.NewRuntimeResources())
+	rm := runners.NewResourceManager(t.RuntimeResources.Limits(runners.NewRuntimeResources()))
 	rundirs := runners.DefaultSpoolDirs()
 	compiledirs := runners.NewSpoolDir(userx.DefaultCacheDirectory("compilespool"))
 
 	// we want to set the umask to 0002 to ensure that the cache (and other) directory are readable by the group.
 	runtimex.Umask(0002)
-
-	gpudriver, gpuvram, err := runners.DetectGPU()
-	if err != nil {
-		log.Println("unable to detect gpu:", err)
-	}
-	t.RuntimeResources = gpuresources(t.RuntimeResources, gpudriver, gpuvram)
 
 	log.Println("cache directory", t.CacheDir)
 	log.Println("detected runtime configuration", spew.Sdump(t.RuntimeResources))

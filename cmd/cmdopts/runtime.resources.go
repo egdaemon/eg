@@ -7,6 +7,9 @@ import (
 
 	"github.com/alecthomas/kong"
 	"github.com/egdaemon/eg/internal/bytesx"
+	"github.com/egdaemon/eg/internal/langx"
+	"github.com/egdaemon/eg/internal/numericx"
+	"github.com/egdaemon/eg/runners"
 )
 
 type RuntimeResources struct {
@@ -19,6 +22,16 @@ type RuntimeResources struct {
 	TTL    time.Duration `flag:"" name:"ttl" type:"durationinf" help:"maximum runtime for the upload. use 'infinity' to disable the ttl. infinite ttl is not supported for remote workloads." default:"1h"`
 	// we lie about the limit here to encourage good end user behavior.
 	Labels []string `flag:"" name:"label" help:"up to 10 labels to assign to this compute resource" default:"${vars_labels}"`
+}
+
+// Limits returns the capacity to schedule against: the configured resources capped at what the host has.
+// a zero cores or memory is unconfigured and is the host's total. vram is never defaulted, zero is no vram.
+func (t RuntimeResources) Limits(host runners.RuntimeResources) runners.RuntimeResources {
+	return runners.RuntimeResources{
+		Cores:  numericx.Min(langx.FirstNonZero(t.Cores, host.Cores), host.Cores),
+		Memory: numericx.Min(langx.FirstNonZero(uint64(t.Memory), host.Memory), host.Memory),
+		Vram:   numericx.Min(uint64(t.Vram), host.Vram),
+	}
 }
 
 // KongVars returns the kong.Vars needed to satisfy RuntimeResources' own defaults

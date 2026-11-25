@@ -25,11 +25,6 @@ const (
 	writeMsgSyscallName = "sendmsg"
 )
 
-// defaultwait is how long a goroutine sleeps after the host reports EAGAIN before it retries.
-// the host sockets are non-blocking and the host must not wait (it would stall every guest
-// goroutine), so the guest waits here: time.Sleep parks only the calling goroutine.
-const defaultwait = time.Millisecond
-
 func loopbackIP(nnet string) net.IP {
 	if nnet != "" && nnet[len(nnet)-1] == '6' {
 		return net.IPv6loopback
@@ -143,7 +138,7 @@ func (fd *netFD) accept() (netfd *netFD, err error) {
 
 			switch ffierrors.Errno(err) {
 			case syscall.EINTR, syscall.EAGAIN:
-				time.Sleep(defaultwait)
+				runtime.Gosched()
 			default:
 				return -1, err
 			}
@@ -219,7 +214,7 @@ func (fd *netFD) Read(p []byte) (n int, err error) {
 
 			switch ffierrors.Errno(err) {
 			case syscall.EINTR, syscall.EAGAIN:
-				time.Sleep(defaultwait)
+				runtime.Gosched()
 			default:
 				return 0, err
 			}
@@ -248,7 +243,7 @@ func (fd *netFD) Write(p []byte) (nn int, err error) {
 		nn += n
 		switch ffierrors.Errno(err) {
 		case syscall.EINTR, syscall.EAGAIN:
-			time.Sleep(defaultwait)
+			runtime.Gosched()
 			continue
 		}
 
@@ -295,7 +290,7 @@ func (fd *netFD) readMsg(b, oob []byte) (n, oobn int, flags int, rsa wasip1sysca
 
 			switch ffierrors.Errno(err) {
 			case syscall.EINTR, syscall.EAGAIN:
-				time.Sleep(defaultwait)
+				runtime.Gosched()
 			default:
 				return n, int(rflags), rsa, err
 			}
@@ -307,27 +302,13 @@ func (fd *netFD) readMsg(b, oob []byte) (n, oobn int, flags int, rsa wasip1sysca
 }
 
 func (fd *netFD) writeTo(p []byte, sa *wasip1syscall.RawSocketAddress) (n int, err error) {
-	for {
-		n, err = wasip1syscall.SendToSingle(fd.sysfd, p, nil, sa, 0)
-		if e := ffierrors.Errno(err); err == nil || (e != syscall.EINTR && e != syscall.EAGAIN) {
-			break
-		}
-		time.Sleep(defaultwait)
-	}
-
+	n, err = wasip1syscall.SendToSingle(fd.sysfd, p, nil, sa, 0)
 	runtime.KeepAlive(fd)
 	return n, wrapSyscallError(writeToSyscallName, err)
 }
 
 func (fd *netFD) writeMsg(p []byte, oob []byte, sa *wasip1syscall.RawSocketAddress) (n int, oobn int, err error) {
-	for {
-		n, err = wasip1syscall.SendToSingle(fd.sysfd, p, oob, sa, 0)
-		if e := ffierrors.Errno(err); err == nil || (e != syscall.EINTR && e != syscall.EAGAIN) {
-			break
-		}
-		time.Sleep(defaultwait)
-	}
-
+	n, err = wasip1syscall.SendToSingle(fd.sysfd, p, oob, sa, 0)
 	runtime.KeepAlive(fd)
 	return n, oobn, wrapSyscallError(writeMsgSyscallName, err)
 }

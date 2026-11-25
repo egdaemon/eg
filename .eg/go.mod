@@ -5,7 +5,7 @@ go 1.27.2
 require (
 	cloud.google.com/go/secretmanager v1.22.0
 	github.com/egdaemon/eg v0.0.0-20261116151058-f53594029bd0
-	github.com/egdaemon/wasinet/wasinet v0.0.0-20261125165302-a2ab2283c016
+	github.com/egdaemon/wasinet/wasinet v0.0.0-20261125170107-27fd9cfeb9ec
 	github.com/jackc/pgx/v5 v5.13.0
 	google.golang.org/api v0.307.0
 	google.golang.org/grpc v1.84.0
@@ -29,7 +29,7 @@ require (
 	github.com/egdaemon/duckproxy v0.0.0-20261120193429-c2b61b872b69 // indirect
 	github.com/egdaemon/sh/v3 v3.14.1-0.20261103040545-e33e887fd27a // indirect
 	github.com/egdaemon/sh/x v0.0.0-20261105220106-700f29e4a1a9 // indirect
-	github.com/egdaemon/wasinet/wazeronet v0.0.0-20261125165302-a2ab2283c016 // indirect
+	github.com/egdaemon/wasinet/wazeronet v0.0.0-20261125170107-27fd9cfeb9ec // indirect
 	github.com/emirpasic/gods v1.18.1 // indirect
 	github.com/envoyproxy/go-control-plane/envoy v1.39.0 // indirect
 	github.com/felixge/fgprof v0.9.5 // indirect

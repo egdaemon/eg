@@ -266,10 +266,10 @@ github.com/egdaemon/sh/v3 v3.14.1-0.20261103040545-e33e887fd27a h1:iGlPjuwVYuTIF
 github.com/egdaemon/sh/v3 v3.14.1-0.20261103040545-e33e887fd27a/go.mod h1:bgSyM3zQ992me4O94jt+XjZKvSzfkTlKunY2kaD6XHo=
 github.com/egdaemon/sh/x v0.0.0-20261105220106-700f29e4a1a9 h1:eAdpsqf90sDDfpwJeyUxTbRcOk0asRT34gNmEVmz3TQ=
 github.com/egdaemon/sh/x v0.0.0-20261105220106-700f29e4a1a9/go.mod h1:fJ7Tj6v7oj9TNesarHyi0HfgeR8zDfRu9B5f4JUS4zk=
-github.com/egdaemon/wasinet/wasinet v0.0.0-20261125165302-a2ab2283c016 h1:5IlM4RnxFnwZvN9siFzOR9s1XVTDRUcckzrliMVLMmk=
-github.com/egdaemon/wasinet/wasinet v0.0.0-20261125165302-a2ab2283c016/go.mod h1:2/G25/idU+fUZa8vElMrvgKi2RRkNM/0z0hHRsIfvkQ=
-github.com/egdaemon/wasinet/wazeronet v0.0.0-20261125165302-a2ab2283c016 h1:/MpxSZX8LDcOPwfY2HwbNT9swfBHrNf9oNrvGfHqTVg=
-github.com/egdaemon/wasinet/wazeronet v0.0.0-20261125165302-a2ab2283c016/go.mod h1:24MLedTkSsszJFr4scqXeDTqieTAtdymhflkj1joXB4=
+github.com/egdaemon/wasinet/wasinet v0.0.0-20261125170107-27fd9cfeb9ec h1:JIWet88GA13JaGFuenh1xMAlCLx8dO89NA56R7sFHRw=
+github.com/egdaemon/wasinet/wasinet v0.0.0-20261125170107-27fd9cfeb9ec/go.mod h1:2/G25/idU+fUZa8vElMrvgKi2RRkNM/0z0hHRsIfvkQ=
+github.com/egdaemon/wasinet/wazeronet v0.0.0-20261125170107-27fd9cfeb9ec h1:E1v0JTIcU0O/9gSXAMnP1P0fTtxJUUgM4e4AzEo8L8Y=
+github.com/egdaemon/wasinet/wazeronet v0.0.0-20261125170107-27fd9cfeb9ec/go.mod h1:24MLedTkSsszJFr4scqXeDTqieTAtdymhflkj1joXB4=
 github.com/emirpasic/gods v1.18.1 h1:FXtiHYKDGKCW2KzwZKx0iC0PQmdlorYgdFG9jPXJ1Bc=
 github.com/emirpasic/gods v1.18.1/go.mod h1:8tpGGwCnJ5H4r6BWwaV6OrWmMoPhUl5jm/FMNAnJvWQ=
 github.com/envoyproxy/go-control-plane v0.14.0 h1:hbG2kr4RuFj222B6+7T83thSPqLjwBIfQawTkC++2HA=

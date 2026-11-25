@@ -30,8 +30,8 @@ require (
 	github.com/egdaemon/gdx/konggdx v0.0.0-20261115232526-a70109276a78
 	github.com/egdaemon/sh/v3 v3.14.1-0.20261103040545-e33e887fd27a
 	github.com/egdaemon/sh/x v0.0.0-20261105220106-700f29e4a1a9
-	github.com/egdaemon/wasinet/wasinet v0.0.0-20261125165302-a2ab2283c016
-	github.com/egdaemon/wasinet/wazeronet v0.0.0-20261125165302-a2ab2283c016
+	github.com/egdaemon/wasinet/wasinet v0.0.0-20261125170107-27fd9cfeb9ec
+	github.com/egdaemon/wasinet/wazeronet v0.0.0-20261125170107-27fd9cfeb9ec
 	github.com/fsnotify/fsnotify v1.10.1
 	github.com/go-git/go-billy/v5 v5.9.1
 	github.com/go-git/go-git/v6 v6.0.0-beta.1

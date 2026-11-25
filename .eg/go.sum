@@ -59,8 +59,8 @@ github.com/egdaemon/eg v0.0.0-20261116151058-f53594029bd0 h1:scSaY5MQ79blse9U7OI
 github.com/egdaemon/eg v0.0.0-20261116151058-f53594029bd0/go.mod h1:5vEByo6QVitChwdRII/IA4I2WD4doxQikmY00p9etek=
 github.com/egdaemon/sh/v3 v3.14.1-0.20261103040545-e33e887fd27a h1:iGlPjuwVYuTIFqTFNbHIeRDArtr1Ji/Y4r5Upebpo14=
 github.com/egdaemon/sh/x v0.0.0-20261105220106-700f29e4a1a9 h1:eAdpsqf90sDDfpwJeyUxTbRcOk0asRT34gNmEVmz3TQ=
-github.com/egdaemon/wasinet/wasinet v0.0.0-20261125165302-a2ab2283c016 h1:5IlM4RnxFnwZvN9siFzOR9s1XVTDRUcckzrliMVLMmk=
-github.com/egdaemon/wasinet/wazeronet v0.0.0-20261125165302-a2ab2283c016 h1:/MpxSZX8LDcOPwfY2HwbNT9swfBHrNf9oNrvGfHqTVg=
+github.com/egdaemon/wasinet/wasinet v0.0.0-20261125170107-27fd9cfeb9ec h1:JIWet88GA13JaGFuenh1xMAlCLx8dO89NA56R7sFHRw=
+github.com/egdaemon/wasinet/wazeronet v0.0.0-20261125170107-27fd9cfeb9ec h1:E1v0JTIcU0O/9gSXAMnP1P0fTtxJUUgM4e4AzEo8L8Y=
 github.com/emirpasic/gods v1.18.1 h1:FXtiHYKDGKCW2KzwZKx0iC0PQmdlorYgdFG9jPXJ1Bc=
 github.com/emirpasic/gods v1.18.1/go.mod h1:8tpGGwCnJ5H4r6BWwaV6OrWmMoPhUl5jm/FMNAnJvWQ=
 github.com/envoyproxy/go-control-plane/envoy v1.39.0 h1:1uwRDYPYG8BIBU9Mj1sUAebNmlM6beu/ZKKweSLDxk8=

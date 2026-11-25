@@ -57,9 +57,7 @@ func Open(ctx context.Context, c *http.Client, location string, toc digest.Diges
 	var (
 		u  *url.URL
 		f  *os.File
-		st os.FileInfo
 		sr *io.SectionReader
-		a  *Archive
 	)
 
 	if u, err = url.Parse(location); err != nil {
@@ -80,6 +78,17 @@ func Open(ctx context.Context, c *http.Client, location string, toc digest.Diges
 	if f, err = os.Open(location); err != nil {
 		return nil, err
 	}
+	return OpenFile(f, toc)
+}
+
+// OpenFile opens the egiso in f, which the archive closes, pinned to the digest of its table of
+// contents. f is closed when it does not hold the egiso.
+func OpenFile(f *os.File, toc digest.Digest) (_ *Archive, err error) {
+	var (
+		st os.FileInfo
+		a  *Archive
+	)
+
 	if st, err = f.Stat(); err != nil {
 		return nil, errorsx.Compact(err, f.Close())
 	}

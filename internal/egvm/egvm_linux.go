@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"io/fs"
 	"net"
 	"net/netip"
 	"os"
@@ -44,6 +45,7 @@ type VM struct {
 	netns   string
 	socket  string
 	client  *ssh.ClientConfig
+	host    *host
 	devs    []*os.File
 	owned   []*os.Root
 	init    *exec.Cmd
@@ -68,6 +70,7 @@ func Boot(m Machine, console io.Writer) (_ *VM, err error) {
 		mounted    [2]int
 		owned      *os.Root
 		args       []string
+		keys       fs.FS
 	)
 	defer func() {
 		if err != nil {
@@ -86,8 +89,20 @@ func Boot(m Machine, console io.Writer) (_ *VM, err error) {
 	if err = os.Mkdir(shared, 0700); err != nil {
 		return nil, errorsx.Wrap(err, "unable to create the machine's ssh directory")
 	}
+	if err = t.listen(filepath.Join(shared, rootsocket), m); err != nil {
+		return nil, err
+	}
 
-	if t.client, authorized, err = client(m.root.Upper()); err != nil {
+	keys = m.root.Upper()
+	if m.egiso != "" {
+		if t.host, err = dialhost(); err != nil {
+			return nil, err
+		}
+	}
+	if t.host != nil {
+		keys = t.host
+	}
+	if t.client, authorized, err = client(keys); err != nil {
 		return nil, err
 	}
 
@@ -155,7 +170,7 @@ func Boot(m Machine, console io.Writer) (_ *VM, err error) {
 	}
 
 	mapped[1].Close()
-	if err = t.serve(mounted[0], m.root, m.nfs...); err != nil {
+	if err = t.root(mounted[0], m); err != nil {
 		return nil, errorsx.Wrap(err, "the machine did not mount its root")
 	}
 
@@ -175,6 +190,24 @@ func Boot(m Machine, console io.Writer) (_ *VM, err error) {
 	}
 
 	return t, nil
+}
+
+// root serves the machine's root on the /dev/fuse descriptor it sends over the socket fd, or has the
+// host of the machine Boot runs in serve it.
+func (t *VM) root(fd int, m Machine) (err error) {
+	var (
+		dev *os.File
+	)
+
+	if t.host == nil {
+		return t.serve(fd, m.root, m.nfs...)
+	}
+
+	if dev, err = received(fd); err != nil {
+		return err
+	}
+	defer dev.Close()
+	return t.host.serve(dev, m.egiso)
 }
 
 // serve serves fsys on the /dev/fuse descriptor the machine sends over the socket fd, once it mounts
@@ -407,6 +440,9 @@ func (t *VM) Close() error {
 	if t.init != nil && t.init.Process != nil {
 		errorsx.Log(errorsx.Ignore(t.init.Process.Signal(syscall.SIGTERM), os.ErrProcessDone))
 		<-t.stopped
+	}
+	if t.host != nil {
+		errs = append(errs, t.host.Close())
 	}
 	t.served.Wait()
 	for _, dev := range t.devs {

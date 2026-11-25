@@ -118,6 +118,7 @@ func NewMachine(ctx context.Context, c *http.Client, ws workspaces.Context, uri 
 		cache    = userx.DefaultCacheDirectory("egvm")
 		upperdir string
 		copied   string
+		root     *egiso.SysFS
 		users    []egiso.Account
 		groups   []egiso.Account
 	)
@@ -148,7 +149,10 @@ func NewMachine(ctx context.Context, c *http.Client, ws workspaces.Context, uri 
 		return nil, errorsx.Wrap(err, "unable to open the machine's upper")
 	}
 
-	if users, groups, err = t.archive.Accounts(); err != nil {
+	// the machine has the image's own accounts, so the image's files keep their owners. The host user
+	// owns what it writes in the workspace's directories, except the runtime directory, whose sockets
+	// the machine binds for the host to dial.
+	if root, users, groups, err = egiso.NewRoot(t.archive, t.upper); err != nil {
 		return nil, err
 	}
 
@@ -175,12 +179,9 @@ func NewMachine(ctx context.Context, c *http.Client, ws workspaces.Context, uri 
 	t.moduleenv = append(config.environ, envx.Format(eg.EnvComputeEgiso, uri))
 	t.args = config.args
 
-	// the machine has the image's own accounts, so the image's files keep their owners. The host user
-	// owns what it writes in the workspace's directories, except the runtime directory, whose sockets
-	// the machine binds for the host to dial.
-	root := egiso.NewSysFS(egiso.NewUpper(egiso.Tree{}.Mount(".", t.archive, egiso.Identity(users), egiso.Identity(groups)), t.upper), egiso.Default, egiso.Default)
-
 	if t.vm, err = egvm.Boot(egvm.New(root, append([]egvm.Option{
+		egvm.OptionEgiso(uri),
+		egvm.OptionClient(c),
 		egvm.OptionAccounts(users, groups),
 		egvm.OptionMountOwned(ws.CacheDir, eg.DefaultMountRoot(eg.CacheDirectory)),
 		egvm.OptionMountReadWrite(ws.RuntimeDir, eg.DefaultMountRoot(eg.RuntimeDirectory)),

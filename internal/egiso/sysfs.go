@@ -40,6 +40,15 @@ func NewShare(dir *os.Root) *SysFS {
 	return NewSysFS(NewUpper(Tree{}.Bind(".", dir, NewOwners(), NewOwners()), nil), Default, Default)
 }
 
+// NewRoot serves archive as a machine's root under the writable upper in dir, its files owned by
+// the archive's own accounts, which it returns for the machine to name its owners by.
+func NewRoot(archive *Archive, dir *os.Root) (_ *SysFS, users []Account, groups []Account, err error) {
+	if users, groups, err = archive.Accounts(); err != nil {
+		return nil, nil, nil, err
+	}
+	return NewSysFS(NewUpper(Tree{}.Mount(".", archive, Identity(users), Identity(groups)), dir), Default, Default), users, groups, nil
+}
+
 // Upper is the upper the guest is served, for the host to read as it stands.
 func (t *SysFS) Upper() *Upper {
 	return t.upper

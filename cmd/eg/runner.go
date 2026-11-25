@@ -521,7 +521,15 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, environsecret
 			c8sproxy.ServiceProxyOptionBuildOptions(runners.ZeroAgent(hostnet).Options()...),
 			c8sproxy.ServiceProxyOptionMux(mux),
 		).Bind(srv)
-		machines.RegisterMachinesServer(srv, runners.NewMachines(tlsc.DefaultClient(), ws, log.Writer(), runners.MachineOptionEGBin(errorsx.Must(exec.LookPath(os.Args[0])))))
+		// a machine shares the container storage of the module booting it, as a container does, as overlay
+		// can not layer it on the machine's root.
+		machines.RegisterMachinesServer(srv, runners.NewMachines(
+			tlsc.DefaultClient(),
+			ws,
+			log.Writer(),
+			runners.MachineOptionEGBin(errorsx.Must(exec.LookPath(os.Args[0]))),
+			runners.MachineOptionVM(egvm.OptionMountVolume("/var/lib/containers", "/var/lib/containers")),
+		))
 
 		go func() {
 			errorsx.Log(errorsx.Wrap(srv.Serve(control), "unable to serve control socket"))

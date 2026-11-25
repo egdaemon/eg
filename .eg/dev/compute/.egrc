@@ -5,14 +5,7 @@
 [serve]
 --ttl=infinity
 --mount-read-only=${HOME}/.ssh:/workload/ssh
---cargs=--security-opt
---cargs=unmask=/proc/*
---cargs=--env
---cargs=EG_COMPUTE_RUNNER_UNMASK=true
+--vram=0B
 
 [local]
 --ttl=infinity
---cargs=--security-opt
---cargs=unmask=/proc/*
---cargs=--env
---cargs=EG_COMPUTE_RUNNER_UNMASK=true

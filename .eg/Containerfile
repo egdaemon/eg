@@ -42,5 +42,6 @@ RUN npm install -g @anthropic-ai/claude-code
 # change the buster to pull the latest, the layer is otherwise cached.
 RUN echo "cache buster 2d0a6c1e-6b0f-4f4e-9d27-0f5c8d1b7a43"
 RUN apt-get update && apt-get -y upgrade
+RUN systemctl enable ssh.service
 
 CMD /usr/sbin/init

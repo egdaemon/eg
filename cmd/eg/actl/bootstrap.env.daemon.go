@@ -5,6 +5,7 @@ import (
 	"log"
 	"math"
 	"runtime"
+	"slices"
 	"time"
 
 	"github.com/alecthomas/kong"
@@ -43,9 +44,21 @@ func (t BootstrapEnvDaemon) Run(kctx *kong.Context, gctx *cmdopts.Global, entrop
 		return errorsx.Wrap(err, "failed to generate entropy")
 	}
 
-	gpudriver, gpuvram, err := runners.DetectGPU()
-	if err != nil {
-		log.Println("unable to detect gpu:", err)
+	var (
+		gpudriver string
+		gpuvram   bytesx.Unit
+	)
+
+	// an explicit --vram=0 on the command line opts out of gpu support, i.e. nothing is detected or advertised.
+	// the default of 0 can't be told apart from it by value, so look at what was actually passed.
+	vramdisabled := t.RuntimeResources.Vram == 0 && slices.ContainsFunc(kctx.Path, func(p *kong.Path) bool {
+		return p != nil && p.Flag != nil && p.Flag.Name == "vram"
+	})
+
+	if !vramdisabled {
+		if gpudriver, gpuvram, err = runners.DetectGPU(); err != nil {
+			log.Println("unable to detect gpu:", err)
+		}
 	}
 
 	labels := t.RuntimeResources.Labels

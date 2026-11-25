@@ -185,6 +185,19 @@ func TestBootstrapEnvDaemon(t *testing.T) {
 		require.Contains(t, out.String(), "EG_LABELS=\"fast disk,prod") // the detected gpu label may follow.
 	})
 
+	t.Run("explicit zero vram skips gpu detection, no vram and no gpu label", func(t *testing.T) {
+		var out bytes.Buffer
+		harness := cmdtestx.New(t, &actl.BootstrapEnvDaemon{}).Options(
+			cmdopts.RuntimeResources{Cores: uint64(runtime.NumCPU())}.KongVars(),
+			kong.Vars{"vars_account_id": "expected-account", "vars_entropy_seed": "expected-seed"},
+			kong.Writers(&out, nil),
+			kong.Bind(cmdopts.Entropy(cmdopts.GenerateEntropy)))
+
+		require.NoError(t, harness.Run("--vram", "0B"))
+		require.Contains(t, out.String(), "EG_RESOURCES_VRAM=\"0 B\"\n")
+		require.NotContains(t, out.String(), "eg:gpu:")
+	})
+
 	t.Run("cores and memory honor the requested values", func(t *testing.T) {
 		var out bytes.Buffer
 		harness := cmdtestx.New(t, &actl.BootstrapEnvDaemon{}).Options(

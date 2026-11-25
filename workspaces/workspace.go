@@ -15,7 +15,7 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/egdaemon/eg"
 	"github.com/egdaemon/eg/astcodec"
-	"github.com/egdaemon/eg/cmd/cmdopts"
+	"github.com/egdaemon/eg/internal/buildinfo"
 	"github.com/egdaemon/eg/internal/debugx"
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
@@ -319,7 +319,7 @@ func cacheid(ctx context.Context, root string, mdir string, cacheid hash.Hash, i
 		return errorsx.Wrapf(err, "unable to ensure module directory: %s", root)
 	}
 
-	if _, err := cacheid.Write([]byte(cmdopts.BuildInfoSafe())); err != nil {
+	if _, err := cacheid.Write([]byte(buildinfo.Safe())); err != nil {
 		return errorsx.Wrapf(err, "unable include buildinfo: %s", root)
 	}
 

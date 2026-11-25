@@ -603,7 +603,7 @@ github.com/egdaemon/sh/v3/syntax
 # github.com/egdaemon/sh/x v0.0.0-20261105220106-700f29e4a1a9
 ## explicit; go 1.26.0
 github.com/egdaemon/sh/x/coreutils
-# github.com/egdaemon/wasinet/wasinet v0.0.0-20261125170107-27fd9cfeb9ec
+# github.com/egdaemon/wasinet/wasinet v0.0.0-20261125170832-89188e153bcf
 ## explicit; go 1.26.0
 github.com/egdaemon/wasinet/wasinet
 github.com/egdaemon/wasinet/wasinet/autohijack
@@ -616,7 +616,7 @@ github.com/egdaemon/wasinet/wasinet/internal/langx
 github.com/egdaemon/wasinet/wasinet/stdlib/wasip1net
 github.com/egdaemon/wasinet/wasinet/stdlib/wasip1syscall
 github.com/egdaemon/wasinet/wasinet/wnetruntime
-# github.com/egdaemon/wasinet/wazeronet v0.0.0-20261125170107-27fd9cfeb9ec
+# github.com/egdaemon/wasinet/wazeronet v0.0.0-20261125170832-89188e153bcf
 ## explicit; go 1.25.0
 github.com/egdaemon/wasinet/wazeronet
 # github.com/emirpasic/gods v1.18.1

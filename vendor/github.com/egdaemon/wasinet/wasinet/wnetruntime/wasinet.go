@@ -247,18 +247,22 @@ func (t network) SendTo(ctx context.Context, fd int, sa unix.Sockaddr, vecs [][]
 	case *unix.SockaddrUnix:
 		// apparently its fine to send the sock address to a tcp stream
 		// but for unix sockets it'll return syscall.EISCONN
-		sa = nil
+		err = ready(fd, unix.POLLOUT, func() error {
+			n, err = unix.SendmsgBuffers(fd, vecs, oob, nil, flags)
+			return err
+		})
+		return n, err
 	default:
 		if err = t.restricted(sa); err != nil {
 			return 0, err
 		}
-	}
 
-	err = ready(fd, unix.POLLOUT, func() error {
-		n, err = unix.SendmsgBuffers(fd, vecs, oob, sa, flags)
-		return err
-	})
-	return n, err
+		err = ready(fd, unix.POLLOUT, func() error {
+			n, err = unix.SendmsgBuffers(fd, vecs, oob, sa, flags)
+			return err
+		})
+		return n, err
+	}
 }
 
 // ready runs op on the non-blocking socket fd and, when op would block, waits up to

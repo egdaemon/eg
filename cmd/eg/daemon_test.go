@@ -67,4 +67,14 @@ func TestCmdDaemon(t *testing.T) {
 
 		require.Equal(t, identity.ID(first.PublicKey()), identity.ID(second.PublicKey()))
 	})
+
+	t.Run("the root container is built on the host network when enabled", func(t *testing.T) {
+		require.NotContains(t, daemon{}.buildopts(), "--network")
+		require.Subset(t, daemon{NetworkHost: true}.buildopts(), []string{"--network", "host"})
+	})
+
+	t.Run("the root container is built in the pid namespace of its parent when enabled", func(t *testing.T) {
+		require.NotContains(t, daemon{}.buildopts(), "--pid")
+		require.Subset(t, daemon{PIDHost: true}.buildopts(), []string{"--pid", "host"})
+	})
 }

@@ -47,7 +47,26 @@ type daemon struct {
 	MDNSAdvertise bool          `name:"mdns-advertise" help:"advertise this daemon on the local network (multicast dns) so clients on the same network can upload to it directly, requires --uploadable" default:"false" negatable:"" env:"${env_eg_lan_mdns_advertise}"`
 	LANPeerTTL    time.Duration `name:"lan-peer-ttl" type:"durationinf" help:"how long peers that reached this daemon are remembered after they were last seen" default:"720h" env:"${env_eg_lan_peer_ttl}"`
 	VCSCache      bool          `name:"vcs-cache" help:"mirror cloned repositories in the workload cache so repeat clones are incremental" hidden:"" default:"false" env:"${env_eg_compute_vcs_cache}"`
+	NetworkHost   bool          `name:"network-host" help:"build the root container and run workloads on the network of the daemon's container instead of a private one, required when the daemon runs inside a container that masks /proc/sys" default:"false" negatable:""`
+	PIDHost       bool          `name:"pid-host" help:"build the root container and run workloads in the pid namespace of the container the daemon runs in instead of a private one, required when the daemon runs inside a container that masks /proc" default:"false" negatable:""`
 	Uploadable    bool          `name:"uploadable" help:"accept workloads pushed directly to this runner (POST /c/upload, POST /c/enqueue) and advertise it to the control plane" default:"true" negatable:"" env:"${env_eg_compute_api_enabled}"`
+}
+
+// buildopts are the options the root container is built with.
+func (t daemon) buildopts() []string {
+	opts := []string{"--build-arg", envx.Format(eg.EnvBuildCommit, cmdopts.BuildCommit())}
+
+	// builds create their own network namespace, which a container the daemon is nested in may not be able to configure.
+	if t.NetworkHost {
+		opts = append(opts, "--network", "host")
+	}
+
+	// a private pid namespace needs a fresh /proc, which a container that masks its own /proc cannot mount.
+	if t.PIDHost {
+		opts = append(opts, "--pid", "host")
+	}
+
+	return opts
 }
 
 func (t daemon) signer(keygen cmdopts.KeyGenSeeded) (ssh.Signer, error) {
@@ -175,7 +194,7 @@ func (t daemon) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, keygen cmdopt
 		return err
 	}
 
-	if err = runners.BuildRootContainer(ctx, "--build-arg", envx.Format(eg.EnvBuildCommit, cmdopts.BuildCommit())); err != nil {
+	if err = runners.BuildRootContainer(ctx, t.buildopts()...); err != nil {
 		return err
 	}
 
@@ -200,6 +219,10 @@ func (t daemon) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, keygen cmdopt
 			runners.AgentOptionEnvKeys(t.EnvVars...),
 			runners.AgentOptionEnv(eg.EnvComputeTLSInsecure, strconv.FormatBool(tlsc.Insecure)),
 			repocacheopt,
+			// workload containers create their own network namespace too, which a container the daemon is nested in may not be able to configure.
+			envx.Toggle(runners.AgentOptionNoop, runners.AgentOptionCommandLine("--network", "host"), t.NetworkHost),
+			// a private pid namespace needs a fresh /proc, which a container that masks its own /proc cannot mount.
+			envx.Toggle(runners.AgentOptionNoop, runners.AgentOptionCommandLine("--pid", "host"), t.PIDHost),
 		),
 		runners.QueueOptionLogVerbosity(gctx.Verbosity),
 		runners.QueueOptionGPU(t.RuntimeResources.Vram > 0),

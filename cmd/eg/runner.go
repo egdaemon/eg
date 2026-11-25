@@ -319,6 +319,7 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, environsecret
 		uid     = envx.String(uuidx.Nil().String(), eg.EnvComputeRunID)
 		descr   = envx.String("", eg.EnvComputeVCS)
 		hostnet = envx.Toggle(runners.AgentOptionCommandLine("--network", "host"), runners.AgentOptionNoop, envx.Boolean(false, eg.EnvExperimentalDisableHostNetwork)) // ipv4 group bullshit. pretty sure its a podman 4 issue that was resolved in podman 5. this is 'safe' to do because we are already in a container.
+		pidhost = envx.Toggle(runners.AgentOptionNoop, runners.AgentOptionCommandLine("--pid", "host"), runners.Nested())                                              // a container that masks its own /proc cannot mount a fresh one for a private pid namespace, containers it creates share its own.
 		cc      grpc.ClientConnInterface
 		cmdenv  []string
 	)
@@ -507,6 +508,7 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, environsecret
 			runners.AgentOptionHostOS(),
 			runners.AgentOptionCommandLine("--cgroups", envx.String("enabled", eg.EnvComputeRunnerCgroups)),
 			hostnet,
+			pidhost,
 			gpu,
 		)
 
@@ -518,7 +520,7 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, environsecret
 				ragent.Options()...,
 			),
 			// builds create their own network namespace as well, they take the options of hostnet.
-			c8sproxy.ServiceProxyOptionBuildOptions(runners.ZeroAgent(hostnet).Options()...),
+			c8sproxy.ServiceProxyOptionBuildOptions(runners.ZeroAgent(hostnet, pidhost).Options()...),
 			c8sproxy.ServiceProxyOptionMux(mux),
 		).Bind(srv)
 		// a machine shares the container storage of the module booting it, as a container does, as overlay

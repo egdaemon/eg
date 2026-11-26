@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/containerd/stargz-snapshotter/estargz"
 	"github.com/egdaemon/eg/internal/egiso"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/execx"
@@ -150,7 +151,8 @@ func ImageEgiso(ctx context.Context, cache, image string) (_ string, err error) 
 	}
 	defer out.Close()
 
-	if toc, err = egiso.Build(io.NewSectionReader(root, 0, st.Size()), out); err != nil {
+	// estargz defaults to gzip.BestCompression, twice the cpu of the default level for an egiso a few percent smaller.
+	if toc, err = egiso.Build(io.NewSectionReader(root, 0, st.Size()), out, estargz.WithCompressionLevel(gzip.DefaultCompression)); err != nil {
 		return "", errorsx.Wrap(err, "unable to build the egiso")
 	}
 

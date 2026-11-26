@@ -37,14 +37,14 @@ type attrs struct {
 // the symlinks.
 type Upper struct {
 	tree  Tree
-	dir   *os.Root
+	dir   hostdir
 	m     sync.Mutex
 	attrs map[string]attrs
 }
 
 // NewUpper layers the empty directory dir over tree.
 func NewUpper(tree Tree, dir *os.Root) *Upper {
-	return &Upper{tree: tree, dir: dir, attrs: map[string]attrs{}}
+	return &Upper{tree: tree, dir: newhostdir(dir), attrs: map[string]attrs{}}
 }
 
 // Lstat describes the named file.
@@ -60,7 +60,7 @@ func (t *Upper) Lstat(name string) (fs.FileInfo, error) {
 	if err != nil || !up {
 		return st, err
 	}
-	return attrinfo{FileInfo: st, mode: t.attrs[name].mode}, nil
+	return attrinfo{FileInfo: st, attrs: t.attrs[name]}, nil
 }
 
 // ReadLink returns the target of the named symlink.
@@ -84,21 +84,19 @@ func (t *Upper) ReadLink(name string) (string, error) {
 
 // Owner returns the virtual user and group the named file is exposed as owned by.
 func (t *Upper) Owner(name string) (user string, group string, err error) {
-	if _, _, ok := t.bound(name); ok {
-		return t.tree.Owner(name)
-	}
-
-	t.m.Lock()
-	defer t.m.Unlock()
-
-	_, up, err := t.lstat("owner", name)
+	st, err := t.Lstat(name)
 	if err != nil {
 		return "", "", err
 	}
-	if up {
-		return t.attrs[name].user, t.attrs[name].group, nil
+	return t.owner(name, st)
+}
+
+// owner returns the virtual user and group of name from st, as Lstat describes it.
+func (t *Upper) owner(name string, st fs.FileInfo) (user string, group string, err error) {
+	if a, ok := st.(attrinfo); ok {
+		return a.attrs.user, a.attrs.group, nil
 	}
-	return t.tree.Owner(name)
+	return t.tree.owner(name, st)
 }
 
 // Open opens the named file for reading.
@@ -162,7 +160,7 @@ func (t *Upper) Chtimes(name string, atime time.Time, mtime time.Time) error {
 // and the flags to open it with.
 func (t *Upper) prepare(name string, flag int, perm fs.FileMode, user string, group string) (_ *os.Root, _ string, _ int, err error) {
 	if m, rel, ok := t.bound(name); ok {
-		return m.root, rel, flag, nil
+		return m.root.Root, rel, flag, nil
 	}
 
 	t.m.Lock()
@@ -183,7 +181,7 @@ func (t *Upper) prepare(name string, flag int, perm fs.FileMode, user string, gr
 		return nil, "", 0, err
 	}
 
-	return t.dir, name, flag &^ (os.O_CREATE | os.O_EXCL), nil
+	return t.dir.Root, name, flag &^ (os.O_CREATE | os.O_EXCL), nil
 }
 
 // Mkdir creates the named directory with mode perm, owned by user and group.
@@ -429,14 +427,14 @@ func (t *Upper) Chown(name string, user string, group string) error {
 // holds it.
 func (t *Upper) host(name string) (*os.Root, string, bool) {
 	if m, rel, ok := t.bound(name); ok {
-		return m.root, rel, true
+		return m.root.Root, rel, true
 	}
 
 	t.m.Lock()
 	defer t.m.Unlock()
 
 	if _, up, err := t.lstat("open", name); err == nil && up {
-		return t.dir, name, true
+		return t.dir.Root, name, true
 	}
 	return nil, "", false
 }
@@ -444,7 +442,7 @@ func (t *Upper) host(name string) (*os.Root, string, bool) {
 // bound returns the Bind mount name is within.
 func (t *Upper) bound(name string) (mount, string, bool) {
 	m, rel, ok := t.tree.mount(name)
-	return m, rel, ok && m.root != nil
+	return m, rel, ok && m.root.Root != nil
 }
 
 // lstat describes name and reports whether the upper holds it.
@@ -477,14 +475,25 @@ func (t *Upper) lstat(op string, name string) (_ fs.FileInfo, up bool, err error
 // hidden reports whether the upper hides name in the tree: by a whiteout of it or of an ancestor,
 // or by replacing an ancestor with a file or an opaque directory.
 func (t *Upper) hidden(name string) bool {
-	for p := name; p != "."; p = path.Dir(p) {
+	var (
+		p string
+	)
+
+	// from the root down, stopping at the first ancestor the upper lacks: whatever hides an entry is
+	// recorded within its parent.
+	for c := range strings.SplitSeq(name, "/") {
+		p = path.Join(p, c)
 		if t.exists(whiteoutof(p)) {
 			return true
 		}
 		if p == name {
-			continue
+			return false
 		}
-		if st, err := t.dir.Lstat(p); err == nil && (!st.IsDir() || t.exists(path.Join(p, opaque))) {
+		st, err := t.dir.Lstat(p)
+		if err != nil {
+			return false
+		}
+		if !st.IsDir() || t.exists(path.Join(p, opaque)) {
 			return true
 		}
 	}
@@ -584,7 +593,7 @@ func (t *Upper) copyup(name string) (err error) {
 	if st, err = t.tree.Lstat(name); err != nil {
 		return err
 	}
-	if user, group, err = t.tree.Owner(name); err != nil {
+	if user, group, err = t.tree.owner(name, st); err != nil {
 		return err
 	}
 
@@ -729,13 +738,13 @@ func whiteoutof(name string) string {
 	return path.Join(path.Dir(name), whiteout+path.Base(name))
 }
 
-// attrinfo describes an entry of the upper with the mode the environment sees.
+// attrinfo describes an entry of the upper with the owner and mode the environment sees.
 type attrinfo struct {
 	fs.FileInfo
-	mode fs.FileMode
+	attrs attrs
 }
 
-func (t attrinfo) Mode() fs.FileMode { return t.mode }
+func (t attrinfo) Mode() fs.FileMode { return t.attrs.mode }
 
 type attrentry struct {
 	fs.DirEntry
@@ -747,5 +756,5 @@ func (t attrentry) Info() (fs.FileInfo, error) {
 	if err != nil {
 		return nil, err
 	}
-	return attrinfo{FileInfo: st, mode: t.attrs.mode}, nil
+	return attrinfo{FileInfo: st, attrs: t.attrs}, nil
 }

@@ -26,9 +26,20 @@ type Tree struct {
 type mount struct {
 	at     string
 	src    fs.FS
-	root   *os.Root // the host directory a Bind mounts, which writes go to
+	root   hostdir // the host directory a Bind mounts, which writes go to
 	users  Owners
 	groups Owners
+}
+
+func (t mount) stat(rel string) (fs.FileInfo, error) {
+	return fs.Stat(t.src, rel)
+}
+
+func (t mount) lstat(rel string) (fs.FileInfo, error) {
+	if t.root.Root != nil {
+		return t.root.Lstat(rel)
+	}
+	return fs.Lstat(t.src, rel)
 }
 
 // Mount mounts src at the path at, "." for the root, exposing its files' uids through users and
@@ -40,7 +51,7 @@ func (t Tree) Mount(at string, src fs.FS, users Owners, groups Owners) Tree {
 // Bind mounts the host directory dir at the path at, like Mount, and the environment's writes
 // within it go to dir as the host user, so the host user can change and delete what it writes.
 func (t Tree) Bind(at string, dir *os.Root, users Owners, groups Owners) Tree {
-	return t.attach(mount{at: at, src: dir.FS(), root: dir, users: users, groups: groups})
+	return t.attach(mount{at: at, src: dir.FS(), root: newhostdir(dir), users: users, groups: groups})
 }
 
 func (t Tree) attach(m mount) Tree {
@@ -66,12 +77,12 @@ func (t Tree) Open(name string) (fs.File, error) {
 
 // Stat describes the named file, following a final symlink within its mount.
 func (t Tree) Stat(name string) (fs.FileInfo, error) {
-	return t.stat("stat", name, fs.Stat)
+	return t.stat("stat", name, mount.stat)
 }
 
 // Lstat describes the named file without following a final symlink.
 func (t Tree) Lstat(name string) (fs.FileInfo, error) {
-	return t.stat("lstat", name, fs.Lstat)
+	return t.stat("lstat", name, mount.lstat)
 }
 
 // ReadLink returns the target of the named symlink.
@@ -87,13 +98,13 @@ func (t Tree) ReadLink(name string) (string, error) {
 	return fs.ReadLink(m.src, rel)
 }
 
-func (t Tree) stat(op string, name string, stat func(fs.FS, string) (fs.FileInfo, error)) (fs.FileInfo, error) {
+func (t Tree) stat(op string, name string, stat func(mount, string) (fs.FileInfo, error)) (fs.FileInfo, error) {
 	if !fs.ValidPath(name) {
 		return nil, &fs.PathError{Op: op, Path: name, Err: fs.ErrInvalid}
 	}
 
 	if m, rel, ok := t.mount(name); ok {
-		st, err := stat(m.src, rel)
+		st, err := stat(m, rel)
 		if err == nil {
 			return info{FileInfo: st, name: path.Base(name)}, nil
 		}
@@ -161,7 +172,11 @@ func (t Tree) Owner(name string) (user string, group string, err error) {
 	if err != nil {
 		return "", "", err
 	}
+	return t.owner(name, st)
+}
 
+// owner returns the virtual user and group of name from st, as Lstat describes it.
+func (t Tree) owner(name string, st fs.FileInfo) (user string, group string, err error) {
 	if _, ok := st.Sys().(syntheticsys); ok {
 		return Privileged, Privileged, nil
 	}
@@ -191,7 +206,7 @@ func (t Tree) mount(name string) (found mount, rel string, ok bool) {
 
 // binds reports whether the tree holds a Bind mount.
 func (t Tree) binds() bool {
-	return slices.ContainsFunc(t.mounts, func(m mount) bool { return m.root != nil })
+	return slices.ContainsFunc(t.mounts, func(m mount) bool { return m.root.Root != nil })
 }
 
 // leads reports whether name is a directory on the way to a mount point.

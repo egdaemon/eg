@@ -258,7 +258,7 @@ func (t nfsfs) lstat(name string) (fs.FileInfo, error) {
 	}
 
 	if t.users != nil {
-		if user, group, err = t.sys.upper.Owner(name); err != nil {
+		if user, group, err = t.sys.upper.owner(name, st); err != nil {
 			return nil, err
 		}
 		uid, gid = t.users.id(user), t.groups.id(group)

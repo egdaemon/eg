@@ -161,7 +161,11 @@ func (t Tree) Owner(name string) (user string, group string, err error) {
 	if err != nil {
 		return "", "", err
 	}
+	return t.owner(name, st)
+}
 
+// owner returns the virtual user and group of name from st, as Lstat describes it.
+func (t Tree) owner(name string, st fs.FileInfo) (user string, group string, err error) {
 	if _, ok := st.Sys().(syntheticsys); ok {
 		return Privileged, Privileged, nil
 	}

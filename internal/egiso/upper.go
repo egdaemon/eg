@@ -60,7 +60,7 @@ func (t *Upper) Lstat(name string) (fs.FileInfo, error) {
 	if err != nil || !up {
 		return st, err
 	}
-	return attrinfo{FileInfo: st, mode: t.attrs[name].mode}, nil
+	return attrinfo{FileInfo: st, attrs: t.attrs[name]}, nil
 }
 
 // ReadLink returns the target of the named symlink.
@@ -84,21 +84,19 @@ func (t *Upper) ReadLink(name string) (string, error) {
 
 // Owner returns the virtual user and group the named file is exposed as owned by.
 func (t *Upper) Owner(name string) (user string, group string, err error) {
-	if _, _, ok := t.bound(name); ok {
-		return t.tree.Owner(name)
-	}
-
-	t.m.Lock()
-	defer t.m.Unlock()
-
-	_, up, err := t.lstat("owner", name)
+	st, err := t.Lstat(name)
 	if err != nil {
 		return "", "", err
 	}
-	if up {
-		return t.attrs[name].user, t.attrs[name].group, nil
+	return t.owner(name, st)
+}
+
+// owner returns the virtual user and group of name from st, as Lstat describes it.
+func (t *Upper) owner(name string, st fs.FileInfo) (user string, group string, err error) {
+	if a, ok := st.(attrinfo); ok {
+		return a.attrs.user, a.attrs.group, nil
 	}
-	return t.tree.Owner(name)
+	return t.tree.owner(name, st)
 }
 
 // Open opens the named file for reading.
@@ -595,7 +593,7 @@ func (t *Upper) copyup(name string) (err error) {
 	if st, err = t.tree.Lstat(name); err != nil {
 		return err
 	}
-	if user, group, err = t.tree.Owner(name); err != nil {
+	if user, group, err = t.tree.owner(name, st); err != nil {
 		return err
 	}
 
@@ -740,13 +738,13 @@ func whiteoutof(name string) string {
 	return path.Join(path.Dir(name), whiteout+path.Base(name))
 }
 
-// attrinfo describes an entry of the upper with the mode the environment sees.
+// attrinfo describes an entry of the upper with the owner and mode the environment sees.
 type attrinfo struct {
 	fs.FileInfo
-	mode fs.FileMode
+	attrs attrs
 }
 
-func (t attrinfo) Mode() fs.FileMode { return t.mode }
+func (t attrinfo) Mode() fs.FileMode { return t.attrs.mode }
 
 type attrentry struct {
 	fs.DirEntry
@@ -758,5 +756,5 @@ func (t attrentry) Info() (fs.FileInfo, error) {
 	if err != nil {
 		return nil, err
 	}
-	return attrinfo{FileInfo: st, mode: t.attrs.mode}, nil
+	return attrinfo{FileInfo: st, attrs: t.attrs}, nil
 }

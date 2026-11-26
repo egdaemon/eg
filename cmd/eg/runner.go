@@ -314,22 +314,13 @@ func (t module) isolated(ctx context.Context, cc grpc.ClientConnInterface, uid, 
 
 func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, environsecret *cmdopts.EnvironSecret) (err error) {
 	var (
-		ws      workspaces.Context
-		aid     = envx.String(uuidx.Nil().String(), eg.EnvComputeAccountID)
-		uid     = envx.String(uuidx.Nil().String(), eg.EnvComputeRunID)
-		descr   = envx.String("", eg.EnvComputeVCS)
-		hostnet = envx.Toggle(runners.AgentOptionCommandLine("--network", "host"), runners.AgentOptionNoop, envx.Boolean(false, eg.EnvExperimentalDisableHostNetwork)) // ipv4 group bullshit. pretty sure its a podman 4 issue that was resolved in podman 5. this is 'safe' to do because we are already in a container.
-		pidhost = envx.Toggle(runners.AgentOptionNoop, runners.AgentOptionCommandLine("--pid", "host"), runners.Nested())                                              // a container that masks its own /proc cannot mount a fresh one for a private pid namespace, the builds it runs share its own. module containers keep a private one, their init (systemd) only runs as pid 1.
-		cc      grpc.ClientConnInterface
-		cmdenv  []string
+		ws     workspaces.Context
+		aid    = envx.String(uuidx.Nil().String(), eg.EnvComputeAccountID)
+		uid    = envx.String(uuidx.Nil().String(), eg.EnvComputeRunID)
+		descr  = envx.String("", eg.EnvComputeVCS)
+		cc     grpc.ClientConnInterface
+		cmdenv []string
 	)
-
-	// within a workload podman's configuration gives the module's containers namespaces of their own, its builds share the module's network, see runners.PodmanWorkload.
-	buildopts := runners.ZeroAgent(hostnet, pidhost).Options()
-	if runners.PodmanWorkload() {
-		hostnet, pidhost = runners.AgentOptionNoop, runners.AgentOptionNoop
-		buildopts = runners.PodmanWorkloadBuildOptions()
-	}
 
 	// ensure when we run modules our umask is set to allow git clones to work properly
 	runtimex.Umask(0002)
@@ -515,7 +506,6 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, environsecret
 			runners.AgentOptionEGBin(fsx.LocateFirst(eg.DefaultMountRoot(eg.RuntimeDirectory, eg.BinaryBin), errorsx.Must(exec.LookPath(os.Args[0])))),
 			runners.AgentOptionHostOS(),
 			runners.AgentOptionCommandLine("--cgroups", envx.String("enabled", eg.EnvComputeRunnerCgroups)),
-			hostnet,
 			gpu,
 		)
 
@@ -526,8 +516,8 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, environsecret
 			c8sproxy.ServiceProxyOptionContainerOptions(
 				ragent.Options()...,
 			),
-			// builds create their own network and pid namespaces as well, they take the options of hostnet and pidhost.
-			c8sproxy.ServiceProxyOptionBuildOptions(buildopts...),
+			// within a workload podman's configuration gives the module's containers namespaces of their own, its builds share the module's network, see runners.PodmanWorkload.
+			c8sproxy.ServiceProxyOptionBuildOptions(runners.PodmanWorkloadBuildOptions()...),
 			c8sproxy.ServiceProxyOptionMux(mux),
 		).Bind(srv)
 		// a machine shares the container storage of the module booting it, as a container does, as overlay

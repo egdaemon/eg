@@ -20,18 +20,8 @@ func TestPodmanWorkload(t *testing.T) {
 		return env
 	}
 
-	t.Run("a host is not a workload and declares none by default", func(t *testing.T) {
+	t.Run("a host is not a workload and declares the containers it launches one", func(t *testing.T) {
 		t.Setenv(eg.EnvComputePodmanWorkload, "")
-		t.Setenv(eg.EnvExperimentalPodmanWorkload, "")
-
-		require.False(t, PodmanWorkload())
-		require.Empty(t, PodmanWorkloadBuildOptions())
-		require.NotContains(t, agentenv(), declared)
-	})
-
-	t.Run("a host opted in declares the containers it launches without becoming one", func(t *testing.T) {
-		t.Setenv(eg.EnvComputePodmanWorkload, "")
-		t.Setenv(eg.EnvExperimentalPodmanWorkload, "true")
 
 		require.False(t, PodmanWorkload())
 		require.Empty(t, PodmanWorkloadBuildOptions())
@@ -40,7 +30,6 @@ func TestPodmanWorkload(t *testing.T) {
 
 	t.Run("a declared workload builds within its network and declares the containers it launches", func(t *testing.T) {
 		t.Setenv(eg.EnvComputePodmanWorkload, "true")
-		t.Setenv(eg.EnvExperimentalPodmanWorkload, "")
 
 		require.True(t, PodmanWorkload())
 		require.Equal(t, []string{"--network", "host"}, PodmanWorkloadBuildOptions())

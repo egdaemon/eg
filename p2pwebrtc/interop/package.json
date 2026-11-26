@@ -1,0 +1,16 @@
+{
+  "name": "p2pwebrtc-interop",
+  "private": true,
+  "type": "module",
+  "description": "js-libp2p side of the p2pwebrtc interop test, see run.sh",
+  "dependencies": {
+    "@chainsafe/libp2p-noise": "^17.0.0",
+    "@chainsafe/libp2p-yamux": "^8.0.1",
+    "@libp2p/circuit-relay-v2": "^4.2.18",
+    "@libp2p/identify": "^4.1.19",
+    "@libp2p/tcp": "^11.0.33",
+    "@libp2p/webrtc": "^7.0.3",
+    "@multiformats/multiaddr": "^13.0.3",
+    "libp2p": "^3.5.2"
+  }
+}

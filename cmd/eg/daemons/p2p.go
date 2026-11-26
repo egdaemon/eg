@@ -10,6 +10,7 @@ import (
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/libp2px"
 	"github.com/egdaemon/eg/internal/netx"
+	"github.com/egdaemon/p2pwebrtc"
 
 	"github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p/core/crypto"
@@ -56,7 +57,15 @@ func P2PProxyGated(ctx context.Context, seed []byte, httpl net.Listener, gate Ga
 		libp2p.EnableAutoNATv2(),
 		libp2p.EnableRelay(),
 		libp2p.EnableHolePunching(),
+		// advertise <relay>/p2p-circuit/webrtc next to every relayed address.
+		libp2p.AddrsFactory(p2pwebrtc.AddrsFactory(nil)),
 	))
+
+	// browsers reach the runner through its relay reservation and upgrade to a direct webrtc
+	// connection (/p2p-circuit/webrtc), the relay only carries the signaling.
+	if _, err = p2pwebrtc.Add(self, p2pwebrtc.WithSTUN(p2pwebrtc.DefaultSTUNServers...)); err != nil {
+		return zero, errorsx.Wrap(err, "unable to enable the webrtc transport")
+	}
 
 	// Construct a datastore (needed by the DHT). This is just a simple, in-memory thread-safe datastore.
 	dstore := dsync.MutexWrap(ds.NewMapDatastore())

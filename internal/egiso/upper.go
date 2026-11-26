@@ -477,14 +477,25 @@ func (t *Upper) lstat(op string, name string) (_ fs.FileInfo, up bool, err error
 // hidden reports whether the upper hides name in the tree: by a whiteout of it or of an ancestor,
 // or by replacing an ancestor with a file or an opaque directory.
 func (t *Upper) hidden(name string) bool {
-	for p := name; p != "."; p = path.Dir(p) {
+	var (
+		p string
+	)
+
+	// from the root down, stopping at the first ancestor the upper lacks: whatever hides an entry is
+	// recorded within its parent.
+	for c := range strings.SplitSeq(name, "/") {
+		p = path.Join(p, c)
 		if t.exists(whiteoutof(p)) {
 			return true
 		}
 		if p == name {
-			continue
+			return false
 		}
-		if st, err := t.dir.Lstat(p); err == nil && (!st.IsDir() || t.exists(path.Join(p, opaque))) {
+		st, err := t.dir.Lstat(p)
+		if err != nil {
+			return false
+		}
+		if !st.IsDir() || t.exists(path.Join(p, opaque)) {
 			return true
 		}
 	}

@@ -227,6 +227,8 @@ func TestUpper(t *testing.T) {
 		require.NoError(t, u.Rename("etc", "config"))
 		require.Equal(t, "etc/apt/sources", read(t, u, "config/apt/sources"))
 		require.Equal(t, []string{"apt", "hostname"}, names(t, u, "config"))
+		_, err = u.Lstat("etc/apt/sources")
+		require.ErrorIs(t, err, fs.ErrNotExist)
 	})
 
 	t.Run("refuses to rename a file over a directory", func(t *testing.T) {

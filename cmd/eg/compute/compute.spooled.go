@@ -150,13 +150,7 @@ func (t spooled) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath, stdi
 
 	buildopts := []string{"--build-arg", envx.Format(eg.EnvBuildCommit, cmdopts.BuildCommit())}
 
-	// nested containers cannot create the systemd scopes crun needs, build without a container runtime.
-	// within a workload podman's configuration builds with one, see runners.PodmanWorkload.
-	if runners.PodmanWorkload() {
-		buildopts = append(buildopts, runners.PodmanWorkloadBuildOptions()...)
-	} else if runners.Nested() {
-		buildopts = append(buildopts, "--isolation", "chroot")
-	}
+	buildopts = append(buildopts, runners.PodmanWorkloadBuildOptions()...)
 
 	if err = runners.BuildRootContainer(ctx, buildopts...); err != nil {
 		return err
@@ -180,7 +174,6 @@ func (t spooled) Run(gctx *cmdopts.Global, hotswapbin *cmdopts.HotswapPath, stdi
 		runners.QueueOptionCompletion(cc),
 		runners.QueueOptionAgentOptions(
 			agentopt,
-			envx.Toggle(runners.AgentOptionNoop, runners.AgentOptionCommandLine("--network", "host"), runners.Nested() && !runners.PodmanWorkload() && !envx.Boolean(false, eg.EnvExperimentalDisableHostNetwork)),
 		),
 		runners.QueueOptionLogVerbosity(gctx.Verbosity),
 	)

@@ -213,10 +213,11 @@ func ZeroAgent(options ...AgentOption) Agent {
 }
 
 func NewRunner(ctx context.Context, ws workspaces.Context, id string, options ...AgentOption) (_ *Agent) {
+	// every container eg runs a workload in is declared one, see PodmanWorkload.
 	r := langx.Clone(Agent{
 		id: id,
 		ws: ws,
-	}, options...)
+	}, append([]AgentOption{AgentOptionPodmanWorkload()}, options...)...)
 
 	return &r
 }

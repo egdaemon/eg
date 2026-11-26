@@ -93,6 +93,7 @@ const (
 	EnvComputePodmanDeviceTun        = "EG_COMPUTE_PODMAN_DEVICE_TUN"               // pass /dev/net/tun through, required by pasta's tap device. defaults to true.
 	EnvComputePodmanSecurityLabel    = "EG_COMPUTE_PODMAN_SECURITY_LABEL"           // podman --security-opt label setting, defaults to label=disable.
 	EnvComputePodmanPidsLimit        = "EG_COMPUTE_PODMAN_PIDS_LIMIT"               // podman --pids-limit, defaults to -1 (unlimited).
+	EnvComputePodmanWorkload         = "EG_COMPUTE_PODMAN_WORKLOAD"                 // declared by the eg that launched the container: eg runs within a workload container, see runners.PodmanWorkload.
 	EnvComputeLoggingVerbosity       = "EG_COMPUTE_LOG_VERBOSITY"                   // logging verbosity.
 	EnvComputeModuleNestedLevel      = "EG_COMPUTE_MODULE_LEVEL"                    // number of nested levels the current module is running in.
 	EnvComputeModuleIsolate          = "EG_COMPUTE_MODULE_ISOLATE"                  // path of the Containerfile the module is built and run within, set by the runner for uploaded workloads. blank or unset runs the module directly.
@@ -341,6 +342,7 @@ const (
 	EnvExperimentalDisableHostNetwork = "EG_EXPERIMENTAL_DISABLE_HOST_NETWORK"
 	EnvExperimentalBaremetal          = "EG_EXPERIMENTAL_BAREMETAL"
 	EnvExperimentalBindMount          = "EG_EXPERIMENTAL_BIND_MOUNT"
-	EnvExperimentalProcSockets        = "EG_EXPERIMENTAL_PROC_SOCKETS" // interp/execproxy/v2 carries a command's stdio over unix sockets in the runtime directory.
-	EnvExperimentalGuestShell         = "EG_EXPERIMENTAL_GUEST_SHELL"  // runtime/x/wasi/egbash interprets commands in the guest, requires EG_EXPERIMENTAL_PROC_SOCKETS for the module.
+	EnvExperimentalProcSockets        = "EG_EXPERIMENTAL_PROC_SOCKETS"    // interp/execproxy/v2 carries a command's stdio over unix sockets in the runtime directory.
+	EnvExperimentalGuestShell         = "EG_EXPERIMENTAL_GUEST_SHELL"     // runtime/x/wasi/egbash interprets commands in the guest, requires EG_EXPERIMENTAL_PROC_SOCKETS for the module.
+	EnvExperimentalPodmanWorkload     = "EG_EXPERIMENTAL_PODMAN_WORKLOAD" // a host declares the workload containers it launches, see runners.PodmanWorkload.
 )

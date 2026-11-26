@@ -85,7 +85,7 @@ func (t *ProxyService) Bind(host grpc.ServiceRegistrar) {
 
 func (t *ProxyService) prepcmd(cmd *exec.Cmd) *exec.Cmd {
 	cmd.Dir = t.ws.Root
-	cmd.Env = t.cmdenv
+	cmd.Env = podmanx.Environ(t.cmdenv) // the commands are podman's, see podmanx.Environ.
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = t.log.Writer()
 	cmd.Stderr = t.log.Writer()

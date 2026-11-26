@@ -324,6 +324,13 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, environsecret
 		cmdenv  []string
 	)
 
+	// within a workload podman's configuration gives the module's containers namespaces of their own, its builds share the module's network, see runners.PodmanWorkload.
+	buildopts := runners.ZeroAgent(hostnet, pidhost).Options()
+	if runners.PodmanWorkload() {
+		hostnet, pidhost = runners.AgentOptionNoop, runners.AgentOptionNoop
+		buildopts = runners.PodmanWorkloadBuildOptions()
+	}
+
 	// ensure when we run modules our umask is set to allow git clones to work properly
 	runtimex.Umask(0002)
 
@@ -346,6 +353,7 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, environsecret
 		eg.EnvComputeBin,
 		eg.EnvComputeRunID,
 		eg.EnvComputeAccountID,
+		eg.EnvComputePodmanWorkload, // the commands run within the workload as well, see runners.PodmanWorkload.
 	).Var(
 		eg.EnvComputeWorkingDirectory, eg.DefaultWorkingDirectory(),
 	).Var(
@@ -519,7 +527,7 @@ func (t module) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, environsecret
 				ragent.Options()...,
 			),
 			// builds create their own network and pid namespaces as well, they take the options of hostnet and pidhost.
-			c8sproxy.ServiceProxyOptionBuildOptions(runners.ZeroAgent(hostnet, pidhost).Options()...),
+			c8sproxy.ServiceProxyOptionBuildOptions(buildopts...),
 			c8sproxy.ServiceProxyOptionMux(mux),
 		).Bind(srv)
 		// a machine shares the container storage of the module booting it, as a container does, as overlay

@@ -270,7 +270,8 @@ func (t local) podman(ctx context.Context, ws workspaces.Context, uid uuidx.UUID
 		privileged  runners.AgentOption = runners.AgentOptionNoop
 		cgroups                         = envx.Toggle(runners.AgentOptionNoop, runners.AgentOptionCommandLine("--cgroups", envx.String("", eg.EnvComputeRunnerCgroups)), envx.String("", eg.EnvComputeRunnerCgroups) != "") // explicit podman --cgroups mode, otherwise podman's default.
 		// nested containers cannot write the sysctls netavark needs for a bridge network (read-only /proc/sys), share the outer network instead.
-		hostnet                        = envx.Toggle(runners.AgentOptionNoop, runners.AgentOptionCommandLine("--network", "host"), runners.Nested() && !envx.Boolean(false, eg.EnvExperimentalDisableHostNetwork))
+		// within a workload podman's configuration gives them a network of their own instead, see runners.PodmanWorkload.
+		hostnet                        = envx.Toggle(runners.AgentOptionNoop, runners.AgentOptionCommandLine("--network", "host"), runners.Nested() && !runners.PodmanWorkload() && !envx.Boolean(false, eg.EnvExperimentalDisableHostNetwork))
 		mountegbin runners.AgentOption = runners.AgentOptionEGBin(errorsx.Must(exec.LookPath(os.Args[0])))
 		platform                       = podmanx.AutoPlatform(t.Arch)
 	)
@@ -304,7 +305,8 @@ func (t local) podman(ctx context.Context, ws workspaces.Context, uid uuidx.UUID
 		return nil, err
 	}
 
-	if err = runners.BuildRootContainerPath(ctx, imagename, t.Dir, filepath.Join(ws.RuntimeDir, "Containerfile"), containerfile, "--build-arg", envx.Format(eg.EnvBuildCommit, cmdopts.BuildCommit()), "--platform", platform); err != nil {
+	buildopts := append([]string{"--build-arg", envx.Format(eg.EnvBuildCommit, cmdopts.BuildCommit()), "--platform", platform}, runners.PodmanWorkloadBuildOptions()...)
+	if err = runners.BuildRootContainerPath(ctx, imagename, t.Dir, filepath.Join(ws.RuntimeDir, "Containerfile"), containerfile, buildopts...); err != nil {
 		return nil, err
 	}
 

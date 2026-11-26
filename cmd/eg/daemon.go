@@ -67,6 +67,11 @@ func (t daemon) buildopts() []string {
 		opts = append(opts, "--pid", "host")
 	}
 
+	// within a workload podman's configuration builds within the network of the daemon's container, see runners.PodmanWorkload.
+	if !t.NetworkHost {
+		opts = append(opts, runners.PodmanWorkloadBuildOptions()...)
+	}
+
 	return opts
 }
 

@@ -2,7 +2,10 @@ package main
 
 import (
 	"path/filepath"
+	"slices"
 	"testing"
+
+	"github.com/egdaemon/eg"
 
 	"github.com/egdaemon/eg/cmd/cmdopts"
 	"github.com/egdaemon/eg/cmd/eg/actl"
@@ -69,8 +72,16 @@ func TestCmdDaemon(t *testing.T) {
 	})
 
 	t.Run("the root container is built on the host network when enabled", func(t *testing.T) {
+		t.Setenv(eg.EnvComputePodmanWorkload, "")
 		require.NotContains(t, daemon{}.buildopts(), "--network")
 		require.Subset(t, daemon{NetworkHost: true}.buildopts(), []string{"--network", "host"})
+	})
+
+	t.Run("the root container is built on the network of the workload the daemon runs in", func(t *testing.T) {
+		t.Setenv(eg.EnvComputePodmanWorkload, "true")
+		require.Subset(t, daemon{}.buildopts(), []string{"--network", "host"})
+		// the option of the daemon and the workload's are the same network, it is given once.
+		require.Len(t, slices.DeleteFunc(daemon{NetworkHost: true}.buildopts(), func(s string) bool { return s != "--network" }), 1)
 	})
 
 	t.Run("the root container is built in the pid namespace of its parent when enabled", func(t *testing.T) {

@@ -22,6 +22,7 @@ import (
 	"github.com/egdaemon/eg/internal/envx"
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/execx"
+	"github.com/egdaemon/eg/internal/podmanx"
 	"github.com/egdaemon/eg/internal/slicesx"
 	"github.com/egdaemon/eg/internal/stringsx"
 	"github.com/egdaemon/eg/internal/termx"
@@ -48,7 +49,7 @@ func cleanup(ctx context.Context, cmdctx func(*exec.Cmd) *exec.Cmd, cname string
 
 	// don't care about this error; if the container doesn't exist its fine. a failed
 	// stop must not skip the removal below, that is what leaks the published ports.
-	if err := execx.MaybeRun(silence(cmdctx(exec.CommandContext(sctx, "podman", "stop", cname)))); err != nil {
+	if err := execx.MaybeRun(silence(cmdctx(podmanx.Command(sctx, "stop", cname)))); err != nil {
 		debugx.Println(errorsx.Wrap(err, "container stop failed"))
 	}
 
@@ -58,7 +59,7 @@ func cleanup(ctx context.Context, cmdctx func(*exec.Cmd) *exec.Cmd, cname string
 	rctx, rdone := context.WithTimeout(ctx, 10*time.Second)
 	defer rdone()
 
-	if err := execx.MaybeRun(silence(cmdctx(exec.CommandContext(rctx, "podman", "rm", "--force", "--ignore", cname)))); err != nil {
+	if err := execx.MaybeRun(silence(cmdctx(podmanx.Command(rctx, "rm", "--force", "--ignore", cname)))); err != nil {
 		debugx.Println(errorsx.Wrap(err, "container rm failed"))
 	}
 }
@@ -72,8 +73,8 @@ func PodmanRun(ctx context.Context, cmdctx func(*exec.Cmd) *exec.Cmd, image, cna
 	// attempt to cleanup.
 	defer cleanup(context.Background(), cmdctx, cname)
 
-	cmd = exec.CommandContext(
-		ctx, "podman", "run", "-i", "--name", cname,
+	cmd = podmanx.Command(
+		ctx, "run", "-i", "--name", cname,
 	)
 	cmd.Args = append(cmd.Args, options...)
 	cmd.Args = append(cmd.Args, image)
@@ -96,9 +97,8 @@ func PodmanModule(ctx context.Context, cmdctx func(*exec.Cmd) *exec.Cmd, image, 
 	// attempt to cleanup.
 	defer cleanup(context.Background(), cmdctx, cname)
 
-	cmd = cmdctx(exec.CommandContext(
+	cmd = cmdctx(podmanx.Command(
 		ctx,
-		"podman",
 		PodmanModuleRunCmd(image, cname, options...)...,
 	))
 

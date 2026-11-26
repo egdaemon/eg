@@ -69,7 +69,7 @@ func Build(ctx context.Context, name string, dir string, definition string, opti
 	args = append(args, options...)
 	args = append(args, dir)
 
-	return exec.CommandContext(ctx, "podman", args...), nil
+	return Command(ctx, args...), nil
 }
 
 func Pull(ctx context.Context, name string, options ...string) (cmd *exec.Cmd, err error) {
@@ -78,5 +78,5 @@ func Pull(ctx context.Context, name string, options ...string) (cmd *exec.Cmd, e
 	}
 	args = append(args, options...)
 
-	return exec.CommandContext(ctx, "podman", args...), nil
+	return Command(ctx, args...), nil
 }

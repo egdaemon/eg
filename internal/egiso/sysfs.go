@@ -91,7 +91,7 @@ func (t *SysFS) OpenFile(name string, flag experimentalsys.Oflag, perm fs.FileMo
 	if err != nil {
 		return nil, errnoof(err)
 	}
-	if dir == t.upper.dir {
+	if dir == t.upper.dir.Root {
 		flag &^= experimentalsys.O_CREAT | experimentalsys.O_EXCL
 	}
 	f, errno := sysfs.DirFS(dir.Name()).OpenFile(rel, flag, perm)

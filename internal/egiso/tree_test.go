@@ -216,6 +216,47 @@ func TestTree(t *testing.T) {
 		require.ErrorContains(t, err, "path escapes from parent")
 	})
 
+	t.Run("describes a Bind mount's files as its host directory does, without following a final symlink", func(t *testing.T) {
+		dir := t.TempDir()
+		require.NoError(t, os.MkdirAll(filepath.Join(dir, "a/b/c"), 0755))
+		require.NoError(t, os.WriteFile(filepath.Join(dir, "a/b/c/file"), []byte("data"), 0640))
+		require.NoError(t, os.Symlink("file", filepath.Join(dir, "a/b/c/link")))
+		require.NoError(t, os.Symlink("a/b", filepath.Join(dir, "short")))
+		r, cause := os.OpenRoot(dir)
+		require.NoError(t, cause)
+		defer r.Close()
+		bound := egiso.Tree{}.Bind("srv", r, egiso.NewOwners(), egiso.NewOwners())
+
+		for _, name := range []string{"a", "a/b/c", "a/b/c/file", "a/b/c/link", "short", "short/c/file"} {
+			expected, rooterr := r.Lstat(name)
+			require.NoError(t, rooterr, name)
+			st, bounderr := bound.Lstat("srv/" + name)
+			require.NoError(t, bounderr, name)
+			require.Equal(t, expected.Name(), st.Name(), name)
+			require.Equal(t, expected.Mode(), st.Mode(), name)
+			require.Equal(t, expected.Size(), st.Size(), name)
+			require.Equal(t, expected.Sys().(*syscall.Stat_t).Ino, st.Sys().(*syscall.Stat_t).Ino, name)
+		}
+	})
+
+	t.Run("reports a Bind mount's missing files and keeps its symlinks inside it", func(t *testing.T) {
+		dir := t.TempDir()
+		require.NoError(t, os.Symlink("/etc", filepath.Join(dir, "escape")))
+		require.NoError(t, os.WriteFile(filepath.Join(dir, "file"), nil, 0600))
+		r, cause := os.OpenRoot(dir)
+		require.NoError(t, cause)
+		defer r.Close()
+		bound := egiso.Tree{}.Bind("srv", r, egiso.NewOwners(), egiso.NewOwners())
+
+		_, cause = bound.Lstat("srv/missing/file")
+		require.ErrorIs(t, cause, fs.ErrNotExist)
+		_, cause = bound.Lstat("srv/file/below")
+		require.ErrorIs(t, cause, syscall.ENOTDIR)
+		_, cause = bound.Lstat("srv/escape/hosts")
+		require.Error(t, cause)
+		require.NotErrorIs(t, cause, fs.ErrNotExist)
+	})
+
 	t.Run("lists a mount point in the directory that holds it", func(t *testing.T) {
 		entries, err := fs.ReadDir(tree, "home/egd")
 		require.NoError(t, err)

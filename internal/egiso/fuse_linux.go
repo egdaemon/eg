@@ -400,11 +400,11 @@ func (t *fusenode) Fsync(ctx context.Context, f gofs.FileHandle, flags uint32) s
 func (t *fusenode) Statfs(ctx context.Context, out *fuse.StatfsOut) syscall.Errno {
 	var (
 		st  syscall.Statfs_t
-		dir = t.fsys.sys.upper.dir
+		dir = t.fsys.sys.upper.dir.Root
 	)
 
 	if m, _, ok := t.fsys.sys.upper.bound(t.name()); ok {
-		dir = m.root
+		dir = m.root.Root
 	}
 	if err := syscall.Statfs(dir.Name(), &st); err != nil {
 		return errnoofuse(err)

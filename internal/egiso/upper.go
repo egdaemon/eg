@@ -37,14 +37,14 @@ type attrs struct {
 // the symlinks.
 type Upper struct {
 	tree  Tree
-	dir   *os.Root
+	dir   hostdir
 	m     sync.Mutex
 	attrs map[string]attrs
 }
 
 // NewUpper layers the empty directory dir over tree.
 func NewUpper(tree Tree, dir *os.Root) *Upper {
-	return &Upper{tree: tree, dir: dir, attrs: map[string]attrs{}}
+	return &Upper{tree: tree, dir: newhostdir(dir), attrs: map[string]attrs{}}
 }
 
 // Lstat describes the named file.
@@ -160,7 +160,7 @@ func (t *Upper) Chtimes(name string, atime time.Time, mtime time.Time) error {
 // and the flags to open it with.
 func (t *Upper) prepare(name string, flag int, perm fs.FileMode, user string, group string) (_ *os.Root, _ string, _ int, err error) {
 	if m, rel, ok := t.bound(name); ok {
-		return m.root, rel, flag, nil
+		return m.root.Root, rel, flag, nil
 	}
 
 	t.m.Lock()
@@ -181,7 +181,7 @@ func (t *Upper) prepare(name string, flag int, perm fs.FileMode, user string, gr
 		return nil, "", 0, err
 	}
 
-	return t.dir, name, flag &^ (os.O_CREATE | os.O_EXCL), nil
+	return t.dir.Root, name, flag &^ (os.O_CREATE | os.O_EXCL), nil
 }
 
 // Mkdir creates the named directory with mode perm, owned by user and group.
@@ -427,14 +427,14 @@ func (t *Upper) Chown(name string, user string, group string) error {
 // holds it.
 func (t *Upper) host(name string) (*os.Root, string, bool) {
 	if m, rel, ok := t.bound(name); ok {
-		return m.root, rel, true
+		return m.root.Root, rel, true
 	}
 
 	t.m.Lock()
 	defer t.m.Unlock()
 
 	if _, up, err := t.lstat("open", name); err == nil && up {
-		return t.dir, name, true
+		return t.dir.Root, name, true
 	}
 	return nil, "", false
 }
@@ -442,7 +442,7 @@ func (t *Upper) host(name string) (*os.Root, string, bool) {
 // bound returns the Bind mount name is within.
 func (t *Upper) bound(name string) (mount, string, bool) {
 	m, rel, ok := t.tree.mount(name)
-	return m, rel, ok && m.root != nil
+	return m, rel, ok && m.root.Root != nil
 }
 
 // lstat describes name and reports whether the upper holds it.

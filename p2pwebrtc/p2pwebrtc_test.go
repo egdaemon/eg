@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/egdaemon/p2pwebrtc"
+	"github.com/egdaemon/eg/p2pwebrtc"
 	"github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"

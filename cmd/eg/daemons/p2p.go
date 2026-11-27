@@ -10,7 +10,7 @@ import (
 	"github.com/egdaemon/eg/internal/errorsx"
 	"github.com/egdaemon/eg/internal/libp2px"
 	"github.com/egdaemon/eg/internal/netx"
-	"github.com/egdaemon/p2pwebrtc"
+	"github.com/egdaemon/eg/p2pwebrtc"
 
 	"github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p/core/crypto"

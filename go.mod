@@ -28,7 +28,7 @@ require (
 	github.com/egdaemon/duckproxy/duckkong v0.0.0-20261120193429-c2b61b872b69
 	github.com/egdaemon/gdx v0.0.0-20261115232526-a70109276a78
 	github.com/egdaemon/gdx/konggdx v0.0.0-20261115232526-a70109276a78
-	github.com/egdaemon/p2pwebrtc v0.0.0-00010101000000-000000000000
+	github.com/egdaemon/eg/p2pwebrtc v0.0.0-00010101000000-000000000000
 	github.com/egdaemon/sh/v3 v3.14.1-0.20261103040545-e33e887fd27a
 	github.com/egdaemon/sh/x v0.0.0-20261105220106-700f29e4a1a9
 	github.com/egdaemon/wasinet/wasinet v0.0.0-20261125170832-89188e153bcf

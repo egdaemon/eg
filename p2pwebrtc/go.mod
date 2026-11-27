@@ -1,4 +1,4 @@
-module github.com/egdaemon/p2pwebrtc
+module github.com/egdaemon/eg/p2pwebrtc
 
 go 1.26.0
 

@@ -13,7 +13,7 @@ import (
 	"github.com/egdaemon/eg/internal/libp2px"
 	"github.com/egdaemon/eg/internal/sqltestx"
 	"github.com/egdaemon/eg/internal/testx"
-	"github.com/egdaemon/p2pwebrtc"
+	"github.com/egdaemon/eg/p2pwebrtc"
 	"github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/p2p/protocol/circuitv2/relay"

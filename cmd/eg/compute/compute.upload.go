@@ -163,7 +163,7 @@ func (t upload) Run(gctx *cmdopts.Global, tlsc *cmdopts.TLSConfig, ident *cmdide
 		FromEnviron(errorsx.Zero(gitx.Env(repo, t.GitRemote, t.GitReference, t.GitClone))...)
 
 	if t.GCPAuto {
-		envb = envb.Var(eg.EnvGCPWorkloadIdentityEnabled, "true")
+		envb = envb.Var(eg.EnvGCPWorkloadIdentityEnabled, true)
 	}
 
 	if err = envb.CopyTo(environio); err != nil {

@@ -17,14 +17,8 @@ func TestUploadContainerfile(t *testing.T) {
 	require.NoError(t, os.MkdirAll(filepath.Join(dir, "custom"), 0700))
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "custom", "Containerfile"), []byte("FROM scratch\n"), 0600))
 
-	t.Run("by default none is shipped", func(t *testing.T) {
+	t.Run("by default the nearest one is shipped", func(t *testing.T) {
 		path, err := upload{Dir: dir, Name: "workload"}.containerfile()
-		require.NoError(t, err)
-		require.Empty(t, path)
-	})
-
-	t.Run("upload-containerfile ships the nearest one", func(t *testing.T) {
-		path, err := upload{Dir: dir, Name: "workload", UploadContainerfile: true}.containerfile()
 		require.NoError(t, err)
 		require.Equal(t, filepath.Join(moduledir, "Containerfile"), path)
 	})
@@ -36,7 +30,7 @@ func TestUploadContainerfile(t *testing.T) {
 	})
 
 	t.Run("the one it names wins over the nearest one", func(t *testing.T) {
-		path, err := upload{Dir: dir, Name: "workload", UploadContainerfile: true, Containerfile: filepath.Join("custom", "Containerfile")}.containerfile()
+		path, err := upload{Dir: dir, Name: "workload", Containerfile: filepath.Join("custom", "Containerfile")}.containerfile()
 		require.NoError(t, err)
 		require.Equal(t, filepath.Join(dir, "custom", "Containerfile"), path)
 	})
@@ -47,7 +41,7 @@ func TestUploadContainerfile(t *testing.T) {
 	})
 
 	t.Run("no Containerfile to find ships none", func(t *testing.T) {
-		path, err := upload{Dir: t.TempDir(), Name: "workload", UploadContainerfile: true}.containerfile()
+		path, err := upload{Dir: t.TempDir(), Name: "workload"}.containerfile()
 		require.NoError(t, err)
 		require.Empty(t, path)
 	})
